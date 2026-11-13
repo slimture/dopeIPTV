@@ -2,6 +2,7 @@
 and the loopback redirect capture. No network - requests is monkeypatched and
 the loopback server is driven over real localhost sockets."""
 
+import socket
 import threading
 import time
 import urllib.parse
@@ -180,8 +181,17 @@ def test_exchange_code_raises_on_rejection(monkeypatch):
         pass
 
 
+def _free_port() -> int:
+    # A port the system hands out now. A fixed one (46123) sat in Linux's
+    # range for outgoing connections, and another test's client socket
+    # sometimes held it: "Address already in use" failed a CI run.
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
 def test_loopback_captures_the_redirect_query():
-    port = 46123
+    port = _free_port()
     out = {}
 
     def run():
@@ -206,14 +216,18 @@ def test_loopback_cancel_returns_none():
     out = {}
 
     def run():
-        out["r"] = capture_oauth_redirect(
-            46124, timeout=10, should_cancel=lambda: cancel["v"])
+        try:
+            out["r"] = capture_oauth_redirect(
+                _free_port(), timeout=10, should_cancel=lambda: cancel["v"])
+        except OSError as e:            # the reason, not a KeyError below
+            out["error"] = e
 
     th = threading.Thread(target=run)
     th.start()
     time.sleep(0.3)
     cancel["v"] = True
     th.join(5)
+    assert "error" not in out, out.get("error")
     assert out["r"] is None
 
 
