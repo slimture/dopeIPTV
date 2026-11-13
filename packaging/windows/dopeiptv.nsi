@@ -8,8 +8,9 @@
 ; prompt, and the app can update itself by running the next installer
 ; silently (/S /relaunch - dopeiptv/core/winupdate.py). A Start menu
 ; entry, and an entry under Settings -> Apps with Solecraft AB as the
-; publisher. Settings, playlists and caches live elsewhere (the registry,
-; %APPDATA%) and are never touched: uninstalling removes the program only.
+; publisher. An update replaces the program and keeps everything else;
+; uninstalling removes everything dopeIPTV kept for the user (see the
+; Uninstall section) except their own recordings.
 
 Unicode true
 ManifestDPIAware true
@@ -128,6 +129,10 @@ Function .onInstSuccess
 FunctionEnd
 
 Section "Uninstall"
+  ; A copy still running from this folder is closed first, or its files stay.
+  nsExec::Exec `powershell.exe -NoProfile -NonInteractive -Command "Get-Process dopeiptv -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like '$INSTDIR\*' } | Stop-Process -Force"`
+  Pop $0
+  Sleep 1000
   Delete "$SMPROGRAMS\${APP}.lnk"
   RMDir /r "$INSTDIR\_internal"
   Delete "$INSTDIR\${EXE}"
@@ -135,4 +140,16 @@ Section "Uninstall"
   ; Empty now unless the user kept something of their own in it: then it stays.
   RMDir "$INSTDIR"
   DeleteRegKey HKCU "${UNINST_KEY}"
+
+  ; Nothing of dopeIPTV is left behind (the list packaging/WINDOWS-README.txt
+  ; gives for the portable zip): settings, playlists, favourites and history
+  ; (the registry), the guide cache, logos, posters and the rewind buffer's
+  ; default folder (%LOCALAPPDATA%\dopeiptv), shortcuts the app made itself,
+  ; and an update it downloaded. The user's recordings (Videos\dopeIPTV by
+  ; default) are their own files and stay.
+  DeleteRegKey HKCU "Software\dopeiptv"
+  RMDir /r "$LOCALAPPDATA\dopeiptv"
+  Delete "$DESKTOP\${APP}.lnk"
+  Delete "$PROFILE\Desktop\${APP}.lnk"
+  RMDir /r "$TEMP\dopeIPTV-update"
 SectionEnd

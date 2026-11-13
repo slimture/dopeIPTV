@@ -110,7 +110,9 @@ or download the current one.
 **Windows** — from 1.4.5 an installer, `dopeIPTV-*-windows-x64-setup.exe`
 (and `-windows-arm64-setup.exe` for Snapdragon laptops): it installs for
 your user only, without admin rights, adds dopeIPTV to the Start menu and
-to **Settings → Apps**, and the installed app updates itself. Or the
+to **Settings → Apps**, and the installed app updates itself. Uninstalling
+it there removes everything dopeIPTV kept - settings, playlists, history,
+caches and its shortcuts - except your own recordings. Or the
 portable `dopeIPTV-*-windows-x64.zip`: unzip the folder and run
 `dopeiptv.exe`; a Start-menu/desktop shortcut lives under **Settings →
 Advanced → Create shortcut**, and the bundled `README.txt` covers removing

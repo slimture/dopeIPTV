@@ -1495,11 +1495,15 @@ jobs:
           if (-not (Test-Path $lnk)) { Write-Error "no Start menu entry"; exit 1 }
           $p = Start-Process -FilePath "$dir\dopeiptv.exe" -ArgumentList "--self-check" -Wait -PassThru
           if ($p.ExitCode -ne 0) { Write-Error "self-check of the installed app failed (exit $($p.ExitCode))"; exit 1 }
+          # What the app keeps for the user goes on uninstalling too.
+          New-Item -Path "HKCU:\Software\dopeiptv\dopeiptv" -Force | Out-Null
+          New-Item -ItemType File -Path "$env:LOCALAPPDATA\dopeiptv\dopeIPTV\cache\marker" -Force | Out-Null
           # _?= keeps the uninstaller where it is, so Start-Process waits for it.
           $p = Start-Process -FilePath "$dir\uninstall.exe" -ArgumentList "/S", "_?=$dir" -PassThru
           $p.WaitForExit()
           if ($p.ExitCode -ne 0) { Write-Error "uninstaller exit $($p.ExitCode)"; exit 1 }
-          foreach ($left in @("$dir\dopeiptv.exe", "$dir\_internal", $key, $lnk)) {
+          foreach ($left in @("$dir\dopeiptv.exe", "$dir\_internal", $key, $lnk,
+                              "HKCU:\Software\dopeiptv", "$env:LOCALAPPDATA\dopeiptv")) {
             if (Test-Path $left) { Write-Error "left behind after removal: $left"; exit 1 }
           }
           Write-Output "installed, updated over, relaunched, self-checked and removed: OK"
