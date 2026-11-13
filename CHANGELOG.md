@@ -25,6 +25,11 @@ and macOS, fetched from dopeiptv.org.
   two when dopeIPTV restarts (or quits). A copy run from the .dmg, or one
   macOS moved aside because it was opened from Downloads, is sent to the
   download page instead.
+- One update window, in the app's own style, from the download to the
+  restart: what is happening, a bar with the megabytes, then Restart now
+  (Install now on Windows) or Later - or why nothing was installed.
+- The welcome screen connects a Stalker / Ministra portal too (the
+  portal's address and a MAC address), beside Xtream and M3U.
 
 ### Changed
 
@@ -39,6 +44,11 @@ and macOS, fetched from dopeiptv.org.
   Anyway under Privacy & Security. 1.4.4's own .dmg files were rebuilt
   this way on 13 November 2026 (the app inside is unchanged); test builds
   are signed but not notarised.
+
+### Fixed
+
+- Home without a provider: its top bar was squeezed to a sliver - the
+  back button cut off and no way out of Home.
 
 ## [1.4.4]
 

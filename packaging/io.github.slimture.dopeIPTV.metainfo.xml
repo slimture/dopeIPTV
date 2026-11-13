@@ -60,7 +60,7 @@
   <releases>
     <release version="1.4.5" date="2026-11-13">
       <description>
-        <p>An installer for Windows, and updates that install themselves on Windows and macOS: Update now downloads the new version, checks it and installs it. On a Mac the new version is used only when it is signed by Solecraft AB and notarised by Apple. Updates come from dopeiptv.org, which counts how many are made, never who makes them.</p>
+        <p>An installer for Windows, and updates that install themselves on Windows and macOS: Update now downloads the new version, checks it and installs it. On a Mac the new version is used only when it is signed by Solecraft AB and notarised by Apple. Updates come from dopeiptv.org, which counts how many are made, never who makes them. The welcome screen connects Stalker and Ministra portals too.</p>
       </description>
     </release>
     <release version="1.4.4" date="2026-11-11">

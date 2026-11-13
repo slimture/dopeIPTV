@@ -10,14 +10,19 @@ and macOS.
   anyway**.
 - **Windows and macOS update themselves.** When a new version is out,
   **Update now** in the banner or in About downloads it, checks it,
-  installs it and opens dopeIPTV again. On a Mac the new version is only
-  used when it is signed by Solecraft AB and notarised by Apple. On
-  Windows this works for a copy installed with the installer; the
-  portable zip opens the download page as before.
+  installs it and opens dopeIPTV again - one window shows how far it has
+  come and asks when to restart. On a Mac the new version is only used
+  when it is signed by Solecraft AB and notarised by Apple. On Windows
+  this works for a copy installed with the installer; the portable zip
+  opens the download page as before.
 - **The Mac app is signed and notarised**, so it opens like any other app,
   with no Open Anyway in System Settings.
 - **Updates come from dopeiptv.org.** The site counts how many updates are
   made, by version and system - never who makes them.
+- **Stalker and Ministra portals on the welcome screen**, beside Xtream
+  and M3U: the portal's address and a MAC address.
+- **Home without a provider** shows its top bar again - the way back was
+  cut off.
 
 On the AppImage from 1.2.15 or later? Click **Update now** in the banner.
 On Windows and macOS, download 1.4.5 once from
