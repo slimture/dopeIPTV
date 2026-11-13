@@ -1437,6 +1437,66 @@ jobs:
           name: windows-start-${{ matrix.arch }}
           path: windows-start-*.png
           if-no-files-found: ignore
+      - name: Installer (NSIS)
+        shell: bash
+        run: |
+          # Per user, no administrator (packaging/windows/dopeiptv.nsi): a
+          # Start menu entry, an entry under Settings -> Apps, and what the
+          # app's own update runs silently. NSIS (zlib licence) is on the
+          # x64 image; elsewhere it comes from Chocolatey.
+          V=${{ steps.v.outputs.version }}
+          A=${{ matrix.arch }}
+          MAKENSIS=$(command -v makensis || true)
+          for c in "/c/Program Files (x86)/NSIS/makensis.exe" "/c/Program Files/NSIS/makensis.exe"; do
+            [ -z "$MAKENSIS" ] && [ -x "$c" ] && MAKENSIS="$c"
+          done
+          if [ -z "$MAKENSIS" ]; then
+            choco install nsis -y --no-progress
+            for c in "/c/Program Files (x86)/NSIS/makensis.exe" "/c/Program Files/NSIS/makensis.exe"; do
+              [ -z "$MAKENSIS" ] && [ -x "$c" ] && MAKENSIS="$c"
+            done
+          fi
+          [ -n "$MAKENSIS" ] || { echo "::error::makensis not found"; exit 1; }
+          "$MAKENSIS" -VERSION
+          V4=$(python -c "import sys; p = sys.argv[1].split('.'); print('.'.join((p + ['0'] * 4)[:4]))" "$V")
+          "$MAKENSIS" -V3 -DVERSION="$V" -DVERSION4="$V4" -DARCH="$A" \
+            -DSRC="$(cygpath -w "$PWD/dist/dopeiptv")" -DICON="$(cygpath -w "$PWD/packaging/dopeIPTV.ico")" \
+            -DOUT="$(cygpath -w "$PWD/dopeIPTV-${V}-windows-${A}-setup.exe")" packaging/windows/dopeiptv.nsi
+          ls -la ./*-setup.exe
+      - name: Smoke test - install, update over it, start, and remove
+        shell: pwsh
+        run: |
+          # What a user's machine does with the installer: install, install
+          # the next one over it the way the app's update does (silently,
+          # opening the app again), self-check the installed copy, remove it.
+          $v = "${{ steps.v.outputs.version }}"
+          $setup = (Resolve-Path "dopeIPTV-$v-windows-${{ matrix.arch }}-setup.exe").Path
+          $dir = Join-Path $env:RUNNER_TEMP "dopeIPTV-installed"
+          $key = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\dopeIPTV"
+          $lnk = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\dopeIPTV.lnk"
+          $p = Start-Process -FilePath $setup -ArgumentList "/S", "/D=$dir" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "installer exit $($p.ExitCode)"; exit 1 }
+          $p = Start-Process -FilePath $setup -ArgumentList "/S", "/relaunch", "/D=$dir" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "installing over it: exit $($p.ExitCode)"; exit 1 }
+          Start-Sleep -Seconds 5
+          $run = Get-Process -Name dopeiptv -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$dir*" }
+          if (-not $run) { Write-Error "/relaunch did not open the installed app"; exit 1 }
+          $run | Stop-Process -Force
+          Start-Sleep -Seconds 2
+          $reg = Get-ItemProperty $key
+          if ($reg.DisplayVersion -ne $v -or $reg.Publisher -ne "Solecraft AB") {
+            Write-Error "Settings -> Apps entry: version '$($reg.DisplayVersion)', publisher '$($reg.Publisher)'"; exit 1
+          }
+          if (-not (Test-Path $lnk)) { Write-Error "no Start menu entry"; exit 1 }
+          $p = Start-Process -FilePath "$dir\dopeiptv.exe" -ArgumentList "--self-check" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "self-check of the installed app failed (exit $($p.ExitCode))"; exit 1 }
+          # _?= keeps the uninstaller where it is, so Start-Process waits for it.
+          $p = Start-Process -FilePath "$dir\uninstall.exe" -ArgumentList "/S", "_?=$dir" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "uninstaller exit $($p.ExitCode)"; exit 1 }
+          foreach ($left in @("$dir\dopeiptv.exe", "$dir\_internal", $key, $lnk)) {
+            if (Test-Path $left) { Write-Error "left behind after removal: $left"; exit 1 }
+          }
+          Write-Output "installed, updated over, relaunched, self-checked and removed: OK"
       - name: Package portable zip
         shell: bash
         run: |
@@ -1455,8 +1515,14 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: '*.zip'
+          files: |
+            *.zip
+            *-setup.exe
           body_path: RELEASE_NOTES.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dopeIPTV-windows-setup-${{ matrix.arch }}
+          path: '*-setup.exe'
       # Also upload the app FOLDER (not the .zip) as a CI artifact for testing:
       # the Actions artifact download UI always re-zips whatever you give it, so
       # uploading our .zip produced a zip-in-a-zip. Uploading the folder means

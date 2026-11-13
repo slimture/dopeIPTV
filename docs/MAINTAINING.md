@@ -96,6 +96,12 @@ Platform notes that are easy to forget:
 - macOS builds are signed with Solecraft AB's Developer ID and notarised
   ("macOS signing" below). Windows builds are unsigned (SmartScreen "Run
   anyway"); the help page and README explain it.
+- Windows comes two ways: an installer (NSIS, zlib licence -
+  `packaging/windows/dopeiptv.nsi`), per user in
+  `%LOCALAPPDATA%\Programs\dopeIPTV` without administrator rights, with a
+  Start menu entry and an entry under Settings -> Apps - and the portable
+  zip. The release job installs it, installs it again over itself the way
+  the app's update does (`/S /relaunch`), self-checks and removes it.
 
 ## Cutting a release
 

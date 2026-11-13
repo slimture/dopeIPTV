@@ -61,7 +61,7 @@ jobs:
         run: |
           mkdir out
           find artifacts -type f \( -name '*.AppImage' -o -name '*.deb' \
-            -o -name '*.dmg' -o -name '*.whl' -o -name '*.tar.gz' \) \
+            -o -name '*.dmg' -o -name '*.whl' -o -name '*.tar.gz' -o -name '*-setup.exe' \) \
             -exec cp {} out/ \;
           # Flatpak: the builder's artifact is named after the bundle only.
           f=$(find artifacts -type f -name '*.flatpak' | head -1)
@@ -70,6 +70,7 @@ jobs:
           # does (one dopeiptv\ folder inside).
           for d in artifacts/dopeIPTV-windows-*; do
             [ -d "$d" ] || continue
+            case "$d" in *-setup-*) continue ;; esac        # the installer, copied above
             arch="${d##*-}"
             rm -rf stage && mkdir -p stage/dopeiptv
             cp -r "$d"/. stage/dopeiptv/
@@ -88,6 +89,8 @@ jobs:
                       "macOS-x86_64.dmg:macOS (Intel)" \
                       "windows-x64.zip:Windows (x64)" \
                       "windows-arm64.zip:Windows (arm64)" \
+                      "windows-x64-setup.exe:Windows installer (x64)" \
+                      "windows-arm64-setup.exe:Windows installer (arm64)" \
                       ".flatpak:Flatpak" ".whl:wheel"; do
             pat="${want%%:*}"; name="${want#*:}"
             ls out/*"$pat" >/dev/null 2>&1 || echo "$name" >> missing.txt
