@@ -1173,50 +1173,23 @@ window.iptvCopyButtons = function (root) {
 window.iptvCopyButtons(document);
 
 /* What dopeIPTV is built on, under the donate band: opened, the card
- * switches on like an old TV - a bright line that opens into the picture -
- * and the projects tune in as channels (style.css .built-more); closed, it
- * switches off into a line again. The page follows the card down. Without
- * motion, it simply opens and closes. */
+ * slides down and a small TV in it switches on, the projects coming in as
+ * its channels (style.css .built-more); closed, it slides back up. The page
+ * follows the card down. Without motion, it simply opens and closes. */
 (function () {
   "use strict";
   var box = document.querySelector(".built-more");
   if (!box || !box.animate) { return; }
   var sum = box.querySelector("summary"), body = box.querySelector(".built-body");
   var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var running = null, zapper = null, last = -1;
-  // Alive while open: every few seconds one channel zaps - a jolt and a
-  // moment of grain - on top of its own animations (Web Animations).
-  function zap() {
-    var tiles = box.querySelectorAll(".credit");
-    if (!tiles.length || !box.open) { return; }
-    var i = Math.floor(Math.random() * tiles.length);
-    if (i === last) { i = (i + 1) % tiles.length; }
-    last = i;
-    var tile = tiles[i], grain = document.createElement("span");
-    grain.className = "built-noise";
-    tile.appendChild(grain);
-    grain.animate([{ opacity: .8, transform: "translate(0, 0)" }, { opacity: .6, transform: "translate(-10px, 7px)", offset: .3 },
-                   { opacity: .45, transform: "translate(8px, -9px)", offset: .6 }, { opacity: 0, transform: "translate(-4px, 3px)" }],
-                  { duration: 420, easing: "steps(5, end)" }).onfinish = function () { grain.remove(); };
-    tile.animate([{ transform: "translateX(-5px) skewX(-6deg)", filter: "contrast(1.5) brightness(1.4)" },
-                  { transform: "translateX(4px) skewX(5deg)", filter: "contrast(1.3) brightness(1.2)", offset: .35 },
-                  { transform: "none", filter: "none" }], { duration: 380, easing: "steps(3, end)" });
-  }
-  function live(on) {
-    if (zapper) { clearInterval(zapper); zapper = null; }
-    if (on && !still) { zapper = setInterval(zap, 2600 + Math.random() * 1200); }
-  }
-  box.addEventListener("toggle", function () { live(box.open); });
+  var running = null;
   sum.addEventListener("click", function (e) {
     if (still || !body) { return; }
     e.preventDefault();
     if (running) { running.cancel(); running = null; }
     if (box.open) {
-      running = body.animate([
-        { transform: "none", filter: "none", opacity: 1 },
-        { transform: "scale(1, .006)", filter: "brightness(2.4)", opacity: 1, offset: .55 },
-        { transform: "scale(0, .006)", filter: "brightness(3)", opacity: 0 }
-      ], { duration: 420, easing: "cubic-bezier(.5, 0, .7, .4)" });
+      running = body.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateY(-10px)" }],
+                             { duration: 220, easing: "cubic-bezier(.4, 0, 1, 1)" });
       running.onfinish = function () { box.open = false; running = null; };
       return;
     }
@@ -1225,9 +1198,8 @@ window.iptvCopyButtons(document);
     void sum.offsetWidth;
     sum.classList.add("cheer");
     setTimeout(function () { sum.classList.remove("cheer"); }, 1400);
-    // The card is at full height at once (it switches on in place): the
-    // page goes down to it, never so far that the heading leaves the top.
-    // Measured by layout, not by its rectangle: it is still a line now.
+    // The page goes down to the card, never so far that the heading leaves
+    // the top (measured by layout: the card is still sliding in).
     var s = sum.getBoundingClientRect();
     var bottom = s.bottom + (parseFloat(getComputedStyle(body).marginTop) || 0) + body.offsetHeight;
     var over = bottom + 24 - window.innerHeight, room = s.top - 76;
