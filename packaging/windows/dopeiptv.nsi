@@ -93,6 +93,15 @@ VIAddVersionKey /LANG=0 "LegalCopyright" "${PUBLISHER} - GPL-3.0"
 
 Section "dopeIPTV"
   SetOutPath "$INSTDIR"
+  ; A silent install is an update: the copy that asked for it has exited,
+  ; but another copy left open would hold its files, and the update would
+  ; skip those - a mix of old and new files. It is closed first, as the
+  ; uninstaller does.
+  IfSilent 0 not_silent
+    nsExec::Exec `powershell.exe -NoProfile -NonInteractive -Command "Get-Process dopeiptv -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like '$INSTDIR\*' } | Stop-Process -Force"`
+    Pop $0
+    Sleep 1000
+  not_silent:
   ; The last version's program files go first, so nothing it had and this
   ; one has not is left behind (the app is closed: by the updater before it
   ; runs this, by hand otherwise - a file in use stops here with NSIS's own
