@@ -60,6 +60,7 @@ Var Updating
 !insertmacro MUI_PAGE_WELCOME
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipWhenUpdating
 !insertmacro MUI_PAGE_DIRECTORY
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW ShowProgress
 !insertmacro MUI_PAGE_INSTFILES
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipWhenUpdating
 !insertmacro MUI_PAGE_FINISH
@@ -116,6 +117,13 @@ Function SkipWhenUpdating
   ${EndIf}
 FunctionEnd
 
+; The app handed this the front (AllowSetForegroundWindow) before it closed.
+Function ShowProgress
+  ${If} $Updating == 1
+    BringToFront
+  ${EndIf}
+FunctionEnd
+
 Section "dopeIPTV"
   SetOutPath "$INSTDIR"
   ${If} $Updating == 1
@@ -166,6 +174,19 @@ Section "dopeIPTV"
   WriteRegDWORD HKCU "${UNINST_KEY}" "NoRepair" 1
   ${GetSize} "$INSTDIR" "/S=0K" $0 $1 $2
   WriteRegDWORD HKCU "${UNINST_KEY}" "EstimatedSize" $0
+
+  ; An update opens the new version while this window still shows - it is
+  ; in front, so the new window comes to the front too - and stays a few
+  ; seconds while the app starts: no gap with nothing on screen.
+  ${If} $Updating == 1
+    ${GetParameters} $0
+    ClearErrors
+    ${GetOptions} $0 "/relaunch" $1
+    ${IfNot} ${Errors}
+      Exec '"$INSTDIR\${EXE}" --updated'
+      Sleep 3000
+    ${EndIf}
+  ${EndIf}
 SectionEnd
 
 ; Run by the app's own update (/relaunch): open it again once installed. By
@@ -173,6 +194,9 @@ SectionEnd
 ; app to ask for the front: Windows opens a window started by a process in
 ; the background behind the one in front (dopeiptv/ui/mw_updates.py).
 Function .onInstSuccess
+  ${If} $Updating == 1
+    Return                      ; opened already, at the end of the section
+  ${EndIf}
   ${GetParameters} $0
   ClearErrors
   ${GetOptions} $0 "/relaunch" $1

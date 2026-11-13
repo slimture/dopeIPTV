@@ -121,12 +121,31 @@ def restart_into(setup: Path, pid: int | None = None) -> None:
     two minutes at most - and opens the new version when done. The caller
     closes the app straight after."""
     pid = pid or os.getpid()
-    subprocess.Popen(
+    proc = subprocess.Popen(
         [str(setup), "/update", "/relaunch", f"/waitpid={pid}"],
         env=_child_env(), close_fds=True, stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         creationflags=_CREATE_NEW_PROCESS_GROUP)
+    _hand_over_the_front(proc)
     log.info("update: %s started; it installs once this instance (%s) has exited", setup.name, pid)
+
+
+def _hand_over_the_front(proc: subprocess.Popen) -> None:
+    """While this window is still in front: let the installer take the
+    front, and wait - five seconds at most - until its window is up. A
+    window opened later, by a process this one no longer vouches for, went
+    behind whatever was there, and the update looked like nothing at all."""
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        user32 = ctypes.windll.user32
+        user32.AllowSetForegroundWindow(proc.pid)
+        handle = getattr(proc, "_handle", None)
+        if handle is not None:
+            user32.WaitForInputIdle(int(handle), 5000)
+    except Exception as e:                     # a nicety; the update goes on
+        log.debug("update: could not hand the front to the installer: %s", e)
 
 
 def cleanup() -> None:
