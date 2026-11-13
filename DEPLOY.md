@@ -427,6 +427,11 @@ How it counts, so the numbers are honest:
   every two minutes), each file with a download and a link to copy for a
   tester - through `/dl.php`, so a tester's download counts. A new file
   of the page (`builds.js`): `service iptv_donate restart` after deploying.
+- Sites that linked here, and the exact page when the linking site sends
+  it (many send only their address - Google, Facebook and X always): host
+  and path, never the query or fragment, which can carry what points to a
+  person; never for a search engine. Kept per visit (`ref_page`) and per
+  day (`ref_pages`, the top 200 like the sites).
 - Your own visits are left out: a browser that has opened `/admin/` gets a
   cookie nginx does not log (pages, downloads, `/hit`), addresses that are
   not public (your own network) never count, and `STATS_IGNORE` in

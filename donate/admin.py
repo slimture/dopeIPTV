@@ -218,7 +218,7 @@ def _timed(row: dict) -> int:
     """Visits whose time is known. Days counted before that was kept took
     every visit as timed, and are read so."""
     return row["timed"] if "timed" in row else row.get("visits", 0)
-LISTS = ("pages", "refs", "channels", "sources", "langs", "os", "os_versions", "devices", "countries",
+LISTS = ("pages", "refs", "ref_pages", "channels", "sources", "langs", "os", "os_versions", "devices", "countries",
          "browsers", "browser_versions", "screens", "downloads", "files", "events",
          "updates", "update_files", "update_from", "update_own")
 
@@ -555,9 +555,9 @@ def visitor(stats_dir: str, vid: str) -> dict:
 # Each of the overview's lists, and what of a visit it counted. A visitor's
 # country, browser and the rest were counted on a page they opened, so only
 # visits with a page match those; downloads match by what was downloaded.
-FIND_BY = ("country", "channel", "ref", "source", "page", "lang", "os_version", "browser",
+FIND_BY = ("country", "channel", "ref", "ref_page", "source", "page", "lang", "os_version", "browser",
            "browser_version", "device", "screen", "download", "file")
-_PLAIN = {"ref": "ref", "source": "source", "os_version": "os", "browser": "browser", "device": "device"}
+_PLAIN = {"ref": "ref", "ref_page": "ref_page", "source": "source", "os_version": "os", "browser": "browser", "device": "device"}
 
 
 def _counted_under(v: dict, by: str, value: str) -> bool:

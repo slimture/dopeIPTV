@@ -653,3 +653,9 @@ tr:last-child td { border-bottom: 0; }
 /* The app's updates by channel, at the head of their card. */
 .upd-split { margin: -2px 0 8px; font-size: 14px; font-weight: 600; }
 .kpi .note.also { margin-top: 3px; }
+/* An exact page that linked here: its arrow opens it. */
+.rank li:has(.out) { grid-template-columns: minmax(0, 1fr) auto auto; }
+.rank .out { color: var(--muted); text-decoration: none; font-size: 13px; padding: 0 2px; }
+.rank .out:hover, .rank .out:focus-visible { color: var(--accent); }
+.facts a.ext { color: var(--accent); text-decoration: none; }
+.facts a.ext:hover { text-decoration: underline; }

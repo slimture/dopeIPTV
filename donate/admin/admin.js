@@ -477,6 +477,18 @@
       "downloads. A test build is one of the app's Test builds channel." + (own ? " Besides these: " + own + "." : "")));
     return c;
   }
+  // A page elsewhere, opened in a new tab without telling it where from.
+  function outLink(page) {
+    const a = mk("a", "out", "\u2197");
+    a.href = "https://" + page;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.title = "Open " + page;
+    a.setAttribute("aria-label", "Open " + page);
+    a.addEventListener("click", (e) => e.stopPropagation());
+    a.addEventListener("keydown", (e) => e.stopPropagation());
+    return a;
+  }
   // A row each, its bar drawn behind it: as long as its share of the top one.
   // The first dozen show; the rest are a click away, never cut off unseen.
   const SHOWN = 12;
@@ -531,7 +543,21 @@
     }
     const sites = listCard("Sites that linked here", L.refs, (k) => k === "other" ? "Other sites" : k,
                            ["Tagged links", L.sources, null, "source"], "ref");
-    sites.append(mk("p", "muted", "Tagged links carry ?ref=name, e.g. dopeiptv.org/?ref=github."));
+    // The exact pages that linked here, before the tagged links: each opens
+    // the visits it brought, and its arrow the page itself.
+    if ((L.ref_pages || []).length) {
+      const pages = rankList(L.ref_pages, (k) => k === "other" ? "Other pages" : k, "ref_page", "Page that linked");
+      pages.querySelectorAll("li").forEach((li, i) => {
+        const k = L.ref_pages[i][0];
+        if (k !== "other") { li.append(outLink(k)); }
+      });
+      const tagged = sites.querySelector("h3.subhead");
+      sites.insertBefore(pages, tagged);
+      sites.insertBefore(mk("h3", "subhead", "Exact pages"), pages);
+    }
+    sites.append(mk("p", "muted", "The exact page shows when the site that linked sends it - many send only their " +
+      "address (Google, Facebook and X always do). Tagged links carry ?ref=name, e.g. dopeiptv.org/?ref=github: " +
+      "add one to a link you post yourself."));
     // In three groups, by the question each answers.
     $("lists").replaceChildren(
       group("Where they come from", [listCard("How they found the site", L.channels, null, null, "channel"), sites, countries]),
@@ -829,6 +855,15 @@
     steps.forEach(([t, text]) => { const li = mk("li"); li.append(mk("span", "t", clockSec.format(new Date(t * 1000))), mk("span", "", text)); ol.append(li); });
     body.append(ol);
     const facts = mk("dl", "facts");
+    if (v.ref_page) {
+      const dd = mk("dd", "", "");
+      const a = mk("a", "ext", v.ref_page);
+      a.href = "https://" + v.ref_page;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      dd.append(a);
+      facts.append(mk("dt", "", "Linked from"), dd);
+    }
     [["Screen", v.screen], ["Page language", v.lang && (langNames ? langNames.of(v.lang) : v.lang)],
      ["Browser language", v.blang], ["Tagged link", v.source], ["Judged", judgedText(v)],
      ["Visitor", v.id]].forEach(([k, val]) => {

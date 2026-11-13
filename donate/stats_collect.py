@@ -227,6 +227,21 @@ def referrer_host(ref: str) -> str:
     return host if parts.scheme in ("http", "https", "android-app") else ""
 
 
+def referrer_page(ref: str, host: str) -> str:
+    """The page that linked here, when the linking site sent more than its
+    own address (many send only that - Google, Facebook and X always):
+    host and path, without the query or fragment, which can carry what
+    points to a person (a search, a session, a click id). "" when there is
+    no page, and for a search engine, whose page says nothing more."""
+    if not host or SEARCH.search(host):
+        return ""
+    parts = urlsplit(ref)
+    if parts.scheme not in ("http", "https"):
+        return ""
+    path = re.sub(r"/+", "/", parts.path or "").rstrip("/")
+    return (host + path)[:200] if path else ""
+
+
 def os_of(ua: str) -> str:
     if "Windows" in ua:
         return "Windows"
@@ -697,11 +712,14 @@ def _page_line(stats: dict, uniques: dict, state: dict, r: dict, db, visits: Vis
     host = referrer_host(q.get("r", ""))
     if host in SITE_HOSTS:
         host = ""
+    ref_page = referrer_page(q.get("r", ""), host)
     src = re.sub(r"[^\w.-]", "", q.get("s", ""))[:40].lower()
     if visit is None or "channel" not in visit:  # a new visit, or one that began with a download
         visit = visit or _new_visit(visits, day, vid, t, ip, ua, db)
         visit.update(channel=channel_of(host, src), ref=host[:80], source=src,
                      lang=q.get("l", "")[:5], blang=q.get("bl", "")[:20])
+        if ref_page:
+            visit["ref_page"] = ref_page
         visit["screen"], kind = screen_of(q.get("w", ""), q.get("h", ""))
         _bump(d.setdefault("visit_channels", {}), visit["channel"])
         if kind:
@@ -721,6 +739,8 @@ def _page_line(stats: dict, uniques: dict, state: dict, r: dict, db, visits: Vis
     _bump(d["channels"], channel_of(host, src))
     if host:
         _bump(d["refs"], host[:80])
+    if ref_page:
+        _bump(d.setdefault("ref_pages", {}), ref_page)
     if src:
         _bump(d["sources"], src)
     lang = q.get("l") or r.get("l") or "en"
@@ -872,6 +892,7 @@ def robot_share(lst: list) -> tuple:
         lang = first.get("lang") or ""
         add("channels", first.get("channel") or "Direct or unknown")
         add("refs", first.get("ref") or "")
+        add("ref_pages", first.get("ref_page") or "")
         add("sources", first.get("source") or "")
         add("langs", lang if re.fullmatch(r"[a-z]{2,3}", lang) else "en")
         add("os", _os_family(first.get("os") or ""))
@@ -966,7 +987,7 @@ def collect(backfill: bool = False, with_fetch: bool = False) -> None:
         # A day's list of sites or files stays short, so the years stay small -
         # a flood of made-up referrers cannot grow the file without end.
         for d in stats["days"].values():
-            for k in ("refs", "files", "sources", "update_files", "update_from"):
+            for k in ("refs", "ref_pages", "files", "sources", "update_files", "update_from"):
                 lst = d.get(k) or {}
                 if len(lst) > KEEP_PER_DAY:
                     top = sorted(lst.items(), key=lambda kv: -kv[1])
