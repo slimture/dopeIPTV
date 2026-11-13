@@ -761,6 +761,11 @@
   let logFilter = null;          // {by, value, label}: one row of the overview; {label, keys}: a group of the Analysis tab
   let logVisitor = "";           // the log shows every visit of one visitor
   let logSpan = "day", logEnd = "";  // the log shows a day, week, month or year
+  // Whether it shows the period we are in (today, this week...): then it
+  // moves on with the clock - past midnight to the new day, and a reload
+  // opens the period of the day it is reloaded on. A period chosen in the
+  // past stays where it is.
+  let logNow = true;
   let dlCounts = null;               // admin.py download_counts, from the newest answer
   try { showRobots = localStorage.getItem("admin-robots") === "1"; } catch (e) { /* hidden then */ }
   function badge(text, cls) { return mk("span", "badge" + (cls ? " " + cls : ""), text); }
@@ -949,6 +954,7 @@
       .then((r) => { if (!r.ok) { throw new Error("the service answered " + r.status); } return r.json(); })
       .then((res) => {
         logDay = res.day; logEnd = res.end || res.day; logDays = res.periods || res.days || [];
+        logNow = todayIso() >= logDay && todayIso() <= logEnd;
         if (res.dl) { dlCounts = res.dl; }
         const pick = $("day-pick");
         pick.replaceChildren(...(logDays.indexOf(logDay) < 0 ? [logDay].concat(logDays) : logDays).map((x) => {
@@ -1112,10 +1118,19 @@
     }
     const today = todayIso();
     if (tab === "visitors" && !logFilter && !logVisitor && logDay && today >= logDay && today <= logEnd) { refreshLog(); }
+    else { followClock(); }
+  }
+  // Past midnight (or into a new week, month, year) with the current period
+  // shown: on to the new one.
+  function followClock() {
+    if (tab === "visitors" && !logFilter && !logVisitor && logNow && logEnd && todayIso() > logEnd && !busyHere()) {
+      loadDay(todayIso());
+    }
   }
   function liveTick() {
     clearTimeout(liveTimer);
     if (!liveWanted() || liveBusy) { return; }
+    followClock();
     liveBusy = true;
     fetch("/admin/live", { credentials: "same-origin", cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
@@ -1312,7 +1327,7 @@
       if (logVisitor) { p.set("visitor", logVisitor); }
       else if (f && f.keys) { p.set("group", "1"); extra = { keys: f.keys, label: f.label }; }
       else if (f && f.by) { p.set("by", f.by); p.set("value", f.value); p.set("label", f.label); }
-      else { p.set("span", logSpan); if (logDay) { p.set("day", logDay); } }
+      else { p.set("span", logSpan); if (logDay && !logNow) { p.set("day", logDay); } }
       const t = !logVisitor && window.LogTools ? window.LogTools.toHash() : "";
       if (t) { p.set("f", t); }
       h = "visitors?" + p.toString();
