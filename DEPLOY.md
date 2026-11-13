@@ -131,10 +131,13 @@ file back - nginx was never reloaded with the new one.
 
 ## 9. The cron line (jail)
 
-Every 15 minutes, as before, as `iptv`:
+Every 15 minutes, as before, as `iptv` - and in between only the newest
+test build (`nightly`: one call to GitHub, writes `nightly.json`), so the
+app's Test builds channel has a new one within five minutes:
 
 ```sh
 echo '0,15,30,45 * * * * iptv /bin/sh /usr/local/www/iptv/sync-releases.sh >> /var/log/iptv-sync.log 2>&1' >> /etc/crontab
+echo '5,10,20,25,35,40,50,55 * * * * iptv /bin/sh /usr/local/www/iptv/sync-releases.sh nightly >> /var/log/iptv-sync.log 2>&1' >> /etc/crontab
 grep -n sync-releases /etc/crontab
 ```
 

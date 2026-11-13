@@ -10,9 +10,14 @@
 #
 # From /etc/crontab, as the site's own user, every 15 minutes (DEPLOY.md):
 #   0,15,30,45 * * * * iptv /bin/sh /usr/local/www/iptv/sync-releases.sh >> /var/log/iptv-sync.log 2>&1
+# and, in between, only the newest test build (nightly.json), so the app's
+# Test builds channel has a new one within five minutes:
+#   5,10,20,25,35,40,50,55 * * * * iptv /bin/sh /usr/local/www/iptv/sync-releases.sh nightly >> /var/log/iptv-sync.log 2>&1
 #
 # Needs FreeBSD's fetch(1), sha256(1) and md5(1), and jq. GitHub's API is
-# asked once per run, unauthenticated: 4 calls an hour of the 60 allowed.
+# asked unauthenticated: twice a full run, once a test-build run - 16 calls
+# an hour of the 60 allowed (the admin page's Builds tab asks too, at most
+# every two minutes while it is open).
 #
 # Exit status: 0 - the pages are current (also while a release is still
 # being built: they keep the release before it). 1 - GitHub or a download
@@ -155,8 +160,6 @@ count_downloads() {
     echo "$ino $off" > "$LOG_STATE.part"
     mv -f "$LOG_STATE.part" "$LOG_STATE"
 }
-count_downloads
-
 # ---- The newest test build (not shown anywhere) ------------------------------------
 # nightly.json, the same shape as releases.json, for the app's "Test builds"
 # channel: it asks the site and fetches through /dl.php like a release,
@@ -164,6 +167,7 @@ count_downloads
 # sends a test build's file on to GitHub (deploy/content-iptv.dope.rs.conf)
 # - and no page links it. A failure here leaves the last one in place.
 NIGHTLY=$PUB/nightly.json
+write_nightly() {
 if fetch -q -T 30 --user-agent="$UA" -o "$TMP/releases-list.json" \
         "https://api.github.com/repos/$REPO/releases?per_page=20" 2>/dev/null; then
     jq --indent 4 '
@@ -189,6 +193,13 @@ if fetch -q -T 30 --user-agent="$UA" -o "$TMP/releases-list.json" \
 else
     say "could not list GitHub's releases - nightly.json left as it is"
 fi
+}
+if [ "${1:-}" = nightly ]; then         # only that, between the full runs
+    write_nightly
+    exit 0
+fi
+count_downloads
+write_nightly
 
 # ---- The latest release --------------------------------------------------------
 API=$TMP/latest.json
