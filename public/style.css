@@ -1400,16 +1400,16 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
   box-shadow: 0 14px 38px -24px color-mix(in srgb, var(--accent) 50%, transparent); }
 .is-phone .built-more > summary {
   background: radial-gradient(90% 90% at 50% 0, color-mix(in srgb, var(--accent) 7%, transparent), transparent), var(--bg); }
-/* Closed: a heading in the page's own hand, and under it the line that
-   opens the projects, with a round chevron that turns. */
-.built-more > summary { list-style: none; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 4px; width: max-content; max-width: 100%; min-width: 260px; margin: 0 auto; padding: 13px 32px 14px;
-  text-align: center; cursor: pointer; border-radius: 22px; -webkit-tap-highlight-color: transparent; }
+/* Closed: one slim row - the heading, the projects' names after it and a
+   round chevron that turns. */
+.built-more > summary { list-style: none; display: flex; align-items: center; justify-content: center; gap: 14px;
+  width: max-content; max-width: 100%; margin: 0 auto; padding: 11px 14px 11px 24px; text-align: center; cursor: pointer;
+  border-radius: 16px; -webkit-tap-highlight-color: transparent; }
 .built-more > summary::-webkit-details-marker { display: none; }
 .built-more > summary::marker { content: ""; }
-.built-more .bt { display: inline-flex; align-items: center; gap: 9px; font-size: 1.1rem; font-weight: 600;
-  letter-spacing: -.025em; line-height: 1.15; transition: color .25s ease; }
-.built-more .bp { font-size: 13px; color: var(--faint); transition: color .25s ease; }
+.built-more .bt { font-size: 1.05rem; font-weight: 600; letter-spacing: -.02em; line-height: 1.2; transition: color .25s ease; }
+.built-more .bp { padding-inline-start: 14px; border-inline-start: 1px solid var(--line-2); font-size: 13px; color: var(--faint);
+  white-space: nowrap; transition: color .25s ease; }
 .built-more .bc { position: relative; width: 22px; height: 22px; flex: none; border-radius: 50%; color: var(--muted);
   border: 1px solid var(--line-2); transition: background-color .25s ease, border-color .25s ease, transform .45s cubic-bezier(.3, 1.6, .5, 1); }
 .built-more .bc::before { content: ""; position: absolute; left: 50%; top: 44%; width: 6px; height: 6px;
@@ -1418,10 +1418,13 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
 .built-more > summary:hover .bc { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); transform: translateY(3px); }
 .built-more[open] .bc { transform: rotate(180deg); border-color: color-mix(in srgb, var(--accent) 60%, var(--line-2)); color: var(--accent); }
 .built-more[open] > summary:hover .bc { transform: rotate(180deg) translateY(3px); }
-.built-more .bh { transition: color .25s ease; }
-.built-more > summary:hover .bh { color: color-mix(in srgb, var(--accent) 30%, var(--text)); }
+.built-more > summary:hover .bt { color: color-mix(in srgb, var(--accent) 30%, var(--text)); }
 .built-more > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 @media (max-width: 560px) { .built-more .bp { font-size: 12.5px; } }
+/* Too narrow for one row: the names under the heading. */
+@media (max-width: 380px) {
+  .built-more > summary { flex-wrap: wrap; row-gap: 4px; padding: 12px 18px; }
+  .built-more .bp { order: 3; flex-basis: 100%; padding: 0; border: 0; } }
 .built-body { position: relative; isolation: isolate; overflow: hidden; margin-top: 16px; padding: 30px 26px 22px;
   border-radius: 22px; text-align: center; border: 1px solid var(--line);
   background: radial-gradient(90% 70% at 50% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%), var(--surface); }
@@ -1497,7 +1500,8 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
   100% { transform: translate(8px, 520px); opacity: 0; } }
 @media (max-width: 720px) {
   .built-body { padding: 22px 12px 16px; border-radius: 18px; }
-  .built-more > summary { min-width: 0; padding: 12px 24px 13px; }
+  .built-more > summary { gap: 11px; padding: 10px 12px 10px 18px; }
+  .built-more .bp { padding-inline-start: 11px; }
   .built-body .credits-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .built-body .credit { padding: 14px 8px 12px; }
   .built-body .credit p { font-size: 14.5px; }
