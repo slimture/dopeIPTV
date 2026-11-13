@@ -118,13 +118,15 @@ Section "dopeIPTV"
 SectionEnd
 
 ; Run silently by the app's own update (/S /relaunch): open it again once
-; installed. By hand, the last page offers the same.
+; installed. By hand, the last page offers the same. --updated tells the
+; app to ask for the front: Windows opens a window started by a process in
+; the background behind the one in front (dopeiptv/ui/mw_updates.py).
 Function .onInstSuccess
   ${GetParameters} $0
   ClearErrors
   ${GetOptions} $0 "/relaunch" $1
   IfErrors done
-    Exec '"$INSTDIR\${EXE}"'
+    Exec '"$INSTDIR\${EXE}" --updated'
   done:
 FunctionEnd
 

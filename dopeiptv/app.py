@@ -535,6 +535,10 @@ def main() -> int:
     w.show()
     if welcome:
         w.show_welcome()
+    if "--updated" in sys.argv:
+        # Opened by the installer at the end of an update (Windows,
+        # packaging/windows/dopeiptv.nsi): it asks for the front itself.
+        QTimer.singleShot(0, w._come_forward)
     for _ in range(5):
         app.processEvents()
 

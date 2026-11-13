@@ -13,7 +13,8 @@ import time
 
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
-    QFrame, QHBoxLayout, QLabel, QMessageBox, QProgressDialog, QPushButton,
+    QApplication, QFrame, QHBoxLayout, QLabel, QMessageBox, QProgressDialog,
+    QPushButton,
 )
 
 from .. import VERSION
@@ -327,6 +328,18 @@ class _UpdatesMixin:
                                 tr("update_failed", error=str(err)))
 
         run_async(self.pool, work, done, fail)
+
+    def _come_forward(self) -> None:
+        """Opened by the installer after an update: Windows puts a window a
+        process in the background opens behind the one in front, so the
+        new version asks for the front - and where Windows keeps it back,
+        its taskbar button flashes until it is clicked."""
+        if self.isMinimized():
+            self.showNormal()
+        self.raise_()
+        self.activateWindow()
+        QApplication.alert(self, 0)
+        log.info("update: opened again after the update")
 
     def _finish_self_update(self) -> None:
         """At start: the version that replaced an old AppImage removes it,
