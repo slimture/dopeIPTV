@@ -1488,6 +1488,25 @@ jobs:
           if (-not $run) { Write-Error "/relaunch did not open the installed app"; exit 1 }
           $run | Stop-Process -Force
           Start-Sleep -Seconds 2
+          # The app's own update from 1.4.5 on: started at once by the app
+          # (here a stand-in that exits after ~3 s), only its progress shown,
+          # it waits for that process to exit before it replaces anything,
+          # closes itself and opens the new version, told it was updated.
+          $app = Start-Process -FilePath "ping.exe" -ArgumentList "-n", "4", "127.0.0.1" -PassThru -WindowStyle Hidden
+          $t0 = Get-Date
+          $p = Start-Process -FilePath $setup -ArgumentList "/update", "/relaunch", "/waitpid=$($app.Id)", "/D=$dir" -PassThru
+          $p.WaitForExit()
+          if ($p.ExitCode -ne 0) { Write-Error "update: installer exit $($p.ExitCode)"; exit 1 }
+          if (-not $app.HasExited) { Write-Error "update: the installer did not wait for the app to exit"; exit 1 }
+          Write-Output "update took $([int]((Get-Date) - $t0).TotalSeconds) s (the stand-in app lived ~3 s)"
+          Start-Sleep -Seconds 5
+          $run = Get-CimInstance Win32_Process -Filter "Name = 'dopeiptv.exe'" | Where-Object { $_.ExecutablePath -like "$dir*" }
+          if (-not $run) { Write-Error "/update /relaunch did not open the installed app"; exit 1 }
+          if (-not ($run | Where-Object { $_.CommandLine -like "*--updated*" })) {
+            Write-Error "the app was opened without --updated: $($run.CommandLine)"; exit 1
+          }
+          $run | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+          Start-Sleep -Seconds 2
           $reg = Get-ItemProperty $key
           if ($reg.DisplayVersion -ne $v -or $reg.Publisher -ne "Solecraft AB") {
             Write-Error "Settings -> Apps entry: version '$($reg.DisplayVersion)', publisher '$($reg.Publisher)'"; exit 1

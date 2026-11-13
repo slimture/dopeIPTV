@@ -67,7 +67,10 @@ def test_the_installer_is_downloaded_into_the_temp_folder(monkeypatch, tmp_path)
     assert path == tmp_path / "dopeIPTV-update" / "dopeIPTV-1.4.5-windows-x64-setup.exe" == got["dest"]
 
 
-def test_the_installer_runs_silently_after_the_app_has_exited(monkeypatch):
+def test_the_installer_starts_at_once_and_waits_for_the_app_itself(monkeypatch):
+    # Started by the app while its window is in front, so Windows lets the
+    # installer's progress - and the new version it opens - come to the
+    # front; it waits for this process to exit before it replaces anything.
     seen = {}
 
     class Popen:
@@ -76,11 +79,8 @@ def test_the_installer_runs_silently_after_the_app_has_exited(monkeypatch):
 
     monkeypatch.setattr(winupdate.subprocess, "Popen", Popen)
     monkeypatch.setenv("_PYI_APPLICATION_HOME_DIR", "C:/old")
-    winupdate.restart_into(Path("C:/Users/O'Brien/AppData/Local/Temp/dopeIPTV-update/x-setup.exe"), pid=4242)
-    script = seen["argv"][-1]
-    assert seen["argv"][0] == "powershell.exe"
-    assert script.index("Wait-Process -Id 4242") < script.index("Start-Process")
-    assert "'/S /relaunch'" in script
-    assert "O''Brien" in script                       # quoted for PowerShell
+    setup = Path("C:/Users/O'Brien/AppData/Local/Temp/dopeIPTV-update/x-setup.exe")
+    winupdate.restart_into(setup, pid=4242)
+    assert seen["argv"] == [str(setup), "/update", "/relaunch", "/waitpid=4242"]
     env = seen["kw"]["env"]
     assert "_PYI_APPLICATION_HOME_DIR" not in env and env["PYINSTALLER_RESET_ENVIRONMENT"] == "1"

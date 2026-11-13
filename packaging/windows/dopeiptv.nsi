@@ -6,7 +6,9 @@
 ;
 ; Per user, in %LOCALAPPDATA%\Programs\dopeIPTV: no administrator, no UAC
 ; prompt, and the app can update itself by running the next installer
-; silently (/S /relaunch - dopeiptv/core/winupdate.py). A Start menu
+; (/update /relaunch /waitpid=<pid> - dopeiptv/core/winupdate.py: only its
+; progress, it waits for the app to close and opens the new version; the
+; app's first updaters ran it silently, /S /relaunch). A Start menu
 ; entry, and an entry under Settings -> Apps with Solecraft AB as the
 ; publisher. An update replaces the program and keeps everything else;
 ; uninstalling removes everything dopeIPTV kept for the user (see the
@@ -43,15 +45,23 @@ VIAddVersionKey /LANG=0 "LegalCopyright" "${PUBLISHER} - GPL-3.0"
 
 !include "MUI2.nsh"
 !include "FileFunc.nsh"
+!include "LogicLib.nsh"
+
+; An update the app asked for (/update): no pages to click through, only the
+; progress, and the window closes itself when done.
+Var Updating
 
 !define MUI_ICON "${ICON}"
 !define MUI_UNICON "${ICON}"
 !define MUI_ABORTWARNING
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${EXE}"
 
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipWhenUpdating
 !insertmacro MUI_PAGE_WELCOME
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipWhenUpdating
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipWhenUpdating
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
@@ -91,17 +101,49 @@ VIAddVersionKey /LANG=0 "LegalCopyright" "${PUBLISHER} - GPL-3.0"
 !insertmacro LANG "SimpChinese"
 !insertmacro LANG "Swahili"
 
+Function .onInit
+  ${GetParameters} $0
+  ClearErrors
+  ${GetOptions} $0 "/update" $1
+  ${IfNot} ${Errors}
+    StrCpy $Updating 1
+  ${EndIf}
+FunctionEnd
+
+Function SkipWhenUpdating
+  ${If} $Updating == 1
+    Abort
+  ${EndIf}
+FunctionEnd
+
 Section "dopeIPTV"
   SetOutPath "$INSTDIR"
-  ; A silent install is an update: the copy that asked for it has exited,
-  ; but another copy left open would hold its files, and the update would
-  ; skip those - a mix of old and new files. It is closed first, as the
-  ; uninstaller does.
-  IfSilent 0 not_silent
-    nsExec::Exec `powershell.exe -NoProfile -NonInteractive -Command "Get-Process dopeiptv -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like '$INSTDIR\*' } | Stop-Process -Force"`
+  ${If} $Updating == 1
+    SetAutoClose true
+    ; Started by the app while it was still in front (so this window may
+    ; come to the front, and the new version after it): the app closes as
+    ; this starts, and nothing is replaced before it has, so its settings
+    ; are written first. Two minutes at most; a copy still open then is
+    ; closed below.
+    ${GetParameters} $0
+    ClearErrors
+    ${GetOptions} $0 "/waitpid=" $1
+    ${IfNot} ${Errors}
+      System::Call 'kernel32::OpenProcess(i 0x00100000, i 0, i r1) p .r2'
+      ${If} $2 != 0
+        System::Call 'kernel32::WaitForSingleObject(p r2, i 120000) i .r3'
+        System::Call 'kernel32::CloseHandle(p r2)'
+      ${EndIf}
+    ${EndIf}
+  ${EndIf}
+  ; An update (silent from the app's first updaters): another copy left open
+  ; would hold its files, and the update would skip those - a mix of old and
+  ; new files. It is closed first, as the uninstaller does.
+  ${If} $Updating == 1
+  ${OrIf} ${Silent}
+    nsExec::Exec `powershell.exe -NoProfile -NonInteractive -Command "$$p = Get-Process dopeiptv -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like '$INSTDIR\*' }; if ($$p) { $$p | Stop-Process -Force; $$p | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue }"`
     Pop $0
-    Sleep 1000
-  not_silent:
+  ${EndIf}
   ; The last version's program files go first, so nothing it had and this
   ; one has not is left behind (the app is closed: by the updater before it
   ; runs this, by hand otherwise - a file in use stops here with NSIS's own
@@ -126,8 +168,8 @@ Section "dopeIPTV"
   WriteRegDWORD HKCU "${UNINST_KEY}" "EstimatedSize" $0
 SectionEnd
 
-; Run silently by the app's own update (/S /relaunch): open it again once
-; installed. By hand, the last page offers the same. --updated tells the
+; Run by the app's own update (/relaunch): open it again once installed. By
+; hand, the last page offers the same. --updated tells the
 ; app to ask for the front: Windows opens a window started by a process in
 ; the background behind the one in front (dopeiptv/ui/mw_updates.py).
 Function .onInstSuccess

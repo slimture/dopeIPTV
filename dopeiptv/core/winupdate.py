@@ -5,9 +5,14 @@ app may run it itself, without an administrator:
 
 1. download the release's installer for this build's CPU into the temp
    folder, checking its size and SHA-256 (``selfupdate.download``);
-2. once this process has exited - so its settings are written - run it
-   silently with ``/relaunch``: it installs over this copy, in the folder
-   the last install recorded, and opens the new version.
+2. start it while this window is still in front, as an update
+   (``/update``: only its progress, closing itself when done): it waits
+   for this process to exit - so the settings are written first -
+   installs over this copy, in the folder the last install recorded, and
+   opens the new version (``/relaunch``). Started by the window in front,
+   Windows lets its progress, and the new version after it, come to the
+   front; started from the background, the new version opened behind
+   whatever was there, and nothing showed for half a minute.
 
 Only a copy the installer put there (``uninstall.exe`` beside the exe)
 updates itself; a portable copy from the zip is never touched, and is
@@ -36,7 +41,6 @@ DONE_KEY = "update_ready_install"
 VERIFY_KEY: str | None = None
 
 _CREATE_NEW_PROCESS_GROUP = 0x00000200
-_CREATE_NO_WINDOW = 0x08000000
 
 
 def installed_dir() -> Path | None:
@@ -102,10 +106,6 @@ def install(release: dict, current_version: str,
     return dest
 
 
-def _ps_quote(s: str) -> str:
-    return "'" + s.replace("'", "''") + "'"
-
-
 def _child_env() -> dict:
     """The environment for the installer and the app it opens: nothing of
     this frozen process's own (PyInstaller's variables), so the new copy
@@ -116,21 +116,17 @@ def _child_env() -> dict:
 
 
 def restart_into(setup: Path, pid: int | None = None) -> None:
-    """Run *setup* silently once this process (*pid*) has exited, so the
-    settings are written before files are replaced; it opens the new
-    version when done. Gives up after five minutes: an instance that never
-    exits must not have its files replaced under it."""
+    """Start *setup* now, as an update of this copy: it shows its progress,
+    waits for this process (*pid*) to exit before it replaces anything -
+    two minutes at most - and opens the new version when done. The caller
+    closes the app straight after."""
     pid = pid or os.getpid()
-    script = (f"Wait-Process -Id {pid} -Timeout 300 -ErrorAction SilentlyContinue; "
-              f"if (Get-Process -Id {pid} -ErrorAction SilentlyContinue) {{ exit 1 }}; "
-              f"Start-Process -FilePath {_ps_quote(str(setup))} -ArgumentList '/S /relaunch'")
     subprocess.Popen(
-        ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-         "-WindowStyle", "Hidden", "-Command", script],
+        [str(setup), "/update", "/relaunch", f"/waitpid={pid}"],
         env=_child_env(), close_fds=True, stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        creationflags=_CREATE_NEW_PROCESS_GROUP | _CREATE_NO_WINDOW)
-    log.info("update: %s runs once this instance (%s) has exited", setup.name, pid)
+        creationflags=_CREATE_NEW_PROCESS_GROUP)
+    log.info("update: %s started; it installs once this instance (%s) has exited", setup.name, pid)
 
 
 def cleanup() -> None:
