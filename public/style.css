@@ -1387,33 +1387,33 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
 /* What dopeIPTV is built on, right under the donate band: a heading; opened, a card unfolds downwards and the projects drop into
    place one after another, specks of the accent drifting down behind them
    (nav.js animates the height). */
-#built { padding: 0 0 88px; margin-top: -44px; }
+#built { padding: 0 0 88px; margin-top: -8px; }
 .is-phone #built { background: var(--surface); }
-@media (max-width: 720px) { #built { padding-bottom: 48px; margin-top: -20px; } }
+@media (max-width: 720px) { #built { padding-bottom: 48px; margin-top: 4px; } }
 /* The heading in a card of its own, near square - the donate card's
    corners and surface, a soft glow of the accent instead of its pink. */
-.built-more > summary { position: relative; border: 1px solid color-mix(in srgb, var(--accent) 12%, var(--line));
-  background: radial-gradient(90% 90% at 50% 0, color-mix(in srgb, var(--accent) 9%, transparent), transparent), var(--surface);
-  box-shadow: 0 12px 36px -26px color-mix(in srgb, var(--accent) 42%, transparent);
+.built-more > summary { position: relative; border: 1px solid var(--line);
+  background: radial-gradient(90% 90% at 50% 0, color-mix(in srgb, var(--accent) 6%, transparent), transparent), var(--surface);
+  box-shadow: 0 10px 30px -24px color-mix(in srgb, var(--accent) 34%, transparent);
   transition: box-shadow .35s ease, border-color .35s ease; }
-.built-more > summary:hover, .built-more[open] > summary { border-color: color-mix(in srgb, var(--accent) 28%, var(--line));
-  box-shadow: 0 16px 44px -24px color-mix(in srgb, var(--accent) 58%, transparent); }
+.built-more > summary:hover, .built-more[open] > summary { border-color: color-mix(in srgb, var(--accent) 24%, var(--line));
+  box-shadow: 0 14px 38px -24px color-mix(in srgb, var(--accent) 50%, transparent); }
 .is-phone .built-more > summary {
-  background: radial-gradient(90% 90% at 50% 0, color-mix(in srgb, var(--accent) 10%, transparent), transparent), var(--bg); }
+  background: radial-gradient(90% 90% at 50% 0, color-mix(in srgb, var(--accent) 7%, transparent), transparent), var(--bg); }
 /* Closed: a heading in the page's own hand, and under it the line that
    opens the projects, with a round chevron that turns. */
 .built-more > summary { list-style: none; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 6px; width: max-content; max-width: 100%; min-width: 300px; margin: 0 auto; padding: 18px 40px 19px;
+  gap: 4px; width: max-content; max-width: 100%; min-width: 260px; margin: 0 auto; padding: 13px 32px 14px;
   text-align: center; cursor: pointer; border-radius: 22px; -webkit-tap-highlight-color: transparent; }
 .built-more > summary::-webkit-details-marker { display: none; }
 .built-more > summary::marker { content: ""; }
-.built-more .bt { display: inline-flex; align-items: center; gap: 11px; font-size: clamp(1.15rem, 2.1vw, 1.4rem);
+.built-more .bt { display: inline-flex; align-items: center; gap: 9px; font-size: 1.1rem; font-weight: 600;
   letter-spacing: -.025em; line-height: 1.15; transition: color .25s ease; }
-.built-more .bp { font-size: 14px; color: var(--muted); transition: color .25s ease; }
-.built-more .bc { position: relative; width: 26px; height: 26px; flex: none; border-radius: 50%; color: var(--muted);
-  border: 1.5px solid var(--line-2); transition: background-color .25s ease, border-color .25s ease, transform .45s cubic-bezier(.3, 1.6, .5, 1); }
-.built-more .bc::before { content: ""; position: absolute; left: 50%; top: 45%; width: 7px; height: 7px;
-  border-right: 1.8px solid currentColor; border-bottom: 1.8px solid currentColor; transform: translate(-50%, -50%) rotate(45deg); }
+.built-more .bp { font-size: 13px; color: var(--faint); transition: color .25s ease; }
+.built-more .bc { position: relative; width: 22px; height: 22px; flex: none; border-radius: 50%; color: var(--muted);
+  border: 1px solid var(--line-2); transition: background-color .25s ease, border-color .25s ease, transform .45s cubic-bezier(.3, 1.6, .5, 1); }
+.built-more .bc::before { content: ""; position: absolute; left: 50%; top: 44%; width: 6px; height: 6px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translate(-50%, -50%) rotate(45deg); }
 .built-more > summary:hover .bp, .built-more[open] .bp { color: var(--text); }
 .built-more > summary:hover .bc { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); transform: translateY(3px); }
 .built-more[open] .bc { transform: rotate(180deg); border-color: color-mix(in srgb, var(--accent) 60%, var(--line-2)); color: var(--accent); }
@@ -1421,7 +1421,7 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
 .built-more .bh { transition: color .25s ease; }
 .built-more > summary:hover .bh { color: color-mix(in srgb, var(--accent) 30%, var(--text)); }
 .built-more > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-@media (max-width: 560px) { .built-more .bp { font-size: 13.5px; } .built-more .bc { width: 25px; height: 25px; } }
+@media (max-width: 560px) { .built-more .bp { font-size: 12.5px; } }
 .built-body { position: relative; isolation: isolate; overflow: hidden; margin-top: 16px; padding: 30px 26px 22px;
   border-radius: 22px; text-align: center; border: 1px solid var(--line);
   background: radial-gradient(90% 70% at 50% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%), var(--surface); }
@@ -1497,7 +1497,7 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
   100% { transform: translate(8px, 520px); opacity: 0; } }
 @media (max-width: 720px) {
   .built-body { padding: 22px 12px 16px; border-radius: 18px; }
-  .built-more > summary { min-width: 0; padding: 15px 26px 16px; }
+  .built-more > summary { min-width: 0; padding: 12px 24px 13px; }
   .built-body .credits-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .built-body .credit { padding: 14px 8px 12px; }
   .built-body .credit p { font-size: 14.5px; }
