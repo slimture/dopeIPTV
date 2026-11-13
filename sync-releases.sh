@@ -166,6 +166,8 @@ count_downloads() {
 # so its updates are counted too. Nothing is mirrored - nginx's /dl.php
 # sends a test build's file on to GitHub (deploy/content-iptv.dope.rs.conf)
 # - and no page links it. A failure here leaves the last one in place.
+# The newest is the highest version: GitHub's created_at is the date of the
+# commit a release was made from, the same for two builds of one commit.
 NIGHTLY=$PUB/nightly.json
 write_nightly() {
 if fetch -q -T 30 --user-agent="$UA" -o "$TMP/releases-list.json" \
@@ -173,7 +175,7 @@ if fetch -q -T 30 --user-agent="$UA" -o "$TMP/releases-list.json" \
     jq --indent 4 '
         [.[]? | select(.prerelease and (.draft | not)
                        and ((.tag_name // "") | test("^nightly-[0-9]+(\\.[0-9]+){3}$")))]
-        | sort_by(.created_at) | last // empty
+        | sort_by(.tag_name | sub("^nightly-"; "") | split(".") | map(tonumber)) | last // empty
         | {version: (.tag_name | sub("^nightly-"; "")),
            published_at: (.published_at // null),
            notes: (.body // "" | tostring | .[:20000]),

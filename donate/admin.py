@@ -629,7 +629,10 @@ def _test_builds(keep: int) -> list:
         body = json.loads(resp.read() or b"[]")
     rows = [r for r in body if isinstance(r, dict) and r.get("prerelease") and not r.get("draft")
             and NIGHTLY_TAG.match(str(r.get("tag_name") or ""))]
-    rows.sort(key=lambda r: str(r.get("created_at") or ""), reverse=True)
+    # The highest version first: created_at is the date of the commit a
+    # release was made from, the same for two builds of one commit.
+    rows.sort(key=lambda r: tuple(int(x) for x in str(r["tag_name"])[len("nightly-"):].split(".")),
+              reverse=True)
     out = []
     for r in rows[:keep]:
         notes = str(r.get("body") or "")
