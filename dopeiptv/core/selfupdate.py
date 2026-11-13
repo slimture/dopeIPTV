@@ -36,6 +36,11 @@ from ..i18n import LocalizedError
 from .log import log
 from .xdg import system_env
 
+# The question asked once the new version is in place (i18n key), and
+# whether the new version is started once to check it (the UI says so).
+DONE_KEY = "update_done_restart"
+CHECKS_START = True
+
 # Set by the AppImage runtime for the process it starts. A child AppImage
 # gets its own; ours must not leak into the self-check of the new file.
 _RUNTIME_VARS = ("APPIMAGE", "APPDIR", "ARGV0", "OWD")

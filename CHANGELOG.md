@@ -7,6 +7,14 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Added
+
+- Windows: an installer beside the portable zip - per user, no
+  administrator, a Start menu entry and an entry under Settings -> Apps.
+  A copy it installed updates itself: About and the update banner offer
+  Update now, which downloads the next installer, checks it, closes the
+  app, installs silently and opens the new version.
+
 ### Changed
 
 - Updates come from dopeiptv.org: the app asks the site for the newest

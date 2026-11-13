@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .. import VERSION
-from ..core import selfupdate
+from ..core import selfupdate, winupdate
 from ..core.log import log
 from ..core.updates import GITHUB_REPO, fetch_update, offered
 from ..core.xdg import open_url
@@ -29,6 +29,16 @@ from .theme import P
 # ?ref= tells the site's statistics the visit came from the app: a link
 # opened from a desktop app carries no referrer, so it counted as "direct".
 _WEBSITE = "https://dopeiptv.org/?ref=app-update"
+
+
+def _updater():
+    """What can update this copy in place: an AppImage in a writable folder
+    (selfupdate), a copy the Windows installer put there (winupdate) - or
+    nothing, and the download page is offered."""
+    for m in (selfupdate, winupdate):
+        if m.can_self_update():
+            return m
+    return None
 
 
 class _UpdatesMixin:
@@ -206,16 +216,16 @@ class _UpdatesMixin:
                max(10, parent.height() - b.height() - 16))
         b.raise_()
 
-    # -- updating in place (AppImage) -----------------------------------------
+    # -- updating in place (AppImage, the Windows installer) ------------------
 
     def _update_action_label(self) -> str:
-        return (tr("update_now") if selfupdate.can_self_update()
+        return (tr("update_now") if _updater() is not None
                 else tr("about_download"))
 
     def _update_action(self) -> None:
-        """The banner's / About's button: update in place where the app can
-        (an AppImage in a writable folder), else open the download page."""
-        if selfupdate.can_self_update():
+        """The banner's / About's button: update in place where the app can,
+        else open the download page."""
+        if _updater() is not None:
             self._self_update()
         else:
             # A test build is downloaded from its own release page.
@@ -228,6 +238,8 @@ class _UpdatesMixin:
         progress to the dialog, which can cancel it."""
         if getattr(self, "_self_updating", False):
             return
+        # None: an AppImage's own update, which says why it cannot run.
+        updater = _updater() or selfupdate
         self._self_updating = True
         b = getattr(self, "_update_banner", None)
         if b is not None:
@@ -256,7 +268,7 @@ class _UpdatesMixin:
                                     version=state["tag"]))
                 dlg.setMaximum(100)
                 dlg.setValue(int(got * 100 / total))
-            elif got:
+            elif got and updater.CHECKS_START:
                 dlg.setLabelText(tr("update_verifying"))
                 dlg.setMaximum(0)
 
@@ -271,7 +283,7 @@ class _UpdatesMixin:
                 return None
             state["tag"] = rel["tag"]
             old = selfupdate.appimage_path()
-            new = selfupdate.install(rel, VERSION, progress, cancel)
+            new = updater.install(rel, VERSION, progress, cancel)
             return rel["tag"], old, new
 
         def finish() -> None:
@@ -296,9 +308,9 @@ class _UpdatesMixin:
             self.settings.setValue("update_banner_dismissed", tag)
             if QMessageBox.question(
                     self, tr("update_now"),
-                    tr("update_done_restart", version=tag)
+                    tr(updater.DONE_KEY, version=tag)
                     ) == QMessageBox.StandardButton.Yes:
-                selfupdate.restart_into(new)
+                updater.restart_into(new)
                 self.close()
 
         def fail(err) -> None:
@@ -314,7 +326,10 @@ class _UpdatesMixin:
     def _finish_self_update(self) -> None:
         """At start: the version that replaced an old AppImage removes it,
         and a menu entry left naming a file that is gone (an AppImage
-        replaced by hand) is pointed at this one."""
+        replaced by hand) is pointed at this one; on Windows, the installer
+        an update downloaded goes."""
+        if winupdate.installed_dir() is not None:
+            winupdate.cleanup()
         running = selfupdate.appimage_path()
         old = self.settings.value("selfupdate_old_path", "") or ""
         if old and running is not None:
