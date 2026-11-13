@@ -1173,8 +1173,8 @@ window.iptvCopyButtons = function (root) {
 window.iptvCopyButtons(document);
 
 /* What dopeIPTV is built on, under the donate band: opened, the card
- * slides down and a small TV in it switches on, the projects coming in as
- * its channels (style.css .built-more); closed, it slides back up. The page
+ * grows down and a small TV in it switches on, the projects coming in as
+ * its channels (style.css .built-more); closed, it folds back up. The page
  * follows the card down. Without motion, it simply opens and closes. */
 (function () {
   "use strict";
@@ -1188,22 +1188,26 @@ window.iptvCopyButtons(document);
     e.preventDefault();
     if (running) { running.cancel(); running = null; }
     if (box.open) {
-      running = body.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateY(-10px)" }],
-                             { duration: 220, easing: "cubic-bezier(.4, 0, 1, 1)" });
+      running = body.animate([{ height: body.offsetHeight + "px", opacity: 1 }, { height: "0px", opacity: 0 }],
+                             { duration: 240, easing: "cubic-bezier(.4, 0, .2, 1)" });
       running.onfinish = function () { box.open = false; running = null; };
       return;
     }
+    // One smooth movement: the card grows down to its height, and the page
+    // follows its foot frame by frame - never so far that the heading
+    // leaves the top, under the sticky header.
     box.open = true;
-    sum.classList.remove("cheer");
-    void sum.offsetWidth;
-    sum.classList.add("cheer");
-    setTimeout(function () { sum.classList.remove("cheer"); }, 1400);
-    // The page goes down to the card, never so far that the heading leaves
-    // the top (measured by layout: the card is still sliding in).
-    var s = sum.getBoundingClientRect();
-    var bottom = s.bottom + (parseFloat(getComputedStyle(body).marginTop) || 0) + body.offsetHeight;
-    var over = bottom + 24 - window.innerHeight, room = s.top - 76;
-    if (over > 0 && room > 0) { window.scrollBy({ top: Math.min(over, room), behavior: "smooth" }); }
+    var h = body.offsetHeight;
+    running = body.animate([{ height: "0px", opacity: .4 }, { height: h + "px", opacity: 1 }],
+                           { duration: 420, easing: "cubic-bezier(.2, .8, .2, 1)" });
+    var follow = function () {
+      var over = body.getBoundingClientRect().bottom + 24 - window.innerHeight;
+      var room = sum.getBoundingClientRect().top - 76;
+      if (over > 0 && room > 0) { window.scrollBy(0, Math.min(over, room)); }
+    };
+    var step = function () { if (running) { follow(); requestAnimationFrame(step); } };
+    running.onfinish = function () { running = null; follow(); };
+    requestAnimationFrame(step);
   });
 })();
 

@@ -1395,9 +1395,8 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
 .built-more > summary { position: relative; border: 1px solid var(--line);
   background: radial-gradient(90% 90% at 50% 0, color-mix(in srgb, var(--accent) 6%, transparent), transparent), var(--surface);
   box-shadow: 0 10px 30px -24px color-mix(in srgb, var(--accent) 34%, transparent);
-  transition: box-shadow .35s ease, border-color .35s ease; }
-.built-more > summary:hover, .built-more[open] > summary { border-color: color-mix(in srgb, var(--accent) 24%, var(--line));
-  box-shadow: 0 14px 38px -24px color-mix(in srgb, var(--accent) 50%, transparent); }
+  transition: border-color .25s ease; }
+.built-more > summary:hover, .built-more[open] > summary { border-color: color-mix(in srgb, var(--accent) 24%, var(--line)); }
 .is-phone .built-more > summary {
   background: radial-gradient(90% 90% at 50% 0, color-mix(in srgb, var(--accent) 7%, transparent), transparent), var(--bg); }
 /* Closed: one slim row - the heading, the projects' names after it and a
@@ -1446,23 +1445,19 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
 .built-body .credit a { color: var(--text); }
 .built-body .credit a:hover { color: var(--accent); }
 .built-body .disclaimer { margin: 0 auto; max-width: 72ch; font-size: 11.5px; line-height: 1.55; color: var(--faint); }
-/* Opened: the card slides down, a small TV in it switches on - a line of
+/* Opened: the card grows down (nav.js), a small TV in it switches on - a line of
    light opening into a lit screen, the play mark popping up, the aerials
    giving a wiggle - and the projects come in after it as its channels,
    CH 01 to CH 06 lit for a moment. Transform and opacity only, so it
    stays smooth. */
-.built-body .credit:nth-child(1) { --d: .72s; }
-.built-body .credit:nth-child(2) { --d: .79s; }
-.built-body .credit:nth-child(3) { --d: .86s; }
-.built-body .credit:nth-child(4) { --d: .93s; }
-.built-body .credit:nth-child(5) { --d: 1s; }
-.built-body .credit:nth-child(6) { --d: 1.07s; }
-.built-more[open] .built-body { animation: built-in .45s cubic-bezier(.2, .8, .2, 1) both; }
-@keyframes built-in { from { opacity: 0; transform: translateY(-14px); } }
-.built-more[open] .built-intro { animation: built-rise .5s cubic-bezier(.2, .8, .2, 1) .55s both; }
-.built-more[open] .credit { animation: built-rise .5s cubic-bezier(.2, .8, .2, 1) var(--d, 0s) both; }
-.built-more[open] .disclaimer { animation: built-rise .5s cubic-bezier(.2, .8, .2, 1) 1.2s both; }
-@keyframes built-rise { from { opacity: 0; transform: translateY(12px); } }
+.built-body .credit:nth-child(1) { --d: .06s; }
+.built-body .credit:nth-child(2) { --d: .09s; }
+.built-body .credit:nth-child(3) { --d: .12s; }
+.built-body .credit:nth-child(4) { --d: .15s; }
+.built-body .credit:nth-child(5) { --d: .18s; }
+.built-body .credit:nth-child(6) { --d: .21s; }
+.built-more[open] .credit { animation: built-rise .34s cubic-bezier(.2, .8, .2, 1) var(--d, 0s) both; }
+@keyframes built-rise { from { opacity: 0; transform: translateY(8px); } }
 .built-tv { width: 112px; margin: -4px auto 12px; }
 .built-tv svg { display: block; width: 100%; height: auto; overflow: visible; }
 .built-tv .case, .built-tv .ant path, .built-tv .legs { fill: none; stroke: var(--muted); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
@@ -1472,10 +1467,10 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
 .built-tv .line { fill: #fff; opacity: 0; transform-box: fill-box; transform-origin: center; }
 .built-tv .play { fill: #fff; opacity: 0; transform-box: fill-box; transform-origin: center; }
 .built-tv .ant { transform-box: view-box; transform-origin: 70px 23px; }
-.built-more[open] .built-tv .line { animation: built-line .5s cubic-bezier(.2, .7, .2, 1) .2s both; }
-.built-more[open] .built-tv .glow { animation: built-lit .5s ease-out .48s both; }
-.built-more[open] .built-tv .play { animation: built-play .55s cubic-bezier(.3, 1.6, .5, 1) .6s both; }
-.built-more[open] .built-tv .ant { animation: built-ant .9s ease-in-out .55s both; }
+.built-more[open] .built-tv .line { animation: built-line .34s cubic-bezier(.2, .7, .2, 1) .05s both; }
+.built-more[open] .built-tv .glow { animation: built-lit .3s ease-out .22s both; }
+.built-more[open] .built-tv .play { animation: built-play .4s cubic-bezier(.3, 1.6, .5, 1) .28s both; }
+.built-more[open] .built-tv .ant { animation: built-ant .7s ease-in-out .3s both; }
 @keyframes built-line { 0% { opacity: 1; transform: scale(0, 1); } 55% { opacity: 1; transform: scale(1, 1); }
   100% { opacity: 0; transform: scale(1, 18); } }
 @keyframes built-lit { from { opacity: 0; } to { opacity: .9; } }
@@ -1487,27 +1482,16 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
 .built-body .credit::after { content: "CH " counter(ch, decimal-leading-zero); position: absolute; top: 10px; inset-inline-end: 12px;
   font-family: var(--mono, ui-monospace, monospace); font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--accent);
   opacity: 0; pointer-events: none; }
-.built-more[open] .credit::after { animation: built-osd 1.8s ease calc(var(--d, 0s) + .2s) both; }
+.built-more[open] .credit::after { animation: built-osd 1.6s ease calc(var(--d, 0s) + .25s) both; }
 @keyframes built-osd { 0% { opacity: 0; } 10% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
-.built-more[open] .credit .ic { animation: built-pop .5s cubic-bezier(.3, 1.6, .5, 1) calc(var(--d, 0s) + .15s) both; }
+.built-more[open] .credit .ic { animation: built-pop .4s cubic-bezier(.3, 1.6, .5, 1) calc(var(--d, 0s) + .08s) both; }
 @keyframes built-pop { 0% { opacity: 0; transform: scale(.5); } 100% { opacity: 1; transform: none; } }
-.built-more > summary.cheer .bt { animation: built-glow 1.2s cubic-bezier(.2, .8, .2, 1); }
-@keyframes built-glow {
-  0% { text-shadow: none; }
-  30% { color: var(--accent); text-shadow: 0 0 22px color-mix(in srgb, var(--accent) 65%, transparent); }
-  100% { text-shadow: none; } }
-/* The glow at the top breathes. */
-.built-body::before { content: ""; position: absolute; z-index: -1; left: 50%; top: -40%; width: 120%; height: 90%;
-  transform: translateX(-50%); border-radius: 50%; pointer-events: none;
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 14%, transparent), transparent);
-  animation: built-breathe 4.5s ease-in-out infinite alternate; }
-@keyframes built-breathe { from { opacity: .55; transform: translateX(-50%) scale(.92); } to { opacity: 1; transform: translateX(-50%) scale(1.08); } }
 /* LIVE, as on the TV: a red dot that keeps pulsing while it is open. */
 .built-live { position: absolute; z-index: 3; top: 14px; inset-inline-start: 16px; display: inline-flex; align-items: center; gap: 6px;
   font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: .14em; color: var(--live); opacity: 0; }
 .built-live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--live); }
-.built-more[open] .built-live { opacity: 1; animation: built-rise .5s ease .7s both; }
-.built-more[open] .built-live::before { animation: built-pulse 1.6s ease-out 1.2s infinite; }
+.built-more[open] .built-live { opacity: 1; }
+.built-more[open] .built-live::before { animation: built-pulse 1.6s ease-in-out .6s infinite; }
 @keyframes built-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.75); } }
 @media (max-width: 720px) {
   .built-body { padding: 38px 12px 16px; border-radius: 18px; }
@@ -1520,9 +1504,9 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
   .built-body .credit p { font-size: 14.5px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .built-more[open] .built-body, .built-more[open] .built-intro, .built-more[open] .credit, .built-more[open] .disclaimer,
-  .built-more[open] .credit .ic, .built-more[open] .built-live { animation: built-fade .4s ease both; }
-  .built-more[open] .credit::after, .built-body::before, .built-more > summary.cheer .bt, .built-more[open] .built-live::before,
+  .built-more[open] .built-body, .built-more[open] .credit,
+  .built-more[open] .credit .ic { animation: built-fade .3s ease both; }
+  .built-more[open] .credit::after, .built-more[open] .built-live::before,
   .built-more[open] .built-tv .line, .built-more[open] .built-tv .ant { animation: none; }
   .built-more[open] .built-tv .glow { animation: none; opacity: .9; }
   .built-more[open] .built-tv .play { animation: none; opacity: 1; }
