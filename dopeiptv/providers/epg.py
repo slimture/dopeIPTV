@@ -495,6 +495,16 @@ class XmltvGuide:
 
     def _download(self) -> bytes:
         url = self._effective_url()
+        own = getattr(self.client, "own_guide", None)
+        if not url and callable(own):
+            # A box on the home network hands over its own guide as XMLTV
+            # (providers/boxes.py); a playlist's own guide URL still wins.
+            data = own(self.progress_cb)
+            if not data:
+                raise RuntimeError("the box has no programme guide")
+            if self.progress_cb:
+                self.progress_cb(100)
+            return data
         if url:
             r = requests.get(url, stream=True, timeout=(20, 300))
         elif hasattr(self.client, "epg_url"):

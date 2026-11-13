@@ -12,6 +12,9 @@ from PyQt6.QtWidgets import (
 )
 
 from ..i18n import tr
+from .box_finder import (
+    BOX_KINDS, LOGIN_KINDS, PLACEHOLDERS, FindOnNetwork, add_box_kinds,
+)
 from .theme import P
 
 
@@ -48,7 +51,7 @@ class PlaylistDialog(QDialog):
         playlist = playlist or prefill or {}
         self.setWindowTitle(tr("playlist_edit_title") if editing
                             else tr("playlist_add_title"))
-        self.setMinimumWidth(460)
+        self.setMinimumWidth(520)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(22, 22, 22, 22)
         form = QFormLayout()
@@ -60,6 +63,9 @@ class PlaylistDialog(QDialog):
         self.kind.addItem(tr("playlist_kind_m3u"), "m3u")
         if stalker_available():
             self.kind.addItem(tr("playlist_kind_stalker"), "stalker")
+        add_box_kinds(self.kind)
+        # A box's own options (stream port, profile...) ride along unchanged.
+        self._options = dict(playlist.get("options") or {})
         kidx = self.kind.findData(playlist.get("kind", "xtream"))
         if kidx >= 0:
             self.kind.setCurrentIndex(kidx)
@@ -90,7 +96,11 @@ class PlaylistDialog(QDialog):
         self._mac_lbl = QLabel(tr("playlist_mac"))
         form.addRow(tr("playlist_name"), self.name)
         form.addRow(tr("playlist_kind"), self.kind)
+        # A box on the home network can be found instead of typed.
+        self.finder = FindOnNetwork(self)
+        self.finder.picked.connect(self._box_found)
         form.addRow(self._server_lbl, self.server)
+        form.addRow("", self.finder.row)
         form.addRow(self._user_lbl, self.user)
         form.addRow(self._pw_lbl, self.pw)
         form.addRow(self._mac_lbl, self.mac)
@@ -110,19 +120,40 @@ class PlaylistDialog(QDialog):
     def _update_kind(self) -> None:
         kind = self.kind.currentData()
         m3u, stalker = kind == "m3u", kind == "stalker"
+        box = kind in BOX_KINDS
         # M3U needs only a URL, a portal its URL and a MAC address - hide
-        # the username/password rows and relabel the address field.
+        # the username/password rows and relabel the address field. A box
+        # on the home network takes its address and, if it asks, a login.
         self._server_lbl.setText(
             tr("playlist_m3u_url") if m3u
-            else tr("playlist_portal_url") if stalker else tr("login_server"))
+            else tr("playlist_portal_url") if stalker
+            else tr("playlist_box_address") if box else tr("login_server"))
         self.server.setPlaceholderText(
             "https://example.com/playlist.m3u" if m3u
             else "http://portal.example.com/c/" if stalker
-            else "http://server:port")
+            else PLACEHOLDERS.get(kind, "http://server:port"))
+        login = not (m3u or stalker or box) or kind in LOGIN_KINDS
         for w in (self._user_lbl, self.user, self._pw_lbl, self.pw):
-            w.setVisible(not (m3u or stalker))
+            w.setVisible(login)
+        hint = tr("playlist_login_optional") if box else ""
+        self.user.setPlaceholderText(hint)
+        self.pw.setPlaceholderText(hint)
         for w in (self._mac_lbl, self.mac):
             w.setVisible(stalker)
+        self.finder.row.setVisible(box)
+        if not box:
+            self.finder.status.hide()
+
+    def _box_found(self, found: dict) -> None:
+        """A box picked from what answered on the network fills the form."""
+        idx = self.kind.findData(found.get("kind"))
+        if idx >= 0:
+            self.kind.setCurrentIndex(idx)
+        self.server.setText(found.get("server", ""))
+        if not self.name.text().strip():
+            self.name.setText(str(found.get("name", "")).split(" - ")[0])
+        if found.get("login"):
+            self.user.setFocus()
 
     def _maybe_autodetect_link(self) -> None:
         """Recognise a pasted provider link and configure the dialog: Xtream
@@ -159,6 +190,13 @@ class PlaylistDialog(QDialog):
                 return
             self.accept()
             return
+        if self.kind.currentData() in BOX_KINDS:
+            if not self.server.text().strip():
+                QMessageBox.warning(self, tr("playlist_msg_title"),
+                                    tr("playlist_box_required"))
+                return
+            self.accept()
+            return
         if self.kind.currentData() == "m3u":
             ok = bool(self.server.text().strip())
         else:
@@ -174,7 +212,7 @@ class PlaylistDialog(QDialog):
         name = self.name.text().strip()
         if not name:
             name = self.server.text().strip().split("//")[-1].split("/")[0]
-        return {
+        out = {
             "name": name,
             "kind": self.kind.currentData(),
             "server": self.server.text().strip(),
@@ -184,6 +222,9 @@ class PlaylistDialog(QDialog):
             "refresh": self.refresh.currentData(),
             "mac": self.normal_mac(self.mac.text()) or "",
         }
+        if self._options:
+            out["options"] = dict(self._options)
+        return out
 
 
 

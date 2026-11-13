@@ -553,6 +553,8 @@ class PlaylistStore:
             row = {k: p.get(k, "") for k in self.EXPORT_FIELDS}
             row["kind"] = p.get("kind") or "xtream"
             row["refresh"] = p.get("refresh") or "never"
+            if p.get("options"):
+                row["options"] = dict(p["options"])
             out.append(row)
         return out
 
@@ -575,7 +577,8 @@ class PlaylistStore:
                 value = entry.get(key, "")
                 return value.strip() if isinstance(value, str) else ""
 
-            kind = field("kind") if field("kind") in ("m3u", "stalker") \
+            kind = field("kind") if field("kind") in (
+                "m3u", "stalker", "enigma2", "tvheadend", "hdhomerun") \
                 else "xtream"
             server = field("server")
             user, pw = field("username"), field("password")
@@ -589,13 +592,16 @@ class PlaylistStore:
                    and (p.get("mac") or "").upper() == mac
                    for p in self.items):
                 continue
-            row = {"name": field("name")
+            row: dict[str, Any] = {"name": field("name")
                    or server.split("//")[-1].split("/")[0],
                    "kind": kind, "server": server, "username": user,
                    "password": pw, "epg_url": field("epg_url"),
                    "refresh": field("refresh") or "never"}
             if kind == "stalker":
                 row["mac"] = mac
+            if isinstance(entry.get("options"), dict):
+                row["options"] = {str(k): v for k, v in entry["options"].items()
+                                  if isinstance(v, (str, int, float, bool))}
             self.add(row)
             added += 1
         return added

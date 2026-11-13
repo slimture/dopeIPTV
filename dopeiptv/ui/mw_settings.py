@@ -1071,7 +1071,9 @@ class _SettingsMixin:
         pl_list.setObjectName("PlaylistList")
         pl_list.setItemDelegate(PlaylistDelegate(
             tr("pl_in_use"), {"xtream": "Xtream", "m3u": "M3U",
-                              "stalker": "Stalker"}, pl_list))
+                              "stalker": "Stalker", "enigma2": "Enigma2",
+                              "tvheadend": "Tvheadend",
+                              "hdhomerun": "HDHomeRun"}, pl_list))
         pl_list.setMouseTracking(True)
         # Drag a playlist to change its place; the sidebar's playlist menu
         # lists them in this same order.

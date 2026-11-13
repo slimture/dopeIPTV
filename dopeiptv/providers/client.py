@@ -859,15 +859,39 @@ def _list_cache_path(playlist: dict) -> str | None:
         return None
 
 
+# Boxes and servers on the home network (providers/boxes.py): an address,
+# an optional login, and their own options under "options".
+BOX_KINDS = ("enigma2", "tvheadend", "hdhomerun")
+
+
+def make_box_client(playlist: dict):
+    """The client for a box on the home network (kind in BOX_KINDS)."""
+    kind = playlist.get("kind")
+    args = (playlist.get("server", ""), playlist.get("username", ""),
+            playlist.get("password", ""), playlist.get("options") or {})
+    # Imported here, like stalker.py: they build on this module.
+    if kind == "enigma2":
+        from .enigma2 import Enigma2Client
+        return Enigma2Client(*args)
+    if kind == "tvheadend":
+        from .tvheadend import TvheadendClient
+        return TvheadendClient(*args)
+    from .hdhomerun import HDHomeRunClient
+    return HDHomeRunClient(*args)
+
+
 def make_client(playlist: dict):
     """Build the right provider client for a stored playlist: an M3U-backed
-    client when kind == 'm3u', a Stalker / Ministra portal client when kind
-    == 'stalker', otherwise the Xtream API client (the API clients with a
+    client when kind == 'm3u', a box on the home network for the kinds in
+    BOX_KINDS, a Stalker / Ministra portal client when kind == 'stalker',
+    otherwise the Xtream API client (the API clients with a
     per-playlist on-disk list cache so a down provider still shows the last
     known lineup)."""
     kind = (playlist or {}).get("kind")
     if kind == "m3u":
         return M3UClient(playlist.get("server", ""))
+    if kind in BOX_KINDS:
+        return make_box_client(playlist)
     if kind == "stalker":
         # Imported here: stalker.py builds on this module, and a playlist
         # of another kind never needs it.

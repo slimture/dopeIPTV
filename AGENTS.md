@@ -34,6 +34,11 @@ map and the one-way import rule.
 | `i18n.py` | English source strings, `set_language`, `tr()` (other 26 languages in `locale/*.json`) |
 | `providers/client.py` | Xtream Codes API client |
 | `providers/stalker.py` | Stalker / Ministra portal client (MAC portals: handshake, create_link) |
+| `providers/boxes.py` | `BoxClient`: what boxes on the home network share (login, catalogue, stable ids, recordings as films, the box's guide as XMLTV via `own_guide`) |
+| `providers/enigma2.py` | Enigma2 receivers (VU+, Dreambox, Zgemma...) over the classic `/web/` API of OpenWebif and the Dreambox WebInterface |
+| `providers/tvheadend.py` | Tvheadend servers (channel tags, stream profiles, XMLTV, DVR recordings, digest login) |
+| `providers/hdhomerun.py` | HDHomeRun tuners and their emulators (discover/lineup, SiliconDust guide, UDP discovery) |
+| `providers/lan_scan.py` | "Find on my network": HDHomeRun broadcast plus a probe of the local /24 |
 | `providers/epg.py` | EPG/XMLTV parser, cache and compact index |
 | `providers/epg_index.py` | The guide parser as a process of its own (`--epg-index`) |
 | `providers/metadata.py` | TMDB client, PosterResolver |
@@ -86,6 +91,7 @@ map and the one-way import rule.
 | `ui/tmdb_match.py` | Manual TMDB match dialog |
 | `ui/subtitle_search.py` | OpenSubtitles search dialog |
 | `ui/widgets.py` | Small standalone widgets |
+| `ui/box_finder.py` | Box kinds in the add-a-source forms and the "Find on my network" button |
 | `ui/mw_home.py` | The Home page: which shelves, what goes in them (drawn by `home_widgets.py`) |
 | `ui/mw_local.py` | Local files: folders, library view, music queue |
 | `ui/mw_multiview.py` | Multiview: 2/4/6/9 live streams, an mpv per cell |
@@ -188,7 +194,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   `DOPEIPTV_LOG=debug` shows debug traces; `DOPEIPTV_LOG_FILE=/path` tees
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
-  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log,
+  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log,
   player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest) and `services/` (resume,
   coverart, reminders, mpris, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
