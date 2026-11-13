@@ -107,13 +107,16 @@ A `.dmg` downloaded before 13 November 2026 is not notarized: allow its
 first launch under **System Settings → Privacy & Security → Open Anyway**,
 or download the current one.
 
-**Windows** — a portable `dopeIPTV-*-windows-x64.zip` (and `-windows-arm64.zip`
-for Snapdragon laptops): unzip the folder and run `dopeiptv.exe`, no
-installer and no admin rights. The app isn't code-signed
-yet, so SmartScreen may show *"Windows protected your PC"* — click **More info →
-Run anyway**. An optional Start-menu/desktop shortcut lives under
-**Settings → Advanced → Create shortcut**, and the bundled
-`README.txt` covers removing every trace of the app.
+**Windows** — from 1.4.5 an installer, `dopeIPTV-*-windows-x64-setup.exe`
+(and `-windows-arm64-setup.exe` for Snapdragon laptops): it installs for
+your user only, without admin rights, adds dopeIPTV to the Start menu and
+to **Settings → Apps**, and the installed app updates itself. Or the
+portable `dopeIPTV-*-windows-x64.zip`: unzip the folder and run
+`dopeiptv.exe`; a Start-menu/desktop shortcut lives under **Settings →
+Advanced → Create shortcut**, and the bundled `README.txt` covers removing
+every trace of the app. The app isn't code-signed for Windows yet, so
+SmartScreen may show *"Windows protected your PC"* — click **More info →
+Run anyway**.
 
 > Linux is the primary target; macOS and Windows are a bonus.
 
@@ -161,18 +164,25 @@ pipx install .
 Your settings, playlists and favorites are kept whichever way you update.
 
 - **AppImage** — from 1.2.15 on it updates itself: when a new version is
-  out, **Update now** in the banner (or in About) downloads it, checks its
-  SHA-256, test-starts it and swaps it in, then offers to restart. With an
+  out, **Update now** in the banner (or in About) downloads it from
+  dopeiptv.org, checks its SHA-256, test-starts it and swaps it in, then
+  offers to restart. With an
   older AppImage, download the new one, make it executable, delete the old
   file and start the new one — the menu entry follows it.
 - **.deb** — install the new package over the old one:
   `sudo apt install ./dopeiptv_<version>_amd64.deb`.
 - **Flatpak** — install the new `.flatpak` the same way as the first one;
   it replaces the old version.
-- **Windows** — close the app, delete the old `dopeiptv` folder and unzip
-  the new one in its place (settings live in the registry, not the folder).
-- **macOS** — drag the new dopeIPTV to Applications and choose
-  **Replace**.
+- **Windows** — installed with the installer (from 1.4.5), it updates
+  itself: **Update now** downloads the next installer, checks it, closes
+  the app, installs it and opens it again. The portable zip: close the
+  app, delete the old `dopeiptv` folder and unzip the new one in its place
+  (settings live in the registry, not the folder).
+- **macOS** — from 1.4.5 it updates itself: **Update now** downloads the
+  new version, checks that it is Solecraft AB's and notarised by Apple,
+  and puts it in place when the app restarts. It needs to be in a folder
+  you can write to, such as Applications; otherwise drag the new dopeIPTV
+  to Applications and choose **Replace**.
 - **From source** — `git pull` in your clone, then `./install.sh` again.
 
 ## Running
