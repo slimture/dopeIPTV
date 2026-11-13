@@ -4,8 +4,9 @@
  *
  *   filters  apply to the whole tab: a row clicked anywhere narrows
  *            everything to that group, and they combine
- *   patterns plain sentences for what stands out, from groups of 5 visits
- *            or more only
+ *   patterns what stands out, at a glance: four numbers, the largest
+ *            countries, how far down the front page, what leads to a
+ *            download - from groups of 5 visits or more only
  *   explore  break down by a data point, optionally split by a second (a
  *            pivot), with a measure
  *   charts   over time, when they come, how long and how much they read,
@@ -235,73 +236,154 @@
     box.replaceChildren(text, chips, row);
   }
 
-  // -- patterns: what stands out -----------------------------------------------------
-  function drawPatterns(cur) {
-    const box = card("an-patterns", "Patterns", "groups of " + MIN + " visits or more");
-    const ul = mk("ul", "an-findings");
-    const say = (parts, dim, value) => {
+  // -- patterns: what stands out, at a glance -----------------------------------------
+  // Four numbers, the largest countries, how far down the front page visits
+  // get, and what leads to a download against all visits - blue for visits,
+  // green for downloads, as everywhere on the page. Every group of fewer
+  // than MIN visits is left out; a row clicked narrows the tab to it.
+  function patPanel(title, note) {
+    const sec = mk("section", "pat-panel");
+    const h = mk("div", "pat-h");
+    h.append(mk("h3", "", title));
+    if (note) { h.append(note); }
+    sec.append(h);
+    return sec;
+  }
+  function patBar(frac, cls) {
+    const track = mk("span", "pat-track" + (cls ? " " + cls : ""));
+    const fill = mk("i");
+    fill.style.width = Math.max(1.5, Math.min(1, frac || 0) * 100) + "%";
+    track.append(fill);
+    return track;
+  }
+  // The share that downloaded, group by group, with a line at all visits'.
+  function rateChart(cur, dim, dlAll) {
+    const gs = ordered(dim, groupBy(cur, dim), "visits").filter((x) => x[1].length >= MIN)
+      .map(([v, g]) => [v, g, MEASURES.dlrate.calc(g)]).sort((a, b) => b[2] - a[2]);
+    if (gs.length < 2) { return null; }
+    const top = Math.min(1, Math.max(0.1, Math.ceil(Math.max(dlAll, ...gs.map((x) => x[2])) * 10) / 10));
+    const ul = mk("ul", "pat-rows pat-rates");
+    gs.slice(0, 6).forEach(([v, g, rate]) => {
       const li = mk("li");
-      parts.forEach((p) => li.append(typeof p === "string" ? document.createTextNode(p) : p));
-      if (dim) { pickable(li, dim, value, nameOf(dim, value)); }
+      const bar = patBar(rate / top, "dl");
+      const mark = mk("b", "pat-mark");
+      mark.style.left = (dlAll / top * 100) + "%";
+      bar.append(mark);
+      li.append(mk("span", "pat-k", nameOf(dim, v)), bar, mk("span", "pat-v", pct(rate)), mk("span", "pat-x", num.format(g.length)));
+      pickable(li, dim, v, nameOf(dim, v));
+      tip(li, [nameOf(dim, v), pct(rate) + " downloaded (all visits: " + pct(dlAll) + ")", num.format(g.length) + " visits"]);
       ul.append(li);
-    };
-    const b = (t) => mk("strong", "", t);
-    if (!cur.length) { box.append(mk("p", "empty", "No visits kept in detail for this yet.")); return; }
-    const all0 = cur, dl0 = MEASURES.dlrate.calc(all0);
-    const countries = ordered("country", groupBy(cur, "country"), "visits");
-    const top3 = countries.slice(0, 3), top3n = top3.reduce((s, c) => s + c[1].length, 0);
-    say([b(num.format(cur.length)), " visits from ", b(num.format(countries.length)),
-         countries.length === 1 ? " country" : " countries",
-         countries.length > 1 ? ". " + top3.map((c) => K.countryName(c[0])).join(", ") + " bring " + pct(top3n / cur.length) + " of them." : "."]);
-    // The largest countries, each in a line: how they came, what they use.
-    countries.filter((c) => c[1].length >= MIN && c[0] !== "unknown").slice(0, 5).forEach(([c, g]) => {
-      const lead = (dim) => { const o = ordered(dim, groupBy(g, dim), "visits")[0]; return o ? [nameOf(dim, o[0]), o[1].length / g.length] : null; };
-      const ch = lead("channel"), os = lead("os");
-      // The site that linked, from the visits of that way in only.
-      const si = ordered("site", groupBy(g.filter((r) => r.site && nameOf("channel", r.channel) === ch[0]), "site"), "visits")[0];
-      say([b(K.flag(c) + K.countryName(c)), " · " + num.format(g.length) + " visits: " + pct(ch[1]) + " came by " +
-           ch[0].toLowerCase() + (si ? " (most from " + si[0] + ")" : "") + ", " + pct(os[1]) + " use " + os[0] +
-           ", " + pct(MEASURES.dlrate.calc(g)) + " downloaded"], "country", c);
     });
-    // Which way in, which system, gives downloads.
-    const best = (dim, label) => {
-      const gs = ordered(dim, groupBy(cur, dim), "visits").filter((x) => x[1].length >= MIN);
-      if (gs.length < 2) { return; }
-      gs.sort((a, b2) => MEASURES.dlrate.calc(b2[1]) - MEASURES.dlrate.calc(a[1]));
-      const top = gs[0], low = gs[gs.length - 1];
-      say([label(top[0]), " download most often: ", b(pct(MEASURES.dlrate.calc(top[1]))), " (all: " + pct(dl0) + "); least: " +
-           nameOf(dim, low[0]) + " " + pct(MEASURES.dlrate.calc(low[1])) + "."], dim, top[0]);
+    return ul;
+  }
+  function drawPatterns(cur) {
+    const box = card("an-patterns", "Patterns", "at a glance · groups of " + MIN + " visits or more · click to narrow");
+    if (!cur.length) { box.append(mk("p", "empty", "No visits kept in detail for this yet.")); return; }
+    const dlAll = MEASURES.dlrate.calc(cur);
+    const countries = ordered("country", groupBy(cur, "country"), "visits");
+
+    // The four numbers.
+    const kpis = mk("div", "pat-kpis");
+    const kpi = (label, big, sub, frac, cls, dim, value) => {
+      const el = mk("div", "pat-kpi");
+      el.append(mk("span", "pat-l", label), mk("span", "pat-n", big));
+      if (frac !== null) { el.append(patBar(frac, cls)); }
+      el.append(mk("span", "pat-s", sub));
+      if (dim) { pickable(el, dim, value, label); }
+      kpis.append(el);
     };
-    best("channel", (v) => "Visitors who came by " + nameOf("channel", v).toLowerCase());
-    best("os", (v) => nameOf("os", v) + " visitors");
-    const phones = cur.filter((r) => r.device === "Mobile" || r.device === "Tablet");
-    if (phones.length >= MIN) {
-      say(["Phones and tablets: ", b(pct(phones.length / cur.length)), " of visits; " + pct(MEASURES.dlrate.calc(phones)) +
-           " of them downloaded (they cannot run the app there)."], "device", "Mobile");
-    }
+    const known = countries.filter((c) => c[0] !== "unknown").length;
+    kpi("Visits", num.format(cur.length), "from " + num.format(known) + (known === 1 ? " country" : " countries"), null);
+    kpi("Downloaded", pct(dlAll), num.format(cur.filter((r) => r.dl.length).length) + " of the visits", dlAll, "dl");
     const back = cur.filter((r) => r.ret > 0), first = cur.filter((r) => !r.ret);
-    if (back.length >= MIN && first.length >= MIN) {
-      say(["Returning visitors: ", b(pct(back.length / cur.length)), " of visits; " + pct(MEASURES.dlrate.calc(back)) +
-           " downloaded, against " + pct(MEASURES.dlrate.calc(first)) + " of first visits."], "ret", "Returning");
+    kpi("Came back", pct(back.length / cur.length),
+        back.length >= MIN && first.length >= MIN
+          ? pct(MEASURES.dlrate.calc(back)) + " of them downloaded, " + pct(MEASURES.dlrate.calc(first)) + " of first visits"
+          : "visitors here on an earlier day", back.length / cur.length, "", back.length ? "ret" : "", "Returning");
+    const phones = cur.filter((r) => r.device === "Mobile" || r.device === "Tablet");
+    kpi("Phones and tablets", pct(phones.length / cur.length),
+        phones.length >= MIN ? pct(MEASURES.dlrate.calc(phones)) + " downloaded - the app is not for phones" : "of the visits",
+        phones.length / cur.length, "", phones.length ? "device" : "", "Mobile");
+    box.append(kpis);
+
+    const grid = mk("div", "pat-grid");
+    // The largest countries: their visits, and the share that downloaded.
+    const big = countries.filter((c) => c[1].length >= MIN && c[0] !== "unknown").slice(0, 6);
+    if (big.length) {
+      const top3 = countries.slice(0, 3).reduce((n, c) => n + c[1].length, 0);
+      const panel = patPanel("Where they come from", mk("span", "pat-note", "top 3: " + pct(top3 / cur.length) + " of visits"));
+      const head = mk("div", "pat-cols");
+      head.append(mk("span", "", ""), mk("span", "", ""), mk("span", "", "Visits"), mk("span", "", "Downloaded"));
+      const ul = mk("ul", "pat-rows pat-countries");
+      const max = big[0][1].length;
+      big.forEach(([c, g]) => {
+        const lead = (dim, rows) => { const o = ordered(dim, groupBy(rows, dim), "visits")[0]; return o ? [nameOf(dim, o[0]), o[1].length / rows.length, o[0]] : null; };
+        const ch = lead("channel", g), os = lead("os", g);
+        const si = ch && lead("site", g.filter((r) => r.site && r.channel === ch[2]));
+        const li = mk("li");
+        li.append(mk("span", "pat-k", K.flag(c) + K.countryName(c)), patBar(g.length / max, ""),
+                  mk("span", "pat-v", num.format(g.length)), mk("span", "pat-v", pct(MEASURES.dlrate.calc(g))));
+        pickable(li, "country", c, K.countryName(c));
+        tip(li, [K.countryName(c), num.format(g.length) + " visits · " + pct(MEASURES.dlrate.calc(g)) + " downloaded",
+                 ch ? "Mostly " + ch[0].toLowerCase() + " (" + pct(ch[1]) + ")" + (si ? ", most from " + si[0] : "") : "",
+                 os ? "Mostly " + os[0] + " (" + pct(os[1]) + ")" : ""].filter(Boolean));
+        ul.append(li);
+      });
+      panel.append(head, ul);
+      grid.append(panel);
     }
+    // How far down the front page visits get, section by section.
     const home = cur.filter((r) => r.paths.indexOf("/") >= 0);
-    const reached = (id) => home.filter((r) => r.acts.some((a) => a[0] === "sec" && a[1] === id)).length;
     if (home.length >= MIN && home.some((r) => r.acts.some((a) => a[0] === "sec"))) {
-      say(["Of front-page visits, ", b(pct(reached("download") / home.length)), " got down to the download section and " +
-           pct(reached("donate") / home.length) + " to the donate band."]);
+      const panel = patPanel("How far down the front page", mk("span", "pat-note", num.format(home.length) + " front-page visits"));
+      const ul = mk("ul", "pat-rows pat-funnel");
+      [["", "Opened it"]].concat(SECTIONS).forEach(([id, label]) => {
+        const n = id ? home.filter((r) => r.acts.some((a) => a[0] === "sec" && a[1] === id)).length : home.length;
+        const li = mk("li");
+        li.append(mk("span", "pat-k", label), patBar(n / home.length, ""), mk("span", "pat-v", pct(n / home.length)));
+        tip(li, [id ? "Reached " + label : "Opened the front page", num.format(n) + " of " + num.format(home.length) + " front-page visits"]);
+        ul.append(li);
+      });
+      panel.append(ul);
+      grid.append(panel);
     }
+    // What leads to a download: way in and system, against all visits.
+    [["channel", "Downloads by how they came"], ["os", "Downloads by system"]].forEach(([dim, title]) => {
+      const chart = rateChart(cur, dim, dlAll);
+      if (!chart) { return; }
+      const key = mk("span", "pat-note pat-key");
+      key.append(mk("b", "pat-mark"), document.createTextNode("all visits " + pct(dlAll)));
+      const panel = patPanel(title, key);
+      panel.append(chart);
+      grid.append(panel);
+    });
+    if (grid.childElementCount) { box.append(grid); }
+
+    // Worth a look: help searched in vain, a language the site lacks - each
+    // kind named once, then its chips.
+    const look = mk("div", "pat-look");
+    const group = (label, items) => {
+      if (!items.length) { return; }
+      const g = mk("div", "pat-look-g");
+      g.append(mk("span", "pat-look-h", label), ...items);
+      look.append(g);
+    };
     const empty = new Map();
     cur.forEach((r) => r.acts.forEach((a) => { if (a[0] === "s" && a[2] === 0) { empty.set(a[1], (empty.get(a[1]) || 0) + 1); } }));
-    if (empty.size) {
-      say(["Searched the help and found nothing: ",
-           b(Array.from(empty.entries()).sort((a, c) => c[1] - a[1]).slice(0, 5).map((e) => "“" + e[0] + "”").join(", ")), "."]);
-    }
-    const foreign = ordered("blang", groupBy(cur.filter((r) => r.blang && SITE_LANGS.indexOf(r.blang) < 0), "blang"), "visits")[0];
-    if (foreign && foreign[1].length >= MIN) {
-      say(["Most common browser language the site is not translated into: ", b(lang(foreign[0])),
-           " (" + num.format(foreign[1].length) + " visits)."], "blang", foreign[0]);
-    }
-    box.append(ul);
+    group("Searched the help, no answer", Array.from(empty.entries()).sort((a, c) => c[1] - a[1]).slice(0, 8).map(([q, n]) => {
+      const c = mk("span", "pat-chip");
+      c.append(document.createTextNode("\u201c" + q + "\u201d"), mk("em", "", num.format(n)));
+      return c;
+    }));
+    group("Browser languages the site lacks",
+      ordered("blang", groupBy(cur.filter((r) => r.blang && SITE_LANGS.indexOf(r.blang) < 0), "blang"), "visits")
+        .filter((x) => x[1].length >= MIN).slice(0, 4).map(([bl, g]) => {
+          const c = mk("span", "pat-chip");
+          c.append(document.createTextNode(lang(bl)), mk("em", "", num.format(g.length)));
+          pickable(c, "blang", bl, lang(bl));
+          return c;
+        }));
+    if (look.childElementCount) { box.append(look); }
   }
 
   // -- explore: breakdown, split, measure --------------------------------------------
