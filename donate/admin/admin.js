@@ -124,7 +124,7 @@
     status(data ? "" : "Loading…");
     fetch("/admin/data?days=" + days, { credentials: "same-origin", cache: "no-store" })
       .then((r) => { if (!r.ok) { throw new Error("the service answered " + r.status); } return r.json(); })
-      .then((d) => { data = d; status(""); render(); markSeen(); })
+      .then((d) => { data = d; status(""); render(); markSeen(); if (d.dl) { dlCounts = d.dl; drawDl(); } })
       .catch((e) => status("Could not load the numbers: " + e.message + "."));
   }
 
@@ -691,6 +691,7 @@
   let logFilter = null;          // {by, value, label}: one row of the overview; {label, keys}: a group of the Analysis tab
   let logVisitor = "";           // the log shows every visit of one visitor
   let logSpan = "day", logEnd = "";  // the log shows a day, week, month or year
+  let dlCounts = null;               // admin.py download_counts, from the newest answer
   try { showRobots = localStorage.getItem("admin-robots") === "1"; } catch (e) { /* hidden then */ }
   function badge(text, cls) { return mk("span", "badge" + (cls ? " " + cls : ""), text); }
   // How long single visits are kept (donate.py: STATS_VISITS_DAYS), in words.
@@ -834,6 +835,7 @@
       .then((r) => { if (!r.ok) { throw new Error("the service answered " + r.status); } return r.json(); })
       .then((res) => {
         logDay = res.day; logEnd = res.end || res.day; logDays = res.periods || res.days || [];
+        if (res.dl) { dlCounts = res.dl; }
         const pick = $("day-pick");
         pick.replaceChildren(...(logDays.indexOf(logDay) < 0 ? [logDay].concat(logDays) : logDays).map((x) => {
           const o = mk("option", "", periodName(x)); o.value = x; return o;
@@ -851,10 +853,40 @@
       })
       .catch((e) => $("visit-list").replaceChildren(mk("p", "error", "Could not load the visits: " + e.message + ".")));
   }
+  // Above the log: the downloads of today, yesterday, this week, month and
+  // year, each a way to that period's visits, and the site's counter.
+  const DL_CELLS = [["today", "Today", "day"], ["yesterday", "Yesterday", "day"], ["week", "This week", "week"],
+                    ["month", "This month", "month"], ["year", "This year", "year"]];
+  function drawDl() {
+    const box = $("dl-strip"), c = dlCounts;
+    box.hidden = !c;
+    if (!c) { return; }
+    const plain = !logFilter && !logVisitor;
+    const cells = DL_CELLS.map(([key, label, span]) => {
+      const p = c[key] || { n: 0, day: "" };
+      const b = mk("button", "dl-cell");
+      b.type = "button";
+      b.append(mk("b", "", num.format(p.n)), mk("span", "", label));
+      b.setAttribute("aria-current", plain && logSpan === span && logDay === p.day ? "true" : "false");
+      b.title = (p.day < c.since ? "Counted from " + longDay.format(day(c.since)) + ". " : "") + "Show these visits";
+      b.addEventListener("click", () => {
+        navStep();
+        logSpan = span;
+        loadDay(p.day);
+        window.scrollTo({ top: 0 });
+      });
+      return b;
+    });
+    const all = mk("div", "dl-cell static");
+    all.append(mk("b", "", num.format(c.all || 0)), mk("span", "", "All time"));
+    all.title = "The site's own download counter since it began - likely robots included, unlike the rest";
+    box.replaceChildren(mk("span", "dl-title", "Downloads"), ...cells, all);
+  }
   // The day's visits - or one row of the overview's, across its days - the
   // likely robots hidden unless asked for; the count says how many there
   // were either way.
   function drawLog() {
+    drawDl();
     const f = logFilter;
     ["day-prev", "day-pick", "day-next", "spans"].forEach((id) => { $(id).hidden = !!f; });
     $("filter-clear").hidden = !f;
@@ -943,6 +975,7 @@
         if (logVisitor !== id) { return; }
         const list = res.visits || [];
         $("visitor-head").hidden = false;
+        drawDl();
         $("visitor-title").textContent = "Visitor " + res.id + " · " + num.format(list.length) +
           (list.length === 1 ? " visit" : " visits") + " in the last " + keptFor();
         $("visit-list").replaceChildren(...list.map((v) => visitRow(v, true, true)));

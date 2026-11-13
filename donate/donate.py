@@ -786,8 +786,11 @@ class Handler(BaseHTTPRequestHandler):
                 stats_collect.collect_if_stale()
             except Exception as e:  # noqa: BLE001 - old numbers rather than no page
                 print(f"[donate] statistics not brought up to date: {e!r}", file=sys.stderr, flush=True)
+            downloads_json = CONF.get("DOWNLOADS_JSON", os.path.join(admin.SITE, "downloads.json"))
             if path == "/admin/visits":
-                return self._send(200, admin.visits(stats_dir, query.get("day", ""), query.get("span", "day")))
+                res = admin.visits(stats_dir, query.get("day", ""), query.get("span", "day"))
+                res["dl"] = admin.download_counts(stats_dir, downloads_json)
+                return self._send(200, res)
             if path == "/admin/visitor":
                 return self._send(200, admin.visitor(stats_dir, query.get("id", "")))
             try:
@@ -799,9 +802,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, analysis.rows(stats_dir, days))
             if path == "/admin/find":
                 return self._send(200, admin.find(stats_dir, query.get("by", ""), query.get("value", "")[:200], days))
-            body = admin.data(days, stats_dir,
-                              CONF.get("DOWNLOADS_JSON", os.path.join(admin.SITE, "downloads.json")),
-                              _secret(), API_VERSION)
+            body = admin.data(days, stats_dir, downloads_json, _secret(), API_VERSION)
+            body["dl"] = admin.download_counts(stats_dir, downloads_json)
             body["visits_days"] = int(CONF.get("STATS_VISITS_DAYS", "400") or 400)
             try:
                 import analysis

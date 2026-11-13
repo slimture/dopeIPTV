@@ -418,6 +418,35 @@ def _span_end(start: date, span: str) -> date:
     return start
 
 
+def download_counts(stats_dir: str, downloads_json: str) -> dict:
+    """Downloads today, yesterday, this week (from Monday), this month and
+    this year - likely robots left out, as everywhere else - with the day
+    each period starts on; and the site's own counter over all time, which
+    began before the statistics and counts robots too."""
+    per_day = _load(os.path.join(stats_dir, "stats.json"), {"days": {}}).get("days") or {}
+    today = datetime.now().astimezone().date()
+
+    def since(first: date) -> int:
+        n, d = 0, first
+        while d <= today:
+            row = per_day.get(d.isoformat())
+            if row:
+                n += sum((_net(row).get("downloads") or {}).values())
+            d += timedelta(days=1)
+        return n
+    yday = today - timedelta(days=1)
+    out = {"since": min(per_day) if per_day else today.isoformat()}
+    out["today"] = {"n": since(today), "day": today.isoformat()}
+    row = per_day.get(yday.isoformat())
+    out["yesterday"] = {"n": sum((_net(row).get("downloads") or {}).values()) if row else 0, "day": yday.isoformat()}
+    for span in ("week", "month", "year"):
+        first = _span_start(today, span)
+        out[span] = {"n": since(first), "day": first.isoformat()}
+    dl_all = _load(downloads_json, {})
+    out["all"] = int(sum(v for v in dl_all.values() if isinstance(v, (int, float)))) if isinstance(dl_all, dict) else 0
+    return out
+
+
 def _anon_by_day(stats_dir: str) -> dict:
     """The anonymous visits (STATS_DIR/visits-anon/<month>.json), by day."""
     by_day: dict = {}
