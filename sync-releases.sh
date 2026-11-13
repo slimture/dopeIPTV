@@ -160,6 +160,22 @@ count_downloads() {
     echo "$ino $off" > "$LOG_STATE.part"
     mv -f "$LOG_STATE.part" "$LOG_STATE"
 }
+# A release's SHA256SUMS and SHA256SUMS.sig (signed with dopeIPTV's key by
+# release.yml / nightly.yml) from GitHub, into <out> and <out>.sig - empty
+# when the release has none. $1 is the release's JSON from GitHub's API.
+fetch_signed() {
+    : > "$2"; : > "$2.sig"
+    for f in SHA256SUMS SHA256SUMS.sig; do
+        u=$(jq -r --arg f "$f" '.assets[]? | select(.name == $f) | .browser_download_url // empty' "$1" 2>/dev/null | head -1)
+        o=$2
+        [ "$f" = SHA256SUMS.sig ] && o=$2.sig
+        if [ -n "$u" ] && ! fetch -q -T 60 --user-agent="$UA" -o "$o" "$u" 2>/dev/null; then
+            : > "$o"
+            say "could not fetch $f of $(jq -r '.tag_name // "?"' "$1")"
+        fi
+    done
+}
+
 # ---- The newest test build (not shown anywhere) ------------------------------------
 # nightly.json, the same shape as releases.json, for the app's "Test builds"
 # channel: it asks the site and fetches through /dl.php like a release,
@@ -169,13 +185,16 @@ count_downloads() {
 # The newest is the highest version: GitHub's created_at is the date of the
 # commit a release was made from, the same for two builds of one commit.
 NIGHTLY=$PUB/nightly.json
+NEWEST_NIGHTLY='[.[]? | select(.prerelease and (.draft | not)
+                 and ((.tag_name // "") | test("^nightly-[0-9]+(\\.[0-9]+){3}$")))]
+    | sort_by(.tag_name | sub("^nightly-"; "") | split(".") | map(tonumber)) | last // empty'
 write_nightly() {
 if fetch -q -T 30 --user-agent="$UA" -o "$TMP/releases-list.json" \
         "https://api.github.com/repos/$REPO/releases?per_page=20" 2>/dev/null; then
-    jq --indent 4 '
-        [.[]? | select(.prerelease and (.draft | not)
-                       and ((.tag_name // "") | test("^nightly-[0-9]+(\\.[0-9]+){3}$")))]
-        | sort_by(.tag_name | sub("^nightly-"; "") | split(".") | map(tonumber)) | last // empty
+    jq "$NEWEST_NIGHTLY" "$TMP/releases-list.json" > "$TMP/newest-nightly.json" 2>/dev/null || : > "$TMP/newest-nightly.json"
+    fetch_signed "$TMP/newest-nightly.json" "$TMP/n-sums"
+    jq --indent 4 --rawfile sums "$TMP/n-sums" --rawfile sumsig "$TMP/n-sums.sig" '
+        .
         | {version: (.tag_name | sub("^nightly-"; "")),
            published_at: (.published_at // null),
            notes: (.body // "" | tostring | .[:20000]),
@@ -184,8 +203,9 @@ if fetch -q -T 30 --user-agent="$UA" -o "$TMP/releases-list.json" \
                     | (.name // "" | split("/") | last) as $name | select($name != "")
                     | {name: $name, size: (.size // 0),
                        sha256: ((.digest // "") | sub("^sha256:"; "")),
-                       url: ("/dl.php?f=" + ($name | @uri))}]}' \
-        "$TMP/releases-list.json" > "$TMP/nightly.json" 2>/dev/null || : > "$TMP/nightly.json"
+                       url: ("/dl.php?f=" + ($name | @uri))}],
+           sha256sums: $sums, sha256sums_sig: $sumsig}' \
+        "$TMP/newest-nightly.json" > "$TMP/nightly.json" 2>/dev/null || : > "$TMP/nightly.json"
     if jq -e '.version | type == "string"' "$TMP/nightly.json" >/dev/null 2>&1; then
         if ! cmp -s "$TMP/nightly.json" "$NIGHTLY" 2>/dev/null; then
             cp "$TMP/nightly.json" "$NIGHTLY.part" && mv -f "$NIGHTLY.part" "$NIGHTLY"
@@ -229,7 +249,8 @@ missing=$(jq -r '
               or endswith(".rpm") or endswith(".flatpak")) then empty else "Linux" end,
        if any($n[]; endswith(".dmg") or endswith(".pkg")) then empty else "macOS" end,
        if any($n[]; endswith(".exe") or endswith(".msi")
-              or (endswith(".zip") and contains("win"))) then empty else "Windows" end]
+              or (endswith(".zip") and contains("win"))) then empty else "Windows" end,
+       if any($n[]; . == "sha256sums.sig") then empty else "signed checksums" end]
     | join("+")' "$API")
 
 if [ -n "$missing" ]; then
@@ -321,10 +342,16 @@ else
         fi
     done
 
+    # The release's checksum list and its signature by dopeIPTV's key, as
+    # GitHub has them: the app installs an update only with that signature
+    # (dopeiptv/core/selfupdate.py, signed_asset).
+    fetch_signed "$API" "$TMP/gh-sums"
+
     # releases.json, the release the pages are rendered from, in the shape
     # and layout the PHP sync wrote it.
     synced=$(date -u +%Y-%m-%dT%H:%M:%S+00:00)
-    jq -j --indent 4 -a --arg synced "$synced" --rawfile mirrored "$TMP/mirrored.tsv" '
+    jq -j --indent 4 -a --arg synced "$synced" --rawfile mirrored "$TMP/mirrored.tsv" \
+        --rawfile sums "$TMP/gh-sums" --rawfile sumsig "$TMP/gh-sums.sig" '
         def human: . as $b | ["B", "KB", "MB", "GB"] as $u
             | {v: $b, i: 0} | until(.v < 1024 or .i >= 3; .v /= 1024 | .i += 1)
             | "\((.v * 10 | round) / 10) \($u[.i])";
@@ -368,6 +395,7 @@ else
                        sub: (if $sub != "" then $sub + " · " + $size else $size end),
                        icon: $icon, url: ("/files/" + ($name | @uri)),
                        name: $name, sha256: $sha[$name], size: (.size // 0)}],
+           sha256sums: $sums, sha256sums_sig: $sumsig,
            synced_at: $synced}' "$API" > "$TMP/releases.json"
     cp "$TMP/releases.json" "$REL.part"
     mv -f "$REL.part" "$REL"

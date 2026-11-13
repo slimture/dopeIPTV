@@ -427,6 +427,12 @@ How it counts, so the numbers are honest:
   every two minutes), each file with a download and a link to copy for a
   tester - through `/dl.php`, so a tester's download counts. A new file
   of the page (`builds.js`): `service iptv_donate restart` after deploying.
+- Signed releases (from 1.4.5): `releases.json` and `nightly.json` carry the
+  release's `SHA256SUMS` and its signature by dopeIPTV's key
+  (`sha256sums`, `sha256sums_sig`), fetched from GitHub, and the app
+  installs an update only with that signature. The site moves to a new
+  release only once it is signed (the completeness gate says "signed
+  checksums" until then).
 - Sites that linked here, and the exact page when the linking site sends
   it (many send only their address - Google, Facebook and X always): host
   and path, never the query or fragment, which can carry what points to a

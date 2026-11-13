@@ -614,6 +614,8 @@ def _build_asset(a: dict) -> dict | None:
     name = str(a.get("name") or "").rsplit("/", 1)[-1]
     if not name or name.startswith(".") or (a.get("state") or "uploaded") != "uploaded":
         return None
+    if name.startswith("SHA256SUMS"):              # the signed list, for the app
+        return None
     sha = str(a.get("sha256") or a.get("digest") or "")
     return {"name": name, "size": int(a.get("size") or 0),
             "sha256": sha.split(":", 1)[1] if sha.startswith("sha256:") else sha,
