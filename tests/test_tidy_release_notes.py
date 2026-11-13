@@ -65,3 +65,30 @@ def test_the_app_still_reads_a_folded_body():
     got = tidy(_rel("v1.4.4", "## dopeIPTV 1.4.4\n\nSmoother playback.\n\n" + LONG), "v1.4.5")
     plain = re.sub(r"(?i)</?details>", "", re.sub(r"(?is)<summary>.*?</summary>", "", got))
     assert "Smoother playback." in plain and "- change 5" in plain and "<" not in plain
+
+
+def test_wrapped_lines_are_joined_and_blocks_kept_apart():
+    # GitHub shows a release's every line break: notes wrapped at 72
+    # columns broke mid-sentence on a phone.
+    text = ("**One headline\nover two lines.**\n\n### The big ones\n\n- **An item** that\n  goes on here.\n"
+            "  - a sub item\n- Another\n\n<details>\n<summary>More</summary>\n\nA paragraph\nwrapped.\n\n"
+            "```\nkeep\nas is\n```\nHard break  \nstays.\n\n| a | b |\n| - | - |\n</details>")
+    got = tidy_mod.unwrap(text)
+    assert "**One headline over two lines.**" in got
+    assert "- **An item** that goes on here.\n  - a sub item\n- Another" in got
+    assert "<details>\n<summary>More</summary>\n\nA paragraph wrapped." in got
+    assert "```\nkeep\nas is\n```" in got and "Hard break  \nstays." in got
+    assert "| a | b |\n| - | - |\n</details>" in got
+    assert tidy_mod.unwrap(got) == got
+
+
+def test_a_release_already_short_still_gets_its_lines_joined():
+    got = tidy(_rel("v1.4.5", "## dopeIPTV 1.4.5\n\nA line\nwrapped here.\n"), "v1.4.5")
+    assert got == "## dopeIPTV 1.4.5\n\nA line wrapped here.\n"
+    assert tidy(_rel("v1.4.5", got), "v1.4.5") is None
+
+
+def test_release_notes_are_written_one_line_a_paragraph():
+    # RELEASE_NOTES.md becomes the release's text as it is.
+    notes = (Path(__file__).resolve().parent.parent / "RELEASE_NOTES.md").read_text(encoding="utf-8")
+    assert tidy_mod.unwrap(notes.strip()) == notes.strip()

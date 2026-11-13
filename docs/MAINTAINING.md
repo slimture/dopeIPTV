@@ -116,7 +116,9 @@ Platform notes that are easy to forget:
    - `RELEASE_NOTES.md` - the new version's notes under `## dopeIPTV x.y.z`,
      replacing the last version's (for users; it becomes the GitHub release
      text and the website's "What's new"). One version only: every version
-     before it is in `CHANGELOG.md`, and on its own release page
+     before it is in `CHANGELOG.md`, and on its own release page. Each
+     paragraph and list item on one line: GitHub shows a release's every
+     line break (`tests/test_tidy_release_notes.py` checks it)
 2. Push `testing`; wait for CI to be green (and ideally try the test build).
 3. Run **`tools/release.sh x.y.z`**. It never trusts a local branch: it
    fetches, merges `origin/testing` into `main`, checks that all five

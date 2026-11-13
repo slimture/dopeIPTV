@@ -49,13 +49,45 @@ def _unwrap(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
+# A line that starts a block of its own: a list item, a heading, a quote, a
+# tag, a table row, a fence.
+_BLOCK = re.compile(r"\s*(?:[-*+]\s|\d+[.)]\s|#|>|<|\||```|~~~)")
+
+
+def unwrap(text: str) -> str:
+    """Each paragraph and list item on one line. GitHub shows a release's
+    every line break as one (a Markdown file it would join), so notes
+    wrapped at 72 columns broke mid-sentence on a phone."""
+    out: list[str] = []
+    fence = False
+    for line in text.split("\n"):
+        s = line.strip()
+        if s.startswith(("```", "~~~")):
+            fence = not fence
+            out.append(line)
+            continue
+        prev = out[-1].strip() if out else ""
+        if (not fence and s and prev and not _BLOCK.match(line) and not out[-1].endswith("  ")
+                and not prev.startswith(("#", "<", "|", "```", "~~~"))):
+            out[-1] = out[-1].rstrip() + " " + s
+        else:
+            out.append(line)
+    return "\n".join(out)
+
+
 def tidy(rel: dict, latest: str) -> str | None:
     """The body *rel* (a release from GitHub's API) should have, or None
     when it has it already. *latest* is the latest release's tag."""
-    tag = str(rel.get("tag_name") or "")
     body = str(rel.get("body") or "").replace("\r\n", "\n").strip()
     if not body or rel.get("draft"):
         return None
+    new = unwrap((_shape(rel, latest, body) or body).strip())
+    return new + "\n" if new != body else None
+
+
+def _shape(rel: dict, latest: str, body: str) -> str | None:
+    """Only its own notes, folded where they should be; None when so already."""
+    tag = str(rel.get("tag_name") or "")
     if tag.startswith("nightly-"):
         m = CHANGES.search(body)
         if not m or "<details>" in body[m.end():]:

@@ -141,9 +141,8 @@ jobs:
           {
             echo "## dopeIPTV ${V} (test build)"
             echo
-            echo "Built from \`testing\` at ${GITHUB_SHA::7}, for testing what"
-            echo "comes next - it can have faults a release does not. In the"
-            echo "app: Settings -> General -> Update channel -> Test builds."
+            # One line a paragraph: GitHub shows a release's every line break.
+            echo "Built from \`testing\` at ${GITHUB_SHA::7}, for testing what comes next - it can have faults a release does not. In the app: Settings -> General -> Update channel -> Test builds."
             echo
             if [ -s missing.txt ]; then
               echo "Not in this build (a step failed - see the run, ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}):"
