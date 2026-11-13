@@ -1173,8 +1173,8 @@ window.iptvCopyButtons = function (root) {
 window.iptvCopyButtons(document);
 
 /* What dopeIPTV is built on, under the donate band: opened, the card
- * grows down and a small TV in it switches on, the projects coming in as
- * its channels (style.css .built-more); closed, it folds back up. The page
+ * grows down, a small TV drops in and switches on, and the projects fly out
+ * of it as its channels (style.css .built-more); closed, it folds back up. The page
  * follows the card down. Without motion, it simply opens and closes. */
 (function () {
   "use strict";
@@ -1183,6 +1183,22 @@ window.iptvCopyButtons(document);
   var sum = box.querySelector("summary"), body = box.querySelector(".built-body");
   var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var running = null;
+  // The channels fly out of the TV: each project starts small at the TV's
+  // screen and springs to its place, one after another (transform and
+  // opacity only). Measured once, while the card is laid out at full size.
+  function fly() {
+    var tv = box.querySelector(".built-tv svg");
+    if (!tv) { return; }
+    var t = tv.getBoundingClientRect(), cx = t.left + t.width / 2, cy = t.top + t.height * .55;
+    [].forEach.call(box.querySelectorAll(".credit"), function (c, i) {
+      var r = c.getBoundingClientRect();
+      var dx = cx - (r.left + r.width / 2), dy = cy - (r.top + r.height / 2);
+      c.animate([{ transform: "translate(" + dx + "px, " + dy + "px) scale(.12)", opacity: 0 },
+                 { opacity: 1, offset: .3 },
+                 { transform: "none", opacity: 1 }],
+                { duration: 680, delay: 420 + i * 70, easing: "cubic-bezier(.34, 1.36, .64, 1)", fill: "backwards" });
+    });
+  }
   sum.addEventListener("click", function (e) {
     if (still || !body) { return; }
     e.preventDefault();
@@ -1198,6 +1214,7 @@ window.iptvCopyButtons(document);
     // leaves the top, under the sticky header.
     box.open = true;
     var h = body.offsetHeight;
+    fly();
     running = body.animate([{ height: "0px", opacity: .4 }, { height: h + "px", opacity: 1 }],
                            { duration: 420, easing: "cubic-bezier(.2, .8, .2, 1)" });
     var follow = function () {
