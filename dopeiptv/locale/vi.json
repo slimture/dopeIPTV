@@ -1134,5 +1134,8 @@
   "update_install_now": "Cài đặt ngay",
   "update_later": "Để sau",
   "update_failed_title": "Bản cập nhật chưa được cài",
-  "update_nothing_changed": "Không có gì bị thay đổi."
+  "update_nothing_changed": "Không có gì bị thay đổi.",
+  "upd_err_no_checksum": "Phiên bản mới không có mã kiểm tra (checksum), nên không thể kiểm tra.",
+  "upd_err_not_https": "Địa chỉ của phiên bản mới không an toàn (https).",
+  "upd_err_unsigned": "Phiên bản mới không được ký bằng khóa của dopeIPTV."
 }

@@ -1134,5 +1134,8 @@
   "update_install_now": "지금 설치",
   "update_later": "나중에",
   "update_failed_title": "업데이트가 설치되지 않았습니다",
-  "update_nothing_changed": "아무것도 변경되지 않았습니다."
+  "update_nothing_changed": "아무것도 변경되지 않았습니다.",
+  "upd_err_no_checksum": "새 버전에 체크섬이 없어 확인할 수 없습니다.",
+  "upd_err_not_https": "새 버전의 주소가 안전한(https) 주소가 아닙니다.",
+  "upd_err_unsigned": "새 버전이 dopeIPTV의 키로 서명되지 않았습니다."
 }

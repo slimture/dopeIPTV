@@ -1134,5 +1134,8 @@
   "update_install_now": "Установить",
   "update_later": "Позже",
   "update_failed_title": "Обновление не установлено",
-  "update_nothing_changed": "Ничего не изменено."
+  "update_nothing_changed": "Ничего не изменено.",
+  "upd_err_no_checksum": "Для новой версии не указана контрольная сумма, поэтому её нельзя проверить.",
+  "upd_err_not_https": "Адрес новой версии не защищён (https).",
+  "upd_err_unsigned": "Новая версия не подписана ключом dopeIPTV."
 }

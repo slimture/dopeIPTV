@@ -1134,5 +1134,8 @@
   "update_install_now": "Instaliraj sada",
   "update_later": "Kasnije",
   "update_failed_title": "Ažuriranje nije instalirano",
-  "update_nothing_changed": "Ništa nije promenjeno."
+  "update_nothing_changed": "Ništa nije promenjeno.",
+  "upd_err_no_checksum": "Nova verzija ne navodi kontrolni zbir pa ne može da se proveri.",
+  "upd_err_not_https": "Adresa nove verzije nije bezbedna (https).",
+  "upd_err_unsigned": "Nova verzija nije potpisana ključem dopeIPTV-a."
 }

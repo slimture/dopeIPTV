@@ -54,7 +54,10 @@ map and the one-way import rule.
 | `core/dvr_record.py` | `BufferRecorder`: a recording read from a buffer, no connection of its own |
 | `core/recording.py` | Recording manager |
 | `core/updates.py` | GitHub latest-release check |
-| `core/selfupdate.py` | AppImage in-place update (download, checksum, self-check, swap) |
+| `core/selfupdate.py` | AppImage in-place update (download, checksum, self-check, swap); every update's signed checksum check (`signed_asset`) |
+| `core/winupdate.py` / `core/macupdate.py` | The same for an installed Windows copy (the installer) and the Mac app (the .dmg) |
+| `core/ed25519.py` | Ed25519 signatures in plain Python (the release key) |
+| `core/update_keys.py` | The public half of dopeIPTV's release signing key (`tools/make_update_key.py`, `tools/sign_sums.py`) |
 | `core/wakelock.py` | Screensaver inhibitor |
 | `core/gcguard.py` | Cyclic garbage collection on the GUI thread only |
 | `core/contest.py` | `ContestWatch`: tells another device taking the account's connection from repeated drops |
@@ -186,7 +189,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
   epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log,
-  player_exec, wakelock, selfupdate, gcguard, contest) and `services/` (resume,
+  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest) and `services/` (resume,
   coverart, reminders, mpris, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list

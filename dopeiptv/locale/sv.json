@@ -1134,5 +1134,8 @@
   "update_install_now": "Installera nu",
   "update_later": "Senare",
   "update_failed_title": "Uppdateringen installerades inte",
-  "update_nothing_changed": "Ingenting har ändrats."
+  "update_nothing_changed": "Ingenting har ändrats.",
+  "upd_err_no_checksum": "Den nya versionen anger ingen kontrollsumma, så den kan inte kontrolleras.",
+  "upd_err_not_https": "Den nya versionens adress är inte en säker (https).",
+  "upd_err_unsigned": "Den nya versionen är inte signerad med dopeIPTV:s nyckel."
 }

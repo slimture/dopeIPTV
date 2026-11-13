@@ -37,7 +37,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from .log import log
-from .selfupdate import UpdateError, download
+from .selfupdate import UpdateError, download, signed_asset
 from .updates import is_nightly
 from .xdg import system_env
 
@@ -187,6 +187,7 @@ def install(release: dict, current_version: str,
     asset = pick_asset(release.get("assets") or [], tag, cpu)
     if asset is None:
         raise UpdateError("upd_err_no_asset", cpu=cpu)
+    asset = signed_asset(release, asset)
     work = Path(tempfile.mkdtemp(prefix="dopeIPTV-update-"))
     staged = app.parent / STAGED
     try:

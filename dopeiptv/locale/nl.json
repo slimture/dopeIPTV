@@ -1134,5 +1134,8 @@
   "update_install_now": "Nu installeren",
   "update_later": "Later",
   "update_failed_title": "De update is niet geïnstalleerd",
-  "update_nothing_changed": "Er is niets gewijzigd."
+  "update_nothing_changed": "Er is niets gewijzigd.",
+  "upd_err_no_checksum": "De nieuwe versie noemt geen controlesom en kan dus niet worden gecontroleerd.",
+  "upd_err_not_https": "Het adres van de nieuwe versie is geen veilig (https) adres.",
+  "upd_err_unsigned": "De nieuwe versie is niet ondertekend met de sleutel van dopeIPTV."
 }

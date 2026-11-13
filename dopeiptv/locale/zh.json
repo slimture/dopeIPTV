@@ -1134,5 +1134,8 @@
   "update_install_now": "立即安装",
   "update_later": "稍后",
   "update_failed_title": "更新未安装",
-  "update_nothing_changed": "未做任何更改。"
+  "update_nothing_changed": "未做任何更改。",
+  "upd_err_no_checksum": "新版本没有提供校验和，因此无法检查。",
+  "upd_err_not_https": "新版本的地址不是安全的（https）地址。",
+  "upd_err_unsigned": "新版本未使用 dopeIPTV 的密钥签名。"
 }

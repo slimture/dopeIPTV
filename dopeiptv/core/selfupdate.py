@@ -18,6 +18,7 @@ one exactly where it was. No Qt here; the UI drives it from a worker.
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import os
 import platform
@@ -29,9 +30,10 @@ import threading
 from collections.abc import Callable
 from pathlib import Path
 
-from . import desktop_entry
+from . import desktop_entry, ed25519
 from ._lazy_requests import requests
-from .updates import user_agent
+from .update_keys import UPDATE_KEYS
+from .updates import GITHUB_REPO, is_nightly, user_agent
 from ..i18n import LocalizedError
 from .log import log
 from .xdg import system_env
@@ -106,6 +108,73 @@ def target_path(current: Path, old_version: str, new_version: str) -> Path:
     return current
 
 
+_SUMS_LINE = re.compile(r"([0-9a-fA-F]{64}) [ *](\S.*)")
+
+
+def _github_file(tag: str, name: str) -> bytes:
+    """A small file of the release *tag* (v1.4.6, or a test build's
+    v1.4.5.90), straight from GitHub."""
+    ver = tag.strip().lstrip("vV")
+    gh_tag = f"nightly-{ver}" if is_nightly(tag) else f"v{ver}"
+    url = f"https://github.com/{GITHUB_REPO}/releases/download/{gh_tag}/{name}"
+    r = requests.get(url, timeout=20, headers={"User-Agent": user_agent()})
+    r.raise_for_status()
+    if len(r.content) > 1 << 20:
+        raise ValueError(f"{name} is too large")
+    return r.content
+
+
+def signed_asset(release: dict, asset: dict) -> dict:
+    """*asset* with the SHA-256 the release's signed checksum list gives
+    it - the list signed with dopeIPTV's own key (core/update_keys.py).
+    The site sends the list and its signature with the release
+    (releases.json, nightly.json); otherwise they come from GitHub. With
+    no signature, or one that is not by that key, or the file not on the
+    list, the update stops: a site or mirror taken over cannot serve
+    anything this accepts."""
+    keys = []
+    for k in UPDATE_KEYS:
+        try:
+            keys.append(base64.b64decode(k, validate=True))
+        except ValueError:
+            continue
+    if not keys:
+        # A test build made before the release key existed: the checksum
+        # the release gives is all there is. Never a release - the build
+        # signs it with the key this carries, or refuses (tools/sign_sums.py).
+        log.warning("update: this build carries no release key; checksum only")
+        return asset
+    tag = str(release.get("tag") or "")
+    name = asset.get("name")
+    # The site's copy first; GitHub's when that one is missing, stale or
+    # does not check out - the signature, not where it came from, decides.
+    for where in ("site", "GitHub"):
+        try:
+            if where == "site":
+                sums, sig = release.get("sums"), release.get("sums_sig")
+                if not (sums and sig):
+                    continue
+            else:
+                sums, sig = _github_file(tag, "SHA256SUMS"), _github_file(tag, "SHA256SUMS.sig")
+            data = sums.encode() if isinstance(sums, str) else bytes(sums)
+            raw_sig = base64.b64decode(sig.strip() if isinstance(sig, (str, bytes)) else b"",
+                                       validate=True)
+        except Exception as e:
+            log.error("update: no signed checksum list for %s from %s: %s", tag, where, e)
+            continue
+        if not any(ed25519.verify(k, data, raw_sig) for k in keys):
+            log.error("update: the checksum list of %s from %s is not signed with "
+                      "dopeIPTV's key", tag, where)
+            continue
+        for line in data.decode("utf-8", "replace").splitlines():
+            m = _SUMS_LINE.fullmatch(line.strip())
+            if m and m.group(2) == name:
+                return dict(asset, digest="sha256:" + m.group(1).lower())
+        log.error("update: %s is not on the signed checksum list of %s from %s",
+                  name, tag, where)
+    raise UpdateError("upd_err_unsigned")
+
+
 def _expected_sha256(asset: dict) -> str | None:
     digest = str(asset.get("digest") or "")
     m = re.fullmatch(r"sha256:([0-9a-fA-F]{64})", digest)
@@ -119,6 +188,12 @@ def download(asset: dict, dest: Path,
     or mismatching file before raising."""
     size = int(asset.get("size") or 0)
     sha = _expected_sha256(asset)
+    # Nothing is fetched that cannot be checked, or from an address that
+    # is not https.
+    if not str(asset.get("url") or "").startswith("https://"):
+        raise UpdateError("upd_err_not_https")
+    if not sha:
+        raise UpdateError("upd_err_no_checksum")
     h = hashlib.sha256()
     got = 0
     try:
@@ -139,11 +214,8 @@ def download(asset: dict, dest: Path,
                         progress(got, total)
         if size and got != size:
             raise UpdateError("upd_err_incomplete", got=got, size=size)
-        if sha and h.hexdigest() != sha:
+        if h.hexdigest() != sha:
             raise UpdateError("upd_err_checksum")
-        if not sha:
-            log.warning("update: release lists no SHA-256 for %s; size "
-                        "checked only", asset.get("name"))
     except UpdateError:
         dest.unlink(missing_ok=True)
         raise
@@ -207,6 +279,7 @@ def install(release: dict, current_version: str,
     asset = pick_asset(release.get("assets") or [], tag, cpu)
     if asset is None:
         raise UpdateError("upd_err_no_asset", cpu=cpu)
+    asset = signed_asset(release, asset)
     target = target_path(current, current_version, tag)
     part = target.with_name(f".{target.name}.part")
     download(asset, part, progress, cancel)

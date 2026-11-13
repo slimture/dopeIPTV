@@ -106,6 +106,21 @@ jobs:
             PUB=false
           fi
           echo "publish=${PUB}" >> "$GITHUB_OUTPUT"
+      - name: Sign the checksums
+        if: steps.gather.outputs.publish == 'true'
+        env:
+          DOPEIPTV_UPDATE_KEY: ${{ secrets.DOPEIPTV_UPDATE_KEY }}
+        run: |
+          # The app installs an update only when its file is on this list,
+          # signed with dopeIPTV's key (dopeiptv/core/update_keys.py) - so a
+          # site or mirror taken over cannot serve one it accepts.
+          (cd out && sha256sum -- * > ../SHA256SUMS)
+          mv SHA256SUMS out/
+          if [ -z "$DOPEIPTV_UPDATE_KEY" ]; then
+            echo "::warning::DOPEIPTV_UPDATE_KEY is not set: this test build is not signed, and the app will not install it"
+          else
+            python3 tools/sign_sums.py out/SHA256SUMS
+          fi
       - name: Notes
         if: steps.gather.outputs.publish == 'true'
         run: |

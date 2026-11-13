@@ -102,6 +102,7 @@ class FakeTools:
 
 def install_with(monkeypatch, mac_app, tools):
     monkeypatch.setattr(macupdate, "can_self_update", lambda: True)
+    monkeypatch.setattr(macupdate, "signed_asset", lambda rel, asset: asset)
     monkeypatch.setattr(macupdate, "download", lambda asset, dest, p, c: dest.write_text("dmg"))
     monkeypatch.setattr(macupdate.subprocess, "run", tools.run)
     macupdate._team_id.cache_clear()
@@ -152,6 +153,7 @@ def test_a_test_build_is_held_to_our_signature_not_to_notarisation(monkeypatch, 
     # Test builds are signed but never sent to Apple (release.yml).
     tools = FakeTools(tmp_path / "mnt", gatekeeper="rejected\nsource=Unnotarized Developer ID")
     monkeypatch.setattr(macupdate, "can_self_update", lambda: True)
+    monkeypatch.setattr(macupdate, "signed_asset", lambda rel, asset: asset)
     monkeypatch.setattr(macupdate, "download", lambda asset, dest, p, c: dest.write_text("dmg"))
     monkeypatch.setattr(macupdate.subprocess, "run", tools.run)
     macupdate._team_id.cache_clear()

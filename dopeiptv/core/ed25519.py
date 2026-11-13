@@ -2,7 +2,7 @@
 
 The releases are signed with dopeIPTV's own key (release.yml, nightly.yml:
 tools/sign_sums.py), and the app checks the signature before it installs an
-update (core/updatesig.py). Plain Python, so the frozen app needs no
+update (core/selfupdate.py, signed_asset). Plain Python, so the frozen app needs no
 cryptography library for one check per update; it takes a few milliseconds.
 Verification needs no secret and runs in no particular time; signing is
 done on GitHub's machines only.

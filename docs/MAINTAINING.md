@@ -143,9 +143,32 @@ Only names here - the values are with the owner.
 | Apple Developer Program (Solecraft AB, team `6QR76TBT4J`) | the macOS builds' signature and notarisation - see "macOS signing" below | the .dmg is signed ad hoc and users allow the first start under Privacy & Security |
 | GitHub Actions secrets `MACOS_CERT_P12`, `MACOS_CERT_PASSWORD` | the Developer ID Application certificate with its private key (base64 of the exported .p12) and the export password | as above |
 | GitHub Actions secrets `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID` | an App Store Connect API team key (Developer access) for `notarytool` | a release fails at notarising - the certificate alone signs but is not enough |
+| GitHub Actions secret `DOPEIPTV_UPDATE_KEY` | dopeIPTV's release signing key (Ed25519, base64): release.yml's `checksums` job and nightly.yml sign each release's `SHA256SUMS` with it (`tools/sign_sums.py`); its public half is in `dopeiptv/core/update_keys.py`. Made once with `tools/make_update_key.py`; the only backup is the owner's password manager - see "The release key" below | a release fails at signing; a test build goes out unsigned and the app will not install it |
 
 A source checkout works without any of these. For local testing, set
 `DOPEIPTV_TMDB_KEY` / `DOPEIPTV_OPENSUBTITLES_KEY` in the environment.
+
+### The release key
+
+From 1.4.5 the app installs an update - on Linux, Windows and macOS alike -
+only when the file is on the release's `SHA256SUMS`, signed with
+dopeIPTV's own key (`dopeiptv/core/selfupdate.py`, `signed_asset`). The
+site sends the list and its signature with the release (`releases.json`,
+`nightly.json`; `sync-releases.sh` moves the site to a release only once it
+is signed); otherwise they come from GitHub. A site or mirror taken over,
+or a checksum changed beside the file, gets nothing installed.
+
+- The private key is made once on the owner's own computer
+  (`python3 tools/make_update_key.py`) and kept in two places only: the
+  Actions secret `DOPEIPTV_UPDATE_KEY` and the owner's password manager. It
+  is never sent to anyone, never committed, never on the web server.
+- Lose it, and the copies out there accept no update from inside the app
+  until a new version is installed by hand. To change keys: add the new
+  public half to `UPDATE_KEYS` beside the old one, release, and only once
+  that release is widespread sign with the new key and drop the old one.
+- `tools/sign_sums.py` refuses a secret whose public half the app does not
+  carry, so a wrong secret stops the build instead of shipping a release
+  no app will install.
 
 ### macOS signing
 

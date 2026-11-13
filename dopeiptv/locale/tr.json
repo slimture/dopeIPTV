@@ -1134,5 +1134,8 @@
   "update_install_now": "Şimdi yükle",
   "update_later": "Sonra",
   "update_failed_title": "Güncelleme yüklenmedi",
-  "update_nothing_changed": "Hiçbir şey değiştirilmedi."
+  "update_nothing_changed": "Hiçbir şey değiştirilmedi.",
+  "upd_err_no_checksum": "Yeni sürüm bir sağlama toplamı belirtmiyor, bu yüzden denetlenemiyor.",
+  "upd_err_not_https": "Yeni sürümün adresi güvenli (https) değil.",
+  "upd_err_unsigned": "Yeni sürüm dopeIPTV'nin anahtarıyla imzalanmamış."
 }

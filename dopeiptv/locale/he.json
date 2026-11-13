@@ -1134,5 +1134,8 @@
   "update_install_now": "התקנה עכשיו",
   "update_later": "מאוחר יותר",
   "update_failed_title": "העדכון לא הותקן",
-  "update_nothing_changed": "שום דבר לא שונה."
+  "update_nothing_changed": "שום דבר לא שונה.",
+  "upd_err_no_checksum": "הגרסה החדשה לא מציינת סכום ביקורת, ולכן אי אפשר לבדוק אותה.",
+  "upd_err_not_https": "הכתובת של הגרסה החדשה אינה מאובטחת (https).",
+  "upd_err_unsigned": "הגרסה החדשה אינה חתומה במפתח של dopeIPTV."
 }

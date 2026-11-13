@@ -1134,5 +1134,8 @@
   "update_install_now": "Installer maintenant",
   "update_later": "Plus tard",
   "update_failed_title": "La mise à jour n'a pas été installée",
-  "update_nothing_changed": "Rien n’a été modifié."
+  "update_nothing_changed": "Rien n’a été modifié.",
+  "upd_err_no_checksum": "La nouvelle version n'indique aucune somme de contrôle : elle ne peut pas être vérifiée.",
+  "upd_err_not_https": "L'adresse de la nouvelle version n'est pas sécurisée (https).",
+  "upd_err_unsigned": "La nouvelle version n'est pas signée avec la clé de dopeIPTV."
 }

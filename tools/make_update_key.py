@@ -10,7 +10,7 @@ It prints two lines:
             (Settings -> Secrets and variables -> Actions -> New repository
             secret), and into your password manager as the only backup.
             Never anywhere else: whoever has it can sign an update.
-  PUBLIC  - goes into the app (dopeiptv/core/updatesig.py, UPDATE_KEYS);
+  PUBLIC  - goes into the app (dopeiptv/core/update_keys.py, UPDATE_KEYS);
             it is no secret.
 
 Lose the private key, and the apps out there accept no further update from

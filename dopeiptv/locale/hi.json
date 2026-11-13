@@ -1134,5 +1134,8 @@
   "update_install_now": "अभी इंस्टॉल करें",
   "update_later": "बाद में",
   "update_failed_title": "अपडेट इंस्टॉल नहीं हुआ",
-  "update_nothing_changed": "कुछ भी नहीं बदला गया।"
+  "update_nothing_changed": "कुछ भी नहीं बदला गया।",
+  "upd_err_no_checksum": "नए संस्करण में कोई चेकसम नहीं दिया गया, इसलिए इसकी जाँच नहीं हो सकती।",
+  "upd_err_not_https": "नए संस्करण का पता सुरक्षित (https) नहीं है।",
+  "upd_err_unsigned": "नया संस्करण dopeIPTV की कुंजी से हस्ताक्षरित नहीं है।"
 }

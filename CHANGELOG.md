@@ -45,6 +45,12 @@ and macOS, fetched from dopeiptv.org.
   this way on 13 November 2026 (the app inside is unchanged); test builds
   are signed but not notarised.
 
+- Updates are signed: release.yml and nightly.yml sign each release's
+  SHA256SUMS with dopeIPTV's own Ed25519 key (a GitHub Actions secret), and
+  the app installs an update only when the file is on a list signed so -
+  sent by the site with the release, else fetched from GitHub. Nothing is
+  fetched over plain http, and nothing without a checksum.
+
 ### Fixed
 
 - Home without a provider: its top bar was squeezed to a sliver - the

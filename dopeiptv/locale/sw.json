@@ -1134,5 +1134,8 @@
   "update_install_now": "Sakinisha sasa",
   "update_later": "Baadaye",
   "update_failed_title": "Sasisho halikusakinishwa",
-  "update_nothing_changed": "Hakuna kilichobadilishwa."
+  "update_nothing_changed": "Hakuna kilichobadilishwa.",
+  "upd_err_no_checksum": "Toleo jipya halina checksum, kwa hiyo haliwezi kukaguliwa.",
+  "upd_err_not_https": "Anwani ya toleo jipya si salama (https).",
+  "upd_err_unsigned": "Toleo jipya halijasainiwa kwa ufunguo wa dopeIPTV."
 }

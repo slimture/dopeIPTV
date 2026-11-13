@@ -25,8 +25,11 @@ on the newest version.**
 
 - **Stalker and Ministra portals on the welcome screen**, beside Xtream
   and M3U: the portal's address and a MAC address.
-- **Updates come from dopeiptv.org.** The site counts how many updates are
-  made, by version and system - never who makes them.
+- **Updates come from dopeiptv.org - and only genuine ones are installed.**
+  Every release is signed with dopeIPTV's own key, and the app checks the
+  signature before it installs anything, so not even a server taken over
+  could slip in something else. The site counts how many updates are made,
+  by version and system - never who makes them.
 - **Home without a provider** shows its top bar again - the way back was
   cut off.
 

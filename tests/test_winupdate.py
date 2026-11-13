@@ -62,6 +62,7 @@ def test_the_installer_is_downloaded_into_the_temp_folder(monkeypatch, tmp_path)
     monkeypatch.setattr(winupdate, "arch", lambda: "x64")
     monkeypatch.setattr(winupdate, "update_folder", lambda: tmp_path / "dopeIPTV-update")
     got = {}
+    monkeypatch.setattr(winupdate, "signed_asset", lambda rel, asset: asset)
     monkeypatch.setattr(winupdate, "download", lambda asset, dest, p, c: got.update(name=asset["name"], dest=dest))
     path = winupdate.install({"tag": "v1.4.5", "assets": assets("1.4.5")}, "1.4.4")
     assert path == tmp_path / "dopeIPTV-update" / "dopeIPTV-1.4.5-windows-x64-setup.exe" == got["dest"]

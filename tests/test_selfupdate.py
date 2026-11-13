@@ -9,6 +9,7 @@ pass or fail --self-check) and a fake download.
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import os
 import sys
@@ -16,12 +17,25 @@ from pathlib import Path
 
 import pytest
 
-from dopeiptv.core import desktop_entry, selfupdate, updates
+from dopeiptv.core import desktop_entry, ed25519, selfupdate, updates
 from dopeiptv.core.selfupdate import UpdateError
 from dopeiptv.i18n import tr
 
 pytestmark = pytest.mark.skipif(not sys.platform.startswith("linux"),
                                 reason="AppImages are Linux-only")
+
+# A release signing key for these tests only (the app carries the real one).
+TEST_SEED = bytes(range(32))
+TEST_KEY = base64.b64encode(ed25519.public_key(TEST_SEED)).decode()
+
+
+def signed(release: dict) -> dict:
+    """*release* with a checksum list of its assets, signed with TEST_SEED."""
+    sums = "".join(f"{a['digest'].split(':', 1)[1]}  {a['name']}\n"
+                   for a in release["assets"] if str(a.get("digest", "")).startswith("sha256:"))
+    sig = base64.b64encode(ed25519.sign(TEST_SEED, sums.encode())).decode()
+    return dict(release, sums=sums, sums_sig=sig)
+
 
 GOOD = b"#!/bin/sh\n[ \"$1\" = --self-check ] && exit 0\nexit 0\n"
 BROKEN = b"#!/bin/sh\nexit 1\n"
@@ -56,6 +70,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv("APPIMAGE", str(current))
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
     monkeypatch.setattr(selfupdate.platform, "machine", lambda: "x86_64")
+    monkeypatch.setattr(selfupdate, "UPDATE_KEYS", (TEST_KEY,))
     served: dict = {}
 
     class _Requests:
@@ -73,10 +88,10 @@ def _release(served: dict, body: bytes, version: str = "1.2.15",
     url = f"https://example.invalid/{name}"
     served[url] = body
     sha = digest or "sha256:" + hashlib.sha256(body).hexdigest()
-    return {"tag": f"v{version}", "assets": [
+    return signed({"tag": f"v{version}", "assets": [
         {"name": f"dopeIPTV-{version}-aarch64.AppImage", "url": url + "-arm",
          "size": 1, "digest": ""},
-        {"name": name, "url": url, "size": len(body), "digest": sha}]}
+        {"name": name, "url": url, "size": len(body), "digest": sha}]})
 
 
 def _leftovers(folder: Path) -> list[str]:
@@ -360,3 +375,108 @@ def test_the_restart_keeps_the_entry_it_was_launched_from(monkeypatch, tmp_path)
     selfupdate.restart_into(tmp_path / "dopeIPTV.AppImage", pid=1)
     assert seen["env"]["GIO_LAUNCHED_DESKTOP_FILE"] == "/x/applications/a.desktop"
     assert "APPIMAGE" not in seen["env"]
+
+
+def _asset(name="dopeIPTV-1.4.6-x86_64.AppImage", digest="sha256:" + "ab" * 32):
+    return {"name": name, "url": f"https://dopeiptv.org/dl.php?f={name}", "size": 3, "digest": digest}
+
+
+class _Got:
+    def __init__(self, body: bytes):
+        self.content = body
+
+    def raise_for_status(self):
+        pass
+
+
+def _github_has(monkeypatch, rel: dict | None) -> list:
+    """GitHub's copy of the release's signed list - *rel*'s, or none."""
+    asked: list = []
+
+    def get(url, **_kw):
+        asked.append(url)
+        if rel is None:
+            raise OSError("no network")
+        return _Got(rel["sums"].encode() if url.endswith("/SHA256SUMS") else rel["sums_sig"].encode())
+
+    monkeypatch.setattr(selfupdate.requests, "get", get)
+    return asked
+
+
+def test_only_a_checksum_list_signed_with_the_apps_key_is_trusted(monkeypatch):
+    monkeypatch.setattr(selfupdate, "UPDATE_KEYS", (TEST_KEY,))
+    _github_has(monkeypatch, None)
+    real = "cd" * 32
+    rel = signed({"tag": "v1.4.6", "assets": [_asset(digest="sha256:" + real)]})
+    # What the site's own JSON says is replaced by the signed list's.
+    got = selfupdate.signed_asset(rel, _asset(digest="sha256:" + "00" * 32))
+    assert got["digest"] == "sha256:" + real
+    # A list changed after signing - a site taken over - is refused.
+    forged = dict(rel, sums=rel["sums"].replace(real, "ee" * 32))
+    with pytest.raises(UpdateError, match="not signed"):
+        selfupdate.signed_asset(forged, _asset())
+    # Signed with another key: refused.
+    other = base64.b64encode(ed25519.sign(bytes(32), rel["sums"].encode())).decode()
+    with pytest.raises(UpdateError, match="not signed"):
+        selfupdate.signed_asset(dict(rel, sums_sig=other), _asset())
+    # A file the signed list does not name: refused.
+    with pytest.raises(UpdateError, match="not signed"):
+        selfupdate.signed_asset(rel, _asset(name="dopeIPTV-1.4.6-evil.AppImage"))
+
+
+def test_without_the_list_on_the_site_it_comes_from_github(monkeypatch):
+    monkeypatch.setattr(selfupdate, "UPDATE_KEYS", (TEST_KEY,))
+    rel = signed({"tag": "v1.4.5.90", "assets": [_asset(name="dopeIPTV-1.4.5.90-x86_64.AppImage")]})
+    asked = _github_has(monkeypatch, rel)
+    got = selfupdate.signed_asset({"tag": "v1.4.5.90"}, _asset(name="dopeIPTV-1.4.5.90-x86_64.AppImage"))
+    assert got["digest"].startswith("sha256:")
+    assert asked == ["https://github.com/slimture/dopeIPTV/releases/download/nightly-1.4.5.90/SHA256SUMS",
+                     "https://github.com/slimture/dopeIPTV/releases/download/nightly-1.4.5.90/SHA256SUMS.sig"]
+
+    _github_has(monkeypatch, None)
+    with pytest.raises(UpdateError, match="not signed"):
+        selfupdate.signed_asset({"tag": "v1.4.6"}, _asset())
+
+
+def test_a_stale_list_on_the_site_falls_back_to_githubs(monkeypatch):
+    # The site still has the list from before a file was rebuilt (or a
+    # garbled one): GitHub's signed list decides, and the site's is not
+    # fetched again.
+    monkeypatch.setattr(selfupdate, "UPDATE_KEYS", (TEST_KEY,))
+    name = "dopeIPTV-1.4.6-x86_64.AppImage"
+    old = signed({"tag": "v1.4.6", "assets": [_asset(name="dopeIPTV-1.4.5-x86_64.AppImage")]})
+    new = signed({"tag": "v1.4.6", "assets": [_asset(name=name, digest="sha256:" + "cd" * 32)]})
+    asked = _github_has(monkeypatch, new)
+    assert selfupdate.signed_asset(old, _asset(name=name))["digest"] == "sha256:" + "cd" * 32
+    assert len(asked) == 2
+    garbled = dict(new, sums_sig="not base64!")
+    assert selfupdate.signed_asset(garbled, _asset(name=name))["digest"] == "sha256:" + "cd" * 32
+    # A good list on the site needs nothing from GitHub.
+    asked.clear()
+    selfupdate.signed_asset(new, _asset(name=name))
+    assert asked == []
+
+
+def test_nothing_is_fetched_without_https_or_a_checksum(monkeypatch, tmp_path):
+    def get(*_a, **_k):
+        raise AssertionError("nothing may be fetched")
+
+    monkeypatch.setattr(selfupdate.requests, "get", get)
+    with pytest.raises(UpdateError, match="https"):
+        selfupdate.download(dict(_asset(), url="http://dopeiptv.org/x"), tmp_path / "x")
+    with pytest.raises(UpdateError, match="checksum"):
+        selfupdate.download(_asset(digest=""), tmp_path / "x")
+
+
+def test_the_release_keys_are_ed25519_public_keys():
+    # A release cannot go out without one: tools/sign_sums.py refuses a
+    # secret whose public half is not here.
+    from dopeiptv.core.update_keys import UPDATE_KEYS
+    for k in UPDATE_KEYS:
+        assert len(base64.b64decode(k, validate=True)) == 32
+
+
+def test_a_build_without_a_key_goes_by_the_checksum(monkeypatch):
+    monkeypatch.setattr(selfupdate, "UPDATE_KEYS", ())
+    asset = _asset()
+    assert selfupdate.signed_asset({"tag": "v1.4.6"}, asset) is asset

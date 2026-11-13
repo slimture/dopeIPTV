@@ -1671,3 +1671,36 @@ jobs:
         with:
           files: ${{ env.BUNDLE }}
           body_path: RELEASE_NOTES.md
+
+  # ------------------------------------------------------------ checksums ---
+  # Once every job has attached its files: the list of the release's files
+  # and their SHA-256 (SHA256SUMS), signed with dopeIPTV's key
+  # (tools/sign_sums.py, the Actions secret DOPEIPTV_UPDATE_KEY). The app
+  # installs an update only when its file is on a list signed so
+  # (dopeiptv/core/update_keys.py), and sync-releases.sh moves the site to
+  # a release only once it is signed. Also after a .dmg is replaced.
+  checksums:
+    needs: [python-dist, linux-bundle, macos-dmg, windows-zip, flatpak]
+    if: ${{ !cancelled() && (startsWith(github.ref, 'refs/tags/') || (inputs.replace_macos_dmg || '') != '') }}
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.replace_macos_dmg || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Sign the release's checksums
+        env:
+          DOPEIPTV_UPDATE_KEY: ${{ secrets.DOPEIPTV_UPDATE_KEY }}
+        run: |
+          mkdir rel
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir rel
+          rm -f rel/SHA256SUMS rel/SHA256SUMS.sig
+          (cd rel && sha256sum -- * > ../SHA256SUMS)
+          cat SHA256SUMS
+          if [ -z "$DOPEIPTV_UPDATE_KEY" ]; then
+            echo "::error::DOPEIPTV_UPDATE_KEY is not set: the release is not signed, and the app will not install it"
+            exit 1
+          fi
+          python3 tools/sign_sums.py SHA256SUMS
+          gh release upload "$TAG" SHA256SUMS SHA256SUMS.sig --clobber --repo "$GITHUB_REPOSITORY"
+

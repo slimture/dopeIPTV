@@ -18,7 +18,9 @@ def test_the_release_workflow_can_be_called_with_a_nightly_version():
     stamp = ("      - uses: actions/checkout@v5\n"
              "      - name: Nightly version\n"
              "        if: ${{ inputs.nightly_version }}\n")
-    assert RELEASE.count(stamp) == RELEASE.count("actions/checkout@v5") == 5
+    assert RELEASE.count(stamp) == 5
+    # The sixth checkout is the checksums job's, which builds nothing.
+    assert RELEASE.count("actions/checkout@v5") == 6
 
 
 def test_a_release_still_attaches_only_on_a_tag():
@@ -47,7 +49,9 @@ def test_a_test_build_publishes_what_built_and_a_release_fails_loud():
         in RELEASE
     # What did not build is named in the notes; no AppImage, no nightly.
     assert "missing.txt" in NIGHTLY and "Not in this build" in NIGHTLY
-    assert NIGHTLY.count("if: steps.gather.outputs.publish == 'true'") == 3
+    # Gather's publish guard on the signed checksums, the notes, the
+    # pre-release and keeping the newest seven.
+    assert NIGHTLY.count("if: steps.gather.outputs.publish == 'true'") == 4
 
 
 def test_a_macos_rebuild_replaces_only_the_dmg_of_the_same_app():
@@ -58,5 +62,6 @@ def test_a_macos_rebuild_replaces_only_the_dmg_of_the_same_app():
     skip = "    if: ${{ (inputs.replace_macos_dmg || '') == '' }}\n"
     assert RELEASE.count(skip) == 4
     assert 'git diff --quiet "$TAG" HEAD -- dopeiptv requirements.txt' in RELEASE
-    assert RELEASE.count('gh release upload "$TAG"') == 1
+    # The .dmg, and the checksum list signed again after it (checksums job).
+    assert RELEASE.count('gh release upload "$TAG"') == 2
     assert 'if [ "$TAG" != "v${V}" ]; then' in RELEASE

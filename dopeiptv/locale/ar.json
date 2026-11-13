@@ -1134,5 +1134,8 @@
   "update_install_now": "ثبّت الآن",
   "update_later": "لاحقًا",
   "update_failed_title": "لم يُثبَّت التحديث",
-  "update_nothing_changed": "لم يتغيّر أي شيء."
+  "update_nothing_changed": "لم يتغيّر أي شيء.",
+  "upd_err_no_checksum": "لا يذكر الإصدار الجديد مجموعًا اختباريًا، لذا لا يمكن التحقق منه.",
+  "upd_err_not_https": "عنوان الإصدار الجديد ليس آمنًا (https).",
+  "upd_err_unsigned": "الإصدار الجديد غير موقّع بمفتاح dopeIPTV."
 }

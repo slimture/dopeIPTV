@@ -81,9 +81,12 @@ def _from_site(d: dict, nightly: bool = False) -> dict:
             "url": f"{SITE}/dl.php?f={quote(name)}",
             "size": int(a.get("size") or 0),
             "digest": f"sha256:{sha.lower()}" if re.fullmatch(r"[0-9a-fA-F]{64}", sha) else ""})
+    # The release's checksum list and its signature by dopeIPTV's key, as
+    # GitHub has them (sync-releases.sh): selfupdate.signed_asset checks them.
     return {"tag": "v" + version, "name": f"dopeIPTV {version}",
             "body": str(d.get("notes") or ""), "url": str(d.get("html_url") or ""),
-            "nightly": nightly, "assets": assets}
+            "nightly": nightly, "assets": assets,
+            "sums": str(d.get("sha256sums") or ""), "sums_sig": str(d.get("sha256sums_sig") or "")}
 
 
 def fetch_site_release() -> dict:

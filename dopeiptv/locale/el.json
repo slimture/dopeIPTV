@@ -1134,5 +1134,8 @@
   "update_install_now": "Εγκατάσταση τώρα",
   "update_later": "Αργότερα",
   "update_failed_title": "Η ενημέρωση δεν εγκαταστάθηκε",
-  "update_nothing_changed": "Δεν άλλαξε τίποτα."
+  "update_nothing_changed": "Δεν άλλαξε τίποτα.",
+  "upd_err_no_checksum": "Η νέα έκδοση δεν αναφέρει άθροισμα ελέγχου, οπότε δεν μπορεί να ελεγχθεί.",
+  "upd_err_not_https": "Η διεύθυνση της νέας έκδοσης δεν είναι ασφαλής (https).",
+  "upd_err_unsigned": "Η νέα έκδοση δεν είναι υπογεγραμμένη με το κλειδί του dopeIPTV."
 }

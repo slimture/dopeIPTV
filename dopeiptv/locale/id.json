@@ -1134,5 +1134,8 @@
   "update_install_now": "Pasang sekarang",
   "update_later": "Nanti",
   "update_failed_title": "Pembaruan tidak terpasang",
-  "update_nothing_changed": "Tidak ada yang diubah."
+  "update_nothing_changed": "Tidak ada yang diubah.",
+  "upd_err_no_checksum": "Versi baru tidak mencantumkan checksum, jadi tidak bisa diperiksa.",
+  "upd_err_not_https": "Alamat versi baru bukan alamat aman (https).",
+  "upd_err_unsigned": "Versi baru tidak ditandatangani dengan kunci dopeIPTV."
 }

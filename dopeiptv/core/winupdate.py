@@ -32,7 +32,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from .log import log
-from .selfupdate import UpdateError, download
+from .selfupdate import UpdateError, download, signed_asset
 
 # What the update dialog says once the installer is downloaded (i18n key:
 # install it, and dopeIPTV opens again); the download is checked as it
@@ -98,6 +98,7 @@ def install(release: dict, current_version: str,
     asset = pick_asset(release.get("assets") or [], tag, cpu)
     if asset is None:
         raise UpdateError("upd_err_no_setup", cpu=cpu)
+    asset = signed_asset(release, asset)
     folder = update_folder()
     folder.mkdir(parents=True, exist_ok=True)
     dest = folder / asset["name"]

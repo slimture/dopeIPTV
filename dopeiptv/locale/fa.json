@@ -1134,5 +1134,8 @@
   "update_install_now": "اکنون نصب کن",
   "update_later": "بعداً",
   "update_failed_title": "به‌روزرسانی نصب نشد",
-  "update_nothing_changed": "هیچ چیزی تغییر نکرد."
+  "update_nothing_changed": "هیچ چیزی تغییر نکرد.",
+  "upd_err_no_checksum": "نسخهٔ تازه هیچ checksum‌ای ندارد، پس نمی‌توان آن را بررسی کرد.",
+  "upd_err_not_https": "نشانی نسخهٔ تازه امن (https) نیست.",
+  "upd_err_unsigned": "نسخهٔ تازه با کلید dopeIPTV امضا نشده است."
 }
