@@ -2249,6 +2249,7 @@ class _SettingsMixin:
             if not rel or not rel.get("tag"):
                 status.setText(tr("about_check_failed"))
                 return
+            self._remember_update(rel)
             if offered(rel["tag"], VERSION, self._update_channel()):
                 status.setText(tr("about_update_available", version=rel["tag"]))
                 status.setStyleSheet(

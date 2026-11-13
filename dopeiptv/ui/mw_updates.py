@@ -103,10 +103,7 @@ class _UpdatesMixin:
             tag = rel.get("tag", "") or ""
             self.settings.setValue("update_check_ts", str(int(time.time())))
             self.settings.setValue("update_check_channel", channel)
-            self.settings.setValue("update_latest_tag", tag)
-            self.settings.setValue("update_latest_url",
-                                   (_own_file(rel) or rel.get("url", ""))
-                                   if rel.get("nightly") else "")
+            self._remember_update(rel)
             self._apply_update_state(tag)
 
         run_async(self.pool, lambda: fetch_update(GITHUB_REPO, channel),
@@ -244,6 +241,16 @@ class _UpdatesMixin:
     def _update_action_label(self) -> str:
         return (tr("update_now") if _updater() is not None
                 else tr("about_download"))
+
+    def _remember_update(self, rel: dict) -> None:
+        """What the last check found, for the banner's and About's button:
+        the version, and for a test build where to fetch it by hand. Kept
+        by every check - About's too, or its button opened the build the
+        check before had found."""
+        self.settings.setValue("update_latest_tag", rel.get("tag", "") or "")
+        self.settings.setValue("update_latest_url",
+                               (_own_file(rel) or rel.get("url", ""))
+                               if rel.get("nightly") else "")
 
     def _update_action(self) -> None:
         """The banner's / About's button: update in place where the app can,

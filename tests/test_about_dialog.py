@@ -32,6 +32,9 @@ class _Host(QMainWindow):
     def _update_action(self) -> None:
         pass
 
+    def _remember_update(self, rel: dict) -> None:
+        pass
+
 
 def _notes() -> str:
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
