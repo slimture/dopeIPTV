@@ -146,7 +146,7 @@
     "footer_releases": "リリース",
     "footer_built_by": "開発：Solecraft AB",
     "footer_docs": "ドキュメント",
-    "cred_more": "土台となっているプロジェクト",
+    "built_on": "使用している技術",
     "cred_intro": "dopeIPTV は GPL-3.0 ライセンスの<b>自由でオープンソースな</b>ソフトウェアです。広告なし、追跡なし、アカウント不要。以下のプロジェクトとサービスに支えられています:",
     "cred_playback": "再生",
     "cred_interface": "インターフェース",

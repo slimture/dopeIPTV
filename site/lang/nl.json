@@ -146,7 +146,7 @@
     "footer_releases": "Releases",
     "footer_built_by": "Gebouwd door Solecraft AB",
     "footer_docs": "Documentatie",
-    "cred_more": "De projecten waarop het bouwt",
+    "built_on": "Gebouwd op",
     "cred_intro": "dopeIPTV is <b>vrij en open source</b> onder de GPL-3.0-licentie — geen advertenties, geen tracking, geen accounts. Het bouwt op deze projecten en diensten, en heeft er veel aan te danken:",
     "cred_playback": "Weergave",
     "cred_interface": "Interface",

@@ -146,7 +146,7 @@
     "footer_releases": "发布",
     "footer_built_by": "由 Solecraft AB 打造",
     "footer_docs": "文档",
-    "cred_more": "它所依托的项目",
+    "built_on": "基于",
     "cred_intro": "dopeIPTV 是基于 GPL-3.0 许可证的<b>自由开源软件</b>——没有广告，没有跟踪，没有账户。它构建于以下项目和服务之上，并对它们心怀感激：",
     "cred_playback": "播放",
     "cred_interface": "界面",

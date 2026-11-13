@@ -1384,47 +1384,48 @@ dialog.howdlg::backdrop { background: rgba(5, 7, 10, .66); }
     var(--surface); }
 #download .dlx-big.alt, #download .dlx.has-mine .dlx-card:not(.is-mine) .dlx-big { background: var(--surface); }
 footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0; }
-/* What dopeIPTV is built on, right under the donate band: one faint
-   line; opened, a card unfolds downwards and the projects drop into
+/* What dopeIPTV is built on, right under the donate band: a heading; opened, a card unfolds downwards and the projects drop into
    place one after another, specks of the accent drifting down behind them
    (nav.js animates the height). */
-#built { --built-bg: var(--bg); padding: 0 0 72px; margin-top: -68px; }
-.is-phone #built { --built-bg: var(--surface); background: var(--surface); }
-@media (max-width: 720px) { #built { padding-bottom: 44px; margin-top: -30px; } }
-/* Closed: a pill a light runs round the edge of, slowly, over a soft glow. */
-@property --built-a { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
-.built-more > summary { list-style: none; display: flex; align-items: center; gap: 10px; width: max-content; max-width: 100%;
-  margin: 0 auto; padding: 12px 22px; border-radius: 999px; cursor: pointer; font-size: 15px; font-weight: 600;
-  color: var(--text); border: 1.5px solid transparent;
-  background: linear-gradient(color-mix(in srgb, var(--accent) 7%, var(--built-bg, var(--bg))),
-      color-mix(in srgb, var(--accent) 7%, var(--built-bg, var(--bg)))) padding-box,
-    conic-gradient(from var(--built-a), var(--accent), color-mix(in srgb, var(--accent) 25%, var(--line)) 28%,
-      var(--line) 50%, color-mix(in srgb, var(--accent) 25%, var(--line)) 72%, var(--accent)) border-box;
-  box-shadow: 0 8px 30px -10px color-mix(in srgb, var(--accent) 55%, transparent);
-  animation: built-spin 5s linear infinite;
-  transition: color .2s ease, background-color .2s ease, border-color .2s ease, transform .15s ease;
-  -webkit-tap-highlight-color: transparent; }
+#built { padding: 0 0 88px; margin-top: -72px; }
+.is-phone #built { background: var(--surface); }
+@media (max-width: 720px) { #built { padding-bottom: 48px; margin-top: -36px; } }
+/* The heading in a card of its own, near square - the donate card's
+   corners and surface, a soft glow of the accent instead of its pink. */
+.built-more > summary { position: relative; border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
+  background: radial-gradient(90% 90% at 50% 0, color-mix(in srgb, var(--accent) 16%, transparent), transparent), var(--surface);
+  box-shadow: 0 16px 48px -24px color-mix(in srgb, var(--accent) 60%, transparent);
+  transition: box-shadow .35s ease, border-color .35s ease; }
+.built-more > summary:hover, .built-more[open] > summary { border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  box-shadow: 0 20px 60px -22px color-mix(in srgb, var(--accent) 75%, transparent); }
+.is-phone .built-more > summary {
+  background: radial-gradient(90% 90% at 50% 0, color-mix(in srgb, var(--accent) 18%, transparent), transparent), var(--bg); }
+/* Closed: a heading in the page's own hand, and under it the line that
+   opens the projects, with a round chevron that turns. */
+.built-more > summary { list-style: none; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; width: max-content; max-width: 100%; min-width: 300px; min-height: 132px; margin: 0 auto; padding: 30px 44px;
+  text-align: center; cursor: pointer; border-radius: 22px; -webkit-tap-highlight-color: transparent; }
 .built-more > summary::-webkit-details-marker { display: none; }
 .built-more > summary::marker { content: ""; }
-.built-more > summary::after { content: "\203A"; font-size: 1.35em; line-height: 1; transform: rotate(90deg);
-  transition: transform .3s ease; }
-.built-more[open] > summary::after { transform: rotate(-90deg); }
-.built-more .bi { width: 19px; height: 19px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7;
-  stroke-linejoin: round; color: var(--accent); overflow: visible; }
-@keyframes built-spin { to { --built-a: 360deg; } }
-.built-more > summary:hover, .built-more[open] > summary {
-  background: linear-gradient(color-mix(in srgb, var(--accent) 14%, var(--built-bg, var(--bg))),
-      color-mix(in srgb, var(--accent) 14%, var(--built-bg, var(--bg)))) padding-box,
-    conic-gradient(from var(--built-a), var(--accent), color-mix(in srgb, var(--accent) 45%, var(--line)) 30%,
-      var(--accent) 50%, color-mix(in srgb, var(--accent) 45%, var(--line)) 70%, var(--accent)) border-box;
-  box-shadow: 0 10px 36px -8px color-mix(in srgb, var(--accent) 70%, transparent); }
-.built-more .bp { font-weight: 400; font-size: 13px; color: var(--muted); padding-inline-start: 10px;
-  border-inline-start: 1px solid var(--line-2); white-space: nowrap; }
-@media (max-width: 560px) { .built-more .bp { display: none; } .built-more > summary { font-size: 14px; padding: 11px 18px; } }
-.built-more > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.built-body { position: relative; isolation: isolate; overflow: hidden; margin-top: 12px; padding: 30px 26px 22px;
+.built-more .bt { display: inline-flex; align-items: center; gap: 12px; font-size: clamp(1.3rem, 2.6vw, 1.75rem);
+  letter-spacing: -.025em; line-height: 1.15; transition: color .25s ease; }
+.built-more .bp { font-size: 15px; color: var(--muted); transition: color .25s ease; }
+.built-more .bc { position: relative; width: 30px; height: 30px; flex: none; border-radius: 50%; color: var(--muted);
+  border: 1.5px solid var(--line-2); transition: background-color .25s ease, border-color .25s ease, transform .45s cubic-bezier(.3, 1.6, .5, 1); }
+.built-more .bc::before { content: ""; position: absolute; left: 50%; top: 45%; width: 7px; height: 7px;
+  border-right: 1.8px solid currentColor; border-bottom: 1.8px solid currentColor; transform: translate(-50%, -50%) rotate(45deg); }
+.built-more > summary:hover .bp, .built-more[open] .bp { color: var(--text); }
+.built-more > summary:hover .bc { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); transform: translateY(3px); }
+.built-more[open] .bc { transform: rotate(180deg); border-color: color-mix(in srgb, var(--accent) 60%, var(--line-2)); color: var(--accent); }
+.built-more[open] > summary:hover .bc { transform: rotate(180deg) translateY(3px); }
+.built-more .bh { transition: color .25s ease; }
+.built-more > summary:hover .bh { color: color-mix(in srgb, var(--accent) 30%, var(--text)); }
+.built-more > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (max-width: 560px) { .built-more .bp { font-size: 14px; } .built-more .bc { width: 27px; height: 27px; } }
+.built-body { position: relative; isolation: isolate; overflow: hidden; margin-top: 16px; padding: 30px 26px 22px;
   border-radius: 22px; text-align: center; border: 1px solid var(--line);
-  background: radial-gradient(90% 70% at 50% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%), var(--surface); }
+  background: radial-gradient(90% 70% at 50% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%), var(--surface); }
+.is-phone .built-body { background: radial-gradient(90% 70% at 50% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%), var(--bg); }
 .built-intro { margin: 0 auto; max-width: 60ch; font-size: 14px; line-height: 1.65; color: var(--muted); }
 .built-intro b { color: var(--text); font-weight: 600; }
 .built-body .credits-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 22px 0 18px; }
@@ -1464,7 +1465,7 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
 @keyframes built-pop { 0% { opacity: 0; transform: scale(.3) rotate(-25deg); } 100% { opacity: 1; transform: none; } }
 .built-body::before { content: ""; position: absolute; z-index: -2; left: 50%; top: -40%; width: 120%; height: 90%;
   transform: translateX(-50%); border-radius: 50%; pointer-events: none;
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 22%, transparent), transparent);
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 12%, transparent), transparent);
   animation: built-breathe 4.5s ease-in-out infinite alternate; }
 @keyframes built-breathe { from { opacity: .55; transform: translateX(-50%) scale(.92); } to { opacity: 1; transform: translateX(-50%) scale(1.08); } }
 .built-body::after { content: ""; position: absolute; z-index: -1; inset: 0; pointer-events: none; transform: translateX(-110%);
@@ -1494,13 +1495,9 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
   35% { transform: translate(14px, 160px); }
   65% { transform: translate(-12px, 320px); opacity: .45; }
   100% { transform: translate(8px, 520px); opacity: 0; } }
-/* The pill's layers part a little, hovered or open. */
-.built-more .bi path { transition: transform .4s cubic-bezier(.3, 1.7, .5, 1); }
-.built-more > summary:hover .bi .l1, .built-more[open] .bi .l1 { transform: translateY(-2.2px); }
-.built-more > summary:hover .bi .l3, .built-more[open] .bi .l3 { transform: translateY(2.2px); }
-.built-more > summary:active { transform: scale(.97); }
 @media (max-width: 720px) {
-  .built-body { padding: 24px 14px 18px; border-radius: 18px; }
+  .built-body { padding: 22px 12px 16px; border-radius: 18px; }
+  .built-more > summary { min-width: 0; min-height: 112px; padding: 24px 30px; }
   .built-body .credits-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .built-body .credit { padding: 14px 8px 12px; }
   .built-body .credit p { font-size: 14.5px; }
@@ -1509,14 +1506,32 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
   .built-more[open] .built-intro, .built-more[open] .credit, .built-more[open] .disclaimer,
   .built-more[open] .credit .ic { animation-name: built-fade; }
   .built-body::before, .built-more[open] .built-body::after { animation: none; }
-  .built-more .bi path { transition: none; }
-  .built-more > summary { animation: none; }
-  .built-more > summary:hover .bi .l1, .built-more[open] .bi .l1, .built-more > summary:hover .bi .l3, .built-more[open] .bi .l3 { transform: none; }
   .built-fx { display: none; }
-  .built-body .credit, .built-body .credit .ic, .built-more .bi { transition: background-color .2s ease; }
-  .built-body .credit:hover, .built-body .credit:hover .ic, .built-more > summary:hover .bi { transform: none; }
+  .built-body .credit, .built-body .credit .ic, .built-more .bc { transition: background-color .2s ease; }
+  .built-body .credit:hover, .built-body .credit:hover .ic, .built-more > summary:hover .bc { transform: none; }
+  .built-more[open] .bc { transform: rotate(180deg); }
 }
 @keyframes built-fade { from { opacity: 0; } }
+/* The tribute (nav.js cheer): confetti, sparks and stars over the page. */
+.built-cheer { position: absolute; left: 0; top: 0; width: 100%; z-index: 70; pointer-events: none; overflow: hidden; }
+.built-cheer i { position: absolute; width: 8px; height: 8px; border-radius: 50%; will-change: transform, opacity; }
+.built-cheer i.k1 { width: 5px; height: 13px; border-radius: 2px; }
+.built-cheer i.k2 { width: 13px; height: 13px; border-radius: 0;
+  clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%); }
+.built-cheer b { position: absolute; width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--accent); }
+.built-more > summary.cheer .bt { animation: built-glow 1.3s cubic-bezier(.2, .8, .2, 1); }
+@keyframes built-glow {
+  0% { transform: scale(1); text-shadow: none; }
+  25% { transform: scale(1.08); color: var(--accent); text-shadow: 0 0 28px color-mix(in srgb, var(--accent) 70%, transparent); }
+  60% { transform: scale(.98); }
+  100% { transform: none; text-shadow: none; } }
+/* Each project lights up once it has landed: applause. */
+.built-more[open] .credit { animation: built-deal .85s cubic-bezier(.2, .8, .2, 1) var(--d, 0s) both,
+  built-clap .9s ease-out calc(var(--d, 0s) + .6s) both; }
+@keyframes built-clap { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+  100% { box-shadow: 0 0 0 14px transparent; } }
+@media (prefers-reduced-motion: reduce) { .built-cheer { display: none; } .built-more > summary.cheer .bt { animation: none; }
+  .built-more[open] .credit { animation: built-fade .5s ease both; } }
 @media (max-width: 720px) {
   section { padding: 52px 0; }
   .sec-head h2 { font-size: 1.75rem; }
