@@ -392,13 +392,30 @@ def _hash(state: dict, *parts: str) -> str:
 #: The app updating itself (dopeiptv/core/updates.py user_agent):
 #: "dopeIPTV/1.4.4 (Windows; AMD64)" - the version it updates from.
 APP_UA = re.compile(r"^dopeIPTV/(\d+(?:\.\d+){1,3})\b")
+# A test build's file: a four-part version (dopeIPTV-1.4.5.78-x86_64.AppImage),
+# as the content server's $iptv_dl_nightly map tells it.
+TEST_BUILD = re.compile(r"^dopeiptv[-_]\d+(?:\.\d+){3}[-_.]", re.I)
 
 
-def _app_update(stats: dict, day: str, name: str, ua: str, ip: str, state: dict) -> None:
+def update_channel(name: str) -> str:
+    """"test" for a test build's file, "release" otherwise."""
+    return "test" if TEST_BUILD.match(name or "") else "release"
+
+
+# The newest updates, for the admin page's live line (admin.live): when,
+# which file, from which version, the country, and whether from your own
+# network - no address. The last few only, in state.json.
+RECENT_UPDATES = 30
+
+
+def _app_update(stats: dict, day: str, name: str, ua: str, ip: str, state: dict,
+                own: bool = False, t: int = 0, db=None) -> None:
     """An update the app fetched for itself: counted apart from downloads
     (a browser's), by platform, by file (the version it goes to) and by the
     version it comes from - once per address, file and day, and never a
-    visit: no page was seen."""
+    visit: no page was seen. One from your own network (*own*: an address
+    that is not counted) is kept apart, release or test build, so a test
+    of the update shows without being counted."""
     m = APP_UA.match(ua)
     if not m:
         return
@@ -408,7 +425,14 @@ def _app_update(stats: dict, day: str, name: str, ua: str, ip: str, state: dict)
         if h in seen:
             return
         seen.append(h)
+    country = (db.country(ip) if db is not None and ip and ip != "-" else "") or ""
+    recent = state.setdefault("recent_updates", [])
+    recent.append([t, name[:120], m.group(1)[:20], country, 1 if own else 0])
+    del recent[:-RECENT_UPDATES]
     d = _day(stats, day)
+    if own:
+        _bump(d.setdefault("update_own", {}), update_channel(name))
+        return
     _bump(d.setdefault("updates", {}), platform_of(name))
     _bump(d.setdefault("update_files", {}), name[:120])
     _bump(d.setdefault("update_from", {}), m.group(1)[:20])
@@ -416,7 +440,7 @@ def _app_update(stats: dict, day: str, name: str, ua: str, ip: str, state: dict)
 
 def _download(stats: dict, line: str, state: dict, visits: Visits | None = None, db=None) -> None:
     m = DL_LINE.search(line)
-    if not m or m.group(5) != "302" or not counted(m.group(7) or ""):
+    if not m or m.group(5) != "302":
         return
     dd, mon, yyyy, name = m.group(1), m.group(2), m.group(3), m.group(4)
     if mon not in MONTHS:
@@ -425,8 +449,9 @@ def _download(stats: dict, line: str, state: dict, visits: Visits | None = None,
     name = name.rsplit("/", 1)[-1]
     ip = m.group(7) or ""
     if APP_UA.match(m.group(6)):
-        return _app_update(stats, day, name, m.group(6), ip, state)
-    if not browser(m.group(6)):
+        return _app_update(stats, day, name, m.group(6), ip, state, own=not counted(ip),
+                           t=_dl_epoch(line), db=db)
+    if not counted(ip) or not browser(m.group(6)):
         return
     if ip and ip != "-":
         h = _hash(state, ip, m.group(6), name)

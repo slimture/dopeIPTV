@@ -409,6 +409,11 @@ How it counts, so the numbers are honest:
   and per version updated from, once per address and file a day - and
   `sync-releases.sh` leaves them out of the public download counter.
   `releases.json` lists each file's size and SHA-256, which the app checks.
+  The admin page splits them into release and test build (a file with a
+  four-part version), keeps one from your own network apart (shown, not
+  counted), and the Visitors tab shows the newest few as they come - from
+  the last 30 the collector keeps in `state.json` (time, file, version
+  from, country; no address).
   Test builds the same way: `sync-releases.sh` writes the newest one to
   `nightly.json` (linked from nowhere), and `/dl.php` counts a test
   build's file and sends it on to its pre-release on GitHub - nothing of

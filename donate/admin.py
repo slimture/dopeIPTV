@@ -220,7 +220,7 @@ def _timed(row: dict) -> int:
     return row["timed"] if "timed" in row else row.get("visits", 0)
 LISTS = ("pages", "refs", "channels", "sources", "langs", "os", "os_versions", "devices", "countries",
          "browsers", "browser_versions", "screens", "downloads", "files", "events",
-         "updates", "update_files", "update_from")
+         "updates", "update_files", "update_from", "update_own")
 
 
 def _updates(row: dict) -> int:
@@ -481,10 +481,15 @@ def live(stats_dir: str, downloads_json: str) -> dict:
                      if isinstance(d, list) and len(d) > 1), reverse=True)[:5]
     stats = _load(os.path.join(stats_dir, "stats.json"), {"days": {}})
     row = _net((stats.get("days") or {}).get(today.isoformat()) or {})
-    rev += f".{_updates(row)}"                  # an update makes no visit
+    own = sum((row.get("update_own") or {}).values())
+    rev += f".{_updates(row)}.{own}"            # an update makes no visit
+    st = _load(os.path.join(stats_dir, "state.json"), {})
+    upd = sorted((r for r in (st.get("recent_updates") or []) if isinstance(r, list) and len(r) >= 5),
+                 key=lambda r: r[0] or 0, reverse=True)[:5]
     return {"at": int(now), "rev": rev, "updated": stats.get("updated"), "window": LIVE_WINDOW, "here": len(here),
-            "today": {"visitors": row.get("visitors", 0), "views": row.get("views", 0), "updates": _updates(row)},
-            "recent": recent, "dl": download_counts(stats_dir, downloads_json)}
+            "today": {"visitors": row.get("visitors", 0), "views": row.get("views", 0), "updates": _updates(row),
+                      "updates_own": own},
+            "recent": recent, "updates_recent": upd, "dl": download_counts(stats_dir, downloads_json)}
 
 
 def _anon_by_day(stats_dir: str) -> dict:

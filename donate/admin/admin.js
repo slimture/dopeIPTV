@@ -135,7 +135,8 @@
     const p = Math.round((now - before) / before * 100);
     return (p > 0 ? "▲ " : p < 0 ? "▼ " : "") + Math.abs(p) + "%";
   }
-  function tile(label, value, note, d, small) {
+  // *also*: a line under the note that shows with the comparison too.
+  function tile(label, value, note, d, small, also) {
     const t = mk("div", "kpi");
     t.append(mk("div", "label", label));
     t.append(mk("div", "value" + (small ? " small" : ""), value));
@@ -143,6 +144,7 @@
     if (d) { n.append(mk("span", "delta", d), document.createTextNode(" vs " + periodText())); }
     else if (note) { n.textContent = note; }
     t.append(n);
+    if (also) { t.append(mk("div", "note also", also)); }
     return t;
   }
   // -- the summary: what the period came to, in one sentence and three numbers --
@@ -270,17 +272,33 @@
       tile("Donate dialog", num.format(opened ? opened[1] : 0), "times opened" + (D.error ? "" : " · " + sums(D.sums)), "", true),
       // The app updating itself through dopeiptv.org: people who keep it,
       // never counted among the downloads above.
-      tile("Updates from the app", num.format(T.updates || 0), updatesNote(), delta(T.updates || 0, B.updates))
+      tile("Updates from the app", num.format(T.updates || 0), "", delta(T.updates || 0, B.updates), false, updatesNote())
     );
     void visitorsNote;
   }
 
-  // "to 1.4.5 · most from 1.4.4": where the period's updates went and came from.
+  // A test build's file has a four-part version (dopeIPTV-1.4.5.78-...).
+  const TEST_FILE = /^dopeiptv[-_](\d+(?:\.\d+){3})[-_.]/i;
+  function fileVersion(n) { return (/^dopeiptv[-_](\d+(?:\.\d+)+)[-_.]/i.exec(n || "") || [, ""])[1]; }
+  // The period's updates by channel: [release, test builds], from the files.
+  function updateSplit(files) {
+    let rel = 0, test = 0;
+    (files || []).forEach(([k, v]) => { if (TEST_FILE.test(k)) { test += v; } else if (k !== "other") { rel += v; } });
+    return [rel, test];
+  }
+  function splitText(rel, test) {
+    return num.format(rel) + " to a release · " + num.format(test) + " to a test build";
+  }
+  function ownText(rows) {
+    const own = (rows || []).reduce((a, r) => a + r[1], 0);
+    return own ? num.format(own) + " from your own network, not counted" : "";
+  }
+  // "3 to a release · 1 to a test build": the period's updates by channel.
   function updatesNote() {
-    const L = data.top, to = (L.update_files || [])[0], from = (L.update_from || [])[0];
-    if (!to) { return "the app fetches them from dopeiptv.org"; }
-    const ver = (n) => (/-(\d+(?:\.\d+)+)-/.exec(n) || [, n])[1];
-    return "most to " + ver(to[0]) + (from ? " · most from " + from[0] : "");
+    const L = data.top;
+    if (!(L.update_files || []).length && !(L.update_own || []).length) { return "the app fetches them from dopeiptv.org"; }
+    const [rel, test] = updateSplit(L.update_files);
+    return [splitText(rel, test), ownText(L.update_own)].filter(Boolean).join(" · ");
   }
 
   // -- charts ----------------------------------------------------------------------
@@ -448,9 +466,15 @@
   // The app's own updates: per system, to which file, from which version.
   function updatesCard(L) {
     const c = listCard("Updates from the app", L.updates || [], null,
-                       ["Updated to", L.update_files || [], (k) => k === "other" ? "Other files" : k.replace(/^dopeIPTV-/, "")]);
+                       ["Updated to", L.update_files || [], (k) => k === "other" ? "Other files"
+                         : k.replace(/^dopeIPTV-/, "") + (TEST_FILE.test(k) ? " (test build)" : "")]);
+    const [rel, test] = updateSplit(L.update_files);
+    const split = mk("p", "upd-split", splitText(rel, test));
+    c.querySelector(".card-head") ? c.querySelector(".card-head").after(split) : c.prepend(split);
     c.append(mk("h3", "subhead", "Updated from"), rankList(L.update_from || [], (k) => k === "other" ? "Other versions" : k));
-    c.append(mk("p", "muted", "Fetched by the app itself from dopeiptv.org, once per address and file a day - not among the downloads."));
+    const own = ownText(L.update_own);
+    c.append(mk("p", "muted", "Fetched by the app itself from dopeiptv.org, once per address and file a day - not among the " +
+      "downloads. A test build is one of the app's Test builds channel." + (own ? " Besides these: " + own + "." : "")));
     return c;
   }
   // A row each, its bar drawn behind it: as long as its share of the top one.
@@ -934,6 +958,17 @@
       title.append(here);
     }
     const parts = [title, ...cells, all];
+    if (L && L.updates_recent && L.updates_recent.length) {
+      // [time, file, from version, country, own network]
+      const upd = (u) => fileKind(u[1]) + ", " +
+        (TEST_FILE.test(u[1]) ? "test build " : "release ") + fileVersion(u[1]) + (u[2] ? " (from " + u[2] + ")" : "") +
+        (u[3] ? " · " + flag(u[3]) + " " + countryName(u[3]) : "") + (u[4] ? " · your own network" : "") +
+        ", " + ago(Math.max(0, L.at - (u[0] || L.at)));
+      const line = mk("p", "dl-latest");
+      line.append(mk("span", "muted", "Latest update from the app: "), document.createTextNode(upd(L.updates_recent[0])));
+      line.title = L.updates_recent.map(upd).join("\n");
+      parts.push(line);
+    }
     if (L && L.recent && L.recent.length) {
       const r = L.recent[0], line = mk("p", "dl-latest");
       line.append(mk("span", "muted", "Latest download: "), document.createTextNode(fileKind(r[1]) +

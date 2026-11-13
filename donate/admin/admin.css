@@ -650,3 +650,6 @@ tr:last-child td { border-bottom: 0; }
   .build-sum { padding: 12px 14px; }
   .build > :not(summary) { margin-left: 14px; margin-right: 14px; }
 }
+/* The app's updates by channel, at the head of their card. */
+.upd-split { margin: -2px 0 8px; font-size: 14px; font-weight: 600; }
+.kpi .note.also { margin-top: 3px; }
