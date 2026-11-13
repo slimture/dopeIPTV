@@ -113,9 +113,10 @@ Platform notes that are easy to forget:
      `<release version="x.y.z" date="YYYY-MM-DD">` at the top (software
      catalogs read the version there)
    - `CHANGELOG.md` - a `## [x.y.z]` section (developer detail)
-   - `RELEASE_NOTES.md` - a `## dopeIPTV x.y.z` section at the top (for
-     users; it becomes the GitHub release text and the website's "What's
-     new")
+   - `RELEASE_NOTES.md` - the new version's notes under `## dopeIPTV x.y.z`,
+     replacing the last version's (for users; it becomes the GitHub release
+     text and the website's "What's new"). One version only: every version
+     before it is in `CHANGELOG.md`, and on its own release page
 2. Push `testing`; wait for CI to be green (and ideally try the test build).
 3. Run **`tools/release.sh x.y.z`**. It never trusts a local branch: it
    fetches, merges `origin/testing` into `main`, checks that all five
