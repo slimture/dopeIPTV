@@ -32,12 +32,19 @@ def rel(tag, prerelease=False, draft=False):
 
 @pytest.fixture
 def github(monkeypatch):
-    state = {"latest": rel("v1.4.0"), "all": []}
+    # "site": dopeiptv.org's releases.json, or None for a site that does not
+    # answer (then GitHub's latest release is asked, as these tests mostly do).
+    state = {"latest": rel("v1.4.0"), "all": [], "site": None, "asked": []}
 
     class Fake:
         @staticmethod
         def get(url, params=None, headers=None, timeout=None):
-            assert headers["User-Agent"] == "dopeIPTV"
+            assert headers["User-Agent"].startswith("dopeIPTV/")
+            state["asked"].append(url)
+            if url == "https://dopeiptv.org/releases.json":
+                if state["site"] is None:
+                    raise OSError("no answer")
+                return Resp(state["site"])
             if url.endswith("/releases/latest"):
                 return Resp(state["latest"])
             assert url.endswith("/releases")
@@ -45,6 +52,44 @@ def github(monkeypatch):
 
     monkeypatch.setattr(updates, "requests", Fake)
     return state
+
+
+def site_json(version, names=("x86_64.AppImage",)):
+    return {"version": version, "notes": f"notes {version}",
+            "html_url": f"https://github.invalid/v{version}",
+            "assets": [{"name": f"dopeIPTV-{version}-{n}", "size": 7, "sha256": "ab" * 32,
+                        "url": f"/files/dopeIPTV-{version}-{n}"} for n in names]}
+
+
+def test_a_release_comes_from_dopeiptv_org_and_is_fetched_through_it(github):
+    github["site"] = site_json("1.4.1")
+    r = fetch_update(channel="stable")
+    assert r["tag"] == "v1.4.1" and r["nightly"] is False
+    assert github["asked"] == ["https://dopeiptv.org/releases.json"]   # GitHub not asked
+    a = selfupdate.pick_asset(r["assets"], r["tag"], "x86_64")
+    # Through /dl.php, which the site counts, as an update from the app.
+    assert a["url"] == "https://dopeiptv.org/dl.php?f=dopeIPTV-1.4.1-x86_64.AppImage"
+    assert a["size"] == 7 and a["digest"] == "sha256:" + "ab" * 32
+
+
+def test_github_answers_when_the_site_does_not(github):
+    github["site"] = None
+    assert fetch_update(channel="stable")["tag"] == "v1.4.0"
+    github["site"] = {"version": "", "assets": []}              # a broken file
+    assert fetch_update(channel="stable")["tag"] == "v1.4.0"
+
+
+def test_test_builds_still_come_from_github_beside_the_sites_release(github):
+    github["site"] = site_json("1.4.0")
+    github["all"] = [rel("nightly-1.4.0.15", prerelease=True)]
+    assert fetch_update(channel="nightly")["tag"] == "v1.4.0.15"
+    github["site"] = site_json("1.4.1")
+    assert fetch_update(channel="nightly")["tag"] == "v1.4.1"
+
+
+def test_the_user_agent_names_the_app_and_its_version():
+    from dopeiptv import VERSION
+    assert updates.user_agent().startswith(f"dopeIPTV/{VERSION} (")
 
 
 def test_a_nightly_slots_between_releases():

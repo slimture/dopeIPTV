@@ -31,6 +31,7 @@ from pathlib import Path
 
 from . import desktop_entry
 from ._lazy_requests import requests
+from .updates import user_agent
 from ..i18n import LocalizedError
 from .log import log
 from .xdg import system_env
@@ -117,7 +118,7 @@ def download(asset: dict, dest: Path,
     got = 0
     try:
         with requests.get(asset["url"], stream=True, timeout=30,
-                          headers={"User-Agent": "dopeIPTV"}) as r:
+                          headers={"User-Agent": user_agent()}) as r:
             r.raise_for_status()
             total = size or int(r.headers.get("Content-Length") or 0)
             with open(dest, "wb") as fh:

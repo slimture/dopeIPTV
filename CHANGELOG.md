@@ -9,6 +9,12 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Changed
 
+- Updates come from dopeiptv.org: the app asks the site for the newest
+  version and fetches it from there, as `dopeIPTV/<version>`, so the site
+  can count updates made from the app (how many, by version and system,
+  never who). GitHub answers when the site does not; test builds still
+  come from GitHub.
+
 - macOS: the .dmg files are signed with Solecraft AB's Developer ID and
   notarised by Apple, so the app opens like any other - no more Open
   Anyway under Privacy & Security. 1.4.4's own .dmg files were rebuilt
