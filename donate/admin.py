@@ -8,7 +8,9 @@ missing auth_basic line cannot open the page to everyone.
     GET /admin/data?days=N the numbers for the last N days (7, 30, 90, 365;
                            0 for everything kept)
     GET /admin/visits?day=YYYY-MM-DD&span=day|week|month|year
-                                       the visits of that day, week, month or year
+                                       the visits of that day, week, month or year,
+                                       and the app's own updates among them
+                                       (type "update" - never a visit)
     GET /admin/visitor?id=...          every visit kept of one visitor
     GET /admin/find?by=country&value=SE&days=30   the kept visits one row of
                                        the overview's lists counted
@@ -388,21 +390,28 @@ def by_channel(stats_dir: str, first: str, last: str) -> list:
 
 # -- the visitor log ----------------------------------------------------------------
 
-def _visits_file(stats_dir: str, day: str) -> list:
+def _visits_file(stats_dir: str, day: str, folder: str = "visits") -> list:
     try:
-        with open(os.path.join(stats_dir, "visits", day + ".json"), encoding="utf-8") as fh:
+        with open(os.path.join(stats_dir, folder, day + ".json"), encoding="utf-8") as fh:
             got = json.load(fh)
         return got if isinstance(got, list) else []
     except (OSError, ValueError):
         return []
 
 
-def visit_days(stats_dir: str) -> list:
+def visit_days(stats_dir: str, folder: str = "visits") -> list:
     try:
-        names = os.listdir(os.path.join(stats_dir, "visits"))
+        names = os.listdir(os.path.join(stats_dir, folder))
     except OSError:
         return []
     return sorted((n[:10] for n in names if n.endswith(".json") and len(n) == 15), reverse=True)
+
+
+def _update_rows(stats_dir: str, day: str) -> list:
+    """The app's own updates of a day (stats_collect.py: STATS_DIR/updates),
+    as rows of the visitor log: type "update", their time as a start."""
+    return [dict(u, day=day, type="update", start=u.get("t") or 0)
+            for u in _visits_file(stats_dir, day, "updates") if isinstance(u, dict) and u.get("file")]
 
 
 SPANS = ("day", "week", "month", "year")
@@ -522,7 +531,8 @@ def visits(stats_dir: str, day: str, span: str = "day") -> dict:
     detailed = visit_days(stats_dir)
     kept = set(detailed)
     anon = _anon_by_day(stats_dir)
-    periods = sorted({_span_start(date.fromisoformat(d), span).isoformat() for d in kept | set(anon)},
+    updated = set(visit_days(stats_dir, "updates"))
+    periods = sorted({_span_start(date.fromisoformat(d), span).isoformat() for d in kept | set(anon) | updated},
                      reverse=True)
     start = _span_start(at, span)
     end = _span_end(start, span)
@@ -534,6 +544,8 @@ def visits(stats_dir: str, day: str, span: str = "day") -> dict:
             lst += [dict(v, day=iso) for v in _visits_file(stats_dir, iso) if v.get("pages") or v.get("downloads")]
         else:
             lst += [a for a in anon.get(iso, []) if a.get("pages") or a.get("downloaded")]
+        if iso in updated:
+            lst += _update_rows(stats_dir, iso)
         d += timedelta(days=1)
     lst.sort(key=lambda v: (v.get("day", ""), v.get("start", 0)), reverse=True)
     return {"span": span, "day": start.isoformat(), "end": end.isoformat(), "periods": periods,

@@ -6,7 +6,10 @@
  *   group   by day, week or month, or by a data point; each group a
  *           folded row with its own sums, opened when wanted
  *   filter  country, system, browser, device, how they came, page language,
- *           and on/off: downloaded, returning, opened donate, ...
+ *           and on/off: downloaded, returning, opened donate, app updates, ...
+ *
+ * The app's own updates (type "update") are rows of the log too, but never
+ * visits: the sums count them apart.
  *
  * A long list shows a part at a time. admin.js draws the rows; this only
  * decides which, in what order and under which heading. An external file for
@@ -29,6 +32,15 @@
   // kept without (anon: a day, no time of day, no visitor).
   function facts(v) {
     if (v.f) { return v.f; }
+    if (v.type === "update") {
+      v.f = {
+        day: v.day || iso(new Date((v.start || 0) * 1000)), start: v.start || 0,
+        pages: 0, time: 0, dl: 0, acts: 0, donate: false, ret: false,
+        country: v.country || "unknown", os: v.os || "Other", browser: "dopeIPTV app", device: "Computer",
+        channel: "App update", site: "", lang: "", kind: "update", id: "", upd: true,
+      };
+      return v.f;
+    }
     const anon = !!v.anon;
     const day = v.day || iso(new Date(v.start * 1000));
     const pages = anon ? v.pages : v.pages.length;
@@ -46,7 +58,7 @@
     return v.f;
   }
   const lang = (k) => { try { return K.langNames ? K.langNames.of(k) : k; } catch (e) { return k; } };
-  const KINDS = { person: "Person", unknown: "Not sure", robot: "Likely robot" };
+  const KINDS = { person: "Person", unknown: "Not sure", robot: "Likely robot", update: "App update" };
 
   const SORTS = [
     ["new", "Newest first", (a, b) => b.start - a.start],
@@ -73,7 +85,8 @@
     ["more", "More than one page", (f) => f.pages > 1],
     ["long", "A minute or more", (f) => f.time >= 60],
     ["acts", "Used the page", (f) => f.acts > 0],
-    ["first", "First visit", (f) => !f.ret],
+    ["first", "First visit", (f) => !f.ret && !f.upd],
+    ["upd", "App update", (f) => !!f.upd],
   ];
   const weekStart = (day) => { const d = new Date(day + "T12:00:00"); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return iso(d); };
   const GROUPS = [
@@ -192,15 +205,18 @@
   }
 
   // -- the rows: filtered, sorted, grouped, a part at a time ------------------------------
-  function sums(fs) {
+  function sums(all) {
+    const ups = all.filter((f) => f.upd).length;
+    const fs = all.filter((f) => !f.upd);
     const people = new Set(fs.filter((f) => f.id).map((f) => f.id)).size;
     const dl = fs.filter((f) => f.dl).length;
     const timed = fs.filter((f) => f.time > 0);
     const t = timed.length ? timed.reduce((s, f) => s + f.time, 0) / timed.length : 0;
-    return [num.format(fs.length) + (fs.length === 1 ? " visit" : " visits"),
+    return [fs.length || !ups ? num.format(fs.length) + (fs.length === 1 ? " visit" : " visits") : "",
             people ? num.format(people) + (people === 1 ? " visitor" : " visitors") : "",
             dl ? num.format(dl) + " downloaded" : "",
-            t ? "about " + K.duration(t) + " each" : ""].filter(Boolean).join(" · ");
+            t ? "about " + K.duration(t) + " each" : "",
+            ups ? num.format(ups) + (ups === 1 ? " app update" : " app updates") : ""].filter(Boolean).join(" · ");
   }
   // Rows for admin.js to draw: visits, a group's head ({head}) or the
   // "Show more" ({more}). row(v) draws one visit.
@@ -208,7 +224,7 @@
     const sort = SORTS.find((s) => s[0] === st.sort) || SORTS[0];
     const shown = list.filter((v) => keep(facts(v))).sort((a, b) => sort[2](facts(a), facts(b)));
     if (!shown.length) {
-      const p = mk("p", "empty", "No visits match these filters. ");
+      const p = mk("p", "empty", "Nothing matches these filters. ");
       const clear = mk("button", "link", "Clear filters");
       clear.type = "button";
       clear.addEventListener("click", () => { st.sel = {}; st.flags = {}; redraw(); });

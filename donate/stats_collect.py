@@ -59,6 +59,12 @@ whether there was a download or the donate dialog - no id, no time of day,
 no screen, mixed in the month so their order tells nothing. Those, and the
 counts per day, are kept for good.
 
+Each update the app fetched for itself goes to STATS_DIR/updates/<day>.json
+for the same log: when, the file, the version it came from, the system and
+processor the app named, the country, and whether from your own network -
+no address. Never a visit, never counted as one; after STATS_VISITS_DAYS
+the day's file goes (the counts per day stay).
+
 A visitor is a hash of address and browser with a secret salt kept on this
 server: no address is written down, and the hashes are kept 25 months only
 to count unique and returning visitors (a year against the year before);
@@ -130,6 +136,7 @@ KEEP_UNIQUE_DAYS = 761    # the visitor hashes: 25 months, a year against the ye
 KEEP_PER_DAY = 40         # a day's longest lists (sites, files): the top 40, the rest summed
 VISITS_DIR = os.path.join(STATS_DIR, "visits")
 ANON_DIR = os.path.join(STATS_DIR, "visits-anon")
+UPDATES_DIR = os.path.join(STATS_DIR, "updates")
 try:
     VISITS_DAYS = max(1, int(CONF.get("STATS_VISITS_DAYS", "400")))
 except ValueError:
@@ -423,8 +430,19 @@ def update_channel(name: str) -> str:
 RECENT_UPDATES = 30
 
 
+#: "(Windows; AMD64)" in the app's user agent: the system and the processor.
+APP_SYSTEM = re.compile(r"\(([^;()]{1,40});\s*([^;()]{0,40})\)")
+
+
+def _update_row(t: int, name: str, from_version: str, country: str, own: bool, ua: str = "") -> dict:
+    """An update as the visitor log shows it (admin.py visits)."""
+    m = APP_SYSTEM.search(ua or "")
+    return {"t": t, "file": name[:120], "from": from_version[:20], "os": platform_of(name),
+            "cpu": (m.group(2).strip()[:20] if m else ""), "country": country, "own": 1 if own else 0}
+
+
 def _app_update(stats: dict, day: str, name: str, ua: str, ip: str, state: dict,
-                own: bool = False, t: int = 0, db=None) -> None:
+                own: bool = False, t: int = 0, db=None, visits: Visits | None = None) -> None:
     """An update the app fetched for itself: counted apart from downloads
     (a browser's), by platform, by file (the version it goes to) and by the
     version it comes from - once per address, file and day, and never a
@@ -444,6 +462,8 @@ def _app_update(stats: dict, day: str, name: str, ua: str, ip: str, state: dict,
     recent = state.setdefault("recent_updates", [])
     recent.append([t, name[:120], m.group(1)[:20], country, 1 if own else 0])
     del recent[:-RECENT_UPDATES]
+    if visits is not None:
+        visits.updates(day).append(_update_row(t, name, m.group(1), country, own, ua))
     d = _day(stats, day)
     if own:
         _bump(d.setdefault("update_own", {}), update_channel(name))
@@ -465,7 +485,7 @@ def _download(stats: dict, line: str, state: dict, visits: Visits | None = None,
     ip = m.group(7) or ""
     if APP_UA.match(m.group(6)):
         return _app_update(stats, day, name, m.group(6), ip, state, own=not counted(ip),
-                           t=_dl_epoch(line), db=db)
+                           t=_dl_epoch(line), db=db, visits=visits)
     if not counted(ip) or not browser(m.group(6)):
         return
     if ip and ip != "-":
@@ -606,6 +626,7 @@ class Visits:
 
     def __init__(self, uniques: dict) -> None:
         self.days: dict = {}
+        self.upd_days: dict = {}
         self.uniques = uniques
         self._sets: dict = {}
 
@@ -633,12 +654,20 @@ class Visits:
                 n += 1
         return n
 
+    def updates(self, day: str) -> list:
+        """The app's own updates of a day, for the visitor log - kept apart
+        from the visits, so nothing that counts visits ever sees them."""
+        if day not in self.upd_days:
+            self.upd_days[day] = _load_list(os.path.join(UPDATES_DIR, day + ".json"))
+        return self.upd_days[day]
+
     def save(self) -> None:
-        if not self.days:
-            return
-        os.makedirs(VISITS_DIR, mode=0o750, exist_ok=True)
-        for day, lst in self.days.items():
-            _save(os.path.join(VISITS_DIR, day + ".json"), lst)
+        for folder, days in ((VISITS_DIR, self.days), (UPDATES_DIR, self.upd_days)):
+            if not days:
+                continue
+            os.makedirs(folder, mode=0o750, exist_ok=True)
+            for day, lst in days.items():
+                _save(os.path.join(folder, day + ".json"), lst)
 
 
 def _new_visit(visits: Visits, day: str, vid: str, t: int, ip: str, ua: str, db) -> dict:
@@ -952,6 +981,8 @@ def collect(backfill: bool = False, with_fetch: bool = False) -> None:
         if with_fetch:
             fetch_geo(state)
         db = geo()
+        if not os.path.isdir(UPDATES_DIR):
+            _seed_updates(state, visits)
 
         for line in _read_new(STATS_LOG, state.setdefault("logs", {}).setdefault("stats", {})):
             try:
@@ -1003,6 +1034,18 @@ def collect(backfill: bool = False, with_fetch: bool = False) -> None:
         _save(state_path, state)
 
 
+def _seed_updates(state: dict, visits: Visits) -> None:
+    """Once, when the visitor log first shows updates: the newest ones
+    already counted (state.json's recent_updates), so today's show too."""
+    for r in state.get("recent_updates") or []:
+        if not (isinstance(r, list) and len(r) >= 5 and r[0]):
+            continue
+        day = datetime.fromtimestamp(r[0]).date().isoformat()
+        visits.updates(day).append(_update_row(r[0], str(r[1]), str(r[2] or ""), str(r[3] or ""), bool(r[4])))
+    for lst in visits.upd_days.values():
+        lst.sort(key=lambda u: u.get("t") or 0)
+
+
 def _family(os_version: str) -> str:
     return os_version.split(" (")[0].split(" ")[0] if os_version else "Other"
 
@@ -1040,6 +1083,11 @@ def _anonymize_old() -> None:
             _save(month_path, month)
         with contextlib.suppress(OSError):
             os.unlink(f)
+    # The app's updates of then: counted in stats.json already, so they go.
+    for f in glob.glob(os.path.join(UPDATES_DIR, "*.json")):
+        if os.path.basename(f)[:10] < cutoff:
+            with contextlib.suppress(OSError):
+                os.unlink(f)
 
 
 def collect_if_stale(seconds: int = 20) -> None:

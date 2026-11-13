@@ -880,6 +880,39 @@
     row.append(body);
     return row;
   }
+  // An update the app fetched for itself (stats_collect.py _app_update,
+  // admin.py visits: type "update"). No page was seen, so it is no visit:
+  // never among the visits, visitors or downloads counted above it.
+  const isUpdate = (v) => v.type === "update";
+  function updateRow(u, showDay) {
+    const row = mk("details", "visit app-update" + (u.own ? " own" : "") + (showDay ? " with-day" : ""));
+    row.dataset.id = (u.day || "") + "|" + (u.start || "") + "|" + (u.file || "");
+    const test = TEST_FILE.test(u.file || "");
+    const to = fileVersion(u.file) || "?";
+    const sum = mk("summary");
+    sum.append(
+      timeCell(new Date((u.start || 0) * 1000), showDay),
+      mk("span", "v-where", flag(u.country) + countryName(u.country)),
+      mk("span", "v-what", "dopeIPTV app · " + fileKind(u.file)),
+      mk("span", "v-from", "Updated itself"),
+      mk("span", "v-pages", (u.from ? u.from + " \u2192 " : "to ") + to));
+    const tags = mk("span", "v-tags");
+    tags.append(badge(test ? "Test build" : "Release", "app"));
+    if (u.own) { tags.append(badge("Your network")); }
+    sum.append(tags);
+    row.append(sum);
+    const body = mk("div", "v-body");
+    const facts = mk("dl", "facts");
+    [["Updated", (u.from ? "from " + u.from + " " : "") + "to " + to + (test ? ", a test build" : ", a release")],
+     ["File", u.file], ["System", [u.os, u.cpu].filter(Boolean).join(" · ")]].forEach(([k, val]) => {
+      if (val) { facts.append(mk("dt", "", k), mk("dd", "", val)); }
+    });
+    body.append(facts, mk("p", "muted", "Fetched by the app itself from dopeiptv.org. No page was seen, so it is not " +
+      "a visit and not among the visitors or downloads" + (u.own ? " - and from your own network, so not among the " +
+      "update counts either." : "; it is among the updates on the overview.")));
+    row.append(body);
+    return row;
+  }
   // What a visitor did on a page (public/events.js, donate/stats_events.py):
   // [time, event, what, hits].
   const SECTION_NAMES = { features: "Features", shots: "Screenshots", download: "Download", donate: "the donate band" };
@@ -1052,7 +1085,7 @@
       .then((res) => {
         if (!res || tab !== "visitors" || logFilter || logVisitor || logDay !== want || logSpan !== span || busyHere()) { return; }
         const box = $("visit-list");
-        const known = new Set(logList.map((v) => (v.day || "") + "|" + (v.start || "") + "|" + (v.id || "")));
+        const known = new Set(logList.map((v) => (v.day || "") + "|" + (v.start || "") + "|" + (v.id || v.file || "")));
         const open = new Set([...box.querySelectorAll("details.visit[open]")].map((d) => d.dataset.id));
         const top = $("dl-strip").getBoundingClientRect().bottom > 0 ? null :
           [...box.querySelectorAll("details.visit")].find((d) => d.getBoundingClientRect().bottom > 80);
@@ -1118,8 +1151,9 @@
     $("filter-clear").textContent = f && f.back === "analysis" ? "\u2039 Back to the analysis" : "\u2039 Back";
     $("analyse-this").hidden = !(f && f.by && FIND_DIMS[f.by] && window.AdminAnalysis);
     document.querySelectorAll("#spans button").forEach((b) => b.setAttribute("aria-checked", b.dataset.span === logSpan ? "true" : "false"));
-    const counted = logList.filter((v) => v.kind !== "robot");
-    const robots = logList.length - counted.length;
+    const ups = logList.filter(isUpdate).length;
+    const counted = logList.filter((v) => v.kind !== "robot" && !isUpdate(v));
+    const robots = logList.filter((v) => v.kind === "robot").length;
     const anon = counted.filter((v) => v.anon).length;
     const people = new Set(counted.filter((v) => !v.anon).map((v) => v.id)).size;
     let span = "";
@@ -1128,19 +1162,22 @@
       span = !days || days > kept ? " in the last " + keptFor() + " (single visits are kept that long)"
                                   : " in the last " + days + " days";
     }
-    $("day-sum").textContent = (f ? f.label + " \u00b7 " : "") +
-      num.format(counted.length) + (counted.length === 1 ? " visit" : " visits") +
-      (anon ? " \u00b7 " + num.format(anon) + " kept without details"
-            : " by " + num.format(people) + (people === 1 ? " visitor" : " visitors")) + span +
-      (robots ? " · " + num.format(robots) + (robots === 1 ? " likely robot" : " likely robots") : "");
+    const visitsText = counted.length || !ups
+      ? num.format(counted.length) + (counted.length === 1 ? " visit" : " visits") +
+        (anon ? " \u00b7 " + num.format(anon) + " kept without details"
+              : " by " + num.format(people) + (people === 1 ? " visitor" : " visitors"))
+      : "No visits";
+    $("day-sum").textContent = (f ? f.label + " \u00b7 " : "") + visitsText + span +
+      (robots ? " · " + num.format(robots) + (robots === 1 ? " likely robot" : " likely robots") : "") +
+      (ups ? " · " + num.format(ups) + (ups === 1 ? " app update" : " app updates") : "");
     const tog = $("robots-toggle");
     tog.hidden = !robots;
     tog.textContent = showRobots ? "Hide" : "Show";
     tog.setAttribute("aria-pressed", showRobots ? "true" : "false");
-    const list = showRobots ? logList : counted;
+    const list = showRobots ? logList : logList.filter((v) => v.kind !== "robot");
     const none = f ? "No visits kept for this." : "No visits this " + logSpan + ".";
     const many = !!f || logSpan !== "day";
-    const row = (v) => (v.anon ? anonRow(v) : visitRow(v, many));
+    const row = (v) => (isUpdate(v) ? updateRow(v, many) : v.anon ? anonRow(v) : visitRow(v, many));
     const LT = window.LogTools, shownFor = f ? "group" : logSpan;
     if (LT) { LT.bar($("log-tools"), list, shownFor, drawLog); }
     $("visit-list").replaceChildren(...(!list.length ? [mk("p", "empty", robots ? "Only likely robots." : none)]
