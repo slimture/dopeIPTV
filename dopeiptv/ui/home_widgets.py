@@ -584,11 +584,21 @@ class _Hero(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
         self.setSizePolicy(QSizePolicy.Policy.Expanding,
                            QSizePolicy.Policy.Fixed)
-        v = QVBoxLayout(self)
-        v.setContentsMargins(40, 14, 40, 22)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(40, 14, 40, 22)
+        outer.setSpacing(0)
+        outer.addWidget(bar)
+        outer.addStretch(1)
+        # The featured title, in a box of its own: hidden whole when there is
+        # nothing to feature - its spacing too, which hidden labels leave
+        # behind and which squeezed the bar to a sliver (no provider yet:
+        # the back chip cut off, no way out of Home).
+        self._detail_box = QWidget(objectName="HeroDetail")
+        self._detail_box.setStyleSheet("#HeroDetail { background: transparent; }")
+        outer.addWidget(self._detail_box)
+        v = QVBoxLayout(self._detail_box)
+        v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(0)
-        v.addWidget(bar)
-        v.addStretch(1)
         self._kicker = self._label(12, 800, P["accent"])
         self._title = self._label(36, 800, P["text"])
         self._title.setWordWrap(True)
@@ -632,9 +642,8 @@ class _Hero(QWidget):
         row.addLayout(self._dots)
         row.addStretch(1)
         v.addLayout(row)
-        self._detail = [self._kicker, self._title, self._meta, self._plot,
-                        self._play_btn, self._info_btn]
-        self._bar_h = bar.sizeHint().height()
+        self._bar = bar
+        self._bar_h = max(bar.sizeHint().height(), bar.minimumHeight())
         self._timer = QTimer(self)
         self._timer.setInterval(self.TURN_MS)
         self._timer.timeout.connect(lambda: self.show_item(self._i + 1))
@@ -659,8 +668,9 @@ class _Hero(QWidget):
         self._art.clear()
         self._bg = None
         has = bool(self._items)
-        for wdg in self._detail:
-            wdg.setVisible(has)
+        self._detail_box.setVisible(has)
+        self._bar_h = max(self._bar_h, self._bar.sizeHint().height(),
+                          self._bar.minimumHeight())
         while self._dots.count():
             d = self._dots.takeAt(0).widget()
             if d is not None:

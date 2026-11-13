@@ -71,7 +71,7 @@ def test_the_strip_is_just_the_bar_with_nothing_to_feature():
     bar.setFixedHeight(40)
     hero = _Hero(bar, None, lambda it, kind: None)
     assert hero.height() < HERO_H
-    assert hero._title.isHidden()
+    assert hero._detail_box.isHidden()
     hero.set_items([({"name": "Copper Sky (2022)", "rating": "7"}, "vod",
                      "#1 · Popular"),
                     ({"name": "Signal"}, "series", "#1 · Series")])
@@ -87,6 +87,27 @@ def test_the_strip_is_just_the_bar_with_nothing_to_feature():
     assert played == [("Copper Sky (2022)", "vod"), ("Signal", "series")]
     hero.set_items([])
     assert hero.height() < HERO_H and not hero._timer.isActive()
+
+
+def test_with_nothing_to_feature_the_bar_keeps_its_whole_height():
+    # No provider yet: the strip is only the bar - the back chip, the nav
+    # and the heart. The hidden title's spacing once squeezed it to a
+    # sliver, the chips cut off and no way out of Home.
+    from PyQt6.QtWidgets import QHBoxLayout
+    bar = QWidget()
+    h = QHBoxLayout(bar)
+    h.setContentsMargins(0, 4, 0, 4)
+    chip = QWidget()
+    chip.setFixedSize(34, 34)
+    h.addWidget(chip)
+    hero = _Hero(bar, None, lambda it, kind: None)
+    hero.resize(1200, hero.height())
+    hero.layout().activate()
+    assert bar.height() >= 42 and chip.height() == 34
+    hero.set_items([({"name": "Copper Sky"}, "vod", "#1")])
+    hero.set_items([])
+    hero.layout().activate()
+    assert bar.height() >= 42
 
 
 def test_featured_is_the_chart_first_else_what_was_added_last():
