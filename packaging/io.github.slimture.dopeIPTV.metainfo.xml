@@ -58,6 +58,11 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.4.5" date="2026-11-13">
+      <description>
+        <p>An installer for Windows, and updates that install themselves on Windows and macOS: Update now downloads the new version, checks it and installs it. On a Mac the new version is used only when it is signed by Solecraft AB and notarised by Apple. Updates come from dopeiptv.org, which counts how many are made, never who makes them.</p>
+      </description>
+    </release>
     <release version="1.4.4" date="2026-11-11">
       <description>
         <p>Tells you when another device or app on your account keeps taking the stream, with the account's figures when the provider gives them. The rewind buffer rides out a dropping connection instead of stuttering and jumping back, and the guide in right-to-left languages opens on what is on now. The website is now dopeiptv.org.</p>

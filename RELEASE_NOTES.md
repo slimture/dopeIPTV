@@ -1,3 +1,28 @@
+## dopeIPTV 1.4.5
+
+An installer for Windows, and updates that install themselves on Windows
+and macOS.
+
+- **An installer for Windows.** dopeIPTV installs for your own user
+  without asking for an administrator, and shows up in the Start menu and
+  under Settings → Apps. The portable zip is still there. The first time,
+  Windows may say *"Windows protected your PC"*: click **More info → Run
+  anyway**.
+- **Windows and macOS update themselves.** When a new version is out,
+  **Update now** in the banner or in About downloads it, checks it,
+  installs it and opens dopeIPTV again. On a Mac the new version is only
+  used when it is signed by Solecraft AB and notarised by Apple. On
+  Windows this works for a copy installed with the installer; the
+  portable zip opens the download page as before.
+- **The Mac app is signed and notarised**, so it opens like any other app,
+  with no Open Anyway in System Settings.
+- **Updates come from dopeiptv.org.** The site counts how many updates are
+  made, by version and system - never who makes them.
+
+On the AppImage from 1.2.15 or later? Click **Update now** in the banner.
+On Windows and macOS, download 1.4.5 once from
+[dopeiptv.org](https://dopeiptv.org) - from then on it updates itself.
+
 ## dopeIPTV 1.4.4
 
 Smoother playback when the connection drops, and a warning when another
