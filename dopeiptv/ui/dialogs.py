@@ -985,6 +985,107 @@ class ProblemDialog(QDialog):
         close.setFocus()
 
 
+def health_secs(value: float | None) -> str:
+    """Seconds as the app's language writes them ("2,4 s"); a dash for none."""
+    if value is None:
+        return "–"
+    from .qt_i18n import app_locale
+    return tr("health_secs", s=app_locale().toString(float(value), "f", 1))
+
+
+class StreamHealthDialog(QDialog):
+    """A channel's stream health (Nerd, core/health.py) in the look of the
+    problem window: a mark in the colour of how it is doing, a sentence,
+    then its numbers - which can be copied."""
+
+    STATES = {"ok": ("ok", "✓"), "warn": ("warn", "!"), "error": ("error", "✕")}
+
+    def __init__(self, parent, name: str, entry: dict | None) -> None:
+        super().__init__(parent)
+        from PyQt6.QtGui import QGuiApplication
+        from PyQt6.QtWidgets import QGridLayout
+
+        from ..core import health
+        from .qt_i18n import format_when
+        e = entry or {}
+        grade = health.grade(e)
+        self.setWindowTitle(tr("nerd_card_health"))
+        self.setModal(True)
+        self.setMinimumWidth(460)
+        row = QHBoxLayout(self)
+        row.setContentsMargins(24, 22, 24, 20)
+        row.setSpacing(16)
+        key, glyph = self.STATES.get(grade, ("muted", "i"))
+        colour = P.get(key, P["muted"])
+        mark = QLabel(glyph)
+        mark.setFixedSize(40, 40)
+        mark.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        mark.setStyleSheet(f"border-radius:20px; border:2px solid {colour}; color:{colour};"
+                           " font-size:18px; font-weight:800;")
+        row.addWidget(mark, 0, Qt.AlignmentFlag.AlignTop)
+        col = QVBoxLayout()
+        col.setSpacing(6)
+        head = QLabel(name)
+        head.setWordWrap(True)
+        head.setStyleSheet(f"font-size:16px; font-weight:700; color:{P['text']};")
+        self.summary = QLabel(tr({"ok": "health_sum_ok", "warn": "health_sum_warn",
+                                  "error": "health_sum_error"}.get(grade, "health_sum_none")))
+        self.summary.setWordWrap(True)
+        self.summary.setStyleSheet(f"font-size:13px; color:{P['text2']};")
+        col.addWidget(head)
+        col.addWidget(self.summary)
+        col.addSpacing(8)
+        starts, fails, drops = health.counts(e)
+        played, err_at = health.when(e, "at"), health.when(e, "err_at")
+        self.lines: list[tuple[str, str]] = [
+            (tr("health_starts"), str(starts)),
+            (tr("health_fails"), str(fails)),
+            (tr("health_ttff_last"), health_secs(health.last_start(e))),
+            (tr("health_ttff_avg"), health_secs(health.average(e))),
+            (tr("health_drops"), str(drops)),
+            (tr("health_played"), format_when(played) if played else "–"),
+        ]
+        if e.get("err"):
+            when = f" ({format_when(err_at)})" if err_at else ""
+            self.lines.append((tr("health_error"), f"{e['err']}{when}"))
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(18)
+        grid.setVerticalSpacing(6)
+        for i, (label, value) in enumerate(self.lines):
+            lbl = QLabel(label)
+            lbl.setStyleSheet(f"font-size:12px; color:{P['muted']};")
+            val = QLabel(value)
+            val.setWordWrap(True)
+            val.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            val.setStyleSheet(f"font-size:13px; color:{P['text']};")
+            grid.addWidget(lbl, i, 0, Qt.AlignmentFlag.AlignTop)
+            grid.addWidget(val, i, 1)
+        grid.setColumnStretch(1, 1)
+        col.addLayout(grid)
+        col.addSpacing(10)
+        buttons = QHBoxLayout()
+        buttons.setSpacing(8)
+        self.copied = QLabel("")
+        self.copied.setStyleSheet(f"font-size:12px; color:{P['muted']};")
+        buttons.addWidget(self.copied)
+        buttons.addStretch(1)
+        self.copy_btn = QPushButton(tr("problem_copy"))
+        close = QPushButton(tr("common_close"), objectName="Primary")
+        text = "\n".join([name, self.summary.text(), ""] + [f"{a}: {b}" for a, b in self.lines])
+
+        def copy() -> None:
+            QGuiApplication.clipboard().setText(text)
+            self.copied.setText("✓ " + tr("problem_copied"))
+        self.copy_btn.clicked.connect(copy)
+        close.clicked.connect(self.accept)
+        buttons.addWidget(self.copy_btn)
+        buttons.addWidget(close)
+        col.addLayout(buttons)
+        row.addLayout(col, 1)
+        close.setDefault(True)
+        close.setFocus()
+
+
 class ClearHistoryDialog(QDialog):
     """Clear what was watched, as a browser clears its history: a time range
     and what to clear. *preselect*: "channels" or "titles" ticks only that

@@ -106,6 +106,7 @@ files = [
     "dopeiptv/core/wakelock.py",
     "dopeiptv/core/gcguard.py",
     "dopeiptv/core/contest.py",
+    "dopeiptv/core/health.py",
     "dopeiptv/services/failover.py",
     "dopeiptv/services/share.py",
     "dopeiptv/services/resume.py",

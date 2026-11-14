@@ -42,6 +42,7 @@ from ..services.resume import ResumeStore
 from ..services.reminders import ReminderStore
 from ..media.players import embedded_playback_supported, launch_player
 from ..core.contest import ContestWatch
+from ..core.health import StreamHealth
 from ..core.recording import RecordingManager
 from ..core.stores import (
     CategoryOverrides, ChannelOverrides, FavoriteStore, FollowedSeriesStore,
@@ -62,6 +63,7 @@ from .mw_recording import _RecordingMixin
 from .mw_busy import _BusyMixin
 from .mw_cast import _CastMixin
 from .mw_failover import _FailoverMixin
+from .mw_health import _HealthMixin
 from .mw_remote import _RemoteMixin
 from .mw_report import _ReportMixin
 from .mw_privacy import _PrivacyMixin
@@ -123,7 +125,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _PopoutMixin, _MultiviewMixin, _HomeMixin, _MprisMixin,
                  _FollowMixin, _SubtitlesMixin, _CastMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
-                 _RemoteMixin, _ReportMixin, QMainWindow):
+                 _HealthMixin, _RemoteMixin, _ReportMixin, QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
     epg_progress = pyqtSignal(int)
@@ -303,6 +305,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._stream_retries = 0
         self._last_stream_error_ts = 0.0
         self._contest = ContestWatch()
+        # Nerd's stream health per channel: it only watches (mw_health).
+        self.health = StreamHealth(settings)
         self._cast_device: str | None = None   # device a cast is running on
         self._cast_paused_at = None            # when the cast was paused
         self._cast_behind = 0.0                # and how far behind live it is
@@ -1271,6 +1275,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.stalled.connect(self._on_player_stalled)
             self.player.contested.connect(self._on_stream_contested)
             self.player.reopen_live.connect(self._reopen_live_edge)
+            self.player.first_frame.connect(self._health_frame)
             self.player.finished.connect(self._on_player_finished)
             self.player.next_episode.connect(self._play_next_episode)
             # Keep the poster overlay's play/pause/stop glyph in sync with the
@@ -4845,6 +4850,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                                 local_buffer=kind == "live" and not catchup,
                                 buffer_key=f"{kind}:{key}" if key else None):
                 self.wake.acquire(tr("wake_playing", title=title))
+                self._health_begin(key, title, item, kind, catchup)
             else:
                 log.warning("embedded play() refused %s - falling back to an "
                             "external mpv window", redact_url(url))
@@ -5066,11 +5072,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._set_status(tr("status_reconnecting"), emphasis=True)
             if self._player_fs and self.player:
                 self.player.set_overlay_info(tr("status_reconnecting"))
+            self._health_drop()
             QTimer.singleShot(1500, self._retry_last_stream)
             return
         self._stream_retries = 0
         if self.player:
             self.player.current_url = None
+        # The reconnects are spent: for stream health, it did not play.
+        self._health_failed(msg)
         url = (lp or {}).get("url")
         # Nerd: the same channel from another source, before giving up.
         if url and self._try_failover(lambda u=url: self._diagnose_stream_failure(u)):
@@ -5130,6 +5139,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         from ..providers.diagnostics import (
             DEFINITIVE_CODES, reason_for_code, stream_status)
         gen = getattr(self, "_diag_gen", 0)
+        hkey = self.health.current
 
         def done(code, gen=gen, item=item):
             if (gen != getattr(self, "_diag_gen", -1)
@@ -5145,6 +5155,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if (reason == tr("diag_not_started")
                     and not self._upcoming_prompt_plausible(item)):
                 reason = tr("diag_generic")
+            self._health_failed(reason, hkey)
             self._show_stream_error(reason)
             if reason == tr("diag_not_started"):
                 self._offer_upcoming_actions(item)
@@ -5155,6 +5166,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         from ..providers.diagnostics import diagnose_stream
 
         lp = getattr(self, "_last_playback", None)
+        hkey = self.health.current
 
         def show(reason: str) -> None:
             # If a channel started playing meanwhile (the user zapped on), the
@@ -5173,6 +5185,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if (reason == tr("diag_not_started")
                     and not self._upcoming_prompt_plausible(it)):
                 reason = tr("diag_generic")
+            self._health_failed(reason, hkey)
             self._show_stream_error(reason)
             if reason == tr("diag_not_started"):
                 self._offer_upcoming_actions(it)
@@ -5254,6 +5267,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # (that yanked the user out of the archive) - the segment is
             # seekable, so let mpv settle after the seek.
             return
+        self._health_drop()
         if not self._auto_reconnect_live():
             msg = tr("status_stream_dropped")
             self._set_status(msg, emphasis=True)
@@ -5280,6 +5294,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # channel that comes back (transient drop, provider hiccup) resumes
             # on its own instead of staying frozen. Armed once; re-armed each
             # slow attempt. A successful play resets the counters after 20 s.
+            self._health_stuck()
             self._arm_slow_reconnect()
             return
         self._last_stream_error_ts = now
@@ -5398,6 +5413,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             log.info("retry skipped: last playback is %r, not live",
                      (lp or {}).get("kind"))
             return
+        self._health_retry()
         # A catch-up/archive segment must be replayed by its own archive URL.
         # Re-deriving a live URL (below) would silently yank the user to the
         # live edge - which is exactly what made a channel whose provider

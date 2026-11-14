@@ -987,11 +987,23 @@ class ChannelDelegate(QStyledItemDelegate):
         fname.setBold(True)
         painter.setFont(fname)
         fm = painter.fontMetrics()
+        # Nerd's stream health: a dot in the colour of how the channel plays.
+        health_dot = getattr(self.window, "health_dot", None)
+        dot = health_dot(it, kind) if health_dot is not None else None
+        name_x, name_w = text_x, text_w
+        if dot:
+            d = max(7, self.name_pt - 2)
+            painter.save()
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(dot))
+            painter.drawEllipse(QRectF(text_x, y + (name_h - d) / 2, d, d))
+            painter.restore()
+            name_x, name_w = text_x + d + 6, max(0, text_w - d - 6)
         painter.drawText(
-            QRect(text_x, y, text_w, name_h),
+            QRect(name_x, y, name_w, name_h),
             Qt.AlignmentFlag.AlignVCenter,
             fm.elidedText(
-                name, Qt.TextElideMode.ElideRight, text_w))
+                name, Qt.TextElideMode.ElideRight, name_w))
 
         if now:
             title, pct = now

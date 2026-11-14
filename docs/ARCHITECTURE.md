@@ -51,6 +51,7 @@ dopeiptv/
     wakelock.py        Screensaver/suspend inhibitor (DBus + caffeinate)
     gcguard.py         Cyclic garbage collection on the GUI thread only
     contest.py         ContestWatch: another device taking the account's connection
+    health.py          Nerd's stream health per channel (it only watches)
     log.py             Central logging (configure_logging, DOPEIPTV_LOG)
     platform_macos.py  macOS-specific helpers (OpenGL, libmpv, paths)
     platform_windows.py Windows helpers (libmpv discovery, wakelock, shortcut)

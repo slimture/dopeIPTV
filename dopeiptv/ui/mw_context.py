@@ -103,6 +103,8 @@ class _ContextMenuMixin:
             # "stream hasn't started yet" prompt offers.
             m.addAction(tr("upcoming_remind"),
                         lambda it=it: self._remind_upcoming(it))
+            # Nerd: how this channel has been playing (only while it counts).
+            self._health_channel_menu(m, it)
         if (content_kind in ("live", "fav")
                 and it.get("stream_id") is not None):
             # Every category works the same: a one-click "Add to favorites"

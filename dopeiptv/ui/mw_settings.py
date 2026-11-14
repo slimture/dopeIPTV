@@ -1752,7 +1752,8 @@ class _SettingsMixin:
             playlists=lambda: ((self.playlist_store.playlists(), self.playlist_store.active_id)
                                if self.playlist_store else ([], None)),
             remote=self._remote_apply,
-            open_page=shell.show_page)
+            open_page=shell.show_page,
+            health_store=lambda: self.health)
 
         # -- the playlist page's behaviour -------------------------------------
         def reload_pl_list():

@@ -496,6 +496,9 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
     contested = pyqtSignal()
     # LIVE in the DVR row with the buffer far behind the channel: open it again.
     reopen_live = pyqtSignal()
+    # The stream play() opened is playing, once per play(): how many seconds
+    # it had already played when the poll saw it (stream health, Nerd).
+    first_frame = pyqtSignal(float)
     finished = pyqtSignal()
     next_episode = pyqtSignal()
     paused_changed = pyqtSignal(bool)
@@ -2525,6 +2528,7 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
             self._stopping = False
             self._stall_since = 0.0
             self._eof_seen = False
+            self._frame_told = False
             self._contest_told = False
             self._hide_nextup()     # new title: no stale card
             self._blackout.hide()
@@ -3382,6 +3386,7 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         self._sync_pause_label(paused)
         if getattr(self, "_sub_rule", None) is not None:
             self._apply_sub_rule(m)
+        played = pos
         if self._dvr is not None:
             pos = self._dvr_pos(pos)    # the app's own buffer keeps its time
         local_window = self._update_local_buffer(pos)
@@ -3403,6 +3408,16 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
                 self._stall_since = 0.0
                 if not (self._dvr is not None and self._dvr_on_stall()):
                     self.stalled.emit()
+        if (not getattr(self, "_frame_told", True) and played is not None
+                and self.current_url is not None and not paused and not idle):
+            self._frame_told = True
+            # A stream starts at 0: what it played before this poll is
+            # taken off; a time far from 0 says nothing about that.
+            try:
+                ahead = float(played)
+            except (TypeError, ValueError):
+                ahead = 0.0
+            self.first_frame.emit(ahead if 0.0 <= ahead <= 1.0 else 0.0)
         if self._dvr is not None and not getattr(self, "_contest_told", False):
             try:
                 hit = bool(self._dvr.contested)

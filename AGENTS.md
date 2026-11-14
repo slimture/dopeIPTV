@@ -66,6 +66,7 @@ map and the one-way import rule.
 | `core/wakelock.py` | Screensaver inhibitor |
 | `core/gcguard.py` | Cyclic garbage collection on the GUI thread only |
 | `core/contest.py` | `ContestWatch`: tells another device taking the account's connection from repeated drops |
+| `core/health.py` | Nerd's stream health per channel (source + stream id): starts, failures, time to picture, drops, last error (scrubbed), last played; one settings value, 500 channels at most; it only watches |
 | `core/desktop_entry.py` | The user's .desktop entry and icons (Wayland takes the window icon from there) |
 | `core/xdg.py` | Launch system programs from a frozen bundle without our bundled libraries |
 | `core/audiotags.py` | Artist/album/title and cover art from music files, header-only |
@@ -114,6 +115,7 @@ map and the one-way import rule.
 | `ui/mw_commands.py` | Commands from outside carried out: play an address or file, a channel by name, come forward |
 | `ui/mw_privacy.py` | Private viewing and Clear recent history in the window: app-menu entries and shortcuts, the sidebar marker |
 | `ui/mw_failover.py` | Failover in the window: once per channel, the other source's options while it plays, a note |
+| `ui/mw_health.py` | Stream health in the window: the playback path's hooks (start, picture, drop, fail), the channel menu's "Stream health…", the list's dot |
 | `ui/mw_remote.py` | The remote API and sharing in the window: the server as Nerd says, each request's work on the window's thread |
 | `ui/mw_report.py` | Send feedback, and the offer of a report after an error or a crash |
 | `ui/mw_home.py` | The Home page: which shelves, what goes in them (drawn by `home_widgets.py`) |
@@ -143,7 +145,7 @@ series, new-episode news), `mw_subtitles` (OpenSubtitles, subtitles
 remembered per title), `mw_cast` (Chromecast and DLNA: the cast
 dialog, the strip, handing over from the archive), `mw_donate` (the
 sidebar heart, About's link, Home's card), `mw_failover` (failover to another
-source), `mw_privacy` (private viewing,
+source), `mw_health` (stream health per channel), `mw_privacy` (private viewing,
 clear recent history) and `mw_popout`
 (detached-window player). What stays in `main_window.py` is
 the `__init__`/`_build_ui` composition and the playback path (start/stop,
@@ -221,7 +223,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
   epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log,
-  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, nerd, nerd_lists, http_login, commands, instance, nerd_check, privacy, rec_extras, catchup, remote_api, report, supporter) and `services/` (failover, share, resume,
+  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, health, nerd, nerd_lists, http_login, commands, instance, nerd_check, privacy, rec_extras, catchup, remote_api, report, supporter) and `services/` (failover, share, resume,
   coverart, reminders, mpris, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list

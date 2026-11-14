@@ -72,7 +72,7 @@ PART_KEYS = {
     "net": ("nerd_user_agent", "nerd_referer", "nerd_headers", "nerd_proxy", "nerd_proxy_player",
             "nerd_ip_family", "nerd_net_timeout", "nerd_reconnect_max", "nerd_vpn_guard",
             "nerd_vpn_iface", "nerd_vpn_lan"),
-    "lists": ("nerd_picon_dir", "nerd_picon_override", "nerd_udpxy", "nerd_failover"),
+    "lists": ("nerd_picon_dir", "nerd_picon_override", "nerd_udpxy", "nerd_failover", "nerd_health"),
     "player": ("nerd_spdif", "nerd_video_sync", "nerd_interpolation", "nerd_probe", "nerd_demux_max_mb",
                "nerd_mpv_config_dir", "nerd_shaders", "nerd_mpv_options", "nerd_adelay_per_channel"),
     "rec": ("nerd_rec_template", "nerd_rec_post"),
@@ -167,7 +167,8 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
           rec_dir: Callable[[], str] | None = None,
           playlists: Callable[[], tuple[list[dict], str | None]] | None = None,
           remote: Callable[[dict], dict] | None = None,
-          open_page: Callable[[str], None] | None = None) -> Callable[[Callable[[str, Any], None]], None]:
+          open_page: Callable[[str], None] | None = None,
+          health_store: Callable[[], Any] | None = None) -> Callable[[Callable[[str, Any], None]], None]:
     """*page* is Nerd's own: the switch, how it works, stats, diagnostics.
     *pages* ("net", "boxes", "lists", "player", "rec") take the rest, shown by
     *show_pages* while Nerd is on; without them it all goes on *page*.
@@ -177,7 +178,9 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     matches against it). *remote*: puts the remote API and sharing as the
     page says now and returns how the server stands (its Test).
     *open_page*: shows a page by key (the list of Nerd's parts, their way
-    back)."""
+    back). *health_store*: the window's stream health (core/health.py),
+    whose worst channels the page lists and clears; without it, the one
+    stored in *settings*."""
     n = _Defaults(settings)
     sub = pages or {}
 
@@ -419,6 +422,35 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     c.row(tr("nerd_failover"), fail_on, tr("nerd_failover_hint"),
           search="failover backup another source fallback", below=fo_line)
     c.note(tr("nerd_applies_stream"))
+
+    # -- channels: stream health -----------------------------------------------------------
+    from ..core import health
+    own_store = health.StreamHealth(settings) if health_store is None else None
+
+    def store_now() -> Any:
+        return health_store() if health_store is not None else own_store
+    c = at("lists").card(tr("nerd_card_health"))
+    health_on = ToggleSwitch(n.flag(health.SWITCH))
+    health_on.setAccessibleName(tr("nerd_health"))
+    c.row(tr("nerd_health"), health_on, tr("nerd_health_hint"),
+          search="stream health statistics start time failures drops reconnects")
+    worst = HealthList()
+    c.widget(worst, "worst channels slowest start failures")
+    clear_health = QPushButton(tr("nerd_health_clear"))
+
+    def show_worst() -> None:
+        rows = store_now().worst(10)
+        worst.fill(rows)
+        clear_health.setEnabled(bool(rows))
+
+    def forget_health() -> None:
+        store_now().clear()
+        show_worst()
+    clear_health.clicked.connect(lambda _c=False: forget_health())
+    c.layout_row(_hbox(clear_health), "clear stream health")
+    c.note(tr("nerd_applies_stream"))
+    show_worst()
+    at("lists").installEventFilter(_OnShow(at("lists"), show_worst))
 
     # -- channels: guide -------------------------------------------------------------------
     c = at("lists").card(tr("nerd_card_guide"))
@@ -717,6 +749,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
         put("nerd_rec_template", template.text().strip())
         put("nerd_rec_post", post.text().strip())
         put("nerd_failover", "true" if fail_on.isChecked() else "false")
+        put("nerd_health", "true" if health_on.isChecked() else "false")
         put("nerd_remote", "true" if remote_on.isChecked() else "false")
         put("nerd_share", "true" if share_on.isChecked() else "false")
         put("nerd_remote_lan", "true" if who.currentData() == "lan" else "false")
@@ -810,6 +843,56 @@ class _OnShow(QWidget):
         if event.type() == QEvent.Type.Show:
             self._fn()
         return False
+
+
+class HealthList(QWidget):
+    """Stream health's worst channels: a dot in the colour of how each is
+    doing, its name, its numbers - or a line saying nothing is recorded."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._col = QVBoxLayout(self)
+        self._col.setContentsMargins(0, 0, 0, 0)
+        self._col.setSpacing(8)
+        self.rows: list[tuple[str, str]] = []     # (name, numbers) shown
+
+    def fill(self, worst: list[tuple[str, dict]]) -> None:
+        import html
+
+        from PyQt6.QtCore import Qt
+        from PyQt6.QtWidgets import QLabel
+
+        from ..core import health
+        from .dialogs import health_secs
+        from .theme import P
+        while self._col.count():
+            item = self._col.takeAt(0)
+            w = item.widget() if item is not None else None
+            if w is not None:
+                w.deleteLater()
+        self.rows = []
+        if not worst:
+            empty = QLabel(tr("nerd_health_empty"))
+            empty.setWordWrap(True)
+            empty.setStyleSheet(f"color:{P['muted']}; font-size:12px;")
+            self._col.addWidget(empty)
+            return
+        head = QLabel(tr("nerd_health_worst"))
+        head.setStyleSheet(f"color:{P['text']}; font-weight:650;")
+        self._col.addWidget(head)
+        for key, e in worst:
+            name = str(e.get("name") or key)
+            starts, fails, drops = health.counts(e)
+            numbers = tr("nerd_health_line", fails=fails, starts=starts,
+                         avg=health_secs(health.average(e)), drops=drops)
+            dot = P.get(health.grade(e) or "muted", P["muted"])
+            line = QLabel(f"<span style='color:{dot}'>●</span>&nbsp;"
+                          f"<span style='color:{P['text']}; font-weight:600'>{html.escape(name)}</span><br>"
+                          f"<span style='color:{P['text2']}; font-size:12px'>{html.escape(numbers)}</span>")
+            line.setTextFormat(Qt.TextFormat.RichText)
+            line.setWordWrap(True)
+            self._col.addWidget(line)
+            self.rows.append((name, numbers))
 
 
 def _how_block(items: list[tuple[str, str]]) -> QWidget:
@@ -920,7 +1003,7 @@ def diagnostics(settings: Any) -> str:
     lines.append(f"Nerd: {'on' if n.on else 'off'}")
     safe = {"nerd_ip_family", "nerd_net_timeout", "nerd_reconnect_max", "nerd_spdif", "nerd_video_sync",
             "nerd_interpolation", "nerd_probe", "nerd_demux_max_mb", "nerd_log_level", "nerd_vpn_guard",
-            "nerd_vpn_lan", "nerd_proxy_player", "nerd_failover", "nerd_remote", "nerd_share",
+            "nerd_vpn_lan", "nerd_proxy_player", "nerd_failover", "nerd_health", "nerd_remote", "nerd_share",
             "nerd_remote_lan", "nerd_remote_port"}
     for key in sorted(safe):
         v = n.get(key)

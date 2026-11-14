@@ -102,6 +102,7 @@ def _window(played=9.0, watch=None):
     f._arm_slow_reconnect = lambda: f.slow.append(1)
     f._retry_last_stream = lambda: None
     f._tell_contested = lambda: f.told.append(1)
+    f._health_drop = f._health_stuck = lambda: None   # stream health only watches
     f._contest = watch or ContestWatch()
     f.MAX_STREAM_RETRIES = MainWindow.MAX_STREAM_RETRIES
     f._auto_reconnect_live = MainWindow._auto_reconnect_live.__get__(f)
