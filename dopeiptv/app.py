@@ -448,6 +448,16 @@ def main() -> int:
         from .core.platform_windows import setup_opengl
         setup_opengl()
 
+    # A backup restored over everything in Settings waits for this moment:
+    # put in place before anything reads the settings it replaces (the size
+    # of the interface below included). Never in the way of starting.
+    restored = None
+    try:
+        from .core import backup
+        restored = backup.apply_pending()
+    except Exception as e:
+        log.warning("restore: not put in place: %s", e)
+
     # Opt-in X11/XWayland backend (Settings > "Run via X11"). Must be set
     # before QApplication. Guarded so it can never wedge startup: Linux only,
     # never overrides a user-set QT_QPA_PLATFORM, and `--no-x11` bypasses it
@@ -588,6 +598,10 @@ def main() -> int:
 
     w = MainWindow(client, settings, store)
     w.show()
+    if restored is not None:
+        from .i18n import tr
+        w._show_toast(tr("restore_done_start") if restored
+                      else tr("restore_failed_start"), 8000)
     w._start_command_server()
     w._remote_apply()
     _watch_link_events(app, w)

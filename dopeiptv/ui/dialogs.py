@@ -1460,3 +1460,112 @@ class ChannelSettingsDialog(QDialog):
             f"font-size:13px; color:{theme.ACCENT if own else P['muted']};"
             f" font-weight:{600 if own else 400};")
         self.reset_btn.setEnabled(own)
+class RestoreBackupDialog(QDialog):
+    """What a backup holds, and how to take it: over everything here, or its
+    playlists beside the ones here. *counts*: backup.summary(); *missing*:
+    how many folder settings name folders this computer does not have;
+    *risky*: (key, value) of settings that run something or send the
+    connections elsewhere, shown before anything is taken."""
+
+    _RISKY_LABELS = {"nerd_rec_post": "nerd_rec_post",
+                     "nerd_mpv_options": "nerd_mpv_options",
+                     "nerd_mpv_config_dir": "nerd_mpv_dir",
+                     "nerd_proxy": "nerd_proxy"}
+
+    def __init__(self, parent, backup, counts: dict, missing: int,
+                 risky: list, can_add: bool = True) -> None:
+        super().__init__(parent)
+        from PyQt6.QtWidgets import QButtonGroup, QRadioButton
+        self.setWindowTitle(tr("restore_title"))
+        self.setModal(True)
+        self.setMinimumWidth(500)
+        col = QVBoxLayout(self)
+        col.setContentsMargins(24, 22, 24, 20)
+        col.setSpacing(10)
+        head = QLabel(tr("restore_title"))
+        head.setStyleSheet(f"font-size:16px; font-weight:700; color:{P['text']};")
+        col.addWidget(head)
+        sub = QLabel(tr("restore_made", version=backup.app_version or "?",
+                        date=self._when(backup.created)) if backup.full
+                     else tr("restore_old_file"))
+        sub.setWordWrap(True)
+        sub.setTextFormat(Qt.TextFormat.PlainText)   # the file's own words
+        sub.setStyleSheet(f"font-size:13px; color:{P['muted']};")
+        col.addWidget(sub)
+        lines = [tr("backup_count", what=tr(f"backup_kind_{kind}"), n=n)
+                 for kind, n in counts.items() if n or kind == "sources"]
+        self.holds = QLabel(tr("restore_holds") + "\n" + "\n".join(
+            "  •  " + line for line in lines))
+        self.holds.setWordWrap(True)
+        self.holds.setTextFormat(Qt.TextFormat.PlainText)
+        self.holds.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.holds.setStyleSheet(f"font-size:13px; color:{P['text']};")
+        col.addWidget(self.holds)
+        notes = []
+        if backup.full and missing:
+            notes.append(tr("restore_missing_paths", n=missing))
+        if risky:
+            notes.append(tr("restore_risky") + "\n" + "\n".join(
+                "  •  " + tr("backup_count",
+                             what=tr(self._RISKY_LABELS.get(k, k)),
+                             n=self._short(v))
+                for k, v in risky))
+        self.notes = QLabel("\n\n".join(notes))
+        self.notes.setWordWrap(True)
+        self.notes.setTextFormat(Qt.TextFormat.PlainText)
+        self.notes.setStyleSheet(
+            f"font-size:12px; color:{P.get('warn', P['muted'])};")
+        self.notes.setVisible(bool(notes))
+        col.addWidget(self.notes)
+        col.addSpacing(4)
+        self.replace = QRadioButton(tr("restore_replace"))
+        self.add = QRadioButton(tr("restore_add"))
+        group = QButtonGroup(self)
+        for i, (radio, hint) in enumerate(
+                ((self.replace, "restore_replace_hint"),
+                 (self.add, "restore_add_hint"))):
+            group.addButton(radio, i)
+            col.addWidget(radio)
+            text = QLabel(tr(hint))
+            text.setWordWrap(True)
+            text.setContentsMargins(26, 0, 0, 4)
+            text.setStyleSheet(f"font-size:12px; color:{P['muted']};")
+            col.addWidget(text)
+        self.replace.setEnabled(backup.full)
+        self.add.setEnabled(can_add)
+        (self.replace if backup.full else self.add).setChecked(True)
+        col.addSpacing(6)
+        buttons = QHBoxLayout()
+        buttons.addStretch(1)
+        cancel = QPushButton(tr("common_cancel"))
+        self.go = QPushButton(tr("restore_go"), objectName="Primary")
+        cancel.clicked.connect(self.reject)
+        self.go.clicked.connect(self.accept)
+        self.go.setEnabled(self.replace.isEnabled() or self.add.isEnabled())
+        buttons.addWidget(cancel)
+        buttons.addWidget(self.go)
+        col.addLayout(buttons)
+        cancel.setFocus()
+
+    @staticmethod
+    def _when(created: str) -> str:
+        from datetime import datetime
+
+        from .qt_i18n import format_when
+        try:
+            return format_when(datetime.fromisoformat(created),
+                               "d MMM yyyy HH:mm")
+        except (TypeError, ValueError):
+            return created or "?"
+
+    @staticmethod
+    def _short(value: str, most: int = 90) -> str:
+        value = " ".join(value.split())
+        return value if len(value) <= most else value[:most - 1] + "…"
+
+    def choice(self) -> str:
+        """"replace" (everything) or "add" (its playlists only)."""
+        if self.replace.isChecked() and self.replace.isEnabled():
+            return "replace"
+        return "add"

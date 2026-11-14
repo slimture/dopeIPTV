@@ -55,6 +55,8 @@ dopeiptv/
     health.py          Nerd's stream health per channel (it only watches)
     channel_prefs.py   Nerd: a channel's own audio/subtitle language,
                        deinterlace, aspect, audio delay (what each sets in mpv)
+    backup.py          Full backup and restore (one JSON file; a restore over
+                       everything is put in place as the app next starts)
     log.py             Central logging (configure_logging, DOPEIPTV_LOG)
     platform_macos.py  macOS-specific helpers (OpenGL, libmpv, paths)
     platform_windows.py Windows helpers (libmpv discovery, wakelock, shortcut)

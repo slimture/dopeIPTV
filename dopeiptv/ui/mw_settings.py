@@ -386,6 +386,103 @@ class _SettingsMixin:
         # terminate ran exit() finalizers while Qt timers were still live.
         self.close()
 
+    # -- backup and restore (core/backup.py) ---------------------------------
+
+    def _backup_stores(self) -> dict:
+        return {"main": self.settings,
+                "resume": getattr(self, "_resume_settings", None),
+                "follow": getattr(self, "_follow_settings", None),
+                "cache": getattr(self, "_cache_settings", None)}
+
+    @staticmethod
+    def _backup_counts(counts: dict) -> str:
+        """One line per kind a backup holds, as many as it has."""
+        return "\n".join(tr("backup_count", what=tr(f"backup_kind_{kind}"), n=n)
+                         for kind, n in counts.items() if n)
+
+    def _backup_save(self, parent) -> None:
+        """Settings > General > Backup: everything to one file."""
+        from datetime import date
+
+        from ..core import backup
+        path, _f = QFileDialog.getSaveFileName(
+            parent, tr("backup_title"),
+            f"dopeIPTV-backup-{date.today().isoformat()}.json",
+            tr("file_filter_json"),
+            options=QFileDialog.Option.DontUseNativeDialog)
+        if not path:
+            return
+        doc = backup.collect(self._backup_stores(), VERSION)
+        try:
+            backup.write(path, doc)
+        except OSError as exc:
+            log.warning("backup: not written: %s", exc)
+            QMessageBox.warning(parent, tr("backup_title"),
+                                tr("pl_export_failed", error=exc))
+            return
+        counts = backup.summary(backup.parse(doc))
+        log.info("backup: written (%s)", ", ".join(
+            f"{k} {n}" for k, n in counts.items() if n))
+        QMessageBox.information(
+            parent, tr("backup_title"),
+            tr("backup_done", what=self._backup_counts(counts), path=path))
+
+    def _backup_restore(self, parent, playlists_added) -> None:
+        """Settings > General > Backup: a backup back - over everything, as
+        the app next starts, or its playlists beside the ones here now."""
+        from ..core import backup
+        from .dialogs import RestoreBackupDialog
+        path, _f = QFileDialog.getOpenFileName(
+            parent, tr("restore_title"), "",
+            tr("file_filter_json") + ";;" + tr("file_filter_all"),
+            options=QFileDialog.Option.DontUseNativeDialog)
+        if not path:
+            return
+        try:
+            b = backup.read(path)
+        except backup.BackupError as exc:
+            log.warning("restore: %s", exc)
+            text = (tr("pl_import_unreadable", error=exc.detail)
+                    if exc.reason == "unreadable"
+                    else tr("restore_newer", version=exc.detail or "?")
+                    if exc.reason == "newer" else tr("restore_invalid"))
+            QMessageBox.warning(parent, tr("restore_title"), text)
+            return
+        store = getattr(self, "playlist_store", None)
+        dlg = RestoreBackupDialog(parent, b, backup.summary(b),
+                                  len(backup.missing_paths(b)), backup.risky(b),
+                                  can_add=store is not None)
+        if not dlg.exec():
+            return
+        if dlg.choice() == "add":
+            added = store.import_data(b.sources)
+            log.info("restore: %d playlist(s) added from a backup", added)
+            playlists_added()
+            QMessageBox.information(parent, tr("restore_title"),
+                                    tr("pl_import_done", n=added))
+            return
+        # Over everything: the PIN and what it locks are part of it.
+        if self.parental.has_pin() and not self._request_unlock():
+            return
+        if not confirm(parent, tr("restore_title"), tr("restore_confirm"),
+                       default_yes=False):
+            return
+        try:
+            backup.stage(b)
+        except OSError as exc:
+            log.warning("restore: not staged: %s", exc)
+            QMessageBox.warning(parent, tr("restore_title"),
+                                tr("pl_export_failed", error=exc))
+            return
+        # As after Reset all: nothing written on the way out, and the app
+        # closes - the backup is put in place as it next starts, where no
+        # store held in memory here can write over it.
+        self._resetting = True
+        QMessageBox.information(parent, tr("restore_title"),
+                                tr("restore_closing"))
+        parent.reject()
+        self.close()
+
     def _set_language(self, code: str) -> None:
         from ..i18n import current_language, is_rtl, set_language
         if code == current_language():
@@ -666,6 +763,17 @@ class _SettingsMixin:
             self._update_channel())
         c.row(tr("setting_update_channel"), channel_box,
               tr("setting_update_channel_hint"))
+        # Everything a person would miss on a new computer, in one file (it
+        # was the playlists only, on the Playlists page). Connected further
+        # down, beside the playlist list a restore of playlists refreshes.
+        export_btn = QPushButton(tr("backup_btn"))
+        import_btn = QPushButton(tr("restore_btn"))
+        c = general.card(tr("set_card_backup"))
+        c.row(tr("set_backup_label"), hbox(export_btn, import_btn,
+                                           stretch=False),
+              tr("set_backup_hint"),
+              search="export import backup restore playlists json")
+        c.note(tr("backup_note"))
         # Only where an entry is actually missing: a .deb or a Flatpak has
         # one already, and offering to add a second would be nonsense.
         desktop_box = None
@@ -1152,14 +1260,6 @@ class _SettingsMixin:
         c = playlists.card(tr("set_card_selected_playlist"))
         account_lbl = c.row(tr("set_account"), refresh_pl_btn,
                             tr("account_loading")).hint_label
-        export_btn = QPushButton(tr("btn_export"))
-        export_btn.setToolTip(tr("settings_export_tip"))
-        import_btn = QPushButton(tr("btn_import"))
-        import_btn.setToolTip(tr("settings_import_tip"))
-        c = playlists.card(tr("set_card_backup"))
-        c.row(tr("set_backup_label"), hbox(export_btn, import_btn,
-                                           stretch=False),
-              tr("set_backup_hint"))
 
         # -- Home -------------------------------------------------------------
         home = page("home", tr("nav_home"), tr("set_page_home_sub"), "home")
@@ -1964,56 +2064,14 @@ class _SettingsMixin:
                 select_pid(pid)
 
         def export_playlists():
-            if not store or not store.playlists():
-                QMessageBox.information(
-                    d, tr("pl_export_title"), tr("pl_export_none"))
-                return
-            path, _ = QFileDialog.getSaveFileName(
-                d, tr("pl_export_title"), "playlists.json",
-                tr("file_filter_json"),
-                options=QFileDialog.Option.DontUseNativeDialog)
-            if not path:
-                return
-            import json
-            data = store.export_data()
-            try:
-                with open(path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
-            except OSError as exc:
-                QMessageBox.warning(d, tr("pl_export_title"),
-                                    tr("pl_export_failed", error=exc))
-                return
-            QMessageBox.information(
-                d, tr("pl_export_title"),
-                tr("pl_export_done", n=len(data), path=path))
+            self._backup_save(d)
 
-        def import_playlists():
-            if not store:
-                return
-            path, _ = QFileDialog.getOpenFileName(
-                d, tr("pl_import_title"), "",
-                tr("file_filter_json") + ";;" + tr("file_filter_all"),
-                options=QFileDialog.Option.DontUseNativeDialog)
-            if not path:
-                return
-            import json
-            try:
-                with open(path, "r", encoding="utf-8-sig") as f:
-                    data = json.load(f)
-            except (OSError, ValueError) as exc:
-                QMessageBox.warning(d, tr("pl_import_title"),
-                                    tr("pl_import_unreadable", error=exc))
-                return
-            try:
-                added = store.import_data(data)
-            except ValueError:
-                QMessageBox.warning(d, tr("pl_import_title"),
-                                    tr("pl_import_invalid"))
-                return
+        def playlists_added() -> None:
             reload_pl_list()
             select_pid(store.active_id)
-            QMessageBox.information(d, tr("pl_import_title"),
-                                    tr("pl_import_done", n=added))
+
+        def import_playlists():
+            self._backup_restore(d, playlists_added)
 
         add_btn.clicked.connect(lambda _c=False: add_playlist())
         edit_btn.clicked.connect(edit_playlist)
