@@ -91,6 +91,21 @@ assert shown and shown[-1] is not None and opened[-1] == "supporter"
 s.remove("supporter_key")
 w._donate_heart_refresh()
 assert not w._donate_btn._supporter and w._donate_card_due()
+# Where a key goes, in plain sight: the app menu, the heart's tip, the
+# window saying where the key is; "I've already donated" asks for it.
+from dopeiptv.i18n import tr
+assert w._supporter_action.text() == tr("supporter_menu") + "…"
+n = len(shown)
+w._supporter_action.trigger()
+assert len(shown) == n + 1
+assert tr("heart_tip_key") in w._donate_btn.toolTip()
+d2 = dialogs.SupporterDialog(w, s)
+assert d2.where.isVisibleTo(d2) and "Stripe" in d2.where.text()
+d2.key.setText(key)
+assert not d2.where.isVisibleTo(d2)
+s.remove("supporter_key")
+w.already_donated()                           # closed without a key: taken at their word
+assert s.value("donate_thanked") == "true"
 print("SUPPORTER_OK")
 """
 

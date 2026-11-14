@@ -67,7 +67,8 @@ class _DonateMixin:
             return
         shown = self._donate_heart_due()
         sup = self._supporter()
-        tip = tr("supporter_tip", date=sup["since"].isoformat()) if sup else tr("donate_support")
+        tip = tr("supporter_tip", date=sup["since"].isoformat()) if sup \
+            else tr("donate_support") + "\n" + tr("heart_tip_key")
         for heart in (btn, getattr(self, "_home_heart", None)):
             try:
                 if heart is not None and hasattr(heart, "set_supporter"):
@@ -109,8 +110,16 @@ class _DonateMixin:
         menu.addAction(tr("supporter_menu"), self.open_supporter)
         menu.addAction(tr("donate_hide"), self.hide_donate_heart)
         if self._supporter() is None:
-            menu.addAction(tr("donate_done"), self.donated)
+            menu.addAction(tr("donate_done"), self.already_donated)
         menu.exec(btn.mapToGlobal(pos))
+
+    def already_donated(self) -> None:
+        """"I've already donated": the key's window first - with a key the
+        app knows for sure, and the heart says thank you; closed without one,
+        taken at their word as before."""
+        self.open_supporter()
+        if self._supporter() is None:
+            self.donated()
 
     def heart_clicked(self, ref: str = "app-heart") -> None:
         """The heart: the donate page, or for a supporter their thank-you
@@ -200,7 +209,7 @@ class _DonateMixin:
         card.later.connect(lambda: away(SNOOZE_SECS))
 
         def already() -> None:
-            self.donated()
+            self.already_donated()
             card.hide()
             card.deleteLater()
 

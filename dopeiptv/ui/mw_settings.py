@@ -681,6 +681,14 @@ class _SettingsMixin:
                                  tr("setting_mpris_hint"))
         # The sidebar's heart, last and quiet: off hides it for three months.
         c = general.card(tr("donate_support"))
+        if hasattr(self, "open_supporter"):
+            from ..core import supporter as _sup
+            mine = _sup.stored(self.settings)
+            key_btn = QPushButton(tr("set_supporter_open") if mine else tr("set_supporter_enter"))
+            key_btn.clicked.connect(lambda _c=False: self.open_supporter())
+            c.row(tr("supporter_menu"), key_btn,
+                  tr("supporter_tip", date=mine["since"].isoformat()) if mine else tr("set_supporter_hint"),
+                  search="supporter key donation donated code nyckel")
         heart_box = c.toggle(tr("set_donate_heart"), self._donate_heart_due(),
                              tr("set_donate_heart_hint"))
 

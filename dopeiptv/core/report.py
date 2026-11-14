@@ -27,6 +27,9 @@ from typing import Any, Callable, Iterable
 from .log import log, recent_lines
 
 ENDPOINT = "https://dopeiptv.org/feedback/report"
+REPLIES = "https://dopeiptv.org/feedback/replies"
+#: How long the app asks whether a report was answered, and keeps its answers.
+ASK_DAYS, KEEP_DAYS = 30, 90
 MAX_TEXT = 48_000
 #: What the native crash handler writes to, in the log folder.
 CRASH_FILE = "last-crash.txt"
@@ -193,7 +196,10 @@ def send(kind: str, text: str, timeout: float = 15.0, endpoint: str | None = Non
                        "text": (text or "")[:MAX_TEXT],
                        # What feedback is about (a topic, an area, how often): words from a short list.
                        **{k: v for k, v in (extra or {}).items()
-                          if k in ("topic", "area", "often") and isinstance(v, str) and v.isalpha() and len(v) <= 12}}
+                          if k in ("topic", "area", "often") and isinstance(v, str) and v.isalpha() and len(v) <= 12},
+                       # The hash of the code this computer keeps to be told the answers.
+                       **({"reply": str((extra or {})["reply"])}
+                          if re.fullmatch(r"[0-9a-f]{64}", str((extra or {}).get("reply") or "")) else {})}
                       ).encode("utf-8")
     req = urllib.request.Request(endpoint or ENDPOINT, data=body, method="POST", headers={
         "Content-Type": "application/json", "User-Agent": f"dopeIPTV/{__version__}",
@@ -206,6 +212,68 @@ def send(kind: str, text: str, timeout: float = 15.0, endpoint: str | None = Non
         return False
     log.info("report: sent (%s)", kind)
     return ok
+
+
+# -- answers: a random code kept here, its hash sent with the report ---------------
+
+def new_code() -> tuple[str, str]:
+    """(code, its SHA-256): the code stays on this computer, the hash goes
+    with the report - the one link between the two, naming nobody."""
+    import hashlib
+    import secrets
+    code = secrets.token_urlsafe(24)
+    return code, hashlib.sha256(code.encode("ascii")).hexdigest()
+
+
+def code_hash(code: str) -> str:
+    import hashlib
+    return hashlib.sha256(code.encode("ascii")).hexdigest()
+
+
+def tickets(settings: Any) -> list[dict]:
+    """The reports this computer asked answers to: {"c": code, "t": sent,
+    "w": the first words (kept here only), "r": answers, "seen": how many
+    were shown}. Old ones without answers drop off."""
+    import time
+    try:
+        raw = json.loads(str(settings.value("feedback_tickets", "") or "[]"))
+    except (ValueError, TypeError):
+        raw = []
+    now = time.time()
+    out = []
+    for t in raw if isinstance(raw, list) else []:
+        if not isinstance(t, dict) or not isinstance(t.get("c"), str):
+            continue
+        age = now - float(t.get("t") or 0)
+        if age < ASK_DAYS * 86400 or (t.get("r") and age < KEEP_DAYS * 86400):
+            out.append(t)
+    return out[-20:]
+
+
+def save_tickets(settings: Any, items: list[dict]) -> None:
+    settings.setValue("feedback_tickets", json.dumps(items[-20:], ensure_ascii=False))
+
+
+def fetch_replies(codes: list[str], timeout: float = 15.0, endpoint: str | None = None) -> dict | None:
+    """{code: [answers]} for the codes whose reports were answered; None
+    when the site could not be asked. Only the hashes are sent."""
+    from .. import __version__
+    by_hash = {code_hash(c): c for c in codes[:20]}
+    req = urllib.request.Request(endpoint or REPLIES, method="POST",
+                                 data=json.dumps({"codes": list(by_hash)}).encode("utf-8"), headers={
+                                     "Content-Type": "application/json", "User-Agent": f"dopeIPTV/{__version__}",
+                                     "X-Dopeiptv-Report": "1"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            got = json.loads(r.read() or b"{}").get("replies") or {}
+    except Exception as e:
+        log.info("report: answers not asked (%s)", type(e).__name__)
+        return None
+    return {by_hash[h]: a for h, a in got.items() if h in by_hash and isinstance(a, list)}
+
+
+#: The fixed answers an admin picks; the app says them in its own language.
+REPLY_CODES = ("thanks", "known", "fixed", "needinfo", "note")
 
 
 # -- not too many: feedback is a press of Send, not a stream ----------------------

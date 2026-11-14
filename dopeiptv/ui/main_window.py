@@ -459,6 +459,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             app_menu.addSeparator()
         self._donate_action = app_menu.addAction(tr("donate_support") + "…")
         self._donate_action.triggered.connect(lambda: self.open_donate("app-menu"))
+        # Where a supporter key goes, in plain sight (the site's thank-you
+        # points here).
+        self._supporter_action = app_menu.addAction(tr("supporter_menu") + "…")
+        self._supporter_action.triggered.connect(lambda: self.open_supporter())
         self._feedback_action = self._build_report_action(app_menu)
         about_action = app_menu.addAction(tr("menu_about"))
         about_action.triggered.connect(self.show_about)
@@ -503,6 +507,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             about_action: lambda: tr("menu_about"),
             quit_action: lambda: tr("menu_quit"),
             self._donate_action: lambda: tr("donate_support") + "…",
+            self._supporter_action: lambda: tr("supporter_menu") + "…",
             self._feedback_action: lambda: tr("feedback_menu") + "…",
             private_action: lambda: tr("private_menu"),
             clear_action: lambda: tr("clear_menu") + "…",

@@ -56,6 +56,7 @@ def test_a_report_holds_versions_the_error_and_the_recent_log_scrubbed():
 class Inbox:
     def __init__(self, status=200):
         self.got = []
+        self.answers = {}            # reply hash -> answers, for /feedback/replies
         inbox = self
 
         class H(BaseHTTPRequestHandler):
@@ -63,8 +64,16 @@ class Inbox:
                 pass
 
             def do_POST(self):
-                body = self.rfile.read(int(self.headers["Content-Length"]))
-                inbox.got.append((self.path, dict(self.headers), json.loads(body)))
+                body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                if self.path.endswith("/replies"):
+                    out = json.dumps({"replies": {h: inbox.answers[h] for h in body.get("codes", [])
+                                                  if h in inbox.answers}}).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Length", str(len(out)))
+                    self.end_headers()
+                    self.wfile.write(out)
+                    return
+                inbox.got.append((self.path, dict(self.headers), body))
                 self.send_response(status)
                 self.send_header("Content-Length", "0")
                 self.end_headers()
@@ -166,6 +175,7 @@ toasts = []
 w._show_toast = lambda text, ms=0: toasts.append(text)
 inbox = Inbox()
 report.ENDPOINT = inbox.url
+report.REPLIES = inbox.url.replace("/report", "/replies")
 shown = []
 
 def fake_exec(self):
@@ -180,6 +190,11 @@ def fake_feedback(self):
     # What the person picks: something does not work, in the guide, every
     # time; their words; this run's log stays attached, versions too.
     asked.append(self)
+    # The second time, the answer to the first is shown at the top.
+    if len(asked) == 2:
+        assert self.answers_box is not None
+        said = self.answers_box.widget().text()
+        assert "1.5.1" in said and "The guide for &lt;private&gt; is empty" in said, said
     self.topic_chips["bug"].setChecked(True)
     self.area.setCurrentIndex(self.area.findData("guide"))
     self.message.setPlainText("The guide for Anna TV is empty")
@@ -216,6 +231,18 @@ assert "Log from this run (warnings, errors, guide" in sent["text"] and "dopeIPT
 assert "anna-tv" not in sent["text"] and "Anna TV" not in sent["text"]
 assert (sent["topic"], sent["area"], sent["often"]) == ("bug", "guide", "always"), sent
 assert any("sent" in t.lower() or "skick" in t.lower() for t in toasts), toasts
+# An answer in the app: the code stays here, only its hash went with it.
+import hashlib
+kept = report.tickets(s)
+assert len(kept) == 1 and hashlib.sha256(kept[0]["c"].encode()).hexdigest() == sent["reply"], (kept, sent)
+assert kept[0]["w"] == "The guide for <private> is empty"
+inbox.answers[sent["reply"]] = [{"t": 1763100000, "code": "fixed", "version": "1.5.1"}]
+w._ask_answers()
+for _ in range(100):
+    app.processEvents(); w.pool.waitForDone(5)
+    if any("answered" in t for t in toasts): break
+assert any("answered" in t for t in toasts), toasts
+assert report.tickets(s)[0]["r"][0]["version"] == "1.5.1"
 # Right after: not again within the minute - said, nothing opened or sent.
 w._feedback_action.trigger()
 assert len(asked) == 1 and len(inbox.got) == 2
@@ -337,3 +364,46 @@ def test_only_the_part_of_the_log_that_matters_goes_with_feedback():
     assert len(report.relevant_log(lines * 20, "playback", most=50)) <= 50
     # The log file's own form (a date and milliseconds) reads the same.
     assert report._parts("2026-11-14 21:02:10,123 ERROR play: x") == ("ERROR", "play: x")
+
+
+def test_answers_in_the_apps_own_words():
+    pytest.importorskip("PyQt6.QtWidgets")
+    from dopeiptv.ui.dialogs import answer_text
+    assert answer_text({"code": "fixed", "version": "1.5.1"}) == "This is fixed in version 1.5.1 - update dopeIPTV to get it."
+    assert answer_text({"code": "fixed"}) == "This is fixed in the next version."
+    assert answer_text({"code": "note", "text": "Try the other server"}) == "Try the other server"
+    assert answer_text({"code": "thanks", "text": "Great idea!"}).endswith("noted. Great idea!")
+    assert answer_text({"code": "nonsense"}) == ""
+
+
+def test_codes_kept_here_and_old_ones_let_go():
+    import time as _t
+
+    class S(dict):
+        def value(self, k, d=None):
+            return self.get(k, d)
+
+        def setValue(self, k, v):
+            self[k] = v
+    s = S()
+    now = _t.time()
+    report.save_tickets(s, [{"c": "a", "t": now - 5 * 86400},
+                            {"c": "b", "t": now - 40 * 86400},
+                            {"c": "c", "t": now - 40 * 86400, "r": [{"code": "thanks"}]},
+                            {"c": "d", "t": now - 100 * 86400, "r": [{"code": "thanks"}]}])
+    assert [t["c"] for t in report.tickets(s)] == ["a", "c"]
+    code, digest = report.new_code()
+    assert len(code) > 20 and report.code_hash(code) == digest and len(digest) == 64
+
+
+def test_asking_for_answers_sends_only_hashes(monkeypatch):
+    for var in ("HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy", "ALL_PROXY", "all_proxy"):
+        monkeypatch.delenv(var, raising=False)
+    inbox = Inbox()
+    try:
+        inbox.answers[report.code_hash("mine")] = [{"t": 1, "code": "known"}]
+        got = report.fetch_replies(["mine", "other"], endpoint=inbox.url.replace("/report", "/replies"))
+        assert got == {"mine": [{"t": 1, "code": "known"}]}
+        assert report.fetch_replies(["x"], endpoint="http://127.0.0.1:9/replies", timeout=2) is None
+    finally:
+        inbox.close()

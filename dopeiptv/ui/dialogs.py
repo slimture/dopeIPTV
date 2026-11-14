@@ -596,6 +596,11 @@ class SupporterDialog(QDialog):
         self.state = QLabel()
         self.state.setWordWrap(True)
         col.addWidget(self.state)
+        where = QLabel(tr("supporter_where"))
+        where.setWordWrap(True)
+        where.setStyleSheet(f"font-size:12px; color:{P['muted']};")
+        self.where = where
+        col.addWidget(where)
         buttons = QHBoxLayout()
         self.remove = QPushButton(tr("supporter_remove"))
         buttons.addWidget(self.remove)
@@ -635,8 +640,38 @@ class SupporterDialog(QDialog):
             self.state.setStyleSheet(f"font-size:12px; color:{P['error']};")
             self.donate_btn.setText(tr("donate_support") + "…")
         self.heart.set_supporter(found is not None)
+        self.where.setVisible(found is None)
         self.remove.setVisible(bool(text))
         self.supporter = found
+
+
+def answer_text(a: dict) -> str:
+    """An admin's answer in the app's own words: its fixed part in this
+    language, their own words as written."""
+    code, version = str(a.get("code") or ""), str(a.get("version") or "")
+    fixed = {"thanks": "fbr_thanks", "known": "fbr_known", "needinfo": "fbr_needinfo"}
+    if code == "fixed":
+        said = tr("fbr_fixed", version=version) if version else tr("fbr_fixed_next")
+    else:
+        said = tr(fixed[code]) if code in fixed else ""
+    return " ".join(p for p in (said, str(a.get("text") or "").strip()) if p)
+
+
+def answers_html(tickets: list) -> str:
+    """The answered reports, newest first: what the person wrote (kept on
+    this computer only) and each answer with its day."""
+    import datetime as _dt
+    import html as _html
+    rows = []
+    ordered = sorted(tickets, key=lambda t: -max((a.get("t", 0) for a in t.get("r") or [{}]), default=0))
+    for n, t in enumerate(ordered):
+        said = "".join(
+            f"<p style='margin:4px 0 0'><span style='color:{P['muted']}'>"
+            f"{_dt.date.fromtimestamp(int(a.get('t') or 0)).isoformat()}</span>&nbsp; "
+            f"{_html.escape(answer_text(a))}</p>" for a in t.get("r") or [])
+        rows.append(f"<p style='margin:{12 if n else 0}px 0 0 0; color:{P['text2']}'>"
+                    f"{_html.escape(tr('fbr_you', text=str(t.get('w') or '…')))}</p>{said}")
+    return "".join(rows)
 
 
 class FeedbackDialog(QDialog):
@@ -651,10 +686,10 @@ class FeedbackDialog(QDialog):
              ("updates", "fb_a_updates"), ("other", "fb_a_other"))
     OFTEN = (("always", "fb_o_always"), ("sometimes", "fb_o_sometimes"), ("once", "fb_o_once"))
 
-    def __init__(self, parent, details, has_log_file: bool = False) -> None:
+    def __init__(self, parent, details, has_log_file: bool = False, answers: list | None = None) -> None:
         super().__init__(parent)
         from PyQt6.QtGui import QFont
-        from PyQt6.QtWidgets import QButtonGroup, QCheckBox, QComboBox, QGridLayout, QPlainTextEdit
+        from PyQt6.QtWidgets import QButtonGroup, QCheckBox, QComboBox, QGridLayout, QPlainTextEdit, QScrollArea
 
         from .settings_ui import Chip, _Flow
         self._details = details
@@ -673,6 +708,27 @@ class FeedbackDialog(QDialog):
             return lbl
         col.addWidget(label(tr("feedback_title"), 17, P["text"]))
         col.addWidget(label(tr("feedback_intro"), 13, P["text2"], bold=False))
+        # Answers to earlier feedback (asked for with its code), first.
+        self.answers_box: QWidget | None = None
+        if answers:
+            col.addSpacing(4)
+            col.addWidget(label(tr("fbr_title")))
+            inner = QLabel(answers_html(answers))
+            inner.setWordWrap(True)
+            inner.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+            inner.setTextFormat(Qt.TextFormat.RichText)
+            inner.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            inner.setStyleSheet(f"font-size:13px; color:{P['text']}; padding:10px 12px;")
+            scroll = QScrollArea()
+            scroll.setWidget(inner)
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+            scroll.setStyleSheet(f"QScrollArea {{ background:{P['input']}; border-radius:10px; }}"
+                                 f" QScrollArea > QWidget > QWidget {{ background:transparent; }}")
+            # As tall as the answers at the window's width, up to a few of them.
+            scroll.setFixedHeight(min(180, inner.heightForWidth(552) + 4))
+            self.answers_box = scroll
+            col.addWidget(scroll)
         col.addSpacing(4)
         col.addWidget(label(tr("fb_topic")))
         chips = _Flow(6, False)
@@ -735,7 +791,12 @@ class FeedbackDialog(QDialog):
         self.preview.setFixedHeight(190)
         self.preview.hide()
         col.addWidget(self.preview)
-        col.addWidget(label(tr("report_privacy"), 12, bold=False))
+        # An answer in the app: a code kept here, its hash with the report.
+        self.answers = QCheckBox(tr("fb_answers_opt"))
+        self.answers.setChecked(True)
+        self.answers.setToolTip(tr("fb_answers_note"))
+        col.addWidget(self.answers)
+        col.addWidget(label(tr("fb_answers_note") + " " + tr("report_privacy"), 12, bold=False))
         buttons = QHBoxLayout()
         buttons.addStretch(1)
         cancel = QPushButton(tr("common_cancel"))

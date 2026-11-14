@@ -28,6 +28,13 @@ class _ReportMixin:
         self._report_relay = _Relay()
         self._report_relay.raised.connect(self._offer_error_report)
         report.add_listener(self._report_relay.raised.emit)
+        # Answers to feedback: asked a little after the start, then every six
+        # hours, only while there is a report young enough to ask about.
+        self._answers_timer = QTimer(self)
+        self._answers_timer.setInterval(6 * 3600 * 1000)
+        self._answers_timer.timeout.connect(self._ask_answers)
+        self._answers_timer.start()
+        QTimer.singleShot(45_000, self._ask_answers)
         crash = report.pending_crash()
         if crash:
             QTimer.singleShot(4000, lambda: self.open_report("crash", crash, tr("report_crash_intro")))
@@ -51,6 +58,34 @@ class _ReportMixin:
         last = getattr(self, "_last_playback", None) or {}
         titles.append(str(last.get("title") or ""))
         return report.personal_values(playlists, channels, titles)
+
+    def _ask_answers(self) -> None:
+        settings = getattr(self, "settings", None)
+        if settings is None:
+            return
+        import time
+        now = time.time()
+        open_ = [t["c"] for t in report.tickets(settings) if now - float(t.get("t") or 0) < report.ASK_DAYS * 86400]
+        if not open_:
+            return
+
+        def done(got) -> None:
+            if not got:
+                return
+            items, fresh = report.tickets(settings), 0
+            for t in items:
+                answers = got.get(t["c"])
+                if answers and len(answers) > len(t.get("r") or []):
+                    fresh += 1
+                    t["r"] = answers
+            report.save_tickets(settings, items)
+            if fresh:
+                self._show_toast(tr("fbr_new"), 9000)
+        run_async(self.pool, lambda: report.fetch_replies(open_), done, lambda _e=None: None)
+
+    def _answered(self) -> list[dict]:
+        settings = getattr(self, "settings", None)
+        return [t for t in report.tickets(settings) if t.get("r")] if settings is not None else []
 
     #: Offers of an error report in one run: a storm of errors is one problem.
     REPORT_OFFERS = 3
@@ -101,7 +136,7 @@ class _ReportMixin:
         from ..core.log import log_file
         from .dialogs import FeedbackDialog, ReportDialog
         fields: dict = {}
-        words = ""
+        words = code = first_words = ""
         settings = getattr(self, "settings", None)
         if kind == "feedback":
             import time
@@ -110,12 +145,22 @@ class _ReportMixin:
             if wait:
                 self._show_toast(tr("fb_wait" if wait == "wait" else "fb_enough"), 6000)
                 return
-            fd = FeedbackDialog(self, self._feedback_details, has_log_file=os.path.isfile(log_file()))
+            answered = self._answered()
+            fd = FeedbackDialog(self, self._feedback_details, has_log_file=os.path.isfile(log_file()),
+                                answers=answered)
+            if answered and settings is not None:      # shown now: no longer new
+                items = report.tickets(settings)
+                for t in items:
+                    t["seen"] = len(t.get("r") or [])
+                report.save_tickets(settings, items)
             if not fd.exec():
                 return
             fields = fd.fields()
+            if fd.answers.isChecked():
+                code, fields["reply"] = report.new_code()
             payload = report.scrub(fd.payload(), self._personal_values())
             words = report.text_hash(fd.message.toPlainText())
+            first_words = " ".join(report.scrub(fd.message.toPlainText(), self._personal_values()).split())[:90]
             if settings is not None and words == str(settings.value("feedback_last", "") or ""):
                 self._show_toast(tr("fb_same"), 5000)
                 return
@@ -136,6 +181,9 @@ class _ReportMixin:
                     keep = [t for t in report.sent_times(settings.value("feedback_sent", "")) if now - t < 86400]
                     settings.setValue("feedback_sent", ",".join(str(int(t)) for t in [*keep, now]))
                     settings.setValue("feedback_last", words)
+                    if code:
+                        report.save_tickets(settings, [*report.tickets(settings),
+                                                       {"c": code, "t": int(now), "w": first_words, "seen": 0}])
                 self._show_toast(tr("report_sent"), 5000)
                 return
             from PyQt6.QtGui import QGuiApplication
