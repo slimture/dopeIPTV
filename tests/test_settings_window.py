@@ -117,8 +117,8 @@ def search_and_cancel(self):
                        and nav.item(i).data(0x0100)]
     # Every page, Nerd too (its switch is on it); Nerd's four pages are
     # left out while it is off.
-    shown = len(shell.pages) - 5
-    assert shell._off == {"nerd_net", "nerd_boxes", "nerd_lists", "nerd_player", "nerd_rec"}, shell._off
+    shown = len(shell.pages) - 6
+    assert shell._off == {"nerd_net", "nerd_boxes", "nerd_lists", "nerd_player", "nerd_rec", "nerd_serve"}, shell._off
     assert len(visible()) == shown >= 14, (visible(), shown)
     shell.search.setText(tr("setting_sub_lang_fallback")[:-2])
     assert visible() == ["audio"], visible()
@@ -233,8 +233,8 @@ def layout(self):
     assert keys[:4] == ["general", "playlists", "appearance", "home"], keys
     # Nerd last under System, after Advanced, a category of its own; its
     # four pages under a NERD heading of their own, left out while it is off.
-    nerd_pages = ["nerd_net", "nerd_boxes", "nerd_lists", "nerd_player", "nerd_rec"]
-    assert keys[-8:] == ["parental", "advanced", "nerd"] + nerd_pages, keys
+    nerd_pages = ["nerd_net", "nerd_boxes", "nerd_lists", "nerd_player", "nerd_rec", "nerd_serve"]
+    assert keys[-9:] == ["parental", "advanced", "nerd"] + nerd_pages, keys
     at = {k: i for i, (k, _f) in enumerate(rows) if k}
     assert not nav.item(at["nerd"]).isHidden()
     assert all(nav.item(at[k]).isHidden() for k in nerd_pages)

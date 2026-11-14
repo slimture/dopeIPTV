@@ -935,6 +935,16 @@ def _own_icon(kind: str, s: int, colour: str) -> QPixmap | None:
             pr.setBrush(col)
             pr.drawEllipse(QPointF(f * x, f * knob), f * 0.08, f * 0.08)
             pr.setBrush(Qt.BrushStyle.NoBrush)
+    elif kind == "remote":                  # a remote control
+        pr.drawRoundedRect(QRectF(f * 0.32, f * 0.1, f * 0.36, f * 0.8), f * 0.1, f * 0.1)
+        pr.drawEllipse(QPointF(f * 0.5, f * 0.3), f * 0.08, f * 0.08)
+        pr.setPen(Qt.PenStyle.NoPen)
+        pr.setBrush(col)
+        for y in (0.52, 0.66):
+            for x in (0.43, 0.57):
+                pr.drawEllipse(QPointF(f * x, f * y), f * 0.035, f * 0.035)
+        pr.setBrush(Qt.BrushStyle.NoBrush)
+        pr.setPen(pen)
     elif kind == "channels":                # a list with logos
         for y in (0.24, 0.5, 0.76):
             pr.drawRoundedRect(QRectF(f * 0.1, f * (y - 0.08), f * 0.16, f * 0.16),

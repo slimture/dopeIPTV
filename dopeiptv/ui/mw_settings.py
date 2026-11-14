@@ -1724,10 +1724,11 @@ class _SettingsMixin:
             "lists": page("nerd_lists", tr("nerd_pg_lists"), tr("nerd_pg_lists_sub"), "channels"),
             "player": page("nerd_player", tr("nerd_pg_player"), tr("nerd_pg_player_sub"), "knobs"),
             "rec": page("nerd_rec", tr("nerd_pg_rec"), tr("nerd_pg_rec_sub"), "rec"),
+            "serve": page("nerd_serve", tr("nerd_pg_serve"), tr("nerd_pg_serve_sub"), "remote"),
         }
 
         def show_nerd_pages(on: bool) -> None:
-            for key in ("nerd_net", "nerd_boxes", "nerd_lists", "nerd_player", "nerd_rec"):
+            for key in ("nerd_net", "nerd_boxes", "nerd_lists", "nerd_player", "nerd_rec", "nerd_serve"):
                 shell.set_page_enabled(key, on)
         nerd_client = self.client
         nerd_commit = nerd_settings.build(
@@ -1741,7 +1742,8 @@ class _SettingsMixin:
             channels=lambda: nerd_client.live_streams(None),
             rec_dir=lambda: self.rec.directory(),
             playlists=lambda: ((self.playlist_store.playlists(), self.playlist_store.active_id)
-                               if self.playlist_store else ([], None)))
+                               if self.playlist_store else ([], None)),
+            remote=self._remote_apply)
 
         # -- the playlist page's behaviour -------------------------------------
         def reload_pl_list():
@@ -1968,7 +1970,8 @@ class _SettingsMixin:
             (tr("set_sec_services"), ["metadata", "trakt"]),
             (tr("set_sec_system"), ["parental", "advanced", "nerd"]),
             # Only while Nerd is on (its pages are left out otherwise).
-            (tr("nerd_sec"), ["nerd_net", "nerd_boxes", "nerd_lists", "nerd_player", "nerd_rec"]),
+            (tr("nerd_sec"), ["nerd_net", "nerd_boxes", "nerd_lists", "nerd_player", "nerd_rec",
+                              "nerd_serve"]),
         ])
         # Back on the page that was open last time this session.
         shell.show_page(getattr(self, "_settings_page", None))
@@ -2124,6 +2127,9 @@ class _SettingsMixin:
                 self._nerd_to_player()
                 if changed & {"nerd_enabled", "nerd_picon_dir", "nerd_picon_override", "nerd_udpxy"}:
                     self._nerd_lists_changed = True
+                if changed & {"nerd_enabled", "nerd_remote", "nerd_share", "nerd_remote_lan",
+                              "nerd_remote_port", "nerd_remote_token"}:
+                    self._remote_apply()
 
             if any(k.startswith("mv_") for k in changed):
                 self._apply_multiview_settings()

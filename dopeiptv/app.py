@@ -573,6 +573,7 @@ def main() -> int:
     w = MainWindow(client, settings, store)
     w.show()
     w._start_command_server()
+    w._remote_apply()
     _watch_link_events(app, w)
     if command is not None:
         # After the window and its source are up: a channel needs its list.

@@ -62,6 +62,7 @@ from .mw_recording import _RecordingMixin
 from .mw_busy import _BusyMixin
 from .mw_cast import _CastMixin
 from .mw_failover import _FailoverMixin
+from .mw_remote import _RemoteMixin
 from .mw_privacy import _PrivacyMixin
 from .mw_commands import _CommandsMixin
 from .mw_box import _BoxMixin
@@ -111,7 +112,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _PopoutMixin, _MultiviewMixin, _HomeMixin, _MprisMixin,
                  _FollowMixin, _SubtitlesMixin, _CastMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
-                 QMainWindow):
+                 _RemoteMixin, QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
     epg_progress = pyqtSignal(int)
@@ -5618,6 +5619,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._maybe_auto_mark_watched()
         self.wake.release()
         self._stop_media_session()
+        self._remote_stop()
         self.cover.flush()
         if self._trakt_active:
             active = self._trakt_active

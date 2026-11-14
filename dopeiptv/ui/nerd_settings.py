@@ -17,6 +17,7 @@ import platform
 import sys
 from typing import Any, Callable
 
+from PyQt6 import sip
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QComboBox, QFileDialog, QHBoxLayout, QLineEdit, QPlainTextEdit,
@@ -74,14 +75,16 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
           source: Callable[[], dict | None] | None = None,
           channels: Callable[[], list[dict]] | None = None,
           rec_dir: Callable[[], str] | None = None,
-          playlists: Callable[[], tuple[list[dict], str | None]] | None = None) -> Callable[[Callable[[str, Any], None]], None]:
+          playlists: Callable[[], tuple[list[dict], str | None]] | None = None,
+          remote: Callable[[dict], dict] | None = None) -> Callable[[Callable[[str, Any], None]], None]:
     """*page* is Nerd's own: the switch, how it works, stats, diagnostics.
     *pages* ("net", "boxes", "lists", "player", "rec") take the rest, shown by
     *show_pages* while Nerd is on; without them it all goes on *page*.
     *boxes*: the box sources, each a click (*edit*, by id) from its options.
     *source*: the active source, which the network checks ask; *channels*:
     fetches its channel list, off the window's thread (the picon check
-    matches against it)."""
+    matches against it). *remote*: puts the remote API and sharing as the
+    page says now and returns how the server stands (its Test)."""
     n = nerd.Nerd(settings)
     sub = pages or {}
 
@@ -453,6 +456,86 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
           search="command script comskip post-processing after recording", below=post_line)
     c.note(tr("nerd_applies_rec"))
 
+    # -- remote control and sharing --------------------------------------------------------
+    from ..core import remote_api
+    c = at("serve").card(tr("nerd_card_remote"))
+    remote_on = ToggleSwitch(n.flag("nerd_remote"))
+    remote_on.setAccessibleName(tr("nerd_remote"))
+    c.row(tr("nerd_remote"), remote_on, tr("nerd_remote_hint"),
+          search="remote API HTTP REST Home Assistant curl script control")
+    c.note(tr("nerd_remote_calls"))
+
+    c = at("serve").card(tr("nerd_card_share"))
+    share_on = ToggleSwitch(n.flag("nerd_share"))
+    share_on.setAccessibleName(tr("nerd_share"))
+    c.row(tr("nerd_share"), share_on, tr("nerd_share_hint"),
+          search="server share M3U XMLTV Kodi TiviMate VLC playlist guide")
+    copy_m3u = QPushButton(tr("nerd_share_copy_m3u"))
+    copy_epg = QPushButton(tr("nerd_share_copy_epg"))
+    c.row(tr("nerd_share_addresses"), _hbox(copy_m3u, copy_epg), tr("nerd_share_addresses_hint"),
+          search="address URL copy playlist guide")
+
+    c = at("serve").card(tr("nerd_card_access"))
+    who = combo([("local", "nerd_remote_local"), ("lan", "nerd_remote_home")],
+                "lan" if n.flag("nerd_remote_lan") else "local")
+    c.row(tr("nerd_remote_who"), who, tr("nerd_remote_who_hint"), search="LAN network localhost listen")
+    port = Stepper(lo=1024, hi=65535, value=n.num("nerd_remote_port", remote_api.DEFAULT_PORT), width=150)
+    c.row(tr("nerd_remote_port"), port, tr("nerd_remote_port_hint"), search="port")
+    token = QLineEdit(val("nerd_remote_token"))
+    token.setReadOnly(True)
+    token.setEchoMode(QLineEdit.EchoMode.Password)
+    token.setAccessibleName(tr("nerd_remote_token"))
+    copy_tok = QPushButton(tr("problem_copy"))
+    new_tok = QPushButton(tr("nerd_remote_new_token"))
+
+    def wanted_remote() -> dict:
+        return {"remote": switch.isChecked() and remote_on.isChecked(),
+                "share": switch.isChecked() and share_on.isChecked(),
+                "port": port.value(), "host": "0.0.0.0" if who.currentData() == "lan" else "127.0.0.1",
+                "token": token.text().strip()}
+
+    def ensure_token(*_a) -> None:
+        if (remote_on.isChecked() or share_on.isChecked()) and not token.text().strip():
+            token.setText(remote_api.new_token())
+    remote_on.toggled.connect(ensure_token)
+    share_on.toggled.connect(ensure_token)
+
+    def address(path: str) -> str:
+        ips = remote_api.lan_addresses() if who.currentData() == "lan" else []
+        ensure_token()
+        return f"http://{(ips or ['127.0.0.1'])[0]}:{port.value()}{path}?token={token.text().strip()}"
+
+    def copy(btn: QPushButton, text: str) -> None:
+        from PyQt6.QtCore import QTimer
+        from PyQt6.QtWidgets import QApplication
+        QApplication.clipboard().setText(text)
+        label = btn.text()
+        btn.setText("✓ " + tr("problem_copied"))
+        QTimer.singleShot(1500, lambda: btn.setText(label) if not sip.isdeleted(btn) else None)
+    copy_m3u.clicked.connect(lambda _c=False: copy(copy_m3u, address("/playlist.m3u")))
+    copy_epg.clicked.connect(lambda _c=False: copy(copy_epg, address("/guide.xml.gz")))
+    copy_tok.clicked.connect(lambda _c=False: (ensure_token(), copy(copy_tok, token.text().strip())))
+    new_tok.clicked.connect(lambda _c=False: token.setText(remote_api.new_token()))
+
+    def remote_job() -> Any:
+        if remote is None:
+            return None
+        ensure_token()
+        st = remote(wanted_remote())
+        args = (st["host"], st["port"], st["token"], st["remote"], st["share"], st["running"], st["error"])
+        return lambda: remote_api.check_server(*args)
+    remote_line = check(remote_job, tr("nerd_ck_title_remote"), test=True, test_text=tr("nerd_ck_test_remote"))
+    for sig in (remote_on.toggled, share_on.toggled, who.currentIndexChanged, port.valueChanged, token.textChanged):
+        sig.connect(remote_line.changed)
+    tok_row = QHBoxLayout()
+    tok_row.setSpacing(8)
+    tok_row.addWidget(token, 1)
+    tok_row.addWidget(copy_tok)
+    tok_row.addWidget(new_tok)
+    c.row(tr("nerd_remote_token"), tok_row, tr("nerd_remote_token_hint"), stretch_control=True,
+          search="token password secret key", below=remote_line)
+    c.note(tr("nerd_applies_remote"))
+
     # -- diagnostics (Nerd's own page) --------------------------------------------------------
     c = page.card(tr("nerd_card_diag"))
     level = combo([("info", "nerd_log_info"), ("debug", "nerd_log_debug")], val("nerd_log_level", "info"))
@@ -514,6 +597,11 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
         put("nerd_rec_template", template.text().strip())
         put("nerd_rec_post", post.text().strip())
         put("nerd_failover", "true" if fail_on.isChecked() else "false")
+        put("nerd_remote", "true" if remote_on.isChecked() else "false")
+        put("nerd_share", "true" if share_on.isChecked() else "false")
+        put("nerd_remote_lan", "true" if who.currentData() == "lan" else "false")
+        put("nerd_remote_port", port.value())
+        put("nerd_remote_token", token.text().strip())
         return out
 
     # Off: the switch and what Nerd holds, nothing else. On: all of it - on
@@ -612,7 +700,8 @@ def diagnostics(settings: Any) -> str:
     lines.append(f"Nerd: {'on' if n.on else 'off'}")
     safe = {"nerd_ip_family", "nerd_net_timeout", "nerd_reconnect_max", "nerd_spdif", "nerd_video_sync",
             "nerd_interpolation", "nerd_probe", "nerd_demux_max_mb", "nerd_log_level", "nerd_vpn_guard",
-            "nerd_vpn_lan", "nerd_proxy_player"}
+            "nerd_vpn_lan", "nerd_proxy_player", "nerd_failover", "nerd_remote", "nerd_share",
+            "nerd_remote_lan", "nerd_remote_port"}
     for key in sorted(safe):
         v = n.get(key)
         if v:
