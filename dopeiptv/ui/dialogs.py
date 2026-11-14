@@ -641,6 +641,7 @@ class SupporterDialog(QDialog):
             self.donate_btn.setText(tr("donate_support") + "…")
         self.heart.set_supporter(found is not None)
         self.where.setVisible(found is None)
+        self.state.setVisible(bool(text))
         self.remove.setVisible(bool(text))
         self.supporter = found
 

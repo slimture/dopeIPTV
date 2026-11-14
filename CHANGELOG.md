@@ -7,6 +7,66 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.5.0]
+
+Boxes on the home network as sources, Nerd for those who tinker, private
+viewing, feedback with answers in the app, and a supporter key.
+
+### Added
+
+- Enigma2 receivers (OpenWebif and the Dreambox WebInterface), Tvheadend
+  servers and HDHomeRun tuners (and their emulators) as source types, with
+  their bouquets or tags, guides and recordings; "Find on my network"
+  (HDHomeRun broadcast and a probe of the local /24).
+- Nerd: a Settings page, off until chosen, whose pages fold out under it in
+  a colour of their own - Network, Boxes and servers, Channels and guide,
+  Player, Recording, Remote and sharing. Each setting is tried for real
+  (✓ / ! / ✕, Test, Details): user agent, headers, proxy and IP version
+  per source, a VPN guard, mpv options and shaders, the box from the app
+  (zap, wake, standby, record on the box), picon folders, udpxy, guides
+  from several places and a channel's guide by hand, presets (Fritz!Box,
+  Channels DVR, Threadfin, xTeVe, Dispatcharr, ErsatzTV).
+- Failover: a live channel that will not play is played from another
+  source (by guide id, else name).
+- Stream health per channel (starts, failures, time to the first picture,
+  drops, the last error), in Settings, the channel's menu and a dot.
+- Channel numbers of one's own; digits typed over the picture zap too, a
+  number not on screen is found in the whole source, `POST /api/play
+  {"number": 12}`.
+- A source's own catch-up address: Kodi's placeholders and modes (default,
+  append, shift, flussonic), tried before the app's own guesses.
+- A remote API and sharing: one small server with a token - play, the
+  channel list, what is playing - and every source's channels as one M3U
+  and their guides as one XMLTV.
+- `--play`, `--channel` and `dopeiptv://` links; a single instance.
+- Recording file names from a template (folders, never outside), and a
+  command after a recording (no shell).
+- Private viewing (nothing kept until the app closes) and Clear recent
+  history by time range.
+- Send feedback…: topic, where and how often for a problem, attachments
+  one by one, only the part of the log that matters, "Show exactly what is
+  sent"; an answer in the app through a random code kept on the computer
+  (only its hash is sent). Error and crash reports offered, scrubbed of
+  addresses, logins, sources, channels and titles. Limits against
+  spamming in the app and on the site.
+- Supporter keys: signed by dopeiptv.org, checked offline, nothing about
+  the person in them; "Supporter key…" in the dopeIPTV menu and Settings,
+  `dopeiptv://supporter?key=...` from the site's thank-you.
+
+### Changed
+
+- Stats for nerds are laid out for the room the picture has: larger in
+  fullscreen, two columns when one is too tall, seven lines on a click.
+- Serbian in Latin script throughout.
+- Flatpak: freedesktop runtime 25.08 (24.08 reached end of life).
+- Typed channel numbers wait 1.5 s (was 1.2 s); Enter zaps at once.
+
+### Fixed
+
+- macOS: a second dopeIPTV menu appeared beside the real one.
+- The source dialog with Nerd on was too tall to use and did not scroll;
+  Check now moved the focus away.
+
 ## [1.4.5]
 
 An installer for Windows, and updates that install themselves on Windows

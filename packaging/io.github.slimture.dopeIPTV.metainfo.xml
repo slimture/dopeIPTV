@@ -58,6 +58,11 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.5.0" date="2026-11-14">
+      <description>
+        <p>Boxes on the home network as sources: Enigma2 receivers, Tvheadend servers and HDHomeRun tuners, found on the network by themselves. Nerd, a Settings page for tinkerers, off until chosen: the box from the app, picons, udpxy, guides from several places, network and player options that each say whether they work, failover to another source, stream health, channel numbers of your own, catch-up addresses, recording names, a remote API and every source shared as one playlist and guide. Private viewing and Clear recent history. Feedback from the app with only the part of the log that matters, and answers to it in the app - nothing that identifies anyone. A supporter key for those who donate.</p>
+      </description>
+    </release>
     <release version="1.4.5" date="2026-11-13">
       <description>
         <p>An installer for Windows, and updates that install themselves on Windows and macOS: Update now downloads the new version, checks it and installs it. On a Mac the new version is used only when it is signed by Solecraft AB and notarised by Apple. Updates come from dopeiptv.org, which counts how many are made, never who makes them. The welcome screen connects Stalker and Ministra portals too.</p>

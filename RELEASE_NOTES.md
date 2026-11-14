@@ -1,17 +1,26 @@
-## dopeIPTV 1.4.5
+## dopeIPTV 1.5.0
 
-**dopeIPTV now installs on Windows like any other program - and on Windows and macOS it updates itself from now on. One click in the app, and you are on the newest version.**
+**Your receiver, your TV server and your tuner as sources - and Nerd: a Settings page for those who like to tinker, off until you turn it on.**
 
 ### The big ones
 
-- **A real installer for Windows.** Run it and dopeIPTV is in the Start menu and under Settings → Apps - no unzipping, no administrator, no folder to keep track of. Uninstalling there removes everything dopeIPTV kept, except your recordings. The portable zip is still there for those who want it. The first time, Windows may say *"Windows protected your PC"*: click **More info → Run anyway**.
-- **Updates from inside the app, on Windows and macOS.** When a new version is out, **Update now** in the banner or in About downloads it, checks it, installs it and opens dopeIPTV again - one window shows how far it has come. No more downloading and replacing by hand. On a Mac the new version is only used when it is signed by Solecraft AB and notarised by Apple.
-- **The Mac app is signed and notarised by Apple**, so it opens like any other app - no more Open Anyway in System Settings.
+- **Boxes on the home network.** An Enigma2 receiver (VU+, Dreambox, Zgemma and the like), a Tvheadend server or an HDHomeRun tuner is a source of its own - with its channels, its guide and its recordings. **Find on my network** looks for them by itself.
+- **Nerd.** Turn it on in Settings and its pages fold out under it, in a colour of their own: the box from the app (zap, wake, standby, record on the box from the guide), your own picons, multicast through udpxy, guides from several places and a channel's guide picked by hand, a user agent, headers, a proxy and the IP version per source, mpv options and shaders. Every setting tells you whether it works - ✓, ! or ✕, with a Test button.
+- **Failover.** A live channel that will not play is found in another of your sources and played from there.
+- **Stream health.** How each channel starts and plays: how often it failed, how long the picture took, drops and the last error - a coloured dot beside the worst ones.
+- **Channel numbers of your own.** Give a channel a number, then type it to zap - in the list or over the picture, docked or fullscreen.
+- **Catch-up where the app could not find it.** A source can say where its archive is, with the placeholders Kodi uses.
+- **Remote control and sharing.** A small server, with a token, so a script or another program can play a channel - and every source shared as one playlist and one guide for other players in the house.
+- **Private viewing**, and **Clear recent history** for the last hour, day or all of it.
+- **Send feedback** from the menu: say what it is about, and attach only what you choose - the app picks the part of the log that matters. Ask for an answer and it comes in the app - no e-mail, no account. After an error or a crash the app offers to send a report. Before you see any of it, addresses, logins, your sources' names, channels and what you watched are taken out.
+- **A supporter key** for those who donate: a mark on the heart and in About, and the app stops asking. It is checked on your computer and holds nothing about you. Find it under **dopeIPTV → Supporter key…**.
 
 ### Also new
 
-- **Stalker and Ministra portals on the welcome screen**, beside Xtream and M3U: the portal's address and a MAC address.
-- **Updates come from dopeiptv.org - and only genuine ones are installed.** Every release is signed with dopeIPTV's own key, and the app checks the signature before it installs anything, so not even a server taken over could slip in something else. The site counts how many updates are made, by version and system - never who makes them.
-- **Home without a provider** shows its top bar again - the way back was cut off.
+- Recordings named the way you want, in folders of their own, and a command run when one is done.
+- `--play`, `--channel` and `dopeiptv://` links; a second start hands its command to the copy that is running.
+- Stats for nerds as large as the picture allows - and tidy in fullscreen.
+- Serbian is written in one script throughout (Latin).
+- macOS: one dopeIPTV menu again, not two.
 
-On the AppImage from 1.2.15 or later? Click **Update now** in the banner. On Windows and macOS, download 1.4.5 once from [dopeiptv.org](https://dopeiptv.org) - from then on it updates itself.
+On the AppImage, Windows or macOS? Click **Update now** in the banner - or download 1.5.0 from [dopeiptv.org](https://dopeiptv.org).
