@@ -892,8 +892,9 @@ w._events_quit()
 assert time.monotonic() - t0 < 0.2              # never waited for on the window's thread
 w._events_join(3.0)
 assert seen("app_quitting"), both()
-assert broker.topics("home/tv/state")[-1]["state"] == "off"
-assert [p for t, p, _r, _n in broker.publishes if t == "home/tv/availability"][-1] == b"offline"
+# The broker's thread takes them in its own time: wait, as above.
+assert until(lambda: broker.topics("home/tv/state")[-1]["state"] == "off"), broker.topics("home/tv/state")
+assert until(lambda: [p for t, p, _r, _n in broker.publishes if t == "home/tv/availability"][-1] == b"offline")
 print("EVENTS_OK", flush=True)
 os._exit(0)
 """
