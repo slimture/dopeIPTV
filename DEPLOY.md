@@ -630,6 +630,39 @@ cp /root/iptv-static/deploy/content-iptv.dope.rs.conf "$C"
 bastille cmd pontusweb nginx -t && bastille cmd pontusweb service nginx reload
 ```
 
+## Feedback and error reports from the app
+
+The app's *Send feedback…* and the offer after an error or a crash post to
+`/feedback/report` (donate/feedback.py; nothing about the sender is kept).
+The admin page shows them under **Feedback**: the numbers for the period,
+a row a day, the problems grouped by what went wrong (sortable: most
+reported, most recent, most versions, newest; not fixed / all / fixed;
+one version), what people wrote, each report in full with *Copy for a bug
+fix*, and seen / fixed marks. A new report sends a push to the admins'
+devices, like a donation.
+
+1. Copy the files and restart (jail):
+
+       cd ~/dopeiptv; git checkout website; git pull origin website
+       cp -R donate /usr/local/www/iptv/
+       service iptv_donate restart
+
+2. nginx (host): the new `/feedback/report` and `/feedback/export` blocks
+   and the `iptv_feedback` zone are in deploy/content-iptv.dope.rs.conf -
+   copy it as before, then `nginx -t && service nginx reload`.
+
+3. Optional - reading the reports from a fixing session: a read-only token
+   of its own, not an admin login. In the jail, add a line to
+   /usr/local/etc/iptv-donate.conf
+
+       FEEDBACK_READ_TOKEN=<openssl rand -hex 24>
+
+   and restart the service. `GET /feedback/export?days=30` with
+   `Authorization: Bearer <token>` then answers the same summary with each
+   report's text; without the line it answers 404. Give the token only to
+   a place that keeps secrets (a cloud session's environment secret), never
+   in a chat or a file in the repository.
+
 ## Moving to dopeiptv.org
 
 The site's address is dopeiptv.org; iptv.dope.rs sends every request on to

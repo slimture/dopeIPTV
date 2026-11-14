@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>dopeIPTV stats</title>
+<title>dopeIPTV admin</title>
 <link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml">
 <link rel="manifest" href="/admin/app.webmanifest">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -17,19 +17,24 @@
 <script src="/admin/passkey.js" defer></script>
 <script src="/admin/account.js" defer></script>
 <script src="/admin/builds.js" defer></script>
+<script src="/admin/feedback.js" defer></script>
 </head>
 <body>
 <header class="top">
   <button type="button" class="nav-back" id="nav-back" hidden aria-label="Back"><span aria-hidden="true">‹</span><span class="l">Back</span></button>
   <div class="brand">
     <img src="/favicon.svg?v=2" alt="" width="28" height="28">
-    <span class="name">dopeIPTV</span><span class="sub">Statistics</span>
+    <span class="name">dopeIPTV</span><span class="sub">Admin</span>
   </div>
   <div class="tabs" role="tablist">
+    <span class="tab-group" aria-hidden="true">Statistics</span>
     <button type="button" role="tab" data-tab="overview" aria-selected="true">Overview</button>
     <button type="button" role="tab" data-tab="visitors" aria-selected="false">Visitors</button>
     <button type="button" role="tab" data-tab="analysis" aria-selected="false">Analysis</button>
     <button type="button" role="tab" data-tab="builds" aria-selected="false">Builds</button>
+    <span class="tab-sep" aria-hidden="true"></span>
+    <button type="button" role="tab" data-tab="feedback" aria-selected="false">Feedback<span class="tab-count" id="fb-count" hidden></span></button>
+    <span class="tab-sep" aria-hidden="true"></span>
     <button type="button" role="tab" data-tab="account" aria-selected="false">Account</button>
   </div>
   <div class="range" role="radiogroup" aria-label="Period">
@@ -135,6 +140,36 @@
       <section class="card" id="an-langs"></section>
     </div>
     <section class="card" id="an-acts"></section>
+  </div>
+
+  <div id="tab-feedback" class="tab" hidden>
+    <p class="status" id="fb-status" role="status"></p>
+    <section class="summary fb-summary" id="fb-summary" aria-label="Reports in this period"></section>
+    <section class="card">
+      <div class="card-head"><h2>Reports per day</h2><span class="muted">errors and crashes on feedback</span></div>
+      <div id="fb-chart"></div>
+    </section>
+    <section class="group">
+      <h3 class="group-head">What goes wrong</h3>
+      <section class="card">
+        <div class="card-head"><h2>Problems</h2><span class="muted">the same error from many people is one row - the most reported first, fixed ones last</span></div>
+        <div id="fb-problems"></div>
+      </section>
+    </section>
+    <section class="group">
+      <h3 class="group-head">What people say</h3>
+      <section class="card">
+        <div class="card-head"><h2>Feedback</h2><span class="muted">newest first</span></div>
+        <div id="fb-words"></div>
+      </section>
+    </section>
+    <section class="group">
+      <h3 class="group-head">Where it comes from</h3>
+      <div class="lists" id="fb-versions"></div>
+    </section>
+    <p class="muted fb-note">Sent from the app only when someone presses Send, after reading the whole report.
+      The app takes out addresses, IP and MAC addresses, logins, source and channel names and titles watched
+      first; the service takes out addresses again and keeps no IP address.</p>
   </div>
 
   <div id="tab-builds" class="tab" hidden>

@@ -716,3 +716,49 @@ tr:last-child td { border-bottom: 0; }
 .rank .out:hover, .rank .out:focus-visible { color: var(--accent); }
 .facts a.ext { color: var(--accent); text-decoration: none; }
 .facts a.ext:hover { text-decoration: underline; }
+
+/* -- the parts of the page: Statistics (its four tabs), Feedback, Account ------ */
+.tabs .tab-group { align-self: center; font-size: 11px; font-weight: 750; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--muted); padding: 0 6px 0 2px; white-space: nowrap; }
+.tabs .tab-sep { align-self: center; width: 1px; height: 18px; margin: 0 6px; background: var(--line); }
+.tabs .tab-count { display: inline-block; min-width: 18px; margin-inline-start: 6px; padding: 0 5px; border-radius: 999px;
+  font-size: 11px; line-height: 18px; text-align: center; color: #fff; background: var(--heart); }
+@media (max-width: 600px) { .tabs .tab-group { display: none; } }
+
+/* -- Feedback: error reports and what people wrote ---------------------------- */
+.fb-summary .big.crash .value { color: var(--down); }
+.fb-summary .big.fb .value { color: var(--s1); }
+.fb-bars { width: 100%; height: auto; display: block; }
+.fb-bars rect.err { fill: var(--s3); } .fb-bars rect.crash { fill: var(--down); } .fb-bars rect.fb { fill: var(--s1); }
+.fb-bars .axis { font-size: 11px; fill: var(--muted); }
+#fb-chart .legend .key { display: inline-flex; align-items: center; gap: 6px; margin-inline-end: 14px; font-size: 13px; color: var(--text-2); }
+#fb-chart .legend .key i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+#fb-chart .legend .err i { background: var(--s3); } #fb-chart .legend .crash i { background: var(--down); }
+#fb-chart .legend .fb i { background: var(--s1); }
+.fb-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.fb-row { border-top: 1px solid var(--line); padding: 8px 0; }
+.fb-row:first-child { border-top: 0; }
+.fb-row.st-fixed { opacity: .6; }
+.fb-head { all: unset; box-sizing: border-box; width: 100%; cursor: pointer; display: flex; align-items: center; gap: 10px;
+  padding: 4px 6px; border-radius: 8px; }
+.fb-head:hover, .fb-head:focus-visible { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.fb-head .sig { flex: 1; min-width: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-head .sig.words { font-family: inherit; font-size: 14px; }
+.fb-head .count { font-weight: 750; color: var(--text); }
+.fb-meta { color: var(--muted); font-size: 12.5px; padding: 0 6px; }
+.chip.kind-error { color: var(--s3); background: color-mix(in srgb, var(--s3) 14%, transparent); }
+.chip.kind-crash { color: var(--down); background: color-mix(in srgb, var(--down) 14%, transparent); }
+.chip.st-new { color: var(--heart); background: color-mix(in srgb, var(--heart) 12%, transparent); }
+.chip.st-fixed { color: var(--up); background: color-mix(in srgb, var(--up) 14%, transparent); }
+.fb-body { padding: 8px 6px 4px; }
+.fb-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.btn.quiet { background: none; color: var(--text-2); }
+.fb-text { margin: 0; max-height: 420px; overflow: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px;
+  background: color-mix(in srgb, var(--text) 5%, transparent); border-radius: 10px; padding: 10px 12px; }
+.fb-note { margin: 4px 2px 0; }
+.fb-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 2px 0 10px; }
+.fb-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-inline-end: auto; }
+.fb-chips .chip-f.on { color: var(--text); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.fb-select { font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 9px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--text); }

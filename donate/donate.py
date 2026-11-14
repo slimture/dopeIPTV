@@ -669,9 +669,16 @@ def _watch_donations() -> None:
 # One list, so a new path cannot be served by one check and refused by another.
 ADMIN_DATA = ("/admin/data", "/admin/visits", "/admin/visitor", "/admin/find", "/admin/rows", "/admin/account",
               "/admin/live", "/admin/builds")
+ADMIN_FEEDBACK = ("/admin/feedback", "/admin/feedback-item")
 ADMIN_GET = ("/admin/admin.js", "/admin/analysis.js", "/admin/logtools.js", "/admin/account.js",
-             "/admin/builds.js", *ADMIN_DATA)
-ADMIN_POST = ("/admin/notify-test", "/admin/push-subscribe", "/admin/push-unsubscribe", "/admin/pick")
+             "/admin/builds.js", "/admin/feedback.js", *ADMIN_DATA, *ADMIN_FEEDBACK)
+ADMIN_POST = ("/admin/notify-test", "/admin/push-subscribe", "/admin/push-unsubscribe", "/admin/pick",
+              "/admin/feedback-mark")
+# From the app: an error report or feedback, sent when its user pressed Send.
+FEEDBACK_POST = "/feedback/report"
+# The reports for reading elsewhere (a fixing session), with a read-only
+# token of their own - FEEDBACK_READ_TOKEN in the config; off without one.
+FEEDBACK_EXPORT = "/feedback/export"
 ACCOUNT = "/admin/account/"      # + an action: one's own sign-in, the other admins
 # Open to anyone (nginx asks nothing here either): the sign-in page and what
 # it needs, and the files a Home Screen app or the push worker fetch.
@@ -782,6 +789,18 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(500, {"error": "admin unavailable"})
         if path == "/admin/builds":         # no statistics in it: nothing to collect first
             return self._send(200, admin.builds(admin.SITE))
+        if path in ADMIN_FEEDBACK:
+            import feedback
+            query = {k: v[0] for k, v in urllib.parse.parse_qs(self.path.partition("?")[2]).items()}
+            fb_dir = CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats"))
+            if path == "/admin/feedback-item":
+                row = feedback.item(fb_dir, query.get("id", "")[:40])
+                return self._send(200, row) if row else self._send(404, {"error": "no such report"})
+            try:
+                fb_days = int(query.get("days", "30"))
+            except ValueError:
+                fb_days = 30
+            return self._send(200, feedback.summary(fb_dir, fb_days))
         if path in ADMIN_DATA:
             query = {k: v[0] for k, v in urllib.parse.parse_qs(self.path.partition("?")[2]).items()}
             stats_dir = CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats"))
@@ -987,6 +1006,12 @@ class Handler(BaseHTTPRequestHandler):
             import analysis
             stats_dir = CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats"))
             return self._send(200, analysis.pick(stats_dir, data.get("keys") or []))
+        if path == "/admin/feedback-mark":
+            import admin
+            import feedback
+            fb_dir = CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats"))
+            ok = feedback.mark(fb_dir, str(data.get("key") or ""), str(data.get("state") or ""))
+            return self._send(200 if ok else 400, {"ok": ok})
         if path == "/admin/notify-test":
             sent, why = push("Notifications work", "This is how a new donation will look.", tag="test")
             return self._send(200 if sent else 502, {"ok": bool(sent), "sent": sent, "error": why})
@@ -998,6 +1023,47 @@ class Handler(BaseHTTPRequestHandler):
         else:
             push_remove([str(data.get("endpoint") or "")])
         return self._send(200, {"ok": True, "devices": len(push_subs())})
+
+    def _feedback(self) -> None:
+        """A report from the app: kind, version, system and the text its user
+        read and sent. Nothing about who sent it is kept (the rate limit
+        holds the address in memory only)."""
+        if self.headers.get("X-Dopeiptv-Report") != "1":
+            return self._send(400, {"error": "not from the app"})
+        addr = self.headers.get("X-Real-IP") or "local"
+        if not _allowed("fb:" + addr):
+            return self._send(429, {"error": "slow down"})
+        data = self._body(60000)
+        if data is None:
+            return self._send(400, {"error": "body"})
+        import admin
+        import feedback
+        status, body = feedback.accept(CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats")), data)
+        if status == 200 and push_ready():
+            kind = str(data.get("kind") or "feedback")
+            threading.Thread(target=push, args=(
+                {"error": "An error report", "crash": "A crash report"}.get(kind, "Feedback") + " from the app",
+                f"dopeIPTV {str(data.get('version') or '?')[:20]} · {str(data.get('os') or '?')[:20]}",
+                "/admin/#feedback", "feedback"), daemon=True).start()
+        return self._send(status, body)
+
+    def _feedback_export(self) -> None:
+        token = CONF.get("FEEDBACK_READ_TOKEN", "")
+        given = (self.headers.get("Authorization") or "")[7:].strip() \
+            if (self.headers.get("Authorization") or "").lower().startswith("bearer ") else ""
+        if len(token) < 24:
+            return self._send(404, {"error": "not found"})
+        if not hmac.compare_digest(given.encode(), token.encode()):
+            time.sleep(0.5)
+            return self._send(401, {"error": "token"})
+        import admin
+        import feedback
+        query = {k: v[0] for k, v in urllib.parse.parse_qs(self.path.partition("?")[2]).items()}
+        try:
+            days = int(query.get("days", "30"))
+        except ValueError:
+            days = 30
+        return self._send(200, feedback.export(CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats")), days))
 
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
@@ -1013,6 +1079,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/admin/news":
             return self._news()
+        if path == FEEDBACK_EXPORT:
+            return self._feedback_export()
         if path == "/admin/login" and self._user() and "invite=" not in self.path:
             return self._redirect("/admin/")          # signed in already
         if path in PUBLIC_GET:
@@ -1038,6 +1106,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._sign_in(path[len(SIGN_IN):])
         if path in ADMIN_POST or path.startswith(ACCOUNT):
             return self._admin_post(path)
+        if path == FEEDBACK_POST:
+            return self._feedback()
         if path not in ("/donate/session", "/donate/wallet"):
             return self._send(404, {"error": "not found"})
         origin = (self.headers.get("Origin") or "").rstrip("/")

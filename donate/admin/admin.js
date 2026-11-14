@@ -111,6 +111,7 @@
     });
     load();
     if (tab === "analysis" && window.AdminAnalysis) { window.AdminAnalysis.show(); }
+    if (tab === "feedback" && window.AdminFeedback) { window.AdminFeedback.show(); }
   }
   // Donations seen here are not shown again in the note on the site's own
   // pages (public/nav.js, the same browser's storage).
@@ -1276,7 +1277,14 @@
     $("tab-analysis").hidden = name !== "analysis";
     $("tab-account").hidden = name !== "account";
     $("tab-builds").hidden = name !== "builds";
+    $("tab-feedback").hidden = name !== "feedback";
     document.querySelector(".range").hidden = name === "visitors" || name === "account" || name === "builds";
+    if (name === "feedback") {
+      if (window.AdminFeedback) { window.AdminFeedback.show(); } else {
+        $("fb-status").textContent = "The Feedback tab's script did not load. The service on the server serves it " +
+          "once restarted: service iptv_donate restart - then reload this page.";
+      }
+    }
     if (name === "account" && window.AdminAccount) { window.AdminAccount.show(); }
     if (name === "builds") {
       if (window.AdminBuilds) { window.AdminBuilds.show(); } else {
@@ -1296,7 +1304,7 @@
     }
     // The visitor log writes the address once its visits are in, the
     // Analysis tab once drawn: a step back then scrolls to where it was.
-    if (name === "overview" || name === "account" || name === "builds") { writeHash(); }
+    if (name === "overview" || name === "account" || name === "builds" || name === "feedback") { writeHash(); }
     // Drawn while the tab was hidden (data arriving, a resize), a chart
     // measured its box as 0 wide, fell back to its narrowest size and was
     // then stretched to the full width - tall as a wall. Drawn again now
@@ -1333,7 +1341,7 @@
       h = "visitors?" + p.toString();
     } else if (tab === "analysis") {
       h = "analysis" + (window.AdminAnalysis ? window.AdminAnalysis.toHash() : "");
-    } else if (tab === "account" || tab === "builds") {
+    } else if (tab === "account" || tab === "builds" || tab === "feedback") {
       h = tab;
     }
     const url = h ? "#" + h : location.pathname + location.search;
@@ -1374,6 +1382,7 @@
       if (/^\d{4}-\d\d-\d\d$/.test(p.get("day") || "")) { logDay = p.get("day"); }
       return setTab("visitors");
     }
+    if (name === "feedback") { return setTab("feedback"); }
     if (name === "analysis" && window.AdminAnalysis) {
       window.AdminAnalysis.fromHash(h.slice("analysis".length));
       return setTab("analysis");
@@ -1460,7 +1469,7 @@
   window.AdminKit = {
     $: $, mk: mk, svg: svg, num: num, dayFmt: dayFmt, flag: flag, countryName: countryName, duration: duration,
     showTip: showTip, hideTip: hideTip, tipRow: tipRow, PAGE_NAMES: PAGE_NAMES, langNames: langNames,
-    helpName: helpName, writeHash: writeHash, step: navStep,
+    helpName: helpName, writeHash: writeHash, step: navStep, listCard: listCard, rankList: rankList,
     showFiltered: (by, value, label) => { navStep(); showFiltered(by, value, label); },
     showGroup: (label, keys) => { navStep(); showGroup(label, keys); },
     days: () => days,
