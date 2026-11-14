@@ -163,11 +163,13 @@ def _accents_of(key: str) -> list[tuple[str, str]]:
 
 
 @pytest.mark.parametrize("key", list(THEMES))
-def test_the_selected_nav_entry_reads_in_every_theme_and_accent(key):
+def test_the_selected_nav_entry_reads_in_every_theme_and_accent(key, monkeypatch):
     """The selected entry is a light wash of the accent with its label, icon
     and leading bar in the accent - moved toward the text colour where the
     accent itself would not read (gold or mint on a light theme). Checked
-    for every theme, light and dark, with every accent."""
+    for every theme, light and dark, with every accent - the supporters'
+    themes as a supporter sees them."""
+    monkeypatch.setattr(theme, "supporter_themes_open", lambda _s=None: True)
     t = THEMES[key]
     for name, accent in _accents_of(key):
         try:
