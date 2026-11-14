@@ -19,7 +19,7 @@ from .qt_i18n import format_when
 from PyQt6.QtCore import QDateTime, Qt, QTimer
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QComboBox, QDateTimeEdit, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu, QMessageBox, QPushButton, QVBoxLayout
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 # Why a recording stopped or failed, as the recorder says it (English, and
@@ -1144,6 +1144,12 @@ class _RecordingMixin:
         # whichever scheme this provider actually serves.
         urls = self.client.timeshift_urls(
             sid, datetime.fromtimestamp(start), duration_min)
+        # Nerd: the source's own catch-up address goes first; the app's
+        # own still follow it, so a template that does not answer with a
+        # stream costs nothing but the try.
+        own = self._nerd_catchup_url(it, start, start + duration_min * 60)
+        if own:
+            urls = [own] + [u for u in (urls or []) if u != own]
         if not urls:
             return
         log.debug("[ts] probe back_min=%s prog=%s days=%s start=%s "
@@ -1243,6 +1249,30 @@ class _RecordingMixin:
                   lambda u=list(urls): self._probe_ts_candidates(u),
                   # A crashed probe proves nothing either - never mark on it.
                   done, lambda _e: done((None, False)))
+
+    def _nerd_catchup_url(self, it, start: float, end: float) -> str | None:
+        """Nerd: the active source's own catch-up address (Add/Edit source >
+        Nerd options) for a programme from *start* to *end* (epoch seconds) -
+        None, and nothing changes, while Nerd is off or the source asks for
+        nothing of its own."""
+        from ..core import catchup, nerd
+        src = nerd.source()
+        if not catchup.wanted(src):
+            return None
+        try:
+            fmt = str(self.settings.value("stream_format", "ts") or "ts")
+            live = self.client.live_url(it.get("stream_id"), fmt) or ""
+            url = catchup.for_programme(
+                src, live, datetime.fromtimestamp(start, timezone.utc),
+                datetime.fromtimestamp(end, timezone.utc),
+                catchup_id=str(it.get("catchup_id") or ""),
+                channel_source=str(it.get("catchup_source") or ""))
+        except Exception as e:
+            log.info("[ts] the source's catch-up address could not be made: %s", e)
+            return None
+        if url:
+            log.debug("[ts] the source's own catch-up address first: %s", redact_url(url))
+        return url
 
     def _probe_ts_candidates(self, urls) -> tuple:
         """(worker thread) Return (url, proven_dead): the first candidate URL

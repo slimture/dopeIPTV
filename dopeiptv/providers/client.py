@@ -688,6 +688,10 @@ class M3UClient(OfflineClient):
                     "tv_archive_duration": int(days) if days.isdigit() else (
                         7 if has_archive else 0),
                 }
+                # What a Nerd catch-up template's {catchup-id} stands for.
+                cid = attrs.get("catchup-id", "").strip()
+                if cid:
+                    pending["catchup_id"] = cid
             elif line.startswith("#EXTM3U"):
                 # Header line: many playlists advertise their XMLTV guide here
                 # as url-tvg="..." (or x-tvg-url="..."). Grab it as an EPG hint.

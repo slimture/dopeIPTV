@@ -80,6 +80,7 @@ files = [
     "dopeiptv/core/nerd_check.py",
     "dopeiptv/core/privacy.py",
     "dopeiptv/core/rec_extras.py",
+    "dopeiptv/core/catchup.py",
     "dopeiptv/core/remote_api.py",
     "dopeiptv/core/report.py",
     "dopeiptv/core/supporter.py",

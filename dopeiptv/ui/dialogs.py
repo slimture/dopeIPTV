@@ -157,9 +157,12 @@ class PlaylistDialog(QDialog):
         from ..core import nerd
         if nerd.current().on:
             from .source_nerd import SourceNerdPanel
-            self.nerd_panel = SourceNerdPanel(self.kind.currentData(), self._options, self)
+            self.nerd_panel = SourceNerdPanel(self.kind.currentData(), self._options, self,
+                                              source=self._source_now)
             lay.addWidget(self.nerd_panel)
             self.nerd_panel.toggle.toggled.connect(lambda _on: self._fit())
+            for field in (self.server, self.user, self.pw):
+                field.textChanged.connect(self.nerd_panel.source_changed)
         lay.addStretch(1)
 
         buttons = QDialogButtonBox(
@@ -170,6 +173,13 @@ class PlaylistDialog(QDialog):
         outer.addWidget(buttons)
         self.kind.currentIndexChanged.connect(self._update_kind)
         self._update_kind()
+
+    def _source_now(self) -> dict:
+        """The source as the form has it now, without its Nerd options (what
+        the catch-up Test asks)."""
+        return {"kind": self.kind.currentData(), "server": self.server.text().strip(),
+                "username": self.user.text().strip(), "password": self.pw.text().strip(),
+                "mac": self.normal_mac(self.mac.text()) or ""}
 
     def _fit(self) -> None:
         """Grow or shrink with the form (rows shown for the kind, the Nerd

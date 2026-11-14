@@ -29,13 +29,18 @@ Job = Callable[[], "Callable[[], Check | None] | None"]
 class CheckLine(QWidget):
     """*title*: what the problem window is called when this check fails.
     *test*: a Test button (a check that asks the network); otherwise it runs
-    by itself, shortly after its setting changes."""
+    by itself, shortly after its setting changes. *preview*: with a Test
+    button, what the line says until Test is pressed (and again shortly
+    after the setting changes) - a quick look made on the window's thread,
+    never one that waits on the network."""
 
     def __init__(self, job: Job, title: str, test: bool = False,
-                 parent: QWidget | None = None, test_text: str = "") -> None:
+                 parent: QWidget | None = None, test_text: str = "",
+                 preview: Callable[[], Check | None] | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("NerdCheck")
         self._job, self._title = job, title
+        self._preview = preview if test else None
         self._test_text = test_text or tr("nerd_ck_test")
         self._seq = 0
         self._result: Check | None = None
@@ -67,7 +72,13 @@ class CheckLine(QWidget):
         self._soon.setSingleShot(True)
         self._soon.setInterval(600)
         self._soon.timeout.connect(self.run)
-        if test:
+        self._look = QTimer(self)
+        self._look.setSingleShot(True)
+        self._look.setInterval(300)
+        self._look.timeout.connect(self.show_preview)
+        if self._preview is not None:
+            self.show_preview()
+        elif test:
             # A Test button is there from the start, so the test can be found.
             self._show(INFO, tr("nerd_ck_untested"))
         else:
@@ -78,11 +89,34 @@ class CheckLine(QWidget):
     def changed(self, *_a) -> None:
         """Its setting changed: check again in a moment (a check that asks
         the network waits for Test, but says the last answer is old)."""
+        if self._preview is not None:
+            self._seq += 1          # a test still under way answers for the old setting
+            if self.test_btn is not None:
+                self.test_btn.setText(self._test_text)
+            self._look.start()
+            return
         if self.test_btn is not None:
             if self._result is not None:
                 self._show(INFO, tr("nerd_ck_retest"))
             return
         self._soon.start()
+
+    def show_preview(self) -> None:
+        """What the setting comes to now, without asking the network."""
+        self._look.stop()
+        if self._preview is None:
+            return
+        try:
+            result = self._preview()
+        except Exception as e:     # a control in a state nobody foresaw
+            self._result = None
+            self._show(FAIL, tr("nerd_ck_error"), f"{type(e).__name__}: {e}")
+            return
+        self._result = result
+        if result is None:
+            self._show(INFO, tr("nerd_ck_untested"))
+        else:
+            self._show(result.state, tr(result.key, **result.params), result.detail)
 
     def start(self) -> None:
         """The first look, when the page is built."""
@@ -102,6 +136,8 @@ class CheckLine(QWidget):
             self._result = None
             if self.test_btn is None:
                 self.hide()
+            elif self._preview is not None:
+                self.show_preview()
             else:
                 self._show(INFO, tr("nerd_ck_nothing") if explicit else tr("nerd_ck_untested"))
             return
@@ -131,6 +167,8 @@ class CheckLine(QWidget):
         if result is None:
             if self.test_btn is None:
                 self.hide()
+            elif self._preview is not None:
+                self.show_preview()
             else:
                 self._show(INFO, tr("nerd_ck_untested"))
             return
