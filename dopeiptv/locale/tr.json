@@ -1769,5 +1769,11 @@
   "supporter_again": "Yeniden bağış yap",
   "supporter_menu": "Destekçi anahtarı",
   "supporter_tip": "{date} tarihinden beri destekçi – teşekkürler!",
-  "report_waiting": "dopeIPTV bir hatayla karşılaştı. Raporu okumak için buraya tıklayın - rapor menüde de bekliyor."
+  "report_waiting": "dopeIPTV bir hatayla karşılaştı. Raporu okumak için buraya tıklayın - rapor menüde de bekliyor.",
+  "theme_aurora": "Kutup Işığı",
+  "theme_dawn": "Şafak",
+  "theme_supporter_tip": "Destekçiler için – dopeIPTV'yi ücretsiz tuttuğunuz için teşekkürler",
+  "set_supporter_icon": "Destekçi simgesi",
+  "set_supporter_icon_hint": "Uygulamanın simgesi, kenar çubuğundaki logo gibi destekçi renklerini ve bir kalbi alır.",
+  "supporter_perks": "Anahtar ayrıca destekçilere özel iki temayı ve uygulama için bir destekçi simgesini açar."
 }

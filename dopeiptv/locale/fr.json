@@ -1769,5 +1769,11 @@
   "supporter_again": "Donner à nouveau",
   "supporter_menu": "Clé de soutien",
   "supporter_tip": "Soutien depuis le {date} – merci !",
-  "report_waiting": "dopeIPTV a rencontré une erreur. Cliquez ici pour lire le rapport – il vous attend aussi dans le menu."
+  "report_waiting": "dopeIPTV a rencontré une erreur. Cliquez ici pour lire le rapport – il vous attend aussi dans le menu.",
+  "theme_aurora": "Aurore boréale",
+  "theme_dawn": "Aube",
+  "theme_supporter_tip": "Pour les soutiens – merci de garder dopeIPTV gratuit",
+  "set_supporter_icon": "Icône de soutien",
+  "set_supporter_icon_hint": "L'icône de l'app prend les couleurs de soutien et un cœur, comme le logo de la barre latérale.",
+  "supporter_perks": "La clé ouvre aussi deux thèmes réservés aux soutiens et une icône de soutien pour l'app."
 }

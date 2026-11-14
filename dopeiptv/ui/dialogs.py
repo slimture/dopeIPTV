@@ -651,7 +651,9 @@ class SupporterDialog(QDialog):
             if not text:
                 self._settings.remove("supporter_key")
             self.head.setText(tr("supporter_title"))
-            self.sub.setText(tr("supporter_intro"))
+            # What the key opens, too: someone who picked a supporter theme
+            # lands here and should read why.
+            self.sub.setText(tr("supporter_intro") + "\n\n" + tr("supporter_perks"))
             self.state.setText(tr("supporter_bad") if text else "")
             self.state.setStyleSheet(f"font-size:12px; color:{P['error']};")
             self.donate_btn.setText(tr("donate_support") + "…")
@@ -662,6 +664,27 @@ class SupporterDialog(QDialog):
         self.state.setVisible(bool(text))
         self.remove.setVisible(bool(text))
         self.supporter = found
+        if self.isVisible():
+            self._fit()
+
+    def _fit(self) -> None:
+        """As tall as its words at its width: the intro and what the key
+        opens wrap beside the heart, and a plain size hint does not count
+        the wrapping - they ran past the top and bottom of the row."""
+        lay = self.layout()
+        if lay is None:
+            return
+        lay.invalidate()
+        lay.activate()
+        w = max(self.width(), self.minimumWidth())
+        h = lay.totalHeightForWidth(w) if lay.hasHeightForWidth() else lay.totalSizeHint().height()
+        h = max(h, lay.totalSizeHint().height())
+        self.setMinimumHeight(h)
+        self.resize(w, h)
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self._fit()
 
 
 def answer_text(a: dict) -> str:

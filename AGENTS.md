@@ -142,7 +142,8 @@ map and the one-way import rule.
 | `ui/welcome.py` | First-run welcome overlay |
 | `ui/category_flags.py` | Bundled SVG flags for category names (flag emoji, "SE \| …" prefixes) |
 | `ui/player_resize.py` | The handle under the docked video that sets its height |
-| `ui/theme.py` | Theming engine |
+| `ui/theme.py` | Theming engine; `SUPPORTER_THEMES`, the two a supporter key opens |
+| `ui/app_icon.py` | The app's own icon - plain, or the supporter's while the key and its switch say so: drawn at every size, the window icon, on Linux the user's icon theme |
 
 ## Working with individual modules
 

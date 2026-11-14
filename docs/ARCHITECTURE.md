@@ -15,7 +15,7 @@ dopeiptv.py            Thin launcher (calls dopeiptv.app.main)
 
 dopeiptv/
   __init__.py          Package metadata (APP_NAME, ORG, VERSION)
-  app.py               QApplication bootstrap, login flow, icon generation
+  app.py               QApplication bootstrap, login flow
   i18n.py              English source strings + set_language / tr()
   locale/              One <code>.json per non-English language (26 files)
 
@@ -142,8 +142,10 @@ dopeiptv/
     shortcuts.py       Keyboard-shortcuts card (Settings > Advanced)
     tmdb_match.py      Manual TMDB match dialog
     subtitle_search.py OpenSubtitles search dialog
-    theme.py           THEMES (25) x ACCENTS (10 + custom), palette dict P,
-                       QSS generator
+    theme.py           THEMES (27, two of them a supporter's) x ACCENTS
+                       (10 + custom), palette dict P, QSS generator
+    app_icon.py        The app's icon, plain or the supporter's: drawn,
+                       set for every window, written to the icon theme
 ```
 
 Import direction is one-way: `ui` may use `services`, `media`, `core`

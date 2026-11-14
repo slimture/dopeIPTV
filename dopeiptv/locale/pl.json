@@ -1769,5 +1769,11 @@
   "supporter_again": "Wpłać ponownie",
   "supporter_menu": "Klucz wspierającego",
   "supporter_tip": "Wspierasz od {date} – dziękujemy!",
-  "report_waiting": "dopeIPTV napotkał błąd. Kliknij tutaj, aby przeczytać raport – czeka też w menu."
+  "report_waiting": "dopeIPTV napotkał błąd. Kliknij tutaj, aby przeczytać raport – czeka też w menu.",
+  "theme_aurora": "Zorza",
+  "theme_dawn": "Świt",
+  "theme_supporter_tip": "Dla wspierających – dziękujemy, że dzięki tobie dopeIPTV pozostaje darmowy",
+  "set_supporter_icon": "Ikona wspierającego",
+  "set_supporter_icon_hint": "Ikona aplikacji przybiera kolory wspierającego i serce, jak logo na pasku bocznym.",
+  "supporter_perks": "Klucz odblokowuje też dwa motywy dla wspierających i ikonę wspierającego dla aplikacji."
 }

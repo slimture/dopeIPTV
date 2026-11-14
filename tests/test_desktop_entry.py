@@ -148,9 +148,9 @@ _PNG = b"pretend-this-is-a-png"
 
 def _install_icon(monkeypatch):
     """Run the real install_icon against the patched XDG_DATA_HOME."""
-    import dopeiptv.app as app
-    monkeypatch.setattr(app, "_png_bytes", lambda _icon, _size: _PNG)
-    app.install_icon(object())
+    from dopeiptv.ui import app_icon
+    monkeypatch.setattr(app_icon, "_png_bytes", lambda _icon, _size: _PNG)
+    app_icon.install_icon(object())
 
 
 def test_a_stale_icon_cache_is_dropped_so_the_icon_can_be_seen(

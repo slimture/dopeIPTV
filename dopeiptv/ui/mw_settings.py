@@ -69,7 +69,7 @@ from ..media.dvr_player import DVR_SPACE_GB, dvr_base
 from ..media.embedded import SUB_COLORS, SUB_SCALES
 from ..media.players import embedded_playback_reason
 from .theme import (
-    ACCENT_CUSTOM, ACCENT_THEME, ACCENTS, P, THEME_ORDER,
+    ACCENT_CUSTOM, ACCENT_THEME, ACCENTS, P, SUPPORTER_THEMES, THEME_ORDER,
     THEMES, UI_SCALES, apply_theme, build_style, effective_theme,
     is_light,
 )
@@ -782,16 +782,26 @@ class _SettingsMixin:
             mpris_box = c.toggle(tr("setting_mpris"), is_on("mpris", "true"),
                                  tr("setting_mpris_hint"))
         # The sidebar's heart, last and quiet: off hides it for three months.
-        c = general.card(tr("donate_support"))
+        c = support_card = general.card(tr("donate_support"))
+        # What the supporter key opens: read once here, again only after the
+        # key's window (every check of a key is a signature check).
+        key_state: dict = {"mine": None}
+        key_row = key_btn = icon_box = None
         if hasattr(self, "open_supporter"):
-            from ..core import supporter as _sup
             from .qt_i18n import format_month
-            mine = _sup.stored(self.settings)
+            key_state["mine"] = self._supporter()
+            mine = key_state["mine"]
             key_btn = QPushButton(tr("set_supporter_open") if mine else tr("set_supporter_enter"))
-            key_btn.clicked.connect(lambda _c=False: self.open_supporter())
-            c.row(tr("supporter_menu"), key_btn,
-                  tr("supporter_tip", date=format_month(mine["since"])) if mine else tr("set_supporter_hint"),
-                  search="supporter key donation donated code nyckel")
+            key_btn.clicked.connect(lambda _c=False: supporter_window())
+            key_row = c.row(tr("supporter_menu"), key_btn,
+                            tr("supporter_tip", date=format_month(mine["since"])) if mine else tr("set_supporter_hint"),
+                            search="supporter key donation donated code nyckel")
+            # The supporter's app icon - for a supporter only, on unless
+            # turned off; applied as it is switched (commit below).
+            icon_box = c.toggle(tr("set_supporter_icon"),
+                                is_on("supporter_icon", "true"),
+                                tr("set_supporter_icon_hint"))
+            c.shown_if(c.rows[-1][0], lambda: key_state["mine"] is not None)
         heart_box = c.toggle(tr("set_donate_heart"), self._donate_heart_due(),
                              tr("set_donate_heart_hint"))
 
@@ -817,7 +827,8 @@ class _SettingsMixin:
         accents.setMinimumWidth(min(len(accent_keys) * (ColorDot.D + 6), 440))
         light_box = self._combo(
             [(key, tr(f"theme_{key}")) for key in THEME_ORDER
-             if is_light(key)],
+             if is_light(key) and (key not in SUPPORTER_THEMES
+                                   or key_state["mine"] is not None)],
             self.settings.value("theme_light", "light"))
         corner_box = self._combo(
             [("sharp", tr("option_corners_sharp")),
@@ -840,17 +851,72 @@ class _SettingsMixin:
             themes.refresh()
             accents.refresh()
 
-        def restyle() -> None:
-            self._apply_theme_now()
+        def restyle_dialog() -> None:
             # The dialog's own rules are built from the palette too.
             d.setStyleSheet(settings_style())
             sync_pickers()
             for chip in d.findChildren(Chip):
                 chip.refresh()
 
+        def restyle() -> None:
+            self._apply_theme_now()
+            restyle_dialog()
+
+        def sync_locks() -> None:
+            """The supporter themes: a heart and a word on them without a
+            key; in the light-theme list only with one."""
+            closed = key_state["mine"] is None
+            for tile in themes.tiles:
+                tile.set_locked(closed and tile.key in SUPPORTER_THEMES,
+                                tr("theme_supporter_tip"))
+            light_box.blockSignals(True)
+            for key in THEME_ORDER:
+                if key not in SUPPORTER_THEMES or not is_light(key):
+                    continue
+                at = light_box.findData(key)
+                if not closed and at < 0:
+                    light_box.addItem(tr(f"theme_{key}"), key)
+                elif closed and at >= 0:
+                    light_box.removeItem(at)
+            at = light_box.findData(self.settings.value("theme_light", "light"))
+            light_box.setCurrentIndex(max(at, 0))
+            light_box.blockSignals(False)
+
+        def supporter_window() -> None:
+            """The key's window, from the Support card or a supporter theme;
+            the page follows what it changed - the card's row, the locks,
+            and the palette if a supporter theme gave way."""
+            before = P.get("name")
+            self.open_supporter()
+            from .qt_i18n import format_month
+            mine = key_state["mine"] = self._supporter()
+            if key_btn is not None and key_row is not None:
+                key_btn.setText(tr("set_supporter_open") if mine
+                                else tr("set_supporter_enter"))
+                if key_row.hint_label is not None:
+                    key_row.hint_label.setText(
+                        tr("supporter_tip", date=format_month(mine["since"]))
+                        if mine else tr("set_supporter_hint"))
+            support_card.refresh()
+            sync_locks()
+            themes.set_value(self.settings.value("theme", "graphite"))
+            if P.get("name") != before:
+                restyle_dialog()
+
         sync_pickers()
+        sync_locks()
 
         def pick_theme(key: str) -> None:
+            if key in SUPPORTER_THEMES and key_state["mine"] is None:
+                # Not open yet: the supporter window says what opens it, and
+                # the theme comes on as soon as a key does.
+                themes.set_value(self.settings.value("theme", "graphite"))
+                if not hasattr(self, "open_supporter"):
+                    return
+                supporter_window()
+                if key_state["mine"] is None:
+                    return
+                themes.set_value(key)
             self.settings.setValue("theme", key)
             restyle()
 
@@ -2177,6 +2243,11 @@ class _SettingsMixin:
                     self.hide_donate_heart()
                     changed.add("donate_heart_until")
                 self._donate_heart_refresh()
+            # Written once switched (on is the default): an untouched window
+            # stores nothing.
+            if icon_box is not None and icon_box.isChecked() != is_on("supporter_icon", "true"):
+                put("supporter_icon", flag(icon_box))
+                self._app_icon_refresh()
             if channel_box.currentData() != self._update_channel():
                 put("update_channel", channel_box.currentData())
                 # Look again now, on the channel just chosen.

@@ -1769,5 +1769,11 @@
   "supporter_again": "再次捐赠",
   "supporter_menu": "支持者密钥",
   "supporter_tip": "自 {date} 起成为支持者——谢谢！",
-  "report_waiting": "dopeIPTV 遇到了一个错误。点击这里阅读报告——它也在菜单中等你。"
+  "report_waiting": "dopeIPTV 遇到了一个错误。点击这里阅读报告——它也在菜单中等你。",
+  "theme_aurora": "极光",
+  "theme_dawn": "晨曦",
+  "theme_supporter_tip": "支持者专享——感谢你让 dopeIPTV 保持免费",
+  "set_supporter_icon": "支持者图标",
+  "set_supporter_icon_hint": "应用图标会像侧边栏的标志一样，换上支持者的配色和一颗爱心。",
+  "supporter_perks": "密钥还会解锁两款支持者主题和应用的支持者图标。"
 }

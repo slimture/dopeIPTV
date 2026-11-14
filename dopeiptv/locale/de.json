@@ -1769,5 +1769,11 @@
   "supporter_again": "Erneut spenden",
   "supporter_menu": "Unterstützer-Schlüssel",
   "supporter_tip": "Unterstützer seit {date} – danke!",
-  "report_waiting": "dopeIPTV ist auf einen Fehler gestoßen. Hier klicken, um den Bericht zu lesen – er wartet auch im Menü."
+  "report_waiting": "dopeIPTV ist auf einen Fehler gestoßen. Hier klicken, um den Bericht zu lesen – er wartet auch im Menü.",
+  "theme_aurora": "Polarlicht",
+  "theme_dawn": "Morgenrot",
+  "theme_supporter_tip": "Für Unterstützer – danke, dass du dopeIPTV kostenlos hältst",
+  "set_supporter_icon": "Unterstützer-Symbol",
+  "set_supporter_icon_hint": "Das App-Symbol bekommt die Unterstützer-Farben und ein Herz, wie das Logo in der Seitenleiste.",
+  "supporter_perks": "Der Schlüssel schaltet außerdem zwei Unterstützer-Designs und ein Unterstützer-Symbol für die App frei."
 }

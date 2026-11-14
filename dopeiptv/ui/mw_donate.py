@@ -20,6 +20,7 @@ import time
 
 from PyQt6.QtCore import QTimer
 
+from ..core.log import log
 from ..core.xdg import open_url
 from ..i18n import tr
 from .theme import P
@@ -135,6 +136,39 @@ class _DonateMixin:
                 home.setVisible(due)
             except RuntimeError:                       # Home was rebuilt
                 self._home_heart = None
+        self._supporter_perks(sup)
+
+    # -- what the key opens ----------------------------------------------------
+    def _supporter_perks(self, sup) -> None:
+        """What a supporter key opens, kept in step with it - here, after
+        the key's window, and once a minute: the supporter's app icon
+        (unless switched off in Settings) and the supporter themes. With
+        the key gone, a supporter theme in use gives way to the default,
+        quietly. The first call, while the window is being built, only
+        corrects the stored choice: the start already showed the default
+        (theme.effective_theme)."""
+        from .theme import THEMES, drop_locked_themes, effective_theme
+        first = not hasattr(self, "_perks_seen")
+        self._perks_seen = True
+        if sup is None and drop_locked_themes(self.settings):
+            log.info("supporter theme: no supporter key - back to the default")
+            if not first and P.get("name") != THEMES[effective_theme(self.settings)]["name"]:
+                self._apply_theme_now()
+        from . import app_icon
+        try:
+            app_icon.show(sup is not None and app_icon.switched_on(self.settings))
+        except Exception as e:
+            log.warning("supporter icon: %s", e)
+
+    def _app_icon_refresh(self) -> None:
+        """The app's icon after the Settings switch: the supporter's or the
+        plain one, live."""
+        from . import app_icon
+        try:
+            app_icon.show(self._supporter() is not None
+                          and app_icon.switched_on(self.settings))
+        except Exception as e:
+            log.warning("supporter icon: %s", e)
 
     def donated(self) -> None:
         """Said they have: the heart and Home's card go for good."""

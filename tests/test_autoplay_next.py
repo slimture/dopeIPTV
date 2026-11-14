@@ -287,9 +287,13 @@ assert 0.78 <= tile <= 0.83, "tile is %.1f%% of canvas, want ~80.5%%" % (tile * 
 # overrides the bundle icon in the macOS Dock the moment the app starts,
 # and on Linux it is what gets written into the XDG icon theme. A
 # full-bleed one here undoes the margin either way. Check the call main()
-# actually makes, per platform.
+# actually makes, per platform: it shows ui/app_icon.platform_icon.
 import re, inspect, dopeiptv.app as A
-src = inspect.getsource(A.main)
+from dopeiptv.ui import app_icon
+assert "app_icon.show(" in inspect.getsource(A.main), \
+    "main() must set the window icon through app_icon.show"
+src = inspect.getsource(app_icon.show) + inspect.getsource(app_icon.platform_icon)
+assert "platform_icon(supporter)" in src
 assert "_padded = _mac or sys.platform.startswith(\"linux\")" in src, \
     "macOS AND Linux must both take the margin; only Windows is full bleed"
 assert "inset=ICON_SAFE_INSET if _padded else 0.0" in src, \

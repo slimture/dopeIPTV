@@ -1769,5 +1769,11 @@
   "supporter_again": "Donasi lagi",
   "supporter_menu": "Kunci pendukung",
   "supporter_tip": "Pendukung sejak {date} – terima kasih!",
-  "report_waiting": "dopeIPTV mengalami kesalahan. Klik di sini untuk membaca laporannya - laporan itu juga menunggu di menu."
+  "report_waiting": "dopeIPTV mengalami kesalahan. Klik di sini untuk membaca laporannya - laporan itu juga menunggu di menu.",
+  "theme_aurora": "Aurora",
+  "theme_dawn": "Fajar",
+  "theme_supporter_tip": "Untuk pendukung – terima kasih telah menjaga dopeIPTV tetap gratis",
+  "set_supporter_icon": "Ikon pendukung",
+  "set_supporter_icon_hint": "Ikon aplikasi memakai warna pendukung dan sebuah hati, seperti logo di bilah samping.",
+  "supporter_perks": "Kunci ini juga membuka dua tema pendukung dan ikon pendukung untuk aplikasi."
 }

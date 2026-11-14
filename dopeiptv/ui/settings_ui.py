@@ -39,8 +39,10 @@ from PyQt6.QtWidgets import (
 )
 
 from .theme import (
-    P, THEMES, _luminance, _mix, corner_radius, resolve_accent, rounded,
+    HEART, P, SUPPORTER_THEMES, THEMES, _luminance, _mix, corner_radius,
+    resolve_accent, rounded,
 )
+from .widgets import heart_shape
 
 #: Widest a page's content gets. A form stretched over a large window puts
 #: the label and its control a screen apart.
@@ -1491,16 +1493,52 @@ class _Choice(QAbstractButton):
 
 class ThemeTile(_Choice):
     """A small picture of the app in one theme - sidebar, a list with its
-    selected row, the accent - with the theme's name under it."""
+    selected row, the accent - with the theme's name under it. A supporter
+    theme (theme.SUPPORTER_THEMES) has a small heart before its name;
+    *locked* - no supporter key - its tooltip says what it is for, and
+    picking it opens the supporter window instead (mw_settings)."""
 
     W, H, PREVIEW_H = 118, 92, 64
+    HEART_W = 9.0
 
     def __init__(self, key: str, name: str) -> None:
         super().__init__(key, name)
         self.accent = ("blue", "")
+        self.locked = False
+
+    def set_locked(self, locked: bool, tip: str = "") -> None:
+        self.locked = bool(locked)
+        name = self.text()
+        self.setToolTip(f"{name}\n{tip}" if self.locked and tip else name)
+        self.setAccessibleDescription(tip if self.locked else "")
+        self.update()
 
     def minimumSizeHint(self) -> QSize:
         return QSize(self.W, self.H)
+
+    def _draw_name(self, pr: QPainter, label: QRectF) -> None:
+        """The name centred under the picture - after a heart for a
+        supporter theme (before it, read right to left)."""
+        fm = pr.fontMetrics()
+        flags = Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop
+        if self.key not in SUPPORTER_THEMES:
+            text = fm.elidedText(self.text(), Qt.TextElideMode.ElideRight,
+                                 self.width() - 4)
+            pr.drawText(label, flags, text)
+            return
+        hw, gap = self.HEART_W, 4.0
+        text = fm.elidedText(self.text(), Qt.TextElideMode.ElideRight,
+                             int(self.width() - 4 - hw - gap))
+        tw = float(fm.horizontalAdvance(text))
+        x = (self.width() - (hw + gap + tw)) / 2.0
+        heart_x, text_x = (x + tw + gap, x) if self.isRightToLeft() else (x, x + hw + gap)
+        mid = label.top() + fm.ascent() - fm.xHeight() / 2.0 - 0.5
+        hh = hw * 0.84
+        pr.fillPath(heart_shape(QRectF(heart_x, mid - hh / 2.0, hw, hh)),
+                    QColor(HEART))
+        pr.drawText(QRectF(text_x, label.top(), tw + 2.0, label.height()),
+                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+                    text)
 
     def paintEvent(self, _event) -> None:
         t = THEMES[self.key]
@@ -1571,11 +1609,7 @@ class ThemeTile(_Choice):
         pr.setPen(QColor(P["text"] if on else P["text2"]))
         label = QRectF(0, self.PREVIEW_H, self.width(),
                        self.H - self.PREVIEW_H)
-        text = pr.fontMetrics().elidedText(self.text(),
-                                           Qt.TextElideMode.ElideRight,
-                                           self.width() - 4)
-        pr.drawText(label, Qt.AlignmentFlag.AlignHCenter
-                    | Qt.AlignmentFlag.AlignTop, text)
+        self._draw_name(pr, label)
         pr.end()
 
 

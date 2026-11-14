@@ -1769,5 +1769,11 @@
   "supporter_again": "Donar de nuevo",
   "supporter_menu": "Clave de colaborador",
   "supporter_tip": "Colaborador desde el {date}, ¡gracias!",
-  "report_waiting": "dopeIPTV encontró un error. Haz clic aquí para leer el informe; también te espera en el menú."
+  "report_waiting": "dopeIPTV encontró un error. Haz clic aquí para leer el informe; también te espera en el menú.",
+  "theme_aurora": "Aurora",
+  "theme_dawn": "Alba",
+  "theme_supporter_tip": "Para colaboradores: gracias por mantener dopeIPTV gratis",
+  "set_supporter_icon": "Icono de colaborador",
+  "set_supporter_icon_hint": "El icono de la app toma los colores de colaborador y un corazón, como el logo de la barra lateral.",
+  "supporter_perks": "La clave también desbloquea dos temas para colaboradores y un icono de colaborador para la app."
 }

@@ -1769,5 +1769,11 @@
   "supporter_again": "Donera igen",
   "supporter_menu": "Supporternyckel",
   "supporter_tip": "Supporter sedan {date} – tack!",
-  "report_waiting": "dopeIPTV stötte på ett fel. Klicka här för att läsa rapporten – den väntar också i menyn."
+  "report_waiting": "dopeIPTV stötte på ett fel. Klicka här för att läsa rapporten – den väntar också i menyn.",
+  "theme_aurora": "Norrsken",
+  "theme_dawn": "Gryning",
+  "theme_supporter_tip": "För supportrar – tack för att du håller dopeIPTV gratis",
+  "set_supporter_icon": "Supporterikon",
+  "set_supporter_icon_hint": "Appens ikon får supporterfärgerna och ett hjärta, som logotypen i sidopanelen.",
+  "supporter_perks": "Nyckeln öppnar också två supporterteman och en supporterikon för appen."
 }

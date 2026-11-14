@@ -1769,5 +1769,11 @@
   "supporter_again": "תרומה נוספת",
   "supporter_menu": "מפתח תומך",
   "supporter_tip": "תומך מאז {date} – תודה!",
-  "report_waiting": "dopeIPTV נתקלה בשגיאה. לחצו כאן כדי לקרוא את הדיווח - הוא מחכה גם בתפריט."
+  "report_waiting": "dopeIPTV נתקלה בשגיאה. לחצו כאן כדי לקרוא את הדיווח - הוא מחכה גם בתפריט.",
+  "theme_aurora": "זוהר קוטבי",
+  "theme_dawn": "שחר",
+  "theme_supporter_tip": "לתומכים – תודה ששומרים על dopeIPTV חינמי",
+  "set_supporter_icon": "סמל תומך",
+  "set_supporter_icon_hint": "סמל האפליקציה מקבל את צבעי התומך ולב, כמו הלוגו בסרגל הצד.",
+  "supporter_perks": "המפתח פותח גם שתי ערכות נושא לתומכים וסמל תומך לאפליקציה."
 }

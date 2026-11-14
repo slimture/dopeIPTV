@@ -1769,5 +1769,11 @@
   "supporter_again": "Doniraj ponovo",
   "supporter_menu": "Ključ podrške",
   "supporter_tip": "Podrška od {date} – hvala!",
-  "report_waiting": "dopeIPTV je naišao na grešku. Kliknite ovde da pročitate izveštaj – čeka vas i u meniju."
+  "report_waiting": "dopeIPTV je naišao na grešku. Kliknite ovde da pročitate izveštaj – čeka vas i u meniju.",
+  "theme_aurora": "Aurora",
+  "theme_dawn": "Zora",
+  "theme_supporter_tip": "Za podržavaoce – hvala što dopeIPTV ostaje besplatan",
+  "set_supporter_icon": "Ikona podrške",
+  "set_supporter_icon_hint": "Ikona aplikacije dobija boje podrške i srce, kao logo u bočnoj traci.",
+  "supporter_perks": "Ključ otključava i dve teme za podržavaoce i ikonu podrške za aplikaciju."
 }

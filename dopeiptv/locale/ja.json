@@ -1769,5 +1769,11 @@
   "supporter_again": "もう一度寄付する",
   "supporter_menu": "サポーターキー",
   "supporter_tip": "{date} からのサポーター – ありがとう！",
-  "report_waiting": "dopeIPTV でエラーが起きました。ここをクリックするとレポートを読めます。メニューからも開けます。"
+  "report_waiting": "dopeIPTV でエラーが起きました。ここをクリックするとレポートを読めます。メニューからも開けます。",
+  "theme_aurora": "オーロラ",
+  "theme_dawn": "夜明け",
+  "theme_supporter_tip": "サポーター向け – dopeIPTV を無料のままにしてくれてありがとう",
+  "set_supporter_icon": "サポーターアイコン",
+  "set_supporter_icon_hint": "アプリのアイコンが、サイドバーのロゴと同じくサポーターの色とハートになります。",
+  "supporter_perks": "キーがあれば、サポーター向けの 2 つのテーマとアプリのサポーターアイコンも使えます。"
 }

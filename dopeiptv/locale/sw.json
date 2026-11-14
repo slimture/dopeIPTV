@@ -1769,5 +1769,11 @@
   "supporter_again": "Changia tena",
   "supporter_menu": "Ufunguo wa mfadhili",
   "supporter_tip": "Mfadhili tangu {date} – asante!",
-  "report_waiting": "dopeIPTV imekumbana na hitilafu. Bofya hapa kusoma ripoti - inakusubiri pia kwenye menyu."
+  "report_waiting": "dopeIPTV imekumbana na hitilafu. Bofya hapa kusoma ripoti - inakusubiri pia kwenye menyu.",
+  "theme_aurora": "Aurora",
+  "theme_dawn": "Alfajiri",
+  "theme_supporter_tip": "Kwa wafadhili – asante kwa kuifanya dopeIPTV ibaki bure",
+  "set_supporter_icon": "Aikoni ya mfadhili",
+  "set_supporter_icon_hint": "Aikoni ya programu inapata rangi za mfadhili na moyo, kama nembo kwenye utepe wa pembeni.",
+  "supporter_perks": "Ufunguo pia unafungua mandhari mawili ya wafadhili na aikoni ya mfadhili kwa programu."
 }

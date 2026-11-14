@@ -1769,5 +1769,11 @@
   "supporter_again": "Opnieuw doneren",
   "supporter_menu": "Supportersleutel",
   "supporter_tip": "Supporter sinds {date} – bedankt!",
-  "report_waiting": "dopeIPTV liep tegen een fout aan. Klik hier om het rapport te lezen - het wacht ook in het menu."
+  "report_waiting": "dopeIPTV liep tegen een fout aan. Klik hier om het rapport te lezen - het wacht ook in het menu.",
+  "theme_aurora": "Noorderlicht",
+  "theme_dawn": "Dageraad",
+  "theme_supporter_tip": "Voor supporters – bedankt dat je dopeIPTV gratis houdt",
+  "set_supporter_icon": "Supporterpictogram",
+  "set_supporter_icon_hint": "Het app-pictogram krijgt de supporterkleuren en een hart, zoals het logo in de zijbalk.",
+  "supporter_perks": "De sleutel opent ook twee supporterthema's en een supporterpictogram voor de app."
 }

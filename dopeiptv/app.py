@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import os
 import sys
-from pathlib import Path
 
 from PyQt6.QtCore import QSettings, Qt, QTimer
-from PyQt6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPixmap
 from PyQt6.QtWidgets import (
     QApplication, QMessageBox, QProxyStyle, QPushButton, QStyle,
 )
@@ -79,137 +77,14 @@ def _qt_message_filter(msg_type, context, message):
 
 
 from .core.stores import PlaylistStore
-from .ui.theme import ACCENT, apply_theme, build_style
+from .ui.theme import apply_theme, build_style
 
 
-# An app icon is drawn INSIDE its canvas, not edge to edge, and both
-# desktops that care ask for the same thing:
-#
-#   Apple  - the rounded square is 824 pt on a 1024 pt canvas: 80.5% of
-#            the canvas, ~9.8% margin a side.
-#   GNOME  - "a margin that measures about 10% of the image canvas ...
-#            it's best when the image occupies about 80%".
-#
-# Drawing full-bleed makes ours stand a quarter larger than every icon
-# beside it, because the shell sizes by canvas and everyone else's canvas
-# carries that margin. It was the macOS Dock first and the GNOME dash
-# second, from the same cause and with the same fix.
-#
-# Windows is left full-bleed: its shell adds the padding itself, and no
-# one has reported ours looking oversized there.
-ICON_SAFE_INSET = 0.098
-
-
-def make_app_icon(inset: float = 0.0, sizes=(256, 128, 64, 48, 32)) -> QIcon:
-    """Draw the app icon (rounded accent tile with a play triangle).
-
-    *inset* is the fraction of each side left as transparent margin; pass
-    ICON_SAFE_INSET on macOS and Linux, 0 on Windows.
-
-    *sizes* is every pixel size to render. QIcon.pixmap() never scales UP,
-    so a size not drawn here comes back as the largest one that was: asking
-    for 1024 got a 256 px image, and that is what the retina Dock icon was
-    built from."""
-    icon = QIcon()
-    for s in sizes:
-        pm = QPixmap(s, s)
-        pm.fill(Qt.GlobalColor.transparent)
-        p = QPainter(pm)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        off = s * inset
-        side = s - 2 * off
-        tile = QPainterPath()
-        tile.addRoundedRect(off, off, side, side, side * 0.22, side * 0.22)
-        p.fillPath(tile, QColor(ACCENT))
-        tri = QPainterPath()
-        # Centred by its weight (centroid at the middle), not by its box:
-        # a play triangle centred by its box looks shifted left.
-        tri.moveTo(off + side * 0.38, off + side * 0.28)
-        tri.lineTo(off + side * 0.38, off + side * 0.72)
-        tri.lineTo(off + side * 0.74, off + side * 0.50)
-        tri.closeSubpath()
-        p.fillPath(tri, QColor("white"))
-        p.end()
-        icon.addPixmap(pm)
-    return icon
-
-
-def install_icon(icon: QIcon) -> None:
-    """Save the icon into the XDG icon theme so .desktop files can find it.
-
-    Every rendered size, not just 256: a panel or a dash asks for 32 or 48,
-    and with only the big one there it downscales, which is why the icon
-    looked soft beside sharp system icons.
-
-    An existing file is replaced when the icon has actually CHANGED, and
-    left alone byte for byte when it has not. "Skip anything already
-    there" was the obvious rule and the wrong one: the day the drawing
-    changed - a margin added, a colour moved - every machine that had ever
-    run the app kept the old picture forever, which is the one case where
-    rewriting matters."""
-    base = Path(os.environ.get(
-        "XDG_DATA_HOME", Path.home() / ".local" / "share"))
-    theme = base / "icons" / "hicolor"
-    newest = 0.0
-    for size in (256, 128, 64, 48, 32):
-        target = theme / f"{size}x{size}" / "apps" / "dopeiptv.png"
-        try:
-            fresh = _png_bytes(icon, size)
-            if not fresh:
-                continue
-            if not target.exists() or target.read_bytes() != fresh:
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(fresh)
-            newest = max(newest, target.stat().st_mtime)
-        except OSError:
-            pass
-    if newest:
-        _drop_stale_icon_cache(theme, newest)
-
-
-def _png_bytes(icon: QIcon, size: int) -> bytes:
-    """The icon at *size*, encoded as PNG, without touching the disk - so
-    it can be compared against what is already there."""
-    from PyQt6.QtCore import QBuffer
-    # No QByteArray argument: passing one hands the buffer a temporary that
-    # Python frees immediately, and writing into it segfaults. Default
-    # construction gives the buffer an internal array it owns.
-    buf = QBuffer()
-    buf.open(QBuffer.OpenModeFlag.WriteOnly)
-    ok = icon.pixmap(size, size).save(buf, "PNG")
-    buf.close()
-    return bytes(buf.data()) if ok else b""
-
-
-def _drop_stale_icon_cache(theme: Path, icon_mtime: float) -> None:
-    """Writing the PNG is not enough on its own.
-
-    Where icon-theme.cache exists, GTK - and so GNOME's shell and dash -
-    reads THAT instead of scanning the directory, and an icon that was not
-    in the theme when the cache was built is invisible however correct the
-    file on disk is. A cache four months older than the icons is exactly
-    what months of testing leaves behind, and the symptom is an icon that
-    never appears while everything else looks right.
-
-    Keyed on the cache being OLDER than our icon, not on having just
-    written one: by the time this bites, the icons have usually been on
-    disk for a while and there is nothing new to write, so "did we write
-    something this run" would skip precisely the case that needs fixing.
-
-    The cache is derived data - removing it costs a directory scan and
-    nothing else, and whatever built it will build it again with our icon
-    in it this time. The directory's own timestamp is bumped as well,
-    since that is the other half of the staleness check."""
-    try:
-        cache = theme / "icon-theme.cache"
-        if not cache.exists() or cache.stat().st_mtime >= icon_mtime:
-            return
-        cache.unlink()
-        os.utime(theme, None)
-        log.info("icon theme: dropped %s - it predates our icons, so the "
-                 "desktop could not see them", cache)
-    except OSError:
-        pass        # a cache we cannot remove is not worth failing over
+# The icon is drawn in ui/app_icon.py (the plain one and the supporter's);
+# the names stay importable from here for packaging/gen_icon*.py.
+from .ui.app_icon import (  # noqa: F401
+    ICON_SAFE_INSET, install_icon, make_app_icon,
+)
 
 
 def _install_crash_hooks() -> None:
@@ -534,27 +409,19 @@ def main() -> int:
     # 64 MB keeps a large visible working set scaled exactly once.
     from PyQt6.QtGui import QPixmapCache
     QPixmapCache.setCacheLimit(64 * 1024)   # KB
-    # On macOS setWindowIcon OVERRIDES the bundle's .icns in the Dock the
-    # moment the app starts, so giving the .icns Apple's margin was not
-    # enough on its own - this icon replaced it a second later and the Dock
-    # icon stayed a quarter larger than its neighbours. Same margin here,
-    # and drawn large enough for a retina Dock (it only ever went to 256).
-    #
-    # Linux takes the margin too: GNOME asks for the same 80% of canvas
-    # that Apple does, and full-bleed made the dash icon stand out exactly
-    # the way the Dock one did. Windows keeps full-bleed - its shell adds
-    # the padding itself.
-    _mac = sys.platform == "darwin"
-    _padded = _mac or sys.platform.startswith("linux")
-    icon = make_app_icon(
-        inset=ICON_SAFE_INSET if _padded else 0.0,
-        sizes=((512, 256, 128, 64, 48, 32) if _mac
-               else (256, 128, 64, 48, 32)))
-    app.setWindowIcon(icon)
-    # The XDG icon theme is a Linux thing.
-    if sys.platform.startswith("linux"):
-        install_icon(icon)
+    # The app's icon - the supporter's for a supporter who keeps it on -
+    # drawn as this system wants it (ui/app_icon.platform_icon: Apple's and
+    # GNOME's margin, a retina Dock's size) and set for every window; on
+    # Linux also written into the XDG icon theme, where Wayland takes it
+    # from. The window keeps it in step with the key and the switch.
     settings = QSettings(ORG, ORG)
+    from .ui import app_icon
+    try:
+        supporter_icon = app_icon.wanted(settings)
+    except Exception as e:          # a thank-you is never worth a failed start
+        log.warning("supporter icon: %s", e)
+        supporter_icon = False
+    app_icon.show(supporter_icon, theme_icons=sys.platform.startswith("linux"))
     from .i18n import is_rtl, set_language
     set_language(settings.value("language", "en"))
     from .ui.qt_i18n import apply_qt_language
