@@ -105,6 +105,16 @@ _COUNT_KEYS = {
 }
 
 
+
+def fold_into_app_menu(menu) -> None:
+    """macOS: every entry of *menu* without a standard role goes into the
+    one real application menu - an entry left with none makes Qt keep a
+    second menu named like the app beside it."""
+    for act in menu.actions():
+        if not act.isSeparator() and act.menuRole() in (QAction.MenuRole.TextHeuristicRole,
+                                                        QAction.MenuRole.NoRole):
+            act.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
+
 class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _ContextMenuMixin, _FavoritesMixin, _DetailMixin, _RemindersMixin,
                  _BusyMixin, _UpdatesMixin, _SearchMixin, _SidebarMixin,
@@ -475,6 +485,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             clear_action.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
             self._donate_action.setMenuRole(
                 QAction.MenuRole.ApplicationSpecificRole)
+            # And every entry added since (Send feedback… came without one
+            # and brought the second "dopeIPTV" menu back).
+            fold_into_app_menu(app_menu)
         # Kept for live language switching (see retranslate_ui).
         self._i18n_actions = {
             settings_action: lambda: tr("btn_settings") + "…",
@@ -486,6 +499,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             about_action: lambda: tr("menu_about"),
             quit_action: lambda: tr("menu_quit"),
             self._donate_action: lambda: tr("donate_support") + "…",
+            self._feedback_action: lambda: tr("feedback_menu") + "…",
             private_action: lambda: tr("private_menu"),
             clear_action: lambda: tr("clear_menu") + "…",
         }
