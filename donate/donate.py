@@ -228,7 +228,7 @@ def _secret() -> str:
 _SEEN: dict[str, list[float]] = {}
 _LOCK = threading.Lock()
 WINDOW, PER_WINDOW = 600.0, 12
-FEEDBACK_PER_WINDOW = 60          # reports from one address in WINDOW
+FEEDBACK_PER_WINDOW = 20          # reports from one address in WINDOW (many can share one)
 
 
 def _allowed(addr: str, most: int = PER_WINDOW) -> bool:
@@ -1041,7 +1041,7 @@ class Handler(BaseHTTPRequestHandler):
         import admin
         import feedback
         status, body = feedback.accept(CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats")), data)
-        if status == 200 and push_ready():
+        if status == 200 and not body.get("duplicate") and push_ready():
             kind = str(data.get("kind") or "feedback")
             threading.Thread(target=push, args=(
                 {"error": "An error report", "crash": "A crash report"}.get(kind, "Feedback") + " from the app",

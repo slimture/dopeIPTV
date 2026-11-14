@@ -9,6 +9,13 @@ a hand-made request sends something it should not.
 
 Stored one report a line in feedback.jsonl beside the statistics; what an
 admin marked (seen, fixed) in feedback-state.json.
+
+Not a way to fill the disk or the inbox: the same report twice in a day
+is kept once; past SAME_SIG_DAY reports of one problem in a day the rest
+are only counted (no text); past DAY_MOST reports a day, everyone
+together, none are taken until the next day; the file never grows past
+MAX_FILE. (The app waits a minute between two and stops at a few a day;
+nginx and donate.py limit each address as well.)
 """
 
 from __future__ import annotations
@@ -24,7 +31,16 @@ import uuid
 
 KINDS = ("error", "crash", "feedback")
 MAX_TEXT = 48_000
+#: What feedback is about, where, how often: the app's short lists, nothing else kept.
+CHOICES = {"topic": ("bug", "idea", "like", "question"),
+           "area": ("playback", "guide", "recording", "lists", "settings", "cast", "updates", "other"),
+           "often": ("always", "sometimes", "once")}
+DAY_MOST = 2000
+SAME_SIG_DAY = 50
+MAX_FILE = 64 << 20
 _LOCK = threading.Lock()
+# What the limits remember (a day back), read from the file once.
+_seen: dict[str, dict] = {}
 
 _URL = re.compile(r"\b([a-zA-Z][a-zA-Z0-9+.-]{1,15})://[^\s'\"<>()\[\]]+")
 _IPV4 = re.compile(r"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])")
@@ -65,8 +81,39 @@ def signature(kind: str, text: str) -> str:
     return re.sub(r"\d+", "N", exc)[:300]
 
 
+def _same(kind: str, text: str) -> str:
+    return hashlib.sha256((kind + "\0" + " ".join(text.lower().split())).encode("utf-8")).hexdigest()[:24]
+
+
+def _memory(stats_dir: str, now: float) -> dict:
+    """The limits' memory for *stats_dir*: hashes of the last day's
+    reports, today's count, today's count per problem. Under _LOCK."""
+    today = dt.date.fromtimestamp(now).isoformat()
+    mem = _seen.get(stats_dir)
+    if mem is None:
+        mem = {"hashes": {}, "day": today, "n": 0, "sigs": {}}
+        for r in _rows(stats_dir):
+            t = r.get("t", 0)
+            if now - t >= 86400:
+                continue
+            if r.get("text"):
+                mem["hashes"][_same(r.get("kind", ""), r["text"])] = t
+            if dt.date.fromtimestamp(t).isoformat() == today:
+                mem["n"] += 1
+                sig = r.get("sig") or ""
+                mem["sigs"][sig] = mem["sigs"].get(sig, 0) + 1
+        _seen[stats_dir] = mem
+    if mem["day"] != today:
+        mem.update(day=today, n=0, sigs={})
+    if len(mem["hashes"]) > 20000 or any(now - t >= 86400 for t in list(mem["hashes"].values())[:1]):
+        mem["hashes"] = {h: t for h, t in mem["hashes"].items() if now - t < 86400}
+    return mem
+
+
 def accept(stats_dir: str, body: dict) -> tuple[int, dict]:
-    """One report from the app; (status, answer)."""
+    """One report from the app; (status, answer). A report already taken
+    answers ok with "duplicate" (the app need not try again), and is not
+    kept twice."""
     kind = str(body.get("kind") or "feedback")
     if kind not in KINDS:
         kind = "feedback"
@@ -77,12 +124,35 @@ def accept(stats_dir: str, body: dict) -> tuple[int, dict]:
     text = scrub(str(body.get("text") or "")).strip()[:MAX_TEXT]
     if not text:
         return 400, {"error": "empty"}
-    row = {"id": uuid.uuid4().hex[:12], "t": int(time.time()), "kind": kind,
+    now = time.time()
+    row = {"id": uuid.uuid4().hex[:12], "t": int(now), "kind": kind,
            "version": version, "os": system, "sig": signature(kind, text), "text": text}
+    if kind == "feedback":
+        row.update({k: str(body.get(k)) for k, allowed in CHOICES.items() if body.get(k) in allowed})
     os.makedirs(stats_dir, exist_ok=True)
     path, _state = _paths(stats_dir)
-    with _LOCK, open(path, "a", encoding="utf-8") as fh:
-        fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+    with _LOCK:
+        try:
+            if os.path.getsize(path) >= MAX_FILE:
+                return 503, {"error": "full"}
+        except OSError:
+            pass
+        mem = _memory(stats_dir, now)
+        same = _same(kind, text)
+        if same in mem["hashes"]:
+            return 200, {"ok": True, "duplicate": True}
+        if mem["n"] >= DAY_MOST:
+            return 429, {"error": "enough for today"}
+        sig = row["sig"]
+        if kind != "feedback" and mem["sigs"].get(sig, 0) >= SAME_SIG_DAY:
+            # Counted, so the problem's number stays right; its text is
+            # already here many times over today.
+            row["text"], row["counted"] = "", True
+        mem["hashes"][same] = now
+        mem["n"] += 1
+        mem["sigs"][sig] = mem["sigs"].get(sig, 0) + 1
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(row, ensure_ascii=False) + "\n")
     return 200, {"ok": True, "id": row["id"]}
 
 
@@ -158,7 +228,9 @@ def summary(stats_dir: str, days: int) -> dict:
             g["count"] += 1
             g["first"] = min(g["first"], r["t"])
             if r["t"] >= g["last"]:
-                g["last"], g["latest"] = r["t"], r["id"]
+                g["last"] = r["t"]
+                if r.get("text"):
+                    g["latest"] = r["id"]
             g["versions"].add(r["version"])
             g["systems"].add(r["os"])
     group_list = []
@@ -168,11 +240,16 @@ def summary(stats_dir: str, days: int) -> dict:
         g["state"] = state.get(g["key"], "new")
         group_list.append(g)
     group_list.sort(key=lambda g: (g["state"] == "fixed", -g["count"], -g["last"]))
+    topics: dict[str, int] = {}
+    for r in rows:
+        if r["kind"] == "feedback":
+            topics[r.get("topic") or ""] = topics.get(r.get("topic") or "", 0) + 1
     items = [{"id": r["id"], "t": r["t"], "kind": r["kind"], "version": r["version"], "os": r["os"],
-              "sig": r.get("sig") or "", "preview": _preview(r), "state": state.get(r["id"], "new")}
-             for r in sorted(rows, key=lambda r: -r["t"])[:300]]
+              "sig": r.get("sig") or "", "preview": _preview(r), "state": state.get(r["id"], "new"),
+              **{k: r[k] for k in CHOICES if r.get(k)}}
+             for r in sorted(rows, key=lambda r: -r["t"]) if r.get("text")][:300]
     open_groups = sum(1 for g in group_list if g["state"] != "fixed")
-    return {"total": len(rows), "kinds": kinds, "open_groups": open_groups,
+    return {"total": len(rows), "kinds": kinds, "open_groups": open_groups, "topics": topics,
             "new": sum(1 for i in items if i["state"] == "new"),
             "per_day": [[day, v["error"], v["crash"], v["feedback"]] for day, v in sorted(per_day.items())],
             "by_version": sorted(by_version.items(), key=lambda kv: -kv[1]),

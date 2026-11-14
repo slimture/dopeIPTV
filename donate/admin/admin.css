@@ -749,6 +749,10 @@ tr:last-child td { border-bottom: 0; }
 .fb-meta { color: var(--muted); font-size: 12.5px; padding: 0 6px; }
 .chip.kind-error { color: var(--s3); background: color-mix(in srgb, var(--s3) 14%, transparent); }
 .chip.kind-crash { color: var(--down); background: color-mix(in srgb, var(--down) 14%, transparent); }
+.chip.t-bug { color: var(--down); background: color-mix(in srgb, var(--down) 13%, transparent); }
+.chip.t-idea { color: var(--s1); background: color-mix(in srgb, var(--s1) 13%, transparent); }
+.chip.t-like { color: var(--up); background: color-mix(in srgb, var(--up) 14%, transparent); }
+.chip.t-question { color: var(--s3); background: color-mix(in srgb, var(--s3) 14%, transparent); }
 .chip.st-new { color: var(--heart); background: color-mix(in srgb, var(--heart) 12%, transparent); }
 .chip.st-fixed { color: var(--up); background: color-mix(in srgb, var(--up) 14%, transparent); }
 .fb-body { padding: 8px 6px 4px; }

@@ -15,6 +15,12 @@
   const { $, mk, num } = K;
   const when = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   const KIND = { error: "Error", crash: "Crash", feedback: "Feedback" };
+  // What the person picked in the app: what it is about, where, how often.
+  const TOPIC = { bug: "Not working", idea: "Idea", like: "Likes", question: "Question" };
+  const AREA = { playback: "Playback", guide: "Guide", recording: "Recording", lists: "Channels and lists",
+                 settings: "Settings", cast: "Casting", updates: "Updates", other: "Something else" };
+  const OFTEN = { always: "every time", sometimes: "sometimes", once: "once" };
+  let topic = "";
   let res = null, loading = false, open = null;
   // How the problems are ordered and which show: most people hit first,
   // fixed ones out of the way, one version at a time if wanted.
@@ -173,25 +179,46 @@
     box.replaceChildren(controls(), ul);
   }
 
-  // What people wrote, newest first.
+  // What people wrote, newest first - all of it, or one topic.
+  function topicChips(all) {
+    const t = res.topics || {};
+    const bar = mk("div", "fb-controls");
+    const chips = mk("div", "fb-chips");
+    [["", "All", all.length]].concat(Object.keys(TOPIC).map((k) => [k, TOPIC[k], t[k] || 0]))
+      .forEach(([key, label, n]) => {
+        if (key && !n) { return; }
+        const b = mk("button", "chip-f" + (topic === key ? " on" : ""), label + " " + num.format(n));
+        b.type = "button";
+        b.setAttribute("aria-pressed", topic === key ? "true" : "false");
+        b.addEventListener("click", () => { topic = key; words(); });
+        chips.append(b);
+      });
+    bar.append(chips);
+    return bar;
+  }
+
   function words() {
     const box = $("fb-words");
-    const items = (res.items || []).filter((i) => i.kind === "feedback");
-    if (!items.length) { box.replaceChildren(mk("p", "empty", "No feedback in this period.")); return; }
+    const all = (res.items || []).filter((i) => i.kind === "feedback");
+    if (!all.length) { box.replaceChildren(mk("p", "empty", "No feedback in this period.")); return; }
+    const items = topic ? all.filter((i) => i.topic === topic) : all;
     const ul = mk("ul", "fb-list");
     items.forEach((it) => {
       const li = mk("li", "fb-row st-" + it.state);
       const btn = mk("button", "fb-head");
       btn.type = "button";
+      if (it.topic) { btn.append(mk("span", "chip t-" + it.topic, TOPIC[it.topic] || it.topic)); }
       btn.append(mk("span", "sig words", it.preview || "(empty)"), stateChip(it.state));
-      const meta = mk("div", "fb-meta", when.format(new Date(it.t * 1000)) + " · " + it.version + " · " + it.os);
+      const where = [it.area && AREA[it.area], it.often && OFTEN[it.often]].filter(Boolean).join(", ");
+      const meta = mk("div", "fb-meta", when.format(new Date(it.t * 1000)) + " · " + it.version + " · " + it.os +
+                      (where ? " · " + where : ""));
       const body = mk("div", "fb-body");
       body.hidden = true;
       btn.addEventListener("click", () => toggle(body, it.id, it.id));
       li.append(btn, meta, body);
       ul.append(li);
     });
-    box.replaceChildren(ul);
+    box.replaceChildren(topicChips(all), items.length ? ul : mk("p", "empty", "Nothing on this topic in this period."));
   }
 
   // A report in full: its text, a copy to paste where it gets fixed, and
