@@ -629,6 +629,193 @@ class SupporterDialog(QDialog):
         self.supporter = found
 
 
+class FeedbackDialog(QDialog):
+    """Feedback, asked the way the answers are useful: what it is about,
+    for something that does not work where and how often, the person's
+    words, and what to attach - each on its own, versions only by default.
+    What is sent can be shown in full and changed before Send."""
+
+    TOPICS = (("bug", "fb_t_bug"), ("idea", "fb_t_idea"), ("like", "fb_t_like"), ("question", "fb_t_question"))
+    AREAS = (("playback", "fb_a_play"), ("guide", "fb_a_guide"), ("recording", "fb_a_rec"),
+             ("lists", "fb_a_lists"), ("settings", "fb_a_settings"), ("cast", "fb_a_cast"),
+             ("updates", "fb_a_updates"), ("other", "fb_a_other"))
+    OFTEN = (("always", "fb_o_always"), ("sometimes", "fb_o_sometimes"), ("once", "fb_o_once"))
+
+    def __init__(self, parent, details, has_log_file: bool = False) -> None:
+        super().__init__(parent)
+        from PyQt6.QtGui import QFont
+        from PyQt6.QtWidgets import QButtonGroup, QCheckBox, QComboBox, QGridLayout, QPlainTextEdit
+
+        from .settings_ui import Chip, _Flow
+        self._details = details
+        self._edited = False
+        self.setWindowTitle(tr("feedback_title"))
+        self.setMinimumWidth(600)
+        col = QVBoxLayout(self)
+        col.setContentsMargins(24, 20, 24, 18)
+        col.setSpacing(8)
+
+        def label(text: str, size: int = 12, colour: str = "", bold: bool = True) -> QLabel:
+            lbl = QLabel(text)
+            lbl.setWordWrap(True)
+            lbl.setStyleSheet(f"font-size:{size}px; font-weight:{700 if bold else 400};"
+                              f" color:{colour or P['muted']};")
+            return lbl
+        col.addWidget(label(tr("feedback_title"), 17, P["text"]))
+        col.addWidget(label(tr("feedback_intro"), 13, P["text2"], bold=False))
+        col.addSpacing(4)
+        col.addWidget(label(tr("fb_topic")))
+        chips = _Flow(6, False)
+        self._topics = QButtonGroup(self)
+        self._topics.setExclusive(True)
+        self.topic_chips: dict[str, Chip] = {}
+        for key, text in self.TOPICS:
+            chip = Chip(tr(text), False)
+            self._topics.addButton(chip)
+            self.topic_chips[key] = chip
+            chips.flow.addWidget(chip)
+        col.addWidget(chips)
+        self.bug_row = QWidget()
+        bug = QGridLayout(self.bug_row)
+        bug.setContentsMargins(0, 2, 0, 0)
+        bug.setHorizontalSpacing(10)
+        self.area = QComboBox()
+        for key, text in self.AREAS:
+            self.area.addItem(tr(text), key)
+        self.often = QComboBox()
+        for key, text in self.OFTEN:
+            self.often.addItem(tr(text), key)
+        bug.addWidget(label(tr("fb_where")), 0, 0)
+        bug.addWidget(label(tr("fb_often")), 0, 1)
+        bug.addWidget(self.area, 1, 0)
+        bug.addWidget(self.often, 1, 1)
+        self.bug_row.hide()
+        col.addWidget(self.bug_row)
+        box_style = (f"QPlainTextEdit {{ background: {P['input']}; color: {P['text']};"
+                     f" border: none; border-radius: 10px; padding: 8px 10px;"
+                     f" selection-background-color: {P['sel']}; }}")
+        self.message = QPlainTextEdit()
+        self.message.setPlaceholderText(tr("feedback_placeholder"))
+        self.message.setStyleSheet(box_style)
+        self.message.setFixedHeight(104)
+        col.addWidget(self.message)
+        col.addWidget(label(tr("fb_attach")))
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(16)
+        grid.setVerticalSpacing(4)
+        self.attach = {"versions": QCheckBox(tr("fb_att_versions")), "log": QCheckBox(tr("fb_att_log")),
+                       "file": QCheckBox(tr("fb_att_file")), "source": QCheckBox(tr("fb_att_source"))}
+        self.attach["versions"].setChecked(True)
+        self.attach["file"].setVisible(has_log_file)
+        for n, key in enumerate(("versions", "log", "source", "file")):
+            grid.addWidget(self.attach[key], n // 2, n % 2)
+        col.addLayout(grid)
+        self.show_btn = QPushButton(tr("fb_show") + "  \u25be")
+        self.show_btn.setFlat(True)
+        self.show_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.show_btn.setStyleSheet(f"QPushButton {{ border:none; background:transparent; padding:2px 0;"
+                                    f" text-align:left; color:{P['text2']}; font-size:12px; }}"
+                                    f" QPushButton:hover {{ color:{P['text']}; }}")
+        col.addWidget(self.show_btn, 0, Qt.AlignmentFlag.AlignLeft)
+        self.preview = QPlainTextEdit()
+        mono = QFont("monospace")
+        mono.setStyleHint(QFont.StyleHint.TypeWriter)
+        self.preview.setFont(mono)
+        self.preview.setStyleSheet(box_style)
+        self.preview.setFixedHeight(190)
+        self.preview.hide()
+        col.addWidget(self.preview)
+        col.addWidget(label(tr("report_privacy"), 12, bold=False))
+        buttons = QHBoxLayout()
+        buttons.addStretch(1)
+        cancel = QPushButton(tr("common_cancel"))
+        self.send_btn = QPushButton(tr("report_send"), objectName="Primary")
+        cancel.clicked.connect(self.reject)
+        self.send_btn.clicked.connect(self.accept)
+        buttons.addWidget(cancel)
+        buttons.addWidget(self.send_btn)
+        col.addLayout(buttons)
+        self._topics.buttonToggled.connect(lambda *_a: self._topic_changed())
+        for box in self.attach.values():
+            box.toggled.connect(lambda *_a: self._refresh())
+        self.message.textChanged.connect(self._ready)
+        self.preview.textChanged.connect(self._preview_edited)
+        self.show_btn.clicked.connect(self._toggle_preview)
+        self._refresh()
+        self._ready()
+        self.message.setFocus()
+
+    def topic(self) -> str:
+        return next((k for k, chip in self.topic_chips.items() if chip.isChecked()), "")
+
+    def _topic_changed(self) -> None:
+        t = self.topic()
+        self.bug_row.setVisible(t == "bug")
+        self.message.setPlaceholderText(tr({"bug": "fb_ph_bug", "idea": "fb_ph_idea", "like": "fb_ph_like",
+                                            "question": "fb_ph_question"}.get(t, "feedback_placeholder")))
+        if t == "bug" and not self._edited:
+            self.attach["log"].setChecked(True)
+            self.attach["source"].setChecked(True)
+        self._ready()
+        self._fit()
+
+    def _fit(self) -> None:
+        """As tall as what it holds at its width: the questions and the
+        preview come and go, and wrapped text (the topics, the notes) is
+        taller in some languages - a plain size hint leaves it overlapping."""
+        lay = self.layout()
+        if lay is None:
+            return
+        lay.invalidate()
+        lay.activate()
+        w = max(self.width(), self.minimumWidth())
+        h = lay.totalHeightForWidth(w) if lay.hasHeightForWidth() else lay.totalSizeHint().height()
+        h = max(h, lay.totalSizeHint().height())
+        self.setMinimumHeight(h)
+        self.resize(w, h)
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self._fit()
+
+    def options(self) -> dict[str, bool]:
+        return {k: box.isChecked() and box.isVisibleTo(self) for k, box in self.attach.items()}
+
+    def _refresh(self) -> None:
+        if self._edited:
+            return
+        self._setting = True
+        self.preview.setPlainText(self._details(self.options()))
+        self._setting = False
+
+    def _preview_edited(self) -> None:
+        if not getattr(self, "_setting", False):
+            self._edited = True
+
+    def _toggle_preview(self) -> None:
+        on = not self.preview.isVisible()
+        self.preview.setVisible(on)
+        self.show_btn.setText(tr("fb_hide" if on else "fb_show") + ("  \u25b4" if on else "  \u25be"))
+        self._fit()
+
+    def _ready(self) -> None:
+        self.send_btn.setEnabled(bool(self.topic()) and bool(self.message.toPlainText().strip()))
+
+    def fields(self) -> dict[str, str]:
+        out = {"topic": self.topic()}
+        if out["topic"] == "bug":
+            out["area"] = str(self.area.currentData())
+            out["often"] = str(self.often.currentData())
+        return out
+
+    def payload(self) -> str:
+        parts = [self.message.toPlainText().strip()]
+        extra = self.preview.toPlainText().strip()
+        if extra:
+            parts.append(extra)
+        return "\n\n".join(p for p in parts if p)
+
+
 class ReportDialog(QDialog):
     """An error report or feedback, shown in full before anything is sent:
     what it holds, that nothing in it identifies a stream or a person, and

@@ -174,6 +174,19 @@ def fake_exec(self):
         self.message.setPlainText("The guide for Anna TV is empty")
     return 1
 dialogs.ReportDialog.exec = fake_exec
+asked = []
+
+def fake_feedback(self):
+    # What the person picks: something does not work, in the guide, every
+    # time; their words; this run's log stays attached, versions too.
+    asked.append(self)
+    self.topic_chips["bug"].setChecked(True)
+    self.area.setCurrentIndex(self.area.findData("guide"))
+    self.message.setPlainText("The guide for Anna TV is empty")
+    assert self.bug_row.isVisibleTo(self) and self.attach["log"].isChecked()
+    assert self.send_btn.isEnabled()
+    return 1
+dialogs.FeedbackDialog.exec = fake_feedback
 # An uncaught error in a slot: offered once, scrubbed, sent on Send.
 def boom():
     raise RuntimeError("cannot open http://anna-tv.example/live/x/y/1.ts")
@@ -193,14 +206,27 @@ for _ in range(20):
 assert len(shown) == 1, shown
 # Feedback from the menu: the person's words, scrubbed of their own source's name.
 w._feedback_action.trigger()
-for _ in range(50):
+for _ in range(100):
     app.processEvents(); w.pool.waitForDone(5)
-    if len(inbox.got) == 2: break
-kind, text, included = shown[-1]
-assert kind == "feedback" and not included
+    if len(inbox.got) == 2 and len(toasts) == 2: break
+assert len(asked) == 1
 sent = inbox.got[-1][2]
-assert sent["kind"] == "feedback" and sent["text"] == "The guide for <private> is empty", sent
+assert sent["kind"] == "feedback" and sent["text"].startswith("The guide for <private> is empty"), sent
+assert "Log from this run:" in sent["text"] and "dopeIPTV " in sent["text"], sent["text"][:400]
+assert "anna-tv" not in sent["text"] and "Anna TV" not in sent["text"]
+assert (sent["topic"], sent["area"], sent["often"]) == ("bug", "guide", "always"), sent
 assert any("sent" in t.lower() or "skick" in t.lower() for t in toasts), toasts
+# Right after: not again within the minute - said, nothing opened or sent.
+w._feedback_action.trigger()
+assert len(asked) == 1 and len(inbox.got) == 2
+assert "minute" in toasts[-1], toasts
+# A while later, the same words again: not sent twice.
+s.setValue("feedback_sent", "1")
+w._feedback_action.trigger()
+for _ in range(20):
+    app.processEvents(); w.pool.waitForDone(5)
+assert len(asked) == 2 and len(inbox.got) == 2, inbox.got
+assert "already" in toasts[-1], toasts
 inbox.close()
 print("REPORT_WINDOW_OK")
 """
@@ -218,3 +244,65 @@ def test_the_window_offers_scrubs_and_sends_only_on_send():
 @pytest.mark.parametrize("keep", ["21:05:03 INFO started", "std::string", "Qt::AlignLeft", "1.4.5", "a:b:c"])
 def test_ordinary_text_is_left_alone(keep):
     assert report.scrub(keep) == keep
+
+
+def test_on_a_mac_no_entry_is_left_for_a_second_app_menu():
+    """Every app-menu entry without a standard role is folded into the real
+    application menu on macOS (Send feedback… once was not: two dopeIPTV
+    menus side by side)."""
+    pytest.importorskip("PyQt6.QtWidgets")
+    from PyQt6.QtGui import QAction
+    from PyQt6.QtWidgets import QApplication, QMenu
+
+    from dopeiptv.ui.main_window import fold_into_app_menu
+    app = QApplication.instance() or QApplication([])  # noqa: F841
+    menu = QMenu()
+    plain = menu.addAction("Send feedback…")
+    about = menu.addAction("About")
+    about.setMenuRole(QAction.MenuRole.AboutRole)
+    menu.addSeparator()
+    fold_into_app_menu(menu)
+    assert plain.menuRole() == QAction.MenuRole.ApplicationSpecificRole
+    assert about.menuRole() == QAction.MenuRole.AboutRole
+
+
+def test_feedback_waits_a_minute_and_stops_for_the_day():
+    now = 1_000_000.0
+    assert report.feedback_wait([], now) == ""
+    assert report.feedback_wait([now - 20], now) == "wait"
+    assert report.feedback_wait([now - 61], now) == ""
+    day = [now - 3600 * i - 100 for i in range(report.FEEDBACK_PER_DAY)]
+    assert report.feedback_wait(day, now) == "day"
+    assert report.feedback_wait([t - 86400 for t in day], now) == ""
+    assert report.sent_times("12,x,,15.5") == [12.0, 15.5]
+    assert report.text_hash("Hello  World\n") == report.text_hash("hello world")
+
+
+def test_only_the_short_answers_go_with_feedback():
+    """topic/area/often travel as single words from a short list; anything
+    else a caller passes stays home."""
+    import json as _json
+    import urllib.request as _ur
+    got = {}
+
+    class _Resp:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def fake(req, timeout=0):
+        got.update(_json.loads(req.data))
+        return _Resp()
+    real, _ur.urlopen = _ur.urlopen, fake
+    try:
+        assert report.send("feedback", "hi", endpoint="http://127.0.0.1:9/x",
+                           extra={"topic": "bug", "area": "guide", "often": "once",
+                                  "name": "Anna", "topicx": "y", "area2": "z", "often_": "a b"})
+    finally:
+        _ur.urlopen = real
+    assert got["topic"] == "bug" and got["area"] == "guide" and got["often"] == "once"
+    assert not {"name", "topicx", "area2", "often_"} & set(got)

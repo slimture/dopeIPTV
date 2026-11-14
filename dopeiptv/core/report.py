@@ -117,12 +117,17 @@ def build(kind: str, message: str = "", trace: str = "", with_log: bool = True,
     return scrub("\n".join(parts), personal)[:MAX_TEXT]
 
 
-def send(kind: str, text: str, timeout: float = 15.0, endpoint: str | None = None) -> bool:
+def send(kind: str, text: str, timeout: float = 15.0, endpoint: str | None = None,
+         extra: dict | None = None) -> bool:
     """POST the report as the person left it. True when it arrived."""
     from .. import __version__
     body = json.dumps({"kind": kind if kind in ("error", "crash", "feedback") else "feedback",
                        "version": __version__, "os": platform.system(),
-                       "text": (text or "")[:MAX_TEXT]}).encode("utf-8")
+                       "text": (text or "")[:MAX_TEXT],
+                       # What feedback is about (a topic, an area, how often): words from a short list.
+                       **{k: v for k, v in (extra or {}).items()
+                          if k in ("topic", "area", "often") and isinstance(v, str) and v.isalpha() and len(v) <= 12}}
+                      ).encode("utf-8")
     req = urllib.request.Request(endpoint or ENDPOINT, data=body, method="POST", headers={
         "Content-Type": "application/json", "User-Agent": f"dopeIPTV/{__version__}",
         "X-Dopeiptv-Report": "1"})
@@ -134,6 +139,41 @@ def send(kind: str, text: str, timeout: float = 15.0, endpoint: str | None = Non
         return False
     log.info("report: sent (%s)", kind)
     return ok
+
+
+# -- not too many: feedback is a press of Send, not a stream ----------------------
+
+#: A minute between two, a few a day, from one copy of the app (the site
+#: has limits of its own - this one says why before anything is sent).
+FEEDBACK_GAP = 60.0
+FEEDBACK_PER_DAY = 8
+
+
+def feedback_wait(sent: Iterable[float], now: float) -> str:
+    """"" when feedback may go now; "wait" right after one, "day" when
+    today's are used up."""
+    recent = [t for t in sent if 0 <= now - t < 86400]
+    if recent and now - max(recent) < FEEDBACK_GAP:
+        return "wait"
+    if len(recent) >= FEEDBACK_PER_DAY:
+        return "day"
+    return ""
+
+
+def text_hash(text: str) -> str:
+    """The same words, however spaced, give the same hash."""
+    import hashlib
+    return hashlib.sha256(" ".join((text or "").lower().split()).encode("utf-8")).hexdigest()[:24]
+
+
+def sent_times(raw: object) -> list[float]:
+    out: list[float] = []
+    for part in str(raw or "").split(","):
+        try:
+            out.append(float(part))
+        except ValueError:
+            continue
+    return out
 
 
 # -- errors as they happen, and a crash from last time ------------------------------

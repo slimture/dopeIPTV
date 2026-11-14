@@ -52,33 +52,87 @@ class _ReportMixin:
         titles.append(str(last.get("title") or ""))
         return report.personal_values(playlists, channels, titles)
 
+    #: Offers of an error report in one run: a storm of errors is one problem.
+    REPORT_OFFERS = 3
+
     def _offer_error_report(self, trace: str) -> None:
         key = (trace.strip().splitlines() or [""])[-1][:200]
-        if self._report_offered is None or key in self._report_offered:
+        if self._report_offered is None or key in self._report_offered \
+                or len(self._report_offered) >= self.REPORT_OFFERS:
             return
         self._report_offered.add(key)
         self.open_report("error", trace, tr("report_error_intro"))
 
+    def _feedback_details(self, opts: dict) -> str:
+        """What feedback carries besides the person's words, as they chose."""
+        from ..core.log import log_file, recent_lines
+        parts: list[str] = []
+        if opts.get("versions"):
+            parts += report.system_lines()
+        if opts.get("source"):
+            store = getattr(self, "playlist_store", None)
+            kinds = sorted({str(p.get("kind") or "xtream") for p in (store.playlists() if store else [])})
+            parts.append("Sources: " + (", ".join(kinds) or "none"))
+        if opts.get("log"):
+            parts += ["", "Log from this run:", *recent_lines(80)]
+        if opts.get("file"):
+            try:
+                with open(log_file(), encoding="utf-8", errors="replace") as fh:
+                    tail = fh.read().splitlines()[-150:]
+            except OSError:
+                tail = []
+            if tail:
+                parts += ["", "Log file (last lines):", *tail]
+        return report.scrub("\n".join(parts), self._personal_values())
+
     def open_report(self, kind: str, trace: str = "", intro: str = "") -> None:
         """The report window, filled in and scrubbed; sent on Send only."""
-        from .dialogs import ReportDialog
-        text = report.build(kind, trace=trace, personal=self._personal_values(),
-                            with_log=True)
-        d = ReportDialog(self, kind, text, intro)
-        if not d.exec():
-            return
-        payload = report.scrub(d.payload(), self._personal_values())
+        import os
+
+        from ..core.log import log_file
+        from .dialogs import FeedbackDialog, ReportDialog
+        fields: dict = {}
+        words = ""
+        settings = getattr(self, "settings", None)
+        if kind == "feedback":
+            import time
+            sent = report.sent_times(settings.value("feedback_sent", "") if settings else "")
+            wait = report.feedback_wait(sent, time.time())
+            if wait:
+                self._show_toast(tr("fb_wait" if wait == "wait" else "fb_enough"), 6000)
+                return
+            fd = FeedbackDialog(self, self._feedback_details, has_log_file=os.path.isfile(log_file()))
+            if not fd.exec():
+                return
+            fields = fd.fields()
+            payload = report.scrub(fd.payload(), self._personal_values())
+            words = report.text_hash(fd.message.toPlainText())
+            if settings is not None and words == str(settings.value("feedback_last", "") or ""):
+                self._show_toast(tr("fb_same"), 5000)
+                return
+        else:
+            text = report.build(kind, trace=trace, personal=self._personal_values(), with_log=True)
+            d = ReportDialog(self, kind, text, intro)
+            if not d.exec():
+                return
+            payload = report.scrub(d.payload(), self._personal_values())
         if not payload.strip():
             return
 
         def done(ok) -> None:
             if ok:
+                if kind == "feedback" and settings is not None:
+                    import time
+                    now = time.time()
+                    keep = [t for t in report.sent_times(settings.value("feedback_sent", "")) if now - t < 86400]
+                    settings.setValue("feedback_sent", ",".join(str(int(t)) for t in [*keep, now]))
+                    settings.setValue("feedback_last", words)
                 self._show_toast(tr("report_sent"), 5000)
                 return
             from PyQt6.QtGui import QGuiApplication
             QGuiApplication.clipboard().setText(payload)
             self._show_toast(tr("report_not_sent"), 9000)
-        run_async(self.pool, lambda: report.send(kind, payload), done, lambda _e=None: done(False))
+        run_async(self.pool, lambda: report.send(kind, payload, extra=fields), done, lambda _e=None: done(False))
         log.info("report: %s sent by the person", kind)
 
     @staticmethod
