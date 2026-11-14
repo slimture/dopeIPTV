@@ -90,3 +90,17 @@ def test_locale_dir_found_under_frozen_bundle_root(tmp_path, monkeypatch):
 
     assert i18n._locale_dir() == os.path.join(
         str(tmp_path), "dopeiptv", "locale")
+
+
+def test_serbian_is_written_in_one_script():
+    """The app's Serbian is Latin ("Podešavanja"); strings added later in
+    Cyrillic made one window read in two alphabets."""
+    import json
+    import os
+
+    path = os.path.join(os.path.dirname(i18n.__file__), "locale", "sr.json")
+    with open(path, encoding="utf-8") as fh:
+        strings = json.load(fh)
+    cyrillic = sorted(k for k, v in strings.items()
+                      if isinstance(v, str) and re.search("[Ѐ-ӿ]", v))
+    assert not cyrillic, cyrillic
