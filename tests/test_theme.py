@@ -59,6 +59,9 @@ def test_every_theme_has_every_colour_and_readable_text(key):
     # A check that worked (✓) or warns (!) reads on the page and on a card.
     for status in ("ok", "warn"):
         assert min(_contrast(t[status], t["bg"]), _contrast(t[status], t["pane"])) >= 3, (key, status)
+    # Nerd's own colour is text too (the list, the crumb, the page picked in
+    # the sidebar): readable on the page, a card and the sidebar.
+    assert min(_contrast(t["nerd"], t[k]) for k in ("bg", "pane", "side")) >= 4.5, key
 
 
 def test_the_picker_lists_dark_themes_then_light_ones():

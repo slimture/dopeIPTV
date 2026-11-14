@@ -5,7 +5,7 @@ and what clearing refreshes."""
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QEvent, QObject, Qt
 from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QPushButton
 
@@ -15,6 +15,20 @@ from .theme import P
 
 PRIVATE_SHORTCUT = "Ctrl+Shift+N"
 CLEAR_SHORTCUT = "Ctrl+Shift+Delete"
+
+
+class _Follow(QObject):
+    """Calls *place* whenever the watched widget moves, resizes or shows."""
+
+    def __init__(self, parent: QObject, place) -> None:
+        super().__init__(parent)
+        self._place = place
+
+    def eventFilter(self, obj, event) -> bool:        # noqa: N802 - Qt hook
+        if event.type() in (QEvent.Type.Move, QEvent.Type.Resize, QEvent.Type.Show,
+                            QEvent.Type.LayoutRequest):
+            self._place()
+        return False
 
 
 class _PrivacyMixin:
@@ -29,20 +43,41 @@ class _PrivacyMixin:
         self._clear_action.triggered.connect(lambda: self.open_clear_history())
         return [self._private_action, self._clear_action]
 
-    def _build_private_pill(self, row) -> None:
-        """The marker beside the logo while private viewing is on; a click
-        turns it off."""
-        self._private_pill = QPushButton(tr("private_pill"), objectName="PrivatePill")
-        self._private_pill.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._private_pill.setToolTip(tr("private_pill_tip"))
-        self._private_pill.setStyleSheet(
+    def _build_private_pill(self) -> None:
+        """The marker while private viewing is on: a small label laid over
+        the logo's lower edge, centred on it - in no layout, so the logo,
+        the heart beside it and the row under it stay exactly where they
+        are. A click turns private viewing off."""
+        logo = self._sidebar_logo
+        pill = QPushButton(tr("private_pill"), logo.parentWidget(), objectName="PrivatePill")
+        pill.setCursor(Qt.CursorShape.PointingHandCursor)
+        pill.setToolTip(tr("private_pill_tip"))
+        pill.setAccessibleName(tr("private_pill_tip"))
+        # Ringed in the sidebar's colour, so it reads as lying on the mark.
+        pill.setStyleSheet(
             f"QPushButton#PrivatePill {{ background:{P['sel']}; color:{P['text']};"
-            f" border:none; border-radius:10px; padding:2px 10px; font-size:11px;"
-            f" font-weight:700; }}"
+            f" border:2px solid {P['side']}; border-radius:10px; padding:1px 9px;"
+            f" font-size:10px; font-weight:700; }}"
             f"QPushButton#PrivatePill:hover {{ background:{P['btn_hover']}; }}")
-        self._private_pill.clicked.connect(lambda: self.set_private_viewing(False))
-        self._private_pill.hide()
-        row.addWidget(self._private_pill, 0, Qt.AlignmentFlag.AlignVCenter)
+        pill.clicked.connect(lambda: self.set_private_viewing(False))
+        pill.hide()
+        self._private_pill = pill
+        follow = _Follow(pill, self._place_private_pill)
+        logo.installEventFilter(follow)
+        logo.parentWidget().installEventFilter(follow)
+
+    def _place_private_pill(self) -> None:
+        pill = getattr(self, "_private_pill", None)
+        logo = getattr(self, "_sidebar_logo", None)
+        if pill is None or logo is None or not pill.isVisible():
+            return
+        pill.adjustSize()
+        g = logo.geometry()
+        mark_top = g.top() + (g.height() - logo.LOGO_H) // 2
+        # On the icon rail the heart sits under the logo: the top edge there.
+        edge = mark_top if getattr(self, "_sidebar_collapsed", False) else mark_top + logo.LOGO_H
+        pill.move(g.center().x() + 1 - pill.width() // 2, edge - pill.height() // 2)
+        pill.raise_()
 
     def set_private_viewing(self, on: bool) -> None:
         """Turn private viewing on or off (it ends with the app anyway)."""
@@ -61,6 +96,7 @@ class _PrivacyMixin:
         pill = getattr(self, "_private_pill", None)
         if pill is not None:
             pill.setVisible(on)
+            self._place_private_pill()
         if was != on:
             self._show_toast(tr("private_on_toast") if on else tr("private_off_toast"), 5000)
 

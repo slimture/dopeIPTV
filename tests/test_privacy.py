@@ -165,8 +165,38 @@ assert w._private_action.shortcut() == QKeySequence("Ctrl+Shift+N")
 assert w._clear_action.shortcut() == QKeySequence("Ctrl+Shift+Delete")
 # On from the menu: the marker shows, history keeps nothing.
 from dopeiptv.i18n import tr
+w.resize(1400, 900)
+w._set_sidebar_collapsed(False)
+for _ in range(10):
+    app.processEvents()
+logo = w._sidebar_logo
+before = (logo.geometry(), w._guide_btn.geometry(), w._donate_btn.geometry())
 w._private_action.trigger()
+for _ in range(5):
+    app.processEvents()
 assert privacy.private() and not w._private_pill.isHidden()
+# It lies over the logo's lower edge, centred, in no layout: nothing moves.
+pill = w._private_pill
+assert (logo.geometry(), w._guide_btn.geometry(), w._donate_btn.geometry()) == before
+assert w._logo_row.indexOf(pill) == -1 and pill.parentWidget() is logo.parentWidget()
+assert abs(pill.geometry().center().x() - logo.geometry().center().x()) <= 1, (pill.geometry(), logo.geometry())
+mark_bottom = logo.y() + (logo.height() + logo.LOGO_H) // 2
+assert abs(pill.geometry().center().y() - mark_bottom) <= 1, (pill.geometry(), mark_bottom)
+assert pill.geometry().right() < w._donate_btn.geometry().left() or w._donate_btn.isHidden() \
+    or pill.geometry().bottom() < w._donate_btn.geometry().top() or pill.geometry().top() > w._donate_btn.geometry().bottom()
+assert 0 <= pill.x() and pill.geometry().right() < logo.parentWidget().width()
+# On the icon rail too: inside the rail, still centred on the logo, on its
+# top edge (the heart is under it there).
+w._set_sidebar_collapsed(True)
+for _ in range(10):
+    app.processEvents()
+assert abs(pill.geometry().center().x() - logo.geometry().center().x()) <= 1
+assert abs(pill.geometry().center().y() - (logo.y() + (logo.height() - logo.LOGO_H) // 2)) <= 1
+assert pill.geometry().right() < logo.parentWidget().width() + 2, (pill.geometry(), logo.parentWidget().width())
+w._set_sidebar_collapsed(False)
+for _ in range(10):
+    app.processEvents()
+assert abs(pill.geometry().center().x() - logo.geometry().center().x()) <= 1
 w.history.add("http://h/1.ts", "SVT1 HD", None, 1, "live")
 assert w.history.items() == []
 # Off from the marker.

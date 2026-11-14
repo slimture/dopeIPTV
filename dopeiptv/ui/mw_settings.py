@@ -622,9 +622,10 @@ class _SettingsMixin:
         outer.addWidget(shell, 1)
 
         def page(key: str, title: str, subtitle: str,
-                 icon: str) -> SettingsPage:
-            return shell.add_page(SettingsPage(key, title, subtitle),
-                                  page_icon(icon, self._action_pixmap))
+                 icon: str, tint: str | None = None) -> SettingsPage:
+            pg = SettingsPage(key, title, subtitle)
+            pg.icon_kind, pg.icon_base = icon, self._action_pixmap
+            return shell.add_page(pg, page_icon(icon, self._action_pixmap, tint=tint))
 
         on = "true"
 
@@ -1717,19 +1718,22 @@ class _SettingsMixin:
 
         # -- Nerd -------------------------------------------------------------
         from . import nerd_settings
-        nerd_page = page("nerd", tr("nerd_page"), tr("nerd_page_sub"), "nerd")
+        nerd_tint = P.get("nerd", P["accent"])
+        nerd_page = page("nerd", tr("nerd_page"), tr("nerd_page_sub"), "nerd", nerd_tint)
         nerd_pages = {
-            "net": page("nerd_net", tr("nerd_pg_net"), tr("nerd_pg_net_sub"), "network"),
-            "boxes": page("nerd_boxes", tr("nerd_pg_boxes"), tr("nerd_pg_boxes_sub"), "box"),
-            "lists": page("nerd_lists", tr("nerd_pg_lists"), tr("nerd_pg_lists_sub"), "channels"),
-            "player": page("nerd_player", tr("nerd_pg_player"), tr("nerd_pg_player_sub"), "knobs"),
-            "rec": page("nerd_rec", tr("nerd_pg_rec"), tr("nerd_pg_rec_sub"), "rec"),
-            "serve": page("nerd_serve", tr("nerd_pg_serve"), tr("nerd_pg_serve_sub"), "remote"),
+            "net": page("nerd_net", tr("nerd_pg_net"), tr("nerd_pg_net_sub"), "network", nerd_tint),
+            "boxes": page("nerd_boxes", tr("nerd_pg_boxes"), tr("nerd_pg_boxes_sub"), "box", nerd_tint),
+            "lists": page("nerd_lists", tr("nerd_pg_lists"), tr("nerd_pg_lists_sub"), "channels", nerd_tint),
+            "player": page("nerd_player", tr("nerd_pg_player"), tr("nerd_pg_player_sub"), "knobs", nerd_tint),
+            "rec": page("nerd_rec", tr("nerd_pg_rec"), tr("nerd_pg_rec_sub"), "rec", nerd_tint),
+            "serve": page("nerd_serve", tr("nerd_pg_serve"), tr("nerd_pg_serve_sub"), "remote", nerd_tint),
         }
+        # Nerd's pages fold out under Nerd itself, in its own colour - not a
+        # section with a heading of its own.
+        shell.set_children("nerd", [p.key for p in nerd_pages.values()], nerd_tint)
 
         def show_nerd_pages(on: bool) -> None:
-            for key in ("nerd_net", "nerd_boxes", "nerd_lists", "nerd_player", "nerd_rec", "nerd_serve"):
-                shell.set_page_enabled(key, on)
+            shell.set_group_enabled("nerd", on)
         nerd_client = self.client
         nerd_commit = nerd_settings.build(
             nerd_page, self.settings, d,
@@ -1743,7 +1747,8 @@ class _SettingsMixin:
             rec_dir=lambda: self.rec.directory(),
             playlists=lambda: ((self.playlist_store.playlists(), self.playlist_store.active_id)
                                if self.playlist_store else ([], None)),
-            remote=self._remote_apply)
+            remote=self._remote_apply,
+            open_page=shell.show_page)
 
         # -- the playlist page's behaviour -------------------------------------
         def reload_pl_list():
@@ -1968,10 +1973,8 @@ class _SettingsMixin:
                                       "multiview"]),
             (tr("set_sec_library"), ["recording", "local"]),
             (tr("set_sec_services"), ["metadata", "trakt"]),
+            # Nerd's own pages fold out under it while it is on.
             (tr("set_sec_system"), ["parental", "advanced", "nerd"]),
-            # Only while Nerd is on (its pages are left out otherwise).
-            (tr("nerd_sec"), ["nerd_net", "nerd_boxes", "nerd_lists", "nerd_player", "nerd_rec",
-                              "nerd_serve"]),
         ])
         # Back on the page that was open last time this session.
         shell.show_page(getattr(self, "_settings_page", None))

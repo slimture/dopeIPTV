@@ -335,3 +335,65 @@ def test_the_problem_window_can_be_selected_and_copied(app):
     copied = QGuiApplication.clipboard().text()
     assert "The proxy does not work" in copied and "ProxyError" in copied
     assert d.copied.text().endswith("Copied")
+
+
+def test_the_nerd_page_lists_its_parts_and_what_is_changed(app, settings):
+    """Under the switch, Nerd's pages as a list: each opens its page, says
+    what is changed on it, and has the way back above its title."""
+    from PyQt6.QtCore import QPointF, Qt
+    from PyQt6.QtGui import QMouseEvent
+    from PyQt6.QtWidgets import QLineEdit
+
+    from dopeiptv.i18n import tr
+    from dopeiptv.ui import nerd_settings
+    from dopeiptv.ui.settings_ui import SettingsPage, ToggleSwitch
+    settings.setValue("nerd_enabled", "true")
+    settings.setValue("nerd_rec_template", "{channel}/{title}")
+    nerd.install(settings)
+    page = SettingsPage("nerd", "Nerd", "")
+    blank = lambda k, sz, c: QPixmap(sz, sz)  # noqa: E731
+    pages = {}
+    for key, kind in (("net", "network"), ("boxes", "box"), ("lists", "channels"),
+                      ("player", "knobs"), ("rec", "rec"), ("serve", "remote")):
+        sp = SettingsPage(f"nerd_{key}", key.title(), f"About {key}")
+        sp.icon_kind, sp.icon_base = kind, blank
+        pages[key] = sp
+    opened = []
+    nerd_settings.build(page, settings, QDialog(), boxes=[{"id": "b", "name": "Vu+", "kind": "enigma2"}],
+                        pages=pages, open_page=opened.append)
+    rows = page.findChildren(nerd_settings._PartRow)
+    assert [r.accessibleName() for r in rows] == ["Net", "Boxes", "Lists", "Player", "Rec", "Serve"]
+    summary = {r.accessibleName(): r.summary.text() for r in rows}
+    assert summary["Rec"] == tr("nerd_part_changed", n=1)           # the template, stored
+    assert summary["Net"] == tr("nerd_part_untouched")
+    assert summary["Boxes"] == tr("nerd_part_boxes", n=1)
+    # A change on a page shows the next time the list is looked at.
+    proxy = next(e for e in pages["net"].findChildren(QLineEdit)
+                 if e.placeholderText().startswith("http://192.168.1.1"))
+    proxy.setText("http://10.0.0.1:3128")
+    page.show()
+    app.processEvents()
+    assert next(r for r in rows if r.accessibleName() == "Net").summary.text() == tr("nerd_part_changed", n=1)
+    remote = next(sw for sw in pages["serve"].findChildren(ToggleSwitch) if sw.accessibleName() == tr("nerd_remote"))
+    remote.setChecked(True)
+    page.hide()
+    page.show()
+    app.processEvents()
+    assert next(r for r in rows if r.accessibleName() == "Serve").summary.text() == tr("nerd_part_on", port=3673)
+    # A click, or Enter, opens the page; its crumb leads back.
+    row = rows[3]
+    pos = QPointF(row.rect().center())
+    for kind in (QMouseEvent.Type.MouseButtonPress, QMouseEvent.Type.MouseButtonRelease):
+        row.event(QMouseEvent(kind, pos, pos, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
+                              Qt.KeyboardModifier.NoModifier))
+    assert opened == ["nerd_player"]
+    from PyQt6.QtTest import QTest
+    QTest.keyClick(rows[4], Qt.Key.Key_Return)
+    assert opened == ["nerd_player", "nerd_rec"]
+    pages["player"].crumb.click()
+    assert opened[-1] == "nerd"
+    # Off: the list goes with the rest of what Nerd holds.
+    switch = next(sw for sw in page.findChildren(ToggleSwitch) if sw.accessibleName() == tr("nerd_switch"))
+    switch.setChecked(False)
+    assert all(not r.isVisibleTo(page) for r in rows)
+    page.hide()

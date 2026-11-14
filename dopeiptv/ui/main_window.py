@@ -841,8 +841,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._actions_box.addWidget(multiview_btn)
         sl.addLayout(self._actions_box)
         self._logo_row.addWidget(donate_btn, 0, Qt.AlignmentFlag.AlignVCenter)
-        self._build_private_pill(self._logo_row)
         self._logo_row.addStretch(1)
+        self._build_private_pill()
         self._fit_logo(False)
         self._donate_heart_refresh()         # hidden for three months, maybe
         self._apply_action_icons()

@@ -20,7 +20,7 @@ from typing import Any, Callable
 from PyQt6 import sip
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
-    QComboBox, QFileDialog, QHBoxLayout, QLineEdit, QPlainTextEdit,
+    QComboBox, QFileDialog, QFrame, QHBoxLayout, QLineEdit, QPlainTextEdit,
     QPushButton, QVBoxLayout, QWidget,
 )
 
@@ -65,6 +65,96 @@ def text_box(value: str, placeholder: str, lines: int = 4) -> QPlainTextEdit:
 
 BOX_NAMES = {"enigma2": "Enigma2", "tvheadend": "Tvheadend", "hdhomerun": "HDHomeRun"}
 
+#: Nerd's pages in the order its list shows them, and the settings on each
+#: (what "2 changed" counts; boxes are counted as boxes).
+PARTS = ("net", "boxes", "lists", "player", "rec", "serve")
+PART_KEYS = {
+    "net": ("nerd_user_agent", "nerd_referer", "nerd_headers", "nerd_proxy", "nerd_proxy_player",
+            "nerd_ip_family", "nerd_net_timeout", "nerd_reconnect_max", "nerd_vpn_guard",
+            "nerd_vpn_iface", "nerd_vpn_lan"),
+    "lists": ("nerd_picon_dir", "nerd_picon_override", "nerd_udpxy", "nerd_failover"),
+    "player": ("nerd_spdif", "nerd_video_sync", "nerd_interpolation", "nerd_probe", "nerd_demux_max_mb",
+               "nerd_mpv_config_dir", "nerd_shaders", "nerd_mpv_options", "nerd_adelay_per_channel"),
+    "rec": ("nerd_rec_template", "nerd_rec_post"),
+    "serve": ("nerd_remote", "nerd_share", "nerd_remote_lan", "nerd_remote_port"),
+}
+
+
+class _Defaults(nerd.Nerd):
+    """Nerd's settings, noting the default each was read with: what an
+    untouched page shows, so the list can say what was changed."""
+
+    def __init__(self, settings: Any) -> None:
+        super().__init__(settings)
+        self.defaults: dict[str, str] = {}
+
+    def get(self, key: str, default: str = "") -> str:
+        self.defaults.setdefault(key, default)
+        return super().get(key, default)
+
+
+class _PartRow(QFrame):
+    """One of Nerd's pages in its list: icon, name, what it is for, what is
+    changed on it; a click (or Enter) opens it."""
+
+    def __init__(self, page: SettingsPage, opened: Callable[[], None]) -> None:
+        from PyQt6.QtCore import Qt
+        from PyQt6.QtWidgets import QLabel
+
+        from .settings_ui import page_icon
+        from .theme import P
+        super().__init__()
+        self.setObjectName("NerdPart")
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setAccessibleName(page.title)
+        self._opened = opened
+        h = QHBoxLayout(self)
+        h.setContentsMargins(10, 8, 10, 8)
+        h.setSpacing(12)
+        icon = QLabel()
+        if page.icon_kind and page.icon_base is not None:
+            icon.setPixmap(page_icon(page.icon_kind, page.icon_base, 20, tint=P.get("nerd")).pixmap(20, 20))
+        icon.setFixedWidth(22)
+        h.addWidget(icon, 0, Qt.AlignmentFlag.AlignTop)
+        text = QVBoxLayout()
+        text.setSpacing(1)
+        name = QLabel(page.title)
+        name.setObjectName("NerdPartTitle")
+        about = QLabel(page.subtitle)
+        about.setObjectName("NerdPartAbout")
+        about.setWordWrap(True)
+        text.addWidget(name)
+        text.addWidget(about)
+        h.addLayout(text, 1)
+        self.summary = QLabel("")
+        self.summary.setObjectName("NerdPartSummary")
+        h.addWidget(self.summary, 0, Qt.AlignmentFlag.AlignVCenter)
+        arrow = QLabel("‹" if self.layoutDirection() == Qt.LayoutDirection.RightToLeft else "›")
+        arrow.setObjectName("NerdPartArrow")
+        h.addWidget(arrow, 0, Qt.AlignmentFlag.AlignVCenter)
+        for w in (icon, name, about, self.summary, arrow):
+            w.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+
+    def set_summary(self, text: str, lit: bool) -> None:
+        self.summary.setText(text)
+        self.summary.setProperty("lit", lit)
+        self.summary.style().unpolish(self.summary)
+        self.summary.style().polish(self.summary)
+
+    def mouseReleaseEvent(self, event) -> None:       # noqa: N802 - Qt hook
+        if self.rect().contains(event.position().toPoint()):
+            self._opened()
+        super().mouseReleaseEvent(event)
+
+    def keyPressEvent(self, event) -> None:           # noqa: N802
+        from PyQt6.QtCore import Qt
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
+            self._opened()
+            return
+        super().keyPressEvent(event)
+
 
 def build(page: SettingsPage, settings: Any, parent: QWidget,
           boxes: list[dict] | None = None,
@@ -76,7 +166,8 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
           channels: Callable[[], list[dict]] | None = None,
           rec_dir: Callable[[], str] | None = None,
           playlists: Callable[[], tuple[list[dict], str | None]] | None = None,
-          remote: Callable[[dict], dict] | None = None) -> Callable[[Callable[[str, Any], None]], None]:
+          remote: Callable[[dict], dict] | None = None,
+          open_page: Callable[[str], None] | None = None) -> Callable[[Callable[[str, Any], None]], None]:
     """*page* is Nerd's own: the switch, how it works, stats, diagnostics.
     *pages* ("net", "boxes", "lists", "player", "rec") take the rest, shown by
     *show_pages* while Nerd is on; without them it all goes on *page*.
@@ -84,8 +175,10 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     *source*: the active source, which the network checks ask; *channels*:
     fetches its channel list, off the window's thread (the picon check
     matches against it). *remote*: puts the remote API and sharing as the
-    page says now and returns how the server stands (its Test)."""
-    n = nerd.Nerd(settings)
+    page says now and returns how the server stands (its Test).
+    *open_page*: shows a page by key (the list of Nerd's parts, their way
+    back)."""
+    n = _Defaults(settings)
     sub = pages or {}
 
     def at(key: str) -> SettingsPage:
@@ -111,6 +204,21 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     teaser = c.note(tr("nerd_teaser"))
     teaser_row = teaser.parentWidget()
     gated_from = len(page.cards)
+
+    # -- what is in Nerd: its pages as a list that folds out under the switch ---
+    def go(key: str) -> None:
+        if open_page is not None:
+            open_page(key)
+    parts_card = page.card(tr("nerd_card_parts")) if pages else None
+    part_rows: list[tuple[str, _PartRow]] = []
+    for key in PARTS:
+        sp = sub.get(key)
+        if sp is None or parts_card is None:
+            continue
+        row = _PartRow(sp, lambda k=sp.key: go(k))
+        parts_card.widget(row, "")
+        part_rows.append((key, row))
+        sp.set_crumb(tr("nerd_page"), lambda: go(page.key))
 
     c = page.card(tr("nerd_card_how"))
     how = [("nerd_how_saved_t", "nerd_how_saved"), ("nerd_how_alone_t", "nerd_how_alone"),
@@ -463,7 +571,8 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     remote_on.setAccessibleName(tr("nerd_remote"))
     c.row(tr("nerd_remote"), remote_on, tr("nerd_remote_hint"),
           search="remote API HTTP REST Home Assistant curl script control")
-    c.note(tr("nerd_remote_calls"))
+    # A word joiner after each "/": a path is never broken after its slash.
+    c.note(tr("nerd_remote_calls").replace("/", "/\u2060"))
 
     c = at("serve").card(tr("nerd_card_share"))
     share_on = ToggleSwitch(n.flag("nerd_share"))
@@ -472,7 +581,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
           search="server share M3U XMLTV Kodi TiviMate VLC playlist guide")
     copy_m3u = QPushButton(tr("nerd_share_copy_m3u"))
     copy_epg = QPushButton(tr("nerd_share_copy_epg"))
-    c.row(tr("nerd_share_addresses"), _hbox(copy_m3u, copy_epg), tr("nerd_share_addresses_hint"),
+    c.row(tr("nerd_share_addresses"), _fitted(copy_m3u, copy_epg), tr("nerd_share_addresses_hint"),
           search="address URL copy playlist guide")
 
     c = at("serve").card(tr("nerd_card_access"))
@@ -487,6 +596,8 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     token.setAccessibleName(tr("nerd_remote_token"))
     copy_tok = QPushButton(tr("problem_copy"))
     new_tok = QPushButton(tr("nerd_remote_new_token"))
+    drop_tok = QPushButton(tr("nerd_remote_drop_token"))
+    drop_tok.setToolTip(tr("nerd_remote_drop_token_tip"))
 
     def wanted_remote() -> dict:
         return {"remote": switch.isChecked() and remote_on.isChecked(),
@@ -517,6 +628,14 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     copy_tok.clicked.connect(lambda _c=False: (ensure_token(), copy(copy_tok, token.text().strip())))
     new_tok.clicked.connect(lambda _c=False: token.setText(remote_api.new_token()))
 
+    def drop_token() -> None:
+        """Nobody gets in without a token: both off; turning one on again
+        makes a new token."""
+        remote_on.setChecked(False)
+        share_on.setChecked(False)
+        token.setText("")
+    drop_tok.clicked.connect(lambda _c=False: drop_token())
+
     def remote_job() -> Any:
         if remote is None:
             return None
@@ -532,6 +651,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     tok_row.addWidget(token, 1)
     tok_row.addWidget(copy_tok)
     tok_row.addWidget(new_tok)
+    tok_row.addWidget(drop_tok)
     c.row(tr("nerd_remote_token"), tok_row, tr("nerd_remote_token_hint"), stretch_control=True,
           search="token password secret key", below=remote_line)
     c.note(tr("nerd_applies_remote"))
@@ -618,6 +738,33 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
             if line.test_btn is None or getattr(line, "auto", False):
                 line.start()
 
+    def part_summary(key: str) -> tuple[str, bool]:
+        if key == "boxes":
+            return (tr("nerd_part_boxes", n=len(boxes)), True) if boxes else (tr("nerd_part_no_boxes"), False)
+        if key == "serve" and (remote_on.isChecked() or share_on.isChecked()):
+            return tr("nerd_part_on", port=port.value()), True
+        now = values()
+        changed = sum(1 for k in PART_KEYS.get(key, ()) if now.get(k, "") != n.defaults.get(k, ""))
+        return (tr("nerd_part_changed", n=changed), True) if changed else (tr("nerd_part_untouched"), False)
+
+    def refresh_parts() -> None:
+        for key, row in part_rows:
+            row.set_summary(*part_summary(key))
+    if part_rows:
+        page.installEventFilter(_OnShow(page, refresh_parts))
+
+    def unfold(card: QWidget) -> None:
+        """The list opens downwards rather than appearing all at once."""
+        from PyQt6.QtCore import QEasingCurve, QPropertyAnimation
+        end = card.sizeHint().height()
+        anim = QPropertyAnimation(card, b"maximumHeight", card)
+        anim.setDuration(220)
+        anim.setStartValue(0)
+        anim.setEndValue(end)
+        anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        anim.finished.connect(lambda: card.setMaximumHeight(16777215) if not sip.isdeleted(card) else None)
+        anim.start()
+
     def flip(on: bool) -> None:
         for card in page.cards:
             card.refresh()
@@ -625,6 +772,9 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
             show_pages(on)
         if on:
             start_checks()
+            refresh_parts()
+            if parts_card is not None and parts_card.isVisibleTo(page):
+                unfold(parts_card)
     switch.toggled.connect(flip)
     if show_pages is not None:
         show_pages(n.on)
@@ -632,6 +782,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
         start_checks()
 
     shown = values()
+    refresh_parts()
 
     def commit(put: Callable[[str, Any], None]) -> None:
         """Only what was changed is written: a key never stored that still
@@ -644,6 +795,21 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
 
     commit.lines = lines  # type: ignore[attr-defined]
     return commit
+
+
+class _OnShow(QWidget):
+    """Runs *fn* each time *target* is shown (the list's counts, fresh)."""
+
+    def __init__(self, target: QWidget, fn: Callable[[], None]) -> None:
+        super().__init__(target)
+        self.hide()
+        self._fn = fn
+
+    def eventFilter(self, obj, event) -> bool:        # noqa: N802 - Qt hook
+        from PyQt6.QtCore import QEvent
+        if event.type() == QEvent.Type.Show:
+            self._fn()
+        return False
 
 
 def _how_block(items: list[tuple[str, str]]) -> QWidget:
@@ -667,6 +833,17 @@ def _how_block(items: list[tuple[str, str]]) -> QWidget:
         grid.addWidget(head, i, 0, Qt.AlignmentFlag.AlignTop)
         grid.addWidget(text, i, 1)
     grid.setColumnStretch(1, 1)
+    return box
+
+
+def _fitted(*widgets: QWidget) -> QWidget:
+    """Buttons side by side at the width they need: a row's control column
+    is as wide as a dropdown, and two buttons squeezed into it cut their
+    words off."""
+    box = QWidget()
+    box.setLayout(_hbox(*widgets))
+    box.layout().setContentsMargins(0, 0, 0, 0)
+    box.setFixedWidth(box.sizeHint().width())
     return box
 
 

@@ -575,7 +575,7 @@ def test_the_page_turns_it_on_tests_it_and_stores_it(tmp_path):
     from PyQt6.QtCore import QSettings
     from PyQt6.QtGui import QPixmap
     from PyQt6.QtTest import QTest
-    from PyQt6.QtWidgets import QApplication, QDialog, QPushButton
+    from PyQt6.QtWidgets import QApplication, QDialog, QLineEdit, QPushButton
 
     from dopeiptv.core import nerd
     from dopeiptv.i18n import tr
@@ -638,6 +638,25 @@ def test_the_page_turns_it_on_tests_it_and_stores_it(tmp_path):
         assert win._remote.token != token
         assert ask(free, "GET", "/", token=token)[0] == 401
         assert ask(free, "GET", "/", token=win._remote.token)[0] == 200
+        # Removed: both off, the port closed, and turning one on makes a new token.
+        drop = next(b for b in serve.findChildren(QPushButton) if b.text() == tr("nerd_remote_drop_token"))
+        last = win._remote.token
+        drop.click()
+        assert not switches[tr("nerd_remote")].isChecked() and not switches[tr("nerd_share")].isChecked()
+        line.test_btn.click()
+        for _ in range(100):
+            QTest.qWait(20)
+            if line.result is not None:
+                break
+        assert win._remote is None and line.result.key == "nerd_ck_remote_off"
+        with pytest.raises(OSError):
+            socket.create_connection(("127.0.0.1", free), timeout=2).close()
+        switches[tr("nerd_share")].setChecked(True)
+        made = [e for e in serve.findChildren(QLineEdit) if e.accessibleName() == tr("nerd_remote_token")][0].text()
+        assert len(made) >= 30 and made != last
+        # The two copy buttons get the room their words need.
+        for b in (copy, ):
+            assert b.width() >= b.sizeHint().width() or not b.isVisible()
     finally:
         win._remote_stop()
         nerd.install(None)

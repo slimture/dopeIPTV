@@ -26,8 +26,8 @@ from PyQt6.QtCore import (
     QLocale, QPoint, QPointF, QRect, QRectF, QSize, Qt, QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QColor, QConicalGradient, QFont, QIcon, QPainter, QPainterPath, QPen,
-    QPixmap,
+    QColor, QConicalGradient, QFont, QFontMetrics, QIcon, QPainter,
+    QPainterPath, QPen, QPixmap,
 )
 from PyQt6.QtWidgets import (
     QAbstractButton, QAbstractSpinBox, QButtonGroup, QCheckBox, QFrame,
@@ -259,6 +259,11 @@ class SettingsPage(QScrollArea):
         super().__init__()
         self.key = key
         self.title = title
+        self.subtitle = subtitle
+        #: How its sidebar icon is drawn (set by whoever adds the page).
+        self.icon_kind = ""
+        self.icon_base = None
+        self.crumb: QPushButton | None = None
         self.setWidgetResizable(True)
         self.setFrameShape(QFrame.Shape.NoFrame)
         body = QWidget()
@@ -291,6 +296,23 @@ class SettingsPage(QScrollArea):
         #: The controls in the column down the right of the cards.
         self.column: list[QWidget] = []
 
+    def set_crumb(self, text: str, on_click: Callable[[], None]) -> QPushButton:
+        """A way back above the title ("Nerd ›" on Nerd's own pages), in
+        the colour of the group the page belongs to."""
+        rtl = QLocale().textDirection() == Qt.LayoutDirection.RightToLeft
+        btn = QPushButton(f"{text}  {'‹' if rtl else '›'}")
+        btn.setObjectName("SettingsCrumb")
+        btn.setFlat(True)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.clicked.connect(lambda _c=False: on_click())
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(btn)
+        row.addStretch(1)
+        self._col.insertLayout(0, row)
+        self.crumb = btn
+        return btn
+
     def card(self, title: str = "") -> SettingsCard:
         at = self._col.indexOf(self._tail)
         c = SettingsCard(self)
@@ -320,6 +342,111 @@ class SettingsPage(QScrollArea):
         return shown or not needle
 
 
+#: On a sidebar entry: 1 a page folded out under another, 2 the last of them.
+CHILD_ROLE = Qt.ItemDataRole.UserRole + 1
+#: On the entry they fold out under: 1 with none showing, 2 unfolded.
+PARENT_ROLE = Qt.ItemDataRole.UserRole + 2
+
+
+class _NavDelegate(QStyledItemDelegate):
+    """Pages folded out under another (Nerd's under Nerd): indented, joined
+    by a rail that comes down from the parent's icon, in the group's own
+    colour - one group to the eye, not a section of its own."""
+
+    RAIL_X = 19.0          # the parent's icon centre: padding 10 + icon 18 / 2
+    INDENT = 30
+
+    def __init__(self, nav: QListWidget) -> None:
+        super().__init__(nav)
+        self.colour = ""
+
+    def paint(self, painter, option, index) -> None:
+        child = index.data(CHILD_ROLE)
+        parent = index.data(PARENT_ROLE)
+        selected = bool(option.state & QStyle.StateFlag.State_Selected)
+        if not self.colour or not (child or (parent and selected)):
+            super().paint(painter, option, index)
+        else:
+            self._tinted(painter, option, index, bool(child), selected)
+        if parent == 2 and self.colour:
+            self._chevron(painter, option)
+
+    def _tinted(self, painter, option, index, child: bool, selected: bool) -> None:
+        """A page of the group in the group's colour: a child indented on
+        the rail; the parent itself, when it is the page shown."""
+        r = option.rect
+        rtl = option.direction == Qt.LayoutDirection.RightToLeft
+
+        def x(v: float) -> float:          # from the leading edge, either way round
+            return r.right() + 1 - v if rtl else r.left() + v
+        col = QColor(self.colour)
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        mid = r.center().y() + 0.5
+        indent = self.INDENT if child else 0
+        if child:
+            rail = QColor(col)
+            rail.setAlphaF(0.5)
+            pen = QPen(rail, 2)
+            pen.setCapStyle(Qt.PenCapStyle.FlatCap)
+            painter.setPen(pen)
+            last = index.data(CHILD_ROLE) == 2
+            painter.drawLine(QPointF(x(self.RAIL_X), r.top()),
+                             QPointF(x(self.RAIL_X), mid if last else r.bottom() + 1))
+        hover = bool(option.state & QStyle.StateFlag.State_MouseOver)
+        left, right = x(indent), x(r.width())
+        pill = QRectF(min(left, right), r.top() + 1, abs(right - left), r.height() - 2)
+        painter.setPen(Qt.PenStyle.NoPen)
+        if selected:
+            fill = QColor(col)
+            fill.setAlphaF(0.2)
+            painter.setBrush(fill)
+            painter.drawRoundedRect(pill, 8, 8)
+            if child:
+                painter.setBrush(col)
+                painter.drawEllipse(QPointF(x(self.RAIL_X), mid), 3.5, 3.5)
+        elif hover:
+            painter.setBrush(QColor(P["hover"]))
+            painter.drawRoundedRect(pill, 8, 8)
+        icon = index.data(Qt.ItemDataRole.DecorationRole)
+        size = 16 if child else 18
+        lead = indent + 10
+        ix = x(lead + (size if rtl else 0))
+        if isinstance(icon, QIcon):
+            icon.paint(painter, QRect(int(ix), int(r.center().y() - size / 2 + 1), size, size))
+        font = QFont(option.font)
+        if selected:
+            font.setWeight(QFont.Weight.DemiBold)
+        painter.setFont(font)
+        painter.setPen(col if selected else QColor(P["text2"]))
+        t0, t1 = x(lead + size + (10 if child else 8)), x(r.width() - (28 if index.data(PARENT_ROLE) else 8))
+        text_rect = QRectF(min(t0, t1), r.top(), abs(t1 - t0), r.height())
+        text = QFontMetrics(font).elidedText(str(index.data(Qt.ItemDataRole.DisplayRole) or ""),
+                                             Qt.TextElideMode.ElideRight, int(text_rect.width()))
+        align = Qt.AlignmentFlag.AlignVCenter | (Qt.AlignmentFlag.AlignRight if rtl
+                                                 else Qt.AlignmentFlag.AlignLeft)
+        painter.drawText(text_rect, int(align), text)
+        painter.restore()
+
+    def _chevron(self, painter, option) -> None:
+        """A small open chevron at the far end of the parent: unfolded."""
+        r = option.rect
+        rtl = option.direction == Qt.LayoutDirection.RightToLeft
+        cx = r.left() + 16 if rtl else r.right() - 15
+        cy = r.center().y() + 1
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        pen = QPen(QColor(self.colour), 1.6)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+        path = QPainterPath()
+        path.moveTo(cx - 4, cy - 2)
+        path.lineTo(cx, cy + 2)
+        path.lineTo(cx + 4, cy - 2)
+        painter.drawPath(path)
+        painter.restore()
+
+
 class SettingsNav(QListWidget):
     """The sidebar: one entry per page, with its icon."""
 
@@ -331,6 +458,9 @@ class SettingsNav(QListWidget):
         self.setIconSize(QSize(18, 18))
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
+        self.setMouseTracking(True)
+        self.delegate = _NavDelegate(self)
+        self.setItemDelegate(self.delegate)
         self.currentRowChanged.connect(self.page_chosen.emit)
 
 
@@ -384,6 +514,10 @@ class SettingsShell(QWidget):
         self.pages: list[SettingsPage] = []
         self._items: dict[str, QListWidgetItem] = {}
         self._sections: list[tuple[QListWidgetItem, list[QListWidgetItem]]] = []
+        #: Pages folded out under another: parent key -> its pages, in order.
+        self._children: dict[str, list[str]] = {}
+        #: Fold out with a short stagger (off in tests that count at once).
+        self.animate = True
         self._aligned = False
         self.nav.page_chosen.connect(self._show)
         self.search.textChanged.connect(self._filter)
@@ -424,6 +558,55 @@ class SettingsShell(QWidget):
         self._items[page.key] = item
         return page
 
+    def set_children(self, parent: str, keys: list[str], colour: str) -> None:
+        """*keys* fold out under *parent* in the sidebar - indented, joined
+        by a rail in *colour* - wherever *parent* is placed."""
+        self._children[parent] = [k for k in keys if k in self._items]
+        self.nav.delegate.colour = colour
+        for k in self._children[parent]:
+            self._items[k].setSizeHint(QSize(0, 30))
+        if parent in self._items:
+            self._items[parent].setData(PARENT_ROLE, 1)
+
+    def set_group_enabled(self, parent: str, on: bool) -> None:
+        """Show or leave out every page under *parent* at once; turned on,
+        they fold out one after another."""
+        keys = self._children.get(parent, [])
+        was = [k for k in keys if k not in self._off]
+        for k in keys:
+            if on:
+                self._off.discard(k)
+            else:
+                self._off.add(k)
+        self._filter(self.search.text())
+        if not (on and self.animate and not was and not self._searching):
+            return
+        shown = [self._items[k] for k in keys if not self._items[k].isHidden()]
+        for it in shown:
+            it.setHidden(True)
+
+        def reveal(i: int) -> None:
+            for it in shown[:i + 1]:
+                key = it.data(Qt.ItemDataRole.UserRole)
+                if key not in self._off and not self._searching:
+                    it.setHidden(False)
+            self._mark_children()
+        for i in range(len(shown)):
+            QTimer.singleShot(35 * (i + 1), lambda i=i: reveal(i))
+
+    def _mark_children(self) -> None:
+        """The last page showing under each parent ends the rail; a parent
+        with pages showing is unfolded."""
+        for parent, keys in self._children.items():
+            showing = [self._items[k] for k in keys if not self._items[k].isHidden()]
+            for k in keys:
+                self._items[k].setData(CHILD_ROLE, 1)
+            if showing:
+                showing[-1].setData(CHILD_ROLE, 2)
+            if parent in self._items:
+                self._items[parent].setData(PARENT_ROLE, 2 if showing else 1)
+        self.nav.viewport().update()
+
     def arrange(self, sections: list[tuple[str, list[str]]]) -> None:
         """Put the sidebar in this order, under these headings: (heading,
         [page keys]). The pages are built in whatever order their code needs;
@@ -434,7 +617,11 @@ class SettingsShell(QWidget):
             self.nav.takeItem(0)
         self._sections = []
         placed: set[str] = set()
+        under = {k for keys in self._children.values() for k in keys}
         for heading, keys in sections:
+            # A parent's pages come right after it, wherever it is.
+            keys = [k for k in keys if k not in under]
+            keys = [x for k in keys for x in [k, *self._children.get(k, [])]]
             items = [self._items[k] for k in keys if k in self._items]
             if not items:
                 continue
@@ -531,6 +718,7 @@ class SettingsShell(QWidget):
         # A heading goes with the last of its pages.
         for head, items in self._sections:
             head.setHidden(all(it.isHidden() for it in items))
+        self._mark_children()
         for i in range(self.nav.count()):
             if self._page_at(i) is not None and not self.nav.item(i).isHidden():
                 first = i
@@ -608,6 +796,19 @@ QListWidget#SettingsNav::item:selected {{
 QLineEdit#SettingsSearch {{ padding: 7px 10px; border-radius: 9px; }}
 #SettingsPageBody {{ background: {p['bg']}; }}
 QLabel#SettingsTitle {{ font-size: 22px; font-weight: 700; color: {p['text']}; }}
+QPushButton#SettingsCrumb {{
+    background: transparent; border: none; padding: 0; margin: 0 0 2px 0;
+    color: {p.get('nerd', p['accent'])}; font-size: 12px; font-weight: 700;
+    text-align: left;
+}}
+QPushButton#SettingsCrumb:hover {{ text-decoration: underline; }}
+QFrame#NerdPart {{ background: transparent; border: none; border-radius: 10px; }}
+QFrame#NerdPart:hover, QFrame#NerdPart:focus {{ background: {p['hover']}; }}
+QLabel#NerdPartTitle {{ color: {p['text']}; font-weight: 600; }}
+QLabel#NerdPartAbout {{ color: {p['muted']}; font-size: 12px; }}
+QLabel#NerdPartSummary {{ color: {p['muted']}; font-size: 12px; }}
+QLabel#NerdPartSummary[lit="true"] {{ color: {p.get('nerd', p['accent'])}; font-weight: 600; }}
+QLabel#NerdPartArrow {{ color: {p['muted']}; font-size: 16px; }}
 QLabel#SettingsCardTitle {{
     color: {p['text']}; font-size: 14px; font-weight: 600;
     padding: 16px 4px 6px 4px;
@@ -819,13 +1020,13 @@ def _scaled(font: QFont, factor: float) -> QFont:
 
 # -- icons -------------------------------------------------------------------
 
-def page_icon(kind: str, base, size: int = 18) -> QIcon:
-    """The sidebar icon for a page: muted at rest, in the accent's text
-    colour when selected.
+def page_icon(kind: str, base, size: int = 18, tint: str | None = None) -> QIcon:
+    """The sidebar icon for a page: muted at rest (or in *tint*, a
+    group's own), in the accent's text colour when selected.
     *base* draws the kinds the main window already has (gear, home, ...);
     the rest are drawn here."""
     icon = QIcon()
-    for mode, colour in ((QIcon.Mode.Normal, P["text2"]),
+    for mode, colour in ((QIcon.Mode.Normal, tint or P["text2"]),
                          (QIcon.Mode.Selected, P.get("on_accent", "#FFFFFF"))):
         pm = _own_icon(kind, size, colour)
         if pm is None:
@@ -837,7 +1038,7 @@ def page_icon(kind: str, base, size: int = 18) -> QIcon:
 def _own_icon(kind: str, s: int, colour: str) -> QPixmap | None:
     if kind not in ("palette", "play", "subtitles", "picture", "lock",
                     "wrench", "image", "trakt", "nerd", "network", "box",
-                    "knobs", "channels"):
+                    "knobs", "channels", "remote"):
         return None
     scale = 3
     pm = QPixmap(s * scale, s * scale)

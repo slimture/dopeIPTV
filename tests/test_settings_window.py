@@ -231,26 +231,38 @@ def layout(self):
             for i in range(nav.count())]
     keys = [k for k, _f in rows if k]
     assert keys[:4] == ["general", "playlists", "appearance", "home"], keys
-    # Nerd last under System, after Advanced, a category of its own; its
-    # four pages under a NERD heading of their own, left out while it is off.
+    # Nerd last under System, after Advanced; its pages fold out right under
+    # it (no heading of their own), left out while it is off.
     nerd_pages = ["nerd_net", "nerd_boxes", "nerd_lists", "nerd_player", "nerd_rec", "nerd_serve"]
     assert keys[-9:] == ["parental", "advanced", "nerd"] + nerd_pages, keys
     at = {k: i for i, (k, _f) in enumerate(rows) if k}
     assert not nav.item(at["nerd"]).isHidden()
     assert all(nav.item(at[k]).isHidden() for k in nerd_pages)
     heads = [i for i, (k, f) in enumerate(rows) if not k]
-    assert len(heads) == 6 and heads[0] == 0, heads
-    assert nav.item(heads[-1]).isHidden()             # NERD, with nothing under it
-    # Turned on: the pages and their heading appear; off again: gone.
+    assert len(heads) == 5 and heads[0] == 0, heads
+    assert at["nerd_net"] == at["nerd"] + 1
+    from dopeiptv.ui.settings_ui import CHILD_ROLE, PARENT_ROLE
+    # Turned on: they fold out under Nerd, one after another; off again: gone.
     nerd_switch = [x for x in self.findChildren(ToggleSwitch)
                    if x.accessibleName() == tr("nerd_switch")][0]
+    import time as _t
     nerd_switch.setChecked(True)
+    end = _t.monotonic() + 3
+    while any(nav.item(at[k]).isHidden() for k in nerd_pages) and _t.monotonic() < end:
+        app.processEvents()
     assert all(not nav.item(at[k]).isHidden() for k in nerd_pages)
-    assert not nav.item(heads[-1]).isHidden()
+    assert [nav.item(at[k]).data(CHILD_ROLE) for k in nerd_pages] == [1, 1, 1, 1, 1, 2]
+    assert nav.item(at["nerd"]).data(PARENT_ROLE) == 2
     shell.show_page("nerd_player")
     assert shell.current_key() == "nerd_player"
+    # Each says where it belongs, and the way back is a click.
+    player = next(p for p in shell.pages if p.key == "nerd_player")
+    assert player.crumb is not None and player.crumb.text().startswith(tr("nerd_page"))
+    player.crumb.click()
+    assert shell.current_key() == "nerd"
     nerd_switch.setChecked(False)
     assert all(nav.item(at[k]).isHidden() for k in nerd_pages)
+    assert nav.item(at["nerd"]).data(PARENT_ROLE) == 1
     assert all(not (rows[i][1] & Qt.ItemFlag.ItemIsSelectable) for i in heads)
     shell.show_page("playlists")
     assert shell.current_key() == "playlists"
