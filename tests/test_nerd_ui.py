@@ -192,3 +192,62 @@ def test_diagnostics_never_carry_a_secret(app, settings):
     text = diagnostics(settings)
     assert "hunter2" not in text and "s3cr3t" not in text and "10.0.0.1" not in text
     assert "nerd_proxy = (set)" in text and "nerd_spdif = ac3" in text and "Nerd: on" in text
+
+
+def test_the_source_dialog_scrolls_rather_than_outgrow_the_screen(app, settings):
+    """With Nerd on and a source's own options open, the form is taller
+    than a laptop's screen: it scrolls, OK and Cancel stay in view, and it
+    shrinks again when they fold shut."""
+    from PyQt6.QtTest import QTest
+    from PyQt6.QtWidgets import QDialogButtonBox
+
+    from dopeiptv.ui.dialogs import PlaylistDialog
+    settings.setValue("nerd_enabled", "true")
+    nerd.install(settings)
+    d = PlaylistDialog(playlist={"name": "Vu", "kind": "enigma2", "server": "http://10.0.0.2"})
+    d.show()
+    QTest.qWait(30)
+    shut = d.height()
+    d.nerd_panel.toggle.setChecked(True)
+    QTest.qWait(30)
+    screen = d.screen().availableGeometry().height()
+    assert d.frameGeometry().height() <= screen
+    content = d._scroll.widget().sizeHint().height()
+    assert content > d._scroll.viewport().height()          # more than shown...
+    assert d._scroll.verticalScrollBar().maximum() > 0      # ...so it scrolls
+    buttons = d.findChild(QDialogButtonBox)
+    assert buttons.parent() is d and buttons.isVisible()    # never scrolled away
+    d.nerd_panel.toggle.setChecked(False)
+    QTest.qWait(30)
+    assert d.height() == shut
+    d.close()
+
+
+def test_check_now_keeps_the_focus(app, settings):
+    """Pressing Check now (VPN) used to disable it while it looked - and a
+    focused widget that is disabled hands the focus to the next field, the
+    picon folder below, which lit up as if clicked."""
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtTest import QTest
+    from PyQt6.QtWidgets import QPushButton
+
+    from dopeiptv.i18n import tr
+    from dopeiptv.ui import nerd_settings
+    settings.setValue("nerd_enabled", "true")
+    nerd.install(settings)
+    shell, page = _shell()
+    nerd_settings.build(page, settings, QDialog())
+    shell.arrange([("System", ["general", "nerd"])])
+    shell.show_page("nerd")
+    shell.resize(900, 700)
+    shell.show()
+    QTest.qWait(400)                      # the first check, at opening
+    btn = next(b for b in shell.findChildren(QPushButton) if b.text() == tr("nerd_vpn_check"))
+    btn.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+    btn.setFocus()
+    QTest.mouseClick(btn, Qt.MouseButton.LeftButton)
+    QTest.qWait(30)
+    assert QApplication.focusWidget() is btn
+    QTest.qWait(400)
+    assert QApplication.focusWidget() is btn and btn.isEnabled()
+    shell.close()

@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import re
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
-    QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
-    QListWidgetItem, QMessageBox, QProgressBar, QPushButton, QVBoxLayout,
+    QFrame, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
+    QListWidgetItem, QMessageBox, QProgressBar, QPushButton, QScrollArea,
+    QVBoxLayout, QWidget,
 )
 
 from ..i18n import tr
@@ -28,6 +29,37 @@ def stalker_available() -> bool:
         return importlib.util.find_spec("dopeiptv.providers.stalker") is not None
     except (ImportError, ValueError):
         return False
+
+
+class FitScroll(QScrollArea):
+    """A scroll area as tall as what it holds, up to the screen: a dialog
+    around it grows with its content and scrolls once that would not fit
+    (the source form with its Nerd options open is taller than a laptop's
+    screen)."""
+
+    def __init__(self, content: QWidget, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWidget(content)
+        self.setWidgetResizable(True)
+        self.setFrameShape(QFrame.Shape.NoFrame)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # Room the dialog needs around this: its margins, title, buttons.
+        self.reserve = 160
+
+    def _cap(self) -> int:
+        screen = self.screen() or QApplication.primaryScreen()
+        avail = screen.availableGeometry().height() if screen is not None else 800
+        return max(200, int(avail * 0.9) - self.reserve)
+
+    def sizeHint(self) -> QSize:  # noqa: N802 - Qt's name
+        w = self.widget()
+        hint = w.sizeHint() if w is not None else QSize(400, 200)
+        bar = self.verticalScrollBar().sizeHint().width()
+        return QSize(hint.width() + bar, min(hint.height(), self._cap()))
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802 - Qt's name
+        hint = self.sizeHint()
+        return QSize(hint.width(), min(hint.height(), 200))
 
 
 class PlaylistDialog(QDialog):
@@ -52,8 +84,15 @@ class PlaylistDialog(QDialog):
         self.setWindowTitle(tr("playlist_edit_title") if editing
                             else tr("playlist_add_title"))
         self.setMinimumWidth(520)
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(22, 22, 22, 22)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(22, 22, 22, 22)
+        # The form scrolls, the buttons stay: with Nerd on it can be taller
+        # than the screen.
+        body = QWidget()
+        lay = QVBoxLayout(body)
+        lay.setContentsMargins(0, 0, 0, 0)
+        self._scroll = FitScroll(body, self)
+        outer.addWidget(self._scroll, 1)
         form = QFormLayout()
         form.setSpacing(10)
         self.name = QLineEdit(playlist.get("name", ""))
@@ -120,15 +159,27 @@ class PlaylistDialog(QDialog):
             from .source_nerd import SourceNerdPanel
             self.nerd_panel = SourceNerdPanel(self.kind.currentData(), self._options, self)
             lay.addWidget(self.nerd_panel)
+            self.nerd_panel.toggle.toggled.connect(lambda _on: self._fit())
+        lay.addStretch(1)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self._validate)
         buttons.rejected.connect(self.reject)
-        lay.addWidget(buttons)
+        outer.addWidget(buttons)
         self.kind.currentIndexChanged.connect(self._update_kind)
         self._update_kind()
+
+    def _fit(self) -> None:
+        """Grow or shrink with the form (rows shown for the kind, the Nerd
+        options folded open or shut) - after the layouts have taken the
+        change in."""
+        def fit() -> None:
+            self._scroll.widget().adjustSize()
+            self._scroll.updateGeometry()
+            self.adjustSize()
+        QTimer.singleShot(0, fit)
 
     def _update_kind(self) -> None:
         kind = self.kind.currentData()
@@ -158,6 +209,7 @@ class PlaylistDialog(QDialog):
             self.finder.status.hide()
         if getattr(self, "nerd_panel", None) is not None:
             self.nerd_panel.set_kind(kind)
+        self._fit()
 
     def _preset_picked(self, src: dict) -> None:
         idx = self.kind.findData(src["kind"])

@@ -77,15 +77,15 @@ class FindOnNetwork(QPushButton):
         if self._busy:
             return
         from ..providers import lan_scan
+        # Not disabled while it searches: a focused button that is, hands the
+        # focus to the next field (the user name), as if asked to type there.
         self._busy = True
-        self.setEnabled(False)
         self.setText(tr("playlist_searching_network"))
         self.status.hide()
         run_async(QThreadPool.globalInstance(), lan_scan.scan, self._done, self._failed)
 
     def _reset(self) -> None:
         self._busy = False
-        self.setEnabled(True)
         self.setText(tr("playlist_find_on_network"))
 
     def _failed(self, _err=None) -> None:

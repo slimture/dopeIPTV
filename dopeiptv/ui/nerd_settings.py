@@ -136,19 +136,25 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     status.setObjectName("SettingsHint")
     check = QPushButton(tr("nerd_vpn_check"))
 
+    checking = [False]
+
     def show_vpn() -> None:
         # Seen to happen: "Checking…" first, then the answer with the time,
         # so a check that finds the same as before still says it looked.
+        # The button stays enabled: disabled while it has the focus, Qt
+        # hands the focus on to the next field - the picon folder below.
         from PyQt6.QtCore import QTime, QTimer
+        if checking[0]:
+            return
+        checking[0] = True
         status.setText(tr("nerd_vpn_checking"))
-        check.setEnabled(False)
 
         def answer() -> None:
             up = nerd.vpn_interfaces()
             at = QTime.currentTime().toString("HH:mm:ss")
             status.setText((tr("nerd_vpn_up", names=", ".join(up)) if up else tr("nerd_vpn_none"))
                            + f"  ({at})")
-            check.setEnabled(True)
+            checking[0] = False
         QTimer.singleShot(250, answer)
     check.clicked.connect(show_vpn)
     row = QHBoxLayout()
