@@ -28,12 +28,14 @@ body { margin: 0; background: var(--page); color: var(--text);
 h2 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
 .muted { color: var(--muted); font-size: 13px; }
 
-.top { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
-  gap: 10px 12px; padding: 12px max(16px, calc((100vw - 1120px) / 2)); background: color-mix(in srgb, var(--page) 86%, transparent);
+/* The bar: the name and the sections (Statistics, Builds, Feedback,
+   Account) on top; under them, Statistics' own views and the period, set
+   under the sections. On a phone each is a line of its own. */
+.top { position: sticky; top: 0; z-index: 5; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center;
+  column-gap: 20px; padding: 12px max(16px, calc((100vw - 1120px) / 2 + 16px)); background: color-mix(in srgb, var(--page) 86%, transparent);
   backdrop-filter: saturate(1.6) blur(14px); -webkit-backdrop-filter: saturate(1.6) blur(14px);
   border-bottom: 1px solid var(--line); }
-/* The name never gives way: when the tabs and the period do not fit beside
-   it, the period goes to a line of its own (and on a phone the tabs too). */
+.lead { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .brand { display: flex; align-items: center; gap: 9px; flex: none; }
 .brand img { border-radius: 7px; flex: none; }
 .brand .name { font-weight: 700; letter-spacing: -.02em; }
@@ -140,12 +142,35 @@ tr:last-child td { border-bottom: 0; }
 .foot { margin: 8px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
 .foot a { color: inherit; }
 .tab { display: flex; flex-direction: column; gap: 16px; }
-.tabs { display: inline-flex; gap: 2px; margin-inline-end: auto; margin-inline-start: 12px; max-width: 100%;
-  overflow-x: auto; scrollbar-width: none; }
+/* The sections: the one shown filled. */
+.tabs { display: flex; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
-.tabs button { font: inherit; font-size: 14px; font-weight: 600; border: 0; background: none; color: var(--text-2);
-  padding: 6px 12px; border-radius: 8px; cursor: pointer; }
-.tabs button[aria-selected="true"] { color: var(--text); background: color-mix(in srgb, var(--text) 8%, transparent); }
+.tabs a { display: inline-flex; align-items: center; font-size: 14px; font-weight: 600; color: var(--text-2); text-decoration: none;
+  padding: 6px 12px; border-radius: 8px; white-space: nowrap; }
+.tabs a[aria-current] { color: var(--text); background: color-mix(in srgb, var(--text) 9%, transparent); }
+.tabs a:focus-visible, .subtabs a:focus-visible, .range button:focus-visible, .nav-back:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: -2px; }
+/* Statistics' views, under the sections: smaller, the one shown underlined
+   where the bar ends. The period beside them, at the end of the line. */
+.subbar { grid-column: 2; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; min-height: 50px;
+  margin: 6px 0 -12px; padding: 4px 0 8px; }
+.subtabs { display: flex; gap: 14px; align-self: stretch; margin: 0 0 -8px 8px; }
+.subtabs a { display: flex; align-items: center; font-size: 13.5px; font-weight: 600; color: var(--text-2); text-decoration: none;
+  padding: 0 4px 8px; border-bottom: 2px solid transparent; white-space: nowrap; }
+@media (hover: hover) {
+  .tabs a:hover { color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }
+  .tabs a[aria-current]:hover { background: color-mix(in srgb, var(--text) 9%, transparent); }
+  .subtabs a:hover { color: var(--text); }
+}
+.subtabs a[aria-current] { color: var(--text); border-bottom-color: var(--accent); }
+.subbar .range { margin-inline-start: auto; }
+/* A tablet: the second line from the edge, so the views and the period
+   still share it (the period's short names where even that is narrow). */
+@media (min-width: 601px) and (max-width: 880px) {
+  .subbar { grid-column: 1 / -1; }
+  .subtabs { margin-inline-start: -4px; }
+}
+@media (min-width: 601px) and (max-width: 660px) { .range .l { display: none; } .range .s { display: inline; } }
 .card .muted { margin: 10px 0 0; }
 
 /* The visitor log: one visit a row, opened for its pages and facts. */
@@ -227,14 +252,16 @@ tr:last-child td { border-bottom: 0; }
   .lists { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 600px) {
-  .top { padding: 10px 16px; }
+  .top { grid-template-columns: minmax(0, 1fr); row-gap: 6px; padding: 10px 16px; }
   .brand .sub { display: none; }
+  .tabs a { flex: 1 1 auto; justify-content: center; padding: 5px 8px; }
+  .subbar { grid-column: 1; min-height: 0; margin: 0; padding: 0; gap: 6px; }
+  .subtabs { flex: 1 0 100%; align-self: auto; margin: 0; padding-inline: 4px; }
+  .subtabs a { padding: 3px 4px 5px; }
   .range { width: 100%; }
   .range button { flex: 1; padding: 6px 4px; font-size: 12.5px; }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .kpi:first-child { grid-column: 1 / -1; }
-  .tabs { margin-inline-start: 0; }
-  .tabs button { white-space: nowrap; }
   .visit summary { grid-template-columns: 52px minmax(0, 1fr); }
   .v-what, .v-from, .v-pages, .v-tags { grid-column: 2 / -1; }
   .kpi .value { font-size: 24px; }
@@ -668,7 +695,7 @@ tr:last-child td { border-bottom: 0; }
 .account > .msg { order: 99; position: sticky; bottom: 16px; z-index: 4; box-shadow: 0 6px 20px rgba(0, 0, 0, .15);
   background: color-mix(in srgb, var(--down) 12%, var(--surface)); }
 .account > .msg.ok { background: color-mix(in srgb, var(--up) 14%, var(--surface)); }
-@media (max-width: 380px) { .tabs button { padding: 6px 7px; font-size: 13.5px; } }
+@media (max-width: 380px) { .tabs { gap: 0; } .tabs a { padding: 5px 5px; font-size: 13.5px; } }
 
 /* -- the Builds tab: the release and the test builds, each file to fetch or pass on -- */
 .builds { display: flex; flex-direction: column; gap: 10px; }
@@ -717,13 +744,9 @@ tr:last-child td { border-bottom: 0; }
 .facts a.ext { color: var(--accent); text-decoration: none; }
 .facts a.ext:hover { text-decoration: underline; }
 
-/* -- the parts of the page: Statistics (its four tabs), Feedback, Account ------ */
-.tabs .tab-group { align-self: center; font-size: 11px; font-weight: 750; letter-spacing: .07em; text-transform: uppercase;
-  color: var(--muted); padding: 0 6px 0 2px; white-space: nowrap; }
-.tabs .tab-sep { align-self: center; width: 1px; height: 18px; margin: 0 6px; background: var(--line); }
+/* -- the sections' marks: what Feedback has not had read yet ----------------- */
 .tabs .tab-count { display: inline-block; min-width: 18px; margin-inline-start: 6px; padding: 0 5px; border-radius: 999px;
   font-size: 11px; line-height: 18px; text-align: center; color: #fff; background: var(--heart); }
-@media (max-width: 600px) { .tabs .tab-group { display: none; } }
 
 /* -- Feedback: error reports and what people wrote ---------------------------- */
 .fb-summary .big.crash .value { color: var(--down); }

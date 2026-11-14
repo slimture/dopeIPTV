@@ -21,28 +21,32 @@
 </head>
 <body>
 <header class="top">
-  <button type="button" class="nav-back" id="nav-back" hidden aria-label="Back"><span aria-hidden="true">‹</span><span class="l">Back</span></button>
-  <div class="brand">
-    <img src="/favicon.svg?v=2" alt="" width="28" height="28">
-    <span class="name">dopeIPTV</span><span class="sub">Admin</span>
+  <div class="lead">
+    <button type="button" class="nav-back" id="nav-back" hidden aria-label="Back"><span aria-hidden="true">‹</span><span class="l">Back</span></button>
+    <div class="brand">
+      <img src="/favicon.svg?v=2" alt="" width="28" height="28">
+      <span class="name">dopeIPTV</span><span class="sub">Admin</span>
+    </div>
   </div>
-  <div class="tabs" role="tablist">
-    <span class="tab-group" aria-hidden="true">Statistics</span>
-    <button type="button" role="tab" data-tab="overview" aria-selected="true">Overview</button>
-    <button type="button" role="tab" data-tab="visitors" aria-selected="false">Visitors</button>
-    <button type="button" role="tab" data-tab="analysis" aria-selected="false">Analysis</button>
-    <button type="button" role="tab" data-tab="builds" aria-selected="false">Builds</button>
-    <span class="tab-sep" aria-hidden="true"></span>
-    <button type="button" role="tab" data-tab="feedback" aria-selected="false">Feedback<span class="tab-count" id="fb-count" hidden></span></button>
-    <span class="tab-sep" aria-hidden="true"></span>
-    <button type="button" role="tab" data-tab="account" aria-selected="false">Account</button>
-  </div>
-  <div class="range" role="radiogroup" aria-label="Period">
-    <button type="button" role="radio" data-days="7"><span class="l">7 days</span><span class="s" aria-hidden="true">7 d</span></button>
-    <button type="button" role="radio" data-days="30"><span class="l">30 days</span><span class="s" aria-hidden="true">30 d</span></button>
-    <button type="button" role="radio" data-days="90"><span class="l">90 days</span><span class="s" aria-hidden="true">90 d</span></button>
-    <button type="button" role="radio" data-days="365"><span class="l">12 months</span><span class="s" aria-hidden="true">1 yr</span></button>
-    <button type="button" role="radio" data-days="0">All</button>
+  <nav class="tabs" aria-label="Admin">
+    <a href="#statistics" data-section="statistics" aria-current="true">Statistics</a>
+    <a href="#builds" data-tab="builds">Builds</a>
+    <a href="#feedback" data-tab="feedback">Feedback<span class="tab-count" id="fb-count" hidden></span></a>
+    <a href="#account" data-tab="account">Account</a>
+  </nav>
+  <div class="subbar" id="subbar">
+    <nav class="subtabs" id="subtabs" aria-label="Statistics">
+      <a href="#overview" data-tab="overview" aria-current="page">Overview</a>
+      <a href="#visitors" data-tab="visitors">Visitors</a>
+      <a href="#analysis" data-tab="analysis">Analysis</a>
+    </nav>
+    <div class="range" role="radiogroup" aria-label="Period">
+      <button type="button" role="radio" data-days="7"><span class="l">7 days</span><span class="s" aria-hidden="true">7 d</span></button>
+      <button type="button" role="radio" data-days="30"><span class="l">30 days</span><span class="s" aria-hidden="true">30 d</span></button>
+      <button type="button" role="radio" data-days="90"><span class="l">90 days</span><span class="s" aria-hidden="true">90 d</span></button>
+      <button type="button" role="radio" data-days="365"><span class="l">12 months</span><span class="s" aria-hidden="true">1 yr</span></button>
+      <button type="button" role="radio" data-days="0">All</button>
+    </div>
   </div>
 </header>
 

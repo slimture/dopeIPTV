@@ -61,6 +61,16 @@
     const saved = localStorage.getItem("admin-days");
     if (saved !== null && RANGES.indexOf(Number(saved)) >= 0) { days = Number(saved); }
   } catch (e) { /* default */ }
+  // The page's sections: Statistics holds three views, the rest are one
+  // each. The period applies where it says (the visitor log has its own).
+  const STATS = ["overview", "visitors", "analysis"];
+  const WITH_RANGE = ["overview", "analysis", "feedback"];
+  // Statistics opens where it was left, in this browser.
+  let lastStats = "overview";
+  try {
+    const saved = localStorage.getItem("admin-stats-view");
+    if (STATS.indexOf(saved) >= 0) { lastStats = saved; }
+  } catch (e) { /* the overview then */ }
 
   function mk(tag, cls, text) {
     const n = document.createElement(tag);
@@ -1305,16 +1315,31 @@
         writeHash();
       });
   }
+  // Where the page is, in the bar: the section (Statistics while one of its
+  // views shows: "true", the view itself "page"), its views, the period.
+  function markNav(name) {
+    const inStats = STATS.indexOf(name) >= 0;
+    document.querySelectorAll(".tabs a, .subtabs a").forEach((a) => {
+      const on = a.dataset.section === "statistics" ? (inStats ? "true" : "") : a.dataset.tab === name ? "page" : "";
+      if (on) { a.setAttribute("aria-current", on); } else { a.removeAttribute("aria-current"); }
+    });
+    $("subtabs").hidden = !inStats;
+    document.querySelector(".range").hidden = WITH_RANGE.indexOf(name) < 0;
+    $("subbar").hidden = !inStats && WITH_RANGE.indexOf(name) < 0;
+  }
   function setTab(name, keepLog) {
     tab = name;
-    document.querySelectorAll(".tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === name ? "true" : "false"));
+    markNav(name);
+    if (started && STATS.indexOf(name) >= 0 && name !== lastStats) {
+      lastStats = name;
+      try { localStorage.setItem("admin-stats-view", name); } catch (e) { /* this time only */ }
+    }
     $("tab-overview").hidden = name !== "overview";
     $("tab-visitors").hidden = name !== "visitors";
     $("tab-analysis").hidden = name !== "analysis";
     $("tab-account").hidden = name !== "account";
     $("tab-builds").hidden = name !== "builds";
     $("tab-feedback").hidden = name !== "feedback";
-    document.querySelector(".range").hidden = name === "visitors" || name === "account" || name === "builds";
     if (name === "feedback") {
       if (window.AdminFeedback) { window.AdminFeedback.show(); } else {
         $("fb-status").textContent = "The Feedback tab's script did not load. The service on the server serves it " +
@@ -1424,6 +1449,11 @@
       return setTab("analysis");
     }
     if (name === "account" || name === "builds") { return setTab(name); }
+    // The section by its name: the view last used in it.
+    if (name === "statistics" && lastStats !== "overview") {
+      if (lastStats === "visitors") { return setTab("visitors"); }
+      if (window.AdminAnalysis) { return setTab("analysis"); }
+    }
     setTab("overview");
   }
 
@@ -1458,9 +1488,16 @@
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => { if (data) { visitsChart(); downloadsChart(); } }, 120);
   });
-  document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
-    if (b.dataset.tab !== tab) { navStep(); }
-    setTab(b.dataset.tab);
+  // The sections and Statistics' views are links (#builds, #visitors...),
+  // so one opens in a new tab as well; a plain click moves here, a step in
+  // the history like any other.
+  document.querySelectorAll(".tabs a, .subtabs a").forEach((a) => a.addEventListener("click", (e) => {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) { return; }
+    e.preventDefault();
+    if (a.dataset.section === "statistics" && STATS.indexOf(tab) >= 0) { return; }    // in it already
+    const to = a.dataset.section === "statistics" ? lastStats : a.dataset.tab;
+    if (to !== tab) { navStep(); }
+    setTab(to);
   }));
   $("nav-back").addEventListener("click", () => history.back());
   $("day-pick").addEventListener("change", (e) => loadDay(e.target.value));
