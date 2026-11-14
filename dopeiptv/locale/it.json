@@ -1427,5 +1427,13 @@
   "nerd_ck_post_missing": "Programma inesistente: {name}",
   "nerd_ck_post_slow": "Ancora in corso dopo {s} s – va bene per un lavoro lungo.",
   "nerd_ck_post_code": "Il comando è finito con il codice {code}.",
-  "nerd_ck_post_ok": "Il comando è partito · {ms} ms"
+  "nerd_ck_post_ok": "Il comando è partito · {ms} ms",
+  "nerd_card_failover": "Riserva",
+  "nerd_failover": "Prova il canale in un'altra sorgente",
+  "nerd_failover_hint": "Quando un canale non parte dopo le solite riconnessioni, parte lo stesso canale da un'altra tua sorgente, riconosciuto dall'id della guida o dal nome.",
+  "nerd_ck_title_failover": "Riserva",
+  "nerd_ck_failover_ok": "{n} altre sorgenti da provare: {names}",
+  "nerd_ck_failover_none": "Nessun'altra sorgente di riserva: aggiungine una seconda.",
+  "failover_looking": "{name} non parte – lo cerco nelle tue altre sorgenti…",
+  "failover_playing": "{name} non è partito qui – lo riproduco da {source}."
 }

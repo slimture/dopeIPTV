@@ -72,7 +72,8 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
           show_pages: Callable[[bool], None] | None = None,
           source: Callable[[], dict | None] | None = None,
           channels: Callable[[], list[dict]] | None = None,
-          rec_dir: Callable[[], str] | None = None) -> Callable[[Callable[[str, Any], None]], None]:
+          rec_dir: Callable[[], str] | None = None,
+          playlists: Callable[[], tuple[list[dict], str | None]] | None = None) -> Callable[[Callable[[str, Any], None]], None]:
     """*page* is Nerd's own: the switch, how it works, stats, diagnostics.
     *pages* ("net", "boxes", "lists", "player", "rec") take the rest, shown by
     *show_pages* while Nerd is on; without them it all goes on *page*.
@@ -293,6 +294,20 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     c.row("udpxy", udpxy, tr("nerd_udpxy_hint"), search="multicast udp rtp IPTV", below=ux_line)
     c.note(tr("nerd_applies_reload"))
 
+    # -- channels: failover ----------------------------------------------------------------
+    from ..core import failover
+    c = at("lists").card(tr("nerd_card_failover"))
+    fail_on = ToggleSwitch(n.flag("nerd_failover"))
+    fail_on.setAccessibleName(tr("nerd_failover"))
+
+    def failover_job() -> Any:
+        pls, active = playlists() if playlists is not None else ([], None)
+        return lambda: failover.check_sources(pls, active)
+    fo_line = check(failover_job, tr("nerd_ck_title_failover"))
+    c.row(tr("nerd_failover"), fail_on, tr("nerd_failover_hint"),
+          search="failover backup another source fallback", below=fo_line)
+    c.note(tr("nerd_applies_stream"))
+
     # -- channels: guide -------------------------------------------------------------------
     c = at("lists").card(tr("nerd_card_guide"))
     c.note(tr("nerd_epg_multi"))
@@ -497,6 +512,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
         put("nerd_adelay_per_channel", "true" if adelay.isChecked() else "false")
         put("nerd_rec_template", template.text().strip())
         put("nerd_rec_post", post.text().strip())
+        put("nerd_failover", "true" if fail_on.isChecked() else "false")
         return out
 
     # Off: the switch and what Nerd holds, nothing else. On: all of it - on

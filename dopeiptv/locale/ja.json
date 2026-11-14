@@ -1427,5 +1427,13 @@
   "nerd_ck_post_missing": "そのプログラムはありません：{name}",
   "nerd_ck_post_slow": "{s}秒後もまだ実行中です。長い処理なら問題ありません。",
   "nerd_ck_post_code": "コマンドはコード{code}で終了しました。",
-  "nerd_ck_post_ok": "コマンドを実行しました · {ms} ms"
+  "nerd_ck_post_ok": "コマンドを実行しました · {ms} ms",
+  "nerd_card_failover": "予備",
+  "nerd_failover": "別のソースでチャンネルを試す",
+  "nerd_failover_hint": "通常の再接続でもチャンネルが再生できないとき、ほかのソースの同じチャンネルを再生します。番組表IDか名前で照合します。",
+  "nerd_ck_title_failover": "予備",
+  "nerd_ck_failover_ok": "試せるほかのソース（{n}）：{names}",
+  "nerd_ck_failover_none": "切り替え先のソースがありません。もう一つ追加してください。",
+  "failover_looking": "{name}を再生できません。ほかのソースで探しています…",
+  "failover_playing": "{name}はここで再生できなかったため、{source}から再生しています。"
 }

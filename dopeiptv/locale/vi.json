@@ -1427,5 +1427,13 @@
   "nerd_ck_post_missing": "Không có chương trình: {name}",
   "nerd_ck_post_slow": "Vẫn chạy sau {s} giây – ổn với việc dài.",
   "nerd_ck_post_code": "Lệnh kết thúc với mã {code}.",
-  "nerd_ck_post_ok": "Lệnh đã chạy · {ms} ms"
+  "nerd_ck_post_ok": "Lệnh đã chạy · {ms} ms",
+  "nerd_card_failover": "Dự phòng",
+  "nerd_failover": "Thử kênh ở nguồn khác",
+  "nerd_failover_hint": "Khi một kênh không phát được sau các lần kết nối lại thông thường, cùng kênh đó sẽ phát từ một nguồn khác của bạn – nhận ra qua id lịch phát sóng hoặc tên.",
+  "nerd_ck_title_failover": "Dự phòng",
+  "nerd_ck_failover_ok": "{n} nguồn khác để thử: {names}",
+  "nerd_ck_failover_none": "Không có nguồn dự phòng – hãy thêm nguồn thứ hai.",
+  "failover_looking": "{name} không phát được – đang tìm ở các nguồn khác…",
+  "failover_playing": "{name} không phát được ở đây – đang phát từ {source}."
 }

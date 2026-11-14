@@ -1427,5 +1427,13 @@
   "nerd_ck_post_missing": "لا يوجد برنامج بهذا الاسم: {name}",
   "nerd_ck_post_slow": "ما زال يعمل بعد {s} ث – لا بأس لمهمة طويلة.",
   "nerd_ck_post_code": "انتهى الأمر بالرمز {code}.",
-  "nerd_ck_post_ok": "نُفّذ الأمر · {ms} مللي ثانية"
+  "nerd_ck_post_ok": "نُفّذ الأمر · {ms} مللي ثانية",
+  "nerd_card_failover": "البديل",
+  "nerd_failover": "جرّب القناة في مصدر آخر",
+  "nerd_failover_hint": "عندما لا تعمل قناة بعد محاولات إعادة الاتصال المعتادة، تعمل القناة نفسها من مصدر آخر لديك – تُعرف بمعرّف الدليل أو الاسم.",
+  "nerd_ck_title_failover": "البديل",
+  "nerd_ck_failover_ok": "مصادر أخرى للتجربة ({n}): {names}",
+  "nerd_ck_failover_none": "لا يوجد مصدر بديل – أضف مصدرًا ثانيًا.",
+  "failover_looking": "{name} لا تعمل – جارٍ البحث في مصادرك الأخرى…",
+  "failover_playing": "لم تعمل {name} هنا – تُشغَّل من {source}."
 }

@@ -1427,5 +1427,13 @@
   "nerd_ck_post_missing": "Programa não encontrado: {name}",
   "nerd_ck_post_slow": "Ainda rodando após {s} s – normal para uma tarefa longa.",
   "nerd_ck_post_code": "O comando terminou com o código {code}.",
-  "nerd_ck_post_ok": "O comando rodou · {ms} ms"
+  "nerd_ck_post_ok": "O comando rodou · {ms} ms",
+  "nerd_card_failover": "Reserva",
+  "nerd_failover": "Tentar o canal em outra fonte",
+  "nerd_failover_hint": "Quando um canal não toca após as reconexões de sempre, o mesmo canal de outra das suas fontes toca no lugar – reconhecido pelo id do guia ou pelo nome.",
+  "nerd_ck_title_failover": "Reserva",
+  "nerd_ck_failover_ok": "{n} outras fontes para tentar: {names}",
+  "nerd_ck_failover_none": "Nenhuma outra fonte de reserva – adicione uma segunda.",
+  "failover_looking": "{name} não toca – procurando nas suas outras fontes…",
+  "failover_playing": "{name} não tocou aqui – tocando de {source}."
 }

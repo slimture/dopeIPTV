@@ -1427,5 +1427,13 @@
   "nerd_ck_post_missing": "Nema takvog programa: {name}",
   "nerd_ck_post_slow": "Još radi nakon {s} s – u redu za dug posao.",
   "nerd_ck_post_code": "Naredba je završila kodom {code}.",
-  "nerd_ck_post_ok": "Naredba je pokrenuta · {ms} ms"
+  "nerd_ck_post_ok": "Naredba je pokrenuta · {ms} ms",
+  "nerd_card_failover": "Pričuva",
+  "nerd_failover": "Pokušaj kanal u drugom izvoru",
+  "nerd_failover_hint": "Kad kanal ne krene ni nakon uobičajenih ponovnih spajanja, isti kanal kreće iz drugog tvog izvora – prepoznat po ID-u vodiča ili nazivu.",
+  "nerd_ck_title_failover": "Pričuva",
+  "nerd_ck_failover_ok": "Drugih izvora za pokušaj: {n} – {names}",
+  "nerd_ck_failover_none": "Nema drugog izvora za pričuvu – dodaj još jedan.",
+  "failover_looking": "{name} ne kreće – tražim u tvojim drugim izvorima…",
+  "failover_playing": "{name} nije krenuo ovdje – reproducira se iz {source}."
 }

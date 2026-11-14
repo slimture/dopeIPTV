@@ -1739,7 +1739,9 @@ class _SettingsMixin:
             pages=nerd_pages, show_pages=show_nerd_pages,
             source=lambda: self.playlist_store.active() if self.playlist_store else None,
             channels=lambda: nerd_client.live_streams(None),
-            rec_dir=lambda: self.rec.directory())
+            rec_dir=lambda: self.rec.directory(),
+            playlists=lambda: ((self.playlist_store.playlists(), self.playlist_store.active_id)
+                               if self.playlist_store else ([], None)))
 
         # -- the playlist page's behaviour -------------------------------------
         def reload_pl_list():

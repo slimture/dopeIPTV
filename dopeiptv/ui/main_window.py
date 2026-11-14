@@ -61,6 +61,7 @@ from .mw_trakt import _TraktMixin
 from .mw_recording import _RecordingMixin
 from .mw_busy import _BusyMixin
 from .mw_cast import _CastMixin
+from .mw_failover import _FailoverMixin
 from .mw_privacy import _PrivacyMixin
 from .mw_commands import _CommandsMixin
 from .mw_box import _BoxMixin
@@ -109,7 +110,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _LocalFilesMixin,
                  _PopoutMixin, _MultiviewMixin, _HomeMixin, _MprisMixin,
                  _FollowMixin, _SubtitlesMixin, _CastMixin, _DonateMixin,
-                 _BoxMixin, _CommandsMixin, _PrivacyMixin, QMainWindow):
+                 _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
+                 QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
     epg_progress = pyqtSignal(int)
@@ -4688,6 +4690,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         if kind != "local" and self._vpn_guard_blocks():
             return
+        self._failover_leave(url, key)
         # A click that led here also armed the auto-preview timer; kill it so
         # a pending preview can't fire 350 ms later and stomp this playback.
         if hasattr(self, "_preview_timer"):
@@ -5051,6 +5054,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self.player:
             self.player.current_url = None
         url = (lp or {}).get("url")
+        # Nerd: the same channel from another source, before giving up.
+        if url and self._try_failover(lambda u=url: self._diagnose_stream_failure(u)):
+            return
         if url:
             # mpv's "loading failed" is opaque. Probe the account and the stream
             # URL in the background and report the real reason in plain language

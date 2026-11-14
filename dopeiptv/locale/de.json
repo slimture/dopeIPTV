@@ -1427,5 +1427,13 @@
   "nerd_ck_post_missing": "Kein solches Programm: {name}",
   "nerd_ck_post_slow": "Läuft nach {s} s noch – für eine lange Aufgabe in Ordnung.",
   "nerd_ck_post_code": "Der Befehl endete mit Code {code}.",
-  "nerd_ck_post_ok": "Der Befehl lief · {ms} ms"
+  "nerd_ck_post_ok": "Der Befehl lief · {ms} ms",
+  "nerd_card_failover": "Ausweichen",
+  "nerd_failover": "Sender in einer anderen Quelle versuchen",
+  "nerd_failover_hint": "Spielt ein Sender auch nach den üblichen Neuverbindungen nicht, läuft derselbe Sender aus einer deiner anderen Quellen – erkannt an Guide-ID oder Name.",
+  "nerd_ck_title_failover": "Ausweichen",
+  "nerd_ck_failover_ok": "{n} andere Quellen zum Versuchen: {names}",
+  "nerd_ck_failover_none": "Keine andere Quelle zum Ausweichen – füge eine zweite hinzu.",
+  "failover_looking": "{name} spielt nicht – suche in deinen anderen Quellen…",
+  "failover_playing": "{name} spielte hier nicht – läuft jetzt aus {source}."
 }

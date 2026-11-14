@@ -1427,5 +1427,13 @@
   "nerd_ck_post_missing": "Hakuna programu hiyo: {name}",
   "nerd_ck_post_slow": "Bado inaendelea baada ya sekunde {s} – sawa kwa kazi ndefu.",
   "nerd_ck_post_code": "Amri ilimalizika na msimbo {code}.",
-  "nerd_ck_post_ok": "Amri iliendeshwa · {ms} ms"
+  "nerd_ck_post_ok": "Amri iliendeshwa · {ms} ms",
+  "nerd_card_failover": "Akiba",
+  "nerd_failover": "Jaribu chaneli kwenye chanzo kingine",
+  "nerd_failover_hint": "Chaneli isipocheza hata baada ya kuunganisha upya kwa kawaida, chaneli hiyo hiyo kutoka chanzo chako kingine inacheza – inatambuliwa kwa kitambulisho cha mwongozo au jina.",
+  "nerd_ck_title_failover": "Akiba",
+  "nerd_ck_failover_ok": "Vyanzo vingine {n} vya kujaribu: {names}",
+  "nerd_ck_failover_none": "Hakuna chanzo kingine cha akiba – ongeza cha pili.",
+  "failover_looking": "{name} haichezi – inatafutwa kwenye vyanzo vyako vingine…",
+  "failover_playing": "{name} haikucheza hapa – inacheza kutoka {source}."
 }

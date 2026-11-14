@@ -1427,5 +1427,13 @@
   "nerd_ck_post_missing": "Böyle bir program yok: {name}",
   "nerd_ck_post_slow": "{s} sn sonra hâlâ çalışıyor – uzun bir iş için sorun değil.",
   "nerd_ck_post_code": "Komut {code} koduyla bitti.",
-  "nerd_ck_post_ok": "Komut çalıştı · {ms} ms"
+  "nerd_ck_post_ok": "Komut çalıştı · {ms} ms",
+  "nerd_card_failover": "Yedek",
+  "nerd_failover": "Kanalı başka bir kaynakta dene",
+  "nerd_failover_hint": "Bir kanal olağan yeniden bağlanmalardan sonra da açılmazsa, aynı kanal diğer kaynaklarından birinden açılır – rehber kimliği ya da adıyla eşleşir.",
+  "nerd_ck_title_failover": "Yedek",
+  "nerd_ck_failover_ok": "Denenecek {n} kaynak daha: {names}",
+  "nerd_ck_failover_none": "Geçilecek başka kaynak yok – ikinci bir kaynak ekle.",
+  "failover_looking": "{name} açılmıyor – diğer kaynaklarında aranıyor…",
+  "failover_playing": "{name} burada açılmadı – {source} üzerinden oynatılıyor."
 }

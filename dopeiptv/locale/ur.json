@@ -1427,5 +1427,13 @@
   "nerd_ck_post_missing": "ایسا کوئی پروگرام نہیں: {name}",
   "nerd_ck_post_slow": "{s} سیکنڈ بعد بھی چل رہی ہے – لمبے کام کے لیے ٹھیک ہے۔",
   "nerd_ck_post_code": "کمانڈ کوڈ {code} پر ختم ہوئی۔",
-  "nerd_ck_post_ok": "کمانڈ چلی · {ms} ms"
+  "nerd_ck_post_ok": "کمانڈ چلی · {ms} ms",
+  "nerd_card_failover": "متبادل",
+  "nerd_failover": "چینل کسی اور ذریعے میں آزمائیں",
+  "nerd_failover_hint": "جب کوئی چینل معمول کی دوبارہ کنکشن کوششوں کے بعد بھی نہ چلے، تو وہی چینل آپ کے کسی اور ذریعے سے چلتا ہے – گائیڈ آئی ڈی یا نام سے پہچانا جاتا ہے۔",
+  "nerd_ck_title_failover": "متبادل",
+  "nerd_ck_failover_ok": "آزمانے کے لیے مزید {n} ذرائع: {names}",
+  "nerd_ck_failover_none": "متبادل کے لیے کوئی اور ذریعہ نہیں – دوسرا شامل کریں۔",
+  "failover_looking": "{name} نہیں چل رہا – آپ کے دوسرے ذرائع میں ڈھونڈا جا رہا ہے…",
+  "failover_playing": "{name} یہاں نہیں چلا – {source} سے چل رہا ہے۔"
 }

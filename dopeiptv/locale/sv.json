@@ -1427,5 +1427,13 @@
   "nerd_ck_post_missing": "Programmet finns inte: {name}",
   "nerd_ck_post_slow": "Kör fortfarande efter {s} s – helt okej för ett långt jobb.",
   "nerd_ck_post_code": "Kommandot slutade med kod {code}.",
-  "nerd_ck_post_ok": "Kommandot kördes · {ms} ms"
+  "nerd_ck_post_ok": "Kommandot kördes · {ms} ms",
+  "nerd_card_failover": "Reserv",
+  "nerd_failover": "Prova kanalen i en annan källa",
+  "nerd_failover_hint": "När en kanal inte vill spela efter de vanliga återanslutningarna spelas samma kanal från en av dina andra källor i stället – matchad på guide-id eller namn.",
+  "nerd_ck_title_failover": "Reserv",
+  "nerd_ck_failover_ok": "{n} andra källor att prova: {names}",
+  "nerd_ck_failover_none": "Ingen annan källa att byta till – lägg till en till.",
+  "failover_looking": "{name} vill inte spela – letar i dina andra källor…",
+  "failover_playing": "{name} spelade inte här – spelar den från {source}."
 }

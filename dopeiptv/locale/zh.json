@@ -1427,5 +1427,13 @@
   "nerd_ck_post_missing": "没有这个程序：{name}",
   "nerd_ck_post_slow": "{s} 秒后仍在运行——长任务没问题。",
   "nerd_ck_post_code": "命令以代码 {code} 结束。",
-  "nerd_ck_post_ok": "命令已运行 · {ms} 毫秒"
+  "nerd_ck_post_ok": "命令已运行 · {ms} 毫秒",
+  "nerd_card_failover": "备用",
+  "nerd_failover": "在其他来源中尝试该频道",
+  "nerd_failover_hint": "当频道在常规重连后仍无法播放时，改为播放你其他来源中的同一频道——按节目单 ID 或名称匹配。",
+  "nerd_ck_title_failover": "备用",
+  "nerd_ck_failover_ok": "可尝试的其他来源（{n}）：{names}",
+  "nerd_ck_failover_none": "没有可切换的其他来源——请再添加一个。",
+  "failover_looking": "{name} 无法播放——正在你的其他来源中查找…",
+  "failover_playing": "{name} 在这里无法播放——改为从 {source} 播放。"
 }

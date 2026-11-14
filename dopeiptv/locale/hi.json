@@ -1427,5 +1427,13 @@
   "nerd_ck_post_missing": "ऐसा कोई प्रोग्राम नहीं: {name}",
   "nerd_ck_post_slow": "{s} सेकंड बाद भी चल रही है – लंबे काम के लिए ठीक है।",
   "nerd_ck_post_code": "कमांड कोड {code} के साथ खत्म हुई।",
-  "nerd_ck_post_ok": "कमांड चली · {ms} ms"
+  "nerd_ck_post_ok": "कमांड चली · {ms} ms",
+  "nerd_card_failover": "विकल्प",
+  "nerd_failover": "चैनल को दूसरे स्रोत में आज़माएँ",
+  "nerd_failover_hint": "जब कोई चैनल सामान्य दोबारा जुड़ने के बाद भी न चले, तो वही चैनल आपके किसी दूसरे स्रोत से चलता है – गाइड आईडी या नाम से पहचाना जाता है।",
+  "nerd_ck_title_failover": "विकल्प",
+  "nerd_ck_failover_ok": "आज़माने के लिए {n} और स्रोत: {names}",
+  "nerd_ck_failover_none": "विकल्प के लिए कोई और स्रोत नहीं – दूसरा जोड़ें।",
+  "failover_looking": "{name} नहीं चल रहा – आपके दूसरे स्रोतों में खोजा जा रहा है…",
+  "failover_playing": "{name} यहाँ नहीं चला – {source} से चल रहा है।"
 }

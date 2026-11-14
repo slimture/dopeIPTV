@@ -1427,5 +1427,13 @@
   "nerd_ck_post_missing": "그런 프로그램이 없습니다: {name}",
   "nerd_ck_post_slow": "{s}초가 지나도 실행 중 – 긴 작업이면 괜찮습니다.",
   "nerd_ck_post_code": "명령이 코드 {code}로 끝났습니다.",
-  "nerd_ck_post_ok": "명령 실행됨 · {ms} ms"
+  "nerd_ck_post_ok": "명령 실행됨 · {ms} ms",
+  "nerd_card_failover": "예비",
+  "nerd_failover": "다른 소스에서 채널 시도",
+  "nerd_failover_hint": "평소처럼 다시 연결해도 채널이 재생되지 않으면, 다른 소스의 같은 채널을 대신 재생합니다. 편성표 ID나 이름으로 찾습니다.",
+  "nerd_ck_title_failover": "예비",
+  "nerd_ck_failover_ok": "시도할 다른 소스 {n}개: {names}",
+  "nerd_ck_failover_none": "전환할 다른 소스가 없습니다 – 하나 더 추가하세요.",
+  "failover_looking": "{name} 재생 안 됨 – 다른 소스에서 찾는 중…",
+  "failover_playing": "{name}이(가) 여기서 재생되지 않아 {source}에서 재생합니다."
 }

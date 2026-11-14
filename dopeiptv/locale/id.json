@@ -1427,5 +1427,13 @@
   "nerd_ck_post_missing": "Program tidak ada: {name}",
   "nerd_ck_post_slow": "Masih berjalan setelah {s} dtk – wajar untuk pekerjaan panjang.",
   "nerd_ck_post_code": "Perintah berakhir dengan kode {code}.",
-  "nerd_ck_post_ok": "Perintah berjalan · {ms} md"
+  "nerd_ck_post_ok": "Perintah berjalan · {ms} md",
+  "nerd_card_failover": "Cadangan",
+  "nerd_failover": "Coba saluran di sumber lain",
+  "nerd_failover_hint": "Saat saluran tidak mau diputar setelah sambung ulang biasa, saluran yang sama dari sumbermu yang lain diputar – dikenali dari id panduan atau namanya.",
+  "nerd_ck_title_failover": "Cadangan",
+  "nerd_ck_failover_ok": "{n} sumber lain untuk dicoba: {names}",
+  "nerd_ck_failover_none": "Tidak ada sumber cadangan – tambahkan sumber kedua.",
+  "failover_looking": "{name} tidak mau diputar – mencari di sumber lainnya…",
+  "failover_playing": "{name} tidak bisa diputar di sini – diputar dari {source}."
 }

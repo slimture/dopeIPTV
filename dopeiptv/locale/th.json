@@ -1427,5 +1427,13 @@
   "nerd_ck_post_missing": "ไม่มีโปรแกรมนี้: {name}",
   "nerd_ck_post_slow": "ยังทำงานอยู่หลัง {s} วินาที – ปกติสำหรับงานยาว",
   "nerd_ck_post_code": "คำสั่งจบด้วยรหัส {code}",
-  "nerd_ck_post_ok": "คำสั่งทำงานแล้ว · {ms} มิลลิวินาที"
+  "nerd_ck_post_ok": "คำสั่งทำงานแล้ว · {ms} มิลลิวินาที",
+  "nerd_card_failover": "สำรอง",
+  "nerd_failover": "ลองช่องนี้ในแหล่งอื่น",
+  "nerd_failover_hint": "เมื่อช่องเล่นไม่ได้หลังเชื่อมต่อใหม่ตามปกติ ช่องเดียวกันจากแหล่งอื่นของคุณจะเล่นแทน – จับคู่ด้วย id ผังรายการหรือชื่อ",
+  "nerd_ck_title_failover": "สำรอง",
+  "nerd_ck_failover_ok": "มีอีก {n} แหล่งให้ลอง: {names}",
+  "nerd_ck_failover_none": "ไม่มีแหล่งสำรอง – เพิ่มแหล่งที่สอง",
+  "failover_looking": "{name} เล่นไม่ได้ – กำลังหาในแหล่งอื่นของคุณ…",
+  "failover_playing": "{name} เล่นไม่ได้ที่นี่ – กำลังเล่นจาก {source}"
 }

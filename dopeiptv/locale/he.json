@@ -1427,5 +1427,13 @@
   "nerd_ck_post_missing": "אין תוכנה כזו: {name}",
   "nerd_ck_post_slow": "עדיין רצה אחרי {s} שניות – בסדר למשימה ארוכה.",
   "nerd_ck_post_code": "הפקודה הסתיימה עם קוד {code}.",
-  "nerd_ck_post_ok": "הפקודה רצה · {ms} אלפיות שנייה"
+  "nerd_ck_post_ok": "הפקודה רצה · {ms} אלפיות שנייה",
+  "nerd_card_failover": "גיבוי",
+  "nerd_failover": "לנסות את הערוץ במקור אחר",
+  "nerd_failover_hint": "כשערוץ לא מתנגן גם אחרי החיבורים החוזרים הרגילים, אותו ערוץ מתנגן ממקור אחר שלך – לפי מזהה המדריך או השם.",
+  "nerd_ck_title_failover": "גיבוי",
+  "nerd_ck_failover_ok": "{n} מקורות נוספים לניסיון: {names}",
+  "nerd_ck_failover_none": "אין מקור נוסף לגיבוי – הוסיפו מקור שני.",
+  "failover_looking": "{name} לא מתנגן – מחפש במקורות האחרים…",
+  "failover_playing": "{name} לא התנגן כאן – מתנגן מ-{source}."
 }

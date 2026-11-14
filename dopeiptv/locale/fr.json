@@ -1427,5 +1427,13 @@
   "nerd_ck_post_missing": "Programme introuvable : {name}",
   "nerd_ck_post_slow": "Toujours en cours après {s} s – normal pour une longue tâche.",
   "nerd_ck_post_code": "La commande s'est terminée avec le code {code}.",
-  "nerd_ck_post_ok": "La commande s'est exécutée · {ms} ms"
+  "nerd_ck_post_ok": "La commande s'est exécutée · {ms} ms",
+  "nerd_card_failover": "Secours",
+  "nerd_failover": "Essayer la chaîne dans une autre source",
+  "nerd_failover_hint": "Quand une chaîne ne démarre pas après les reconnexions habituelles, la même chaîne d'une autre de tes sources prend le relais – reconnue par son identifiant de guide ou son nom.",
+  "nerd_ck_title_failover": "Secours",
+  "nerd_ck_failover_ok": "{n} autres sources à essayer : {names}",
+  "nerd_ck_failover_none": "Aucune autre source de secours – ajoutes-en une deuxième.",
+  "failover_looking": "{name} ne démarre pas – recherche dans tes autres sources…",
+  "failover_playing": "{name} n'a pas démarré ici – lecture depuis {source}."
 }
