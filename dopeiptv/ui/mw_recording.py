@@ -192,7 +192,8 @@ class _RecordingMixin:
                 self.rec.add_job(j["url"],
                                  tr("rec_continued_title", title=j["title"]),
                                  time.time(), j.get("stop"),
-                                 icon=j.get("stream_icon"))
+                                 icon=j.get("stream_icon"),
+                                 channel=j.get("channel") or "")
                 self._multi_stream_ok = True
                 return True
             return False
@@ -452,7 +453,7 @@ class _RecordingMixin:
             and self._playing_key == self._item_key(it))
         if watching_this:
             try:
-                path = self.rec.build_path(title)
+                path = self.rec.build_path(title, channel=self.channel_display_name(it))
             except OSError as e:
                 QMessageBox.warning(self, tr("rec_status_recording"), str(e))
                 return
@@ -461,7 +462,8 @@ class _RecordingMixin:
                     title, path, stop_ts,
                     url=self.client.live_url(it["stream_id"], "ts"),
                     icon=it.get("stream_icon"),
-                    recorder=self.player.take_buffer_recorder())
+                    recorder=self.player.take_buffer_recorder(),
+                    channel=self.channel_display_name(it))
                 self._set_status("● " + tr("rec_started_inplayer",
                                            title=title, length=length))
                 self._warn_pause_while_recording()
@@ -493,7 +495,8 @@ class _RecordingMixin:
             return
         url = self.client.live_url(it["stream_id"], "ts")
         self.rec.add_job(url, title, now, stop_ts,
-                         icon=it.get("stream_icon"))
+                         icon=it.get("stream_icon"),
+                         channel=self.channel_display_name(it))
         self._set_status("● " + tr("rec_started_to", title=title,
                                    length=length,
                                    folder=self.rec.directory()))
@@ -503,7 +506,7 @@ class _RecordingMixin:
         stream we're now watching - one connection, no conflict."""
         title = self.channel_display_name(it)
         try:
-            path = self.rec.build_path(title)
+            path = self.rec.build_path(title, channel=self.channel_display_name(it))
         except OSError as e:
             QMessageBox.warning(self, tr("rec_status_recording"), str(e))
             return
@@ -520,7 +523,8 @@ class _RecordingMixin:
         elif self._recorder_ready():
             url = self.client.live_url(it["stream_id"], "ts")
             self.rec.add_job(url, title, time.time(), stop_ts,
-                             icon=it.get("stream_icon"))
+                             icon=it.get("stream_icon"),
+                             channel=self.channel_display_name(it))
             self._set_status("● " + tr("rec_started_to", title=title,
                                        length=length,
                                        folder=self.rec.directory()))
@@ -575,7 +579,8 @@ class _RecordingMixin:
                  or self.channel_display_name(it))
         self.rec.add_job(url, title, start_ts, stop_ts,
                          folder_box.currentData(),
-                         icon=it.get("stream_icon"))
+                         icon=it.get("stream_icon"),
+                         channel=self.channel_display_name(it))
         self._set_status(tr("rec_scheduled_for", title=title,
                             when=format_when(start_ts)))
 

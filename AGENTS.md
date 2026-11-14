@@ -80,6 +80,7 @@ map and the one-way import rule.
 | `core/commands.py` | What the app is asked from outside: `--play`, `--channel`, `dopeiptv://` links |
 | `core/instance.py` | A second start hands its command to the copy running (local socket) |
 | `core/privacy.py` | Private viewing (nothing kept until the app closes) and Clear recent history by time range, for every source |
+| `core/rec_extras.py` | Nerd for recordings: file name template (folders, never outside), the command after a recording (no shell), their checks |
 | `core/platform_macos.py` | macOS-specific helpers |
 | `core/platform_windows.py` | Windows-specific helpers |
 | `media/embedded.py` | Embedded mpv player widget |
@@ -99,7 +100,7 @@ map and the one-way import rule.
 | `ui/subtitle_search.py` | OpenSubtitles search dialog |
 | `ui/widgets.py` | Small standalone widgets |
 | `ui/box_finder.py` | Box kinds in the add-a-source forms and the "Find on my network" button |
-| `ui/nerd_settings.py` | Nerd in Settings: its own page (switch, how it works, diagnostics) and the four pages under NERD while it is on |
+| `ui/nerd_settings.py` | Nerd in Settings: its own page (switch, how it works, diagnostics) and the five pages under NERD while it is on |
 | `ui/source_nerd.py` | A source's own Nerd options in the Add/Edit source dialog |
 | `ui/nerd_check_line.py` | The ✓ / ! / ✗ line under a Nerd setting, its Test button and Details (the app's problem window) |
 | `ui/source_presets.py` | Presets in the source dialog (Fritz!Box, Channels DVR, Threadfin, xTeVe, Dispatcharr, ErsatzTV) |
@@ -210,7 +211,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
   epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log,
-  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, nerd, nerd_lists, http_login, commands, instance, nerd_check, privacy) and `services/` (resume,
+  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, nerd, nerd_lists, http_login, commands, instance, nerd_check, privacy, rec_extras) and `services/` (resume,
   coverart, reminders, mpris, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list

@@ -245,12 +245,12 @@ class RecordingManager(QObject):
 
     def add_job(self, url: str, title: str, start_ts: float,
                 stop_ts: float | None, folder: str = "",
-                icon: str | None = None) -> dict:
+                icon: str | None = None, channel: str = "") -> dict:
         job: dict[str, Any] = {
             "id": uuid.uuid4().hex[:10], "url": url, "title": title,
             "start": start_ts, "stop": stop_ts, "folder": folder or "",
             "status": "scheduled", "path": "", "error": "", "proc": None,
-            "stream_icon": icon or ""}
+            "stream_icon": icon or "", "channel": channel or ""}
         self.jobs.append(job)
         self._save()
         self.tick()
@@ -271,7 +271,7 @@ class RecordingManager(QObject):
     def add_inplayer_job(self, title: str, path: str,
                          stop_ts: float | None, url: str = "",
                          icon: str | None = None,
-                         recorder: Any = None) -> dict:
+                         recorder: Any = None, channel: str = "") -> dict:
         """Register a recording that rides the embedded player's stream -
         or, with *recorder*, reads the player's own rewind buffer (a
         BufferRecorder): no connection of its own, whole through a pause,
@@ -281,7 +281,7 @@ class RecordingManager(QObject):
             "start": time.time(), "stop": stop_ts, "folder": "",
             "status": "recording", "path": path, "error": "",
             "proc": None, "inplayer": True, "stream_icon": icon or "",
-            "recorder": recorder}
+            "recorder": recorder, "channel": channel or ""}
         self.jobs.append(job)
         if icon and path:
             self.write_info(path, "", "", icon=icon)
@@ -307,6 +307,7 @@ class RecordingManager(QObject):
             def validate(j=j, reason=reason):
                 if (j.get("path") and os.path.exists(j["path"])
                         and os.path.getsize(j["path"]) > 0):
+                    self._after(j)
                     return
                 j["status"] = "failed"
                 j["error"] = reason or "no data captured"
@@ -340,6 +341,7 @@ class RecordingManager(QObject):
         def validate(j=j, reason=reason):
             if (j.get("path") and os.path.exists(j["path"])
                     and os.path.getsize(j["path"]) > 0):
+                self._after(j)
                 return
             j["status"] = "failed"
             j["error"] = j["recorder"].error or reason or "no data captured"
@@ -394,19 +396,39 @@ class RecordingManager(QObject):
     def active_count(self) -> int:
         return sum(1 for j in self.jobs if j["status"] == "recording")
 
-    def build_path(self, title: str, folder: str = "") -> str:
-        """A unique target file for a new recording."""
-        stamp = datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d %H.%M")
-        target_dir = os.path.join(self.directory(), folder or "")
-        os.makedirs(target_dir, exist_ok=True)
-        path = os.path.join(target_dir,
-                            f"{safe_filename(title)} {stamp}.ts")
+    def build_path(self, title: str, folder: str = "", channel: str = "") -> str:
+        """A unique target file for a new recording: "Title 2026-11-14
+        21.00.ts", or as the Nerd page's template names it (folders
+        included, never outside the recording folder)."""
+        from . import nerd
+        from .rec_extras import render_name
+        n_ = nerd.current()
+        template = n_.get("nerd_rec_template").strip() if n_.on else ""
+        if template:
+            stem = os.path.join(self.directory(), folder or "",
+                                render_name(template, title, channel))
+        else:
+            stamp = datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d %H.%M")
+            stem = os.path.join(self.directory(), folder or "",
+                                f"{safe_filename(title)} {stamp}")
+        os.makedirs(os.path.dirname(stem), exist_ok=True)
+        path = stem + ".ts"
         n = 1
         while os.path.exists(path):
-            path = os.path.join(target_dir,
-                                f"{safe_filename(title)} {stamp} ({n}).ts")
+            path = f"{stem} ({n}).ts"
             n += 1
         return path
+
+    def _after(self, j: dict) -> None:
+        """A recording is done and has data: the Nerd page's command for it,
+        if there is one."""
+        from . import nerd
+        from .rec_extras import run_post
+        n_ = nerd.current()
+        cmd = n_.get("nerd_rec_post").strip() if n_.on else ""
+        path = j.get("path") or ""
+        if cmd and path and os.path.exists(path) and os.path.getsize(path) > 0:
+            run_post(cmd, path, j.get("title") or "", j.get("channel") or "")
 
     def _spawn(self, j: dict) -> None:
         kind, exe = self.recorder()
@@ -415,7 +437,7 @@ class RecordingManager(QObject):
             j["error"] = "neither ffmpeg nor mpv found"
             return
         try:
-            path = self.build_path(j["title"], j.get("folder") or "")
+            path = self.build_path(j["title"], j.get("folder") or "", j.get("channel") or "")
         except OSError as e:
             j["status"] = "failed"
             j["error"] = str(e)
@@ -560,13 +582,16 @@ class RecordingManager(QObject):
                         j["title"],
                         "size limit reached" if self._over_size_cap(j, cap)
                         else "finished")
+                    self._after(j)
                     changed = True
                 elif rc is not None:
                     ok = (rc == 0 and j.get("path")
                           and os.path.exists(j["path"])
                           and os.path.getsize(j["path"]) > 0)
                     j["status"] = "done" if ok else "failed"
-                    if not ok:
+                    if ok:
+                        self._after(j)
+                    else:
                         j["error"] = f"recorder exited early (code {rc})"
                     self.recording_stopped.emit(
                         j["title"], "finished" if ok

@@ -1058,7 +1058,8 @@ class _DetailMixin:
         if not url:
             return
         self.rec.add_job(url, title, max(now, start_ts), stop_ts,
-                         icon=ch.get("stream_icon"))
+                         icon=ch.get("stream_icon"),
+                         channel=self.channel_display_name(ch))
 
     def _refresh_progress(self) -> None:
         e = self._current_epg

@@ -1723,10 +1723,11 @@ class _SettingsMixin:
             "boxes": page("nerd_boxes", tr("nerd_pg_boxes"), tr("nerd_pg_boxes_sub"), "box"),
             "lists": page("nerd_lists", tr("nerd_pg_lists"), tr("nerd_pg_lists_sub"), "channels"),
             "player": page("nerd_player", tr("nerd_pg_player"), tr("nerd_pg_player_sub"), "knobs"),
+            "rec": page("nerd_rec", tr("nerd_pg_rec"), tr("nerd_pg_rec_sub"), "rec"),
         }
 
         def show_nerd_pages(on: bool) -> None:
-            for key in ("nerd_net", "nerd_boxes", "nerd_lists", "nerd_player"):
+            for key in ("nerd_net", "nerd_boxes", "nerd_lists", "nerd_player", "nerd_rec"):
                 shell.set_page_enabled(key, on)
         nerd_client = self.client
         nerd_commit = nerd_settings.build(
@@ -1737,7 +1738,8 @@ class _SettingsMixin:
             add=lambda: add_playlist({"kind": "enigma2"}),
             pages=nerd_pages, show_pages=show_nerd_pages,
             source=lambda: self.playlist_store.active() if self.playlist_store else None,
-            channels=lambda: nerd_client.live_streams(None))
+            channels=lambda: nerd_client.live_streams(None),
+            rec_dir=lambda: self.rec.directory())
 
         # -- the playlist page's behaviour -------------------------------------
         def reload_pl_list():
@@ -1964,7 +1966,7 @@ class _SettingsMixin:
             (tr("set_sec_services"), ["metadata", "trakt"]),
             (tr("set_sec_system"), ["parental", "advanced", "nerd"]),
             # Only while Nerd is on (its pages are left out otherwise).
-            (tr("nerd_sec"), ["nerd_net", "nerd_boxes", "nerd_lists", "nerd_player"]),
+            (tr("nerd_sec"), ["nerd_net", "nerd_boxes", "nerd_lists", "nerd_player", "nerd_rec"]),
         ])
         # Back on the page that was open last time this session.
         shell.show_page(getattr(self, "_settings_page", None))

@@ -71,9 +71,10 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
           pages: dict[str, SettingsPage] | None = None,
           show_pages: Callable[[bool], None] | None = None,
           source: Callable[[], dict | None] | None = None,
-          channels: Callable[[], list[dict]] | None = None) -> Callable[[Callable[[str, Any], None]], None]:
+          channels: Callable[[], list[dict]] | None = None,
+          rec_dir: Callable[[], str] | None = None) -> Callable[[Callable[[str, Any], None]], None]:
     """*page* is Nerd's own: the switch, how it works, stats, diagnostics.
-    *pages* ("net", "boxes", "lists", "player") take the rest, shown by
+    *pages* ("net", "boxes", "lists", "player", "rec") take the rest, shown by
     *show_pages* while Nerd is on; without them it all goes on *page*.
     *boxes*: the box sources, each a click (*edit*, by id) from its options.
     *source*: the active source, which the network checks ask; *channels*:
@@ -399,6 +400,43 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
           search="mpv.conf options", below=raw_line)
     c.note(tr("nerd_applies_mpv"))
 
+    # -- recordings: names, the folder, what follows ------------------------------------------
+    from ..core import rec_extras
+    c = at("rec").card(tr("nerd_card_rec_names"))
+    template = QLineEdit(val("nerd_rec_template"))
+    template.setPlaceholderText(rec_extras.DEFAULT_TEMPLATE)
+
+    def template_job() -> Any:
+        text = template.text()
+        return lambda: rec_extras.check_template(text)
+    tpl_line = check(template_job, tr("nerd_ck_title_tpl"))
+    template.textChanged.connect(tpl_line.changed)
+    c.row(tr("nerd_rec_template"), template, tr("nerd_rec_template_hint"), stretch_control=True,
+          search="file name template folder recording", below=tpl_line)
+    c.note(tr("nerd_rec_fields"))
+
+    c = at("rec").card(tr("nerd_card_rec_folder"))
+
+    def folder_job() -> Any:
+        folder = rec_dir() if rec_dir is not None else ""
+        return lambda: rec_extras.check_folder(folder)
+    folder_line = check(folder_job, tr("nerd_ck_title_recdir"))
+    c.widget(folder_line, "recording folder network share NAS free space")
+    c.note(tr("nerd_rec_folder_note"))
+
+    c = at("rec").card(tr("nerd_card_rec_after"))
+    post = QLineEdit(val("nerd_rec_post"))
+    post.setPlaceholderText('comskip "{path}"')
+
+    def post_job() -> Any:
+        cmd = post.text().strip()
+        return (lambda: rec_extras.check_post(cmd)) if cmd else None
+    post_line = check(post_job, tr("nerd_ck_title_post"), test=True,
+                      test_text=tr("nerd_ck_test_post"))
+    c.row(tr("nerd_rec_post"), post, tr("nerd_rec_post_hint"), stretch_control=True,
+          search="command script comskip post-processing after recording", below=post_line)
+    c.note(tr("nerd_applies_rec"))
+
     # -- diagnostics (Nerd's own page) --------------------------------------------------------
     c = page.card(tr("nerd_card_diag"))
     level = combo([("info", "nerd_log_info"), ("debug", "nerd_log_debug")], val("nerd_log_level", "info"))
@@ -457,6 +495,8 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
         put("nerd_picon_override", "true" if picon_over.isChecked() else "false")
         put("nerd_udpxy", udpxy.text().strip())
         put("nerd_adelay_per_channel", "true" if adelay.isChecked() else "false")
+        put("nerd_rec_template", template.text().strip())
+        put("nerd_rec_post", post.text().strip())
         return out
 
     # Off: the switch and what Nerd holds, nothing else. On: all of it - on
