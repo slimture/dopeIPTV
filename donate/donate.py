@@ -812,9 +812,13 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def _body(self, most: int) -> dict | None:
+        """The JSON object posted; {} for none, None for one that is not
+        JSON or is bigger than ``most`` (a big one was answered "empty")."""
         try:
             length = int(self.headers.get("Content-Length") or 0)
-            data = json.loads(self.rfile.read(length)) if 0 < length <= most else {}
+            if length > most:
+                return None
+            data = json.loads(self.rfile.read(length)) if length > 0 else {}
         except (ValueError, TypeError):
             return None
         return data if isinstance(data, dict) else {}
@@ -1172,7 +1176,9 @@ class Handler(BaseHTTPRequestHandler):
         # Many people can share one address; a report is one press of Send.
         if not _allowed("fb:" + addr, FEEDBACK_PER_WINDOW):
             return self._send(429, {"error": "slow down"})
-        data = self._body(60000)
+        # The app sends at most 56 000 bytes; older ones escaped every
+        # letter outside ASCII into six, so take more than that.
+        data = self._body(200000)
         if data is None:
             return self._send(400, {"error": "body"})
         if data.get("from") == "site":

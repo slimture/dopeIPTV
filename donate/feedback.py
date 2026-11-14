@@ -280,13 +280,34 @@ def replies_for(stats_dir: str, hashes: list) -> dict:
         return {}
     data = _replies(stats_dir)
     out: dict[str, list] = {}
-    for r in _rows(stats_dir):
+    for r in _asking(stats_dir):
         h = r.get("reply")
         if h in want:
             got = _answers(r, data)
             if got:
                 out.setdefault(h, []).extend(got)
     return out
+
+
+_ASKING: dict = {"key": None, "rows": []}
+
+
+def _asking(stats_dir: str) -> list[dict]:
+    """The reports whose senders can be told answers: kept in memory and read
+    again only when the file changes - every copy of the app asks now and
+    then, and the file may hold many megabytes."""
+    path, _state = _paths(stats_dir)
+    try:
+        st = os.stat(path)
+        key = (path, st.st_mtime_ns, st.st_size)
+    except OSError:
+        return []
+    with _LOCK:
+        if _ASKING["key"] != key:
+            _ASKING["rows"] = [{"id": r.get("id"), "sig": r.get("sig"), "kind": r.get("kind"),
+                                "reply": r["reply"]} for r in _rows(stats_dir) if r.get("reply")]
+            _ASKING["key"] = key
+        return _ASKING["rows"]
 
 
 def summary(stats_dir: str, days: int) -> dict:
