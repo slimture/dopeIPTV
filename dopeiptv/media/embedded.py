@@ -2496,6 +2496,15 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
             except Exception:
                 pass
             self.apply_default_options(load=True, live=live)
+            # Nerd: user agent, headers and proxy for this source (nothing
+            # while Nerd is off and never was; the defaults back once it was).
+            try:
+                from ..core import nerd
+                self._nerd_applied = nerd.apply_stream(
+                    m, nerd.source(), getattr(self, "_nerd_applied", False),
+                    url=url)
+            except Exception as e:
+                log.debug("nerd stream options: %s", e)
             # Remembered per-title track choices (resume): set before load,
             # exactly like the multiview cells do - mpv keeps a sid/aid set
             # while loading and selects that track once the file's tracks are
@@ -3096,8 +3105,41 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
             f"Format: {prop('file-format')}",
             f"Protocol: {prop('stream-path', lambda v: v.split('://')[0] if '://' in str(v) else str(v))}",
         ]
+        lines += self._nerd_stats(prop)
         self._stats_overlay.setText("\n".join(lines))
         self._place_stats()
+
+    def _nerd_stats(self, prop) -> list[str]:
+        """More for a nerd, with Nerd on: the picture's colour and scan,
+        what the audio goes out as, the source and what the network says
+        it is."""
+        from ..core import nerd
+        n = nerd.current()
+        if not (n.on and n.flag("nerd_overlay_more", True)):
+            return []
+
+        def vp(key: str) -> str:
+            try:
+                return str((self.video.mpv.video_params or {}).get(key) or "—")
+            except Exception:
+                return "—"
+        src = nerd.source() or {}
+        out = [
+            "",
+            f"Colour: {vp('colormatrix')} / {vp('primaries')} / {vp('gamma')}",
+            f"Pixels: {vp('pixelformat')} · {vp('w')}×{vp('h')} · aspect {vp('aspect')}",
+            f"Deinterlace: {prop('deinterlace')}",
+            f"Audio out: {prop('audio-codec-name')} · {prop('audio-out-params', lambda v: (v or {}).get('format', '—'))}",
+            f"Passthrough: {n.get('nerd_spdif') or 'off'}",
+            f"Container: {prop('file-format')} · demuxer {prop('current-demuxer')}",
+            f"Source: {src.get('_kind') or '—'}",
+            f"User agent: {n.user_agent(src)}",
+            f"Proxy: {n.proxy(src) and 'on' or 'off'}",
+        ]
+        if n.flag("nerd_vpn_guard"):
+            up = nerd.vpn_interfaces()
+            out.append(f"VPN: {', '.join(up) if up else 'none'}")
+        return out
 
     def _place_stats(self) -> None:
         self._stats_overlay.adjustSize()

@@ -122,6 +122,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.settings = settings
         self.playlist_store = playlists
         active_pl = playlists.active() if playlists else None
+        # The Nerd page's profile (nothing while Nerd is off) and the source
+        # it applies to.
+        from ..core import nerd
+        nerd.install(settings)
+        nerd.set_source(active_pl)
         # Reclaim EPG guides left behind by playlists that no longer exist -
         # each is hundreds of MB and they were never cleaned up.
         try:
@@ -2179,6 +2184,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._hide_busy()
             self.playlist_store.set_active(pid)
             self.client = candidate
+            from ..core import nerd
+            nerd.set_source(pl)
             # Another provider's category ids say nothing about this one's.
             self._last_cat = {}
             self.favs = FavoriteStore(self.settings, f"favorites_{pid}")
@@ -4663,6 +4670,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                         item=None, catchup: bool = False) -> None:
         if not self._guard_stream_switch(url, title):
             return
+        if kind != "local" and self._vpn_guard_blocks():
+            return
         # A click that led here also armed the auto-preview timer; kill it so
         # a pending preview can't fire 350 ms later and stomp this playback.
         if hasattr(self, "_preview_timer"):
@@ -4875,6 +4884,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.set_seek_mode("live")
             self.player.set_live_badge(None)
 
+
+    def _vpn_guard_blocks(self) -> bool:
+        """Nerd's VPN guard: with it on and no VPN up, nothing streams -
+        said once, plainly, with where to change it."""
+        from ..core import nerd
+        src = nerd.source() or {}
+        if not nerd.current().vpn_blocks(src.get("_kind") in nerd.BOX_KINDS):
+            return False
+        self._show_toast(tr("nerd_vpn_blocked"), 6000)
+        return True
 
     def _show_toast(self, text: str, duration_ms: int = 0) -> None:
         self._toast.show_message(text, duration_ms)

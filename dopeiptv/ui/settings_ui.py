@@ -366,6 +366,9 @@ class SettingsShell(QWidget):
         self.results.setWidget(rbody)
         self.stack.addWidget(self.results)
         self._searching = False
+        # Pages that are not shown at all (Nerd until it is turned on):
+        # left out of the sidebar and of every search.
+        self._off: set[str] = set()
         self.pages: list[SettingsPage] = []
         self._items: dict[str, QListWidgetItem] = {}
         self._sections: list[tuple[QListWidgetItem, list[QListWidgetItem]]] = []
@@ -482,6 +485,14 @@ class SettingsShell(QWidget):
             page.setWidget(page.body)
             page.body.show()
 
+    def set_page_enabled(self, key: str, on: bool) -> None:
+        """Show or leave out a whole page (Nerd, until it is turned on)."""
+        if on:
+            self._off.discard(key)
+        else:
+            self._off.add(key)
+        self._filter(self.search.text())
+
     def show_page(self, key: str | None) -> None:
         item = self._items.get(key or "")
         if item is not None and not item.isHidden():
@@ -500,7 +511,7 @@ class SettingsShell(QWidget):
         needle = " ".join(text.split()).casefold()
         first = None
         for page in self.pages:
-            hit = page.apply_filter(needle)
+            hit = page.key not in self._off and page.apply_filter(needle)
             self._items[page.key].setHidden(not hit)
         # A heading goes with the last of its pages.
         for head, items in self._sections:
@@ -596,13 +607,16 @@ QFrame#SettingsCard > QFrame#SettingsDivider {{ background: {line}; border: none
    a border on top of it was one box too many. High contrast keeps its
    borders - there the outline is the point. */
 #SettingsPageBody QComboBox, #SettingsPageBody QLineEdit,
-#SettingsPageBody QSpinBox {{
+#SettingsPageBody QSpinBox, #SettingsPageBody QPlainTextEdit {{
     background: {ctrl}; border: 1px solid {edge}; border-radius: 8px;
 }}
+#SettingsPageBody QPlainTextEdit {{ color: {p['text']}; padding: 4px 6px; }}
 #SettingsPageBody QComboBox:hover, #SettingsPageBody QLineEdit:hover,
-#SettingsPageBody QSpinBox:hover {{ background: {ctrl_hi}; }}
+#SettingsPageBody QSpinBox:hover,
+#SettingsPageBody QPlainTextEdit:hover {{ background: {ctrl_hi}; }}
 #SettingsPageBody QComboBox:focus, #SettingsPageBody QLineEdit:focus,
-#SettingsPageBody QSpinBox:focus {{ border: 1px solid {p['accent']}; }}
+#SettingsPageBody QSpinBox:focus,
+#SettingsPageBody QPlainTextEdit:focus {{ border: 1px solid {p['accent']}; }}
 #SettingsPageBody QComboBox:disabled, #SettingsPageBody QLineEdit:disabled {{
     color: {p['muted2']}; background: {p['hover']};
 }}
@@ -807,7 +821,7 @@ def page_icon(kind: str, base, size: int = 18) -> QIcon:
 
 def _own_icon(kind: str, s: int, colour: str) -> QPixmap | None:
     if kind not in ("palette", "play", "subtitles", "picture", "lock",
-                    "wrench", "image", "trakt"):
+                    "wrench", "image", "trakt", "nerd"):
         return None
     scale = 3
     pm = QPixmap(s * scale, s * scale)
@@ -876,6 +890,16 @@ def _own_icon(kind: str, s: int, colour: str) -> QPixmap | None:
         arc.arcTo(QRectF(f * 0.32, f * 0.12, f * 0.36, f * 0.36), 180, -180)
         arc.lineTo(f * 0.68, f * 0.44)
         pr.drawPath(arc)
+    elif kind == "nerd":                    # a pair of glasses
+        for x in (0.08, 0.54):
+            pr.drawRoundedRect(QRectF(f * x, f * 0.38, f * 0.38, f * 0.3),
+                               f * 0.1, f * 0.1)
+        bridge = QPainterPath()
+        bridge.moveTo(f * 0.46, f * 0.47)
+        bridge.quadTo(f * 0.5, f * 0.41, f * 0.54, f * 0.47)
+        pr.drawPath(bridge)
+        pr.drawLine(QPointF(f * 0.08, f * 0.44), QPointF(f * 0.02, f * 0.36))
+        pr.drawLine(QPointF(f * 0.92, f * 0.44), QPointF(f * 0.98, f * 0.36))
     elif kind == "trakt":
         pr.drawEllipse(QRectF(f * 0.1, f * 0.1, f * 0.8, f * 0.8))
         tick = QPainterPath()

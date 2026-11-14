@@ -73,6 +73,8 @@ files = [
     "dopeiptv/providers/tvheadend.py",
     "dopeiptv/providers/hdhomerun.py",
     "dopeiptv/providers/lan_scan.py",
+    "dopeiptv/core/nerd.py",
+    "dopeiptv/core/http_login.py",
     "dopeiptv/providers/dlna.py",
     "dopeiptv/providers/stalker.py",
     "dopeiptv/core/stores.py",

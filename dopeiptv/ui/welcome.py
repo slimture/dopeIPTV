@@ -27,6 +27,10 @@ from PyQt6.QtWidgets import (
 )
 
 from ..i18n import LANGUAGES, tr
+from .box_finder import (
+    BOX_KINDS, LOGIN_KINDS, PLACEHOLDERS, FindOnNetwork, add_box_kinds,
+    retranslate_box_kinds,
+)
 from .dialogs import PlaylistDialog, stalker_available
 from .theme import P
 
@@ -157,7 +161,46 @@ class WelcomeOverlay(QWidget):
         lay.addWidget(self._w_next)
         lay.addWidget(self._w_demo)
         lay.addWidget(self._w_skip)
+        # Nerd, offered quietly: a small link under it all. On, the next
+        # step offers boxes on the home network too; off, nothing changes.
+        self._w_nerd = QPushButton(objectName="OnbNerd")
+        self._w_nerd.setFlat(True)
+        self._w_nerd.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._w_nerd.setStyleSheet(
+            f"QPushButton#OnbNerd {{ background: transparent; border: none;"
+            f" color: {P['muted2']}; font-size: 11px; padding: 4px 0; }}"
+            f"QPushButton#OnbNerd:hover {{ color: {P['text']}; text-decoration: underline; }}")
+        self._w_nerd.clicked.connect(self._toggle_nerd)
+        lay.addWidget(self._w_nerd, 0, Qt.AlignmentFlag.AlignHCenter)
+        self._sync_nerd_link()
         return page
+
+    def _nerd_on(self) -> bool:
+        return bool(self._settings) and self._settings.value("nerd_enabled", "false") == "true"
+
+    def _toggle_nerd(self) -> None:
+        if not self._settings:
+            return
+        self._settings.setValue("nerd_enabled", "false" if self._nerd_on() else "true")
+        from ..core import nerd
+        nerd.install(self._settings)
+        self._sync_nerd_link()
+        # The kinds the next step offers follow.
+        combo = getattr(self, "_conn_kind", None)
+        if combo is not None:
+            if self._nerd_on():
+                if combo.findData(BOX_KINDS[0]) < 0:
+                    add_box_kinds(combo)
+            else:
+                if combo.currentData() in BOX_KINDS:
+                    combo.setCurrentIndex(0)
+                for kind in BOX_KINDS:
+                    i = combo.findData(kind)
+                    if i >= 0:
+                        combo.removeItem(i)
+
+    def _sync_nerd_link(self) -> None:
+        self._w_nerd.setText(tr("onb_nerd_on") if self._nerd_on() else tr("onb_nerd_offer"))
 
     def _build_connect_page(self) -> QWidget:
         page = QWidget()
@@ -177,6 +220,8 @@ class WelcomeOverlay(QWidget):
         self._conn_kind.addItem(tr("playlist_kind_m3u"), "m3u")
         if stalker_available():
             self._conn_kind.addItem(tr("playlist_kind_stalker"), "stalker")
+        if self._nerd_on():
+            add_box_kinds(self._conn_kind)
         self._conn_kind.currentIndexChanged.connect(self._update_conn_kind)
         self._name = QLineEdit(s.value("playlist_name", "") if s else "")
         self._name.setPlaceholderText(tr("playlist_name_hint"))
@@ -204,6 +249,10 @@ class WelcomeOverlay(QWidget):
         form.addRow(self._lbl_kind, self._conn_kind)
         form.addRow(self._lbl_name, self._name)
         form.addRow(self._lbl_server, self._server)
+        # Only for a box on the home network (a Nerd kind).
+        self._finder = FindOnNetwork(page)
+        self._finder.picked.connect(self._box_found)
+        form.addRow("", self._finder.row)
         form.addRow(self._lbl_user, self._user)
         form.addRow(self._lbl_pw, self._pw)
         form.addRow(self._lbl_mac, self._mac)
@@ -309,18 +358,37 @@ class WelcomeOverlay(QWidget):
     def _update_conn_kind(self) -> None:
         kind = self._conn_kind.currentData()
         m3u, stalker = kind == "m3u", kind == "stalker"
-        # M3U needs only a URL, a portal its URL and a MAC address.
+        box = kind in BOX_KINDS
+        # M3U needs only a URL, a portal its URL and a MAC address, a box
+        # on the home network its address and, if it asks, a login.
         self._lbl_server.setText(
             tr("playlist_m3u_url") if m3u
-            else tr("playlist_portal_url") if stalker else tr("login_server"))
+            else tr("playlist_portal_url") if stalker
+            else tr("playlist_box_address") if box else tr("login_server"))
         self._server.setPlaceholderText(
             "https://example.com/playlist.m3u" if m3u
             else "http://portal.example.com/c/" if stalker
-            else "http://server:port")
+            else PLACEHOLDERS.get(kind, "http://server:port"))
+        login = not (m3u or stalker or box) or kind in LOGIN_KINDS
         for w in (self._lbl_user, self._user, self._lbl_pw, self._pw):
-            w.setVisible(not (m3u or stalker))
+            w.setVisible(login)
+        hint = tr("playlist_login_optional") if box else ""
+        self._user.setPlaceholderText(hint)
+        self._pw.setPlaceholderText(hint)
         for w in (self._lbl_mac, self._mac):
             w.setVisible(stalker)
+        self._finder.row.setVisible(box)
+        if not box:
+            self._finder.status.hide()
+        self._fit_card(self._stack.currentIndex())
+
+    def _box_found(self, found: dict) -> None:
+        self._set_kind(found.get("kind", ""))
+        self._server.setText(found.get("server", ""))
+        if not self._name.text().strip():
+            self._name.setText(str(found.get("name", "")).split(" - ")[0])
+        if found.get("login"):
+            self._user.setFocus()
         self._fit_card(self._stack.currentIndex())
 
     def _set_kind(self, kind: str) -> None:
@@ -334,7 +402,8 @@ class WelcomeOverlay(QWidget):
         preferred mode) or M3U (a plain playlist URL). A bare host with no link
         shape is left alone so manual entry keeps working. A portal's
         address is never taken for one of those."""
-        if self._conn_kind.currentData() == "stalker":
+        if self._conn_kind.currentData() == "stalker" \
+                or self._conn_kind.currentData() in BOX_KINDS:
             return
         from ..providers.client import detect_provider_link
         detected = detect_provider_link(self._server.text())
@@ -358,6 +427,16 @@ class WelcomeOverlay(QWidget):
                 return
             self._hide_error()
             self._on_connect(server, "", "", kind, name, mac)
+            self._stack.setCurrentIndex(2)
+            return
+        if kind in BOX_KINDS:
+            if not server:
+                self._show_error(tr("playlist_box_required"))
+                return
+            self._hide_error()
+            user = self._user.text().strip() if kind in LOGIN_KINDS else ""
+            pw = self._pw.text().strip() if kind in LOGIN_KINDS else ""
+            self._on_connect(server, user, pw, kind, name)
             self._stack.setCurrentIndex(2)
             return
         if kind == "m3u":
@@ -415,9 +494,14 @@ class WelcomeOverlay(QWidget):
         self._lbl_user.setText(tr("login_username"))
         self._lbl_pw.setText(tr("login_password"))
         self._lbl_mac.setText(tr("playlist_mac"))
-        for i, key in enumerate(("playlist_kind_xtream", "playlist_kind_m3u",
-                                 "playlist_kind_stalker")[:self._conn_kind.count()]):
-            self._conn_kind.setItemText(i, tr(key))
+        for kind, key in (("xtream", "playlist_kind_xtream"), ("m3u", "playlist_kind_m3u"),
+                          ("stalker", "playlist_kind_stalker")):
+            i = self._conn_kind.findData(kind)
+            if i >= 0:
+                self._conn_kind.setItemText(i, tr(key))
+        retranslate_box_kinds(self._conn_kind)
+        self._finder.retranslate()
+        self._sync_nerd_link()
         self._c_hint.setText(tr("onb_xtream_link_hint"))
         self._update_conn_kind()   # re-labels the server row for the mode
         self._c_connect.setText(tr("btn_connect"))

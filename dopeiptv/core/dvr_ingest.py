@@ -104,8 +104,22 @@ class Ingest:
 
     @staticmethod
     def _default_open(url: str, **kw: Any) -> Any:
-        import requests     # not at startup: the window opens without it
-        return requests.get(url, **kw)
+        # A login in the address is answered as the box asks (Tvheadend
+        # wants digest, which requests alone never sends); the Nerd page's
+        # user agent, headers and proxy apply as they do for the player.
+        from . import nerd
+        from .http_login import get_with_login
+        n = nerd.current()
+        if n.on:
+            src = nerd.source()
+            headers = dict(kw.pop("headers", None) or {})
+            headers["User-Agent"] = n.user_agent(src)
+            headers.update(n.headers(src))
+            kw["headers"] = headers
+            px = n.proxy(src, url)
+            if px:
+                kw["proxies"] = {"http": px, "https": px}
+        return get_with_login(url, **kw)
 
     def start(self) -> None:
         self._thread.start()

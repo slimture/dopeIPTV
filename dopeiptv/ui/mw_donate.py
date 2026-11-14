@@ -23,7 +23,9 @@ from PyQt6.QtCore import QTimer
 from ..core.xdg import open_url
 from ..i18n import tr
 
-DONATE_URL = "https://dopeiptv.org/?ref={ref}#donate"
+# #support: the donate band, not the payment form - an invitation, not
+# a bill (#donate opens the form, for links from people already decided).
+DONATE_URL = "https://dopeiptv.org/?ref={ref}#support"
 #: Minutes of watching before Home shows the card.
 CARD_AFTER_MIN = 600
 SNOOZE_SECS = 90 * 86400          # "Not now"

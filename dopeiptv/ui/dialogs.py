@@ -107,6 +107,13 @@ class PlaylistDialog(QDialog):
         form.addRow(tr("playlist_custom_epg_url"), self.epg_url)
         form.addRow(tr("playlist_auto_refresh"), self.refresh)
         lay.addLayout(form)
+        # The source's own Nerd options: only while Nerd is on, folded.
+        self.nerd_panel = None
+        from ..core import nerd
+        if nerd.current().on:
+            from .source_nerd import SourceNerdPanel
+            self.nerd_panel = SourceNerdPanel(self.kind.currentData(), self._options, self)
+            lay.addWidget(self.nerd_panel)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
@@ -143,6 +150,8 @@ class PlaylistDialog(QDialog):
         self.finder.row.setVisible(box)
         if not box:
             self.finder.status.hide()
+        if getattr(self, "nerd_panel", None) is not None:
+            self.nerd_panel.set_kind(kind)
 
     def _box_found(self, found: dict) -> None:
         """A box picked from what answered on the network fills the form."""
@@ -222,8 +231,10 @@ class PlaylistDialog(QDialog):
             "refresh": self.refresh.currentData(),
             "mac": self.normal_mac(self.mac.text()) or "",
         }
-        if self._options:
-            out["options"] = dict(self._options)
+        options = (self.nerd_panel.values() if self.nerd_panel is not None
+                   else dict(self._options))
+        if options:
+            out["options"] = options
         return out
 
 

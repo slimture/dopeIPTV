@@ -346,6 +346,13 @@ class _MpvGLWidget(QOpenGLWidget):
                 self.mpv[key.replace("_", "-")] = val
             except Exception as e:
                 log.debug("mpv option %r skipped: %s", key, e)
+        # The Nerd page's options last (nothing while Nerd is off); one this
+        # libmpv rejects is skipped, never fatal.
+        try:
+            from ..core import nerd
+            nerd.apply_core(self.mpv)
+        except Exception as e:
+            log.warning("nerd options not applied: %s", e)
         log.info("mpv created, creating render context...")
         self._create_render_context()
         _register_error_callback(self.mpv, self.playback_error, self.eof_event)

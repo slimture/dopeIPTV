@@ -881,6 +881,19 @@ def make_box_client(playlist: dict):
 
 
 def make_client(playlist: dict):
+    """The client for *playlist* (see _make_client), with the Nerd page's
+    user agent, headers and proxy on its session."""
+    client = _make_client(playlist)
+    from ..core import nerd
+    session = getattr(client, "session", None)
+    if session is not None:
+        nerd.current().apply_session(
+            session, dict((playlist or {}).get("options") or {},
+                          _kind=(playlist or {}).get("kind") or "xtream"))
+    return client
+
+
+def _make_client(playlist: dict):
     """Build the right provider client for a stored playlist: an M3U-backed
     client when kind == 'm3u', a box on the home network for the kinds in
     BOX_KINDS, a Stalker / Ministra portal client when kind == 'stalker',

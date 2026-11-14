@@ -20,8 +20,8 @@ from PyQt6.QtWidgets import (
     QColorDialog, QComboBox, QDialog, QDialogButtonBox,
     QFileDialog,
     QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
-    QListWidgetItem, QMessageBox, QPushButton, QScrollArea, QScrollBar,
-    QSpinBox, QTextBrowser, QVBoxLayout, QWidget,
+    QListWidgetItem, QMessageBox, QPlainTextEdit, QPushButton, QScrollArea,
+    QScrollBar, QSpinBox, QTextBrowser, QVBoxLayout, QWidget,
 )
 
 
@@ -567,6 +567,15 @@ class _SettingsMixin:
             f"{tr('account_connections')}: {active} / {maxc}",
         ])
 
+    def _unlock_nerd(self) -> None:
+        """Nerd on, from About's seven taps: the page appears in Settings."""
+        from ..core import nerd
+        already = self.settings.value("nerd_enabled", "false") == "true"
+        self.settings.setValue("nerd_enabled", "true")
+        nerd.install(self.settings)
+        self._show_toast(tr("nerd_already") if already else tr("nerd_unlocked"),
+                         4000)
+
     def open_settings(self) -> None:
         d = QDialog(self)
         d.setWindowTitle(tr("settings_title"))
@@ -641,6 +650,11 @@ class _SettingsMixin:
         c = general.card(tr("donate_support"))
         heart_box = c.toggle(tr("set_donate_heart"), self._donate_heart_due(),
                              tr("set_donate_heart_hint"))
+        # Nerd: one quiet switch, last. Off, the app is as it always was and
+        # the Nerd page is not even in the sidebar.
+        c = general.card(tr("nerd_card_general"))
+        nerd_box = c.toggle(tr("nerd_show"), is_on("nerd_enabled", "false"),
+                            tr("nerd_show_hint"))
 
         # -- Appearance -------------------------------------------------------
         look = page("appearance", tr("set_page_appearance"),
@@ -1674,6 +1688,14 @@ class _SettingsMixin:
         c = adv.card(tr("set_card_reset"))
         c.row(tr("set_reset_label"), reset_btn, tr("set_reset_hint"))
 
+        # -- Nerd -------------------------------------------------------------
+        from . import nerd_settings
+        nerd_page = page("nerd", tr("nerd_page"), tr("nerd_page_sub"), "nerd")
+        nerd_commit = nerd_settings.build(nerd_page, self.settings, d)
+        shell.set_page_enabled("nerd", nerd_box.isChecked())
+        nerd_box.toggled.connect(
+            lambda on_: shell.set_page_enabled("nerd", on_))
+
         # -- the playlist page's behaviour -------------------------------------
         def reload_pl_list():
             pl_list.clear()
@@ -1895,8 +1917,9 @@ class _SettingsMixin:
                                       "multiview"]),
             (tr("set_sec_library"), ["recording", "local"]),
             (tr("set_sec_services"), ["metadata", "trakt"]),
-            (tr("set_sec_system"), ["parental", "advanced"]),
+            (tr("set_sec_system"), ["parental", "advanced", "nerd"]),
         ])
+        shell.set_page_enabled("nerd", nerd_box.isChecked())
         # Back on the page that was open last time this session.
         shell.show_page(getattr(self, "_settings_page", None))
         d.finished.connect(
@@ -2040,6 +2063,12 @@ class _SettingsMixin:
             for skey, box in home_shelf_boxes.items():
                 put(skey, flag(box))
             put("follow_notify", flag(follow_notify_box))
+            if nerd_box.isChecked() or self.settings.value("nerd_enabled") is not None:
+                put("nerd_enabled", flag(nerd_box))
+            nerd_commit(put)
+            if any(k.startswith("nerd_") for k in changed):
+                from ..core import nerd
+                nerd.install(self.settings)
 
             if any(k.startswith("mv_") for k in changed):
                 self._apply_multiview_settings()
@@ -2089,6 +2118,8 @@ class _SettingsMixin:
             if edit is not shell.search and not isinstance(
                     edit.parent(), QAbstractSpinBox):
                 edit.editingFinished.connect(soon)
+        for text in d.findChildren(QPlainTextEdit):
+            text.textChanged.connect(soon)
 
         d.exec()
         live.stop()
@@ -2157,6 +2188,18 @@ class _SettingsMixin:
             f"<b style='font-size:18px'>{APP_NAME}</b>"
             f"&nbsp;&nbsp;<span style='color:{P['muted2']}'>{BUILD_VERSION}</span>")
         lay.addWidget(title)
+        # Seven taps on the version, as Android's developer options: Nerd.
+        taps: list[float] = []
+
+        def tap(_event) -> None:
+            import time as _time
+            now = _time.monotonic()
+            taps[:] = [t for t in taps if now - t < 3.0] + [now]
+            if len(taps) >= 7:
+                taps.clear()
+                self._unlock_nerd()
+
+        title.mousePressEvent = tap
         desc = QLabel(tr("about_desc"))
         desc.setWordWrap(True)
         lay.addWidget(desc)
