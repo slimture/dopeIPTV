@@ -140,6 +140,54 @@ class _RedactFilter(logging.Filter):
         return True
 
 
+_file_handler: logging.Handler | None = None
+
+
+def log_dir() -> str:
+    """Where the app keeps its own log files (Nerd: Save a log file):
+    ~/.local/state/dopeiptv/logs on Linux (XDG_STATE_HOME; a Flatpak's own),
+    ~/Library/Logs/dopeIPTV on a Mac, %LOCALAPPDATA%\\dopeiptv\\logs on
+    Windows."""
+    if sys.platform == "win32":
+        base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+        return os.path.join(base, "dopeiptv", "logs")
+    if sys.platform == "darwin":
+        return os.path.expanduser("~/Library/Logs/dopeIPTV")
+    state = os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state")
+    return os.path.join(state, "dopeiptv", "logs")
+
+
+def log_file() -> str:
+    return os.path.join(log_dir(), "dopeiptv.log")
+
+
+def set_file_logging(on: bool) -> str | None:
+    """Keep a log file (rotating: 2 MB, three files at most) or stop.
+    Scrubbed like every other line (the filter is on the logger). Returns
+    the file written to, or None."""
+    global _file_handler
+    if not on:
+        if _file_handler is not None:
+            log.removeHandler(_file_handler)
+            _file_handler.close()
+            _file_handler = None
+        return None
+    if _file_handler is not None:
+        return log_file()
+    try:
+        from logging.handlers import RotatingFileHandler
+        os.makedirs(log_dir(), exist_ok=True)
+        fh = RotatingFileHandler(log_file(), maxBytes=2_000_000, backupCount=2, encoding="utf-8")
+        fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    except Exception as e:
+        log.warning("log file not kept: %s", e)
+        return None
+    log.addHandler(fh)
+    _file_handler = fh
+    log.info("log file: %s", log_file())
+    return log_file()
+
+
 def configure_logging() -> None:
     """Install the stderr (and optional file) handlers. Idempotent."""
     global _configured

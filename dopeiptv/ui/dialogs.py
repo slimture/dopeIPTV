@@ -545,3 +545,85 @@ class UpdateDialog(QDialog):
             self.cancelled.emit()
         super().reject()
 
+
+
+class ProblemDialog(QDialog):
+    """Something did not work, said plainly: what, in a sentence, then the
+    details - what was tried and the exact error or code - in a box that can
+    be selected and copied (a forum post, a bug report). In the app's own
+    look, not a system message box."""
+
+    def __init__(self, parent, title: str, summary: str, detail: str,
+                 state: str = "fail") -> None:
+        super().__init__(parent)
+        from PyQt6.QtGui import QFont, QGuiApplication
+        from PyQt6.QtWidgets import QPlainTextEdit
+        self.setWindowTitle(title)
+        self.setModal(True)
+        self.setMinimumWidth(520)
+        row = QHBoxLayout(self)
+        row.setContentsMargins(24, 22, 24, 20)
+        row.setSpacing(16)
+        # "fail" (✕), "warn" (!) or "ok" (✓: what a check that worked did).
+        colour = {"warn": P.get("warn", P["muted"]), "ok": P.get("ok", P["muted"]),
+                  "info": P["muted"]}.get(state, P["error"])
+        mark = QLabel({"warn": "!", "ok": "✓", "info": "i"}.get(state, "✕"))
+        mark.setFixedSize(40, 40)
+        mark.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        mark.setStyleSheet(f"border-radius:20px; border:2px solid {colour}; color:{colour};"
+                           " font-size:18px; font-weight:800;")
+        row.addWidget(mark, 0, Qt.AlignmentFlag.AlignTop)
+        col = QVBoxLayout()
+        col.setSpacing(6)
+        head = QLabel(title)
+        head.setWordWrap(True)
+        head.setStyleSheet(f"font-size:16px; font-weight:700; color:{P['text']};")
+        body = QLabel(summary)
+        body.setWordWrap(True)
+        body.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        body.setStyleSheet(f"font-size:13px; color:{P['text2']};")
+        col.addWidget(head)
+        col.addWidget(body)
+        col.addSpacing(6)
+        what = QLabel(tr("problem_details"))
+        what.setStyleSheet(f"font-size:12px; font-weight:700; color:{P['muted']};")
+        col.addWidget(what)
+        self.details = QPlainTextEdit(detail)
+        self.details.setReadOnly(True)
+        self.details.setObjectName("NerdText")
+        self.details.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse
+                                             | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+        mono = QFont("monospace")
+        mono.setStyleHint(QFont.StyleHint.TypeWriter)
+        self.details.setFont(mono)
+        # Its own colours: the box's style elsewhere belongs to Settings,
+        # and a system default here was light text on white.
+        self.details.setStyleSheet(
+            f"QPlainTextEdit {{ background: {P['input']}; color: {P['text']};"
+            f" border: none; border-radius: 8px; padding: 6px 8px;"
+            f" selection-background-color: {P['sel']}; }}")
+        self.details.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
+        lines = max(6, min(16, detail.count("\n") + 4))
+        self.details.setFixedHeight(self.details.fontMetrics().lineSpacing() * lines + 18)
+        col.addWidget(self.details)
+        col.addSpacing(10)
+        buttons = QHBoxLayout()
+        buttons.setSpacing(8)
+        self.copied = QLabel("")
+        self.copied.setStyleSheet(f"font-size:12px; color:{P['muted']};")
+        buttons.addWidget(self.copied)
+        buttons.addStretch(1)
+        self.copy_btn = QPushButton(tr("problem_copy"))
+        close = QPushButton(tr("common_close"), objectName="Primary")
+
+        def copy() -> None:
+            QGuiApplication.clipboard().setText(f"{title}\n{summary}\n\n{detail}")
+            self.copied.setText("✓ " + tr("problem_copied"))
+        self.copy_btn.clicked.connect(copy)
+        close.clicked.connect(self.accept)
+        buttons.addWidget(self.copy_btn)
+        buttons.addWidget(close)
+        col.addLayout(buttons)
+        row.addLayout(col, 1)
+        close.setDefault(True)
+        close.setFocus()

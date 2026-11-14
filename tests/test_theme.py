@@ -56,6 +56,9 @@ def test_every_theme_has_every_colour_and_readable_text(key):
     assert _contrast(t["text"], t["sel"]) >= 4.5, key
     assert _contrast(t["muted"], t["bg"]) >= 3, key
     assert is_light(key) == (_luminance(t["bg"]) > 0.5), key
+    # A check that worked (✓) or warns (!) reads on the page and on a card.
+    for status in ("ok", "warn"):
+        assert min(_contrast(t[status], t["bg"]), _contrast(t[status], t["pane"])) >= 3, (key, status)
 
 
 def test_the_picker_lists_dark_themes_then_light_ones():

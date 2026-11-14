@@ -1,7 +1,10 @@
-"""The Nerd page in Settings: the network, the VPN guard, the player (mpv)
-all the way down, and diagnostics. Shown only once Nerd is turned on
-(General, or seven taps on the version in About); core/nerd.py turns what is
-stored here into what the player and the network do.
+"""Nerd in Settings: its own page (the switch, how it works, stats,
+diagnostics) and, while it is on, four more under NERD - the network, boxes
+and servers, channels and guide, the player. Each setting that can be tried
+has a line under it saying whether it works (ui/nerd_check_line.py,
+core/nerd_check.py); each card says when its settings take effect.
+core/nerd.py turns what is stored here into what the player and the network
+do.
 
 ``build`` fills the page and returns ``commit(put)``, which open_settings
 calls with its own put() like every other page's controls.
@@ -9,19 +12,22 @@ calls with its own put() like every other page's controls.
 
 from __future__ import annotations
 
+import os
 import platform
 import sys
 from typing import Any, Callable
 
-from PyQt6.QtGui import QFont, QGuiApplication
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
-    QComboBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit,
+    QComboBox, QFileDialog, QHBoxLayout, QLineEdit, QPlainTextEdit,
     QPushButton, QVBoxLayout, QWidget,
 )
 
-from ..core import nerd
+from ..core import nerd, nerd_check
+from ..core.log import log, log_dir
 from ..i18n import tr
-from .settings_ui import Chip, ChipGroups, SettingsPage, Stepper
+from .nerd_check_line import CheckLine
+from .settings_ui import Chip, ChipGroups, SettingsPage, Stepper, ToggleSwitch
 
 UA_CHOICES = [("", "nerd_ua_default"), ("vlc", "VLC"), ("kodi", "Kodi"), ("tivimate", "TiviMate"),
               ("smarters", "IPTV Smarters"), ("ffmpeg", "FFmpeg"), ("mag", "MAG box"),
@@ -61,44 +67,59 @@ BOX_NAMES = {"enigma2": "Enigma2", "tvheadend": "Tvheadend", "hdhomerun": "HDHom
 def build(page: SettingsPage, settings: Any, parent: QWidget,
           boxes: list[dict] | None = None,
           edit: Callable[[str], None] | None = None,
-          add: Callable[[], None] | None = None) -> Callable[[Callable[[str, Any], None]], None]:
-    """*boxes*: the box sources, each listed with its options a click
-    away (*edit* opens a source by id)."""
+          add: Callable[[], None] | None = None,
+          pages: dict[str, SettingsPage] | None = None,
+          show_pages: Callable[[bool], None] | None = None,
+          source: Callable[[], dict | None] | None = None,
+          channels: Callable[[], list[dict]] | None = None) -> Callable[[Callable[[str, Any], None]], None]:
+    """*page* is Nerd's own: the switch, how it works, stats, diagnostics.
+    *pages* ("net", "boxes", "lists", "player") take the rest, shown by
+    *show_pages* while Nerd is on; without them it all goes on *page*.
+    *boxes*: the box sources, each a click (*edit*, by id) from its options.
+    *source*: the active source, which the network checks ask; *channels*:
+    fetches its channel list, off the window's thread (the picon check
+    matches against it)."""
     n = nerd.Nerd(settings)
+    sub = pages or {}
+
+    def at(key: str) -> SettingsPage:
+        return sub.get(key, page)
 
     def val(key: str, default: str = "") -> str:
         return n.get(key, default)
 
-    # -- the switch: everything below it is there only while it is on -------
+    lines: list[CheckLine] = []
+
+    def check(job: Callable[[], Any], title: str, test: bool = False,
+              test_text: str = "") -> CheckLine:
+        line = CheckLine(job, title, test=test, test_text=test_text)
+        lines.append(line)
+        return line
+
+    def src() -> dict | None:
+        return source() if source is not None else None
+
+    # -- Nerd's own page: the switch, then how it works -------------------------
     c = page.card()
     switch = c.toggle(tr("nerd_switch"), n.on, tr("nerd_show_hint"))
     teaser = c.note(tr("nerd_teaser"))
     teaser_row = teaser.parentWidget()
     gated_from = len(page.cards)
 
-    # -- the overlay ------------------------------------------------------------
+    c = page.card(tr("nerd_card_how"))
+    how = [("nerd_how_saved_t", "nerd_how_saved"), ("nerd_how_alone_t", "nerd_how_alone"),
+           ("nerd_how_checks_t", "nerd_how_checks")]
+    if pages:
+        how.append(("nerd_how_pages_t", "nerd_how_pages"))
+    c.widget(_how_block(how), " ".join(tr(t) + " " + tr(b) for t, b in how))
+
     c = page.card(tr("nerd_card_view"))
     overlay = c.toggle(tr("nerd_overlay"), n.flag("nerd_overlay_more", True), tr("nerd_overlay_hint"))
     c.note(tr("nerd_intro"))
 
-    # -- the boxes and servers ------------------------------------------------------
-    if boxes is not None:
-        c = page.card(tr("nerd_card_boxes"))
-        for pl in boxes:
-            btn = QPushButton(tr("nerd_box_options"))
-            btn.clicked.connect(lambda _c=False, pid=pl.get("id"): edit and pid and edit(pid))
-            c.row(str(pl.get("name") or pl.get("server") or ""), btn,
-                  f"{BOX_NAMES.get(pl.get('kind') or '', '')} · {pl.get('server') or ''}",
-                  search="box Enigma2 Tvheadend HDHomeRun")
-        if not boxes:
-            c.note(tr("nerd_no_boxes"))
-        if add is not None:
-            add_btn = QPushButton(tr("nerd_add_box"))
-            add_btn.clicked.connect(lambda _c=False: add())
-            c.layout_row(_hbox(add_btn), "box Enigma2 Tvheadend HDHomeRun add")
-
-    # -- network ------------------------------------------------------------------
-    c = page.card(tr("nerd_card_network"))
+    # -- network: who the app says it is -------------------------------------------
+    c = at("net").card(tr("nerd_card_identity"))
+    c.note(tr("nerd_identity_intro"))
     ua_stored = val("nerd_user_agent")
     ua_key = ua_stored if ua_stored in nerd.UA_PRESETS or not ua_stored else "custom"
     ua_box = combo(UA_CHOICES, ua_key)
@@ -112,60 +133,117 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     referer.setPlaceholderText("https://portal.example.com/")
     c.row("Referer", referer, tr("nerd_referer_hint"))
     headers = text_box(val("nerd_headers"), "X-Forwarded-For: 203.0.113.7\nOrigin: https://example.com", 3)
-    c.row(tr("nerd_headers"), headers, tr("nerd_headers_hint"), stretch_control=True, search="HTTP header")
+
+    def ua_now() -> str:
+        key = ua_box.currentData()
+        if key == "custom":
+            return ua_custom.text().strip() or nerd.DEFAULT_UA
+        return nerd.UA_PRESETS.get(key, "") or nerd.DEFAULT_UA
+
+    def hdrs_now() -> dict[str, str]:
+        out = nerd.parse_headers(headers.toPlainText())
+        if referer.text().strip():
+            out["Referer"] = referer.text().strip()
+        return out
+
+    def proxy_now() -> str:
+        return proxy.text().strip()
+
+    def identity_job() -> Any:
+        s = src()
+        url = nerd_check.probe_url(s)
+        ua, h, px = ua_now(), hdrs_now(), proxy_now()
+        if url is None:
+            return lambda: nerd_check.Check(nerd_check.INFO, "nerd_ck_no_source")
+        return lambda: nerd_check.check_request(url, ua, h, px, secrets=nerd_check.source_secrets(s))
+    id_line = check(identity_job, tr("nerd_ck_title_identity"), test=True,
+                    test_text=tr("nerd_ck_test_source"))
+    c.row(tr("nerd_headers"), headers, tr("nerd_headers_hint"), stretch_control=True,
+          search="HTTP header", below=id_line)
+    c.note(tr("nerd_applies_stream"))
+
+    # -- network: the proxy ------------------------------------------------------------
+    c = at("net").card(tr("nerd_card_proxy"))
     proxy = QLineEdit(val("nerd_proxy"))
     proxy.setPlaceholderText("http://192.168.1.1:3128")
-    c.row(tr("nerd_proxy"), proxy, tr("nerd_proxy_hint"), search="proxy HTTP")
+
+    def proxy_job() -> Any:
+        px = proxy_now()
+        if not px:
+            return None
+        s = src()
+        url = nerd_check.probe_url(s)
+        ua, h = ua_now(), hdrs_now()
+        if url is None:
+            return lambda: nerd_check.check_proxy_listens(px)
+        return lambda: nerd_check.check_request(url, ua, h, px, about_proxy=True,
+                                                secrets=nerd_check.source_secrets(s))
+    px_line = check(proxy_job, tr("nerd_ck_title_proxy"), test=True)
+    c.row(tr("nerd_proxy"), proxy, tr("nerd_proxy_hint"), search="proxy HTTP", below=px_line)
     proxy_player = c.toggle(tr("nerd_proxy_player"), n.flag("nerd_proxy_player", True))
+    pp_row = c.rows[-1][0]
+    c.shown_if(pp_row, lambda: bool(proxy_now()))
+    proxy.textChanged.connect(lambda _t: c.refresh())
+    c.note(tr("nerd_applies_stream"))
+
+    # -- network: the connection ---------------------------------------------------------
+    c = at("net").card(tr("nerd_card_conn"))
     ip_box = combo([("auto", "nerd_ip_auto"), ("ipv4", "nerd_ip_v4"), ("ipv6", "nerd_ip_v6")],
                    val("nerd_ip_family", "auto"))
-    c.row(tr("nerd_ip_family"), ip_box, tr("nerd_ip_family_hint"), search="IPv4 IPv6")
+
+    def ip_job() -> Any:
+        url = nerd_check.probe_url(src())
+        fam = ip_box.currentData()
+        if url is None:
+            return lambda: nerd_check.Check(nerd_check.INFO, "nerd_ck_no_source")
+        return lambda: nerd_check.check_ip_family(url, fam)
+    ip_line = check(ip_job, tr("nerd_ck_title_ip"), test=True)
+    c.row(tr("nerd_ip_family"), ip_box, tr("nerd_ip_family_hint"), search="IPv4 IPv6", below=ip_line)
     timeout = Stepper(lo=5, hi=180, value=n.num("nerd_net_timeout", 30) or 30, width=130)
     c.row(tr("nerd_timeout"), timeout, tr("nerd_timeout_hint"))
     recon = Stepper(lo=1, hi=60, value=n.num("nerd_reconnect_max", 5) or 5, width=130)
     c.row(tr("nerd_reconnect"), recon, tr("nerd_reconnect_hint"))
+    c.note(tr("nerd_applies_conn"))
 
-    # -- the VPN guard ------------------------------------------------------------
-    c = page.card(tr("nerd_card_vpn"))
+    # -- network: the VPN guard ------------------------------------------------------------
+    c = at("net").card(tr("nerd_card_vpn"))
     guard = c.toggle(tr("nerd_vpn_guard"), n.flag("nerd_vpn_guard"), tr("nerd_vpn_guard_hint"))
     iface = QLineEdit(val("nerd_vpn_iface"))
     iface.setPlaceholderText(tr("nerd_vpn_iface_auto"))
-    c.row(tr("nerd_vpn_iface"), iface, tr("nerd_vpn_iface_hint"), search="WireGuard wg0 tun0 VPN")
+    iface_row = c.row(tr("nerd_vpn_iface"), iface, tr("nerd_vpn_iface_hint"), search="WireGuard wg0 tun0 VPN")
     vpn_lan = c.toggle(tr("nerd_vpn_lan"), n.flag("nerd_vpn_lan"))
-    status = QLabel()
-    status.setObjectName("SettingsHint")
-    check = QPushButton(tr("nerd_vpn_check"))
+    lan_row = c.rows[-1][0]
+    for r in (iface_row, lan_row):
+        c.shown_if(r, lambda: guard.isChecked())
+    guard.toggled.connect(lambda _on: c.refresh())
 
-    checking = [False]
+    def vpn_job() -> Any:
+        name = iface.text().strip()
+        return lambda: nerd_check.check_vpn(name)
+    vpn_line = check(vpn_job, tr("nerd_ck_title_vpn"), test=True, test_text=tr("nerd_vpn_check"))
+    c.widget(vpn_line, "VPN WireGuard")
+    vpn_line.auto = True
+    c.note(tr("nerd_applies_vpn"))
 
-    def show_vpn() -> None:
-        # Seen to happen: "Checking…" first, then the answer with the time,
-        # so a check that finds the same as before still says it looked.
-        # The button stays enabled: disabled while it has the focus, Qt
-        # hands the focus on to the next field - the picon folder below.
-        from PyQt6.QtCore import QTime, QTimer
-        if checking[0]:
-            return
-        checking[0] = True
-        status.setText(tr("nerd_vpn_checking"))
+    # -- boxes and servers ---------------------------------------------------------------
+    if boxes is not None:
+        c = at("boxes").card(tr("nerd_card_boxes"))
+        c.note(tr("nerd_boxes_intro"))
+        for pl in boxes:
+            btn = QPushButton(tr("nerd_box_options"))
+            btn.clicked.connect(lambda _c=False, pid=pl.get("id"): edit and pid and edit(pid))
+            c.row(str(pl.get("name") or pl.get("server") or ""), btn,
+                  f"{BOX_NAMES.get(pl.get('kind') or '', '')} · {pl.get('server') or ''}",
+                  search="box Enigma2 Tvheadend HDHomeRun")
+        if not boxes:
+            c.note(tr("nerd_no_boxes"))
+        if add is not None:
+            add_btn = QPushButton(tr("nerd_add_box"))
+            add_btn.clicked.connect(lambda _c=False: add())
+            c.layout_row(_hbox(add_btn), "box Enigma2 Tvheadend HDHomeRun add")
 
-        def answer() -> None:
-            up = nerd.vpn_interfaces()
-            at = QTime.currentTime().toString("HH:mm:ss")
-            status.setText((tr("nerd_vpn_up", names=", ".join(up)) if up else tr("nerd_vpn_none"))
-                           + f"  ({at})")
-            checking[0] = False
-        QTimer.singleShot(250, answer)
-    check.clicked.connect(show_vpn)
-    row = QHBoxLayout()
-    row.addWidget(status, 1)
-    row.addWidget(check)
-    c.layout_row(row, "VPN")
-    if n.on:
-        show_vpn()
-
-    # -- channels and guide -----------------------------------------------------------
-    c = page.card(tr("nerd_card_lists"))
+    # -- channels: picons ------------------------------------------------------------------
+    c = at("lists").card(tr("nerd_card_picons"))
     picon_dir = QLineEdit(val("nerd_picon_dir"))
     picon_dir.setPlaceholderText("~/picons")
     pick_picons = QPushButton(tr("nerd_choose"))
@@ -180,17 +258,47 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     picon_row.setSpacing(8)
     picon_row.addWidget(picon_dir, 1)
     picon_row.addWidget(pick_picons)
+
+    def picon_job() -> Any:
+        folder = picon_dir.text().strip()
+        if not folder:
+            return None
+        fetch = channels
+
+        def run() -> Any:
+            try:
+                rows = list(fetch() or []) if fetch is not None else []
+            except Exception as e:      # no list now: count the picons alone
+                log.info("nerd check: no channel list for picons: %s", e)
+                rows = []
+            return nerd_check.check_picons(folder, rows)
+        return run
+    pi_line = check(picon_job, tr("nerd_ck_title_picons"))
+    picon_dir.textChanged.connect(pi_line.changed)
     c.row(tr("nerd_picon_dir"), picon_row, tr("nerd_picon_dir_hint"), stretch_control=True,
-          search="picon logo SNP")
+          search="picon logo SNP", below=pi_line)
     picon_over = c.toggle(tr("nerd_picon_override"), n.flag("nerd_picon_override"))
+    c.note(tr("nerd_applies_reload"))
+
+    # -- channels: multicast ---------------------------------------------------------------
+    c = at("lists").card(tr("nerd_card_udpxy"))
     udpxy = QLineEdit(val("nerd_udpxy"))
     udpxy.setPlaceholderText("http://192.168.1.1:4022")
-    c.row("udpxy", udpxy, tr("nerd_udpxy_hint"), search="multicast udp rtp IPTV")
-    adelay = c.toggle(tr("nerd_adelay"), n.flag("nerd_adelay_per_channel", True), tr("nerd_adelay_hint"))
-    c.note(tr("nerd_epg_multi"))
 
-    # -- the player -----------------------------------------------------------------
-    c = page.card(tr("nerd_card_player"))
+    def udpxy_job() -> Any:
+        url = udpxy.text().strip()
+        return (lambda: nerd_check.check_udpxy(url)) if url else None
+    ux_line = check(udpxy_job, tr("nerd_ck_title_udpxy"), test=True)
+    c.row("udpxy", udpxy, tr("nerd_udpxy_hint"), search="multicast udp rtp IPTV", below=ux_line)
+    c.note(tr("nerd_applies_reload"))
+
+    # -- channels: guide -------------------------------------------------------------------
+    c = at("lists").card(tr("nerd_card_guide"))
+    c.note(tr("nerd_epg_multi"))
+    c.note(tr("nerd_epg_map_note"))
+
+    # -- the player: picture and sound -------------------------------------------------------
+    c = at("player").card(tr("nerd_card_player"))
     spdif_on = set(val("nerd_spdif").split(","))
     spdif = [Chip(label, key in spdif_on) for key, label in SPDIF_LABELS]
     c.row(tr("nerd_spdif"), ChipGroups([("", spdif)]), tr("nerd_spdif_hint"), stretch_control=True,
@@ -198,15 +306,44 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     sync = combo([("", "nerd_sync_audio"), ("display-resample", "nerd_sync_resample"),
                   ("display-vdrop", "nerd_sync_vdrop")], val("nerd_video_sync"))
     c.row(tr("nerd_sync"), sync, tr("nerd_sync_hint"), search="video-sync display-resample")
-    interp = c.toggle(tr("nerd_interpolation"), n.flag("nerd_interpolation"), tr("nerd_interpolation_hint"))
+
+    def picture_pairs() -> list[tuple[str, str]]:
+        out = []
+        codecs = [k for (k, _l), chip in zip(SPDIF_LABELS, spdif, strict=True) if chip.isChecked()]
+        if codecs:
+            out.append(("audio-spdif", ",".join(codecs)))
+        if sync.currentData():
+            out.append(("video-sync", sync.currentData()))
+        if interp.isChecked():
+            out += [("interpolation", "yes"), ("tscale", "oversample")]
+        return out
+
+    def picture_job() -> Any:
+        pairs = picture_pairs()
+        return (lambda: nerd_check.check_mpv_options("", extra=pairs)) if pairs else None
+    pic_line = check(picture_job, tr("nerd_ck_title_mpv"))
+    interp = ToggleSwitch(n.flag("nerd_interpolation"))
+    interp.setAccessibleName(tr("nerd_interpolation"))
+    c.row(tr("nerd_interpolation"), interp, tr("nerd_interpolation_hint"), below=pic_line)
+    for chip in spdif:
+        chip.toggled.connect(pic_line.changed)
+    sync.currentIndexChanged.connect(pic_line.changed)
+    interp.toggled.connect(pic_line.changed)
+    c.note(tr("nerd_applies_now"))
+
+    # -- the player: channel start and buffer --------------------------------------------------
+    c = at("player").card(tr("nerd_card_start"))
     probe = combo([("instant", "nerd_probe_instant"), ("", "nerd_probe_fast"),
                    ("thorough", "nerd_probe_thorough")], val("nerd_probe"))
     c.row(tr("nerd_probe"), probe, tr("nerd_probe_hint"))
     cache = combo([(str(mb), tr("nerd_cache_auto") if not mb else f"{mb} MB") for mb in CACHE_CHOICES],
                   str(n.num("nerd_demux_max_mb", 0)))
     c.row(tr("nerd_cache"), cache, tr("nerd_cache_hint"), search="demuxer-max-bytes")
+    adelay = c.toggle(tr("nerd_adelay"), n.flag("nerd_adelay_per_channel", True), tr("nerd_adelay_hint"))
+    c.note(tr("nerd_applies_stream"))
 
-    c = page.card(tr("nerd_card_mpv"))
+    # -- the player: mpv itself ----------------------------------------------------------------
+    c = at("player").card(tr("nerd_card_mpv"))
     conf_dir = QLineEdit(val("nerd_mpv_config_dir"))
     conf_dir.setPlaceholderText("~/.config/mpv")
     pick_dir = QPushButton(tr("nerd_choose"))
@@ -221,8 +358,14 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     dir_row.setSpacing(8)
     dir_row.addWidget(conf_dir, 1)
     dir_row.addWidget(pick_dir)
+
+    def dir_job() -> Any:
+        folder = conf_dir.text().strip()
+        return (lambda: nerd_check.check_mpv_dir(folder)) if folder else None
+    dir_line = check(dir_job, tr("nerd_ck_title_mpvdir"))
+    conf_dir.textChanged.connect(dir_line.changed)
     c.row(tr("nerd_mpv_dir"), dir_row, tr("nerd_mpv_dir_hint"), stretch_control=True,
-          search="mpv.conf scripts lua")
+          search="mpv.conf scripts lua", below=dir_line)
     shaders = text_box(val("nerd_shaders"), "~/.config/mpv/shaders/FSRCNNX_x2_8-0-4-1.glsl", 2)
     add_shader = QPushButton(tr("nerd_add_shader"))
 
@@ -237,26 +380,49 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     shader_col.setSpacing(6)
     shader_col.addWidget(shaders)
     shader_col.addLayout(_hbox(add_shader))
-    c.row(tr("nerd_shaders"), shader_col, tr("nerd_shaders_hint"), stretch_control=True,
-          search="glsl FSRCNNX Anime4K upscaling")
-    raw = text_box(val("nerd_mpv_options"), "deband=yes\nscale=ewa_lanczossharp\nvolume-max=150", 6)
-    c.row(tr("nerd_mpv_options"), raw, tr("nerd_mpv_options_hint"), stretch_control=True,
-          search="mpv.conf options")
-    c.note(tr("nerd_restart_note"))
 
-    # -- diagnostics --------------------------------------------------------------
+    def shader_job() -> Any:
+        text = shaders.toPlainText()
+        return (lambda: nerd_check.check_shaders(text)) if text.strip() else None
+    sh_line = check(shader_job, tr("nerd_ck_title_shaders"))
+    shaders.textChanged.connect(sh_line.changed)
+    c.row(tr("nerd_shaders"), shader_col, tr("nerd_shaders_hint"), stretch_control=True,
+          search="glsl FSRCNNX Anime4K upscaling", below=sh_line)
+    raw = text_box(val("nerd_mpv_options"), "deband=yes\nscale=ewa_lanczossharp\nvolume-max=150", 6)
+
+    def raw_job() -> Any:
+        text = raw.toPlainText()
+        return (lambda: nerd_check.check_mpv_options(text)) if text.strip() else None
+    raw_line = check(raw_job, tr("nerd_ck_title_mpv"))
+    raw.textChanged.connect(raw_line.changed)
+    c.row(tr("nerd_mpv_options"), raw, tr("nerd_mpv_options_hint"), stretch_control=True,
+          search="mpv.conf options", below=raw_line)
+    c.note(tr("nerd_applies_mpv"))
+
+    # -- diagnostics (Nerd's own page) --------------------------------------------------------
     c = page.card(tr("nerd_card_diag"))
     level = combo([("info", "nerd_log_info"), ("debug", "nerd_log_debug")], val("nerd_log_level", "info"))
     c.row(tr("nerd_log_level"), level, tr("nerd_log_level_hint"), search="log debug")
-    copy_btn = QPushButton(tr("nerd_copy_diag"))
-    copied = QLabel("")
-    copied.setObjectName("SettingsHint")
+    log_file = c.toggle(tr("nerd_log_file"), n.flag("nerd_log_file"), tr("nerd_log_file_hint"))
+    open_logs = QPushButton(tr("nerd_open_logs"))
 
-    def copy_diag() -> None:
-        QGuiApplication.clipboard().setText(diagnostics(settings))
-        copied.setText(tr("nerd_copied"))
-    copy_btn.clicked.connect(copy_diag)
-    c.layout_row(_hbox(copy_btn, copied), "diagnostics")
+    def open_log_folder() -> None:
+        from ..core.xdg import open_url
+        os.makedirs(log_dir(), exist_ok=True)
+        from pathlib import Path
+        open_url(Path(log_dir()).as_uri())
+    open_logs.clicked.connect(open_log_folder)
+    home = os.path.expanduser("~")
+    shown_dir = "~" + log_dir()[len(home):] if log_dir().startswith(home) else log_dir()
+    c.row(tr("nerd_log_folder"), open_logs, shown_dir, search="log logs folder")
+    info_btn = QPushButton(tr("nerd_show_diag"))
+
+    def show_diag() -> None:
+        from .dialogs import ProblemDialog
+        ProblemDialog(parent, tr("nerd_diag_title"), tr("nerd_diag_summary"),
+                      diagnostics(settings), state="info").exec()
+    info_btn.clicked.connect(show_diag)
+    c.row(tr("nerd_diag_row"), info_btn, tr("nerd_diag_hint"), search="diagnostics bug report copy")
 
     def values() -> dict[str, str]:
         out: dict[str, str] = {}
@@ -285,6 +451,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
         put("nerd_shaders", shaders.toPlainText().strip())
         put("nerd_mpv_options", raw.toPlainText().strip())
         put("nerd_log_level", level.currentData())
+        put("nerd_log_file", "true" if log_file.isChecked() else "false")
         put("nerd_overlay_more", "true" if overlay.isChecked() else "false")
         put("nerd_picon_dir", picon_dir.text().strip())
         put("nerd_picon_override", "true" if picon_over.isChecked() else "false")
@@ -292,7 +459,8 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
         put("nerd_adelay_per_channel", "true" if adelay.isChecked() else "false")
         return out
 
-    # Off: the switch and what Nerd holds, nothing else. On: all of it.
+    # Off: the switch and what Nerd holds, nothing else. On: all of it - on
+    # their own pages where there are pages, else gated here.
     first = page.cards[gated_from - 1]
     first.shown_if(teaser_row, lambda: not switch.isChecked())
     for card in page.cards[gated_from:]:
@@ -300,10 +468,23 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
             prev = card._shown_if.get(id(row))
             card.shown_if(row, lambda prev=prev: switch.isChecked() and (prev is None or prev()))
 
-    def flip(_on: bool) -> None:
+    def start_checks() -> None:
+        for line in lines:
+            if line.test_btn is None or getattr(line, "auto", False):
+                line.start()
+
+    def flip(on: bool) -> None:
         for card in page.cards:
             card.refresh()
+        if show_pages is not None:
+            show_pages(on)
+        if on:
+            start_checks()
     switch.toggled.connect(flip)
+    if show_pages is not None:
+        show_pages(n.on)
+    if n.on:
+        start_checks()
 
     shown = values()
 
@@ -316,7 +497,32 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
                 continue
             put(key, value)
 
+    commit.lines = lines  # type: ignore[attr-defined]
     return commit
+
+
+def _how_block(items: list[tuple[str, str]]) -> QWidget:
+    """How Nerd works, as one block: a short lead-in on the left of each
+    line, what it means beside it - no hairlines between, one thing to read."""
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import QGridLayout, QLabel
+
+    from .theme import P
+    box = QWidget()
+    grid = QGridLayout(box)
+    grid.setContentsMargins(0, 4, 0, 4)
+    grid.setHorizontalSpacing(18)
+    grid.setVerticalSpacing(10)
+    for i, (title, body) in enumerate(items):
+        head = QLabel(tr(title))
+        head.setStyleSheet(f"color:{P['text']}; font-weight:600;")
+        text = QLabel(tr(body))
+        text.setWordWrap(True)
+        text.setStyleSheet(f"color:{P['text2']};")
+        grid.addWidget(head, i, 0, Qt.AlignmentFlag.AlignTop)
+        grid.addWidget(text, i, 1)
+    grid.setColumnStretch(1, 1)
+    return box
 
 
 def _hbox(*widgets: QWidget) -> QHBoxLayout:
@@ -360,4 +566,6 @@ def diagnostics(settings: Any) -> str:
             lines.append(f"  {key} = (set)")
     up = nerd.vpn_interfaces()
     lines.append(f"VPN interfaces up: {', '.join(up) if up else 'none'}")
+    if n.on and n.flag("nerd_log_file"):
+        lines.append("Log file: on (rotating, in the app's log folder)")
     return "\n".join(lines)

@@ -115,9 +115,11 @@ def search_and_cancel(self):
     visible = lambda: [nav.item(i).data(0x0100) for i in range(nav.count())
                        if not nav.item(i).isHidden()
                        and nav.item(i).data(0x0100)]
-    # Every page, Nerd too (its switch is on it).
-    shown = len(shell.pages)
-    assert not shell._off and len(visible()) == shown >= 14
+    # Every page, Nerd too (its switch is on it); Nerd's four pages are
+    # left out while it is off.
+    shown = len(shell.pages) - 4
+    assert shell._off == {"nerd_net", "nerd_boxes", "nerd_lists", "nerd_player"}, shell._off
+    assert len(visible()) == shown >= 14, (visible(), shown)
     shell.search.setText(tr("setting_sub_lang_fallback")[:-2])
     assert visible() == ["audio"], visible()
     # What a search finds is shown from every page at once, in one view.
@@ -229,11 +231,26 @@ def layout(self):
             for i in range(nav.count())]
     keys = [k for k, _f in rows if k]
     assert keys[:4] == ["general", "playlists", "appearance", "home"], keys
-    # Nerd last, after Advanced, a category of its own.
-    assert keys[-3:] == ["parental", "advanced", "nerd"], keys
-    assert not nav.item([k for k, _f in rows].index("nerd")).isHidden()
+    # Nerd last under System, after Advanced, a category of its own; its
+    # four pages under a NERD heading of their own, left out while it is off.
+    nerd_pages = ["nerd_net", "nerd_boxes", "nerd_lists", "nerd_player"]
+    assert keys[-7:] == ["parental", "advanced", "nerd"] + nerd_pages, keys
+    at = {k: i for i, (k, _f) in enumerate(rows) if k}
+    assert not nav.item(at["nerd"]).isHidden()
+    assert all(nav.item(at[k]).isHidden() for k in nerd_pages)
     heads = [i for i, (k, f) in enumerate(rows) if not k]
-    assert len(heads) == 5 and heads[0] == 0, heads
+    assert len(heads) == 6 and heads[0] == 0, heads
+    assert nav.item(heads[-1]).isHidden()             # NERD, with nothing under it
+    # Turned on: the pages and their heading appear; off again: gone.
+    nerd_switch = [x for x in self.findChildren(ToggleSwitch)
+                   if x.accessibleName() == tr("nerd_switch")][0]
+    nerd_switch.setChecked(True)
+    assert all(not nav.item(at[k]).isHidden() for k in nerd_pages)
+    assert not nav.item(heads[-1]).isHidden()
+    shell.show_page("nerd_player")
+    assert shell.current_key() == "nerd_player"
+    nerd_switch.setChecked(False)
+    assert all(nav.item(at[k]).isHidden() for k in nerd_pages)
     assert all(not (rows[i][1] & Qt.ItemFlag.ItemIsSelectable) for i in heads)
     shell.show_page("playlists")
     assert shell.current_key() == "playlists"

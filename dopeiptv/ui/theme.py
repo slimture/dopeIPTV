@@ -30,7 +30,7 @@ THEMES = {
         "scroll": "#33333C", "scroll_hover": "#45454F",
         "text": "#ECECF1", "text2": "#C9C9D2", "text3": "#A7A7B1",
         "muted": "#8B8B96", "muted2": "#6E6E79", "muted3": "#5A5A64",
-        "muted4": "#7A7A85", "error": "#FF6B6B", "rec": "#FF5C5C",
+        "muted4": "#7A7A85", "ok": "#5FCB8A", "warn": "#E5B454", "error": "#FF6B6B", "rec": "#FF5C5C",
     },
     "midnight": {
         "name": "Midnight (blue)",
@@ -41,7 +41,7 @@ THEMES = {
         "scroll": "#2A3654", "scroll_hover": "#3A4870",
         "text": "#E6EAF2", "text2": "#C3CBD9", "text3": "#9AA5B8",
         "muted": "#8E99AF", "muted2": "#6B7690", "muted3": "#57627B",
-        "muted4": "#77829C", "error": "#FF6B6B", "rec": "#FF5C5C",
+        "muted4": "#77829C", "ok": "#5FCB8A", "warn": "#E5B454", "error": "#FF6B6B", "rec": "#FF5C5C",
     },
     "oled": {
         "name": "OLED (pure black)",
@@ -52,7 +52,7 @@ THEMES = {
         "scroll": "#2E2E36", "scroll_hover": "#3E3E48",
         "text": "#F2F2F6", "text2": "#CFCFD8", "text3": "#A8A8B4",
         "muted": "#8B8B96", "muted2": "#6E6E79", "muted3": "#5A5A64",
-        "muted4": "#7A7A85", "error": "#FF6B6B", "rec": "#FF5C5C",
+        "muted4": "#7A7A85", "ok": "#5FCB8A", "warn": "#E5B454", "error": "#FF6B6B", "rec": "#FF5C5C",
     },
     "nord": {
         "name": "Nord",
@@ -63,7 +63,7 @@ THEMES = {
         "scroll": "#4C566A", "scroll_hover": "#5E6A82",
         "text": "#ECEFF4", "text2": "#D8DEE9", "text3": "#B8C0D0",
         "muted": "#94A0B8", "muted2": "#7B879D", "muted3": "#6A7590",
-        "muted4": "#8590A6", "error": "#FF6B6B", "rec": "#FF5C5C",
+        "muted4": "#8590A6", "ok": "#A3BE8C", "warn": "#EBCB8B", "error": "#FF6B6B", "rec": "#FF5C5C",
         "accent": ("#88C0D0", "#9DCDDB"),
     },
     "dracula": {
@@ -75,7 +75,7 @@ THEMES = {
         "scroll": "#44475A", "scroll_hover": "#565973",
         "text": "#F8F8F2", "text2": "#E4E4DE", "text3": "#C9C9C4",
         "muted": "#A2A3B2", "muted2": "#7E7F92", "muted3": "#6C6D80",
-        "muted4": "#8B8C9E", "error": "#FF5555", "rec": "#FF5555",
+        "muted4": "#8B8C9E", "ok": "#50FA7B", "warn": "#F1FA8C", "error": "#FF5555", "rec": "#FF5555",
         "accent": ("#BD93F9", "#CBA8FA"),
     },
     "gruvbox": {
@@ -87,7 +87,7 @@ THEMES = {
         "scroll": "#504945", "scroll_hover": "#665C54",
         "text": "#EBDBB2", "text2": "#D5C4A1", "text3": "#BDAE93",
         "muted": "#A89984", "muted2": "#928374", "muted3": "#7C6F64",
-        "muted4": "#928374", "error": "#FB4934", "rec": "#FB4934",
+        "muted4": "#928374", "ok": "#B8BB26", "warn": "#FABD2F", "error": "#FB4934", "rec": "#FB4934",
         "accent": ("#FE8019", "#FE9540"),
     },
     "solarized": {
@@ -99,7 +99,7 @@ THEMES = {
         "scroll": "#0E4B5A", "scroll_hover": "#14606F",
         "text": "#EEE8D5", "text2": "#93A1A1", "text3": "#839496",
         "muted": "#768D92", "muted2": "#657B83", "muted3": "#556B72",
-        "muted4": "#768D92", "error": "#DC322F", "rec": "#DC322F",
+        "muted4": "#768D92", "ok": "#859900", "warn": "#B58900", "error": "#DC322F", "rec": "#DC322F",
         "accent": ("#268BD2", "#3A99DA"),
     },
     "catppuccin": {
@@ -111,7 +111,7 @@ THEMES = {
         "scroll": "#45475A", "scroll_hover": "#585B70",
         "text": "#CDD6F4", "text2": "#BAC2DE", "text3": "#A6ADC8",
         "muted": "#9399B2", "muted2": "#7F849C", "muted3": "#6C7086",
-        "muted4": "#9399B2", "error": "#F38BA8", "rec": "#F38BA8",
+        "muted4": "#9399B2", "ok": "#A6E3A1", "warn": "#F9E2AF", "error": "#F38BA8", "rec": "#F38BA8",
         "accent": ("#CBA6F7", "#D6B9F9"),
     },
     "light": {
@@ -123,7 +123,7 @@ THEMES = {
         "scroll": "#C5C5CE", "scroll_hover": "#ADADB8",
         "text": "#1B1B1F", "text2": "#3A3A42", "text3": "#55555F",
         "muted": "#6E6E79", "muted2": "#8B8B96", "muted3": "#8B8B96",
-        "muted4": "#7A7A85", "error": "#D93025", "rec": "#D93025",
+        "muted4": "#7A7A85", "ok": "#1E7F3C", "warn": "#9A6200", "error": "#D93025", "rec": "#D93025",
         "light": True,
     },
     "tokyonight": {
@@ -135,7 +135,7 @@ THEMES = {
         "scroll": "#3B4261", "scroll_hover": "#414868",
         "text": "#C0CAF5", "text2": "#A9B1D6", "text3": "#9AA5CE",
         "muted": "#8089B3", "muted2": "#737AA2", "muted3": "#5E6590",
-        "muted4": "#6B7199", "error": "#F7768E", "rec": "#F7768E",
+        "muted4": "#6B7199", "ok": "#9ECE6A", "warn": "#E0AF68", "error": "#F7768E", "rec": "#F7768E",
         "accent": ("#7AA2F7", "#8FB2FA"),
     },
     "rosepine": {
@@ -147,7 +147,7 @@ THEMES = {
         "scroll": "#403D52", "scroll_hover": "#524F67",
         "text": "#E0DEF4", "text2": "#CDCAE6", "text3": "#ABA7C6",
         "muted": "#908CAA", "muted2": "#7E7A98", "muted3": "#6E6A86",
-        "muted4": "#857F9F", "error": "#EB6F92", "rec": "#EB6F92",
+        "muted4": "#857F9F", "ok": "#9CCFD8", "warn": "#F6C177", "error": "#EB6F92", "rec": "#EB6F92",
         "accent": ("#C4A7E7", "#D3BCF0"),
     },
     "onedark": {
@@ -159,7 +159,7 @@ THEMES = {
         "scroll": "#4B5263", "scroll_hover": "#5C6370",
         "text": "#D7DAE0", "text2": "#ABB2BF", "text3": "#9DA5B4",
         "muted": "#8B929E", "muted2": "#7F848E", "muted3": "#636B78",
-        "muted4": "#828997", "error": "#E06C75", "rec": "#E06C75",
+        "muted4": "#828997", "ok": "#98C379", "warn": "#E5C07B", "error": "#E06C75", "rec": "#E06C75",
         "accent": ("#61AFEF", "#7CBDF2"),
     },
     "everforest": {
@@ -171,7 +171,7 @@ THEMES = {
         "scroll": "#475258", "scroll_hover": "#56635F",
         "text": "#D3C6AA", "text2": "#C4B99D", "text3": "#9DA9A0",
         "muted": "#859289", "muted2": "#7A8478", "muted3": "#68736B",
-        "muted4": "#859289", "error": "#E67E80", "rec": "#E67E80",
+        "muted4": "#859289", "ok": "#A7C080", "warn": "#DBBC7F", "error": "#E67E80", "rec": "#E67E80",
         "accent": ("#A7C080", "#B8CE94"),
     },
     "kanagawa": {
@@ -183,7 +183,7 @@ THEMES = {
         "scroll": "#363646", "scroll_hover": "#54546D",
         "text": "#DCD7BA", "text2": "#C8C093", "text3": "#A6A28C",
         "muted": "#938F80", "muted2": "#807E72", "muted3": "#727169",
-        "muted4": "#8A8878", "error": "#E46876", "rec": "#E82424",
+        "muted4": "#8A8878", "ok": "#98BB6C", "warn": "#E6C384", "error": "#E46876", "rec": "#E82424",
         "accent": ("#7E9CD8", "#93ADE0"),
     },
     "contrast": {
@@ -195,7 +195,7 @@ THEMES = {
         "scroll": "#8A8A8A", "scroll_hover": "#BFBFBF",
         "text": "#FFFFFF", "text2": "#FFFFFF", "text3": "#F0F0F0",
         "muted": "#E0E0E0", "muted2": "#D0D0D0", "muted3": "#C8C8C8",
-        "muted4": "#D8D8D8", "error": "#FF6B6B", "rec": "#FF4D4D",
+        "muted4": "#D8D8D8", "ok": "#5FCB8A", "warn": "#E5B454", "error": "#FF6B6B", "rec": "#FF4D4D",
         "accent": ("#1A73E8", "#4A90F0"),
     },
     "latte": {
@@ -207,7 +207,7 @@ THEMES = {
         "scroll": "#BCC0CC", "scroll_hover": "#ACB0BE",
         "text": "#4C4F69", "text2": "#5C5F77", "text3": "#6C6F85",
         "muted": "#6C6F85", "muted2": "#7C7F93", "muted3": "#8C8FA1",
-        "muted4": "#7C7F93", "error": "#D20F39", "rec": "#D20F39",
+        "muted4": "#7C7F93", "ok": "#2B7A1C", "warn": "#9C5D08", "error": "#D20F39", "rec": "#D20F39",
         "accent": ("#8839EF", "#9A55F2"), "light": True,
     },
     "solarized_light": {
@@ -219,7 +219,7 @@ THEMES = {
         "scroll": "#D6CDB2", "scroll_hover": "#C4BB9F",
         "text": "#073642", "text2": "#586E75", "text3": "#657B83",
         "muted": "#657B83", "muted2": "#7B8E91", "muted3": "#839496",
-        "muted4": "#7B8E91", "error": "#DC322F", "rec": "#DC322F",
+        "muted4": "#7B8E91", "ok": "#5F7300", "warn": "#8A6A00", "error": "#DC322F", "rec": "#DC322F",
         "accent": ("#268BD2", "#3A99DA"), "light": True,
     },
     # Themes that differ by colour, not by shade: each has a hue of its own
@@ -233,7 +233,7 @@ THEMES = {
         "scroll": "#1A5A6B", "scroll_hover": "#24707F",
         "text": "#E3F6F8", "text2": "#BFE3E8", "text3": "#97CBD3",
         "muted": "#7FB3BC", "muted2": "#5F939C", "muted3": "#4A7A83",
-        "muted4": "#6DA2AB", "error": "#FF7A7A", "rec": "#FF6B6B",
+        "muted4": "#6DA2AB", "ok": "#5FCB8A", "warn": "#E5B454", "error": "#FF7A7A", "rec": "#FF6B6B",
         "accent": ("#0F9F94", "#14B8A6"),
     },
     "forest": {
@@ -245,7 +245,7 @@ THEMES = {
         "scroll": "#2A543B", "scroll_hover": "#36694B",
         "text": "#E6F4EA", "text2": "#C4E2CD", "text3": "#9CC7A9",
         "muted": "#86B293", "muted2": "#679477", "muted3": "#527B61",
-        "muted4": "#74A383", "error": "#FF7B72", "rec": "#FF6B6B",
+        "muted4": "#74A383", "ok": "#5FCB8A", "warn": "#E5B454", "error": "#FF7B72", "rec": "#FF6B6B",
         "accent": ("#1E9E50", "#2BB463"),
     },
     "bordeaux": {
@@ -257,7 +257,7 @@ THEMES = {
         "scroll": "#5E2A3D", "scroll_hover": "#743650",
         "text": "#F8E8EC", "text2": "#E7C7D0", "text3": "#D0A3B0",
         "muted": "#BB8C99", "muted2": "#9A6E7B", "muted3": "#805866",
-        "muted4": "#AA7C89", "error": "#FF9A8F", "rec": "#FF6B6B",
+        "muted4": "#AA7C89", "ok": "#5FCB8A", "warn": "#E5B454", "error": "#FF9A8F", "rec": "#FF6B6B",
         "accent": ("#C8784C", "#D88A5E"),
     },
     "synthwave": {
@@ -269,7 +269,7 @@ THEMES = {
         "scroll": "#4A2378", "scroll_hover": "#5C2E93",
         "text": "#F5EBFF", "text2": "#DCC8F5", "text3": "#BFA6E6",
         "muted": "#A68BD0", "muted2": "#866BB0", "muted3": "#6F5796",
-        "muted4": "#977CC0", "error": "#FF6B9A", "rec": "#FF5C8A",
+        "muted4": "#977CC0", "ok": "#5FCB8A", "warn": "#E5B454", "error": "#FF6B9A", "rec": "#FF5C8A",
         "accent": ("#E03CAE", "#EC5BC0"),
     },
     "amber": {
@@ -281,7 +281,7 @@ THEMES = {
         "scroll": "#3A2D14", "scroll_hover": "#4D3C1A",
         "text": "#FFC24D", "text2": "#E8AE3E", "text3": "#CC9733",
         "muted": "#A87C2E", "muted2": "#86632A", "muted3": "#6B5023",
-        "muted4": "#977030", "error": "#FF5F4A", "rec": "#FF5F4A",
+        "muted4": "#977030", "ok": "#5FCB8A", "warn": "#E5B454", "error": "#FF5F4A", "rec": "#FF5F4A",
         "accent": ("#CC7A00", "#E08E10"),
     },
     "espresso": {
@@ -293,7 +293,7 @@ THEMES = {
         "scroll": "#4A3A2E", "scroll_hover": "#5E4A3B",
         "text": "#F3E9DF", "text2": "#DCCBBA", "text3": "#C2AC96",
         "muted": "#A88F78", "muted2": "#88715D", "muted3": "#705C4B",
-        "muted4": "#98806A", "error": "#FF7B6B", "rec": "#FF6B5C",
+        "muted4": "#98806A", "ok": "#5FCB8A", "warn": "#E5B454", "error": "#FF7B6B", "rec": "#FF6B5C",
         "accent": ("#B87A45", "#C88C58"),
     },
     "sand": {
@@ -305,7 +305,7 @@ THEMES = {
         "scroll": "#CDBB97", "scroll_hover": "#B9A57F",
         "text": "#3B2F1E", "text2": "#55462F", "text3": "#6A5A40",
         "muted": "#6F5F45", "muted2": "#85755A", "muted3": "#9C8C70",
-        "muted4": "#85755A", "error": "#B03024", "rec": "#C0392B",
+        "muted4": "#85755A", "ok": "#1E7F3C", "warn": "#9A6200", "error": "#B03024", "rec": "#C0392B",
         "accent": ("#A3561A", "#B5651D"), "light": True,
     },
     "sky": {
@@ -317,7 +317,7 @@ THEMES = {
         "scroll": "#AFC8E3", "scroll_hover": "#94B3D6",
         "text": "#102A43", "text2": "#243B53", "text3": "#334E68",
         "muted": "#4A5F78", "muted2": "#627D98", "muted3": "#7B93AB",
-        "muted4": "#627D98", "error": "#C62828", "rec": "#D32F2F",
+        "muted4": "#627D98", "ok": "#1E7F3C", "warn": "#9A6200", "error": "#C62828", "rec": "#D32F2F",
         "accent": ("#1E6FD9", "#3A85E3"), "light": True,
     },
 }

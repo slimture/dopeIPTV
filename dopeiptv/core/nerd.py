@@ -18,6 +18,7 @@ import os
 import re
 import socket
 import sys
+import weakref
 from typing import Any, Protocol
 
 from .log import log
@@ -371,9 +372,12 @@ def install(settings: Settings | None) -> Nerd:
     global _current
     _current = Nerd(settings)
     apply_ip_family(_current.get("nerd_ip_family", "auto") if _current.on else "auto")
-    if _current.on and _current.get("nerd_log_level") == "debug" and not os.environ.get("DOPEIPTV_LOG"):
+    if not os.environ.get("DOPEIPTV_LOG"):
         import logging
-        log.setLevel(logging.DEBUG)
+        debug = _current.on and _current.get("nerd_log_level") == "debug"
+        log.setLevel(logging.DEBUG if debug else logging.INFO)
+    from .log import set_file_logging
+    set_file_logging(_current.on and _current.flag("nerd_log_file"))
     return _current
 
 
@@ -414,10 +418,36 @@ def apply_options(mpv: Any, pairs: list[tuple[str, str]]) -> list[str]:
     return took
 
 
+# What each core had before Nerd set an option on it, put back when the
+# option goes again (Settings changed while it plays). A value libmpv will
+# not take back (0 for "not set") is replaced by what that means.
+_before: dict[int, dict[str, Any]] = {}
+_UNSET_MEANS = {"demuxer-lavf-probesize": "5000000"}
+
+
+def _remember(mpv: Any, keys: list[str]) -> dict[str, Any]:
+    saved = _before.get(id(mpv))
+    if saved is None:
+        saved = _before[id(mpv)] = {}
+        try:
+            weakref.finalize(mpv, _before.pop, id(mpv), None)
+        except TypeError:
+            pass
+    for key in keys:
+        if key not in saved:
+            try:
+                saved[key] = mpv[key]
+            except Exception:
+                saved[key] = None
+    return saved
+
+
 def apply_core(mpv: Any) -> list[str]:
     """The Nerd options and scripts for a newly made mpv core."""
     n = current()
-    took = apply_options(mpv, n.core_options())
+    pairs = n.core_options()
+    _remember(mpv, [k for k, _v in pairs])
+    took = apply_options(mpv, pairs)
     for path in n.scripts():
         try:
             mpv.command("load-script", path)
@@ -427,6 +457,35 @@ def apply_core(mpv: Any) -> list[str]:
     if took:
         log.info("nerd: %d option(s) on the player: %s", len(took), ", ".join(took))
     return took
+
+
+def reapply_core(mpv: Any) -> dict[str, list[str]]:
+    """Settings changed while *mpv* plays: an option no longer asked for goes
+    back to what the core had, the rest are set anew - the picture ones at
+    once, the stream ones (buffer, channel start) from the next stream.
+    Scripts load when a core is made, so a new one waits for the next start."""
+    pairs = current().core_options()
+    keys = [k for k, _v in pairs]
+    saved = _remember(mpv, keys)
+    restored: list[str] = []
+    for key in [k for k in saved if k not in keys]:
+        value = saved.pop(key)
+        if value is None:
+            continue
+        try:
+            mpv[key] = value
+        except Exception:
+            try:
+                mpv[key] = _UNSET_MEANS[key]
+            except Exception as e:
+                log.info("nerd: %s not put back: %s", key, e)
+                continue
+        restored.append(key)
+    took = apply_options(mpv, pairs)
+    if restored or took:
+        log.info("nerd: player updated (set %s; back to default %s)",
+                 ", ".join(took) or "-", ", ".join(restored) or "-")
+    return {"set": took, "restored": restored}
 
 
 def apply_stream(mpv: Any, source: dict | None, was_applied: bool, url: str = "") -> bool:

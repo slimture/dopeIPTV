@@ -183,6 +183,30 @@ def test_welcome_offers_nerd_quietly_and_boxes_only_then(app, settings):
     assert settings.value("nerd_enabled") == "false"
 
 
+def test_welcome_is_no_taller_with_nerd_on(app, settings):
+    """The welcome card with Nerd on holds the box kinds and Find on my
+    network, nothing more: never taller than the plain Xtream form (the
+    source's own Nerd options live in the source dialog only)."""
+    def height(kind):
+        ov, got = _welcome(settings)
+        got["_win"].resize(1100, 640)
+        got["_win"].show()
+        ov._stack.setCurrentIndex(1)
+        i = ov._conn_kind.findData(kind)
+        assert i >= 0, kind
+        ov._conn_kind.setCurrentIndex(i)
+        ov._fit_card(1)
+        h = ov._card.sizeHint().height()
+        got["_win"].close()
+        return h
+    plain = height("xtream")
+    settings.setValue("nerd_enabled", "true")
+    nerd.install(settings)
+    assert height("xtream") == plain
+    for kind in ("enigma2", "tvheadend", "hdhomerun"):
+        assert height(kind) <= plain, kind
+
+
 def test_diagnostics_never_carry_a_secret(app, settings):
     from dopeiptv.ui.nerd_settings import diagnostics
     settings.setValue("nerd_enabled", "true")
@@ -251,3 +275,62 @@ def test_check_now_keeps_the_focus(app, settings):
     QTest.qWait(400)
     assert QApplication.focusWidget() is btn and btn.isEnabled()
     shell.close()
+
+
+def test_a_check_that_ends_after_settings_closed_does_nothing(app):
+    """Test pressed, Settings closed before the answer: the line is gone
+    when the check ends. Touching it then ended the whole app (an exception
+    in a Qt slot aborts); now the late answer is dropped."""
+    import time
+
+    from PyQt6 import sip
+    from PyQt6.QtTest import QTest
+    from PyQt6.QtWidgets import QWidget
+
+    from dopeiptv.core.nerd_check import OK, Check
+    from dopeiptv.ui.nerd_check_line import CheckLine
+
+    def slow() -> Check:
+        time.sleep(0.4)
+        return Check(OK, "nerd_ck_udpxy_ok", {"ms": 1})
+    holder = QWidget()
+    line = CheckLine(lambda: slow, "udpxy", test=True, parent=holder)
+    line.run(explicit=True)
+    holder.deleteLater()
+    QTest.qWait(50)
+    assert sip.isdeleted(line)
+    QTest.qWait(700)                      # the answer arrives: nothing happens
+
+
+def test_a_check_line_says_what_it_found(app):
+    """A check's answer, in words and with its details a click away."""
+    from PyQt6.QtTest import QTest
+
+    from dopeiptv.core.nerd_check import FAIL, Check
+    from dopeiptv.ui.nerd_check_line import CheckLine
+    line = CheckLine(lambda: (lambda: Check(FAIL, "nerd_ck_denied", {"code": 403}, "GET http://h/\\nResult: HTTP 403")),
+                     "Your source", test=True)
+    assert line.text.text() == "Not tested yet." and not line.isHidden()
+    line.run()
+    for _ in range(50):
+        QTest.qWait(20)
+        if line.result is not None:
+            break
+    assert line.result.state == FAIL and "HTTP 403" in line.text.text()
+    assert line.glyph.text() == "✗" and not line.details.isHidden()
+
+
+def test_the_problem_window_can_be_selected_and_copied(app):
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtGui import QGuiApplication
+
+    from dopeiptv.ui.dialogs import ProblemDialog
+    d = ProblemDialog(None, "The proxy does not work", "The proxy does not answer.",
+                      "GET http://h/\\nError: ProxyError: Cannot connect to proxy")
+    flags = d.details.textInteractionFlags()
+    assert flags & Qt.TextInteractionFlag.TextSelectableByMouse
+    assert d.details.isReadOnly() and "ProxyError" in d.details.toPlainText()
+    d.copy_btn.click()
+    copied = QGuiApplication.clipboard().text()
+    assert "The proxy does not work" in copied and "ProxyError" in copied
+    assert d.copied.text().endswith("Copied")

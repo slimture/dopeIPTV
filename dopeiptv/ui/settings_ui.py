@@ -131,14 +131,26 @@ class SettingsCard(QFrame):
         return w
 
     def row(self, label: str, control=None, hint: str = "",
-            stretch_control: bool = False, search: str = "") -> QWidget:
+            stretch_control: bool = False, search: str = "",
+            below: QWidget | None = None) -> QWidget:
         """Label on the left (and its explanation under it), the control -
         a widget or a layout - on the right. *search* adds words the row is
-        found under besides its label and hint."""
+        found under besides its label and hint. *below*: a line across the
+        whole row under both (what a check of the setting found)."""
         w = QWidget()
         w.setObjectName("SettingsRow")
-        h = QHBoxLayout(w)
-        h.setContentsMargins(0, ROW_PAD, 0, ROW_PAD)
+        if below is None:
+            h = QHBoxLayout(w)
+            h.setContentsMargins(0, ROW_PAD, 0, ROW_PAD)
+        else:
+            outer = QVBoxLayout(w)
+            outer.setContentsMargins(0, ROW_PAD, 0, ROW_PAD)
+            outer.setSpacing(6)
+            h = QHBoxLayout()
+            h.setContentsMargins(0, 0, 0, 0)
+            outer.addLayout(h)
+            outer.addWidget(below)
+        w.below = below
         h.setSpacing(16)
         text = QVBoxLayout()
         text.setSpacing(2)
@@ -445,6 +457,9 @@ class SettingsShell(QWidget):
             if p.key not in placed:
                 self.nav.addItem(self._items[p.key])
         self.nav.blockSignals(False)
+        # Items taken out and put back are shown again: a page left out
+        # (Nerd's, while it is off) stays out.
+        self._filter(self.search.text())
 
     def _page_at(self, row: int) -> SettingsPage | None:
         item = self.nav.item(row)
@@ -821,7 +836,8 @@ def page_icon(kind: str, base, size: int = 18) -> QIcon:
 
 def _own_icon(kind: str, s: int, colour: str) -> QPixmap | None:
     if kind not in ("palette", "play", "subtitles", "picture", "lock",
-                    "wrench", "image", "trakt", "nerd"):
+                    "wrench", "image", "trakt", "nerd", "network", "box",
+                    "knobs", "channels"):
         return None
     scale = 3
     pm = QPixmap(s * scale, s * scale)
@@ -901,6 +917,29 @@ def _own_icon(kind: str, s: int, colour: str) -> QPixmap | None:
         pr.drawPath(bridge)
         pr.drawLine(QPointF(f * 0.13, f * 0.5), QPointF(f * 0.1, f * 0.3))
         pr.drawLine(QPointF(f * 0.87, f * 0.5), QPointF(f * 0.9, f * 0.3))
+    elif kind == "network":                 # a globe
+        pr.drawEllipse(QRectF(f * 0.1, f * 0.1, f * 0.8, f * 0.8))
+        pr.drawEllipse(QRectF(f * 0.33, f * 0.1, f * 0.34, f * 0.8))
+        pr.drawLine(QPointF(f * 0.12, f * 0.5), QPointF(f * 0.88, f * 0.5))
+    elif kind == "box":                     # a set-top box with its light
+        pr.drawRoundedRect(QRectF(f * 0.1, f * 0.34, f * 0.8, f * 0.34),
+                           f * 0.07, f * 0.07)
+        pr.drawLine(QPointF(f * 0.24, f * 0.78), QPointF(f * 0.24, f * 0.68))
+        pr.drawLine(QPointF(f * 0.76, f * 0.78), QPointF(f * 0.76, f * 0.68))
+        pr.setPen(Qt.PenStyle.NoPen)
+        pr.setBrush(col)
+        pr.drawEllipse(QPointF(f * 0.72, f * 0.51), f * 0.05, f * 0.05)
+    elif kind == "knobs":                   # three sliders
+        for x, knob in ((0.25, 0.62), (0.5, 0.36), (0.75, 0.56)):
+            pr.drawLine(QPointF(f * x, f * 0.12), QPointF(f * x, f * 0.88))
+            pr.setBrush(col)
+            pr.drawEllipse(QPointF(f * x, f * knob), f * 0.08, f * 0.08)
+            pr.setBrush(Qt.BrushStyle.NoBrush)
+    elif kind == "channels":                # a list with logos
+        for y in (0.24, 0.5, 0.76):
+            pr.drawRoundedRect(QRectF(f * 0.1, f * (y - 0.08), f * 0.16, f * 0.16),
+                               f * 0.03, f * 0.03)
+            pr.drawLine(QPointF(f * 0.36, f * y), QPointF(f * 0.9, f * y))
     elif kind == "trakt":
         pr.drawEllipse(QRectF(f * 0.1, f * 0.1, f * 0.8, f * 0.8))
         tick = QPainterPath()

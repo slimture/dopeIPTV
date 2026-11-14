@@ -568,6 +568,31 @@ class _SettingsMixin:
             f"{tr('account_connections')}: {active} / {maxc}",
         ])
 
+    def _nerd_to_player(self) -> None:
+        """Nerd's player options onto the core playing now (they used to wait
+        for the app's next start)."""
+        from ..core import nerd
+        video = getattr(getattr(self, "player", None), "video", None)
+        m = getattr(video, "mpv", None)
+        if m is None:
+            return
+        try:
+            nerd.reapply_core(m)
+        except Exception as e:
+            log.warning("nerd: player not updated: %s", e)
+
+    def _nerd_lists_rebuild(self) -> None:
+        """Settings closed after a change to picons or udpxy: the channel
+        list again, from the source (its cached copy carries the old logos
+        and addresses); the guide stays as it is."""
+        if not getattr(self, "_nerd_lists_changed", False):
+            return
+        self._nerd_lists_changed = False
+        clear = getattr(self.client, "clear_list_cache", None)
+        if clear is not None:
+            clear()
+        self.refresh_playlist(force=False)
+
     def _unlock_nerd(self) -> None:
         """Nerd on, from About's seven taps: the page appears in Settings."""
         from ..core import nerd
@@ -1687,12 +1712,26 @@ class _SettingsMixin:
         # -- Nerd -------------------------------------------------------------
         from . import nerd_settings
         nerd_page = page("nerd", tr("nerd_page"), tr("nerd_page_sub"), "nerd")
+        nerd_pages = {
+            "net": page("nerd_net", tr("nerd_pg_net"), tr("nerd_pg_net_sub"), "network"),
+            "boxes": page("nerd_boxes", tr("nerd_pg_boxes"), tr("nerd_pg_boxes_sub"), "box"),
+            "lists": page("nerd_lists", tr("nerd_pg_lists"), tr("nerd_pg_lists_sub"), "channels"),
+            "player": page("nerd_player", tr("nerd_pg_player"), tr("nerd_pg_player_sub"), "knobs"),
+        }
+
+        def show_nerd_pages(on: bool) -> None:
+            for key in ("nerd_net", "nerd_boxes", "nerd_lists", "nerd_player"):
+                shell.set_page_enabled(key, on)
+        nerd_client = self.client
         nerd_commit = nerd_settings.build(
             nerd_page, self.settings, d,
             boxes=[p for p in (self.playlist_store.playlists() if self.playlist_store else [])
                    if p.get("kind") in ("enigma2", "tvheadend", "hdhomerun")],
             edit=lambda pid: edit_source(pid),
-            add=lambda: add_playlist({"kind": "enigma2"}))
+            add=lambda: add_playlist({"kind": "enigma2"}),
+            pages=nerd_pages, show_pages=show_nerd_pages,
+            source=lambda: self.playlist_store.active() if self.playlist_store else None,
+            channels=lambda: nerd_client.live_streams(None))
 
         # -- the playlist page's behaviour -------------------------------------
         def reload_pl_list():
@@ -1918,11 +1957,16 @@ class _SettingsMixin:
             (tr("set_sec_library"), ["recording", "local"]),
             (tr("set_sec_services"), ["metadata", "trakt"]),
             (tr("set_sec_system"), ["parental", "advanced", "nerd"]),
+            # Only while Nerd is on (its pages are left out otherwise).
+            (tr("nerd_sec"), ["nerd_net", "nerd_boxes", "nerd_lists", "nerd_player"]),
         ])
         # Back on the page that was open last time this session.
         shell.show_page(getattr(self, "_settings_page", None))
         d.finished.connect(
             lambda _r: setattr(self, "_settings_page", shell.current_key()))
+        # Picons and udpxy change the channel list: built again on close.
+        self._nerd_lists_changed = False
+        d.finished.connect(lambda _r: self._nerd_lists_rebuild())
         d.setUpdatesEnabled(True)
         self._install_wheel_guard(d)
 
@@ -2066,6 +2110,10 @@ class _SettingsMixin:
             if any(k.startswith("nerd_") for k in changed):
                 from ..core import nerd
                 nerd.install(self.settings)
+                # The player that is playing takes the change now.
+                self._nerd_to_player()
+                if changed & {"nerd_enabled", "nerd_picon_dir", "nerd_picon_override", "nerd_udpxy"}:
+                    self._nerd_lists_changed = True
 
             if any(k.startswith("mv_") for k in changed):
                 self._apply_multiview_settings()

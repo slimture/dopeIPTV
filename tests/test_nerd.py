@@ -396,3 +396,51 @@ def test_real_mpv_answers_tvheadends_digest_login_from_the_address(player, serve
     assert _plays(player, url)
     assert tvh.requests[0]["headers"].get("authorization") is None       # challenged first
     assert tvh.requests[-1]["headers"]["authorization"].lower().startswith("digest ")
+
+
+def test_settings_changed_while_playing_reach_the_player_and_go_back(tmp_path):
+    """The Nerd page's player options apply to the core that is playing,
+    not only to the next one made; one taken away goes back to exactly what
+    the core had before Nerd - checked on a real libmpv."""
+    m = _libmpv()
+    try:
+        before = {k: m[k] for k in ("video-sync", "interpolation", "demuxer-max-bytes",
+                                     "demuxer-lavf-probesize", "deband", "network-timeout")}
+        s = S()
+        s.setValue("nerd_enabled", "true")
+        nerd.install(s)
+        nerd.apply_core(m)                                # made with Nerd on, nothing set
+        s.setValue("nerd_video_sync", "display-resample")
+        s.setValue("nerd_interpolation", "true")
+        s.setValue("nerd_demux_max_mb", "256")
+        s.setValue("nerd_probe", "thorough")
+        s.setValue("nerd_mpv_options", "deband=yes")
+        s.setValue("nerd_net_timeout", "45")
+        nerd.install(s)
+        done = nerd.reapply_core(m)
+        assert m["video-sync"] == "display-resample" and m["interpolation"] is True
+        assert m["demuxer-max-bytes"] == 256 * 1024 * 1024 and m["deband"] is True
+        assert m["network-timeout"] == 45 and "deband" in done["set"]
+        for key in ("nerd_video_sync", "nerd_interpolation", "nerd_demux_max_mb", "nerd_probe",
+                    "nerd_mpv_options", "nerd_net_timeout"):
+            s.setValue(key, "")
+        nerd.install(s)
+        done = nerd.reapply_core(m)
+        after = {k: m[k] for k in before}
+        # probesize's "not set" (0) cannot be set back; FFmpeg's own default
+        # is what it meant.
+        assert after.pop("demuxer-lavf-probesize") in (before.pop("demuxer-lavf-probesize"), 5000000)
+        assert after == before
+        assert set(done["restored"]) >= {"video-sync", "interpolation", "deband", "network-timeout"}
+        # Nerd turned off altogether: the same.
+        s.setValue("nerd_interpolation", "true")
+        nerd.install(s)
+        nerd.reapply_core(m)
+        assert m["interpolation"] is True
+        s.setValue("nerd_enabled", "false")
+        nerd.install(s)
+        nerd.reapply_core(m)
+        assert m["interpolation"] is False
+    finally:
+        nerd.install(None)
+        m.terminate()
