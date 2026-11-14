@@ -814,6 +814,9 @@ class _SettingsMixin:
             c.shown_if(c.rows[-1][0], lambda: key_state["mine"] is not None)
         heart_box = c.toggle(tr("set_donate_heart"), self._donate_heart_due(),
                              tr("set_donate_heart_hint"))
+        # Sync between computers: a supporter's thank-you (mw_sync).
+        if hasattr(self, "_build_sync_card"):
+            self._build_sync_card(general, d)
 
         # -- Appearance -------------------------------------------------------
         look = page("appearance", tr("set_page_appearance"),

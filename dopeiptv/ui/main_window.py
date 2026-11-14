@@ -72,6 +72,7 @@ from .mw_health import _HealthMixin
 from .mw_remote import _RemoteMixin
 from .mw_events import _EventsMixin
 from .mw_report import _ReportMixin
+from .mw_sync import _SyncMixin
 from .mw_privacy import _PrivacyMixin
 from .mw_commands import _CommandsMixin
 from .mw_box import _BoxMixin
@@ -133,7 +134,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _FollowMixin, _SubtitlesMixin, _CastMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
                  _HealthMixin, _ChannelPrefsMixin, _RemoteMixin, _EventsMixin, _ReportMixin,
-                 _PortalArchiveMixin, _SeriesMixin,
+                 _PortalArchiveMixin, _SeriesMixin, _SyncMixin,
                  QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
@@ -250,6 +251,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.rec.jobs_changed.connect(self._events_jobs)
         self.wake = WakeLock()
         self._init_donate()
+        # Settings sync between a supporter's computers (off until started).
+        self._init_sync()
         self._full_catalog: list | None = None
         self._poster_refresh_timer = QTimer(self)
         self._poster_refresh_timer.setSingleShot(True)
@@ -4874,6 +4877,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.set_next_available(
                 kind == "episode" and self._has_next_episode())
         self._playback_max_pct = 0.0
+        self._sync_mark_play()     # settings sync waits out a stream's start
         # New stream: reset the failure-diagnosis guard (a definitive-probe or
         # the full diagnosis may show once per playback attempt).
         self._diag_gen = getattr(self, "_diag_gen", 0) + 1
@@ -5777,6 +5781,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._save_layout()
             self._save_resume_position()
             self._maybe_auto_mark_watched()
+            self._sync_on_close()
         self.wake.release()
         self._stop_media_session()
         self._events_quit()
@@ -5841,8 +5846,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # instead of being orphaned until the compositor times them
         # out.
         active_workers = any(
-            p.activeThreadCount() > 0
-            for p in (self.pool, self._logo_pool, self._art_pool))
+            p is not None and p.activeThreadCount() > 0
+            for p in (self.pool, self._logo_pool, self._art_pool,
+                      getattr(self, "_sync_pool", None)))
         # macOS: QApplication.quit() enters AppKit's terminate cascade, whose
         # exit() finalizers run while Qt timers are still live - a timer then
         # fires into the half-destroyed QGuiApplication and segfaults (seen

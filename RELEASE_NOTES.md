@@ -19,6 +19,7 @@
 - **Catch-up on Stalker / Ministra portals**, from the portal's own archive.
 - **More Nerd:** a channel's own audio and subtitle language, picture and delay; rewrite rules for a source's addresses; a highest quality for adaptive streams; and events out to webhooks and MQTT for Home Assistant and the like.
 - **A supporter key** for those who donate: your logo takes on the heart's colours, the app's icon can too, two themes are yours (Aurora and Dawn), your feedback is read first, and the app stops asking. It is checked on your computer and holds nothing about you. Find it under **dopeIPTV → Supporter key…**.
+- **Sync between computers**, a thank-you for supporters: your favorites and settings - and, if you like, your playlists and watch history - the same on all your computers. Encrypted on your computer with a code only your computers know; dopeiptv.org can't read what's synced. **Settings → General → Sync between computers.**
 
 ### Also new
 

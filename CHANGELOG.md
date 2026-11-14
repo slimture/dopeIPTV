@@ -56,6 +56,14 @@ feedback with answers in the app, and a supporter key.
   logo shades into the heart's colour with a heart on its middle bar, the
   app's icon can do the same, two themes are theirs (Aurora, Dawn), and
   their feedback is marked to be read first (a word, never the key).
+- Sync between computers, for supporters (Settings, General): favorites
+  with their folders, settings, and on request playlists and watch
+  history, the same on every computer. End-to-end encrypted with a code
+  only the person's computers know (ChaCha20-Poly1305 and HKDF in plain
+  Python); dopeiptv.org keeps ciphertext under a slot it cannot tie to
+  anyone and only checks that the supporter key is one. Last writer wins
+  per entry, a removal travels; a change syncs half a minute later, never
+  in a stream's first seconds.
 - Series recording: "Record series…" on a programme - the exact title or
   a word, one channel or any - scheduled from the guide for the week
   ahead, nothing twice, a cancelled one not again; padding before and
