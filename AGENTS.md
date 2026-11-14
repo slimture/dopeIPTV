@@ -87,6 +87,7 @@ map and the one-way import rule.
 | `core/catchup.py` | Nerd: a source's own catch-up address - Kodi's placeholders and the M3U modes (default, append, shift, flussonic), tried before the app's own; its checks |
 | `core/series_rules.py` | Series recordings: rules (exact title or a word, one channel or any), the guide looked through for their airings, the plan (padding, nothing twice, one copy of a programme on two channels, a cancelled one not again), their store; recording padding |
 | `core/url_rewrite.py` | Nerd: a source's rewrite rules for its stream addresses (find -> replace, plain or regex, in order; bad ones refused, skipped in playback), applied by `make_client` to every address it hands out; the preview line and its Test |
+| `core/hls_cap.py` | Nerd: the highest quality adaptive (HLS) streams play at - `hls-bitrate`, and the variant (picture and sound together) the player switches to at file-loaded for a size cap |
 | `core/remote_api.py` | The remote API and shared lists' small HTTP server (token on every request, this computer only unless chosen) |
 | `core/supporter.py` | The supporter key: signed by dopeiptv.org, checked offline, nothing about the person in it |
 | `core/backup.py` | Full backup and restore: every setting a person would miss in one JSON file (logins included, caches, window layout and machine state left out); a restore over everything waits for the next start (`stage` / `apply_pending`) |
@@ -234,7 +235,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
   epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log,
-  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, health, nerd, nerd_lists, channel_numbers, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, catchup, url_rewrite, remote_api, report, supporter, backup) and `services/` (failover, share, resume,
+  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, health, nerd, nerd_lists, channel_numbers, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, catchup, url_rewrite, hls_cap, remote_api, report, supporter, backup) and `services/` (failover, share, resume,
   coverart, reminders, mpris, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list

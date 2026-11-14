@@ -21,6 +21,7 @@ import sys
 import weakref
 from typing import Any, Protocol
 
+from . import hls_cap as _hls
 from .log import log
 
 DEFAULT_UA = "dopeIPTV/1.0"
@@ -353,7 +354,15 @@ class Nerd:
             out += [("demuxer-lavf-analyzeduration", "5"), ("demuxer-lavf-probesize", "5000000")]
         elif start == "instant":
             out += [("demuxer-lavf-analyzeduration", "0.5"), ("demuxer-lavf-probesize", "500000")]
+        out += _hls.mpv_options(self.hls_cap())
         return out
+
+    def hls_cap(self) -> _hls.Cap:
+        """The highest quality adaptive streams play at (core/hls_cap.py):
+        none while Nerd is off or the page says Best."""
+        if not self.on:
+            return _hls.Cap()
+        return _hls.cap_of(self.get("nerd_hls_quality"), self.num("nerd_hls_max_kbps", 0))
 
     def scripts(self) -> list[str]:
         """Lua/JS scripts from the user's mpv folder (scripts/)."""

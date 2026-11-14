@@ -21,7 +21,7 @@ from PyQt6 import sip
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
-    QPlainTextEdit, QPushButton, QVBoxLayout, QWidget,
+    QPlainTextEdit, QPushButton, QSpinBox, QVBoxLayout, QWidget,
 )
 
 from ..core import nerd, nerd_check
@@ -75,7 +75,8 @@ PART_KEYS = {
     "lists": ("nerd_picon_dir", "nerd_picon_override", "nerd_udpxy", "nerd_failover", "nerd_health",
               "nerd_numbers_keep"),
     "player": ("nerd_spdif", "nerd_video_sync", "nerd_interpolation", "nerd_probe", "nerd_demux_max_mb",
-               "nerd_mpv_config_dir", "nerd_shaders", "nerd_mpv_options", "nerd_adelay_per_channel"),
+               "nerd_mpv_config_dir", "nerd_shaders", "nerd_mpv_options", "nerd_adelay_per_channel",
+               "nerd_hls_quality", "nerd_hls_max_kbps"),
     "rec": ("nerd_rec_template", "nerd_rec_post"),
     "serve": ("nerd_remote", "nerd_share", "nerd_remote_lan", "nerd_remote_port"),
 }
@@ -564,6 +565,34 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     adelay = c.toggle(tr("nerd_adelay"), n.flag("nerd_adelay_per_channel", True), tr("nerd_adelay_hint"))
     c.note(tr("nerd_applies_stream"))
 
+    # -- the player: adaptive streams (HLS) ------------------------------------------------------
+    from ..core import hls_cap
+    c = at("player").card(tr("nerd_card_hls"))
+    hls_q = combo([("", "nerd_hls_best"), ("1080", "1080p"), ("720", "720p"), ("480", "480p"),
+                   ("lowest", "nerd_hls_lowest")], val("nerd_hls_quality"))
+    hls_spin = QSpinBox()
+    hls_spin.setRange(0, 200000)
+    hls_spin.setSingleStep(500)
+    hls_spin.setSuffix(" kbit/s")
+    hls_spin.setSpecialValueText(tr("nerd_hls_no_limit"))
+    hls_spin.setValue(max(0, n.num("nerd_hls_max_kbps", 0)))
+    hls_spin.setAccessibleName(tr("nerd_hls_max_rate"))
+    hls_rate = Stepper(hls_spin, width=170)
+
+    def hls_job() -> Any:
+        cap = hls_cap.cap_of(hls_q.currentData(), hls_spin.value())
+        return (lambda: hls_cap.check(cap, make_mpv=throwaway_mpv)) if cap.active else None
+    hls_line = check(hls_job, tr("nerd_ck_title_hls"))
+    c.row(tr("nerd_hls_quality"), hls_q, tr("nerd_hls_quality_hint"),
+          search="HLS adaptive quality resolution 1080p 720p 480p variant hls-bitrate", below=hls_line)
+    rate_row = c.row(tr("nerd_hls_max_rate"), hls_rate, tr("nerd_hls_max_rate_hint"),
+                     search="HLS bitrate kbit hls-bitrate bandwidth")
+    c.shown_if(rate_row, lambda: hls_q.currentData() != "lowest")
+    hls_q.currentIndexChanged.connect(lambda _i: c.refresh())
+    hls_q.currentIndexChanged.connect(hls_line.changed)
+    hls_spin.valueChanged.connect(hls_line.changed)
+    c.note(tr("nerd_applies_stream"))
+
     # -- the player: mpv itself ----------------------------------------------------------------
     c = at("player").card(tr("nerd_card_mpv"))
     conf_dir = QLineEdit(val("nerd_mpv_config_dir"))
@@ -808,6 +837,8 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
         put("nerd_picon_override", "true" if picon_over.isChecked() else "false")
         put("nerd_udpxy", udpxy.text().strip())
         put("nerd_adelay_per_channel", "true" if adelay.isChecked() else "false")
+        put("nerd_hls_quality", hls_q.currentData())
+        put("nerd_hls_max_kbps", str(hls_spin.value()))
         put("nerd_rec_template", template.text().strip())
         put("nerd_rec_post", post.text().strip())
         put("nerd_failover", "true" if fail_on.isChecked() else "false")
@@ -1067,7 +1098,7 @@ def diagnostics(settings: Any) -> str:
     safe = {"nerd_ip_family", "nerd_net_timeout", "nerd_reconnect_max", "nerd_spdif", "nerd_video_sync",
             "nerd_interpolation", "nerd_probe", "nerd_demux_max_mb", "nerd_log_level", "nerd_vpn_guard",
             "nerd_vpn_lan", "nerd_proxy_player", "nerd_failover", "nerd_health", "nerd_remote", "nerd_share",
-            "nerd_remote_lan", "nerd_remote_port"}
+            "nerd_remote_lan", "nerd_remote_port", "nerd_hls_quality", "nerd_hls_max_kbps"}
     for key in sorted(safe):
         v = n.get(key)
         if v:

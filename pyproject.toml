@@ -85,6 +85,7 @@ files = [
     "dopeiptv/core/series_rules.py",
     "dopeiptv/core/catchup.py",
     "dopeiptv/core/url_rewrite.py",
+    "dopeiptv/core/hls_cap.py",
     "dopeiptv/core/remote_api.py",
     "dopeiptv/core/report.py",
     "dopeiptv/core/supporter.py",

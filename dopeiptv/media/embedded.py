@@ -2695,6 +2695,11 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
                 self._nerd_applied = nerd.apply_stream(
                     m, nerd.source(), getattr(self, "_nerd_applied", False),
                     url=url)
+                # Nerd: adaptive streams up to a picture size - the variant
+                # is chosen once mpv has opened the stream (core/hls_cap.py).
+                self._hls_cap = nerd.current().hls_cap()
+                if self._hls_cap.picks:
+                    self._watch_variants(m)
                 # Nerd: each channel's own audio delay (lip sync), as set
                 # for it last - in its settings, or for anything that is no
                 # channel under a key of its own; untouched while Nerd is
@@ -2813,6 +2818,36 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
             self.current_url = None
             self._end_dvr()
             return False
+
+    def _watch_variants(self, m) -> None:
+        """Nerd's quality cap: each stream core *m* opens goes to the
+        variant the cap allows. Hooked once per core, and only once a cap
+        has asked for it; it does nothing while none does."""
+        watched = getattr(self, "_variants_watched", None)
+        if watched is not None and watched() is m:
+            return
+        import weakref
+
+        from ..core import hls_cap
+        try:
+            me, core = weakref.ref(self), weakref.ref(m)
+        except TypeError:
+            return
+
+        def loaded(_evt) -> None:        # mpv's event thread
+            try:
+                player, mpv_core = me(), core()
+                cap = getattr(player, "_hls_cap", None) if player is not None else None
+                if mpv_core is not None and cap is not None and cap.picks:
+                    hls_cap.apply_pick(mpv_core, cap)
+            except Exception as e:
+                log.debug("nerd: adaptive stream variant: %s", e)
+        try:
+            m.event_callback("file-loaded")(loaded)
+        except Exception as e:
+            log.info("nerd: adaptive streams not capped by size: %s", e)
+            return
+        self._variants_watched = core
 
     def _ensure_unpaused(self, gen: int) -> None:
         """Clear a pause the user never asked for, shortly after a load.
