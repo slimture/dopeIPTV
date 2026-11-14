@@ -145,6 +145,10 @@ def accept(stats_dir: str, body: dict) -> tuple[int, dict]:
            "version": version, "os": system, "sig": signature(kind, text), "text": text}
     if _HASH.match(str(body.get("reply") or "")):
         row["reply"] = str(body["reply"])
+    if body.get("supporter") == "yes":
+        # From someone whose app holds a supporter key: read first. Only the
+        # word comes, never the key, so it names nobody.
+        row["sup"] = 1
     if kind == "feedback":
         row.update({k: str(body.get(k)) for k, allowed in CHOICES.items() if body.get(k) in allowed})
         if body.get("from") == "site":
@@ -359,7 +363,7 @@ def summary(stats_dir: str, days: int) -> dict:
     items = [{"id": r["id"], "t": r["t"], "kind": r["kind"], "version": r["version"], "os": r["os"],
               "sig": r.get("sig") or "", "preview": _preview(r), "state": state.get(r["id"], "new"),
               "answerable": bool(r.get("reply")), "replies": len(answered["report"].get(r["id"], [])),
-              **{k: r[k] for k in (*CHOICES, "from") if r.get(k)}}
+              **{k: r[k] for k in (*CHOICES, "from", "sup") if r.get(k)}}
              for r in sorted(rows, key=lambda r: -r["t"]) if r.get("text")][:300]
     open_groups = sum(1 for g in group_list if g["state"] != "fixed")
     return {"total": len(rows), "kinds": kinds, "open_groups": open_groups, "topics": topics,

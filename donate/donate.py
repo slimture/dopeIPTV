@@ -1195,7 +1195,8 @@ class Handler(BaseHTTPRequestHandler):
             kind = str(data.get("kind") or "feedback")
             threading.Thread(target=push, args=(
                 {"error": "An error report", "crash": "A crash report"}.get(kind, "Feedback")
-                + (" from the website" if data.get("from") == "site" else " from the app"),
+                + (" from the website" if data.get("from") == "site"
+                   else " from a supporter" if data.get("supporter") == "yes" else " from the app"),
                 f"dopeIPTV {str(data.get('version') or '?')[:20]} · {str(data.get('os') or '?')[:20]}",
                 "/admin/#feedback", "feedback"), daemon=True).start()
         return self._send(status, body)

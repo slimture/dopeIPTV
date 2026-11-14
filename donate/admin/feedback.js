@@ -209,7 +209,10 @@
     const box = $("fb-words");
     const all = (res.items || []).filter((i) => i.kind === "feedback");
     if (!all.length) { box.replaceChildren(mk("p", "empty", "No feedback in this period.")); return; }
-    const items = topic ? all.filter((i) => i.topic === topic) : all;
+    // A supporter's feedback first while it is new; the rest newest first.
+    const first = (i) => (i.sup && i.state === "new" ? 1 : 0);
+    const items = (topic ? all.filter((i) => i.topic === topic) : all.slice())
+      .sort((a, b) => first(b) - first(a));
     const ul = mk("ul", "fb-list");
     items.forEach((it) => {
       const li = mk("li", "fb-row st-" + it.state);
@@ -217,6 +220,11 @@
       btn.type = "button";
       if (it.topic) { btn.append(mk("span", "chip t-" + it.topic, TOPIC[it.topic] || it.topic)); }
       if (it.from === "site") { btn.append(mk("span", "chip from-site", "Website")); }
+      if (it.sup) {
+        const sup = mk("span", "chip sup", "\u2665 Supporter");
+        sup.title = "Sent from an app with a supporter key - read first";
+        btn.append(sup);
+      }
       btn.append(mk("span", "sig words", it.preview || "(empty)"), stateChip(it.state));
       if (it.replies) { btn.append(mk("span", "chip answered", "Answered")); }
       const where = [it.area && AREA[it.area], it.often && OFTEN[it.often]].filter(Boolean).join(", ");

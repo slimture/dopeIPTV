@@ -775,6 +775,7 @@ tr:last-child td { border-bottom: 0; }
 .sk-key { font: 600 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all;
   background: var(--page); padding: 8px 10px; border-radius: 8px; user-select: all; }
 .chip.from-site { color: var(--text-2); background: color-mix(in srgb, var(--text) 9%, transparent); }
+.chip.sup { color: var(--heart); background: color-mix(in srgb, var(--heart) 12%, transparent); font-weight: 650; }
 /* Answering feedback (feedback.js): a quiet block above the report. */
 .fb-answer { margin: 10px 0; padding: 12px; border-radius: 10px; background: var(--page);
   display: flex; flex-direction: column; gap: 8px; }
