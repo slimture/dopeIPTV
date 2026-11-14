@@ -44,6 +44,7 @@ STATIC = {
     "/admin/analysis.js": ("analysis.js", "application/javascript; charset=utf-8"),
     "/admin/account.js": ("account.js", "application/javascript; charset=utf-8"),
     "/admin/builds.js": ("builds.js", "application/javascript; charset=utf-8"),
+    "/admin/feedback.js": ("feedback.js", "application/javascript; charset=utf-8"),
     "/admin/login": ("login.html", "text/html; charset=utf-8"),
     "/admin/login.js": ("login.js", "application/javascript; charset=utf-8"),
     "/admin/passkey.js": ("passkey.js", "application/javascript; charset=utf-8"),
