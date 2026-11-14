@@ -256,6 +256,11 @@ def _install_crash_hooks() -> None:
         # (DOPEIPTV_LOG_FILE) that gets attached to bug reports, redacted
         # like every other line; its stderr handler flushes each record.
         try:
+            from .core import report
+            report.notify_error(buf.getvalue())
+        except Exception:
+            pass
+        try:
             log.error("CRASH: uncaught exception\n%s", buf.getvalue().rstrip())
             return
         except Exception:
@@ -288,8 +293,19 @@ def _install_crash_hooks() -> None:
     # stream. Linux/macOS never raise those SEH exceptions, so faulthandler is
     # kept there unchanged.
     if sys.platform != "win32":
+        # From a terminal, to it; otherwise to a file in the log folder,
+        # which the next start reads and offers to send (Help > reports).
+        target = sys.stderr
         try:
-            faulthandler.enable(file=sys.stderr, all_threads=True)
+            from .core import report
+            from .core.log import log_dir
+            report.set_pending_crash(report.take_last_crash(log_dir()))
+            if not (sys.stderr and sys.stderr.isatty()):
+                target = report.open_crash_file(log_dir())
+        except Exception:
+            target = sys.stderr
+        try:
+            faulthandler.enable(file=target, all_threads=True)
         except Exception:
             pass
 

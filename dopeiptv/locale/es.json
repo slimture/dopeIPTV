@@ -1474,5 +1474,19 @@
   "nerd_part_boxes": "Añadidos: {n}",
   "nerd_part_no_boxes": "Ninguno añadido aún",
   "nerd_remote_drop_token": "Quitar",
-  "nerd_remote_drop_token_tip": "Quitar el token: el control remoto y compartir se desactivan y nadie puede llegar a la app. Al activar uno de nuevo se crea un token nuevo."
+  "nerd_remote_drop_token_tip": "Quitar el token: el control remoto y compartir se desactivan y nadie puede llegar a la app. Al activar uno de nuevo se crea un token nuevo.",
+  "feedback_menu": "Enviar comentarios",
+  "feedback_title": "Enviar comentarios",
+  "feedback_intro": "Una idea, algo que no funciona, algo que te gusta: llega a quienes hacen dopeIPTV. No incluye ninguna dirección de correo, así que no llega una respuesta por sí sola.",
+  "feedback_placeholder": "¿Qué quieres contarnos?",
+  "report_title": "Enviar un informe de error",
+  "report_intro": "Esto es lo que enviaría el informe.",
+  "report_error_intro": "dopeIPTV encontró un error. Un informe ayuda a corregirlo: aquí está completo, para leerlo primero.",
+  "report_crash_intro": "dopeIPTV se cerró inesperadamente la última vez. Un informe ayuda a corregirlo: aquí está completo, para leerlo primero.",
+  "report_include": "Incluir detalles técnicos (versiones, el error, el registro reciente)",
+  "report_what_is_sent": "Exactamente lo que se envía; cambia o borra lo que quieras:",
+  "report_privacy": "Las direcciones, direcciones IP y MAC, inicios de sesión, nombres de tus fuentes, canales y lo que viste se quitan antes de que veas esto. No se envía nada hasta que pulses Enviar.",
+  "report_send": "Enviar",
+  "report_sent": "Gracias: el informe se envió.",
+  "report_not_sent": "No se pudo enviar el informe. Está en el portapapeles: puedes pegarlo en una incidencia en GitHub."
 }

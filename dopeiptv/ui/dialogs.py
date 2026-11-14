@@ -547,6 +547,83 @@ class UpdateDialog(QDialog):
 
 
 
+class ReportDialog(QDialog):
+    """An error report or feedback, shown in full before anything is sent:
+    what it holds, that nothing in it identifies a stream or a person, and
+    a box where any of it can be changed or deleted. Sent only on Send."""
+
+    def __init__(self, parent, kind: str, text: str, intro: str = "") -> None:
+        super().__init__(parent)
+        from PyQt6.QtGui import QFont
+        from PyQt6.QtWidgets import QCheckBox, QPlainTextEdit
+        self.kind = kind
+        feedback = kind == "feedback"
+        self.setWindowTitle(tr("feedback_title") if feedback else tr("report_title"))
+        self.setMinimumWidth(600)
+        col = QVBoxLayout(self)
+        col.setContentsMargins(24, 22, 24, 20)
+        col.setSpacing(8)
+        head = QLabel(tr("feedback_title") if feedback else tr("report_title"))
+        head.setStyleSheet(f"font-size:16px; font-weight:700; color:{P['text']};")
+        col.addWidget(head)
+        about = QLabel(intro or (tr("feedback_intro") if feedback else tr("report_intro")))
+        about.setWordWrap(True)
+        about.setStyleSheet(f"font-size:13px; color:{P['text2']};")
+        col.addWidget(about)
+        box_style = (f"QPlainTextEdit {{ background: {P['input']}; color: {P['text']};"
+                     f" border: none; border-radius: 8px; padding: 6px 8px;"
+                     f" selection-background-color: {P['sel']}; }}")
+        self.message: QPlainTextEdit | None = None
+        if feedback:
+            self.message = QPlainTextEdit()
+            self.message.setPlaceholderText(tr("feedback_placeholder"))
+            self.message.setStyleSheet(box_style)
+            self.message.setFixedHeight(110)
+            col.addWidget(self.message)
+        self.include = QCheckBox(tr("report_include"))
+        self.include.setChecked(not feedback)
+        col.addWidget(self.include)
+        what = QLabel(tr("report_what_is_sent"))
+        what.setStyleSheet(f"font-size:12px; font-weight:700; color:{P['muted']};")
+        col.addWidget(what)
+        self.text = QPlainTextEdit(text)
+        mono = QFont("monospace")
+        mono.setStyleHint(QFont.StyleHint.TypeWriter)
+        self.text.setFont(mono)
+        self.text.setStyleSheet(box_style)
+        self.text.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
+        self.text.setMinimumHeight(self.text.fontMetrics().lineSpacing() * 12 + 18)
+        col.addWidget(self.text, 1)
+        self.include.toggled.connect(self.text.setVisible)
+        self.include.toggled.connect(what.setVisible)
+        self.text.setVisible(self.include.isChecked())
+        what.setVisible(self.include.isChecked())
+        privacy = QLabel(tr("report_privacy"))
+        privacy.setWordWrap(True)
+        privacy.setStyleSheet(f"font-size:12px; color:{P['muted']};")
+        col.addWidget(privacy)
+        buttons = QHBoxLayout()
+        buttons.addStretch(1)
+        cancel = QPushButton(tr("common_cancel"))
+        self.send_btn = QPushButton(tr("report_send"), objectName="Primary")
+        cancel.clicked.connect(self.reject)
+        self.send_btn.clicked.connect(self.accept)
+        buttons.addWidget(cancel)
+        buttons.addWidget(self.send_btn)
+        col.addLayout(buttons)
+        if self.message is not None:
+            self.message.setFocus()
+
+    def payload(self) -> str:
+        """What is sent: the person's words, then the report as they left it."""
+        parts = []
+        if self.message is not None and self.message.toPlainText().strip():
+            parts.append(self.message.toPlainText().strip())
+        if self.include.isChecked() and self.text.toPlainText().strip():
+            parts.append(self.text.toPlainText().strip())
+        return "\n\n".join(parts)
+
+
 class ProblemDialog(QDialog):
     """Something did not work, said plainly: what, in a sentence, then the
     details - what was tried and the exact error or code - in a box that can

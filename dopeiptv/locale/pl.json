@@ -1474,5 +1474,19 @@
   "nerd_part_boxes": "Dodane: {n}",
   "nerd_part_no_boxes": "Jeszcze nic nie dodano",
   "nerd_remote_drop_token": "Usuń",
-  "nerd_remote_drop_token_tip": "Usuń token: zdalne sterowanie i udostępnianie wyłączą się i nikt nie połączy się z aplikacją. Ponowne włączenie utworzy nowy token."
+  "nerd_remote_drop_token_tip": "Usuń token: zdalne sterowanie i udostępnianie wyłączą się i nikt nie połączy się z aplikacją. Ponowne włączenie utworzy nowy token.",
+  "feedback_menu": "Wyślij opinię",
+  "feedback_title": "Wyślij opinię",
+  "feedback_intro": "Pomysł, coś, co nie działa, coś, co ci się podoba – trafi do twórców dopeIPTV. Nie ma w tym adresu e-mail, więc odpowiedź nie przyjdzie sama.",
+  "feedback_placeholder": "Co chcesz nam powiedzieć?",
+  "report_title": "Wyślij raport o błędzie",
+  "report_intro": "Oto co wysłałby raport.",
+  "report_error_intro": "dopeIPTV napotkał błąd. Raport pomoże go naprawić – oto cały, do przeczytania najpierw.",
+  "report_crash_intro": "dopeIPTV ostatnio nieoczekiwanie się zamknął. Raport pomoże to naprawić – oto cały, do przeczytania najpierw.",
+  "report_include": "Dołącz szczegóły techniczne (wersje, błąd, ostatni dziennik)",
+  "report_what_is_sent": "Dokładnie to zostanie wysłane – zmień lub usuń, co chcesz:",
+  "report_privacy": "Adresy, adresy IP i MAC, loginy, nazwy twoich źródeł, kanały i to, co oglądałeś, są usuwane, zanim to zobaczysz. Nic nie zostanie wysłane, dopóki nie naciśniesz Wyślij.",
+  "report_send": "Wyślij",
+  "report_sent": "Dziękujemy – raport został wysłany.",
+  "report_not_sent": "Nie udało się wysłać raportu. Jest w schowku – możesz wkleić go w zgłoszeniu na GitHubie."
 }

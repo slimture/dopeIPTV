@@ -1474,5 +1474,19 @@
   "nerd_part_boxes": "Ditambahkan: {n}",
   "nerd_part_no_boxes": "Belum ada yang ditambahkan",
   "nerd_remote_drop_token": "Hapus",
-  "nerd_remote_drop_token_tip": "Hapus token: kendali jarak jauh dan berbagi mati, dan tak ada yang bisa menjangkau aplikasi. Menyalakan salah satunya lagi membuat token baru."
+  "nerd_remote_drop_token_tip": "Hapus token: kendali jarak jauh dan berbagi mati, dan tak ada yang bisa menjangkau aplikasi. Menyalakan salah satunya lagi membuat token baru.",
+  "feedback_menu": "Kirim masukan",
+  "feedback_title": "Kirim masukan",
+  "feedback_intro": "Ide, sesuatu yang tidak berfungsi, sesuatu yang kamu suka – sampai ke pembuat dopeIPTV. Tidak ada alamat email di dalamnya, jadi tidak ada balasan yang datang sendiri.",
+  "feedback_placeholder": "Apa yang ingin kamu sampaikan?",
+  "report_title": "Kirim laporan kesalahan",
+  "report_intro": "Inilah yang akan dikirim laporan.",
+  "report_error_intro": "dopeIPTV mengalami kesalahan. Laporan membantu memperbaikinya – ini isinya lengkap, untuk dibaca dulu.",
+  "report_crash_intro": "dopeIPTV tertutup tiba-tiba terakhir kali. Laporan membantu memperbaikinya – ini isinya lengkap, untuk dibaca dulu.",
+  "report_include": "Sertakan detail teknis (versi, kesalahan, log terbaru)",
+  "report_what_is_sent": "Persis yang dikirim – ubah atau hapus apa pun:",
+  "report_privacy": "Alamat, alamat IP dan MAC, info masuk, nama sumbermu, saluran, dan yang kamu tonton dihapus sebelum kamu melihat ini. Tidak ada yang dikirim sampai kamu menekan Kirim.",
+  "report_send": "Kirim",
+  "report_sent": "Terima kasih – laporan sudah dikirim.",
+  "report_not_sent": "Laporan tidak bisa dikirim. Laporan ada di papan klip – kamu bisa menempelkannya di issue di GitHub."
 }

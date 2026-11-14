@@ -81,6 +81,9 @@ map and the one-way import rule.
 | `core/instance.py` | A second start hands its command to the copy running (local socket) |
 | `core/privacy.py` | Private viewing (nothing kept until the app closes) and Clear recent history by time range, for every source |
 | `core/rec_extras.py` | Nerd for recordings: file name template (folders, never outside), the command after a recording (no shell), their checks |
+| `core/remote_api.py` | The remote API and shared lists' small HTTP server (token on every request, this computer only unless chosen) |
+| `core/report.py` | Error reports and feedback: scrubbed of anything identifying, shown in full, sent only on Send; the native crash file |
+| `services/share.py` | dopeIPTV as a server: every source's channels as one M3U, the downloaded guides as one XMLTV (streamed) |
 | `services/failover.py` | Failover: a live channel that will not play found in another source (guide id, else name) |
 | `core/platform_macos.py` | macOS-specific helpers |
 | `core/platform_windows.py` | Windows-specific helpers |
@@ -109,6 +112,8 @@ map and the one-way import rule.
 | `ui/mw_commands.py` | Commands from outside carried out: play an address or file, a channel by name, come forward |
 | `ui/mw_privacy.py` | Private viewing and Clear recent history in the window: app-menu entries and shortcuts, the sidebar marker |
 | `ui/mw_failover.py` | Failover in the window: once per channel, the other source's options while it plays, a note |
+| `ui/mw_remote.py` | The remote API and sharing in the window: the server as Nerd says, each request's work on the window's thread |
+| `ui/mw_report.py` | Send feedback, and the offer of a report after an error or a crash |
 | `ui/mw_home.py` | The Home page: which shelves, what goes in them (drawn by `home_widgets.py`) |
 | `ui/mw_local.py` | Local files: folders, library view, music queue |
 | `ui/mw_multiview.py` | Multiview: 2/4/6/9 live streams, an mpv per cell |
@@ -214,7 +219,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
   epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log,
-  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, nerd, nerd_lists, http_login, commands, instance, nerd_check, privacy, rec_extras) and `services/` (failover, resume,
+  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, nerd, nerd_lists, http_login, commands, instance, nerd_check, privacy, rec_extras, remote_api, report) and `services/` (failover, share, resume,
   coverart, reminders, mpris, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list

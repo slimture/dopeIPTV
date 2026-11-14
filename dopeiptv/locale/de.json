@@ -1474,5 +1474,19 @@
   "nerd_part_boxes": "Hinzugefügt: {n}",
   "nerd_part_no_boxes": "Noch keine hinzugefügt",
   "nerd_remote_drop_token": "Entfernen",
-  "nerd_remote_drop_token_tip": "Token entfernen: Fernsteuerung und Teilen gehen aus, niemand erreicht die App. Schaltest du eines wieder ein, entsteht ein neues Token."
+  "nerd_remote_drop_token_tip": "Token entfernen: Fernsteuerung und Teilen gehen aus, niemand erreicht die App. Schaltest du eines wieder ein, entsteht ein neues Token.",
+  "feedback_menu": "Feedback senden",
+  "feedback_title": "Feedback senden",
+  "feedback_intro": "Eine Idee, etwas, das nicht klappt, etwas, das dir gefällt – es geht an die Leute hinter dopeIPTV. Es ist keine E-Mail-Adresse dabei, also kommt nicht von selbst eine Antwort.",
+  "feedback_placeholder": "Was möchtest du uns sagen?",
+  "report_title": "Fehlerbericht senden",
+  "report_intro": "Das würde der Bericht senden.",
+  "report_error_intro": "dopeIPTV ist auf einen Fehler gestoßen. Ein Bericht hilft, ihn zu beheben – hier ist er ganz, zum Durchlesen.",
+  "report_crash_intro": "dopeIPTV wurde beim letzten Mal unerwartet beendet. Ein Bericht hilft, das zu beheben – hier ist er ganz, zum Durchlesen.",
+  "report_include": "Technische Details mitsenden (Versionen, der Fehler, das letzte Protokoll)",
+  "report_what_is_sent": "Genau das wird gesendet – ändere oder lösche, was du willst:",
+  "report_privacy": "Adressen, IP- und MAC-Adressen, Logins, die Namen deiner Quellen, Sender und was du geschaut hast, werden entfernt, bevor du das siehst. Nichts wird gesendet, bis du auf Senden drückst.",
+  "report_send": "Senden",
+  "report_sent": "Danke – der Bericht wurde gesendet.",
+  "report_not_sent": "Der Bericht konnte nicht gesendet werden. Er liegt in der Zwischenablage – du kannst ihn in ein Issue auf GitHub einfügen."
 }

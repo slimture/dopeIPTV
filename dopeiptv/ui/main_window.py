@@ -63,6 +63,7 @@ from .mw_busy import _BusyMixin
 from .mw_cast import _CastMixin
 from .mw_failover import _FailoverMixin
 from .mw_remote import _RemoteMixin
+from .mw_report import _ReportMixin
 from .mw_privacy import _PrivacyMixin
 from .mw_commands import _CommandsMixin
 from .mw_box import _BoxMixin
@@ -112,7 +113,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _PopoutMixin, _MultiviewMixin, _HomeMixin, _MprisMixin,
                  _FollowMixin, _SubtitlesMixin, _CastMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
-                 _RemoteMixin, QMainWindow):
+                 _RemoteMixin, _ReportMixin, QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
     epg_progress = pyqtSignal(int)
@@ -444,6 +445,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             app_menu.addSeparator()
         self._donate_action = app_menu.addAction(tr("donate_support") + "…")
         self._donate_action.triggered.connect(lambda: self.open_donate("app-menu"))
+        self._feedback_action = self._build_report_action(app_menu)
         about_action = app_menu.addAction(tr("menu_about"))
         about_action.triggered.connect(self.show_about)
         quit_action = app_menu.addAction(tr("menu_quit"))
@@ -1583,6 +1585,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._install_shortcuts()
         # The desktop's media controls and the keyboard's media keys.
         self._start_media_session()
+        self._report_init()
         # New episodes of the series the user follows.
         self._start_follow_checks()
 

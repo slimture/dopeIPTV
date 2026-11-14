@@ -1474,5 +1474,19 @@
   "nerd_part_boxes": "Zilizoongezwa: {n}",
   "nerd_part_no_boxes": "Bado hakuna kilichoongezwa",
   "nerd_remote_drop_token": "Ondoa",
-  "nerd_remote_drop_token_tip": "Ondoa tokeni: udhibiti wa mbali na kushiriki vinazimwa na hakuna anayeweza kufikia programu. Ukiwasha kimoja tena, tokeni mpya inaundwa."
+  "nerd_remote_drop_token_tip": "Ondoa tokeni: udhibiti wa mbali na kushiriki vinazimwa na hakuna anayeweza kufikia programu. Ukiwasha kimoja tena, tokeni mpya inaundwa.",
+  "feedback_menu": "Tuma maoni",
+  "feedback_title": "Tuma maoni",
+  "feedback_intro": "Wazo, kitu kisichofanya kazi, kitu unachokipenda – kinawafikia wanaotengeneza dopeIPTV. Hakuna anwani ya barua pepe ndani yake, kwa hivyo jibu halitakuja lenyewe.",
+  "feedback_placeholder": "Ungependa kutuambia nini?",
+  "report_title": "Tuma ripoti ya hitilafu",
+  "report_intro": "Hiki ndicho ripoti ingetuma.",
+  "report_error_intro": "dopeIPTV imekumbana na hitilafu. Ripoti husaidia kuirekebisha – hii hapa yote, uisome kwanza.",
+  "report_crash_intro": "dopeIPTV ilifungwa ghafla mara iliyopita. Ripoti husaidia kurekebisha hilo – hii hapa yote, uisome kwanza.",
+  "report_include": "Jumuisha maelezo ya kiufundi (matoleo, hitilafu, kumbukumbu za karibuni)",
+  "report_what_is_sent": "Hasa kinachotumwa – badilisha au futa chochote:",
+  "report_privacy": "Anwani, anwani za IP na MAC, taarifa za kuingia, majina ya vyanzo vyako, chaneli na ulichotazama huondolewa kabla hujaona hili. Hakuna kinachotumwa hadi ubonyeze Tuma.",
+  "report_send": "Tuma",
+  "report_sent": "Asante – ripoti imetumwa.",
+  "report_not_sent": "Ripoti haikuweza kutumwa. Iko kwenye ubao wa kunakili – unaweza kuibandika kwenye issue kwenye GitHub."
 }

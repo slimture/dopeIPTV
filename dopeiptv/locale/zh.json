@@ -1474,5 +1474,19 @@
   "nerd_part_boxes": "已添加：{n}",
   "nerd_part_no_boxes": "尚未添加",
   "nerd_remote_drop_token": "删除",
-  "nerd_remote_drop_token_tip": "删除令牌：远程控制和共享会关闭，任何人都无法访问本应用。再次开启其中一项会生成新令牌。"
+  "nerd_remote_drop_token_tip": "删除令牌：远程控制和共享会关闭，任何人都无法访问本应用。再次开启其中一项会生成新令牌。",
+  "feedback_menu": "发送反馈",
+  "feedback_title": "发送反馈",
+  "feedback_intro": "一个想法、某个不好用的地方、你喜欢的东西——都会送到 dopeIPTV 的开发者那里。其中不含电子邮件地址，所以不会自动收到回复。",
+  "feedback_placeholder": "你想告诉我们什么？",
+  "report_title": "发送错误报告",
+  "report_intro": "这是报告将发送的内容。",
+  "report_error_intro": "dopeIPTV 遇到了错误。报告有助于修复——这是全部内容，请先阅读。",
+  "report_crash_intro": "dopeIPTV 上次意外关闭。报告有助于修复——这是全部内容，请先阅读。",
+  "report_include": "附上技术信息（版本、错误、最近的日志）",
+  "report_what_is_sent": "将发送的确切内容——可随意修改或删除：",
+  "report_privacy": "地址、IP 和 MAC 地址、登录信息、你的来源名称、频道和观看记录在你看到之前已被移除。在你点击“发送”之前不会发送任何内容。",
+  "report_send": "发送",
+  "report_sent": "谢谢——报告已发送。",
+  "report_not_sent": "报告无法发送。它已在剪贴板中——你可以把它粘贴到 GitHub 的 issue 里。"
 }

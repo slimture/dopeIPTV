@@ -1474,5 +1474,19 @@
   "nerd_part_boxes": "追加済み：{n}",
   "nerd_part_no_boxes": "まだ追加されていません",
   "nerd_remote_drop_token": "削除",
-  "nerd_remote_drop_token_tip": "トークンを削除：リモート操作と共有がオフになり、誰もアプリに接続できなくなります。どちらかをもう一度オンにすると新しいトークンが作られます。"
+  "nerd_remote_drop_token_tip": "トークンを削除：リモート操作と共有がオフになり、誰もアプリに接続できなくなります。どちらかをもう一度オンにすると新しいトークンが作られます。",
+  "feedback_menu": "フィードバックを送る",
+  "feedback_title": "フィードバックを送る",
+  "feedback_intro": "アイデア、うまく動かないこと、気に入っていること – dopeIPTV の開発者に届きます。メールアドレスは含まれないので、返信が自動で届くことはありません。",
+  "feedback_placeholder": "伝えたいことは何ですか？",
+  "report_title": "エラーレポートを送る",
+  "report_intro": "レポートが送信する内容です。",
+  "report_error_intro": "dopeIPTV でエラーが発生しました。レポートは修正の助けになります。まず全文をご確認ください。",
+  "report_crash_intro": "前回 dopeIPTV が予期せず終了しました。レポートは修正の助けになります。まず全文をご確認ください。",
+  "report_include": "技術情報を含める（バージョン、エラー、最近のログ）",
+  "report_what_is_sent": "送信される内容そのものです。自由に変更・削除できます：",
+  "report_privacy": "アドレス、IP・MACアドレス、ログイン情報、ソース名、チャンネル、視聴した内容は、表示前に取り除かれています。［送信］を押すまで何も送られません。",
+  "report_send": "送信",
+  "report_sent": "ありがとうございます。レポートを送信しました。",
+  "report_not_sent": "レポートを送信できませんでした。クリップボードにコピーしたので、GitHub の Issue に貼り付けられます。"
 }

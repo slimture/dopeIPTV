@@ -1474,5 +1474,19 @@
   "nerd_part_boxes": "Eklenen: {n}",
   "nerd_part_no_boxes": "Henüz eklenmedi",
   "nerd_remote_drop_token": "Kaldır",
-  "nerd_remote_drop_token_tip": "Anahtarı kaldır: uzaktan kumanda ve paylaşım kapanır, kimse uygulamaya ulaşamaz. Birini yeniden açınca yeni bir anahtar oluşur."
+  "nerd_remote_drop_token_tip": "Anahtarı kaldır: uzaktan kumanda ve paylaşım kapanır, kimse uygulamaya ulaşamaz. Birini yeniden açınca yeni bir anahtar oluşur.",
+  "feedback_menu": "Geri bildirim gönder",
+  "feedback_title": "Geri bildirim gönder",
+  "feedback_intro": "Bir fikir, çalışmayan bir şey, sevdiğin bir şey – dopeIPTV'yi yapanlara gider. İçinde e-posta adresi yok, bu yüzden kendiliğinden yanıt gelmez.",
+  "feedback_placeholder": "Bize ne anlatmak istersin?",
+  "report_title": "Hata raporu gönder",
+  "report_intro": "Rapor şunu gönderir.",
+  "report_error_intro": "dopeIPTV bir hatayla karşılaştı. Bir rapor düzeltilmesine yardım eder – işte tamamı, önce okuman için.",
+  "report_crash_intro": "dopeIPTV geçen sefer beklenmedik şekilde kapandı. Bir rapor bunun düzeltilmesine yardım eder – işte tamamı, önce okuman için.",
+  "report_include": "Teknik ayrıntıları ekle (sürümler, hata, son günlük)",
+  "report_what_is_sent": "Tam olarak gönderilecek olan – istediğini değiştir ya da sil:",
+  "report_privacy": "Adresler, IP ve MAC adresleri, oturum bilgileri, kaynaklarının adları, kanallar ve izlediklerin sen bunu görmeden önce çıkarılır. Gönder'e basana kadar hiçbir şey gönderilmez.",
+  "report_send": "Gönder",
+  "report_sent": "Teşekkürler – rapor gönderildi.",
+  "report_not_sent": "Rapor gönderilemedi. Panoda duruyor – GitHub'da bir issue'ya yapıştırabilirsin."
 }

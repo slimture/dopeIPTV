@@ -18,6 +18,8 @@ _state = {"last_full": time.monotonic()}
 # lists_main.d), and a list cached by an earlier run could stand in for a
 # server that did not answer. Child processes inherit it.
 os.environ["XDG_CACHE_HOME"] = tempfile.mkdtemp(prefix="dopeiptv-test-cache-")
+# Log files and the crash file (core/report.py) too: never the real ones.
+os.environ["XDG_STATE_HOME"] = tempfile.mkdtemp(prefix="dopeiptv-test-state-")
 
 
 @pytest.fixture(autouse=True, scope="session")

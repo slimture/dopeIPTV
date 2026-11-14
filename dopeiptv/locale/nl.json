@@ -1474,5 +1474,19 @@
   "nerd_part_boxes": "Toegevoegd: {n}",
   "nerd_part_no_boxes": "Nog niets toegevoegd",
   "nerd_remote_drop_token": "Verwijderen",
-  "nerd_remote_drop_token_tip": "Token verwijderen: bediening op afstand en delen gaan uit en niemand bereikt de app. Zet je er een weer aan, dan komt er een nieuw token."
+  "nerd_remote_drop_token_tip": "Token verwijderen: bediening op afstand en delen gaan uit en niemand bereikt de app. Zet je er een weer aan, dan komt er een nieuw token.",
+  "feedback_menu": "Feedback sturen",
+  "feedback_title": "Feedback sturen",
+  "feedback_intro": "Een idee, iets wat niet werkt, iets wat je goed vindt – het gaat naar de makers van dopeIPTV. Er zit geen e-mailadres bij, dus er komt niet vanzelf een antwoord.",
+  "feedback_placeholder": "Wat wil je ons vertellen?",
+  "report_title": "Een foutrapport sturen",
+  "report_intro": "Dit zou het rapport versturen.",
+  "report_error_intro": "dopeIPTV liep tegen een fout aan. Een rapport helpt om die op te lossen – hier is het helemaal, om eerst te lezen.",
+  "report_crash_intro": "dopeIPTV sloot de vorige keer onverwacht af. Een rapport helpt om dat op te lossen – hier is het helemaal, om eerst te lezen.",
+  "report_include": "Technische details meesturen (versies, de fout, het recente logboek)",
+  "report_what_is_sent": "Precies wat er verstuurd wordt – wijzig of verwijder wat je wilt:",
+  "report_privacy": "Adressen, IP- en MAC-adressen, logins, de namen van je bronnen, zenders en wat je keek worden verwijderd voordat je dit ziet. Er wordt niets verstuurd tot je op Versturen drukt.",
+  "report_send": "Versturen",
+  "report_sent": "Bedankt – het rapport is verstuurd.",
+  "report_not_sent": "Het rapport kon niet worden verstuurd. Het staat op het klembord – je kunt het in een issue op GitHub plakken."
 }

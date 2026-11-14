@@ -1474,5 +1474,19 @@
   "nerd_part_boxes": "Ajoutés : {n}",
   "nerd_part_no_boxes": "Aucun ajouté pour l'instant",
   "nerd_remote_drop_token": "Supprimer",
-  "nerd_remote_drop_token_tip": "Supprimer le jeton : la télécommande et le partage se désactivent, personne ne peut joindre l'app. En réactiver un crée un nouveau jeton."
+  "nerd_remote_drop_token_tip": "Supprimer le jeton : la télécommande et le partage se désactivent, personne ne peut joindre l'app. En réactiver un crée un nouveau jeton.",
+  "feedback_menu": "Envoyer un avis",
+  "feedback_title": "Envoyer un avis",
+  "feedback_intro": "Une idée, quelque chose qui ne marche pas, quelque chose que tu aimes – cela va aux personnes qui font dopeIPTV. Aucune adresse e-mail n'y figure, donc aucune réponse ne revient d'elle-même.",
+  "feedback_placeholder": "Que veux-tu nous dire ?",
+  "report_title": "Envoyer un rapport d'erreur",
+  "report_intro": "Voici ce que le rapport enverrait.",
+  "report_error_intro": "dopeIPTV a rencontré une erreur. Un rapport aide à la corriger – le voici en entier, à lire d'abord.",
+  "report_crash_intro": "dopeIPTV s'est fermé de façon inattendue la dernière fois. Un rapport aide à corriger cela – le voici en entier, à lire d'abord.",
+  "report_include": "Inclure les détails techniques (versions, l'erreur, le journal récent)",
+  "report_what_is_sent": "Exactement ce qui est envoyé – modifie ou supprime ce que tu veux :",
+  "report_privacy": "Les adresses, adresses IP et MAC, identifiants, noms de tes sources, chaînes et ce que tu as regardé sont retirés avant que tu ne voies ceci. Rien n'est envoyé avant que tu appuies sur Envoyer.",
+  "report_send": "Envoyer",
+  "report_sent": "Merci – le rapport a été envoyé.",
+  "report_not_sent": "Le rapport n'a pas pu être envoyé. Il est dans le presse-papiers – tu peux le coller dans un ticket sur GitHub."
 }

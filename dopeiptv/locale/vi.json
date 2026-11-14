@@ -1474,5 +1474,19 @@
   "nerd_part_boxes": "Đã thêm: {n}",
   "nerd_part_no_boxes": "Chưa thêm gì",
   "nerd_remote_drop_token": "Xóa",
-  "nerd_remote_drop_token_tip": "Xóa token: điều khiển từ xa và chia sẻ sẽ tắt, không ai truy cập được ứng dụng. Bật lại một trong hai sẽ tạo token mới."
+  "nerd_remote_drop_token_tip": "Xóa token: điều khiển từ xa và chia sẻ sẽ tắt, không ai truy cập được ứng dụng. Bật lại một trong hai sẽ tạo token mới.",
+  "feedback_menu": "Gửi góp ý",
+  "feedback_title": "Gửi góp ý",
+  "feedback_intro": "Một ý tưởng, điều gì đó không chạy, điều bạn thích – sẽ đến với những người làm dopeIPTV. Không có địa chỉ email kèm theo, nên sẽ không tự có phản hồi.",
+  "feedback_placeholder": "Bạn muốn nói gì với chúng tôi?",
+  "report_title": "Gửi báo cáo lỗi",
+  "report_intro": "Đây là những gì báo cáo sẽ gửi.",
+  "report_error_intro": "dopeIPTV gặp lỗi. Báo cáo giúp sửa lỗi – đây là toàn bộ, để bạn đọc trước.",
+  "report_crash_intro": "Lần trước dopeIPTV đã đóng bất ngờ. Báo cáo giúp sửa lỗi – đây là toàn bộ, để bạn đọc trước.",
+  "report_include": "Kèm chi tiết kỹ thuật (phiên bản, lỗi, nhật ký gần đây)",
+  "report_what_is_sent": "Chính xác những gì được gửi – sửa hoặc xóa tùy ý:",
+  "report_privacy": "Địa chỉ, địa chỉ IP và MAC, thông tin đăng nhập, tên nguồn, kênh và những gì bạn đã xem được xóa trước khi bạn thấy nội dung này. Không gì được gửi cho đến khi bạn bấm Gửi.",
+  "report_send": "Gửi",
+  "report_sent": "Cảm ơn – báo cáo đã được gửi.",
+  "report_not_sent": "Không gửi được báo cáo. Nội dung đã nằm trong bộ nhớ tạm – bạn có thể dán vào một issue trên GitHub."
 }

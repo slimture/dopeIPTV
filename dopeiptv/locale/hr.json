@@ -1474,5 +1474,19 @@
   "nerd_part_boxes": "Dodano: {n}",
   "nerd_part_no_boxes": "Još ništa nije dodano",
   "nerd_remote_drop_token": "Ukloni",
-  "nerd_remote_drop_token_tip": "Ukloni token: daljinsko upravljanje i dijeljenje se isključuju i nitko ne može pristupiti aplikaciji. Kad ponovno uključiš jedno, stvara se novi token."
+  "nerd_remote_drop_token_tip": "Ukloni token: daljinsko upravljanje i dijeljenje se isključuju i nitko ne može pristupiti aplikaciji. Kad ponovno uključiš jedno, stvara se novi token.",
+  "feedback_menu": "Pošalji povratnu informaciju",
+  "feedback_title": "Pošalji povratnu informaciju",
+  "feedback_intro": "Ideja, nešto što ne radi, nešto što ti se sviđa – stiže do onih koji rade dopeIPTV. U njoj nema e-adrese, pa odgovor ne stiže sam od sebe.",
+  "feedback_placeholder": "Što nam želiš reći?",
+  "report_title": "Pošalji izvješće o pogrešci",
+  "report_intro": "Ovo bi izvješće poslalo.",
+  "report_error_intro": "dopeIPTV je naišao na pogrešku. Izvješće pomaže da se ispravi – evo ga cijelog, da ga prvo pročitaš.",
+  "report_crash_intro": "dopeIPTV se prošli put neočekivano zatvorio. Izvješće pomaže da se to ispravi – evo ga cijelog, da ga prvo pročitaš.",
+  "report_include": "Uključi tehničke pojedinosti (verzije, pogrešku, nedavni zapisnik)",
+  "report_what_is_sent": "Točno ono što se šalje – izmijeni ili obriši što god želiš:",
+  "report_privacy": "Adrese, IP i MAC adrese, prijave, nazivi tvojih izvora, kanali i ono što si gledao uklanjaju se prije nego što ovo vidiš. Ništa se ne šalje dok ne pritisneš Pošalji.",
+  "report_send": "Pošalji",
+  "report_sent": "Hvala – izvješće je poslano.",
+  "report_not_sent": "Izvješće nije moguće poslati. U međuspremniku je – možeš ga zalijepiti u prijavu na GitHubu."
 }

@@ -19,6 +19,8 @@ WARNING+ to stderr, so nothing is ever silently lost.
 """
 from __future__ import annotations
 
+from typing import Any
+
 import logging
 import os
 import sys
@@ -186,6 +188,33 @@ def set_file_logging(on: bool) -> str | None:
     _file_handler = fh
     log.info("log file: %s", log_file())
     return log_file()
+
+
+class _Recent(logging.Handler):
+    """The last few hundred lines, kept in memory (already redacted by the
+    logger's filter): what an error report shows of what led up to it."""
+
+    def __init__(self, size: int = 300) -> None:
+        super().__init__()
+        from collections import deque
+        self.lines: Any = deque(maxlen=size)
+        self.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s", "%H:%M:%S"))
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            self.lines.append(self.format(record))
+        except Exception:
+            pass
+
+
+_recent = _Recent()
+# From the first line on, configured or not (a test, an early error).
+log.addHandler(_recent)
+
+
+def recent_lines(n: int = 120) -> list[str]:
+    """The last *n* log lines of this run."""
+    return list(_recent.lines)[-n:]
 
 
 def configure_logging() -> None:

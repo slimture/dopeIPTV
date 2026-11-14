@@ -1474,5 +1474,19 @@
   "nerd_part_boxes": "Tillagda: {n}",
   "nerd_part_no_boxes": "Inga tillagda än",
   "nerd_remote_drop_token": "Ta bort",
-  "nerd_remote_drop_token_tip": "Ta bort token: fjärrstyrning och delning stängs av och ingen kan nå appen. Slår du på någon igen skapas en ny token."
+  "nerd_remote_drop_token_tip": "Ta bort token: fjärrstyrning och delning stängs av och ingen kan nå appen. Slår du på någon igen skapas en ny token.",
+  "feedback_menu": "Skicka feedback",
+  "feedback_title": "Skicka feedback",
+  "feedback_intro": "En idé, något som inte fungerar, något du gillar – det går till dem som gör dopeIPTV. Ingen e-postadress följer med, så inget svar kommer av sig självt.",
+  "feedback_placeholder": "Vad vill du berätta?",
+  "report_title": "Skicka en felrapport",
+  "report_intro": "Det här är vad rapporten skulle skicka.",
+  "report_error_intro": "dopeIPTV stötte på ett fel. En rapport hjälper till att rätta det – här är hela den, att läsa först.",
+  "report_crash_intro": "dopeIPTV stängdes oväntat förra gången. En rapport hjälper till att rätta det – här är hela den, att läsa först.",
+  "report_include": "Ta med tekniska detaljer (versioner, felet, senaste loggen)",
+  "report_what_is_sent": "Exakt det som skickas – ändra eller ta bort vad du vill:",
+  "report_privacy": "Adresser, IP- och MAC-adresser, inloggningar, dina källors namn, kanaler och det du tittat på tas bort innan du ser detta. Inget skickas förrän du trycker Skicka.",
+  "report_send": "Skicka",
+  "report_sent": "Tack – rapporten skickades.",
+  "report_not_sent": "Rapporten kunde inte skickas. Den ligger i urklipp – du kan klistra in den i ett ärende på GitHub."
 }
