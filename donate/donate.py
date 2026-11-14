@@ -228,13 +228,17 @@ def _secret() -> str:
 _SEEN: dict[str, list[float]] = {}
 _LOCK = threading.Lock()
 WINDOW, PER_WINDOW = 600.0, 12
+FEEDBACK_PER_WINDOW = 60          # reports from one address in WINDOW
 
 
-def _allowed(addr: str) -> bool:
+def _allowed(addr: str, most: int = PER_WINDOW) -> bool:
     now = time.monotonic()
     with _LOCK:
+        if len(_SEEN) > 5000:          # addresses seen once, long ago: let go (memory only)
+            for key in [k for k, ts in _SEEN.items() if not ts or now - ts[-1] >= WINDOW]:
+                del _SEEN[key]
         hits = [t for t in _SEEN.get(addr, []) if now - t < WINDOW]
-        if len(hits) >= PER_WINDOW:
+        if len(hits) >= most:
             _SEEN[addr] = hits
             return False
         hits.append(now)
@@ -1031,7 +1035,8 @@ class Handler(BaseHTTPRequestHandler):
         if self.headers.get("X-Dopeiptv-Report") != "1":
             return self._send(400, {"error": "not from the app"})
         addr = self.headers.get("X-Real-IP") or "local"
-        if not _allowed("fb:" + addr):
+        # Many people can share one address; a report is one press of Send.
+        if not _allowed("fb:" + addr, FEEDBACK_PER_WINDOW):
             return self._send(429, {"error": "slow down"})
         data = self._body(60000)
         if data is None:
