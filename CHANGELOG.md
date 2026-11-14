@@ -66,6 +66,9 @@ viewing, feedback with answers in the app, and a supporter key.
 - macOS: a second dopeIPTV menu appeared beside the real one.
 - The source dialog with Nerd on was too tall to use and did not scroll;
   Check now moved the focus away.
+- The guide could take the app down after it had been closed, with the
+  older PyQt the Flatpak uses: its timers kept calling into the closed
+  dialog.
 
 ## [1.4.5]
 
