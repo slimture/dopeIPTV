@@ -21,6 +21,9 @@
 - **A supporter key** for those who donate: your logo takes on the heart's colours, the app's icon can too, two themes are yours (Aurora and Dawn), your feedback is read first, and the app stops asking. It is checked on your computer and holds nothing about you. Find it under **dopeIPTV → Supporter key…**.
 - **Sync between computers**, a thank-you for supporters: your favorites and settings - and, if you like, your playlists and watch history - the same on all your computers. Encrypted on your computer with a code only your computers know; dopeiptv.org can't read what's synced. **Settings → General → Sync between computers.**
 
+- **A tidier sidebar** - the places you watch at the top, your own lists below, a red dot while something records - and **the guide in the middle of the window**, beside what you are watching.
+- **Answers to your feedback** in a window of their own, under Help.
+
 ### Also new
 
 - Recordings named the way you want, in folders of their own, and a command run when one is done.

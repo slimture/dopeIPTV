@@ -81,6 +81,17 @@ feedback with answers in the app, and a supporter key.
 - Nerd: rewrite rules for a source's stream addresses (find -> replace,
   plain or regex, previewed and tested), and a highest quality for
   adaptive streams (1080p, 720p, 480p, lowest, or a bitrate).
+- The sidebar in places and MINE: Home, TV, Guide, Movies, Series,
+  Recordings and Local files at the top; Favorites, Watch later and
+  History (with a Watched filter) below; a quiet status - a red dot while
+  recording, new episodes, the watch-later count; the source as an avatar
+  beside Settings at the foot. Multiview lives in the View menu and on a
+  channel's right-click.
+- The guide opens as a page in the middle, beside the player; Pop out
+  gives it its own window as before.
+- Answers to feedback in a window of their own (Help > Answers to
+  feedback, Settings > General), asked for soon after a report; the menus
+  grouped as each system has them (File, View, History, Help on a Mac).
 - Nerd: events out to webhooks and MQTT - playing, paused, stopped,
   channel changed, recordings - with Home Assistant discovery; private
   viewing sends what happened, not what.
