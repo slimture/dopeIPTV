@@ -139,6 +139,8 @@
     "donate_key_open": "Öppna i dopeIPTV",
     "donate_key_wait": "Nyckeln syns när betalningen har gått igenom – öppna länken i ditt kvitto igen om en stund.",
     "donate_key_none": "Den här länken leder inte till någon supporternyckel.",
+    "donate_paused": "Donationer är pausade några dagar medan vi byter betalleverantör. Tack för att du vill stödja dopeIPTV – titta in igen snart!",
+    "donate_paused_note": "Pausat några dagar medan vi byter betalleverantör",
     "foot_feedback": "Feedback",
     "fbs_app": "Appen",
     "fbs_site": "Den här webbplatsen",

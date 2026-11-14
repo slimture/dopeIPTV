@@ -139,6 +139,8 @@
     "donate_key_open": "Buka di dopeIPTV",
     "donate_key_wait": "Kunci muncul setelah pembayaran berhasil - buka lagi tautan di tanda terima Anda beberapa saat lagi.",
     "donate_key_none": "Tautan ini tidak mengarah ke kunci pendukung.",
+    "donate_paused": "Donasi dijeda beberapa hari selagi kami pindah ke penyedia pembayaran baru. Terima kasih sudah ingin mendukung dopeIPTV – kunjungi lagi segera!",
+    "donate_paused_note": "Dijeda beberapa hari selagi kami ganti penyedia pembayaran",
     "foot_feedback": "Masukan",
     "fbs_app": "Aplikasi",
     "fbs_site": "Situs ini",

@@ -183,6 +183,9 @@ var iptvHit = (function () {
       typeof HTMLDialogElement !== "function") { return; }
   var T = words.dataset;
   var LANG = T.lang || document.documentElement.lang || "en";
+  // While the payment provider is being changed: the donate links stay, and
+  // open a short note instead of the checkout (nothing is loaded for it).
+  var PAUSED = !!T.paused;
   // The Stripe.js release solequiz.com runs on against the same account.
   var STRIPE_JS = "https://js.stripe.com/endive/stripe.js";
   var ZERO_DECIMAL = /^(bif|clp|djf|gnf|jpy|kmf|krw|mga|pyg|rwf|ugx|vnd|vuv|xaf|xof|xpf)$/;
@@ -595,6 +598,24 @@ var iptvHit = (function () {
   // What went wrong goes to the console, for whoever looks after the site;
   // the visitor gets a plain sentence and stays on the page.
   function warn(what, err) { try { console.warn("[donate] " + what, err || ""); } catch (e) { /* none */ } }
+
+  function pausedNote() {
+    var d = mk("dialog", "dn dn-paused");
+    d.setAttribute("aria-labelledby", "dn-paused-title");
+    var head = mk("div", "dn-head"), ht = mk("div");
+    var h = mk("h2", "", T.title); h.id = "dn-paused-title";
+    h.prepend(heart("dn-titleheart"));
+    ht.append(h, mk("p", "", T.paused));
+    var x = mk("button", "dn-x", "×"); x.type = "button"; x.setAttribute("aria-label", T.close);
+    head.append(ht, x);
+    d.append(head);
+    function shut() { d.close(); }
+    x.addEventListener("click", shut);
+    d.addEventListener("click", function (e) { if (e.target === d) { shut(); } });
+    d.addEventListener("close", function () { d.remove(); });
+    document.body.append(d);
+    d.showModal();
+  }
 
   function build() {
     dlg = mk("dialog", "dn");
@@ -1087,7 +1108,7 @@ var iptvHit = (function () {
 
   function intent(e) {
     var a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
-    if (isDonate(a)) { warm(); }
+    if (isDonate(a) && !PAUSED) { warm(); }
   }
   document.addEventListener("pointerover", intent, { passive: true });
   document.addEventListener("focusin", intent);
@@ -1103,6 +1124,7 @@ var iptvHit = (function () {
     var from = centre(mark);
     if (menu) { menu.open = false; }
     thump(mark, false);
+    if (PAUSED) { pausedNote(); return; }
     open(a.href, from);
     if (!open.hero) { burst(from, false); }
   });

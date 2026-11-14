@@ -139,6 +139,8 @@
     "donate_key_open": "dopeIPTV에서 열기",
     "donate_key_wait": "결제가 완료되면 키가 표시됩니다. 잠시 후 영수증의 링크를 다시 열어 주세요.",
     "donate_key_none": "이 링크로는 서포터 키를 찾을 수 없습니다.",
+    "donate_paused": "새 결제 서비스로 옮기는 동안 며칠간 기부를 잠시 멈췄습니다. dopeIPTV를 응원해 주셔서 감사합니다. 곧 다시 들러 주세요!",
+    "donate_paused_note": "결제 서비스를 바꾸는 동안 며칠간 일시 중지",
     "foot_feedback": "피드백",
     "fbs_app": "앱",
     "fbs_site": "이 웹사이트",

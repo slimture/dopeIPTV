@@ -160,7 +160,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
            ["busy", "donate_busy"], ["lock", "donate_lock"], ["back", "donate_back"],
            ["thanks", "donate_thanks"], ["receipt", "donate_receipt"], ["failed", "donate_failed"],
            ["emailmissing", "donate_email_missing"], ["range", "donate_range"],
-           ["close", "donate_close"], ["loading", "donate_loading"],
+           ["close", "donate_close"], ["loading", "donate_loading"], ["paused", "donate_paused"],
            ["apple", "donate_apple"], ["google", "donate_google"], ["card", "donate_card"],
            ["key", "donate_key"], ["keyhow", "donate_key_how"], ["keycopy", "donate_key_copy"],
            ["keycopied", "donate_key_copied"], ["keyopen", "donate_key_open"], ["keywait", "donate_key_wait"],
@@ -366,7 +366,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
       + "        </div>\n"
       + "        <div class=\"donate-act\">\n"
       + "          <a class=\"btn primary donate-btn\" href=\"\($DONATE | h)\" rel=\"nofollow noopener\"><svg class=\"donate-heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("donate_btn") | h)</a>\n"
-      + "          <small>\(t("donate_note") | h)</small>\n"
+      + "          <small>\(t("donate_paused_note") | h)</small>\n"
       + "        </div>\n"
       + "      </div>\n"
       + "    </div>\n"

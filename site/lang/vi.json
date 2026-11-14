@@ -139,6 +139,8 @@
     "donate_key_open": "Mở trong dopeIPTV",
     "donate_key_wait": "Khóa sẽ hiện khi thanh toán hoàn tất - hãy mở lại liên kết trong biên nhận sau ít phút.",
     "donate_key_none": "Liên kết này không dẫn đến khóa người ủng hộ nào.",
+    "donate_paused": "Việc quyên góp tạm dừng vài ngày trong lúc chúng tôi chuyển sang nhà cung cấp thanh toán mới. Cảm ơn bạn đã muốn ủng hộ dopeIPTV – hãy quay lại sớm nhé!",
+    "donate_paused_note": "Tạm dừng vài ngày trong lúc đổi nhà cung cấp thanh toán",
     "foot_feedback": "Góp ý",
     "fbs_app": "Ứng dụng",
     "fbs_site": "Trang web này",

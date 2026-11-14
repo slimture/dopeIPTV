@@ -139,6 +139,8 @@
     "donate_key_open": "Otvori u dopeIPTV-u",
     "donate_key_wait": "Ključ se pojavljuje kad plaćanje prođe - otvori poveznicu iz potvrde ponovno malo kasnije.",
     "donate_key_none": "Ova poveznica ne vodi do ključa podržavatelja.",
+    "donate_paused": "Donacije su pauzirane nekoliko dana dok prelazimo na novog pružatelja plaćanja. Hvala što želiš podržati dopeIPTV – navrati uskoro!",
+    "donate_paused_note": "Pauzirano nekoliko dana dok mijenjamo pružatelja plaćanja",
     "foot_feedback": "Povratne informacije",
     "fbs_app": "Aplikacija",
     "fbs_site": "Ova stranica",

@@ -139,6 +139,8 @@
     "donate_key_open": "Open in dopeIPTV",
     "donate_key_wait": "The key appears once the payment has gone through - open the link in your receipt again in a little while.",
     "donate_key_none": "This link does not lead to a supporter key.",
+    "donate_paused": "Donations are paused for a few days while we move to a new payment provider. Thank you for wanting to support dopeIPTV - please check back soon!",
+    "donate_paused_note": "Paused for a few days while we switch payment provider",
     "foot_feedback": "Feedback",
     "fbs_app": "The app",
     "fbs_site": "This website",

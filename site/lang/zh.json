@@ -139,6 +139,8 @@
     "donate_key_open": "在 dopeIPTV 中打开",
     "donate_key_wait": "付款完成后会显示密钥——请稍后再打开收据里的链接。",
     "donate_key_none": "此链接无法打开支持者密钥。",
+    "donate_paused": "我们正在更换支付服务商，捐赠暂停几天。感谢你愿意支持 dopeIPTV——请稍后再来！",
+    "donate_paused_note": "更换支付服务商期间暂停几天",
     "foot_feedback": "反馈",
     "fbs_app": "应用",
     "fbs_site": "本网站",
