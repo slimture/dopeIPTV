@@ -561,6 +561,12 @@ class SettingsShell(QWidget):
         self.folded: set[str] = set()
         #: Told (parent, folded) when the person folds a group: to keep it.
         self.on_fold: Callable[[str, bool], None] | None = None
+        #: The group just turned on, scrolled into sight as it folds out.
+        self._into_view: str | None = None
+        self._into_view_steps = 0
+        self._into_view_timer = QTimer(self)
+        self._into_view_timer.setSingleShot(True)
+        self._into_view_timer.timeout.connect(self._bring_into_view)
         self._aligned = False
         self.nav.page_chosen.connect(self._show)
         self.nav.fold_clicked.connect(self._fold_row)
@@ -613,8 +619,11 @@ class SettingsShell(QWidget):
             self._items[parent].setData(PARENT_ROLE, 0)
 
     def set_group_enabled(self, parent: str, on: bool) -> None:
-        """Show or leave out every page under *parent* at once; turned on,
-        they fold out one after another."""
+        """Show or leave out every page under *parent* at once. Turned on,
+        they fold out one after another - unfolded even if the person had
+        folded them in before - and the sidebar scrolls them into sight:
+        at the foot of a long sidebar they came out below its edge, and
+        nothing showed that anything had happened."""
         keys = self._children.get(parent, [])
         was = [k for k in keys if k not in self._off]
         for k in keys:
@@ -622,8 +631,21 @@ class SettingsShell(QWidget):
                 self._off.discard(k)
             else:
                 self._off.add(k)
+        turned_on = bool(on and keys and not was)
+        if turned_on and parent in self.folded:
+            self.folded.discard(parent)
+            if self.on_fold is not None:
+                self.on_fold(parent, False)
+        if not on and self._into_view == parent:
+            self._into_view_timer.stop()
+            self._into_view = None
         self._filter(self.search.text())
-        if not (on and self.animate and not was and not self._searching):
+        if not turned_on or self._searching:
+            return
+        self._into_view = parent
+        self._into_view_steps = 0
+        if not self.animate:
+            self._into_view_timer.start(0)
             return
         shown = [self._items[k] for k in keys if not self._items[k].isHidden()]
         for it in shown:
@@ -637,6 +659,39 @@ class SettingsShell(QWidget):
             self._mark_children()
         for i in range(len(shown)):
             QTimer.singleShot(35 * (i + 1), lambda i=i: reveal(i))
+        # Each page as it comes out, so the list follows the fold.
+        self._into_view_steps = len(shown)
+        self._into_view_timer.start(35)
+
+    def _bring_into_view(self) -> None:
+        """Scroll the sidebar so the group being folded out is in sight:
+        its last page showing at least, and the parent too when the whole
+        group fits. Steps along with the fold-out (one page every 35 ms),
+        then once more after its last page."""
+        parent = self._into_view
+        if self._into_view_steps > 0:
+            self._into_view_steps -= 1
+            self._into_view_timer.start(35)
+        else:
+            self._into_view = None
+        item = self._items.get(parent or "")
+        if parent is None or item is None or item.isHidden() or self._searching:
+            return
+        rows = [item] + [self._items[k] for k in self._children.get(parent, [])
+                         if not self._items[k].isHidden()]
+        nav = self.nav
+        top = nav.visualItemRect(rows[0]).top()
+        bottom = nav.visualItemRect(rows[-1]).bottom()
+        height = nav.viewport().height()
+        if height <= 0:
+            return
+        if bottom - top < height and top < 0:
+            delta = top
+        else:
+            delta = max(0, bottom + 1 - height)
+        if delta:
+            bar = nav.verticalScrollBar()
+            bar.setValue(bar.value() + delta)
 
     def _fold_row(self, row: int) -> None:
         item = self.nav.item(row)

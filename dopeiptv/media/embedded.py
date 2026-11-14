@@ -1446,6 +1446,10 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         # (the intermittent "video over the control bar").
         QTimer.singleShot(0, lambda: self._show_dock_placeholder(True))
         self._reveal_sleep_badge()
+        # Stats that were on come along: now, and once more against the
+        # settled window (the caller adds the mirror and the bar after this).
+        self._keep_stats_up()
+        QTimer.singleShot(0, self._keep_stats_up)
         # Every fullscreen toggle tears this down and builds it again - a new
         # GL context and a fresh mpv render binding each time. Timed so a
         # stall at the transition can be attributed to the rebuild rather
@@ -1635,6 +1639,8 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         self._relayout_controls()
         self.video.update()
         self._reveal_sleep_badge()
+        self._keep_stats_up()
+        QTimer.singleShot(0, self._keep_stats_up)
         log.info("VID mirror stop took %.0fms",
                  (time.monotonic() - _t_stop) * 1000)
 
@@ -1991,6 +1997,8 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
             self._hide_seek_overlay(force=True)
             self._set_local_buffer_visible(False)   # fullscreen has its own
             self._lock_video_box()
+            # Before the controls: they are raised over it, never under.
+            self._keep_stats_up()
             self._show_overlay()
             # Focus the surface that is actually on screen: with a mirror up
             # the docked widget is behind a placeholder in another window,
@@ -2010,6 +2018,7 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
             # next tick to be robust against the transition ordering.
             self._lock_video_box()
             QTimer.singleShot(0, self._lock_video_box)
+            self._keep_stats_up()
 
     def _cursor_surfaces(self) -> list:
         """Every surface the pointer can actually be over.
@@ -3303,6 +3312,22 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         self._stats_overlay.raise_()
         self._place_stats()
         self._stats_timer.start()
+
+    def _keep_stats_up(self) -> None:
+        """Stats that are on (their timer runs) stay on: shown over the
+        surface that has the picture now, above what came into its window.
+
+        The pop-out - and fullscreen on macOS, which is the pop-out filling
+        the screen - moves the overlays into another window, and a widget
+        given a new parent is hidden. Nothing showed the stats again, so
+        they went the moment fullscreen began, their timer ticking on."""
+        ov = self._stats_overlay
+        if not self._stats_timer.isActive() or self.video.mpv is None:
+            return
+        if ov.isHidden():
+            ov.show()
+        ov.raise_()
+        self._place_stats()
 
     def _update_stats_text(self) -> None:
         m = self.video.mpv

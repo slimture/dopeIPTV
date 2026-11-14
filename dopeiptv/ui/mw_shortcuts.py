@@ -43,8 +43,13 @@ class _ShortcutsMixin:
 
     def _typing(self) -> bool:
         """True when a text field has focus, so single-letter player shortcuts
-        don't steal the keystroke from the search box etc."""
-        return isinstance(self.focusWidget(), QLineEdit)
+        don't steal the keystroke from the search box etc.
+
+        The field that has the keys now, in whichever window is active - not
+        this window's last one. Over the pop-out, and in fullscreen on macOS
+        (the pop-out filling the screen), a search box clicked into earlier
+        still counted as typing, so I, M, P and R did nothing there."""
+        return isinstance(QApplication.focusWidget(), QLineEdit)
 
     def _player_up(self) -> bool:
         if self._multiview_active() is not None:
