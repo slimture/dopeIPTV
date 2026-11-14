@@ -436,7 +436,7 @@ rel=$REL
 counts=$COUNTS
 [ -s "$counts" ] && jq -e 'type == "object"' "$counts" >/dev/null 2>&1 || counts=/dev/null
 
-render() {  # render PAGE LANG TEMPLATE OUTFILE
+render() {  # render PAGE LANG TEMPLATE OUTFILE [BODY]
     mkdir -p "${4%/*}"
     tr=$SITE/lang/$2.json
     jq -n -j -f "$SITE/render.jq" \
@@ -444,15 +444,29 @@ render() {  # render PAGE LANG TEMPLATE OUTFILE
         --argjson avail "$avail" --argjson asset_urls "$asset_urls" \
         --argjson screenshots "$screenshots" --argjson help_mtime "$help_mtime" \
         --slurpfile site "$SITE/i18n.json" --slurpfile helpfile "$SITE/help.json" \
-        --slurpfile fmt "$SITE/formats.json" \
+        --slurpfile fmt "$SITE/formats.json" --slurpfile legal "$SITE/legal.json" \
         --slurpfile en "$SITE/lang/en.json" --slurpfile tr "$tr" \
         --slurpfile rel "$rel" --slurpfile dl "$counts" \
-        --rawfile tpl "$3" --rawfile navtpl "$SITE/templates/nav.html" > "$4"
+        --rawfile tpl "$3" --rawfile navtpl "$SITE/templates/nav.html" \
+        --rawfile body "${5:-/dev/null}" > "$4"
 }
+# The legal pages (site/legal.json): written in Swedish, which governs, and
+# English; every other language gets the English text in its own header and
+# footer (render.jq page_legal, which picks the language by the same rule).
+legal_pages=$(jq -r '.pages[]' "$SITE/legal.json")
+legal_langs=$(jq -r '.text | keys[]' "$SITE/legal.json")
 for c in $codes; do
     render index "$c" "$SITE/templates/index.html" "$OUT/i18n/$c/index.html"
     render help "$c" "$SITE/templates/help.html" "$OUT/i18n/$c/help/index.html"
     render 404 "$c" "$SITE/templates/404.html" "$OUT/i18n/$c/404.html"
+    written=en
+    for l in $legal_langs; do
+        if [ "$l" = "$c" ]; then written=$c; fi
+    done
+    for p in $legal_pages; do
+        render "$p" "$c" "$SITE/templates/legal.html" "$OUT/i18n/$c/$p/index.html" \
+            "$SITE/legal/$written/$p.html"
+    done
 done
 render sitemap en /dev/null "$OUT/i18n/sitemap.xml"
 

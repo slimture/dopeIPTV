@@ -1,0 +1,157 @@
+<div class="lead">
+<h2 id="kort">Kort sagt</h2>
+<ul>
+<li><strong>Appen sparar dina uppgifter på din dator.</strong> Dina källor, inloggningar, favoriter, din historik och dina inställningar stannar där. Appen har ingen analys eller telemetri, och du har inget konto hos oss.</li>
+<li><strong>Appen kontaktar oss bara när den har ett skäl:</strong> för att leta efter uppdateringar (det går att stänga av), när du själv skickar en felrapport eller feedback och – om du slår på det – för synkronisering av inställningar, som är krypterad så att vi inte kan läsa den.</li>
+<li><strong>Webbplatsen räknar besök i egen statistik</strong>, utan kakor och utan externa analystjänster. Din IP-adress används för att räkna fram ett pseudonymt besökar-id och ett land. Den sparas inte i statistiken, och serverloggarna som innehåller den raderas efter kort tid.</li>
+<li><strong>Donationer:</strong> kortuppgifter går direkt till vår betalleverantör och aldrig till oss.</li>
+<li>Vi säljer inga personuppgifter, visar ingen reklam och använder inga spårare från andra företag.</li>
+</ul>
+</div>
+
+<nav class="legal-toc" aria-label="Innehåll">
+<ol>
+<li><a href="#ansvarig">Vem som ansvarar</a></li>
+<li><a href="#appen">Appen dopeIPTV</a></li>
+<li><a href="#webbplatsen">Webbplatsen</a></li>
+<li><a href="#kakor">Kakor och lagring i din webbläsare</a></li>
+<li><a href="#donationer">Donationer</a></li>
+<li><a href="#kontakt">När du kontaktar oss</a></li>
+<li><a href="#mottagare">Vilka som får del av uppgifterna</a></li>
+<li><a href="#overforing">Överföring till länder utanför EU/EES</a></li>
+<li><a href="#lagring">Hur länge vi sparar uppgifter</a></li>
+<li><a href="#rattigheter">Dina rättigheter</a></li>
+<li><a href="#sakerhet">Säkerhet</a></li>
+<li><a href="#andringar">Ändringar</a></li>
+</ol>
+</nav>
+
+<h2 id="ansvarig">1. Vem som ansvarar</h2>
+<p>Solecraft AB (org.nr 559601-3176), <mark class="todo">[ADDRESS - Solecraft AB's registered address]</mark>, Sverige, är personuppgiftsansvarig för den behandling av personuppgifter som beskrivs här. Kontakta oss på <a href="mailto:info@solecraft.se">info@solecraft.se</a> – även när du vill använda dina rättigheter (avsnitt 10).</p>
+<p>Policyn gäller webbplatsen dopeiptv.org (den gamla adressen iptv.dope.rs skickar bara vidare dit), tjänsterna på den – donationer, feedback och felrapporter, synkronisering av inställningar och uppdateringar – och appen dopeIPTV så som vi ger ut den.</p>
+
+<h2 id="appen">2. Appen dopeIPTV</h2>
+<h3>Det som stannar på din dator</h3>
+<p>Allt du lägger till eller gör i appen – dina källor och deras inloggningar, favoriter, tittarhistorik, inställningar, inspelningar och cachade data – sparas på din egen dator. Vi kan inte se det. Appen har ingen analys eller telemetri, ingen reklam och inget konto hos oss.</p>
+<p><strong>Privat tittande:</strong> medan det är på sparas inget av det du spelar – ingen historik, ingen position att fortsätta från och ingen scrobbling till Trakt.</p>
+
+<h3>När appen kontaktar dopeiptv.org</h3>
+<ul>
+<li><strong>Uppdateringar.</strong> En gång om dagen (var sjätte timme om du har valt testversioner) frågar appen dopeiptv.org vilken version som är den senaste, och en uppdatering som du installerar hämtas via dopeiptv.org. Anropet anger appens namn och version, operativsystem och processortyp – till exempel <code>dopeIPTV/1.5.0 (Linux; x86_64)</code> – och kommer, som alla anrop på internet, från din IP-adress. Vi räknar uppdateringar så som beskrivs i avsnitt 3. Om dopeiptv.org inte svarar frågar appen GitHub i stället. Du kan stänga av kontrollen i appens inställningar (<em>Sök efter uppdateringar vid start</em>).</li>
+<li><strong>Felrapporter och feedback</strong> skickas bara när du trycker på <em>Skicka</em>. Du ser hela rapporten först och kan ändra eller ta bort vad som helst i den. Innan du ser den har appen redan tagit bort webbadresser, IP- och MAC-adresser, e-postadresser, inloggningar och åtkomstnycklar, ditt användarnamn och din hemkatalog, dina källors namn, servrar och inloggningar, kanalnamn och titlar du har tittat på. Det som når oss är: typ av rapport (fel, krasch eller feedback), appens version, operativsystemets namn, texten, för feedback det ämne och område du valde, om appen har en supporternyckel (bara ”ja” – aldrig nyckeln) och, om du bad om svar, en hashsumma av en slumpad kod som bara din dator känner till. Vi rensar texten en gång till och sparar rapporten utan IP-adress och utan uppgifter om webbläsare. I 30 dagar frågar appen då och då om det finns ett svar och skickar då bara dessa hashsummor.</li>
+<li><strong>Synkronisering av inställningar</strong> (för supportrar, bara om du slår på den). Det du väljer att synka – favoriter, inställningar och, om du slår på dem, spellistor med inloggningar och tittarhistorik – krypteras på din dator med en nyckel som tas fram ur en synkkod som bara dina datorer känner till. Vår server sparar de krypterade uppgifterna under ett namn som också tas fram ur koden, tillsammans med ett versionsnummer och tidpunkten då de skrevs. Vi kan inte läsa dem och kan inte se vems de är. Varje anrop innehåller din supporternyckel så att servern kan kontrollera den; nyckeln kontrolleras och glöms sedan – den sparas aldrig och kopplas aldrig till dina uppgifter. Anrop för synkronisering loggas inte. Uppgifter som ingen har läst eller skrivit på 400 dagar raderas, och du kan själv radera dem i appen (<em>Sluta synka på den här datorn</em>, och radera också den synkade kopian).</li>
+<li><strong>Supporternyckeln</strong> kontrolleras i appen, utan uppkoppling. Inget skickas för att kontrollera den (utom vid synkronisering, ovan).</li>
+</ul>
+<p>Rättslig grund: vårt berättigade intresse av att leverera uppdateringar och veta hur många som installeras, och av att rätta de fel du rapporterar (artikel 6.1 f i dataskyddsförordningen); för synkronisering att tillhandahålla den tjänst du har bett om (artikel 6.1 b).</p>
+
+<h3>Tjänster som appen använder direkt</h3>
+<p>När du använder funktionerna nedan ansluter appen från din dator direkt till de här tjänsterna. Vi får inget av det, och varje tjänsts egna villkor och integritetspolicy gäller.</p>
+<ul>
+<li><strong>Dina egna tv-tjänster och källor</strong> – de Xtream Codes-, M3U-, Stalker- och andra källor och de boxar i ditt nätverk som du lägger till. Appen ansluter till de adresser du har angett, med de inloggningar du har lämnat, så tjänsten ser din IP-adress och vad du spelar.</li>
+<li><strong>TMDB (The Movie Database)</strong> – affischer, beskrivningar och veckans populära filmer och serier. Appen skickar titlar (och årtal), aldrig dina inloggningar eller adressen till din tjänst. Påslaget från början; välj <em>Leverantörens bilder</em> under <em>Inställningar → Affischer och info</em> för att stänga av det.</li>
+<li><strong>OpenSubtitles.com</strong> – när du söker undertexter: titeln, språket och, för dina egna filer, ett fingeravtryck (en hashsumma) av filen, samt din inloggning hos OpenSubtitles om du har lagt till en.</li>
+<li><strong>Trakt</strong> – om du kopplar ditt Trakt-konto: vad du tittar på samt din bevakningslista och historik. Inloggningen går via din webbläsare och dopeiptv.org/trakt/callback/, som skickar engångskoden från inloggningen direkt vidare till appen på din dator utan att spara den.</li>
+<li><strong>Apple (iTunes Search)</strong> – saknade omslagsbilder till dina egna musikfiler: artistens och albumets namn. Kan stängas av (<em>Hämta saknad albumkonst online</em>).</li>
+<li><strong>SiliconDust</strong> – tablån för en HDHomeRun-mottagare som du lägger till, med mottagarens egen kod för tablån.</li>
+<li><strong>Chromecast och smarta tv-apparater (DLNA)</strong> – hittas och spelas till i ditt lokala nätverk. För det kan appen köra en liten server i ditt nätverk.</li>
+<li><strong>Webhooks, MQTT och fjärr-API:t</strong> (Nerd-inställningarna) – bara till de adresser du själv anger.</li>
+<li><strong>Demokanaler</strong> – offentliga testströmmar från Mux, Apple och Bitmovin. När du spelar dem ser deras servrar din IP-adress.</li>
+<li><strong>GitHub</strong> – när dopeiptv.org inte svarar på en uppdateringskontroll, och för att hämta testversioner.</li>
+</ul>
+
+<h2 id="webbplatsen">3. Webbplatsen</h2>
+<h3>Serverloggar</h3>
+<p>För att kunna skicka en sida till dig behöver vår webbserver din IP-adress, och din webbläsare skickar dessutom sidans adress, tidpunkten, webbläsarens och systemets namn och version (user agent), sidan du kom från (referrer) och vilka språk du föredrar.</p>
+<ul>
+<li>Frontservern, som hanterar den krypterade anslutningen, för en allmän teknisk logg över anrop för drift och säkerhet. Den sparas i <mark class="todo">[LOG RETENTION - how long the front server's general access log is kept]</mark>. Anrop för synkronisering loggas aldrig.</li>
+<li>För statistiken nedan för servern två separata loggar med IP-adress, tidpunkt, adress, status, referrer, webbläsare och språk: en över sidvisningar och sidornas visningssignal, som sparas i ungefär en vecka, och en över klick på nedladdningar, som roteras efter storlek och där de tio senaste delarna sparas.</li>
+<li>Tjänsterna bakom webbplatsen – donationer, feedback och synkronisering – håller IP-adresser bara i minnet, en kort stund, för att begränsa hur många anrop en adress kan göra.</li>
+</ul>
+<p>Rättslig grund: vårt berättigade intresse av att driva webbplatsen säkert (artikel 6.1 f).</p>
+
+<h3>Statistik</h3>
+<p>Vi räknar besök själva: utan kakor, utan att spara något i din webbläsare och utan externa analystjänster. Syftet är att förstå hur människor hittar och använder webbplatsen och appen, så att vi kan göra dem bättre.</p>
+<p>När en sida har öppnats i din webbläsare skickar den en kort signal till vår server med: sidan; sidan du kom från; sidans och webbläsarens språk; skärmens storlek; om webbläsaren uppger att den är automatiserad; hur länge sidan visades; om muspekare, pekskärm eller tangentbord användes (bara att det hände); om donationsrutan öppnades eller en donation genomfördes; samt en del av det du gör på sidan – hjälpfrågor du öppnar, ord du söker efter i hjälpen och hur många svar som hittades, delar av startsidan som du scrollar fram till, installationsanvisningar du öppnar, byte av språk och adressen (bara webbplatsen) till en länk till en annan webbplats som du följer.</p>
+<p>Var femtonde minut går servern igenom loggarna och sparar varje besök med:</p>
+<ul>
+<li>ett <strong>pseudonymt besökar-id</strong>: en envägshash av IP-adressen och webbläsarens namn, beräknad med en hemlig nyckel som bara finns på vår server. Själva IP-adressen sparas inte i statistiken;</li>
+<li>ett <strong>land</strong>, som slås upp från IP-adressen i en landsdatabas på vår egen server (<a href="https://db-ip.com" rel="noopener">DB-IP:s</a> fria databas) – inget skickas någonstans;</li>
+<li>tidpunkt, webbläsare och version, operativsystem, typ av enhet, skärmstorlek, språk, hur du hittade oss (den länkande webbplatsen och sidan, utan sökord eller andra parametrar; en <code>?ref=</code>-märkning på våra egna länkar), sidorna och tiden på var och en, nedladdningar, donationsrutan, handlingarna ovan och om du har varit här förut.</li>
+</ul>
+<p>Besök från icke-offentliga adresser och från webbplatsens administratörer räknas inte, och besök som ser ut att komma från robotar markeras som sådana.</p>
+<p>För uppdateringar som appen hämtar (avsnitt 2) sparar vi tidpunkt, fil, versionen som uppdaterades, operativsystem och processor, land och om den kom från vårt eget nätverk – inte IP-adressen.</p>
+<p><strong>Hur länge:</strong> varje besök och varje uppdatering sparas i 400 dagar (13 månader). Därefter görs besöken anonyma – bara dag, land, webbläsare och system utan versionsnummer, typ av enhet, sidans språk, hur besökaren kom, antal sidor, tiden avrundad till tio sekunder och om det blev en nedladdning eller donationsrutan finns kvar, utan id och utan klockslag – och uppgifterna om uppdateringar raderas. Besökar-id sparas i 25 månader, så att vi kan räkna unika och återkommande besökare ett år jämfört med året före. Anonyma besök och summor per dag sparas utan tidsgräns; de är inte längre personuppgifter.</p>
+<p>Bara webbplatsens administratörer kan se statistiken. Rättslig grund: vårt berättigade intresse av att förstå och förbättra webbplatsen och appen (artikel 6.1 f). Vi har valt metoder som inte följer dig: inga kakor, inga externa tjänster, pseudonyma id och fasta tider för radering. Du kan när som helst invända (avsnitt 10).</p>
+
+<h3>Feedbackformuläret</h3>
+<p>Länken <em>Feedback</em> längst ned på varje sida fungerar som feedback från appen: du väljer ämne och om det gäller appen eller webbplatsen och skriver din text. E-postadresser och webbadresser i texten tas bort, och feedbacken sparas utan IP-adress och utan uppgifter om webbläsare. Eftersom vi inte vet vem som skickade den kan vi inte svara – vill du ha svar, mejla oss. Din webbläsare kommer ihåg när du senast skickade feedback, så att det går en minut mellan två.</p>
+
+<h2 id="kakor">4. Kakor och lagring i din webbläsare</h2>
+<ul>
+<li><strong>Kakan <code>lang</code></strong> sätts bara när du väljer språk i språkmenyn, och kommer ihåg ditt val i ett år. Den behövs för den funktion du har bett om.</li>
+<li><strong>Lokal lagring</strong> (sparas i din webbläsare och läses där av våra sidor): <code>dn-currency</code> – valutan du valde i donationsrutan; <code>dn-wallet</code> – om din enhet erbjöd Apple Pay eller Google Pay, så att rätt knapp visas direkt; <code>dn-supporter-key</code> – din supporternyckel efter en donation, så att donationsrutan kan visa den igen; <code>fbs-last</code> – när du senast skickade feedback. Du kan rensa dem i webbläsarens inställningar.</li>
+<li><strong>Bara för administratörer:</strong> webbplatsens administratörer har en inloggningskaka och en markering som håller deras egna besök utanför statistiken. De sätts aldrig för andra besökare.</li>
+<li><strong>Betalleverantören:</strong> när donationer är öppna och du pekar på, trycker på eller öppnar knappen <em>Donera</em>, laddar sidan vår betalleverantörs betalformulär från leverantören, som kan använda egna kakor eller egen lagring, till exempel för att förhindra bedrägerier. Medan donationerna är pausade laddas inget.</li>
+</ul>
+<p>Vi använder inga kakor för reklam eller spårning, och även typsnitten kommer från vår egen server.</p>
+
+<h2 id="donationer">5. Donationer</h2>
+<p>Donationer hanteras av vår betalleverantör, <mark class="todo">[PAYMENT PROVIDER]</mark>. Du anger dina kort- eller plånboksuppgifter i leverantörens eget betalformulär; de går direkt till leverantören och når aldrig oss. Leverantören ansvarar själv för sin behandling av betalningen: <mark class="todo">[PAYMENT PROVIDER - link to its privacy policy]</mark>.</p>
+<ul>
+<li><strong>Det vi ser:</strong> belopp, valuta och tidpunkt, hur du betalade (kort eller en digital plånbok som Apple Pay eller Google Pay) och det namn eller den e-postadress du angav för kvittot. Våra administratörer ser det på webbplatsens administrationssida, och som en notis på de enheter där de har slagit på notiser. Vår server hämtar uppgifterna från betalleverantören vid behov och håller dem bara i minnet, några minuter; den sparar dem inte. Notiserna skickas krypterade via push-tjänsten i administratörens webbläsare (Apple, Google, Mozilla eller Microsoft), som inte kan läsa dem.</li>
+<li>E-postadressen för kvittot, och namnet som en digital plånbok lämnar, passerar vår server på väg till betalleverantören utan att sparas.</li>
+<li><strong>Supporternyckeln</strong> innehåller inga personuppgifter (se <a href="/donations/">Donationer</a>). Vi noterar att en nyckel har lämnats ut – ett nummer som tas fram ur betalningen, tidpunkten och hur – så att vi kan räkna nycklarna.</li>
+<li><strong>Bokföring:</strong> donationerna ingår i Solecraft AB:s räkenskaper, som vi enligt bokföringslagen måste spara i sju år.</li>
+</ul>
+<p>Rättslig grund: att genomföra den donation du har bett om (artikel 6.1 b), vår rättsliga förpliktelse att föra och bevara räkenskaper (artikel 6.1 c) och vårt berättigade intresse av att få veta om donationer när de kommer in (artikel 6.1 f).</p>
+
+<h2 id="kontakt">6. När du kontaktar oss</h2>
+<p>När du mejlar <a href="mailto:info@solecraft.se">info@solecraft.se</a> använder vi din e-postadress och det du skriver för att svara och hantera ditt ärende. Vi sparar mejlet så länge ärendet kräver, och längre bara när lagen kräver det – till exempel vid en återbetalning. Vår e-post hanteras av vår leverantör av e-posttjänster. Rättslig grund: vårt berättigade intresse av att svara dig (artikel 6.1 f) eller våra rättsliga förpliktelser (artikel 6.1 c).</p>
+<p>Om du rapporterar ett problem på GitHub är det du skriver där offentligt, och GitHubs integritetspolicy gäller.</p>
+
+<h2 id="mottagare">7. Vilka som får del av uppgifterna</h2>
+<p>Vi säljer inte och hyr inte ut personuppgifter. De delas bara med:</p>
+<ul>
+<li>driften av vår webbplats och dess tjänster: <mark class="todo">[HOSTING - where the server is]</mark>;</li>
+<li>vår betalleverantör, för donationer (avsnitt 5);</li>
+<li>vår leverantör av e-posttjänster, för e-post till oss;</li>
+<li>webbläsarnas push-tjänster, som för krypterade notiser till administratörernas egna enheter;</li>
+<li>myndigheter, när lagen kräver det.</li>
+</ul>
+<p>Tjänsterna som appen använder direkt (avsnitt 2) får sina uppgifter från din app, inte från oss.</p>
+
+<h2 id="overforing">8. Överföring till länder utanför EU/EES</h2>
+<p>Statistik, rapporter och synkade data stannar på vår server (avsnitt 7). Uppgifter kan behandlas utanför EU/EES av betalleverantören och av push-tjänsterna (notiserna är krypterade). När en mottagare behandlar personuppgifter utanför EU/EES måste det finnas stöd för överföringen, till exempel ett beslut av Europeiska kommissionen om att landet har en adekvat skyddsnivå (för USA ramverket EU–US Data Privacy Framework) eller kommissionens standardavtalsklausuler.</p>
+<p>Tjänster som du använder via appen, som TMDB och Trakt, kan finnas i andra länder. Din app kontaktar dem direkt när du ber om det, och deras egna policyer gäller.</p>
+
+<h2 id="lagring">9. Hur länge vi sparar uppgifter</h2>
+<ul>
+<li>Frontserverns allmänna logg: <mark class="todo">[LOG RETENTION - how long the front server's general access log is kept]</mark>.</li>
+<li>Loggen över sidvisningar: ungefär en vecka. Loggen över klick på nedladdningar: roteras efter storlek, och de tio senaste delarna sparas.</li>
+<li>Besök i statistiken: 400 dagar, därefter anonyma. Besökar-id: 25 månader. Uppgifter om uppdateringar: 400 dagar.</li>
+<li>Felrapporter och feedback: så länge de hjälper oss att förbättra appen. De är utformade så att de inte pekar ut dig.</li>
+<li>Synkade data: tills du raderar dem, eller 400 dagar efter att de senast användes.</li>
+<li>Uppgifter om donationer: hos betalleverantören enligt dess villkor, och i våra räkenskaper i sju år.</li>
+<li>E-post: så länge ärendet kräver.</li>
+<li>I din webbläsare: tills du rensar dem (språkkakan i ett år).</li>
+</ul>
+
+<h2 id="rattigheter">10. Dina rättigheter</h2>
+<p>Enligt dataskyddsförordningen har du rätt att:</p>
+<ul>
+<li>få tillgång till de personuppgifter vi har om dig (en kopia);</li>
+<li>få felaktiga uppgifter rättade;</li>
+<li>få uppgifter raderade;</li>
+<li>få behandlingen begränsad;</li>
+<li>invända mot behandling som grundar sig på vårt berättigade intresse – till exempel statistiken;</li>
+<li>få ut uppgifter som du har lämnat till oss i ett maskinläsbart format (dataportabilitet), när behandlingen grundar sig på ett avtal.</li>
+</ul>
+<p>Skriv till <a href="mailto:info@solecraft.se">info@solecraft.se</a>. Vi svarar inom en månad, utan kostnad. Mycket av det vi har pekar inte direkt ut dig: för att hitta dina besök i statistiken behöver vi den IP-adress och den webbläsare du använde och ungefär när, och för att hitta en rapport eller en feedback behöver vi veta vad du skrev.</p>
+<p>Vi fattar inga automatiserade beslut som har rättsliga eller liknande betydande följder för dig.</p>
+<p>Du kan lämna klagomål till Integritetsskyddsmyndigheten (IMY), <a href="https://www.imy.se" rel="noopener">imy.se</a>, eller till dataskyddsmyndigheten där du bor. Vi blir glada om du hör av dig till oss först.</p>
+
+<h2 id="sakerhet">11. Säkerhet</h2>
+<p>Webbplatsen nås bara över krypterade anslutningar (HTTPS). Statistik, rapporter och andra uppgifter förvaras på vår server utanför den publika webbplatsen, och bara webbplatsens administratörer kan se dem. De loggar in med lösennyckel (passkey) eller lösenord och, om de väljer det, en engångskod. Kortuppgifter når aldrig oss, och synkade data krypteras på din dator innan de lämnar den.</p>
+
+<h2 id="andringar">12. Ändringar</h2>
+<p>När vi ändrar hur vi behandlar personuppgifter uppdaterar vi den här policyn och datumet överst. Större ändringar meddelar vi också på webbplatsen.</p>

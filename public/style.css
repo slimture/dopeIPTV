@@ -346,6 +346,25 @@ footer .v { font-size: 12.5px; color: var(--faint); }
 footer nav { display: flex; gap: 22px; flex-wrap: wrap; }
 footer nav a { color: var(--muted); font-size: 12.5px; }
 footer nav a:hover { color: var(--accent); }
+/* Privacy, terms, donations, about: a row of its own under the rest, on
+   every page (the 404's whole footer). */
+footer nav.foot-legal { flex-basis: 100%; gap: 8px 22px; padding-top: 16px; border-top: 1px solid var(--line); }
+footer nav.foot-legal:only-child { padding-top: 0; border-top: 0; }
+
+/* What the app is not, where everyone looks first: the front page's hero
+   and the top of the help (both say it in every language). */
+.playeronly {
+  display: flex; align-items: flex-start; gap: 10px;
+  width: fit-content; max-width: min(46em, 100%); margin: 26px auto 0; padding: 11px 16px;
+  border-radius: 14px; background: var(--surface); border: 1px solid var(--line);
+  color: var(--text); font-size: 14.5px; line-height: 1.5; text-align: start;
+}
+.playeronly svg { flex: none; width: 19px; height: 19px; margin-top: 1px; fill: none;
+  stroke: var(--accent); stroke-width: 2; stroke-linecap: round; }
+.playeronly span { text-wrap: pretty; }
+.playeronly a { color: var(--accent); font-weight: 600; white-space: nowrap; }
+.playeronly a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.help-top .playeronly { margin: -6px 0 22px; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
 
 /* Screenshot lightbox (opened from app.js) */
@@ -693,6 +712,86 @@ body.searching .help-layout { grid-template-columns: 1fr; }
 /* While filtering, sections lose their headings' distance - the list should
    read as results, not as a table of contents with gaps in it. */
 body.searching .help-sec { margin-bottom: 26px; }
+
+/* ---- Legal pages: privacy, terms, donations, about ---------------------- */
+/* Long text, so it reads like a document: one column of comfortable width,
+   the body in the text colour rather than the muted grey of short answers,
+   links underlined. The text is Swedish or English (render.jq page_legal),
+   left to right even on a right-to-left page. */
+.legal-top { padding: 34px 0 26px; border-bottom: 1px solid var(--line); }
+.legal-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 26px; }
+.legal-tabs a {
+  color: var(--muted); font-size: 14px; line-height: 1.35;
+  padding: 7px 13px; border-radius: 999px; background: var(--surface);
+}
+.legal-tabs a:hover { color: var(--text); background: var(--surface-2); }
+.legal-tabs a[aria-current="page"] {
+  color: var(--accent); font-weight: 600;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.legal-head h1 { font-size: 34px; margin: 0; max-width: none; text-align: start; }
+.legal-meta { margin: 10px 0 0; color: var(--faint); font-size: 14px; line-height: 1.6; }
+.legal-meta a { color: var(--accent); white-space: nowrap; }
+.legal-meta a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.legal-note {
+  margin: 0 0 18px; padding: 10px 14px; border-radius: 12px;
+  background: var(--surface); color: var(--muted); font-size: 14px; line-height: 1.5;
+}
+section.legal-main { padding: 30px 0 72px; }
+/* Left even on a right-to-left page, beside its left-aligned heading: in an
+   RTL container a narrower block would otherwise sit at the right. */
+.legal { max-width: 72ch; margin: 0 auto 0 0; color: var(--text); font-size: 16.5px; line-height: 1.7; text-align: left; }
+.legal h2 {
+  font-size: 23px; line-height: 1.25; letter-spacing: -.02em;
+  margin: 42px 0 10px; scroll-margin-top: 80px;
+}
+.legal h3 { font-size: 17.5px; line-height: 1.35; margin: 26px 0 6px; font-weight: 600; }
+.legal p { margin: 0 0 12px; }
+.legal ul, .legal ol { margin: 0 0 12px; padding-left: 22px; }
+.legal li { margin: 0 0 7px; }
+.legal li::marker { color: var(--faint); }
+.legal strong { font-weight: 600; }
+.legal a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.legal code {
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 5px;
+  padding: 1px 5px; font: .9em/1.4 var(--mono); word-break: break-word;
+}
+.legal .fine { font-size: 14px; color: var(--muted); }
+/* "In short" and the one sentence a page is about: a quiet panel. */
+.legal .lead, .legal .callout {
+  margin: 0 0 26px; padding: 18px 22px; border-radius: 16px; background: var(--surface);
+}
+.legal .lead h2 { margin: 0 0 8px; font-size: 18px; }
+.legal .lead ul { margin-bottom: 0; }
+.legal .callout { border-left: 3px solid var(--accent); border-radius: 4px 16px 16px 4px; }
+.legal .callout p:last-child { margin-bottom: 0; }
+.legal-toc { margin: 0 0 8px; padding: 0 0 18px; border-bottom: 1px solid var(--line); }
+.legal-toc ol { columns: 2; column-gap: 32px; margin: 0; padding-left: 22px; font-size: 15px; }
+.legal-toc li { margin: 0 0 5px; break-inside: avoid; }
+.legal-toc a { text-decoration: none; }
+.legal-toc a:hover { text-decoration: underline; }
+/* Company details: a label and a value a row, stacked on a phone. */
+.legal .facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 28px; margin: 0 0 14px; }
+.legal .facts dt { color: var(--muted); }
+.legal .facts dd { margin: 0; overflow-wrap: anywhere; }
+/* A detail still to be filled in before the page is final. */
+.legal mark.todo {
+  color: inherit; background: color-mix(in srgb, #ffcc00 22%, transparent);
+  border: 1px dashed color-mix(in srgb, #ffcc00 70%, var(--line)); border-radius: 4px; padding: 0 4px;
+}
+
+@media (max-width: 860px) {
+  .legal-head h1 { font-size: 27px; }
+  .legal { font-size: 16px; }
+  .legal h2 { font-size: 21px; margin-top: 34px; }
+  .legal .lead, .legal .callout { padding: 16px 18px; }
+}
+@media (max-width: 560px) {
+  .legal-toc ol { columns: 1; }
+  .legal .facts { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .legal .facts dt { font-size: 14px; }
+  .legal .facts dd { margin: 0 0 10px; }
+}
 
 @media (max-width: 860px) {
   .help-layout { grid-template-columns: 1fr; gap: 22px; }

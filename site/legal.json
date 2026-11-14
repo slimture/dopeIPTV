@@ -1,0 +1,60 @@
+{
+    "updated": "2026-11-14",
+    "pages": ["privacy", "terms", "donations", "about"],
+    "text": {
+        "sv": {
+            "updated": "Senast uppdaterad 14 november 2026",
+            "governing": "Det här är den svenska texten, som är den som gäller.",
+            "other": "Read in English",
+            "link": "en"
+        },
+        "en": {
+            "updated": "Last updated 14 November 2026",
+            "governing": "This is a translation of the Swedish text, which is the one that applies.",
+            "other": "Läs på svenska",
+            "link": "sv"
+        }
+    },
+    "page": {
+        "privacy": {
+            "sv": {
+                "title": "Integritetspolicy",
+                "desc": "Hur dopeIPTV och dopeiptv.org hanterar personuppgifter: vad appen, webbplatsen och dess tjänster behandlar, hur länge, och dina rättigheter enligt dataskyddsförordningen."
+            },
+            "en": {
+                "title": "Privacy policy",
+                "desc": "How dopeIPTV and dopeiptv.org handle personal data: what the app, the website and its services process, for how long, and your rights under the GDPR."
+            }
+        },
+        "terms": {
+            "sv": {
+                "title": "Användarvillkor",
+                "desc": "Villkoren för appen dopeIPTV och dopeiptv.org: bara en spelare, utan kanaler eller innehåll, öppen källkod under GPL, och ditt ansvar för det du lägger till."
+            },
+            "en": {
+                "title": "Terms of use",
+                "desc": "The terms for the dopeIPTV app and dopeiptv.org: a player only, with no channels or content, open source under the GPL, and your responsibility for what you add."
+            }
+        },
+        "donations": {
+            "sv": {
+                "title": "Donationer och supporternyckel",
+                "desc": "Att donera till dopeIPTV är frivilligt och appen förblir gratis. Vad donationerna går till, vad supporternyckeln är, hur du får den igen och hur du får pengarna tillbaka."
+            },
+            "en": {
+                "title": "Donations and supporter key",
+                "desc": "Donating to dopeIPTV is voluntary and the app stays free. What donations pay for, what the supporter key is, how to get it again and how to get a refund."
+            }
+        },
+        "about": {
+            "sv": {
+                "title": "Om oss och kontakt",
+                "desc": "dopeIPTV görs av Solecraft AB i Sverige. Företagsuppgifter, kontaktuppgifter och vad dopeIPTV är: bara en app, utan kanaler eller innehåll."
+            },
+            "en": {
+                "title": "About us and contact",
+                "desc": "dopeIPTV is made by Solecraft AB in Sweden. Company details, contact information and what dopeIPTV is: an app only, with no channels or content."
+            }
+        }
+    }
+}

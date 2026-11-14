@@ -21,6 +21,10 @@
 
 $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 | ($rel[0] // {}) as $R | ($dl[0] // {}) as $D | $helpfile[0] as $HELP
+# The legal pages (site/legal.json): their titles, and the languages they are
+# written in - Swedish, which governs, and English. Every other language
+# shows the English text inside its own header and footer.
+| $legal[0] as $L
 | "https://dopeiptv.org" as $SITE | "https://github.com/slimture/dopeIPTV" as $REPO
 # The donate button's address: a Stripe Payment Link (donate.stripe.com/...
 # or buy.stripe.com/...). nav.js opens the donate dialog over it (paid
@@ -184,7 +188,9 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
   def nav($current):
     ($current == "home") as $home
     | (if $home then "" else "/" end) as $base
-    | (if $current == "help" then "/help/" else "/" end) as $self
+    | (if $current == "help" then "/help/"
+       elif ($L.pages | index($current)) != null then "/\($current)/"
+       else "/" end) as $self
     | [[$base + "#features", t("nav_features"), ""],
        [$base + "#shots", t("nav_screenshots"), ""],
        [$base + "#download", t("nav_download"), ""],
@@ -497,6 +503,34 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 
   def page_404: $tpl | expand(common; {nav: nav("")});
 
+# -- the legal pages: /privacy/, /terms/, /donations/, /about/ ----------------
+# The text ($body, site/legal/<language>/<page>.html, which sync-releases.sh
+# picks by the same rule) is Swedish or English; a page in any other language
+# says so in the reader's language and points its canonical at the English.
+
+  def legal_langs: $L.text | keys;
+  def legal_hreflang($path):
+    ([legal_langs[] as $c
+      | "<link rel=\"alternate\" hreflang=\"\($c | h)\" href=\"\(url($path; $c) | h)\">\n"] | add)
+    + "<link rel=\"alternate\" hreflang=\"x-default\" href=\"\($SITE + $path | h)\">\n";
+  def page_legal:
+    (if ($L.text | has($lang)) then $lang else "en" end) as $cl
+    | $L.page[$page][$cl] as $P
+    | $L.text[$cl] as $X
+    | "/\($page)/" as $path
+    | $tpl
+    | expand(common + {title: ($P.title | h), desc: ($P.desc | h), clang: ($cl | h),
+                       canonical: (url($path; $cl) | h)};
+        {hreflang: legal_hreflang($path), nav: nav($page),
+         tabs: ([$L.pages[] as $p
+           | "        <a href=\"/\($p | h)/\"\(if $p == $page then " aria-current=\"page\"" else "" end)>\(t("foot_\($p)") | h)</a>\n"]
+           | add),
+         note: (if $cl == $lang then "" else
+           "      <p class=\"legal-note\">\(t("legal_only_en") | h)</p>\n" end),
+         meta: ("<time datetime=\"\($L.updated | h)\">\($X.updated | h)</time> · \($X.governing | h)"
+           + " <a href=\"\($path + "?lang=" + $X.link | h)\" hreflang=\"\($X.link | h)\" lang=\"\($X.link | h)\">\($X.other | h)</a>"),
+         body: $body});
+
 # -- sitemap.php ------------------------------------------------------------------
 
   def page_sitemap:
@@ -512,10 +546,21 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
                 | "    <xhtml:link rel=\"alternate\" hreflang=\"\($alt | h)\" href=\"\(url($path; $alt) | h)\"/>\n"] | add)
             + "    <xhtml:link rel=\"alternate\" hreflang=\"x-default\" href=\"\($SITE + $path | h)\"/>\n"
             + "  </url>\n"] | add)
+      # The legal pages, in the languages they are written in.
+      + ([$L.pages[] as $p | legal_langs[] as $code
+          | "/\($p)/" as $path
+          | "  <url>\n"
+            + "    <loc>\(url($path; $code) | h)</loc>\n"
+            + "    <lastmod>\($L.updated | h)</lastmod>\n"
+            + ([legal_langs[] as $alt
+                | "    <xhtml:link rel=\"alternate\" hreflang=\"\($alt | h)\" href=\"\(url($path; $alt) | h)\"/>\n"] | add)
+            + "    <xhtml:link rel=\"alternate\" hreflang=\"x-default\" href=\"\($SITE + $path | h)\"/>\n"
+            + "  </url>\n"] | add)
       + "</urlset>\n";
 
   if $page == "index" then page_index
   elif $page == "help" then page_help
   elif $page == "404" then page_404
   elif $page == "sitemap" then page_sitemap
+  elif ($L.pages | index($page)) != null then page_legal
   else error("render.jq: unknown page \($page)") end

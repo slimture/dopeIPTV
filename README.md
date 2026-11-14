@@ -27,10 +27,12 @@ website/
 │   ├── files/              mirrored release assets land here (git-ignored)
 │   └── screenshots/        the app's pictures, <lang>/<name>.webp (from the app's tools/site_screenshots.py)
 ├── site/                   what the pages are made from - not web-served
-│   ├── templates/          index.html, help.html, 404.html and nav.html
+│   ├── templates/          index.html, help.html, legal.html, 404.html and nav.html
 │   ├── lang/*.json         the texts, one file per language (en.json is the source)
 │   ├── i18n.json           language names, which are right-to-left, ICU locales
 │   ├── help.json           the help page's sections and topics
+│   ├── legal.json          the legal pages: their titles, the date, the languages
+│   ├── legal/{sv,en}/      their texts - Swedish governs, English is a translation
 │   ├── formats.json        dates and numbers per language, as ICU 76.1 writes them
 │   └── render.jq           the renderer
 ├── sync-releases.sh        cron: latest release → files/ + releases.json + i18n/
@@ -259,6 +261,35 @@ query. A quick check after a deploy:
 curl -sI 'https://dopeiptv.org/trakt/callback/?code=x&state=y' | grep -i location
 # location: http://127.0.0.1:41794/callback?code=x&state=y
 ```
+
+## The legal pages
+
+`/privacy/`, `/terms/`, `/donations/` and `/about/` - the privacy policy,
+the terms of use, donations and the supporter key, and the company details
+the Swedish E-Commerce Act asks for. Linked from a row at the foot of every
+page; the front page and the help also say, in every language, that
+dopeIPTV is a player only and provides no channels or content.
+
+- The texts are HTML fragments in `site/legal/sv/` and `site/legal/en/`.
+  **The Swedish text governs**; the English is its translation, and the two
+  change together. Legal text is never machine-translated: the other 25
+  languages render the English text inside their own header and footer,
+  with a line in their language saying so (`legal_only_en`), and their
+  canonical points at the English page.
+- Titles, descriptions and the "last updated" date are in
+  `site/legal.json`; change the date (`updated` and both `text.*.updated`)
+  whenever the content changes.
+- What the privacy policy says is what the code does: the statistics
+  (`donate/stats_collect.py`), the reports (`donate/feedback.py`), sync,
+  the logs in `deploy/`, and in the app `core/report.py`, `core/updates.py`
+  and the services it calls. Change one, change the other.
+- Yellow `<mark class="todo">` boxes are details still to be filled in
+  (the address, the payment provider, where the server is, log retention,
+  the VAT number) - none should be left when the pages go live.
+- They need the content server's two `legal` locations
+  (`deploy/content-iptv.dope.rs.conf`): copy it and reload nginx once.
+- When donations open again, take the "paused" box off the top of
+  `site/legal/*/donations.html`.
 
 ## Still to add (drop-in, no code changes)
 
