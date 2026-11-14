@@ -133,7 +133,7 @@
     "donate_thanks": "感谢你支持 dopeIPTV！",
     "donate_receipt": "收据正在发送到你的邮箱。",
     "donate_key": "你的支持者密钥",
-    "donate_key_how": "在 dopeIPTV 中：关于 dopeIPTV → 支持者密钥，然后粘贴。收据里的链接随时可以再次显示它。",
+    "donate_key_how": "在 dopeIPTV 中：dopeIPTV → 支持者密钥…，然后粘贴。收据里的链接随时可以再次显示它。",
     "donate_key_copy": "复制密钥",
     "donate_key_copied": "已复制 ✓",
     "donate_key_open": "在 dopeIPTV 中打开",
