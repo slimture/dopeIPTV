@@ -1308,7 +1308,7 @@ class _MultiviewMixin:
         return w
 
     def _show_multiview(self) -> None:
-        """Sidebar ▦ button: opens multiview, and pressed again closes it.
+        """The menu's Multiview entry: opens multiview, and chosen again closes it.
         It only raised a grid with streams running, and where the window
         manager refuses to raise a window on request (GNOME on Wayland) the
         grid stayed behind the app - the button seemed to do nothing. A grid

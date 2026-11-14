@@ -1,6 +1,7 @@
 """The sidebar's navigation: places on top (Home, TV, Guide, Movies, Series,
 Recordings, Local files), MINE (Favourites, Watch later, History) under
-them, Settings and Multiview named at the foot. The Guide is a place too,
+them, the source's avatar and Settings at the foot (tests/
+test_sidebar_foot.py has the foot itself). The Guide is a place too,
 its page in the middle pane; Watched is History's second filter; the
 entries carry a quiet status (a recording running, new episodes, what waits
 under Watch later); the selected entry is a light wash with a leading bar;
@@ -171,11 +172,12 @@ assert all(w.nav_btns[k].property("primary") == "false" for k in mine)
 assert all(w.nav_btns[k].parentWidget() is w._library_box for k in mine)
 assert w._lib_section_label.text() == tr("sidebar_mine") == "MITT"
 assert w.nav_btns["guide"].text() == tr("nav_guide")
-# Settings and Multiview at the foot, under its hairline, with their names.
-assert y(w.cat_list) < y(w._bottom_rule) < y(w._settings_btn) < y(w._multiview_btn)
-assert w._settings_btn.text() == tr("btn_settings")
-assert w._multiview_btn.text() == tr("menu_multiview")
-assert not w._settings_btn.icon().isNull() and not w._multiview_btn.icon().isNull()
+# Settings at the foot, under its hairline: an icon, its name in the tooltip.
+# Multiview has left the sidebar (the menu bar's View group has it).
+assert y(w.cat_list) < y(w._bottom_rule) < y(w._settings_btn)
+assert w._settings_btn.text() == "" and w._settings_btn.toolTip() == tr("btn_settings")
+assert not w._settings_btn.icon().isNull()
+assert not hasattr(w, "_multiview_btn")
 assert all(not b.icon().isNull() for b in w.nav_btns.values())
 
 # -- the guide: a place, its page in the middle pane --------------------------
@@ -283,7 +285,7 @@ job = w.rec.add_inplayer_job("Nyheter", "", None)
 w._set_sidebar_collapsed(True)
 pump(20)
 assert all(b.text() == "" for b in w.nav_btns.values())
-assert w._settings_btn.text() == "" and w._multiview_btn.text() == ""
+assert w._settings_btn.text() == ""
 assert w._settings_btn.toolTip() == tr("btn_settings")
 assert w._lib_header.isHidden() and not w._rail_rule_mine.isHidden()
 assert w._rail_rule_mine.isVisible() and w._bottom_rule.isVisible() and w._bottom_rule.is_rail()
@@ -296,14 +298,14 @@ pump(20)
 assert w._rail_rule_mine.isHidden() and not w._lib_header.isHidden()
 assert not w._bottom_rule.is_rail()
 assert w.nav_btns["guide"].text() == tr("nav_guide")
-assert w._settings_btn.text() == tr("btn_settings")
+assert w._settings_btn.toolTip() == tr("btn_settings")
 
 # -- a language switch renames all of it ---------------------------------------
 w._set_language("en")
 pump()
 assert w.nav_btns["guide"].text() == "Guide" and w._lib_section_label.text() == "MINE"
 assert w.nav_btns["home"].text() == "Home"
-assert w._settings_btn.text() == "Settings" and chips["watched"].text() == "Watched"
+assert w._settings_btn.toolTip() == "Settings" and chips["watched"].text() == "Watched"
 print("NAV_OK", flush=True)
 os._exit(0)
 """

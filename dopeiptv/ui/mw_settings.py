@@ -477,16 +477,9 @@ class _SettingsMixin:
         if hasattr(self, "_lib_section_label"):
             self._lib_section_label.setText(tr("sidebar_mine"))
             self._lib_toggle.setToolTip(tr("tooltip_toggle_mine"))
-        # Settings / Multiview: their names beside the icon expanded, in the
-        # tooltip on the rail (where _apply_sidebar_chrome puts no text on).
-        self._side_action_texts = {"settings": tr("btn_settings"),
-                                   "multiview": tr("menu_multiview")}
-        for key, btn in (("settings", self._settings_btn),
-                         ("multiview", self._multiview_btn)):
-            btn.setToolTip(self._side_action_texts[key])
-            btn.setAccessibleName(self._side_action_texts[key])
-            if not rail:
-                btn.setText(self._side_action_texts[key])
+        # Settings at the foot: an icon, its name in the tooltip.
+        self._settings_btn.setToolTip(tr("btn_settings"))
+        self._settings_btn.setAccessibleName(tr("btn_settings"))
         if hasattr(self, "_history_chip_btns"):
             self._history_chip_btns["all"].setText(tr("history_chip_all"))
             self._history_chip_btns["watched"].setText(

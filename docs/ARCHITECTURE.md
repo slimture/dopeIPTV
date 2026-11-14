@@ -135,7 +135,8 @@ dopeiptv/
     mw_onboarding.py   First-run setup wizard
     mw_sort.py         List sort order
     widgets.py         Small standalone widgets
-    nav_widgets.py     A nav entry (selected bar, status) and the rail's hairline
+    nav_widgets.py     A nav entry (selected bar, status), the rail's hairline,
+                       the source's avatar at the foot
     category_flags.py  Bundled SVG flags for category names (flag-icons, MIT)
     player_resize.py   Height handle under the docked video
     welcome.py         First-run welcome overlay (connect / explore)

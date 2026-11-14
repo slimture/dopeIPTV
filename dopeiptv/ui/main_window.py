@@ -56,11 +56,11 @@ from .player_resize import PlayerResizeHandle
 from ..providers.trakt import TraktClient
 from ..core.wakelock import WakeLock
 from .dialogs import PlaylistDialog
-from .nav_widgets import NavButton, SideRule
+from .nav_widgets import NavButton, SideRule, SourceAvatar
 # fold_into_app_menu: imported from here as well (tests, older callers).
 from .app_menu import MAC_MENUS, fold_into_app_menu, lay_out, open_website  # noqa: F401
 from .widgets import (
-    FlowRow, HeartButton, _HoverTextButton, _SidebarLogo, _Toast,
+    FlowRow, HeartButton, _SidebarLogo, _Toast,
     cast_strip_icon, confirm,
 )
 from .mw_settings import _SettingsMixin
@@ -396,7 +396,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _fill_playlist_menu(self, menu: QMenu) -> None:
         """Fill *menu* with a checkable entry per playlist, the active one
-        ticked. Used by the sidebar playlist switcher."""
+        ticked. Used by the source avatar at the sidebar's foot."""
         menu.clear()
         store = self.playlist_store
         if not store or not store.playlists():
@@ -413,38 +413,28 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     lambda _c=False, pid=p["id"]: self.switch_playlist(pid))
 
     def _show_playlist_menu(self) -> None:
-        """Pop the playlist switcher centered directly under the sidebar's
-        playlist button (not left-aligned to its corner)."""
+        """Pop the source switcher just above the avatar at the sidebar's
+        foot, centred on it (Qt keeps it on the screen)."""
         menu = QMenu(self)
         self._fill_playlist_menu(menu)
         btn = self._playlist_btn
-        below = btn.mapToGlobal(btn.rect().bottomLeft())
-        menu_w = menu.sizeHint().width()
-        x = below.x() + (btn.width() - menu_w) // 2
-        menu.exec(QPoint(x, below.y()))
+        top = btn.mapToGlobal(btn.rect().topLeft())
+        hint = menu.sizeHint()
+        x = top.x() + (btn.width() - hint.width()) // 2
+        menu.exec(QPoint(x, top.y() - hint.height() - 4))
 
     def _update_playlist_btn(self) -> None:
-        """Reflect the active playlist on the sidebar switcher button."""
-        if not hasattr(self, "_playlist_btn"):
+        """Put the active source on the avatar at the sidebar's foot: its
+        initials, its full name in the tooltip. Shown whenever there is a
+        source of one's own (demo and explore have none to name)."""
+        btn = getattr(self, "_playlist_btn", None)
+        if btn is None:
             return
         store = self.playlist_store
         pl = store.get(store.active_id) if (store and store.active_id) else None
-        name = (pl or {}).get("name", "") if pl else ""
-        # Icon-only at rest in both sidebar states: the drawn playlist-stack
-        # mark under the logo. Hovering it (expanded only) reveals the active
-        # playlist's name next to the icon; the name also lives in the
-        # tooltip and the window title.
-        self._playlist_btn.setText("")
-        self._playlist_btn.hover_text = name
-        self._playlist_btn.setIcon(
-            QIcon(self._action_pixmap("stack", 18, P["text2"])))
-        self._playlist_btn.setIconSize(QSize(18, 18))
-        tip = tr("menu_playlists") + (f" — {name}" if name else "")
-        self._playlist_btn.setToolTip(tip)
-        # Only worth showing when there's actually more than one playlist to
-        # switch between - a single-playlist user has nothing to pick.
-        multiple = bool(store and len(store.playlists()) > 1)
-        self._playlist_btn.setVisible(multiple)
+        name = ((pl or {}).get("name") or (pl or {}).get("server") or "")
+        btn.set_source(name, tr("menu_playlists"))
+        btn.setVisible(pl is not None)
 
     def _build_ui(self) -> None:
         # Dropping a video file anywhere on the window plays it (see
@@ -577,24 +567,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._logo_row.addStretch(1)
         self._logo_row.addWidget(self._sidebar_logo)
         sl.addLayout(self._logo_row)
-        sl.addSpacing(6)
-
-        # Visible playlist switcher at the top of the sidebar: one click to hop
-        # providers (e.g. to feed multiview cells from different accounts)
-        # without a trip through Settings. Shows the active playlist; the menu
-        # is built on demand. Hidden when there's nothing to switch.
-        self._playlist_btn = _HoverTextButton("", objectName="PlaylistChip")
-        # Fit the pill to its label (the active playlist name) instead of
-        # stretching the full sidebar width; centred under the logo. On the
-        # collapsed rail it goes back to filling the rail (see
-        # _apply_sidebar_chrome).
-        self._playlist_btn.setSizePolicy(QSizePolicy.Policy.Maximum,
-                                         QSizePolicy.Policy.Fixed)
-        self._playlist_btn.setToolTip(tr("menu_playlists"))
-        self._playlist_btn.clicked.connect(self._show_playlist_menu)
-        sl.addWidget(self._playlist_btn, 0, Qt.AlignmentFlag.AlignHCenter)
-        sl.addSpacing(6)
-        self._update_playlist_btn()
+        sl.addSpacing(10)
 
         # Vector-icon kinds for the nav entries (drawn in _action_pixmap), all
         # in one outline style. Each must be visually distinct: watch-later is
@@ -813,29 +786,21 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._sync_now_btn.hide()
         sl.addWidget(self._sync_now_btn)
 
-        # Settings + Multiview at the bottom, under a hairline: rows with
-        # their icon and name like the nav entries, icons alone on the rail
-        # (their names in the tooltip there). The icons are painted by
-        # _apply_action_icons, the names put on by _apply_sidebar_chrome.
-        # (The guide is a nav entry now; reload lives in the menu bar's
-        # "Refresh playlist" and the per-playlist auto-refresh setting - a
-        # sidebar button for it was just an easy mis-click.)
-        self._side_action_texts = {"settings": tr("btn_settings"),
-                                   "multiview": tr("menu_multiview")}
-        self._settings_btn = settings_btn = NavButton(
-            "settings", tr("btn_settings"), object_name="SideAction",
-            checkable=False)
-        settings_btn.setToolTip(tr("btn_settings"))
-        settings_btn.setAccessibleName(tr("btn_settings"))
-        settings_btn.clicked.connect(self.open_settings)
-        # Multiview beside it (the app-menu entry is easy to miss, and on
-        # macOS a hidden multiview window won't Cmd+Tab back).
-        self._multiview_btn = multiview_btn = NavButton(
-            "multiview", tr("menu_multiview"), object_name="SideAction",
-            checkable=False)
-        multiview_btn.setToolTip(tr("menu_multiview"))
-        multiview_btn.setAccessibleName(tr("menu_multiview"))
-        multiview_btn.clicked.connect(self._show_multiview)
+        # The foot, under a hairline: the active source as an avatar (its
+        # initials on the accent; a click opens the source switcher) and
+        # Settings, icon buttons side by side - one above the other on the
+        # rail (_apply_sidebar_chrome). Multiview is in the menu bar's View
+        # group and the channel menu's "Add to multiview". (The guide is a
+        # nav entry; reload lives in "Refresh playlist" and the per-playlist
+        # auto-refresh setting - a sidebar button for it was a mis-click.)
+        self._playlist_btn = SourceAvatar()
+        self._playlist_btn.clicked.connect(self._show_playlist_menu)
+        self._settings_btn = QPushButton(objectName="SideIcon")
+        self._settings_btn.setFixedSize(SourceAvatar.SIZE, SourceAvatar.SIZE)
+        self._settings_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._settings_btn.setToolTip(tr("btn_settings"))
+        self._settings_btn.setAccessibleName(tr("btn_settings"))
+        self._settings_btn.clicked.connect(self.open_settings)
         # A small red heart on the logo's lower corner, its words in the
         # tooltip (mw_donate) - the same place on every system; gone for a
         # supporter, whose mark is the logo itself (widgets._SidebarLogo).
@@ -849,12 +814,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         donate_btn.customContextMenuRequested.connect(self._donate_heart_menu)
         self._bottom_rule = SideRule()
         sl.addWidget(self._bottom_rule)
-        self._actions_box = QBoxLayout(QBoxLayout.Direction.TopToBottom)
-        self._actions_box.setContentsMargins(0, 0, 0, 0)
-        self._actions_box.setSpacing(2)
-        self._actions_box.addWidget(settings_btn)
-        self._actions_box.addWidget(multiview_btn)
+        self._actions_box = QBoxLayout(QBoxLayout.Direction.LeftToRight)
+        self._actions_box.setContentsMargins(0, 2, 0, 0)
+        self._actions_box.setSpacing(10)
+        self._actions_box.addWidget(self._playlist_btn)
+        self._actions_box.addWidget(self._settings_btn)
         sl.addLayout(self._actions_box)
+        # Centred as a pair (a per-button alignment spread them apart).
+        sl.setAlignment(self._actions_box, Qt.AlignmentFlag.AlignHCenter)
+        self._update_playlist_btn()
         self._logo_row.addStretch(1)
         self._build_private_pill()
         self._build_heart_badge()

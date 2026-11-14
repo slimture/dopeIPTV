@@ -255,19 +255,15 @@ class _NavMixin:
         self._refresh_nav_status()
 
     def _apply_action_icons(self) -> None:
-        """Paint Settings and Multiview at the sidebar's foot in the theme's
-        muted tone, the same outline icons and size as the rows under MINE
-        (their names are put on by _apply_sidebar_chrome, the rail shows the
-        icons alone). Re-tinted on theme change."""
-        specs = (("_settings_btn", "gear"), ("_multiview_btn", "grid"))
-        for name, kind in specs:
-            btn = getattr(self, name, None)
-            if btn is None:
-                continue
-            btn.setIcon(QIcon(self._action_pixmap(kind, 19, P["text2"])))
-            btn.setIconSize(QSize(19, 19))
-        # The playlist stack icon follows the theme too (same square icon in
-        # both sidebar states; _update_playlist_btn repaints it).
+        """Paint Settings at the sidebar's foot in the theme's muted tone,
+        the outline gear at the size of the nav's icons. Re-tinted on theme
+        change."""
+        btn = getattr(self, "_settings_btn", None)
+        if btn is not None:
+            btn.setIcon(QIcon(self._action_pixmap("gear", 20, P["text2"])))
+            btn.setIconSize(QSize(20, 20))
+        # The source's avatar beside it is painted in the accent (it reads
+        # the theme as it paints; _update_playlist_btn repaints it).
         if hasattr(self, "_donate_btn"):
             self._donate_btn.set_rest(HEART)
             if hasattr(self, "_heart_chip"):          # ringed in the new sidebar colour

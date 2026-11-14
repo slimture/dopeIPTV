@@ -118,7 +118,7 @@ map and the one-way import rule.
 | `ui/tmdb_match.py` | Manual TMDB match dialog |
 | `ui/subtitle_search.py` | OpenSubtitles search dialog |
 | `ui/widgets.py` | Small standalone widgets |
-| `ui/nav_widgets.py` | The sidebar's `NavButton` (leading bar when selected, a dot / pill / muted count painted over it) and `SideRule`, the hairline between its groups |
+| `ui/nav_widgets.py` | The sidebar's `NavButton` (leading bar when selected, a dot / pill / muted count painted over it), `SideRule`, the hairline between its groups, and `SourceAvatar` at its foot (the active source's initials on the accent, `source_initials`) |
 | `ui/box_finder.py` | Box kinds in the add-a-source forms and the "Find on my network" button |
 | `ui/nerd_settings.py` | Nerd in Settings: its own page (switch, how it works, diagnostics) and the five pages under NERD while it is on |
 | `ui/source_nerd.py` | A source's own Nerd options in the Add/Edit source dialog |

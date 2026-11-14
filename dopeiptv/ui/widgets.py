@@ -338,27 +338,6 @@ class HeartButton(_ChipPainting, QPushButton):
         super().leaveEvent(event)
 
 
-class _HoverTextButton(QPushButton):
-    """Icon button that reveals a text label while hovered (and drops it on
-    leave). Used by the sidebar playlist switcher: a clean square icon at
-    rest, the active playlist's name when you point at it. Disabled on the
-    collapsed rail (the rail's fixed width can't fit text)."""
-
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.hover_text = ""
-
-    def enterEvent(self, event) -> None:
-        if self.hover_text and not self.property("rail"):
-            self.setText(self.hover_text)
-        super().enterEvent(event)
-
-    def leaveEvent(self, event) -> None:
-        if self.text():
-            self.setText("")
-        super().leaveEvent(event)
-
-
 class _ClickableWidget(QWidget):
     """Plain QWidget that emits clicked() on a left-button press."""
 

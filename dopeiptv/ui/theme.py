@@ -508,6 +508,20 @@ def contrast(a: str, b: str) -> float:
     return (la + 0.05) / (lb + 0.05)
 
 
+def ink_on(hex_color: str) -> str:
+    """Small text on HEX_COLOR (the source's initials on the accent): white
+    or the dark ink, whichever reads better, at 4.5:1 or more - where
+    on_accent() settles for 3:1 on a bold button label. On the few middle
+    tones neither reaches (a copper), black does: white or black always
+    reaches 4.5:1."""
+    best = max(("#FFFFFF", ON_ACCENT_DARK),
+               key=lambda ink: contrast(ink, hex_color))
+    if contrast(best, hex_color) >= 4.5:
+        return best
+    return max(("#FFFFFF", "#000000"),
+               key=lambda ink: contrast(ink, hex_color))
+
+
 #: The selected nav entry's fill: this much of its colour over the sidebar.
 NAV_TINT = 0.16
 #: The new-episodes pill under its number: a stronger wash of the accent.
@@ -719,11 +733,6 @@ def build_style() -> str:
     # clearly visible even on the near-black OLED palette (its border_in is
     # almost invisible against pure black).
     chk_border = _mix(p['text'], p['input'], 0.45)
-    # The playlist chip under the logo: a soft edge and hover derived from
-    # the palette, so it tracks the theme. Opaque, so it shows the same over
-    # the transparent scroll content.
-    side_action_edge = _mix(p['text'], p['side'], 0.26)
-    side_action_hover = _mix(p['text'], p['side'], 0.20)
     # Fields, dropdowns and buttons are filled, not outlined: an outline on
     # every control inside a framed panel read as boxes inside boxes. On a
     # dark theme the fill is worked out from the page, since the palettes'
@@ -766,15 +775,13 @@ QPushButton#NavBtn:checked {{
     background: {p['nav_tint']}; color: {p['nav_ink']}; font-weight: 600;
 }}
 QPushButton#NavBtn[rail="true"] {{ text-align: center; padding: 4px 0; font-size: 19px; }}
-/* Settings / Multiview: the sidebar's bottom actions, rows like the nav
-   entries (icon and name) under a hairline, icons alone on the rail. */
-QPushButton#SideAction {{
-    background: transparent; border: none; border-radius: 8px;
-    padding: 4px 12px; text-align: left; font-size: 14px; color: {p['text2']};
+/* The sidebar's foot: the source's avatar and Settings, icon buttons side
+   by side under a hairline (one above the other on the rail). */
+QPushButton#SideIcon {{
+    background: transparent; border: none; border-radius: 8px; padding: 0;
 }}
-QPushButton#SideAction:hover {{ background: {p['hover']}; color: {p['text']}; }}
-QPushButton#SideAction:pressed {{ background: {p['sel']}; }}
-QPushButton#SideAction[rail="true"] {{ text-align: center; padding: 4px 0; }}
+QPushButton#SideIcon:hover {{ background: {p['hover']}; }}
+QPushButton#SideIcon:pressed {{ background: {p['sel']}; }}
 
 /* Support dopeIPTV: a small red heart beside the sidebar's logo, its
    words in the tooltip. No pill - only a soft round under the pointer. */
@@ -782,25 +789,6 @@ QPushButton#DonateHeart {{
     background: transparent; border: none; border-radius: 15px; padding: 0;
 }}
 QPushButton#DonateHeart:hover {{ background: {p['hover']}; }}
-
-/* Playlist switcher: a compact pill "chip" sitting right under the logo, so
-   the two read as one block (logo = the app, chip = the account/playlist it
-   is showing). Same stack icon as its rail form ties the two states together. */
-QPushButton#PlaylistChip {{
-    background: transparent; border: 1px solid {side_action_edge};
-    border-radius: 8px; padding: 5px 9px; text-align: center;
-    font-size: 12px; font-weight: 600; color: {p['text2']};
-}}
-QPushButton#PlaylistChip:hover {{
-    background: {side_action_hover}; border-color: {ACCENT}; color: {p['text']};
-}}
-QPushButton#PlaylistChip[rail="true"] {{
-    /* On the rail it sits among the flat nav icons - same footprint, no
-       pill chrome (the bordered pill read as a taller, different control). */
-    background: transparent; border: none; border-radius: 8px;
-    padding: 4px 0; margin-top: 0px;
-}}
-QPushButton#PlaylistChip[rail="true"]:hover {{ background: {p['hover']}; }}
 
 #SectionLabel {{
     color: {p['muted2']}; font-size: 10px; font-weight: 700;

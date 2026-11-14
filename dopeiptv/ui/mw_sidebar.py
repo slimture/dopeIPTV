@@ -73,31 +73,20 @@ class _SidebarMixin:
                 not collapsed and getattr(self, "_cat_search_supported", False))
             if collapsed:
                 self.cat_search.hide()
-        # Settings / Multiview: icon and name expanded, the icon alone on the
-        # rail (the name stays in the tooltip).
-        for key, name in (("settings", "_settings_btn"),
-                          ("multiview", "_multiview_btn")):
-            btn = getattr(self, name, None)
-            if btn is None:
-                continue
-            btn.setText("" if collapsed else self._side_action_texts[key])
-            self._set_rail(btn, collapsed)
+        # The foot - the source's avatar and Settings: side by side, one
+        # above the other on the rail; centred either way.
+        box = getattr(self, "_actions_box", None)
+        if box is not None:
+            from PyQt6.QtWidgets import QBoxLayout
+            box.setDirection(QBoxLayout.Direction.TopToBottom if collapsed
+                             else QBoxLayout.Direction.LeftToRight)
+            box.setSpacing(6 if collapsed else 10)
         if hasattr(self, "_logo_row"):
             # The heart and the marks lie over the logo; placed again for the
             # rail's smaller mark.
             self._donate_heart_refresh()
         if hasattr(self, "_playlist_btn"):
-            # The switcher is the same square stack-icon in both states (the
-            # active playlist's name lives in its tooltip and the window
-            # title); only the sizing flips - fitted square when expanded,
-            # filling the rail when collapsed.
-            from PyQt6.QtWidgets import QSizePolicy
-            self._playlist_btn.setSizePolicy(
-                QSizePolicy.Policy.Ignored if collapsed
-                else QSizePolicy.Policy.Maximum,
-                QSizePolicy.Policy.Fixed)
             self._update_playlist_btn()
-            self._set_rail(self._playlist_btn, collapsed)
 
     def _apply_sidebar_collapsed(self) -> None:
         collapsed = getattr(self, "_sidebar_collapsed", False)

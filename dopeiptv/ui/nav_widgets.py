@@ -1,13 +1,16 @@
 """The sidebar's own widgets: a nav entry with its selected bar and quiet
-status, and the hairline between the sidebar's groups."""
+status, the hairline between the sidebar's groups, and the active source's
+avatar at its foot."""
 
 from __future__ import annotations
 
+import re
+
 from PyQt6.QtCore import QPoint, QRectF, Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QFontMetricsF, QPainter, QPaintEvent
+from PyQt6.QtGui import QColor, QFont, QFontMetricsF, QPainter, QPaintEvent, QPen
 from PyQt6.QtWidgets import QPushButton, QSizePolicy, QWidget
 
-from .theme import P
+from .theme import P, ink_on
 
 #: Status kinds a nav entry can show.
 DOT, PILL, COUNT = "dot", "pill", "count"
@@ -171,4 +174,79 @@ class SideRule(QWidget):
         pr = QPainter(self)
         pr.fillRect(QRectF((w - length) / 2, self.height() // 2, length, 1.0),
                     QColor(P.get("border", "#232329")))
+        pr.end()
+
+
+_WORD = re.compile(r"[^\W_]+")
+
+
+def source_initials(name: str) -> str:
+    """A source's initials for its avatar: the first letters of its first
+    two words, or the first two letters of a single word ("Min IPTV" -> MI,
+    "dopeIPTV" -> DO). Words are runs of letters and digits, so "TV-Box
+    (Home)" gives TB; "?" for a name with none."""
+    words = _WORD.findall(name or "")
+    if not words:
+        return "?"
+    text = (words[0][0] + words[1][0]) if len(words) > 1 else words[0][:2]
+    return text.upper()
+
+
+class SourceAvatar(QPushButton):
+    """The active source as an avatar: a rounded square in the accent with
+    its initials, the full name in the tooltip. Painted from the theme each
+    time, so a new theme or accent shows at once."""
+
+    SIZE = 32
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.setObjectName("SourceAvatar")
+        self.setFixedSize(self.SIZE, self.SIZE)
+        self.setFlat(True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self._initials = "?"
+
+    def set_source(self, name: str, hint: str = "") -> None:
+        """Show source *name*; *hint* (what a click does) under it in the
+        tooltip."""
+        self._initials = source_initials(name)
+        self.setToolTip(f"{name}\n{hint}" if name and hint else (name or hint))
+        self.setAccessibleName(name or hint)
+        self.setAccessibleDescription(hint)
+        self.update()
+
+    def initials(self) -> str:
+        return self._initials
+
+    def colors(self) -> tuple[str, str]:
+        """(fill, ink) as painted now."""
+        fill = P.get("accent", "#4C8DFF")
+        if self.isDown():
+            fill = QColor(fill).darker(115).name()
+        elif self.underMouse():
+            fill = P.get("accent_hi", fill)
+        return fill, ink_on(fill)
+
+    def paintEvent(self, _event: QPaintEvent) -> None:
+        fill, ink = self.colors()
+        pr = QPainter(self)
+        pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        pr.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
+        pr.setPen(Qt.PenStyle.NoPen)
+        pr.setBrush(QColor(fill))
+        box = QRectF(0.5, 0.5, self.width() - 1.0, self.height() - 1.0)
+        pr.drawRoundedRect(box, 8.0, 8.0)
+        if self.hasFocus() and self.focusPolicy() != Qt.FocusPolicy.NoFocus:
+            ring = QPen(QColor(P.get("text", "#ECECF1")), 1.5)
+            pr.setPen(ring)
+            pr.setBrush(Qt.BrushStyle.NoBrush)
+            pr.drawRoundedRect(box.adjusted(1, 1, -1, -1), 7.0, 7.0)
+        f = QFont(self.font())
+        f.setPixelSize(13)
+        f.setWeight(QFont.Weight.Bold)
+        pr.setFont(f)
+        pr.setPen(QColor(ink))
+        pr.drawText(box, int(Qt.AlignmentFlag.AlignCenter), self._initials)
         pr.end()
