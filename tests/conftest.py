@@ -3,6 +3,8 @@ tests - what the app does with dopeiptv/core/gcguard.py. Left automatic, a
 collection triggered on a pool or cast thread tore Qt objects down off the
 main thread, and the suite segfaulted under load in a QTimer's lambda."""
 import gc
+import os
+import tempfile
 import time
 
 import pytest
@@ -10,6 +12,12 @@ import pytest
 from dopeiptv.core.gcguard import collect_due
 
 _state = {"last_full": time.monotonic()}
+
+# The app's caches (channel lists, guides) for this run only: a test process
+# has no application name, so they went straight into ~/.cache (lists_a.d,
+# lists_main.d), and a list cached by an earlier run could stand in for a
+# server that did not answer. Child processes inherit it.
+os.environ["XDG_CACHE_HOME"] = tempfile.mkdtemp(prefix="dopeiptv-test-cache-")
 
 
 @pytest.fixture(autouse=True, scope="session")
