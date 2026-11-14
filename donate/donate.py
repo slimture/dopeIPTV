@@ -21,6 +21,9 @@ device on the admin page (needs Python's cryptography package).
                           ->  {"ok": true, "key"?} | {"action": client_secret} | {"error"}
     POST /donate/key      {"cs": client_secret} | {"t": receipt token}
                           ->  {"key", "since"} | {"pending": true} (202) | {"error"}
+    GET/PUT/DELETE /sync/<slot>
+                          settings sync for supporters (sync.py): ciphertext
+                          kept per slot, the supporter key checked and forgotten
 
 A donation comes with a supporter key for the app (supporter.py): shown on
 the page when the payment goes through, and behind a link in Stripe's
@@ -242,6 +245,7 @@ _SEEN: dict[str, list[float]] = {}
 _LOCK = threading.Lock()
 WINDOW, PER_WINDOW = 600.0, 12
 FEEDBACK_PER_WINDOW = 20          # reports from one address in WINDOW (many can share one)
+SYNC_PER_WINDOW = 120             # sync requests from one address in WINDOW (a household's computers)
 
 
 def _allowed(addr: str, most: int = PER_WINDOW) -> bool:
@@ -350,10 +354,32 @@ def key_for(pi: dict, how: str) -> dict | None:
     return {"key": key, "since": supporter.check(key, _public())["since"]}
 
 
+_PUBLIC: dict[bytes, bytes] = {}
+
+
 def _public() -> bytes:
     import ed25519
     seed = _supporter_seed()
-    return ed25519.public_key(seed) if seed else b""
+    if not seed:
+        return b""
+    if seed not in _PUBLIC:
+        _PUBLIC.clear()
+        _PUBLIC[seed] = ed25519.public_key(seed)
+    return _PUBLIC[seed]
+
+
+def supporter_ok(key: str) -> int:
+    """0 when *key* is a supporter key this site signed; else the status to
+    answer (401, or 503 without a signing key). The key is not kept."""
+    import supporter
+    public = _public()
+    if not public:
+        return 503
+    try:
+        ok = bool(key) and len(key) < 200 and supporter.check(key, public) is not None
+    except Exception:  # noqa: BLE001 - a malformed key is just not a key
+        ok = False
+    return 0 if ok else 401
 
 
 def find_key(data: dict) -> tuple[int, dict]:
@@ -780,6 +806,8 @@ FEEDBACK_REPLIES = "/feedback/replies"
 # The reports for reading elsewhere (a fixing session), with a read-only
 # token of their own - FEEDBACK_READ_TOKEN in the config; off without one.
 FEEDBACK_EXPORT = "/feedback/export"
+# Settings sync for supporters (sync.py): GET, PUT and DELETE of one slot.
+SYNC = "/sync/"
 ACCOUNT = "/admin/account/"      # + an action: one's own sign-in, the other admins
 # Open to anyone (nginx asks nothing here either): the sign-in page and what
 # it needs, and the files a Home Screen app or the push worker fetch.
@@ -1235,8 +1263,64 @@ class Handler(BaseHTTPRequestHandler):
             days = 30
         return self._send(200, feedback.export(CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats")), days))
 
+    def _sync(self) -> None:
+        """A supporter's encrypted copy under a slot (sync.py). The supporter
+        key in the header is checked and forgotten: never kept, never logged,
+        never tied to the slot. Nor is the address (the rate limit holds it
+        in memory only)."""
+        import sync
+        slot = self.path.split("?", 1)[0][len(SYNC):]
+        if not sync.SLOT.match(slot):
+            return self._send(404, {"error": "not found"})
+        addr = self.headers.get("X-Real-IP") or "local"
+        if not _allowed("sync:" + addr, SYNC_PER_WINDOW):
+            return self._send(429, {"error": "slow down"})
+        refused = supporter_ok((self.headers.get(sync.HEADER) or "").strip())
+        if refused:
+            return self._send(refused, {"error": "supporter key" if refused == 401
+                                        else "not configured"})
+        where = _stats_dir()
+        if self.command == "GET":
+            got = sync.get(where, slot)
+            return self._send(200, got) if got else self._send(404, {"error": "none"})
+        if self.command == "DELETE":
+            return self._send(200, {"deleted": sync.delete(where, slot)})
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = -1
+        if length > sync.MAX_BODY:
+            self.close_connection = True
+            return self._send(413, {"error": "too big", "most": sync.MAX_BLOB})
+        if length <= 0:
+            return self._send(400, {"error": "body"})
+        try:
+            data = json.loads(self.rfile.read(length))
+        except (ValueError, TypeError):
+            return self._send(400, {"error": "body"})
+        if not isinstance(data, dict):
+            return self._send(400, {"error": "body"})
+        try:
+            status, body = sync.put(where, slot, data.get("version_seen"), data.get("blob"))
+        except OSError as e:
+            print(f"[donate] sync: not stored ({type(e).__name__})", file=sys.stderr, flush=True)
+            return self._send(503, {"error": "not stored"})
+        return self._send(status, body)
+
+    def do_PUT(self) -> None:
+        if self.path.split("?", 1)[0].startswith(SYNC):
+            return self._sync()
+        return self._send(404, {"error": "not found"})
+
+    def do_DELETE(self) -> None:
+        if self.path.split("?", 1)[0].startswith(SYNC):
+            return self._sync()
+        return self._send(404, {"error": "not found"})
+
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
+        if path.startswith(SYNC):
+            return self._sync()
         if path == "/admin-session":
             # nginx's auth_request: a valid session cookie lets the browser
             # in without the password prompt, and names the admin.
@@ -1336,6 +1420,20 @@ class Handler(BaseHTTPRequestHandler):
 LISTEN = CONF.get("LISTEN", "unix:/var/run/iptv_donate/donate.sock")
 
 
+def _sync_cleanup() -> None:
+    """Once a day: the sync slots nobody has used for sync.KEEP_DAYS go."""
+    import sync
+    while True:
+        try:
+            gone = sync.cleanup(_stats_dir())
+            if gone:
+                print(f"[donate] sync: {gone} slot(s) unused for {sync.KEEP_DAYS} days removed",
+                      file=sys.stderr, flush=True)
+        except Exception as e:  # noqa: BLE001 - the cleanup keeps its schedule
+            print(f"[donate] sync cleanup: {type(e).__name__}", file=sys.stderr, flush=True)
+        time.sleep(86400)
+
+
 class UnixHTTPServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
     daemon_threads = True
 
@@ -1388,6 +1486,7 @@ def main() -> None:
           file=sys.stderr, flush=True)
     if push_ready() and _secret():
         threading.Thread(target=_watch_donations, name="donations", daemon=True).start()
+    threading.Thread(target=_sync_cleanup, name="sync-cleanup", daemon=True).start()
     srv.serve_forever()
 
 

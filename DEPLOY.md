@@ -710,6 +710,45 @@ cp ~/dopeiptv/deploy/content-iptv.dope.rs.conf /usr/local/etc/nginx/conf.d/iptv.
 nginx -t && service nginx reload
 ```
 
+## Settings sync for supporters
+
+A supporter's app can keep favorites, settings, playlists and watch history
+the same on several computers (the app's Settings, General, "Sync between
+computers"). The app encrypts all of it with a key made from a random code
+that only the person's computers know; the service (donate/sync.py, routes
+`/sync/<slot>` in donate.py) keeps that ciphertext under a slot - another
+hash of the code - and cannot read it. Every request carries the supporter
+key, which the service checks against the signing key (the same one as
+"Supporter keys" above; without it /sync/ answers 503) and forgets: it is
+never stored, logged or tied to a slot, and nginx does not log /sync/.
+Kept: `stats/sync/<slot>.json` (mode 600) - the ciphertext, a version and
+when it was written; at most 2 MB a slot. A slot nobody has read or written
+for 400 days is removed by the service once a day
+(`python3 donate/sync.py --cleanup` does the same by hand).
+
+1. The files and the service (jail):
+
+       cd ~/dopeiptv; git checkout website; git pull origin website
+       cp -R donate /usr/local/www/iptv/
+       service iptv_donate restart
+
+2. The content server (jail): the new `iptv_sync` zone and the
+   `location ^~ /sync/` block are in deploy/content-iptv.dope.rs.conf:
+
+       cp ~/dopeiptv/deploy/content-iptv.dope.rs.conf /usr/local/etc/nginx/conf.d/iptv.dope.rs.conf
+       nginx -t && service nginx reload
+
+3. The TLS-front proxy (`bastille console webproxy`): its own
+   `location ^~ /sync/` block, now in deploy/proxy-dopeiptv.org.conf -
+   without it nginx's 1 MB default refuses a large sync. Copy the block
+   into /usr/local/etc/nginx/conf.d/dopeiptv.org.conf (CONTENT_HOST as in
+   the file's other blocks), then `nginx -t && service nginx reload`.
+
+**Check** (jail): `python3 -m pytest donate/test_sync.py` or
+`python3 donate/test_sync.py` - all pass; then
+`curl -s -o /dev/null -w '%{http_code}\n' https://dopeiptv.org/sync/$(printf 'ab%.0s' $(seq 32))`
+answers `401` (no supporter key), not 404 or 502.
+
 ## Feedback from the site's footer
 
 The footer's "Feedback" (nav.js, words in site/lang `fbs_*`, reusing the
