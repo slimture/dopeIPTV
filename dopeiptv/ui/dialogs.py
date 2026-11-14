@@ -1159,3 +1159,66 @@ class ClearHistoryDialog(QDialog):
         return {"seconds": int(self.range.currentData() or 0),
                 "channels": self.channels.isChecked(), "titles": self.titles.isChecked(),
                 "positions": self.positions.isChecked()}
+
+
+class ChannelNumberDialog(QDialog):
+    """Nerd: a channel's own number, typed or stepped. *taken(n)* says
+    whether another channel has *n* by hand, and its name if known: that
+    one gives the number up."""
+
+    def __init__(self, parent, name: str, number: int, taken) -> None:
+        super().__init__(parent)
+        from ..core.channel_numbers import MAX_NUMBER
+        from .settings_ui import Stepper, settings_style
+        self._taken = taken
+        self.setWindowTitle(tr("chno_title"))
+        self.setModal(True)
+        self.setMinimumWidth(420)
+        self.setStyleSheet(settings_style())
+        col = QVBoxLayout(self)
+        col.setContentsMargins(24, 22, 24, 20)
+        col.setSpacing(10)
+        head = QLabel(name or tr("chno_title"))
+        head.setWordWrap(True)
+        head.setStyleSheet(f"font-size:16px; font-weight:700; color:{P['text']};")
+        sub = QLabel(tr("chno_sub"))
+        sub.setWordWrap(True)
+        sub.setStyleSheet(f"font-size:13px; color:{P['muted']};")
+        col.addWidget(head)
+        col.addWidget(sub)
+        row = QHBoxLayout()
+        row.addWidget(QLabel(tr("chno_label")))
+        row.addStretch(1)
+        self.stepper = Stepper(lo=1, hi=MAX_NUMBER, value=max(1, min(MAX_NUMBER, int(number or 1))),
+                               width=150)
+        self.stepper.setAccessibleName(tr("chno_label"))
+        row.addWidget(self.stepper)
+        col.addLayout(row)
+        self.note = QLabel("")
+        self.note.setWordWrap(True)
+        self.note.setStyleSheet(f"font-size:12px; color:{P.get('warn', P['muted'])};")
+        col.addWidget(self.note)
+        col.addSpacing(6)
+        buttons = QHBoxLayout()
+        buttons.addStretch(1)
+        cancel = QPushButton(tr("common_cancel"))
+        ok = QPushButton(tr("common_save"), objectName="Primary")
+        cancel.clicked.connect(self.reject)
+        ok.clicked.connect(self.accept)
+        ok.setDefault(True)
+        buttons.addWidget(cancel)
+        buttons.addWidget(ok)
+        col.addLayout(buttons)
+        self.stepper.valueChanged.connect(self._said)
+        self._said()
+        self.stepper.spin.setFocus()
+        self.stepper.spin.selectAll()
+
+    def _said(self, *_a) -> None:
+        other, name = self._taken(self.value())
+        self.note.setText((tr("chno_taken_by", name=name) if name else tr("chno_taken"))
+                          if other else "")
+        self.note.setVisible(bool(other))
+
+    def value(self) -> int:
+        return self.stepper.value()

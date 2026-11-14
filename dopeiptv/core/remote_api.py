@@ -340,6 +340,8 @@ def check_server(host: str, port: int, token: str, remote: bool, sharing: bool,
         lines.append(f'  curl -X POST -H "Authorization: Bearer <token>" {addresses[-1]}/api/toggle')
         lines.append(f'  curl -X POST -H "Authorization: Bearer <token>" -d \'{{"channel": "SVT1"}}\' '
                      f"{addresses[-1]}/api/play")
+        lines.append(f'  curl -X POST -H "Authorization: Bearer <token>" -d \'{{"number": 12}}\' '
+                     f"{addresses[-1]}/api/play")
     if sharing:
         lines.append("")
         lines.append("For another player:")

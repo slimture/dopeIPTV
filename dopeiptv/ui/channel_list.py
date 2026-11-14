@@ -914,7 +914,11 @@ class ChannelDelegate(QStyledItemDelegate):
         # draws on its own).
         live_like = (kind in ("live", "fav")
                      or (kind == "history" and it.get("_kind") == "live"))
-        num_str = str(it["num"]) if it.get("num") else ""
+        # A TV row carries the number to show (the user's own with Nerd,
+        # core/channel_numbers.py); a favourite is a snapshot, so it asks.
+        num = (self.window._chno_shown(it) if kind == "fav" and live_like
+               else it.get("num"))
+        num_str = str(num) if num else ""
         has_archive = live_like and self.window._timeshift_days(it) > 0
         if live_like and (num_str or has_archive):
             num_w = 52 if has_archive else 34

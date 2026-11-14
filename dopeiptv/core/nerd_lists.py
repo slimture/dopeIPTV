@@ -1,5 +1,6 @@
 """Nerd's touches on a source's channel list: logos from a local picon
-folder, a channel's guide chosen by hand, multicast through udpxy.
+folder, a channel's guide chosen by hand, the user's own channel numbers
+(core/channel_numbers.py), multicast through udpxy.
 
 All of it applies only with Nerd on, and only what is set: a list from a
 source with none of these is returned as it came.
@@ -16,7 +17,7 @@ import unicodedata
 from typing import Any
 from urllib.parse import urlsplit
 
-from . import nerd
+from . import channel_numbers, nerd
 from .log import log
 
 PICON_EXTS = (".png", ".svg", ".webp", ".jpg")
@@ -108,7 +109,10 @@ def set_epg_map(settings: Any, pid: str, stream_id: int | str, epg_id: str | Non
 
 
 def decorate(rows: list[dict], source: dict | None, pid: str | None) -> list[dict]:
-    """A source's channels with Nerd's picons and guide mapping applied."""
+    """A source's channels with Nerd's picons, guide mapping and the
+    user's channel numbers applied (the source's numbers come back with
+    Nerd off)."""
+    channel_numbers.apply(rows, pid)
     n = nerd.current()
     if not n.on or not rows:
         return rows

@@ -76,6 +76,7 @@ map and the one-way import rule.
 | `core/log.py` | Central logging (`configure_logging`, `DOPEIPTV_LOG`) |
 | `core/nerd.py` | Nerd settings into what the player and network do (mpv options, user agent/headers/proxy per source, IP version, VPN guard); nothing while Nerd is off |
 | `core/nerd_lists.py` | Nerd on a source's lists: local picon folder, a channel's guide chosen by hand, udpxy for multicast |
+| `core/channel_numbers.py` | Nerd: channel numbers of the user's own per source (`nerd_chno_<source id>`), numbering in list order, a number's channel; they win over the source's `num` |
 | `core/nerd_check.py` | Does a Nerd setting work? Each tried for real (proxy, user agent, IP version, udpxy, picons, mpv folder, shaders, mpv options, VPN), no secrets in what it shows |
 | `core/http_login.py` | `get_with_login`: a login in a stream's address answered as the server asks (basic or digest) |
 | `core/commands.py` | What the app is asked from outside: `--play`, `--channel`, `dopeiptv://` links |
@@ -223,7 +224,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
   epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log,
-  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, health, nerd, nerd_lists, http_login, commands, instance, nerd_check, privacy, rec_extras, catchup, remote_api, report, supporter) and `services/` (failover, share, resume,
+  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, health, nerd, nerd_lists, channel_numbers, http_login, commands, instance, nerd_check, privacy, rec_extras, catchup, remote_api, report, supporter) and `services/` (failover, share, resume,
   coverart, reminders, mpris, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list

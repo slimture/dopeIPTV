@@ -83,6 +83,7 @@ class _ContextMenuMixin:
                     lambda it=it, n=n: self._add_channel_to_multiview(it, n))
             m.addAction(tr("btn_epg_guide"), self._open_epg_guide)
             m.addAction(tr("btn_refresh_epg"), self._refresh_epg_now)
+            self._chno_menu(m, it)
         if (content_kind in ("live", "fav")
                 and it.get("stream_id") is not None):
             if self._timeshift_days(it):
@@ -330,6 +331,114 @@ class _ContextMenuMixin:
         self.channel_ov.update(mode, key, **fields)
         self.list_model.refresh_all()
         self.listw.viewport().update()
+
+    # -- channel numbers of the user's own (Nerd; core/channel_numbers.py) ---------
+
+    def _chno_pid(self) -> str | None:
+        store = getattr(self, "playlist_store", None)
+        return store.active_id if store is not None else None
+
+    def _chno_shown(self, it: dict):
+        """The number a row shows: the user's own while Nerd is on, else
+        the source's. A favourite is a snapshot, so it is asked here."""
+        from ..core import channel_numbers
+        return channel_numbers.shown(it, channel_numbers.active(self._chno_pid()))
+
+    def _chno_rows(self, rows: list[dict]) -> list[dict]:
+        """The channels a number may reach or be given: what the lists show
+        - none from a hidden category, or a locked one while it is locked,
+        nor one hidden by hand."""
+        excluded = self.overrides.excluded_ids(
+            "live", include_locked=not self.parental.session_unlocked)
+        hidden = self.channel_ov.anything_hidden()
+        return [r for r in rows if r.get("stream_id") is not None and not r.get("_header")
+                and str(r.get("category_id")) not in excluded
+                and not (hidden and self._channel_hidden(r, "live"))]
+
+    def _chno_menu(self, menu, it: dict) -> None:
+        """Nerd: Set channel number… and, when it has one, Clear."""
+        from ..core import channel_numbers, nerd
+        pid = self._chno_pid()
+        if not (nerd.current().on and pid and self.mode in ("live", "fav")):
+            return
+        menu.addAction(tr("chno_set"), lambda it=it: self._set_channel_number(it))
+        if channel_numbers.get(self.settings, pid, it.get("stream_id")) is not None:
+            menu.addAction(tr("chno_clear"), lambda it=it: self._clear_channel_number(it))
+
+    def _set_channel_number(self, it: dict) -> None:
+        from ..core import channel_numbers
+        from .dialogs import ChannelNumberDialog
+        pid, sid = self._chno_pid(), it.get("stream_id")
+        if not pid or sid is None:
+            return
+        numbers = channel_numbers.stored(self.settings, pid)
+        names = {str(r.get("stream_id")): r.get("name") or "" for r in (self.all_items or [])
+                 if isinstance(r, dict)}
+        start = (numbers.get(str(sid)) or channel_numbers.valid(channel_numbers.own_number(it))
+                 or 1)
+
+        def taken(n: int) -> tuple[bool, str]:
+            other = channel_numbers.holder(numbers, n)
+            if other is None or other == str(sid):
+                return False, ""
+            return True, names.get(other, "")
+        name = it.get("name") or ""
+        d = ChannelNumberDialog(self, name, start, taken)
+        if not d.exec():
+            return
+        number = d.value()
+        channel_numbers.set_number(self.settings, pid, sid, number)
+        self._chno_refresh()
+        self._show_toast(tr("chno_set_done", name=name, num=number), 3000)
+
+    def _clear_channel_number(self, it: dict) -> None:
+        from ..core import channel_numbers
+        pid = self._chno_pid()
+        if not pid or it.get("stream_id") is None:
+            return
+        channel_numbers.clear(self.settings, pid, it["stream_id"])
+        self._chno_refresh()
+        self._show_toast(tr("chno_cleared", name=it.get("name") or ""), 3000)
+
+    def _chno_refresh(self) -> None:
+        """The list on screen with the numbers as they are now. TV's rows
+        are the source's own (numbered in place, as every fetch does);
+        Favorites are snapshots, read through _chno_shown as they paint."""
+        from ..core import channel_numbers
+        if self.mode == "live" and self.all_items:
+            channel_numbers.apply(self.all_items, self._chno_pid())
+        self.list_model.refresh_all()
+        self.listw.viewport().update()
+
+    def _chno_settings(self, action: str, keep: bool, done) -> None:
+        """Nerd > Channels and guide: "count", "all" (number every channel
+        the lists show, in the source's order; *keep* the numbers set by
+        hand) or "clear". *done* gets how many channels have a number now,
+        or -1 when the channel list could not be read."""
+        from ..core import channel_numbers
+        from ..core.workers import run_async
+        pid = self._chno_pid()
+        if not pid:
+            done(0)
+            return
+        if action == "clear":
+            channel_numbers.clear_all(self.settings, pid)
+            self._chno_refresh()
+            done(0)
+            return
+        if action != "all":
+            done(len(channel_numbers.stored(self.settings, pid)))
+            return
+        client = self.client
+
+        def numbered(rows) -> None:
+            if client is not self.client or self._chno_pid() != pid:
+                done(-1)
+                return
+            got = channel_numbers.number_all(self.settings, pid, self._chno_rows(list(rows or [])), keep)
+            self._chno_refresh()
+            done(len(got))
+        run_async(self.pool, lambda: client.live_streams(None), numbered, lambda _e=None: done(-1))
 
     def _open_tmdb_match_dialog(self, it: dict, kind: str) -> None:
         """Open the manual TMDB-match dialog for a movie/series and refresh

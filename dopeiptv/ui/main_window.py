@@ -5448,32 +5448,64 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # leaving as the new 'previous', so pressing it again bounces back.
             self.play_live_channel(prev)
 
-    def _channel_digit(self, digit: str) -> None:
-        """Accumulate a typed channel number and jump after a short pause."""
-        if self.mode not in ("live", "fav"):
+    # How long a typed channel number waits for its next digit.
+    CHAN_ENTRY_MS = 1500
+
+    def _channel_digit(self, digit: str, from_player: bool = False) -> None:
+        """Accumulate a typed channel number and jump after a short pause:
+        typed in the channel list (TV, Favorites), or - *from_player* - over
+        the picture while a live channel plays, whatever the list shows."""
+        if not (len(digit) == 1 and digit.isdecimal()):
             return
-        self._chan_buffer = (self._chan_buffer + digit)[:5]
+        if self.mode not in ("live", "fav") and not (from_player and self._live_playing()):
+            return
+        self._chan_buffer = (self._chan_buffer + str(int(digit)))[:5]
         self._set_status(tr("chan_entry", num=self._chan_buffer))
-        self._chan_timer.start(1200)
+        self._chan_entry_show(self._chan_buffer, self.CHAN_ENTRY_MS + 1000)
+        self._chan_timer.start(self.CHAN_ENTRY_MS)
+
+    def _live_playing(self) -> bool:
+        return self._player_up() and getattr(self, "_playing_item", None) is not None
+
+    def _chan_entry_show(self, text: str, ms: int) -> None:
+        """The digits typed (or that no channel has them) on screen: over
+        the picture while the player is up, else as a note in the window."""
+        p = self.player
+        if p is not None and p.isVisible() and p.current_url is not None:
+            p.show_number_entry(text, ms)
+        elif text:
+            self._show_toast(tr("chan_entry", num=text) if text.isdigit() else text, ms)
+
+    def _chan_not_found(self, number) -> None:
+        self._set_status(tr("chan_not_found", num=number))
+        self._chan_entry_show(tr("chan_not_found", num=number), 2500)
 
     def _channel_jump(self) -> None:
+        from ..core import channel_numbers
+        self._chan_timer.stop()
         buf = self._chan_buffer
         self._chan_buffer = ""
         if not buf:
             return
-        target = None
-        for i in range(self.list_model.rowCount()):
-            it = self.list_model.item_at(i)
-            if it and not it.get("_header") and str(it.get("num")) == buf:
-                target = i
-                break
-        if target is None:
-            self._set_status(tr("chan_not_found", num=buf))
-            return
-        idx = self.list_model.index(target)
-        self.listw.setCurrentIndex(idx)
-        self.listw.scrollTo(idx)
-        self.play()
+        self._chan_entry_show("", 0)
+        if self.mode in ("live", "fav") and not self.series_ctx:
+            # The list on screen first: the channel is selected there too.
+            rows = [self.list_model.item_at(i) for i in range(self.list_model.rowCount())]
+            found = channel_numbers.find([r for r in rows if r], buf,
+                                         channel_numbers.active(self._chno_pid()))
+            if found is not None:
+                target = next(i for i, r in enumerate(rows) if r is found)
+                idx = self.list_model.index(target)
+                self.listw.setCurrentIndex(idx)
+                self.listw.scrollTo(idx)
+                self.play()
+                return
+        # The whole source next - from a channel list, or over a channel
+        # that plays; never instead of a film in Favorites' Movies.
+        if self._content_kind() in ("live", "fav") or self._live_playing():
+            self._play_channel_number(int(buf))
+        else:
+            self._chan_not_found(buf)
 
     def _zap(self, direction: int) -> None:
         # Music: the buttons step the play queue, not the browsing list -

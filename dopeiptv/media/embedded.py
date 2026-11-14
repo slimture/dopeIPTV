@@ -991,6 +991,16 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         self.sleep_badge = QLabel("", self)
         self.sleep_badge.hide()
 
+        # The channel number being typed (the window's number zapping), in
+        # the picture's top-right corner like a television's. A sibling of
+        # the video like the badges above; it only shows text.
+        self.number_badge = QLabel("", self)
+        self.number_badge.setObjectName("NumberEntry")
+        self.number_badge.hide()
+        self._number_badge_timer = QTimer(self)
+        self._number_badge_timer.setSingleShot(True)
+        self._number_badge_timer.timeout.connect(self.number_badge.hide)
+
         # "Next episode" card, over the picture for the last stretch of an
         # episode, so the credits can be skipped with one click instead of
         # being sat through. Deliberately NOT automatic: where the credits
@@ -1414,6 +1424,8 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         # a timer is armed (then it fades / stays pinned per the countdown).
         self.sleep_badge.setParent(parent)
         self.sleep_badge.hide()
+        self.number_badge.setParent(parent)
+        self.number_badge.hide()
         self._show_dock_placeholder(True)
         # Re-place once the reflow has settled: the caller still has to move
         # the control bar out and re-lock the height after this returns, and a
@@ -1600,6 +1612,8 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
                 ov.hide()
         self.sleep_badge.setParent(self)
         self.sleep_badge.hide()
+        self.number_badge.setParent(self)
+        self.number_badge.hide()
         self._mirror = None
         self._show_dock_placeholder(False)
         # The control bar is back in the player by now (the caller re-adds it
@@ -2124,6 +2138,8 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
             self.live_badge.move(tl.x() + 12, tl.y() + 12)
         if self.sleep_badge.isVisible():
             self._place_sleep_badge()
+        if self.number_badge.isVisible():
+            self._place_number_badge()
         if self.center_btn.isVisible():
             self._position_center_btn()
         if self.overlay.isVisible() or self.fs_controls.isVisible():
@@ -3099,6 +3115,35 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         g = self._ov_surface.geometry()
         b = self.sleep_badge
         b.move(g.right() - b.width() - 12, g.top() + 12)
+
+    def show_number_entry(self, text: str, ms: int = 4000) -> None:
+        """Show *text* (the digits typed so far, or why nothing played) in
+        the picture's corner for *ms*; empty hides it. Nothing else changes:
+        the window decides what plays."""
+        b = self.number_badge
+        if not text:
+            self._number_badge_timer.stop()
+            b.hide()
+            return
+        b.setText(text)
+        b.setStyleSheet(
+            "QLabel#NumberEntry { background: rgba(0,0,0,170); color: white;"
+            f" border: 2px solid {P['accent']}; border-radius: 10px;"
+            " padding: 4px 14px; font-size: 22px; font-weight: 700; }")
+        b.adjustSize()
+        self._place_number_badge()
+        b.show()
+        b.raise_()
+        self._number_badge_timer.start(max(500, ms))
+
+    def _place_number_badge(self) -> None:
+        # Under the sleep-timer pill when that one is up.
+        g = self._ov_surface.geometry()
+        b = self.number_badge
+        top = g.top() + 12
+        if self.sleep_badge.isVisible() and self.sleep_badge.parent() is b.parent():
+            top = self.sleep_badge.geometry().bottom() + 8
+        b.move(g.right() - b.width() - 12, top)
 
     def _ask_sleep_minutes(self) -> None:
         from PyQt6.QtWidgets import QInputDialog

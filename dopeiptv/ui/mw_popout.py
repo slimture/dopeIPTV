@@ -156,6 +156,11 @@ class _PopoutWindow(QWidget):
             self._owner._popout_escape()
             event.accept()
             return
+        # A channel number typed over the picture here zaps as it does in
+        # the window.
+        if self._owner._number_key(event):
+            event.accept()
+            return
         super().keyPressEvent(event)
 
     def resizeEvent(self, event) -> None:

@@ -94,7 +94,33 @@ class _ShortcutsMixin:
         if self.player and self.player.isVisible():
             self._toggle_player_fullscreen()
 
+    def _number_key(self, event) -> bool:
+        """A digit, or Enter after digits, that reached the window - from
+        the player, the pop-out, or anything else nobody took it from:
+        number zapping (the channel list hands over its own). True when
+        taken."""
+        # Shift is fine: an AZERTY keyboard types its digits with it.
+        held = (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifier
+                | Qt.KeyboardModifier.MetaModifier)
+        if event.modifiers() & held or self._typing():
+            return False
+        if self._multiview_active() is not None:
+            return False
+        txt = event.text()
+        if len(txt) == 1 and txt.isdecimal():
+            if not (self._live_playing() or self.mode in ("live", "fav")):
+                return False
+            self._channel_digit(txt, from_player=True)
+            return True
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and self._chan_buffer:
+            self._channel_jump()
+            return True
+        return False
+
     def keyPressEvent(self, event) -> None:
+        if self._number_key(event):
+            event.accept()
+            return
         if event.key() in (Qt.Key.Key_Left, Qt.Key.Key_Right):
             bare = _is_bare_arrow(event.modifiers())
             shift = _is_shift_arrow(event.modifiers())

@@ -1,6 +1,7 @@
 """Commands from outside, carried out: the command line and dopeiptv://
 links (core/commands.py), a second start handing over (core/instance.py),
-and the remote API, which asks the same way."""
+and the remote API, which asks the same way - also for a channel by its
+number, as a typed number zaps."""
 
 from __future__ import annotations
 
@@ -40,12 +41,12 @@ class _CommandsMixin:
 
     def handle_command(self, cmd: dict) -> dict[str, Any]:
         """Do what *cmd* asks: {"play": address}, {"channel": name},
-        {"open": True}. Returns at once; a channel is looked up off the
-        window's thread."""
+        {"number": channel number}, {"open": True}. Returns at once; a
+        channel is looked up off the window's thread."""
         if not isinstance(cmd, dict):
             return {"ok": False}
         log.info("command: %s", ", ".join(sorted(cmd)))
-        if cmd.get("open") or cmd.get("play") or cmd.get("channel") or cmd.get("supporter"):
+        if cmd.get("open") or cmd.get("play") or cmd.get("channel") or cmd.get("supporter") or cmd.get("number"):
             self._come_forward()
         key = str(cmd.get("supporter") or "").strip()
         if key and hasattr(self, "open_supporter"):
@@ -61,6 +62,11 @@ class _CommandsMixin:
         name = str(cmd.get("channel") or "").strip()
         if name:
             self._play_channel_named(name)
+            return {"ok": True}
+        from ..core.channel_numbers import valid
+        number = valid(cmd.get("number"))
+        if number is not None:
+            self._play_channel_number(number)
             return {"ok": True}
         return {"ok": bool(cmd.get("open"))}
 
@@ -85,6 +91,25 @@ class _CommandsMixin:
             if it is None:
                 from ..i18n import tr
                 self._show_toast(tr("cmd_no_channel", name=name), 5000)
+                return
+            self.play_live_channel(it)
+        run_async(self.pool, lambda: client.live_streams(None), done,
+                  lambda _e=None: done([]))
+
+    def _play_channel_number(self, number: int) -> None:
+        """The channel with *number* in the whole source - the user's own
+        number (Nerd) first, else the source's - typed or asked for. Only
+        channels the lists show: none from a hidden or locked category."""
+        from ..core import channel_numbers
+        client, pid = self.client, self._chno_pid()
+
+        def done(rows: Any) -> None:
+            if client is not self.client:
+                return          # the source changed meanwhile
+            it = channel_numbers.find(self._chno_rows(list(rows or [])), number,
+                                      channel_numbers.active(pid))
+            if it is None:
+                self._chan_not_found(number)
                 return
             self.play_live_channel(it)
         run_async(self.pool, lambda: client.live_streams(None), done,

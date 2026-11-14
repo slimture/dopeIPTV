@@ -20,8 +20,8 @@ from typing import Any, Callable
 from PyQt6 import sip
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
-    QComboBox, QFileDialog, QFrame, QHBoxLayout, QLineEdit, QPlainTextEdit,
-    QPushButton, QVBoxLayout, QWidget,
+    QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
+    QPlainTextEdit, QPushButton, QVBoxLayout, QWidget,
 )
 
 from ..core import nerd, nerd_check
@@ -72,7 +72,8 @@ PART_KEYS = {
     "net": ("nerd_user_agent", "nerd_referer", "nerd_headers", "nerd_proxy", "nerd_proxy_player",
             "nerd_ip_family", "nerd_net_timeout", "nerd_reconnect_max", "nerd_vpn_guard",
             "nerd_vpn_iface", "nerd_vpn_lan"),
-    "lists": ("nerd_picon_dir", "nerd_picon_override", "nerd_udpxy", "nerd_failover", "nerd_health"),
+    "lists": ("nerd_picon_dir", "nerd_picon_override", "nerd_udpxy", "nerd_failover", "nerd_health",
+              "nerd_numbers_keep"),
     "player": ("nerd_spdif", "nerd_video_sync", "nerd_interpolation", "nerd_probe", "nerd_demux_max_mb",
                "nerd_mpv_config_dir", "nerd_shaders", "nerd_mpv_options", "nerd_adelay_per_channel"),
     "rec": ("nerd_rec_template", "nerd_rec_post"),
@@ -168,7 +169,9 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
           playlists: Callable[[], tuple[list[dict], str | None]] | None = None,
           remote: Callable[[dict], dict] | None = None,
           open_page: Callable[[str], None] | None = None,
-          health_store: Callable[[], Any] | None = None) -> Callable[[Callable[[str, Any], None]], None]:
+          health_store: Callable[[], Any] | None = None,
+          numbers: Callable[[str, bool, Callable[[int], None]], None] | None = None,
+          ) -> Callable[[Callable[[str, Any], None]], None]:
     """*page* is Nerd's own: the switch, how it works, stats, diagnostics.
     *pages* ("net", "boxes", "lists", "player", "rec") take the rest, shown by
     *show_pages* while Nerd is on; without them it all goes on *page*.
@@ -180,7 +183,10 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     *open_page*: shows a page by key (the list of Nerd's parts, their way
     back). *health_store*: the window's stream health (core/health.py),
     whose worst channels the page lists and clears; without it, the one
-    stored in *settings*."""
+    stored in *settings*. *numbers(action, keep, done)*: the active
+    source's channel numbers - "count", "all" (number them in list order)
+    or "clear"; *done* gets how many have one now (-1: the list could not
+    be read)."""
     n = _Defaults(settings)
     sub = pages or {}
 
@@ -456,6 +462,62 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     c = at("lists").card(tr("nerd_card_guide"))
     c.note(tr("nerd_epg_multi"))
     c.note(tr("nerd_epg_map_note"))
+
+    # -- channels: numbers of the user's own ------------------------------------------------
+    c = at("lists").card(tr("nerd_card_chno"))
+    c.note(tr("nerd_chno_intro"))
+    chno_keep = c.toggle(tr("nerd_chno_keep"), n.flag("nerd_numbers_keep", True), tr("nerd_chno_keep_hint"))
+    chno_all = QPushButton(tr("nerd_chno_all_btn"))
+    chno_clear = QPushButton(tr("nerd_chno_clear_btn"), objectName="Danger")
+    # How many the active source has, under the button that changes it.
+    chno_state = QLabel("")
+    chno_state.setObjectName("SettingsHint")
+    chno_state.setWordWrap(True)
+    chno_state.setStyleSheet("font-size:12px;")
+    c.row(tr("nerd_chno_all"), chno_all, tr("nerd_chno_all_hint"),
+          search="channel number numbers LCN zap renumber order", below=chno_state)
+    c.row(tr("nerd_chno_clear"), chno_clear, tr("nerd_chno_clear_hint"),
+          search="channel number numbers reset")
+
+    def chno_source() -> str:
+        s = src() or {}
+        return str(s.get("name") or s.get("server") or "") if s.get("id") else ""
+
+    def chno_said(count: int) -> None:
+        if sip.isdeleted(chno_state):
+            return
+        name = chno_source()
+        for b in (chno_all, chno_clear):
+            b.setEnabled(bool(name) and numbers is not None)
+        if not name:
+            chno_state.setText(tr("nerd_chno_no_source"))
+        elif count < 0:
+            chno_state.setText(tr("nerd_chno_failed"))
+        elif count == 0:
+            chno_state.setText(tr("nerd_chno_none", source=name))
+        else:
+            chno_state.setText(tr("nerd_chno_count", source=name, n=count))
+
+    def chno_number_all() -> None:
+        if numbers is None:
+            return
+        chno_all.setEnabled(False)
+        chno_state.setText(tr("nerd_chno_working"))
+        numbers("all", chno_keep.isChecked(), chno_said)
+
+    def chno_clear_all() -> None:
+        from .widgets import confirm
+        if numbers is None or not confirm(parent, tr("nerd_chno_clear"),
+                                          tr("nerd_chno_clear_ask", source=chno_source()),
+                                          default_yes=False):
+            return
+        numbers("clear", False, chno_said)
+    chno_all.clicked.connect(lambda _c=False: chno_number_all())
+    chno_clear.clicked.connect(lambda _c=False: chno_clear_all())
+    if numbers is not None:
+        numbers("count", False, chno_said)
+    else:
+        chno_said(0)
 
     # -- the player: picture and sound -------------------------------------------------------
     c = at("player").card(tr("nerd_card_player"))
@@ -750,6 +812,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
         put("nerd_rec_post", post.text().strip())
         put("nerd_failover", "true" if fail_on.isChecked() else "false")
         put("nerd_health", "true" if health_on.isChecked() else "false")
+        put("nerd_numbers_keep", "true" if chno_keep.isChecked() else "false")
         put("nerd_remote", "true" if remote_on.isChecked() else "false")
         put("nerd_share", "true" if share_on.isChecked() else "false")
         put("nerd_remote_lan", "true" if who.currentData() == "lan" else "false")

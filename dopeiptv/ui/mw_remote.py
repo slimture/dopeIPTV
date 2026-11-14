@@ -159,8 +159,15 @@ class _RemoteMixin:
         if action == "play":
             url = str(params.get("url") or "").strip()
             channel = str(params.get("channel") or "").strip()
+            if params.get("number") not in (None, "") and not (url or channel):
+                from ..core.channel_numbers import MAX_NUMBER, valid
+                number = valid(params.get("number"))
+                if number is None:
+                    raise ValueError(f'"number" is a channel number from 1 to {MAX_NUMBER}')
+                self.handle_command({"number": number})
+                return {"ok": True}
             if not (url or channel):
-                raise ValueError('give "channel" (a name) or "url"')
+                raise ValueError('give "channel" (a name), "number" or "url"')
             self.handle_command({"play": url} if url else {"channel": channel})
             return {"ok": True}
         if action == "volume":
