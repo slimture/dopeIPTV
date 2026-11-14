@@ -870,6 +870,22 @@ dialog.dn { overflow-x: hidden; }
 .dn-done h3 { margin: 0; font-size: 1.2rem; }
 .dn-done p { margin: 0; color: var(--muted); }
 .dn-heart { line-height: 1; color: var(--heart); margin-bottom: 6px !important; }
+/* The supporter key under the thank-you: the key itself, set apart, to copy
+   or hand to the app. */
+.dn-key { margin-top: 14px; padding: 14px; border-radius: 14px; width: 100%; box-sizing: border-box;
+  background: color-mix(in srgb, var(--heart) 8%, transparent); display: flex; flex-direction: column; gap: 10px; }
+.dn-done .dn-keyhead { color: var(--text); font-weight: 700; font-size: 14px; }
+.dn-keytext { display: block; font: 600 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--text); background: var(--bg); border-radius: 10px; padding: 10px 12px; word-break: break-all;
+  user-select: all; -webkit-user-select: all; text-align: start; }
+.dn-keyrow { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.dn-keyrow .btn { flex: 1 1 140px; justify-content: center; }
+.dn-done .dn-keynote { font-size: 13px; line-height: 1.5; }
+.dn-done .dn-keystate { margin-top: 10px; font-size: 13px; }
+.dn-mine { font: inherit; font-size: 13px; font-weight: 650; color: var(--muted); background: none; border: 0;
+  padding: 2px 0; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; align-self: center; }
+.dn-mine:hover { color: var(--text); }
+.dn-mineheart { width: 14px; height: 14px; fill: var(--heart); }
 .dn-bigheart { width: 56px; height: 56px; fill: currentColor; display: block; margin: 0 auto;
   filter: drop-shadow(0 8px 18px rgba(255, 45, 85, .45)); }
 .dn-titleheart { width: 22px; height: 22px; fill: var(--heart); vertical-align: -3px; margin-inline-end: 9px; }

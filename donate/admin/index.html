@@ -94,6 +94,18 @@
       <div class="notify" id="notify"></div>
       <div id="donations"></div>
     </section>
+    <section class="card">
+      <div class="card-head"><h2>Supporter keys</h2><span class="muted" id="sk-count"></span></div>
+      <p class="sk-help">A donation gets its key in the dialog and behind a link in Stripe's receipt. Someone who lost
+        theirs: the payment's id from Stripe's Dashboard (pi_…) makes the same key again. Someone who gave another
+        way: make one by hand. Nothing about the person is in a key or kept here.</p>
+      <div class="acct-inline sk-row">
+        <input id="sk-pi" placeholder="pi_…" autocomplete="off" spellcheck="false" aria-label="Payment id">
+        <button type="button" class="btn" id="sk-again">Make the key again</button>
+        <button type="button" class="btn quiet" id="sk-hand">Make one by hand</button>
+      </div>
+      <div id="sk-out" class="sk-out" aria-live="polite"></div>
+    </section>
     <div class="years" id="years"></div>
   </section>
 

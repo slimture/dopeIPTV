@@ -161,7 +161,10 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
            ["thanks", "donate_thanks"], ["receipt", "donate_receipt"], ["failed", "donate_failed"],
            ["emailmissing", "donate_email_missing"], ["range", "donate_range"],
            ["close", "donate_close"], ["loading", "donate_loading"],
-           ["apple", "donate_apple"], ["google", "donate_google"], ["card", "donate_card"]][]
+           ["apple", "donate_apple"], ["google", "donate_google"], ["card", "donate_card"],
+           ["key", "donate_key"], ["keyhow", "donate_key_how"], ["keycopy", "donate_key_copy"],
+           ["keycopied", "donate_key_copied"], ["keyopen", "donate_key_open"], ["keywait", "donate_key_wait"],
+           ["keynone", "donate_key_none"]][]
           | . as [$k, $key] | " data-\($k)=\"\(t($key) | h)\""] | add)
       + (if $PAYEE == "" then "" else " data-payee=\"\($PAYEE | h)\" data-payeenote=\"\(t("donate_payee_note") | h)\""
              + (if $PAYEE_LOGO == "" then "" else " data-payeelogo=\"\($PAYEE_LOGO | h)\"" end)

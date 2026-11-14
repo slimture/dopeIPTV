@@ -166,6 +166,15 @@ var iptvHit = (function () {
  * the device says it is, out of the ones /donate/config offers, and a small
  * menu in the dialog's head changes it on either step - on the card form's
  * step the form follows at once (remembered on this device).
+ *
+ * A donation comes with a supporter key for the app (donate/supporter.py):
+ * the thank-you shows it with a copy button and a dopeiptv:// link that
+ * hands it to the app. It comes from /donate/key once Stripe says the
+ * payment went through ({cs} right after paying, or back from a method that
+ * left the page), in /donate/wallet's answer for Apple Pay and Google Pay,
+ * and from the link in Stripe's receipt (dopeiptv.org/#key=<token>, {t}) -
+ * so it can be fetched again later. Remembered in this browser only, where
+ * the dialog offers it again.
  */
 (function () {
   "use strict";
@@ -178,7 +187,7 @@ var iptvHit = (function () {
   var STRIPE_JS = "https://js.stripe.com/endive/stripe.js";
   var ZERO_DECIMAL = /^(bif|clp|djf|gnf|jpy|kmf|krw|mga|pyg|rwf|ugx|vnd|vuv|xaf|xof|xpf)$/;
   var cfg = null, cfgLoading = null, stripeLoading = null, dlg = null, el = {}, chosen = 0, live = null, busy = false, cur = "";
-  var stripe = null, pr = null, wallet = null, walletAmount = 0, prepping = false;
+  var stripe = null, pr = null, wallet = null, walletAmount = 0, prepping = false, paidSecret = "";
   var APPLE = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
   // Asked once: whoever turned motion down gets the dialog without the show.
   var CALM = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
@@ -631,6 +640,14 @@ var iptvHit = (function () {
     el.amounts.append(el.chips, other, el.err1);
     if (el.more1) { el.amounts.append(el.more1); }
     el.amounts.append(el.go, el.card);
+    // A supporter key this browser keeps, offered again (a supporter can
+    // still give again - the amounts are right above).
+    if (T.key && storedKey()) {
+      el.mine = mk("button", "dn-mine"); el.mine.type = "button";
+      el.mine.append(heart("dn-mineheart"), document.createTextNode(T.key));
+      el.mine.addEventListener("click", function () { keyOnly(); showKey(storedKey()); });
+      el.amounts.append(el.mine);
+    }
 
     el.pay = mk("div", "dn-step"); el.pay.hidden = true;
     // The amount stays open here: the same choices, smaller, and an own
@@ -664,7 +681,9 @@ var iptvHit = (function () {
     el.loading = mk("p", "dn-loading", T.loading); el.loading.hidden = true;
     el.done = mk("div", "dn-step dn-done"); el.done.hidden = true;
     var bigHeart = mk("p", "dn-heart"); bigHeart.append(heart("dn-bigheart"));
-    el.done.append(bigHeart, mk("h3", "", T.thanks), mk("p", "", T.receipt));
+    el.receipt = mk("p", "", T.receipt);
+    el.done.append(bigHeart, mk("h3", "", T.thanks), el.receipt);
+    if (T.key) { el.done.append(keyBox()); }
 
     var body = mk("div", "dn-body");
     body.append(el.loading, el.amounts, el.pay, el.done);
@@ -705,6 +724,70 @@ var iptvHit = (function () {
     dlg.addEventListener("click", function (e) { if (e.target === dlg) { close(); } });
     document.body.appendChild(dlg);
   }
+  // -- the supporter key ------------------------------------------------------
+  function storedKey() {
+    try { return localStorage.getItem("dn-supporter-key") || ""; } catch (e) { return ""; }
+  }
+  function keyBox() {
+    el.key = mk("div", "dn-key"); el.key.hidden = true;
+    el.keyText = mk("code", "dn-keytext");
+    el.keyText.setAttribute("translate", "no");
+    var row = mk("div", "dn-keyrow");
+    el.keyCopy = mk("button", "btn primary dn-keycopy", T.keycopy); el.keyCopy.type = "button";
+    el.keyCopy.addEventListener("click", function () {
+      var said = function () {
+        el.keyCopy.textContent = T.keycopied;
+        setTimeout(function () { el.keyCopy.textContent = T.keycopy; }, 2500);
+      };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(el.keyText.textContent).then(said, function () { pick(); });
+      } else { pick(); }
+    });
+    el.keyOpen = mk("a", "btn dn-keyopen", T.keyopen);
+    row.append(el.keyCopy, el.keyOpen);
+    el.keyNote = mk("p", "dn-keynote", T.keyhow);
+    el.keyState = mk("p", "dn-keystate"); el.keyState.hidden = true;
+    el.key.append(mk("p", "dn-keyhead", T.key), el.keyText, row, el.keyNote);
+    var box = mk("div");
+    box.append(el.key, el.keyState);
+    return box;
+  }
+  function pick() {        // no clipboard: the key selected, for the visitor's own copy
+    var r = document.createRange(); r.selectNodeContents(el.keyText);
+    var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  }
+  function showKey(key) {
+    if (!el.key || !/^DS1-[A-Za-z0-9_-]{20,}$/.test(key || "")) { return; }
+    el.keyText.textContent = key;
+    el.keyOpen.href = "dopeiptv://supporter?key=" + encodeURIComponent(key);
+    el.key.hidden = false; el.keyState.hidden = true;
+    try { localStorage.setItem("dn-supporter-key", key); } catch (e) { /* this browser keeps nothing */ }
+  }
+  function keyState(text) {
+    if (!el.keyState) { return; }
+    el.keyState.textContent = text; el.keyState.hidden = !text;
+  }
+  // From the service: once the payment went through (Stripe is asked).
+  function fetchKey(ask, quiet) {
+    if (!T.key) { return; }
+    if (!quiet) { keyState(T.loading); }
+    fetch("/donate/key", { method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify(ask) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return [r.status, j]; }); })
+      .then(function (got) {
+        if (got[0] === 200 && got[1].key) { showKey(got[1].key); return; }
+        keyState(quiet ? "" : got[0] === 202 ? T.keywait : T.keynone);
+      })
+      .catch(function () { keyState(quiet ? "" : T.keywait); });
+  }
+  // The thank-you without "a receipt is on its way": a key asked for later.
+  function keyOnly() {
+    if (!dlg) { build(); }
+    el.receipt.hidden = true;
+    show(el.done);
+    if (!dlg.open) { dlg.showModal(); }
+  }
+
   function show(step) {
     var thanks = step === el.done && el.done.hidden;
     [el.loading, el.amounts, el.pay, el.done].forEach(function (s) { s.hidden = s !== step; });
@@ -879,7 +962,10 @@ var iptvHit = (function () {
   function donated() {
     if (typeof iptvHit === "function") { iptvHit("donated"); }
   }
-  function walletDone() { donated(); show(el.done); }
+  function walletDone(res) {
+    donated(); show(el.done);
+    if (res && res.key) { showKey(res.key); } else if (res && res.cs) { fetchKey({ cs: res.cs }, true); }
+  }
   function walletFailed(msg) {
     show(el.amounts);
     el.err1.textContent = msg || T.failed; el.err1.hidden = false;
@@ -891,14 +977,14 @@ var iptvHit = (function () {
         email: ev.payerEmail || "", name: ev.payerName || "" }) })
       .then(function (r) { return r.json().catch(function () { return {}; }); })
       .then(function (res) {
-        if (res.ok) { ev.complete("success"); walletDone(); return; }
+        if (res.ok) { ev.complete("success"); walletDone(res); return; }
         if (res.action) {
           ev.complete("success");
           show(el.loading);
           var next = stripe.handleNextAction ? stripe.handleNextAction({ clientSecret: res.action })
                                              : stripe.confirmCardPayment(res.action);
           return next.then(function (r) {
-            if (r.error) { walletFailed(r.error.message); } else { walletDone(); }
+            if (r.error) { walletFailed(r.error.message); } else { walletDone({ cs: res.action }); }
           });
         }
         ev.complete("fail");
@@ -972,6 +1058,7 @@ var iptvHit = (function () {
           return res.json();
         });
     }).then(function (sess) {
+      paidSecret = sess.clientSecret;
       return stripe.confirmPayment({
         elements: elements,
         clientSecret: sess.clientSecret,
@@ -984,7 +1071,11 @@ var iptvHit = (function () {
     }).then(function (r) {
       if (r && r.error) { payAgain(r.error.message); return; }
       var state = r && r.paymentIntent && r.paymentIntent.status;
-      if (state === "succeeded" || state === "processing") { teardown(); busy = false; donated(); show(el.done); return; }
+      if (state === "succeeded" || state === "processing") {
+        teardown(); busy = false; donated(); show(el.done);
+        fetchKey({ cs: paidSecret }, state !== "succeeded");
+        return;
+      }
       warn("payment ended as", state);
       payAgain();
     }).catch(function (err) {
@@ -1104,13 +1195,22 @@ var iptvHit = (function () {
   })();
 
   // Back from a payment method that left the page (Klarna and the like).
+  var back = /[?&]payment_intent_client_secret=([A-Za-z0-9_]+)/.exec(window.location.search);
+  var receipt = /^#key=([A-Za-z0-9_-]{16,40})$/.exec(window.location.hash);
   if (/[?&]donated=1(&|$)/.test(window.location.search)) {
     try {
+      // Stripe's own return parameters go too: the secret is not for the history.
       history.replaceState(null, "", window.location.pathname +
-        window.location.search.replace(/([?&])donated=1(&|$)/, "$1").replace(/[?&]$/, "") +
+        window.location.search.replace(/([?&])(donated|payment_intent|payment_intent_client_secret|redirect_status)=[^&]*/g, "$1")
+          .replace(/[?&]+$/, "").replace(/\?&+/, "?") +
         window.location.hash);
     } catch (e) { /* the address stays; harmless */ }
     build(); show(el.done); dlg.showModal();
+    if (back) { fetchKey({ cs: back[1] }, false); }
+  } else if (receipt) {
+    // The link in Stripe's receipt: the key again, once the payment went through.
+    keyOnly();
+    fetchKey({ t: receipt[1] }, false);
   } else if (window.location.hash === "#donate") {
     // A link from elsewhere to the donate section - GitHub's Sponsor button,
     // the README, the release notes: dopeiptv.org/#donate - opens the dialog.

@@ -766,3 +766,11 @@ tr:last-child td { border-bottom: 0; }
 .fb-chips .chip-f.on { color: var(--text); background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .fb-select { font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 9px; border: 1px solid var(--line);
   background: var(--surface); color: var(--text); }
+
+/* Supporter keys (Donations): the key to copy, set apart. */
+.sk-help { font-size: 13.5px; color: var(--text-2); margin: 0 0 10px; line-height: 1.5; }
+.sk-row { flex-wrap: wrap; }
+.sk-out { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.sk-out:empty { display: none; }
+.sk-key { font: 600 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all;
+  background: var(--page); padding: 8px 10px; border-radius: 8px; user-select: all; }
