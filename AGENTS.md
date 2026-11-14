@@ -136,10 +136,8 @@ map and the one-way import rule.
 | `ui/mw_portal_archive.py` | A Stalker portal's archive in the window: its link asked for off the window's thread (`StalkerClient.archive_link`), played from the moment asked, a go-back carried on to the next programme |
 | `ui/mw_remote.py` | The remote API and sharing in the window: the server as Nerd says, each request's work on the window's thread |
 | `ui/mw_events.py` | Events pushed out in the window: the playback path's and the recordings' hooks (start, pause, stop, channel changed, recording started/ended), handed to `core/events.py`; it only watches |
-| `ui/mw_report.py` | Send feedback, and the offer of a report after an error or a crash (queued; while a video plays it waits in the menu) |
-| `ui/mw_report.py` | Send feedback, and the offer of a report after an error or a crash |
+| `ui/mw_report.py` | Send feedback, and the offer of a report after an error or a crash (queued; while a video plays it waits in the menu); answers to feedback (their window, the menu entry's count, when they are asked) |
 | `ui/mw_sync.py` | Settings sync in the window: when a round runs (start, after a change, every half hour, Sync now; never in a stream's first seconds), what came back put in place, its card in Settings, General |
-| `ui/mw_report.py` | Send feedback, and the offer of a report after an error or a crash; answers to feedback (their window, the menu entry's count, when they are asked) |
 | `ui/mw_home.py` | The Home page: which shelves, what goes in them (drawn by `home_widgets.py`) |
 | `ui/mw_local.py` | Local files: folders, library view, music queue |
 | `ui/mw_multiview.py` | Multiview: 2/4/6/9 live streams, an mpv per cell |
@@ -174,14 +172,10 @@ sidebar heart, About's link, Home's card), `mw_failover` (failover to another
 source), `mw_series` (series recording rules), `mw_health` (stream
 health per channel), `mw_chanprefs` (a channel's own settings),
 `mw_portal_archive` (a Stalker portal's archive, by programme),
-`mw_privacy` (private viewing, clear recent history) and `mw_popout`
-source), `mw_health` (stream health per channel), `mw_events` (events pushed
-out: webhooks and MQTT), `mw_privacy` (private viewing,
-clear recent history) and `mw_popout`
-source), `mw_health` (stream health per channel), `mw_privacy` (private viewing,
-clear recent history), `mw_sync` (settings sync between a supporter's
-computers) and `mw_popout`
-(detached-window player). What stays in `main_window.py` is
+`mw_events` (events pushed out: webhooks and MQTT), `mw_privacy` (private
+viewing, clear recent history), `mw_report` (feedback, error reports and
+the answers to them), `mw_sync` (settings sync between a supporter's
+computers) and `mw_popout` (detached-window player). What stays in `main_window.py` is
 the `__init__`/`_build_ui` composition and the playback path (start/stop,
 seek, fullscreen, reconnect) - keep playback code there.
 When making changes:
