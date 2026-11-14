@@ -234,9 +234,6 @@ FEEDBACK_PER_WINDOW = 60          # reports from one address in WINDOW
 def _allowed(addr: str, most: int = PER_WINDOW) -> bool:
     now = time.monotonic()
     with _LOCK:
-        if len(_SEEN) > 5000:          # addresses seen once, long ago: let go (memory only)
-            for key in [k for k, ts in _SEEN.items() if not ts or now - ts[-1] >= WINDOW]:
-                del _SEEN[key]
         hits = [t for t in _SEEN.get(addr, []) if now - t < WINDOW]
         if len(hits) >= most:
             _SEEN[addr] = hits
