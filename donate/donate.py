@@ -1421,7 +1421,9 @@ LISTEN = CONF.get("LISTEN", "unix:/var/run/iptv_donate/donate.sock")
 
 
 def _sync_cleanup() -> None:
-    """Once a day: the sync slots nobody has used for sync.KEEP_DAYS go."""
+    """Once a day: the sync slots nobody has used for sync.KEEP_DAYS go, and
+    the reports older than feedback.KEEP_DAYS (the privacy policy's 12
+    months)."""
     import sync
     while True:
         try:
@@ -1431,6 +1433,14 @@ def _sync_cleanup() -> None:
                       file=sys.stderr, flush=True)
         except Exception as e:  # noqa: BLE001 - the cleanup keeps its schedule
             print(f"[donate] sync cleanup: {type(e).__name__}", file=sys.stderr, flush=True)
+        try:
+            import feedback
+            gone = feedback.prune(_stats_dir())
+            if gone:
+                print(f"[donate] feedback: {gone} report(s) older than {feedback.KEEP_DAYS} days removed",
+                      file=sys.stderr, flush=True)
+        except Exception as e:  # noqa: BLE001 - the cleanup keeps its schedule
+            print(f"[donate] feedback cleanup: {type(e).__name__}", file=sys.stderr, flush=True)
         time.sleep(86400)
 
 

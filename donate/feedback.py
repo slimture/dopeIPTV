@@ -180,6 +180,41 @@ def accept(stats_dir: str, body: dict) -> tuple[int, dict]:
     return 200, {"ok": True, "id": row["id"]}
 
 
+#: How long a report is kept: the privacy policy says 12 months.
+KEEP_DAYS = 365
+
+
+def prune(stats_dir: str, now: float | None = None) -> int:
+    """Reports older than KEEP_DAYS go, and the answers written to them
+    (the file is rewritten whole and swapped in, never half). How many
+    went."""
+    path, _state = _paths(stats_dir)
+    cut = (now if now is not None else time.time()) - KEEP_DAYS * 86400
+    with _LOCK:
+        try:
+            with open(path, encoding="utf-8") as fh:
+                lines = fh.readlines()
+        except OSError:
+            return 0
+        keep, gone = [], 0
+        for line in lines:
+            try:
+                old = float(json.loads(line).get("t") or 0) < cut
+            except (ValueError, AttributeError):
+                old = False                      # never drop what cannot be read
+            if old:
+                gone += 1
+            else:
+                keep.append(line)
+        if not gone:
+            return 0
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.writelines(keep)
+        os.replace(tmp, path)
+    return gone
+
+
 def _rows(stats_dir: str) -> list[dict]:
     path, _state = _paths(stats_dir)
     out: list[dict] = []

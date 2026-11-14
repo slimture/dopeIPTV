@@ -27,7 +27,7 @@
 </nav>
 
 <h2 id="controller">1. Who is responsible</h2>
-<p>Solecraft AB (company registration number 559601-3176), <mark class="todo">[ADDRESS - Solecraft AB's registered address]</mark>, Sweden, is the controller for the processing of personal data described here. Contact us at <a href="mailto:info@solecraft.se">info@solecraft.se</a> – also when you want to use your rights (section 10).</p>
+<p>Solecraft AB (company registration number 559601-3176), Mogatan 21, SE-702 13 Örebro, Sweden, is the controller for the processing of personal data described here. Contact us at <a href="mailto:info@solecraft.se">info@solecraft.se</a> – also when you want to use your rights (section 10).</p>
 <p>This policy covers the website dopeiptv.org (the old address iptv.dope.rs only forwards there), the services on it – donations, feedback and error reports, settings sync and updates – and the dopeIPTV app as we publish it.</p>
 
 <h2 id="app">2. The dopeIPTV app</h2>
@@ -63,7 +63,7 @@
 <h3>Server logs</h3>
 <p>To send you a page, our web server needs your IP address, and your browser also sends the address of the page, the time, the name and version of your browser and system (the user agent), the page you came from (the referrer) and the languages you prefer.</p>
 <ul>
-<li>The front server, which handles the encrypted connection, keeps a general technical log of requests for operation and security. It is kept for <mark class="todo">[LOG RETENTION - how long the front server's general access log is kept]</mark>. Settings sync requests are never logged.</li>
+<li>The front server, which handles the encrypted connection, keeps a general technical log of requests and a log of errors, for operation and security. They are rotated when they grow large, and only the seven latest parts are kept; at today's traffic that means about two weeks for the request log and about two months for the error log. Settings sync requests are never logged.</li>
 <li>For the statistics below, the server keeps two separate logs with IP address, time, address, status, referrer, browser and language: one of page views and the pages' view signal, kept for about a week, and one of download clicks, which is rotated by size, the ten latest parts being kept.</li>
 <li>The services behind the website – donations, feedback and sync – keep IP addresses only in memory, briefly, to limit how many requests one address can make.</li>
 </ul>
@@ -96,7 +96,7 @@
 <p>We use no cookies for advertising or tracking, and even the fonts come from our own server.</p>
 
 <h2 id="donations">5. Donations</h2>
-<p>Donations are handled by our payment provider, <mark class="todo">[PAYMENT PROVIDER]</mark>. You enter your card or wallet details in the provider's own payment form; they go straight to the provider and never reach us. The provider is responsible for its own processing of the payment: <mark class="todo">[PAYMENT PROVIDER - link to its privacy policy]</mark>.</p>
+<p>Donations are handled by our payment provider Mollie B.V., Amsterdam, the Netherlands (donations are paused while we move to Mollie). You enter your card or wallet details in the provider's own payment form; they go straight to the provider and never reach us. The provider is responsible for its own processing of the payment, under its own privacy policy.</p>
 <ul>
 <li><strong>What we see:</strong> the amount, currency and time, how you paid (by card or with a digital wallet such as Apple Pay or Google Pay) and the name or e-mail address you gave for the receipt. Our administrators see this on the website's admin page, and as a notification on the devices where they have turned notifications on. Our server fetches it from the payment provider when needed and keeps it only in memory, for a few minutes; it does not save it. The notifications are sent encrypted through the push service of the administrator's browser (Apple, Google, Mozilla or Microsoft), which cannot read them.</li>
 <li>The e-mail address for the receipt, and the name a digital wallet passes on, go through our server on their way to the payment provider without being saved.</li>
@@ -112,7 +112,7 @@
 <h2 id="recipients">7. Who receives the data</h2>
 <p>We do not sell or rent out personal data. It is shared only with:</p>
 <ul>
-<li>the hosting of our website and its services: <mark class="todo">[HOSTING - where the server is]</mark>;</li>
+<li>the hosting of our website and its services: a server in Sweden;</li>
 <li>our payment provider, for donations (section 5);</li>
 <li>our e-mail service provider, for e-mail to us;</li>
 <li>the browsers' push services, which carry encrypted notifications to the administrators' own devices;</li>
@@ -121,15 +121,15 @@
 <p>The services the app uses directly (section 2) get their data from your app, not from us.</p>
 
 <h2 id="transfers">8. Transfers outside the EU/EEA</h2>
-<p>Statistics, reports and synced data stay on our server (section 7). Data may be processed outside the EU/EEA by the payment provider and by the push services (the notifications are encrypted). When a recipient processes personal data outside the EU/EEA, there must be a legal basis for the transfer, for example a decision by the European Commission that the country's level of protection is adequate (for the United States, the EU–US Data Privacy Framework) or the Commission's standard contractual clauses.</p>
+<p>Statistics, reports and synced data stay on our server (section 7). The payment provider Mollie is a company in the Netherlands, inside the EU; if Mollie processes anything outside the EU/EEA, it does so under its own privacy policy. Data may be processed outside the EU/EEA by the push services (the notifications are encrypted). When a recipient processes personal data outside the EU/EEA, there must be a legal basis for the transfer, for example a decision by the European Commission that the country's level of protection is adequate (for the United States, the EU–US Data Privacy Framework) or the Commission's standard contractual clauses.</p>
 <p>Services you use through the app, such as TMDB and Trakt, may be in other countries. Your app contacts them directly when you ask it to, and their own policies apply.</p>
 
 <h2 id="retention">9. How long we keep data</h2>
 <ul>
-<li>The front server's general log: <mark class="todo">[LOG RETENTION - how long the front server's general access log is kept]</mark>.</li>
+<li>The front server's logs: rotated by size, and the seven latest parts are kept – today about two weeks for the request log and about two months for the error log.</li>
 <li>The log of page views: about a week. The log of download clicks: rotated by size, and the ten latest parts are kept.</li>
 <li>Visits in the statistics: 400 days, then anonymous. Visitor IDs: 25 months. Update records: 400 days.</li>
-<li>Error reports and feedback: as long as they help us improve the app. They are designed not to point to you.</li>
+<li>Error reports and feedback: 12 months from when they were sent, then removed automatically. They are designed not to point to you.</li>
 <li>Synced data: until you delete it, or 400 days after it was last used.</li>
 <li>Donation details: at the payment provider under its terms, and in our accounts for seven years.</li>
 <li>E-mail: as long as the matter needs.</li>
