@@ -1115,6 +1115,21 @@ var iptvHit = (function () {
     // A link from elsewhere to the donate section - GitHub's Sponsor button,
     // the README, the release notes: dopeiptv.org/#donate - opens the dialog.
     open();
+  } else if (window.location.hash === "#support") {
+    // The app's heart: the band, not the payment form. The visitor reads
+    // why first, and opens the dialog themselves if they want to.
+    var band = document.getElementById("donate");
+    if (band) {
+      requestAnimationFrame(function () {
+        var calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        band.scrollIntoView({ behavior: calm ? "auto" : "smooth", block: "center" });
+        var btn = band.querySelector(".donate-btn");
+        if (btn && !calm) {
+          setTimeout(function () { btn.classList.add("invite"); }, 500);
+          setTimeout(function () { btn.classList.remove("invite"); }, 3100);
+        }
+      });
+    }
   }
 })();
 

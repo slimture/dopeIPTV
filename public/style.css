@@ -1593,3 +1593,9 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
 @media (max-width: 560px) {
   .owner-note { right: 16px; left: 16px; width: auto; bottom: max(16px, env(safe-area-inset-bottom)); }
 }
+
+/* The app's heart lands on the band (#support): the button breathes twice
+   to say where to click - transform only. */
+.donate-btn.invite { animation: invite 1.3s ease-in-out 2; }
+@keyframes invite { 50% { transform: scale(1.07); } }
+@media (prefers-reduced-motion: reduce) { .donate-btn.invite { animation: none; } }
