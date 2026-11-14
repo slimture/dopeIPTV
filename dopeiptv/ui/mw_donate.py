@@ -22,6 +22,7 @@ from PyQt6.QtCore import QTimer
 
 from ..core.xdg import open_url
 from ..i18n import tr
+from .theme import P
 
 # #support: the donate band, not the payment form - an invitation, not
 # a bill (#donate opens the form, for links from people already decided).
@@ -61,30 +62,71 @@ class _DonateMixin:
             until = 0.0
         return time.time() >= until
 
+    def _build_heart_badge(self) -> None:
+        """The donate heart, laid over the logo like the private marker
+        (mw_privacy) - in no layout, so the logo stays centred and nothing
+        beside it moves: on the mark's lower right corner, on a ring of the
+        sidebar's colour. A supporter has no heart: the logo itself is their
+        mark (widgets._SidebarLogo.set_supporter)."""
+        from .mw_privacy import _Follow
+        logo = getattr(self, "_sidebar_logo", None)
+        btn = getattr(self, "_donate_btn", None)
+        if logo is None or btn is None:
+            return
+        host = logo.parentWidget()
+        btn.setParent(host)
+        self._heart_chip()
+        follow = _Follow(btn, self._place_logo_marks)
+        logo.installEventFilter(follow)
+        host.installEventFilter(follow)
+
+    def _heart_chip(self) -> None:
+        from PyQt6.QtGui import QColor
+        btn = getattr(self, "_donate_btn", None)
+        if btn is not None and hasattr(btn, "set_chip"):
+            btn.set_chip(QColor(P["side"]), QColor(P["side"]), QColor(P["border"]))
+
+    def _place_logo_marks(self) -> None:
+        """The heart on the mark's lower right corner."""
+        logo = getattr(self, "_sidebar_logo", None)
+        btn = getattr(self, "_donate_btn", None)
+        if logo is None or btn is None or not btn.isVisible():
+            return
+        g = logo.geometry()
+        w, h = logo.LOGO_W, logo.LOGO_H
+        x0 = g.left() + (g.width() - w) // 2
+        y0 = g.top() + (g.height() - h) // 2
+        btn.move(x0 + w - btn.width() // 2 - 3, y0 + h - btn.height() // 2 - 1)
+        btn.raise_()
+
     def _donate_heart_refresh(self) -> None:
         btn = getattr(self, "_donate_btn", None)
         if btn is None:
             return
-        shown = self._donate_heart_due()
+        from ..core import privacy
         sup = self._supporter()
-        tip = tr("supporter_tip", date=sup["since"].isoformat()) if sup \
-            else tr("donate_support") + "\n" + tr("heart_tip_key")
+        # A supporter's heart is gone: the logo itself says it instead.
+        # While private viewing is on its marker has the logo to itself.
+        due = self._donate_heart_due() and sup is None
+        shown = due and not privacy.private()
+        tip = tr("donate_support") + "\n" + tr("heart_tip_key")
         for heart in (btn, getattr(self, "_home_heart", None)):
             try:
-                if heart is not None and hasattr(heart, "set_supporter"):
-                    heart.set_supporter(sup is not None)
+                if heart is not None:
                     heart.setToolTip(tip)
             except RuntimeError:
                 pass
         btn.setVisible(shown)
-        # The pad left of the logo balances the heart - only beside it.
-        pad = getattr(self, "_logo_pad", None)
-        if pad is not None:
-            pad.setVisible(shown and not getattr(self, "_sidebar_collapsed", False))
+        from .qt_i18n import format_month
+        logo = getattr(self, "_sidebar_logo", None)
+        if logo is not None and hasattr(logo, "set_supporter"):
+            logo.set_supporter(sup is not None, tr("supporter_tip", date=format_month(sup["since"]))
+                               if sup is not None else "")
+        self._place_logo_marks()
         home = getattr(self, "_home_heart", None)      # Home's, top right
         if home is not None:
             try:
-                home.setVisible(shown)
+                home.setVisible(due)
             except RuntimeError:                       # Home was rebuilt
                 self._home_heart = None
 

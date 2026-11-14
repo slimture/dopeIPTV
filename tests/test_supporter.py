@@ -67,7 +67,7 @@ s.setValue("donate_watch_min", 5000)           # used for real: the card would b
 w = MainWindow(DemoClient(), s, PlaylistStore(s))
 opened = []
 w.open_donate = lambda ref: opened.append(ref)
-assert w._donate_card_due() and not getattr(w._donate_btn, "_supporter", False)
+assert w._donate_card_due() and not w._sidebar_logo._supporter
 w.heart_clicked("app-heart")
 assert opened == ["app-heart"]
 # The key pasted in its window: checked as it is typed, kept when good.
@@ -80,7 +80,9 @@ assert d.supporter is not None and s.value("supporter_key") == key
 d.donate_btn.click()
 assert opened[-1] == "supporter"               # a supporter can always donate again
 w._donate_heart_refresh()
-assert w._donate_btn._supporter and "202" in w._donate_btn.toolTip()
+# A supporter's mark is the logo itself; the heart is gone.
+assert w._sidebar_logo._supporter and "2026" in w._sidebar_logo.toolTip()
+assert w._donate_btn.isHidden()
 assert not w._donate_card_due()                # not asked any more
 # The heart now opens the thank-you, which still offers to donate.
 shown = []
@@ -90,7 +92,7 @@ assert shown and shown[-1] is not None and opened[-1] == "supporter"
 # Removed: as before.
 s.remove("supporter_key")
 w._donate_heart_refresh()
-assert not w._donate_btn._supporter and w._donate_card_due()
+assert not w._sidebar_logo._supporter and w._donate_card_due()
 # Where a key goes, in plain sight: the app menu, the heart's tip, the
 # window saying where the key is; "I've already donated" asks for it.
 from dopeiptv.i18n import tr
@@ -101,8 +103,12 @@ assert len(shown) == n + 1
 assert tr("heart_tip_key") in w._donate_btn.toolTip()
 d2 = dialogs.SupporterDialog(w, s)
 assert d2.where.isVisibleTo(d2) and "Stripe" in d2.where.text()
+assert d2.heart.isVisibleTo(d2) and not d2.mark.isVisibleTo(d2)
 d2.key.setText(key)
 assert not d2.where.isVisibleTo(d2)
+# The thank-you shows the supporter's mark, the month in words.
+assert d2.mark.isVisibleTo(d2) and not d2.heart.isVisibleTo(d2) and d2.mark._supporter
+assert "2026" in d2.sub.text() and "-11-" not in d2.sub.text()
 s.remove("supporter_key")
 w.already_donated()                           # closed without a key: taken at their word
 assert s.value("donate_thanked") == "true"

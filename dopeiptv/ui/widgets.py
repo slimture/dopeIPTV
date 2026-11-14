@@ -6,10 +6,11 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import (
-    QPointF, QRect, QRectF, QSize, Qt, QTimer, QVariantAnimation, pyqtSignal,
+    QPointF, QRect, QRectF, QSize, Qt, QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QColor, QIcon, QImage, QImageReader, QPainter, QPainterPath, QPen, QPixmap,
+    QColor, QIcon, QImage, QImageReader, QLinearGradient, QPainter, QPainterPath,
+    QPen, QPixmap,
 )
 from PyQt6.QtWidgets import (
     QLabel, QLayout, QLayoutItem, QMessageBox, QPushButton, QWidget,
@@ -276,10 +277,10 @@ class RoundChip(_ChipPainting, QPushButton):
 
 
 class HeartButton(_ChipPainting, QPushButton):
-    """A heart that beats twice under the pointer. At rest in *rest* (the
-    heart's own red by default, or a muted tone), heart-red under the
-    pointer. ``set_rest`` re-tints it for a new theme. ``set_chip`` puts it
-    on a filled circle."""
+    """A heart: at rest in *rest* (the heart's own red by default, or a
+    muted tone), heart-red under the pointer - still, no beating (a moving
+    heart in the window read as nagging). ``set_rest`` re-tints it for a new
+    theme. ``set_chip`` puts it on a filled circle."""
 
     SIZE = 18
 
@@ -292,21 +293,11 @@ class HeartButton(_ChipPainting, QPushButton):
             self.SIZE = size
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._rest = rest or HEART
-        self._beat = QVariantAnimation(self)
-        self._beat.setDuration(900)
-        for at, v in ((0.0, 1.0), (0.15, 1.32), (0.3, 0.94), (0.45, 1.2),
-                      (0.62, 1.0), (1.0, 1.0)):
-            self._beat.setKeyValueAt(at, v)
-        self._beat.valueChanged.connect(self._grow)
         self._paint(self._rest)
 
     def _paint(self, colour: str) -> None:
         self.setIcon(QIcon(heart_pixmap(self.SIZE, colour)))
         self.setIconSize(QSize(self.SIZE, self.SIZE))
-
-    def _grow(self, v) -> None:
-        n = max(1, round(self.SIZE * float(v)))
-        self.setIconSize(QSize(n, n))
 
     def set_rest(self, colour: str) -> None:
         self._rest = colour
@@ -339,12 +330,9 @@ class HeartButton(_ChipPainting, QPushButton):
 
     def enterEvent(self, event) -> None:
         self._paint(HEART)
-        self._beat.stop()
-        self._beat.start()
         super().enterEvent(event)
 
     def leaveEvent(self, event) -> None:
-        self._beat.stop()
         self._paint(self._rest)
         super().leaveEvent(event)
 
@@ -419,6 +407,18 @@ class _Toast(QLabel):
         self.hide()
 
 
+def heart_shape(box: QRectF) -> QPainterPath:
+    """A heart filling ``box``: two lobes on top, the point at the bottom."""
+    cx, w, hh = box.center().x(), box.width(), box.height() / 0.82
+    cy = box.top() + box.height() * (0.40 / 0.82)
+    p = QPainterPath()
+    p.moveTo(cx, cy + hh * 0.42)
+    p.cubicTo(cx - w * 0.62, cy - hh * 0.02, cx - w * 0.48, cy - hh * 0.58, cx, cy - hh * 0.22)
+    p.cubicTo(cx + w * 0.48, cy - hh * 0.58, cx + w * 0.62, cy - hh * 0.02, cx, cy + hh * 0.42)
+    p.closeSubpath()
+    return p
+
+
 class _SidebarLogo(QWidget):
     """Themed mark at the top of the sidebar. A rounded accent pill with a
     play triangle on the left and three vertical audio/EQ bars on the right,
@@ -442,6 +442,16 @@ class _SidebarLogo(QWidget):
         self._update_color = QColor("#E5484D")
         self._update_follow_accent = False
         self._bounce_dy = 0.0
+        self._supporter = False
+
+    def set_supporter(self, on: bool, tip: str = "") -> None:
+        """A supporter's mark: the pill shades from the accent into the
+        heart's colour and the tall middle bar is a short one crowned with a
+        heart - the same silhouette, nothing that moves."""
+        self._supporter = bool(on)
+        self.setToolTip(tip or APP_NAME)
+        self.setAccessibleName(tip or APP_NAME)
+        self.update()
 
     def set_compact(self, on: bool) -> None:
         """Rail mode: the same mark scaled down to fit the 60 px icon rail
@@ -528,7 +538,13 @@ class _SidebarLogo(QWidget):
         # Rounded pill as the base.
         pill = QPainterPath()
         pill.addRoundedRect(x0, y0, w, h, h * 0.30, h * 0.30)
-        painter.fillPath(pill, accent)
+        if self._supporter:
+            shade = QLinearGradient(QPointF(x0, y0), QPointF(x0 + w, y0 + h))
+            shade.setColorAt(0.0, accent)
+            shade.setColorAt(1.0, QColor(HEART))
+            painter.fillPath(pill, shade)
+        else:
+            painter.fillPath(pill, accent)
 
         # Left half: play triangle. Nudged right by a fraction so its
         # optical centre lines up with its geometric third of the pill.
@@ -563,6 +579,16 @@ class _SidebarLogo(QWidget):
         gap = h * 0.14
         for i, bh in enumerate(heights):
             bx = first_x + i * (bar_w + gap)
+            if self._supporter and i == 1:
+                # A short bar crowned with a heart, reaching where the tall
+                # bar did.
+                stem = h * 0.20
+                painter.drawRoundedRect(QRectF(bx, base_y - stem, bar_w, stem),
+                                        bar_w * 0.4, bar_w * 0.4)
+                painter.fillPath(heart_shape(QRectF(bx + bar_w / 2 - h * 0.17,
+                                                    base_y - bh - h * 0.02,
+                                                    h * 0.34, h * 0.28)), ink)
+                continue
             painter.drawRoundedRect(
                 QRectF(bx, base_y - bh, bar_w, bh),
                 bar_w * 0.4, bar_w * 0.4)

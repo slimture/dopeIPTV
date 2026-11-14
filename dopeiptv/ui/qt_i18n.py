@@ -27,7 +27,7 @@ import struct
 import tempfile
 
 from PyQt6.QtCore import (
-    QDateTime, QLibraryInfo, QLocale, QStandardPaths, QTranslator,
+    QDate, QDateTime, QLibraryInfo, QLocale, QStandardPaths, QTranslator,
 )
 
 from ..core.log import log
@@ -62,6 +62,14 @@ def format_when(when, fmt: str = "ddd d MMM HH:mm") -> str:
     in every language."""
     ts = when if isinstance(when, (int, float)) else when.timestamp()
     return app_locale().toString(QDateTime.fromSecsSinceEpoch(int(ts)), fmt)
+
+
+def format_month(day) -> str:
+    """A date as its month and year in the app's language ("november
+    2026"); the East Asian languages write the year first."""
+    code = current_language()
+    fmt = {"ja": "yyyy年M月", "zh": "yyyy年M月", "ko": "yyyy년 M월"}.get(code, "MMMM yyyy")
+    return app_locale().toString(QDate(day.year, day.month, day.day), fmt)
 
 
 # Where Qt looks the buttons up: QPlatformTheme by default, QGnomeTheme

@@ -566,7 +566,7 @@ class SupporterDialog(QDialog):
         from PyQt6.QtWidgets import QLineEdit
 
         from ..core import supporter
-        from .widgets import HeartButton
+        from .widgets import HeartButton, _SidebarLogo
         self._settings = settings
         self.setWindowTitle(tr("supporter_title"))
         self.setMinimumWidth(480)
@@ -579,6 +579,13 @@ class SupporterDialog(QDialog):
         heart.setFlat(True)
         self.heart = heart
         top.addWidget(heart, 0, Qt.AlignmentFlag.AlignTop)
+        # A supporter sees their mark: the logo as the sidebar shows it now.
+        mark = _SidebarLogo()
+        mark.set_supporter(True)
+        mark.setCursor(Qt.CursorShape.ArrowCursor)
+        mark.setFixedWidth(mark.LOGO_W + 8)
+        self.mark = mark
+        top.addWidget(mark, 0, Qt.AlignmentFlag.AlignTop)
         words = QVBoxLayout()
         self.head = QLabel()
         self.head.setStyleSheet(f"font-size:16px; font-weight:700; color:{P['text']};")
@@ -625,7 +632,8 @@ class SupporterDialog(QDialog):
         found = self._supporter.parse(text) if text else None
         if found is not None:
             self._settings.setValue("supporter_key", text)
-            date = found["since"].isoformat()
+            from .qt_i18n import format_month
+            date = format_month(found["since"])
             self.head.setText(tr("supporter_thanks"))
             self.sub.setText(tr("supporter_since", date=date))
             self.state.setText("✓ " + tr("supporter_ok", date=date))
@@ -639,7 +647,9 @@ class SupporterDialog(QDialog):
             self.state.setText(tr("supporter_bad") if text else "")
             self.state.setStyleSheet(f"font-size:12px; color:{P['error']};")
             self.donate_btn.setText(tr("donate_support") + "…")
-        self.heart.set_supporter(found is not None)
+        self.heart.setVisible(found is None)
+        self.mark.setVisible(found is not None)
+        self.mark.setToolTip(tr("supporter_tip", date=date) if found is not None else "")
         self.where.setVisible(found is None)
         self.state.setVisible(bool(text))
         self.remove.setVisible(bool(text))

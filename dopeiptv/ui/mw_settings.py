@@ -683,11 +683,12 @@ class _SettingsMixin:
         c = general.card(tr("donate_support"))
         if hasattr(self, "open_supporter"):
             from ..core import supporter as _sup
+            from .qt_i18n import format_month
             mine = _sup.stored(self.settings)
             key_btn = QPushButton(tr("set_supporter_open") if mine else tr("set_supporter_enter"))
             key_btn.clicked.connect(lambda _c=False: self.open_supporter())
             c.row(tr("supporter_menu"), key_btn,
-                  tr("supporter_tip", date=mine["since"].isoformat()) if mine else tr("set_supporter_hint"),
+                  tr("supporter_tip", date=format_month(mine["since"])) if mine else tr("set_supporter_hint"),
                   search="supporter key donation donated code nyckel")
         heart_box = c.toggle(tr("set_donate_heart"), self._donate_heart_due(),
                              tr("set_donate_heart_hint"))
@@ -2344,11 +2345,12 @@ class _SettingsMixin:
         lay.addLayout(links)
         # A supporter's thank-you, and where a key goes (mw_donate).
         from ..core import supporter as _supporter
+        from .qt_i18n import format_month
         mine = _supporter.stored(getattr(self, "settings", None))
         sup_row = QHBoxLayout()
         if mine is not None:
             mark = QLabel(f"<span style='color:{HEART}'>\u2665</span>&nbsp; "
-                          + tr("supporter_tip", date=mine["since"].isoformat()))
+                          + tr("supporter_tip", date=format_month(mine["since"])))
             mark.setStyleSheet(f"color:{P['text2']}; font-size:12px; font-weight:600;")
             sup_row.addWidget(mark)
         if hasattr(self, "open_supporter"):

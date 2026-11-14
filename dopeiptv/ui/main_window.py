@@ -571,16 +571,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # The logo draws a small update badge in its top-right corner when a
         # newer release is out; clicking that corner opens About.
         self._sidebar_logo.update_clicked.connect(self.show_about)
-        # The logo's row also holds the donate heart, at its right (added
-        # with the heart, below); a pad as wide on the left keeps the logo
-        # centred. On the icon rail the row stands up, the heart under it.
+        # The logo alone in its row, centred. The donate heart, the private
+        # marker and a supporter's mark lie over it (mw_donate, mw_privacy) -
+        # in no layout, so nothing beside the logo moves.
         self._logo_row = QBoxLayout(QBoxLayout.Direction.LeftToRight)
         self._logo_row.setContentsMargins(0, 0, 0, 0)
         self._logo_row.setSpacing(0)
-        self._logo_pad = QWidget()
-        self._logo_pad.setFixedWidth(30)
         self._logo_row.addStretch(1)
-        self._logo_row.addWidget(self._logo_pad)
         self._logo_row.addWidget(self._sidebar_logo)
         sl.addLayout(self._logo_row)
         sl.addSpacing(6)
@@ -847,11 +844,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         multiview_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
                                     QSizePolicy.Policy.Fixed)
         multiview_btn.clicked.connect(self._show_multiview)
-        # A small red heart beside the logo, its words in the tooltip
-        # (mw_donate) - the same place on every system. It beats under the
-        # pointer.
-        self._donate_btn = donate_btn = HeartButton(objectName="DonateHeart", size=15)
-        donate_btn.setFixedSize(30, 30)
+        # A small red heart on the logo's lower corner, its words in the
+        # tooltip (mw_donate) - the same place on every system; gone for a
+        # supporter, whose mark is the logo itself (widgets._SidebarLogo).
+        self._donate_btn = donate_btn = HeartButton(objectName="DonateHeart", size=12)
+        donate_btn.setFixedSize(22, 22)
         donate_btn.setToolTip(tr("donate_support"))
         donate_btn.setAccessibleName(tr("donate_support"))
         donate_btn.clicked.connect(lambda: self.heart_clicked("app-heart"))
@@ -865,9 +862,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._actions_box.addWidget(settings_btn)
         self._actions_box.addWidget(multiview_btn)
         sl.addLayout(self._actions_box)
-        self._logo_row.addWidget(donate_btn, 0, Qt.AlignmentFlag.AlignVCenter)
         self._logo_row.addStretch(1)
         self._build_private_pill()
+        self._build_heart_badge()
         self._fit_logo(False)
         self._donate_heart_refresh()         # hidden for three months, maybe
         self._apply_action_icons()
