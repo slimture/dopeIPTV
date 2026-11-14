@@ -241,6 +241,89 @@ def _subtitle_to_load(path: str) -> str:
     return copy
 
 
+_ASPECTS = ((16 / 9, "16:9"), (4 / 3, "4:3"), (21 / 9, "21:9"), (2.39, "2.39:1"),
+            (1.85, "1.85:1"), (5 / 4, "5:4"), (1.0, "1:1"), (3 / 2, "3:2"))
+
+
+def aspect_name(value) -> str:
+    """mpv's aspect as people write it: 1.7777777777777777 is 16:9."""
+    try:
+        a = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    for ratio, name in _ASPECTS:
+        if abs(a - ratio) < 0.01:
+            return name
+    return f"{a:.2f}:1"
+
+
+def on_off(value) -> str:
+    if isinstance(value, bool):
+        return "on" if value else "off"
+    text = str(value).strip().lower()
+    return {"yes": "on", "true": "on", "no": "off", "false": "off"}.get(text, str(value))
+
+
+class _StatsLabel(QLabel):
+    """Stats for nerds over the picture: names quiet, values bright and in
+    fixed-width digits (they change every second without the text
+    jumping). A click switches between all of it and the few lines most
+    looked at."""
+
+    toggled = pyqtSignal()
+    #: The lines of the compact view.
+    COMPACT = ("Video", "Audio", "HW dec", "Dropped", "Bitrate", "Cache", "Net")
+
+    def __init__(self, parent) -> None:
+        super().__init__("", parent)
+        self.compact = False
+        self.columns = 1
+        self.font_px = 11
+        self.setTextFormat(Qt.TextFormat.RichText)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip("Click: fewer or more lines")
+
+    def mousePressEvent(self, event) -> None:      # noqa: N802 - Qt hook
+        self.compact = not self.compact
+        self.toggled.emit()
+        event.accept()
+
+    def _html(self, groups, columns: int) -> str:
+        from html import escape
+
+        def table(rows) -> str:
+            return ("<table cellspacing='0' cellpadding='0'>" + "".join(
+                f"<tr><td style='color:#9A9AA8; padding:1px 12px 1px 0'>{escape(k)}</td>"
+                f"<td style='color:#F2F2F6; font-family:monospace; padding:1px 0'>{escape(str(v))}</td></tr>"
+                for k, v in rows) + "</table>")
+        shown = [[r for r in g if not self.compact or r[0] in self.COMPACT] for g in groups]
+        shown = [g for g in shown if g]
+        if columns > 1 and len(shown) > 1:
+            cells = "<td width='22'></td>".join(f"<td valign='top'>{table(g)}</td>" for g in shown)
+            return f"<table cellspacing='0' cellpadding='0'><tr>{cells}</tr></table>"
+        return "<div style='margin:0'></div>".join(table(g) + ("<div style='font-size:6px'>&nbsp;</div>"
+                                                                if i < len(shown) - 1 else "")
+                                                     for i, g in enumerate(shown))
+
+    def _style(self, px: int) -> None:
+        self.setStyleSheet(
+            "background: rgba(0,0,0,185); border-radius: 8px;"
+            f"padding: {max(6, px // 2 + 2)}px {max(8, px - 1)}px; font-size: {px}px;")
+
+    def lay_out(self, groups, max_w: int, max_h: int) -> None:
+        """The largest type, one column or two, that fits *max_w* x *max_h*."""
+        top = max(10, min(15, round(max_h / 62)))
+        tries = [(px, cols) for px in range(top, 8, -1) for cols in (1, 2)]
+        for px, cols in tries:
+            self._style(px)
+            self.setText(self._html(groups, cols))
+            self.adjustSize()
+            if self.height() <= max_h and self.width() <= max_w:
+                self.font_px, self.columns = px, cols
+                return
+        self.font_px, self.columns = 9, 2
+
+
 class _MacInputFilter(QObject):
     """macOS-only application-level input filter for the embedded player.
 
@@ -883,11 +966,8 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         # over the GL widget kept the composited path alive, so a reparent
         # froze the picture every time. As the player's child it no longer
         # touches the GL widget's child list.
-        self._stats_overlay = QLabel("", self)
-        self._stats_overlay.setStyleSheet(
-            "background: rgba(0,0,0,180); color: #ECECF1;"
-            "border-radius: 6px; padding: 8px 10px;"
-            "font-family: monospace; font-size: 11px;")
+        self._stats_overlay = _StatsLabel(self)
+        self._stats_overlay.toggled.connect(lambda: self._update_stats_text())
         self._stats_overlay.hide()
         self._stats_timer = QTimer(self)
         self._stats_timer.setInterval(1000)
@@ -3105,22 +3185,21 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         mistimed = prop("mistimed-frame-count", lambda v: str(int(v)))
         delayed = prop("vo-delayed-frame-count", lambda v: str(int(v)))
 
-        lines = [
-            f"Video: {track_info('video')}",
-            f"Audio: {track_info('audio')}",
-            f"HW dec: {hwdec}",
-            f"A/V sync: {prop('avsync', lambda v: f'{v:.3f} s')}",
-            f"Dropped: {dropped}",
-            f"Timing: {mistimed} mistimed / {delayed} delayed",
-            f"FPS: {prop('estimated-vf-fps', lambda v: f'{v:.1f}')}",
-            f"Bitrate: {prop('video-bitrate', lambda v: f'{v / 1000:.0f} kbps' if v else '—')}",
-            f"Cache: {prop('demuxer-cache-duration', lambda v: f'{v:.1f} s')}",
-            f"Net: {prop('cache-speed', lambda v: f'{v / 1024:.0f} KB/s' if v else '0 KB/s')}",
-            f"Format: {prop('file-format')}",
-            f"Protocol: {prop('stream-path', lambda v: v.split('://')[0] if '://' in str(v) else str(v))}",
+        stream = [
+            ("Video", track_info('video')),
+            ("Audio", track_info('audio')),
+            ("HW dec", hwdec),
+            ("A/V sync", prop('avsync', lambda v: f'{v:.3f} s')),
+            ("Dropped", dropped),
+            ("Timing", f"{mistimed} mistimed / {delayed} delayed"),
+            ("FPS", prop('estimated-vf-fps', lambda v: f'{v:.1f}')),
+            ("Bitrate", prop('video-bitrate', lambda v: f'{v / 1000:.0f} kbps' if v else '—')),
+            ("Cache", prop('demuxer-cache-duration', lambda v: f'{v:.1f} s')),
+            ("Net", prop('cache-speed', lambda v: f'{v / 1024:.0f} KB/s' if v else '0 KB/s')),
+            ("Format", prop('file-format')),
+            ("Protocol", prop('stream-path', lambda v: v.split('://')[0] if '://' in str(v) else str(v))),
         ]
-        lines += self._nerd_stats(prop)
-        self._stats_overlay.setText("\n".join(lines))
+        self._stats_groups = [stream, self._nerd_stats(prop)]
         self._place_stats()
 
     def _remember_delay(self, value: float) -> None:
@@ -3148,28 +3227,35 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
                 return "—"
         src = nerd.source() or {}
         out = [
-            "",
-            f"Colour: {vp('colormatrix')} / {vp('primaries')} / {vp('gamma')}",
-            f"Pixels: {vp('pixelformat')} · {vp('w')}×{vp('h')} · aspect {vp('aspect')}",
-            f"Deinterlace: {prop('deinterlace')}",
-            f"Audio out: {prop('audio-codec-name')} · {prop('audio-out-params', lambda v: (v or {}).get('format', '—'))}",
-            f"Passthrough: {n.get('nerd_spdif') or 'off'}",
-            f"Container: {prop('file-format')} · demuxer {prop('current-demuxer')}",
-            f"Source: {src.get('_kind') or '—'}",
-            f"User agent: {n.user_agent(src)}",
-            f"Proxy: {n.proxy(src) and 'on' or 'off'}",
+            ("Colour", f"{vp('colormatrix')} / {vp('primaries')} / {vp('gamma')}"),
+            ("Pixels", f"{vp('pixelformat')} · {vp('w')}×{vp('h')} · {aspect_name(vp('aspect'))}"),
+            ("Deinterlace", prop('deinterlace', on_off)),
+            ("Audio out", f"{prop('audio-codec-name')} · "
+                          f"{prop('audio-out-params', lambda v: (v or {}).get('format', '—'))}"),
+            ("Passthrough", n.get('nerd_spdif') or 'off'),
+            ("Container", f"{prop('file-format')} · demuxer {prop('current-demuxer')}"),
+            ("Source", src.get('_kind') or '—'),
+            ("User agent", n.user_agent(src)),
+            ("Proxy", n.proxy(src) and 'on' or 'off'),
         ]
         if n.flag("nerd_vpn_guard"):
             up = nerd.vpn_interfaces()
-            out.append(f"VPN: {', '.join(up) if up else 'none'}")
+            out.append(("VPN", ', '.join(up) if up else 'none'))
         return out
 
     def _place_stats(self) -> None:
-        self._stats_overlay.adjustSize()
-        # 8 px inside the surface's top-left (the docked video, or the pop-out
-        # mirror while popped out).
-        tl = self._ov_surface.geometry().topLeft()
-        self._stats_overlay.move(tl.x() + 8, tl.y() + 8)
+        """Lay the stats out for the room the picture has: the type grows
+        with it (fullscreen reads from the sofa), a second column when one
+        is taller than the picture, smaller type when even that is not
+        enough. 8 px inside the surface's top-left (the docked video, or the
+        pop-out mirror while popped out)."""
+        g = self._ov_surface.geometry()
+        groups = getattr(self, "_stats_groups", None)
+        if groups:
+            self._stats_overlay.lay_out(groups, g.width() - 16, g.height() - 16)
+        else:
+            self._stats_overlay.adjustSize()
+        self._stats_overlay.move(g.x() + 8, g.y() + 8)
 
     def _pick_track(self, prop: str, tid) -> None:
         """User picked an audio/subtitle track from the options menu: apply
