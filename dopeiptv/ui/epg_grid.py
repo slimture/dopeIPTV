@@ -1293,6 +1293,10 @@ class EpgGridDialog(QDialog):
             box = getattr(self.window, "_box_record_action", None)
             if box is not None:
                 box(m, ch, p.get("title") or "", p["start_timestamp"], p["stop_timestamp"])
+        # Every airing of it from now on - also from an episode already over.
+        if (ch.get("stream_id") is not None and (p.get("title") or "").strip()
+                and hasattr(self.window, "_record_series")):
+            m.addAction(tr("series_record_menu"), lambda: self._record_series(ch, p))
         # Remind me when a future programme starts.
         if (ch.get("stream_id") is not None
                 and p["start_timestamp"] > time.time()
@@ -1320,3 +1324,8 @@ class EpgGridDialog(QDialog):
             ch, {"title": p.get("title")},
             p["start_timestamp"], p["stop_timestamp"])
         self.info.setText("● " + (p.get("title") or ch.get("name") or ""))
+
+    def _record_series(self, ch: dict, p: dict) -> None:
+        rule = self.window._record_series(ch, p.get("title") or "", parent=self)
+        if rule:
+            self.info.setText("● " + rule["text"])

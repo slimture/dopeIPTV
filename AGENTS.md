@@ -85,6 +85,7 @@ map and the one-way import rule.
 | `core/privacy.py` | Private viewing (nothing kept until the app closes) and Clear recent history by time range, for every source |
 | `core/rec_extras.py` | Nerd for recordings: file name template (folders, never outside), the command after a recording (no shell), their checks |
 | `core/catchup.py` | Nerd: a source's own catch-up address - Kodi's placeholders and the M3U modes (default, append, shift, flussonic), tried before the app's own; its checks |
+| `core/series_rules.py` | Series recordings: rules (exact title or a word, one channel or any), the guide looked through for their airings, the plan (padding, nothing twice, one copy of a programme on two channels, a cancelled one not again), their store; recording padding |
 | `core/remote_api.py` | The remote API and shared lists' small HTTP server (token on every request, this computer only unless chosen) |
 | `core/supporter.py` | The supporter key: signed by dopeiptv.org, checked offline, nothing about the person in it |
 | `core/report.py` | Error reports and feedback: scrubbed of anything identifying, shown in full, sent only on Send; the native crash file |
@@ -116,6 +117,7 @@ map and the one-way import rule.
 | `ui/mw_box.py` | The box from the app: zap, wake, standby, record on the box from the guide; Nerd's copy address and guide channel |
 | `ui/mw_commands.py` | Commands from outside carried out: play an address or file, a channel by name, come forward |
 | `ui/mw_privacy.py` | Private viewing and Clear recent history in the window: app-menu entries and shortcuts, the sidebar marker |
+| `ui/mw_series.py` | Series recordings in the window: "Record series…", the rules' look through the guide on the pool when it loads and with its 20-minute check, the jobs added |
 | `ui/mw_failover.py` | Failover in the window: once per channel, the other source's options while it plays, a note |
 | `ui/mw_chanprefs.py` | A channel's own settings in the window: the player told which channel it plays (`set_channel`), the channel menu's "Channel settings…" (a dot when it has its own), its dialog |
 | `ui/mw_health.py` | Stream health in the window: the playback path's hooks (start, picture, drop, fail), the channel menu's "Stream health…", the list's dot |
@@ -149,10 +151,10 @@ series, new-episode news), `mw_subtitles` (OpenSubtitles, subtitles
 remembered per title), `mw_cast` (Chromecast and DLNA: the cast
 dialog, the strip, handing over from the archive), `mw_donate` (the
 sidebar heart, About's link, Home's card), `mw_failover` (failover to another
-source), `mw_health` (stream health per channel), `mw_chanprefs` (a channel's
-own settings), `mw_portal_archive` (a Stalker portal's archive, by
-programme), `mw_privacy` (private viewing,
-clear recent history) and `mw_popout`
+source), `mw_series` (series recording rules), `mw_health` (stream
+health per channel), `mw_chanprefs` (a channel's own settings),
+`mw_portal_archive` (a Stalker portal's archive, by programme),
+`mw_privacy` (private viewing, clear recent history) and `mw_popout`
 (detached-window player). What stays in `main_window.py` is
 the `__init__`/`_build_ui` composition and the playback path (start/stop,
 seek, fullscreen, reconnect) - keep playback code there.
@@ -229,7 +231,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
   epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log,
-  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, health, nerd, nerd_lists, channel_numbers, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, catchup, remote_api, report, supporter) and `services/` (failover, share, resume,
+  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, health, nerd, nerd_lists, channel_numbers, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, catchup, remote_api, report, supporter) and `services/` (failover, share, resume,
   coverart, reminders, mpris, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list

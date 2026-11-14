@@ -245,12 +245,18 @@ class RecordingManager(QObject):
 
     def add_job(self, url: str, title: str, start_ts: float,
                 stop_ts: float | None, folder: str = "",
-                icon: str | None = None, channel: str = "") -> dict:
+                icon: str | None = None, channel: str = "",
+                extra: dict | None = None) -> dict:
+        """A recording from *start_ts* to *stop_ts*. *extra*: what else
+        the job keeps (a programme's own times, the series rule that made
+        it), saved with it; never one of the keys above."""
         job: dict[str, Any] = {
             "id": uuid.uuid4().hex[:10], "url": url, "title": title,
             "start": start_ts, "stop": stop_ts, "folder": folder or "",
             "status": "scheduled", "path": "", "error": "", "proc": None,
             "stream_icon": icon or "", "channel": channel or ""}
+        for k, v in (extra or {}).items():
+            job.setdefault(k, v)
         self.jobs.append(job)
         self._save()
         self.tick()
@@ -258,12 +264,18 @@ class RecordingManager(QObject):
         return job
 
     def update_job_times(self, job_id: str, start_ts: float,
-                         stop_ts: float | None) -> None:
-        """Adjust a not-yet-started scheduled job's start/stop time."""
+                         stop_ts: float | None,
+                         extra: dict | None = None) -> None:
+        """Adjust a not-yet-started scheduled job's start/stop time (and
+        what add_job's *extra* gave it)."""
         for j in self.jobs:
             if j["id"] == job_id and j["status"] == "scheduled":
                 j["start"] = start_ts
                 j["stop"] = stop_ts
+                for k, v in (extra or {}).items():
+                    if k not in ("id", "url", "start", "stop", "status",
+                                 "path", "proc", "recorder"):
+                        j[k] = v
                 self._save()
                 self.jobs_changed.emit()
                 return

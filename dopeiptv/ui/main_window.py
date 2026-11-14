@@ -40,6 +40,7 @@ from ..providers.epg import XmltvGuide, epg_cache_path, prune_epg_caches
 from ..services.coverart import CoverArtService
 from ..services.resume import ResumeStore
 from ..services.reminders import ReminderStore
+from ..core.series_rules import SeriesRuleStore
 from ..media.players import embedded_playback_supported, launch_player
 from ..core.contest import ContestWatch
 from ..core.health import StreamHealth
@@ -84,6 +85,7 @@ from .mw_local import _LocalFilesMixin
 from .mw_onboarding import _OnboardingMixin
 from .mw_popout import _PopoutMixin
 from .mw_reminders import _RemindersMixin
+from .mw_series import _SeriesMixin
 from .mw_search import _SearchMixin
 from .mw_shortcuts import _ShortcutsMixin
 from .mw_sidebar import _SidebarMixin
@@ -128,7 +130,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _FollowMixin, _SubtitlesMixin, _CastMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
                  _HealthMixin, _ChannelPrefsMixin, _RemoteMixin, _ReportMixin,
-                 _PortalArchiveMixin,
+                 _PortalArchiveMixin, _SeriesMixin,
                  QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
@@ -227,6 +229,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._resume_settings = self._open_resume_settings(settings)
         self.resume = ResumeStore(self._resume_settings, pid)
         self.reminders = ReminderStore(settings, pid)
+        self.series_rules = SeriesRuleStore(settings, pid)
         self._follow_settings = self._open_follow_settings()
         self.followed = FollowedSeriesStore(self._follow_settings, pid)
         self.overrides = CategoryOverrides(
@@ -338,6 +341,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._guide_check = QTimer(self)
         self._guide_check.setInterval(20 * 60 * 1000)
         self._guide_check.timeout.connect(self._check_guide_age)
+        # The series rules look through the guide on the same beat.
+        self._guide_check.timeout.connect(self._check_series_rules)
         self._guide_check.start()
         QApplication.instance().applicationStateChanged.connect(
             lambda state: state == Qt.ApplicationState.ApplicationActive
@@ -2240,6 +2245,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.history = HistoryStore(self.settings, f"history_{pid}")
             self.resume = ResumeStore(self._resume_settings, pid)
             self.reminders = ReminderStore(self.settings, pid)
+            self.series_rules = SeriesRuleStore(self.settings, pid)
             self.followed = FollowedSeriesStore(self._follow_settings, pid)
             # Hide/rename/lock rules are per playlist too: kept, the old
             # provider's locks applied here and edits saved under its key.
@@ -3104,6 +3110,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     # way (lookups don't wait for it), or shows the guide a
                     # refresh replaced: fill it in now.
                     self._request_epg()
+                # A guide in (or a new one): what the series rules ask for.
+                if hasattr(self, "_check_series_rules"):
+                    self._check_series_rules()
 
         run_async(self.pool, lambda: x.ensure_loaded(force=force),
                   finished, lambda _e: finished(False))

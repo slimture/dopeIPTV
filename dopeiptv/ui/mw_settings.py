@@ -1343,6 +1343,80 @@ class _SettingsMixin:
         c = rec.card(tr("set_card_limits"))
         c.row(tr("rec_max_label"), rec_max_box)
         c.row(tr("rec_total_label"), rec_total_box)
+        # Minutes before and after a programme recorded from the guide (and
+        # by a series rule); 0 and 0 record its listed times, as before.
+        from ..core import series_rules as srules
+        pad_before, pad_after = srules.padding(self.settings)
+
+        def pad_box(grid: list[int], value: int, name: str) -> Stepper:
+            spin = GridSpin(sorted(set(grid) | {value}),
+                            lambda v: tr("opt_minutes", n=v))
+            spin.setValue(value)
+            box = Stepper(spin, width=spin.widest() + 80)
+            box.setAccessibleName(name)
+            return box
+
+        pad_before_box = pad_box([0, 1, 2, 3, 5, 10, 15, 20, 30], pad_before,
+                                 tr("rec_pad_before"))
+        pad_after_box = pad_box([0, 1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90,
+                                 120], pad_after, tr("rec_pad_after"))
+        c = rec.card(tr("set_card_padding"))
+        c.row(tr("rec_pad_before"), pad_before_box, tr("rec_pad_before_hint"))
+        c.row(tr("rec_pad_after"), pad_after_box, tr("rec_pad_after_hint"))
+        # Series recordings: the rules of the source in use, deleted at once
+        # (with the recordings they scheduled that have not started).
+        series_card = rec.card(tr("set_card_series"))
+        rule_list = QListWidget(objectName="SeriesRuleList")
+        rec_icon = page_icon("rec", self._action_pixmap, 16)
+
+        def fill_rules() -> None:
+            rule_list.clear()
+            for r in sorted(self.series_rules.rules(),
+                            key=lambda r: srules.norm(r.get("text"))):
+                item = QListWidgetItem(rec_icon, self._series_rule_label(r))
+                item.setData(Qt.ItemDataRole.UserRole, r["id"])
+                rule_list.addItem(item)
+            rule_list.setCurrentRow(0)
+
+        fill_rules()
+        fit_to_rows(rule_list)
+        rules_none = QLabel(tr("series_none",
+                              menu=tr("series_record_menu").rstrip("….")))
+        rules_none.setObjectName("SettingsHint")
+        rules_none.setWordWrap(True)
+        rule_add = QPushButton(tr("series_add_word"))
+        rule_del = QPushButton(tr("ctx_delete"))
+        series_card.shown_if(
+            series_card.widget(rules_none, tr("set_card_series")),
+            lambda: rule_list.count() == 0)
+        series_card.shown_if(
+            series_card.widget(rule_list, tr("set_card_series")),
+            lambda: rule_list.count() > 0)
+        series_card.layout_row(hbox(rule_add, rule_del))
+        series_card.note(tr("series_note", days=srules.DAYS))
+
+        def rules_sync() -> None:
+            rule_del.setEnabled(rule_list.currentItem() is not None)
+            series_card.refresh()
+
+        def rule_delete() -> None:
+            item = rule_list.currentItem()
+            if item is None:
+                return
+            row = rule_list.row(item)
+            self._delete_series_rule(item.data(Qt.ItemDataRole.UserRole))
+            fill_rules()
+            rule_list.setCurrentRow(min(row, rule_list.count() - 1))
+            rules_sync()
+
+        def rule_add_word() -> None:
+            if self._record_series(None, "", word=True, parent=d):
+                fill_rules()
+                rules_sync()
+
+        rule_add.clicked.connect(rule_add_word)
+        rule_del.clicked.connect(rule_delete)
+        rules_sync()
         rk, rexe = self.rec.recorder()
         c = rec.card()
         c.note(tr("rec_recorder_found", kind=rk, path=rexe) if rexe
@@ -2118,6 +2192,11 @@ class _SettingsMixin:
                 val, unit = mb_value(rec_total_box.value())
                 put("rec_total_value", val)
                 put("rec_total_unit", unit)
+            # Untouched and never set: not written (0 is the default).
+            for skey, box, was in ((srules.PAD_BEFORE_KEY, pad_before_box, pad_before),
+                                   (srules.PAD_AFTER_KEY, pad_after_box, pad_after)):
+                if box.value() != was or self.settings.value(skey) is not None:
+                    put(skey, box.value())
             if cast_pause_box.value() != cast_pause_mb:
                 put("cast_pause_gb", f"{cast_pause_box.value() / 1000:g}")
             put("metadata_source", meta_source_box.currentData())

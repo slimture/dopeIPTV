@@ -18,7 +18,7 @@ from array import array
 from bisect import bisect_left, bisect_right
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 from ..core._lazy_requests import requests
 from PyQt6.QtCore import QStandardPaths
@@ -827,20 +827,24 @@ class XmltvGuide:
         return None
 
     def programmes_in(self, item: dict, win_start: float,
-                      win_stop: float) -> list[dict]:
+                      win_stop: float,
+                      keep: Callable[[str], Any] | None = None) -> list[dict]:
         """Every programme overlapping the window [win_start, win_stop],
-        in air order - for the timeline grid."""
+        in air order - for the timeline grid. With *keep*, only those whose
+        title it answers truthy for (the series rules look through a week
+        of every channel, and an entry for each programme cost more than
+        the look itself)."""
         if not self._loaded:
             return []
         sched = self._sched_for(item)
         if not sched:
             return []
-        starts, stops = sched[0], sched[1]
+        starts, stops, titles = sched[0], sched[1], sched[2]
         n = len(starts)
         out: list[dict] = []
         j = bisect_left(starts, win_start - self._MAX_PROG_SECS)
         while j < n and starts[j] < win_stop:
-            if stops[j] > win_start:
+            if stops[j] > win_start and (keep is None or keep(titles[j])):
                 out.append(self._entry(sched, j))
             j += 1
         return out

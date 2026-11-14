@@ -1025,6 +1025,9 @@ class _DetailMixin:
             m.addAction(tr("rec_record_programme"),
                         lambda: self._record_programme(it, post, start, stop))
             self._box_record_action(m, it, post.get("title") or "", start, stop)
+        if (post.get("title") or "").strip():
+            m.addAction(tr("series_record_menu"),
+                        lambda: self._record_series(it, post.get("title") or ""))
         rem = getattr(self, "reminders", None)
         if start > now and rem is not None:
             sid = it.get("stream_id")
@@ -1043,23 +1046,31 @@ class _DetailMixin:
     def _record_programme(self, ch, post, start_ts, stop_ts) -> None:
         if not self._within_storage_cap():
             return
+        from ..core import series_rules
         now = datetime.now().astimezone().timestamp()
         title = post.get("title") or ch.get("name") or "recording"
+        # Settings > Recording's padding: started earlier, stopped later.
+        before, after = series_rules.padding(self.settings)
         # A programme that's on the air right now records like "record this
         # channel": if you're watching it, _record_now captures the stream you
         # already pull (one connection) instead of opening a second - and it
         # offers the switch/background prompt otherwise. Only a genuinely future
         # programme becomes a scheduled job that opens a connection at air time.
-        if start_ts <= now < stop_ts:
-            minutes = max(1, int((stop_ts - now) // 60) + 1)
+        if start_ts - before * 60 <= now < stop_ts:
+            minutes = max(1, int((stop_ts + after * 60 - now) // 60) + 1)
             self._record_now(ch, minutes, title_override=title)
             return
         url = self.client.live_url(ch.get("stream_id"), "ts")
         if not url:
             return
-        self.rec.add_job(url, title, max(now, start_ts), stop_ts,
+        start, stop = series_rules.padded(start_ts, stop_ts, before, after, now)
+        # The programme's own times and channel go with the job, so a
+        # series rule knows this airing is recorded already.
+        self.rec.add_job(url, title, start, stop,
                          icon=ch.get("stream_icon"),
-                         channel=self.channel_display_name(ch))
+                         channel=self.channel_display_name(ch),
+                         extra={"stream_key": series_rules.stream_key(ch),
+                                "prog_start": start_ts, "prog_stop": stop_ts})
 
     def _refresh_progress(self) -> None:
         e = self._current_epg

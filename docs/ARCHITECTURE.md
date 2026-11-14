@@ -46,6 +46,7 @@ dopeiptv/
     dvr_pool.py        Every channel's buffer this session, one budget
     dvr_record.py      A recording read from a buffer
     recording.py       RecordingManager - ffmpeg/mpv stream-copy, timers
+    series_rules.py    Series recordings: rules, airings found, the plan, padding
     updates.py         GitHub latest-release check (is_newer, fetch)
     selfupdate.py      AppImage in-place update: download, verify, test, swap
     wakelock.py        Screensaver/suspend inhibitor (DBus + caffeinate)
@@ -113,6 +114,7 @@ dopeiptv/
     mw_busy.py         Loading indicator + spinner overlay
     mw_updates.py      Update-check badge/status wiring, "Update now"
     mw_reminders.py    Programme-reminder UI (set / list / fire)
+    mw_series.py       Series recordings: "Record series…", the rules' check
     mw_mpris.py        Desktop media controls (MPRIS host) + media keys
     mw_follow.py       Follow a series: new-episode checks and news
     mw_subtitles.py    Subtitles from OpenSubtitles; remembered per title
