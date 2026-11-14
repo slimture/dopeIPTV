@@ -199,11 +199,12 @@ def test_welcome_is_no_taller_with_nerd_on(app, settings):
         h = ov._card.sizeHint().height()
         got["_win"].close()
         return h
-    plain = height("xtream")
+    # The tallest the plain form measures (a first window can measure a few
+    # pixels apart from a later one - CI saw 504 then 486).
+    plain = max(height("xtream"), height("xtream"))
     settings.setValue("nerd_enabled", "true")
     nerd.install(settings)
-    assert height("xtream") == plain
-    for kind in ("enigma2", "tvheadend", "hdhomerun"):
+    for kind in ("xtream", "enigma2", "tvheadend", "hdhomerun"):
         assert height(kind) <= plain, kind
 
 
