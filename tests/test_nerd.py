@@ -306,8 +306,10 @@ def _plays(m, url: str, timeout: float = 15.0) -> bool:
     end = time.monotonic() + timeout
     while time.monotonic() < end:
         try:
-            # Properties, not options: m["x"] reads options/x.
-            if m.file_format == "mpegts" and m.time_pos is not None:
+            # Properties, not options: m["x"] reads options/x. The path
+            # first: with keep_open the last file stays loaded, and that
+            # one playing said nothing about this one.
+            if m.path == url and m.file_format == "mpegts" and m.time_pos is not None:
                 return True
         except Exception:
             pass
