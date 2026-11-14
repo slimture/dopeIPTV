@@ -3762,6 +3762,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                      player, external, title)
             if not self._confirm_external_while_playing():
                 return
+            if kind not in ("local", "recording") and self._vpn_guard_blocks():
+                return
             launch_player(player or "mpv", url, title, self)
             if self.mode != "history":
                 self.history.add(url, title, icon, key, kind)
@@ -4259,6 +4261,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         if not self._guard_stream_switch(url, title):
             return
+        if self._vpn_guard_blocks():
+            return
+        self._failover_leave(url, self._item_key(it))
         # The preview path never reaches _start_playback, so it must carry the
         # same side effects itself: the multiview-conflict question (close it
         # and free its connections, or keep both) and the History entry -
@@ -4309,6 +4314,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self.player.play(url, title, local_buffer=True,
                             buffer_key=f"live:{self._item_key(it)}"):
             self.wake.acquire(tr("wake_playing", title=title))
+            self._health_begin(self._item_key(it), title, it, "live", False)
         self._apply_seek_mode(it, "live")
         # Refresh the poster overlay glyph (play -> pause for a timeshift
         # channel, -> stop for plain live). Unlike _start_playback, the preview
@@ -4440,7 +4446,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 return
             title = it.get("name") or it.get("title") or "dopeIPTV"
             if external or player == "vlc":
-                launch_player(player or "mpv", url, title, self)
+                if not self._vpn_guard_blocks():
+                    launch_player(player or "mpv", url, title, self)
                 return
             # No autoplay-queue from this flat list: pin an empty override so
             # _start_playback doesn't snapshot the Continue list as episodes.
@@ -4595,6 +4602,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         _last_playback is kept so Play can bring this title back."""
         self._save_resume_position()
         self._maybe_auto_mark_watched()
+        self._failover_stopped()
         self._playing_key = None
         self._playing_group = None
         self._playing_item = None
@@ -4713,7 +4721,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                         item=None, catchup: bool = False) -> None:
         if not self._guard_stream_switch(url, title):
             return
-        if kind != "local" and self._vpn_guard_blocks():
+        # The guard is about streams: the user's own files always play.
+        if kind not in ("local", "recording") and self._vpn_guard_blocks():
             return
         self._failover_leave(url, key)
         # A click that led here also armed the auto-preview timer; kill it so

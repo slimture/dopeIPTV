@@ -39,12 +39,14 @@ def _no_network(monkeypatch):
     asked iTunes about a home-video folder called "Semester", and on a
     runner that HAS a network it came back with a real album cover. A test
     whose result depends on whether the machine is online is not a test.
-    Individual tests still monkeypatch urlopen themselves; theirs wins,
+    Individual tests still monkeypatch the lookup themselves; theirs wins,
     because it is installed after this one."""
     def _blocked(*_a, **_k):
         raise AssertionError("test tried to open a network connection")
 
     monkeypatch.setattr("urllib.request.urlopen", _blocked)
+    from dopeiptv.core._lazy_requests import requests as _rq
+    monkeypatch.setattr(_rq, "get", _blocked, raising=False)
 
 
 class _Settings:
@@ -643,24 +645,17 @@ def test_online_album_art_is_asked_once_and_only_when_needed(tmp_path,
     calls = []
 
     class _Resp:
-        def __init__(self, body):
-            self._b = body
+        def json(self):
+            return {"results": [{"artworkUrl100": "https://art/a100x100bb.jpg"}]}
 
-        def read(self):
-            return self._b
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *a):
-            return False
-
-    def fake_open(url, timeout=0):
+    def fake_get(url, timeout=0):
         calls.append(url)
-        return _Resp(b'{"results":[{"artworkUrl100":'
-                     b'"https://art/a100x100bb.jpg"}]}')
+        return _Resp()
 
-    monkeypatch.setattr("urllib.request.urlopen", fake_open)
+    # requests, whose certificates travel with the app (urllib found none
+    # in the Mac build).
+    from dopeiptv.core._lazy_requests import requests as _rq
+    monkeypatch.setattr(_rq, "get", fake_get, raising=False)
     jobs = []
     monkeypatch.setattr(ml, "run_async",
                         lambda pool, fn, done, err=None: jobs.append(
@@ -884,23 +879,15 @@ def test_a_known_miss_never_hogs_the_album_art_batch(tmp_path, monkeypatch):
     seen = []
 
     class _Resp:
-        def __init__(self, term):
-            self.term = term
+        def json(self):
+            return {"results": []}             # nothing matches: a miss
 
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *_a):
-            return False
-
-        def read(self):
-            return b'{"results": []}'          # nothing matches: a miss
-
-    def _open(url, timeout=0):
+    def _get(url, timeout=0):
         seen.append(url)
-        return _Resp(url)
+        return _Resp()
 
-    monkeypatch.setattr("urllib.request.urlopen", _open)
+    from dopeiptv.core._lazy_requests import requests as _rq
+    monkeypatch.setattr(_rq, "get", _get, raising=False)
 
     w = _Stub()
     w.list_model = type("M", (), {"refresh_all": lambda self: None})()

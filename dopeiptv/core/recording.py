@@ -431,6 +431,14 @@ class RecordingManager(QObject):
             run_post(cmd, path, j.get("title") or "", j.get("channel") or "")
 
     def _spawn(self, j: dict) -> None:
+        from . import nerd
+        if nerd.blocks_stream(str(j.get("url") or "")):
+            # Nerd's VPN guard: no VPN up, nothing streams - recordings too.
+            j["status"] = "failed"
+            j["error"] = "no VPN up (Nerd's VPN guard)"
+            from .log import log
+            log.info("record: %s not started - no VPN up", j.get("title"))
+            return
         kind, exe = self.recorder()
         if not exe:
             j["status"] = "failed"

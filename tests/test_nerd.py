@@ -171,6 +171,21 @@ def test_vpn_guard(monkeypatch):
     assert on(nerd_vpn_guard="false").vpn_blocks() is False
 
 
+def test_tunnels_are_asked_once_in_a_while(monkeypatch):
+    """ifconfig/ipconfig run at most every few seconds: the stats overlay
+    asks once a second, and each run was a process (a console on Windows)."""
+    calls = []
+    monkeypatch.setattr(nerd.sys, "platform", "darwin")
+    monkeypatch.setattr(nerd, "_tunnels_seen", (-1e9, []))
+    monkeypatch.setattr(nerd, "_run", lambda cmd: calls.append(cmd) or
+                        "utun3: flags=8051<UP,POINTOPOINT,RUNNING> mtu 1380\n\tinet 10.8.0.2 --> 10.8.0.1\n")
+    assert nerd.active_tunnels() == ["utun3"]
+    assert nerd.active_tunnels() == ["utun3"] and len(calls) == 1
+    monkeypatch.setattr(nerd, "_tunnels_seen", (-1e9, []))
+    nerd.active_tunnels()
+    assert len(calls) == 2
+
+
 def test_vpn_guard_named_interface_on_linux(monkeypatch):
     monkeypatch.setattr(nerd.sys, "platform", "linux")
     monkeypatch.setattr(nerd, "_is_up", lambda n: n == "wg0")

@@ -19,6 +19,9 @@ class _FailoverMixin:
     _failover_source: dict | None = None
     _failover_url: str | None = None
     _failover_tried: Any = None
+    # Moves on with every start and stop: a lookup that comes back after the
+    # user played something else, or pressed Stop, must not take over.
+    _failover_gen = 0
 
     def _failover_on(self) -> bool:
         n = nerd.current()
@@ -44,8 +47,12 @@ class _FailoverMixin:
         name = str(item.get("name") or "")
         self._set_status(tr("failover_looking", name=name), emphasis=True)
         playlists, active, wanted = store.playlists(), store.active_id, dict(item)
+        gen = self._failover_gen
 
         def done(found) -> None:
+            if gen != self._failover_gen:
+                log.info("failover: %s found too late - something else was chosen", name)
+                return
             if not found:
                 log.info("failover: no other source has %s", name)
                 fallback()
@@ -53,8 +60,12 @@ class _FailoverMixin:
             pl, row, url = found
             self._failover_play(pl, row, url, name)
 
+        def failed(_e=None) -> None:
+            if gen == self._failover_gen:
+                fallback()
+
         run_async(self.pool, lambda: failover.find_elsewhere(playlists, active, wanted),
-                  done, lambda _e=None: fallback())
+                  done, failed)
         return True
 
     def _failover_play(self, pl: dict, row: dict, url: str, name: str) -> None:
@@ -67,10 +78,15 @@ class _FailoverMixin:
                              "live", record=False)
         self._show_toast(tr("failover_playing", name=name, source=source), 6000)
 
+    def _failover_stopped(self) -> None:
+        """Stop was pressed: a lookup under way is no longer wanted."""
+        self._failover_gen += 1
+
     def _failover_leave(self, url: str, key: Any) -> None:
         """Called as anything starts: the active source's options back once
         something other than the failover stream plays, and a new channel
         may fail over again."""
+        self._failover_gen += 1
         if self._failover_source is not None and url != self._failover_url:
             store = getattr(self, "playlist_store", None)
             nerd.set_source(store.active() if store is not None else None)

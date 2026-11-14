@@ -149,21 +149,36 @@ def parse_ipconfig(text: str) -> list[str]:
 
 def _run(cmd: list[str]) -> str:
     import subprocess
+
+    from .player_exec import NO_WINDOW
     try:
+        # NO_WINDOW: the windowed Windows build flashed a console otherwise.
         return subprocess.run(cmd, capture_output=True, text=True, timeout=5,
-                              errors="replace").stdout
+                              errors="replace", creationflags=NO_WINDOW).stdout
     except (OSError, subprocess.SubprocessError):
         return ""
+
+
+#: How long an answer from ifconfig/ipconfig holds: a playback start and the
+#: stats overlay's once-a-second line ask far more often than tunnels change.
+TUNNELS_FOR = 5.0
+_tunnels_seen: tuple[float, list[str]] = (-1e9, [])
 
 
 def active_tunnels() -> list[str]:
     """The VPN-like interfaces that are up and carry traffic, as this
     system can tell: Linux by sysfs, macOS by ifconfig, Windows by
-    ipconfig."""
-    if sys.platform == "darwin":
-        return parse_ifconfig(_run(["/sbin/ifconfig"]))
-    if sys.platform.startswith("win"):
-        return parse_ipconfig(_run(["ipconfig"]))
+    ipconfig (those two remembered for a few seconds)."""
+    global _tunnels_seen
+    if sys.platform == "darwin" or sys.platform.startswith("win"):
+        import time
+        now = time.monotonic()
+        if now - _tunnels_seen[0] < TUNNELS_FOR:
+            return list(_tunnels_seen[1])
+        found = parse_ifconfig(_run(["/sbin/ifconfig"])) if sys.platform == "darwin" \
+            else parse_ipconfig(_run(["ipconfig"]))
+        _tunnels_seen = (now, found)
+        return list(found)
     try:
         names = [n for _i, n in socket.if_nameindex()]
     except (OSError, AttributeError):
@@ -177,6 +192,37 @@ def vpn_interfaces(names: list[str] | None = None) -> list[str]:
     if names is None:
         return active_tunnels()
     return [n for n in names if VPN_PATTERNS.match(n) and _is_up(n)]
+
+
+def is_lan_url(url: str) -> bool:
+    """A stream on this computer or the home network (loopback, private and
+    link-local addresses, .local names) - the VPN guard leaves those alone
+    unless told to cover them."""
+    import ipaddress
+    from urllib.parse import urlsplit
+    try:
+        host = (urlsplit(url).hostname or "").strip("[]")
+    except ValueError:
+        return False
+    if not host:
+        return not url.startswith(("http:", "https:", "rtmp:", "rtsp:", "udp:", "rtp:", "srt:"))
+    if host == "localhost" or host.endswith(".local"):
+        return True
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return ip.is_private or ip.is_loopback or ip.is_link_local
+
+
+def blocks_stream(url: str) -> bool:
+    """The VPN guard says no to *url* (core code without a window asks this:
+    recordings, multiview cells)."""
+    try:
+        return _current.vpn_blocks(local_source=is_lan_url(url))
+    except Exception:
+        log.debug("vpn guard check", exc_info=True)
+        return False
 
 
 def _is_up(name: str) -> bool:

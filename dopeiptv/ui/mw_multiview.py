@@ -412,6 +412,10 @@ class _MultiviewCell(QWidget):
         for archive-segment / go-live swaps). *start* is an offset in seconds
         to begin at - a film or episode handed over from the docked player
         continues where it was, instead of restarting from zero."""
+        from ..core import nerd
+        if nerd.blocks_stream(url):
+            log.info("multiview: not started - no VPN up (Nerd's VPN guard)")
+            return False
         if self.video.mpv is None:
             self.video.show()
             QApplication.instance().processEvents()
