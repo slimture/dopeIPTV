@@ -889,6 +889,18 @@ dialog.dn { overflow-x: hidden; }
 .dn-bigheart { width: 56px; height: 56px; fill: currentColor; display: block; margin: 0 auto;
   filter: drop-shadow(0 8px 18px rgba(255, 45, 85, .45)); }
 .dn-titleheart { width: 22px; height: 22px; fill: var(--heart); vertical-align: -3px; margin-inline-end: 9px; }
+/* Donations paused: a short note in the dialog's frame - a heart on a soft
+   round, the words centred, one button to close. */
+dialog.dn.dn-paused { width: min(400px, calc(100vw - 32px)); }
+.dn-paused-x { position: absolute; top: 12px; inset-inline-end: 12px; margin: 0; }
+.dn-paused-body { display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 36px 28px 26px; }
+.dn-paused-heart { display: grid; place-items: center; width: 64px; height: 64px; margin-bottom: 16px;
+  border-radius: 50%; background: color-mix(in srgb, var(--heart) 15%, transparent); }
+.dn-paused-heart svg { width: 30px; height: 30px; fill: var(--heart); }
+.dn-paused h2 { margin: 0 0 8px; font-size: 1.25rem; font-weight: 700; letter-spacing: -.03em; }
+.dn-paused p { margin: 0 0 24px; max-width: 32ch; color: var(--muted); font-size: 15px; line-height: 1.55; }
+.dn-paused-ok { justify-content: center; min-width: 150px; }
 /* The show (nav.js): a full-screen layer, a popover in the top layer, that
    nothing can click. */
 .dn-burst { position: fixed; inset: 0; width: 100vw; height: 100vh; max-width: none; max-height: none;

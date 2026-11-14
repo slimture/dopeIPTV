@@ -602,19 +602,22 @@ var iptvHit = (function () {
   function pausedNote() {
     var d = mk("dialog", "dn dn-paused");
     d.setAttribute("aria-labelledby", "dn-paused-title");
-    var head = mk("div", "dn-head"), ht = mk("div");
+    var x = mk("button", "dn-x dn-paused-x", "×"); x.type = "button"; x.setAttribute("aria-label", T.close);
+    var body = mk("div", "dn-paused-body");
+    var mark = mk("span", "dn-paused-heart");
+    mark.append(heart(""));
     var h = mk("h2", "", T.title); h.id = "dn-paused-title";
-    h.prepend(heart("dn-titleheart"));
-    ht.append(h, mk("p", "", T.paused));
-    var x = mk("button", "dn-x", "×"); x.type = "button"; x.setAttribute("aria-label", T.close);
-    head.append(ht, x);
-    d.append(head);
+    var ok = mk("button", "btn primary dn-paused-ok", T.close); ok.type = "button";
+    body.append(mark, h, mk("p", "", T.paused), ok);
+    d.append(x, body);
     function shut() { d.close(); }
     x.addEventListener("click", shut);
+    ok.addEventListener("click", shut);
     d.addEventListener("click", function (e) { if (e.target === d) { shut(); } });
     d.addEventListener("close", function () { d.remove(); });
     document.body.append(d);
     d.showModal();
+    ok.focus();
   }
 
   function build() {
