@@ -123,7 +123,11 @@ class EpgGridDialog(QDialog):
         outer.setContentsMargins(10, 10, 10, 10)
         outer.setSpacing(8)
         self.filter = QLineEdit(placeholderText=tr("epg_filter_channels"))
-        self.filter.textChanged.connect(lambda _t: self._build())
+        # Bound methods, not lambdas, for every signal of this dialog's own
+        # widgets and timers: PyQt lets go of a bound method with its object,
+        # while a lambda holding *self* outlived a guide closed and collected -
+        # its timer then called into freed memory (PyQt 6.9/6.10 crashed).
+        self.filter.textChanged.connect(self._on_filter)
         outer.addWidget(self.filter)
 
         self.scene = QGraphicsScene(self)
@@ -187,7 +191,7 @@ class EpgGridDialog(QDialog):
         self.day_back_btn.setIcon(self._tri_icon(left=True))
         self.day_back_btn.setToolTip(tr("epg_day_back"))
         self.day_back_btn.setFixedWidth(34)
-        self.day_back_btn.clicked.connect(lambda: self._scroll_hours(-24))
+        self.day_back_btn.clicked.connect(self._day_back)
         bar.addWidget(self.day_back_btn)
         self.now_btn = QPushButton(tr("epg_jump_now"))
         self.now_btn.clicked.connect(self._scroll_to_now)
@@ -199,7 +203,7 @@ class EpgGridDialog(QDialog):
         self.day_fwd_btn.setIcon(self._tri_icon(left=False))
         self.day_fwd_btn.setToolTip(tr("epg_day_fwd"))
         self.day_fwd_btn.setFixedWidth(34)
-        self.day_fwd_btn.clicked.connect(lambda: self._scroll_hours(24))
+        self.day_fwd_btn.clicked.connect(self._day_fwd)
         bar.addWidget(self.day_fwd_btn)
         # Fetch the guide again from here - where you notice it is missing.
         # Drawn, not "↻": that glyph is an empty box in fonts without it.
@@ -251,7 +255,7 @@ class EpgGridDialog(QDialog):
         self._preload = QTimer(self)
         self._preload.setSingleShot(True)
         self._preload.setInterval(80)
-        self._preload.timeout.connect(lambda: self._fill_rows(preload=True))
+        self._preload.timeout.connect(self._preload_rows)
         self._focus: tuple[int, int] | None = None
         # Keep the board alive while open: the now-line and the progress
         # fills tick along instead of freezing at open time.
@@ -276,10 +280,7 @@ class EpgGridDialog(QDialog):
         self._guide_poll = QTimer(self)
         self._guide_poll.setInterval(500)
         self._guide_poll.timeout.connect(self._after_refresh)
-        self.finished.connect(lambda _r: (self._refresh.stop(),
-                                          self._epg_poll.stop(),
-                                          self._guide_poll.stop(),
-                                          self._preload.stop()))
+        self.finished.connect(self._stop_timers)
 
         scr = self.screen().availableGeometry() if self.screen() else None
         want_w = self.CH_COL_W + self._grid_w + 40
@@ -513,6 +514,22 @@ class EpgGridDialog(QDialog):
         y = self.HEADER_H + row * self.ROW_H
         self.view.verticalScrollBar().setValue(
             max(0, int(y - self.HEADER_H - self.ROW_H)))
+
+    def _on_filter(self, _text: str = "") -> None:
+        self._build()
+
+    def _day_back(self) -> None:
+        self._scroll_hours(-24)
+
+    def _day_fwd(self) -> None:
+        self._scroll_hours(24)
+
+    def _preload_rows(self) -> None:
+        self._fill_rows(preload=True)
+
+    def _stop_timers(self, *_a) -> None:
+        for timer in (self._refresh, self._epg_poll, self._guide_poll, self._preload):
+            timer.stop()
 
     # -- build ---------------------------------------------------------------
 
