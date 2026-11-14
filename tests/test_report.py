@@ -317,12 +317,14 @@ def test_only_the_short_answers_go_with_feedback():
     real, report._post = report._post, fake
     try:
         assert report.send("feedback", "hi", endpoint="http://127.0.0.1:9/x",
-                           extra={"topic": "bug", "area": "guide", "often": "once",
-                                  "name": "Anna", "topicx": "y", "area2": "z", "often_": "a b"})
+                           extra={"topic": "bug", "area": "guide", "often": "once", "supporter": "yes",
+                                  "name": "Anna", "topicx": "y", "area2": "z", "often_": "a b",
+                                  "key": "DS1-abc"})
     finally:
         report._post = real
     assert got["topic"] == "bug" and got["area"] == "guide" and got["often"] == "once"
-    assert not {"name", "topicx", "area2", "often_"} & set(got)
+    assert not {"name", "topicx", "area2", "often_", "key"} & set(got)
+    assert got["supporter"] == "yes"            # a word, never the key itself
 
 
 def test_a_supporter_key_never_goes_in_a_report():

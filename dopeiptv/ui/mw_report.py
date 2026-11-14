@@ -156,6 +156,9 @@ class _ReportMixin:
             if not fd.exec():
                 return
             fields = fd.fields()
+            # A supporter's feedback is read first: only "yes" goes, never the key.
+            if self._supporter_now():
+                fields["supporter"] = "yes"
             if fd.answers.isChecked():
                 code, fields["reply"] = report.new_code()
             payload = report.scrub(fd.payload(), self._personal_values())

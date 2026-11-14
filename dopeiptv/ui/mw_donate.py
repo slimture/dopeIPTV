@@ -53,6 +53,12 @@ class _DonateMixin:
         from ..core import supporter
         return supporter.stored(self.settings)
 
+    def _supporter_now(self) -> bool:
+        try:
+            return self._supporter() is not None
+        except Exception:                      # no settings yet
+            return False
+
     def _donate_heart_due(self) -> bool:
         if self._donate_thanked() and self._supporter() is None:
             return False

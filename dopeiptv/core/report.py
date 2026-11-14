@@ -212,15 +212,18 @@ def send(kind: str, text: str, timeout: float = 15.0, endpoint: str | None = Non
          extra: dict | None = None) -> bool:
     """POST the report as the person left it. True when it arrived."""
     from .. import __version__
+    extra = extra or {}
     fields = {"kind": kind if kind in ("error", "crash", "feedback") else "feedback",
               "version": __version__, "os": platform.system(),
-              "text": (text or "")[:MAX_TEXT],
-              # What feedback is about (a topic, an area, how often): words from a short list.
-              **{k: v for k, v in (extra or {}).items()
-              if k in ("topic", "area", "often") and isinstance(v, str) and v.isalpha() and len(v) <= 12},
-              # The hash of the code this computer keeps to be told the answers.
-              **({"reply": str((extra or {})["reply"])}
-              if re.fullmatch(r"[0-9a-f]{64}", str((extra or {}).get("reply") or "")) else {})}
+              "text": (text or "")[:MAX_TEXT]}
+    # What feedback is about (a topic, an area, how often) and "supporter":
+    # "yes" from a supporter (read first): single words from a short list.
+    fields.update({k: v for k, v in extra.items()
+                   if k in ("topic", "area", "often", "supporter")
+                   and isinstance(v, str) and v.isalpha() and len(v) <= 12})
+    # The hash of the code this computer keeps to be told the answers.
+    if re.fullmatch(r"[0-9a-f]{64}", str(extra.get("reply") or "")):
+        fields["reply"] = str(extra["reply"])
     # UTF-8 as it is (an escaped "å" is six bytes), and cut to what the site
     # takes - a long log once made the whole report too big to be kept.
     body = json.dumps(fields, ensure_ascii=False).encode("utf-8")
