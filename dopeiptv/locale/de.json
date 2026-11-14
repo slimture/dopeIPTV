@@ -1842,5 +1842,8 @@
   "restore_cannot_replace": "Diese Sicherung enthält weder Wiedergabelisten noch Einstellungen und kann deshalb nicht ersetzen, was hier ist.",
   "restore_kept": "Nicht in dieser Sicherung, daher bleibt hier, wie es ist: {what}.",
   "restore_risky_source": "Wiedergabeliste „{name}“: {what}",
-  "restore_token_note": "Das Token der Fernsteuerung wird nie aus einer Sicherung übernommen: Auf diesem Computer wird ein neues erstellt, sobald Fernsteuerung oder Teilen eingeschaltet wird."
+  "restore_token_note": "Das Token der Fernsteuerung wird nie aus einer Sicherung übernommen: Auf diesem Computer wird ein neues erstellt, sobald Fernsteuerung oder Teilen eingeschaltet wird.",
+  "epg_zoom_out": "Herauszoomen",
+  "epg_zoom_in": "Hineinzoomen",
+  "epg_zoom_fit": "An Fenster anpassen"
 }

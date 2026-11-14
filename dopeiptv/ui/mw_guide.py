@@ -373,10 +373,12 @@ class _GuideMixin:
         if not self._guide_page_showing():
             self._drop_guide_grid()
             return
-        h = old.view.horizontalScrollBar().value()
+        # The time at the left edge, not the scroll value: the new board
+        # works its scale out afresh as it comes on screen.
+        left = old.left_time()
         v = old.view.verticalScrollBar().value()
         grid = self._new_guide_grid(old.scope_key, old.category_name,
                                     old._all_channels)
         self._guide_page.put(grid)
-        grid.view.horizontalScrollBar().setValue(h)
+        grid.scroll_to_time(left)
         grid.view.verticalScrollBar().setValue(v)

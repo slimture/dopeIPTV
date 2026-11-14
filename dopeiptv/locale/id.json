@@ -1842,5 +1842,8 @@
   "restore_cannot_replace": "Cadangan ini tidak berisi daftar putar atau pengaturan, jadi tidak bisa menggantikan yang ada di sini.",
   "restore_kept": "Tidak ada di cadangan ini, jadi tetap seperti di sini: {what}.",
   "restore_risky_source": "Daftar putar “{name}”: {what}",
-  "restore_token_note": "Token kendali jarak jauh tidak pernah diambil dari cadangan: token baru dibuat di komputer ini saat kendali jarak jauh atau berbagi dinyalakan."
+  "restore_token_note": "Token kendali jarak jauh tidak pernah diambil dari cadangan: token baru dibuat di komputer ini saat kendali jarak jauh atau berbagi dinyalakan.",
+  "epg_zoom_out": "Perkecil",
+  "epg_zoom_in": "Perbesar",
+  "epg_zoom_fit": "Sesuaikan dengan jendela"
 }

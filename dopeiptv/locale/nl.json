@@ -1842,5 +1842,8 @@
   "restore_cannot_replace": "Deze back-up bevat geen afspeellijsten of instellingen en kan dus niet vervangen wat hier staat.",
   "restore_kept": "Niet in deze back-up, dus ze blijven zoals ze hier zijn: {what}.",
   "restore_risky_source": "Afspeellijst ‘{name}’: {what}",
-  "restore_token_note": "Het token voor bediening op afstand wordt nooit uit een back-up overgenomen: er wordt op deze computer een nieuw gemaakt zodra bediening op afstand of delen aan gaat."
+  "restore_token_note": "Het token voor bediening op afstand wordt nooit uit een back-up overgenomen: er wordt op deze computer een nieuw gemaakt zodra bediening op afstand of delen aan gaat.",
+  "epg_zoom_out": "Uitzoomen",
+  "epg_zoom_in": "Inzoomen",
+  "epg_zoom_fit": "Aanpassen aan venster"
 }

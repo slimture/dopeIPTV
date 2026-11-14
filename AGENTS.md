@@ -144,7 +144,7 @@ map and the one-way import rule.
 | `ui/mw_local.py` | Local files: folders, library view, music queue |
 | `ui/mw_multiview.py` | Multiview: 2/4/6/9 live streams, an mpv per cell |
 | `ui/mw_donate.py` | Donating from the app: the sidebar heart, About's link, Home's one card after real use |
-| `ui/epg_grid.py` | The guide (`EpgGrid`): timeline grid, filter, its bar; the same widget on the Guide page or in its window (`EpgGridDialog`); timers only while on screen |
+| `ui/epg_grid.py` | The guide (`EpgGrid`): timeline grid, filter, its bar; the same widget on the Guide page or in its window (`EpgGridDialog`); timers only while on screen; its zoom (the time scale fitted to the room in steady steps, or a span picked with − / +, remembered for the page and the window apart) |
 | `ui/mw_guide.py` | The Guide page in the middle pane (a place in the nav): what it covers, kept for the next visit, Esc back, Pop out to its window |
 | `ui/epg_search.py` | Programme search across the whole guide |
 | `ui/welcome.py` | First-run welcome overlay |

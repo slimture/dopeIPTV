@@ -1842,5 +1842,8 @@
   "restore_cannot_replace": "Ova rezervna kopija nema plejliste ni podešavanja, pa ne može da zameni ono što je ovde.",
   "restore_kept": "Nisu u ovoj rezervnoj kopiji, pa ostaju kakvi su ovde: {what}.",
   "restore_risky_source": "Plejlista „{name}”: {what}",
-  "restore_token_note": "Token daljinskog upravljanja nikad se ne uzima iz rezervne kopije: novi se pravi na ovom računaru kada se uključi daljinsko upravljanje ili deljenje."
+  "restore_token_note": "Token daljinskog upravljanja nikad se ne uzima iz rezervne kopije: novi se pravi na ovom računaru kada se uključi daljinsko upravljanje ili deljenje.",
+  "epg_zoom_out": "Umanji",
+  "epg_zoom_in": "Uvećaj",
+  "epg_zoom_fit": "Prilagodi prozoru"
 }

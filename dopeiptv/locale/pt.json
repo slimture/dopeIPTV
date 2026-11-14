@@ -1842,5 +1842,8 @@
   "restore_cannot_replace": "Este backup não tem listas nem configurações, então não pode substituir o que está aqui.",
   "restore_kept": "Não estão neste backup, então ficam como estão aqui: {what}.",
   "restore_risky_source": "Lista “{name}”: {what}",
-  "restore_token_note": "O token do controle remoto nunca vem de um backup: um novo é criado neste computador quando o controle remoto ou o compartilhamento é ligado."
+  "restore_token_note": "O token do controle remoto nunca vem de um backup: um novo é criado neste computador quando o controle remoto ou o compartilhamento é ligado.",
+  "epg_zoom_out": "Diminuir zoom",
+  "epg_zoom_in": "Aumentar zoom",
+  "epg_zoom_fit": "Ajustar à janela"
 }

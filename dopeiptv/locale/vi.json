@@ -1842,5 +1842,8 @@
   "restore_cannot_replace": "Bản sao lưu này không có danh sách phát hay cài đặt nào, nên không thể thay thế những gì đang có ở đây.",
   "restore_kept": "Không có trong bản sao lưu này nên được giữ nguyên như ở đây: {what}.",
   "restore_risky_source": "Danh sách phát “{name}”: {what}",
-  "restore_token_note": "Mã thông báo của điều khiển từ xa không bao giờ được lấy từ bản sao lưu: một mã mới được tạo trên máy tính này khi bật điều khiển từ xa hoặc chia sẻ."
+  "restore_token_note": "Mã thông báo của điều khiển từ xa không bao giờ được lấy từ bản sao lưu: một mã mới được tạo trên máy tính này khi bật điều khiển từ xa hoặc chia sẻ.",
+  "epg_zoom_out": "Thu nhỏ",
+  "epg_zoom_in": "Phóng to",
+  "epg_zoom_fit": "Vừa với cửa sổ"
 }

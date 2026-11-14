@@ -1842,5 +1842,8 @@
   "restore_cannot_replace": "Den här säkerhetskopian har varken spellistor eller inställningar, så den kan inte ersätta det som finns här.",
   "restore_kept": "Finns inte i den här säkerhetskopian, så de förblir som de är här: {what}.",
   "restore_risky_source": "Spellistan ”{name}”: {what}",
-  "restore_token_note": "Fjärrstyrningens token tas aldrig från en säkerhetskopia: en ny skapas på den här datorn när du slår på fjärrstyrning eller delning."
+  "restore_token_note": "Fjärrstyrningens token tas aldrig från en säkerhetskopia: en ny skapas på den här datorn när du slår på fjärrstyrning eller delning.",
+  "epg_zoom_out": "Zooma ut",
+  "epg_zoom_in": "Zooma in",
+  "epg_zoom_fit": "Anpassa till fönstret"
 }

@@ -1842,5 +1842,8 @@
   "restore_cannot_replace": "이 백업에는 재생 목록도 설정도 없어서 이 컴퓨터의 내용을 바꿀 수 없습니다.",
   "restore_kept": "이 백업에 없으므로 이 컴퓨터의 내용 그대로 유지됩니다: {what}.",
   "restore_risky_source": "재생 목록 “{name}”: {what}",
-  "restore_token_note": "원격 제어 토큰은 백업에서 가져오지 않습니다. 원격 제어나 공유를 켜면 이 컴퓨터에서 새 토큰이 만들어집니다."
+  "restore_token_note": "원격 제어 토큰은 백업에서 가져오지 않습니다. 원격 제어나 공유를 켜면 이 컴퓨터에서 새 토큰이 만들어집니다.",
+  "epg_zoom_out": "축소",
+  "epg_zoom_in": "확대",
+  "epg_zoom_fit": "창에 맞추기"
 }

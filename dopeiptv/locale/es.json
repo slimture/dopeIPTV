@@ -1842,5 +1842,8 @@
   "restore_cannot_replace": "Esta copia de seguridad no tiene listas de reproducción ni ajustes, así que no puede reemplazar lo que hay aquí.",
   "restore_kept": "No están en esta copia de seguridad, así que se quedan como están aquí: {what}.",
   "restore_risky_source": "Lista «{name}»: {what}",
-  "restore_token_note": "El token del control remoto nunca se toma de una copia de seguridad: se crea uno nuevo en este ordenador cuando se activa el control remoto o compartir."
+  "restore_token_note": "El token del control remoto nunca se toma de una copia de seguridad: se crea uno nuevo en este ordenador cuando se activa el control remoto o compartir.",
+  "epg_zoom_out": "Alejar",
+  "epg_zoom_in": "Acercar",
+  "epg_zoom_fit": "Ajustar a la ventana"
 }

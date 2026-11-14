@@ -1842,5 +1842,8 @@
   "restore_cannot_replace": "Ta kopia zapasowa nie zawiera playlist ani ustawień, więc nie może zastąpić tego, co jest tutaj.",
   "restore_kept": "Nie ma ich w tej kopii zapasowej, więc pozostają takie jak tutaj: {what}.",
   "restore_risky_source": "Playlista „{name}”: {what}",
-  "restore_token_note": "Token zdalnego sterowania nigdy nie jest brany z kopii zapasowej: nowy powstaje na tym komputerze, gdy włączysz zdalne sterowanie lub udostępnianie."
+  "restore_token_note": "Token zdalnego sterowania nigdy nie jest brany z kopii zapasowej: nowy powstaje na tym komputerze, gdy włączysz zdalne sterowanie lub udostępnianie.",
+  "epg_zoom_out": "Pomniejsz",
+  "epg_zoom_in": "Powiększ",
+  "epg_zoom_fit": "Dopasuj do okna"
 }

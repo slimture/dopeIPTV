@@ -1842,5 +1842,8 @@
   "restore_cannot_replace": "Ova sigurnosna kopija nema popise ni postavke, pa ne može zamijeniti ono što je ovdje.",
   "restore_kept": "Nisu u ovoj sigurnosnoj kopiji, pa ostaju kakvi su ovdje: {what}.",
   "restore_risky_source": "Popis „{name}”: {what}",
-  "restore_token_note": "Token daljinskog upravljanja nikad se ne uzima iz sigurnosne kopije: novi se stvara na ovom računalu kad se uključi daljinsko upravljanje ili dijeljenje."
+  "restore_token_note": "Token daljinskog upravljanja nikad se ne uzima iz sigurnosne kopije: novi se stvara na ovom računalu kad se uključi daljinsko upravljanje ili dijeljenje.",
+  "epg_zoom_out": "Umanji",
+  "epg_zoom_in": "Uvećaj",
+  "epg_zoom_fit": "Prilagodi prozoru"
 }

@@ -10,6 +10,12 @@ under them.
 the buttons - as a widget, so the same guide lives in the window's middle
 pane (the Guide page, ui/mw_guide.py) or in a window of its own
 (``EpgGridDialog``, the pop-out). Its timers run only while it is on screen.
+
+The time scale fits the room the board has (Fit): as many hours as fit
+while a half hour stays wide enough for a short title, in steady steps
+(``ZOOM_SPANS``). − and + fix the span instead, remembered for the page
+and the window apart; a new scale lays out the axis and the rows on screen
+again, never the channel list.
 """
 
 from __future__ import annotations
@@ -19,8 +25,8 @@ from datetime import datetime
 
 from PyQt6.QtCore import QEvent, QPointF, QRectF, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (
-    QBrush, QColor, QFont, QFontMetrics, QGradient, QIcon, QLinearGradient,
-    QPainter, QPainterPath, QPen, QPixmap,
+    QBrush, QColor, QFont, QFontMetrics, QFontMetricsF, QGradient, QIcon,
+    QLinearGradient, QPainter, QPainterPath, QPen, QPixmap,
 )
 from PyQt6.QtWidgets import (
     QApplication, QDialog, QGraphicsItemGroup, QGraphicsPathItem,
@@ -29,6 +35,7 @@ from PyQt6.QtWidgets import (
     QMenu, QPushButton, QVBoxLayout, QWidget,
 )
 
+from ..core.log import log
 from ..i18n import tr
 from .qt_i18n import format_when
 from .theme import P, corner_radius
@@ -56,7 +63,28 @@ class _GridView(QGraphicsView):
         self._grid._play_at(self.mapToScene(e.pos()))
         super().mouseDoubleClickEvent(e)
 
+    def resizeEvent(self, e) -> None:
+        # The viewport's size (QAbstractScrollArea hands its resizes here),
+        # which is the room the time scale fits.
+        super().resizeEvent(e)
+        self._grid._viewport_resized()
+
+    def paintEvent(self, e) -> None:
+        super().paintEvent(e)
+        self._grid._painted = True
+
+    def wheelEvent(self, e) -> None:
+        # Ctrl + wheel zooms the time scale; the plain wheel scrolls.
+        if e.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            self._grid._wheel_zoom(e.angleDelta().y())
+            e.accept()
+            return
+        super().wheelEvent(e)
+
     def keyPressEvent(self, e) -> None:
+        if self._grid._zoom_key(e):
+            e.accept()
+            return
         # TV-style cell navigation: arrows move the selection between
         # programme blocks instead of just scrolling the view.
         k = e.key()
@@ -81,7 +109,16 @@ class EpgGrid(QWidget):
     ROW_H = 60
     HEADER_H = 34
     CH_COL_W = 224
-    PX_PER_MIN = 7            # 420 px per hour
+    # The scale before the guide knows its room, and what its window is
+    # sized by: 420 px per hour. Once on screen the board fits its width.
+    PX_PER_MIN = 7
+    # The hours the board shows at once, fitted (Fit) or picked (− / +):
+    # steady steps, so a small change of size does not change the span.
+    ZOOM_SPANS = (1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0)
+    # Fit shows as many hours as keep a half hour this wide: room for a
+    # short title ("Vem vet mest?", "Sportnytt") in a half-hour card.
+    MIN_HALF_HOUR_W = 110
+    FIT_DELAY_MS = 120       # a resize settles before the scale follows
     LABEL_DY = 21            # vertical inset of a card's title text
     FUTURE_HOURS = 12       # how far ahead the board reaches
     MAX_PAST_HOURS = 48     # cap on how far back timeshift opens the board
@@ -119,6 +156,26 @@ class EpgGrid(QWidget):
         self._compact: bool | None = None
         self._refresh_pending = False
         self._built_unready = False
+        # The time scale (px per minute) and how it is chosen: fitted to the
+        # viewport (auto) or a span of hours picked with − / +. _fitted_vw is
+        # the viewport width it was last worked out for; _painted, whether
+        # the board has been painted since it came on screen (until then a
+        # resize is followed at once, so it never shows at a wrong scale).
+        self._ppm = float(self.PX_PER_MIN)
+        self._zoom_auto = True
+        self._zoom_span = self.ZOOM_SPANS[0]
+        self._span = self.ZOOM_SPANS[0]
+        self._fitted_vw: int | None = None
+        self._painted = False
+        self._wheel_acc = 0
+        self._in_window = False
+        # A resize (window, sidebar, the player's column, popping out)
+        # settles before the time scale follows it. Stopped with the other
+        # timers while the guide is off screen.
+        self._fit_timer = QTimer(self)
+        self._fit_timer.setSingleShot(True)
+        self._fit_timer.setInterval(self.FIT_DELAY_MS)
+        self._fit_timer.timeout.connect(self._refit)
 
         now = time.time()
         self._built_day = datetime.fromtimestamp(now).date()
@@ -141,7 +198,7 @@ class EpgGrid(QWidget):
         past_h = min(max(0.5, max_ts_days * 24), self.MAX_PAST_HOURS)
         self._start = now_floor - past_h * 3600
         self._stop = now_floor + self.FUTURE_HOURS * 3600
-        self._grid_w = int((self._stop - self._start) / 60 * self.PX_PER_MIN)
+        self._grid_w = int((self._stop - self._start) / 60 * self._ppm)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -216,6 +273,31 @@ class EpgGrid(QWidget):
         self.playing_btn.hide()
         bar.addWidget(self.playing_btn)
         bar.addStretch(1)
+        # Zoom along the time axis: − shows more hours, + fewer, Fit (lit
+        # while the scale follows the room by itself) the hours that fit.
+        # Left to right in every language, like the day jumps.
+        zoom = QWidget()
+        zoom.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
+        zl = QHBoxLayout(zoom)
+        zl.setContentsMargins(0, 0, 0, 0)
+        zl.setSpacing(6)
+        self.zoom_out_btn = self._tile("")
+        self.zoom_out_btn.clicked.connect(self.zoom_out)
+        self.fit_btn = self._tile("")
+        self.fit_btn.setCheckable(True)
+        self.fit_btn.clicked.connect(self.zoom_fit)
+        self.zoom_in_btn = self._tile("")
+        self.zoom_in_btn.clicked.connect(self.zoom_in)
+        for b, key in ((self.zoom_out_btn, "epg_zoom_out"),
+                       (self.fit_btn, "epg_zoom_fit"),
+                       (self.zoom_in_btn, "epg_zoom_in")):
+            b.setToolTip(tr(key))
+            b.setAccessibleName(tr(key))
+            b.setFixedWidth(30)
+            zl.addWidget(b)
+        bar.addWidget(zoom)
+        self._zoom_box = zoom
+        self._bar = bar
         # Fetch the guide again from here - where you notice it is missing.
         # Drawn, not "↻": that glyph is an empty box in fonts without it.
         self.refresh_btn = self._tile("")
@@ -321,9 +403,7 @@ class EpgGrid(QWidget):
         self.set_in_window(False)
         self._build()
 
-        now_x = self.CH_COL_W + (now - self._start) / 60 * self.PX_PER_MIN
-        self.view.horizontalScrollBar().setValue(max(0, int(now_x
-                                                             - self.CH_COL_W - 40)))
+        self._scroll_to_now()
         # Open on the channel you're watching (if any), so the guide lands on
         # what's playing instead of the top of a long line-up.
         if getattr(self, "_playing_row", None) is not None:
@@ -347,12 +427,14 @@ class EpgGrid(QWidget):
 
     def set_in_window(self, on: bool) -> None:
         """In its own window the title bar names it and Close ends it; on the
-        page it says what it covers itself, and offers to pop out."""
+        page it says what it covers itself, and offers to pop out. Each
+        place keeps its own zoom."""
         self._in_window = on
         self.close_btn.setVisible(on)
         for w in (self.title_lbl, self.scope_lbl, self.popout_btn):
             w.setVisible(not on)
         self.scope_lbl.setVisible(not on and bool(self.category_name))
+        self._load_zoom()
 
     def restyle(self) -> None:
         """Colours and drawn icons from the current theme (P)."""
@@ -366,7 +448,10 @@ class EpgGrid(QWidget):
                           (self.refresh_btn, "refresh"),
                           (self.reminders_btn, "bell"),
                           (self.rec_sched_btn, "record"),
-                          (self.popout_btn, "popout")):
+                          (self.popout_btn, "popout"),
+                          (self.zoom_out_btn, "zoom_out"),
+                          (self.fit_btn, "fit"),
+                          (self.zoom_in_btn, "zoom_in")):
             btn.setIcon(self._bar_icon(kind))
             btn.setIconSize(QSize(14, 14))
         self.day_back_btn.setIcon(self._tri_icon(left=True))
@@ -427,6 +512,17 @@ class EpgGrid(QWidget):
             self._apply_compact(w < self.WIDE_W)
         else:
             self._apply_compact(w < self.COMPACT_W)
+        self._fit_bar()
+
+    def _fit_bar(self) -> None:
+        """The zoom buttons give way in a bar with no room for them (a very
+        narrow pane, where an hour is all the board shows anyway) rather
+        than squeeze the day jumps; Ctrl + wheel and the keys still zoom."""
+        zoom = self._zoom_box
+        extra = zoom.sizeHint().width() + self._bar.spacing()
+        need = self._bar.minimumSize().width() - (0 if zoom.isHidden()
+                                                   else extra)
+        zoom.setHidden(need + extra > self.width())
 
     # -- on screen or not --------------------------------------------------------
 
@@ -440,11 +536,16 @@ class EpgGrid(QWidget):
         super().showEvent(event)
         self._update_compact()
         self._start_timers()
+        # Resized while away (the window, or popped out / back): the scale
+        # follows before the first paint, not a moment after it.
+        if self.view.viewport().width() != self._fitted_vw:
+            self._refit()
         self._pin()
 
     def hideEvent(self, event) -> None:
         super().hideEvent(event)
         self._stop_timers()
+        self._painted = False
 
     def _start_timers(self) -> None:
         """The guide came (back) on screen: catch up with the clock and the
@@ -463,18 +564,25 @@ class EpgGrid(QWidget):
         # N and P are the guide's own keys. On the page, inside the main
         # window, the window's shortcuts would take P (pop the player out)
         # before the guide ever saw it - in its own window it always had it.
-        if (e.type() == QEvent.Type.ShortcutOverride
-                and e.key() in (Qt.Key.Key_N, Qt.Key.Key_P)
-                and not (e.modifiers() & ~Qt.KeyboardModifier.KeypadModifier)
-                and not isinstance(QApplication.focusWidget(), QLineEdit)):
+        # So are Ctrl + = / - / 0, the zoom, wherever the focus is in it.
+        if e.type() == QEvent.Type.ShortcutOverride and (
+                self._zoom_action(e) is not None
+                or (e.key() in (Qt.Key.Key_N, Qt.Key.Key_P)
+                    and not (e.modifiers()
+                             & ~Qt.KeyboardModifier.KeypadModifier)
+                    and not isinstance(QApplication.focusWidget(),
+                                       QLineEdit))):
             e.accept()
             return True
         return super().event(e)
 
     def keyPressEvent(self, event) -> None:
         # In-guide shortcuts: N jumps to now, P to the playing channel, Enter
-        # plays the selected programme. Esc is the host's: its window closes
-        # (QDialog), the page goes back (the main window's Esc).
+        # plays the selected programme, Ctrl + = / - / 0 zoom. Esc is the
+        # host's: its window closes (QDialog), the page goes back (the main
+        # window's Esc).
+        if self._zoom_key(event):
+            return
         k = event.key()
         if k == Qt.Key.Key_N:
             self._scroll_to_now()
@@ -502,10 +610,184 @@ class EpgGrid(QWidget):
             return
         super().keyPressEvent(event)
 
+    # -- zoom ----------------------------------------------------------------
+
+    @classmethod
+    def auto_span(cls, area_w: float) -> float:
+        """The hours Fit shows in a time area *area_w* px wide: the most of
+        ZOOM_SPANS that keep a half hour MIN_HALF_HOUR_W wide (the fewest
+        when not even those do)."""
+        fit = [s for s in cls.ZOOM_SPANS
+               if area_w / (s * 2) >= cls.MIN_HALF_HOUR_W]
+        return fit[-1] if fit else cls.ZOOM_SPANS[0]
+
+    def span_hours(self) -> float:
+        """The hours the board shows at once now."""
+        return self._span
+
+    def _settings_key(self) -> str:
+        return "guide_zoom_window" if self._in_window else "guide_zoom_page"
+
+    def _load_zoom(self) -> None:
+        """This place's zoom (the page's, or the window's): "auto", or the
+        span picked there."""
+        st = getattr(self.window, "settings", None)
+        try:
+            raw = str(st.value(self._settings_key(), "auto")) if st else "auto"
+            span = float(raw)
+        except (TypeError, ValueError):
+            span = 0.0
+        self._zoom_auto = span not in self.ZOOM_SPANS
+        if not self._zoom_auto:
+            self._zoom_span = span
+            self._span = span
+        self._sync_zoom_buttons()
+        if self.isVisible():
+            self._refit()
+        else:
+            self._fitted_vw = None              # worked out as it shows
+
+    def _save_zoom(self) -> None:
+        st = getattr(self.window, "settings", None)
+        if st is None:
+            return
+        value = "auto" if self._zoom_auto else f"{self._zoom_span:g}"
+        key = self._settings_key()
+        try:
+            if str(st.value(key, "auto")) != value:
+                st.setValue(key, value)
+        except Exception as e:
+            log.debug("guide: zoom not kept: %s", e)
+
+    def _sync_zoom_buttons(self) -> None:
+        self.zoom_out_btn.setEnabled(self._span < self.ZOOM_SPANS[-1])
+        self.zoom_in_btn.setEnabled(self._span > self.ZOOM_SPANS[0])
+        self.fit_btn.setChecked(self._zoom_auto)
+
+    def zoom_in(self) -> None:
+        """Fewer hours at once; the span stays until Fit."""
+        self._step_zoom(-1)
+
+    def zoom_out(self) -> None:
+        """More hours at once; the span stays until Fit."""
+        self._step_zoom(1)
+
+    def zoom_fit(self) -> None:
+        """Back to the hours that fit, following the room from now on."""
+        self._set_zoom(True)
+
+    def _step_zoom(self, step: int) -> None:
+        spans = self.ZOOM_SPANS
+        i = min(range(len(spans)), key=lambda j: abs(spans[j] - self._span))
+        new = spans[max(0, min(len(spans) - 1, i + step))]
+        if new != self._span:
+            self._set_zoom(False, new)
+
+    def _set_zoom(self, auto: bool, span: float | None = None) -> None:
+        self._zoom_auto = auto
+        if span is not None:
+            self._zoom_span = span
+        self._save_zoom()
+        self._refit()
+
+    @staticmethod
+    def _zoom_action(e) -> str | None:
+        """What a key asks of the zoom: Ctrl + = (or +) "in", Ctrl + -
+        "out", Ctrl + 0 "fit"; None for any other key."""
+        mods = e.modifiers()
+        if (not mods & Qt.KeyboardModifier.ControlModifier
+                or mods & (Qt.KeyboardModifier.AltModifier
+                           | Qt.KeyboardModifier.MetaModifier)):
+            return None
+        k = e.key()
+        if k in (Qt.Key.Key_Equal, Qt.Key.Key_Plus):
+            return "in"
+        if k == Qt.Key.Key_Minus:
+            return "out"
+        if k == Qt.Key.Key_0:
+            return "fit"
+        return None
+
+    def _zoom_key(self, e) -> bool:
+        act = self._zoom_action(e)
+        if act == "in":
+            self.zoom_in()
+        elif act == "out":
+            self.zoom_out()
+        elif act == "fit":
+            self.zoom_fit()
+        return act is not None
+
+    def _wheel_zoom(self, dy: int) -> None:
+        """Ctrl + wheel: a step per notch (high-resolution wheels and
+        touchpads add up to one); up zooms in."""
+        if dy * self._wheel_acc < 0:
+            self._wheel_acc = 0
+        self._wheel_acc += dy
+        while self._wheel_acc >= 120:
+            self._wheel_acc -= 120
+            self.zoom_in()
+        while self._wheel_acc <= -120:
+            self._wheel_acc += 120
+            self.zoom_out()
+
+    def _viewport_resized(self) -> None:
+        if self.view.viewport().width() == self._fitted_vw:
+            return
+        if self._painted:
+            self._fit_timer.start()
+        else:
+            self._refit()
+
+    def _refit(self) -> None:
+        """Work the scale out for the viewport as it is now: the span Fit
+        gives this room, or the one picked; then the board at that scale."""
+        self._fit_timer.stop()
+        vw = self.view.viewport().width()
+        area = max(2 * self.MIN_HALF_HOUR_W, vw - self.CH_COL_W)
+        self._span = (self.auto_span(area) if self._zoom_auto
+                      else self._zoom_span)
+        self._fitted_vw = vw
+        self._sync_zoom_buttons()
+        self._apply_scale(area / (self._span * 60))
+
+    def left_time(self) -> float:
+        """The time at the board's left visible edge, beside the channels."""
+        return (self._start
+                + self.view.horizontalScrollBar().value() / self._ppm * 60)
+
+    def scroll_to_time(self, ts: float) -> None:
+        """Scroll sideways so *ts* is at the left visible edge."""
+        self.view.horizontalScrollBar().setValue(
+            max(0, round((ts - self._start) / 60 * self._ppm)))
+
+    def _apply_scale(self, ppm: float) -> None:
+        """The board at *ppm* px per minute, the time at its left edge kept
+        - and "now" kept in view when it was."""
+        if abs(ppm - self._ppm) < 1e-6:
+            self._pin()                         # the rows in view, drawn
+            return
+        area = self.view.viewport().width() - self.CH_COL_W
+        left = self.left_time()
+        now = time.time()
+        now_seen = left <= now <= left + area / self._ppm * 60
+        self._ppm = ppm
+        self._grid_w = int((self._stop - self._start) / 60 * ppm)
+        if getattr(self, "_header_group", None) is None:
+            return                              # not drawn yet
+        sel, focus = self._selected, self._focus
+        self._relayout()
+        self.scroll_to_time(left)
+        if now_seen and not left <= now <= left + area / ppm * 60:
+            self._scroll_to_now()
+        self._pin()
+        if sel:
+            self._reselect(sel, focus)
+
     # -- geometry ------------------------------------------------------------
 
     def _x(self, ts: float) -> float:
-        return self.CH_COL_W + (ts - self._start) / 60 * self.PX_PER_MIN
+        return self.CH_COL_W + (ts - self._start) / 60 * self._ppm
 
     def _open_search(self) -> None:
         from .epg_search import EpgSearchDialog
@@ -518,15 +800,48 @@ class EpgGrid(QWidget):
         bigger than the label text and sit on a different baseline - so those
         buttons grew taller than their neighbours and their text no longer
         lined up. Drawn in the same 14 px box as the day-jump triangles, every
-        button in the row now has identical metrics on every platform."""
+        button in the row now has identical metrics on every platform. A
+        checked button (Fit) draws its icon in the accent's ink."""
+        icon = QIcon(self._bar_pixmap(kind, QColor(P["text"])))
+        icon.addPixmap(self._bar_pixmap(kind, QColor(P["on_accent"])),
+                       QIcon.Mode.Normal, QIcon.State.On)
+        return icon
+
+    @staticmethod
+    def _bar_pixmap(kind: str, col: QColor) -> QPixmap:
         s, scale = 14, 3
         pm = QPixmap(s * scale, s * scale)
         pm.setDevicePixelRatio(float(scale))
         pm.fill(Qt.GlobalColor.transparent)
         pr = QPainter(pm)
         pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        col = QColor(P["text"])
-        if kind == "search":
+        if kind in ("zoom_out", "zoom_in"):
+            # A minus, or a plus: the zoom's own marks.
+            pen = QPen(col)
+            pen.setWidthF(s * 0.12)
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            pr.setPen(pen)
+            pr.drawLine(QPointF(s * 0.22, s * 0.5), QPointF(s * 0.78, s * 0.5))
+            if kind == "zoom_in":
+                pr.drawLine(QPointF(s * 0.5, s * 0.22),
+                            QPointF(s * 0.5, s * 0.78))
+        elif kind == "fit":
+            # |<->| : the hours stretched to the board's two edges.
+            pen = QPen(col)
+            pen.setWidthF(s * 0.09)
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+            pr.setPen(pen)
+            pr.drawLine(QPointF(s * 0.10, s * 0.22), QPointF(s * 0.10, s * 0.78))
+            pr.drawLine(QPointF(s * 0.90, s * 0.22), QPointF(s * 0.90, s * 0.78))
+            pr.drawLine(QPointF(s * 0.25, s * 0.5), QPointF(s * 0.75, s * 0.5))
+            for tip, back in ((0.25, 0.38), (0.75, 0.62)):
+                path = QPainterPath()
+                path.moveTo(s * back, s * 0.37)
+                path.lineTo(s * tip, s * 0.5)
+                path.lineTo(s * back, s * 0.63)
+                pr.drawPath(path)
+        elif kind == "search":
             pen = QPen(col)
             pen.setWidthF(s * 0.11)
             pen.setCapStyle(Qt.PenCapStyle.RoundCap)
@@ -583,7 +898,7 @@ class EpgGrid(QWidget):
             pr.setBrush(col)
             pr.drawEllipse(QRectF(s * 0.24, s * 0.24, s * 0.52, s * 0.52))
         pr.end()
-        return QIcon(pm)
+        return pm
 
     def _tri_icon(self, left: bool) -> QIcon:
         """A drawn left/right triangle for the icon-only day-jump buttons.
@@ -638,7 +953,7 @@ class EpgGrid(QWidget):
     def _scroll_hours(self, hours: int) -> None:
         """Jump the timeline by whole days/hours without dragging."""
         bar = self.view.horizontalScrollBar()
-        bar.setValue(bar.value() + int(hours * 60 * self.PX_PER_MIN))
+        bar.setValue(bar.value() + int(hours * 60 * self._ppm))
 
     def _scroll_tonight(self) -> None:
         """Jump to prime time (20:00) today - the slot people actually plan
@@ -671,12 +986,48 @@ class EpgGrid(QWidget):
         self._fill_rows(preload=True)
 
     def _stop_timers(self, *_a) -> None:
-        for timer in (self._refresh, self._epg_poll, self._guide_poll, self._preload):
+        for timer in (self._refresh, self._epg_poll, self._guide_poll,
+                      self._preload, self._fit_timer):
             timer.stop()
 
     # -- build ---------------------------------------------------------------
 
     def _build(self) -> None:
+        self._clear_scene()
+        self._selected = None
+        self._build_gen += 1       # invalidates in-flight logo callbacks
+        self._focus = None
+        # Drawn while the guide still loads: drawn again once it is in, also
+        # when that happened while the guide was off screen.
+        self._built_unready = not self._epg_ready()
+        self.play_btn.setEnabled(False)
+        self.desc.hide()
+        text = self.filter.text().lower().strip()
+        chans = [c for c in self._all_channels
+                 if not text or text in (c.get("name") or "").lower()]
+        self._rows = [(ch, []) for ch in chans]
+        # Known before any row is drawn, so the guide can open on (and jump
+        # to) the channel being watched even when its row is far down.
+        self._playing_row = next(
+            (i for i, ch in enumerate(chans) if self._is_playing(ch)), None)
+        self._lay_out_board()
+        self._pin()
+        if hasattr(self, "playing_btn"):
+            self.playing_btn.setVisible(self._playing_row is not None)
+            self._fit_bar()
+
+    def _relayout(self) -> None:
+        """The board again at a new scale: the axis, its width and (as
+        _pin asks for them) the rows on screen. The channel list, the filter
+        and the playing row stay as they are, and no row off screen is
+        drawn - a line-up of thousands costs what the rows in view cost."""
+        for row in self._row_items:
+            self._rows[row] = (self._rows[row][0], [])
+        self._clear_scene()
+        self._focus = None
+        self._lay_out_board()
+
+    def _clear_scene(self) -> None:
         # Null the pinned-group refs BEFORE clearing. scene.clear() deletes
         # the underlying C++ items, and clearing also nudges the scrollbars,
         # whose valueChanged fires _pin synchronously - which would then touch
@@ -694,25 +1045,13 @@ class EpgGrid(QWidget):
         finally:
             hbar.blockSignals(was_h)
             vbar.blockSignals(was_v)
-        self._selected = None
         self._sel_outline = None   # dropped by scene.clear(); recreated on pick
-        self._build_gen += 1       # invalidates in-flight logo callbacks
-        self._focus = None
-        # Drawn while the guide still loads: drawn again once it is in, also
-        # when that happened while the guide was off screen.
-        self._built_unready = not self._epg_ready()
-        self.play_btn.setEnabled(False)
-        self.desc.hide()
-        text = self.filter.text().lower().strip()
-        chans = [c for c in self._all_channels
-                 if not text or text in (c.get("name") or "").lower()]
-        self._rows = [(ch, []) for ch in chans]
         self._row_items = {}
-        # Known before any row is drawn, so the guide can open on (and jump
-        # to) the channel being watched even when its row is far down.
-        self._playing_row = next(
-            (i for i, ch in enumerate(chans) if self._is_playing(ch)), None)
-        grid_h = max(self.ROW_H, len(chans) * self.ROW_H)
+
+    def _lay_out_board(self) -> None:
+        """The scene's size, the pinned groups, the grid lines, the time
+        header and the corner, at the current scale - no rows yet."""
+        grid_h = max(self.ROW_H, len(self._rows) * self.ROW_H)
         self.scene.setSceneRect(0, 0, self.CH_COL_W + self._grid_w,
                                 self.HEADER_H + grid_h)
 
@@ -732,9 +1071,40 @@ class EpgGrid(QWidget):
             0, 0, self.CH_COL_W, self.HEADER_H,
             QPen(QColor(P["border"])), QBrush(head_bg))
         self._corner.setZValue(30)
-        self._pin()
-        if hasattr(self, "playing_btn"):
-            self.playing_btn.setVisible(self._playing_row is not None)
+
+    def _reselect(self, sel: dict, focus: tuple[int, int] | None) -> None:
+        """The selection again after a new scale: the same programme (or
+        channel) in its row as drawn now, outlined; it stays selected even
+        when it is too short to draw at this scale."""
+        ch = sel["channel"]
+        row = focus[0] if focus and focus[0] < len(self._rows) else None
+        if row is None or self._rows[row][0] is not ch:
+            row = next((i for i, (c, _b) in enumerate(self._rows)
+                        if c is ch), None)
+        self._selected = sel
+        if row is None:
+            return
+        self._ensure_row(row)
+        blocks = self._rows[row][1]
+        p = sel["prog"]
+        for col, b in enumerate(blocks):
+            bp = b["data"]["prog"]
+            if (bp is p is None) or (
+                    bp is not None and p is not None
+                    and bp["start_timestamp"] == p["start_timestamp"]
+                    and bp.get("title") == p.get("title")):
+                self._selected = b["data"]
+                self._focus = (row, col)
+                self._highlight_item(b["item"])
+                return
+        if blocks:
+            ts = (time.time() if p is None
+                  else (p["start_timestamp"] + p["stop_timestamp"]) / 2)
+            self._focus = (row, self._col_for_time(blocks, ts))
+        cell = next((it for in_group, it in self._row_items.get(row, ())
+                     if in_group and isinstance(it.data(0), dict)), None)
+        if p is None and cell is not None:      # the channel's own cell
+            self._highlight_item(cell)
 
     # -- rows on demand --------------------------------------------------------
 
@@ -758,8 +1128,9 @@ class EpgGrid(QWidget):
         few hundred rows in the scene, never all. The rows just beyond the
         viewport follow once scrolling pauses (*preload*), so dragging the
         scrollbar through thousands of channels draws only what is on screen
-        at each step."""
-        if not self._rows:
+        at each step. Nothing is drawn before the board has its scale (as
+        it first comes on screen) - it would only be drawn again."""
+        if not self._rows or self._fitted_vw is None:
             return
         top, bottom = self._visible_rows()
         extra = self.PRELOAD_ROWS if preload else 1
@@ -788,16 +1159,24 @@ class EpgGrid(QWidget):
             self.scene.removeItem(it)
         self._rows[row] = (self._rows[row][0], [])
 
+    def _half_hours(self) -> list[float]:
+        """The board's half-hour marks, from its start to its stop."""
+        n = int((self._stop - self._start) // 1800)
+        return [self._start + i * 1800 for i in range(n + 1)]
+
+    @staticmethod
+    def _on_hour(ts: float) -> bool:
+        """A mark on the hour of the clock here (not of UTC: a half-hour
+        time zone has its hours on UTC's half hours)."""
+        return datetime.fromtimestamp(ts).minute == 0
+
     def _draw_grid_lines(self, grid_h: int) -> None:
-        t = self._start
-        while t <= self._stop:
+        for t in self._half_hours():
             x = self._x(t)
-            on_hour = int(t) % 3600 == 0
             line = self.scene.addLine(
                 x, 0, x, self.HEADER_H + grid_h,
-                QPen(QColor(P["border"]), 1 if on_hour else 0))
+                QPen(QColor(P["border"]), 1 if self._on_hour(t) else 0))
             line.setZValue(1)
-            t += 1800
 
     def _draw_time_header(self) -> None:
         band = QGraphicsRectItem(0, 0, self.CH_COL_W + self._grid_w,
@@ -805,17 +1184,22 @@ class EpgGrid(QWidget):
         band.setBrush(QBrush(QColor(P["pane"])))
         band.setPen(QPen(Qt.PenStyle.NoPen))
         self._header_group.addToGroup(band)
-        # Every half hour, the hours in the text colour: the middle pane shows
-        # an hour of the board or so, often no hour mark at all.
-        t = self._start
-        while t <= self._stop:
+        # Every half hour, the hours in the text colour: a narrow board
+        # shows an hour of it or so, often no hour mark at all. Zoomed out
+        # until a half hour is narrower than its label, the hours alone.
+        marks = self._half_hours()
+        label_w = QFontMetricsF(QFont()).horizontalAdvance("00:00")
+        if 30 * self._ppm < label_w + 14 and len(marks) > 1:
+            first = 1 if (not self._on_hour(marks[0])
+                          and self._on_hour(marks[1])) else 0
+            marks = marks[first::2]
+        for t in marks:
             lbl = QGraphicsSimpleTextItem(
                 datetime.fromtimestamp(t).strftime("%H:%M"))
-            lbl.setBrush(QColor(P["text"] if int(t) % 3600 == 0
+            lbl.setBrush(QColor(P["text"] if self._on_hour(t)
                                 else P["muted"]))
             lbl.setPos(self._x(t) + 4, 7)
             self._header_group.addToGroup(lbl)
-            t += 1800
 
     def _is_playing(self, ch: dict) -> bool:
         """True if this channel is the one currently playing live, so the row
@@ -995,6 +1379,12 @@ class EpgGrid(QWidget):
             data = {"channel": ch, "prog": p}
             block = self._card(x1 + 1, y + 4, x2 - x1 - 3, self.ROW_H - 8,
                                state, tones, data)
+            # The whole title and its time, however narrow the card is
+            # drawn (zoomed out, its title is cut short or left out).
+            block.setToolTip(
+                f"{p.get('title') or '?'}\n"
+                f"{datetime.fromtimestamp(p['start_timestamp']):%H:%M}–"
+                f"{datetime.fromtimestamp(p['stop_timestamp']):%H:%M}")
             # State glyphs on the block itself: a scheduled/running recording
             # and a set reminder used to be visible only in the context menu.
             prefix = ""
@@ -1036,7 +1426,8 @@ class EpgGrid(QWidget):
                                "x2": self.CH_COL_W + self._grid_w,
                                "y": y, "text": text, "_state": "past"})
             items.append((False, block))
-            items.append((False, label))
+            if label is not None:
+                items.append((False, label))
         self._rows[row] = (ch, row_blocks)
 
     @staticmethod
@@ -1079,8 +1470,14 @@ class EpgGrid(QWidget):
         self.scene.addItem(item)
         return item
 
+    @staticmethod
+    def _cut_to_nothing(shown: str, full: str) -> bool:
+        """A title cut to less than two letters ("S…"): noise on a narrow
+        card, which shows none instead (its tooltip has the title)."""
+        return shown != full and len(shown.rstrip("…").strip()) < 2
+
     def _block_label(self, text, x1, x2, y, color) -> \
-            QGraphicsSimpleTextItem:
+            QGraphicsSimpleTextItem | None:
         """A top-level (not block-child) programme title, so it can be
         re-anchored to the left visible edge as the timeline scrolls
         (_reflow_labels) - the title stays readable while the card slides
@@ -1092,10 +1489,12 @@ class EpgGrid(QWidget):
         letters rather than the card. Only the card is clickable; the title is
         just paint on top of it."""
         label = QGraphicsSimpleTextItem(text)
+        self._elide(label, x2 - x1 - 14)
+        if self._cut_to_nothing(label.text(), text):
+            return None
         label.setBrush(color)
         label.setZValue(8)
         label.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
-        self._elide(label, x2 - x1 - 14)
         label.setPos(x1 + 8, y + self.LABEL_DY)
         self.scene.addItem(label)
         return label
@@ -1163,15 +1562,21 @@ class EpgGrid(QWidget):
                 self._drop_row(row)
         self._fill_rows()
         self.playing_btn.setVisible(new is not None)
+        self._fit_bar()
 
     @staticmethod
     def _elide(item: QGraphicsSimpleTextItem, max_w: float) -> None:
         if item.boundingRect().width() <= max_w:
             return
+        # One measure for the whole title, not one per letter taken off: a
+        # zoomed-out board has many narrow cards with long titles to cut.
+        text = QFontMetricsF(item.font()).elidedText(
+            item.text(), Qt.TextElideMode.ElideRight, max(0.0, max_w))
+        item.setText(text or "…")
         text = item.text()
-        while text and item.boundingRect().width() > max_w:
-            text = text[:-1]
-            item.setText(text + "…")
+        while len(text) > 1 and item.boundingRect().width() > max_w:
+            text = text[:-2] + "…"
+            item.setText(text)
 
     # -- sticky header / column ---------------------------------------------
 
@@ -1234,6 +1639,9 @@ class EpgGrid(QWidget):
                     lbl.setPos(left + pad, y + self.LABEL_DY)
                     self._set_label(lbl, rb["text"], avail)
                     rb["_stuck"] = True
+                    if self._cut_to_nothing(lbl.text(), rb["text"]):
+                        lbl.setVisible(False)
+                        rb["_hidden"] = True
 
     # -- interaction ---------------------------------------------------------
 
@@ -1525,7 +1933,10 @@ class EpgGridDialog(QDialog):
 
         g = self.grid
         scr = self.screen().availableGeometry() if self.screen() else None
-        want_w = g.CH_COL_W + g._grid_w + 40
+        # Sized by the board at the reference scale (the board then fits
+        # whatever the window is).
+        want_w = g.CH_COL_W + int((g._stop - g._start) / 60
+                                  * g.PX_PER_MIN) + 40
         want_h = g.HEADER_H + len(g.channels) * g.ROW_H + 150
         # Cap to the main window, not the whole screen, so the guide stays in
         # proportion to the app instead of ballooning to 1500 px on a big

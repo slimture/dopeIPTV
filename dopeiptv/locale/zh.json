@@ -1842,5 +1842,8 @@
   "restore_cannot_replace": "此备份中没有播放列表或设置，因此无法替换这里现有的内容。",
   "restore_kept": "此备份中没有，因此保持本机原样：{what}。",
   "restore_risky_source": "播放列表“{name}”：{what}",
-  "restore_token_note": "远程控制的令牌绝不会从备份中取用：开启远程控制或共享时，会在这台计算机上新建一个。"
+  "restore_token_note": "远程控制的令牌绝不会从备份中取用：开启远程控制或共享时，会在这台计算机上新建一个。",
+  "epg_zoom_out": "缩小",
+  "epg_zoom_in": "放大",
+  "epg_zoom_fit": "适应窗口"
 }
