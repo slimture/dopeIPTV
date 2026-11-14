@@ -172,6 +172,15 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
       + (if $MORE_EMAIL == "" then "" else " data-more=\"\(t("donate_more") | h)\" data-moremail=\"\($MORE_EMAIL | h)\"" end)
       + " data-lang=\"\($lang | h)\"></div>\n"
     end;
+  # Feedback from the footer's link (nav.js): its words, on every page.
+  def feedback_i18n:
+    "<div id=\"feedback-i18n\" hidden"
+    + ([[["title", "fbs_title"], ["intro", "fbs_intro"], ["topic", "fbs_topic"], ["bug", "fbs_t_bug"],
+         ["idea", "fbs_t_idea"], ["like", "fbs_t_like"], ["question", "fbs_t_question"], ["where", "fbs_where"],
+         ["app", "fbs_app"], ["site", "fbs_site"], ["ph", "fbs_ph"], ["send", "fbs_send"], ["sent", "fbs_sent"],
+         ["failed", "fbs_failed"], ["wait", "fbs_wait"], ["privacy", "fbs_privacy"], ["close", "donate_close"]][]
+        | . as [$k, $key] | " data-\($k)=\"\(t($key) | h)\""] | add)
+    + "></div>\n";
   def nav($current):
     ($current == "home") as $home
     | (if $home then "" else "/" end) as $base
@@ -222,7 +231,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
        | expand({brand_href: (if $home then "#top" else "/" end), nav_base: $base};
                 {navlinks: ($navlinks + $navdonate + $navheart), langpick: $langpick,
                  menuitems: ($menuitems + $menudonate)}))
-      + donate_i18n;
+      + donate_i18n + feedback_i18n;
   def common:
     {lang: ($lang | h),
      dir: (if ($S.rtl | index($lang)) then "rtl" else "ltr" end),

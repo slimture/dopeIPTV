@@ -694,6 +694,17 @@ Stripe's Dashboard - the same key the donor got) or by hand for someone who
 gave another way; it also counts the keys handed out. Nothing about the
 donor is kept: supporters.jsonl beside the statistics has an id and a time.
 
+## Feedback from the site's footer
+
+The footer's "Feedback" (nav.js, words in site/lang `fbs_*`, reusing the
+app's) sends to the same /feedback/report as the app, marked
+`"from": "site"`: the admin page's Feedback shows it as from the website.
+Only from the site's own pages (Origin), a field people never see must be
+empty (a robot filling it is thanked and nothing kept), no sending in the
+first three seconds, a minute between two from one browser - and the
+service's own limits on top. Deploy: the site files and `donate/` as usual,
+`service iptv_donate restart`.
+
 ## Moving to dopeiptv.org
 
 The site's address is dopeiptv.org; iptv.dope.rs sends every request on to
@@ -704,6 +715,9 @@ engines still use it. The content server's file keeps its name
 
 **1. DNS (registrar).** `dopeiptv.org` and `www.dopeiptv.org`: the same A
 (and AAAA, if it has one) as `iptv.dope.rs`.
+
+The TLS-front proxy is a jail of its own, `webproxy` (`bastille console
+webproxy`); its files below are in that jail's /usr/local/etc/nginx/.
 
 **2. A certificate (the TLS-front proxy).** Before the site moves,
 plain http:// on the new names only has to answer certbot. Put this in

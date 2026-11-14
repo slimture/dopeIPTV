@@ -1615,3 +1615,14 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
 .donate-btn.invite { animation: invite 1.3s ease-in-out 2; }
 @keyframes invite { 50% { transform: scale(1.07); } }
 @media (prefers-reduced-motion: reduce) { .donate-btn.invite { animation: none; } }
+
+/* Feedback from the footer (nav.js): the donate dialog's look, its own
+   choices. */
+.fbs-label { margin: 0 0 -6px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.fbs-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.dn-chip.fbs-chip { font-size: 14px; padding: 9px 14px; }
+.fbs-text { min-height: 110px; resize: vertical; font: inherit; line-height: 1.5; }
+.fbs-trap { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.fbs-send { align-self: stretch; justify-content: center; padding: 14px 18px; font-size: 16px; }
+.fbs-send:disabled { opacity: .55; cursor: default; transform: none; }
+.fbs-thanks { margin: 18px 0; text-align: center; font-weight: 650; font-size: 1.05rem; }

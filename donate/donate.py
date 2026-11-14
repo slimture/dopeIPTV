@@ -1165,13 +1165,21 @@ class Handler(BaseHTTPRequestHandler):
         data = self._body(60000)
         if data is None:
             return self._send(400, {"error": "body"})
+        if data.get("from") == "site":
+            # The footer's form: from the site's own pages only, and a robot
+            # that filled the field people never see is thanked, not kept.
+            if (self.headers.get("Origin") or "").rstrip("/") != ORIGIN:
+                return self._send(403, {"error": "origin"})
+            if data.get("hp"):
+                return self._send(200, {"ok": True})
         import admin
         import feedback
         status, body = feedback.accept(CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats")), data)
         if status == 200 and not body.get("duplicate") and push_ready():
             kind = str(data.get("kind") or "feedback")
             threading.Thread(target=push, args=(
-                {"error": "An error report", "crash": "A crash report"}.get(kind, "Feedback") + " from the app",
+                {"error": "An error report", "crash": "A crash report"}.get(kind, "Feedback")
+                + (" from the website" if data.get("from") == "site" else " from the app"),
                 f"dopeIPTV {str(data.get('version') or '?')[:20]} · {str(data.get('os') or '?')[:20]}",
                 "/admin/#feedback", "feedback"), daemon=True).start()
         return self._send(status, body)

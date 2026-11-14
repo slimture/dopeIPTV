@@ -1,7 +1,8 @@
 """Error reports and feedback from the app, and the admin's view of them.
 
 The app sends POST /feedback/report - kind, version, system and the text
-the person read, changed and sent (core/report.py there scrubs it of
+the person read, changed and sent (the site's footer sends feedback the
+same way, marked "from": "site") (core/report.py there scrubs it of
 anything that identifies a stream or a person first). Nothing else is
 kept: no address, no IP (the rate limit holds it in memory only), no
 user agent. The text is scrubbed once more here, in case an older app or
@@ -33,7 +34,8 @@ KINDS = ("error", "crash", "feedback")
 MAX_TEXT = 48_000
 #: What feedback is about, where, how often: the app's short lists, nothing else kept.
 CHOICES = {"topic": ("bug", "idea", "like", "question"),
-           "area": ("playback", "guide", "recording", "lists", "settings", "cast", "updates", "other"),
+           "area": ("playback", "guide", "recording", "lists", "settings", "cast", "updates", "other",
+                    "website"),
            "often": ("always", "sometimes", "once")}
 DAY_MOST = 2000
 SAME_SIG_DAY = 50
@@ -131,6 +133,8 @@ def accept(stats_dir: str, body: dict) -> tuple[int, dict]:
            "version": version, "os": system, "sig": signature(kind, text), "text": text}
     if kind == "feedback":
         row.update({k: str(body.get(k)) for k, allowed in CHOICES.items() if body.get(k) in allowed})
+        if body.get("from") == "site":
+            row["from"] = "site"
     os.makedirs(stats_dir, exist_ok=True)
     path, _state = _paths(stats_dir)
     with _LOCK:
@@ -248,7 +252,7 @@ def summary(stats_dir: str, days: int) -> dict:
             topics[r.get("topic") or ""] = topics.get(r.get("topic") or "", 0) + 1
     items = [{"id": r["id"], "t": r["t"], "kind": r["kind"], "version": r["version"], "os": r["os"],
               "sig": r.get("sig") or "", "preview": _preview(r), "state": state.get(r["id"], "new"),
-              **{k: r[k] for k in CHOICES if r.get(k)}}
+              **{k: r[k] for k in (*CHOICES, "from") if r.get(k)}}
              for r in sorted(rows, key=lambda r: -r["t"]) if r.get("text")][:300]
     open_groups = sum(1 for g in group_list if g["state"] != "fixed")
     return {"total": len(rows), "kinds": kinds, "open_groups": open_groups, "topics": topics,

@@ -1343,3 +1343,122 @@ window.iptvCopyButtons(document);
   });
 })();
 
+/* Feedback from the footer's link: what it is about, the app or this
+ * website, a few words - to the admin page's Feedback part, as the app's
+ * Send feedback does (POST /feedback/report, donate/feedback.py), marked as
+ * from the website. Nothing about the visitor goes with it; the service
+ * scrubs the words of addresses and e-mail addresses. Not a door for
+ * spam: a field only a robot fills in, no sending in the first seconds, a
+ * minute between two from one browser - and the service's own limits.
+ * The words are in #feedback-i18n (render.jq).
+ */
+(function () {
+  "use strict";
+  var words = document.getElementById("feedback-i18n");
+  if (!words || !window.fetch || typeof HTMLDialogElement !== "function") { return; }
+  var T = words.dataset, dlg = null, el = {}, opened = 0, topic = "", where = "app";
+  var TOPICS = ["bug", "idea", "like", "question"];
+  function mk(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) { n.className = cls; }
+    if (text) { n.textContent = text; }
+    return n;
+  }
+  function chipRow(keys, pick, label) {
+    var row = mk("div", "fbs-chips");
+    row.setAttribute("role", "radiogroup");
+    row.setAttribute("aria-label", label);
+    keys.forEach(function (k) {
+      var b = mk("button", "dn-chip fbs-chip", T[k]); b.type = "button";
+      b.setAttribute("role", "radio"); b.dataset.key = k;
+      b.addEventListener("click", function () { pick(k); mark(); });
+      row.append(b);
+    });
+    return row;
+  }
+  function mark() {
+    [].forEach.call(dlg.querySelectorAll(".fbs-chip"), function (b) {
+      var on = b.dataset.key === topic || b.dataset.key === where;
+      b.classList.toggle("is-on", on);
+      b.setAttribute("aria-checked", on ? "true" : "false");
+    });
+    el.send.disabled = !topic || el.text.value.trim().length < 3;
+  }
+  function build() {
+    dlg = mk("dialog", "dn fbs");
+    dlg.setAttribute("aria-labelledby", "fbs-title");
+    var head = mk("div", "dn-head"), ht = mk("div");
+    var h = mk("h2", "", T.title); h.id = "fbs-title";
+    ht.append(h, mk("p", "", T.intro));
+    var x = mk("button", "dn-x", "×"); x.type = "button"; x.setAttribute("aria-label", T.close);
+    x.addEventListener("click", close);
+    head.append(ht, x);
+    el.form = mk("div", "dn-step");
+    var t1 = mk("p", "fbs-label", T.topic), t2 = mk("p", "fbs-label", T.where);
+    el.text = mk("textarea", "dn-input fbs-text");
+    Object.assign(el.text, { rows: 5, maxLength: 4000, placeholder: T.ph });
+    el.text.setAttribute("aria-label", T.ph);
+    el.text.addEventListener("input", mark);
+    // Left empty by people (it is out of sight and out of the tab order);
+    // a robot filling in every field gives itself away.
+    var trap = mk("label", "fbs-trap"); trap.setAttribute("aria-hidden", "true");
+    el.trap = mk("input"); Object.assign(el.trap, { type: "text", name: "website", tabIndex: -1, autocomplete: "off" });
+    trap.append(el.trap);
+    el.err = mk("p", "dn-error"); el.err.hidden = true; el.err.setAttribute("role", "alert");
+    el.send = mk("button", "btn primary fbs-send", T.send); el.send.type = "button";
+    el.send.addEventListener("click", send);
+    el.form.append(t1, chipRow(TOPICS, function (k) { topic = k; }, T.topic),
+                   t2, chipRow(["app", "site"], function (k) { where = k; }, T.where),
+                   el.text, trap, el.err, el.send, mk("p", "dn-lock", T.privacy));
+    el.done = mk("div", "dn-step fbs-done"); el.done.hidden = true;
+    el.done.append(mk("p", "fbs-thanks", T.sent));
+    var body = mk("div", "dn-body");
+    body.append(el.form, el.done);
+    dlg.append(head, body);
+    dlg.addEventListener("cancel", function (e) { e.preventDefault(); close(); });
+    dlg.addEventListener("click", function (e) { if (e.target === dlg) { close(); } });
+    document.body.appendChild(dlg);
+  }
+  function open() {
+    if (!dlg) { build(); }
+    el.form.hidden = false; el.done.hidden = true; el.err.hidden = true;
+    opened = Date.now();
+    mark();
+    dlg.showModal();
+  }
+  function close() { if (dlg && dlg.open) { dlg.close(); } }
+  function fail(text) { el.err.textContent = text; el.err.hidden = false; el.send.disabled = false; }
+  function last() { try { return Number(localStorage.getItem("fbs-last") || 0); } catch (e) { return 0; } }
+  function thanked() {
+    el.form.hidden = true; el.done.hidden = false;
+    el.text.value = ""; topic = ""; mark();
+  }
+  function send() {
+    var text = el.text.value.trim();
+    if (!topic || text.length < 3) { return; }
+    // A robot: thanked, and nothing sent.
+    if (el.trap.value || Date.now() - opened < 3000) { thanked(); return; }
+    if (Date.now() - last() < 60000) { fail(T.wait); return; }
+    el.send.disabled = true; el.err.hidden = true;
+    fetch("/feedback/report", { method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "X-Dopeiptv-Report": "1" },
+      body: JSON.stringify({ kind: "feedback", from: "site", version: "site", os: "Web", text: text,
+                             topic: topic, area: where === "site" ? "website" : "", hp: el.trap.value }) })
+      .then(function (r) {
+        if (r.ok) {
+          try { localStorage.setItem("fbs-last", String(Date.now())); } catch (e) { /* none kept */ }
+          thanked();
+          return;
+        }
+        fail(r.status === 429 ? T.wait : T.failed);
+      })
+      .catch(function () { fail(T.failed); });
+  }
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest ? e.target.closest("a[data-feedback]") : null;
+    if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) { return; }
+    e.preventDefault();
+    open();
+  });
+  if (window.location.hash === "#feedback") { open(); }
+})();
