@@ -10,6 +10,7 @@ from typing import Any
 
 from ..core import nerd
 from ..core.log import log
+from ..core.privacy import for_log
 from ..core.workers import run_async
 from ..i18n import tr
 from ..services import failover
@@ -51,10 +52,10 @@ class _FailoverMixin:
 
         def done(found) -> None:
             if gen != self._failover_gen:
-                log.info("failover: %s found too late - something else was chosen", name)
+                log.info("failover: %s found too late - something else was chosen", for_log(name))
                 return
             if not found:
-                log.info("failover: no other source has %s", name)
+                log.info("failover: no other source has %s", for_log(name))
                 fallback()
                 return
             pl, row, url = found

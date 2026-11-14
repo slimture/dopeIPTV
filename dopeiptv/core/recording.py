@@ -54,10 +54,14 @@ def free_path(path: str, current: str | None = None) -> str:
 
 
 def safe_filename(name: str | None) -> str:
-    """Strip characters that are unsafe in filenames."""
+    """Strip characters that are unsafe in filenames; at most 120
+    characters and 200 bytes, so the date, a " (2)" and the extension added
+    to it stay under a file system's 255 bytes a name (120 characters of
+    Japanese alone were 360)."""
     cleaned = "".join(c for c in (name or "recording")
-                      if c not in '/\\:*?"<>|').strip()
-    return cleaned[:120] or "recording"
+                      if c not in '/\\:*?"<>|').strip()[:120]
+    cleaned = cleaned.encode("utf-8")[:200].decode("utf-8", "ignore").strip()
+    return cleaned or "recording"
 
 
 def format_size(nbytes: float) -> str:
@@ -95,6 +99,7 @@ class RecordingManager(QObject):
         self._timer.start()
         self.session_cap: int | None = None
         self.stop_inplayer_cb: Callable | None = None
+        self._ended_on_quit: list[dict] = []
 
     # -- storage location ---------------------------------------------------
 
@@ -433,9 +438,12 @@ class RecordingManager(QObject):
 
     def _after(self, j: dict) -> None:
         """A recording is done and has data: the Nerd page's command for it,
-        if there is one."""
+        if there is one - once."""
         from . import nerd
         from .rec_extras import run_post
+        if j.get("_after_ran"):
+            return
+        j["_after_ran"] = True
         n_ = nerd.current()
         cmd = n_.get("nerd_rec_post").strip() if n_.on else ""
         path = j.get("path") or ""
@@ -621,6 +629,10 @@ class RecordingManager(QObject):
             self.jobs_changed.emit()
 
     def shutdown(self) -> None:
+        """The app closes: every recording ends. The command after a
+        recording runs for them in after_shutdown(), once the player has
+        let go of its file - their usual check, 1.5 s later, never comes."""
+        self._ended_on_quit = [j for j in self.jobs if j["status"] == "recording"]
         self.finish_all_inplayer("app closed")
         for j in self.jobs:
             if j["status"] == "recording" and j.get("recorder") is not None:
@@ -628,4 +640,28 @@ class RecordingManager(QObject):
                 j["status"] = "done"
             elif j["status"] == "recording" and not j.get("inplayer"):
                 self._stop_proc(j)
+                j["status"] = "done"
         self._save()
+
+    #: How long the app's closing waits, in all, for the rewind buffer's
+    #: recordings to write their last bytes before their command runs.
+    QUIT_WAIT = 1.0
+
+    def after_shutdown(self) -> None:
+        """The command after a recording, for each one the closing ended
+        and that holds data (started on its own, as always: the app does
+        not wait for it). A buffer's recording still writing after
+        QUIT_WAIT is left without it rather than hold the closing up."""
+        ended, self._ended_on_quit = self._ended_on_quit, []
+        deadline = time.monotonic() + self.QUIT_WAIT
+        for j in ended:
+            rec = j.get("recorder")
+            if rec is not None:
+                rec.join(max(0.0, deadline - time.monotonic()))
+                if rec.alive:
+                    continue
+            try:
+                self._after(j)
+            except Exception as e:      # never in the way of closing
+                from .log import log
+                log.warning("recording: the command after it failed: %s", e)

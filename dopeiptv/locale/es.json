@@ -1748,5 +1748,6 @@
   "supporter_remove": "Quitar la clave",
   "supporter_again": "Donar de nuevo",
   "supporter_menu": "Clave de colaborador",
-  "supporter_tip": "Colaborador desde el {date}, ¡gracias!"
+  "supporter_tip": "Colaborador desde el {date}, ¡gracias!",
+  "report_waiting": "dopeIPTV encontró un error. Haz clic aquí para leer el informe; también te espera en el menú."
 }

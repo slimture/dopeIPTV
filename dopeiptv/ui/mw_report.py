@@ -1,11 +1,17 @@
 """Error reports and feedback in the window (core/report.py builds and
 scrubs them): "Send feedback…" in the app menu, an offer to send a report
 when something went wrong this run or the app went down last time - never
-sent until the person has read it and pressed Send."""
+sent until the person has read it and pressed Send.
+
+An error is offered after the code that raised it is done (a queued
+signal: the hook runs inside the failing slot - a paint event, the
+player's poll - and a window's own event loop there ran everything else
+inside it), and never over a video: while one plays or the window is
+fullscreen the report waits in the app menu, said by a note that opens it."""
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+from PyQt6.QtCore import QObject, Qt, QTimer, pyqtSignal
 
 from ..core import report
 from ..core.log import log, log_dir
@@ -22,11 +28,18 @@ class _Relay(QObject):
 class _ReportMixin:
     _report_relay: _Relay | None = None
     _report_offered: set | None = None
+    _report_waiting: list | None = None
+    _report_wait_action = None
+    _report_crash = ""
 
     def _report_init(self) -> None:
         self._report_offered = set()
+        self._report_waiting = []
         self._report_relay = _Relay()
-        self._report_relay.raised.connect(self._offer_error_report)
+        # Queued: offered from the event loop once the failing code is
+        # done, never from inside it (the error hook runs there).
+        self._report_relay.raised.connect(self._offer_error_report,
+                                          Qt.ConnectionType.QueuedConnection)
         report.add_listener(self._report_relay.raised.emit)
         # Answers to feedback: asked a little after the start, then every six
         # hours, only while there is a report young enough to ask about.
@@ -35,11 +48,16 @@ class _ReportMixin:
         self._answers_timer.timeout.connect(self._ask_answers)
         self._answers_timer.start()
         QTimer.singleShot(45_000, self._ask_answers)
-        crash = report.pending_crash()
-        if crash:
-            QTimer.singleShot(4000, lambda: self.open_report("crash", crash, tr("report_crash_intro")))
+        self._report_crash = report.pending_crash()
+        if self._report_crash:
+            QTimer.singleShot(4000, self._offer_crash_report)
 
     def _build_report_action(self, menu):
+        # An error's report that waits (it came while a video played): here
+        # only while one does.
+        self._report_wait_action = menu.addAction(tr("report_title") + "…")
+        self._report_wait_action.setVisible(False)
+        self._report_wait_action.triggered.connect(self.open_waiting_report)
         action = menu.addAction(tr("feedback_menu") + "…")
         action.triggered.connect(lambda: self.open_report("feedback"))
         return action
@@ -96,7 +114,49 @@ class _ReportMixin:
                 or len(self._report_offered) >= self.REPORT_OFFERS:
             return
         self._report_offered.add(key)
-        self.open_report("error", trace, tr("report_error_intro"))
+        self._offer_report("error", trace, "report_error_intro")
+
+    def _offer_crash_report(self) -> None:
+        crash, self._report_crash = getattr(self, "_report_crash", ""), ""
+        if crash:
+            self._offer_report("crash", crash, "report_crash_intro")
+
+    def _offer_report(self, kind: str, trace: str, intro: str) -> None:
+        if not self._report_would_interrupt():
+            self.open_report(kind, trace, tr(intro))
+            return
+        # Not over a video: it waits in the menu; the note opens it.
+        if self._report_waiting is None:
+            self._report_waiting = []
+        self._report_waiting.append((kind, trace, intro))
+        if self._report_wait_action is not None:
+            self._report_wait_action.setVisible(True)
+        self._show_action_toast(tr("report_waiting"), 10_000, self.open_waiting_report)
+        log.info("report: the %s report waits in the menu (a video is on)", kind)
+
+    def _report_would_interrupt(self) -> bool:
+        """A video plays (here, popped out or in multiview) or the window
+        is fullscreen: a window of questions now would stop the person
+        watching."""
+        if self.isFullScreen() or getattr(self, "_player_fs", False):
+            return True
+        pop = getattr(self, "_popout_win", None)
+        if pop is not None and pop.isFullScreen():
+            return True
+        if getattr(getattr(self, "player", None), "current_url", None):
+            return True
+        mv = getattr(self, "_multiview_win", None)
+        return mv is not None and any(getattr(c, "url", None) for c in getattr(mv, "cells", []))
+
+    def open_waiting_report(self) -> None:
+        """The report of an error that came while a video played - the
+        oldest first, the menu entry gone with the last."""
+        waiting = self._report_waiting or []
+        kind, trace, intro = waiting.pop(0) if waiting else ("", "", "")
+        if self._report_wait_action is not None:
+            self._report_wait_action.setVisible(bool(waiting))
+        if trace:
+            self.open_report(kind, trace, tr(intro))
 
     def _feedback_details(self, opts: dict) -> str:
         """What feedback carries besides the person's words, as they chose:

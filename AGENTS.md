@@ -81,8 +81,8 @@ map and the one-way import rule.
 | `core/nerd_check.py` | Does a Nerd setting work? Each tried for real (proxy, user agent, IP version, udpxy, picons, mpv folder, shaders, mpv options, VPN), no secrets in what it shows |
 | `core/http_login.py` | `get_with_login`: a login in a stream's address answered as the server asks (basic or digest) |
 | `core/commands.py` | What the app is asked from outside: `--play`, `--channel`, `dopeiptv://` links |
-| `core/instance.py` | A second start hands its command to the copy running (local socket) |
-| `core/privacy.py` | Private viewing (nothing kept until the app closes) and Clear recent history by time range, for every source |
+| `core/instance.py` | A second start hands its command to the copy running (local socket, the user's alone; `$XDG_RUNTIME_DIR` on Linux) |
+| `core/privacy.py` | Private viewing (nothing kept until the app closes; `for_log` keeps titles out of the log) and Clear recent history by time range, for every source |
 | `core/rec_extras.py` | Nerd for recordings: file name template (folders, never outside), the command after a recording (no shell), their checks |
 | `core/catchup.py` | Nerd: a source's own catch-up address - Kodi's placeholders and the M3U modes (default, append, shift, flussonic), tried before the app's own; its checks |
 | `core/series_rules.py` | Series recordings: rules (exact title or a word, one channel or any), the guide looked through for their airings, the plan (padding, nothing twice, one copy of a programme on two channels, a cancelled one not again), their store; recording padding |
@@ -130,7 +130,7 @@ map and the one-way import rule.
 | `ui/mw_portal_archive.py` | A Stalker portal's archive in the window: its link asked for off the window's thread (`StalkerClient.archive_link`), played from the moment asked, a go-back carried on to the next programme |
 | `ui/mw_remote.py` | The remote API and sharing in the window: the server as Nerd says, each request's work on the window's thread |
 | `ui/mw_events.py` | Events pushed out in the window: the playback path's and the recordings' hooks (start, pause, stop, channel changed, recording started/ended), handed to `core/events.py`; it only watches |
-| `ui/mw_report.py` | Send feedback, and the offer of a report after an error or a crash |
+| `ui/mw_report.py` | Send feedback, and the offer of a report after an error or a crash (queued; while a video plays it waits in the menu) |
 | `ui/mw_home.py` | The Home page: which shelves, what goes in them (drawn by `home_widgets.py`) |
 | `ui/mw_local.py` | Local files: folders, library view, music queue |
 | `ui/mw_multiview.py` | Multiview: 2/4/6/9 live streams, an mpv per cell |

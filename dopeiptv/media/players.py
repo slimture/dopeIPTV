@@ -8,6 +8,7 @@ import subprocess
 import sys
 
 from ..core.log import log, redact_url
+from ..core.privacy import for_log
 from ..core.xdg import system_env
 
 from PyQt6.QtCore import pyqtSignal
@@ -203,7 +204,7 @@ def launch_player(player: str, url: str, title: str | None = None,
                   parent: object = None) -> None:
     """Spawn an external mpv or VLC process."""
     log.info("launching EXTERNAL %s for %s", player,
-             title or redact_url(url))
+             for_log(title or redact_url(url)))
     title = title or "dopeIPTV"
     exe = find_player_executable(player)
     if player == "mpv":

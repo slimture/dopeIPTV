@@ -1748,5 +1748,6 @@
   "supporter_remove": "Sleutel verwijderen",
   "supporter_again": "Opnieuw doneren",
   "supporter_menu": "Supportersleutel",
-  "supporter_tip": "Supporter sinds {date} – bedankt!"
+  "supporter_tip": "Supporter sinds {date} – bedankt!",
+  "report_waiting": "dopeIPTV liep tegen een fout aan. Klik hier om het rapport te lezen - het wacht ook in het menu."
 }

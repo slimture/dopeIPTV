@@ -1748,5 +1748,6 @@
   "supporter_remove": "Ta bort nyckeln",
   "supporter_again": "Donera igen",
   "supporter_menu": "Supporternyckel",
-  "supporter_tip": "Supporter sedan {date} – tack!"
+  "supporter_tip": "Supporter sedan {date} – tack!",
+  "report_waiting": "dopeIPTV stötte på ett fel. Klicka här för att läsa rapporten – den väntar också i menyn."
 }

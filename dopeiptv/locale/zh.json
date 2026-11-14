@@ -1748,5 +1748,6 @@
   "supporter_remove": "移除密钥",
   "supporter_again": "再次捐赠",
   "supporter_menu": "支持者密钥",
-  "supporter_tip": "自 {date} 起成为支持者——谢谢！"
+  "supporter_tip": "自 {date} 起成为支持者——谢谢！",
+  "report_waiting": "dopeIPTV 遇到了一个错误。点击这里阅读报告——它也在菜单中等你。"
 }

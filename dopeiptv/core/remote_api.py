@@ -35,6 +35,9 @@ from .nerd_check import FAIL, OK, WARN, Check
 DEFAULT_PORT = 3673            # D-O-P-E on a phone's keypad
 MAX_BODY = 64 * 1024
 API_VERSION = 1
+# Seconds a connection may sit without a byte coming or going: a client on
+# the network that opens one and says nothing no longer holds a thread.
+REQUEST_TIMEOUT = 15
 
 # What the remote API answers: (method, path) -> the window's action.
 READ = {"/api/status": "status", "/api/channels": "channels", "/api/sources": "sources"}
@@ -131,6 +134,7 @@ def _make_handler(server: RemoteServer) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         server_version = "dopeIPTV"
         sys_version = ""
+        timeout = REQUEST_TIMEOUT
 
         def log_message(self, fmt, *args):     # noqa: A003 - stdlib hook
             pass

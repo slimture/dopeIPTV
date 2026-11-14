@@ -1748,5 +1748,6 @@
   "supporter_remove": "إزالة المفتاح",
   "supporter_again": "تبرّع مجددًا",
   "supporter_menu": "مفتاح الداعم",
-  "supporter_tip": "داعم منذ {date} – شكرًا!"
+  "supporter_tip": "داعم منذ {date} – شكرًا!",
+  "report_waiting": "واجه dopeIPTV خطأً. انقر هنا لقراءة التقرير - وهو ينتظرك أيضًا في القائمة."
 }

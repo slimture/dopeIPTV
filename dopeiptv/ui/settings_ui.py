@@ -22,6 +22,7 @@ import math
 import bisect
 from collections.abc import Callable
 
+from PyQt6 import sip
 from PyQt6.QtCore import (
     QLocale, QPoint, QPointF, QRect, QRectF, QSize, Qt, QTimer, pyqtSignal,
 )
@@ -652,7 +653,11 @@ class SettingsShell(QWidget):
             it.setHidden(True)
 
         def reveal(i: int) -> None:
+            if self._gone():
+                return
             for it in shown[:i + 1]:
+                if sip.isdeleted(it):
+                    continue
                 key = it.data(Qt.ItemDataRole.UserRole)
                 if key not in self._off and not self._searching:
                     it.setHidden(False)
@@ -720,13 +725,22 @@ class SettingsShell(QWidget):
                 it.setHidden(True)
 
             def reveal(i: int) -> None:
+                if self._gone():
+                    return
                 for it in shown[:i + 1]:
+                    if sip.isdeleted(it):
+                        continue
                     key = it.data(Qt.ItemDataRole.UserRole)
                     if key not in self._off and parent not in self.folded and not self._searching:
                         it.setHidden(False)
                 self._mark_children()
             for i in range(len(shown)):
                 QTimer.singleShot(25 * (i + 1), lambda i=i: reveal(i))
+
+    def _gone(self) -> bool:
+        """Settings closed while its pages were still folding out: the
+        staggered steps still to come find the sidebar and its rows gone."""
+        return sip.isdeleted(self) or sip.isdeleted(self.nav)
 
     def _mark_children(self) -> None:
         """The last page showing under each parent ends the rail; a parent

@@ -268,6 +268,109 @@ def test_the_window_offers_scrubs_and_sends_only_on_send():
     assert "REPORT_WINDOW_OK" in out.stdout, out.stdout + out.stderr[-3000:]
 
 
+_WAITS = r"""
+import os, sys, json, tempfile
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from PyQt6.QtCore import QSettings, QTimer, Qt
+from PyQt6.QtTest import QTest
+from PyQt6.QtWidgets import QApplication
+from dopeiptv.core import report
+from dopeiptv.core.stores import PlaylistStore
+from dopeiptv.i18n import tr
+from dopeiptv.providers.client import DemoClient
+from dopeiptv.ui.main_window import MainWindow
+from dopeiptv.ui import dialogs
+
+from dopeiptv import app as dopeiptv_app
+dopeiptv_app._install_crash_hooks()
+app = QApplication.instance() or QApplication([])
+QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, tempfile.mkdtemp())
+s = QSettings(os.path.join(tempfile.mkdtemp(), "s.ini"), QSettings.Format.IniFormat)
+w = MainWindow(DemoClient(), s, PlaylistStore(s))
+report.ENDPOINT = "http://127.0.0.1:9/report"
+shown, notes = [], []
+dialogs.ReportDialog.exec = lambda self: shown.append(self.text.toPlainText()) or 0
+w._show_action_toast = lambda text, ms, on_click: notes.append((text, on_click))
+
+def spin(n=30):
+    for _ in range(n):
+        app.processEvents()
+
+# Offered once the failing code is done - never from inside it (the hook
+# runs there: a paint event, the player's poll).
+inside = []
+report.notify_error("Traceback (most recent call last):\nRuntimeError: boom 1")
+inside.append(len(shown))
+assert inside == [0], "the window was opened inside the failing code"
+spin()
+assert len(shown) == 1 and "boom 1" in shown[0], shown
+
+# A video fullscreen: no window over it - a note that opens it, and the
+# report waits in the menu.
+w._player_fs = True
+def boom2():
+    raise RuntimeError("boom 2")
+def boom3():
+    raise ValueError("boom 3")
+def boom4():
+    raise KeyError("boom 4")
+QTimer.singleShot(0, boom2)
+spin()
+assert len(shown) == 1, "a window over the video"
+assert len(notes) == 1 and notes[0][0] == tr("report_waiting"), notes
+assert w._report_wait_action.isVisible() and w._report_wait_action.text() == tr("report_title") + "…"
+QTimer.singleShot(0, boom3)
+spin()
+assert len(notes) == 2 and len(shown) == 1
+# Past the three offers a run makes: nothing more, waiting or not.
+QTimer.singleShot(0, boom4)
+spin()
+assert len(notes) == 2 and len(shown) == 1, notes
+w._player_fs = False
+# The note's click opens the oldest; the menu, the next; then it is gone.
+notes[0][1]()
+assert len(shown) == 2 and "boom 2" in shown[-1], shown[-1][-300:]
+assert w._report_wait_action.isVisible()
+w._report_wait_action.trigger()
+assert len(shown) == 3 and "boom 3" in shown[-1] and not w._report_wait_action.isVisible()
+w._report_wait_action.trigger()
+assert len(shown) == 3
+# Last run's crash, offered a little after the start: the same, over a video.
+w._report_crash = "Fatal Python error: Segmentation fault"
+w._player_fs = True
+w._offer_crash_report()
+assert len(shown) == 3 and len(notes) == 3 and w._report_wait_action.isVisible()
+w._player_fs = False
+w._report_wait_action.trigger()
+assert len(shown) == 4 and "Segmentation fault" in shown[-1] and not w._report_wait_action.isVisible()
+
+# The note itself: a click does what it was given, once, and it goes; a
+# plain note's click does nothing.
+clicked = []
+t = w._toast
+t.show_message("note", 5000, on_click=lambda: clicked.append(1))
+QTest.mouseClick(t, Qt.MouseButton.LeftButton)
+spin()
+assert clicked == [1] and t.isHidden(), clicked
+t.show_message("plain", 5000)
+QTest.mouseClick(t, Qt.MouseButton.LeftButton)
+spin()
+assert clicked == [1] and not t.isHidden()
+print("REPORT_WAITS_OK")
+"""
+
+
+def test_an_error_is_offered_after_its_code_and_never_over_a_video():
+    """The error hook ran inside the failing slot and the report window's
+    own event loop ran there too; over a video it stopped the person
+    watching. Now: queued, and while a video plays or the window is
+    fullscreen it waits in the menu, a note away - three offers a run."""
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+    out = subprocess.run([sys.executable, "-c", _WAITS], cwd=_REPO_ROOT, env=env,
+                         capture_output=True, text=True, timeout=120)
+    assert "REPORT_WAITS_OK" in out.stdout, out.stdout + out.stderr[-3000:]
+
+
 @pytest.mark.parametrize("keep", ["21:05:03 INFO started", "std::string", "Qt::AlignLeft", "1.4.5", "a:b:c"])
 def test_ordinary_text_is_left_alone(keep):
     assert report.scrub(keep) == keep

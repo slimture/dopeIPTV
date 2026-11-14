@@ -1748,5 +1748,6 @@
   "supporter_remove": "حذف کلید",
   "supporter_again": "کمک دوباره",
   "supporter_menu": "کلید حامی",
-  "supporter_tip": "حامی از {date} – سپاس!"
+  "supporter_tip": "حامی از {date} – سپاس!",
+  "report_waiting": "dopeIPTV با خطایی روبه‌رو شد. برای خواندن گزارش اینجا کلیک کنید - در منو هم منتظر شماست."
 }

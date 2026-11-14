@@ -78,6 +78,45 @@ def test_a_click_shows_the_few_lines_most_looked_at(label):
     assert all(k in label.text() for k in _StatsLabel.COMPACT) and label.height() < full
 
 
+def test_new_values_each_second_do_not_search_the_fit_again(label, monkeypatch):
+    """The stats change every second; a picture too small for them took up
+    to 14 style sheets and layouts each time. The fit is searched again only
+    when the room, the view or the lines change."""
+    calls = {"style": 0, "size": 0}
+    real_style, real_size = label.setStyleSheet, label.adjustSize
+
+    def style(s):
+        calls["style"] += 1
+        real_style(s)
+
+    def size():
+        calls["size"] += 1
+        real_size()
+    monkeypatch.setattr(label, "setStyleSheet", style)
+    monkeypatch.setattr(label, "adjustSize", size)
+
+    def stream(n):
+        return [(k, f"{v} {n}" if k == "Bitrate" else v) for k, v in STREAM]
+
+    for w, h in ((300, 120), (1100, 280)):        # nothing fits / two columns fit
+        label.lay_out([stream(0), NERD], w, h)
+        first = (label.font_px, label.columns, label.size())
+        for n in range(1, 6):
+            calls.update(style=0, size=0)
+            label.lay_out([stream(n), NERD], w, h)
+            assert calls == {"style": 0, "size": 1}, (w, h, calls)
+            assert f"4253 kbps {n}" in label.text()
+            assert (label.font_px, label.columns) == first[:2]
+    # Another room, or the compact view: searched again.
+    calls.update(style=0, size=0)
+    label.lay_out([stream(9), NERD], 1904, 1064)
+    assert (label.columns, label.font_px) == (1, 15) and calls["style"] >= 1
+    label.compact = True
+    calls.update(style=0, size=0)
+    label.lay_out([stream(9), NERD], 1904, 1064)
+    assert "Colour" not in label.text() and calls["size"] >= 1
+
+
 def test_values_as_people_write_them():
     assert aspect_name(1.7777777777777777) == "16:9"
     assert aspect_name("1.3333333") == "4:3"

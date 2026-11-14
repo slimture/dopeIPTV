@@ -137,6 +137,40 @@ def test_the_clear_window(settings):
     assert app is not None
 
 
+def test_what_is_played_privately_never_reaches_the_log(monkeypatch):
+    """The log is kept on disk and goes with a report: while private
+    viewing is on, a line about playback says <private>, not the title."""
+    import logging
+
+    from dopeiptv.core.log import log
+    from dopeiptv.media import players
+    lines: list[str] = []
+
+    class Catch(logging.Handler):
+        def emit(self, record):
+            lines.append(record.getMessage())
+    catch = Catch(logging.INFO)
+    level = log.level
+    log.addHandler(catch)
+    log.setLevel(logging.INFO)
+    monkeypatch.setattr(players, "find_player_executable", lambda _p: "/usr/bin/mpv")
+    monkeypatch.setattr(players.subprocess, "Popen", lambda *a, **k: None)
+    try:
+        privacy.set_private(True)
+        players.launch_player("mpv", "http://h/live/1.ts", "A Secret Film")
+        assert privacy.for_log("A Secret Film") == "<private>"
+        privacy.set_private(False)
+        players.launch_player("mpv", "http://h/live/2.ts", "An Open Film")
+        assert privacy.for_log("An Open Film") == "An Open Film"
+    finally:
+        privacy.set_private(False)
+        log.removeHandler(catch)
+        log.setLevel(level)
+    said = "\n".join(lines)
+    assert "Secret" not in said and "launching EXTERNAL mpv for <private>" in said, said
+    assert "An Open Film" in said
+
+
 _CHILD = r"""
 import os, sys, json, tempfile
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")

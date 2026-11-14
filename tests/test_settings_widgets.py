@@ -166,3 +166,35 @@ def test_the_slider_writes_its_value_beside_it():
     assert sl.value() == 1.0 and sl.label.text() == "1.0"
     sl.slider.setValue(0)
     assert sl.value() == 0.0 and sl.label.text() == "Off"
+
+
+def test_settings_closed_while_its_pages_fold_out_is_no_error(monkeypatch):
+    """The pages under a parent fold out one after another on timers; the
+    window closed in between left them touching rows already deleted - an
+    error from a timer, offered as a report."""
+    import sys
+    import time
+
+    from PyQt6 import sip
+    from PyQt6.QtGui import QIcon
+
+    from dopeiptv.ui.settings_ui import SettingsShell
+    errors: list = []
+    monkeypatch.setattr(sys, "excepthook", lambda *a: errors.append(a))
+    for how in ("enable", "unfold"):
+        shell = SettingsShell("Search", "Nothing")
+        for key in ("nerd", "net", "boxes", "lists"):
+            shell.add_page(SettingsPage(key, key.title()), QIcon())
+        shell.set_children("nerd", ["net", "boxes", "lists"], "#888888")
+        if how == "enable":
+            shell.set_group_enabled("nerd", False)
+            shell.set_group_enabled("nerd", True)
+        else:
+            shell.set_folded("nerd", True)
+            shell.set_folded("nerd", False)
+        sip.delete(shell)
+        end = time.monotonic() + 0.4
+        while time.monotonic() < end:
+            app.processEvents()
+            time.sleep(0.01)
+    assert errors == [], errors

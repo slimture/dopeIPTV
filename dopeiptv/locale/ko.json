@@ -1748,5 +1748,6 @@
   "supporter_remove": "키 삭제",
   "supporter_again": "다시 후원하기",
   "supporter_menu": "후원자 키",
-  "supporter_tip": "{date}부터 후원자 – 감사합니다!"
+  "supporter_tip": "{date}부터 후원자 – 감사합니다!",
+  "report_waiting": "dopeIPTV에서 오류가 발생했습니다. 여기를 클릭해 보고서를 읽으세요. 메뉴에서도 열 수 있습니다."
 }

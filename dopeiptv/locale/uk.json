@@ -1748,5 +1748,6 @@
   "supporter_remove": "Видалити ключ",
   "supporter_again": "Пожертвувати знову",
   "supporter_menu": "Ключ підтримки",
-  "supporter_tip": "Підтримка з {date} — дякуємо!"
+  "supporter_tip": "Підтримка з {date} — дякуємо!",
+  "report_waiting": "dopeIPTV натрапив на помилку. Натисніть тут, щоб прочитати звіт, — він також чекає в меню."
 }

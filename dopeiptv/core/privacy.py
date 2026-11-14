@@ -41,6 +41,13 @@ def private() -> bool:
     return _private
 
 
+def for_log(text: Any) -> Any:
+    """What a log line may say of what is played: its title or name, or
+    "<private>" while private viewing is on - the log is kept on disk and
+    goes with a report."""
+    return "<private>" if _private else text
+
+
 def cutoff(seconds: int, now: float | None = None) -> float | None:
     """The moment from which to clear (a Unix time), or None for all."""
     if seconds <= 0:

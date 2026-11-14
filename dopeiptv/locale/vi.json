@@ -1748,5 +1748,6 @@
   "supporter_remove": "Xóa khóa",
   "supporter_again": "Ủng hộ lần nữa",
   "supporter_menu": "Khóa người ủng hộ",
-  "supporter_tip": "Ủng hộ từ {date} – cảm ơn!"
+  "supporter_tip": "Ủng hộ từ {date} – cảm ơn!",
+  "report_waiting": "dopeIPTV đã gặp lỗi. Bấm vào đây để đọc báo cáo - báo cáo cũng đang chờ trong menu."
 }

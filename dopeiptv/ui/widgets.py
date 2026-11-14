@@ -383,11 +383,19 @@ class _Toast(QLabel):
             "border-radius: 10px; padding: 10px 18px;"
             "font-size: 12px; font-weight: 500;")
         self.hide()
+        self._on_click = None
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self._dismiss)
 
-    def show_message(self, text: str, duration_ms: int = 0) -> None:
+    def show_message(self, text: str, duration_ms: int = 0, on_click=None) -> None:
+        """*on_click*: what a click on the note does (it goes then); without
+        one a click does nothing, as before."""
+        self._on_click = on_click
+        if on_click is not None:
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
+        else:
+            self.unsetCursor()
         self.setText(text)
         self.adjustSize()
         self.setFixedWidth(min(320, max(180, self.sizeHint().width() + 20)))
@@ -403,7 +411,19 @@ class _Toast(QLabel):
             self.move((p.width() - self.width()) // 2,
                       p.height() - self.height() - 30)
 
+    def mousePressEvent(self, event) -> None:      # noqa: N802 - Qt hook
+        act = self._on_click
+        if act is None or event.button() != Qt.MouseButton.LeftButton:
+            super().mousePressEvent(event)
+            return
+        event.accept()
+        self._dismiss()
+        # After this event: what it opens may run an event loop of its own.
+        QTimer.singleShot(0, act)
+
     def _dismiss(self) -> None:
+        self._on_click = None
+        self._timer.stop()
         self.hide()
 
 

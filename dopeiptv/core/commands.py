@@ -4,7 +4,7 @@ dopeiptv:// link, another program (the remote API asks the same way).
     dopeiptv --play <address>        play a stream or file
     dopeiptv --channel "SVT1 HD"     play the active source's channel
     dopeiptv <address>               as --play
-    dopeiptv dopeiptv://play?url=<address, url-encoded>
+    dopeiptv dopeiptv://play?url=<address, url-encoded>   (a stream only)
     dopeiptv dopeiptv://channel/<name>   (or ?name=<name>)
     dopeiptv dopeiptv://open             bring the window forward
     dopeiptv dopeiptv://supporter?key=DS1-...   a supporter key from the
@@ -19,9 +19,13 @@ from __future__ import annotations
 from urllib.parse import parse_qs, unquote, urlsplit
 
 SCHEME = "dopeiptv"
-# What a bare argument may be to count as something to play.
-_PLAYABLE = ("http://", "https://", "rtsp://", "rtmp://", "rtp://", "udp://",
-             "srt://", "file://")
+# What may be played when asked from elsewhere - a dopeiptv:// link (any web
+# page can open one) or the remote API: a stream, never a file here.
+_STREAMS = ("http://", "https://", "rtsp://", "rtmp://", "rtp://", "udp://",
+            "srt://")
+# What a bare argument may be to count as something to play: the person's
+# own command line may name a file too.
+_PLAYABLE = (*_STREAMS, "file://")
 
 
 def parse_link(link: str) -> dict | None:
@@ -34,7 +38,7 @@ def parse_link(link: str) -> dict | None:
     q = {k: v[0] for k, v in parse_qs(u.query).items() if v}
     if what == "play":
         url = q.get("url", "").strip()
-        return {"play": url} if _ok_url(url) else None
+        return {"play": url} if stream_url_ok(url) else None
     if what == "channel":
         name = (q.get("name") or unquote(rest)).strip()
         return {"channel": name} if name else None
@@ -48,6 +52,13 @@ def parse_link(link: str) -> dict | None:
 
 def _ok_url(url: str) -> bool:
     return url.lower().startswith(_PLAYABLE)
+
+
+def stream_url_ok(url: str) -> bool:
+    """A stream's address, as a link or the remote API may ask to play:
+    no file:// and no path - a page or a program on the network must not
+    open the person's own files."""
+    return url.strip().lower().startswith(_STREAMS)
 
 
 def parse_command(argv: list[str]) -> dict | None:

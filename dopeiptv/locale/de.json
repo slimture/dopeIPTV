@@ -1748,5 +1748,6 @@
   "supporter_remove": "Schlüssel entfernen",
   "supporter_again": "Erneut spenden",
   "supporter_menu": "Unterstützer-Schlüssel",
-  "supporter_tip": "Unterstützer seit {date} – danke!"
+  "supporter_tip": "Unterstützer seit {date} – danke!",
+  "report_waiting": "dopeIPTV ist auf einen Fehler gestoßen. Hier klicken, um den Bericht zu lesen – er wartet auch im Menü."
 }

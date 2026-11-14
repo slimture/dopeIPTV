@@ -106,7 +106,8 @@ class Ingest:
     def _default_open(url: str, **kw: Any) -> Any:
         # A login in the address is answered as the box asks (Tvheadend
         # wants digest, which requests alone never sends); the Nerd page's
-        # user agent, headers and proxy apply as they do for the player.
+        # user agent, headers and proxy apply as they do for the player -
+        # the proxy only while "streams through the proxy too" is on.
         from . import nerd
         from .http_login import get_with_login
         n = nerd.current()
@@ -116,7 +117,7 @@ class Ingest:
             headers["User-Agent"] = n.user_agent(src)
             headers.update(n.headers(src))
             kw["headers"] = headers
-            px = n.proxy(src, url)
+            px = n.proxy(src, url) if n.flag("nerd_proxy_player", True) else ""
             if px:
                 kw["proxies"] = {"http": px, "https": px}
         return get_with_login(url, **kw)

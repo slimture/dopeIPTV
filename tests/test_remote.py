@@ -15,6 +15,7 @@ import socket
 import subprocess
 import sys
 import threading
+import time
 import xml.etree.ElementTree as ET
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -105,6 +106,25 @@ def test_every_request_needs_the_token(served):
         assert json.loads(raw) == {"app": "dopeIPTV", "api": 1, "remote": True, "sharing": False}
     code, _h, raw = ask(port, "GET", "/api/status", token=None)
     assert code == 401 and b"unauthorized" in raw
+
+
+def test_a_client_that_says_nothing_is_let_go(served, monkeypatch):
+    """A connection opened and left silent - or a request never finished -
+    is closed after a while instead of holding one of the server's threads
+    for as long as the client likes."""
+    assert remote_api.REQUEST_TIMEOUT == 15
+    monkeypatch.setattr(remote_api, "REQUEST_TIMEOUT", 0.5)
+    port = served().port
+    for said in (b"", b"GET / HTTP/1.1\r\nHost: x\r\n"):
+        s = socket.create_connection(("127.0.0.1", port), timeout=10)
+        try:
+            s.sendall(said)
+            t0 = time.monotonic()
+            assert s.recv(1024) == b""                    # closed by the server
+            assert time.monotonic() - t0 < 5
+        finally:
+            s.close()
+    assert ask(port, "GET", "/")[0] == 200                # and it still answers
 
 
 def test_an_empty_token_lets_nobody_in(window):
@@ -513,6 +533,12 @@ code, out = ask("POST", "/api/play", {"url": "http://127.0.0.1:9/some/clip.ts"})
 assert code == 200 and played[-1][:2] == ("http://127.0.0.1:9/some/clip.ts", "clip.ts"), played
 code, out = ask("POST", "/api/play", {})
 assert code == 400 and "channel" in out["error"]
+# A stream, never a file of this computer's - by address or by path.
+n = len(played)
+for bad in ("file:///etc/passwd", "/etc/passwd", "javascript:alert(1)"):
+    code, out = ask("POST", "/api/play", {"url": bad})
+    assert code == 400 and "stream" in out["error"], (bad, code, out)
+assert len(played) == n, played
 
 code, out = ask("POST", "/api/volume", {"value": 150})
 assert code == 200 and out["volume"] == 100 and media[-1] == ("volume", 1.0), media

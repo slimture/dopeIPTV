@@ -1748,5 +1748,6 @@
   "supporter_remove": "Anahtarı kaldır",
   "supporter_again": "Yeniden bağış yap",
   "supporter_menu": "Destekçi anahtarı",
-  "supporter_tip": "{date} tarihinden beri destekçi – teşekkürler!"
+  "supporter_tip": "{date} tarihinden beri destekçi – teşekkürler!",
+  "report_waiting": "dopeIPTV bir hatayla karşılaştı. Raporu okumak için buraya tıklayın - rapor menüde de bekliyor."
 }

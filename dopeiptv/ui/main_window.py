@@ -43,6 +43,7 @@ from ..services.reminders import ReminderStore
 from ..core.series_rules import SeriesRuleStore
 from ..media.players import embedded_playback_supported, launch_player
 from ..core.contest import ContestWatch
+from ..core.privacy import for_log
 from ..core.health import StreamHealth
 from ..core.recording import RecordingManager
 from ..core.stores import (
@@ -522,6 +523,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._donate_action: lambda: tr("donate_support") + "…",
             self._supporter_action: lambda: tr("supporter_menu") + "…",
             self._feedback_action: lambda: tr("feedback_menu") + "…",
+            self._report_wait_action: lambda: tr("report_title") + "…",
             private_action: lambda: tr("private_menu"),
             clear_action: lambda: tr("clear_menu") + "…",
         }
@@ -3780,7 +3782,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # left no way to tell a deliberate "open externally" from the
             # embedded player refusing the stream.
             log.info("play: external requested (player=%r external=%r) %s",
-                     player, external, title)
+                     player, external, for_log(title))
             if not self._confirm_external_while_playing():
                 return
             if kind not in ("local", "recording") and self._vpn_guard_blocks():
@@ -3959,7 +3961,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         it = q[index]
         path = it.get("_path")
         if not path or not os.path.isfile(path):
-            log.info("queue: skipping missing track %s", path)
+            log.info("queue: skipping missing track %s", for_log(path))
             return False
         self._track_index = index
         self._start_playback(path, it.get("name") or os.path.basename(path),
@@ -4043,7 +4045,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         lp = getattr(self, "_last_playback", None) or {}
         if not self._local_autoadvance_ok(lp.get("url") or ""):
             log.info("queue: not auto-advancing past %r (not an episode)",
-                     lp.get("url"))
+                     for_log(lp.get("url")))
             return False
         return self._queue_step(1)
 
@@ -4852,7 +4854,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.setWindowTitle(title or self._base_title)
         self._set_status(tr("status_playing", title=title))
         log.info("play: embedded path kind=%s player=%s %s",
-                 kind, "yes" if self.player else "NO", title)
+                 kind, "yes" if self.player else "NO", for_log(title))
         if self.player:
             self.rec.finish_all_inplayer("channel changed")
             self.player.show()
@@ -4990,6 +4992,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _show_toast(self, text: str, duration_ms: int = 0) -> None:
         self._toast.show_message(text, duration_ms)
+
+    def _show_action_toast(self, text: str, duration_ms: int, on_click) -> None:
+        """A note that does *on_click* when clicked (and goes)."""
+        self._toast.show_message(text, duration_ms, on_click=on_click)
 
     def _loading_message(self) -> str:
         return {"live": tr("status_loading_channels"),
@@ -5752,6 +5758,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.rec.shutdown()
         if self.player:
             self.player.shutdown()
+        # Now that the player has let go of an in-player recording's file.
+        self.rec.after_shutdown()
         # The app exits via os._exit (here on stuck workers, and always after
         # the event loop - see app.main), which skips QSettings' auto-sync on
         # destruction. Flush every settings file explicitly so this session's

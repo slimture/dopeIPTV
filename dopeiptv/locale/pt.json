@@ -1748,5 +1748,6 @@
   "supporter_remove": "Remover chave",
   "supporter_again": "Doar de novo",
   "supporter_menu": "Chave de apoiador",
-  "supporter_tip": "Apoiador desde {date} – obrigado!"
+  "supporter_tip": "Apoiador desde {date} – obrigado!",
+  "report_waiting": "O dopeIPTV encontrou um erro. Clique aqui para ler o relatório - ele também fica esperando no menu."
 }

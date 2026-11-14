@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 from PyQt6.QtWidgets import QMenu
 
 from ..core.log import log
+from ..core.privacy import for_log
 from ..core.workers import run_async
 from ..i18n import tr
 from ..providers.chromecast import CastDialog
@@ -1078,7 +1079,7 @@ class _CastMixin:
         # The moment itself, not how it was worked out - it is the one thing
         # that can be checked against what the picture actually shows.
         log.info("cast: resuming %s from %s (%d min behind live)",
-                 ctx.get("title") or "", paused_at.strftime("%H:%M:%S"),
+                 for_log(ctx.get("title") or ""), paused_at.strftime("%H:%M:%S"),
                  behind)
         title = ctx.get("title") or "dopeIPTV"
         # The session now lives at the archive address. Recording it keeps the

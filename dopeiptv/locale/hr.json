@@ -1748,5 +1748,6 @@
   "supporter_remove": "Ukloni ključ",
   "supporter_again": "Doniraj ponovno",
   "supporter_menu": "Ključ podrške",
-  "supporter_tip": "Podrška od {date} – hvala!"
+  "supporter_tip": "Podrška od {date} – hvala!",
+  "report_waiting": "dopeIPTV je naišao na pogrešku. Kliknite ovdje da pročitate izvješće – čeka vas i u izborniku."
 }

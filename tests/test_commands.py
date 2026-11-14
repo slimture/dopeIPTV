@@ -53,7 +53,11 @@ def test_a_command_line(argv, want):
     ("dopeiptv://channel/Kanal%205", {"channel": "Kanal 5"}),
     ("DOPEIPTV://OPEN", {"open": True}),
     ("dopeiptv://", {"open": True}),
-    ("dopeiptv://play?url=file%3A%2F%2F%2Fetc%2Fpasswd", {"play": "file:///etc/passwd"}),
+    # Any web page can open a link: it plays a stream, never a file here.
+    ("dopeiptv://play?url=file%3A%2F%2F%2Fetc%2Fpasswd", None),
+    ("dopeiptv://play?url=FILE%3A%2F%2F%2Fhome%2Fu%2Fx.mkv", None),
+    ("dopeiptv://play?url=%2Fhome%2Fu%2Ffilm.mkv", None),
+    ("dopeiptv://play?url=C%3A%5CUsers%5Cu%5Cx.mkv", None),
     # The site's thank-you hands a supporter key over; nothing else rides along.
     ("dopeiptv://supporter?key=DS1-AQALYXcAAAAAAAAACmF8F1Jg", {"supporter": "DS1-AQALYXcAAAAAAAAACmF8F1Jg"}),
     ("dopeiptv://supporter?key=hello", None),
@@ -146,6 +150,62 @@ def test_a_socket_left_by_a_crash_is_taken_over(app, socket_name):
     server = CommandServer(lambda _c: None)
     assert server.listening
     server.close()
+
+
+@pytest.fixture
+def runtime_dir(monkeypatch):
+    """A user's runtime folder ($XDG_RUNTIME_DIR), short: a socket's path
+    has a limit."""
+    d = tempfile.mkdtemp(prefix="dpr")
+    os.chmod(d, 0o700)
+    for var in ("DOPEIPTV_INSTANCE_SOCKET", "FLATPAK_ID"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("XDG_RUNTIME_DIR", d)
+    yield d
+    shutil.rmtree(d, ignore_errors=True)
+
+
+def test_the_socket_is_named_in_the_users_own_folder_not_tmp(runtime_dir, monkeypatch):
+    """/tmp is everyone's: another account could take the name there first
+    and hear this one's commands. On Linux the user's runtime folder;
+    macOS and Windows keep Qt's own place (a per-user temp folder, a pipe)."""
+    from dopeiptv.core import instance
+    monkeypatch.setattr(instance.sys, "platform", "linux")
+    name = instance.server_name()
+    assert os.path.dirname(name) == os.path.join(runtime_dir, "dopeiptv")
+    assert os.path.basename(name).startswith("dopeiptv-")
+    for other in ("darwin", "win32"):
+        monkeypatch.setattr(instance.sys, "platform", other)
+        assert "/" not in instance.server_name()
+    monkeypatch.setattr(instance.sys, "platform", "linux")
+    monkeypatch.delenv("XDG_RUNTIME_DIR")
+    assert "/" not in instance.server_name()                 # no runtime folder: as before
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="the runtime folder is Linux's")
+def test_a_second_start_reaches_the_copy_through_the_runtime_folder(app, runtime_dir):
+    from dopeiptv.core.instance import CommandServer, server_name
+    got: list[dict] = []
+    server = CommandServer(got.append)
+    try:
+        assert server.listening
+        name = server_name()
+        assert os.path.exists(name) and name.startswith(runtime_dir)
+        assert os.stat(os.path.dirname(name)).st_mode & 0o777 == 0o700
+        assert os.stat(name).st_mode & 0o077 == 0, oct(os.stat(name).st_mode)   # the user's alone
+        sender = subprocess.Popen(
+            [sys.executable, "-c",
+             "import sys, json\n"
+             "from PyQt6.QtCore import QCoreApplication\n"
+             "app = QCoreApplication([])\n"
+             "from dopeiptv.core.instance import send_to_running\n"
+             "sys.exit(0 if send_to_running(json.loads(sys.argv[1])) else 3)",
+             json.dumps({"open": True})],
+            cwd=_REPO_ROOT, env=dict(os.environ))
+        _wait_for(got, sender)
+        assert sender.wait(10) == 0 and got == [{"open": True}]
+    finally:
+        server.close()
 
 
 def test_main_hands_over_and_opens_no_window(app, socket_name):

@@ -15,6 +15,7 @@ import re
 from typing import Any, Callable
 
 from ..core.log import log
+from ..core.privacy import for_log
 
 _QUALITY = re.compile(r"\b(uhd|fhd|hd|sd|hevc|h265|4k|1080p?|720p?|50fps|backup)\b")
 # A provider's country prefix: "SE: ", "SE | ", "|UK| " (not "SVT-1").
@@ -75,7 +76,7 @@ def find_elsewhere(playlists: list[dict], active_id: str | None, item: dict,
             log.info("failover: %s has the channel but no address: %s", name, e)
             continue
         if url:
-            log.info("failover: %s found in %s", item.get("name"), name)
+            log.info("failover: %s found in %s", for_log(item.get("name")), name)
             return pl, row, url
     return None
 

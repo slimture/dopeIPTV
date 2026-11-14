@@ -639,6 +639,82 @@ def test_a_box_that_is_down_keeps_its_channels(fake):
     assert len(c.live_streams()) == n
 
 
+def test_a_garbage_recording_time_does_not_lose_the_source(monkeypatch):
+    """A recording's time no calendar has (negative, centuries off, not a
+    number) raised in fromtimestamp - always on Windows - and the whole
+    source failed to load with it: that row has no date instead."""
+    from datetime import datetime
+
+    class WindowsTime(datetime):
+        @classmethod
+        def fromtimestamp(cls, t, tz=None):
+            if t < 0 or t > 32536850000:          # Windows: [Errno 22] Invalid argument
+                raise OSError(22, "Invalid argument")
+            return datetime.fromtimestamp(t, tz)
+    monkeypatch.setattr(boxes, "datetime", WindowsTime)
+    c = Enigma2Client("http://127.0.0.1:9")
+    rows = [("neg", -86400, 60), ("far", 10 ** 20, "x"), ("word", "soon", None), ("nan", "nan", "inf"),
+            ("ok", NOW, 1800)]
+    c._take([{"key": "1:0:1", "name": "SVT1", "url": "http://b/1"}],
+            [{"key": k, "title": k, "url": f"http://b/{k}", "start": v, "secs": s} for k, v, s in rows])
+    films = {r["name"]: r for r in c._recs}
+    assert set(films) == {"neg", "far", "word", "nan", "ok"}
+    assert films["ok"]["_info"]["releasedate"] == datetime.fromtimestamp(NOW).strftime("%Y-%m-%d")
+    assert films["ok"]["_info"]["duration_secs"] == 1800 and films["ok"]["added"] == str(NOW)
+    for k in ("neg", "far", "word", "nan"):
+        assert (films[k]["added"], films[k]["_info"]["releasedate"]) == ("0", ""), films[k]
+    assert [r["name"] for r in c._recs][0] == "ok"                     # newest first still
+
+
+def test_a_play_address_never_loads_the_box_on_the_windows_thread(fake, monkeypatch):
+    """With no catalogue yet (the box was off at the start) a play address
+    was a login and the box's lists on the window's thread - a frozen
+    window. The window now asks off its thread first, as for a portal."""
+    pytest.importorskip("PyQt6.QtWidgets")
+    from types import SimpleNamespace
+
+    from dopeiptv.ui import main_window
+    from dopeiptv.ui.main_window import MainWindow
+    box = fake(openwebif_routes())
+    loaded = Enigma2Client(box.base)
+    sid = loaded.live_streams()[0]["stream_id"]
+    address = loaded.live_url(sid)
+    assert address
+    pending: list = []
+    monkeypatch.setattr(main_window, "run_async",
+                        lambda pool, work, done, fail: pending.append((work, done)))
+
+    def window_with(client):
+        loads: list = []
+        real = client.authenticate
+
+        def counted():
+            loads.append(1)
+            return real()
+        client.authenticate = counted
+        h = SimpleNamespace(client=client, pool=None, _set_status=lambda *_: None)
+        played: list = []
+
+        def play():
+            if MainWindow._links_later(h, lambda: h.client.live_url(sid), play):
+                return
+            played.append(h.client.live_url(sid))
+        return h, loads, played, play
+
+    # The box answers; then one that is off (no address, and no new try).
+    for server, want in ((box.base, address), ("http://127.0.0.1:9", "")):
+        c = Enigma2Client(server)
+        h, loads, played, play = window_with(c)
+        assert not c.link_ready("live_url", sid)
+        play()
+        assert played == [] and loads == [] and h.client is c, "nothing loaded on the window"
+        work, done = pending.pop()
+        done(work())                                     # the load, off the window's thread
+        assert c.link_ready("live_url", sid)
+        assert played == [want] and len(loads) == 1, (played, loads)
+        assert not pending
+
+
 def test_options_survive_export_and_import():
     from dopeiptv.core.stores import PlaylistStore
 

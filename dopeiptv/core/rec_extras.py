@@ -31,11 +31,30 @@ FIELDS = ("title", "channel", "date", "time", "year", "month", "day", "hour",
           "minute", "weekday", "path", "folder", "file")
 _NAME_FIELDS = FIELDS[:10]
 _UNSAFE = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
+# A title or a channel's name is cut at this many characters, as
+# safe_filename cuts a title; and no part of the path comes near a file
+# system's 255 bytes a name - room is left for the " (12)" and the extension
+# a recording's file adds (any part may be the last). Too long, the title
+# gives way first, so the template's date and time stay.
+NAME_CHARS = 120
+PART_BYTES = 255 - 16
+
+
+def _clean(text: str) -> str:
+    return re.sub(r"\s+", " ", _UNSAFE.sub("", text)).strip()
 
 
 def _safe_part(text: str) -> str:
-    part = _UNSAFE.sub("", text).strip().strip(".")
-    return re.sub(r"\s+", " ", part)
+    part = _clean(text)
+    raw = part.encode("utf-8")
+    if len(raw) > PART_BYTES:
+        part = raw[:PART_BYTES].decode("utf-8", "ignore")
+    return part.strip().strip(".").strip()
+
+
+def _pieces(template: str, values: dict[str, str]) -> list[str]:
+    text = re.sub(r"\{(\w*)\}", lambda m: values.get(m.group(1), ""), template or "")
+    return re.split(r"[\\/]+", text)
 
 
 def fields(title: str, channel: str = "", when: datetime | None = None) -> dict[str, str]:
@@ -54,27 +73,51 @@ def unknown_fields(template: str) -> list[str]:
 def render_name(template: str, title: str, channel: str = "",
                 when: datetime | None = None) -> str:
     """A recording's path under the recording folder, without extension:
-    the template filled in, part by part made safe. Empty parts go, and an
-    empty result falls back to the default template."""
+    the template filled in, part by part made safe and short enough for any
+    file system. Empty parts go, and an empty result falls back to the
+    default template."""
     # A "/" in a title ("AC/DC Live", "21/11") is not a folder: only the
     # template's own are.
     values = {k: re.sub(r"[\\/]+", "-", v) for k, v in fields(title, channel, when).items()}
-    text = re.sub(r"\{(\w*)\}", lambda m: values.get(m.group(1), ""), template or "")
-    parts = [_safe_part(p) for p in re.split(r"[\\/]+", text)]
+    for key in ("title", "channel"):
+        values[key] = values[key][:NAME_CHARS]
+    while values["title"]:
+        over = max(len(_clean(p).encode("utf-8")) for p in _pieces(template, values)) - PART_BYTES
+        if over <= 0:
+            break
+        values["title"] = values["title"][:-(over // 4 + 1)]
+    parts = [_safe_part(p) for p in _pieces(template, values)]
     parts = [p for p in parts if p and p not in (".", "..")]
     if not parts:
         if (template or "") != DEFAULT_TEMPLATE:
             return render_name(DEFAULT_TEMPLATE, title, channel, when)
-        return _safe_part(title) or "recording"
+        return _safe_part((title or "")[:NAME_CHARS]) or "recording"
     return os.path.join(*parts)
 
 
-def post_argv(command: str, path: str, title: str, channel: str = "") -> list[str]:
+def _split(command: str, windows: bool) -> list[str]:
+    """The command's words. On Windows as its programs read a command
+    line: only double quotes group, also inside a word (--ini="C:\\My
+    dir\\x.ini"), and they are not part of it - shlex's non-POSIX mode kept
+    them, so "C:\\Program Files\\x.exe" was looked for with its quotes and
+    never found; backslashes are path separators, not escapes."""
+    if not windows:
+        return shlex.split(command, posix=True)
+    lex = shlex.shlex(command, posix=True)
+    lex.whitespace_split = True
+    lex.commenters = ""
+    lex.quotes = '"'
+    lex.escape = ""
+    return list(lex)
+
+
+def post_argv(command: str, path: str, title: str, channel: str = "",
+              windows: bool | None = None) -> list[str]:
     """The command as arguments, placeholders filled in each one."""
     values = fields(title, channel)
     values.update(path=path, folder=os.path.dirname(path), file=os.path.basename(path))
     try:
-        argv = shlex.split(command or "", posix=os.name != "nt")
+        argv = _split(command or "", os.name == "nt" if windows is None else windows)
     except ValueError as e:
         raise ValueError(f"cannot read the command: {e}") from e
     return [re.sub(r"\{(\w*)\}", lambda m: values.get(m.group(1), m.group(0)), a) for a in argv]

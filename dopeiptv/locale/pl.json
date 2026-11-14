@@ -1748,5 +1748,6 @@
   "supporter_remove": "Usuń klucz",
   "supporter_again": "Wpłać ponownie",
   "supporter_menu": "Klucz wspierającego",
-  "supporter_tip": "Wspierasz od {date} – dziękujemy!"
+  "supporter_tip": "Wspierasz od {date} – dziękujemy!",
+  "report_waiting": "dopeIPTV napotkał błąd. Kliknij tutaj, aby przeczytać raport – czeka też w menu."
 }

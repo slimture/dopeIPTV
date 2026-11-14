@@ -1748,5 +1748,6 @@
   "supporter_remove": "Rimuovi la chiave",
   "supporter_again": "Dona di nuovo",
   "supporter_menu": "Chiave da sostenitore",
-  "supporter_tip": "Sostenitore dal {date}, grazie!"
+  "supporter_tip": "Sostenitore dal {date}, grazie!",
+  "report_waiting": "dopeIPTV ha incontrato un errore. Fai clic qui per leggere la segnalazione: ti aspetta anche nel menu."
 }

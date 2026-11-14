@@ -1748,5 +1748,6 @@
   "supporter_remove": "הסרת המפתח",
   "supporter_again": "תרומה נוספת",
   "supporter_menu": "מפתח תומך",
-  "supporter_tip": "תומך מאז {date} – תודה!"
+  "supporter_tip": "תומך מאז {date} – תודה!",
+  "report_waiting": "dopeIPTV נתקלה בשגיאה. לחצו כאן כדי לקרוא את הדיווח - הוא מחכה גם בתפריט."
 }

@@ -1748,5 +1748,6 @@
   "supporter_remove": "Hapus kunci",
   "supporter_again": "Donasi lagi",
   "supporter_menu": "Kunci pendukung",
-  "supporter_tip": "Pendukung sejak {date} – terima kasih!"
+  "supporter_tip": "Pendukung sejak {date} – terima kasih!",
+  "report_waiting": "dopeIPTV mengalami kesalahan. Klik di sini untuk membaca laporannya - laporan itu juga menunggu di menu."
 }

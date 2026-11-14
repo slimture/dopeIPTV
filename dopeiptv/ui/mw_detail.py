@@ -12,6 +12,7 @@ from ..i18n import tr
 from .theme import ACCENT, P
 from .widgets import _ClickableWidget
 from ..core.log import log, redact_url
+from ..core.privacy import for_log
 from ..core.workers import run_async, tmdb_url_from_provider
 from PyQt6.QtCore import QSize, QTimer, Qt
 from PyQt6.QtGui import QIcon, QPainter, QPainterPath, QPixmap
@@ -704,7 +705,7 @@ class _DetailMixin:
             if not url:
                 return
             title = it.get("name") or it.get("title") or "dopeIPTV"
-            log.info("cast pick: play %r -> %s", title, redact_url(url))
+            log.info("cast pick: play %r -> %s", for_log(title), redact_url(url))
             self._start_playback(
                 url, title, it.get("stream_icon") or it.get("cover"),
                 self._item_key(it), "movie", item=it)

@@ -75,3 +75,69 @@ def test_a_digest_channel_plays_through_the_rewind_buffer(server, tmp_path):
     finally:
         m.terminate()
         s.close()
+
+
+class _Refuses:
+    """A server that answers a request without a login with 403 - never a
+    401 that would ask for one - and plays with basic."""
+
+    def __init__(self) -> None:
+        import base64
+        import threading
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        self.seen: list[str] = []
+        want = "Basic " + base64.b64encode(b"kodi:s3cret").decode()
+        rec = self
+
+        class H(BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
+
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):
+                given = self.headers.get("Authorization") or ""
+                rec.seen.append(given)
+                body = TS if given == want else b""
+                self.send_response(200 if given == want else 403)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+        self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), H)
+        self.port = self.httpd.server_address[1]
+        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
+
+    def close(self) -> None:
+        self.httpd.shutdown()
+        self.httpd.server_close()
+
+
+def test_basic_goes_with_the_first_request_as_it_always_did():
+    """1.4.5's ingest (requests.get(url)) sent the address's login as basic
+    at once; a server that says 403 to a request without one never asks."""
+    srv = _Refuses()
+    try:
+        url = with_login(f"http://127.0.0.1:{srv.port}/live/1.ts", "kodi", "s3cret")
+        r = get_with_login(url, timeout=5)
+        assert r.status_code == 200 and r.content == TS
+        assert len(srv.seen) == 1 and srv.seen[0].startswith("Basic ")
+        r = Ingest._default_open(url, stream=True, timeout=5, headers={"User-Agent": "dopeIPTV/1.0"})
+        assert r.status_code == 200 and r.raw.read() == TS
+        assert len(srv.seen) == 2
+    finally:
+        srv.close()
+
+
+def test_the_ingest_takes_the_proxy_only_while_streams_go_through_it(monkeypatch):
+    """"Streams through the proxy too" off: the player goes direct, and so
+    does the rewind buffer's own connection."""
+    from dopeiptv.core import http_login, nerd
+    from tests.test_nerd import on
+    got: list[dict] = []
+    monkeypatch.setattr(http_login, "get_with_login", lambda url, **kw: got.append(kw))
+    for player, want in (("true", {"http": "http://p:3128", "https": "http://p:3128"}),
+                         ("false", None)):
+        monkeypatch.setattr(nerd, "_current", on(nerd_proxy="http://p:3128", nerd_proxy_player=player))
+        Ingest._default_open("http://h/live/1.ts", stream=True, timeout=5)
+        assert got[-1].get("proxies") == want, (player, got[-1])

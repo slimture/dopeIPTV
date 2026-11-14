@@ -9,6 +9,7 @@ from __future__ import annotations
 import getpass
 import json
 import os
+import sys
 import zlib
 from typing import Callable
 
@@ -21,7 +22,11 @@ from .log import log
 def server_name() -> str:
     """Per user: another account's copy never takes this one's commands.
     In a Flatpak each start has a /tmp of its own, where Qt would put the
-    socket; the app's runtime folder is the one place two starts share."""
+    socket; the app's runtime folder is the one place two starts share.
+    Elsewhere on Linux the user's own runtime folder ($XDG_RUNTIME_DIR,
+    which only they can enter), not the /tmp everyone shares, where another
+    account could take the name first and hear this one's commands. macOS
+    keeps Qt's per-user temporary folder, Windows a named pipe."""
     forced = os.environ.get("DOPEIPTV_INSTANCE_SOCKET", "").strip()
     if forced:
         return forced
@@ -35,7 +40,21 @@ def server_name() -> str:
         shared = os.path.join(runtime, "app", app_id)
         if os.path.isdir(shared):
             return os.path.join(shared, name)
+    if sys.platform.startswith("linux") and runtime and os.path.isabs(runtime) \
+            and os.path.isdir(runtime):
+        return os.path.join(runtime, "dopeiptv", name)
     return name
+
+
+def _make_folder(name: str) -> None:
+    """The folder a path name lives in, only the user's (0700)."""
+    folder = os.path.dirname(name)
+    if not folder or os.path.isdir(folder):
+        return
+    try:
+        os.makedirs(folder, mode=0o700, exist_ok=True)
+    except OSError as e:
+        log.info("commands: no folder for the socket (%s)", e)
 
 
 def send_to_running(command: dict, timeout_ms: int = 800) -> bool:
@@ -66,8 +85,11 @@ class CommandServer(QObject):
         super().__init__(parent)
         self._on = on_command
         self._server = QLocalServer(self)
+        # The socket (Unix) or pipe (Windows) is the user's alone.
+        self._server.setSocketOptions(QLocalServer.SocketOption.UserAccessOption)
         self._server.newConnection.connect(self._accept)
         name = server_name()
+        _make_folder(name)
         if not self._server.listen(name):
             # A copy that crashed leaves its socket file behind (Unix).
             QLocalServer.removeServer(name)

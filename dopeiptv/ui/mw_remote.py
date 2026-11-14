@@ -12,6 +12,7 @@ from typing import Any
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
 from ..core import nerd
+from ..core.commands import stream_url_ok
 from ..core.log import log
 from ..core.remote_api import DEFAULT_PORT, RemoteServer, new_token
 from ..i18n import tr
@@ -168,6 +169,9 @@ class _RemoteMixin:
                 return {"ok": True}
             if not (url or channel):
                 raise ValueError('give "channel" (a name), "number" or "url"')
+            if url and not stream_url_ok(url):
+                # A program on the network plays streams, never a file here.
+                raise ValueError('"url" is a stream address: http, https, rtsp, rtmp, rtp, udp or srt')
             self.handle_command({"play": url} if url else {"channel": channel})
             return {"ok": True}
         if action == "volume":

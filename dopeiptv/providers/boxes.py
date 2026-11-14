@@ -150,6 +150,26 @@ def _hms(secs: int) -> str:
     return f"{secs // 3600:02d}:{secs % 3600 // 60:02d}:{secs % 60:02d}"
 
 
+def _number(value: Any) -> int:
+    """A whole number from what a box says, 0 for anything else."""
+    try:
+        return max(0, int(float(value or 0)))
+    except (TypeError, ValueError, OverflowError):
+        return 0
+
+
+def _day(stamp: int) -> str:
+    """The date of a Unix time, "" for one no calendar here has: a box's
+    garbage time (negative, or centuries off) raised on Windows and lost
+    the whole source with it."""
+    if stamp <= 0:
+        return ""
+    try:
+        return datetime.fromtimestamp(stamp).strftime("%Y-%m-%d")
+    except (OverflowError, OSError, ValueError):
+        return ""
+
+
 class BoxClient(OfflineClient):
     """The shared half of a box on the home network. A kind gives
     ``_probe`` (is it the right kind of box: its details, or an error),
@@ -347,13 +367,16 @@ class BoxClient(OfflineClient):
             if not key or not rec.get("url"):
                 continue
             rid = stable_id(key, rtaken)
-            secs = int(rec.get("secs") or 0)
+            secs = _number(rec.get("secs"))
             plot = clean_text(rec.get("plot"), lines=True)
             channel = clean_text(rec.get("channel"))
-            start = int(rec.get("start") or 0)
+            start = _number(rec.get("start"))
+            day = _day(start)
+            if not day:
+                start = 0           # no time it was made, rather than a wrong one
             info = {"plot": plot, "description": plot, "genre": channel,
                     "duration": _hms(secs) if secs else "", "duration_secs": secs,
-                    "releasedate": datetime.fromtimestamp(start).strftime("%Y-%m-%d") if start else "",
+                    "releasedate": day,
                     "cast": "", "director": "", "o_name": ""}
             row = {"num": len(recs) + 1, "name": clean_text(rec.get("title")) or "?",
                    "stream_type": "movie", "stream_id": rid, "stream_icon": str(rec.get("icon") or ""),
@@ -405,6 +428,18 @@ class BoxClient(OfflineClient):
         if category_id is None:
             return list(self._by_id.values())
         return [r for r in self._rows if r["category_id"] == category_id]
+
+    # A play address needs the catalogue, and with none yet (the box was
+    # off when the app started) loading it is a login and the box's lists -
+    # seconds, or a timeout. The window asks off its thread first then
+    # (MainWindow._links_later), as for a portal's links.
+    slow_links = True
+
+    def link_ready(self, method: str, ident: int | str) -> bool:
+        """Whether a play address answers at once: the channels are in, or
+        the last try to load them failed a moment ago (no new try yet)."""
+        return self._loaded or bool(
+            self._failed_at and time.monotonic() - self._failed_at < self.RETRY_SECS)
 
     def live_url(self, stream_id: int | str, fmt: str = "ts") -> str:
         self._ensure(refresh=False)

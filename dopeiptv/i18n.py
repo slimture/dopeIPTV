@@ -1406,6 +1406,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "report_send": {"en": "Send"},
     "report_sent": {"en": "Thank you - the report was sent."},
     "report_not_sent": {"en": "The report could not be sent. It is on the clipboard - you can paste it in an issue on GitHub."},
+    "report_waiting": {"en": "dopeIPTV ran into an error. Click here to read the report - it also waits in the menu."},
     "nerd_remote_drop_token": {"en": "Remove"},
     "nerd_remote_drop_token_tip": {"en": "Remove the token: remote control and sharing turn off, and nobody can reach the app. Turning one on again makes a new token."},
     "nerd_part_no_boxes": {"en": "None added yet"},

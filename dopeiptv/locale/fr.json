@@ -1748,5 +1748,6 @@
   "supporter_remove": "Retirer la clé",
   "supporter_again": "Donner à nouveau",
   "supporter_menu": "Clé de soutien",
-  "supporter_tip": "Soutien depuis le {date} – merci !"
+  "supporter_tip": "Soutien depuis le {date} – merci !",
+  "report_waiting": "dopeIPTV a rencontré une erreur. Cliquez ici pour lire le rapport – il vous attend aussi dans le menu."
 }

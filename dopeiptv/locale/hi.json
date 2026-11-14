@@ -1748,5 +1748,6 @@
   "supporter_remove": "कुंजी हटाएँ",
   "supporter_again": "फिर से दान करें",
   "supporter_menu": "समर्थक कुंजी",
-  "supporter_tip": "{date} से समर्थक – धन्यवाद!"
+  "supporter_tip": "{date} से समर्थक – धन्यवाद!",
+  "report_waiting": "dopeIPTV में एक त्रुटि आई। रिपोर्ट पढ़ने के लिए यहाँ क्लिक करें - यह मेनू में भी आपका इंतज़ार कर रही है।"
 }

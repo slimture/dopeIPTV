@@ -280,6 +280,11 @@ class _StatsLabel(QLabel):
         self.compact = False
         self.columns = 1
         self.font_px = 11
+        # What the last fit was made for (room, view, lines) and whether
+        # anything fitted at all; the type size styled now.
+        self._fit_for: tuple | None = None
+        self._fitted = False
+        self._styled_px: int | None = None
         self.setTextFormat(Qt.TextFormat.RichText)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setToolTip("Click: fewer or more lines")
@@ -307,12 +312,29 @@ class _StatsLabel(QLabel):
                                                      for i, g in enumerate(shown))
 
     def _style(self, px: int) -> None:
+        # A style sheet re-polishes the label: only when the size changes.
+        if px == self._styled_px:
+            return
+        self._styled_px = px
         self.setStyleSheet(
             "background: rgba(0,0,0,185); border-radius: 8px;"
             f"padding: {max(6, px // 2 + 2)}px {max(8, px - 1)}px; font-size: {px}px;")
 
     def lay_out(self, groups, max_w: int, max_h: int) -> None:
-        """The largest type, one column or two, that fits *max_w* x *max_h*."""
+        """The largest type, one column or two, that fits *max_w* x *max_h*.
+
+        Searched again only when the room, the view or the lines change:
+        each second's new values keep the last fit while it still fits
+        (or when nothing did) - the search is up to 14 style sheets and
+        layouts, every second, when the picture is small."""
+        shape = (max_w, max_h, self.compact, tuple(tuple(k for k, _v in g) for g in groups))
+        if shape == self._fit_for:
+            self._style(self.font_px)
+            self.setText(self._html(groups, self.columns))
+            self.adjustSize()
+            if not self._fitted or (self.height() <= max_h and self.width() <= max_w):
+                return
+        self._fit_for = shape
         top = max(10, min(15, round(max_h / 62)))
         tries = [(px, cols) for px in range(top, 8, -1) for cols in (1, 2)]
         for px, cols in tries:
@@ -320,9 +342,9 @@ class _StatsLabel(QLabel):
             self.setText(self._html(groups, cols))
             self.adjustSize()
             if self.height() <= max_h and self.width() <= max_w:
-                self.font_px, self.columns = px, cols
+                self.font_px, self.columns, self._fitted = px, cols, True
                 return
-        self.font_px, self.columns = 9, 2
+        self.font_px, self.columns, self._fitted = 9, 2, False
 
 
 class _MacInputFilter(QObject):

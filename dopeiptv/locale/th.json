@@ -1748,5 +1748,6 @@
   "supporter_remove": "ลบกุญแจ",
   "supporter_again": "บริจาคอีกครั้ง",
   "supporter_menu": "กุญแจผู้สนับสนุน",
-  "supporter_tip": "สนับสนุนตั้งแต่ {date} – ขอบคุณ!"
+  "supporter_tip": "สนับสนุนตั้งแต่ {date} – ขอบคุณ!",
+  "report_waiting": "dopeIPTV พบข้อผิดพลาด คลิกที่นี่เพื่ออ่านรายงาน - รายงานยังรออยู่ในเมนูด้วย"
 }
