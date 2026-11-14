@@ -9,8 +9,9 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [1.5.0]
 
-Boxes on the home network as sources, Nerd for those who tinker, private
-viewing, feedback with answers in the app, and a supporter key.
+Boxes on the home network as sources, Nerd for those who tinker, series
+recording, a full backup, keyboard shortcuts of your own, private viewing,
+feedback with answers in the app, and a supporter key.
 
 ### Added
 
@@ -51,7 +52,30 @@ viewing, feedback with answers in the app, and a supporter key.
   spamming in the app and on the site.
 - Supporter keys: signed by dopeiptv.org, checked offline, nothing about
   the person in them; "Supporter key…" in the dopeIPTV menu and Settings,
-  `dopeiptv://supporter?key=...` from the site's thank-you.
+  `dopeiptv://supporter?key=...` from the site's thank-you. A supporter's
+  logo shades into the heart's colour with a heart on its middle bar, the
+  app's icon can do the same, two themes are theirs (Aurora, Dawn), and
+  their feedback is marked to be read first (a word, never the key).
+- Series recording: "Record series…" on a programme - the exact title or
+  a word, one channel or any - scheduled from the guide for the week
+  ahead, nothing twice, a cancelled one not again; padding before and
+  after every recording from the guide.
+- Back up and restore everything in one file - settings, sources,
+  favourites, history, recordings planned, Nerd - shown before it is
+  restored; or only its playlists, as before.
+- Keyboard shortcuts of your own, in Settings > Advanced: click a key and
+  press the new one; a key moved from another action says so, keys the
+  app needs are kept.
+- Catch-up on Stalker / Ministra portals, from the portal's own archive,
+  by programme.
+- Nerd: a channel's own settings - audio and subtitle language,
+  deinterlacing, aspect ratio, audio delay.
+- Nerd: rewrite rules for a source's stream addresses (find -> replace,
+  plain or regex, previewed and tested), and a highest quality for
+  adaptive streams (1080p, 720p, 480p, lowest, or a bitrate).
+- Nerd: events out to webhooks and MQTT - playing, paused, stopped,
+  channel changed, recordings - with Home Assistant discovery; private
+  viewing sends what happened, not what.
 
 ### Changed
 
@@ -60,6 +84,14 @@ viewing, feedback with answers in the app, and a supporter key.
 - Serbian in Latin script throughout.
 - Flatpak: freedesktop runtime 25.08 (24.08 reached end of life).
 - Typed channel numbers wait 1.5 s (was 1.2 s); Enter zaps at once.
+- An error report never interrupts a video: while one plays, or in
+  fullscreen, it waits in a note and in the menu.
+- "Supporter since" reads as a month in the app's language.
+- `dopeiptv://` links play streams only, never a file on the computer;
+  the remote API checks the address too, and lets an idle client go.
+- Linux: the single-instance socket lives in the user's own runtime
+  folder.
+- The donate heart no longer beats, and sits on the logo's corner.
 
 ### Fixed
 
@@ -69,6 +101,24 @@ viewing, feedback with answers in the app, and a supporter key.
 - The guide could take the app down after it had been closed, with the
   older PyQt the Flatpak uses: its timers kept calling into the closed
   dialog.
+- Feedback and error reports never left the Mac app (no certificates for
+  the secure connection); album art in Local files had the same problem.
+  A long report with a log is no longer too big for the site.
+- Stats for nerds disappeared in fullscreen on macOS, in the pop-out, and
+  after leaving either.
+- Turning Nerd on unfolds its pages and scrolls them into view.
+- Failover could take over after the user had chosen another channel or
+  pressed Stop.
+- The VPN guard now holds auto-preview, external players, multiview and
+  recordings too, and never the user's own recordings; on Windows it no
+  longer flashes a console window.
+- The rewind buffer sends a stream's login up front again (some servers
+  refused it otherwise) and follows "Streams through the proxy too".
+- Windows: the command after a recording broke on quoted arguments.
+- Very long programme titles no longer make a recording's file name too
+  long.
+- Private viewing keeps titles out of the log too.
+- The icon rail lost its logo.
 
 ## [1.4.5]
 

@@ -1,6 +1,6 @@
 ## dopeIPTV 1.5.0
 
-**Your receiver, your TV server and your tuner as sources - and Nerd: a Settings page for those who like to tinker, off until you turn it on.**
+**Your receiver, your TV server and your tuner as sources, series recording, a backup of everything - and Nerd: a Settings page for those who like to tinker, off until you turn it on.**
 
 ### The big ones
 
@@ -13,7 +13,12 @@
 - **Remote control and sharing.** A small server, with a token, so a script or another program can play a channel - and every source shared as one playlist and one guide for other players in the house.
 - **Private viewing**, and **Clear recent history** for the last hour, day or all of it.
 - **Send feedback** from the menu: say what it is about, and attach only what you choose - the app picks the part of the log that matters. Ask for an answer and it comes in the app - no e-mail, no account. After an error or a crash the app offers to send a report. Before you see any of it, addresses, logins, your sources' names, channels and what you watched are taken out.
-- **A supporter key** for those who donate: a mark on the heart and in About, and the app stops asking. It is checked on your computer and holds nothing about you. Find it under **dopeIPTV → Supporter key…**.
+- **Series recording.** "Record series…" on a programme records every episode the guide shows for the week ahead - by exact title or a word, on one channel or any - and a few minutes before and after, if you like.
+- **Back up everything** - settings, sources, favourites, history, planned recordings - in one file, and restore it on another computer.
+- **Keyboard shortcuts of your own**, in Settings → Advanced.
+- **Catch-up on Stalker / Ministra portals**, from the portal's own archive.
+- **More Nerd:** a channel's own audio and subtitle language, picture and delay; rewrite rules for a source's addresses; a highest quality for adaptive streams; and events out to webhooks and MQTT for Home Assistant and the like.
+- **A supporter key** for those who donate: your logo takes on the heart's colours, the app's icon can too, two themes are yours (Aurora and Dawn), your feedback is read first, and the app stops asking. It is checked on your computer and holds nothing about you. Find it under **dopeIPTV → Supporter key…**.
 
 ### Also new
 
@@ -22,5 +27,7 @@
 - Stats for nerds as large as the picture allows - and tidy in fullscreen.
 - Serbian is written in one script throughout (Latin).
 - macOS: one dopeIPTV menu again, not two.
+- Feedback and error reports now reach us from the Mac app, and an error report never interrupts what you watch.
+- Stats for nerds stay up in fullscreen and in the pop-out.
 
 On the AppImage, Windows or macOS? Click **Update now** in the banner - or download 1.5.0 from [dopeiptv.org](https://dopeiptv.org).
