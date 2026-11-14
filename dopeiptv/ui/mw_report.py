@@ -64,8 +64,12 @@ class _ReportMixin:
         self.open_report("error", trace, tr("report_error_intro"))
 
     def _feedback_details(self, opts: dict) -> str:
-        """What feedback carries besides the person's words, as they chose."""
+        """What feedback carries besides the person's words, as they chose:
+        of the logs only the part that matters (report.relevant_log) - the
+        warnings and errors, the lines of where it went wrong, what happened
+        last."""
         from ..core.log import log_file, recent_lines
+        area = str(opts.get("area") or "")
         parts: list[str] = []
         if opts.get("versions"):
             parts += report.system_lines()
@@ -73,16 +77,21 @@ class _ReportMixin:
             store = getattr(self, "playlist_store", None)
             kinds = sorted({str(p.get("kind") or "xtream") for p in (store.playlists() if store else [])})
             parts.append("Sources: " + (", ".join(kinds) or "none"))
+        what = f"warnings, errors, {area} and the last lines" if area in report.AREA_WORDS \
+            else "warnings, errors and the last lines"
         if opts.get("log"):
-            parts += ["", "Log from this run:", *recent_lines(80)]
+            run = recent_lines(300)
+            picked = report.relevant_log(run, area)
+            parts += ["", f"Log from this run ({what}; {len(picked)} of {len(run)} lines):", *picked]
         if opts.get("file"):
             try:
                 with open(log_file(), encoding="utf-8", errors="replace") as fh:
-                    tail = fh.read().splitlines()[-150:]
+                    tail = fh.read().splitlines()[-2000:]
             except OSError:
                 tail = []
-            if tail:
-                parts += ["", "Log file (last lines):", *tail]
+            picked = report.relevant_log(tail, area, most=100, tail=10)
+            if picked:
+                parts += ["", f"Log file from earlier runs ({what}; {len(picked)} lines):", *picked]
         return report.scrub("\n".join(parts), self._personal_values())
 
     def open_report(self, kind: str, trace: str = "", intro: str = "") -> None:

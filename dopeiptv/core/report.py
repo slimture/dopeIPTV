@@ -105,6 +105,70 @@ def system_lines() -> list[str]:
     return lines
 
 
+# -- the part of a log that matters -------------------------------------------------
+
+#: What a log line's message starts with, for each answer to "Where?" in the
+#: feedback window (the app's own prefixes: "play: ...", "EPG: ...").
+AREA_WORDS: dict[str, tuple[str, ...]] = {
+    "playback": ("play", "mpv", "stream", "eof", "embedded playback", "dvr", "local buffer", "gl context",
+                 "opengl", "vid", "mirror", "subtitle", "audio", "resume", "failover", "nerd stream", "retry",
+                 "qt platform"),
+    "guide": ("epg", "xmltv", "guide"),
+    "recording": ("record", "dvr recording", "stream-record", "rec "),
+    "lists": ("m3u", "xtream", "stalker", "enigma2", "tvheadend", "hdhomerun", "lan scan", "queue",
+              "playlist", "channel", "categor", "source", "tmdb", "popular"),
+    "settings": ("nerd", "settings", "i18n", "icon theme", "desktop entry", "remote", "share"),
+    "cast": ("cast", "dlna", "chromecast"),
+    "updates": ("update", "self-check", "download", "signature"),
+}
+_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+_LOUD = ("WARNING", "ERROR", "CRITICAL")
+
+
+def _parts(line: str) -> tuple[str, str]:
+    """(level, message) of a log line, in this run's form ("21:04:11 INFO
+    play: ...") or the file's ("2026-11-14 21:04:11,123 INFO play: ...")."""
+    words = line.split(" ", 4)
+    for i, w in enumerate(words[:4]):
+        if w in _LEVELS:
+            return w, " ".join(words[i + 1:])
+    return "", line
+
+
+def relevant_log(lines: list[str], area: str = "", most: int = 120, tail: int = 15) -> list[str]:
+    """The lines of *lines* that matter: every warning and error with two
+    lines either side, the lines of *area* (AREA_WORDS), and the last
+    *tail* lines - what happened just before. The same line over and over
+    becomes one, with how many; a gap between kept lines is shown as "…".
+    At most *most* lines, the latest kept when there are more."""
+    words = AREA_WORDS.get(area, ())
+    keep: set[int] = set(range(max(0, len(lines) - tail), len(lines)))
+    for i, line in enumerate(lines):
+        level, msg = _parts(line)
+        if level in _LOUD or msg.startswith(("Traceback", "  File ")):
+            keep.update(range(max(0, i - 2), min(len(lines), i + 3)))
+        elif words and msg.lower().startswith(words):
+            keep.add(i)
+    out: list[str] = []
+    last, same, prev_key = -2, 0, None
+    for i in sorted(keep):
+        key = re.sub(r"\d+", "N", _parts(lines[i])[1])
+        if i == last + 1 and key == prev_key:
+            same += 1
+            last = i
+            continue
+        if same:
+            out.append(f"   … the same line ×{same + 1}")
+            same = 0
+        if out and i != last + 1:
+            out.append("…")
+        out.append(lines[i])
+        last, prev_key = i, key
+    if same:
+        out.append(f"   … the same line ×{same + 1}")
+    return out[-most:]
+
+
 def build(kind: str, message: str = "", trace: str = "", with_log: bool = True,
           personal: Iterable[str] = ()) -> str:
     """The report as the person will see it, already scrubbed."""

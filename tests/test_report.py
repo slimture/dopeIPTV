@@ -212,7 +212,7 @@ for _ in range(100):
 assert len(asked) == 1
 sent = inbox.got[-1][2]
 assert sent["kind"] == "feedback" and sent["text"].startswith("The guide for <private> is empty"), sent
-assert "Log from this run:" in sent["text"] and "dopeIPTV " in sent["text"], sent["text"][:400]
+assert "Log from this run (warnings, errors, guide" in sent["text"] and "dopeIPTV " in sent["text"], sent["text"][:400]
 assert "anna-tv" not in sent["text"] and "Anna TV" not in sent["text"]
 assert (sent["topic"], sent["area"], sent["often"]) == ("bug", "guide", "always"), sent
 assert any("sent" in t.lower() or "skick" in t.lower() for t in toasts), toasts
@@ -313,3 +313,27 @@ def test_a_supporter_key_never_goes_in_a_report():
     key = supporter.make(bytes(32))
     out = report.scrub(f"my key is {key} - does it work?")
     assert key not in out and "<supporter key>" in out
+
+
+def test_only_the_part_of_the_log_that_matters_goes_with_feedback():
+    """Warnings and errors with their neighbours, the lines of where it went
+    wrong, the last lines; the same line over and over once, with a count."""
+    lines = [f"21:00:{i:02d} INFO tmdb: poster {i}" for i in range(40)]
+    lines += ["21:01:00 INFO EPG: loaded 300 channels"]
+    lines += [f"21:01:{i:02d} INFO tmdb: poster {i}" for i in range(1, 20)]
+    lines += ["21:02:00 INFO play: starting hls"]
+    lines += [f"21:02:{i:02d} WARNING mpv: demuxer cache low ({i}%)" for i in range(1, 9)]
+    lines += ["21:02:10 ERROR play: stream ended unexpectedly"]
+    lines += [f"21:03:{i:02d} INFO tmdb: poster {i}" for i in range(30)]
+    play = report.relevant_log(lines, "playback")
+    assert "21:02:10 ERROR play: stream ended unexpectedly" in play
+    assert "21:02:00 INFO play: starting hls" in play
+    assert any("the same line ×8" in ln for ln in play), play
+    assert "21:01:00 INFO EPG: loaded 300 channels" not in play
+    assert len(play) < len(lines) / 3
+    guide = report.relevant_log(lines, "guide")
+    assert "21:01:00 INFO EPG: loaded 300 channels" in guide
+    assert "…" in guide
+    assert len(report.relevant_log(lines * 20, "playback", most=50)) <= 50
+    # The log file's own form (a date and milliseconds) reads the same.
+    assert report._parts("2026-11-14 21:02:10,123 ERROR play: x") == ("ERROR", "play: x")

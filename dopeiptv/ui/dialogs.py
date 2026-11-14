@@ -748,6 +748,8 @@ class FeedbackDialog(QDialog):
         self._topics.buttonToggled.connect(lambda *_a: self._topic_changed())
         for box in self.attach.values():
             box.toggled.connect(lambda *_a: self._refresh())
+        # The log's part that matters follows "Where?".
+        self.area.currentIndexChanged.connect(lambda *_a: self._refresh())
         self.message.textChanged.connect(self._ready)
         self.preview.textChanged.connect(self._preview_edited)
         self.show_btn.clicked.connect(self._toggle_preview)
@@ -766,6 +768,7 @@ class FeedbackDialog(QDialog):
         if t == "bug" and not self._edited:
             self.attach["log"].setChecked(True)
             self.attach["source"].setChecked(True)
+        self._refresh()
         self._ready()
         self._fit()
 
@@ -788,8 +791,10 @@ class FeedbackDialog(QDialog):
         super().showEvent(event)
         self._fit()
 
-    def options(self) -> dict[str, bool]:
-        return {k: box.isChecked() and box.isVisibleTo(self) for k, box in self.attach.items()}
+    def options(self) -> dict:
+        out: dict = {k: box.isChecked() and box.isVisibleTo(self) for k, box in self.attach.items()}
+        out["area"] = str(self.area.currentData()) if self.topic() == "bug" else ""
+        return out
 
     def _refresh(self) -> None:
         if self._edited:
