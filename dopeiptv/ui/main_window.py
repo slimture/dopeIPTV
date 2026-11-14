@@ -238,6 +238,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Chromecasts and DLNA TVs alike, behind one object (casting.py).
         self.cast = CastHub()
         self.rec = RecordingManager(settings, self)
+        # A portal's recording asks for its address as it starts.
+        self.rec.address_for = self._rec_address_for
         self.rec.jobs_changed.connect(self._recordings_changed)
         self.rec.recording_stopped.connect(self._on_recording_stopped)
         # Events pushed out (Nerd): they only watch.
@@ -3797,7 +3799,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                      player, external, for_log(title))
             if not self._confirm_external_while_playing():
                 return
-            if kind not in ("local", "recording") and self._vpn_guard_blocks():
+            if kind not in ("local", "recording") and self._vpn_guard_blocks(url):
                 return
             launch_player(player or "mpv", url, title, self)
             if self.mode != "history":
@@ -4296,7 +4298,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         if not self._guard_stream_switch(url, title):
             return
-        if self._vpn_guard_blocks():
+        if self._vpn_guard_blocks(url):
             return
         self._failover_leave(url, self._item_key(it))
         # The preview path never reaches _start_playback, so it must carry the
@@ -4485,7 +4487,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 return
             title = it.get("name") or it.get("title") or "dopeIPTV"
             if external or player == "vlc":
-                if not self._vpn_guard_blocks():
+                if not self._vpn_guard_blocks(url):
                     launch_player(player or "mpv", url, title, self)
                 return
             # No autoplay-queue from this flat list: pin an empty override so
@@ -4768,7 +4770,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not self._guard_stream_switch(url, title):
             return
         # The guard is about streams: the user's own files always play.
-        if kind not in ("local", "recording") and self._vpn_guard_blocks():
+        if kind not in ("local", "recording") and self._vpn_guard_blocks(url):
             return
         self._failover_leave(url, key)
         # A click that led here also armed the auto-preview timer; kill it so
@@ -4993,12 +4995,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.set_live_badge(None)
 
 
-    def _vpn_guard_blocks(self) -> bool:
+    def _vpn_guard_blocks(self, url: str = "") -> bool:
         """Nerd's VPN guard: with it on and no VPN up, nothing streams -
-        said once, plainly, with where to change it."""
+        said once, plainly, with where to change it. The rule recordings
+        and multiview ask too (nerd.blocks_stream): the user's own files
+        always play, and a box's source or a stream at a home address is on
+        the home network."""
         from ..core import nerd
         src = nerd.source() or {}
-        if not nerd.current().vpn_blocks(src.get("_kind") in nerd.BOX_KINDS):
+        if not nerd.blocks_stream(url, src.get("_kind")):
             return False
         self._show_toast(tr("nerd_vpn_blocked"), 6000)
         return True

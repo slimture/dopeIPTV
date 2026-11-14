@@ -1375,7 +1375,7 @@
   "nerd_ck_rw_missing": "Pod przepisanym adresem nic nie ma (HTTP {code}).",
   "nerd_card_hls": "Strumienie adaptacyjne (HLS)",
   "nerd_hls_quality": "Najwyższa jakość strumieni adaptacyjnych",
-  "nerd_hls_quality_hint": "Strumień HLS ma kilka jakości; odtwarzacz bierze najlepszą do tej. Inne strumienie się nie zmieniają.",
+  "nerd_hls_quality_hint": "Strumień HLS ma kilka jakości; odtwarzacz bierze najlepszą do tej. W multiview działają tylko „Najniższa” i najwyższa przepływność. Inne strumienie się nie zmieniają.",
   "nerd_hls_best": "Najlepsza (jaką oferuje strumień)",
   "nerd_hls_lowest": "Najniższa",
   "nerd_hls_max_rate": "Najwyższa przepływność",
@@ -1837,5 +1837,6 @@
   "menu_file": "Plik",
   "menu_view": "Widok",
   "menu_help": "Pomoc",
-  "menu_website": "Strona dopeIPTV"
+  "menu_website": "Strona dopeIPTV",
+  "rec_reason_no_address": "nie udało się uzyskać adresu strumienia"
 }

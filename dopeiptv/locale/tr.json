@@ -1375,7 +1375,7 @@
   "nerd_ck_rw_missing": "Yeniden yazılan adreste bir şey yok (HTTP {code}).",
   "nerd_card_hls": "Uyarlanabilir yayınlar (HLS)",
   "nerd_hls_quality": "Uyarlanabilir yayınlar için en yüksek kalite",
-  "nerd_hls_quality_hint": "Bir HLS yayını birkaç kalitede gelir; oynatıcı buna kadar olan en iyisini alır. Diğer yayınlar etkilenmez.",
+  "nerd_hls_quality_hint": "Bir HLS yayını birkaç kalitede gelir; oynatıcı buna kadar olan en iyisini alır. Çoklu görünümde yalnızca “En düşük” ve en yüksek bit hızı geçerlidir. Diğer yayınlar etkilenmez.",
   "nerd_hls_best": "En iyi (yayının sunduğu)",
   "nerd_hls_lowest": "En düşük",
   "nerd_hls_max_rate": "En yüksek bit hızı",
@@ -1837,5 +1837,6 @@
   "menu_file": "Dosya",
   "menu_view": "Görüntü",
   "menu_help": "Yardım",
-  "menu_website": "dopeIPTV web sitesi"
+  "menu_website": "dopeIPTV web sitesi",
+  "rec_reason_no_address": "yayın adresi alınamadı"
 }

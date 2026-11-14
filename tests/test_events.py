@@ -916,3 +916,68 @@ def test_the_window_tells_both_what_plays(tmp_path):
     if "EVENTS_SKIP" in out.stdout:
         pytest.skip(out.stdout.strip())
     assert "EVENTS_OK" in out.stdout, out.stdout + out.stderr[-4000:]
+
+
+# -- HTTPS checked with certifi too; the broker never named in the log -------------------------
+
+def test_https_webhooks_check_certificates_with_certifi_as_well(monkeypatch):
+    """The Mac app (and other packaged builds) may not find the system's
+    certificates: a webhook's HTTPS is checked against certifi's as well,
+    as the broker's TLS is (mqtt.tls_context). No network here."""
+    import ssl
+    import urllib.request
+    certifi = pytest.importorskip("certifi")
+    op = events.opener_for("https://hooks.example.com/api/webhook/x")
+    https = [h for h in op.handlers if isinstance(h, urllib.request.HTTPSHandler)]
+    assert len(https) == 1 and https[0]._context is events.https_context()
+    ctx = events.https_context()
+    assert ctx.verify_mode == ssl.CERT_REQUIRED and ctx.check_hostname
+    with open(certifi.where(), encoding="ascii", errors="replace") as fh:
+        pem = fh.read()
+    end = "-----END CERTIFICATE-----"
+    first = pem[pem.index("-----BEGIN CERTIFICATE-----"):pem.index(end) + len(end)]
+    assert ssl.PEM_cert_to_DER_cert(first) in ctx.get_ca_certs(binary_form=True)
+    # A home system is still asked directly, whatever proxy the desktop names.
+    monkeypatch.setenv("http_proxy", "http://proxy.example:3128")
+    monkeypatch.setenv("https_proxy", "http://proxy.example:3128")
+    for url, direct in (("http://homeassistant.local:8123/api/webhook/x", True),
+                        ("http://nodered:1880/x", True),
+                        ("https://hooks.example.com/x", False)):
+        handlers = events.opener_for(url).handlers
+        proxied = [h for h in handlers if isinstance(h, urllib.request.ProxyHandler) and h.proxies]
+        assert bool(proxied) != direct, url
+
+
+def test_the_broker_is_never_named_in_the_log():
+    import logging
+    cfg = events.Config(mqtt_host="broker.example.org", mqtt_port=8883, mqtt_tls=True,
+                        client_id="t", prefix="home/tv")
+    shown = events.broker_shown(cfg)
+    assert "broker.example.org" not in shown and "8883" in shown and "TLS" in shown
+    sink = events.MqttSink.__new__(events.MqttSink)
+    sink.cfg = cfg
+    assert sink.quiet("certificate is not valid for 'broker.example.org'") == \
+        "certificate is not valid for '(broker)'"
+    # A broker that is not there: the lines say so, never where it is.
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    seen: list[str] = []
+
+    class Catch(logging.Handler):
+        def emit(self, record):
+            seen.append(record.getMessage())
+    h = Catch()
+    level = events.log.level
+    events.log.setLevel(logging.INFO)
+    events.log.addHandler(h)
+    d = events.Dispatcher()
+    try:
+        d.configure(_mqtt_cfg(port))
+        assert until(lambda: any("no MQTT broker" in m for m in seen)), seen
+    finally:
+        d.quit(0)
+        events.log.removeHandler(h)
+        events.log.setLevel(level)
+    lines = [m for m in seen if "MQTT" in m]
+    assert lines and not [m for m in lines if "127.0.0.1" in m], lines

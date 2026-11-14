@@ -617,6 +617,9 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         lay.setSpacing(2)
 
         self.video = _MpvGLWidget(self)
+        # This player switches adaptive streams to the variant Nerd's cap
+        # allows (_watch_variants): its core may open them on the smallest.
+        self.video.variant_picker = True
         # Hardware-decode preference from Settings, staged on the widget before
         # its lazy GL init builds the mpv core (env DOPEIPTV_HWDEC still wins).
         if settings is not None:
@@ -2850,6 +2853,23 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
             self._end_dvr()
             return False
 
+    def nerd_reapply(self) -> dict[str, list[str]] | None:
+        """Nerd's settings changed while this player's core plays: onto the
+        core at once (nerd.reapply_core), and the quality cap's variant
+        switch armed for the new cap - a reconnect that reopens the stream
+        before the next play() would otherwise open it on the smallest
+        variant the new cap puts on the core, with no switch to leave it.
+        None without a core."""
+        from ..core import nerd
+        m = getattr(self.video, "mpv", None)
+        if m is None:
+            return None
+        done = nerd.reapply_core(m, picker=True)
+        self._hls_cap = nerd.current().hls_cap()
+        if self._hls_cap.picks:
+            self._watch_variants(m)
+        return done
+
     def _watch_variants(self, m) -> None:
         """Nerd's quality cap: each stream core *m* opens goes to the
         variant the cap allows. Hooked once per core, and only once a cap
@@ -3432,7 +3452,14 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         self._place_stats()
 
     def _remember_delay(self, value: float) -> None:
-        """Nerd: the audio delay chosen, kept for the channel playing."""
+        """Nerd: the audio delay chosen, kept for the channel playing - not
+        while viewing privately, which keeps nothing of what is played (a
+        channel's own delay says it was watched): then it holds for this
+        stream only, and the next start sets the delay back."""
+        from ..core.privacy import private
+        if private():
+            self._delay_set = abs(value) >= 0.001
+            return
         chan = getattr(self, "_delay_chan", None)
         if chan and self._settings is not None:
             try:

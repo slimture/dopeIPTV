@@ -1375,7 +1375,7 @@
   "nerd_ck_rw_missing": "Không có gì ở địa chỉ đã viết lại (HTTP {code}).",
   "nerd_card_hls": "Luồng thích ứng (HLS)",
   "nerd_hls_quality": "Chất lượng cao nhất cho luồng thích ứng",
-  "nerd_hls_quality_hint": "Một luồng HLS có nhiều mức chất lượng; trình phát lấy mức tốt nhất đến mức này. Các luồng khác không bị ảnh hưởng.",
+  "nerd_hls_quality_hint": "Một luồng HLS có nhiều mức chất lượng; trình phát lấy mức tốt nhất đến mức này. Khi xem đa kênh chỉ áp dụng “Thấp nhất” và tốc độ bit cao nhất. Các luồng khác không bị ảnh hưởng.",
   "nerd_hls_best": "Tốt nhất (như luồng cung cấp)",
   "nerd_hls_lowest": "Thấp nhất",
   "nerd_hls_max_rate": "Tốc độ bit cao nhất",
@@ -1837,5 +1837,6 @@
   "menu_file": "Tệp",
   "menu_view": "Hiển thị",
   "menu_help": "Trợ giúp",
-  "menu_website": "Trang web dopeIPTV"
+  "menu_website": "Trang web dopeIPTV",
+  "rec_reason_no_address": "không lấy được địa chỉ luồng"
 }

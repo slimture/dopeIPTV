@@ -7,14 +7,17 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import uuid
 from datetime import datetime
 from typing import Any, Callable
 
-from PyQt6.QtCore import QObject, QSettings, QTimer, pyqtSignal
+from PyQt6.QtCore import QObject, QSettings, Qt, QTimer, pyqtSignal
 
+from .log import log
 from .player_exec import NO_WINDOW, find_player_executable
+from .privacy import for_log
 
 #: What the player sends, so a panel that plays a channel also records it.
 RECORD_UA = "dopeIPTV/1.0"
@@ -84,6 +87,17 @@ class RecordingManager(QObject):
 
     jobs_changed = pyqtSignal()
     recording_stopped = pyqtSignal(str, str)
+    # (from the thread that asked) job id, its address ("" for none), why not.
+    _address_in = pyqtSignal(str, str, str)
+
+    #: A job that asks for its address when it starts keeps what that takes
+    #: here - {"source": playlist id, "stream_id": ...} - and no address: a
+    #: portal's link (create_link) lasts seconds, not until the recording.
+    LATER = "url_later"
+    #: How long asking for that address may take before the recording is
+    #: given up.
+    ADDRESS_TIMEOUT_S = 30.0
+    NO_ADDRESS = "could not get the stream address"
 
     VIDEO_EXTS: set[str] = {".ts", ".mp4", ".mkv", ".avi", ".mov",
                              ".webm", ".m2ts"}
@@ -100,6 +114,12 @@ class RecordingManager(QObject):
         self.session_cap: int | None = None
         self.stop_inplayer_cb: Callable | None = None
         self._ended_on_quit: list[dict] = []
+        # (window's thread) Given a job that asks for its address at start:
+        # a function that gets it, run off the window's thread - or None
+        # when there is no way to (its source is gone). Set by the window.
+        self.address_for: Callable[[dict], Callable[[], str] | None] | None = None
+        self._address_in.connect(self._address_came,
+                                 Qt.ConnectionType.QueuedConnection)
 
     # -- storage location ---------------------------------------------------
 
@@ -229,7 +249,8 @@ class RecordingManager(QObject):
             # A hand-edited or damaged entry would raise in tick() every
             # five seconds for the rest of the session: keep only jobs that
             # have what the scheduler reads.
-            if (not isinstance(j, dict) or not j.get("url")
+            if (not isinstance(j, dict)
+                    or not (j.get("url") or self.address_later(j))
                     or not isinstance(j.get("start"), (int, float))
                     or not isinstance(j.get("stop"), (int, float, type(None)))):
                 continue
@@ -244,7 +265,8 @@ class RecordingManager(QObject):
                 self.jobs.append(j)
 
     def _save(self) -> None:
-        keep = [{k: v for k, v in j.items() if k not in ("proc", "recorder")}
+        keep = [{k: v for k, v in j.items()
+                 if k not in ("proc", "recorder", "_asking")}
                 for j in self.jobs if j.get("status") == "scheduled"]
         self.settings.setValue("recording_jobs", json.dumps(keep))
 
@@ -450,14 +472,73 @@ class RecordingManager(QObject):
         if cmd and path and os.path.exists(path) and os.path.getsize(path) > 0:
             run_post(cmd, path, j.get("title") or "", j.get("channel") or "")
 
+    @classmethod
+    def address_later(cls, j: dict) -> bool:
+        """Whether *j* asks for its address when it starts."""
+        later = j.get(cls.LATER)
+        return isinstance(later, dict) and later.get("stream_id") is not None
+
+    def _ask_address(self, j: dict) -> None:
+        """(window's thread) A recording that asks for its address now it
+        starts: asked off this thread, started when it is in
+        (_address_came), given up after ADDRESS_TIMEOUT_S (tick)."""
+        fetch = None
+        try:
+            fetch = self.address_for(dict(j)) if self.address_for else None
+        except Exception as e:
+            log.info("record: no way to ask for the address of %s: %s",
+                     for_log(j.get("title")), e)
+        if fetch is None:
+            self._no_address(j, "its source is not there")
+            return
+        j["_asking"] = time.monotonic()
+        threading.Thread(target=self._fetch_address, args=(j["id"], fetch),
+                         name="rec-address", daemon=True).start()
+
+    def _fetch_address(self, job_id: str, fetch: Callable[[], str]) -> None:
+        """(a thread of its own) The address, handed to the window's thread."""
+        url, why = "", ""
+        try:
+            url = str(fetch() or "")
+        except Exception as e:
+            why = f"{type(e).__name__}: {e}"
+        try:
+            self._address_in.emit(job_id, url, why)
+        except RuntimeError:            # the app closed meanwhile
+            pass
+
+    def _address_came(self, job_id: str, url: str, why: str) -> None:
+        j = next((j for j in self.jobs if j["id"] == job_id), None)
+        if (j is None or j["status"] != "scheduled"
+                or j.pop("_asking", None) is None):
+            return                      # cancelled or given up meanwhile
+        if not url:
+            self._no_address(j, why or "the source gave none")
+        elif j.get("stop") is not None and j["stop"] <= time.time():
+            j["status"] = "failed"
+            j["error"] = "stop time passed before the app could start it"
+        elif j["start"] > time.time():
+            return                      # moved later meanwhile: asked again then
+        else:
+            j["url"] = url
+            self._spawn(j)
+        self._save()
+        self.jobs_changed.emit()
+
+    def _no_address(self, j: dict, why: str) -> None:
+        j.pop("_asking", None)
+        j["status"] = "failed"
+        j["error"] = self.NO_ADDRESS
+        log.info("record: %s not started - %s (%s)", for_log(j.get("title")),
+                 self.NO_ADDRESS, why)
+
     def _spawn(self, j: dict) -> None:
         from . import nerd
-        if nerd.blocks_stream(str(j.get("url") or "")):
+        if nerd.blocks_stream(str(j.get("url") or ""), j.get("source_kind")):
             # Nerd's VPN guard: no VPN up, nothing streams - recordings too.
             j["status"] = "failed"
             j["error"] = "no VPN up (Nerd's VPN guard)"
-            from .log import log
-            log.info("record: %s not started - no VPN up", j.get("title"))
+            log.info("record: %s not started - no VPN up", for_log(j.get("title")))
             return
         kind, exe = self.recorder()
         if not exe:
@@ -574,10 +655,18 @@ class RecordingManager(QObject):
         cap = self._max_bytes()
         changed = False
         for j in self.jobs:
-            if j["status"] == "scheduled" and j["start"] <= now:
+            if j["status"] == "scheduled" and j.get("_asking") is not None:
+                # Its address is being asked for.
+                if time.monotonic() - j["_asking"] > self.ADDRESS_TIMEOUT_S:
+                    self._no_address(j, "no answer in time")
+                    self._save()
+                    changed = True
+            elif j["status"] == "scheduled" and j["start"] <= now:
                 if j.get("stop") is not None and j["stop"] <= now:
                     j["status"] = "failed"
                     j["error"] = "stop time passed before the app could start it"
+                elif self.address_later(j):
+                    self._ask_address(j)
                 else:
                     self._spawn(j)
                 self._save()
@@ -663,5 +752,4 @@ class RecordingManager(QObject):
             try:
                 self._after(j)
             except Exception as e:      # never in the way of closing
-                from .log import log
                 log.warning("recording: the command after it failed: %s", e)

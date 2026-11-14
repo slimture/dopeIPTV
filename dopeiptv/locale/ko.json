@@ -1375,7 +1375,7 @@
   "nerd_ck_rw_missing": "바뀐 주소에는 아무것도 없습니다(HTTP {code}).",
   "nerd_card_hls": "적응형 스트림(HLS)",
   "nerd_hls_quality": "적응형 스트림의 최고 화질",
-  "nerd_hls_quality_hint": "HLS 스트림은 여러 화질로 제공됩니다. 플레이어는 이 화질까지 중 가장 좋은 것을 고릅니다. 다른 스트림에는 영향이 없습니다.",
+  "nerd_hls_quality_hint": "HLS 스트림은 여러 화질로 제공됩니다. 플레이어는 이 화질까지 중 가장 좋은 것을 고릅니다. 멀티뷰에서는 '최저'와 최대 비트레이트만 적용됩니다. 다른 스트림에는 영향이 없습니다.",
   "nerd_hls_best": "최고(스트림이 제공하는 대로)",
   "nerd_hls_lowest": "최저",
   "nerd_hls_max_rate": "최대 비트레이트",
@@ -1837,5 +1837,6 @@
   "menu_file": "파일",
   "menu_view": "보기",
   "menu_help": "도움말",
-  "menu_website": "dopeIPTV 웹사이트"
+  "menu_website": "dopeIPTV 웹사이트",
+  "rec_reason_no_address": "스트림 주소를 가져올 수 없음"
 }

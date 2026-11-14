@@ -415,7 +415,7 @@ class _MultiviewCell(QWidget):
         to begin at - a film or episode handed over from the docked player
         continues where it was, instead of restarting from zero."""
         from ..core import nerd
-        if nerd.blocks_stream(url):
+        if nerd.blocks_stream(url, (nerd.source() or {}).get("_kind")):
             log.info("multiview: not started - no VPN up (Nerd's VPN guard)")
             return False
         if self.video.mpv is None:

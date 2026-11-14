@@ -215,6 +215,103 @@ def test_a_rules_recording_follows_its_programme_in_the_guide():
     assert sr.retimed([moved], [dict(job, rule=None)], NOW) == []    # by hand: left be
 
 
+def _in(source, rule, sid, title, start, stop):
+    """An airing in *source*, known by its stream id only (a portal's)."""
+    return sr.Airing(rule, {"stream_id": sid}, str(sid), title, start, stop, "", source)
+
+
+def _job(source, sid, title, start, stop, rule=None, **kw):
+    j = {"id": f"{source}{sid}{start}", "status": "scheduled", "url": "", "stream_key": str(sid),
+         "title": title, "start": start, "stop": stop, "prog_start": start, "prog_stop": stop}
+    if source:
+        j["source"] = source
+    if rule:
+        j["rule"] = rule
+    j.update(kw)
+    return j
+
+
+def test_one_stream_id_in_two_sources_is_two_channels():
+    a = _in("A", "r", 1, "Show", NOW + H, NOW + 2 * H)
+    # Source B's stream 1 recording then is another channel: not this one.
+    other = _job("B", 1, "Other", NOW + H, NOW + 2 * H)
+    assert [p.airing for p in sr.plan([a], [other], [], NOW)] == [a]
+    # The same source's: recorded already. One kept before sources were (no
+    # source): taken as this channel, as it always was.
+    assert sr.plan([a], [_job("A", 1, "Other", NOW + H, NOW + 2 * H)], [], NOW) == []
+    assert sr.plan([a], [_job("", 1, "Other", NOW + H, NOW + 2 * H)], [], NOW) == []
+    # A rule's recording in source B does not follow source A's guide.
+    mine = _job("B", 1, "Show", NOW + H, NOW + 2 * H, rule="r")
+    moved = _in("A", "r", 1, "Show", NOW + H + 600, NOW + 2 * H + 600)
+    assert sr.retimed([moved], [mine], NOW) == []
+    assert sr.retimed([moved], [dict(mine, source="A")], NOW) == [(dict(mine, source="A"), moved)]
+    # Found in a source, an airing says which.
+    found = sr.find_airings([sr.make_rule("Show")], [{"stream_id": 1}],
+                            _guide({1: [("Show", NOW + H, NOW + 2 * H)]}), NOW, source="A")
+    assert [(a.key, a.source) for a in found] == [("1", "A")]
+
+
+def test_a_programme_moved_far_takes_its_recording_with_it():
+    job = _job("A", 1, "Show", NOW + H, NOW + H + 1800, rule="r")
+    # Two hours later: no overlap with where it was - the same recording
+    # moves, rather than a second one at the new time.
+    later = _in("A", "r", 1, "Show", NOW + 3 * H, NOW + 3 * H + 1800)
+    assert sr.retimed([later], [job], NOW) == [(job, later)]
+    # The nearest of two, never one past MOVED_MAX_S, never another title.
+    tomorrow = _in("A", "r", 1, "Show", NOW + H + 86400, NOW + H + 86400 + 1800)
+    sooner = _in("A", "r", 1, "Show", NOW + 2 * H, NOW + 2 * H + 1800)
+    assert sr.retimed([tomorrow, later, sooner], [job], NOW) == [(job, sooner)]
+    assert sr.retimed([tomorrow], [job], NOW) == []
+    assert sr.retimed([_in("A", "r", 1, "Other", NOW + 3 * H, NOW + 4 * H)], [job], NOW) == []
+    # One another recording has already is not taken from it.
+    there = _job("A", 1, "Show", NOW + 3 * H, NOW + 3 * H + 1800, rule="r", id="other")
+    assert sr.retimed([later], [job, there], NOW) == []
+    # The programme still where it was: that one, not a far one.
+    still = _in("A", "r", 1, "Show", NOW + H, NOW + H + 1800)
+    assert sr.retimed([later, still], [job], NOW) == []
+    # Moved: the plan does not schedule the new time a second time.
+    moved = dict(job, start=later.start, stop=later.stop, prog_start=later.start,
+                 prog_stop=later.stop)
+    assert sr.plan([later], [moved], [], NOW) == []
+
+
+def test_a_keyword_on_any_channel_records_so_many_at_once():
+    word = sr.make_rule("news", sr.WORD)
+    rid = word["id"]
+    # Four news programmes at once (not one programme on four channels:
+    # that is recorded once anyway).
+    news = [_in("A", rid, sid, f"News {sid}", NOW + H, NOW + 2 * H) for sid in (1, 2, 3, 4)]
+    left: list = []
+    got = sr.plan(news, [], [], NOW, wide={rid}, left_out=left)
+    assert [p.airing.key for p in got] == ["1", "2"] and len(got) == sr.MAX_AT_ONCE
+    assert [(a.key, why) for a, why in left] == [("3", sr.AT_ONCE), ("4", sr.AT_ONCE)]
+    # One after the other is not at once; another rule is not held back.
+    after = _in("A", rid, 3, "News 3", NOW + 2 * H, NOW + 3 * H)
+    assert len(sr.plan(news[:2] + [after], [], [], NOW, wide={rid})) == 3
+    assert len(sr.plan(news, [], [], NOW)) == 4
+    # Its recordings already scheduled count.
+    jobs = [_job("A", sid, "News", NOW + H, NOW + 2 * H, rule=rid) for sid in (5, 6)]
+    assert sr.plan(news, jobs, [], NOW, wide={rid}) == []
+
+
+def test_never_more_at_once_than_the_account_has_connections():
+    show = _in("A", "r", 1, "Show", NOW + H, NOW + 2 * H)
+    manual = _job("A", 2, "Film", NOW + 1.5 * H, NOW + 3 * H)
+    left: list = []
+    assert sr.plan([show], [manual], [], NOW, connections=1, left_out=left) == []
+    assert left == [(show, sr.CONNECTIONS)]
+    assert len(sr.plan([show], [manual], [], NOW, connections=2)) == 1
+    # Not known (None) or no limit (0): no cap. Another source's recording
+    # takes another account's connection; one riding the player's, none.
+    assert len(sr.plan([show], [manual], [], NOW, connections=None)) == 1
+    assert len(sr.plan([show], [manual], [], NOW, connections=0)) == 1
+    assert len(sr.plan([show], [dict(manual, source="B")], [], NOW, connections=1)) == 1
+    assert len(sr.plan([show], [dict(manual, inplayer=True)], [], NOW, connections=1)) == 1
+    # Back to back is one at a time.
+    nxt = _in("A", "r", 1, "Show", NOW + 2 * H, NOW + 3 * H)
+    assert len(sr.plan([show, nxt], [], [], NOW, connections=1)) == 2
+
+
 def test_the_store_keeps_rules_per_source_and_forgets_with_them():
     s = _Settings()
     store = sr.SeriesRuleStore(s, "pl1")

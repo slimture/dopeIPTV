@@ -48,6 +48,42 @@ def test_nothing_about_the_person_is_in_it():
     assert raw[5:11] == b"abcdef"
 
 
+def test_a_stored_key_is_checked_once_not_on_every_ask(monkeypatch):
+    """The window asks several times a minute on its own thread, and the
+    check is a pure-Python Ed25519 verify: a few keys' answers are kept."""
+    monkeypatch.setattr(supporter, "PUBLIC_KEY_HEX", PUB.hex())
+    monkeypatch.setattr(supporter, "_seen", supporter.OrderedDict())
+    calls = []
+    real = supporter.verify
+    monkeypatch.setattr(supporter, "verify", lambda *a: calls.append(1) or real(*a))
+
+    class S(dict):
+        def value(self, k, d=None):
+            return self.get(k, d)
+    key = supporter.make(SEED, dt.date(2026, 3, 1).toordinal())
+    s = S(supporter_key=key)
+    first = supporter.stored(s)
+    assert first is not None and first["since"] == dt.date(2026, 3, 1)
+    for _ in range(5):
+        assert supporter.stored(s) == first and supporter.is_supporter(s)
+    assert len(calls) == 1
+    first["since"] = None                                  # a copy each time
+    assert supporter.stored(s)["since"] == dt.date(2026, 3, 1)
+    # A wrong key is remembered as wrong; another key is checked anew.
+    bad = S(supporter_key=key[:-3] + ("A" if key[-3] != "A" else "B") + key[-2:])
+    assert supporter.stored(bad) is None and supporter.stored(bad) is None
+    assert len(calls) == 2
+    # Another public key (the site's changed): checked again, by that key.
+    _seed2, pub2 = supporter.new_seed()
+    monkeypatch.setattr(supporter, "PUBLIC_KEY_HEX", pub2.hex())
+    assert supporter.stored(s) is None and len(calls) == 3
+    # Only a few kept.
+    monkeypatch.setattr(supporter, "PUBLIC_KEY_HEX", PUB.hex())
+    for _ in range(supporter._SEEN_MAX + 2):
+        supporter.stored(S(supporter_key=supporter.make(SEED)))
+    assert len(supporter._seen) == supporter._SEEN_MAX
+
+
 _WINDOW = r"""
 import os, sys, json, tempfile
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")

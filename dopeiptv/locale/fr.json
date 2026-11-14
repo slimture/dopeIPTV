@@ -1375,7 +1375,7 @@
   "nerd_ck_rw_missing": "Rien à l'adresse réécrite (HTTP {code}).",
   "nerd_card_hls": "Flux adaptatifs (HLS)",
   "nerd_hls_quality": "Qualité maximale des flux adaptatifs",
-  "nerd_hls_quality_hint": "Un flux HLS existe en plusieurs qualités ; le lecteur prend la meilleure jusqu'à celle-ci. Les autres flux ne sont pas concernés.",
+  "nerd_hls_quality_hint": "Un flux HLS existe en plusieurs qualités ; le lecteur prend la meilleure jusqu'à celle-ci. En multivue, seuls « La plus basse » et le débit maximal s'appliquent. Les autres flux ne sont pas concernés.",
   "nerd_hls_best": "La meilleure (celle que le flux propose)",
   "nerd_hls_lowest": "La plus basse",
   "nerd_hls_max_rate": "Débit maximal",
@@ -1837,5 +1837,6 @@
   "menu_file": "Fichier",
   "menu_view": "Présentation",
   "menu_help": "Aide",
-  "menu_website": "Site web de dopeIPTV"
+  "menu_website": "Site web de dopeIPTV",
+  "rec_reason_no_address": "impossible d'obtenir l'adresse du flux"
 }

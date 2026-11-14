@@ -254,7 +254,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     ua_custom.setPlaceholderText("MyPlayer/1.0")
     ua_row = c.row(tr("nerd_ua_custom"), ua_custom)
     c.shown_if(ua_row, lambda: ua_box.currentData() == "custom")
-    ua_box.currentIndexChanged.connect(lambda _i: c.refresh())
+    ua_box.currentIndexChanged.connect(lambda _i, c=c: c.refresh())
     referer = QLineEdit(val("nerd_referer"))
     referer.setPlaceholderText("https://portal.example.com/")
     c.row("Referer", referer, tr("nerd_referer_hint"))
@@ -309,7 +309,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     proxy_player = c.toggle(tr("nerd_proxy_player"), n.flag("nerd_proxy_player", True))
     pp_row = c.rows[-1][0]
     c.shown_if(pp_row, lambda: bool(proxy_now()))
-    proxy.textChanged.connect(lambda _t: c.refresh())
+    proxy.textChanged.connect(lambda _t, c=c: c.refresh())
     c.note(tr("nerd_applies_stream"))
 
     # -- network: the connection ---------------------------------------------------------
@@ -341,7 +341,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     lan_row = c.rows[-1][0]
     for r in (iface_row, lan_row):
         c.shown_if(r, lambda: guard.isChecked())
-    guard.toggled.connect(lambda _on: c.refresh())
+    guard.toggled.connect(lambda _on, c=c: c.refresh())
 
     def vpn_job() -> Any:
         name = iface.text().strip()
@@ -590,7 +590,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     rate_row = c.row(tr("nerd_hls_max_rate"), hls_rate, tr("nerd_hls_max_rate_hint"),
                      search="HLS bitrate kbit hls-bitrate bandwidth")
     c.shown_if(rate_row, lambda: hls_q.currentData() != "lowest")
-    hls_q.currentIndexChanged.connect(lambda _i: c.refresh())
+    hls_q.currentIndexChanged.connect(lambda _i, c=c: c.refresh())
     hls_q.currentIndexChanged.connect(hls_line.changed)
     hls_spin.valueChanged.connect(hls_line.changed)
     c.note(tr("nerd_applies_stream"))

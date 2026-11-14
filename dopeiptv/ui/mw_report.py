@@ -96,7 +96,32 @@ class _ReportMixin:
             pass
         last = getattr(self, "_last_playback", None) or {}
         titles.append(str(last.get("title") or ""))
+        titles += self._report_more_values(playlists)
         return report.personal_values(playlists, channels, titles)
+
+    def _report_more_values(self, playlists: list) -> list[str]:
+        """More of the person's own that a log line can carry: the MQTT
+        broker's name and login, every source's series rules (the words
+        recorded) and the recordings' titles."""
+        out: list[str] = []
+        settings = getattr(self, "settings", None)
+        if settings is not None:
+            for key in ("nerd_mqtt_host", "nerd_mqtt_user"):
+                try:
+                    out.append(str(settings.value(key, "") or "").strip())
+                except Exception:
+                    pass
+            try:
+                from ..core.series_rules import SeriesRuleStore
+                for pid in [None] + [p.get("id") for p in playlists if p.get("id")]:
+                    out += [str(r.get("text") or "")
+                            for r in SeriesRuleStore(settings, pid).rules()]
+            except Exception:
+                log.debug("report: series rules not read", exc_info=True)
+        rec = getattr(self, "rec", None)
+        out += [str(j.get("title") or "") for j in (getattr(rec, "jobs", None) or [])
+                if isinstance(j, dict)]
+        return [v for v in out if v]
 
     # -- answers to feedback ---------------------------------------------------
 

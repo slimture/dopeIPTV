@@ -32,6 +32,12 @@ MAX_PER_RULE = 25
 LEAD_S = 60
 #: How long a scheduled airing is remembered after its programme ended.
 TAKEN_KEEP_S = 2 * 86400
+#: Recordings a keyword rule on any channel keeps going at one time: a word
+#: like "news" airs on many channels at once, each a connection of its own.
+MAX_AT_ONCE = 2
+#: How far a programme the guide moved may have gone for its recording to
+#: follow it, when the new time no longer overlaps the old one.
+MOVED_MAX_S = 12 * 3600
 
 PAD_BEFORE_KEY = "rec_pad_before_min"
 PAD_AFTER_KEY = "rec_pad_after_min"
@@ -155,6 +161,9 @@ class Airing:
     start: float
     stop: float
     url: str = ""
+    #: The source (playlist id) the channel is in ("" not known): one
+    #: stream id names different channels in two sources.
+    source: str = ""
 
 
 @dataclass
@@ -185,12 +194,13 @@ def rule_channels(rules: Iterable[dict]) -> list[dict]:
 def find_airings(rules: list[dict], channels: Iterable[dict],
                  programmes: Programmes, now: float, days: int = DAYS,
                  per_rule: int = 2 * MAX_PER_RULE,
-                 shift: float = 0.0) -> list[Airing]:
+                 shift: float = 0.0, source: str = "") -> list[Airing]:
     """Every airing in the next *days* days that a rule asks for, soonest
     first, at most *per_rule* for one rule. A channel listed twice in the
     line-up counts once; an airing two rules want goes to the first.
     *shift*: seconds the guide's times are off the clock (the guide offset
-    in Settings) - the airings come back in clock time."""
+    in Settings) - the airings come back in clock time. *source*: the id
+    of the source the channels are in, kept with each airing."""
     rules = [r for r in rules if _valid(r)]
     if not rules:
         return []
@@ -218,7 +228,8 @@ def find_airings(rules: list[dict], channels: Iterable[dict],
             rid = next((r for r in match(title) if r in here), None)
             if rid is not None:
                 seen.add((key, start))
-                out.append(Airing(rid, ch, key, title, start, stop))
+                out.append(Airing(rid, ch, key, title, start, stop,
+                                  source=str(source or "")))
     out.sort(key=lambda a: (a.start, a.key))
     kept: list[Airing] = []
     count: dict[str, int] = {}
@@ -242,6 +253,8 @@ class _Window:
     title: str
     fixed: bool = True
     plan: Plan | None = None
+    source: str = ""
+    rule: str = ""
 
 
 def _num(v: Any, default: float) -> float:
@@ -257,7 +270,9 @@ def _job_window(job: dict) -> _Window:
     return _Window(str(job.get("stream_key") or ""), str(job.get("url") or ""),
                    _num(job.get("prog_start"), rec_start),
                    _num(job.get("prog_stop"), rec_stop),
-                   rec_start, rec_stop, norm(job.get("title")))
+                   rec_start, rec_stop, norm(job.get("title")),
+                   source=str(job.get("source") or ""),
+                   rule=str(job.get("rule") or ""))
 
 
 def _taken_window(t: dict) -> _Window:
@@ -266,9 +281,24 @@ def _taken_window(t: dict) -> _Window:
                    str(t.get("title") or ""))
 
 
+def _same_source(a: str, b: str) -> bool:
+    """Two sources the same, or one not known (a recording from before
+    sources were kept with them)."""
+    return not a or not b or a == b
+
+
 def _same_channel(a: Airing, w: _Window) -> bool:
-    return bool((a.key and w.key and a.key == w.key)
+    """The same channel: its stream id in the same source, or the same
+    address. A recording's list spans every source, where one stream id
+    names a different channel in each."""
+    return bool((a.key and w.key and a.key == w.key
+                 and _same_source(a.source, w.source))
                 or (a.url and w.url and a.url == w.url))
+
+
+def _row(w: _Window) -> tuple[str, str]:
+    """The channel a window is on, as _meet groups them."""
+    return (w.source, w.key) if w.key else ("", w.url)
 
 
 def _mostly_overlap(a: Airing, w: _Window) -> bool:
@@ -296,8 +326,8 @@ def _meet(windows: list[_Window]) -> None:
     padding (that took a second connection for the minutes they shared):
     two new ones meet halfway between their programmes, a new one next to
     one already there ends where it starts, or starts where it ends."""
-    for ch in {w.key or w.url for w in windows}:
-        row = sorted((w for w in windows if (w.key or w.url) == ch),
+    for ch in {_row(w) for w in windows}:
+        row = sorted((w for w in windows if _row(w) == ch),
                      key=lambda w: w.start)
         for a, b in pairwise(row):
             if a.stop > b.start or a.rec_stop <= b.rec_start:
@@ -317,22 +347,51 @@ def _meet(windows: list[_Window]) -> None:
             w.plan.start, w.plan.stop = w.rec_start, w.rec_stop
 
 
+def _at_once(windows: Iterable[_Window], start: float, stop: float) -> int:
+    """The most of *windows* (their programmes) on at one moment between
+    *start* and *stop*; one ending as another starts is not two at once."""
+    edges: list[tuple[float, int]] = []
+    for w in windows:
+        s, e = max(w.start, start), min(w.stop, stop)
+        if e > s:
+            edges += [(s, 1), (e, -1)]
+    most = n = 0
+    for _t, step in sorted(edges):
+        n += step
+        most = max(most, n)
+    return most
+
+
+#: Why plan() left an airing out (the left_out list).
+AT_ONCE = "at once"
+CONNECTIONS = "connections"
+
+
 def plan(airings: Iterable[Airing], jobs: Iterable[dict],
          taken: Iterable[dict], now: float, before_min: int = 0,
-         after_min: int = 0, per_rule: int = MAX_PER_RULE) -> list[Plan]:
+         after_min: int = 0, per_rule: int = MAX_PER_RULE,
+         wide: Iterable[str] = (), connections: int | None = None,
+         left_out: list[tuple[Airing, str]] | None = None) -> list[Plan]:
     """The airings to schedule now, soonest first, each with its padded
     window. Left out: what is recorded or scheduled already (*jobs*, the
     recorder's list), what a rule scheduled before (*taken*, from the
     store - so a cancelled one is not brought back), a programme airing at
     the same time on two channels after the first, and a rule's airings
-    past *per_rule* upcoming recordings."""
-    jobs = list(jobs)
-    recs = [_job_window(j) for j in jobs
-            if isinstance(j, dict) and j.get("status") in _JOB_LIVE]
+    past *per_rule* upcoming recordings. And, each said in *left_out*: a
+    keyword rule's on any channel (*wide*, their ids) past MAX_AT_ONCE
+    recordings of it at one time, and past *connections* recordings at
+    one time from the airing's source (the account's limit, when known)."""
+    jobs = [j for j in jobs if isinstance(j, dict)]
+    live = [j for j in jobs if j.get("status") in _JOB_LIVE]
+    recs = [_job_window(j) for j in live]
+    # What holds a connection of its own: not a recording riding the
+    # player's stream.
+    busy = [w for j, w in zip(live, recs, strict=True) if not j.get("inplayer")]
     earlier = [_taken_window(t) for t in taken if isinstance(t, dict)]
+    wide = set(wide)
     count: dict[str, int] = {}
     for j in jobs:
-        if (isinstance(j, dict) and j.get("rule") and j.get("status") == "scheduled"
+        if (j.get("rule") and j.get("status") == "scheduled"
                 and _num(j.get("start"), 0.0) > now):
             count[str(j["rule"])] = count.get(str(j["rule"]), 0) + 1
     out: list[Plan] = []
@@ -341,19 +400,33 @@ def plan(airings: Iterable[Airing], jobs: Iterable[dict],
             continue
         if _covered(a, recs) or _covered(a, earlier):
             continue
+        if a.rule in wide and _at_once(
+                (w for w in busy if w.rule == a.rule and w.stop > now),
+                a.start, a.stop) >= MAX_AT_ONCE:
+            if left_out is not None:
+                left_out.append((a, AT_ONCE))
+            continue
+        if connections and connections > 0 and _at_once(
+                (w for w in busy if _same_source(w.source, a.source) and w.stop > now),
+                a.start, a.stop) >= connections:
+            if left_out is not None:
+                left_out.append((a, CONNECTIONS))
+            continue
         s, e = padded(a.start, a.stop, before_min, after_min, now)
         p = Plan(a, s, e)
         out.append(p)
         count[a.rule] = count.get(a.rule, 0) + 1
-        recs.append(_Window(a.key, a.url, a.start, a.stop, s, e,
-                            norm(a.title), fixed=False, plan=p))
+        w = _Window(a.key, a.url, a.start, a.stop, s, e, norm(a.title),
+                    fixed=False, plan=p, source=a.source, rule=a.rule)
+        recs.append(w)
+        busy.append(w)
     # Only the recordings themselves: what a rule scheduled before is a
     # job here already, or was cancelled and takes no connection. A job
     # known by its address alone is on the channel that address is.
-    by_url = {w.url: w.key for w in recs if w.key and w.url}
+    by_url = {w.url: (w.key, w.source) for w in recs if w.key and w.url}
     for w in recs:
         if not w.key and w.url in by_url:
-            w.key = by_url[w.url]
+            w.key, w.source = by_url[w.url]
     _meet([w for w in recs if w.rec_stop > now])
     return out
 
@@ -361,22 +434,45 @@ def plan(airings: Iterable[Airing], jobs: Iterable[dict],
 def retimed(airings: Iterable[Airing], jobs: Iterable[dict],
             now: float) -> list[tuple[dict, Airing]]:
     """Recordings a rule scheduled whose programme the guide now has at
-    another time (the same rule, the same channel, mostly the same time):
-    each with the airing it should follow. Started ones are left be."""
+    another time, each with the airing it should follow; started ones are
+    left be. The same rule and channel at mostly the same time - or, when
+    the guide moved it further than that (by more than half its length),
+    the same rule, channel and title within MOVED_MAX_S of where it was,
+    the nearest such airing no other recording has: the recording moves
+    with it, rather than a second one being scheduled at the new time and
+    the first recording something else at the old one."""
     airings = list(airings)
+    jobs = [j for j in jobs if isinstance(j, dict)]
+    live = [(j, _job_window(j)) for j in jobs if j.get("status") in _JOB_LIVE]
     out: list[tuple[dict, Airing]] = []
-    for j in jobs:
-        if (not isinstance(j, dict) or not j.get("rule")
-                or j.get("status") != "scheduled"
+    followed: set[int] = set()
+    lost: list[tuple[dict, _Window]] = []
+    for j, w in live:
+        if (not j.get("rule") or j.get("status") != "scheduled"
                 or _num(j.get("start"), 0.0) <= now):
             continue
-        w = _job_window(j)
-        for a in airings:
-            if (a.rule == str(j["rule"]) and _same_channel(a, w)
-                    and _mostly_overlap(a, w)):
-                if (a.start, a.stop) != (w.start, w.stop):
-                    out.append((j, a))
-                break
+        hit = next((a for a in airings
+                    if a.rule == w.rule and _same_channel(a, w)
+                    and _mostly_overlap(a, w)), None)
+        if hit is None:
+            lost.append((j, w))
+            continue
+        followed.add(id(hit))
+        if (hit.start, hit.stop) != (w.start, w.stop):
+            out.append((j, hit))
+    for j, w in lost:
+        if not w.title:
+            continue
+        near = [a for a in airings
+                if id(a) not in followed and a.rule == w.rule
+                and _same_channel(a, w) and norm(a.title) == w.title
+                and abs(a.start - w.start) <= MOVED_MAX_S
+                and not any(o is not j and _same_channel(a, ow) and _mostly_overlap(a, ow)
+                            for o, ow in live)]
+        if near:
+            a = min(near, key=lambda a: (abs(a.start - w.start), a.start))
+            followed.add(id(a))
+            out.append((j, a))
     return out
 
 

@@ -8,10 +8,12 @@ from __future__ import annotations
 import os
 import shutil
 import time
+from functools import partial
 from ..providers.client import b64, epg_times
 from ..i18n import tr
 from ..core.log import log, redact_url
-from ..core.recording import format_size, free_path, safe_filename
+from ..core.privacy import for_log
+from ..core.recording import RecordingManager, format_size, free_path, safe_filename
 from .theme import P
 from .widgets import confirm
 from ..core.workers import run_async
@@ -38,6 +40,7 @@ _REC_REASONS = {
     "no data captured": "rec_reason_no_data",
     "neither ffmpeg nor mpv found": "rec_reason_no_recorder",
     "stop time passed before the app could start it": "rec_reason_too_late",
+    RecordingManager.NO_ADDRESS: "rec_reason_no_address",
 }
 
 
@@ -50,6 +53,17 @@ def rec_reason(reason: str) -> str:
         return tr("rec_reason_exit_code",
                   code=reason[len("recorder exited early (code "):-1])
     return reason or ""
+
+
+def _live_address(client, stream_id) -> str:
+    """(the recorder's thread) A channel's address from the source playing."""
+    return client.live_url(stream_id, "ts") or ""
+
+
+def _source_address(playlist: dict, stream_id) -> str:
+    """(the recorder's thread) A channel's address from another source."""
+    from ..providers.client import make_client
+    return make_client(playlist).live_url(stream_id, "ts") or ""
 
 
 class _RecordingMixin:
@@ -434,6 +448,58 @@ class _RecordingMixin:
         mult = {"MB": 10**6, "GB": 10**9, "TB": 10**12}[unit_box.currentData()]
         self.rec.session_cap = int(val * mult)
 
+    def _rec_source(self) -> dict:
+        """What a recording keeps of the source it is from: its id and its
+        kind (the VPN guard's rule, and the address asked for at start,
+        read them). {} without a source."""
+        store = getattr(self, "playlist_store", None)
+        pl = store.active() if store is not None else None
+        if not pl:
+            return {}
+        return {"source": str(pl.get("id") or ""),
+                "source_kind": str(pl.get("kind") or "xtream")}
+
+    def _rec_extra(self, ch: dict, later: bool | None = None) -> dict:
+        """What a recording of channel *ch* keeps besides its address: its
+        source and - from a client whose links are short-lived (a portal),
+        *later* - what asking for the address when it starts takes."""
+        from .mw_series import links_later
+        out: dict = self._rec_source()
+        if later is None:
+            later = links_later(self.client)
+        if later and ch.get("stream_id") is not None:
+            out[RecordingManager.LATER] = {"source": out.get("source", ""),
+                                           "stream_id": ch["stream_id"]}
+        return out
+
+    def _scheduled_address(self, ch: dict) -> tuple[str, dict]:
+        """(address, extra) for a recording of *ch* that starts later: no
+        address yet from a portal - its link would be long dead by then, and
+        asking for it here is a create_link on the window's thread - but
+        what asking for it at the start takes."""
+        extra = self._rec_extra(ch)
+        if RecordingManager.LATER in extra:
+            return "", extra
+        return self.client.live_url(ch["stream_id"], "ts") or "", extra
+
+    def _rec_address_for(self, job: dict):
+        """(window's thread) RecordingManager.address_for: how a recording
+        that asks for its address as it starts gets it - a function the
+        recorder runs off this thread - or None when its source is gone."""
+        later = job.get(RecordingManager.LATER) or {}
+        sid = later.get("stream_id")
+        if sid is None:
+            return None
+        pid = str(later.get("source") or "")
+        if not pid or pid == self._rec_source().get("source", ""):
+            return partial(_live_address, self.client, sid)
+        store = getattr(self, "playlist_store", None)
+        pl = store.get(pid) if store is not None else None
+        if pl is None:
+            log.info("record: %s - its source is gone", for_log(job.get("title")))
+            return None
+        return partial(_source_address, dict(pl), sid)
+
     def _record_now(self, it, minutes, title_override=None) -> None:
         if it.get("stream_id") is None:
             return
@@ -496,7 +562,8 @@ class _RecordingMixin:
         url = self.client.live_url(it["stream_id"], "ts")
         self.rec.add_job(url, title, now, stop_ts,
                          icon=it.get("stream_icon"),
-                         channel=self.channel_display_name(it))
+                         channel=self.channel_display_name(it),
+                         extra=self._rec_source())
         self._set_status("● " + tr("rec_started_to", title=title,
                                    length=length,
                                    folder=self.rec.directory()))
@@ -524,7 +591,8 @@ class _RecordingMixin:
             url = self.client.live_url(it["stream_id"], "ts")
             self.rec.add_job(url, title, time.time(), stop_ts,
                              icon=it.get("stream_icon"),
-                             channel=self.channel_display_name(it))
+                             channel=self.channel_display_name(it),
+                             extra=self._rec_source())
             self._set_status("● " + tr("rec_started_to", title=title,
                                        length=length,
                                        folder=self.rec.directory()))
@@ -574,13 +642,14 @@ class _RecordingMixin:
                 self, tr("rec_schedule_recording").rstrip("."),
                 tr("msg_stop_time_future"))
             return
-        url = self.client.live_url(it["stream_id"], "ts")
+        url, extra = self._scheduled_address(it)
         title = (name_edit.text().strip()
                  or self.channel_display_name(it))
         self.rec.add_job(url, title, start_ts, stop_ts,
                          folder_box.currentData(),
                          icon=it.get("stream_icon"),
-                         channel=self.channel_display_name(it))
+                         channel=self.channel_display_name(it),
+                         extra=extra)
         self._set_status(tr("rec_scheduled_for", title=title,
                             when=format_when(start_ts)))
 

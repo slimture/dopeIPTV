@@ -1375,7 +1375,7 @@
   "nerd_ck_rw_missing": "書き換えたアドレスには何もありません (HTTP {code})。",
   "nerd_card_hls": "アダプティブストリーム (HLS)",
   "nerd_hls_quality": "アダプティブストリームの最高画質",
-  "nerd_hls_quality_hint": "HLS ストリームには複数の画質があります。プレーヤーはここまでで最良のものを選びます。ほかのストリームには影響しません。",
+  "nerd_hls_quality_hint": "HLS ストリームには複数の画質があります。プレーヤーはここまでで最良のものを選びます。マルチビューでは「最低」と最大ビットレートだけが適用されます。ほかのストリームには影響しません。",
   "nerd_hls_best": "最高 (ストリームのまま)",
   "nerd_hls_lowest": "最低",
   "nerd_hls_max_rate": "最大ビットレート",
@@ -1837,5 +1837,6 @@
   "menu_file": "ファイル",
   "menu_view": "表示",
   "menu_help": "ヘルプ",
-  "menu_website": "dopeIPTV ウェブサイト"
+  "menu_website": "dopeIPTV ウェブサイト",
+  "rec_reason_no_address": "ストリームのアドレスを取得できませんでした"
 }

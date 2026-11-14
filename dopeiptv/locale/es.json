@@ -1375,7 +1375,7 @@
   "nerd_ck_rw_missing": "No hay nada en la dirección reescrita (HTTP {code}).",
   "nerd_card_hls": "Emisiones adaptativas (HLS)",
   "nerd_hls_quality": "Calidad máxima de las emisiones adaptativas",
-  "nerd_hls_quality_hint": "Una emisión HLS viene en varias calidades; el reproductor toma la mejor hasta esta. Las demás emisiones no se ven afectadas.",
+  "nerd_hls_quality_hint": "Una emisión HLS viene en varias calidades; el reproductor toma la mejor hasta esta. En multivista solo cuentan «La más baja» y la tasa de bits máxima. Las demás emisiones no se ven afectadas.",
   "nerd_hls_best": "La mejor (la que ofrece la emisión)",
   "nerd_hls_lowest": "La más baja",
   "nerd_hls_max_rate": "Tasa de bits máxima",
@@ -1837,5 +1837,6 @@
   "menu_file": "Archivo",
   "menu_view": "Visualización",
   "menu_help": "Ayuda",
-  "menu_website": "Sitio web de dopeIPTV"
+  "menu_website": "Sitio web de dopeIPTV",
+  "rec_reason_no_address": "no se pudo obtener la dirección de la emisión"
 }

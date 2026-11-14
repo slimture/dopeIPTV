@@ -1375,7 +1375,7 @@
   "nerd_ck_rw_missing": "Inget på den omskrivna adressen (HTTP {code}).",
   "nerd_card_hls": "Adaptiva strömmar (HLS)",
   "nerd_hls_quality": "Högsta kvalitet för adaptiva strömmar",
-  "nerd_hls_quality_hint": "En HLS-ström finns i flera kvaliteter; spelaren tar den bästa upp till den här. Andra strömmar påverkas inte.",
+  "nerd_hls_quality_hint": "En HLS-ström finns i flera kvaliteter; spelaren tar den bästa upp till den här. I multiview gäller bara ”Lägsta” och högsta bithastighet. Andra strömmar påverkas inte.",
   "nerd_hls_best": "Bästa (som strömmen erbjuder)",
   "nerd_hls_lowest": "Lägsta",
   "nerd_hls_max_rate": "Högsta bithastighet",
@@ -1837,5 +1837,6 @@
   "menu_file": "Arkiv",
   "menu_view": "Visa",
   "menu_help": "Hjälp",
-  "menu_website": "dopeIPTV:s webbplats"
+  "menu_website": "dopeIPTV:s webbplats",
+  "rec_reason_no_address": "strömmens adress gick inte att få"
 }

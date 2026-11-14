@@ -77,6 +77,39 @@ def test_the_old_editors_keys_are_carried_over_once():
     assert nk.migrate(_Settings(), "linux") == 0
 
 
+def test_an_old_key_the_app_keeps_now_goes_back_to_the_default_with_a_word():
+    import logging
+
+    from dopeiptv.core.log import log
+    seen: list[str] = []
+
+    class Catch(logging.Handler):
+        def emit(self, record):
+            seen.append(record.getMessage())
+    h = Catch()
+    level = log.level
+    log.setLevel(logging.INFO)
+    log.addHandler(h)
+    try:
+        s = _Settings({"shortcut/linux/mute": "Esc", "shortcut/linux/pause": "K"})
+        assert nk.migrate(s, "linux") == 2
+    finally:
+        log.removeHandler(h)
+        log.setLevel(level)
+    eff = nk.from_settings(s)
+    assert eff["mute"] == nk.DEFAULTS["mute"] and eff["pause"] == "K"
+    said = [m for m in seen if m.startswith("shortcuts:")]
+    assert len(said) == 1 and "mute (Esc)" in said[0] and "pause" not in said[0], said
+    # Nothing lost: nothing said.
+    seen.clear()
+    log.addHandler(h)
+    try:
+        nk.migrate(_Settings({"shortcut/linux/pause": "K"}), "linux")
+    finally:
+        log.removeHandler(h)
+    assert not [m for m in seen if m.startswith("shortcuts:")]
+
+
 def test_a_key_given_to_another_action_leaves_the_first_without():
     over, lost = nk.assign({}, "pause", "M")
     assert lost == ["mute"]

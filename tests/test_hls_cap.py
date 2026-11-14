@@ -149,6 +149,86 @@ def test_apply_pick_switches_and_never_raises():
     assert hls_cap.apply_pick(Broken(), Cap(height=480)) == {}
 
 
+# -- a core without the player's variant switch (a multiview cell) ---------------------------
+
+@pytest.mark.parametrize("quality, kbps, options", [
+    ("", 0, []), ("lowest", 0, [("hls-bitrate", "min")]),
+    ("720", 0, []), ("1080", 0, []), ("480", 2000, [("hls-bitrate", "2000000")]),
+    ("", 2500, [("hls-bitrate", "2500000")]),
+])
+def test_a_core_without_the_switch_gets_no_picture_size_cap(quality, kbps, options):
+    """A size cap is hls-bitrate=min plus the player's switch at file-loaded;
+    on a core without that switch it kept every HLS stream on its smallest
+    variant. There it is the bitrate cap alone (Lowest still asks for it)."""
+    assert mpv_options(cap_of(quality, kbps), picker=False) == options
+    n = nerd.Nerd(S(nerd_enabled="true", nerd_hls_quality=quality, nerd_hls_max_kbps=str(kbps)))
+    assert [p for p in n.core_options(picker=False) if p[0] == "hls-bitrate"] == options
+
+
+class _Core(dict):
+    """An mpv core as nerd and the player's switch use one."""
+
+    def __init__(self):
+        super().__init__({"hls-bitrate": "max"})
+        self.hooks: list = []
+        self.track_list = _variants(*LADDER, selected=3)
+
+    def event_callback(self, name):
+        def hook(fn):
+            self.hooks.append((name, fn))
+            return fn
+        return hook
+
+
+def test_only_a_core_with_the_switch_opens_on_the_smallest_variant():
+    from dopeiptv.media.video_surface import _MpvGLWidget
+    assert _MpvGLWidget.variant_picker is False
+    nerd.install(S(nerd_enabled="true", nerd_hls_quality="720"))
+    cell, docked = _Core(), _Core()
+    nerd.apply_core(cell, picker=False)
+    nerd.apply_core(docked, picker=True)
+    assert cell["hls-bitrate"] == "max" and docked["hls-bitrate"] == "min"
+
+
+def test_a_cap_changed_while_playing_arms_the_switch_before_any_reconnect():
+    """Settings changed mid-stream put hls-bitrate=min on the core at once;
+    a reconnect that reopens the stream before the next play() must still
+    switch up to the cap, not stay on the smallest variant."""
+    from dopeiptv.media.embedded import EmbeddedPlayer
+
+    class Player:
+        _watch_variants = EmbeddedPlayer._watch_variants
+        nerd_reapply = EmbeddedPlayer.nerd_reapply
+        _hls_cap = Cap()
+
+        def __init__(self):
+            self.video = type("V", (), {"mpv": _Core()})()
+    p = Player()
+    m = p.video.mpv
+    s = S(nerd_enabled="true")
+    nerd.install(s)
+    nerd.apply_core(m)
+    assert p.nerd_reapply() is not None and not m.hooks and m["hls-bitrate"] == "max"
+    s["nerd_hls_quality"] = "720"
+    nerd.install(s)
+    p.nerd_reapply()
+    assert m["hls-bitrate"] == "min" and p._hls_cap.picks
+    assert [name for name, _fn in m.hooks] == ["file-loaded"]
+    # The stream reopens (a reconnect): the switch takes it up to 720p.
+    m.hooks[0][1](None)
+    assert m["vid"] == 2 and m["aid"] == 2
+    # Again: hooked once only.
+    p.nerd_reapply()
+    assert len(m.hooks) == 1
+    # Settings > Nerd closes: the window goes through the player's own way.
+    from dopeiptv.ui.mw_settings import _SettingsMixin
+    calls = []
+    win = type("W", (), {"player": type("P", (), {"video": p.video,
+                                                  "nerd_reapply": lambda self: calls.append(1)})()})()
+    _SettingsMixin._nerd_to_player(win)
+    assert calls == [1]
+
+
 # -- the line under the setting ----------------------------------------------------------------
 
 class _Takes(dict):

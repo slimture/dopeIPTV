@@ -18,28 +18,42 @@ from PyQt6.QtWidgets import (
 
 from ..core import series_rules
 from ..core.log import log
+from ..core.privacy import for_log
 from ..core.workers import run_async
 from ..i18n import tr
 from .theme import P
 
 
 def _find(client, guide, rules: list[dict], keep, now: float,
-          shift: float) -> list:
+          shift: float, source: str = "") -> list:
     """(pool thread) The airings the rules ask for, each with its address.
     The whole line-up only when a rule is for any channel; a one-channel
-    rule finds its channel as the rule keeps it."""
+    rule finds its channel as the rule keeps it. A client whose links are
+    slow to get and short-lived (a portal's create_link lasts seconds) is
+    not asked for any here: such a recording asks for its address when it
+    starts (RecordingManager.LATER)."""
     chans = series_rules.rule_channels(rules)
     if keep is not None:
         chans = [c for c in client.live_streams(None) or [] if keep(c)] + chans
     found = series_rules.find_airings(rules, chans, guide.programmes_in, now,
-                                      shift=shift)
+                                      shift=shift, source=source)
+    if links_later(client):
+        return found
     for a in found:
         try:
             a.url = client.live_url(a.channel.get("stream_id"), "ts") or ""
         except Exception as e:
-            log.info("[series] no address for %s: %s", a.channel.get("name"), e)
+            log.info("[series] no address for %s: %s",
+                     for_log(a.channel.get("name")), e)
             a.url = ""
     return found
+
+
+def links_later(client) -> bool:
+    """Whether a recording from *client* asks for its address when it
+    starts, not when it is scheduled: a portal's links (and a box's, whose
+    list may not be in yet) are slow to get, and a portal's last seconds."""
+    return bool(getattr(client, "slow_links", False))
 
 
 class _SeriesMixin:
@@ -88,7 +102,7 @@ class _SeriesMixin:
         kept = self.series_rules.add(rule)
         if kept is None:
             return None
-        log.info("[series] rule: %s %r on %s", kept["kind"], kept["text"],
+        log.info("[series] rule: %s %r on %s", kept["kind"], for_log(kept["text"]),
                  series_rules.rule_key(kept) or "any channel")
         self._show_toast(tr("series_added", title=kept["text"]), 4000)
         self._check_series_rules()
@@ -157,7 +171,8 @@ class _SeriesMixin:
         # detail panel's times have it: a programme airs that much later.
         shift = self._epg_delay_minutes() * 60
         run_async(self.pool, _find, self._series_found, self._series_failed,
-                  self.client, guide, rules, keep, time.time(), shift)
+                  self.client, guide, rules, keep, time.time(), shift,
+                  str(self._rec_source().get("source") or ""))
 
     def _series_failed(self, err) -> None:
         log.info("[series] the look through the guide failed: %s", err)
@@ -185,41 +200,63 @@ class _SeriesMixin:
         """Schedule what the rules found and is not recorded yet; the
         number of recordings added."""
         store = self.series_rules
-        ids = {r["id"] for r in store.rules()}
+        rules = store.rules()
+        ids = {r["id"] for r in rules}
+        later = links_later(self.client)
         # A rule deleted meanwhile asks for nothing; a channel without an
-        # address cannot be recorded.
-        found = [a for a in found if a.rule in ids and a.url]
+        # address cannot be recorded (one whose address is asked for when
+        # the recording starts has none yet).
+        found = [a for a in found if a.rule in ids and (a.url or later)]
         now = time.time()
         before, after = series_rules.padding(self.settings)
+        moved = []
         for job, a in series_rules.retimed(found, self.rec.jobs, now):
             start, stop = series_rules.padded(a.start, a.stop, before, after, now)
             log.info("[series] %s moved in the guide - recording it at its new time",
-                     a.title)
+                     for_log(a.title))
             self.rec.update_job_times(job["id"], start, stop,
                                       extra={"prog_start": a.start,
                                              "prog_stop": a.stop})
-        plans = series_rules.plan(found, self.rec.jobs, store.taken(), now,
-                                  before, after)
+            moved.append(series_rules.Plan(a, start, stop))
+        # A keyword on any channel records so many at one time, and no
+        # rule more at one time than the account has connections.
+        wide = {r["id"] for r in rules if r.get("scope") == series_rules.ANY
+                and r.get("kind") == series_rules.WORD}
+        maxc = getattr(self.client, "max_connections", None)
+        left_out: list = []
+        plans = series_rules.plan(
+            found, self.rec.jobs, store.taken(), now, before, after,
+            wide=wide, connections=maxc, left_out=left_out)
+        if left_out:
+            at_once = sum(1 for _a, why in left_out if why == series_rules.AT_ONCE)
+            log.info("[series] %d airing(s) not scheduled: %d past %d at one time "
+                     "for a keyword rule, %d past the account's %s connection(s)",
+                     len(left_out), at_once, series_rules.MAX_AT_ONCE,
+                     len(left_out) - at_once, maxc or "?")
         if not plans:
-            store.remember([], now)
+            store.remember(moved, now)
             return 0
         if not self.rec.recorder()[1]:
             log.info("[series] %d airing(s) to record, but neither ffmpeg nor "
                      "mpv is there", len(plans))
+            store.remember(moved, now)
             return 0
         if self.rec.total_cap_exceeded():
             log.info("[series] %d airing(s) to record, but the recordings "
                      "folder is at its size limit", len(plans))
+            store.remember(moved, now)
             return 0
         for p in plans:
             a = p.airing
+            extra = {"rule": a.rule, "stream_key": a.key,
+                     "prog_start": a.start, "prog_stop": a.stop}
+            extra.update(self._rec_extra(a.channel, later=later))
             self.rec.add_job(
-                a.url, a.title, p.start, p.stop,
+                "" if later else a.url, a.title, p.start, p.stop,
                 icon=a.channel.get("stream_icon"),
                 channel=self._series_channel_name(a.channel),
-                extra={"rule": a.rule, "stream_key": a.key,
-                       "prog_start": a.start, "prog_stop": a.stop})
-        store.remember(plans, now)
+                extra=extra)
+        store.remember(moved + plans, now)
         log.info("[series] %d recording(s) scheduled", len(plans))
         self._flash_status(tr("series_scheduled_n", n=len(plans)))
         return len(plans)

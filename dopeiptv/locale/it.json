@@ -1375,7 +1375,7 @@
   "nerd_ck_rw_missing": "Niente all'indirizzo riscritto (HTTP {code}).",
   "nerd_card_hls": "Stream adattivi (HLS)",
   "nerd_hls_quality": "Qualità massima degli stream adattivi",
-  "nerd_hls_quality_hint": "Uno stream HLS arriva in più qualità; il lettore prende la migliore fino a questa. Gli altri stream non cambiano.",
+  "nerd_hls_quality_hint": "Uno stream HLS arriva in più qualità; il lettore prende la migliore fino a questa. Nella multiview valgono solo «La più bassa» e il bitrate massimo. Gli altri stream non cambiano.",
   "nerd_hls_best": "La migliore (quella che lo stream offre)",
   "nerd_hls_lowest": "La più bassa",
   "nerd_hls_max_rate": "Bitrate massimo",
@@ -1837,5 +1837,6 @@
   "menu_file": "File",
   "menu_view": "Vista",
   "menu_help": "Aiuto",
-  "menu_website": "Sito web di dopeIPTV"
+  "menu_website": "Sito web di dopeIPTV",
+  "rec_reason_no_address": "non è stato possibile ottenere l'indirizzo dello stream"
 }

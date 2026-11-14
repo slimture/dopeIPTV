@@ -669,12 +669,18 @@ class _SettingsMixin:
         """Nerd's player options onto the core playing now (they used to wait
         for the app's next start)."""
         from ..core import nerd
-        video = getattr(getattr(self, "player", None), "video", None)
+        player = getattr(self, "player", None)
+        video = getattr(player, "video", None)
         m = getattr(video, "mpv", None)
         if m is None:
             return
         try:
-            nerd.reapply_core(m)
+            # The player's own way: its variant switch follows the new cap.
+            again = getattr(player, "nerd_reapply", None)
+            if again is not None:
+                again()
+            else:
+                nerd.reapply_core(m)
         except Exception as e:
             log.warning("nerd: player not updated: %s", e)
 

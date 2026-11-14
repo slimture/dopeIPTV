@@ -1375,7 +1375,7 @@
   "nerd_ck_rw_missing": "لا شيء على العنوان الجديد (HTTP {code}).",
   "nerd_card_hls": "البث المتكيّف (HLS)",
   "nerd_hls_quality": "أعلى جودة للبث المتكيّف",
-  "nerd_hls_quality_hint": "يأتي بث HLS بعدة جودات؛ يأخذ المشغّل أفضلها حتى هذا الحد. لا يتأثر أي بث آخر.",
+  "nerd_hls_quality_hint": "يأتي بث HLS بعدة جودات؛ يأخذ المشغّل أفضلها حتى هذا الحد. في العرض المتعدد يُطبَّق «الأدنى» وأعلى معدل بت فقط. لا يتأثر أي بث آخر.",
   "nerd_hls_best": "الأفضل (كما يعرضه البث)",
   "nerd_hls_lowest": "الأدنى",
   "nerd_hls_max_rate": "أعلى معدل بت",
@@ -1837,5 +1837,6 @@
   "menu_file": "ملف",
   "menu_view": "عرض",
   "menu_help": "مساعدة",
-  "menu_website": "موقع dopeIPTV"
+  "menu_website": "موقع dopeIPTV",
+  "rec_reason_no_address": "تعذّر الحصول على عنوان البث"
 }

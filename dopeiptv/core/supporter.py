@@ -18,6 +18,8 @@ import base64
 import binascii
 import datetime as dt
 import secrets
+import threading
+from collections import OrderedDict
 from typing import Any
 
 from .ed25519 import public_key, sign, verify
@@ -77,12 +79,33 @@ def parse(key: str, public: bytes | None = None) -> dict[str, Any] | None:
     return {"since": since, "id": payload[5:].hex()}
 
 
+#: Keys checked lately and what came of it: the check is a pure-Python
+#: Ed25519 verify (some milliseconds), and the window asks several times a
+#: minute on its own thread - the themes, About, the sidebar.
+_SEEN_MAX = 4
+_seen: OrderedDict[tuple[str, str], dict[str, Any] | None] = OrderedDict()
+_seen_lock = threading.Lock()
+
+
 def stored(settings: Any) -> dict[str, Any] | None:
     try:
         key = str(settings.value("supporter_key", "") or "")
     except Exception:
         return None
-    return parse(key) if key else None
+    if not key:
+        return None
+    seen = (PUBLIC_KEY_HEX, key)
+    with _seen_lock:
+        if seen in _seen:
+            _seen.move_to_end(seen)
+            hit = _seen[seen]
+            return dict(hit) if hit is not None else None
+    got = parse(key)
+    with _seen_lock:
+        _seen[seen] = got
+        while len(_seen) > _SEEN_MAX:
+            _seen.popitem(last=False)
+    return dict(got) if got is not None else None
 
 
 def is_supporter(settings: Any) -> bool:

@@ -296,6 +296,14 @@ def migrate(settings: Writable, platform: str = sys.platform) -> int:
             settings.remove(key)
     if not old:
         return 0
+    # A key the app keeps for itself now (or one not read at all) goes back
+    # to the app's own - said once, so a missing shortcut can be explained.
+    lost = [f"{sid} ({seq})" for sid, seq in old.items()
+            if seq.strip() and (not canon(seq) or blocked(canon(seq), platform))]
+    if lost:
+        from .log import log
+        log.info("shortcuts: old key(s) not kept, back to the app's own: %s",
+                 ", ".join(lost))
     merged = tidy(parse(json.dumps(old)), platform)
     for sid, seq in parse(settings.value(SETTING, "") or "").items():
         merged, _lost = assign(merged, sid, seq, platform)

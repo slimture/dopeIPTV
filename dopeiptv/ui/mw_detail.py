@@ -1048,6 +1048,7 @@ class _DetailMixin:
         if not self._within_storage_cap():
             return
         from ..core import series_rules
+        from ..core.recording import RecordingManager
         now = datetime.now().astimezone().timestamp()
         title = post.get("title") or ch.get("name") or "recording"
         # Settings > Recording's padding: started earlier, stopped later.
@@ -1061,17 +1062,22 @@ class _DetailMixin:
             minutes = max(1, int((stop_ts + after * 60 - now) // 60) + 1)
             self._record_now(ch, minutes, title_override=title)
             return
-        url = self.client.live_url(ch.get("stream_id"), "ts")
-        if not url:
+        if ch.get("stream_id") is None:
+            return
+        # A portal's link would be long dead by then: such a recording asks
+        # for its address when it starts.
+        url, extra = self._scheduled_address(ch)
+        if not url and RecordingManager.LATER not in extra:
             return
         start, stop = series_rules.padded(start_ts, stop_ts, before, after, now)
         # The programme's own times and channel go with the job, so a
         # series rule knows this airing is recorded already.
+        extra.update({"stream_key": series_rules.stream_key(ch),
+                      "prog_start": start_ts, "prog_stop": stop_ts})
         self.rec.add_job(url, title, start, stop,
                          icon=ch.get("stream_icon"),
                          channel=self.channel_display_name(ch),
-                         extra={"stream_key": series_rules.stream_key(ch),
-                                "prog_start": start_ts, "prog_stop": stop_ts})
+                         extra=extra)
 
     def _refresh_progress(self) -> None:
         e = self._current_epg

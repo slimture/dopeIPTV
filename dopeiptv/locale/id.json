@@ -1375,7 +1375,7 @@
   "nerd_ck_rw_missing": "Tidak ada apa-apa di alamat yang ditulis ulang (HTTP {code}).",
   "nerd_card_hls": "Stream adaptif (HLS)",
   "nerd_hls_quality": "Kualitas tertinggi untuk stream adaptif",
-  "nerd_hls_quality_hint": "Stream HLS hadir dalam beberapa kualitas; pemutar mengambil yang terbaik sampai batas ini. Stream lain tidak terpengaruh.",
+  "nerd_hls_quality_hint": "Stream HLS hadir dalam beberapa kualitas; pemutar mengambil yang terbaik sampai batas ini. Di tampilan ganda hanya “Terendah” dan bitrate tertinggi yang berlaku. Stream lain tidak terpengaruh.",
   "nerd_hls_best": "Terbaik (yang ditawarkan stream)",
   "nerd_hls_lowest": "Terendah",
   "nerd_hls_max_rate": "Bitrate tertinggi",
@@ -1837,5 +1837,6 @@
   "menu_file": "Berkas",
   "menu_view": "Tampilan",
   "menu_help": "Bantuan",
-  "menu_website": "Situs web dopeIPTV"
+  "menu_website": "Situs web dopeIPTV",
+  "rec_reason_no_address": "alamat stream tidak bisa didapat"
 }

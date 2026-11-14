@@ -1375,7 +1375,7 @@
   "nerd_ck_rw_missing": "Na prepisanoj adresi nema ničega (HTTP {code}).",
   "nerd_card_hls": "Prilagodljivi strimovi (HLS)",
   "nerd_hls_quality": "Najviši kvalitet prilagodljivih strimova",
-  "nerd_hls_quality_hint": "HLS strim dolazi u više kvaliteta; plejer uzima najbolji do ovog. Ostali strimovi nisu pogođeni.",
+  "nerd_hls_quality_hint": "HLS strim dolazi u više kvaliteta; plejer uzima najbolji do ovog. U višestrukom prikazu važe samo „Najniži” i najviši bitrejt. Ostali strimovi nisu pogođeni.",
   "nerd_hls_best": "Najbolji (kakav strim nudi)",
   "nerd_hls_lowest": "Najniži",
   "nerd_hls_max_rate": "Najviši bitrejt",
@@ -1837,5 +1837,6 @@
   "menu_file": "Datoteka",
   "menu_view": "Prikaz",
   "menu_help": "Pomoć",
-  "menu_website": "Veb-sajt dopeIPTV-a"
+  "menu_website": "Veb-sajt dopeIPTV-a",
+  "rec_reason_no_address": "adresu strima nije bilo moguće dobiti"
 }

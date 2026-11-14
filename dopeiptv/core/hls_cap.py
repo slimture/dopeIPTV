@@ -72,9 +72,13 @@ def cap_of(quality: str | None, kbps: int | str | None = 0) -> Cap:
     return Cap(height=HEIGHTS.get(q, 0), bits=bits)
 
 
-def mpv_options(cap: Cap) -> list[tuple[str, str]]:
-    """What goes on the mpv core for *cap* (nothing for Best)."""
-    if cap.lowest or cap.picks:
+def mpv_options(cap: Cap, picker: bool = True) -> list[tuple[str, str]]:
+    """What goes on the mpv core for *cap* (nothing for Best). *picker*:
+    the core has the player's variant switch (the docked player has it). A
+    core without one (a multiview cell) would stay on the smallest variant
+    for good with a picture size cap, so it gets only the bitrate cap, if
+    one is set - and Lowest, which asks for the smallest."""
+    if cap.lowest or (cap.picks and picker):
         return [("hls-bitrate", "min")]
     if cap.bits:
         return [("hls-bitrate", str(cap.bits))]

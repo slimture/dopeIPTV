@@ -332,32 +332,62 @@ class _Sink:
         pass
 
 
+def broker_shown(cfg: Config) -> str:
+    """The MQTT broker as a log line says it: that one is set, how it is
+    reached (TLS or not) and its port - never its name or address."""
+    return f"(set){' over TLS' if cfg.mqtt_tls else ''}, port {cfg.mqtt_port}"
+
+
 def _no_proxy(host: str) -> bool:
-    """A home system is asked directly, whatever proxy the desktop names."""
-    import ipaddress
-    h = (host or "").lower()
-    if h in ("localhost",) or h.endswith((".local", ".lan", ".home", ".internal")) or "." not in h:
-        return True
+    """A home system is asked directly, whatever proxy the desktop names
+    (the home network as the VPN guard has it: nerd.is_home_host)."""
+    return nerd.is_home_host(host)
+
+
+_tls: ssl.SSLContext | None = None
+_tls_lock = threading.Lock()
+
+
+def https_context() -> ssl.SSLContext:
+    """What a webhook's HTTPS certificate is checked against: the system's
+    certificates and certifi's (mqtt.tls_context) - a packaged build, the
+    Mac app above all, may not find the system's. Made once."""
+    global _tls
+    with _tls_lock:
+        if _tls is None:
+            _tls = mqtt.tls_context()
+        return _tls
+
+
+def opener_for(url: str) -> urllib.request.OpenerDirector:
+    """The opener a webhook is POSTed with: HTTPS checked as https_context
+    says, and a home system asked directly (no proxy)."""
+    handlers: list[Any] = [urllib.request.HTTPSHandler(context=https_context())]
     try:
-        ip = ipaddress.ip_address(h)
+        host = urlsplit(url).hostname or ""
     except ValueError:
-        return False
-    return ip.is_private or ip.is_loopback or ip.is_link_local
+        host = ""
+    if _no_proxy(host):
+        handlers.append(urllib.request.ProxyHandler({}))
+    return urllib.request.build_opener(*handlers)
 
 
 def post(url: str, message: dict[str, Any], header: tuple[str, str] | None,
          timeout: float = HTTP_TIMEOUT) -> tuple[int, str]:
     """POST *message* as JSON: (HTTP status, "") or (0, what went wrong)."""
     data = json.dumps(message, ensure_ascii=False).encode("utf-8")
-    req = urllib.request.Request(url, data=data, method="POST")
+    try:
+        req = urllib.request.Request(url, data=data, method="POST")
+    except ValueError as e:
+        return 0, f"{type(e).__name__}: {e}"
     req.add_header("Content-Type", "application/json; charset=utf-8")
     req.add_header("User-Agent", f"dopeIPTV/{_version() or '1'}")
     if header is not None:
         req.add_header(header[0], header[1])
-    handlers: list[Any] = []
-    if _no_proxy(urlsplit(url).hostname or ""):
-        handlers.append(urllib.request.ProxyHandler({}))
-    opener = urllib.request.build_opener(*handlers)
+    try:
+        opener = opener_for(url)
+    except Exception as e:
+        return 0, f"{type(e).__name__}: {e}"
     try:
         with opener.open(req, timeout=timeout) as r:
             r.read(4096)
@@ -427,6 +457,18 @@ class MqttSink(_Sink):
     def topic(self, leaf: str) -> str:
         return f"{self.prefix}/{leaf}"
 
+    def where(self) -> str:
+        """The broker as the log says it: never its name or address (the
+        log is kept on disk and goes with a report)."""
+        return broker_shown(self.cfg)
+
+    def quiet(self, err: object) -> str:
+        """*err* without the broker's name in it (a certificate's
+        "not valid for 'broker.example.com'")."""
+        text = str(err)
+        host = (self.cfg.mqtt_host or "").strip()
+        return text.replace(host, "(broker)") if len(host) >= 2 else text
+
     def _make(self) -> mqtt.Client:
         c = self.cfg
         return mqtt.Client(c.mqtt_host, c.mqtt_port, c.client_id, c.mqtt_user, c.mqtt_pass, c.mqtt_tls,
@@ -468,13 +510,13 @@ class MqttSink(_Sink):
             wait = BACKOFF[min(self._fails + 1, len(BACKOFF) - 1)]
             self._fails += 1
             self._next_try = time.monotonic() + wait
-            log.info("events: no MQTT broker at %s:%d (%s) - next try in %d s",
-                     self.cfg.mqtt_host, self.cfg.mqtt_port, e, int(wait))
+            log.info("events: no MQTT broker at %s (%s) - next try in %d s",
+                     self.where(), self.quiet(e), int(wait))
             return None
         if self._fails:
             log.info("events: connected to the MQTT broker again")
         else:
-            log.info("events: connected to the MQTT broker at %s:%d", self.cfg.mqtt_host, self.cfg.mqtt_port)
+            log.info("events: connected to the MQTT broker at %s", self.where())
         self._fails = 0
         self.client = cl
         self._fresh = True
@@ -592,7 +634,7 @@ class Dispatcher:
         self.sinks = made
         if made:
             log.info("events: to %d webhook(s)%s", len(cfg.hooks),
-                     f" and MQTT {cfg.mqtt_host}:{cfg.mqtt_port}" if cfg.mqtt else "")
+                     f" and MQTT {broker_shown(cfg)}" if cfg.mqtt else "")
         return True
 
     def emit(self, event: str, fields: dict[str, Any] | None = None, private: bool = False,

@@ -195,32 +195,74 @@ def vpn_interfaces(names: list[str] | None = None) -> list[str]:
     return [n for n in names if VPN_PATTERNS.match(n) and _is_up(n)]
 
 
-def is_lan_url(url: str) -> bool:
-    """A stream on this computer or the home network (loopback, private and
-    link-local addresses, .local names) - the VPN guard leaves those alone
-    unless told to cover them."""
+#: Names only a home network has: a router's own (fritz.box), and the
+#: endings home routers and mDNS give their machines.
+HOME_SUFFIXES = (".local", ".lan", ".home", ".internal", ".home.arpa", ".localdomain")
+HOME_NAMES = ("localhost", "fritz.box")
+
+
+def is_home_host(host: str) -> bool:
+    """A host on this computer or the home network: a loopback, private or
+    link-local address, a name without a dot (a box called "vuduo2"), or a
+    name only a home network has (.local, .lan, .home, .internal,
+    .home.arpa, fritz.box). One rule for the VPN guard and for the events
+    sent to a home system."""
     import ipaddress
-    from urllib.parse import urlsplit
-    try:
-        host = (urlsplit(url).hostname or "").strip("[]")
-    except ValueError:
+    h = (host or "").strip().strip("[]").rstrip(".").lower()
+    if not h:
         return False
-    if not host:
-        return not url.startswith(("http:", "https:", "rtmp:", "rtsp:", "udp:", "rtp:", "srt:"))
-    if host == "localhost" or host.endswith(".local"):
-        return True
     try:
-        ip = ipaddress.ip_address(host)
+        ip = ipaddress.ip_address(h.split("%", 1)[0])
     except ValueError:
-        return False
+        return h in HOME_NAMES or h.endswith(HOME_SUFFIXES) or "." not in h
     return ip.is_private or ip.is_loopback or ip.is_link_local
 
 
-def blocks_stream(url: str) -> bool:
-    """The VPN guard says no to *url* (core code without a window asks this:
-    recordings, multiview cells)."""
+_NET_SCHEMES = ("http:", "https:", "rtmp:", "rtmps:", "rtsp:", "udp:", "rtp:", "srt:",
+                "mms:", "mmsh:", "tcp:", "hls:", "ftp:", "dvb:")
+
+
+def is_own_file(url: str) -> bool:
+    """A file on this computer - the user's own recording or video, never a
+    stream from anywhere: a file: address or a bare path."""
+    u = (url or "").strip()
+    if not u:
+        return False
+    if u.lower().startswith("file:"):
+        return True
+    # A path ("/home/...", "C:\\...") - not "udp:@239.0.0.1:1234".
+    return "://" not in u and not u.lower().startswith(_NET_SCHEMES)
+
+
+def is_lan_url(url: str) -> bool:
+    """A stream on this computer or the home network (is_home_host), or a
+    file of its own - the VPN guard leaves those alone unless told to cover
+    the home network too (a file never is: blocks_stream)."""
+    from urllib.parse import urlsplit
+    if is_own_file(url):
+        return True
     try:
-        return _current.vpn_blocks(local_source=is_lan_url(url))
+        host = urlsplit(url or "").hostname or ""
+    except ValueError:
+        return False
+    return is_home_host(host)
+
+
+def is_local_stream(url: str, source_kind: str | None = None) -> bool:
+    """On the home network as the VPN guard counts it: a box's source (an
+    Enigma2 receiver, a Tvheadend server, an HDHomeRun) whatever its
+    address, or any source's stream at a home address."""
+    return (source_kind or "") in BOX_KINDS or is_lan_url(url)
+
+
+def blocks_stream(url: str, source_kind: str | None = None) -> bool:
+    """The VPN guard says no to *url* - the one rule the window, recordings
+    and multiview cells ask. The user's own files always play; a stream on
+    the home network (is_local_stream) only while the guard covers it too."""
+    if is_own_file(url):
+        return False
+    try:
+        return _current.vpn_blocks(local_source=is_local_stream(url, source_kind))
     except Exception:
         log.debug("vpn guard check", exc_info=True)
         return False
@@ -311,10 +353,11 @@ class Nerd:
 
     # -- the player -----------------------------------------------------------
 
-    def core_options(self) -> list[tuple[str, str]]:
+    def core_options(self, picker: bool = True) -> list[tuple[str, str]]:
         """Options for a new mpv core, after the app's own: an mpv.conf of
         the user's, the typed raw options, then the Nerd page's own (which
-        win)."""
+        win). *picker*: the core switches an adaptive stream's variant
+        itself (hls_cap.mpv_options)."""
         if not self.on:
             return []
         out: list[tuple[str, str]] = []
@@ -354,7 +397,7 @@ class Nerd:
             out += [("demuxer-lavf-analyzeduration", "5"), ("demuxer-lavf-probesize", "5000000")]
         elif start == "instant":
             out += [("demuxer-lavf-analyzeduration", "0.5"), ("demuxer-lavf-probesize", "500000")]
-        out += _hls.mpv_options(self.hls_cap())
+        out += _hls.mpv_options(self.hls_cap(), picker)
         return out
 
     def hls_cap(self) -> _hls.Cap:
@@ -497,10 +540,12 @@ def _remember(mpv: Any, keys: list[str]) -> dict[str, Any]:
     return saved
 
 
-def apply_core(mpv: Any) -> list[str]:
-    """The Nerd options and scripts for a newly made mpv core."""
+def apply_core(mpv: Any, picker: bool = True) -> list[str]:
+    """The Nerd options and scripts for a newly made mpv core. *picker*:
+    the core has the player's switch to an adaptive stream's variant
+    (core/hls_cap.py) - a multiview cell has none."""
     n = current()
-    pairs = n.core_options()
+    pairs = n.core_options(picker)
     _remember(mpv, [k for k, _v in pairs])
     took = apply_options(mpv, pairs)
     for path in n.scripts():
@@ -514,12 +559,15 @@ def apply_core(mpv: Any) -> list[str]:
     return took
 
 
-def reapply_core(mpv: Any) -> dict[str, list[str]]:
+def reapply_core(mpv: Any, picker: bool = True) -> dict[str, list[str]]:
     """Settings changed while *mpv* plays: an option no longer asked for goes
     back to what the core had, the rest are set anew - the picture ones at
     once, the stream ones (buffer, channel start) from the next stream.
-    Scripts load when a core is made, so a new one waits for the next start."""
-    pairs = current().core_options()
+    Scripts load when a core is made, so a new one waits for the next start.
+    *picker* as for apply_core: the caller arms its switch for the new cap
+    too (EmbeddedPlayer.nerd_reapply), or a reconnect before the next start
+    would stay on the smallest variant."""
+    pairs = current().core_options(picker)
     keys = [k for k, _v in pairs]
     saved = _remember(mpv, keys)
     restored: list[str] = []

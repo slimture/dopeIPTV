@@ -45,6 +45,11 @@ class _MpvGLWidget(QOpenGLWidget):
     video_key_release = pyqtSignal(object)
 
     EXTRA_OPTS: dict = {}
+    # The owner switches an adaptive stream to the variant Nerd's quality
+    # cap allows once it is open (EmbeddedPlayer._watch_variants). Without
+    # that switch (a multiview cell) a picture size cap is left off the
+    # core: it would keep every HLS stream on its smallest variant.
+    variant_picker = False
 
     def __init__(self, parent: QWidget | None = None,
                  mirror_of: "_MpvGLWidget | None" = None) -> None:
@@ -350,7 +355,7 @@ class _MpvGLWidget(QOpenGLWidget):
         # libmpv rejects is skipped, never fatal.
         try:
             from ..core import nerd
-            nerd.apply_core(self.mpv)
+            nerd.apply_core(self.mpv, picker=self.variant_picker)
         except Exception as e:
             log.warning("nerd options not applied: %s", e)
         log.info("mpv created, creating render context...")

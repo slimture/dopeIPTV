@@ -14,6 +14,7 @@ from functools import partial
 from typing import Any
 
 from ..core.log import log, redact_url
+from ..core.privacy import for_log
 from ..core.workers import run_async
 from ..i18n import tr
 
@@ -44,11 +45,13 @@ class _PortalArchiveMixin:
         self._flash_status(tr("ts_checking"))
         token = getattr(self, "_ts_probe_token", 0) + 1
         self._ts_probe_token = token
+        # _failover_gen moves on with every start - the auto-preview's too -
+        # and with Stop (mw_failover); _diag_gen only with _start_playback.
         ctx: dict[str, Any] = {
-            "token": token, "client": client, "gen": getattr(self, "_diag_gen", 0),
+            "token": token, "client": client, "gen": getattr(self, "_failover_gen", 0),
             "item": it, "prog": prog, "origin": prog_origin, "after_end": after_end}
-        log.debug("[ts] portal archive: channel %s from %s%s", sid,
-                  datetime.fromtimestamp(start), " (a programme)" if prog else "")
+        log.debug("[ts] portal archive: channel %s from %s%s", for_log(sid),
+                  for_log(datetime.fromtimestamp(start)), " (a programme)" if prog else "")
         run_async(self.pool,
                   partial(client.archive_link, sid, float(start),
                           float(stop) if stop else None),
@@ -57,10 +60,10 @@ class _PortalArchiveMixin:
 
     def _portal_archive_current(self, ctx: dict) -> bool:
         """Nothing newer since it was asked: no other archive, no other
-        source, nothing else started playing."""
+        source, nothing else started playing (a preview included), no Stop."""
         return (ctx["token"] == getattr(self, "_ts_probe_token", 0)
                 and self.client is ctx["client"]
-                and ctx["gen"] == getattr(self, "_diag_gen", 0))
+                and ctx["gen"] == getattr(self, "_failover_gen", 0))
 
     def _portal_archive_ready(self, ctx: dict, got) -> None:
         if not self._portal_archive_current(ctx):
@@ -99,9 +102,9 @@ class _PortalArchiveMixin:
             self._ts_program_stop = None
             self._ts_program_title = None
         log.debug("[ts] portal archive: programme %s %s-%s, %.0f s in: %s",
-                  got.get("id"), datetime.fromtimestamp(got["start"]),
-                  datetime.fromtimestamp(got["stop"]), got["offset"],
-                  redact_url(url))
+                  for_log(got.get("id")), for_log(datetime.fromtimestamp(got["start"])),
+                  for_log(datetime.fromtimestamp(got["stop"])), got["offset"],
+                  for_log(redact_url(url)))
         self._start_playback(url, title, it.get("stream_icon"),
                              self._item_key(it), "live", record=False,
                              item=it, catchup=True, start_at=got["offset"])

@@ -33,6 +33,7 @@ from urllib.parse import quote, urlsplit
 
 from ..core._lazy_requests import requests
 from ..core.log import log, register_secrets
+from ..core.privacy import for_log
 from ..i18n import LocalizedError, tr
 from .client import ListCache, json_object
 
@@ -1382,8 +1383,8 @@ class StalkerClient(ListCache):
             return None
         if prog is None:
             log.info("stalker tv_archive @ %s: channel %s has no programme "
-                     "in the guide at %s", self.server, stream_id,
-                     _local(int(start)))
+                     "in the guide at %s", self.server, for_log(stream_id),
+                     for_log(_local(int(start))))
             return None
         row = prog["row"]
         pid = _text(row.get("id"))
@@ -1391,7 +1392,7 @@ class StalkerClient(ListCache):
             # Asked all the same: a programme still on air is not marked
             # yet, and some portals never mark one.
             log.debug("stalker tv_archive @ %s: programme %s is not marked "
-                      "as in the archive", self.server, pid)
+                      "as in the archive", self.server, for_log(pid))
         url = self._archive_create_link(archive_cmds(row))
         if not url:
             return None
@@ -1423,11 +1424,11 @@ class StalkerClient(ListCache):
             url = archive_address(js)
             if url:
                 log.info("stalker tv_archive @ %s: a link for %s",
-                         self.server, cmd)
+                         self.server, for_log(cmd))
                 return url
             err = js.get("error") if isinstance(js, dict) else ""
             log.info("stalker tv_archive create_link @ %s: no address for "
-                     "%s%s", self.server, cmd, f" ({err})" if err else "")
+                     "%s%s", self.server, for_log(cmd), f" ({err})" if err else "")
         if down is not None:
             raise down
         return ""
@@ -1448,7 +1449,7 @@ class StalkerClient(ListCache):
                     raise
                 # The days already read are worth showing.
                 log.info("stalker archive list @ %s: stopped at %s - %s: %s",
-                         self.server, day, type(e).__name__,
+                         self.server, for_log(day), type(e).__name__,
                          self._redact(str(e)))
                 break
         if any(_flag(r.get("mark_archive")) for r in rows):
