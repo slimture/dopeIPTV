@@ -272,7 +272,7 @@ def tickets(settings: Any) -> list[dict]:
     for t in raw if isinstance(raw, list) else []:
         if not isinstance(t, dict) or not isinstance(t.get("c"), str):
             continue
-        age = now - float(t.get("t") or 0)
+        age = now - _sent(t)
         if age < ASK_DAYS * 86400 or (t.get("r") and age < KEEP_DAYS * 86400):
             out.append(t)
     return out[-20:]
@@ -299,6 +299,75 @@ def fetch_replies(codes: list[str], timeout: float = 15.0, endpoint: str | None 
 
 #: The fixed answers an admin picks; the app says them in its own language.
 REPLY_CODES = ("thanks", "known", "fixed", "needinfo", "note")
+
+#: When answers are asked (seconds): soon after a report that wants one,
+#: every quarter of an hour while one sent in the last day waits for its
+#: first answer, otherwise every six hours. The site takes 60 asks in ten
+#: minutes from one address; this is a handful a day.
+ASK_FIRST, ASK_SOON, ASK_SOON_FOR, ASK_LATER = 120.0, 900.0, 86400.0, 6 * 3600.0
+
+
+def _sent(t: dict) -> float:
+    try:
+        return float(t.get("t") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def open_codes(items: list[dict], now: float) -> list[str]:
+    """The codes still asked about: reports sent in the last ASK_DAYS."""
+    return [str(t["c"]) for t in items if now - _sent(t) < ASK_DAYS * 86400]
+
+
+def next_ask(items: list[dict], now: float, last: float = 0.0) -> float | None:
+    """Seconds until answers are asked next (*last*: when they last were,
+    0 for never); None while no report is asked about."""
+    asked = [t for t in items if now - _sent(t) < ASK_DAYS * 86400]
+    if not asked:
+        return None
+    waiting = [_sent(t) for t in asked if not t.get("r") and now - _sent(t) < ASK_SOON_FOR]
+    if waiting:
+        newest = max(waiting)
+        due = newest + ASK_FIRST if last < newest + ASK_FIRST else last + ASK_SOON
+    else:
+        due = last + ASK_LATER
+    return max(0.0, due - now)
+
+
+def unread(items: list[dict]) -> int:
+    """Answers not shown yet."""
+    out = 0
+    for t in items:
+        try:
+            seen = int(t.get("seen") or 0)
+        except (TypeError, ValueError):
+            seen = 0
+        out += max(0, len(t.get("r") or []) - seen)
+    return out
+
+
+def mark_seen(items: list[dict]) -> bool:
+    """Every answer in *items* shown; True when that changed any."""
+    changed = False
+    for t in items:
+        n = len(t.get("r") or [])
+        if t.get("seen") != n:
+            t["seen"] = n
+            changed = True
+    return changed
+
+
+def merge_replies(items: list[dict], got: dict) -> int:
+    """The site's answers (fetch_replies) into *items*; how many are new."""
+    fresh = 0
+    for t in items:
+        raw = got.get(t["c"])
+        answers = [a for a in raw if isinstance(a, dict)] if isinstance(raw, list) else []
+        had = len(t.get("r") or [])
+        if len(answers) > had:
+            fresh += len(answers) - had
+            t["r"] = answers
+    return fresh
 
 
 # -- not too many: feedback is a press of Send, not a stream ----------------------

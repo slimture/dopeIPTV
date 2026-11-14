@@ -7,11 +7,21 @@ An error is offered after the code that raised it is done (a queued
 signal: the hook runs inside the failing slot - a paint event, the
 player's poll - and a window's own event loop there ran everything else
 inside it), and never over a video: while one plays or the window is
-fullscreen the report waits in the app menu, said by a note that opens it."""
+fullscreen the report waits in the app menu, said by a note that opens it.
+
+And the answers to feedback: asked of the site on one timer (soon after a
+report that wants one, then less often), kept here, shown in a window of
+their own - its menu entry counts the new ones and a dot on the menu says
+so."""
 
 from __future__ import annotations
 
+import time
+from functools import partial
+
+from PyQt6 import sip
 from PyQt6.QtCore import QObject, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QAction
 
 from ..core import report
 from ..core.log import log, log_dir
@@ -41,26 +51,37 @@ class _ReportMixin:
         self._report_relay.raised.connect(self._offer_error_report,
                                           Qt.ConnectionType.QueuedConnection)
         report.add_listener(self._report_relay.raised.emit)
-        # Answers to feedback: asked a little after the start, then every six
-        # hours, only while there is a report young enough to ask about.
+        # Answers to feedback: one timer, set to the next ask each time
+        # (report.next_ask) and stopped while nothing is asked about; the
+        # first a little after the start, not while the app is busy starting.
         self._answers_timer = QTimer(self)
-        self._answers_timer.setInterval(6 * 3600 * 1000)
+        self._answers_timer.setSingleShot(True)
         self._answers_timer.timeout.connect(self._ask_answers)
-        self._answers_timer.start()
-        QTimer.singleShot(45_000, self._ask_answers)
+        self._schedule_answers(self.ANSWERS_AT_START)
+        self._show_unread()
         self._report_crash = report.pending_crash()
         if self._report_crash:
             QTimer.singleShot(4000, self._offer_crash_report)
 
-    def _build_report_action(self, menu):
-        # An error's report that waits (it came while a video played): here
-        # only while one does.
-        self._report_wait_action = menu.addAction(tr("report_title") + "…")
+    def _build_report_actions(self) -> dict[str, QAction]:
+        """Send feedback…, Answers to feedback… and an error's report that
+        waits (it came while a video played - there only while one does);
+        app_menu places them."""
+        feedback = QAction(tr("feedback_menu") + "…", self)
+        feedback.triggered.connect(self.open_feedback)
+        self._answers_action = QAction(self._answers_menu_text(), self)
+        self._answers_action.triggered.connect(self._answers_from_menu)
+        self._report_wait_action = QAction(tr("report_title") + "…", self)
         self._report_wait_action.setVisible(False)
         self._report_wait_action.triggered.connect(self.open_waiting_report)
-        action = menu.addAction(tr("feedback_menu") + "…")
-        action.triggered.connect(lambda: self.open_report("feedback"))
-        return action
+        return {"feedback": feedback, "answers": self._answers_action,
+                "report_wait": self._report_wait_action}
+
+    def open_feedback(self, *_a) -> None:
+        self.open_report("feedback")
+
+    def _answers_from_menu(self, *_a) -> None:
+        self.open_answers()
 
     def _personal_values(self) -> list[str]:
         store = getattr(self, "playlist_store", None)
@@ -77,29 +98,159 @@ class _ReportMixin:
         titles.append(str(last.get("title") or ""))
         return report.personal_values(playlists, channels, titles)
 
+    # -- answers to feedback ---------------------------------------------------
+
+    #: Seconds after the start before the first ask; the least time between
+    #: two asks the person starts (Check now, opening the window).
+    ANSWERS_AT_START, ANSWERS_GAP = 45.0, 20.0
+    _answers_timer: QTimer | None = None
+    _answers_action: QAction | None = None
+    _answers_menu = None
+    _answers_dialog = None
+    _answers_dot = None
+    _answers_busy = False
+    _answers_last = 0.0
+    _answers_ok = True
+
+    def _schedule_answers(self, at_least: float = 0.0) -> None:
+        """The one timer set to the next ask; stopped while no report is
+        asked about (nothing is asked then at all)."""
+        timer = self._answers_timer
+        settings = getattr(self, "settings", None)
+        if timer is None or settings is None:
+            return
+        wait = report.next_ask(report.tickets(settings), time.time(), self._answers_last)
+        if wait is None:
+            timer.stop()
+            return
+        timer.start(int(max(wait, at_least, 1.0) * 1000))
+
     def _ask_answers(self) -> None:
+        """Ask the site for answers to the reports still asked about - off
+        the window's thread, one request at a time."""
+        settings = getattr(self, "settings", None)
+        if settings is None or self._answers_busy:
+            return
+        now = time.time()
+        codes = report.open_codes(report.tickets(settings), now)
+        if not codes:
+            self._schedule_answers()
+            return
+        self._answers_busy = True
+        self._answers_last = now
+        dlg = self._answers_window()
+        if dlg is not None:
+            dlg.show_checking()
+        run_async(self.pool, partial(report.fetch_replies, codes), self._answers_fetched,
+                  self._answers_failed)
+
+    def _answers_failed(self, *_e) -> None:
+        self._answers_fetched(None)
+
+    def _answers_fetched(self, got) -> None:
+        self._answers_busy = False
+        self._answers_ok = got is not None
+        settings = getattr(self, "settings", None)
+        fresh = 0
+        if got and settings is not None:
+            items = report.tickets(settings)
+            fresh = report.merge_replies(items, got)
+            if fresh:
+                report.save_tickets(settings, items)
+        dlg = self._answers_window()
+        if dlg is not None:
+            if fresh:
+                # In front of the person: shown, so no longer new.
+                dlg.set_tickets(report.tickets(settings))
+                self._answers_mark_seen()
+            dlg.show_result(self._answers_ok, fresh, self._answers_last)
+        elif fresh:
+            self._show_action_toast(tr("fbr_new"), 12_000, self._answers_from_menu)
+        self._show_unread()
+        self._schedule_answers()
+
+    def check_answers_now(self) -> None:
+        """Check now (and the window opening): asked at once - unless a
+        request is out already, or one went moments ago and its word stands."""
+        if self._answers_busy:
+            return
+        if time.time() - self._answers_last < self.ANSWERS_GAP:
+            dlg = self._answers_window()
+            if dlg is not None:
+                dlg.show_result(self._answers_ok, 0, self._answers_last)
+            return
+        self._ask_answers()
+
+    def answers_unread(self) -> int:
+        settings = getattr(self, "settings", None)
+        return report.unread(report.tickets(settings)) if settings is not None else 0
+
+    def _answers_menu_text(self) -> str:
+        n = self.answers_unread()
+        return tr("fba_menu") + (f" ({n})" if n else "") + "…"
+
+    def _show_unread(self) -> None:
+        """The menu entry's count, and a dot on the menu that holds it."""
+        n = self.answers_unread()
+        if self._answers_action is not None:
+            self._answers_action.setText(self._answers_menu_text())
+        dot = self._answers_dot
+        if dot is None and n and self._answers_menu is not None:
+            bar = self.menuBar()
+            # A desktop's own menu bar (macOS, a global menu) has no room for it.
+            if not bar.isNativeMenuBar():
+                from .widgets import MenuBarDot
+                dot = self._answers_dot = MenuBarDot(bar, self._answers_menu.menuAction())
+        if dot is not None and not sip.isdeleted(dot):
+            dot.set_on(bool(n))
+
+    def _answers_window(self):
+        dlg = self._answers_dialog
+        if dlg is None or sip.isdeleted(dlg) or not dlg.isVisible():
+            return None
+        return dlg
+
+    def _answers_mark_seen(self) -> None:
         settings = getattr(self, "settings", None)
         if settings is None:
             return
-        import time
-        now = time.time()
-        open_ = [t["c"] for t in report.tickets(settings) if now - float(t.get("t") or 0) < report.ASK_DAYS * 86400]
-        if not open_:
-            return
-
-        def done(got) -> None:
-            if not got:
-                return
-            items, fresh = report.tickets(settings), 0
-            for t in items:
-                answers = got.get(t["c"])
-                if answers and len(answers) > len(t.get("r") or []):
-                    fresh += 1
-                    t["r"] = answers
+        items = report.tickets(settings)
+        if report.mark_seen(items):
             report.save_tickets(settings, items)
-            if fresh:
-                self._show_toast(tr("fbr_new"), 9000)
-        run_async(self.pool, lambda: report.fetch_replies(open_), done, lambda _e=None: None)
+        self._show_unread()
+
+    def open_answers(self, parent=None):
+        """The answers window - over *parent* when it comes from another
+        window (Send feedback, Settings: one of the main window's would wait
+        behind those). Opening it shows the answers, no longer new, and asks
+        the site again."""
+        from .dialogs import AnswersDialog
+        settings = getattr(self, "settings", None)
+        if settings is None:
+            return None
+        dlg = self._answers_window()
+        if dlg is not None and (parent is None or dlg.parent() is parent):
+            dlg.raise_()
+            dlg.activateWindow()
+            return dlg
+        if dlg is not None:
+            dlg.close()
+        items = report.tickets(settings)
+        dlg = AnswersDialog(parent or self, items, check=self.check_answers_now, send=self._answers_send)
+        dlg.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        self._answers_dialog = dlg
+        self._answers_mark_seen()
+        dlg.show()
+        if report.open_codes(items, time.time()):
+            self.check_answers_now()
+        return dlg
+
+    def _answers_send(self) -> None:
+        """The empty window's Send feedback…: it goes, the feedback window comes."""
+        dlg = self._answers_window()
+        if dlg is not None:
+            dlg.close()
+        QTimer.singleShot(0, self.open_feedback)
 
     def _answered(self) -> list[dict]:
         settings = getattr(self, "settings", None)
@@ -207,12 +358,9 @@ class _ReportMixin:
                 return
             answered = self._answered()
             fd = FeedbackDialog(self, self._feedback_details, has_log_file=os.path.isfile(log_file()),
-                                answers=answered)
-            if answered and settings is not None:      # shown now: no longer new
-                items = report.tickets(settings)
-                for t in items:
-                    t["seen"] = len(t.get("r") or [])
-                report.save_tickets(settings, items)
+                                answers=answered, all_answers=self.open_answers)
+            if answered:                               # shown now: no longer new
+                self._answers_mark_seen()
             if not fd.exec():
                 return
             fields = fd.fields()
@@ -247,6 +395,7 @@ class _ReportMixin:
                     if code:
                         report.save_tickets(settings, [*report.tickets(settings),
                                                        {"c": code, "t": int(now), "w": first_words, "seen": 0}])
+                        self._schedule_answers()        # two minutes from now
                 self._show_toast(tr("report_sent"), 5000)
                 return
             from PyQt6.QtGui import QGuiApplication

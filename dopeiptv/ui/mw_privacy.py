@@ -5,6 +5,8 @@ and what clearing refreshes."""
 
 from __future__ import annotations
 
+import sys
+
 from PyQt6.QtCore import QEvent, QObject, Qt
 from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QPushButton
@@ -14,7 +16,8 @@ from ..i18n import tr
 from .theme import P
 
 PRIVATE_SHORTCUT = "Ctrl+Shift+N"
-CLEAR_SHORTCUT = "Ctrl+Shift+Delete"
+# A Mac's delete key is Backspace (⇧⌘⌫, as Safari has it); few have the other.
+CLEAR_SHORTCUT = "Ctrl+Shift+Backspace" if sys.platform == "darwin" else "Ctrl+Shift+Delete"
 
 
 class _Follow(QObject):
@@ -32,15 +35,19 @@ class _Follow(QObject):
 
 
 class _PrivacyMixin:
-    def _build_privacy_actions(self, menu) -> list[QAction]:
-        """Private viewing (on/off) and Clear recent history, in *menu*."""
-        self._private_action = menu.addAction(tr("private_menu"))
+    def _build_privacy_actions(self, menu=None) -> list[QAction]:
+        """Private viewing (on/off) and Clear recent history - in *menu*
+        when given (the app menu lays them out itself otherwise)."""
+        self._private_action = QAction(tr("private_menu"), self)
         self._private_action.setCheckable(True)
         self._private_action.setShortcut(QKeySequence(PRIVATE_SHORTCUT))
         self._private_action.toggled.connect(self.set_private_viewing)
-        self._clear_action = menu.addAction(tr("clear_menu") + "…")
+        self._clear_action = QAction(tr("clear_menu") + "…", self)
         self._clear_action.setShortcut(QKeySequence(CLEAR_SHORTCUT))
         self._clear_action.triggered.connect(lambda: self.open_clear_history())
+        if menu is not None:
+            menu.addAction(self._private_action)
+            menu.addAction(self._clear_action)
         return [self._private_action, self._clear_action]
 
     def _build_private_pill(self) -> None:

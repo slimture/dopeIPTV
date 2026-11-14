@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import (
-    QPointF, QRect, QRectF, QSize, Qt, QTimer, pyqtSignal,
+    QEvent, QPointF, QRect, QRectF, QSize, Qt, QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
     QColor, QIcon, QImage, QImageReader, QLinearGradient, QPainter, QPainterPath,
@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .. import APP_NAME
+from . import theme as _theme
 from .theme import HEART, P, on_accent
 
 
@@ -425,6 +426,55 @@ class _Toast(QLabel):
         self._on_click = None
         self._timer.stop()
         self.hide()
+
+
+class MenuBarDot(QWidget):
+    """A small accent dot on a menu bar's title (the menu holding something
+    new), laid over the bar and following it; clicks go through."""
+
+    D = 6
+
+    def __init__(self, bar: QWidget, action) -> None:
+        super().__init__(bar)
+        self._bar, self._action = bar, action
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.setFixedSize(self.D + 2, self.D + 2)
+        bar.installEventFilter(self)
+        self.hide()
+
+    def set_on(self, on: bool) -> None:
+        self.setVisible(on)
+        if on:
+            self.place()
+            self.raise_()
+
+    def place(self) -> None:
+        r = self._bar.actionGeometry(self._action)
+        if r.isEmpty():
+            return
+        # Just past the end of the title, its top at the top of the capitals.
+        fm = self._bar.fontMetrics()
+        text_w = fm.horizontalAdvance(self._action.text().replace("&", ""))
+        x = r.center().x() + text_w // 2 + 1
+        if self._bar.layoutDirection() == Qt.LayoutDirection.RightToLeft:
+            x = r.center().x() - text_w // 2 - 1 - self.width()
+        baseline = r.center().y() + (fm.ascent() - fm.descent()) // 2
+        self.move(x, max(0, baseline - fm.capHeight() - 1))
+
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802 - Qt hook
+        if self.isVisible() and event.type() in (QEvent.Type.Resize, QEvent.Type.Show,
+                                                 QEvent.Type.LayoutRequest, QEvent.Type.FontChange,
+                                                 QEvent.Type.StyleChange):
+            self.place()
+        return False
+
+    def paintEvent(self, _event) -> None:  # noqa: N802 - Qt hook
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(P.get("accent", _theme.ACCENT)))
+        p.drawEllipse(QRectF(1, 1, self.D, self.D))
+        p.end()
 
 
 def heart_shape(box: QRectF) -> QPainterPath:

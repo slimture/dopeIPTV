@@ -797,6 +797,26 @@ class _SettingsMixin:
         # key's window (every check of a key is a signature check).
         key_state: dict = {"mine": None}
         key_row = key_btn = icon_box = None
+        if hasattr(self, "open_answers"):
+            # Feedback, and the answers to it (their own window, over this one).
+            feedback_btn = QPushButton(tr("feedback_menu") + "…")
+            feedback_btn.clicked.connect(lambda _c=False: self.open_feedback())
+            answers_btn = QPushButton(self._answers_menu_text())
+
+            def show_answers(_c=False) -> None:
+                self.open_answers(d)
+                answers_btn.setText(self._answers_menu_text())
+            answers_btn.clicked.connect(show_answers)
+            # As wide as the two buttons: the column's width for controls
+            # cut the second one's text in some languages.
+            fb_pair = QWidget()
+            fb_pair.setLayout(hbox(feedback_btn, answers_btn, stretch=False))
+            fb_pair.layout().setContentsMargins(0, 0, 0, 0)
+            fb_pair.setFixedWidth(fb_pair.sizeHint().width())     # kept out of the column
+            c.row(tr("fba_settings"), fb_pair, tr("fba_settings_hint"),
+                  search="feedback answer answers reply replies report idea bug svar")
+            fb_pair.ensurePolished()                               # now in the window's style
+            fb_pair.setFixedWidth(fb_pair.sizeHint().width())
         if hasattr(self, "open_supporter"):
             from .qt_i18n import format_month
             key_state["mine"] = self._supporter()

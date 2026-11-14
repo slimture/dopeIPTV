@@ -57,6 +57,7 @@ class Inbox:
     def __init__(self, status=200):
         self.got = []
         self.answers = {}            # reply hash -> answers, for /feedback/replies
+        self.asked = []              # the hashes of each ask, as they came
         inbox = self
 
         class H(BaseHTTPRequestHandler):
@@ -66,6 +67,7 @@ class Inbox:
             def do_POST(self):
                 body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
                 if self.path.endswith("/replies"):
+                    inbox.asked.append(list(body.get("codes", [])))
                     out = json.dumps({"replies": {h: inbox.answers[h] for h in body.get("codes", [])
                                                   if h in inbox.answers}}).encode()
                     self.send_response(200)
@@ -173,6 +175,7 @@ s.setValue("active_playlist", "a")
 w = MainWindow(DemoClient(), s, PlaylistStore(s))
 toasts = []
 w._show_toast = lambda text, ms=0: toasts.append(text)
+w._show_action_toast = lambda text, ms, act: toasts.append(text)
 inbox = Inbox()
 report.ENDPOINT = inbox.url
 report.REPLIES = inbox.url.replace("/report", "/replies")

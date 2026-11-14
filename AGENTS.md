@@ -109,6 +109,7 @@ map and the one-way import rule.
 | `media/video_surface.py` | The video surface mpv draws into (`_MpvGLWidget`) and the Linux pop-out's raster mirror |
 | `media/subtitle_text.py` | Stray right-to-left marks out of subtitle files before mpv reads them |
 | `ui/main_window.py` | MainWindow composition root (+ `mw_*` mixins) |
+| `ui/app_menu.py` | The app's menus per platform: macOS's menu bar (app menu by roles, File, View, History, Help), elsewhere the one menu in the same groups |
 | `ui/channel_list.py` | List model, view, delegate painting |
 | `ui/dialogs.py` | Dialog windows |
 | `ui/settings_ui.py` | Settings building blocks: sidebar shell, search view, pages, sections (`card`), rows, switches, steppers, chips |
@@ -138,6 +139,7 @@ map and the one-way import rule.
 | `ui/mw_report.py` | Send feedback, and the offer of a report after an error or a crash (queued; while a video plays it waits in the menu) |
 | `ui/mw_report.py` | Send feedback, and the offer of a report after an error or a crash |
 | `ui/mw_sync.py` | Settings sync in the window: when a round runs (start, after a change, every half hour, Sync now; never in a stream's first seconds), what came back put in place, its card in Settings, General |
+| `ui/mw_report.py` | Send feedback, and the offer of a report after an error or a crash; answers to feedback (their window, the menu entry's count, when they are asked) |
 | `ui/mw_home.py` | The Home page: which shelves, what goes in them (drawn by `home_widgets.py`) |
 | `ui/mw_local.py` | Local files: folders, library view, music queue |
 | `ui/mw_multiview.py` | Multiview: 2/4/6/9 live streams, an mpv per cell |

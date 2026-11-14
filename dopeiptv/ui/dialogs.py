@@ -716,6 +716,245 @@ def answers_html(tickets: list) -> str:
     return "".join(rows)
 
 
+def _count(value) -> int:
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+class AnswersDialog(QDialog):
+    """Answers to feedback, in a window of their own: a card for each report
+    that asked for one, newest first - the day it went, its first words
+    (kept on this computer only), each answer with its day, the new ones
+    marked and the waiting ones said - with Check now, and how it stays
+    anonymous. With no report yet, a way to send one."""
+
+    #: The first words are kept to this many characters (mw_report).
+    WORDS = 90
+    #: The cards' room before they scroll.
+    TALLEST = 460
+
+    def __init__(self, parent, tickets: list, check=None, send=None) -> None:
+        super().__init__(parent)
+        self._check, self._send = check, send
+        #: (code, answer's index) new while this window has been open.
+        self._new: set[tuple[str, int]] = set()
+        self.cards: list[QFrame] = []
+        self.send_btn: QPushButton | None = None
+        self.setWindowTitle(tr("fbr_title"))
+        self.setMinimumWidth(540)
+        col = QVBoxLayout(self)
+        col.setContentsMargins(24, 20, 24, 18)
+        col.setSpacing(10)
+        head = QLabel(tr("fbr_title"))
+        head.setStyleSheet(f"font-size:17px; font-weight:700; color:{P['text']};")
+        col.addWidget(head)
+        self.list = QWidget(objectName="AnswersList")
+        self.rows = QVBoxLayout(self.list)
+        self.rows.setContentsMargins(0, 0, 0, 0)
+        self.rows.setSpacing(10)
+        self.scroll = QScrollArea()
+        self.scroll.setWidget(self.list)
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scroll.setStyleSheet("QScrollArea, QWidget#AnswersList { background: transparent; }")
+        col.addWidget(self.scroll, 1)
+        self.note = QLabel(tr("fb_answers_note"))
+        self.note.setWordWrap(True)
+        self.note.setStyleSheet(f"font-size:12px; color:{P['muted']};")
+        col.addWidget(self.note)
+        buttons = QHBoxLayout()
+        buttons.setSpacing(8)
+        self.status = QLabel()
+        self.status.setWordWrap(True)
+        self.status.setStyleSheet(f"font-size:12px; color:{P['muted']};")
+        buttons.addWidget(self.status, 1)
+        self.check_btn = QPushButton(tr("fba_check"))
+        self.check_btn.clicked.connect(self._check_clicked)
+        self.close_btn = QPushButton(tr("common_close"), objectName="Primary")
+        self.close_btn.clicked.connect(self.accept)
+        buttons.addWidget(self.check_btn)
+        buttons.addWidget(self.close_btn)
+        col.addLayout(buttons)
+        self.set_tickets(tickets)
+
+    # -- what it shows ------------------------------------------------------------
+
+    def set_tickets(self, tickets: list) -> None:
+        """The reports as they are kept now; an answer not shown before
+        (past its report's "seen") stays marked new while this is open."""
+        import time
+
+        from ..core import report
+        for t in tickets:
+            for i in range(_count(t.get("seen")), len(t.get("r") or [])):
+                self._new.add((str(t.get("c")), i))
+        while self.rows.count():
+            item = self.rows.takeAt(0)
+            w = item.widget() if item is not None else None
+            if w is not None:
+                w.hide()
+                w.deleteLater()
+        self.cards = []
+        self.send_btn = None
+        ordered = sorted(tickets, key=lambda t: -float(t.get("t") or 0))
+        for t in ordered:
+            card = self._card(t)
+            self.cards.append(card)
+            self.rows.addWidget(card)
+        if not ordered:
+            self.rows.addWidget(self._empty())
+        self.rows.addStretch(1)
+        asked = bool(report.open_codes(ordered, time.time()))
+        self.check_btn.setVisible(asked)
+        if not asked:
+            self.status.clear()
+        # One button stands out: Send feedback… while there is nothing yet.
+        primary = "Primary" if ordered else ""
+        if self.close_btn.objectName() != primary:
+            self.close_btn.setObjectName(primary)
+            self.close_btn.style().unpolish(self.close_btn)
+            self.close_btn.style().polish(self.close_btn)
+        if self.isVisible():
+            self._fit()
+
+    def _card(self, t: dict) -> QFrame:
+        import html as _html
+
+        from .qt_i18n import format_when
+        card = QFrame(objectName="AnswerCard")
+        card.setStyleSheet(f"QFrame#AnswerCard {{ background:{P['input']}; border-radius:12px; }}"
+                           " QFrame#AnswerCard QLabel { background: transparent; }")
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(16, 12, 16, 14)
+        lay.setSpacing(4)
+        code, answers = str(t.get("c")), [a for a in t.get("r") or [] if isinstance(a, dict)]
+        top = QHBoxLayout()
+        top.setSpacing(8)
+        sent = QLabel(tr("fba_sent", date=format_when(float(t.get("t") or 0), "d MMM yyyy")))
+        sent.setStyleSheet(f"font-size:12px; color:{P['muted']};")
+        top.addWidget(sent, 1)
+        card.new = sum((code, i) in self._new for i in range(len(answers)))
+        if card.new:
+            pill = QLabel(tr("fba_new"))
+            pill.setStyleSheet(f"QLabel {{ background:{P['accent']}; color:{P['on_accent']};"
+                               f" border-radius:8px; padding:1px 8px; font-size:11px; font-weight:700; }}")
+            top.addWidget(pill, 0, Qt.AlignmentFlag.AlignVCenter)
+        lay.addLayout(top)
+        words = " ".join(str(t.get("w") or "").split())
+        if len(words) >= self.WORDS:
+            words = words.rstrip(" .,;:-") + "…"
+        you = QLabel(tr("fba_you", text=words or "…"))
+        you.setTextFormat(Qt.TextFormat.PlainText)       # "<private>" is words, not a tag
+        you.setWordWrap(True)
+        you.setStyleSheet(f"font-size:13px; color:{P['text2']};")
+        lay.addWidget(you)
+        if not answers:
+            wait = QLabel(tr("fba_waiting"))
+            wait.setStyleSheet(f"font-size:13px; color:{P['muted']}; font-style:italic;")
+            lay.addSpacing(2)
+            lay.addWidget(wait)
+        for i, a in enumerate(answers):
+            lay.addSpacing(8)
+            fresh = (code, i) in self._new
+            dot = f"<span style='color:{P['accent']}'>●</span>&nbsp; " if fresh else ""
+            when = QLabel(dot + _html.escape(tr("fba_answer", date=format_when(float(a.get("t") or 0),
+                                                                              "d MMM yyyy"))))
+            when.setTextFormat(Qt.TextFormat.RichText)
+            when.setStyleSheet(f"font-size:12px; font-weight:600;"
+                               f" color:{P['text'] if fresh else P['muted']};")
+            lay.addWidget(when)
+            said = answer_text(a)
+            if said:
+                text = QLabel(said)
+                text.setTextFormat(Qt.TextFormat.PlainText)
+                text.setWordWrap(True)
+                text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+                text.setStyleSheet(f"font-size:13px; color:{P['text']};")
+                lay.addWidget(text)
+        return card
+
+    def _empty(self) -> QWidget:
+        box = QWidget()
+        lay = QVBoxLayout(box)
+        lay.setContentsMargins(12, 28, 12, 20)
+        lay.setSpacing(8)
+        title = QLabel(tr("fba_empty_title"))
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet(f"font-size:15px; font-weight:700; color:{P['text']};")
+        text = QLabel(tr("fba_empty", option=tr("fb_answers_opt")))
+        text.setWordWrap(True)
+        text.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        text.setStyleSheet(f"font-size:13px; color:{P['text2']};")
+        self.send_btn = QPushButton(tr("feedback_menu") + "…", objectName="Primary")
+        self.send_btn.clicked.connect(self._send_clicked)
+        lay.addWidget(title)
+        lay.addWidget(text)
+        lay.addSpacing(6)
+        lay.addWidget(self.send_btn, 0, Qt.AlignmentFlag.AlignHCenter)
+        return box
+
+    # -- asking -------------------------------------------------------------------
+
+    def show_checking(self) -> None:
+        self.check_btn.setEnabled(False)
+        self.status.setStyleSheet(f"font-size:12px; color:{P['muted']};")
+        self.status.setText(tr("fba_checking"))
+
+    def show_result(self, ok: bool, fresh: int, when: float) -> None:
+        from .qt_i18n import format_when
+        self.check_btn.setEnabled(True)
+        if not ok:
+            self.status.setStyleSheet(f"font-size:12px; color:{P['error']};")
+            self.status.setText(tr("fba_failed"))
+            return
+        self.status.setStyleSheet(f"font-size:12px; color:{P['muted']};")
+        self.status.setText(tr("fba_checked_new" if fresh else "fba_checked_none",
+                               time=format_when(when, "HH:mm")))
+
+    def _check_clicked(self, *_a) -> None:
+        if self._check is not None:
+            self._check()
+
+    def _send_clicked(self, *_a) -> None:
+        if self._send is not None:
+            self._send()
+        else:
+            self.accept()
+
+    # -- size ---------------------------------------------------------------------
+
+    def _fit(self) -> None:
+        """As tall as the cards at this width, up to a screenful's share -
+        then they scroll."""
+        width = max(self.width(), self.minimumWidth())
+        self.rows.activate()
+
+        def tall(inner: int) -> int:
+            h = self.list.heightForWidth(inner) if self.rows.hasHeightForWidth() else -1
+            return h if h > 0 else self.list.sizeHint().height()
+        h = tall(width - 48)
+        if h + 2 <= self.TALLEST:
+            # Exactly as tall as the cards: the scroll area's own size hint
+            # (its content at no particular width) is taller and left a gap.
+            self.scroll.setFixedHeight(h + 2)
+        else:
+            # It scrolls, and grows with the window.
+            self.scroll.setMinimumHeight(self.TALLEST)
+            self.scroll.setMaximumHeight(16_777_215)
+        lay = self.layout()
+        if lay is not None:
+            lay.activate()
+            self.resize(width, lay.totalHeightForWidth(width) if lay.hasHeightForWidth()
+                        else lay.totalSizeHint().height())
+
+    def showEvent(self, event) -> None:  # noqa: N802 - Qt hook
+        super().showEvent(event)
+        self._fit()
+
+
 class FeedbackDialog(QDialog):
     """Feedback, asked the way the answers are useful: what it is about,
     for something that does not work where and how often, the person's
@@ -728,8 +967,10 @@ class FeedbackDialog(QDialog):
              ("updates", "fb_a_updates"), ("other", "fb_a_other"))
     OFTEN = (("always", "fb_o_always"), ("sometimes", "fb_o_sometimes"), ("once", "fb_o_once"))
 
-    def __init__(self, parent, details, has_log_file: bool = False, answers: list | None = None) -> None:
+    def __init__(self, parent, details, has_log_file: bool = False, answers: list | None = None,
+                 all_answers=None) -> None:
         super().__init__(parent)
+        self._all_answers = all_answers
         from PyQt6.QtGui import QFont
         from PyQt6.QtWidgets import QButtonGroup, QCheckBox, QComboBox, QGridLayout, QPlainTextEdit, QScrollArea
 
@@ -752,9 +993,22 @@ class FeedbackDialog(QDialog):
         col.addWidget(label(tr("feedback_intro"), 13, P["text2"], bold=False))
         # Answers to earlier feedback (asked for with its code), first.
         self.answers_box: QWidget | None = None
+        self.all_btn: QPushButton | None = None
         if answers:
             col.addSpacing(4)
-            col.addWidget(label(tr("fbr_title")))
+            title_row = QHBoxLayout()
+            title_row.addWidget(label(tr("fbr_title")), 1)
+            if all_answers is not None:
+                # Every report and its answers, in their own window.
+                self.all_btn = QPushButton(tr("fba_all") + "…")
+                self.all_btn.setFlat(True)
+                self.all_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                self.all_btn.setStyleSheet(f"QPushButton {{ border:none; background:transparent; padding:0;"
+                                           f" color:{P['accent']}; font-size:12px; font-weight:600; }}"
+                                           f" QPushButton:hover {{ text-decoration:underline; }}")
+                self.all_btn.clicked.connect(self._open_all_answers)
+                title_row.addWidget(self.all_btn)
+            col.addLayout(title_row)
             inner = QLabel(answers_html(answers))
             inner.setWordWrap(True)
             inner.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
@@ -862,6 +1116,10 @@ class FeedbackDialog(QDialog):
 
     def topic(self) -> str:
         return next((k for k, chip in self.topic_chips.items() if chip.isChecked()), "")
+
+    def _open_all_answers(self, *_a) -> None:
+        if self._all_answers is not None:
+            self._all_answers(self)
 
     def _topic_changed(self) -> None:
         t = self.topic()

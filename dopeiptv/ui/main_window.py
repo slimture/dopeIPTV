@@ -8,6 +8,7 @@ import os
 import sys
 import threading
 import time
+from functools import partial
 
 from PyQt6.QtCore import (
     QEvent, QPoint, QPointF, QSettings, QSize, Qt, QThreadPool,
@@ -24,7 +25,7 @@ from PyQt6.QtWidgets import (
     QSizePolicy, QSplitter, QToolButton, QVBoxLayout, QWidget,
 )
 
-from .. import APP_NAME, ORG
+from .. import ORG
 from ..core.log import log, redact_url
 from ..i18n import tr
 from .channel_list import (
@@ -56,6 +57,8 @@ from ..providers.trakt import TraktClient
 from ..core.wakelock import WakeLock
 from .dialogs import PlaylistDialog
 from .nav_widgets import NavButton, SideRule
+# fold_into_app_menu: imported from here as well (tests, older callers).
+from .app_menu import MAC_MENUS, fold_into_app_menu, lay_out, open_website  # noqa: F401
 from .widgets import (
     FlowRow, HeartButton, _HoverTextButton, _SidebarLogo, _Toast,
     cast_strip_icon, confirm,
@@ -115,15 +118,6 @@ _COUNT_KEYS = {
 }
 
 
-
-def fold_into_app_menu(menu) -> None:
-    """macOS: every entry of *menu* without a standard role goes into the
-    one real application menu - an entry left with none makes Qt keep a
-    second menu named like the app beside it."""
-    for act in menu.actions():
-        if not act.isSeparator() and act.menuRole() in (QAction.MenuRole.TextHeuristicRole,
-                                                        QAction.MenuRole.NoRole):
-            act.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
 
 class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _ContextMenuMixin, _FavoritesMixin, _DetailMixin, _RemindersMixin,
@@ -452,68 +446,44 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Dropping a video file anywhere on the window plays it (see
         # dragEnterEvent/dropEvent - the local-files entry points).
         self.setAcceptDrops(True)
-        menubar = self.menuBar()
-        app_menu = menubar.addMenu(APP_NAME)
-        settings_action = app_menu.addAction(tr("btn_settings") + "…")
-        settings_action.triggered.connect(self.open_settings)
-        refresh_action = app_menu.addAction(tr("menu_refresh_playlist"))
-        refresh_action.triggered.connect(self.refresh_playlist)
-        open_video_action = app_menu.addAction(tr("menu_open_video"))
+
+        def action(text: str, slot) -> QAction:
+            act = QAction(text, self)
+            act.triggered.connect(slot)
+            return act
+        settings_action = action(tr("btn_settings") + "…", self.open_settings)
+        refresh_action = action(tr("menu_refresh_playlist"), self.refresh_playlist)
+        open_video_action = action(tr("menu_open_video"), self.open_local_video)
         open_video_action.setShortcut("Ctrl+O")
-        open_video_action.triggered.connect(self.open_local_video)
-        reminders_action = app_menu.addAction(tr("reminders_menu"))
-        reminders_action.triggered.connect(self._open_reminders)
-        multiview_action = app_menu.addAction(tr("menu_multiview"))
-        multiview_action.triggered.connect(self._show_multiview)
-        cast_action = app_menu.addAction(tr("ctx_cast_to_chromecast"))
-        cast_action.triggered.connect(self.cast_playing)
-        app_menu.addSeparator()
-        private_action, clear_action = self._build_privacy_actions(app_menu)
-        # Only while something is playing - there is nothing to send
-        # otherwise, and a dead entry is worse than none.
-        app_menu.aboutToShow.connect(
-            lambda: cast_action.setEnabled(self.can_cast_playing()))
-        if sys.platform != "darwin":
-            app_menu.addSeparator()
-        self._donate_action = app_menu.addAction(tr("donate_support") + "…")
-        self._donate_action.triggered.connect(lambda: self.open_donate("app-menu"))
+        reminders_action = action(tr("reminders_menu"), self._open_reminders)
+        multiview_action = action(tr("menu_multiview"), self._show_multiview)
+        cast_action = action(tr("ctx_cast_to_chromecast"), self.cast_playing)
+        private_action, clear_action = self._build_privacy_actions()
+        self._donate_action = action(tr("donate_support") + "…", lambda: self.open_donate("app-menu"))
         # Where a supporter key goes, in plain sight (the site's thank-you
         # points here).
-        self._supporter_action = app_menu.addAction(tr("supporter_menu") + "…")
-        self._supporter_action.triggered.connect(lambda: self.open_supporter())
-        self._feedback_action = self._build_report_action(app_menu)
-        about_action = app_menu.addAction(tr("menu_about"))
-        about_action.triggered.connect(self.show_about)
-        quit_action = app_menu.addAction(tr("menu_quit"))
-        quit_action.triggered.connect(self.close)
-        # On macOS these roles move the items into the standard application
-        # menu (the bold "dopeIPTV" menu next to the Apple logo), which is
-        # where a Mac user expects About / Settings / Quit. The role is a
-        # no-op on Linux/Windows, so the GNOME menu is unchanged.
-        about_action.setMenuRole(QAction.MenuRole.AboutRole)
-        settings_action.setMenuRole(QAction.MenuRole.PreferencesRole)
-        quit_action.setMenuRole(QAction.MenuRole.QuitRole)
-        if sys.platform == "darwin":
-            # Refresh playlist / Reminders have no standard macOS role, so Qt
-            # leaves them behind in a second, duplicate "dopeIPTV" menu.
-            # ApplicationSpecificRole folds them into the one real app menu, so
-            # there's no duplicate. (No-op on Linux/Windows, where the single
-            # menu with these items is intentional.)
-            refresh_action.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
-            open_video_action.setMenuRole(
-                QAction.MenuRole.ApplicationSpecificRole)
-            reminders_action.setMenuRole(
-                QAction.MenuRole.ApplicationSpecificRole)
-            multiview_action.setMenuRole(
-                QAction.MenuRole.ApplicationSpecificRole)
-            cast_action.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
-            private_action.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
-            clear_action.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
-            self._donate_action.setMenuRole(
-                QAction.MenuRole.ApplicationSpecificRole)
-            # And every entry added since (Send feedback… came without one
-            # and brought the second "dopeIPTV" menu back).
-            fold_into_app_menu(app_menu)
+        self._supporter_action = action(tr("supporter_menu") + "…", lambda: self.open_supporter())
+        report_actions = self._build_report_actions()
+        self._feedback_action = report_actions["feedback"]
+        website_action = action(tr("menu_website"), open_website)
+        about_action = action(tr("menu_about"), self.show_about)
+        quit_action = action(tr("menu_quit"), self.close)
+        # Grouped as each platform has it (app_menu): on macOS a menu bar of
+        # its own - the application menu by the roles, File, View, History,
+        # Help - with no second "dopeIPTV" menu; elsewhere the one menu.
+        menus = lay_out(self.menuBar(), {
+            "about": about_action, "settings": settings_action,
+            "open_video": open_video_action, "refresh": refresh_action,
+            "reminders": reminders_action, "multiview": multiview_action,
+            "cast": cast_action, "private": private_action, "clear": clear_action,
+            **report_actions, "website": website_action,
+            "supporter": self._supporter_action, "donate": self._donate_action,
+            "quit": quit_action}, sys.platform == "darwin")
+        self._answers_menu = menus["help"]
+        # Only while something is playing - there is nothing to send
+        # otherwise, and a dead entry is worse than none.
+        menus["view"].aboutToShow.connect(
+            lambda: cast_action.setEnabled(self.can_cast_playing()))
         # Kept for live language switching (see retranslate_ui).
         self._i18n_actions = {
             settings_action: lambda: tr("btn_settings") + "…",
@@ -528,9 +498,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._supporter_action: lambda: tr("supporter_menu") + "…",
             self._feedback_action: lambda: tr("feedback_menu") + "…",
             self._report_wait_action: lambda: tr("report_title") + "…",
+            report_actions["answers"]: self._answers_menu_text,
+            website_action: lambda: tr("menu_website"),
             private_action: lambda: tr("private_menu"),
             clear_action: lambda: tr("clear_menu") + "…",
         }
+        if sys.platform == "darwin":
+            for key, title in MAC_MENUS:
+                self._i18n_actions[menus[key].menuAction()] = partial(tr, title)
 
         root = QSplitter(Qt.Orientation.Horizontal)
         root.setHandleWidth(6)
