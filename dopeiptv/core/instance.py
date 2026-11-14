@@ -80,13 +80,14 @@ class CommandServer(QObject):
 
     def _accept(self) -> None:
         while self._server.hasPendingConnections():
-            sock = self._server.nextPendingConnection()
-            if sock is None:
+            pending = self._server.nextPendingConnection()
+            if pending is None:
                 break
+            conn: QLocalSocket = pending
             buf = bytearray()
 
-            def read(sock: QLocalSocket = sock, buf: bytearray = buf) -> None:
-                buf.extend(bytes(sock.readAll()))
+            def read(sock: QLocalSocket = conn, buf: bytearray = buf) -> None:
+                buf.extend(sock.readAll().data())
                 while b"\n" in buf:
                     line, _, rest = bytes(buf).partition(b"\n")
                     buf[:] = rest
@@ -96,8 +97,8 @@ class CommandServer(QObject):
                         continue
                     if isinstance(cmd, dict):
                         self._on(cmd)
-            sock.readyRead.connect(read)
-            sock.disconnected.connect(sock.deleteLater)
+            conn.readyRead.connect(read)
+            conn.disconnected.connect(conn.deleteLater)
             read()
 
     def close(self) -> None:
