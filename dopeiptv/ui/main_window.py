@@ -394,6 +394,28 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     # -- UI construction -------------------------------------------------------
 
+    def _stream_info_store(self):
+        from ..core.stream_info import StreamInfoCache
+        if getattr(self, "_stream_info_cache", None) is None:
+            self._stream_info_cache = StreamInfoCache(self.settings)
+        return self._stream_info_cache
+
+    def _remember_stream_info(self, key: str, info: dict) -> None:
+        from ..core import privacy, stream_info
+        if privacy.private() or not stream_info.enabled(self.settings):
+            return
+        if self._stream_info_store().put(key, info):
+            self.listw.viewport().update()
+
+    def channel_stream_info(self, item: dict, kind: str) -> str:
+        from ..core import privacy, stream_info
+        if privacy.private() or not stream_info.enabled(self.settings):
+            return ""
+        if kind not in ("live", "fav") and not (
+                kind == "history" and item.get("_kind") == "live"):
+            return ""
+        return self._stream_info_store().get(self._health_key(self._item_key(item), item))
+
     def _fill_playlist_menu(self, menu: QMenu) -> None:
         """Fill *menu* with a checkable entry per playlist, the active one
         ticked. Used by the source avatar at the sidebar's foot."""
@@ -1278,6 +1300,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.contested.connect(self._on_stream_contested)
             self.player.reopen_live.connect(self._reopen_live_edge)
             self.player.first_frame.connect(self._health_frame)
+            self.player.stream_info_changed.connect(self._remember_stream_info)
             # Before _on_player_finished, which may start the next episode.
             self.player.finished.connect(self._events_finished)
             self.player.finished.connect(self._on_player_finished)

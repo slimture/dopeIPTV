@@ -1,4 +1,6 @@
 {
+  "setting_stream_info": "Tampilkan informasi siaran",
+  "setting_stream_info_hint": "Tampilkan resolusi, FPS sumber dan codec sebentar saat berganti saluran dan di bawah bilah kemajuan acara. Daftar memakai nilai terakhir yang diamati saat pemutaran, tanpa membuka siaran tambahan.",
   "nav_home": "Beranda",
   "home_resume": "Lanjutkan menonton",
   "home_fav_now": "Favorit Anda saat ini",

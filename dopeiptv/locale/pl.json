@@ -1,4 +1,6 @@
 {
+  "setting_stream_info": "Pokaż informacje o strumieniu",
+  "setting_stream_info_hint": "Pokazuj krótko rozdzielczość, źródłową liczbę klatek i kodek po zmianie kanału oraz pod paskiem postępu programu. Lista korzysta z ostatnich danych odczytanych podczas odtwarzania, bez otwierania dodatkowych strumieni.",
   "nav_home": "Start",
   "home_resume": "Wznów oglądanie",
   "home_fav_now": "Teraz w Twoich ulubionych",

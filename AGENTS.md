@@ -105,6 +105,8 @@ map and the one-way import rule.
 | `media/players.py` | External player launch, libmpv detection |
 | `media/dvr_player.py` | The player's side of the app-kept buffer (`DvrPlayerMixin`) |
 | `media/rewind_bar.py` | The DVR row and timeshift timeline over the video, and their switch (`RewindBarMixin`) |
+| `media/stream_info.py` | Channel-change technical banner, reading the current mpv track |
+| `core/stream_info.py` | Validated stream metadata and bounded per-source/channel cache |
 | `media/seek_slider.py` | The seek bar slider (`_SeekSlider`): click, drag, hover time |
 | `media/video_surface.py` | The video surface mpv draws into (`_MpvGLWidget`) and the Linux pop-out's raster mirror |
 | `media/subtitle_text.py` | Stray right-to-left marks out of subtitle files before mpv reads them |

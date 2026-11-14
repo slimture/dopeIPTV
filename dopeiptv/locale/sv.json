@@ -1,4 +1,6 @@
 {
+  "setting_stream_info": "Visa ströminformation",
+  "setting_stream_info_hint": "Visa upplösning, källans bildfrekvens och kodek kort vid kanalbyte och under programmets förloppsindikator. Listan använder senast observerade värden från uppspelningen utan att öppna fler strömmar.",
   "nav_home": "Hem",
   "home_resume": "Fortsätt titta",
   "home_fav_now": "På dina favoriter nu",

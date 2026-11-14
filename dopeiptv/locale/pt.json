@@ -1,4 +1,6 @@
 {
+  "setting_stream_info": "Mostrar informações da transmissão",
+  "setting_stream_info_hint": "Mostrar brevemente a resolução, os FPS da origem e o codec ao mudar de canal e abaixo da barra de progresso do programa. A lista usa os últimos valores observados durante a reprodução, sem abrir outras transmissões.",
   "nav_home": "Início",
   "home_resume": "Continuar assistindo",
   "home_fav_now": "Agora nos seus favoritos",

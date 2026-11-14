@@ -100,6 +100,7 @@ files = [
     "dopeiptv/providers/stalker.py",
     "dopeiptv/core/stores.py",
     "dopeiptv/core/local_buffer.py",
+    "dopeiptv/core/stream_info.py",
     "dopeiptv/core/dvr_store.py",
     "dopeiptv/core/dvr_server.py",
     "dopeiptv/core/dvr_ingest.py",

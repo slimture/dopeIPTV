@@ -93,6 +93,22 @@ Two recording modes:
 2. **In-player** (`--stream-record`): records whatever the embedded
    player is currently showing.  Uses mpv's built-in stream recording.
 
+## Channel stream information
+
+Playback's "Show stream information" switch controls a four-second banner
+after a live channel loads and the technical line below its EPG progress
+bar in list view. `media/stream_info.py` reads the selected video track
+from the existing mpv core after `file-loaded`, checks the loaded path and
+keeps sampling for adaptive format changes. FPS is the source's
+`demux-fps`, not the display or deinterlacer's output rate. Missing fields
+stay absent; nothing is inferred from a channel's name.
+
+`core/stream_info.py` validates the metadata and keeps at most 500 channel
+entries in QSettings, keyed by source and channel. Non-playing rows show
+the last observed values, not a fresh measurement. No probe or extra
+provider connection is opened. Private viewing neither reads nor updates
+the persistent cache. Disabling the switch immediately hides both views.
+
 ## Rewind and dopeIPTV's own buffer (DVR)
 
 Two ways to rewind a live channel:

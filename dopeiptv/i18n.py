@@ -58,6 +58,8 @@ LANGUAGES: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 _STRINGS: dict[str, dict[str, str]] = {
+    "setting_stream_info": {"en": 'Show stream information'},
+    "setting_stream_info_hint": {"en": 'Show resolution, source FPS and codec briefly when changing channels and below the programme progress bar. Channel lists use the last values observed during playback; no extra streams are opened.'},
 
     # ── Navigation / sidebar ──────────────────────────────────────────────
 

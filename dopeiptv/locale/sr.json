@@ -1,4 +1,6 @@
 {
+  "setting_stream_info": "Prikaži podatke o strimu",
+  "setting_stream_info_hint": "Kratko prikaži rezoluciju, izvorni FPS i kodek pri promeni kanala i ispod trake napretka programa. Lista koristi poslednje vrednosti zabeležene tokom reprodukcije, bez otvaranja dodatnih strimova.",
   "nav_home": "Početna",
   "home_resume": "Nastavi gledanje",
   "home_fav_now": "Vaši favoriti sada",

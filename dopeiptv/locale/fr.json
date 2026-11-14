@@ -1,4 +1,6 @@
 {
+  "setting_stream_info": "Afficher les informations du flux",
+  "setting_stream_info_hint": "Afficher brièvement la résolution, la fréquence source et le codec au changement de chaîne et sous la barre de progression du programme. La liste utilise les dernières valeurs observées pendant la lecture, sans ouvrir de flux supplémentaires.",
   "nav_home": "Accueil",
   "home_resume": "Reprendre la lecture",
   "home_fav_now": "En ce moment sur vos favoris",

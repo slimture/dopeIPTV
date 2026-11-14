@@ -1,4 +1,6 @@
 {
+  "setting_stream_info": "显示流信息",
+  "setting_stream_info_hint": "切换频道时短暂显示分辨率、源帧率和编解码器，并显示在节目进度条下方。列表使用播放时最后检测到的数值，不会打开额外的流。",
   "nav_home": "主页",
   "home_resume": "继续观看",
   "home_fav_now": "您收藏的频道正在播放",

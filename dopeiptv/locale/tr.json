@@ -1,4 +1,6 @@
 {
+  "setting_stream_info": "Akış bilgilerini göster",
+  "setting_stream_info_hint": "Kanal değiştirirken çözünürlüğü, kaynak FPS değerini ve kodeği kısa süreyle ve program ilerleme çubuğunun altında göster. Liste, ek akış açmadan oynatma sırasında alınan son değerleri kullanır.",
   "nav_home": "Ana Sayfa",
   "home_resume": "İzlemeye devam et",
   "home_fav_now": "Şu anki favorileriniz",
