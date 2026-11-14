@@ -1,6 +1,7 @@
 """Nerd options of one source, in the Add/Edit source dialog: its own user
-agent, headers and proxy (else the Nerd page's), its catch-up address
-(core/catchup.py), and what each kind of box can be told - Enigma2's
+agent, headers and proxy (else the Nerd page's), rewrite rules for its
+stream addresses (core/url_rewrite.py, ui/rewrite_rules.py), its catch-up
+address (core/catchup.py), and what each kind of box can be told - Enigma2's
 stream port, Tvheadend's stream profile, HDHomeRun's transcoding. Only
 there while Nerd is on, and folded until opened. Only what differs from
 the default is stored."""
@@ -9,17 +10,19 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Callable
+from urllib.parse import urlsplit
 
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QFormLayout, QLineEdit, QPushButton, QSpinBox,
     QVBoxLayout, QWidget,
 )
 
-from ..core import catchup, nerd, nerd_check
+from ..core import catchup, nerd, nerd_check, url_rewrite
 from ..core.log import log
 from ..i18n import tr
 from .nerd_check_line import CheckLine
 from .nerd_settings import UA_CHOICES, text_box
+from .rewrite_rules import RulesEditor
 
 TVH_PROFILES = ["", "pass", "matroska", "htsp", "audio", "webtv-h264-aac-mpegts",
                 "webtv-h264-aac-matroska", "webtv-vp8-vorbis-webm"]
@@ -56,7 +59,7 @@ class SourceNerdPanel(QWidget):
     """A fold-out under the source form: "Nerd options"."""
 
     # The rows every kind has; each kind's own come after.
-    COMMON_ROWS = 8
+    COMMON_ROWS = 10
 
     def __init__(self, kind: str, options: dict, parent: QWidget | None = None,
                  source: Callable[[], dict] | None = None) -> None:
@@ -157,6 +160,17 @@ class SourceNerdPanel(QWidget):
         for t in HDHR_TRANSCODE:
             self.transcode.addItem(t or tr("nerd_src_no_transcode"), t)
         self.transcode.setCurrentIndex(max(0, self.transcode.findData(str(o.get("transcode") or ""))))
+        # Address rewrite: every kind's addresses (after the kind's own
+        # widgets, which the example address reads).
+        self._rw_channel: dict | None = None
+        self._rw_gen = 0
+        self.rewrite = RulesEditor(o.get(url_rewrite.KEY) or "")
+        self.rewrite.setToolTip(tr("nerd_src_rewrite_hint"))
+        self.rw_line = CheckLine(self._rw_job, tr("nerd_ck_title_rewrite"), test=True,
+                                 preview=self._rw_preview)
+        self.rewrite.edited.connect(self.rw_line.changed)
+        self.form.addRow(tr("nerd_src_rewrite"), self.rewrite)
+        self.form.addRow("", self.rw_line)
         self.switches: dict[str, QCheckBox] = {}
         self._kind = ""
         self.ua.currentIndexChanged.connect(self._shown)
@@ -191,6 +205,7 @@ class SourceNerdPanel(QWidget):
         if kind == self._kind:
             return
         self._kind = kind
+        self._rw_source_changed()
         while self.form.rowCount() > self.COMMON_ROWS:
             row = self.form.takeRow(self.COMMON_ROWS)
             for item in (row.labelItem, row.fieldItem):
@@ -221,7 +236,7 @@ class SourceNerdPanel(QWidget):
         out = {k: v for k, v in self._options.items()
                if k not in ("user_agent", "referer", "headers", "proxy", "stream_port",
                             "profile", "transcode", "udpxy", "epg_shift",
-                            "catchup_template", "catchup_mode")
+                            "catchup_template", "catchup_mode", url_rewrite.KEY)
                and k not in {key for sw in SWITCHES.values() for key, _l, _d in sw}}
         ua = self.ua.currentData()
         ua = self.ua_custom.text().strip() if ua == "custom" else ua
@@ -239,6 +254,9 @@ class SourceNerdPanel(QWidget):
             out["udpxy"] = self.udpxy.text().strip()
         if self.epg_shift.value():
             out["epg_shift"] = str(self.epg_shift.value())
+        rules = self.rewrite.stored()
+        if rules:
+            out[url_rewrite.KEY] = rules
         if self._kind in catchup.KINDS:
             if self.cu_template.text().strip():
                 out["catchup_template"] = self.cu_template.text().strip()
@@ -277,6 +295,7 @@ class SourceNerdPanel(QWidget):
         self._cu_channel = None
         self._cu_gen += 1
         self.cu_line.changed()
+        self._rw_source_changed()
 
     def _cu_example(self) -> dict:
         """A made-up channel of this source, until Test has found a real one:
@@ -327,12 +346,104 @@ class SourceNerdPanel(QWidget):
             start, end = catchup.sample_programme(now)
             cid, csrc = str(ch.get("catchup_id") or ""), str(ch.get("catchup_source") or "")
             url = catchup.archive_url(ch["live_url"], start, end, template, mode, now, cid, csrc)
+            if url and catchup.whole_address(template, mode, csrc):
+                url = url_rewrite.rewrite(url, opts)        # as the window plays it
             if url is None:
                 return catchup.check_template(template, mode, ch["live_url"], str(ch.get("name") or ""),
                                               catchup_id=cid, channel_source=csrc, secrets=secrets,
                                               now=now)
             return catchup.check_archive(url, ua, hdrs, n.proxy(opts, url), secrets=secrets,
                                          channel=str(ch.get("name") or ""))
+        return run
+
+    # -- address rewrite ----------------------------------------------------------
+
+    def _rw_source_changed(self) -> None:
+        """Another source: a channel Test found no longer stands for it."""
+        self._rw_channel = None
+        self._rw_gen += 1
+        self.rw_line.changed()
+
+    def _rw_example(self) -> dict:
+        """A made-up channel address of this source's kind, until Test has
+        found a real one."""
+        s = self._source_now()
+        kind = str(s.get("kind") or self._kind)
+        if kind == "xtream":
+            return self._cu_example()
+        server = str(s.get("server") or "").strip().rstrip("/")
+        if server and "://" not in server:
+            server = "http://" + server
+        try:
+            parts = urlsplit(server)
+            host, port = parts.hostname or "", parts.port
+        except ValueError:
+            host, port = "", None
+        if not host:
+            return {"live_url": EXAMPLE_LIVE, "_example": True}
+        if ":" in host:
+            host = f"[{host}]"
+        user, pw = str(s.get("username") or ""), str(s.get("password") or "")
+        login = f"{user}:{pw}@" if user and kind in ("enigma2", "tvheadend") else ""
+        origin = f"{parts.scheme}://{host}{f':{port}' if port else ''}"
+        if kind == "enigma2":
+            url = f"http://{login}{host}:{self.port.value()}/1:0:19:283D:3FB:1:C00000:0:0:0:"
+        elif kind == "tvheadend":
+            box = self.profile
+            prof = str((box.currentData() if box.currentText() == box.itemText(box.currentIndex())
+                        else box.currentText().strip()) or "")
+            url = (origin.replace("://", "://" + login, 1) + "/stream/channel/0b1c2d3e4f"
+                   + (f"?profile={prof}" if prof else ""))
+        elif kind == "hdhomerun":
+            url = f"http://{host}:5004/auto/v5.1"
+        else:
+            url = origin + "/channel/1.ts"
+        return {"live_url": url, "_example": True}
+
+    def _rw_preview(self) -> nerd_check.Check:
+        ch = self._rw_channel or self._rw_example()
+        return url_rewrite.check(self.rewrite.rules(), ch["live_url"],
+                                 channel=str(ch.get("name") or ""),
+                                 example=bool(ch.get("_example")),
+                                 secrets=catchup.secrets_of(self._source_now()))
+
+    def rules_ok(self) -> nerd_check.Check | None:
+        """None when every rule can work; else what the line says about the
+        first that cannot (the dialog refuses to close on it)."""
+        shown = self._rw_preview()
+        return shown if shown.state == nerd_check.FAIL else None
+
+    def _rw_job(self) -> Callable[[], nerd_check.Check] | None:
+        """Test: a channel of this source (its address as the source gives
+        it), through the rules, asked with the source's user agent, headers
+        and proxy - does a stream come back?"""
+        rules = self.rewrite.rules()
+        if not rules:
+            return None
+        shown = self._rw_preview()
+        if shown.state == nerd_check.FAIL:
+            return lambda: shown
+        own = {k: v for k, v in self.values().items() if k != url_rewrite.KEY}
+        src = dict(self._source_now(), options=own)
+        src["kind"] = src.get("kind") or self._kind
+        opts = dict(own, _kind=src["kind"])
+        n = nerd.current()
+        ua, hdrs, secrets = n.user_agent(opts), n.headers(opts), catchup.secrets_of(src)
+        fmt = str(n.get("stream_format", "ts") or "ts")
+        known, gen = self._rw_channel, self._rw_gen
+
+        def run() -> nerd_check.Check:
+            ch = known or sample_channel(src, fmt)
+            if ch is None:
+                return nerd_check.Check(nerd_check.FAIL, "nerd_ck_cu_no_channel")
+            if gen == self._rw_gen:         # still the source it was found for
+                self._rw_channel = ch
+            name = str(ch.get("name") or "")
+            after = url_rewrite.apply(ch["live_url"], rules)
+            if after == ch["live_url"] or "://" not in after:
+                return url_rewrite.check(rules, ch["live_url"], channel=name, secrets=secrets)
+            return url_rewrite.check_address(after, ch["live_url"], ua, hdrs, n.proxy(opts, after),
+                                             secrets=secrets, channel=name)
         return run
 
 

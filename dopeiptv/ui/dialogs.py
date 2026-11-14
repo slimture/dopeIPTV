@@ -269,6 +269,14 @@ class PlaylistDialog(QDialog):
         return ":".join(hexd[i:i + 2] for i in range(0, 12, 2)).upper()
 
     def _validate(self) -> None:
+        # Nerd: a rewrite rule that cannot work is refused here, not
+        # stored to be skipped at every channel.
+        bad = self.nerd_panel.rules_ok() if self.nerd_panel is not None else None
+        if bad is not None:
+            self.nerd_panel.toggle.setChecked(True)
+            self.nerd_panel.rw_line.show_preview()
+            QMessageBox.warning(self, tr("nerd_ck_title_rewrite"), tr(bad.key, **bad.params))
+            return
         if self.kind.currentData() == "stalker":
             if not (self.server.text().strip()
                     and self.normal_mac(self.mac.text())):

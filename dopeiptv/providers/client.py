@@ -900,19 +900,38 @@ def make_client(playlist: dict):
 
 def _nerd_lists(client, source: dict, pid: str | None) -> None:
     """Channel lists through Nerd's picons and guide mapping, play
-    addresses through udpxy (core/nerd_lists.py) - each a no-op while
-    Nerd is off or the setting is empty."""
+    addresses through the source's rewrite rules (core/url_rewrite.py) and
+    then udpxy (core/nerd_lists.py) - each a no-op while Nerd is off or the
+    setting is empty. Every address the window plays, records, casts or
+    shares comes from these calls."""
     from ..core import nerd_lists
+    from ..core.url_rewrite import rewrite
     streams, url = client.live_streams, client.live_url
 
     def live_streams(category_id: str | None = None) -> list[dict]:
         return nerd_lists.decorate(streams(category_id), source, pid)
 
     def live_url(stream_id: int | str, fmt: str = "ts") -> str:
-        return nerd_lists.udpxy_url(url(stream_id, fmt), source)
+        return nerd_lists.udpxy_url(rewrite(url(stream_id, fmt), source), source)
 
     client.live_streams = live_streams
     client.live_url = live_url
+    vod, episode, archive = (getattr(client, n, None)
+                             for n in ("vod_url", "episode_url", "timeshift_urls"))
+    if vod is not None:
+        def vod_url(stream_id: int | str, ext: str | None = None) -> str:
+            return rewrite(vod(stream_id, ext), source)
+        client.vod_url = vod_url
+    if episode is not None:
+        def episode_url(episode_id: int | str, ext: str | None = None) -> str:
+            return rewrite(episode(episode_id, ext), source)
+        client.episode_url = episode_url
+    if archive is not None:
+        def timeshift_urls(stream_id: int | str, start_dt: datetime,
+                           duration_min: int) -> list[str]:
+            urls = archive(stream_id, start_dt, duration_min)
+            return [rewrite(u, source) for u in urls] if urls else urls
+        client.timeshift_urls = timeshift_urls
 
 
 def _make_client(playlist: dict):

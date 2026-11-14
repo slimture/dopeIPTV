@@ -206,11 +206,27 @@ def for_programme(source: dict | None, live_url: str, start: datetime, end: date
                   catchup_id: str = "", channel_source: str = "",
                   now: datetime | None = None) -> str | None:
     """What the window tries first for an archive programme: the source's
-    own address, or None (as without Nerd)."""
+    own address, or None (as without Nerd). *live_url* is the channel's
+    address as the client gives it, the source's rewrite rules already
+    applied; an address the template makes whole gets them here."""
     if not wanted(source) or not live_url:
         return None
     template, mode = settings_of(source)
-    return archive_url(live_url, start, end, template, mode, now, catchup_id, channel_source)
+    url = archive_url(live_url, start, end, template, mode, now, catchup_id, channel_source)
+    if url and whole_address(template, mode, channel_source):
+        from .url_rewrite import rewrite
+        url = rewrite(url, source)
+    return url
+
+
+def whole_address(template: str, mode: str = "auto", channel_source: str = "") -> bool:
+    """The archive address is the template itself (mode default, or auto with
+    a whole address), not made from the channel's live one."""
+    m = normal_mode(mode)
+    tpl = (template or "").strip() or (channel_source or "").strip()
+    if m == "auto":
+        return "://" in (template or "")
+    return m == "default" and bool(tpl)
 
 
 def secrets_of(source: dict | None) -> list[str]:
