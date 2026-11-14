@@ -62,6 +62,7 @@ from .mw_trakt import _TraktMixin
 from .mw_recording import _RecordingMixin
 from .mw_busy import _BusyMixin
 from .mw_cast import _CastMixin
+from .mw_chanprefs import _ChannelPrefsMixin
 from .mw_failover import _FailoverMixin
 from .mw_health import _HealthMixin
 from .mw_remote import _RemoteMixin
@@ -125,7 +126,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _PopoutMixin, _MultiviewMixin, _HomeMixin, _MprisMixin,
                  _FollowMixin, _SubtitlesMixin, _CastMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
-                 _HealthMixin, _RemoteMixin, _ReportMixin, QMainWindow):
+                 _HealthMixin, _ChannelPrefsMixin, _RemoteMixin, _ReportMixin,
+                 QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
     epg_progress = pyqtSignal(int)
@@ -4311,6 +4313,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._ts_segment_start = None
         self._ts_live_offset = 0.0
         self._pause_started = None
+        # Nerd: the channel it is, for the settings of its own.
+        self._chanprefs_arm(self._item_key(it), it, "live")
         if self.player.play(url, title, local_buffer=True,
                             buffer_key=f"live:{self._item_key(it)}"):
             self.wake.acquire(tr("wake_playing", title=title))
@@ -4857,6 +4861,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 # A subtitle fetched or picked for this title before.
                 self.player.set_sub_files(
                     self._remembered_subtitles(kind, key))
+            # Nerd: a live channel (its catch-up too) plays with the
+            # settings of its own; anything else with the app's.
+            self._chanprefs_arm(key, item, kind)
             if self.player.play(url, title, start=resume_at,
                                 local_buffer=kind == "live" and not catchup,
                                 buffer_key=f"{kind}:{key}" if key else None):

@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QWidget, QPushButton,
 )
 
+from ..core import channel_prefs
 from ..core.log import log, redact_url
 from ..core.local_buffer import rewind_bytes
 from ..i18n import current_language, tr
@@ -471,9 +472,10 @@ def _sub_look(s, set_opt) -> None:
 
 
 def _delay_key(channel: str) -> str:
-    """Where a channel's own audio delay is kept (Nerd)."""
-    import zlib
-    return f"nerd_adelay/{zlib.crc32((channel or '').encode('utf-8')):08x}"
+    """Where the audio delay of a stream that is no channel (a film, a
+    file) is kept (Nerd) - and where a channel's was, before it moved into
+    its own settings (core/channel_prefs.py)."""
+    return channel_prefs.legacy_key(channel)
 
 
 class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
@@ -563,6 +565,17 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         self._sub_rule: tuple | None = None
         # One-shot subtitle files for the NEXT play() (set_sub_files).
         self._pref_sub_files: list[str] = []
+        # Nerd: the channel the NEXT play() is (set_channel, one-shot), the
+        # one playing and the settings of its own it plays with ({}: none).
+        self._chan_armed: str | None = None
+        self._chan_key: str | None = None
+        self._chan_own: dict = {}
+        self._chan_store = None
+        # Where the playing stream's audio delay is kept, if it is: its
+        # channel's settings or (anything else) a key of its own.
+        self._delay_chan: str | None = None
+        self._delay_key: str | None = None
+        self._delay_set = False
         # Docked video-box height scales with the display so the mini player
         # is usefully large on a 27"/4K screen and modest on a laptop -
         # computed once here, then constant (nothing resizes on its own).
@@ -2212,10 +2225,19 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
             except Exception:
                 pass
 
-        set_opt("alang", s.value("audio_lang", "") or "")
+        # Nerd: the settings of its own the channel playing has win over
+        # these ({} - none, anything but a channel, Nerd off - changes no
+        # value). Every start sets them all again, so a channel's own are
+        # never left behind for the next stream.
+        own = getattr(self, "_chan_own", None) or {}
+        set_opt("alang", channel_prefs.audio_langs(own, s.value("audio_lang", "") or ""))
         sub_mode = s.value("sub_mode", "auto")
         if load:
             self._sub_defaults(sub_mode, live, set_opt)
+            if channel_prefs.own_subtitles(own):
+                self._own_subtitles(own, live, set_opt)
+        elif channel_prefs.own_subtitles(own):
+            pass            # the channel's own choice stays while it plays
         elif sub_mode == "off":
             # Hidden, not deselected: choosing a track mid-stream is what
             # freezes a film (see _sub_defaults).
@@ -2223,21 +2245,17 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         else:
             _set_forced_only(m, sub_mode == "forced")
         _sub_look(s, set_opt)
-        aspect = s.value("aspect_mode", "auto")
-        if aspect == "stretch":
-            set_opt("keepaspect", False)
-        else:
-            set_opt("keepaspect", True)
-            set_opt("video-aspect-override",
-                    aspect if aspect != "auto" else "-1")
+        aspect = channel_prefs.aspect_mode(own, s.value("aspect_mode", "auto"))
+        for prop, value in channel_prefs.aspect_props(aspect):
+            set_opt(prop, value)
 
         # Optional video filters (all off/neutral by default). These are plain
         # mpv properties, applied live on the running core.
         #  - deinterlace: smooth interlaced live SD/HD feeds.
         #  - sharpen: unsharp mask strength (0 = off).
         #  - tone-mapping: HDR->SDR curve; harmless on SDR content.
-        set_opt("deinterlace",
-                s.value("video_deinterlace", "false") == "true")
+        set_opt("deinterlace", channel_prefs.deinterlace(
+            own, s.value("video_deinterlace", "false") == "true"))
         try:
             sharpen = float(s.value("video_sharpen", 0.0) or 0.0)
         except (TypeError, ValueError):
@@ -2305,6 +2323,23 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         set_opt("sub-visibility", False)
         if mode != "off":
             self._sub_rule = (mode, [x.lower() for x in langs])
+
+    def _own_subtitles(self, own: dict, live: bool, set_opt) -> None:
+        """Nerd: a channel's own subtitle choice, over what _sub_defaults
+        just chose - "off", or a language first in line (the app's own
+        after it). Its catch-up opens like a film: a track chosen, hidden,
+        shown once the tracks say it is in that language (_apply_sub_rule)."""
+        s = self._settings
+        langs = [x for x in (s.value("sub_lang", "") or "",
+                             s.value("sub_lang2", "") or "") if x]
+        if live:
+            also = langs if s.value("sub_mode", "auto") == "lang" else []
+        else:
+            also = self._preferred_sub_langs(langs)
+        for prop, value in channel_prefs.subtitle_props(own, live, also):
+            set_opt(prop, value)
+        _set_forced_only(self.video.mpv, False)
+        self._sub_rule = channel_prefs.subtitle_rule(own, live)
 
     def _preferred_sub_langs(self, langs: list[str]) -> list[str]:
         """The languages a film's hidden track is chosen by: those asked
@@ -2479,6 +2514,52 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         self._pref_aid = aid
         self._pref_sid = sid
 
+    def set_channel(self, ckey: str | None) -> None:
+        """Arm which channel the next play() is - its source's id and its
+        stream's id (core/channel_prefs.channel_key); None for anything else.
+        Nerd plays it with the settings of its own and keeps its audio delay
+        there. Consumed by play(), whether it is a channel or not."""
+        self._chan_armed = ckey or None
+
+    def _prefs_store(self):
+        if self._chan_store is None:
+            self._chan_store = channel_prefs.ChannelPrefs(self._settings)
+        return self._chan_store
+
+    def _channel_own(self, chan: str | None, stream: str | None = None) -> dict:
+        """The settings of its own channel *chan* plays with: {} for none,
+        for anything that is no channel, and while Nerd is off (kept, not
+        applied). A delay kept the old way for *stream* moves in. Never
+        raises: a bad stored value must not stop a channel from playing."""
+        if not chan or self._settings is None:
+            return {}
+        try:
+            if not channel_prefs.enabled():
+                return {}
+            return self._prefs_store().get(
+                chan, legacy=_delay_key(stream) if stream else None)
+        except Exception as e:
+            log.debug("channel settings of %s not read: %s", chan, e)
+            return {}
+
+    def channel_prefs_changed(self, chan: str | None) -> None:
+        """The channel playing now got new settings of its own (its dialog):
+        put in force as a Settings change is - the picture and the delay at
+        once; the tracks it plays may wait for its next start."""
+        m = self.video.mpv
+        if (not chan or chan != self._chan_key or m is None
+                or self.current_url is None):
+            return
+        self._chan_own = self._channel_own(chan)
+        self.apply_default_options()
+        if self._delay_chan == chan:
+            try:
+                value = channel_prefs.delay(self._chan_own.get("adelay"))
+                m["audio-delay"] = value
+                self._delay_set = bool(value)
+            except Exception as e:
+                log.debug("audio delay of %s not set: %s", chan, e)
+
     def set_sub_files(self, paths: list[str]) -> None:
         """Arm subtitle files for the next play() - one fetched or picked
         for this title before comes back with it. One-shot, like the track
@@ -2520,6 +2601,11 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         # local_buffer: a live channel, which gets the rewind buffer unless
         # Settings turned it off.
         live = local_buffer
+        # Nerd: the channel this is (set_channel, one-shot) and the settings
+        # of its own it plays with - none for anything else.
+        chan, self._chan_armed = self._chan_armed, None
+        self._chan_key = chan
+        self._chan_own = self._channel_own(chan, buffer_key or url)
         local_buffer = local_buffer and self._live_rewind_minutes() > 0
         # A session of the app's own buffer ends here: its provider
         # connection goes before the next stream opens one. Then, where
@@ -2610,12 +2696,24 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
                     m, nerd.source(), getattr(self, "_nerd_applied", False),
                     url=url)
                 # Nerd: each channel's own audio delay (lip sync), as set
-                # for it last; untouched while Nerd is off.
-                self._delay_key = None
-                if nerd.current().on and nerd.current().flag("nerd_adelay_per_channel", True):
-                    self._delay_key = _delay_key(buffer_key or url)
-                    m["audio-delay"] = float(
-                        self._settings.value(self._delay_key, 0) or 0) if self._settings else 0.0
+                # for it last - in its settings, or for anything that is no
+                # channel under a key of its own; untouched while Nerd is
+                # off, but for the last stream's own delay, which is not
+                # this one's.
+                self._delay_key = self._delay_chan = None
+                if channel_prefs.delay_enabled():
+                    if chan:
+                        self._delay_chan = chan
+                        value = channel_prefs.delay(self._chan_own.get("adelay"))
+                    else:
+                        self._delay_key = _delay_key(buffer_key or url)
+                        value = float(self._settings.value(self._delay_key, 0)
+                                      or 0) if self._settings else 0.0
+                    m["audio-delay"] = value
+                    self._delay_set = bool(value)
+                elif self._delay_set:
+                    m["audio-delay"] = 0.0
+                    self._delay_set = False
             except Exception as e:
                 log.debug("nerd stream options: %s", e)
             # Remembered per-title track choices (resume): set before load,
@@ -3253,8 +3351,17 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
 
     def _remember_delay(self, value: float) -> None:
         """Nerd: the audio delay chosen, kept for the channel playing."""
+        chan = getattr(self, "_delay_chan", None)
+        if chan and self._settings is not None:
+            try:
+                self._chan_own = self._prefs_store().set_delay(chan, value)
+                self._delay_set = bool(channel_prefs.delay(value))
+            except Exception as e:
+                log.debug("audio delay of %s not kept: %s", chan, e)
+            return
         key = getattr(self, "_delay_key", None)
         if key and self._settings is not None:
+            self._delay_set = abs(value) >= 0.001
             if abs(value) < 0.001:
                 self._settings.remove(key)
             else:

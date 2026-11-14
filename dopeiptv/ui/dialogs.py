@@ -1294,3 +1294,169 @@ class ChannelNumberDialog(QDialog):
 
     def value(self) -> int:
         return self.stepper.value()
+
+
+# The languages Settings names in words of the app's own; the rest of a
+# channel's list is named in its own language (QLocale).
+_LANG_WORDS = {
+    "swe": "lang_swe", "eng": "lang_eng", "nor": "lang_nor", "dan": "lang_dan",
+    "fin": "lang_fin", "ger": "lang_ger", "fre": "lang_fre", "spa": "lang_spa",
+    "ita": "lang_ita", "por": "lang_por", "pol": "lang_pol", "ara": "lang_ara",
+    "tur": "lang_tur",
+}
+
+
+def language_choices() -> list[tuple[str, str]]:
+    """(ISO 639-2 code, name) for a channel's language lists: those
+    Settings offers first, in its order, then the others by name."""
+    from PyQt6.QtCore import QLocale
+
+    from ..core.channel_prefs import LANGUAGES
+    out = [(code, tr(key)) for code, key in _LANG_WORDS.items()]
+    rest = []
+    for code, other in LANGUAGES.items():
+        if code in _LANG_WORDS:
+            continue
+        name = QLocale(other[0]).nativeLanguageName() if other else ""
+        rest.append((code, name[:1].upper() + name[1:] if name else code))
+    rest.sort(key=lambda kv: kv[1].casefold())
+    return out + rest
+
+
+class ChannelSettingsDialog(QDialog):
+    """Nerd: the settings of a channel's own (core/channel_prefs.py) - its
+    audio and subtitle language, deinterlacing, aspect ratio and audio
+    delay, each "Default" (the app's setting) until chosen. A line under
+    the name says whether the channel has its own; Reset puts every row
+    back to Default, Save keeps what is chosen. *delay*: the audio delay
+    per channel is on (Nerd's switch), so its row is offered."""
+
+    DELAY_MS = 3000
+
+    def __init__(self, parent, name: str, prefs: dict | None, delay: bool = True) -> None:
+        super().__init__(parent)
+        from PyQt6.QtWidgets import QGridLayout
+
+        from ..core import channel_prefs
+        from .settings_ui import GridSpin, Stepper, settings_style
+        own = channel_prefs.clean(prefs)
+        self.setWindowTitle(tr("chanprefs_title"))
+        self.setModal(True)
+        self.setMinimumWidth(480)
+        self.setStyleSheet(settings_style())
+        col = QVBoxLayout(self)
+        col.setContentsMargins(24, 22, 24, 20)
+        col.setSpacing(10)
+        head = QLabel(name or tr("chanprefs_title"))
+        head.setWordWrap(True)
+        head.setStyleSheet(f"font-size:16px; font-weight:700; color:{P['text']};")
+        self.marker = QLabel("")
+        self.marker.setWordWrap(True)
+        sub = QLabel(tr("chanprefs_sub"))
+        sub.setWordWrap(True)
+        sub.setStyleSheet(f"font-size:12px; color:{P['muted']};")
+        col.addWidget(head)
+        col.addWidget(self.marker)
+        col.addWidget(sub)
+        col.addSpacing(4)
+        default = ("", tr("label_default"))
+        langs = language_choices()
+        self.alang = self._combo([default, *langs], own.get("alang", ""))
+        self.slang = self._combo([default, (channel_prefs.SUB_OFF, tr("option_sub_off")), *langs],
+                                 own.get("slang", ""))
+        self.deint = self._combo([default, ("on", tr("option_on")), ("off", tr("option_off"))],
+                                 own.get("deint", ""))
+        self.aspect = self._combo(
+            [default, ("auto", tr("option_aspect_auto")), ("16:9", "16:9"), ("4:3", "4:3"),
+             ("21:9", "21:9"), ("2.35:1", "2.35:1"), ("stretch", tr("option_aspect_stretch"))],
+            own.get("aspect", ""))
+        rows: list[tuple[str, QWidget]] = [
+            (tr("setting_audio_lang"), self.alang), (tr("setting_sub_lang"), self.slang),
+            (tr("setting_deinterlace"), self.deint), (tr("setting_aspect_ratio"), self.aspect)]
+        self.delay: Stepper | None = None
+        self._delay_kept = channel_prefs.delay(own.get("adelay"))
+        if delay:
+            ms = int(round(self._delay_kept * 1000))
+            grid = list(range(-self.DELAY_MS, self.DELAY_MS + 1, 50))
+            spin = GridSpin(grid, self._delay_text, min(grid[0], ms), max(grid[-1], ms))
+            spin.setValue(ms)
+            self.delay = Stepper(spin, width=max(170, spin.widest() + 80))
+            self.delay.setAccessibleName(tr("opt_audio_delay"))
+            rows.append((tr("opt_audio_delay"), self.delay))
+        form = QGridLayout()
+        form.setHorizontalSpacing(18)
+        form.setVerticalSpacing(8)
+        for i, (label, widget) in enumerate(rows):
+            lbl = QLabel(label)
+            lbl.setStyleSheet(f"font-size:13px; color:{P['text2']};")
+            form.addWidget(lbl, i, 0)
+            form.addWidget(widget, i, 1)
+        form.setColumnStretch(1, 1)
+        col.addLayout(form)
+        col.addSpacing(8)
+        buttons = QHBoxLayout()
+        buttons.setSpacing(8)
+        self.reset_btn = QPushButton(tr("common_reset"))
+        cancel = QPushButton(tr("common_cancel"))
+        save = QPushButton(tr("common_save"), objectName="Primary")
+        self.reset_btn.clicked.connect(self.reset)
+        cancel.clicked.connect(self.reject)
+        save.clicked.connect(self.accept)
+        save.setDefault(True)
+        buttons.addWidget(self.reset_btn)
+        buttons.addStretch(1)
+        buttons.addWidget(cancel)
+        buttons.addWidget(save)
+        col.addLayout(buttons)
+        for box in (self.alang, self.slang, self.deint, self.aspect):
+            box.currentIndexChanged.connect(self._sync)
+        if self.delay is not None:
+            self.delay.valueChanged.connect(self._sync)
+        self._sync()
+
+    @staticmethod
+    def _combo(items: list[tuple[str, str]], current: str) -> QComboBox:
+        box = QComboBox()
+        for value, label in items:
+            box.addItem(label, value)
+        idx = box.findData(current)
+        if idx < 0 and current:
+            box.addItem(current, current)       # kept, though no longer offered
+            idx = box.count() - 1
+        box.setCurrentIndex(max(0, idx))
+        box.setMaxVisibleItems(14)
+        return box
+
+    @staticmethod
+    def _delay_text(ms: int) -> str:
+        return tr("opt_delay_default") if ms == 0 else f"{ms / 1000:+.2f} s"
+
+    def choice(self) -> dict:
+        """What is chosen, as the channel keeps it ({}: none of its own)."""
+        from ..core import channel_prefs
+        return channel_prefs.clean({
+            "alang": self.alang.currentData(), "slang": self.slang.currentData(),
+            "deint": self.deint.currentData(), "aspect": self.aspect.currentData(),
+            "adelay": (self.delay.value() / 1000 if self.delay is not None
+                       else self._delay_kept)})
+
+    def reset(self) -> None:
+        """Every row back to Default."""
+        for box in (self.alang, self.slang, self.deint, self.aspect):
+            box.setCurrentIndex(0)
+        self._delay_kept = 0.0
+        if self.delay is not None:
+            self.delay.setValue(0)
+        self._sync()
+
+    def has_own(self) -> bool:
+        return bool(self.choice())
+
+    def _sync(self, *_a) -> None:
+        from . import theme
+        own = self.has_own()
+        self.marker.setText(("● " + tr("chanprefs_own")) if own else tr("chanprefs_none"))
+        self.marker.setStyleSheet(
+            f"font-size:13px; color:{theme.ACCENT if own else P['muted']};"
+            f" font-weight:{600 if own else 400};")
+        self.reset_btn.setEnabled(own)

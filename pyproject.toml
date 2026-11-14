@@ -76,6 +76,7 @@ files = [
     "dopeiptv/core/nerd.py",
     "dopeiptv/core/nerd_lists.py",
     "dopeiptv/core/channel_numbers.py",
+    "dopeiptv/core/channel_prefs.py",
     "dopeiptv/core/http_login.py",
     "dopeiptv/core/commands.py",
     "dopeiptv/core/nerd_check.py",
