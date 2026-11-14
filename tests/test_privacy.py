@@ -204,14 +204,14 @@ w._set_sidebar_collapsed(False)
 for _ in range(10):
     app.processEvents()
 logo = w._sidebar_logo
-before = (logo.geometry(), w._guide_btn.geometry(), w._donate_btn.geometry())
+before = (logo.geometry(), w.nav_btns["guide"].geometry(), w._donate_btn.geometry())
 w._private_action.trigger()
 for _ in range(5):
     app.processEvents()
 assert privacy.private() and not w._private_pill.isHidden()
 # It lies over the logo's lower edge, centred, in no layout: nothing moves.
 pill = w._private_pill
-assert (logo.geometry(), w._guide_btn.geometry(), w._donate_btn.geometry()) == before
+assert (logo.geometry(), w.nav_btns["guide"].geometry(), w._donate_btn.geometry()) == before
 assert w._logo_row.indexOf(pill) == -1 and pill.parentWidget() is logo.parentWidget()
 assert abs(pill.geometry().center().x() - logo.geometry().center().x()) <= 1, (pill.geometry(), logo.geometry())
 mark_bottom = logo.y() + (logo.height() + logo.LOGO_H) // 2

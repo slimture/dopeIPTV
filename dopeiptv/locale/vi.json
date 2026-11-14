@@ -1775,5 +1775,13 @@
   "theme_supporter_tip": "Dành cho người ủng hộ – cảm ơn bạn đã giúp dopeIPTV luôn miễn phí",
   "set_supporter_icon": "Biểu tượng người ủng hộ",
   "set_supporter_icon_hint": "Biểu tượng ứng dụng mang màu của người ủng hộ và một trái tim, giống logo ở thanh bên.",
-  "supporter_perks": "Khóa này cũng mở hai giao diện dành cho người ủng hộ và biểu tượng người ủng hộ cho ứng dụng."
+  "supporter_perks": "Khóa này cũng mở hai giao diện dành cho người ủng hộ và biểu tượng người ủng hộ cho ứng dụng.",
+  "nav_guide": "Lịch phát",
+  "sidebar_mine": "CỦA TÔI",
+  "tooltip_toggle_mine": "Hiển thị hoặc ẩn danh sách của bạn",
+  "history_chip_all": "Tất cả",
+  "history_chip_watched": "Đã xem",
+  "nav_status_recording": "Đang ghi: {n}",
+  "nav_status_new_episodes": "Tập mới: {n}",
+  "nav_status_watchlist": "Đã lưu để xem sau: {n}"
 }

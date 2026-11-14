@@ -18,8 +18,8 @@ from PyQt6.QtGui import (
     QPixmap, QShortcut,
 )
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QApplication, QBoxLayout, QFrame, QHBoxLayout,
-    QLabel, QLineEdit, QListWidgetItem,
+    QAbstractItemView, QApplication, QBoxLayout, QButtonGroup, QFrame,
+    QHBoxLayout, QLabel, QLineEdit, QListWidgetItem,
     QMainWindow, QMenu, QMessageBox, QProgressBar, QPushButton, QScrollArea,
     QSizePolicy, QSplitter, QToolButton, QVBoxLayout, QWidget,
 )
@@ -55,6 +55,7 @@ from .player_resize import PlayerResizeHandle
 from ..providers.trakt import TraktClient
 from ..core.wakelock import WakeLock
 from .dialogs import PlaylistDialog
+from .nav_widgets import NavButton, SideRule
 from .widgets import (
     FlowRow, HeartButton, _HoverTextButton, _SidebarLogo, _Toast,
     cast_strip_icon, confirm,
@@ -614,77 +615,76 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         sl.addSpacing(6)
         self._update_playlist_btn()
 
-        # Vector-icon kinds for the nav entries (drawn in _action_pixmap).
-        # Each must be visually distinct: watch-later is a bookmark,
-        # recordings a record dot, history a clock - no two alike. Drawn, not
-        # emoji: every OS renders its own emoji font differently.
+        # Vector-icon kinds for the nav entries (drawn in _action_pixmap), all
+        # in one outline style. Each must be visually distinct: watch-later is
+        # a bookmark, recordings a record ring, history a clock, the guide
+        # programme bars on a timeline. Drawn, not emoji: every OS renders its
+        # own emoji font differently.
         self._rail_glyphs = {
-            "home": "home",
-            "live": "tv", "vod": "movie", "series": "series", "fav": "star",
-            "watchlist": "bookmark", "watched": "check", "rec": "rec",
-            "history": "clock", "local": "folder",
+            "home": "home", "live": "tv", "guide": "guide", "vod": "movie",
+            "series": "series", "rec": "rec", "local": "folder_o",
+            "fav": "star", "watchlist": "bookmark", "history": "clock",
         }
         self._nav_texts: dict[str, str] = {}
-        self.nav_btns: dict[str, QPushButton] = {}
+        self.nav_btns: dict[str, NavButton] = {}
         # Browse-mode availability per active provider (see
         # _refresh_mode_availability): hides TV/Movies/Series a provider has no
         # content for. Empty/unknown = shown, so nothing hides until we KNOW.
         self._avail_gen = 0
         self._mode_avail: dict[str, bool] = {}
+        # History's filter (All / Watched), kept while the app runs: the
+        # History entry comes back to the one last chosen.
+        self._history_filter = "all"
 
         def _make_nav(key: str, text: str, into, primary: bool = False) -> None:
-            b = QPushButton(text, objectName="NavBtn")
-            b.setCheckable(True)
-            b.setFlat(True)
+            # The Guide opens a window, it is no place to be: never checked.
+            b = NavButton(key, text, checkable=key != "guide")
             b.setToolTip(text)
-            # Browse (TV/Movies/Series) is the primary tier: a couple of
-            # notches larger than the Library rows (see the NavBtn[primary]
-            # theme rule; _apply_nav_icons paints its icons larger to match).
+            b.setAccessibleName(text)
+            # Places (TV, Guide, Movies, ...) are the primary tier: a couple
+            # of notches larger than the rows under MINE (see the
+            # NavBtn[primary] theme rule; _apply_nav_icons paints their icons
+            # larger to match). A fixed-size icon so every label starts at the
+            # same x; _apply_nav_icons paints it, muted, in the entry's
+            # selected ink when checked.
             b.setProperty("primary", "true" if primary else "false")
-            # A fixed-size icon so every label starts at the SAME x (emoji
-            # glyphs have different advance widths, so putting them in the text
-            # left the labels ragged). The icon is (re)painted and sized by
-            # _apply_nav_icons in the theme's muted tone, white when checked.
-            # "Ignored" horizontal policy: the button fills the width when
-            # there's room but imposes no text-based minimum, so the sidebar
-            # can be dragged narrow enough to cross the auto-collapse threshold
-            # (a plain minimumWidth(0) doesn't lower the minimumSizeHint the
-            # splitter actually honours).
-            b.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
-            b.clicked.connect(lambda _, k=key: self.switch_mode(k))
+            b.navigate.connect(self._on_nav_clicked)
             # Right-click to give this entry a custom colour.
-            b.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-            b.customContextMenuRequested.connect(
-                lambda pos, k=key, bt=b: self._nav_color_menu(
-                    k, bt.mapToGlobal(pos)))
+            b.menu_requested.connect(self._nav_color_menu)
             self._nav_texts[key] = text
             into.addWidget(b)
             self.nav_btns[key] = b
             self._apply_nav_color(key)
 
-        # Browse: the content-type modes, always visible at the top. Home
-        # first - it is not a MODE (it swaps the whole central stack), so its
-        # click is rewired from switch_mode to the Home page below.
-        for key, text in (("home", tr("nav_home")),
-                          ("live", tr("nav_tv")), ("vod", tr("nav_movies")),
-                          ("series", tr("nav_series"))):
+        # Places: where content lives, always at the top. Home first - it is
+        # not a MODE (it swaps the whole central stack), and the Guide opens
+        # its own window; _on_nav_clicked sends each where it belongs.
+        for key, text in (("home", tr("nav_home")), ("live", tr("nav_tv")),
+                          ("guide", tr("nav_guide")),
+                          ("vod", tr("nav_movies")),
+                          ("series", tr("nav_series")),
+                          ("rec", tr("nav_recordings")),
+                          ("local", tr("nav_local"))):
             _make_nav(key, text, sl, primary=True)
-        self.nav_btns["home"].clicked.disconnect()
-        self.nav_btns["home"].clicked.connect(self._show_home_page)
         self.nav_btns["home"].setVisible(self._home_enabled())
 
-        # Library: the personal lists, grouped under a collapsible disclosure
-        # header (same arrow affordance as Categories) so they don't add to the
-        # wall of nav items when you don't need them. The header lives in its
-        # own widget (with a little top gap) so the whole thing - gap included -
-        # disappears on the icon rail, keeping the library icons tight against
-        # the browse icons there.
+        # The icon rail has no section headers: a hairline (and its gap)
+        # keeps the places apart from MINE there.
+        self._rail_rule_mine = SideRule()
+        self._rail_rule_mine.set_rail(True)
+        self._rail_rule_mine.hide()
+        sl.addWidget(self._rail_rule_mine)
+
+        # MINE: the user's own lists, under a collapsible disclosure header
+        # (same arrow affordance as Categories). Watched lives inside History
+        # as a filter. (The attributes keep their Library names; the folded
+        # state keeps its old setting, so it carries over.)
         self._lib_header = QWidget()
         lib_hdr = QHBoxLayout(self._lib_header)
         lib_hdr.setContentsMargins(0, 8, 0, 0)
         lib_hdr.setSpacing(4)
         self._lib_section_label = QLabel(
-            tr("sidebar_library"), objectName="SectionLabel")
+            tr("sidebar_mine"), objectName="SectionLabel")
         self._lib_section_label.setMinimumWidth(0)
         lib_hdr.addWidget(self._lib_section_label)
         lib_hdr.addStretch()
@@ -693,28 +693,25 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._lib_toggle.setArrowType(Qt.ArrowType.DownArrow)
         self._lib_toggle.setAutoRaise(True)
         self._lib_toggle.setFixedSize(22, 18)
-        self._lib_toggle.setToolTip(tr("tooltip_toggle_library"))
+        self._lib_toggle.setToolTip(tr("tooltip_toggle_mine"))
         self._lib_toggle.toggled.connect(self._on_library_toggle)
         lib_hdr.addWidget(self._lib_toggle)
         sl.addWidget(self._lib_header)
 
         # Container so the whole group collapses/reveals in one move. No
         # stylesheet on it (a bare 'background' would cascade onto the child
-        # buttons and wipe their :checked accent - see the #SideContent note).
+        # buttons and wipe their :checked colours - see the #SideContent note).
         self._library_box = QWidget()
         lib_lay = QVBoxLayout(self._library_box)
         lib_lay.setContentsMargins(0, 0, 0, 0)
         lib_lay.setSpacing(2)
         for key, text in (("fav", tr("nav_favorites")),
                           ("watchlist", tr("nav_watchlist")),
-                          ("watched", tr("nav_watched")),
-                          ("rec", tr("nav_recordings")),
-                          ("local", tr("nav_local")),
                           ("history", tr("nav_history"))):
             _make_nav(key, text, lib_lay)
         # The box must not be stretchable: it holds fixed-height buttons, and a
         # default Preferred policy let the layout balloon it when the rail has
-        # spare height, spreading the library icons far apart.
+        # spare height, spreading the icons far apart.
         self._library_box.setSizePolicy(QSizePolicy.Policy.Preferred,
                                         QSizePolicy.Policy.Fixed)
         sl.addWidget(self._library_box)
@@ -832,32 +829,28 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._sync_now_btn.hide()
         sl.addWidget(self._sync_now_btn)
 
-        # Guide + Settings + Multiview as a compact row of three glyph icons
-        # (tooltips carry their names) rather than wide text pills - the icons
-        # are painted by _apply_action_icons. The row is a QBoxLayout whose
-        # direction flips to vertical on the collapsed icon rail (60 px is too
-        # narrow for three buttons abreast) - see _apply_sidebar_chrome.
-        self._guide_btn = guide_btn = QPushButton("", objectName="SideAction")
-        guide_btn.setToolTip(tr("btn_epg_guide"))
-        guide_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
-                                QSizePolicy.Policy.Fixed)
-        guide_btn.clicked.connect(self._open_epg_guide)
-        # (Reload lives in the menu bar's "Refresh playlist" and the
-        # per-playlist auto-refresh setting; a sidebar button here was just
-        # an easy mis-click.)
-        self._settings_btn = settings_btn = QPushButton(
-            "", objectName="SideAction")
+        # Settings + Multiview at the bottom, under a hairline: rows with
+        # their icon and name like the nav entries, icons alone on the rail
+        # (their names in the tooltip there). The icons are painted by
+        # _apply_action_icons, the names put on by _apply_sidebar_chrome.
+        # (The guide is a nav entry now; reload lives in the menu bar's
+        # "Refresh playlist" and the per-playlist auto-refresh setting - a
+        # sidebar button for it was just an easy mis-click.)
+        self._side_action_texts = {"settings": tr("btn_settings"),
+                                   "multiview": tr("menu_multiview")}
+        self._settings_btn = settings_btn = NavButton(
+            "settings", tr("btn_settings"), object_name="SideAction",
+            checkable=False)
         settings_btn.setToolTip(tr("btn_settings"))
-        settings_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
-                                   QSizePolicy.Policy.Fixed)
+        settings_btn.setAccessibleName(tr("btn_settings"))
         settings_btn.clicked.connect(self.open_settings)
-        # Multiview joins the same row (the app-menu entry is easy to miss, and
-        # on macOS a hidden multiview window won't Cmd+Tab back).
-        self._multiview_btn = multiview_btn = QPushButton(
-            "", objectName="SideAction")
+        # Multiview beside it (the app-menu entry is easy to miss, and on
+        # macOS a hidden multiview window won't Cmd+Tab back).
+        self._multiview_btn = multiview_btn = NavButton(
+            "multiview", tr("menu_multiview"), object_name="SideAction",
+            checkable=False)
         multiview_btn.setToolTip(tr("menu_multiview"))
-        multiview_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
-                                    QSizePolicy.Policy.Fixed)
+        multiview_btn.setAccessibleName(tr("menu_multiview"))
         multiview_btn.clicked.connect(self._show_multiview)
         # A small red heart on the logo's lower corner, its words in the
         # tooltip (mw_donate) - the same place on every system; gone for a
@@ -870,10 +863,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Right-click: hide it for three months (mw_donate).
         donate_btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         donate_btn.customContextMenuRequested.connect(self._donate_heart_menu)
-        self._actions_box = QBoxLayout(QBoxLayout.Direction.LeftToRight)
+        self._bottom_rule = SideRule()
+        sl.addWidget(self._bottom_rule)
+        self._actions_box = QBoxLayout(QBoxLayout.Direction.TopToBottom)
         self._actions_box.setContentsMargins(0, 0, 0, 0)
-        self._actions_box.setSpacing(6)
-        self._actions_box.addWidget(guide_btn)
+        self._actions_box.setSpacing(2)
         self._actions_box.addWidget(settings_btn)
         self._actions_box.addWidget(multiview_btn)
         sl.addLayout(self._actions_box)
@@ -883,6 +877,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._fit_logo(False)
         self._donate_heart_refresh()         # hidden for three months, maybe
         self._apply_action_icons()
+        # The nav's quiet status: a recording running, new episodes of a
+        # followed series, what waits under Watch later.
+        self.rec.jobs_changed.connect(self._refresh_nav_status)
+        self._refresh_nav_status()
 
         # Middle column
         mid = QWidget(objectName="MiddlePane")
@@ -1019,6 +1017,30 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         ctl.addWidget(self.local_view_btn)
         ctl.addWidget(self.grid_btn)
         ml.addLayout(ctl)
+
+        # History's two filters: everything played, or what is marked as
+        # watched (the "watched" mode, which has no nav entry of its own).
+        self._history_chips = QWidget()
+        hc = QHBoxLayout(self._history_chips)
+        hc.setContentsMargins(0, 0, 0, 0)
+        hc.setSpacing(6)
+        self._history_chip_group = QButtonGroup(self._history_chips)
+        self._history_chip_group.setExclusive(True)
+        self._history_chip_btns: dict[str, QPushButton] = {}
+        for i, (key, text) in enumerate((("all", tr("history_chip_all")),
+                                         ("watched",
+                                          tr("history_chip_watched")))):
+            chip = QPushButton(text, objectName="FilterChip")
+            chip.setCheckable(True)
+            chip.setCursor(Qt.CursorShape.PointingHandCursor)
+            self._history_chip_group.addButton(chip, i)
+            self._history_chip_btns[key] = chip
+            hc.addWidget(chip)
+        hc.addStretch()
+        self._history_chip_btns["all"].setChecked(True)
+        self._history_chip_group.idClicked.connect(self._on_history_chip)
+        self._history_chips.hide()
+        ml.addWidget(self._history_chips)
 
         self.back_btn = QPushButton("<-  " + tr("btn_back_to_series"))
         self.back_btn.hide()
@@ -2267,6 +2289,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.setWindowTitle(self._base_title)
             self._update_playlist_btn()
             self._update_provider_hint()
+            self._refresh_nav_status()      # this playlist's followed series
             # Drop any Home media cached from the previous (or empty offline)
             # provider so the new provider's Recently-added / Featured shelves
             # actually populate - otherwise the empty result cached while the
@@ -2297,12 +2320,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Any mode switch drops back from the Home page to the classic view.
         if getattr(self, "_center_stack", None) is not None:
             self._center_stack.setCurrentIndex(0)
-        for k, b in self.nav_btns.items():
-            b.setChecked(k == mode)
+        # Watched is History's second filter: History is the entry lit.
+        self._check_nav(self._nav_key_for_mode(mode))
         self.mode = mode
         self.series_ctx = None
         self.back_btn.hide()
         self.clear_history_btn.setVisible(mode == "history")
+        if mode in ("history", "watched"):
+            self._history_filter = "watched" if mode == "watched" else "all"
+        self._sync_history_chips()
+        self._refresh_nav_status()
         if hasattr(self, "local_view_btn"):
             self.local_view_btn.setVisible(mode == "local")
             self._sync_local_view_btn()
@@ -2337,7 +2364,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._mode_avail = {}
         # Start from all-visible so a mode hidden for the previous provider
         # doesn't linger while the new provider's probes are in flight.
-        for m in ("live", "vod", "series"):
+        for m in ("live", "guide", "vod", "series"):
             if m in self.nav_btns:
                 self.nav_btns[m].setVisible(True)
         fns = {"live": getattr(self.client, "live_categories", None),
@@ -2358,15 +2385,22 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         known = {m: self._mode_avail.get(m) for m in modes}
         # Fail open until we know at least one mode has content, so an all-empty
         # result (e.g. an auth glitch) never hides the whole Browse group.
+        guide = self.nav_btns.get("guide")
         if not any(v is True for v in known.values()):
             for m in modes:
                 if m in self.nav_btns:
                     self.nav_btns[m].setVisible(True)
+            if guide is not None:
+                guide.setVisible(True)
             return
         for m in modes:
             if m in self.nav_btns:
                 # Hide only on a definite empty (False); unknown (None) stays.
                 self.nav_btns[m].setVisible(known[m] is not False)
+        # The guide is TV's: a provider without channels has nothing in it.
+        # (Its shortcut and menu entries still open it.)
+        if guide is not None:
+            guide.setVisible(known["live"] is not False)
         # If the mode you're on just got hidden, move to the first visible one.
         if self.mode in modes and known[self.mode] is False:
             for m in modes:

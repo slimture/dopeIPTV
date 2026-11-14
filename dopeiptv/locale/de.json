@@ -1775,5 +1775,13 @@
   "theme_supporter_tip": "Für Unterstützer – danke, dass du dopeIPTV kostenlos hältst",
   "set_supporter_icon": "Unterstützer-Symbol",
   "set_supporter_icon_hint": "Das App-Symbol bekommt die Unterstützer-Farben und ein Herz, wie das Logo in der Seitenleiste.",
-  "supporter_perks": "Der Schlüssel schaltet außerdem zwei Unterstützer-Designs und ein Unterstützer-Symbol für die App frei."
+  "supporter_perks": "Der Schlüssel schaltet außerdem zwei Unterstützer-Designs und ein Unterstützer-Symbol für die App frei.",
+  "nav_guide": "TV-Guide",
+  "sidebar_mine": "MEINS",
+  "tooltip_toggle_mine": "Eigene Listen ein- oder ausblenden",
+  "history_chip_all": "Alle",
+  "history_chip_watched": "Gesehen",
+  "nav_status_recording": "Aufnahme läuft: {n}",
+  "nav_status_new_episodes": "Neue Folgen: {n}",
+  "nav_status_watchlist": "Für später gemerkt: {n}"
 }

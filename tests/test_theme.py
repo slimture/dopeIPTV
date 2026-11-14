@@ -152,3 +152,61 @@ def test_the_stylesheet_puts_the_accent_text_colour_on_accent_buttons():
     finally:
         theme.apply_theme(_Settings())
 
+
+# -- the sidebar's selected entry and its status -------------------------------
+
+
+def _accents_of(key: str) -> list[tuple[str, str]]:
+    """The theme's own accent and every accent of the picker."""
+    return ([("theme", resolve_accent(key, "theme")[0])]
+            + [(name, a[1]) for name, a in ACCENTS.items()])
+
+
+@pytest.mark.parametrize("key", list(THEMES))
+def test_the_selected_nav_entry_reads_in_every_theme_and_accent(key):
+    """The selected entry is a light wash of the accent with its label, icon
+    and leading bar in the accent - moved toward the text colour where the
+    accent itself would not read (gold or mint on a light theme). Checked
+    for every theme, light and dark, with every accent."""
+    t = THEMES[key]
+    for name, accent in _accents_of(key):
+        try:
+            theme.apply_theme(_Settings(theme=key, accent=name))
+            assert P["accent"].upper() == accent.upper(), (key, name)
+            tint, ink = P["nav_tint"], P["nav_ink"]
+            # A light wash: never the solid accent block it replaced.
+            assert tint == theme._mix(accent, t["side"], theme.NAV_TINT), (key, name)
+            assert _contrast(tint, t["side"]) < 1.6, (key, name, tint)
+            # Label and icon on the wash, and the bar against the sidebar.
+            assert _contrast(ink, tint) >= 4.5, (key, name, ink, tint)
+            assert _contrast(ink, t["side"]) >= 3, (key, name, ink)
+            # New episodes: the pill's number on the pill.
+            assert _contrast(P["nav_pill_ink"], P["nav_pill"]) >= 4.5, (key, name)
+            # The muted count on Watch later, on the sidebar.
+            assert _contrast(t["muted"], t["side"]) >= 3, key
+            # The recording dot stands out from the sidebar.
+            assert _contrast(t["rec"], t["side"]) >= 3, key
+            qss = build_style()
+            checked = qss.split("QPushButton#NavBtn:checked {")[1].split("}")[0]
+            assert f"background: {tint}; color: {ink};" in checked, (key, name, checked)
+        finally:
+            theme.apply_theme(_Settings())
+
+
+@pytest.mark.parametrize("colour", ["#E5B454", "#3B5BA5", "#FFFFFF", "#000000", "#34CFA0"])
+@pytest.mark.parametrize("key", ["graphite", "light", "sand", "solarized_light", "oled"])
+def test_an_entry_of_your_own_colour_still_reads_when_selected(key, colour):
+    t = THEMES[key]
+    tint, ink = theme.nav_active_colors(colour, t["side"], t["text"])
+    assert _contrast(ink, tint) >= 4.5, (key, colour, ink, tint)
+
+
+@pytest.mark.parametrize("key", list(THEMES))
+def test_history_filter_chip_reads_when_on(key):
+    try:
+        theme.apply_theme(_Settings(theme=key))
+        wash, ink = theme.tinted(P["accent"], P["bg"], theme.NAV_TINT, P["text"])
+        assert _contrast(ink, wash) >= 4.5, key
+        assert f"background: {wash};\n    color: {ink};" in build_style(), key
+    finally:
+        theme.apply_theme(_Settings())

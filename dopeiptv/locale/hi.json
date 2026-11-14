@@ -1775,5 +1775,13 @@
   "theme_supporter_tip": "समर्थकों के लिए – dopeIPTV को मुफ़्त बनाए रखने के लिए धन्यवाद",
   "set_supporter_icon": "समर्थक आइकन",
   "set_supporter_icon_hint": "ऐप का आइकन समर्थक रंग और एक दिल ले लेता है, साइडबार के लोगो की तरह।",
-  "supporter_perks": "यह कुंजी समर्थकों के लिए दो थीम और ऐप के लिए एक समर्थक आइकन भी खोलती है।"
+  "supporter_perks": "यह कुंजी समर्थकों के लिए दो थीम और ऐप के लिए एक समर्थक आइकन भी खोलती है।",
+  "nav_guide": "गाइड",
+  "sidebar_mine": "मेरा",
+  "tooltip_toggle_mine": "अपनी सूचियाँ दिखाएँ या छिपाएँ",
+  "history_chip_all": "सभी",
+  "history_chip_watched": "देखे गए",
+  "nav_status_recording": "अभी रिकॉर्डिंग: {n}",
+  "nav_status_new_episodes": "नए एपिसोड: {n}",
+  "nav_status_watchlist": "बाद में देखने के लिए: {n}"
 }

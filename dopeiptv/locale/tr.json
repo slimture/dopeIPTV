@@ -1775,5 +1775,13 @@
   "theme_supporter_tip": "Destekçiler için – dopeIPTV'yi ücretsiz tuttuğunuz için teşekkürler",
   "set_supporter_icon": "Destekçi simgesi",
   "set_supporter_icon_hint": "Uygulamanın simgesi, kenar çubuğundaki logo gibi destekçi renklerini ve bir kalbi alır.",
-  "supporter_perks": "Anahtar ayrıca destekçilere özel iki temayı ve uygulama için bir destekçi simgesini açar."
+  "supporter_perks": "Anahtar ayrıca destekçilere özel iki temayı ve uygulama için bir destekçi simgesini açar.",
+  "nav_guide": "Rehber",
+  "sidebar_mine": "BENİM",
+  "tooltip_toggle_mine": "Kendi listelerinizi gösterin veya gizleyin",
+  "history_chip_all": "Tümü",
+  "history_chip_watched": "İzlenenler",
+  "nav_status_recording": "Şu an kaydediliyor: {n}",
+  "nav_status_new_episodes": "Yeni bölümler: {n}",
+  "nav_status_watchlist": "Sonra izlemek için: {n}"
 }

@@ -449,6 +449,29 @@ ACCENT: str = ACCENTS["blue"][1]
 HEART = "#FF375F"
 
 
+def _rgba(hex_color: str, alpha: float) -> str:
+    """A CSS rgba() string from a #rrggbb colour - used for subtle, tinted
+    borders/fills that let some background show through."""
+    c = (hex_color or "#000000").lstrip("#")
+    r, g, b = int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16)
+    return f"rgba({r},{g},{b},{alpha})"
+
+
+def _mix(fg: str, bg: str, ratio: float) -> str:
+    """A SOLID #rrggbb that is ``ratio`` of ``fg`` blended over ``bg``. Unlike
+    an rgba() fill, this stays fully opaque, so it reads the same over a
+    transparent parent (e.g. the sidebar's scroll content) as it would over a
+    solid one - no see-through washout."""
+    f = (fg or "#000000").lstrip("#")
+    b = (bg or "#000000").lstrip("#")
+    fr, fg_, fb = int(f[0:2], 16), int(f[2:4], 16), int(f[4:6], 16)
+    br, bg_, bb = int(b[0:2], 16), int(b[2:4], 16), int(b[4:6], 16)
+    r = round(fr * ratio + br * (1 - ratio))
+    g = round(fg_ * ratio + bg_ * (1 - ratio))
+    bl = round(fb * ratio + bb * (1 - ratio))
+    return f"#{r:02X}{g:02X}{bl:02X}"
+
+
 def _lighter(hex_color: str) -> str:
     return _mix("#FFFFFF", hex_color, 0.18)
 
@@ -477,6 +500,49 @@ def on_accent(hex_color: str) -> str:
     if (1.05 / (_luminance(hex_color) + 0.05)) >= 3.0:
         return "#FFFFFF"
     return ON_ACCENT_DARK
+
+
+def contrast(a: str, b: str) -> float:
+    """WCAG contrast ratio of two #rrggbb colours (1 to 21)."""
+    la, lb = sorted((_luminance(a), _luminance(b)), reverse=True)
+    return (la + 0.05) / (lb + 0.05)
+
+
+#: The selected nav entry's fill: this much of its colour over the sidebar.
+NAV_TINT = 0.16
+#: The new-episodes pill under its number: a stronger wash of the accent.
+NAV_PILL_TINT = 0.30
+
+
+def tinted(colour: str, over: str, ratio: float, text: str,
+           need: float = 4.5) -> tuple[str, str]:
+    """A wash of *colour* over *over* and the ink to write on it in that
+    colour: *colour* itself while it reads at *need*:1 on the wash, else
+    moved step by step toward *text* (the theme's own text colour, which
+    reads on its sidebar) until it does - so gold or mint on a light theme
+    still makes a legible label. Should even the text colour fall short on a
+    strong wash, on toward black or white, whichever the wash is further
+    from."""
+    wash = _mix(colour, over, ratio)
+    ink = colour
+    step = 0
+    while contrast(ink, wash) < need and step < 20:
+        step += 1
+        ink = _mix(text, colour, step / 20)
+    far = ("#000000" if contrast("#000000", wash) >= contrast("#FFFFFF", wash)
+           else "#FFFFFF")
+    base, step = ink, 0
+    while contrast(ink, wash) < need and step < 10:
+        step += 1
+        ink = _mix(far, base, step / 10)
+    return wash, ink
+
+
+def nav_active_colors(colour: str, side: str, text: str) -> tuple[str, str]:
+    """The selected nav entry: (fill, ink) - a light tint of *colour* over
+    the sidebar, and the label, icon and leading bar in *colour* made
+    readable on it."""
+    return tinted(colour, side, NAV_TINT, text)
 
 
 def _valid_hex(value) -> str | None:
@@ -525,6 +591,10 @@ def apply_theme(settings=None, theme: str | None = None,
     P["accent"], P["accent_hi"] = resolve_accent(theme, accent or "blue",
                                                  custom)
     P["on_accent"] = on_accent(P["accent"])
+    P["nav_tint"], P["nav_ink"] = nav_active_colors(
+        P["accent"], P["side"], P["text"])
+    P["nav_pill"], P["nav_pill_ink"] = tinted(
+        P["accent"], P["side"], NAV_PILL_TINT, P["text"])
     ACCENT = P["accent"]
 
 
@@ -555,29 +625,6 @@ def rounded(qss: str, factor: float | None = None) -> str:
 
 
 apply_theme()
-
-
-def _rgba(hex_color: str, alpha: float) -> str:
-    """A CSS rgba() string from a #rrggbb colour - used for subtle, tinted
-    borders/fills that let some background show through."""
-    c = (hex_color or "#000000").lstrip("#")
-    r, g, b = int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16)
-    return f"rgba({r},{g},{b},{alpha})"
-
-
-def _mix(fg: str, bg: str, ratio: float) -> str:
-    """A SOLID #rrggbb that is ``ratio`` of ``fg`` blended over ``bg``. Unlike
-    an rgba() fill, this stays fully opaque, so it reads the same over a
-    transparent parent (e.g. the sidebar's scroll content) as it would over a
-    solid one - no see-through washout."""
-    f = (fg or "#000000").lstrip("#")
-    b = (bg or "#000000").lstrip("#")
-    fr, fg_, fb = int(f[0:2], 16), int(f[2:4], 16), int(f[4:6], 16)
-    br, bg_, bb = int(b[0:2], 16), int(b[2:4], 16), int(b[4:6], 16)
-    r = round(fr * ratio + br * (1 - ratio))
-    g = round(fg_ * ratio + bg_ * (1 - ratio))
-    bl = round(fb * ratio + bb * (1 - ratio))
-    return f"#{r:02X}{g:02X}{bl:02X}"
 
 
 def _arrow_png(direction: str, color: str, size: int = 10) -> str:
@@ -672,12 +719,9 @@ def build_style() -> str:
     # clearly visible even on the near-black OLED palette (its border_in is
     # almost invisible against pure black).
     chk_border = _mix(p['text'], p['input'], 0.45)
-    # Sidebar action buttons (Guide, Settings): a solid, theme-neutral raised
-    # surface with a soft edge, both derived from the palette so they track the
-    # theme instead of standing out in a clashing colour. Opaque so they show
-    # clearly over the transparent scroll content. The accent is reserved for
-    # hover, where a bit of colour is expected.
-    side_action_bg = _mix(p['text'], p['side'], 0.11)
+    # The playlist chip under the logo: a soft edge and hover derived from
+    # the palette, so it tracks the theme. Opaque, so it shows the same over
+    # the transparent scroll content.
     side_action_edge = _mix(p['text'], p['side'], 0.26)
     side_action_hover = _mix(p['text'], p['side'], 0.20)
     # Fields, dropdowns and buttons are filled, not outlined: an outline on
@@ -691,6 +735,7 @@ def build_style() -> str:
     field_hi = p['btn_hover'] if light else _mix(p['text'], p['bg'], 0.15)
     edge = (p['border_in'] if p.get("name") == THEMES["contrast"]["name"]
             else "transparent")
+    chip_r = min(12, round(corner_radius(12)))
     return rounded(f"""
 * {{
     font-family: "SF Pro Text", "Inter", "Cantarell", "Noto Sans", sans-serif;
@@ -714,23 +759,22 @@ QPushButton#NavBtn {{
    small type hierarchy that structures the sidebar without extra chrome. */
 QPushButton#NavBtn[primary="true"] {{ font-size: 16px; }}
 QPushButton#NavBtn:hover  {{ background: {p['hover']}; }}
-QPushButton#NavBtn:checked {{ background: {ACCENT}; color: {ON}; font-weight: 600; }}
+/* The entry you are on: a light wash of the accent, the label and icon in
+   it, and a 3 px bar at the leading edge (widgets.NavButton paints the
+   bar, on the right in a right-to-left language). */
+QPushButton#NavBtn:checked {{
+    background: {p['nav_tint']}; color: {p['nav_ink']}; font-weight: 600;
+}}
 QPushButton#NavBtn[rail="true"] {{ text-align: center; padding: 4px 0; font-size: 19px; }}
-/* Guide / Settings: the sidebar's bottom actions. Give them a visible filled
-   pill with a border so they read as buttons (not plain text like the nav
-   items), plus an obvious hover so it's clear they're clickable. */
+/* Settings / Multiview: the sidebar's bottom actions, rows like the nav
+   entries (icon and name) under a hairline, icons alone on the rail. */
 QPushButton#SideAction {{
-    background: {side_action_bg}; border: 1px solid {side_action_edge};
-    border-radius: 8px; padding: 9px 14px; text-align: center;
-    font-size: 13px; font-weight: 600; color: {p['text2']}; margin-top: 3px;
+    background: transparent; border: none; border-radius: 8px;
+    padding: 4px 12px; text-align: left; font-size: 14px; color: {p['text2']};
 }}
-QPushButton#SideAction:hover {{
-    background: {side_action_hover}; border-color: {ACCENT}; color: {p['text']};
-}}
-QPushButton#SideAction:pressed {{ background: {p['hover']}; }}
-QPushButton#SideAction[rail="true"] {{
-    text-align: center; padding: 8px 0; font-size: 14px; font-weight: 600;
-}}
+QPushButton#SideAction:hover {{ background: {p['hover']}; color: {p['text']}; }}
+QPushButton#SideAction:pressed {{ background: {p['sel']}; }}
+QPushButton#SideAction[rail="true"] {{ text-align: center; padding: 4px 0; }}
 
 /* Support dopeIPTV: a small red heart beside the sidebar's logo, its
    words in the tooltip. No pill - only a soft round under the pointer. */
@@ -1000,6 +1044,23 @@ QToolButton#InlineToggle {{
 }}
 QToolButton#InlineToggle:hover {{ background: {p['btn_hover']}; }}
 QToolButton#InlineToggle::menu-indicator {{ image: none; }}
+/* History's All / Watched: a pair of pills, the one shown in the nav's
+   selected colours. A radius over half the height draws no rounding at
+   all, so the height is fixed and the radius kept to it (per corner, out
+   of rounded()'s reach: "round" would push it past half). */
+QPushButton#FilterChip {{
+    background: {field}; border: 1px solid {edge};
+    border-top-left-radius: {chip_r}px; border-top-right-radius: {chip_r}px;
+    border-bottom-left-radius: {chip_r}px; border-bottom-right-radius: {chip_r}px;
+    padding: 0 14px; min-height: 24px; max-height: 24px;
+    font-size: 12px; color: {p['text2']};
+}}
+QPushButton#FilterChip:hover {{ background: {field_hi}; color: {p['text']}; }}
+QPushButton#FilterChip:checked {{
+    background: {_mix(p['accent'], p['bg'], NAV_TINT)};
+    color: {tinted(p['accent'], p['bg'], NAV_TINT, p['text'])[1]};
+    font-weight: 600;
+}}
 #MiddlePane QLabel {{ color: {p['muted2']}; font-size: 11px; }}
 QDateTimeEdit {{
     background: {field}; border: 1px solid {edge}; border-radius: 8px;

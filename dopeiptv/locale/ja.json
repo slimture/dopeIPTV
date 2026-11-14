@@ -1775,5 +1775,13 @@
   "theme_supporter_tip": "サポーター向け – dopeIPTV を無料のままにしてくれてありがとう",
   "set_supporter_icon": "サポーターアイコン",
   "set_supporter_icon_hint": "アプリのアイコンが、サイドバーのロゴと同じくサポーターの色とハートになります。",
-  "supporter_perks": "キーがあれば、サポーター向けの 2 つのテーマとアプリのサポーターアイコンも使えます。"
+  "supporter_perks": "キーがあれば、サポーター向けの 2 つのテーマとアプリのサポーターアイコンも使えます。",
+  "nav_guide": "番組表",
+  "sidebar_mine": "マイリスト",
+  "tooltip_toggle_mine": "自分のリストを表示または非表示",
+  "history_chip_all": "すべて",
+  "history_chip_watched": "視聴済み",
+  "nav_status_recording": "録画中：{n}",
+  "nav_status_new_episodes": "新しいエピソード：{n}",
+  "nav_status_watchlist": "後で見る：{n}"
 }

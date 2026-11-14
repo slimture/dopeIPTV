@@ -1775,5 +1775,13 @@
   "theme_supporter_tip": "Voor supporters – bedankt dat je dopeIPTV gratis houdt",
   "set_supporter_icon": "Supporterpictogram",
   "set_supporter_icon_hint": "Het app-pictogram krijgt de supporterkleuren en een hart, zoals het logo in de zijbalk.",
-  "supporter_perks": "De sleutel opent ook twee supporterthema's en een supporterpictogram voor de app."
+  "supporter_perks": "De sleutel opent ook twee supporterthema's en een supporterpictogram voor de app.",
+  "nav_guide": "Gids",
+  "sidebar_mine": "VAN MIJ",
+  "tooltip_toggle_mine": "Je eigen lijsten tonen of verbergen",
+  "history_chip_all": "Alle",
+  "history_chip_watched": "Bekeken",
+  "nav_status_recording": "Neemt nu op: {n}",
+  "nav_status_new_episodes": "Nieuwe afleveringen: {n}",
+  "nav_status_watchlist": "Voor later bewaard: {n}"
 }

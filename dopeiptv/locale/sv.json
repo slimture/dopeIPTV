@@ -1775,5 +1775,13 @@
   "theme_supporter_tip": "För supportrar – tack för att du håller dopeIPTV gratis",
   "set_supporter_icon": "Supporterikon",
   "set_supporter_icon_hint": "Appens ikon får supporterfärgerna och ett hjärta, som logotypen i sidopanelen.",
-  "supporter_perks": "Nyckeln öppnar också två supporterteman och en supporterikon för appen."
+  "supporter_perks": "Nyckeln öppnar också två supporterteman och en supporterikon för appen.",
+  "nav_guide": "Guide",
+  "sidebar_mine": "MITT",
+  "tooltip_toggle_mine": "Visa eller dölj dina egna listor",
+  "history_chip_all": "Alla",
+  "history_chip_watched": "Sedda",
+  "nav_status_recording": "Spelar in nu: {n}",
+  "nav_status_new_episodes": "Nya avsnitt: {n}",
+  "nav_status_watchlist": "Sparade till senare: {n}"
 }

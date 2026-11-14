@@ -115,6 +115,7 @@ map and the one-way import rule.
 | `ui/tmdb_match.py` | Manual TMDB match dialog |
 | `ui/subtitle_search.py` | OpenSubtitles search dialog |
 | `ui/widgets.py` | Small standalone widgets |
+| `ui/nav_widgets.py` | The sidebar's `NavButton` (leading bar when selected, a dot / pill / muted count painted over it) and `SideRule`, the hairline between its groups |
 | `ui/box_finder.py` | Box kinds in the add-a-source forms and the "Find on my network" button |
 | `ui/nerd_settings.py` | Nerd in Settings: its own page (switch, how it works, diagnostics) and the five pages under NERD while it is on |
 | `ui/source_nerd.py` | A source's own Nerd options in the Add/Edit source dialog |
@@ -153,7 +154,8 @@ in the `mw_*` mixins beside it, each mixed into `MainWindow`:
 (several favorites at once, move between folders, drag-and-drop), `mw_home`
 (Home), `mw_local` (local files), `mw_multiview` (multiview), `mw_detail`,
 `mw_search` (sidebar search), `mw_sidebar` (panel collapse / icon rail),
-`mw_nav` (focus mode, nav colours/icons, Library group), `mw_shortcuts`
+`mw_nav` (focus mode, nav colours/icons, the MINE group, History's
+Watched filter, the nav's status), `mw_shortcuts`
 (keyboard shortcuts), `mw_busy` (loading indicator), `mw_updates`
 (update badge), `mw_reminders`, `mw_sort`, `mw_onboarding`,
 `mw_mpris` (desktop media controls, media keys), `mw_follow` (followed

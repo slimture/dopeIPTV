@@ -504,31 +504,41 @@ class _SettingsMixin:
         for action, getter in getattr(self, "_i18n_actions", {}).items():
             action.setText(getter())
         nav_labels = {
-            "live": "nav_tv", "vod": "nav_movies", "series": "nav_series",
+            "home": "nav_home", "live": "nav_tv", "guide": "nav_guide",
+            "vod": "nav_movies", "series": "nav_series",
+            "rec": "nav_recordings", "local": "nav_local",
             "fav": "nav_favorites", "watchlist": "nav_watchlist",
-            "watched": "nav_watched",
-            "rec": "nav_recordings", "history": "nav_history",
-            "local": "nav_local",
+            "history": "nav_history",
         }
+        rail = getattr(self, "_sidebar_collapsed", False)
         for key, btn in self.nav_btns.items():
             if key in nav_labels:
                 self._nav_texts[key] = tr(nav_labels[key])
                 btn.setToolTip(self._nav_texts[key])
+                btn.setAccessibleName(self._nav_texts[key])
                 # On the icon rail the buttons are icon-only - don't stamp
                 # text back onto them; the label lands when the rail expands.
-                if not getattr(self, "_sidebar_collapsed", False):
+                if not rail:
                     btn.setText(self._nav_texts[key])
+        self._refresh_nav_status()      # the status's words in the tooltips
         self._cat_section_label.setText(tr("sidebar_categories"))
         if hasattr(self, "_lib_section_label"):
-            self._lib_section_label.setText(tr("sidebar_library"))
-        # Guide / Settings / Multiview are icon-only (their names live in the
-        # tooltip). Only refresh the tooltips here - stamping text back on would
-        # turn them into icon+label pills, which showed up as stray "EPG Guide"
-        # / "Settings" / "Multiview" text in demo and no-provider mode.
-        self._guide_btn.setToolTip(tr("btn_epg_guide"))
-        self._settings_btn.setToolTip(tr("btn_settings"))
-        if hasattr(self, "_multiview_btn"):
-            self._multiview_btn.setToolTip(tr("menu_multiview"))
+            self._lib_section_label.setText(tr("sidebar_mine"))
+            self._lib_toggle.setToolTip(tr("tooltip_toggle_mine"))
+        # Settings / Multiview: their names beside the icon expanded, in the
+        # tooltip on the rail (where _apply_sidebar_chrome puts no text on).
+        self._side_action_texts = {"settings": tr("btn_settings"),
+                                   "multiview": tr("menu_multiview")}
+        for key, btn in (("settings", self._settings_btn),
+                         ("multiview", self._multiview_btn)):
+            btn.setToolTip(self._side_action_texts[key])
+            btn.setAccessibleName(self._side_action_texts[key])
+            if not rail:
+                btn.setText(self._side_action_texts[key])
+        if hasattr(self, "_history_chip_btns"):
+            self._history_chip_btns["all"].setText(tr("history_chip_all"))
+            self._history_chip_btns["watched"].setText(
+                tr("history_chip_watched"))
         if hasattr(self, "_donate_btn"):
             self._donate_btn.setToolTip(tr("donate_support"))
             self._donate_btn.setAccessibleName(tr("donate_support"))

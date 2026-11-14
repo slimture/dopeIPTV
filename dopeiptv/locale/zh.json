@@ -1775,5 +1775,13 @@
   "theme_supporter_tip": "支持者专享——感谢你让 dopeIPTV 保持免费",
   "set_supporter_icon": "支持者图标",
   "set_supporter_icon_hint": "应用图标会像侧边栏的标志一样，换上支持者的配色和一颗爱心。",
-  "supporter_perks": "密钥还会解锁两款支持者主题和应用的支持者图标。"
+  "supporter_perks": "密钥还会解锁两款支持者主题和应用的支持者图标。",
+  "nav_guide": "节目指南",
+  "sidebar_mine": "我的",
+  "tooltip_toggle_mine": "显示或隐藏你的列表",
+  "history_chip_all": "全部",
+  "history_chip_watched": "已观看",
+  "nav_status_recording": "正在录制：{n}",
+  "nav_status_new_episodes": "新剧集：{n}",
+  "nav_status_watchlist": "稍后观看：{n}"
 }

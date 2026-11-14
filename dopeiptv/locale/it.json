@@ -1775,5 +1775,13 @@
   "theme_supporter_tip": "Per i sostenitori – grazie per mantenere dopeIPTV gratuito",
   "set_supporter_icon": "Icona da sostenitore",
   "set_supporter_icon_hint": "L'icona dell'app prende i colori da sostenitore e un cuore, come il logo nella barra laterale.",
-  "supporter_perks": "La chiave sblocca anche due temi per i sostenitori e un'icona da sostenitore per l'app."
+  "supporter_perks": "La chiave sblocca anche due temi per i sostenitori e un'icona da sostenitore per l'app.",
+  "nav_guide": "Guida",
+  "sidebar_mine": "MIEI",
+  "tooltip_toggle_mine": "Mostra o nascondi le tue liste",
+  "history_chip_all": "Tutti",
+  "history_chip_watched": "Visti",
+  "nav_status_recording": "Registrazione in corso: {n}",
+  "nav_status_new_episodes": "Nuovi episodi: {n}",
+  "nav_status_watchlist": "Da guardare più tardi: {n}"
 }

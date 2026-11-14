@@ -1775,5 +1775,13 @@
   "theme_supporter_tip": "برای حامیان – سپاس که dopeIPTV را رایگان نگه می‌دارید",
   "set_supporter_icon": "آیکون حامی",
   "set_supporter_icon_hint": "آیکون برنامه رنگ‌های حامی و یک قلب می‌گیرد، مانند لوگوی نوار کناری.",
-  "supporter_perks": "این کلید همچنین دو زمینهٔ ویژهٔ حامیان و یک آیکون حامی برای برنامه را باز می‌کند."
+  "supporter_perks": "این کلید همچنین دو زمینهٔ ویژهٔ حامیان و یک آیکون حامی برای برنامه را باز می‌کند.",
+  "nav_guide": "راهنما",
+  "sidebar_mine": "مال من",
+  "tooltip_toggle_mine": "نمایش یا پنهان کردن فهرست‌های شما",
+  "history_chip_all": "همه",
+  "history_chip_watched": "تماشاشده",
+  "nav_status_recording": "در حال ضبط: {n}",
+  "nav_status_new_episodes": "قسمت‌های جدید: {n}",
+  "nav_status_watchlist": "برای تماشای بعد: {n}"
 }

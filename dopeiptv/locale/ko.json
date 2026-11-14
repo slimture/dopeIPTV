@@ -1775,5 +1775,13 @@
   "theme_supporter_tip": "후원자 전용 – dopeIPTV를 무료로 지켜 주셔서 감사합니다",
   "set_supporter_icon": "후원자 아이콘",
   "set_supporter_icon_hint": "앱 아이콘이 사이드바의 로고처럼 후원자 색상과 하트로 바뀝니다.",
-  "supporter_perks": "이 키로 후원자 전용 테마 두 가지와 앱의 후원자 아이콘도 열립니다."
+  "supporter_perks": "이 키로 후원자 전용 테마 두 가지와 앱의 후원자 아이콘도 열립니다.",
+  "nav_guide": "편성표",
+  "sidebar_mine": "내 목록",
+  "tooltip_toggle_mine": "내 목록 표시 또는 숨기기",
+  "history_chip_all": "전체",
+  "history_chip_watched": "시청함",
+  "nav_status_recording": "녹화 중: {n}",
+  "nav_status_new_episodes": "새 에피소드: {n}",
+  "nav_status_watchlist": "나중에 보기: {n}"
 }

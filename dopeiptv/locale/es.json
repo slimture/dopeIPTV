@@ -1775,5 +1775,13 @@
   "theme_supporter_tip": "Para colaboradores: gracias por mantener dopeIPTV gratis",
   "set_supporter_icon": "Icono de colaborador",
   "set_supporter_icon_hint": "El icono de la app toma los colores de colaborador y un corazón, como el logo de la barra lateral.",
-  "supporter_perks": "La clave también desbloquea dos temas para colaboradores y un icono de colaborador para la app."
+  "supporter_perks": "La clave también desbloquea dos temas para colaboradores y un icono de colaborador para la app.",
+  "nav_guide": "Guía",
+  "sidebar_mine": "LO MÍO",
+  "tooltip_toggle_mine": "Mostrar u ocultar tus listas",
+  "history_chip_all": "Todo",
+  "history_chip_watched": "Vistos",
+  "nav_status_recording": "Grabando ahora: {n}",
+  "nav_status_new_episodes": "Episodios nuevos: {n}",
+  "nav_status_watchlist": "Para ver más tarde: {n}"
 }

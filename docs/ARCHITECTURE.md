@@ -115,6 +115,9 @@ dopeiptv/
     mw_sidebar.py      Sidebar chrome (collapse / icon rail / mid-compact)
     mw_nav.py          Nav chrome (focus mode, nav colours/icons, Library)
     mw_shortcuts.py    Keyboard shortcuts: dispatch, the keys in force, live rebind
+    mw_nav.py          Nav chrome (focus mode, nav colours/icons, MINE,
+                       History's Watched filter, the nav's status)
+    mw_shortcuts.py    Keyboard shortcuts + registry
     mw_cast.py         Casting: the cast dialog, the strip, archive hand-over
     mw_popout.py       Detached-window ("pop out") player mixin
     mw_multiview.py    Multiview: 2/4/6/9 live streams (own mpv per cell)
@@ -131,6 +134,7 @@ dopeiptv/
     mw_onboarding.py   First-run setup wizard
     mw_sort.py         List sort order
     widgets.py         Small standalone widgets
+    nav_widgets.py     A nav entry (selected bar, status) and the rail's hairline
     category_flags.py  Bundled SVG flags for category names (flag-icons, MIT)
     player_resize.py   Height handle under the docked video
     welcome.py         First-run welcome overlay (connect / explore)

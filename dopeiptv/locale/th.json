@@ -1775,5 +1775,13 @@
   "theme_supporter_tip": "สำหรับผู้สนับสนุน – ขอบคุณที่ช่วยให้ dopeIPTV ฟรีต่อไป",
   "set_supporter_icon": "ไอคอนผู้สนับสนุน",
   "set_supporter_icon_hint": "ไอคอนของแอปจะเป็นสีของผู้สนับสนุนพร้อมหัวใจ เหมือนโลโก้ในแถบด้านข้าง",
-  "supporter_perks": "คีย์นี้ยังเปิดธีมสำหรับผู้สนับสนุนสองแบบและไอคอนผู้สนับสนุนสำหรับแอปด้วย"
+  "supporter_perks": "คีย์นี้ยังเปิดธีมสำหรับผู้สนับสนุนสองแบบและไอคอนผู้สนับสนุนสำหรับแอปด้วย",
+  "nav_guide": "ผังรายการ",
+  "sidebar_mine": "ของฉัน",
+  "tooltip_toggle_mine": "แสดงหรือซ่อนรายการของคุณ",
+  "history_chip_all": "ทั้งหมด",
+  "history_chip_watched": "ดูแล้ว",
+  "nav_status_recording": "กำลังบันทึก: {n}",
+  "nav_status_new_episodes": "ตอนใหม่: {n}",
+  "nav_status_watchlist": "บันทึกไว้ดูภายหลัง: {n}"
 }

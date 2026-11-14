@@ -753,6 +753,7 @@ class _TraktMixin:
         else:
             self.watchlist.add_show_local(item, tid)
             trakt_fn = self.trakt.add_show_watchlist
+        self._refresh_nav_status()      # Watch later's count
         if push_to_trakt:
             if tid is None:
                 self._error(tr("mark_needs_tmdb"))
@@ -779,6 +780,7 @@ class _TraktMixin:
         else:
             self.watchlist.remove_show(tid, sid_int)
             trakt_fn = self.trakt.remove_show_watchlist
+        self._refresh_nav_status()      # Watch later's count
         if push_to_trakt and tid is not None and self.trakt.is_connected():
             def job(tid=tid, fn=trakt_fn):
                 try:

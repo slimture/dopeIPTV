@@ -1,9 +1,12 @@
 """Navigation-chrome mixin for MainWindow.
 
-Focus mode, the per-nav-item accent-colour picker, the painted nav icons (glyph
--> centred pixmap), the collapsible Library group, and the category solo toggle.
-Pure UI moved out of main_window.py; every method operates on MainWindow widgets
-(self.nav_btns, self.cat_list, ...) through the mixin, so behaviour is identical.
+Focus mode, where a nav click goes and which entry is lit, the per-nav-item
+colour picker and the selected entry's colours, the painted nav icons (one
+outline style, glyph -> centred pixmap), the nav's status (a recording
+running, new episodes, Watch later's count), History's All / Watched filter,
+the collapsible MINE group, and the category solo toggle. Every method
+operates on MainWindow widgets (self.nav_btns, self.cat_list, ...) through the
+mixin.
 """
 from __future__ import annotations
 
@@ -16,7 +19,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtWidgets import QColorDialog, QMenu
 
 from ..i18n import tr
-from .theme import HEART, P
+from .theme import HEART, P, nav_active_colors, on_accent
 
 
 class _NavMixin:
@@ -37,11 +40,101 @@ class _NavMixin:
             return
         self._reopen_btn.setGeometry(0, 0, 20, self._det.height())
 
+    # -- which entry is lit, and where a click goes ---------------------------
+
+    @staticmethod
+    def _nav_key_for_mode(mode: str) -> str:
+        """The nav entry a mode lights: Watched is History's second filter,
+        not an entry of its own."""
+        return "history" if mode == "watched" else mode
+
+    def _check_nav(self, key: str) -> None:
+        for k, b in self.nav_btns.items():
+            b.setChecked(k == key)
+
+    def _on_nav_clicked(self, key: str) -> None:
+        """A nav entry clicked. Home swaps the central stack, the Guide opens
+        its window (the same call its shortcut makes) and is never the
+        current entry, History comes back to the filter last chosen; the rest
+        are modes."""
+        if key == "home":
+            self._show_home_page()
+        elif key == "guide":
+            self._open_epg_guide()
+        elif key == "history":
+            self.switch_mode(
+                "watched" if self._history_filter == "watched" else "history")
+        else:
+            self.switch_mode(key)
+
+    # -- History's All / Watched -----------------------------------------------
+
+    def _sync_history_chips(self) -> None:
+        chips = getattr(self, "_history_chips", None)
+        if chips is None:
+            return
+        on = self.mode in ("history", "watched")
+        chips.setVisible(on)
+        if on:
+            want = "watched" if self.mode == "watched" else "all"
+            btn = self._history_chip_btns[want]
+            if not btn.isChecked():
+                btn.setChecked(True)
+
+    def _on_history_chip(self, chip_id: int) -> None:
+        mode = "watched" if chip_id == 1 else "history"
+        if mode != self.mode:
+            self.switch_mode(mode)
+
+    # -- the nav's status ------------------------------------------------------
+
+    def _nav_status(self) -> dict[str, int]:
+        """What the nav shows, all of it already known - nothing here asks
+        the network: recordings running now, episodes of followed series that
+        arrived since the series was last opened, what waits under Watch
+        later."""
+        rec = getattr(self, "rec", None)
+        followed = getattr(self, "followed", None)
+        wl = getattr(self, "watchlist", None)
+        return {
+            "rec": rec.active_count() if rec is not None else 0,
+            "series": (sum(len(r.get("new") or [])
+                           for r in followed.with_new())
+                       if followed is not None else 0),
+            "watchlist": (len(wl.movies) + len(wl.shows)
+                          if wl is not None else 0),
+        }
+
+    def _refresh_nav_status(self) -> None:
+        """Put the status on its entries: a red dot on Recordings while
+        anything records, a pill with the new episodes on Series, a muted
+        count on Watch later - dots in the icon's corner on the rail."""
+        btns = getattr(self, "nav_btns", None)
+        if not btns:
+            return
+        st = self._nav_status()
+        kinds = {"rec": "dot", "series": "pill", "watchlist": "count"}
+        words = {"rec": tr("nav_status_recording", n=st["rec"]),
+                 "series": tr("nav_status_new_episodes", n=st["series"]),
+                 "watchlist": tr("nav_status_watchlist", n=st["watchlist"])}
+        for key, kind in kinds.items():
+            b = btns.get(key)
+            if b is None:
+                continue
+            n = st[key]
+            b.set_badge(kind if n else None, n)
+            label = self._nav_texts.get(key, "")
+            b.setToolTip(f"{label}\n{words[key]}" if n else label)
+            b.setAccessibleDescription(words[key] if n else "")
+
     # -- custom nav colours --------------------------------------------------
 
     def _apply_nav_color(self, key: str) -> None:
         """Tint one nav entry with the user's chosen text and/or background
-        colours. Empty settings -> back to the theme default."""
+        colours, and paint its icon. Empty settings -> the theme's own: the
+        accent's light wash, ink and bar when it is the entry you are on. A
+        custom colour takes the accent's place there - the wash and bar in
+        the text colour, or the entry's own background as its fill."""
         b = self.nav_btns.get(key)
         if b is None:
             return
@@ -49,19 +142,28 @@ class _NavMixin:
         bg = self.settings.value(f"nav_bg_{key}", "") or ""
         if not fg and not bg:
             b.setStyleSheet("")
-            return
-        idle = []
-        if fg:
-            idle.append(f"color:{fg};")
-        if bg:
-            idle.append(f"background:{bg};")
-        # When selected, a custom background wins as the fill; otherwise keep
-        # the accent selection with the custom text colour.
-        checked = (f"background:{bg};color:{fg or '#ffffff'};" if bg
-                   else f"color:{fg};")
-        b.setStyleSheet(
-            "QPushButton#NavBtn{%s}QPushButton#NavBtn:checked{%s}"
-            % ("".join(idle), checked))
+            b.set_active_colors("", "")
+            ink = P["nav_ink"]
+        else:
+            idle = []
+            if fg:
+                idle.append(f"color:{fg};")
+            if bg:
+                idle.append(f"background:{bg};")
+            if bg:
+                fill, ink = bg, fg or on_accent(bg)
+            else:
+                fill, ink = nav_active_colors(fg, P["side"], P["text"])
+            b.setStyleSheet(
+                "QPushButton#NavBtn{%s}"
+                "QPushButton#NavBtn:checked{background:%s;color:%s;}"
+                % ("".join(idle), fill, ink))
+            b.set_active_colors(fill, ink)
+        glyph = getattr(self, "_rail_glyphs", {}).get(key)
+        if glyph:
+            s = 22 if b.property("primary") == "true" else 19
+            b.setIcon(self._nav_icon(glyph, s, ink))
+            b.setIconSize(QSize(s, s))
 
     def _nav_color_menu(self, key: str, global_pos) -> None:
         m = QMenu(self)
@@ -111,16 +213,17 @@ class _NavMixin:
             Qt.ArrowType.RightArrow if checked else Qt.ArrowType.DownArrow)
         self._apply_cat_solo()
 
-    def _nav_icon(self, kind: str, s: int) -> QIcon:
+    def _nav_icon(self, kind: str, s: int, on: str | None = None) -> QIcon:
         """A vector icon of size S in the theme's muted tone (the normal/Off
-        state) and the text colour on the accent (the checked/On state), so
-        it always matches the nav label - and renders identically on every
-        OS."""
+        state) and *on* when checked - the nav's selected ink, or by default
+        the text colour on the accent (the filled toggles) - so it always
+        matches its label, and renders identically on every OS."""
         icon = QIcon()
         icon.addPixmap(self._action_pixmap(kind, s, P["text2"]),
                        QIcon.Mode.Normal, QIcon.State.Off)
-        icon.addPixmap(self._action_pixmap(kind, s, P.get("on_accent", "#FFFFFF")),
-                       QIcon.Mode.Normal, QIcon.State.On)
+        icon.addPixmap(
+            self._action_pixmap(kind, s, on or P.get("on_accent", "#FFFFFF")),
+            QIcon.Mode.Normal, QIcon.State.On)
         return icon
 
     def _apply_cat_search_icon(self) -> None:
@@ -133,35 +236,30 @@ class _NavMixin:
         self.cat_search_btn.setIconSize(QSize(14, 14))
 
     def _apply_nav_icons(self) -> None:
-        """(Re)build every nav button's icon in the current theme tones. Called
-        at construction and whenever the theme/accent changes. Browse icons are
-        a couple of notches larger than Library ones - the same hierarchy as
-        the label sizes (NavBtn[primary] in the theme)."""
+        """(Re)build every nav entry's colours and icon in the current theme
+        tones. Called at construction and whenever the theme/accent changes.
+        The places' icons are a couple of notches larger than MINE's - the
+        same hierarchy as the label sizes (NavBtn[primary] in the theme)."""
         if not hasattr(self, "nav_btns"):
             return
-        for key, b in self.nav_btns.items():
-            s = 22 if key in ("home", "live", "vod", "series") else 19
-            b.setIcon(self._nav_icon(self._rail_glyphs[key], s))
-            b.setIconSize(QSize(s, s))
+        for key in self.nav_btns:
+            self._apply_nav_color(key)
         self._apply_cat_search_icon()   # re-tint 🔍 to the new theme's muted tone
-        self._apply_action_icons()      # Guide / Settings / Multiview glyphs
+        self._apply_action_icons()      # Settings / Multiview
+        self._refresh_nav_status()
 
     def _apply_action_icons(self) -> None:
-        """Paint the three sidebar action buttons in the theme's muted tone, so
-        they read as a compact icon row (expanded) or stack (rail) rather than
-        three wide text pills. Guide and Multiview are crisp vector icons (a
-        programme-grid and a 2x2 tile grid) that render identically on every
-        platform; Settings keeps the universally-read gear glyph. Re-tinted on
-        theme change."""
-        specs = (("_guide_btn", "guide"), ("_settings_btn", "gear"),
-                 ("_multiview_btn", "grid"))
+        """Paint Settings and Multiview at the sidebar's foot in the theme's
+        muted tone, the same outline icons and size as the rows under MINE
+        (their names are put on by _apply_sidebar_chrome, the rail shows the
+        icons alone). Re-tinted on theme change."""
+        specs = (("_settings_btn", "gear"), ("_multiview_btn", "grid"))
         for name, kind in specs:
             btn = getattr(self, name, None)
             if btn is None:
                 continue
-            btn.setText("")   # icon-only; the name lives in the tooltip
-            btn.setIcon(QIcon(self._action_pixmap(kind, 18, P["text2"])))
-            btn.setIconSize(QSize(18, 18))
+            btn.setIcon(QIcon(self._action_pixmap(kind, 19, P["text2"])))
+            btn.setIconSize(QSize(19, 19))
         # The playlist stack icon follows the theme too (same square icon in
         # both sidebar states; _update_playlist_btn repaints it).
         if hasattr(self, "_donate_btn"):
@@ -260,11 +358,12 @@ class _NavMixin:
             pr.drawRoundedRect(QRectF(s * 0.10, s * 0.32, s * 0.64, s * 0.56),
                                s * 0.10, s * 0.10)
         elif kind == "grid":
-            fill()
-            m = s * 0.09
-            gap = s * 0.13
+            # Multiview: four outlined tiles.
+            stroke()
+            m = s * 0.13
+            gap = s * 0.14
             cell = (s - 2 * m - gap) / 2.0
-            rad = cell * 0.26
+            rad = cell * 0.24
             for i in (0, 1):
                 for j in (0, 1):
                     pr.drawRoundedRect(
@@ -286,26 +385,29 @@ class _NavMixin:
                 pr.drawLine(QPointF(s * fx, s * 0.24),
                             QPointF(s * (fx + 0.10), s * 0.42))
         elif kind == "series":
-            back = QColor(col)
-            back.setAlphaF(0.45)
-            pr.setPen(Qt.PenStyle.NoPen)
-            pr.setBrush(back)
-            pr.drawRoundedRect(QRectF(s * 0.20, s * 0.10, s * 0.68, s * 0.50),
-                               s * 0.08, s * 0.08)
-            fill()
-            pr.drawRoundedRect(QRectF(s * 0.10, s * 0.32, s * 0.68, s * 0.52),
-                               s * 0.08, s * 0.08)
-            pr.setCompositionMode(
-                QPainter.CompositionMode.CompositionMode_Clear)
+            # Episodes: a screen with a play mark, a second one behind it -
+            # the back one's edges only where the front leaves them showing.
+            stroke()
+            front = QRectF(s * 0.10, s * 0.36, s * 0.64, s * 0.48)
+            back = QRectF(s * 0.26, s * 0.14, s * 0.64, s * 0.48)
+            gap = pen.widthF() * 1.3
+            clip = QPainterPath()
+            clip.addRect(QRectF(0, 0, s, s))
+            hole = QPainterPath()
+            hole.addRect(front.adjusted(-gap, -gap, gap, gap))
+            pr.setClipPath(clip.subtracted(hole))
+            pr.drawRoundedRect(back, s * 0.08, s * 0.08)
+            pr.setClipping(False)
+            pr.drawRoundedRect(front, s * 0.08, s * 0.08)
+            cx, cy = front.center().x() + s * 0.01, front.center().y()
             pr.drawPolygon(QPolygonF([
-                QPointF(s * 0.36, s * 0.44), QPointF(s * 0.36, s * 0.72),
-                QPointF(s * 0.60, s * 0.58)]))
-            pr.setCompositionMode(
-                QPainter.CompositionMode.CompositionMode_SourceOver)
+                QPointF(cx - s * 0.07, cy - s * 0.09),
+                QPointF(cx - s * 0.07, cy + s * 0.09),
+                QPointF(cx + s * 0.08, cy)]))
         elif kind == "star":
-            fill()
-            cx, cy = s * 0.5, s * 0.54
-            ro, ri = s * 0.44, s * 0.18
+            stroke()
+            cx, cy = s * 0.5, s * 0.53
+            ro, ri = s * 0.42, s * 0.19
             pts = []
             for i in range(10):
                 r = ro if i % 2 == 0 else ri
@@ -314,11 +416,11 @@ class _NavMixin:
                                    cy + r * math.sin(a)))
             pr.drawPolygon(QPolygonF(pts))
         elif kind == "bookmark":
-            fill()
+            stroke()
             pr.drawPolygon(QPolygonF([
-                QPointF(s * 0.28, s * 0.10), QPointF(s * 0.72, s * 0.10),
-                QPointF(s * 0.72, s * 0.90), QPointF(s * 0.50, s * 0.72),
-                QPointF(s * 0.28, s * 0.90)]))
+                QPointF(s * 0.28, s * 0.12), QPointF(s * 0.72, s * 0.12),
+                QPointF(s * 0.72, s * 0.88), QPointF(s * 0.50, s * 0.70),
+                QPointF(s * 0.28, s * 0.88)]))
         elif kind == "check":
             pen.setWidthF(max(1.6, s * 0.12))
             stroke()
@@ -336,7 +438,8 @@ class _NavMixin:
             pr.drawLine(QPointF(s * 0.5, s * 0.5), QPointF(s * 0.5, s * 0.27))
             pr.drawLine(QPointF(s * 0.5, s * 0.5), QPointF(s * 0.67, s * 0.60))
         elif kind == "folder":
-            # A folder: the tab, then the body drawn over it.
+            # A folder: the tab, then the body drawn over it. Filled - the
+            # local files' row art (mw_local); the nav draws "folder_o".
             fill()
             pr.drawPolygon(QPolygonF([
                 QPointF(s * 0.12, s * 0.20), QPointF(s * 0.42, s * 0.20),
@@ -344,23 +447,34 @@ class _NavMixin:
             pr.drawRoundedRect(
                 QRectF(s * 0.12, s * 0.30, s * 0.76, s * 0.50),
                 s * 0.06, s * 0.06)
+        elif kind == "folder_o":
+            stroke()
+            path = QPainterPath()
+            path.moveTo(s * 0.12, s * 0.78)
+            path.lineTo(s * 0.12, s * 0.24)
+            path.lineTo(s * 0.40, s * 0.24)
+            path.lineTo(s * 0.49, s * 0.34)
+            path.lineTo(s * 0.88, s * 0.34)
+            path.lineTo(s * 0.88, s * 0.78)
+            path.closeSubpath()
+            pr.drawPath(path)
         elif kind == "gear":
-            fill()
+            # A cog's outline round a hub: eight teeth with sloped flanks.
+            stroke()
             cx = cy = s * 0.5
-            for i in range(8):
-                pr.save()
-                pr.translate(cx, cy)
-                pr.rotate(i * 45.0)
-                pr.drawRect(QRectF(-s * 0.065, -s * 0.46, s * 0.13, s * 0.18))
-                pr.restore()
-            pr.drawEllipse(QRectF(cx - s * 0.30, cy - s * 0.30,
-                                  s * 0.60, s * 0.60))
-            pr.setCompositionMode(
-                QPainter.CompositionMode.CompositionMode_Clear)
+            ro, ri, n = s * 0.43, s * 0.32, 8
+            pts = []
+            step = 2 * math.pi / n
+            for i in range(n):
+                a0 = -math.pi / 2 + i * step
+                for frac, r in ((-0.30, ri), (-0.16, ro), (0.16, ro),
+                                (0.30, ri)):
+                    a = a0 + frac * step
+                    pts.append(QPointF(cx + r * math.cos(a),
+                                       cy + r * math.sin(a)))
+            pr.drawPolygon(QPolygonF(pts))
             pr.drawEllipse(QRectF(cx - s * 0.13, cy - s * 0.13,
                                   s * 0.26, s * 0.26))
-            pr.setCompositionMode(
-                QPainter.CompositionMode.CompositionMode_SourceOver)
         elif kind == "search":
             stroke()
             pr.drawEllipse(QRectF(s * 0.14, s * 0.14, s * 0.50, s * 0.50))
@@ -407,17 +521,19 @@ class _NavMixin:
                 QPointF(s * 0.54, s * 0.66), QPointF(s * 0.78, s * 0.66),
                 QPointF(s * 0.66, s * 0.86)]))
         else:   # guide
+            # A TV guide: three channel rows of programme bars, each row cut
+            # where one programme ends and the next begins - at a different
+            # time on every row, as in the guide itself (not a table's
+            # columns).
             stroke()
-            m = s * 0.13
-            inner = s - 2 * m
-            pr.drawRoundedRect(QRectF(m, m, inner, inner), s * 0.12, s * 0.12)
-            hy = m + inner * 0.33          # under the header row
-            pr.drawLine(QPointF(m, hy), QPointF(s - m, hy))
-            vx = m + inner * 0.36          # channel column | programmes
-            pr.drawLine(QPointF(vx, hy), QPointF(vx, s - m))
-            for k in (1, 2):              # programme-cell rows
-                ry = hy + (s - m - hy) * k / 3.0
-                pr.drawLine(QPointF(vx, ry), QPointF(s - m, ry))
+            x0, x1 = s * 0.12, s * 0.88
+            h, gap, rad = s * 0.17, s * 0.05, s * 0.05
+            for fy, cut in ((0.14, 0.52), (0.43, 0.30), (0.72, 0.66)):
+                pr.drawRoundedRect(
+                    QRectF(x0, s * fy, s * cut - gap - x0, h), rad, rad)
+                pr.drawRoundedRect(
+                    QRectF(s * cut + gap, s * fy, x1 - s * cut - gap, h),
+                    rad, rad)
         pr.end()
         # A handful of kinds x sizes x theme colors; the cap only matters if
         # someone cycles themes all day.
@@ -427,7 +543,7 @@ class _NavMixin:
         return pm
 
     def _on_library_toggle(self, collapsed: bool) -> None:
-        """Fold the Library group (Favorites..History) away behind its
+        """Fold the MINE group (Favorites, Watch later, History) behind its
         disclosure arrow, the same gesture as the Categories header. On the
         collapsed icon rail the group is always shown (its header/arrow are
         hidden there), so the collapse only applies to the expanded sidebar."""

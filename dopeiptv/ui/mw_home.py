@@ -1096,15 +1096,11 @@ class _HomeMixin:
         page.refresh()
         self._center_stack.setCurrentWidget(page)
         page.setFocus()
-        for k, b in self.nav_btns.items():
-            b.setChecked(k == "home")
+        self._check_nav("home")
 
     def _leave_home(self) -> None:
         self._center_stack.setCurrentIndex(0)
-        if "home" in self.nav_btns:
-            self.nav_btns["home"].setChecked(False)
-        if self.mode in self.nav_btns:
-            self.nav_btns[self.mode].setChecked(True)
+        self._check_nav(self._nav_key_for_mode(self.mode))
         # The middle pane was hidden while Home showed, so its width was stale
         # and the control strip could sit in the wrong compact/full form (icons
         # despite a wide window). Recompute once the classic view has laid out.

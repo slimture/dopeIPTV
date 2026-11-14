@@ -1775,5 +1775,13 @@
   "theme_supporter_tip": "Kwa wafadhili – asante kwa kuifanya dopeIPTV ibaki bure",
   "set_supporter_icon": "Aikoni ya mfadhili",
   "set_supporter_icon_hint": "Aikoni ya programu inapata rangi za mfadhili na moyo, kama nembo kwenye utepe wa pembeni.",
-  "supporter_perks": "Ufunguo pia unafungua mandhari mawili ya wafadhili na aikoni ya mfadhili kwa programu."
+  "supporter_perks": "Ufunguo pia unafungua mandhari mawili ya wafadhili na aikoni ya mfadhili kwa programu.",
+  "nav_guide": "Mwongozo",
+  "sidebar_mine": "VYANGU",
+  "tooltip_toggle_mine": "Onyesha au ficha orodha zako",
+  "history_chip_all": "Zote",
+  "history_chip_watched": "Zilizotazamwa",
+  "nav_status_recording": "Inarekodi sasa: {n}",
+  "nav_status_new_episodes": "Vipindi vipya: {n}",
+  "nav_status_watchlist": "Vya kutazama baadaye: {n}"
 }

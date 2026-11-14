@@ -1775,5 +1775,13 @@
   "theme_supporter_tip": "Za podržavatelje – hvala što dopeIPTV ostaje besplatan",
   "set_supporter_icon": "Ikona podrške",
   "set_supporter_icon_hint": "Ikona aplikacije dobiva boje podrške i srce, kao logotip u bočnoj traci.",
-  "supporter_perks": "Ključ otključava i dvije teme za podržavatelje i ikonu podrške za aplikaciju."
+  "supporter_perks": "Ključ otključava i dvije teme za podržavatelje i ikonu podrške za aplikaciju.",
+  "nav_guide": "Vodič",
+  "sidebar_mine": "MOJE",
+  "tooltip_toggle_mine": "Prikaži ili sakrij svoje popise",
+  "history_chip_all": "Sve",
+  "history_chip_watched": "Odgledano",
+  "nav_status_recording": "Snima se: {n}",
+  "nav_status_new_episodes": "Nove epizode: {n}",
+  "nav_status_watchlist": "Za kasnije: {n}"
 }

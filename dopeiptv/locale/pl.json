@@ -1775,5 +1775,13 @@
   "theme_supporter_tip": "Dla wspierających – dziękujemy, że dzięki tobie dopeIPTV pozostaje darmowy",
   "set_supporter_icon": "Ikona wspierającego",
   "set_supporter_icon_hint": "Ikona aplikacji przybiera kolory wspierającego i serce, jak logo na pasku bocznym.",
-  "supporter_perks": "Klucz odblokowuje też dwa motywy dla wspierających i ikonę wspierającego dla aplikacji."
+  "supporter_perks": "Klucz odblokowuje też dwa motywy dla wspierających i ikonę wspierającego dla aplikacji.",
+  "nav_guide": "Przewodnik",
+  "sidebar_mine": "MOJE",
+  "tooltip_toggle_mine": "Pokaż lub ukryj swoje listy",
+  "history_chip_all": "Wszystkie",
+  "history_chip_watched": "Obejrzane",
+  "nav_status_recording": "Trwa nagrywanie: {n}",
+  "nav_status_new_episodes": "Nowe odcinki: {n}",
+  "nav_status_watchlist": "Do obejrzenia później: {n}"
 }

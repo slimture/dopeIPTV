@@ -1775,5 +1775,13 @@
   "theme_supporter_tip": "לתומכים – תודה ששומרים על dopeIPTV חינמי",
   "set_supporter_icon": "סמל תומך",
   "set_supporter_icon_hint": "סמל האפליקציה מקבל את צבעי התומך ולב, כמו הלוגו בסרגל הצד.",
-  "supporter_perks": "המפתח פותח גם שתי ערכות נושא לתומכים וסמל תומך לאפליקציה."
+  "supporter_perks": "המפתח פותח גם שתי ערכות נושא לתומכים וסמל תומך לאפליקציה.",
+  "nav_guide": "מדריך",
+  "sidebar_mine": "שלי",
+  "tooltip_toggle_mine": "הצג או הסתר את הרשימות שלך",
+  "history_chip_all": "הכול",
+  "history_chip_watched": "נצפו",
+  "nav_status_recording": "מקליט עכשיו: {n}",
+  "nav_status_new_episodes": "פרקים חדשים: {n}",
+  "nav_status_watchlist": "שמורים לצפייה מאוחר יותר: {n}"
 }

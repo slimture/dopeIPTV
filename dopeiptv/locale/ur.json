@@ -1775,5 +1775,13 @@
   "theme_supporter_tip": "حامیوں کے لیے – dopeIPTV کو مفت رکھنے کا شکریہ",
   "set_supporter_icon": "حامی آئیکن",
   "set_supporter_icon_hint": "ایپ کا آئیکن سائیڈ بار کے لوگو کی طرح حامی رنگ اور ایک دل لے لیتا ہے۔",
-  "supporter_perks": "یہ کلید حامیوں کے لیے دو تھیمز اور ایپ کے لیے ایک حامی آئیکن بھی کھولتی ہے۔"
+  "supporter_perks": "یہ کلید حامیوں کے لیے دو تھیمز اور ایپ کے لیے ایک حامی آئیکن بھی کھولتی ہے۔",
+  "nav_guide": "گائیڈ",
+  "sidebar_mine": "میرا",
+  "tooltip_toggle_mine": "اپنی فہرستیں دکھائیں یا چھپائیں",
+  "history_chip_all": "سب",
+  "history_chip_watched": "دیکھی گئی",
+  "nav_status_recording": "ابھی ریکارڈنگ: {n}",
+  "nav_status_new_episodes": "نئی اقساط: {n}",
+  "nav_status_watchlist": "بعد میں دیکھنے کے لیے: {n}"
 }

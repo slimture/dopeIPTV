@@ -77,6 +77,7 @@ class _FollowMixin:
 
     def _unfollow_series(self, it: dict) -> None:
         self.followed.unfollow(it.get("series_id"))
+        self._refresh_nav_status()
         name = it.get("name") or it.get("title") or ""
         self._show_toast(tr("follow_off_toast", name=name), 4000)
         if self._home_showing():
@@ -84,6 +85,7 @@ class _FollowMixin:
 
     def _follow_mark_seen(self, series_id: Any) -> None:
         self.followed.seen(series_id)
+        self._refresh_nav_status()
         if self._home_showing():
             self._home_page.refresh()
 
@@ -105,6 +107,7 @@ class _FollowMixin:
             self._pending_jump_key = first
             QTimer.singleShot(8000, self._clear_pending_jump)
         store.seen(series_id, info)
+        self._refresh_nav_status()
 
     # -- the background check -------------------------------------------------
 
@@ -139,6 +142,8 @@ class _FollowMixin:
             # date, but its news is not this playlist's to announce.
             if fresh and store is self.followed:
                 self._announce_new_episodes(fresh)
+            # The Series entry's count of new episodes.
+            self._refresh_nav_status()
 
         def failed(msg: str) -> None:
             self._follow_running = False

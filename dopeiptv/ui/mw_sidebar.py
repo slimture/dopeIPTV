@@ -8,13 +8,13 @@ mixin, so behaviour is identical.
 """
 from __future__ import annotations
 
-from PyQt6.QtWidgets import QBoxLayout, QMenu
+from PyQt6.QtWidgets import QMenu
 
 from ..i18n import tr
 
 
 class _SidebarMixin:
-    """MainWindow mixin: the category sidebar and the library section."""
+    """MainWindow mixin: the sidebar: its collapse to the icon rail and back."""
     def _on_side_toggle(self, checked: bool) -> None:
         """Collapse the left column to a narrow icon rail (or expand it back).
         The rail keeps the TV/Movies/Series nav as icons, so you reclaim the
@@ -44,22 +44,20 @@ class _SidebarMixin:
         self._cat_section_label.setVisible(not collapsed)
         self.cat_solo_btn.setVisible(not collapsed)
         self.cat_list.setVisible(not collapsed)
-        # Keep the Library header widget itself visible in both modes so its
-        # top gap always separates Browse from Library (you can see they're two
-        # groups). On the rail only its label + arrow hide - the gap stays. The
-        # group's icons are always shown on the rail (honour the collapse only
-        # when expanded).
+        # The MINE header (label and fold arrow) belongs to the expanded
+        # sidebar; on the rail a hairline with its gap stands between the
+        # places and MINE instead, so the groups still read as groups. MINE's
+        # icons always show on the rail (its fold applies only expanded).
         if hasattr(self, "_lib_header"):
-            # Rail: the header keeps only its 8px top margin (label and arrow
-            # hide), leaving a clear but modest gap between the Browse and
-            # Library groups, while the icon-to-icon spacing inside each group
-            # stays identical - the rail filler prevents the old row-spreading,
-            # so this gap is fixed and predictable.
-            self._lib_header.setVisible(True)
+            self._lib_header.setVisible(not collapsed)
             self._lib_section_label.setVisible(not collapsed)
             self._lib_toggle.setVisible(not collapsed)
             self._library_box.setVisible(
                 collapsed or not self._lib_toggle.isChecked())
+        if hasattr(self, "_rail_rule_mine"):
+            self._rail_rule_mine.setVisible(collapsed)
+        if hasattr(self, "_bottom_rule"):
+            self._bottom_rule.set_rail(collapsed)
         # The rail's stand-in stretch item (see construction note).
         if hasattr(self, "_rail_filler"):
             self._rail_filler.setVisible(collapsed)
@@ -75,12 +73,15 @@ class _SidebarMixin:
                 not collapsed and getattr(self, "_cat_search_supported", False))
             if collapsed:
                 self.cat_search.hide()
-        # Guide / Settings / Multiview are glyph-icon buttons in both modes
-        # (see _apply_action_icons); only the rail pill styling toggles.
-        self._set_rail(self._guide_btn, collapsed)
-        self._set_rail(self._settings_btn, collapsed)
-        if hasattr(self, "_multiview_btn"):
-            self._set_rail(self._multiview_btn, collapsed)
+        # Settings / Multiview: icon and name expanded, the icon alone on the
+        # rail (the name stays in the tooltip).
+        for key, name in (("settings", "_settings_btn"),
+                          ("multiview", "_multiview_btn")):
+            btn = getattr(self, name, None)
+            if btn is None:
+                continue
+            btn.setText("" if collapsed else self._side_action_texts[key])
+            self._set_rail(btn, collapsed)
         if hasattr(self, "_logo_row"):
             # The heart and the marks lie over the logo; placed again for the
             # rail's smaller mark.
@@ -97,11 +98,6 @@ class _SidebarMixin:
                 QSizePolicy.Policy.Fixed)
             self._update_playlist_btn()
             self._set_rail(self._playlist_btn, collapsed)
-        # Side by side when expanded, stacked on the narrow rail.
-        if hasattr(self, "_actions_box"):
-            self._actions_box.setDirection(
-                QBoxLayout.Direction.TopToBottom if collapsed
-                else QBoxLayout.Direction.LeftToRight)
 
     def _apply_sidebar_collapsed(self) -> None:
         collapsed = getattr(self, "_sidebar_collapsed", False)

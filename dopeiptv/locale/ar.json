@@ -1775,5 +1775,13 @@
   "theme_supporter_tip": "للداعمين – شكرًا لأنك تُبقي dopeIPTV مجانيًا",
   "set_supporter_icon": "أيقونة الداعم",
   "set_supporter_icon_hint": "تأخذ أيقونة التطبيق ألوان الداعم وقلبًا، مثل الشعار في الشريط الجانبي.",
-  "supporter_perks": "ويفتح المفتاح أيضًا سمتين للداعمين وأيقونة داعم للتطبيق."
+  "supporter_perks": "ويفتح المفتاح أيضًا سمتين للداعمين وأيقونة داعم للتطبيق.",
+  "nav_guide": "الدليل",
+  "sidebar_mine": "قوائمي",
+  "tooltip_toggle_mine": "إظهار أو إخفاء قوائمك",
+  "history_chip_all": "الكل",
+  "history_chip_watched": "تمت مشاهدته",
+  "nav_status_recording": "جارٍ التسجيل: {n}",
+  "nav_status_new_episodes": "حلقات جديدة: {n}",
+  "nav_status_watchlist": "محفوظ للمشاهدة لاحقًا: {n}"
 }
