@@ -1139,6 +1139,11 @@ class _RecordingMixin:
                              and not clamped
                              and requested_back_min <= self.TS_SHALLOW_MIN)
         start += self._replay_delay_minutes() * 60
+        if getattr(self.client, "archive_by_programme", False):
+            # A portal (StalkerClient) keeps its archive by programme, and
+            # asking for a link takes the network (mw_portal_archive).
+            self._play_portal_archive(it, start, prog, prog_origin)
+            return
         # Candidate archive-URL formats (providers differ). Play the first;
         # _playback_error walks to the next on an early failure so we auto-pick
         # whichever scheme this provider actually serves.
@@ -1227,6 +1232,7 @@ class _RecordingMixin:
             self._ts_candidate_started = time.monotonic()
             self._ts_segment_start = start
             self._ts_catchup_program = bool(prog)
+            self._ts_from_portal = False
             # Remember the programme's span so the seek bar can be clamped to
             # just this programme (the provider's archive URL runs on to the
             # live edge). _ts_program_start is the bar's 0-point; it stays fixed
@@ -1404,7 +1410,12 @@ class _RecordingMixin:
                 return progs
             now = time.time()
             out = []
-            for e in self.client.epg_table(it["stream_id"]):
+            # A portal lists its archive by day (StalkerClient.archive_table);
+            # elsewhere the provider's own table is all there is.
+            table = getattr(self.client, "archive_table", None)
+            rows = (table(it["stream_id"], days) if table is not None
+                    else self.client.epg_table(it["stream_id"]))
+            for e in rows:
                 start, stop = epg_times(e)
                 start, stop = (self._apply_epg_delay(start),
                               self._apply_epg_delay(stop))

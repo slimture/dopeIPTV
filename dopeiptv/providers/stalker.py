@@ -10,17 +10,24 @@ know which kind of provider it has.
 Stream addresses are asked for (create_link) rather than built: a portal
 hands out short-lived links, and a channel's own ``cmd`` often only names
 it ("ffmpeg http://localhost/ch/12_").
+
+The archive (catch-up) is kept by programme: a channel row flags it
+(tv_archive / archive / enable_tv_archive, its depth in hours), the guide
+table (get_simple_data_table) lists the programmes with their ids, and
+create_link with type=tv_archive and cmd "auto /media/<programme id>.mpg"
+gives a link that plays one programme from its start (archive_link).
 """
 from __future__ import annotations
 
 import base64
 import calendar
 import json
+import math
 import re
 import threading
 import time
 import zlib
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import quote, urlsplit
 
@@ -55,6 +62,11 @@ _SERIES_INFO_KEYS = ("name", "cover", "plot", "cast", "director", "genre",
                      "releaseDate", "last_modified", "rating",
                      "rating_5based", "backdrop_path", "youtube_trailer",
                      "episode_run_time", "category_id")
+# Where a channel row says it has an archive: Ministra's lists have
+# "archive" and "enable_tv_archive", other portals "tv_archive".
+_ARCHIVE_FLAGS = ("tv_archive", "archive", "enable_tv_archive")
+# A MAG player's options after the address in a cmd ("position:0").
+_MAG_OPTIONS = re.compile(r"(?:\s+[a-z_]+:(?!//)\S*)+\s*$", re.I)
 
 
 def portal_endpoints(url: str) -> list[str]:
@@ -268,6 +280,78 @@ def _is_episode(row: dict) -> bool:
     return _flag(row.get("is_episode")) or "series_number" in row
 
 
+def _archive_days(ch: dict) -> int:
+    """A channel's archive in whole days (what the window counts in), 0
+    without one. Portals flag it three ways; the depth is in hours, as
+    Ministra's admin sets it, and an archive of unknown depth is a day."""
+    if not any(_flag(ch.get(k)) for k in _ARCHIVE_FLAGS):
+        return 0
+    hours = _float(ch.get("tv_archive_duration"))
+    return max(1, math.ceil(hours / 24)) if hours > 0 else 1
+
+
+def archive_address(answer: Any) -> str:
+    """The address in a tv_archive create_link answer's cmd, or "". It
+    names the player first, as every cmd does, and a box's player options
+    may follow it ("auto http://... position:0 media_len:3600") - the
+    archive link begins at the programme's start either way."""
+    got = answer.get("cmd") if isinstance(answer, dict) else answer
+    s = strip_cmd(got if isinstance(got, str) else "")
+    s = _MAG_OPTIONS.sub("", s).strip().replace(" ", "%20")
+    return s if _URL.match(s) else ""
+
+
+def archive_cmds(row: dict) -> list[str]:
+    """What create_link may be asked to play a programme from the portal's
+    guide, likeliest first: the programme's own cmd where the portal gives
+    one, then the name Ministra gives it by its id, then by its real_id
+    (<channel>_<start>), which other portals key their archive by."""
+    out: list[str] = []
+    own = _text(row.get("cmd"))
+    if own:
+        out.append(own)
+    for ident in (_text(row.get("id")), _text(row.get("real_id"))):
+        cmd = f"auto /media/{ident}.mpg"
+        if ident and cmd not in out:
+            out.append(cmd)
+    return out
+
+
+def _archive_rows(rows: list[dict]) -> list[dict]:
+    """A guide table's programmes as {"start", "stop", "row"}, by start. A
+    programme without an end runs to the next one's start."""
+    out: list[dict[str, Any]] = []
+    for p in rows:
+        start = (_int(p.get("start_timestamp")) or _utc_stamp(p.get("time"))
+                 or 0)
+        if start <= 0:
+            continue
+        stop = (_int(p.get("stop_timestamp")) or _utc_stamp(p.get("time_to"))
+                or start + _int(p.get("duration")))
+        out.append({"start": start, "stop": stop, "row": p})
+    out.sort(key=lambda r: r["start"])
+    for here, nxt in zip(out, out[1:], strict=False):
+        if here["stop"] <= here["start"]:
+            here["stop"] = nxt["start"]
+    return [r for r in out if r["stop"] > r["start"]]
+
+
+def pick_programme(rows: list[dict], start: float,
+                   stop: float | None = None) -> dict | None:
+    """The programme of *rows* (_archive_rows) to play from *start*: the
+    one on at that moment - or, given the *stop* of a programme picked in
+    a guide, the one overlapping it most, so a guide whose times differ
+    from the portal's by a minute or two still finds the same programme."""
+    if stop is not None and stop > start:
+        best, most = None, 0.0
+        for r in rows:
+            overlap = min(stop, r["stop"]) - max(start, r["start"])
+            if overlap > most:
+                best, most = r, overlap
+        return best
+    return next((r for r in rows if r["start"] <= start < r["stop"]), None)
+
+
 class StalkerClient(ListCache):
     """A Stalker / Ministra middleware portal, addressed by the portal URL
     and the box's MAC address, behind XtreamClient's interface."""
@@ -288,6 +372,18 @@ class StalkerClient(ListCache):
     # The window fetches this client's play addresses off its thread first
     # (see MainWindow._links_later).
     slow_links = True
+    # A portal's archive is played by programme (archive_link): the window
+    # asks for it off its thread, and timeshift_urls has nothing.
+    archive_by_programme = True
+    # Every create_link behind one archive programme shares this much time
+    # (archive_link runs off the window's thread).
+    ARCHIVE_BUDGET_SECS = 15.0
+    # How long a day of a channel's guide stays in memory for the archive:
+    # today's changes as programmes end and enter it.
+    ARCHIVE_TODAY_SECS = 300.0
+    ARCHIVE_PAST_SECS = 1800.0
+    # How many days back the archive's programme list reads at most.
+    ARCHIVE_TABLE_DAYS = 7
     # Pages are small (14 rows is common): this is 2,800 rows a list.
     MAX_PAGES = 200
     EPG_PAGES = 10
@@ -335,6 +431,9 @@ class StalkerClient(ListCache):
         self._link_lock = threading.Lock()
         self._known: dict[str, dict] | None = None
         self._known_lock = threading.Lock()
+        # (channel, YYYY-MM-DD) -> (when, the day's guide rows): archive_link
+        # and archive_table read the same days.
+        self._days: dict[tuple[str, str], tuple[float, list[dict]]] = {}
 
     # -- requests -------------------------------------------------------------
 
@@ -738,6 +837,7 @@ class StalkerClient(ListCache):
                     and isinstance(cmds[0], dict):
                 cmd = str(cmds[0].get("url") or "")
             cat = _text(ch.get("tv_genre_id"))
+            days = _archive_days(ch)
             out.append({
                 "num": _int(ch.get("number")) or len(out) + 1,
                 "name": str(ch.get("name") or "").strip() or "?",
@@ -748,9 +848,9 @@ class StalkerClient(ListCache):
                 "category_id": cat,
                 "category_ids": [int(cat)] if cat.isdigit() else [],
                 "custom_sid": "", "direct_source": "",
-                # timeshift_urls has nothing to offer (see there), so no
-                # channel says it has an archive, whatever the portal says.
-                "tv_archive": 0, "tv_archive_duration": 0,
+                # Played by programme (archive_link), in whole days as
+                # Xtream counts.
+                "tv_archive": 1 if days else 0, "tv_archive_duration": days,
                 # What create_link needs to play the channel.
                 "_cmd": cmd})
         return out
@@ -1157,10 +1257,9 @@ class StalkerClient(ListCache):
 
     def timeshift_urls(self, stream_id: int | str, start_dt: datetime,
                        duration_min: int) -> list[str]:
-        """Nothing, as OfflineClient. A portal's archive is played by
-        programme (tv_archive create_link with a programme id from the EPG
-        table), while the window asks from any minute and expects the
-        address to start right there - so no channel claims an archive."""
+        """Nothing: a portal's archive is played by programme, and asking
+        for its link takes the network - archive_link, which the window
+        calls off its thread (archive_by_programme)."""
         return []
 
     # -- programme guide ------------------------------------------------------
@@ -1175,19 +1274,23 @@ class StalkerClient(ListCache):
         """Today's programme table (get_simple_data_table, page by page),
         or short_epg's answer where the portal has no table."""
         date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        return (self._programmes(self._table_rows(stream_id, date), stream_id)
+                or self.short_epg(stream_id, 24))
+
+    def _table_rows(self, stream_id: int | str, date: str) -> list[dict]:
+        """A channel's guide rows on *date* (YYYY-MM-DD), as the portal
+        gives them; none where it has no table."""
         try:
-            rows = self._pages({"type": "epg",
+            return self._pages({"type": "epg",
                                 "action": "get_simple_data_table",
                                 "ch_id": str(stream_id), "date": date},
                                limit=self.EPG_PAGES)
         except requests.HTTPError as e:
             if not _not_offered(e):
                 raise
-            rows = []
         except ValueError:
-            rows = []
-        return (self._programmes(rows, stream_id)
-                or self.short_epg(stream_id, 24))
+            pass
+        return []
 
     def _programmes(self, rows: Any, stream_id: int | str) -> list[dict]:
         """A portal's programmes as Xtream's epg_listings: title and
@@ -1214,6 +1317,144 @@ class StalkerClient(ListCache):
                 "channel_id": channel, "start_timestamp": str(start),
                 "stop_timestamp": str(stop)})
         return [by_start[k] for k in sorted(by_start)]
+
+    # -- archive (catch-up) ---------------------------------------------------
+
+    def _day_rows(self, stream_id: int | str, day: str) -> list[dict]:
+        """(worker thread) _table_rows, kept a few minutes: a scrub, the
+        next programme and the archive's list read the same days."""
+        key = (str(stream_id), day)
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        keep = (self.ARCHIVE_PAST_SECS if day < today
+                else self.ARCHIVE_TODAY_SECS)
+        with self._link_lock:
+            hit = self._days.get(key)
+        if hit and time.monotonic() - hit[0] < keep:
+            return hit[1]
+        rows = self._table_rows(stream_id, day)
+        now = time.monotonic()
+        with self._link_lock:
+            self._days = {k: v for k, v in self._days.items()
+                          if now - v[0] < self.ARCHIVE_PAST_SECS}
+            self._days[key] = (now, rows)
+        return rows
+
+    @staticmethod
+    def _days_around(stamp: float) -> list[str]:
+        """The guide days a programme on at *stamp* may be listed under:
+        its own UTC day, the day before (it began before midnight), the day
+        after (a portal that dates its days in its own time zone)."""
+        day = datetime.fromtimestamp(stamp, timezone.utc).date()
+        return [str(day + timedelta(days=d)) for d in (0, -1, 1)]
+
+    def archive_programme(self, stream_id: int | str, start: float,
+                          stop: float | None = None) -> dict | None:
+        """(worker thread) The programme in the portal's guide to play from
+        *start* (pick_programme): {"start", "stop", "row"}, or None when
+        the guide has none then."""
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        for day in self._days_around(start):
+            if day > today:
+                break
+            found = pick_programme(
+                _archive_rows(self._day_rows(stream_id, day)), start, stop)
+            if found is not None:
+                return found
+        return None
+
+    def archive_link(self, stream_id: int | str, start: float,
+                     stop: float | None = None) -> dict | None:
+        """(worker thread) A channel's archive from *start* (unix time):
+        the programme then in the portal's guide - with *stop*, the one a
+        guide's programme from *start* to *stop* stands for - and its link
+        from create_link (type=tv_archive). The link begins at the
+        programme's own start, so *offset* is how far into it *start* is:
+
+            {"url", "start", "stop", "offset", "title", "id"}
+
+        None when the portal has no such programme or gives no address for
+        it. A network failure raises: it says nothing about the archive."""
+        try:
+            prog = self.archive_programme(stream_id, start, stop)
+        except LocalizedError as e:
+            log.warning("stalker tv_archive @ %s: no guide - %s", self.server,
+                        e)
+            return None
+        if prog is None:
+            log.info("stalker tv_archive @ %s: channel %s has no programme "
+                     "in the guide at %s", self.server, stream_id,
+                     _local(int(start)))
+            return None
+        row = prog["row"]
+        pid = _text(row.get("id"))
+        if "mark_archive" in row and not _flag(row.get("mark_archive")):
+            # Asked all the same: a programme still on air is not marked
+            # yet, and some portals never mark one.
+            log.debug("stalker tv_archive @ %s: programme %s is not marked "
+                      "as in the archive", self.server, pid)
+        url = self._archive_create_link(archive_cmds(row))
+        if not url:
+            return None
+        return {"url": url, "start": prog["start"], "stop": prog["stop"],
+                "offset": max(0.0, float(start) - prog["start"]),
+                "title": _text(row.get("name")), "id": pid}
+
+    def _archive_create_link(self, cmds: list[str]) -> str:
+        """The first address create_link gives for one of *cmds*, or "".
+        Raises a network failure when that is all the portal gave."""
+        deadline = time.monotonic() + self.ARCHIVE_BUDGET_SECS
+        down: Exception | None = None
+        for cmd in cmds:
+            try:
+                js = self._call({"type": "tv_archive", "action": "create_link",
+                                 "cmd": cmd, "series": "",
+                                 "forced_storage": "", "disable_ad": "0",
+                                 "download": "0", "force_ch_link_check": "0"},
+                                read=self.ARCHIVE_BUDGET_SECS,
+                                deadline=deadline)
+            except (requests.Timeout, requests.ConnectionError) as e:
+                down = e
+                break               # the portal is not answering at all
+            except Exception as e:
+                log.warning("stalker tv_archive create_link @ %s failed - "
+                            "%s: %s", self.server, type(e).__name__,
+                            self._redact(str(e)))
+                continue
+            url = archive_address(js)
+            if url:
+                log.info("stalker tv_archive @ %s: a link for %s",
+                         self.server, cmd)
+                return url
+            err = js.get("error") if isinstance(js, dict) else ""
+            log.info("stalker tv_archive create_link @ %s: no address for "
+                     "%s%s", self.server, cmd, f" ({err})" if err else "")
+        if down is not None:
+            raise down
+        return ""
+
+    def archive_table(self, stream_id: int | str, days: int) -> list[dict]:
+        """(worker thread) The channel's programmes of the last *days* days
+        and today, as epg_table has them, for the archive's list: those the
+        portal marks as in the archive, where it marks any."""
+        days = max(0, min(int(days), self.ARCHIVE_TABLE_DAYS))
+        today = datetime.now(timezone.utc).date()
+        rows: list[dict] = []
+        for d in range(days + 1):
+            day = str(today - timedelta(days=d))
+            try:
+                rows.extend(self._day_rows(stream_id, day))
+            except Exception as e:
+                if d == 0:
+                    raise
+                # The days already read are worth showing.
+                log.info("stalker archive list @ %s: stopped at %s - %s: %s",
+                         self.server, day, type(e).__name__,
+                         self._redact(str(e)))
+                break
+        if any(_flag(r.get("mark_archive")) for r in rows):
+            rows = [r for r in rows if "mark_archive" not in r
+                    or _flag(r.get("mark_archive"))]
+        return self._programmes(rows, stream_id) or self.epg_table(stream_id)
 
     def xmltv(self) -> bytes:
         """Nothing: portals rarely serve XMLTV (see epg_url)."""

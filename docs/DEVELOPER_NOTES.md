@@ -52,9 +52,25 @@ The app connects to Xtream Codes providers via their HTTP API
 It offers the same calls as `XtreamClient`, so the window does not know
 which kind it has.  A portal hands out a link per play (`create_link`),
 which is resolved off the GUI thread (`link_ready`, with a time limit) so
-a slow portal cannot freeze the window.  Not done yet: catch-up from a
-portal (`tv_archive` / `create_link` on an archive URL) - it needs a portal
-with archive to test against.
+a slow portal cannot freeze the window.
+
+A portal keeps its archive by programme.  A channel row flags it
+(`tv_archive`, `archive` or `enable_tv_archive`; the depth,
+`tv_archive_duration`, is in hours and becomes whole days for the
+window), the guide table (`get_simple_data_table`, one day per call)
+lists programmes with their ids, and `type=tv_archive&action=create_link`
+with `cmd=auto /media/<programme id>.mpg` gives a link that plays that
+programme from its start.  `StalkerClient.archive_link` finds the
+programme for a moment (or the one a guide's programme overlaps most),
+then asks create_link with the programme's own `cmd` if the guide gives
+one, its id, then its `real_id`; `archive_by_programme` tells the window
+to ask for it off its thread (`ui/mw_portal_archive.py`) instead of
+`timeshift_urls`.  The player starts as far into the link as was asked
+(`_start_playback(start_at=...)`), a go-back carries on with the next
+programme when one ends, and multiview and casting leave a portal's
+archive alone.  Tested against a fake portal only
+(`tests/test_stalker_archive.py`): no real portal with an archive has
+been tried yet.
 
 ## Embedded player
 

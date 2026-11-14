@@ -64,6 +64,7 @@ from .mw_busy import _BusyMixin
 from .mw_cast import _CastMixin
 from .mw_chanprefs import _ChannelPrefsMixin
 from .mw_failover import _FailoverMixin
+from .mw_portal_archive import _PortalArchiveMixin
 from .mw_health import _HealthMixin
 from .mw_remote import _RemoteMixin
 from .mw_report import _ReportMixin
@@ -127,6 +128,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _FollowMixin, _SubtitlesMixin, _CastMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
                  _HealthMixin, _ChannelPrefsMixin, _RemoteMixin, _ReportMixin,
+                 _PortalArchiveMixin,
                  QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
@@ -4311,6 +4313,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._ts_program_stop = None
         self._ts_program_title = None
         self._ts_segment_start = None
+        self._ts_from_portal = False
         self._ts_live_offset = 0.0
         self._pause_started = None
         # Nerd: the channel it is, for the settings of its own.
@@ -4675,6 +4678,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 # silently bouncing to live.
                 dur = self.player.playback_duration() if self.player else 0.0
                 it = last.get("item")
+                # A portal's archive link is one programme: a go-back goes
+                # on with the next (mw_portal_archive).
+                if it is not None and self._portal_archive_next(it):
+                    return
                 if not (dur and dur > 10):
                     self._set_status(tr("ts_archive_unavailable"),
                                      emphasis=True)
@@ -4722,7 +4729,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _start_playback(self, url: str, title: str, icon_url,
                         key, kind: str, record: bool = True,
-                        item=None, catchup: bool = False) -> None:
+                        item=None, catchup: bool = False,
+                        start_at: float = 0.0) -> None:
+        # start_at: how far into a catch-up link to start (a portal's
+        # archive link plays a programme from its own start).
         if not self._guard_stream_switch(url, title):
             return
         # The guard is about streams: the user's own files always play.
@@ -4750,6 +4760,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._ts_program_start = None
             self._ts_program_stop = None
             self._ts_program_title = None
+            self._ts_from_portal = False
             self._ts_live_offset = 0.0   # fresh tune = at the live edge
             self._pause_started = None   # per-channel: don't carry a stale pause
         # Remember where we were in whatever was playing before switching,
@@ -4758,6 +4769,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._maybe_auto_mark_watched()
         resume_at = (self._resume_offset(key, kind)
                      if kind in self._RESUMABLE else 0.0)
+        if catchup and start_at > 0:
+            resume_at = float(start_at)
         self._trakt_stop_current()
         if record and kind:
             self.history.add(url, title, icon_url, key, kind,
@@ -5379,6 +5392,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if token != getattr(self, "_catchup_verify_token", 0):
             return   # superseded by a newer play
         if not getattr(self, "_playing_catchup", False):
+            return
+        if getattr(self, "_ts_from_portal", False):
+            # The portal's own link for the programme, not a guessed
+            # address format - and a programme's file need not be seekable.
             return
         if not (self.player and self.player.current_url):
             return

@@ -391,13 +391,15 @@ class _MultiviewCell(QWidget):
         self._want_aid = None
         self._want_sid = None
         # Catch-up capable? Needs the provider flag, a real depth, a stream id
-        # and a client that can build archive URLs.
+        # and a client that can build archive URLs - not a portal, whose
+        # archive is asked for by programme (the main player's alone).
         days = _as_int((item or {}).get("tv_archive_duration"))
         self._ts_days = days
         self._ts_capable = bool(
             item and _as_int((item or {}).get("tv_archive")) and days > 0
             and (item or {}).get("stream_id") is not None
-            and client is not None and hasattr(client, "timeshift_urls"))
+            and client is not None and hasattr(client, "timeshift_urls")
+            and not getattr(client, "archive_by_programme", False))
         self._live_start = None    # fresh rolling window for the new stream
         self._live_edge = 0.0
         self._win_span = 0.0

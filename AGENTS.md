@@ -33,7 +33,7 @@ map and the one-way import rule.
 | `app.py` | Entry point, QApplication, login loop |
 | `i18n.py` | English source strings, `set_language`, `tr()` (other 26 languages in `locale/*.json`) |
 | `providers/client.py` | Xtream Codes API client |
-| `providers/stalker.py` | Stalker / Ministra portal client (MAC portals: handshake, create_link) |
+| `providers/stalker.py` | Stalker / Ministra portal client (MAC portals: handshake, create_link, the archive by programme: `archive_link`, `archive_table`) |
 | `providers/boxes.py` | `BoxClient`: what boxes on the home network share (login, catalogue, stable ids, recordings as films, the box's guide as XMLTV via `own_guide`) |
 | `providers/enigma2.py` | Enigma2 receivers (VU+, Dreambox, Zgemma...) over the classic `/web/` API of OpenWebif and the Dreambox WebInterface |
 | `providers/tvheadend.py` | Tvheadend servers (channel tags, stream profiles, XMLTV, DVR recordings, digest login) |
@@ -119,6 +119,7 @@ map and the one-way import rule.
 | `ui/mw_failover.py` | Failover in the window: once per channel, the other source's options while it plays, a note |
 | `ui/mw_chanprefs.py` | A channel's own settings in the window: the player told which channel it plays (`set_channel`), the channel menu's "Channel settings…" (a dot when it has its own), its dialog |
 | `ui/mw_health.py` | Stream health in the window: the playback path's hooks (start, picture, drop, fail), the channel menu's "Stream health…", the list's dot |
+| `ui/mw_portal_archive.py` | A Stalker portal's archive in the window: its link asked for off the window's thread (`StalkerClient.archive_link`), played from the moment asked, a go-back carried on to the next programme |
 | `ui/mw_remote.py` | The remote API and sharing in the window: the server as Nerd says, each request's work on the window's thread |
 | `ui/mw_report.py` | Send feedback, and the offer of a report after an error or a crash |
 | `ui/mw_home.py` | The Home page: which shelves, what goes in them (drawn by `home_widgets.py`) |
@@ -149,7 +150,8 @@ remembered per title), `mw_cast` (Chromecast and DLNA: the cast
 dialog, the strip, handing over from the archive), `mw_donate` (the
 sidebar heart, About's link, Home's card), `mw_failover` (failover to another
 source), `mw_health` (stream health per channel), `mw_chanprefs` (a channel's
-own settings), `mw_privacy` (private viewing,
+own settings), `mw_portal_archive` (a Stalker portal's archive, by
+programme), `mw_privacy` (private viewing,
 clear recent history) and `mw_popout`
 (detached-window player). What stays in `main_window.py` is
 the `__init__`/`_build_ui` composition and the playback path (start/stop,

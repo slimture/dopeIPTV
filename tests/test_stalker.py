@@ -562,8 +562,10 @@ def test_channels_in_xtreams_shapes(portal, xtream):
     assert sport["stream_icon"] == "http://img.example/102.png"
     assert news["epg_channel_id"] == "news.uk" and news["num"] == 1
     assert sport["is_adult"] == 1
-    # No archive is offered (timeshift_urls has none), whatever the portal says.
-    assert news["tv_archive"] == 0
+    # An archive of three hours is a day's, as the window counts; it is
+    # played by programme (archive_link), so timeshift_urls has nothing.
+    assert (news["tv_archive"], news["tv_archive_duration"]) == (1, 1)
+    assert (sport["tv_archive"], sport["tv_archive_duration"]) == (0, 0)
     assert c.timeshift_urls(101, datetime.now(), 30) == []
 
 

@@ -98,6 +98,8 @@ dopeiptv/
                        QLocale-formatted dates in the app's language
     mw_trakt.py        Trakt / watched / watchlist mixin
     mw_recording.py    Recording / timeshift mixin
+    mw_portal_archive.py A Stalker portal's archive: by programme, its link
+                       asked for off the window's thread
     mw_context.py      Right-click context-menu mixin
     mw_favorites.py    Favorites in bulk: multi-row actions, move, drag-and-drop
     mw_detail.py       EPG / detail-panel mixin

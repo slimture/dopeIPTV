@@ -109,8 +109,12 @@ class _CastMixin:
                      else self._resume_offset(key, rkind))
         self._cast_ctx = {
             "sid": it.get("stream_id") if live else None,
+            # Not a portal's: it is asked for by programme, which only the
+            # player does (mw_portal_archive).
             "archive": bool(live and it.get("stream_id") is not None
-                            and it.get("tv_archive")),
+                            and it.get("tv_archive")
+                            and not getattr(self.client,
+                                            "archive_by_programme", False)),
             "title": title,
             "group": self._RESUME_GROUP.get(rkind or ""),
             "key": key,
