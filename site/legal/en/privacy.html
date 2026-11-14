@@ -63,7 +63,7 @@
 <h3>Server logs</h3>
 <p>To send you a page, our web server needs your IP address, and your browser also sends the address of the page, the time, the name and version of your browser and system (the user agent), the page you came from (the referrer) and the languages you prefer.</p>
 <ul>
-<li>The front server, which handles the encrypted connection, keeps a general technical log of requests and a log of errors, for operation and security. They are rotated when they grow large, and only the seven latest parts are kept; at today's traffic that means about two weeks for the request log and about two months for the error log. Settings sync requests are never logged.</li>
+<li>The front server, which handles the encrypted connection, keeps a general technical log of requests and a log of errors, for operation and security. They are rotated every night and kept for at most 30 days, then removed automatically. Settings sync requests are never logged.</li>
 <li>For the statistics below, the server keeps two separate logs with IP address, time, address, status, referrer, browser and language: one of page views and the pages' view signal, kept for about a week, and one of download clicks, which is rotated by size, the ten latest parts being kept.</li>
 <li>The services behind the website – donations, feedback and sync – keep IP addresses only in memory, briefly, to limit how many requests one address can make.</li>
 </ul>
@@ -126,7 +126,7 @@
 
 <h2 id="retention">9. How long we keep data</h2>
 <ul>
-<li>The front server's logs: rotated by size, and the seven latest parts are kept – today about two weeks for the request log and about two months for the error log.</li>
+<li>The front server's logs: at most 30 days, then removed automatically.</li>
 <li>The log of page views: about a week. The log of download clicks: rotated by size, and the ten latest parts are kept.</li>
 <li>Visits in the statistics: 400 days, then anonymous. Visitor IDs: 25 months. Update records: 400 days.</li>
 <li>Error reports and feedback: 12 months from when they were sent, then removed automatically. They are designed not to point to you.</li>

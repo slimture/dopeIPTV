@@ -63,7 +63,7 @@
 <h3>Serverloggar</h3>
 <p>För att kunna skicka en sida till dig behöver vår webbserver din IP-adress, och din webbläsare skickar dessutom sidans adress, tidpunkten, webbläsarens och systemets namn och version (user agent), sidan du kom från (referrer) och vilka språk du föredrar.</p>
 <ul>
-<li>Frontservern, som hanterar den krypterade anslutningen, för för drift och säkerhet en allmän teknisk logg över anrop och en logg över fel. De roteras när de blir stora, och bara de sju senaste delarna sparas; med dagens trafik betyder det ungefär två veckor för anropsloggen och ungefär två månader för felloggen. Anrop för synkronisering loggas aldrig.</li>
+<li>Frontservern, som hanterar den krypterade anslutningen, för för drift och säkerhet en allmän teknisk logg över anrop och en logg över fel. De byts varje natt och sparas i högst 30 dagar, sedan tas de bort automatiskt. Anrop för synkronisering loggas aldrig.</li>
 <li>För statistiken nedan för servern två separata loggar med IP-adress, tidpunkt, adress, status, referrer, webbläsare och språk: en över sidvisningar och sidornas visningssignal, som sparas i ungefär en vecka, och en över klick på nedladdningar, som roteras efter storlek och där de tio senaste delarna sparas.</li>
 <li>Tjänsterna bakom webbplatsen – donationer, feedback och synkronisering – håller IP-adresser bara i minnet, en kort stund, för att begränsa hur många anrop en adress kan göra.</li>
 </ul>
@@ -126,7 +126,7 @@
 
 <h2 id="lagring">9. Hur länge vi sparar uppgifter</h2>
 <ul>
-<li>Frontserverns loggar: roteras efter storlek, och de sju senaste delarna sparas – i dag ungefär två veckor för anropsloggen och ungefär två månader för felloggen.</li>
+<li>Frontserverns loggar: högst 30 dagar, sedan tas de bort automatiskt.</li>
 <li>Loggen över sidvisningar: ungefär en vecka. Loggen över klick på nedladdningar: roteras efter storlek, och de tio senaste delarna sparas.</li>
 <li>Besök i statistiken: 400 dagar, därefter anonyma. Besökar-id: 25 månader. Uppgifter om uppdateringar: 400 dagar.</li>
 <li>Felrapporter och feedback: 12 månader från att de skickades, sedan tas de bort automatiskt. De är utformade så att de inte pekar ut dig.</li>

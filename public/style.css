@@ -346,25 +346,7 @@ footer .v { font-size: 12.5px; color: var(--faint); }
 footer nav { display: flex; gap: 22px; flex-wrap: wrap; }
 footer nav a { color: var(--muted); font-size: 12.5px; }
 footer nav a:hover { color: var(--accent); }
-/* Privacy, terms, donations, about: a row of its own under the rest, on
-   every page (the 404's whole footer). */
-footer nav.foot-legal { flex-basis: 100%; gap: 8px 22px; padding-top: 16px; border-top: 1px solid var(--line); }
-footer nav.foot-legal:only-child { padding-top: 0; border-top: 0; }
 
-/* What the app is not, where everyone looks first: the front page's hero
-   and the top of the help (both say it in every language). */
-.playeronly {
-  display: flex; align-items: flex-start; gap: 10px;
-  width: fit-content; max-width: min(46em, 100%); margin: 26px auto 0; padding: 11px 16px;
-  border-radius: 14px; background: var(--surface); border: 1px solid var(--line);
-  color: var(--text); font-size: 14.5px; line-height: 1.5; text-align: start;
-}
-.playeronly svg { flex: none; width: 19px; height: 19px; margin-top: 1px; fill: none;
-  stroke: var(--accent); stroke-width: 2; stroke-linecap: round; }
-.playeronly span { text-wrap: pretty; }
-.playeronly a { color: var(--accent); font-weight: 600; white-space: nowrap; }
-.playeronly a:hover { text-decoration: underline; text-underline-offset: 3px; }
-.help-top .playeronly { margin: -6px 0 22px; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
 
 /* Screenshot lightbox (opened from app.js) */
