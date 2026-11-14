@@ -117,7 +117,7 @@ class EpgGrid(QWidget):
     ZOOM_SPANS = (1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0)
     # Fit shows as many hours as keep a half hour this wide: room for a
     # short title ("Vem vet mest?", "Sportnytt") in a half-hour card.
-    MIN_HALF_HOUR_W = 110
+    MIN_HALF_HOUR_W = 80
     FIT_DELAY_MS = 120       # a resize settles before the scale follows
     LABEL_DY = 21            # vertical inset of a card's title text
     FUTURE_HOURS = 12       # how far ahead the board reaches
