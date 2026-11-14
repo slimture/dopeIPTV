@@ -4,7 +4,8 @@ span that stays until Fit; the page and the window each remember their own
 (written only when it changes); a new scale keeps the time at the left edge
 (or "now" in view), puts every programme, the on-air card and the header
 where their times are, keeps the selection, and lays out only the rows on
-screen - with 10,000 channels too.
+screen - with 10,000 channels too. A few pixels more or less keep the scale
+(nothing drawn anew); the rows beyond the view follow a few at a time.
 
 Runs in a subprocess like tests/test_epg_grid.py: the guide needs a real
 MainWindow, whose embedded player owns an offscreen QOpenGLWidget; the
@@ -110,8 +111,10 @@ def shown(g):
 
 def check_layout(g):
     ppm = g._ppm
-    # The board shows exactly its span.
-    assert abs(area(g) / ppm / 60 - g.span_hours()) < 0.01, (
+    # The board shows its span - give or take the few pixels a resize too
+    # small to draw it anew leaves (REFIT_TOLERANCE).
+    assert abs(area(g) / ppm / 60 - g.span_hours()) <= (
+        g.span_hours() * g.REFIT_TOLERANCE * 1.1 + 0.01), (
         area(g), ppm, g.span_hours())
     # Every programme drawn where its time is, the on-air card under "now".
     x = lambda ts: g.CH_COL_W + (ts - g._start) / 60 * ppm
@@ -179,6 +182,23 @@ check_layout(g)
 # Opened on now, and it stays in view.
 lo, hi = shown(g)
 assert lo <= now <= hi, (lo, now, hi)
+# A scheduled recording marks its programme; a finished one does not.
+real_jobs = list(w.rec.jobs)
+sid = chans[0]["stream_id"]
+p0 = next(rb["data"]["prog"] for rb in g._rows[0][1] if rb["data"]["prog"])
+w.rec.jobs = real_jobs + [
+    {"status": "scheduled", "url": f"http://h/live/u/p/{sid}.ts",
+     "start": p0["start_timestamp"], "stop": p0["stop_timestamp"]},
+    {"status": "recorded", "url": f"http://h/live/u/p/{sid}.ts",
+     "start": p0["stop_timestamp"], "stop": p0["stop_timestamp"] + 7200}]
+g._drop_row(0)
+g._ensure_row(0)
+marked = [rb["data"]["prog"] for rb in g._rows[0][1] if rb["text"].startswith("⏺ ")]
+assert [m["start_timestamp"] for m in marked] == [p0["start_timestamp"]], marked
+assert g._has_rec_job(chans[0], p0) and not g._has_rec_job(chans[1], p0)
+w.rec.jobs = real_jobs
+g._drop_row(0)
+g._ensure_row(0)
 
 # ---- 2. A resize: followed once it settles, the left edge's time kept ------
 g.scroll_to_time(now + 3 * 3600)
@@ -208,6 +228,22 @@ d.resize(760, 640)
 settle(g)
 lo, hi = shown(g)
 assert lo <= now <= hi, (lo, now, hi)
+# A few pixels more or less (a scroll bar, the player's column settling):
+# the scale stays and nothing is drawn anew - every row on screen was, for
+# each pixel, which made the guide on the page lag.
+ppm0, span0, vw0 = g._ppm, g.span_hours(), g.view.viewport().width()
+item = next(it for _in, it in next(iter(g._row_items.values())))
+for dw in (3, -2, -4):
+    d.resize(d.width() + dw, 640)
+    settle(g)
+    assert g._fitted_vw == g.view.viewport().width() != vw0
+    if EpgGrid.auto_span(area(g)) == span0:
+        assert g._ppm == ppm0 and g.span_hours() == span0
+        assert item.scene() is g.scene, "the board was drawn anew"
+        check_layout(g)
+# More than that: the scale follows (the rest of this test resizes so).
+d.resize(760, 640)
+settle(g)
 # (A board reaching a day back - catch-up channels - so "now" can sit far
 # right in a view of six hours.)
 real_ts = w._timeshift_days
@@ -400,6 +436,29 @@ for step in [g.zoom_out] * 7 + [g.zoom_in] * 7 + [g.zoom_fit]:
     assert g._rows[top][1] and g._rows[bottom - 1][1]
 assert worst < 1.5, f"a zoom step took {worst:.2f}s with 10,000 channels"
 check_layout(g)
+# The rows beyond the view follow - a few at a time, nearest first, so the
+# window (and the video beside the guide) never waits for two dozen rows.
+top, bottom = g._visible_rows()
+want = set(range(max(0, top - g.PRELOAD_ROWS),
+                 min(len(g._rows), bottom + g.PRELOAD_ROWS)))
+deadline = time.time() + 5
+while not want <= set(g._row_items) and time.time() < deadline:
+    app.processEvents()
+    time.sleep(0.01)
+assert want <= set(g._row_items), sorted(want - set(g._row_items))
+g._preload.stop()
+for r in want - set(range(top - 1, bottom + 1)):
+    g._drop_row(r)
+before = set(g._row_items)
+g._preload_rows()
+drawn = set(g._row_items) - before
+assert 0 < len(drawn) <= g.PRELOAD_CHUNK, drawn
+assert max(abs(r - (top + bottom) / 2) for r in drawn) <= min(
+    abs(r - (top + bottom) / 2) for r in want - set(g._row_items))
+assert g._preload_more.isActive()
+d.hide()
+app.processEvents()
+assert not g._preload_more.isActive()
 d.deleteLater()
 app.processEvents()
 

@@ -183,7 +183,8 @@ assert g._guide_poll.isActive()
 d.hide()
 app.processEvents()
 assert not any(t.isActive() for t in (g._refresh, g._epg_poll,
-                                      g._guide_poll, g._preload))
+                                      g._guide_poll, g._preload,
+                                      g._preload_more))
 state["loaded"] = True
 d.show()
 app.processEvents()

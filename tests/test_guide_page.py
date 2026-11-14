@@ -122,7 +122,8 @@ assert w._mid_stack.currentWidget() is w._list_page and w._list_page.isVisible()
 assert not page.isVisible()
 assert live.isChecked() and not guide.isChecked()
 assert not any(t.isActive() for t in (grid._refresh, grid._epg_poll,
-                                      grid._guide_poll, grid._preload))
+                                      grid._guide_poll, grid._preload,
+                                      grid._preload_more))
 untouched()
 
 # -- back again: the same guide, nothing drawn anew --------------------------

@@ -119,6 +119,10 @@ class EpgGrid(QWidget):
     # short title ("Vem vet mest?", "Sportnytt") in a half-hour card.
     MIN_HALF_HOUR_W = 80
     FIT_DELAY_MS = 120       # a resize settles before the scale follows
+    # A width change this small (a scroll bar, the player's column settling
+    # by a few pixels) keeps the scale: the board was drawn anew - every
+    # row on screen - for a span a minute or two different.
+    REFIT_TOLERANCE = 0.03
     LABEL_DY = 21            # vertical inset of a card's title text
     FUTURE_HOURS = 12       # how far ahead the board reaches
     MAX_PAST_HOURS = 48     # cap on how far back timeshift opens the board
@@ -130,6 +134,10 @@ class EpgGrid(QWidget):
     # channels, which with a big provider was one country's - the rest of the
     # line-up was simply not in the guide.
     PRELOAD_ROWS = 12        # drawn beyond each edge of the viewport
+    # Those a few at a time, nearest the view first, a turn of the event loop
+    # apart: two dozen rows in one go held the window (and the video beside
+    # the guide) for a noticeable moment.
+    PRELOAD_CHUNK = 4
     KEEP_ROWS = 240          # past this many drawn rows, the farthest go
     # Below this width the bar's longer buttons show their icon alone (the
     # middle pane is narrower than the guide's window used to be); above
@@ -381,6 +389,13 @@ class EpgGrid(QWidget):
         self._preload.setSingleShot(True)
         self._preload.setInterval(80)
         self._preload.timeout.connect(self._preload_rows)
+        self._preload_more = QTimer(self)
+        self._preload_more.setSingleShot(True)
+        self._preload_more.setInterval(0)
+        self._preload_more.timeout.connect(self._preload_rows)
+        # The cards' bevelled brushes, one per fill colour (a theme makes a
+        # new guide; restyle starts this afresh all the same).
+        self._brushes: dict[int, QBrush] = {}
         self._focus: tuple[int, int] | None = None
         # Keep the board alive while it is on screen: the on-air cards and
         # the playing channel follow the clock instead of freezing at open.
@@ -438,6 +453,7 @@ class EpgGrid(QWidget):
 
     def restyle(self) -> None:
         """Colours and drawn icons from the current theme (P)."""
+        self._brushes = {}
         self.title_lbl.setStyleSheet(
             f"color:{P['text']}; font-size:15px; font-weight:700;")
         self.scope_lbl.setStyleSheet(f"color:{P['muted']}; font-size:13px;")
@@ -745,11 +761,17 @@ class EpgGrid(QWidget):
         self._fit_timer.stop()
         vw = self.view.viewport().width()
         area = max(2 * self.MIN_HALF_HOUR_W, vw - self.CH_COL_W)
-        self._span = (self.auto_span(area) if self._zoom_auto
-                      else self._zoom_span)
+        span = self.auto_span(area) if self._zoom_auto else self._zoom_span
+        ppm = area / (span * 60)
         self._fitted_vw = vw
+        if (span == self._span
+                and abs(ppm - self._ppm) <= self._ppm * self.REFIT_TOLERANCE):
+            self._sync_zoom_buttons()
+            self._pin()                         # the rows in view, drawn
+            return
+        self._span = span
         self._sync_zoom_buttons()
-        self._apply_scale(area / (self._span * 60))
+        self._apply_scale(ppm)
 
     def left_time(self) -> float:
         """The time at the board's left visible edge, beside the channels."""
@@ -987,7 +1009,7 @@ class EpgGrid(QWidget):
 
     def _stop_timers(self, *_a) -> None:
         for timer in (self._refresh, self._epg_poll, self._guide_poll,
-                      self._preload, self._fit_timer):
+                      self._preload, self._preload_more, self._fit_timer):
             timer.stop()
 
     # -- build ---------------------------------------------------------------
@@ -1136,8 +1158,18 @@ class EpgGrid(QWidget):
         extra = self.PRELOAD_ROWS if preload else 1
         lo = max(0, top - extra)
         hi = min(len(self._rows), bottom + extra)
-        for row in range(lo, hi):
-            self._ensure_row(row)
+        if preload:
+            mid = (top + bottom) / 2
+            want = sorted((r for r in range(lo, hi)
+                           if r not in self._row_items),
+                          key=lambda r: abs(r - mid))
+            for row in want[:self.PRELOAD_CHUNK]:
+                self._ensure_row(row)
+            if len(want) > self.PRELOAD_CHUNK and self.isVisible():
+                self._preload_more.start()
+        else:
+            for row in range(lo, hi):
+                self._ensure_row(row)
         # Nothing ticks while the guide is off screen: a scroll set by code
         # meanwhile (a rebuild keeping its place) waits for showEvent.
         if not preload and self.isVisible():
@@ -1354,6 +1386,7 @@ class EpgGrid(QWidget):
         row_blocks: list = []
         drew_any = False
         now = time.time()
+        rec_spans = self._rec_spans(ch)
         prev_x2, prev_title = -1.0, None
         for p in self.window.xmltv.programmes_in(ch, self._start, self._stop):
             x1 = max(self.CH_COL_W, self._x(p["start_timestamp"]))
@@ -1388,7 +1421,8 @@ class EpgGrid(QWidget):
             # State glyphs on the block itself: a scheduled/running recording
             # and a set reminder used to be visible only in the context menu.
             prefix = ""
-            if self._has_rec_job(ch, p):
+            if any(start < p["stop_timestamp"] and stop > p["start_timestamp"]
+                   for start, stop in rec_spans):
                 prefix += "⏺ "
             if (p["start_timestamp"] > now
                     and ch.get("stream_id") is not None
@@ -1440,11 +1474,14 @@ class EpgGrid(QWidget):
         """Subtle top-to-bottom bevel so cards read as raised, not flat -
         the 'more depth' look, done as one gradient brush (no extra shadow
         items, which 300 channels x several programmes couldn't afford)."""
-        g = QLinearGradient(0.0, 0.0, 0.0, 1.0)
-        g.setCoordinateMode(QGradient.CoordinateMode.ObjectBoundingMode)
-        g.setColorAt(0.0, fill.lighter(112))
-        g.setColorAt(1.0, fill.darker(112))
-        return QBrush(g)
+        brush = self._brushes.get(fill.rgba())
+        if brush is None:
+            g = QLinearGradient(0.0, 0.0, 0.0, 1.0)
+            g.setCoordinateMode(QGradient.CoordinateMode.ObjectBoundingMode)
+            g.setColorAt(0.0, fill.lighter(112))
+            g.setColorAt(1.0, fill.darker(112))
+            brush = self._brushes[fill.rgba()] = QBrush(g)
+        return brush
 
     def _style_card(self, item: QGraphicsPathItem, state: str,
                     tones: dict) -> None:
@@ -1499,24 +1536,26 @@ class EpgGrid(QWidget):
         self.scene.addItem(label)
         return label
 
-    def _has_rec_job(self, ch: dict, p: dict) -> bool:
-        """A scheduled/running recording overlapping this programme on this
-        channel (matched on the stream id embedded in the job's URL)."""
+    def _rec_spans(self, ch: dict) -> list[tuple[float, float]]:
+        """The scheduled or running recordings of this channel (matched on
+        the stream id in the job's URL), as (start, stop) - gone through once
+        per row, not once per programme: the jobs list keeps every recording
+        ever made, and a row has dozens of programmes."""
         rec = getattr(self.window, "rec", None)
         sid = ch.get("stream_id")
         if rec is None or sid is None:
-            return False
+            return []
         tag = f"/{sid}."
-        for j in getattr(rec, "jobs", []):
-            if j.get("status") not in ("scheduled", "recording"):
-                continue
-            if tag not in (j.get("url") or ""):
-                continue
-            stop = j.get("stop") or float("inf")
-            if j.get("start", 0) < p["stop_timestamp"] \
-                    and stop > p["start_timestamp"]:
-                return True
-        return False
+        return [(j.get("start", 0), j.get("stop") or float("inf"))
+                for j in getattr(rec, "jobs", [])
+                if j.get("status") in ("scheduled", "recording")
+                and tag in (j.get("url") or "")]
+
+    def _has_rec_job(self, ch: dict, p: dict) -> bool:
+        """A scheduled/running recording overlapping this programme on this
+        channel."""
+        return any(start < p["stop_timestamp"] and stop > p["start_timestamp"]
+                   for start, stop in self._rec_spans(ch))
 
     def _mark_now(self) -> None:
         """Re-mark which card is on air (and dim the ones that just ended),
