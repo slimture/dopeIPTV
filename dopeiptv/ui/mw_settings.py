@@ -2285,6 +2285,8 @@ class _SettingsMixin:
                 if changed & {"nerd_enabled", "nerd_remote", "nerd_share", "nerd_remote_lan",
                               "nerd_remote_port", "nerd_remote_token"}:
                     self._remote_apply()
+                if "nerd_enabled" in changed or any(k.startswith(("nerd_hooks", "nerd_mqtt")) for k in changed):
+                    self._events_apply()
 
             if any(k.startswith("mv_") for k in changed):
                 self._apply_multiview_settings()

@@ -57,6 +57,9 @@ dopeiptv/
                        deinterlace, aspect, audio delay (what each sets in mpv)
     backup.py          Full backup and restore (one JSON file; a restore over
                        everything is put in place as the app next starts)
+    events.py          Nerd: events pushed out - webhooks and MQTT (queue +
+                       a thread per receiver; it only watches)
+    mqtt.py            A small MQTT 3.1.1 client (standard library only)
     log.py             Central logging (configure_logging, DOPEIPTV_LOG)
     platform_macos.py  macOS-specific helpers (OpenGL, libmpv, paths)
     platform_windows.py Windows helpers (libmpv discovery, wakelock, shortcut)

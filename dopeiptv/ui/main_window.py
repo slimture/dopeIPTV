@@ -68,6 +68,7 @@ from .mw_failover import _FailoverMixin
 from .mw_portal_archive import _PortalArchiveMixin
 from .mw_health import _HealthMixin
 from .mw_remote import _RemoteMixin
+from .mw_events import _EventsMixin
 from .mw_report import _ReportMixin
 from .mw_privacy import _PrivacyMixin
 from .mw_commands import _CommandsMixin
@@ -129,7 +130,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _PopoutMixin, _MultiviewMixin, _HomeMixin, _MprisMixin,
                  _FollowMixin, _SubtitlesMixin, _CastMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
-                 _HealthMixin, _ChannelPrefsMixin, _RemoteMixin, _ReportMixin,
+                 _HealthMixin, _ChannelPrefsMixin, _RemoteMixin, _EventsMixin, _ReportMixin,
                  _PortalArchiveMixin, _SeriesMixin,
                  QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
@@ -242,6 +243,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.rec = RecordingManager(settings, self)
         self.rec.jobs_changed.connect(self._recordings_changed)
         self.rec.recording_stopped.connect(self._on_recording_stopped)
+        # Events pushed out (Nerd): they only watch.
+        self.rec.recording_stopped.connect(self._events_rec_stopped)
+        self.rec.jobs_changed.connect(self._events_jobs)
         self.wake = WakeLock()
         self._init_donate()
         self._full_catalog: list | None = None
@@ -1282,16 +1286,20 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.docked_context_menu.connect(self._docked_context_menu)
             self.player.stop_btn.clicked.connect(self._exit_popout_if_active)
             self.player.stopped.connect(self._on_player_stopped)
+            self.player.stopped.connect(self._events_stopped)
             self.player.resume_requested.connect(self._resume_last)
             self.player.stalled.connect(self._on_player_stalled)
             self.player.contested.connect(self._on_stream_contested)
             self.player.reopen_live.connect(self._reopen_live_edge)
             self.player.first_frame.connect(self._health_frame)
+            # Before _on_player_finished, which may start the next episode.
+            self.player.finished.connect(self._events_finished)
             self.player.finished.connect(self._on_player_finished)
             self.player.next_episode.connect(self._play_next_episode)
             # Keep the poster overlay's play/pause/stop glyph in sync with the
             # player (guarded: the overlay is built later in this constructor).
             self.player.paused_changed.connect(self._on_paused_changed)
+            self.player.paused_changed.connect(self._events_paused)
             self.player.stopped.connect(self._apply_play_icon)
             self.player.finished.connect(self._apply_play_icon)
             self.player.timeshift_seek.connect(self._on_timeshift_seek)
@@ -4331,6 +4339,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                             buffer_key=f"live:{self._item_key(it)}"):
             self.wake.acquire(tr("wake_playing", title=title))
             self._health_begin(self._item_key(it), title, it, "live", False)
+            self._events_started(self._item_key(it), title, it, "live", False)
         self._apply_seek_mode(it, "live")
         # Refresh the poster overlay glyph (play -> pause for a timeshift
         # channel, -> stop for plain live). Unlike _start_playback, the preview
@@ -4891,6 +4900,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                                 buffer_key=f"{kind}:{key}" if key else None):
                 self.wake.acquire(tr("wake_playing", title=title))
                 self._health_begin(key, title, item, kind, catchup)
+                self._events_started(key, title, item, kind, catchup)
             else:
                 log.warning("embedded play() refused %s - falling back to an "
                             "external mpv window", redact_url(url))
@@ -5120,6 +5130,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.current_url = None
         # The reconnects are spent: for stream health, it did not play.
         self._health_failed(msg)
+        self._events_failed()
         url = (lp or {}).get("url")
         # Nerd: the same channel from another source, before giving up.
         if url and self._try_failover(lambda u=url: self._diagnose_stream_failure(u)):
@@ -5728,6 +5739,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._maybe_auto_mark_watched()
         self.wake.release()
         self._stop_media_session()
+        self._events_quit()
         self._remote_stop()
         self.cover.flush()
         if self._trakt_active:
@@ -5776,6 +5788,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # should sit through that just to close the window.
         if casting:
             cast_stop.join(2.0)
+        self._events_join(1.0)
         super().closeEvent(event)
         # Only fall back to os._exit if workers are still active - at
         # that point the interpreter would segfault emitting Qt

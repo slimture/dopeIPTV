@@ -78,7 +78,9 @@ PART_KEYS = {
                "nerd_mpv_config_dir", "nerd_shaders", "nerd_mpv_options", "nerd_adelay_per_channel",
                "nerd_hls_quality", "nerd_hls_max_kbps"),
     "rec": ("nerd_rec_template", "nerd_rec_post"),
-    "serve": ("nerd_remote", "nerd_share", "nerd_remote_lan", "nerd_remote_port"),
+    "serve": ("nerd_remote", "nerd_share", "nerd_remote_lan", "nerd_remote_port", "nerd_hooks",
+              "nerd_hooks_urls", "nerd_mqtt", "nerd_mqtt_host", "nerd_mqtt_port", "nerd_mqtt_tls",
+              "nerd_mqtt_client", "nerd_mqtt_prefix", "nerd_mqtt_ha"),
 }
 
 
@@ -779,6 +781,9 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
           search="token password secret key", below=remote_line)
     c.note(tr("nerd_applies_remote"))
 
+    # -- events pushed out: webhooks and MQTT ------------------------------------------------
+    hooks = _events_cards(at("serve"), n, lines)
+
     # -- diagnostics (Nerd's own page) --------------------------------------------------------
     c = page.card(tr("nerd_card_diag"))
     level = combo([("info", "nerd_log_info"), ("debug", "nerd_log_debug")], val("nerd_log_level", "info"))
@@ -849,6 +854,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
         put("nerd_remote_lan", "true" if who.currentData() == "lan" else "false")
         put("nerd_remote_port", port.value())
         put("nerd_remote_token", token.text().strip())
+        out.update(hooks())
         return out
 
     # Off: the switch and what Nerd holds, nothing else. On: all of it - on
@@ -922,6 +928,140 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
 
     commit.lines = lines  # type: ignore[attr-defined]
     return commit
+
+
+def _events_cards(page: SettingsPage, n: nerd.Nerd, lines: list[CheckLine]) -> Callable[[], dict[str, str]]:
+    """Events pushed out (core/events.py): webhooks and MQTT, each with a
+    Test that sends a test event and says whether it arrived. Returns what
+    the cards hold, as the settings they are stored as."""
+    from ..core import events
+    from ..core.nerd_check import FAIL, INFO, WARN, Check
+
+    def flag(sw: ToggleSwitch) -> str:
+        return "true" if sw.isChecked() else "false"
+
+    # -- webhooks ------------------------------------------------------------------
+    c = page.card(tr("nerd_card_hooks"))
+    hooks_on = ToggleSwitch(n.flag("nerd_hooks"))
+    hooks_on.setAccessibleName(tr("nerd_hooks"))
+    c.row(tr("nerd_hooks"), hooks_on, tr("nerd_hooks_hint"),
+          search="webhook webhooks events push POST JSON Home Assistant Node-RED automation")
+    c.note(tr("nerd_events_what"))
+    urls = text_box(n.get("nerd_hooks_urls"), "http://homeassistant.local:8123/api/webhook/…", 3)
+    urls.setAccessibleName(tr("nerd_hooks_urls"))
+    header = QLineEdit(n.get("nerd_hooks_header"))
+    header.setEchoMode(QLineEdit.EchoMode.Password)
+    header.setPlaceholderText("Authorization: Bearer …")
+    header.setAccessibleName(tr("nerd_hooks_header"))
+
+    def hooks_preview() -> Check | None:
+        if not hooks_on.isChecked():
+            return Check(INFO, "nerd_ck_events_off")
+        good, bad = events.hook_urls(urls.toPlainText())
+        if bad:
+            return Check(WARN, "nerd_ck_hooks_bad", {"n": bad[0]})
+        return None if good else Check(FAIL, "nerd_ck_hooks_none")
+
+    def hooks_job() -> Any:
+        good = events.hook_urls(urls.toPlainText())[0]
+        if not hooks_on.isChecked() or not good:
+            return None
+        head = events.hook_header(header.text())
+        return lambda: events.check_hooks(good, head)
+    hooks_line = CheckLine(hooks_job, tr("nerd_card_hooks"), test=True, preview=hooks_preview)
+    lines.append(hooks_line)
+    shown = [c.row(tr("nerd_hooks_urls"), urls, tr("nerd_hooks_urls_hint"), stretch_control=True,
+                   search="webhook address URL"),
+             c.row(tr("nerd_hooks_header"), header, tr("nerd_hooks_header_hint"), stretch_control=True,
+                   search="webhook header token Authorization Bearer secret", below=hooks_line)]
+    for r in shown:
+        c.shown_if(r, hooks_on.isChecked)
+    hooks_on.toggled.connect(lambda _on, c=c: c.refresh())
+    for sig in (hooks_on.toggled, urls.textChanged, header.textChanged):
+        sig.connect(hooks_line.changed)
+
+    # -- MQTT -----------------------------------------------------------------------
+    c = page.card(tr("nerd_card_mqtt"))
+    mqtt_on = ToggleSwitch(n.flag("nerd_mqtt"))
+    mqtt_on.setAccessibleName(tr("nerd_mqtt"))
+    c.row(tr("nerd_mqtt"), mqtt_on, tr("nerd_mqtt_hint"),
+          search="MQTT broker Mosquitto Home Assistant Node-RED publish topic events")
+    host = QLineEdit(n.get("nerd_mqtt_host"))
+    host.setPlaceholderText("homeassistant.local")
+    host.setAccessibleName(tr("nerd_mqtt_host"))
+    port = Stepper(lo=1, hi=65535, value=n.num("nerd_mqtt_port", 1883), width=150)
+    tls = ToggleSwitch(n.flag("nerd_mqtt_tls"))
+    tls.setAccessibleName(tr("nerd_mqtt_tls"))
+
+    def tls_port(on: bool) -> None:
+        if on and port.value() == 1883:
+            port.setValue(8883)
+        elif not on and port.value() == 8883:
+            port.setValue(1883)
+    tls.toggled.connect(tls_port)
+    user = QLineEdit(n.get("nerd_mqtt_user"))
+    user.setPlaceholderText(tr("login_username"))
+    user.setAccessibleName(tr("login_username"))
+    password = QLineEdit(n.get("nerd_mqtt_pass"))
+    password.setEchoMode(QLineEdit.EchoMode.Password)
+    password.setPlaceholderText(tr("login_password"))
+    password.setAccessibleName(tr("login_password"))
+    login = QHBoxLayout()
+    login.setSpacing(8)
+    login.addWidget(user, 1)
+    login.addWidget(password, 1)
+    client = QLineEdit(n.get("nerd_mqtt_client"))
+    client.setPlaceholderText(events.default_client_id())
+    client.setAccessibleName(tr("nerd_mqtt_client"))
+    prefix = QLineEdit(n.get("nerd_mqtt_prefix"))
+    prefix.setPlaceholderText(events.DEFAULT_PREFIX)
+    prefix.setAccessibleName(tr("nerd_mqtt_prefix"))
+    ha = ToggleSwitch(n.flag("nerd_mqtt_ha"))
+    ha.setAccessibleName(tr("nerd_mqtt_ha"))
+
+    def mqtt_now() -> events.Config:
+        return events.Config(mqtt_host=host.text().strip(), mqtt_port=port.value(), mqtt_tls=tls.isChecked(),
+                             mqtt_user=user.text().strip(), mqtt_pass=password.text(),
+                             client_id=client.text().strip() or events.default_client_id(),
+                             prefix=events.clean_prefix(prefix.text()), ha=ha.isChecked())
+
+    def mqtt_preview() -> Check | None:
+        if not mqtt_on.isChecked():
+            return Check(INFO, "nerd_ck_events_off")
+        return None if host.text().strip() else Check(FAIL, "nerd_ck_mqtt_nohost")
+
+    def mqtt_job() -> Any:
+        if not mqtt_on.isChecked() or not host.text().strip():
+            return None
+        cfg = mqtt_now()
+        return lambda: events.check_mqtt(cfg)
+    mqtt_line = CheckLine(mqtt_job, tr("nerd_card_mqtt"), test=True, preview=mqtt_preview)
+    lines.append(mqtt_line)
+    shown = [c.row(tr("nerd_mqtt_host"), host, search="MQTT broker host address server"),
+             c.row(tr("nerd_remote_port"), port, tr("nerd_mqtt_port_hint"), search="MQTT port 1883 8883"),
+             c.row(tr("nerd_mqtt_tls"), tls, search="TLS SSL encrypted 8883"),
+             c.row(tr("nerd_mqtt_login"), login, tr("nerd_mqtt_login_hint"), stretch_control=True,
+                   search="MQTT user name password login"),
+             c.row(tr("nerd_mqtt_client"), client, search="MQTT client id"),
+             c.row(tr("nerd_mqtt_prefix"), prefix, tr("nerd_mqtt_prefix_hint"), search="MQTT topic prefix"),
+             c.row(tr("nerd_mqtt_ha"), ha, tr("nerd_mqtt_ha_hint"),
+                   search="Home Assistant discovery sensor device", below=mqtt_line)]
+    for r in shown:
+        c.shown_if(r, mqtt_on.isChecked)
+    mqtt_on.toggled.connect(lambda _on, c=c: c.refresh())
+    for sig in (mqtt_on.toggled, host.textChanged, port.valueChanged, tls.toggled, user.textChanged,
+                password.textChanged, client.textChanged, prefix.textChanged, ha.toggled):
+        sig.connect(mqtt_line.changed)
+    c.note(tr("nerd_applies_hooks"))
+
+    def values() -> dict[str, str]:
+        return {"nerd_hooks": flag(hooks_on), "nerd_hooks_urls": urls.toPlainText().strip(),
+                "nerd_hooks_header": header.text().strip(), "nerd_mqtt": flag(mqtt_on),
+                "nerd_mqtt_host": host.text().strip(), "nerd_mqtt_port": str(port.value()),
+                "nerd_mqtt_tls": flag(tls), "nerd_mqtt_user": user.text().strip(),
+                "nerd_mqtt_pass": password.text(), "nerd_mqtt_client": client.text().strip(),
+                "nerd_mqtt_prefix": prefix.text().strip(), "nerd_mqtt_ha": flag(ha)}
+    return values
 
 
 class _OnShow(QWidget):
@@ -1098,13 +1238,15 @@ def diagnostics(settings: Any) -> str:
     safe = {"nerd_ip_family", "nerd_net_timeout", "nerd_reconnect_max", "nerd_spdif", "nerd_video_sync",
             "nerd_interpolation", "nerd_probe", "nerd_demux_max_mb", "nerd_log_level", "nerd_vpn_guard",
             "nerd_vpn_lan", "nerd_proxy_player", "nerd_failover", "nerd_health", "nerd_remote", "nerd_share",
-            "nerd_remote_lan", "nerd_remote_port", "nerd_hls_quality", "nerd_hls_max_kbps"}
+            "nerd_remote_lan", "nerd_remote_port", "nerd_hls_quality", "nerd_hls_max_kbps",
+            "nerd_hooks", "nerd_mqtt", "nerd_mqtt_port", "nerd_mqtt_tls", "nerd_mqtt_ha"}
     for key in sorted(safe):
         v = n.get(key)
         if v:
             lines.append(f"  {key} = {v}")
     for key in ("nerd_user_agent", "nerd_referer", "nerd_headers", "nerd_proxy", "nerd_mpv_options",
-                "nerd_mpv_config_dir", "nerd_shaders", "nerd_vpn_iface"):
+                "nerd_mpv_config_dir", "nerd_shaders", "nerd_vpn_iface", "nerd_hooks_urls",
+                "nerd_hooks_header", "nerd_mqtt_host", "nerd_mqtt_user", "nerd_mqtt_pass"):
         if n.get(key):
             lines.append(f"  {key} = (set)")
     up = nerd.vpn_interfaces()

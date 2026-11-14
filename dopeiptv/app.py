@@ -604,6 +604,7 @@ def main() -> int:
                       else tr("restore_failed_start"), 8000)
     w._start_command_server()
     w._remote_apply()
+    w._events_apply(started=True)
     _watch_link_events(app, w)
     if command is not None:
         # After the window and its source are up: a channel needs its list.

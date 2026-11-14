@@ -89,6 +89,8 @@ map and the one-way import rule.
 | `core/url_rewrite.py` | Nerd: a source's rewrite rules for its stream addresses (find -> replace, plain or regex, in order; bad ones refused, skipped in playback), applied by `make_client` to every address it hands out; the preview line and its Test |
 | `core/hls_cap.py` | Nerd: the highest quality adaptive (HLS) streams play at - `hls-bitrate`, and the variant (picture and sound together) the player switches to at file-loaded for a size cap |
 | `core/remote_api.py` | The remote API and shared lists' small HTTP server (token on every request, this computer only unless chosen) |
+| `core/events.py` | Nerd: events pushed out - webhooks (POST JSON, token header, retries) and MQTT (event, retained state, last will, Home Assistant discovery); a queue and a thread per receiver; private viewing sends what happened, not what; the recordings' statuses as events; its checks |
+| `core/mqtt.py` | A small MQTT 3.1.1 client in the standard library (CONNECT with login and will, PUBLISH QoS 0, SUBSCRIBE, PINGREQ, TLS) |
 | `core/supporter.py` | The supporter key: signed by dopeiptv.org, checked offline, nothing about the person in it |
 | `core/backup.py` | Full backup and restore: every setting a person would miss in one JSON file (logins included, caches, window layout and machine state left out); a restore over everything waits for the next start (`stage` / `apply_pending`) |
 | `core/report.py` | Error reports and feedback: scrubbed of anything identifying, shown in full, sent only on Send; the native crash file |
@@ -127,6 +129,7 @@ map and the one-way import rule.
 | `ui/mw_health.py` | Stream health in the window: the playback path's hooks (start, picture, drop, fail), the channel menu's "Stream health…", the list's dot |
 | `ui/mw_portal_archive.py` | A Stalker portal's archive in the window: its link asked for off the window's thread (`StalkerClient.archive_link`), played from the moment asked, a go-back carried on to the next programme |
 | `ui/mw_remote.py` | The remote API and sharing in the window: the server as Nerd says, each request's work on the window's thread |
+| `ui/mw_events.py` | Events pushed out in the window: the playback path's and the recordings' hooks (start, pause, stop, channel changed, recording started/ended), handed to `core/events.py`; it only watches |
 | `ui/mw_report.py` | Send feedback, and the offer of a report after an error or a crash |
 | `ui/mw_home.py` | The Home page: which shelves, what goes in them (drawn by `home_widgets.py`) |
 | `ui/mw_local.py` | Local files: folders, library view, music queue |
@@ -159,6 +162,9 @@ source), `mw_series` (series recording rules), `mw_health` (stream
 health per channel), `mw_chanprefs` (a channel's own settings),
 `mw_portal_archive` (a Stalker portal's archive, by programme),
 `mw_privacy` (private viewing, clear recent history) and `mw_popout`
+source), `mw_health` (stream health per channel), `mw_events` (events pushed
+out: webhooks and MQTT), `mw_privacy` (private viewing,
+clear recent history) and `mw_popout`
 (detached-window player). What stays in `main_window.py` is
 the `__init__`/`_build_ui` composition and the playback path (start/stop,
 seek, fullscreen, reconnect) - keep playback code there.
@@ -235,7 +241,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
   epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log,
-  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, health, nerd, nerd_lists, channel_numbers, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, catchup, url_rewrite, hls_cap, remote_api, report, supporter, backup) and `services/` (failover, share, resume,
+  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, health, nerd, nerd_lists, channel_numbers, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, catchup, url_rewrite, hls_cap, remote_api, events, mqtt, report, supporter, backup) and `services/` (failover, share, resume,
   coverart, reminders, mpris, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list
