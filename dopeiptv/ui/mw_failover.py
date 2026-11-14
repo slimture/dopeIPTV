@@ -1,4 +1,4 @@
-"""Failover in the window (core/failover.py finds the channel): when a live
+"""Failover in the window (services/failover.py finds the channel): when a live
 channel has not come back after the usual reconnects, the same channel
 from another of the user's sources - its own user agent and proxy - and a
 note saying so. Once per channel; the next channel played is the active
@@ -8,10 +8,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..core import failover, nerd
+from ..core import nerd
 from ..core.log import log
 from ..core.workers import run_async
 from ..i18n import tr
+from ..services import failover
 
 
 class _FailoverMixin:

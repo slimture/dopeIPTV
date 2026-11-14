@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
 from ..core import nerd, nerd_check
 from ..core.log import log, log_dir
 from ..i18n import tr
+from ..media.players import throwaway_mpv
 from .nerd_check_line import CheckLine
 from .settings_ui import Chip, ChipGroups, SettingsPage, Stepper, ToggleSwitch
 
@@ -295,7 +296,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     c.note(tr("nerd_applies_reload"))
 
     # -- channels: failover ----------------------------------------------------------------
-    from ..core import failover
+    from ..services import failover
     c = at("lists").card(tr("nerd_card_failover"))
     fail_on = ToggleSwitch(n.flag("nerd_failover"))
     fail_on.setAccessibleName(tr("nerd_failover"))
@@ -336,7 +337,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
 
     def picture_job() -> Any:
         pairs = picture_pairs()
-        return (lambda: nerd_check.check_mpv_options("", extra=pairs)) if pairs else None
+        return (lambda: nerd_check.check_mpv_options("", extra=pairs, make_mpv=throwaway_mpv)) if pairs else None
     pic_line = check(picture_job, tr("nerd_ck_title_mpv"))
     interp = ToggleSwitch(n.flag("nerd_interpolation"))
     interp.setAccessibleName(tr("nerd_interpolation"))
@@ -408,7 +409,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
 
     def raw_job() -> Any:
         text = raw.toPlainText()
-        return (lambda: nerd_check.check_mpv_options(text)) if text.strip() else None
+        return (lambda: nerd_check.check_mpv_options(text, make_mpv=throwaway_mpv)) if text.strip() else None
     raw_line = check(raw_job, tr("nerd_ck_title_mpv"))
     raw.textChanged.connect(raw_line.changed)
     c.row(tr("nerd_mpv_options"), raw, tr("nerd_mpv_options_hint"), stretch_control=True,

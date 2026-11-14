@@ -1,5 +1,6 @@
 """Failover: a live channel that does not play, found in another of the
 user's sources and played from there (Nerd > Channels and guide).
+A service: it asks the providers for their channel lists.
 
 The same channel is the one with the same guide id ("tv4.se"), else the
 same name once case, punctuation and quality words are set aside
@@ -13,7 +14,7 @@ from __future__ import annotations
 import re
 from typing import Any, Callable
 
-from .log import log
+from ..core.log import log
 
 _QUALITY = re.compile(r"\b(uhd|fhd|hd|sd|hevc|h265|4k|1080p?|720p?|50fps|backup)\b")
 # A provider's country prefix: "SE: ", "SE | ", "|UK| " (not "SVT-1").
@@ -81,7 +82,7 @@ def find_elsewhere(playlists: list[dict], active_id: str | None, item: dict,
 
 def check_sources(playlists: list[dict], active_id: str | None) -> Any:
     """The Nerd page's line: which sources a channel can fail over to."""
-    from .nerd_check import OK, WARN, Check
+    from ..core.nerd_check import OK, WARN, Check
     others = candidates(playlists, active_id)
     names = [str(p.get("name") or p.get("server") or "?") for p in others]
     detail = "Tried in this order:\n" + "\n".join(f"{i}. {n}" for i, n in enumerate(names, 1)) if names else ""

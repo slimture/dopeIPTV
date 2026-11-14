@@ -323,23 +323,18 @@ def check_shaders(text: str) -> Check:
 
 # -- mpv itself --------------------------------------------------------------
 
-def _throwaway_mpv() -> Any:
-    from ..media.players import _libmpv
-    if _libmpv is None:
-        return None
-    return _libmpv.MPV(vo="null", ao="null", terminal=False, idle=True)
-
-
 def check_mpv_options(text: str, extra: list[tuple[str, str]] | None = None,
                       make_mpv: Callable[[], Any] | None = None) -> Check:
     """Each typed option (and *extra*, the page's own) set on a real mpv
-    core made for the purpose: which it takes, which it refuses and why."""
+    core made for the purpose by *make_mpv* (media.players.throwaway_mpv;
+    core never loads the player itself): which it takes, which it refuses
+    and why."""
     pairs = nerd.parse_mpv_options(text) + list(extra or [])
     refused = _refused_in(text)
     if not pairs and not refused:
         return Check(INFO, "nerd_ck_mpv_empty")
     try:
-        m = (make_mpv or _throwaway_mpv)()
+        m = make_mpv() if make_mpv is not None else None
     except Exception as e:
         log.info("nerd check: no mpv core: %s", e)
         m = None

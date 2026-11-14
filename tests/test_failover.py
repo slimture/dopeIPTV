@@ -10,7 +10,7 @@ import sys
 
 import pytest
 
-from dopeiptv.core import failover
+from dopeiptv.services import failover
 from dopeiptv.core.nerd_check import OK, WARN
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

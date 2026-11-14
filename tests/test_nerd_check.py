@@ -284,16 +284,16 @@ def test_shader_files(tmp_path):
 
 def test_mpv_options_are_tried_on_a_real_mpv():
     pytest.importorskip("mpv")
-    from dopeiptv.media.players import _libmpv
+    from dopeiptv.media.players import _libmpv, throwaway_mpv
     if _libmpv is None:
         pytest.skip("libmpv not available")
     r = ck.check_mpv_options("deband=yes\nvolume-max=150\nfoo-bar=1\ninterpolation=maybe\nvo=x11",
-                             extra=[("video-sync", "display-resample")])
+                             extra=[("video-sync", "display-resample")], make_mpv=throwaway_mpv)
     assert (r.state, r.key, r.params) == (ck.FAIL, "nerd_ck_mpv_refused", {"bad": 3, "n": 6})
     assert "unknown option" in r.detail and "foo-bar=1" in r.detail
     assert "value not accepted" in r.detail and "interpolation=maybe" in r.detail
     assert "vo" in r.detail and "picture out of the app" in r.detail
-    good = ck.check_mpv_options("deband=yes\nscale=ewa_lanczossharp")
+    good = ck.check_mpv_options("deband=yes\nscale=ewa_lanczossharp", make_mpv=throwaway_mpv)
     assert (good.state, good.key, good.params) == (ck.OK, "nerd_ck_mpv_ok", {"n": 2})
     assert ck.check_mpv_options("").key == "nerd_ck_mpv_empty"
 

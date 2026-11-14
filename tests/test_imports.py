@@ -70,6 +70,29 @@ def _relative_import_targets():
                 yield modname, target
 
 
+# The one-way rule (docs/ARCHITECTURE.md): what each layer must never import.
+_ABOVE = {"core": ("providers", "services", "media", "ui"),
+          "providers": ("services", "media", "ui"),
+          "media": ("services", "ui"),
+          "services": ("ui",)}
+# The one cross-edge the architecture names: the player overlay's colours.
+_CROSS_EDGES = {("dopeiptv.media.embedded", "dopeiptv.ui.theme")}
+
+
+def test_no_layer_imports_one_above_it():
+    """core depends on nothing above it, providers and media only on core,
+    services never on ui - inline imports included, which run late enough
+    to look harmless and still tie the layers together."""
+    wrong = []
+    for src, target in _relative_import_targets():
+        parts, tparts = src.split("."), target.split(".")
+        if len(parts) < 3 or len(tparts) < 2 or (src, target) in _CROSS_EDGES:
+            continue
+        if tparts[1] in _ABOVE.get(parts[1], ()):
+            wrong.append(f"{src} -> {target}")
+    assert not wrong, wrong
+
+
 def test_relative_imports_resolve():
     """Every `from .x`/`from ..x` in the package must point at a real module -
     at module level AND inside methods. Catches the classic 'moved a file but

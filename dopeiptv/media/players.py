@@ -74,6 +74,14 @@ except Exception as _e:
     _libmpv_error = f"{type(_e).__name__}: {_e}"
 
 
+def throwaway_mpv():
+    """A core that shows and plays nothing, to try options on (Nerd's
+    checks); None without libmpv."""
+    if _libmpv is None:
+        return None
+    return _libmpv.MPV(vo="null", ao="null", terminal=False, idle=True)
+
+
 # Set by probe_opengl() when the display offers no OpenGL at all.
 _gl_error: str | None = None
 
