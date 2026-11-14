@@ -959,7 +959,7 @@
   "restore_old_file": "来自旧版 dopeIPTV 的播放列表文件：只包含播放列表。",
   "restore_holds": "其中包含：",
   "restore_missing_paths": "这台计算机上没有的文件夹：{n}。这些设置保持本机原样。",
-  "restore_risky": "其中有会运行程序或让你的连接经过其他服务器的 Nerd 设置。只有在备份是你自己创建的情况下才恢复：",
+  "restore_risky": "其中有会运行程序、把你的连接或你观看的内容发送到其他服务器，或让其他设备控制本应用的 Nerd 设置。只有在备份是你自己创建的情况下才恢复：",
   "restore_replace": "替换这台计算机上的全部内容",
   "restore_replace_hint": "播放列表、收藏、历史和所有设置都将变为备份中的内容。随后 dopeIPTV 会关闭；再次启动即可使用备份继续。",
   "restore_add": "仅添加其中的播放列表",
@@ -1838,5 +1838,9 @@
   "menu_view": "显示",
   "menu_help": "帮助",
   "menu_website": "dopeIPTV 网站",
-  "rec_reason_no_address": "无法获取流地址"
+  "rec_reason_no_address": "无法获取流地址",
+  "restore_cannot_replace": "此备份中没有播放列表或设置，因此无法替换这里现有的内容。",
+  "restore_kept": "此备份中没有，因此保持本机原样：{what}。",
+  "restore_risky_source": "播放列表“{name}”：{what}",
+  "restore_token_note": "远程控制的令牌绝不会从备份中取用：开启远程控制或共享时，会在这台计算机上新建一个。"
 }

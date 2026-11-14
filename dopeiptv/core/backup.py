@@ -9,9 +9,10 @@ atomically, readable only by its owner where the system has such a thing.
 
 What goes in: every key of the app's settings but those _LEFT_OUT - where
 the windows sit on this screen, this computer's graphics and desktop entry,
-what the update check last found, the feedback reply codes, and caches the
-app fills again by itself. Of the other three files only the person's own
-keys go; the rest of them is cache.
+what the update check last found, the feedback reply codes, the remote
+control's token (one is made on the computer that turns it on), and caches
+the app fills again by itself. Of the other three files only the person's
+own keys go; the rest of them is cache.
 
 Logins go in as plain text, as they are in the settings themselves: with no
 crypto library to lock the file, the app says so where the file is made.
@@ -21,8 +22,13 @@ takes one only where it exists on the computer restoring and keeps that
 computer's own otherwise - a recordings folder that is not there would fail
 every recording.
 
-Putting a backup back over everything is done as the app starts: stage()
-now, apply_pending() at the next start, before anything reads the settings.
+Putting a backup back over everything replaces the files the backup has,
+and only those: a file it does not have stays exactly as it is here. One
+whose app settings hold neither playlists nor settings is not put back over
+everything at all (replaceable()): it would only empty what is here.
+
+That is done as the app starts: stage() now, apply_pending() at the next
+start, before anything reads the settings.
 The running window holds its stores in memory and writes them back as it
 closes (recordings, resume points, watched marks), which would have
 overwritten a restore written under it. A file that does not read as a whole
@@ -75,6 +81,9 @@ _LEFT_OUT = frozenset({
     "selfupdate_old_path",
     # The reply codes of this computer's feedback reports.
     "feedback_tickets", "feedback_last", "feedback_sent",
+    # Whoever has it controls the player: never from a file (a new one is
+    # made here when remote control or sharing is turned on).
+    "nerd_remote_token",
     # Caches the app fills again by itself.
     "local_tmdb_posters", "local_tmdb_posters_v2", "music_art_v1",
     "cast_devices", "subtitle_files", "nerd_health_data",
@@ -90,9 +99,22 @@ _PATHS = {"recordings_dir": "dir", "local_open_dir": "dir",
           "nerd_picon_dir": "dir", "nerd_mpv_config_dir": "dir",
           "local_dirs": "dirs", "nerd_shaders": "files"}
 
-#: Settings that run something or send the connections elsewhere: a restore
-#: shows them before it is made.
-RISKY = ("nerd_rec_post", "nerd_mpv_options", "nerd_mpv_config_dir", "nerd_proxy")
+#: Settings that run something or send the connections, or what is played,
+#: elsewhere: a restore shows them before it is made. Headers by their
+#: names only (a value may be a token).
+RISKY = ("nerd_rec_post", "nerd_mpv_options", "nerd_mpv_config_dir", "nerd_proxy",
+         "nerd_headers", "nerd_udpxy", "nerd_hooks_urls", "nerd_hooks_header",
+         "nerd_mqtt_host")
+#: Switches that let others in or send out what is played: shown when on.
+RISKY_ON = ("nerd_remote", "nerd_share")
+#: A playlist's own options that do the same for its connections.
+RISKY_SOURCE = ("proxy", "headers", "rewrite", "udpxy", "catchup_template")
+_HEADERS = frozenset({"nerd_headers", "nerd_hooks_header", "headers"})
+_HEADER_NAME = re.compile(r"^\s*([A-Za-z0-9!#$%&'*+.^_`|~-]+)\s*[:=]")
+#: The kinds a summary counts, by the file that holds them.
+_KINDS_OF = {"main": ("sources", "favorites", "history", "reminders", "recordings",
+                      "hidden", "numbers", "settings"),
+             "resume": ("resume",), "follow": ("followed",), "cache": ("watched", "watchlist")}
 
 _SOURCE_KEYS = frozenset({"playlists", "active_playlist", "playlist_name",
                           "server", "username", "password"})
@@ -384,19 +406,24 @@ def _count(kind: str, value: Any) -> int:
     return len(data) if isinstance(data, (list, dict)) else 0
 
 
+def _taken(b: Backup, name: str) -> dict[str, Any]:
+    """What a restore takes of the file *name* in *b*."""
+    return {k: v for k, v in b.stores.get(name, {}).items() if covered(name, k)}
+
+
 def summary(b: Backup) -> dict[str, int]:
-    """How much of each of KINDS *b* holds."""
+    """How much of each of KINDS *b* holds - of what a restore takes."""
     counts = dict.fromkeys(KINDS, 0)
     counts["sources"] = len(b.sources)
-    for key, value in b.stores.get("main", {}).items():
+    for key, value in _taken(b, "main").items():
         kind = _kind_of(key)
         if kind:
             counts[kind] += _count(kind, value)
     for name, kind in (("resume", "resume"), ("follow", "followed")):
-        for value in b.stores.get(name, {}).values():
+        for value in _taken(b, name).values():
             data = _json(value)
             counts[kind] += len(data) if isinstance(data, dict) else 0
-    cache = b.stores.get("cache", {})
+    cache = _taken(b, "cache")
     watched = _json(cache.get("trakt_watched_cache"))
     if isinstance(watched, dict) and isinstance(watched.get("local_items"), list):
         counts["watched"] = len(watched["local_items"])
@@ -444,28 +471,96 @@ def missing_paths(b: Backup, exists: Callable[[str], bool] = os.path.exists) -> 
             if key in main and _here(kind, main[key], exists)[2]]
 
 
+def replaceable(b: Backup) -> bool:
+    """Whether *b* can be put back over everything: a full backup whose app
+    settings hold playlists or settings. One without them would only empty
+    what is here."""
+    if not b.full or "main" not in b.stores:
+        return False
+    counts = summary(b)
+    return counts["sources"] > 0 or counts["settings"] > 0
+
+
+def kept(b: Backup) -> list[str]:
+    """The KINDS a restore of *b* over everything leaves as they are here:
+    those of the files it does not have."""
+    return [kind for name in STORES if name not in b.stores for kind in _KINDS_OF[name]]
+
+
+def _on(value: Any) -> bool:
+    return value is True or (isinstance(value, str) and value.strip().lower() in ("true", "1"))
+
+
+def _shown(key: str, value: str) -> str:
+    """*value* of the setting *key* as the restore shows it: headers by
+    their names (core/nerd.parse_headers' lines; a webhook header that is a
+    token alone goes as Authorization)."""
+    if key not in _HEADERS:
+        return " ".join(value.split())
+    names = []
+    for line in value.splitlines():
+        if not line.strip() or line.strip().startswith("#"):
+            continue
+        m = _HEADER_NAME.match(line)
+        if m or key == "nerd_hooks_header":
+            names.append(m.group(1) if m else "Authorization")
+    return ", ".join(dict.fromkeys(names))
+
+
 def risky(b: Backup) -> list[tuple[str, str]]:
-    """(key, value) of RISKY settings *b* sets."""
+    """(key, what to show) of the RISKY settings *b* sets and the RISKY_ON
+    switches it turns on ("" for a switch, or "nerd_remote_lan" when it
+    also opens them to the home network)."""
+    main = _taken(b, "main")
+    out = [(key, shown) for key in RISKY
+           if isinstance(main.get(key), str) and (shown := _shown(key, main[key]))]
+    lan = "nerd_remote_lan" if _on(main.get("nerd_remote_lan")) else ""
+    out += [(key, lan) for key in RISKY_ON if _on(main.get(key))]
+    return out
+
+
+def risky_sources(b: Backup) -> list[tuple[str, list[str]]]:
+    """(playlist name, its RISKY_SOURCE options set) of each playlist in *b*
+    that has any."""
+    out = []
+    for p in b.sources:
+        options = p.get("options")
+        if not isinstance(options, dict):
+            continue
+        keys = [k for k in RISKY_SOURCE if isinstance(options.get(k), str) and options[k].strip()]
+        if keys:
+            name = p.get("name") if isinstance(p.get("name"), str) else ""
+            server = p.get("server") if isinstance(p.get("server"), str) else ""
+            out.append((name or server or "?", keys))
+    return out
+
+
+def new_token_here(b: Backup) -> bool:
+    """Whether a restore should say that the remote control's token is not
+    taken from *b*: it has one, or turns remote control or sharing on."""
     main = b.stores.get("main", {})
-    return [(key, main[key].strip()) for key in RISKY
-            if isinstance(main.get(key), str) and main[key].strip()]
+    return "nerd_remote_token" in main or any(_on(main.get(k)) for k in RISKY_ON)
 
 
 # -- putting it back -------------------------------------------------------------
 
 def restore(b: Backup, stores: Mapping[str, Settings | None],
             exists: Callable[[str], bool] = os.path.exists) -> list[str]:
-    """Replace everything a backup covers in *stores* with what *b* holds.
-    Keys it covers that *b* lacks go; keys it leaves out stay as they are.
+    """Replace everything a backup covers in *stores* with what *b* holds,
+    in each file *b* has: keys it covers that *b* lacks go, keys it leaves
+    out stay as they are, and a file *b* does not have is not touched.
     Returns the path settings left out (see missing_paths). All is worked out
-    before the first write."""
+    before the first write. Raises ValueError for a backup that is not
+    replaceable()."""
     if not b.full:
         raise ValueError("a playlists file holds no settings to put back")
+    if not replaceable(b):
+        raise ValueError("the backup holds no playlists or settings to put back")
     plan: list[tuple[Settings, list[str], dict[str, Any]]] = []
     left: list[str] = []
     for name in STORES:
         s = stores.get(name)
-        if s is None:
+        if s is None or name not in b.stores:
             continue
         incoming = {k: v for k, v in b.stores.get(name, {}).items()
                     if covered(name, k)}
@@ -523,9 +618,12 @@ def pending_path(folder: str | None = None) -> str:
 
 def stage(b: Backup, path: str | None = None) -> str:
     """Leave *b* to be put back over everything at the next start. Returns
-    the file it waits in. Raises OSError."""
+    the file it waits in. Raises OSError, and ValueError for a backup that
+    is not replaceable()."""
     if not b.full:
         raise ValueError("a playlists file holds no settings to put back")
+    if not replaceable(b):
+        raise ValueError("the backup holds no playlists or settings to put back")
     path = path or pending_path()
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     write(path, b.document())
@@ -546,8 +644,8 @@ def apply_pending(stores: Mapping[str, Settings | None] | None = None,
     ok = False
     try:
         b = read(path)
-        if not b.full:
-            raise BackupError("invalid", "no settings")
+        if not replaceable(b):
+            raise BackupError("invalid", "no playlists or settings")
         left = restore(b, stores if stores is not None else open_stores(), exists)
         ok = True
         log.info("restore: the backup of %s (dopeIPTV %s) is in place%s",

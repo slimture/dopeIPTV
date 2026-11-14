@@ -14,9 +14,11 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 
 import pytest
 from PyQt6.QtCore import QByteArray, QSettings
@@ -232,6 +234,117 @@ def test_settings_that_run_something_are_named(tmp_path):
     b = backup.parse(backup.collect(src, "1.5.0"))
     assert backup.risky(b) == [("nerd_rec_post", "/usr/bin/notify {file}"),
                                ("nerd_proxy", "http://proxy.invalid:8080")]
+    assert backup.risky_sources(b) == [] and not backup.new_token_here(b)
+
+
+def test_every_setting_that_sends_something_elsewhere_is_named(tmp_path):
+    """Headers by their names only, the switches that let others in with
+    who, and a playlist's own proxy, headers and rewrite rules."""
+    src = _stores(tmp_path, "src")
+    m = src["main"]
+    m.setValue("playlists", json.dumps([
+        {**SOURCES[0], "options": {"proxy": "socks5://them.invalid:1080",
+                                   "headers": "X-Auth: t0ps3cret",
+                                   "rewrite": '[{"find": "http://", "replace": "http://them/"}]',
+                                   "user_agent": "kodi"}},
+        SOURCES[1]]))
+    for key, value in (("nerd_headers", "X-Api-Key: k3y-value\n# a note\nReferer = http://r"),
+                       ("nerd_udpxy", "http://router.invalid:4022"),
+                       ("nerd_hooks", "true"), ("nerd_hooks_urls", "https://hook.invalid/a"),
+                       ("nerd_hooks_header", "h00k-t0ken"),
+                       ("nerd_mqtt", "true"), ("nerd_mqtt_host", "broker.invalid"),
+                       ("nerd_mqtt_pass", "mq-pass"),
+                       ("nerd_remote", "true"), ("nerd_remote_lan", "true"),
+                       ("nerd_share", "false"), ("nerd_remote_token", "their-token")):
+        m.setValue(key, value)
+    b = backup.parse(backup.collect(src, "1.5.0"))
+    risky = dict(backup.risky(b))
+    assert risky == {"nerd_headers": "X-Api-Key, Referer", "nerd_udpxy": "http://router.invalid:4022",
+                     "nerd_hooks_urls": "https://hook.invalid/a",
+                     "nerd_hooks_header": "Authorization", "nerd_mqtt_host": "broker.invalid",
+                     "nerd_remote": "nerd_remote_lan"}
+    assert backup.risky_sources(b) == [("A", ["proxy", "headers", "rewrite"])]
+    shown = json.dumps(backup.risky(b))
+    for secret in ("k3y-value", "h00k-t0ken", "mq-pass", "their-token", "t0ps3cret"):
+        assert secret not in shown
+    assert backup.new_token_here(b)
+
+
+def test_the_remote_controls_token_is_never_taken_from_a_backup(tmp_path):
+    src = _stores(tmp_path, "src")
+    src["main"].setValue("nerd_remote", "true")
+    src["main"].setValue("nerd_remote_token", "mine-at-home")
+    assert "nerd_remote_token" not in backup.collect(src, "1.5.0")["stores"]["main"]
+    # A file that has one all the same (an old one, or made by hand).
+    doc = {backup.MAGIC: 1, "app_version": "1.5.0", "created": "",
+           "stores": {"main": {"nerd_remote": "true", "nerd_remote_lan": "true",
+                               "nerd_remote_token": "known-to-them"}}}
+    b = backup.parse(doc)
+    assert backup.new_token_here(b)
+    dst = _stores(tmp_path, "dst")
+    dst["main"].setValue("nerd_remote_token", "this-computers")
+    backup.restore(b, dst)
+    after = _on_disk(dst)["main"]
+    assert after["nerd_remote_token"] == "this-computers" and after["nerd_remote"] == "true"
+    fresh = _stores(tmp_path, "fresh")
+    backup.restore(b, fresh)
+    assert "nerd_remote_token" not in _on_disk(fresh)["main"]    # made anew when it starts
+
+
+# -- a backup that would only empty what is here --------------------------------
+
+@pytest.mark.parametrize("stores", [
+    {},
+    {"resume": {}, "follow": {}, "cache": {}},
+    {"main": {}},
+    {"main": {"window_geometry": "x", "update_channel": "nightly"}},   # nothing it takes
+    {"main": {"favorites_a": "{}", "history_a": "[]"}, "resume": {}},
+])
+def test_a_backup_without_playlists_or_settings_never_replaces_anything(tmp_path, stores):
+    b = backup.parse({backup.MAGIC: 1, "stores": stores})
+    assert b.full and not backup.replaceable(b)
+    dst = _stores(tmp_path, "dst")
+    _fill(dst)
+    before = _on_disk(dst)
+    with pytest.raises(ValueError):
+        backup.restore(b, dst)
+    with pytest.raises(ValueError):
+        backup.stage(b, str(tmp_path / "pending.json"))
+    # Staged by an older copy all the same: refused at the start too.
+    pending = tmp_path / backup.PENDING_NAME
+    backup.write(str(pending), b.document())
+    assert backup.apply_pending(dst, str(pending)) is False and not pending.exists()
+    assert _on_disk(dst) == before
+
+
+def test_a_restore_leaves_alone_the_files_a_backup_does_not_have(tmp_path):
+    dst = _stores(tmp_path, "dst")
+    _fill(dst)
+    before = _on_disk(dst)
+    b = backup.parse({backup.MAGIC: 1, "stores": {
+        "main": {"playlists": json.dumps(SOURCES[1:]), "theme": "oled"}}})
+    assert backup.replaceable(b)
+    assert backup.kept(b) == ["resume", "followed", "watched", "watchlist"]
+    backup.restore(b, dst, lambda _p: True)
+    after = _on_disk(dst)
+    assert after["main"]["theme"] == "oled" and "favorites_a" not in after["main"]
+    assert json.loads(after["main"]["playlists"]) == SOURCES[1:]
+    for name in ("resume", "follow", "cache"):
+        assert after[name] == before[name], name
+    # A full one replaces every file it has, and keeps nothing back.
+    src = _stores(tmp_path, "src")
+    _fill(src)
+    full = backup.parse(backup.collect(src, "1.5.0"))
+    assert backup.replaceable(full) and backup.kept(full) == []
+
+
+def test_what_is_counted_is_what_a_restore_takes():
+    b = backup.parse({backup.MAGIC: 1, "stores": {
+        "main": {"theme": "nord", "window_geometry": "x", "update_channel": "nightly",
+                 "resume_positions_a": json.dumps({"x": 1})},
+        "cache": {"tmdb_poster_cache_v3": "{}"}, "resume": {"_migrated": "1"}}})
+    counts = backup.summary(b)
+    assert counts["settings"] == 1 and counts["resume"] == 0
 
 
 def test_an_old_playlists_export_still_reads(tmp_path):
@@ -462,3 +575,113 @@ def test_the_settings_card_backs_up_and_restores():
     out = subprocess.run([sys.executable, "-c", _WINDOW], cwd=_REPO_ROOT, env=env,
                          capture_output=True, text=True, timeout=180)
     assert "BACKUP_OK" in out.stdout, out.stdout + out.stderr[-3000:]
+
+
+# -- the restore dialog -------------------------------------------------------------
+
+@pytest.fixture
+def qapp():
+    from PyQt6.QtWidgets import QApplication
+    return QApplication.instance() or QApplication([])
+
+
+def _dialog(b: backup.Backup):
+    from dopeiptv.ui.dialogs import RestoreBackupDialog
+    return RestoreBackupDialog(None, b, backup.summary(b), len(backup.missing_paths(b)),
+                               backup.risky(b))
+
+
+def test_the_dialog_offers_no_replace_for_a_backup_that_would_only_empty(qapp):
+    from dopeiptv.i18n import tr
+    d = _dialog(backup.parse({backup.MAGIC: 1, "stores": {}}))
+    assert not d.replace.isEnabled() and d.add.isChecked() and d.choice() == "add"
+    assert tr("restore_cannot_replace") in d.notes.text() and d.notes.isVisibleTo(d)
+
+
+def test_the_dialog_says_what_a_restore_replaces_and_keeps(qapp, tmp_path):
+    from dopeiptv.i18n import tr
+    b = backup.parse({backup.MAGIC: 1, "created": "2026-11-01T10:00:00+00:00", "stores": {
+        "main": {"theme": "nord", "nerd_share": "true",
+                 "playlists": json.dumps([{**SOURCES[1], "options": {"proxy": "http://p.invalid"}}])}}})
+    d = _dialog(b)
+    assert d.replace.isEnabled() and d.replace.isChecked() and d.choice() == "replace"
+    notes = d.notes.text()
+    assert tr("restore_kept", what=", ".join(tr(f"backup_kind_{k}") for k in
+                                             ("resume", "followed", "watched", "watchlist"))) in notes
+    assert tr("restore_risky_source", name="B", what=tr("nerd_proxy")) in notes
+    assert tr("nerd_share") in notes and tr("restore_token_note") in notes
+    assert tr("backup_count", what=tr("backup_kind_sources"), n=1) in d.holds.text()
+    # A whole backup keeps nothing back and needs no word on the token.
+    src = _stores(tmp_path, "src")
+    _fill(src)
+    whole = _dialog(backup.parse(backup.collect(src, "1.5.0")))
+    assert tr("restore_kept", what="")[:12] not in whole.notes.text()
+    assert tr("restore_token_note") not in whole.notes.text()
+
+
+@pytest.mark.parametrize("created", ["0001-01-01T00:00:00", "9999-12-31T23:59:59",
+                                     "1900-01-01T00:00:00+00:00", "nonsense", ""])
+def test_a_backups_date_never_stops_the_dialog(qapp, created):
+    from dopeiptv.ui.dialogs import RestoreBackupDialog
+    assert RestoreBackupDialog._when(created)
+    d = _dialog(backup.parse({backup.MAGIC: 1, "created": created,
+                              "stores": {"main": {"theme": "nord"}}}))
+    assert d.replace.isEnabled()
+
+
+@pytest.mark.parametrize("error", [OSError(22, "Invalid argument"),
+                                   OverflowError("timestamp out of range")])
+def test_a_date_the_system_clock_cannot_hold_is_shown_as_written(qapp, monkeypatch, error):
+    """Windows cannot take a date before 1970 (OSError), nor any system year
+    1 or 9999 (OverflowError)."""
+    from dopeiptv.ui import qt_i18n
+    from dopeiptv.ui.dialogs import RestoreBackupDialog
+
+    def fails(*_a, **_k):
+        raise error
+    monkeypatch.setattr(qt_i18n, "format_when", fails)
+    assert RestoreBackupDialog._when("1900-01-01T00:00:00") == "1900-01-01T00:00:00"
+
+
+# -- a second start that hands its command over ------------------------------------
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="XDG folders")
+def test_a_start_that_hands_its_command_over_never_puts_a_restore_in_place(qapp, tmp_path,
+                                                                            monkeypatch):
+    """A restore staged for the next start waits while a second start hands
+    --play to the copy still running (that copy would write its stores over
+    it as it closes): it goes in at the start that opens the window."""
+    from dopeiptv import ORG
+    from dopeiptv.core.instance import CommandServer
+    from tests.test_commands import _wait_for
+    sock_dir = tempfile.mkdtemp(prefix="dpi")
+    monkeypatch.setenv("DOPEIPTV_INSTANCE_SOCKET", os.path.join(sock_dir, "s"))
+    config = tmp_path / "config"
+    pending = config / ORG / backup.PENDING_NAME
+    src = _stores(tmp_path, "src")
+    _fill(src)
+    backup.stage(backup.parse(backup.collect(src, "1.5.0")), str(pending))
+    got: list[dict] = []
+    server = CommandServer(got.append)
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen", XDG_CONFIG_HOME=str(config),
+               DOPEIPTV_INSTANCE_SOCKET=os.path.join(sock_dir, "s"))
+    second = subprocess.Popen(
+        [sys.executable, "-c",
+         "import sys\n"
+         "sys.argv = ['dopeiptv', '--play', 'http://h.invalid/live/1.ts']\n"
+         "from dopeiptv.app import main\n"
+         "sys.exit(main())"],
+        cwd=_REPO_ROOT, env=env)
+    try:
+        _wait_for(got, second, 60)
+        assert second.wait(30) == 0
+    finally:
+        if second.poll() is None:
+            second.kill()
+        server.close()
+        shutil.rmtree(sock_dir, ignore_errors=True)
+    assert got == [{"play": "http://h.invalid/live/1.ts"}]
+    assert pending.exists()
+    for path in config.rglob("*"):
+        if path.is_file() and path != pending:
+            assert "nord" not in path.read_text(encoding="utf-8", errors="replace"), path

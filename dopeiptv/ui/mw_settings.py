@@ -455,6 +455,11 @@ class _SettingsMixin:
             QMessageBox.information(parent, tr("restore_title"),
                                     tr("pl_import_done", n=added))
             return
+        if not backup.replaceable(b):
+            # Nothing it holds would replace anything: it would only empty
+            # what is here (the dialog offers no such choice either).
+            QMessageBox.warning(parent, tr("restore_title"), tr("restore_cannot_replace"))
+            return
         # Over everything: the PIN and what it locks are part of it.
         if self.parental.has_pin() and not self._request_unlock():
             return
@@ -463,7 +468,7 @@ class _SettingsMixin:
             return
         try:
             backup.stage(b)
-        except OSError as exc:
+        except (OSError, ValueError) as exc:
             log.warning("restore: not staged: %s", exc)
             QMessageBox.warning(parent, tr("restore_title"),
                                 tr("pl_export_failed", error=exc))

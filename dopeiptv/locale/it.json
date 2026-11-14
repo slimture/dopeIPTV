@@ -959,7 +959,7 @@
   "restore_old_file": "Un file di playlist di un dopeIPTV precedente: contiene solo playlist.",
   "restore_holds": "Contiene:",
   "restore_missing_paths": "Cartelle indicate che questo computer non ha: {n}. Quelle impostazioni restano come sono qui.",
-  "restore_risky": "Contiene impostazioni Nerd che avviano programmi o fanno passare le tue connessioni da un altro server. Ripristinalo solo se l'hai creato tu:",
+  "restore_risky": "Contiene impostazioni Nerd che avviano programmi, mandano le tue connessioni o ciò che guardi a un altro server, oppure lasciano che altri dispositivi controllino l'app. Ripristinalo solo se l'hai creato tu:",
   "restore_replace": "Sostituisci tutto su questo computer",
   "restore_replace_hint": "Playlist, preferiti, cronologia e tutte le impostazioni diventano quelli del backup. Poi dopeIPTV si chiude; riavvialo per continuare con il backup.",
   "restore_add": "Aggiungi solo le sue playlist",
@@ -1838,5 +1838,9 @@
   "menu_view": "Vista",
   "menu_help": "Aiuto",
   "menu_website": "Sito web di dopeIPTV",
-  "rec_reason_no_address": "non è stato possibile ottenere l'indirizzo dello stream"
+  "rec_reason_no_address": "non è stato possibile ottenere l'indirizzo dello stream",
+  "restore_cannot_replace": "Questo backup non contiene playlist né impostazioni, quindi non può sostituire ciò che c'è qui.",
+  "restore_kept": "Non sono in questo backup, quindi restano come sono qui: {what}.",
+  "restore_risky_source": "Playlist «{name}»: {what}",
+  "restore_token_note": "Il token del telecomando non viene mai preso da un backup: se ne crea uno nuovo su questo computer quando si attiva il telecomando o la condivisione."
 }

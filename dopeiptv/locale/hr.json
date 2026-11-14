@@ -959,7 +959,7 @@
   "restore_old_file": "Datoteka popisa iz starijeg dopeIPTV-a: sadrži samo popise.",
   "restore_holds": "Sadrži:",
   "restore_missing_paths": "Mape koje navodi, a ovo računalo ih nema: {n}. Te postavke ostaju kakve su ovdje.",
-  "restore_risky": "Sadrži Nerd postavke koje pokreću programe ili šalju tvoje veze preko drugog poslužitelja. Vrati je samo ako si je sam napravio:",
+  "restore_risky": "Sadrži Nerd postavke koje pokreću programe, šalju tvoje veze ili ono što gledaš na drugi poslužitelj ili drugim uređajima dopuštaju upravljanje aplikacijom. Vrati je samo ako si je sam napravio:",
   "restore_replace": "Zamijeni sve na ovom računalu",
   "restore_replace_hint": "Popisi, favoriti, povijest i sve postavke postaju ono što sadrži kopija. Zatim se dopeIPTV zatvara; ponovno ga pokreni za nastavak s kopijom.",
   "restore_add": "Dodaj samo njezine popise",
@@ -1838,5 +1838,9 @@
   "menu_view": "Prikaz",
   "menu_help": "Pomoć",
   "menu_website": "Web-stranica dopeIPTV-a",
-  "rec_reason_no_address": "adresu streama nije bilo moguće dobiti"
+  "rec_reason_no_address": "adresu streama nije bilo moguće dobiti",
+  "restore_cannot_replace": "Ova sigurnosna kopija nema popise ni postavke, pa ne može zamijeniti ono što je ovdje.",
+  "restore_kept": "Nisu u ovoj sigurnosnoj kopiji, pa ostaju kakvi su ovdje: {what}.",
+  "restore_risky_source": "Popis „{name}”: {what}",
+  "restore_token_note": "Token daljinskog upravljanja nikad se ne uzima iz sigurnosne kopije: novi se stvara na ovom računalu kad se uključi daljinsko upravljanje ili dijeljenje."
 }

@@ -959,7 +959,7 @@
   "restore_old_file": "En spellistfil från ett äldre dopeIPTV: den innehåller bara spellistor.",
   "restore_holds": "Den innehåller:",
   "restore_missing_paths": "Mappar den nämner som den här datorn inte har: {n}. De inställningarna förblir som de är här.",
-  "restore_risky": "Den har Nerd-inställningar som kör program eller skickar dina anslutningar via en annan server. Återställ den bara om du har gjort den själv:",
+  "restore_risky": "Den har Nerd-inställningar som kör program, skickar dina anslutningar eller det du tittar på till en annan server, eller låter andra enheter styra appen. Återställ den bara om du har gjort den själv:",
   "restore_replace": "Ersätt allt på den här datorn",
   "restore_replace_hint": "Spellistor, favoriter, historik och alla inställningar blir det som säkerhetskopian innehåller. Sedan stängs dopeIPTV; starta det igen för att fortsätta med säkerhetskopian.",
   "restore_add": "Lägg bara till dess spellistor",
@@ -1838,5 +1838,9 @@
   "menu_view": "Visa",
   "menu_help": "Hjälp",
   "menu_website": "dopeIPTV:s webbplats",
-  "rec_reason_no_address": "strömmens adress gick inte att få"
+  "rec_reason_no_address": "strömmens adress gick inte att få",
+  "restore_cannot_replace": "Den här säkerhetskopian har varken spellistor eller inställningar, så den kan inte ersätta det som finns här.",
+  "restore_kept": "Finns inte i den här säkerhetskopian, så de förblir som de är här: {what}.",
+  "restore_risky_source": "Spellistan ”{name}”: {what}",
+  "restore_token_note": "Fjärrstyrningens token tas aldrig från en säkerhetskopia: en ny skapas på den här datorn när du slår på fjärrstyrning eller delning."
 }

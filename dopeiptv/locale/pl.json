@@ -959,7 +959,7 @@
   "restore_old_file": "Plik playlist ze starszego dopeIPTV: zawiera tylko playlisty.",
   "restore_holds": "Zawiera:",
   "restore_missing_paths": "Foldery, które wymienia, a których nie ma na tym komputerze: {n}. Te ustawienia pozostają takie jak tutaj.",
-  "restore_risky": "Zawiera ustawienia Nerd, które uruchamiają programy lub kierują Twoje połączenia przez inny serwer. Przywróć ją tylko, jeśli sam ją utworzyłeś:",
+  "restore_risky": "Zawiera ustawienia Nerd, które uruchamiają programy, wysyłają Twoje połączenia lub to, co oglądasz, na inny serwer albo pozwalają innym urządzeniom sterować aplikacją. Przywróć ją tylko, jeśli sam ją utworzyłeś:",
   "restore_replace": "Zastąp wszystko na tym komputerze",
   "restore_replace_hint": "Playlisty, ulubione, historia i wszystkie ustawienia staną się tym, co zawiera kopia. Potem dopeIPTV się zamknie; uruchom go ponownie, aby kontynuować z kopią.",
   "restore_add": "Dodaj tylko jej playlisty",
@@ -1838,5 +1838,9 @@
   "menu_view": "Widok",
   "menu_help": "Pomoc",
   "menu_website": "Strona dopeIPTV",
-  "rec_reason_no_address": "nie udało się uzyskać adresu strumienia"
+  "rec_reason_no_address": "nie udało się uzyskać adresu strumienia",
+  "restore_cannot_replace": "Ta kopia zapasowa nie zawiera playlist ani ustawień, więc nie może zastąpić tego, co jest tutaj.",
+  "restore_kept": "Nie ma ich w tej kopii zapasowej, więc pozostają takie jak tutaj: {what}.",
+  "restore_risky_source": "Playlista „{name}”: {what}",
+  "restore_token_note": "Token zdalnego sterowania nigdy nie jest brany z kopii zapasowej: nowy powstaje na tym komputerze, gdy włączysz zdalne sterowanie lub udostępnianie."
 }

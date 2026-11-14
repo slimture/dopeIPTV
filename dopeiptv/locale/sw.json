@@ -959,7 +959,7 @@
   "restore_old_file": "Faili la orodha za kucheza kutoka dopeIPTV ya zamani: lina orodha za kucheza pekee.",
   "restore_holds": "Ina:",
   "restore_missing_paths": "Folda inazotaja ambazo kompyuta hii haina: {n}. Mipangilio hiyo inabaki kama ilivyo hapa.",
-  "restore_risky": "Ina mipangilio ya Nerd inayoendesha programu au kupitisha miunganisho yako kupitia seva nyingine. Irejeshe tu kama uliitengeneza wewe mwenyewe:",
+  "restore_risky": "Ina mipangilio ya Nerd inayoendesha programu, kutuma miunganisho yako au unachotazama kwenda seva nyingine, au kuruhusu vifaa vingine kudhibiti programu. Irejeshe tu kama uliitengeneza wewe mwenyewe:",
   "restore_replace": "Badilisha kila kitu kwenye kompyuta hii",
   "restore_replace_hint": "Orodha za kucheza, vipendwa, historia na mipangilio yote vinakuwa kama vilivyo kwenye nakala. Kisha dopeIPTV inafungwa; ianzishe tena ili kuendelea na nakala.",
   "restore_add": "Ongeza orodha zake za kucheza pekee",
@@ -1838,5 +1838,9 @@
   "menu_view": "Mwonekano",
   "menu_help": "Msaada",
   "menu_website": "Tovuti ya dopeIPTV",
-  "rec_reason_no_address": "anwani ya mtiririko haikuweza kupatikana"
+  "rec_reason_no_address": "anwani ya mtiririko haikuweza kupatikana",
+  "restore_cannot_replace": "Nakala rudufu hii haina orodha za kucheza wala mipangilio, kwa hiyo haiwezi kuchukua nafasi ya kilichopo hapa.",
+  "restore_kept": "Havimo kwenye nakala rudufu hii, kwa hiyo vinabaki kama vilivyo hapa: {what}.",
+  "restore_risky_source": "Orodha ya kucheza “{name}”: {what}",
+  "restore_token_note": "Tokeni ya udhibiti wa mbali haichukuliwi kamwe kutoka kwenye nakala rudufu: mpya hutengenezwa kwenye kompyuta hii udhibiti wa mbali au kushiriki kunapowashwa."
 }

@@ -959,7 +959,7 @@
   "restore_old_file": "Un fichier de listes de lecture d'un ancien dopeIPTV : il ne contient que des listes de lecture.",
   "restore_holds": "Elle contient :",
   "restore_missing_paths": "Dossiers qu'elle indique et que cet ordinateur n'a pas : {n}. Ces paramètres restent tels qu'ils sont ici.",
-  "restore_risky": "Elle contient des paramètres Nerd qui lancent des programmes ou font passer vos connexions par un autre serveur. Ne la restaurez que si vous l'avez faite vous-même :",
+  "restore_risky": "Elle contient des paramètres Nerd qui lancent des programmes, envoient vos connexions ou ce que vous regardez vers un autre serveur, ou laissent d'autres appareils piloter l'application. Ne la restaurez que si vous l'avez faite vous-même :",
   "restore_replace": "Tout remplacer sur cet ordinateur",
   "restore_replace_hint": "Listes de lecture, favoris, historique et tous les paramètres deviennent ceux de la sauvegarde. dopeIPTV se ferme ensuite ; relancez-le pour continuer avec la sauvegarde.",
   "restore_add": "Ajouter seulement ses listes de lecture",
@@ -1838,5 +1838,9 @@
   "menu_view": "Présentation",
   "menu_help": "Aide",
   "menu_website": "Site web de dopeIPTV",
-  "rec_reason_no_address": "impossible d'obtenir l'adresse du flux"
+  "rec_reason_no_address": "impossible d'obtenir l'adresse du flux",
+  "restore_cannot_replace": "Cette sauvegarde ne contient ni listes de lecture ni paramètres : elle ne peut donc pas remplacer ce qui est ici.",
+  "restore_kept": "Absents de cette sauvegarde, donc gardés tels qu'ils sont ici : {what}.",
+  "restore_risky_source": "Liste de lecture « {name} » : {what}",
+  "restore_token_note": "Le jeton de la télécommande n'est jamais repris d'une sauvegarde : un nouveau est créé sur cet ordinateur quand la télécommande ou le partage est activé."
 }

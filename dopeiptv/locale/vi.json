@@ -959,7 +959,7 @@
   "restore_old_file": "Tệp danh sách phát từ dopeIPTV cũ hơn: chỉ chứa danh sách phát.",
   "restore_holds": "Nội dung:",
   "restore_missing_paths": "Thư mục được nhắc đến mà máy tính này không có: {n}. Các cài đặt đó giữ nguyên như ở đây.",
-  "restore_risky": "Tệp có cài đặt Nerd chạy chương trình hoặc gửi kết nối của bạn qua máy chủ khác. Chỉ khôi phục nếu chính bạn đã tạo nó:",
+  "restore_risky": "Tệp có cài đặt Nerd chạy chương trình, gửi kết nối của bạn hoặc nội dung bạn xem tới máy chủ khác, hoặc cho thiết bị khác điều khiển ứng dụng. Chỉ khôi phục nếu chính bạn đã tạo nó:",
   "restore_replace": "Thay thế mọi thứ trên máy tính này",
   "restore_replace_hint": "Danh sách phát, mục yêu thích, lịch sử và mọi cài đặt trở thành nội dung của bản sao lưu. Sau đó dopeIPTV đóng lại; hãy mở lại để tiếp tục với bản sao lưu.",
   "restore_add": "Chỉ thêm danh sách phát của nó",
@@ -1838,5 +1838,9 @@
   "menu_view": "Hiển thị",
   "menu_help": "Trợ giúp",
   "menu_website": "Trang web dopeIPTV",
-  "rec_reason_no_address": "không lấy được địa chỉ luồng"
+  "rec_reason_no_address": "không lấy được địa chỉ luồng",
+  "restore_cannot_replace": "Bản sao lưu này không có danh sách phát hay cài đặt nào, nên không thể thay thế những gì đang có ở đây.",
+  "restore_kept": "Không có trong bản sao lưu này nên được giữ nguyên như ở đây: {what}.",
+  "restore_risky_source": "Danh sách phát “{name}”: {what}",
+  "restore_token_note": "Mã thông báo của điều khiển từ xa không bao giờ được lấy từ bản sao lưu: một mã mới được tạo trên máy tính này khi bật điều khiển từ xa hoặc chia sẻ."
 }

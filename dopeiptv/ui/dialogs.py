@@ -1753,21 +1753,63 @@ class RestoreBackupDialog(QDialog):
     """What a backup holds, and how to take it: over everything here, or its
     playlists beside the ones here. *counts*: backup.summary(); *missing*:
     how many folder settings name folders this computer does not have;
-    *risky*: (key, value) of settings that run something or send the
-    connections elsewhere, shown before anything is taken."""
+    *risky*: backup.risky() - with backup.risky_sources(), what runs
+    something, lets others in or sends the connections elsewhere, shown
+    before anything is taken. Replacing everything is offered only for a
+    backup that is backup.replaceable(); the files it does not have are
+    named as kept."""
 
-    _RISKY_LABELS = {"nerd_rec_post": "nerd_rec_post",
-                     "nerd_mpv_options": "nerd_mpv_options",
-                     "nerd_mpv_config_dir": "nerd_mpv_dir",
-                     "nerd_proxy": "nerd_proxy"}
+    WIDTH = 560
+
+    _RISKY_LABELS = {"nerd_rec_post": ("nerd_card_rec_after", "nerd_rec_post"),
+                     "nerd_mpv_options": ("nerd_mpv_options",),
+                     "nerd_mpv_config_dir": ("nerd_mpv_dir",),
+                     "nerd_proxy": ("nerd_proxy",),
+                     "nerd_headers": ("nerd_headers",),
+                     "nerd_udpxy": ("nerd_card_udpxy",),
+                     "nerd_hooks_urls": ("nerd_card_hooks", "nerd_hooks_urls"),
+                     "nerd_hooks_header": ("nerd_card_hooks", "nerd_hooks_header"),
+                     "nerd_mqtt_host": ("nerd_card_mqtt", "nerd_mqtt_host"),
+                     "nerd_remote": ("nerd_remote",),
+                     "nerd_share": ("nerd_share",),
+                     # A playlist's own options.
+                     "proxy": ("nerd_proxy",),
+                     "headers": ("nerd_headers",),
+                     "rewrite": ("nerd_src_rewrite",),
+                     "udpxy": ("nerd_card_udpxy",),
+                     "catchup_template": ("nerd_src_catchup",)}
+
+    @classmethod
+    def _label(cls, key: str) -> str:
+        return " · ".join(tr(k) for k in cls._RISKY_LABELS.get(key, (key,)))
+
+    @classmethod
+    def risky_lines(cls, risky: list, sources: list) -> list[str]:
+        """The lines that name what *risky* (backup.risky()) and *sources*
+        (backup.risky_sources()) set: a setting with its value, a switch
+        that lets others in with who, a playlist with its options."""
+        lines = []
+        for key, value in risky:
+            if key in ("nerd_remote", "nerd_share"):
+                lines.append(cls._label(key) + (" · " + tr("nerd_remote_home")
+                                                if value else ""))
+            else:
+                lines.append(tr("backup_count", what=cls._label(key), n=cls._short(value)))
+        for name, keys in sources:
+            lines.append(tr("restore_risky_source", name=cls._short(name, 40),
+                            what=", ".join(cls._label(k) for k in keys)))
+        return lines
 
     def __init__(self, parent, backup, counts: dict, missing: int,
                  risky: list, can_add: bool = True) -> None:
         super().__init__(parent)
         from PyQt6.QtWidgets import QButtonGroup, QRadioButton
+
+        from ..core import backup as bk
+        replaceable = bk.replaceable(backup)
         self.setWindowTitle(tr("restore_title"))
         self.setModal(True)
-        self.setMinimumWidth(500)
+        self.setMinimumWidth(self.WIDTH)
         col = QVBoxLayout(self)
         col.setContentsMargins(24, 22, 24, 20)
         col.setSpacing(10)
@@ -1792,21 +1834,35 @@ class RestoreBackupDialog(QDialog):
         self.holds.setStyleSheet(f"font-size:13px; color:{P['text']};")
         col.addWidget(self.holds)
         notes = []
+        if backup.full and not replaceable:
+            notes.append(tr("restore_cannot_replace"))
+        elif backup.full and bk.kept(backup):
+            notes.append(tr("restore_kept", what=", ".join(
+                tr(f"backup_kind_{kind}") for kind in bk.kept(backup))))
         if backup.full and missing:
             notes.append(tr("restore_missing_paths", n=missing))
-        if risky:
+        shown = self.risky_lines(risky, bk.risky_sources(backup))
+        if shown:
             notes.append(tr("restore_risky") + "\n" + "\n".join(
-                "  •  " + tr("backup_count",
-                             what=tr(self._RISKY_LABELS.get(k, k)),
-                             n=self._short(v))
-                for k, v in risky))
+                "  •  " + line for line in shown))
+        if backup.full and bk.new_token_here(backup):
+            notes.append(tr("restore_token_note"))
         self.notes = QLabel("\n\n".join(notes))
         self.notes.setWordWrap(True)
         self.notes.setTextFormat(Qt.TextFormat.PlainText)
         self.notes.setStyleSheet(
             f"font-size:12px; color:{P.get('warn', P['muted'])};")
-        self.notes.setVisible(bool(notes))
-        col.addWidget(self.notes)
+        self.notes.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        # A backup with many playlists of their own proxy can name dozens:
+        # they scroll, the choice below stays on the screen.
+        notes_box = QScrollArea()
+        notes_box.setWidget(self.notes)
+        notes_box.setWidgetResizable(True)
+        notes_box.setFrameShape(QScrollArea.Shape.NoFrame)
+        notes_box.setStyleSheet("QScrollArea, QScrollArea > QWidget > QWidget"
+                                " { background:transparent; }")
+        notes_box.setVisible(bool(notes))
+        col.addWidget(notes_box)
         col.addSpacing(4)
         self.replace = QRadioButton(tr("restore_replace"))
         self.add = QRadioButton(tr("restore_add"))
@@ -1821,9 +1877,9 @@ class RestoreBackupDialog(QDialog):
             text.setContentsMargins(26, 0, 0, 4)
             text.setStyleSheet(f"font-size:12px; color:{P['muted']};")
             col.addWidget(text)
-        self.replace.setEnabled(backup.full)
+        self.replace.setEnabled(replaceable)
         self.add.setEnabled(can_add)
-        (self.replace if backup.full else self.add).setChecked(True)
+        (self.replace if replaceable else self.add).setChecked(True)
         col.addSpacing(6)
         buttons = QHBoxLayout()
         buttons.addStretch(1)
@@ -1836,6 +1892,13 @@ class RestoreBackupDialog(QDialog):
         buttons.addWidget(self.go)
         col.addLayout(buttons)
         cancel.setFocus()
+        # A dialog does not ask its wrapped lines how tall they are at its
+        # width: told here, or they were cut.
+        inner = self.WIDTH - 48
+        for label in self.findChildren(QLabel):
+            if label.wordWrap() and label is not self.notes:
+                label.setMinimumHeight(label.heightForWidth(inner - label.contentsMargins().left()))
+        notes_box.setFixedHeight(min(260, self.notes.heightForWidth(inner - 16) + 4))
 
     @staticmethod
     def _when(created: str) -> str:
@@ -1845,7 +1908,9 @@ class RestoreBackupDialog(QDialog):
         try:
             return format_when(datetime.fromisoformat(created),
                                "d MMM yyyy HH:mm")
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OSError, OverflowError):
+            # OSError, OverflowError: a date the system clock cannot hold
+            # (Windows before 1970, year 1 or 9999).
             return created or "?"
 
     @staticmethod

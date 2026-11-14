@@ -959,7 +959,7 @@
   "restore_old_file": "Een afspeellijstbestand van een oudere dopeIPTV: het bevat alleen afspeellijsten.",
   "restore_holds": "Het bevat:",
   "restore_missing_paths": "Mappen die erin staan en die deze computer niet heeft: {n}. Die instellingen blijven zoals ze hier zijn.",
-  "restore_risky": "Er staan Nerd-instellingen in die programma's starten of je verbindingen via een andere server sturen. Zet het alleen terug als je het zelf hebt gemaakt:",
+  "restore_risky": "Er staan Nerd-instellingen in die programma's starten, je verbindingen of wat je kijkt naar een andere server sturen, of andere apparaten de app laten bedienen. Zet het alleen terug als je het zelf hebt gemaakt:",
   "restore_replace": "Alles op deze computer vervangen",
   "restore_replace_hint": "Afspeellijsten, favorieten, geschiedenis en alle instellingen worden wat de back-up bevat. Daarna sluit dopeIPTV; start het opnieuw om met de back-up verder te gaan.",
   "restore_add": "Alleen de afspeellijsten toevoegen",
@@ -1838,5 +1838,9 @@
   "menu_view": "Weergave",
   "menu_help": "Help",
   "menu_website": "Website van dopeIPTV",
-  "rec_reason_no_address": "het streamadres kon niet worden opgehaald"
+  "rec_reason_no_address": "het streamadres kon niet worden opgehaald",
+  "restore_cannot_replace": "Deze back-up bevat geen afspeellijsten of instellingen en kan dus niet vervangen wat hier staat.",
+  "restore_kept": "Niet in deze back-up, dus ze blijven zoals ze hier zijn: {what}.",
+  "restore_risky_source": "Afspeellijst ‘{name}’: {what}",
+  "restore_token_note": "Het token voor bediening op afstand wordt nooit uit een back-up overgenomen: er wordt op deze computer een nieuw gemaakt zodra bediening op afstand of delen aan gaat."
 }

@@ -959,7 +959,7 @@
   "restore_old_file": "Um arquivo de listas de um dopeIPTV mais antigo: ele contém apenas listas.",
   "restore_holds": "Ele contém:",
   "restore_missing_paths": "Pastas que ele cita e que este computador não tem: {n}. Essas configurações ficam como estão aqui.",
-  "restore_risky": "Ele tem configurações Nerd que executam programas ou enviam suas conexões por outro servidor. Restaure-o só se foi você quem o fez:",
+  "restore_risky": "Ele tem configurações Nerd que executam programas, enviam suas conexões ou o que você assiste para outro servidor, ou deixam outros aparelhos controlar o app. Restaure-o só se foi você quem o fez:",
   "restore_replace": "Substituir tudo neste computador",
   "restore_replace_hint": "Listas, favoritos, histórico e todas as configurações passam a ser os do backup. Depois o dopeIPTV fecha; abra-o de novo para continuar com o backup.",
   "restore_add": "Adicionar só as listas dele",
@@ -1838,5 +1838,9 @@
   "menu_view": "Visualizar",
   "menu_help": "Ajuda",
   "menu_website": "Site do dopeIPTV",
-  "rec_reason_no_address": "não foi possível obter o endereço do stream"
+  "rec_reason_no_address": "não foi possível obter o endereço do stream",
+  "restore_cannot_replace": "Este backup não tem listas nem configurações, então não pode substituir o que está aqui.",
+  "restore_kept": "Não estão neste backup, então ficam como estão aqui: {what}.",
+  "restore_risky_source": "Lista “{name}”: {what}",
+  "restore_token_note": "O token do controle remoto nunca vem de um backup: um novo é criado neste computador quando o controle remoto ou o compartilhamento é ligado."
 }

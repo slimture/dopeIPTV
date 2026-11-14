@@ -959,7 +959,7 @@
   "restore_old_file": "Eine Datei mit Wiedergabelisten aus einem älteren dopeIPTV: Sie enthält nur Wiedergabelisten.",
   "restore_holds": "Sie enthält:",
   "restore_missing_paths": "Ordner, die sie nennt und die es auf diesem Computer nicht gibt: {n}. Diese Einstellungen bleiben, wie sie hier sind.",
-  "restore_risky": "Sie enthält Nerd-Einstellungen, die Programme ausführen oder deine Verbindungen über einen anderen Server leiten. Stelle sie nur wieder her, wenn du sie selbst erstellt hast:",
+  "restore_risky": "Sie enthält Nerd-Einstellungen, die Programme ausführen, deine Verbindungen oder das, was du schaust, an einen anderen Server schicken oder anderen Geräten die Steuerung der App erlauben. Stelle sie nur wieder her, wenn du sie selbst erstellt hast:",
   "restore_replace": "Alles auf diesem Computer ersetzen",
   "restore_replace_hint": "Wiedergabelisten, Favoriten, Verlauf und alle Einstellungen werden zu dem, was die Sicherung enthält. Danach schließt sich dopeIPTV; starte es erneut, um mit der Sicherung weiterzumachen.",
   "restore_add": "Nur ihre Wiedergabelisten hinzufügen",
@@ -1838,5 +1838,9 @@
   "menu_view": "Darstellung",
   "menu_help": "Hilfe",
   "menu_website": "dopeIPTV-Website",
-  "rec_reason_no_address": "die Stream-Adresse war nicht zu bekommen"
+  "rec_reason_no_address": "die Stream-Adresse war nicht zu bekommen",
+  "restore_cannot_replace": "Diese Sicherung enthält weder Wiedergabelisten noch Einstellungen und kann deshalb nicht ersetzen, was hier ist.",
+  "restore_kept": "Nicht in dieser Sicherung, daher bleibt hier, wie es ist: {what}.",
+  "restore_risky_source": "Wiedergabeliste „{name}“: {what}",
+  "restore_token_note": "Das Token der Fernsteuerung wird nie aus einer Sicherung übernommen: Auf diesem Computer wird ein neues erstellt, sobald Fernsteuerung oder Teilen eingeschaltet wird."
 }

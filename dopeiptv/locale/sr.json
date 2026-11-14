@@ -959,7 +959,7 @@
   "restore_old_file": "Datoteka plejlista iz starijeg dopeIPTV-a: sadrži samo plejliste.",
   "restore_holds": "Sadrži:",
   "restore_missing_paths": "Fascikle koje navodi, a ovaj računar ih nema: {n}. Ta podešavanja ostaju kakva su ovde.",
-  "restore_risky": "Sadrži Nerd podešavanja koja pokreću programe ili šalju vaše veze preko drugog servera. Vratite je samo ako ste je sami napravili:",
+  "restore_risky": "Sadrži Nerd podešavanja koja pokreću programe, šalju vaše veze ili ono što gledate na drugi server ili drugim uređajima dozvoljavaju da upravljaju aplikacijom. Vratite je samo ako ste je sami napravili:",
   "restore_replace": "Zameni sve na ovom računaru",
   "restore_replace_hint": "Plejliste, favoriti, istorija i sva podešavanja postaju ono što sadrži kopija. Zatim se dopeIPTV zatvara; ponovo ga pokrenite da nastavite sa kopijom.",
   "restore_add": "Dodaj samo njene plejliste",
@@ -1838,5 +1838,9 @@
   "menu_view": "Prikaz",
   "menu_help": "Pomoć",
   "menu_website": "Veb-sajt dopeIPTV-a",
-  "rec_reason_no_address": "adresu strima nije bilo moguće dobiti"
+  "rec_reason_no_address": "adresu strima nije bilo moguće dobiti",
+  "restore_cannot_replace": "Ova rezervna kopija nema plejliste ni podešavanja, pa ne može da zameni ono što je ovde.",
+  "restore_kept": "Nisu u ovoj rezervnoj kopiji, pa ostaju kakvi su ovde: {what}.",
+  "restore_risky_source": "Plejlista „{name}”: {what}",
+  "restore_token_note": "Token daljinskog upravljanja nikad se ne uzima iz rezervne kopije: novi se pravi na ovom računaru kada se uključi daljinsko upravljanje ili deljenje."
 }

@@ -11,6 +11,7 @@ import os
 import subprocess
 import sys
 import threading
+import time
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -82,6 +83,199 @@ def test_rules_that_can_work():
     assert problem(Rule(r"(\d+)", r"<\1>", True)) == ""
     assert problem(Rule("", "x")) == url_rewrite.EMPTY
     assert apply("http://h/1.ts", [Rule("", "x")]) == "http://h/1.ts"
+
+
+# -- a regular expression that could hang the app ----------------------------------
+
+# Each took from seconds to hours on an ordinary address (Python's re cannot
+# be stopped and holds the interpreter: the whole app froze).
+HANGING = [r"(\w+\s?)+$", r"(a|aa)+$", r"(.*a){12}", r"((a+))+$", r"(\w|\d)+$",
+           r"\w*\w*\w*\w*\w*\w*\w*\w*X", r".*.*X", r"\w*\w*X", r"(.*)/live/(.*)\.ts$",
+           r".*a{150}X", "a?" * 24 + "a" * 24, "(a|a)" * 20 + "X", r".{0,4000}.{0,4000}X",
+           r"[\s\S]*[\s\S]*X", r"(?i)K*k*X", r"(x+x+)+y", r"(?:ab)+$", r"(\d+)*$"]
+# What they are refused for besides: refer back, look around, atomic groups.
+NOT_ALLOWED = [r"(a)\1", r"(?P<x>a)(?P=x)", r"(?=a)b", r"(?!a)b", r"(?<=a)b", r"(?<!a)b",
+               r"(?>a+)b", r"(a)?(?(1)b|c)", r"(ab|\d+)", r"(a.|b)"]
+ADDRESS = "http://provider.example.com:8080/live/username1234/password5678abcdefghijklmnop/123456.ts"
+USEFUL = [(r"^http://([^/]+)/live/", r"http://proxy/\1/live/"), (r"\.ts$", ".m3u8"),
+          (r"(?i)token=[a-z0-9]+", "token=X"), (r"/(\d+)\.ts$", r"/\1.m3u8"),
+          (r"profile=\w+", "profile=pass"), ("$", "&x=1"), (r"^https?://", "https://"),
+          (r"(http|https)://", "https://"), (r"(ts|m3u8)$", "mkv"), (r"(\d+)\.ts", r"\1.m3u8"),
+          (r"(.*)\.ts$", r"\1.m3u8"), (r"^(.*)/live/(.*)\.ts$", r"\1/live2/\2.ts"),
+          (r"(.*)/(\d+)\.ts$", r"\1/\2.mkv"), (r"[^/]+$", "x.ts"), (r"&?token=[^&]*", ""),
+          (r":\d+/", "/"), (r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", "box"),
+          (r"(?i)\.M3U8?$", ".ts"), (r"^(?P<all>.*)$", r"\g<all>"), (r"/archive/([\w-]+)/", r"/v/\1/")]
+
+
+@pytest.mark.parametrize("find", HANGING + NOT_ALLOWED)
+def test_a_regular_expression_that_could_hang_the_app_is_refused(find):
+    rule = Rule(find, "x", True)
+    why = problem(rule)
+    assert why and why != url_rewrite.EMPTY, find
+    # Stored all the same (an old rule, an imported playlist, a backup): it
+    # does nothing, at once - the address goes on exactly as it came.
+    t0 = time.perf_counter()
+    assert apply(ADDRESS, [rule]) is ADDRESS
+    assert time.perf_counter() - t0 < 1.0
+
+
+def test_why_it_is_refused_is_said():
+    def why(find: str) -> str:
+        return problem(Rule(find, "", True))
+    assert "repeat" in why(r"(\w+\s?)+$") and "group" in why(r"(a|aa)+$")
+    assert "many ways" in why(r"\w*\w*\w*\w*\w*\w*\w*\w*X") and "^" in why(r".*.*X")
+    assert "backreference" in why(r"(a)\1") and "lookahead" in why(r"(?<=a)b")
+    assert "atomic" in why(r"(?>a)") and "plain text" in why(r"(ab|\d+)")
+    assert "300" in why("a" * 301) and problem(Rule("a" * 301, "")) == ""   # plain text: any length
+    assert "replacement" in problem(Rule("a", "b" * 2001, True))
+    # Anchored, the same parts run once instead of at every place: taken.
+    assert why(r"(.*)/live/(.*)\.ts$") and not why(r"^(.*)/live/(.*)\.ts$")
+    assert why(r".*a{150}X") and not why(r"^.*a{150}X")
+
+
+@pytest.mark.parametrize("find, replace", USEFUL)
+def test_the_useful_regular_expressions_are_taken(find, replace):
+    assert problem(Rule(find, replace, True)) == "", find
+
+
+def test_what_the_useful_ones_do():
+    def one(find, replace, url):
+        return apply(url, [Rule(find, replace, True)])
+    assert one(r"^http://([^/]+)/live/", r"http://proxy/\1/live/", "http://h:8080/live/a/b/1.ts") == \
+        "http://proxy/h:8080/live/a/b/1.ts"
+    assert one(r"\.ts$", ".m3u8", "http://h/live/a/b/1.ts") == "http://h/live/a/b/1.m3u8"
+    assert one(r"(?i)token=[a-z0-9]+", "token=X", "http://h/1.ts?TOKEN=Ab12&x=1") == \
+        "http://h/1.ts?token=X&x=1"
+    assert one(r"(.*)/(\d+)\.ts$", r"\1/\2.mkv", "http://h/live/a/b/42.ts") == "http://h/live/a/b/42.mkv"
+
+
+def test_every_rule_on_a_4_kb_address_takes_under_50_ms(monkeypatch):
+    stored = parse(dump([Rule(f, r, True) for f, r in USEFUL[:14]]
+                        + [Rule(f, "x", True) for f in HANGING[:6]]))
+    assert len(stored) == url_rewrite.MAX_RULES
+    assert [n for n, _w in url_rewrite.problems(stored)] == list(range(15, 21))
+    token = ("http://cdn.example.com:8080/live/user/pass/12345.ts?exp=1&sig="
+             + "aZ09/" * 1000)[:4000]
+    # Each regular expression runs on an address of about 4 KB.
+    seen: list[int] = []
+    real = url_rewrite._regex_sub
+    monkeypatch.setattr(url_rewrite, "_regex_sub",
+                        lambda f, r, s: seen.append(len(s)) or real(f, r, s))
+    for url in (token, ADDRESS * 44, "x" * 4000 + ".ts", "/1" * 2000):
+        apply(url, stored)                       # each rule's checks are made once
+        seen.clear()
+        t0 = time.perf_counter()
+        apply(url, stored)
+        assert time.perf_counter() - t0 < 0.05, url[:30]
+        assert len(seen) == 14 and min(seen) > 3800, seen
+
+
+def test_the_repeats_at_the_start_of_a_pattern_skip_the_tries_that_must_fail():
+    """(.*)\\.ts$, (\\d+)\\.ts, [^/]+$...: playback skips the places in a
+    stretch of the repeat's characters where a try must fail - the same
+    result as re.sub, checked on made-up addresses, without the time."""
+    import random
+    import re
+    rnd = random.Random(5)
+    pats = [r"(.*)\.ts$", r".*/", r"(\d+)\.ts", r"[a-z]+[0-9]+X", r"\w+$", r"[^/]+/", r".*?b",
+            r"(?i)[A-Z]+\d", r"a+?b", r"\d*x", r"(?s).*b", r"[^/]++/", r"\w+\b", r"(?m).+$",
+            r"[ab]*a", r"a*ab", r"(?i)k+s", r"\D+\d", r"(.*)/(\d+)\.ts$", r".*(ts|m3u8)$",
+            r"(?m).*^a", r"[^/]*\.ts$", r".+?\.ts", r"\w*\W", r".{2,}x"]
+    for p in pats:
+        assert url_rewrite._runs(p) is not None, p
+        for _ in range(300):
+            s = "".join(rnd.choice("ab0 1/.ts\nXxéK_k\u212aS\u017f") for _ in range(rnd.randint(0, 30)))
+            for repl in (r"<\g<0>>", "Z"):
+                assert url_rewrite._regex_sub(p, repl, s) == re.sub(p, repl, s), (p, s, repl)
+    # Not for one that can match nothing, or that begins otherwise.
+    for p in (r".*", r"\d*", r"/(\d+)\.ts$", r"^.*x", r"a{1,3}b", r"\bx+y"):
+        assert url_rewrite._runs(p) is None, p
+    for p in pats:
+        parts, _why = url_rewrite._shape(p)
+        for text in url_rewrite._probe_texts(parts, url_rewrite.MAX_SUBJECT):
+            t0 = time.perf_counter()
+            url_rewrite._regex_sub(p, "x", text)
+            assert time.perf_counter() - t0 < 0.05, (p, text[:20])
+
+
+def test_a_taken_rule_stays_quick_on_any_address():
+    """Made-up 4 KB addresses that make each taken rule work hardest (long
+    runs of what it looks for): the costliest ones still end in well under
+    a second - not the hours of the refused ones."""
+    for find, replace in USEFUL + [(r"x[^/]*\.ts$", ""), (r"(.*)[?&]token=([^&]*)(.*)", "")]:
+        rule = Rule(find, replace, True)
+        assert problem(rule) == "", find
+        parts, _why = url_rewrite._shape(find)
+        for text in url_rewrite._probe_texts(parts, url_rewrite.MAX_SUBJECT):
+            t0 = time.perf_counter()
+            apply(text, [rule])
+            assert time.perf_counter() - t0 < 1.0, (find, text[:20])
+
+
+def test_what_a_pattern_costs_is_counted():
+    def steps(find):
+        return url_rewrite._steps(url_rewrite._shape(find)[0], cap=10 ** 18)
+    assert steps(r"^http://([^/]+)/live/") < 100_000             # once, at the start
+    assert steps(r"\w*\w*X") > 100 * url_rewrite.MAX_STEPS        # n * n * n
+    assert steps(r"(.*)\.ts$") < url_rewrite.MAX_STEPS < steps(r"(.*)/live/(.*)\.ts$")
+    # Each place [^/]+ can end in is fixed by the / after it.
+    assert steps(r"([^/]+)/([^/]+)/([^/]+)\.ts") < url_rewrite.MAX_STEPS
+
+
+def test_long_addresses_and_rules_that_would_make_them():
+    long = "http://h/" + "x" * url_rewrite.MAX_SUBJECT + ".ts"
+    # A regular expression is not run on it; plain text still is.
+    assert apply(long, [Rule(r"\.ts$", ".m3u8", True)]) is long
+    assert apply(long, [Rule(".ts", ".m3u8")]).endswith("x.m3u8")
+    # Rules that grow an address without end stop where it would pass the cap.
+    grow = [Rule("/", "/" * 10)] * url_rewrite.MAX_RULES
+    t0 = time.perf_counter()
+    out = apply("http://h/a/b/c.ts", grow)
+    assert len(out) <= url_rewrite.MAX_ADDRESS and time.perf_counter() - t0 < 1.0
+    assert apply("http://h/1.ts", [Rule("$", "x" * 2000, True), Rule("1", "2")]) == \
+        "http://h/2.ts" + "x" * 2000
+    many = apply("http://h/1.ts", [Rule("", "", True), Rule("x*", "y" * 1999, True)])
+    assert many == "http://h/1.ts"                # it would pass the cap: skipped
+
+
+def test_without_the_parser_no_regular_expression_is_taken(monkeypatch):
+    url_rewrite._verdict.cache_clear()
+    monkeypatch.setattr(url_rewrite, "_SRE", None)
+    try:
+        assert "cannot be checked" in problem(Rule(r"\.ts$", ".m3u8", True))
+        assert apply("http://h/1.ts", [Rule(r"\.ts$", ".m3u8", True), Rule("/h/", "/g/")]) == "http://g/1.ts"
+    finally:
+        url_rewrite._verdict.cache_clear()
+
+
+def test_the_timed_check_refuses_what_is_slow(monkeypatch):
+    url_rewrite._verdict.cache_clear()
+    monkeypatch.setattr(url_rewrite, "SLOW_MS", -1.0)
+    try:
+        assert problem(Rule(r"\.ts$", ".m3u8", True)).startswith("too slow")
+        assert problem(Rule(".ts", ".m3u8")) == ""      # plain text is not timed
+    finally:
+        url_rewrite._verdict.cache_clear()
+
+
+def test_a_refused_rule_from_an_imported_playlist_is_kept_and_does_nothing(tmp_path):
+    from PyQt6.QtCore import QSettings
+
+    from dopeiptv.core.stores import PlaylistStore
+    from dopeiptv.providers.client import make_client
+    stored = dump([Rule(r"(\w+\s?)+$", "x", True), Rule("http://", "https://")])
+    store = PlaylistStore(QSettings(str(tmp_path / "s.ini"), QSettings.Format.IniFormat))
+    assert store.import_data([{"name": "X", "kind": "xtream", "server": "http://old.example:8080",
+                               "username": "anna", "password": "pw",
+                               "options": {"rewrite": stored}}]) == 1
+    pl = store.playlists()[0]
+    assert pl["options"]["rewrite"] == stored                    # kept as it came
+    _on()
+    c = make_client({k: v for k, v in pl.items() if k != "id"})
+    t0 = time.perf_counter()
+    # The refused one does nothing; the one that can work still does.
+    assert c.live_url(401, "ts") == "https://old.example:8080/live/anna/pw/401.ts"
+    assert time.perf_counter() - t0 < 1.0
 
 
 def test_an_address_the_rules_would_empty_stays_as_it_was():
@@ -336,6 +530,28 @@ def test_a_rule_that_cannot_work_is_refused_by_the_dialog(settings, monkeypatch)
     d._validate()
     assert d.result() == 1
     assert parse(d.values()["options"]["rewrite"]) == [Rule("(closed)", "", True)]
+
+
+def test_a_stored_rule_that_could_hang_the_app_is_shown_refused_and_quick(settings):
+    """A rule stored before the check (or imported) opens in the dialog
+    with the line saying why it is refused; typing it is never slow."""
+    from dopeiptv.ui.source_nerd import SourceNerdPanel
+    stored = dump([Rule("http://", "https://"), Rule(r"(\w+\s?)+$", "x", True)])
+    p = SourceNerdPanel("xtream", {"rewrite": stored})
+    c = p._rw_preview()
+    assert (c.state, c.key, c.params["n"]) == (FAIL, "nerd_ck_rw_bad", 2)
+    assert "repeat" in c.params["error"] and "Rule 2: a repeat" in c.detail
+    assert p.rules_ok() is not None
+    assert p.values()["rewrite"] == stored                   # kept until changed
+    row = p.rewrite.rows[1]
+    t0 = time.perf_counter()
+    for i in range(1, 12):
+        row.find.setText(r"\w*" * i + "X")                   # each keystroke checked
+        p._rw_preview()
+    assert time.perf_counter() - t0 < 2.0
+    row.find.setText(r"/(\d+)\.ts$")
+    row.replace.setText(r"/\1.m3u8")
+    assert p.rules_ok() is None
 
 
 # -- the window: playing, recording and catch-up at the rewritten address ---------------------

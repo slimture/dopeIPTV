@@ -959,7 +959,7 @@
   "restore_old_file": "이전 dopeIPTV의 재생 목록 파일입니다. 재생 목록만 들어 있습니다.",
   "restore_holds": "들어 있는 항목:",
   "restore_missing_paths": "이 컴퓨터에 없는 폴더: {n}. 해당 설정은 이 컴퓨터의 값 그대로 유지됩니다.",
-  "restore_risky": "프로그램을 실행하거나 연결을 다른 서버로 보내는 Nerd 설정이 들어 있습니다. 직접 만든 백업일 때만 복원하세요:",
+  "restore_risky": "프로그램을 실행하거나, 연결이나 시청 내용을 다른 서버로 보내거나, 다른 기기가 앱을 제어하게 하는 Nerd 설정이 들어 있습니다. 직접 만든 백업일 때만 복원하세요:",
   "restore_replace": "이 컴퓨터의 모든 것을 바꾸기",
   "restore_replace_hint": "재생 목록, 즐겨찾기, 기록, 모든 설정이 백업 내용으로 바뀝니다. 그런 다음 dopeIPTV가 닫히며, 다시 시작하면 백업 내용으로 이어집니다.",
   "restore_add": "재생 목록만 추가",
@@ -1838,5 +1838,9 @@
   "menu_view": "보기",
   "menu_help": "도움말",
   "menu_website": "dopeIPTV 웹사이트",
-  "rec_reason_no_address": "스트림 주소를 가져올 수 없음"
+  "rec_reason_no_address": "스트림 주소를 가져올 수 없음",
+  "restore_cannot_replace": "이 백업에는 재생 목록도 설정도 없어서 이 컴퓨터의 내용을 바꿀 수 없습니다.",
+  "restore_kept": "이 백업에 없으므로 이 컴퓨터의 내용 그대로 유지됩니다: {what}.",
+  "restore_risky_source": "재생 목록 “{name}”: {what}",
+  "restore_token_note": "원격 제어 토큰은 백업에서 가져오지 않습니다. 원격 제어나 공유를 켜면 이 컴퓨터에서 새 토큰이 만들어집니다."
 }

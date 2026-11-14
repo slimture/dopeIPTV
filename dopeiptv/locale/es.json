@@ -959,7 +959,7 @@
   "restore_old_file": "Un archivo de listas de reproducción de un dopeIPTV anterior: solo contiene listas de reproducción.",
   "restore_holds": "Contiene:",
   "restore_missing_paths": "Carpetas que menciona y que este ordenador no tiene: {n}. Esos ajustes se quedan como están aquí.",
-  "restore_risky": "Tiene ajustes Nerd que ejecutan programas o envían tus conexiones a través de otro servidor. Restáurala solo si la hiciste tú:",
+  "restore_risky": "Tiene ajustes Nerd que ejecutan programas, envían tus conexiones o lo que ves a otro servidor, o dejan que otros dispositivos controlen la app. Restáurala solo si la hiciste tú:",
   "restore_replace": "Reemplazar todo en este ordenador",
   "restore_replace_hint": "Listas de reproducción, favoritos, historial y todos los ajustes pasan a ser los de la copia. Después dopeIPTV se cierra; ábrelo de nuevo para seguir con la copia.",
   "restore_add": "Añadir solo sus listas de reproducción",
@@ -1838,5 +1838,9 @@
   "menu_view": "Visualización",
   "menu_help": "Ayuda",
   "menu_website": "Sitio web de dopeIPTV",
-  "rec_reason_no_address": "no se pudo obtener la dirección de la emisión"
+  "rec_reason_no_address": "no se pudo obtener la dirección de la emisión",
+  "restore_cannot_replace": "Esta copia de seguridad no tiene listas de reproducción ni ajustes, así que no puede reemplazar lo que hay aquí.",
+  "restore_kept": "No están en esta copia de seguridad, así que se quedan como están aquí: {what}.",
+  "restore_risky_source": "Lista «{name}»: {what}",
+  "restore_token_note": "El token del control remoto nunca se toma de una copia de seguridad: se crea uno nuevo en este ordenador cuando se activa el control remoto o compartir."
 }

@@ -205,6 +205,18 @@ def _watch_link_events(app, window) -> None:
     app.installEventFilter(window._link_filter)
 
 
+def _put_restore_in_place() -> bool | None:
+    """A backup staged in Settings put in place (core/backup.apply_pending):
+    None when none waited, else whether it went in. Never in the way of
+    starting."""
+    try:
+        from .core import backup
+        return backup.apply_pending()
+    except Exception as e:
+        log.warning("restore: not put in place: %s", e)
+        return None
+
+
 def main() -> int:
     """Launch the application."""
     # PyInstaller's windowed (no-console) build - our Windows release - leaves
@@ -325,13 +337,14 @@ def main() -> int:
 
     # A backup restored over everything in Settings waits for this moment:
     # put in place before anything reads the settings it replaces (the size
-    # of the interface below included). Never in the way of starting.
-    restored = None
-    try:
-        from .core import backup
-        restored = backup.apply_pending()
-    except Exception as e:
-        log.warning("restore: not put in place: %s", e)
+    # of the interface below included) - but only by a start that opens the
+    # window. One with a command (--play, a dopeiptv:// link) may hand it to
+    # a copy still running and end: that copy holds its stores in memory
+    # and would write them over the restore as it closes. Such a start puts
+    # the restore in place once it knows no copy took the command.
+    from .core.commands import parse_command
+    command = parse_command(sys.argv[1:])
+    restored = _put_restore_in_place() if command is None else None
 
     # Opt-in X11/XWayland backend (Settings > "Run via X11"). Must be set
     # before QApplication. Guarded so it can never wedge startup: Linux only,
@@ -363,12 +376,14 @@ def main() -> int:
     app = QApplication(sys.argv)
     # A command (--play, --channel, a dopeiptv:// link) goes to the copy
     # already running, if there is one; this start then ends here.
-    from .core.commands import parse_command
-    command = parse_command(sys.argv[1:])
     if command is not None:
         from .core.instance import send_to_running
         if send_to_running(command):
             return 0
+        # This start opens the window: the restore goes in now (the X11
+        # choice and the interface size above came from the settings as they
+        # were, for this one start).
+        restored = _put_restore_in_place()
     # Cyclic garbage collection on the GUI thread only: collected on a pool
     # thread, a cycle holding Qt objects segfaults (see core/gcguard.py).
     from .core.gcguard import GcGuard

@@ -959,7 +959,7 @@
   "restore_old_file": "Berkas daftar putar dari dopeIPTV versi lama: hanya berisi daftar putar.",
   "restore_holds": "Isinya:",
   "restore_missing_paths": "Folder yang disebutkan tetapi tidak ada di komputer ini: {n}. Pengaturan tersebut tetap seperti di sini.",
-  "restore_risky": "Ada pengaturan Nerd yang menjalankan program atau mengirim koneksi Anda melalui server lain. Pulihkan hanya jika Anda sendiri yang membuatnya:",
+  "restore_risky": "Ada pengaturan Nerd yang menjalankan program, mengirim koneksi Anda atau apa yang Anda tonton ke server lain, atau membiarkan perangkat lain mengendalikan aplikasi. Pulihkan hanya jika Anda sendiri yang membuatnya:",
   "restore_replace": "Ganti semuanya di komputer ini",
   "restore_replace_hint": "Daftar putar, favorit, riwayat, dan semua pengaturan menjadi isi cadangan. Lalu dopeIPTV ditutup; jalankan lagi untuk melanjutkan dengan cadangan.",
   "restore_add": "Tambahkan daftar putarnya saja",
@@ -1838,5 +1838,9 @@
   "menu_view": "Tampilan",
   "menu_help": "Bantuan",
   "menu_website": "Situs web dopeIPTV",
-  "rec_reason_no_address": "alamat stream tidak bisa didapat"
+  "rec_reason_no_address": "alamat stream tidak bisa didapat",
+  "restore_cannot_replace": "Cadangan ini tidak berisi daftar putar atau pengaturan, jadi tidak bisa menggantikan yang ada di sini.",
+  "restore_kept": "Tidak ada di cadangan ini, jadi tetap seperti di sini: {what}.",
+  "restore_risky_source": "Daftar putar “{name}”: {what}",
+  "restore_token_note": "Token kendali jarak jauh tidak pernah diambil dari cadangan: token baru dibuat di komputer ini saat kendali jarak jauh atau berbagi dinyalakan."
 }
