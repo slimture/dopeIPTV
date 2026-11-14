@@ -60,6 +60,8 @@ dopeiptv/
     events.py          Nerd: events pushed out - webhooks and MQTT (queue +
                        a thread per receiver; it only watches)
     mqtt.py            A small MQTT 3.1.1 client (standard library only)
+    shortcut_keys.py   Keyboard shortcuts: the actions, the app's keys, the
+                       user's over them, never two on one key
     log.py             Central logging (configure_logging, DOPEIPTV_LOG)
     platform_macos.py  macOS-specific helpers (OpenGL, libmpv, paths)
     platform_windows.py Windows helpers (libmpv discovery, wakelock, shortcut)
@@ -112,7 +114,7 @@ dopeiptv/
     mw_search.py       Sidebar category / item search mixin
     mw_sidebar.py      Sidebar chrome (collapse / icon rail / mid-compact)
     mw_nav.py          Nav chrome (focus mode, nav colours/icons, Library)
-    mw_shortcuts.py    Keyboard shortcuts + registry
+    mw_shortcuts.py    Keyboard shortcuts: dispatch, the keys in force, live rebind
     mw_cast.py         Casting: the cast dialog, the strip, archive hand-over
     mw_popout.py       Detached-window ("pop out") player mixin
     mw_multiview.py    Multiview: 2/4/6/9 live streams (own mpv per cell)
@@ -137,7 +139,7 @@ dopeiptv/
     epg_grid.py        EPG timeline grid view
     epg_search.py      Programme search across the whole guide
     reminders.py       Reminders manager dialog
-    shortcuts.py       Keyboard-shortcuts editor dialog
+    shortcuts.py       Keyboard-shortcuts card (Settings > Advanced)
     tmdb_match.py      Manual TMDB match dialog
     subtitle_search.py OpenSubtitles search dialog
     theme.py           THEMES (25) x ACCENTS (10 + custom), palette dict P,

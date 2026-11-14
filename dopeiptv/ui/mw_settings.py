@@ -236,12 +236,6 @@ class _SettingsMixin:
         from .epg_search import EpgSearchDialog
         EpgSearchDialog(self).exec()
 
-    def _open_shortcuts(self) -> None:
-        """Open the keyboard-shortcuts editor: rebind any action to your own
-        keys (saved live via apply_shortcuts)."""
-        from .shortcuts import ShortcutsDialog
-        ShortcutsDialog(self).exec()
-
     def _favorite_channels_for_guide(self) -> list:
         """The favorite live channels the EPG guide should cover, honoring the
         currently selected Favorites sub-category (a channel folder, or all)."""
@@ -1821,8 +1815,12 @@ class _SettingsMixin:
         # -- Advanced ---------------------------------------------------------
         adv = page("advanced", tr("set_page_advanced"),
                    tr("set_page_advanced_sub"), "wrench")
-        shortcuts_btn = QPushButton(tr("btn_edit"))
-        shortcuts_btn.clicked.connect(self._open_shortcuts)
+        # Every rebindable action and its key, where the old editor's row
+        # was: recorded on a click, applied as it changes.
+        from ..core import shortcut_keys
+        from .shortcuts import ShortcutEditor
+        keys_shown = self.settings.value(shortcut_keys.SETTING, "") or ""
+        key_editor = ShortcutEditor(adv.card(tr("sc_title")), keys_shown, d)
         # Disk-cache controls: covers/logos accumulate under
         # QStandardPaths.CacheLocation and don't clean themselves. The live
         # cache is the shared "images" dir; the two legacy dirs predate the
@@ -1836,7 +1834,6 @@ class _SettingsMixin:
         ts_reset_btn = QPushButton(tr("common_reset"))
         ts_reset_btn.setAccessibleName(tr("ts_reset_broken"))
         c = adv.card(tr("sec_maintenance"))
-        c.row(tr("sc_title"), shortcuts_btn, tr("set_shortcuts_hint"))
         c.row(tr("ts_reset_broken"), ts_reset_btn, tr("ts_reset_hint"))
         maint = c
         # Every cache in one card: the image cache was here and the local
@@ -2274,6 +2271,13 @@ class _SettingsMixin:
             for skey, box in home_shelf_boxes.items():
                 put(skey, flag(box))
             put("follow_notify", flag(follow_notify_box))
+            # Written only when changed: nothing stored and nothing changed
+            # is not a setting.
+            keys_now = key_editor.text()
+            if keys_now != (self.settings.value(shortcut_keys.SETTING, "") or ""):
+                put(shortcut_keys.SETTING, keys_now)
+            if shortcut_keys.SETTING in changed:
+                self.apply_shortcuts()
             nerd_commit(put)
             if any(k.startswith("nerd_") for k in changed):
                 from ..core import nerd
@@ -2338,6 +2342,8 @@ class _SettingsMixin:
                 edit.editingFinished.connect(soon)
         for text in d.findChildren(QPlainTextEdit):
             text.textChanged.connect(soon)
+        # The key rows change no control watched above: they say so.
+        key_editor.changed.connect(soon)
 
         d.exec()
         live.stop()

@@ -1,20 +1,22 @@
 """Keyboard-shortcut mixin for MainWindow.
 
 The single-key player shortcuts (pause/mute/pop-out/record/stats/guide/fullscreen)
-and the shortcut registry (keyPressEvent dispatch, per-action key storage,
-install/apply, and the video-focused arrow handling). These are thin dispatch
-into self.player / self.* - no playback logic lives here. Moved out of
-main_window.py; behaviour is identical.
+and the shortcut registry (keyPressEvent dispatch, the keys in force - the
+user's over the app's own (core/shortcut_keys.py) - install and live apply,
+and the video-focused arrow handling). These are thin dispatch into
+self.player / self.* - no playback logic lives here.
 """
 from __future__ import annotations
-
-import sys
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QLineEdit
 
+from ..core import shortcut_keys
+from ..core.log import log
+from ..i18n import tr
 from ..media.embedded import _is_bare_arrow, _is_shift_arrow
+from .shortcuts import tip_with_key
 
 
 class _ShortcutsMixin:
@@ -140,29 +142,27 @@ class _ShortcutsMixin:
                     return
         super().keyPressEvent(event)
 
-    # Rebindable actions: (id, default key sequence, i18n label key). The
-    # callbacks are wired in _install_shortcuts. Order here is display order.
-    SHORTCUT_ACTIONS = (
-        ("zap_next", "Ctrl+Right", "sc_next_channel"),
-        ("zap_prev", "Ctrl+Left", "sc_prev_channel"),
-        ("last_channel", "Backspace", "sc_last_channel"),
-        ("pause", "Space", "sc_play_pause"),
-        ("fullscreen", "F", "sc_fullscreen"),
-        ("mute", "M", "sc_mute"),
-        ("popout", "P", "sc_popout"),
-        ("record", "R", "sc_record"),
-        ("stats", "I", "sc_stats"),
-        ("epg_guide", "Ctrl+G", "sc_epg_guide"),
-        ("epg_search", "Ctrl+Shift+F", "sc_epg_search"),
-        ("reminders", "Ctrl+Shift+R", "sc_reminders"),
-        ("sidebar", "Ctrl+B", "sc_sidebar"),
-        ("focus_mode", "Ctrl+Shift+M", "sc_focus_mode"),
-    )
+    # Rebindable actions: (id, default key sequence, i18n label key), in
+    # display order - core/shortcut_keys.py holds them and the rules for the
+    # user's own keys. The callbacks are wired in _install_shortcuts.
+    SHORTCUT_ACTIONS = shortcut_keys.ACTIONS
+
+    def _shortcut_zap_next(self) -> None:
+        self._shortcut_zap(1)
+
+    def _shortcut_zap_prev(self) -> None:
+        self._shortcut_zap(-1)
+
+    def _shortcut_sidebar(self) -> None:
+        self.side_btn.toggle()
+
+    def _shortcut_focus_mode(self) -> None:
+        self._set_focus_mode(not self._focus_mode)
 
     def _shortcut_callbacks(self):
         return {
-            "zap_next": lambda: self._shortcut_zap(1),
-            "zap_prev": lambda: self._shortcut_zap(-1),
+            "zap_next": self._shortcut_zap_next,
+            "zap_prev": self._shortcut_zap_prev,
             "last_channel": self._shortcut_last_channel,
             "pause": self._toggle_pause_shortcut,
             "fullscreen": self._toggle_fullscreen_shortcut,
@@ -173,35 +173,33 @@ class _ShortcutsMixin:
             "epg_guide": self._shortcut_epg_guide,
             "epg_search": self._open_epg_search,
             "reminders": self._open_reminders,
-            "sidebar": lambda: self.side_btn.toggle(),
-            "focus_mode": lambda: self._set_focus_mode(not self._focus_mode),
+            "sidebar": self._shortcut_sidebar,
+            "focus_mode": self._shortcut_focus_mode,
         }
 
-    def _shortcut_key(self, sid: str) -> str:
-        # Scope per-OS: modifier conventions differ (Qt maps Ctrl->Cmd on
-        # macOS) and a config shared across machines shouldn't cross-bind.
-        return f"shortcut/{sys.platform}/{sid}"
+    def shortcut_keys(self) -> dict[str, str]:
+        """Each action's key in force, in Qt's portable text ("" for none):
+        the user's over the app's own."""
+        return shortcut_keys.from_settings(self.settings)
 
-    def shortcut_sequence(self, sid: str, default: str) -> str:
-        """The user's key sequence for *sid*, or the default when unset."""
-        return self.settings.value(self._shortcut_key(sid), default) or default
-
-    def save_shortcut(self, sid: str, seq: str, default: str) -> None:
-        """Persist (or clear, when equal to default/empty) one binding."""
-        if seq and seq != default:
-            self.settings.setValue(self._shortcut_key(sid), seq)
-        else:
-            self.settings.remove(self._shortcut_key(sid))
+    def shortcut_sequence(self, sid: str) -> str:
+        """The key in force for *sid* ("" when it has none)."""
+        return self.shortcut_keys().get(sid, "")
 
     def _install_shortcuts(self) -> None:
-        """Create every rebindable QShortcut from its saved (or default) key
-        sequence. Kept in self._shortcuts so apply_shortcuts() can rebind them
-        live when the user edits them in Settings."""
+        """Create every rebindable QShortcut from the key in force. Kept in
+        self._shortcuts so apply_shortcuts() can rebind them live when the
+        user edits them in Settings."""
+        # The old editor's keys (one setting per action), kept: moved once.
+        moved = shortcut_keys.migrate(self.settings)
+        if moved:
+            log.info("shortcuts: %d key(s) of the old editor carried over", moved)
         cbs = self._shortcut_callbacks()
+        keys = self.shortcut_keys()
         self._shortcuts = {}
-        for sid, default, _label in self.SHORTCUT_ACTIONS:
-            seq = self.shortcut_sequence(sid, default)
-            sc = QShortcut(QKeySequence(seq), self, activated=cbs[sid])
+        for sid, _default, _label in self.SHORTCUT_ACTIONS:
+            sc = QShortcut(QKeySequence(keys.get(sid, "")), self)
+            sc.activated.connect(cbs[sid])
             # Application-wide, not window-wide. Qt's default context only
             # fires a shortcut while THIS window is the active one, and in
             # fullscreen on macOS the active window is the pop-out mirror -
@@ -209,13 +207,30 @@ class _ShortcutsMixin:
             # one mode where they matter most.
             sc.setContext(Qt.ShortcutContext.ApplicationShortcut)
             self._shortcuts[sid] = sc
+        self._shortcut_tips(keys)
 
     def apply_shortcuts(self) -> None:
-        """Re-read the saved key sequences and rebind the live QShortcuts."""
-        for sid, default, _label in self.SHORTCUT_ACTIONS:
+        """Rebind the live QShortcuts to the keys in force now."""
+        keys = self.shortcut_keys()
+        for sid, _default, _label in self.SHORTCUT_ACTIONS:
             sc = getattr(self, "_shortcuts", {}).get(sid)
             if sc is not None:
-                sc.setKey(QKeySequence(self.shortcut_sequence(sid, default)))
+                seq = QKeySequence(keys.get(sid, ""))
+                if sc.key() != seq:
+                    sc.setKey(seq)
+        self._shortcut_tips(keys)
+
+    # Buttons whose tooltip ends in their key, "(Ctrl+B)".
+    _KEY_TIPS = (("sidebar", "side_btn", "tooltip_toggle_sidebar"),
+                 ("focus_mode", "focus_btn", "tooltip_hide_list"))
+
+    def _shortcut_tips(self, keys: dict[str, str]) -> None:
+        """The tooltips that name a key say the one in force, as this
+        system writes it (⌘B on a Mac)."""
+        for sid, attr, tip in self._KEY_TIPS:
+            btn = getattr(self, attr, None)
+            if btn is not None:
+                btn.setToolTip(tip_with_key(tr(tip), shortcut_keys.DEFAULTS[sid], keys.get(sid, "")))
 
     def _handle_player_arrow(self, key, step: bool = False) -> bool:
         """Left/Right while the player is up: a bare arrow fine-seeks (VOD /

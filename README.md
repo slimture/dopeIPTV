@@ -277,8 +277,11 @@ hand costs nothing either.
 | `Esc` | Leave fullscreen / close a dialog |
 
 Single-letter keys (`M`, `P`, `R`, `I`) act on the player and are ignored
-while you're typing in the search box. Every one of these can be changed
-under **Settings → Advanced → Keyboard shortcuts**.
+while you're typing in the search box. Every one of these but `Ctrl`+`O`,
+`Delete` and `Esc` can be changed under **Settings → Advanced → Keyboard
+shortcuts** (a key does one thing: given to another action, the one that
+had it is left without; digits, `Enter`, the arrows, `Tab` and the media
+keys stay the app's).
 
 **With the video focused** (click the video first)
 

@@ -41,7 +41,8 @@ before committing to the rest.
   (`mw_settings.py` `sys.platform.startswith("linux")`, `app.py` likewise) — they
   simply won't appear or run on Windows.
 - **`os._exit(0)`** at teardown works on Windows.
-- **Per-OS keyboard shortcuts** already keyed by `sys.platform`.
+- **Keyboard shortcuts** are stored in Qt's portable form (`Ctrl` is ⌘ on
+  macOS) and shown as each system writes them (`core/shortcut_keys.py`).
 - The **nvidia-open INVALID_ENUM** hazard is Linux-specific — irrelevant on Windows.
 
 ---
