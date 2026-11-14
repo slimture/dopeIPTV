@@ -48,8 +48,12 @@ class _DonateMixin:
     def _donate_thanked(self) -> bool:
         return str(self.settings.value("donate_thanked", "false")) == "true"
 
+    def _supporter(self):
+        from ..core import supporter
+        return supporter.stored(self.settings)
+
     def _donate_heart_due(self) -> bool:
-        if self._donate_thanked():
+        if self._donate_thanked() and self._supporter() is None:
             return False
         try:
             until = float(self.settings.value("donate_heart_until", 0) or 0)
@@ -62,6 +66,15 @@ class _DonateMixin:
         if btn is None:
             return
         shown = self._donate_heart_due()
+        sup = self._supporter()
+        tip = tr("supporter_tip", date=sup["since"].isoformat()) if sup else tr("donate_support")
+        for heart in (btn, getattr(self, "_home_heart", None)):
+            try:
+                if heart is not None and hasattr(heart, "set_supporter"):
+                    heart.set_supporter(sup is not None)
+                    heart.setToolTip(tip)
+            except RuntimeError:
+                pass
         btn.setVisible(shown)
         # The pad left of the logo balances the heart - only beside it.
         pad = getattr(self, "_logo_pad", None)
@@ -93,9 +106,25 @@ class _DonateMixin:
         btn = btn or self._donate_btn
         menu = QMenu(btn)
         menu.addAction(tr("donate_support"), lambda: self.open_donate("app-heart"))
+        menu.addAction(tr("supporter_menu"), self.open_supporter)
         menu.addAction(tr("donate_hide"), self.hide_donate_heart)
-        menu.addAction(tr("donate_done"), self.donated)
+        if self._supporter() is None:
+            menu.addAction(tr("donate_done"), self.donated)
         menu.exec(btn.mapToGlobal(pos))
+
+    def heart_clicked(self, ref: str = "app-heart") -> None:
+        """The heart: the donate page, or for a supporter their thank-you
+        (from which they can still donate again)."""
+        if self._supporter() is not None:
+            self.open_supporter()
+        else:
+            self.open_donate(ref)
+
+    def open_supporter(self) -> None:
+        from .dialogs import SupporterDialog
+        d = SupporterDialog(self, self.settings, donate=lambda: self.open_donate("supporter"))
+        d.exec()
+        self._donate_heart_refresh()
 
     def _donate_count(self) -> None:
         """A minute of watching, by the same sign that keeps the screen
@@ -121,7 +150,9 @@ class _DonateMixin:
         open_url(DONATE_URL.format(ref=ref))
 
     def _donate_card_due(self) -> bool:
-        if self._donate_thanked():
+        # A supporter is not asked (they can still donate: the menu, About,
+        # their heart's thank-you).
+        if self._donate_thanked() or self._supporter() is not None:
             return False
         if self._donate_watched() + getattr(self, "_donate_unsaved", 0) \
                 < CARD_AFTER_MIN:

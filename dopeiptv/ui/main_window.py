@@ -831,7 +831,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         donate_btn.setFixedSize(30, 30)
         donate_btn.setToolTip(tr("donate_support"))
         donate_btn.setAccessibleName(tr("donate_support"))
-        donate_btn.clicked.connect(lambda: self.open_donate("app-heart"))
+        donate_btn.clicked.connect(lambda: self.heart_clicked("app-heart"))
         # Right-click: hide it for three months (mw_donate).
         donate_btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         donate_btn.customContextMenuRequested.connect(self._donate_heart_menu)

@@ -1488,5 +1488,17 @@
   "report_privacy": "Adressen, IP- und MAC-Adressen, Logins, die Namen deiner Quellen, Sender und was du geschaut hast, werden entfernt, bevor du das siehst. Nichts wird gesendet, bis du auf Senden drückst.",
   "report_send": "Senden",
   "report_sent": "Danke – der Bericht wurde gesendet.",
-  "report_not_sent": "Der Bericht konnte nicht gesendet werden. Er liegt in der Zwischenablage – du kannst ihn in ein Issue auf GitHub einfügen."
+  "report_not_sent": "Der Bericht konnte nicht gesendet werden. Er liegt in der Zwischenablage – du kannst ihn in ein Issue auf GitHub einfügen.",
+  "supporter_title": "Unterstützer",
+  "supporter_intro": "Eine Spende bringt einen Unterstützer-Schlüssel – ein Dankeschön: ein Zeichen am Herz und unter Über, und die App fragt nicht mehr. Er enthält nichts über dich. Füge ihn hier ein.",
+  "supporter_paste": "Füge deinen Unterstützer-Schlüssel ein (DS1-…)",
+  "supporter_key": "Unterstützer-Schlüssel",
+  "supporter_bad": "Das ist kein Unterstützer-Schlüssel – prüfe, ob alles kopiert wurde.",
+  "supporter_ok": "Ein gültiger Schlüssel – Unterstützer seit {date}.",
+  "supporter_thanks": "Danke, dass du dopeIPTV unterstützt",
+  "supporter_since": "Unterstützer seit {date}. Du kannst jederzeit wieder spenden – das hält die App für alle kostenlos.",
+  "supporter_remove": "Schlüssel entfernen",
+  "supporter_again": "Erneut spenden",
+  "supporter_menu": "Unterstützer-Schlüssel",
+  "supporter_tip": "Unterstützer seit {date} – danke!"
 }

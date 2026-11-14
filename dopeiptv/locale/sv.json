@@ -1488,5 +1488,17 @@
   "report_privacy": "Adresser, IP- och MAC-adresser, inloggningar, dina källors namn, kanaler och det du tittat på tas bort innan du ser detta. Inget skickas förrän du trycker Skicka.",
   "report_send": "Skicka",
   "report_sent": "Tack – rapporten skickades.",
-  "report_not_sent": "Rapporten kunde inte skickas. Den ligger i urklipp – du kan klistra in den i ett ärende på GitHub."
+  "report_not_sent": "Rapporten kunde inte skickas. Den ligger i urklipp – du kan klistra in den i ett ärende på GitHub.",
+  "supporter_title": "Supporter",
+  "supporter_intro": "En donation ger en supporternyckel – ett tack: ett märke på hjärtat och i Om, och appen slutar fråga. Den innehåller inget om dig. Klistra in den här.",
+  "supporter_paste": "Klistra in din supporternyckel (DS1-…)",
+  "supporter_key": "Supporternyckel",
+  "supporter_bad": "Det där är ingen supporternyckel – kontrollera att hela kopierades.",
+  "supporter_ok": "En giltig nyckel – supporter sedan {date}.",
+  "supporter_thanks": "Tack för att du stöttar dopeIPTV",
+  "supporter_since": "Supporter sedan {date}. Du kan alltid donera igen – det håller appen gratis för alla.",
+  "supporter_remove": "Ta bort nyckeln",
+  "supporter_again": "Donera igen",
+  "supporter_menu": "Supporternyckel",
+  "supporter_tip": "Supporter sedan {date} – tack!"
 }

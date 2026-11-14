@@ -1488,5 +1488,17 @@
   "report_privacy": "Adresy, adresy IP i MAC, loginy, nazwy twoich źródeł, kanały i to, co oglądałeś, są usuwane, zanim to zobaczysz. Nic nie zostanie wysłane, dopóki nie naciśniesz Wyślij.",
   "report_send": "Wyślij",
   "report_sent": "Dziękujemy – raport został wysłany.",
-  "report_not_sent": "Nie udało się wysłać raportu. Jest w schowku – możesz wkleić go w zgłoszeniu na GitHubie."
+  "report_not_sent": "Nie udało się wysłać raportu. Jest w schowku – możesz wkleić go w zgłoszeniu na GitHubie.",
+  "supporter_title": "Wspierający",
+  "supporter_intro": "Darowizna daje klucz wspierającego – podziękowanie: znak na serduszku i w O programie, a aplikacja przestaje prosić. Nie zawiera nic o tobie. Wklej go tutaj.",
+  "supporter_paste": "Wklej swój klucz wspierającego (DS1-…)",
+  "supporter_key": "Klucz wspierającego",
+  "supporter_bad": "To nie jest klucz wspierającego – sprawdź, czy skopiowano całość.",
+  "supporter_ok": "Prawidłowy klucz – wspierasz od {date}.",
+  "supporter_thanks": "Dziękujemy za wspieranie dopeIPTV",
+  "supporter_since": "Wspierasz od {date}. Zawsze możesz wpłacić ponownie – dzięki temu aplikacja jest darmowa dla wszystkich.",
+  "supporter_remove": "Usuń klucz",
+  "supporter_again": "Wpłać ponownie",
+  "supporter_menu": "Klucz wspierającego",
+  "supporter_tip": "Wspierasz od {date} – dziękujemy!"
 }

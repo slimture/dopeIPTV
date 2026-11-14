@@ -1488,5 +1488,17 @@
   "report_privacy": "Anwani, anwani za IP na MAC, taarifa za kuingia, majina ya vyanzo vyako, chaneli na ulichotazama huondolewa kabla hujaona hili. Hakuna kinachotumwa hadi ubonyeze Tuma.",
   "report_send": "Tuma",
   "report_sent": "Asante – ripoti imetumwa.",
-  "report_not_sent": "Ripoti haikuweza kutumwa. Iko kwenye ubao wa kunakili – unaweza kuibandika kwenye issue kwenye GitHub."
+  "report_not_sent": "Ripoti haikuweza kutumwa. Iko kwenye ubao wa kunakili – unaweza kuibandika kwenye issue kwenye GitHub.",
+  "supporter_title": "Mfadhili",
+  "supporter_intro": "Mchango unakuja na ufunguo wa mfadhili – shukrani: alama kwenye moyo na katika Kuhusu, na programu inaacha kuomba. Haina chochote kukuhusu. Ibandike hapa.",
+  "supporter_paste": "Bandika ufunguo wako wa mfadhili (DS1-…)",
+  "supporter_key": "Ufunguo wa mfadhili",
+  "supporter_bad": "Huo si ufunguo wa mfadhili – hakikisha umenakiliwa wote.",
+  "supporter_ok": "Ufunguo halali – mfadhili tangu {date}.",
+  "supporter_thanks": "Asante kwa kuunga mkono dopeIPTV",
+  "supporter_since": "Mfadhili tangu {date}. Unaweza kuchangia tena wakati wowote – inaifanya programu iwe bure kwa wote.",
+  "supporter_remove": "Ondoa ufunguo",
+  "supporter_again": "Changia tena",
+  "supporter_menu": "Ufunguo wa mfadhili",
+  "supporter_tip": "Mfadhili tangu {date} – asante!"
 }

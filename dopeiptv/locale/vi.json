@@ -1488,5 +1488,17 @@
   "report_privacy": "Địa chỉ, địa chỉ IP và MAC, thông tin đăng nhập, tên nguồn, kênh và những gì bạn đã xem được xóa trước khi bạn thấy nội dung này. Không gì được gửi cho đến khi bạn bấm Gửi.",
   "report_send": "Gửi",
   "report_sent": "Cảm ơn – báo cáo đã được gửi.",
-  "report_not_sent": "Không gửi được báo cáo. Nội dung đã nằm trong bộ nhớ tạm – bạn có thể dán vào một issue trên GitHub."
+  "report_not_sent": "Không gửi được báo cáo. Nội dung đã nằm trong bộ nhớ tạm – bạn có thể dán vào một issue trên GitHub.",
+  "supporter_title": "Người ủng hộ",
+  "supporter_intro": "Mỗi lần ủng hộ đi kèm một khóa người ủng hộ – lời cảm ơn: dấu hiệu trên trái tim và trong Giới thiệu, và ứng dụng thôi nhắc. Khóa không chứa gì về bạn. Dán vào đây.",
+  "supporter_paste": "Dán khóa người ủng hộ của bạn (DS1-…)",
+  "supporter_key": "Khóa người ủng hộ",
+  "supporter_bad": "Đây không phải khóa người ủng hộ – hãy kiểm tra đã sao chép đủ.",
+  "supporter_ok": "Khóa hợp lệ – ủng hộ từ {date}.",
+  "supporter_thanks": "Cảm ơn bạn đã ủng hộ dopeIPTV",
+  "supporter_since": "Ủng hộ từ {date}. Bạn luôn có thể ủng hộ thêm – điều đó giúp ứng dụng miễn phí cho mọi người.",
+  "supporter_remove": "Xóa khóa",
+  "supporter_again": "Ủng hộ lần nữa",
+  "supporter_menu": "Khóa người ủng hộ",
+  "supporter_tip": "Ủng hộ từ {date} – cảm ơn!"
 }

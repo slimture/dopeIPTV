@@ -196,7 +196,7 @@ class HomePage(QWidget):
         heart.set_chip(*chip)
         heart.setToolTip(tr("donate_support"))
         heart.setAccessibleName(tr("donate_support"))
-        heart.clicked.connect(lambda: w.open_donate("app-heart"))
+        heart.clicked.connect(lambda: w.heart_clicked("app-heart"))
         heart.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         heart.customContextMenuRequested.connect(
             lambda pos, b=heart: w._donate_heart_menu(pos, b))

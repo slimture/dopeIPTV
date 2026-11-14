@@ -344,8 +344,11 @@ class SettingsPage(QScrollArea):
 
 #: On a sidebar entry: 1 a page folded out under another, 2 the last of them.
 CHILD_ROLE = Qt.ItemDataRole.UserRole + 1
-#: On the entry they fold out under: 1 with none showing, 2 unfolded.
+#: On the entry they fold out under: 0 with none to show (Nerd off), 1
+#: folded in, 2 unfolded.
 PARENT_ROLE = Qt.ItemDataRole.UserRole + 2
+#: How wide the chevron's target is at the far end of a parent's row.
+CHEVRON_HIT = 30
 
 
 class _NavDelegate(QStyledItemDelegate):
@@ -368,8 +371,8 @@ class _NavDelegate(QStyledItemDelegate):
             super().paint(painter, option, index)
         else:
             self._tinted(painter, option, index, bool(child), selected)
-        if parent == 2 and self.colour:
-            self._chevron(painter, option)
+        if parent in (1, 2) and self.colour:
+            self._chevron(painter, option, open_=parent == 2)
 
     def _tinted(self, painter, option, index, child: bool, selected: bool) -> None:
         """A page of the group in the group's colour: a child indented on
@@ -428,8 +431,10 @@ class _NavDelegate(QStyledItemDelegate):
         painter.drawText(text_rect, int(align), text)
         painter.restore()
 
-    def _chevron(self, painter, option) -> None:
-        """A small open chevron at the far end of the parent: unfolded."""
+    def _chevron(self, painter, option, open_: bool = True) -> None:
+        """At the far end of the parent: pointing down while its pages are
+        out, towards the text's direction while they are folded in - and a
+        click there folds them (SettingsNav)."""
         r = option.rect
         rtl = option.direction == Qt.LayoutDirection.RightToLeft
         cx = r.left() + 16 if rtl else r.right() - 15
@@ -440,9 +445,15 @@ class _NavDelegate(QStyledItemDelegate):
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(pen)
         path = QPainterPath()
-        path.moveTo(cx - 4, cy - 2)
-        path.lineTo(cx, cy + 2)
-        path.lineTo(cx + 4, cy - 2)
+        if open_:
+            path.moveTo(cx - 4, cy - 2)
+            path.lineTo(cx, cy + 2)
+            path.lineTo(cx + 4, cy - 2)
+        else:
+            d = -1 if rtl else 1
+            path.moveTo(cx - 2 * d, cy - 4)
+            path.lineTo(cx + 2 * d, cy)
+            path.lineTo(cx - 2 * d, cy + 4)
         painter.drawPath(path)
         painter.restore()
 
@@ -451,6 +462,33 @@ class SettingsNav(QListWidget):
     """The sidebar: one entry per page, with its icon."""
 
     page_chosen = pyqtSignal(int)
+    #: A parent's pages folded in or out: (its row).
+    fold_clicked = pyqtSignal(int)
+
+    def mousePressEvent(self, event) -> None:      # noqa: N802 - Qt hook
+        item = self.itemAt(event.position().toPoint())
+        if item is not None and item.data(PARENT_ROLE) in (1, 2):
+            x = event.position().x()
+            rtl = self.layoutDirection() == Qt.LayoutDirection.RightToLeft
+            r = self.visualItemRect(item)
+            on_chevron = x <= r.left() + CHEVRON_HIT if rtl else x >= r.right() - CHEVRON_HIT
+            # The chevron, or the parent again while its page is the one shown.
+            if on_chevron or item is self.currentItem():
+                self.fold_clicked.emit(self.row(item))
+                event.accept()
+                return
+        super().mousePressEvent(event)
+
+    def keyPressEvent(self, event) -> None:        # noqa: N802
+        item = self.currentItem()
+        state = item.data(PARENT_ROLE) if item is not None else None
+        rtl = self.layoutDirection() == Qt.LayoutDirection.RightToLeft
+        fold, unfold = ((Qt.Key.Key_Right, Qt.Key.Key_Left) if rtl
+                        else (Qt.Key.Key_Left, Qt.Key.Key_Right))
+        if (state == 2 and event.key() == fold) or (state == 1 and event.key() == unfold):
+            self.fold_clicked.emit(self.row(item))
+            return
+        super().keyPressEvent(event)
 
     def __init__(self) -> None:
         super().__init__()
@@ -518,8 +556,14 @@ class SettingsShell(QWidget):
         self._children: dict[str, list[str]] = {}
         #: Fold out with a short stagger (off in tests that count at once).
         self.animate = True
+        #: Parents whose pages are folded in by the person (Nerd on, but
+        #: its list put away): a search still finds them.
+        self.folded: set[str] = set()
+        #: Told (parent, folded) when the person folds a group: to keep it.
+        self.on_fold: Callable[[str, bool], None] | None = None
         self._aligned = False
         self.nav.page_chosen.connect(self._show)
+        self.nav.fold_clicked.connect(self._fold_row)
         self.search.textChanged.connect(self._filter)
 
     def showEvent(self, event) -> None:
@@ -566,7 +610,7 @@ class SettingsShell(QWidget):
         for k in self._children[parent]:
             self._items[k].setSizeHint(QSize(0, 30))
         if parent in self._items:
-            self._items[parent].setData(PARENT_ROLE, 1)
+            self._items[parent].setData(PARENT_ROLE, 0)
 
     def set_group_enabled(self, parent: str, on: bool) -> None:
         """Show or leave out every page under *parent* at once; turned on,
@@ -594,6 +638,41 @@ class SettingsShell(QWidget):
         for i in range(len(shown)):
             QTimer.singleShot(35 * (i + 1), lambda i=i: reveal(i))
 
+    def _fold_row(self, row: int) -> None:
+        item = self.nav.item(row)
+        key = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+        if key in self._children:
+            self.set_folded(key, key not in self.folded)
+
+    def set_folded(self, parent: str, folded: bool) -> None:
+        """Fold *parent*'s pages in (or out again) in the sidebar."""
+        was = parent in self.folded
+        if folded:
+            self.folded.add(parent)
+        else:
+            self.folded.discard(parent)
+        if self.on_fold is not None and was != folded:
+            self.on_fold(parent, folded)
+        cur = self.current_key()
+        self._filter(self.search.text())
+        # The page shown was one of those folded in: its parent instead.
+        if folded and cur in self._children.get(parent, []):
+            self.show_page(parent)
+        if not folded and was and self.animate and not self._searching:
+            shown = [self._items[k] for k in self._children.get(parent, [])
+                     if not self._items[k].isHidden()]
+            for it in shown:
+                it.setHidden(True)
+
+            def reveal(i: int) -> None:
+                for it in shown[:i + 1]:
+                    key = it.data(Qt.ItemDataRole.UserRole)
+                    if key not in self._off and parent not in self.folded and not self._searching:
+                        it.setHidden(False)
+                self._mark_children()
+            for i in range(len(shown)):
+                QTimer.singleShot(25 * (i + 1), lambda i=i: reveal(i))
+
     def _mark_children(self) -> None:
         """The last page showing under each parent ends the rail; a parent
         with pages showing is unfolded."""
@@ -603,8 +682,10 @@ class SettingsShell(QWidget):
                 self._items[k].setData(CHILD_ROLE, 1)
             if showing:
                 showing[-1].setData(CHILD_ROLE, 2)
+            available = any(k not in self._off for k in keys)
             if parent in self._items:
-                self._items[parent].setData(PARENT_ROLE, 2 if showing else 1)
+                state = 0 if not available else (2 if showing else 1)
+                self._items[parent].setData(PARENT_ROLE, state)
         self.nav.viewport().update()
 
     def arrange(self, sections: list[tuple[str, list[str]]]) -> None:
@@ -712,9 +793,10 @@ class SettingsShell(QWidget):
     def _filter(self, text: str) -> None:
         needle = " ".join(text.split()).casefold()
         first = None
+        folded_in = {k for p in self.folded for k in self._children.get(p, [])} if not needle else set()
         for page in self.pages:
             hit = page.key not in self._off and page.apply_filter(needle)
-            self._items[page.key].setHidden(not hit)
+            self._items[page.key].setHidden(not hit or page.key in folded_in)
         # A heading goes with the last of its pages.
         for head, items in self._sections:
             head.setHidden(all(it.isHidden() for it in items))

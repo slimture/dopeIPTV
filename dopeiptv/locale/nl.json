@@ -1488,5 +1488,17 @@
   "report_privacy": "Adressen, IP- en MAC-adressen, logins, de namen van je bronnen, zenders en wat je keek worden verwijderd voordat je dit ziet. Er wordt niets verstuurd tot je op Versturen drukt.",
   "report_send": "Versturen",
   "report_sent": "Bedankt – het rapport is verstuurd.",
-  "report_not_sent": "Het rapport kon niet worden verstuurd. Het staat op het klembord – je kunt het in een issue op GitHub plakken."
+  "report_not_sent": "Het rapport kon niet worden verstuurd. Het staat op het klembord – je kunt het in een issue op GitHub plakken.",
+  "supporter_title": "Supporter",
+  "supporter_intro": "Een donatie geeft een supportersleutel – een bedankje: een teken op het hart en bij Over, en de app vraagt niet meer. Er staat niets over jou in. Plak hem hier.",
+  "supporter_paste": "Plak je supportersleutel (DS1-…)",
+  "supporter_key": "Supportersleutel",
+  "supporter_bad": "Dat is geen supportersleutel – controleer of alles gekopieerd is.",
+  "supporter_ok": "Een geldige sleutel – supporter sinds {date}.",
+  "supporter_thanks": "Bedankt dat je dopeIPTV steunt",
+  "supporter_since": "Supporter sinds {date}. Je kunt altijd opnieuw doneren – zo blijft de app voor iedereen gratis.",
+  "supporter_remove": "Sleutel verwijderen",
+  "supporter_again": "Opnieuw doneren",
+  "supporter_menu": "Supportersleutel",
+  "supporter_tip": "Supporter sinds {date} – bedankt!"
 }

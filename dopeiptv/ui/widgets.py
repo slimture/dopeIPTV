@@ -313,6 +313,30 @@ class HeartButton(_ChipPainting, QPushButton):
         if not self.underMouse():
             self._paint(colour)
 
+    def set_supporter(self, on: bool) -> None:
+        """A supporter's heart: always the heart's red, on a soft glow with a
+        ring - a thank-you mark rather than a request."""
+        self._supporter = bool(on)
+        if on:
+            self._rest = HEART
+            self._paint(HEART)
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        if getattr(self, "_supporter", False):
+            p = QPainter(self)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            d = float(min(self.width(), self.height())) - 3.0
+            circle = QRectF((self.width() - d) / 2, (self.height() - d) / 2, d, d)
+            glow, ring = QColor(HEART), QColor(HEART)
+            glow.setAlphaF(0.16)
+            ring.setAlphaF(0.65)
+            p.setBrush(glow)
+            p.setPen(QPen(ring, 1.5))
+            p.drawEllipse(circle)
+            p.end()
+        super().paintEvent(event)
+
     def enterEvent(self, event) -> None:
         self._paint(HEART)
         self._beat.stop()

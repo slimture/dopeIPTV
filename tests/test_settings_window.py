@@ -260,9 +260,40 @@ def layout(self):
     assert player.crumb is not None and player.crumb.text().startswith(tr("nerd_page"))
     player.crumb.click()
     assert shell.current_key() == "nerd"
+    # Folded in with Nerd still on: the pages go, the page shown becomes
+    # Nerd's own, the chevron turns; a search still finds them; out again.
+    shell.show_page("nerd_net")
+    shell.set_folded("nerd", True)
+    assert all(nav.item(at[k]).isHidden() for k in nerd_pages)
+    assert nav.item(at["nerd"]).data(PARENT_ROLE) == 1 and shell.current_key() == "nerd"
+    assert s.value("nerd_folded") == "true"
+    shell.search.setText("proxy")
+    assert not nav.item(at["nerd_net"]).isHidden()
+    shell.search.setText("")
+    assert nav.item(at["nerd_net"]).isHidden()
+    # A click on the chevron (the far end of Nerd's row) unfolds them.
+    from PyQt6.QtCore import QPoint
+    from PyQt6.QtTest import QTest
+    rect = nav.visualItemRect(nav.item(at["nerd"]))
+    QTest.mouseClick(nav.viewport(), Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier,
+                     QPoint(rect.right() - 10, rect.center().y()))
+    end = _t.monotonic() + 3
+    while any(nav.item(at[k]).isHidden() for k in nerd_pages) and _t.monotonic() < end:
+        app.processEvents()
+    assert all(not nav.item(at[k]).isHidden() for k in nerd_pages)
+    assert nav.item(at["nerd"]).data(PARENT_ROLE) == 2 and s.value("nerd_folded") == "false"
+    # The keyboard: Left folds, Right unfolds (on Nerd's row).
+    shell.show_page("nerd")
+    QTest.keyClick(nav, Qt.Key.Key_Left)
+    assert nav.item(at["nerd"]).data(PARENT_ROLE) == 1
+    QTest.keyClick(nav, Qt.Key.Key_Right)
+    end = _t.monotonic() + 3
+    while nav.item(at["nerd"]).data(PARENT_ROLE) != 2 and _t.monotonic() < end:
+        app.processEvents()
+    assert nav.item(at["nerd"]).data(PARENT_ROLE) == 2
     nerd_switch.setChecked(False)
     assert all(nav.item(at[k]).isHidden() for k in nerd_pages)
-    assert nav.item(at["nerd"]).data(PARENT_ROLE) == 1
+    assert nav.item(at["nerd"]).data(PARENT_ROLE) == 0
     assert all(not (rows[i][1] & Qt.ItemFlag.ItemIsSelectable) for i in heads)
     shell.show_page("playlists")
     assert shell.current_key() == "playlists"

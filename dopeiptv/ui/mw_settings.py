@@ -1731,6 +1731,10 @@ class _SettingsMixin:
         # Nerd's pages fold out under Nerd itself, in its own colour - not a
         # section with a heading of its own.
         shell.set_children("nerd", [p.key for p in nerd_pages.values()], nerd_tint)
+        # Folded in by the person: kept that way the next time.
+        if self.settings.value("nerd_folded", "false") == "true":
+            shell.folded.add("nerd")
+        shell.on_fold = lambda _p, folded: self.settings.setValue("nerd_folded", "true" if folded else "false")
 
         def show_nerd_pages(on: bool) -> None:
             shell.set_group_enabled("nerd", on)
@@ -2328,6 +2332,22 @@ class _SettingsMixin:
         give.setStyleSheet(link_css.replace(P["muted"], HEART, 1))
         links.addWidget(give)
         lay.addLayout(links)
+        # A supporter's thank-you, and where a key goes (mw_donate).
+        from ..core import supporter as _supporter
+        mine = _supporter.stored(getattr(self, "settings", None))
+        sup_row = QHBoxLayout()
+        if mine is not None:
+            mark = QLabel(f"<span style='color:{HEART}'>\u2665</span>&nbsp; "
+                          + tr("supporter_tip", date=mine["since"].isoformat()))
+            mark.setStyleSheet(f"color:{P['text2']}; font-size:12px; font-weight:600;")
+            sup_row.addWidget(mark)
+        if hasattr(self, "open_supporter"):
+            key_link = link(tr("supporter_menu") + "…", "")
+            key_link.clicked.disconnect()
+            key_link.clicked.connect(lambda: (d.accept(), self.open_supporter()))
+            sup_row.addWidget(key_link)
+        sup_row.addStretch(1)
+        lay.addLayout(sup_row)
 
         credit = QLabel(tr("about_tmdb_credit"))
         credit.setWordWrap(True)

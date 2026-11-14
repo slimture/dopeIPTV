@@ -1488,5 +1488,17 @@
   "report_privacy": "Les adresses, adresses IP et MAC, identifiants, noms de tes sources, chaînes et ce que tu as regardé sont retirés avant que tu ne voies ceci. Rien n'est envoyé avant que tu appuies sur Envoyer.",
   "report_send": "Envoyer",
   "report_sent": "Merci – le rapport a été envoyé.",
-  "report_not_sent": "Le rapport n'a pas pu être envoyé. Il est dans le presse-papiers – tu peux le coller dans un ticket sur GitHub."
+  "report_not_sent": "Le rapport n'a pas pu être envoyé. Il est dans le presse-papiers – tu peux le coller dans un ticket sur GitHub.",
+  "supporter_title": "Soutien",
+  "supporter_intro": "Un don s'accompagne d'une clé de soutien – un merci : une marque sur le cœur et dans À propos, et l'app ne demande plus. Elle ne contient rien sur toi. Colle-la ici.",
+  "supporter_paste": "Colle ta clé de soutien (DS1-…)",
+  "supporter_key": "Clé de soutien",
+  "supporter_bad": "Ce n'est pas une clé de soutien – vérifie qu'elle a été copiée en entier.",
+  "supporter_ok": "Une clé valide – soutien depuis le {date}.",
+  "supporter_thanks": "Merci de soutenir dopeIPTV",
+  "supporter_since": "Soutien depuis le {date}. Tu peux toujours donner à nouveau – cela garde l'app gratuite pour tous.",
+  "supporter_remove": "Retirer la clé",
+  "supporter_again": "Donner à nouveau",
+  "supporter_menu": "Clé de soutien",
+  "supporter_tip": "Soutien depuis le {date} – merci !"
 }

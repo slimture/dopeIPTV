@@ -1488,5 +1488,17 @@
   "report_privacy": "Indirizzi, indirizzi IP e MAC, accessi, nomi delle tue sorgenti, canali e ciò che hai guardato vengono tolti prima che tu veda questo. Nulla viene inviato finché non premi Invia.",
   "report_send": "Invia",
   "report_sent": "Grazie, la segnalazione è stata inviata.",
-  "report_not_sent": "Non è stato possibile inviare la segnalazione. È negli appunti: puoi incollarla in una segnalazione su GitHub."
+  "report_not_sent": "Non è stato possibile inviare la segnalazione. È negli appunti: puoi incollarla in una segnalazione su GitHub.",
+  "supporter_title": "Sostenitore",
+  "supporter_intro": "Una donazione porta una chiave da sostenitore, un grazie: un segno sul cuore e in Informazioni, e l'app smette di chiedere. Non contiene nulla su di te. Incollala qui.",
+  "supporter_paste": "Incolla la tua chiave da sostenitore (DS1-…)",
+  "supporter_key": "Chiave da sostenitore",
+  "supporter_bad": "Questa non è una chiave da sostenitore: controlla di averla copiata tutta.",
+  "supporter_ok": "Una chiave valida: sostenitore dal {date}.",
+  "supporter_thanks": "Grazie per sostenere dopeIPTV",
+  "supporter_since": "Sostenitore dal {date}. Puoi sempre donare di nuovo: mantiene l'app gratuita per tutti.",
+  "supporter_remove": "Rimuovi la chiave",
+  "supporter_again": "Dona di nuovo",
+  "supporter_menu": "Chiave da sostenitore",
+  "supporter_tip": "Sostenitore dal {date}, grazie!"
 }

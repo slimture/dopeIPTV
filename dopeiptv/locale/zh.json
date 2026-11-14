@@ -1488,5 +1488,17 @@
   "report_privacy": "地址、IP 和 MAC 地址、登录信息、你的来源名称、频道和观看记录在你看到之前已被移除。在你点击“发送”之前不会发送任何内容。",
   "report_send": "发送",
   "report_sent": "谢谢——报告已发送。",
-  "report_not_sent": "报告无法发送。它已在剪贴板中——你可以把它粘贴到 GitHub 的 issue 里。"
+  "report_not_sent": "报告无法发送。它已在剪贴板中——你可以把它粘贴到 GitHub 的 issue 里。",
+  "supporter_title": "支持者",
+  "supporter_intro": "捐赠会附带一个支持者密钥——一份谢意：爱心和“关于”中会出现标记，应用也不再请求捐赠。密钥中不含任何关于你的信息。请粘贴到这里。",
+  "supporter_paste": "粘贴你的支持者密钥（DS1-…）",
+  "supporter_key": "支持者密钥",
+  "supporter_bad": "这不是支持者密钥——请确认已完整复制。",
+  "supporter_ok": "有效的密钥——自 {date} 起成为支持者。",
+  "supporter_thanks": "感谢你支持 dopeIPTV",
+  "supporter_since": "自 {date} 起成为支持者。你随时可以再次捐赠——这让应用对所有人保持免费。",
+  "supporter_remove": "移除密钥",
+  "supporter_again": "再次捐赠",
+  "supporter_menu": "支持者密钥",
+  "supporter_tip": "自 {date} 起成为支持者——谢谢！"
 }

@@ -82,6 +82,7 @@ map and the one-way import rule.
 | `core/privacy.py` | Private viewing (nothing kept until the app closes) and Clear recent history by time range, for every source |
 | `core/rec_extras.py` | Nerd for recordings: file name template (folders, never outside), the command after a recording (no shell), their checks |
 | `core/remote_api.py` | The remote API and shared lists' small HTTP server (token on every request, this computer only unless chosen) |
+| `core/supporter.py` | The supporter key: signed by dopeiptv.org, checked offline, nothing about the person in it |
 | `core/report.py` | Error reports and feedback: scrubbed of anything identifying, shown in full, sent only on Send; the native crash file |
 | `services/share.py` | dopeIPTV as a server: every source's channels as one M3U, the downloaded guides as one XMLTV (streamed) |
 | `services/failover.py` | Failover: a live channel that will not play found in another source (guide id, else name) |
@@ -219,7 +220,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
   epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log,
-  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, nerd, nerd_lists, http_login, commands, instance, nerd_check, privacy, rec_extras, remote_api, report) and `services/` (failover, share, resume,
+  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, nerd, nerd_lists, http_login, commands, instance, nerd_check, privacy, rec_extras, remote_api, report, supporter) and `services/` (failover, share, resume,
   coverart, reminders, mpris, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list

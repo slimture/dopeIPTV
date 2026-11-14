@@ -1488,5 +1488,17 @@
   "report_privacy": "Adresler, IP ve MAC adresleri, oturum bilgileri, kaynaklarının adları, kanallar ve izlediklerin sen bunu görmeden önce çıkarılır. Gönder'e basana kadar hiçbir şey gönderilmez.",
   "report_send": "Gönder",
   "report_sent": "Teşekkürler – rapor gönderildi.",
-  "report_not_sent": "Rapor gönderilemedi. Panoda duruyor – GitHub'da bir issue'ya yapıştırabilirsin."
+  "report_not_sent": "Rapor gönderilemedi. Panoda duruyor – GitHub'da bir issue'ya yapıştırabilirsin.",
+  "supporter_title": "Destekçi",
+  "supporter_intro": "Bağış bir destekçi anahtarıyla gelir – bir teşekkür: kalpte ve Hakkında'da bir işaret, uygulama da artık sormaz. Senin hakkında hiçbir şey içermez. Buraya yapıştır.",
+  "supporter_paste": "Destekçi anahtarını yapıştır (DS1-…)",
+  "supporter_key": "Destekçi anahtarı",
+  "supporter_bad": "Bu bir destekçi anahtarı değil – tamamının kopyalandığını kontrol et.",
+  "supporter_ok": "Geçerli bir anahtar – {date} tarihinden beri destekçi.",
+  "supporter_thanks": "dopeIPTV'yi desteklediğin için teşekkürler",
+  "supporter_since": "{date} tarihinden beri destekçi. İstediğin zaman yeniden bağış yapabilirsin – uygulamayı herkes için ücretsiz tutar.",
+  "supporter_remove": "Anahtarı kaldır",
+  "supporter_again": "Yeniden bağış yap",
+  "supporter_menu": "Destekçi anahtarı",
+  "supporter_tip": "{date} tarihinden beri destekçi – teşekkürler!"
 }

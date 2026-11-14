@@ -1488,5 +1488,17 @@
   "report_privacy": "アドレス、IP・MACアドレス、ログイン情報、ソース名、チャンネル、視聴した内容は、表示前に取り除かれています。［送信］を押すまで何も送られません。",
   "report_send": "送信",
   "report_sent": "ありがとうございます。レポートを送信しました。",
-  "report_not_sent": "レポートを送信できませんでした。クリップボードにコピーしたので、GitHub の Issue に貼り付けられます。"
+  "report_not_sent": "レポートを送信できませんでした。クリップボードにコピーしたので、GitHub の Issue に貼り付けられます。",
+  "supporter_title": "サポーター",
+  "supporter_intro": "寄付にはサポーターキーが付きます。お礼として、ハートと「情報」に印が付き、アプリが寄付をお願いしなくなります。あなたに関する情報は含まれません。ここに貼り付けてください。",
+  "supporter_paste": "サポーターキーを貼り付け（DS1-…）",
+  "supporter_key": "サポーターキー",
+  "supporter_bad": "サポーターキーではありません。すべてコピーされているか確認してください。",
+  "supporter_ok": "有効なキーです。{date} からのサポーター。",
+  "supporter_thanks": "dopeIPTV を支えてくださりありがとうございます",
+  "supporter_since": "{date} からのサポーター。いつでも再び寄付できます。アプリを誰でも無料で使えるようにします。",
+  "supporter_remove": "キーを削除",
+  "supporter_again": "もう一度寄付する",
+  "supporter_menu": "サポーターキー",
+  "supporter_tip": "{date} からのサポーター – ありがとう！"
 }

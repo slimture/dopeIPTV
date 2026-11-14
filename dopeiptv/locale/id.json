@@ -1488,5 +1488,17 @@
   "report_privacy": "Alamat, alamat IP dan MAC, info masuk, nama sumbermu, saluran, dan yang kamu tonton dihapus sebelum kamu melihat ini. Tidak ada yang dikirim sampai kamu menekan Kirim.",
   "report_send": "Kirim",
   "report_sent": "Terima kasih – laporan sudah dikirim.",
-  "report_not_sent": "Laporan tidak bisa dikirim. Laporan ada di papan klip – kamu bisa menempelkannya di issue di GitHub."
+  "report_not_sent": "Laporan tidak bisa dikirim. Laporan ada di papan klip – kamu bisa menempelkannya di issue di GitHub.",
+  "supporter_title": "Pendukung",
+  "supporter_intro": "Donasi disertai kunci pendukung – ucapan terima kasih: tanda di hati dan di Tentang, dan aplikasi berhenti meminta. Kunci ini tidak berisi apa pun tentangmu. Tempelkan di sini.",
+  "supporter_paste": "Tempelkan kunci pendukungmu (DS1-…)",
+  "supporter_key": "Kunci pendukung",
+  "supporter_bad": "Itu bukan kunci pendukung – pastikan semuanya tersalin.",
+  "supporter_ok": "Kunci sah – pendukung sejak {date}.",
+  "supporter_thanks": "Terima kasih telah mendukung dopeIPTV",
+  "supporter_since": "Pendukung sejak {date}. Kamu selalu bisa berdonasi lagi – itu membuat aplikasi tetap gratis untuk semua.",
+  "supporter_remove": "Hapus kunci",
+  "supporter_again": "Donasi lagi",
+  "supporter_menu": "Kunci pendukung",
+  "supporter_tip": "Pendukung sejak {date} – terima kasih!"
 }

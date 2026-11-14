@@ -1488,5 +1488,17 @@
   "report_privacy": "Adrese, IP i MAC adrese, prijave, imena tvojih izvora, kanali i ono što si gledao uklanjaju se pre nego što ovo vidiš. Ništa se ne šalje dok ne pritisneš Pošalji.",
   "report_send": "Pošalji",
   "report_sent": "Hvala – izveštaj je poslat.",
-  "report_not_sent": "Izveštaj nije mogao da se pošalje. U privremenoj je memoriji – možeš da ga nalepiš u prijavu na GitHubu."
+  "report_not_sent": "Izveštaj nije mogao da se pošalje. U privremenoj je memoriji – možeš da ga nalepiš u prijavu na GitHubu.",
+  "supporter_title": "Podrška",
+  "supporter_intro": "Donacija donosi ključ podrške – zahvalnicu: znak na srcu i u O programu, a aplikacija prestaje da traži. U njemu nema ničega o tebi. Nalepi ga ovde.",
+  "supporter_paste": "Nalepi svoj ključ podrške (DS1-…)",
+  "supporter_key": "Ključ podrške",
+  "supporter_bad": "To nije ključ podrške – proveri da li je kopiran ceo.",
+  "supporter_ok": "Važeći ključ – podrška od {date}.",
+  "supporter_thanks": "Hvala što podržavaš dopeIPTV",
+  "supporter_since": "Podrška od {date}. Uvek možeš ponovo da doniraš – tako aplikacija ostaje besplatna za sve.",
+  "supporter_remove": "Ukloni ključ",
+  "supporter_again": "Doniraj ponovo",
+  "supporter_menu": "Ključ podrške",
+  "supporter_tip": "Podrška od {date} – hvala!"
 }

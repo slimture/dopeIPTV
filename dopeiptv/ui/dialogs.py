@@ -547,6 +547,88 @@ class UpdateDialog(QDialog):
 
 
 
+class SupporterDialog(QDialog):
+    """The supporter key: paste it (it is checked here, offline), or - for
+    a supporter - the thank-you, with a way to donate again."""
+
+    def __init__(self, parent, settings, donate=None) -> None:
+        super().__init__(parent)
+        from PyQt6.QtWidgets import QLineEdit
+
+        from ..core import supporter
+        from .widgets import HeartButton
+        self._settings = settings
+        self.setWindowTitle(tr("supporter_title"))
+        self.setMinimumWidth(480)
+        col = QVBoxLayout(self)
+        col.setContentsMargins(24, 22, 24, 20)
+        col.setSpacing(10)
+        top = QHBoxLayout()
+        heart = HeartButton(size=22)
+        heart.setFixedSize(46, 46)
+        heart.setFlat(True)
+        self.heart = heart
+        top.addWidget(heart, 0, Qt.AlignmentFlag.AlignTop)
+        words = QVBoxLayout()
+        self.head = QLabel()
+        self.head.setStyleSheet(f"font-size:16px; font-weight:700; color:{P['text']};")
+        self.sub = QLabel()
+        self.sub.setWordWrap(True)
+        self.sub.setStyleSheet(f"font-size:13px; color:{P['text2']};")
+        words.addWidget(self.head)
+        words.addWidget(self.sub)
+        top.addLayout(words, 1)
+        col.addLayout(top)
+        self.key = QLineEdit(str(settings.value("supporter_key", "") or ""))
+        self.key.setPlaceholderText(tr("supporter_paste"))
+        self.key.setAccessibleName(tr("supporter_key"))
+        col.addWidget(self.key)
+        self.state = QLabel()
+        self.state.setWordWrap(True)
+        col.addWidget(self.state)
+        buttons = QHBoxLayout()
+        self.remove = QPushButton(tr("supporter_remove"))
+        buttons.addWidget(self.remove)
+        buttons.addStretch(1)
+        self.donate_btn = QPushButton(tr("donate_support") + "…")
+        if donate is not None:
+            self.donate_btn.clicked.connect(lambda _c=False: donate())
+        else:
+            self.donate_btn.hide()
+        close = QPushButton(tr("common_close"), objectName="Primary")
+        close.clicked.connect(self.accept)
+        buttons.addWidget(self.donate_btn)
+        buttons.addWidget(close)
+        col.addLayout(buttons)
+        self._supporter = supporter
+        self.key.textChanged.connect(self._check)
+        self.remove.clicked.connect(lambda _c=False: self.key.setText(""))
+        self._check()
+
+    def _check(self, *_a) -> None:
+        text = self.key.text().strip()
+        found = self._supporter.parse(text) if text else None
+        if found is not None:
+            self._settings.setValue("supporter_key", text)
+            date = found["since"].isoformat()
+            self.head.setText(tr("supporter_thanks"))
+            self.sub.setText(tr("supporter_since", date=date))
+            self.state.setText("✓ " + tr("supporter_ok", date=date))
+            self.state.setStyleSheet(f"font-size:12px; color:{P.get('ok', P['text2'])};")
+            self.donate_btn.setText(tr("supporter_again") + "…")
+        else:
+            if not text:
+                self._settings.remove("supporter_key")
+            self.head.setText(tr("supporter_title"))
+            self.sub.setText(tr("supporter_intro"))
+            self.state.setText(tr("supporter_bad") if text else "")
+            self.state.setStyleSheet(f"font-size:12px; color:{P['error']};")
+            self.donate_btn.setText(tr("donate_support") + "…")
+        self.heart.set_supporter(found is not None)
+        self.remove.setVisible(bool(text))
+        self.supporter = found
+
+
 class ReportDialog(QDialog):
     """An error report or feedback, shown in full before anything is sent:
     what it holds, that nothing in it identifies a stream or a person, and

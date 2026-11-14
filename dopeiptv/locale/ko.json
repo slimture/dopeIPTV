@@ -1488,5 +1488,17 @@
   "report_privacy": "주소, IP·MAC 주소, 로그인 정보, 소스 이름, 채널, 시청한 내용은 이 화면에 보이기 전에 제거됩니다. 보내기를 누르기 전에는 아무것도 전송되지 않습니다.",
   "report_send": "보내기",
   "report_sent": "감사합니다. 보고서를 보냈습니다.",
-  "report_not_sent": "보고서를 보낼 수 없습니다. 클립보드에 복사했으니 GitHub 이슈에 붙여 넣을 수 있습니다."
+  "report_not_sent": "보고서를 보낼 수 없습니다. 클립보드에 복사했으니 GitHub 이슈에 붙여 넣을 수 있습니다.",
+  "supporter_title": "후원자",
+  "supporter_intro": "후원하면 후원자 키를 받습니다. 감사의 표시로 하트와 정보 화면에 표시가 생기고 앱이 더 이상 후원을 요청하지 않습니다. 키에는 사용자에 관한 정보가 없습니다. 여기에 붙여 넣으세요.",
+  "supporter_paste": "후원자 키를 붙여 넣으세요(DS1-…)",
+  "supporter_key": "후원자 키",
+  "supporter_bad": "후원자 키가 아닙니다. 전체가 복사되었는지 확인하세요.",
+  "supporter_ok": "유효한 키 – {date}부터 후원자.",
+  "supporter_thanks": "dopeIPTV를 후원해 주셔서 감사합니다",
+  "supporter_since": "{date}부터 후원자. 언제든 다시 후원할 수 있습니다. 앱을 모두에게 무료로 유지해 줍니다.",
+  "supporter_remove": "키 삭제",
+  "supporter_again": "다시 후원하기",
+  "supporter_menu": "후원자 키",
+  "supporter_tip": "{date}부터 후원자 – 감사합니다!"
 }

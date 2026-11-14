@@ -1488,5 +1488,17 @@
   "report_privacy": "Endereços, endereços IP e MAC, logins, nomes das suas fontes, canais e o que você assistiu são removidos antes de você ver isto. Nada é enviado até você tocar em Enviar.",
   "report_send": "Enviar",
   "report_sent": "Obrigado – o relatório foi enviado.",
-  "report_not_sent": "Não foi possível enviar o relatório. Ele está na área de transferência – você pode colá-lo em uma issue no GitHub."
+  "report_not_sent": "Não foi possível enviar o relatório. Ele está na área de transferência – você pode colá-lo em uma issue no GitHub.",
+  "supporter_title": "Apoiador",
+  "supporter_intro": "Uma doação vem com uma chave de apoiador – um agradecimento: uma marca no coração e em Sobre, e o app para de pedir. Ela não contém nada sobre você. Cole-a aqui.",
+  "supporter_paste": "Cole sua chave de apoiador (DS1-…)",
+  "supporter_key": "Chave de apoiador",
+  "supporter_bad": "Isso não é uma chave de apoiador – confira se ela foi copiada inteira.",
+  "supporter_ok": "Uma chave válida – apoiador desde {date}.",
+  "supporter_thanks": "Obrigado por apoiar o dopeIPTV",
+  "supporter_since": "Apoiador desde {date}. Você sempre pode doar de novo – isso mantém o app gratuito para todos.",
+  "supporter_remove": "Remover chave",
+  "supporter_again": "Doar de novo",
+  "supporter_menu": "Chave de apoiador",
+  "supporter_tip": "Apoiador desde {date} – obrigado!"
 }

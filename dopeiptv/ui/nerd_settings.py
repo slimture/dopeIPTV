@@ -813,27 +813,70 @@ class _OnShow(QWidget):
 
 
 def _how_block(items: list[tuple[str, str]]) -> QWidget:
-    """How Nerd works, as one block: a short lead-in on the left of each
-    line, what it means beside it - no hairlines between, one thing to read."""
+    """How Nerd works, as small tiles two by two: a mark in Nerd's colour,
+    a few words, what they mean - read at a glance, not as a wall of text.
+    The tile about the checks shows the marks themselves."""
     from PyQt6.QtCore import Qt
+    from PyQt6.QtGui import QColor
     from PyQt6.QtWidgets import QGridLayout, QLabel
 
+    from .settings_ui import page_icon
     from .theme import P
+    nerd_col = QColor(P.get("nerd", P["accent"]))
+    tint = f"rgba({nerd_col.red()},{nerd_col.green()},{nerd_col.blue()},0.09)"
+    edge = f"rgba({nerd_col.red()},{nerd_col.green()},{nerd_col.blue()},0.22)"
+    marks = {"nerd_how_saved_t": "trakt", "nerd_how_alone_t": "knobs", "nerd_how_pages_t": "channels"}
     box = QWidget()
     grid = QGridLayout(box)
     grid.setContentsMargins(0, 4, 0, 4)
-    grid.setHorizontalSpacing(18)
+    grid.setHorizontalSpacing(10)
     grid.setVerticalSpacing(10)
     for i, (title, body) in enumerate(items):
-        head = QLabel(tr(title))
-        head.setStyleSheet(f"color:{P['text']}; font-weight:600;")
+        tile = QFrame()
+        tile.setObjectName("NerdHowTile")
+        tile.setStyleSheet(f"QFrame#NerdHowTile {{ background:{tint}; border:1px solid {edge}; border-radius:12px; }}"
+                           " QFrame#NerdHowTile QLabel { background: transparent; border: none; }")
+        col = QVBoxLayout(tile)
+        col.setContentsMargins(14, 12, 14, 12)
+        col.setSpacing(6)
+        head = QHBoxLayout()
+        head.setSpacing(8)
+        if title == "nerd_how_checks_t":
+            mark = QLabel(f"<span style='color:{P.get('ok', P['text'])}'>✓</span>&nbsp;"
+                          f"<span style='color:{P.get('warn', P['text'])}'>!</span>&nbsp;"
+                          f"<span style='color:{P['error']}'>✕</span>")
+            mark.setTextFormat(Qt.TextFormat.RichText)
+            mark.setStyleSheet("font-size:15px; font-weight:800;")
+        else:
+            mark = QLabel()
+            mark.setPixmap(page_icon(marks.get(title, "nerd"), lambda k, sz, c: _blank(sz), 18,
+                                     tint=nerd_col.name()).pixmap(18, 18))
+        name = QLabel(tr(title))
+        name.setStyleSheet(f"color:{P['text']}; font-weight:650;")
+        head.addWidget(mark)
+        head.addWidget(name, 1)
         text = QLabel(tr(body))
         text.setWordWrap(True)
-        text.setStyleSheet(f"color:{P['text2']};")
-        grid.addWidget(head, i, 0, Qt.AlignmentFlag.AlignTop)
-        grid.addWidget(text, i, 1)
+        text.setStyleSheet(f"color:{P['text2']}; font-size:12px;")
+        col.addLayout(head)
+        col.addWidget(text)
+        col.addStretch(1)
+        grid.addWidget(tile, i // 2, i % 2)
+    grid.setColumnStretch(0, 1)
     grid.setColumnStretch(1, 1)
     return box
+
+
+def _blank(size: int):
+    from PyQt6.QtGui import QPixmap
+    pm = QPixmap(size, size)
+    pm.fill(Qt_transparent())
+    return pm
+
+
+def Qt_transparent():  # noqa: N802 - a colour, named as Qt names it
+    from PyQt6.QtCore import Qt
+    return Qt.GlobalColor.transparent
 
 
 def _fitted(*widgets: QWidget) -> QWidget:
