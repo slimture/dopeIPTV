@@ -109,6 +109,19 @@ assert not d2.where.isVisibleTo(d2)
 # The thank-you shows the supporter's mark, the month in words.
 assert d2.mark.isVisibleTo(d2) and not d2.heart.isVisibleTo(d2) and d2.mark._supporter
 assert "2026" in d2.sub.text() and "-11-" not in d2.sub.text()
+# On the icon rail the logo keeps a real width (it once shrank to nothing
+# between its row's stretches, leaving only the heart in the air).
+w.resize(1400, 900)
+w.show()
+w._set_sidebar_collapsed(True)
+for _ in range(10):
+    app.processEvents()
+logo = w._sidebar_logo
+assert logo.width() >= logo.LOGO_W and logo.LOGO_W < 92, (logo.width(), logo.LOGO_W)
+w._set_sidebar_collapsed(False)
+for _ in range(10):
+    app.processEvents()
+assert logo.width() >= logo.LOGO_W == 92
 s.remove("supporter_key")
 w.already_donated()                           # closed without a key: taken at their word
 assert s.value("donate_thanked") == "true"
