@@ -650,11 +650,6 @@ class _SettingsMixin:
         c = general.card(tr("donate_support"))
         heart_box = c.toggle(tr("set_donate_heart"), self._donate_heart_due(),
                              tr("set_donate_heart_hint"))
-        # Nerd: one quiet switch, last. Off, the app is as it always was and
-        # the Nerd page is not even in the sidebar.
-        c = general.card(tr("nerd_card_general"))
-        nerd_box = c.toggle(tr("nerd_show"), is_on("nerd_enabled", "false"),
-                            tr("nerd_show_hint"))
 
         # -- Appearance -------------------------------------------------------
         look = page("appearance", tr("set_page_appearance"),
@@ -1691,10 +1686,12 @@ class _SettingsMixin:
         # -- Nerd -------------------------------------------------------------
         from . import nerd_settings
         nerd_page = page("nerd", tr("nerd_page"), tr("nerd_page_sub"), "nerd")
-        nerd_commit = nerd_settings.build(nerd_page, self.settings, d)
-        shell.set_page_enabled("nerd", nerd_box.isChecked())
-        nerd_box.toggled.connect(
-            lambda on_: shell.set_page_enabled("nerd", on_))
+        nerd_commit = nerd_settings.build(
+            nerd_page, self.settings, d,
+            boxes=[p for p in (self.playlist_store.playlists() if self.playlist_store else [])
+                   if p.get("kind") in ("enigma2", "tvheadend", "hdhomerun")],
+            edit=lambda pid: edit_source(pid),
+            add=lambda: add_playlist({"kind": "enigma2"}))
 
         # -- the playlist page's behaviour -------------------------------------
         def reload_pl_list():
@@ -1775,15 +1772,17 @@ class _SettingsMixin:
 
         pl_list.reordered.connect(playlist_moved)
 
-        def add_playlist():
-            dlg = PlaylistDialog(d)
+        def add_playlist(prefill=None):
+            dlg = PlaylistDialog(d, prefill=prefill)
             if dlg.exec():
                 pl = store.add(dlg.values())
                 reload_pl_list()
                 select_pid(pl["id"])
 
         def edit_playlist():
-            pid = selected_pid()
+            edit_source(selected_pid())
+
+        def edit_source(pid):
             pl = store.get(pid) if (store and pid) else None
             if not pl:
                 return
@@ -1870,7 +1869,7 @@ class _SettingsMixin:
             QMessageBox.information(d, tr("pl_import_title"),
                                     tr("pl_import_done", n=added))
 
-        add_btn.clicked.connect(add_playlist)
+        add_btn.clicked.connect(lambda _c=False: add_playlist())
         edit_btn.clicked.connect(edit_playlist)
         remove_btn.clicked.connect(remove_playlist)
         refresh_pl_btn.clicked.connect(self.refresh_playlist)
@@ -1919,7 +1918,6 @@ class _SettingsMixin:
             (tr("set_sec_services"), ["metadata", "trakt"]),
             (tr("set_sec_system"), ["parental", "advanced", "nerd"]),
         ])
-        shell.set_page_enabled("nerd", nerd_box.isChecked())
         # Back on the page that was open last time this session.
         shell.show_page(getattr(self, "_settings_page", None))
         d.finished.connect(
@@ -2063,8 +2061,6 @@ class _SettingsMixin:
             for skey, box in home_shelf_boxes.items():
                 put(skey, flag(box))
             put("follow_notify", flag(follow_notify_box))
-            if nerd_box.isChecked() or self.settings.value("nerd_enabled") is not None:
-                put("nerd_enabled", flag(nerd_box))
             nerd_commit(put)
             if any(k.startswith("nerd_") for k in changed):
                 from ..core import nerd

@@ -115,9 +115,9 @@ def search_and_cancel(self):
     visible = lambda: [nav.item(i).data(0x0100) for i in range(nav.count())
                        if not nav.item(i).isHidden()
                        and nav.item(i).data(0x0100)]
-    # Every page but those not turned on (Nerd, until it is).
-    shown = len(shell.pages) - len(shell._off)
-    assert "nerd" in shell._off and len(visible()) == shown >= 14
+    # Every page, Nerd too (its switch is on it).
+    shown = len(shell.pages)
+    assert not shell._off and len(visible()) == shown >= 14
     shell.search.setText(tr("setting_sub_lang_fallback")[:-2])
     assert visible() == ["audio"], visible()
     # What a search finds is shown from every page at once, in one view.
@@ -229,9 +229,9 @@ def layout(self):
             for i in range(nav.count())]
     keys = [k for k, _f in rows if k]
     assert keys[:4] == ["general", "playlists", "appearance", "home"], keys
-    # Nerd last, after Advanced - and not shown until it is turned on.
+    # Nerd last, after Advanced, a category of its own.
     assert keys[-3:] == ["parental", "advanced", "nerd"], keys
-    assert nav.item([k for k, _f in rows].index("nerd")).isHidden()
+    assert not nav.item([k for k, _f in rows].index("nerd")).isHidden()
     heads = [i for i, (k, f) in enumerate(rows) if not k]
     assert len(heads) == 5 and heads[0] == 0, heads
     assert all(not (rows[i][1] & Qt.ItemFlag.ItemIsSelectable) for i in heads)

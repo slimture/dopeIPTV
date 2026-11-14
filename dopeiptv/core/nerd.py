@@ -111,26 +111,81 @@ def parse_headers(text: str) -> dict[str, str]:
     return out
 
 
+# Windows names a VPN adapter after its software.
+_WIN_VPN = re.compile(r"wireguard|tailscale|openvpn|tap-windows|wintun|nordlynx|proton|mullvad|"
+                      r"cisco anyconnect|fortinet|globalprotect|zerotier|\bwg\d", re.I)
+
+
+def parse_ifconfig(text: str) -> list[str]:
+    """macOS: the tunnels (utun, ipsec, ppp, tun) that are up with an IPv4
+    address. macOS keeps several utun interfaces of its own (iCloud and
+    others) with link-local IPv6 only, so a name alone says nothing."""
+    out, name, up, v4 = [], "", False, False
+    for line in (text or "").splitlines() + ["end: flags=0<>"]:
+        m = re.match(r"^([A-Za-z0-9.]+): flags=\w+<([^>]*)>", line)
+        if m:
+            if name and up and v4 and re.match(r"(utun|ipsec|ppp|tun|tap|wg)\d*", name):
+                out.append(name)
+            name, up, v4 = m.group(1), "UP" in m.group(2).split(","), False
+        elif re.match(r"^\s+inet \d", line):
+            v4 = True
+    return out
+
+
+def parse_ipconfig(text: str) -> list[str]:
+    """Windows: the VPN adapters that have an IPv4 address."""
+    out, name, v4 = [], "", False
+    for line in (text or "").splitlines() + ["End adapter end:"]:
+        m = re.match(r"^\S.*? adapter (.+):\s*$", line) or re.match(r"^(\S.*):\s*$", line)
+        if m and not line.startswith(" "):
+            if name and v4 and _WIN_VPN.search(name):
+                out.append(name)
+            name, v4 = m.group(1).strip(), False
+        elif "IPv4" in line and re.search(r"\d+\.\d+\.\d+\.\d+", line):
+            v4 = True
+    return out
+
+
+def _run(cmd: list[str]) -> str:
+    import subprocess
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=5,
+                              errors="replace").stdout
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def active_tunnels() -> list[str]:
+    """The VPN-like interfaces that are up and carry traffic, as this
+    system can tell: Linux by sysfs, macOS by ifconfig, Windows by
+    ipconfig."""
+    if sys.platform == "darwin":
+        return parse_ifconfig(_run(["/sbin/ifconfig"]))
+    if sys.platform.startswith("win"):
+        return parse_ipconfig(_run(["ipconfig"]))
+    try:
+        names = [n for _i, n in socket.if_nameindex()]
+    except (OSError, AttributeError):
+        names = []
+    return [n for n in names if VPN_PATTERNS.match(n) and _is_up(n)]
+
+
 def vpn_interfaces(names: list[str] | None = None) -> list[str]:
-    """Network interfaces that look like a VPN and are up."""
+    """Network interfaces that look like a VPN and are up (*names*: check
+    these instead of asking the system - Linux's way)."""
     if names is None:
-        try:
-            names = [n for _i, n in socket.if_nameindex()]
-        except (OSError, AttributeError):
-            names = []
+        return active_tunnels()
     return [n for n in names if VPN_PATTERNS.match(n) and _is_up(n)]
 
 
 def _is_up(name: str) -> bool:
-    """Up, as far as this system tells: Linux says it in sysfs (a WireGuard
-    interface reads "unknown" when up); elsewhere one that exists counts."""
-    if sys.platform.startswith("linux"):
-        try:
-            with open(f"/sys/class/net/{name}/operstate", encoding="ascii") as fh:
-                return fh.read().strip() != "down"
-        except OSError:
-            return False
-    return True
+    """Linux: up as sysfs says (a WireGuard interface reads "unknown" when
+    up)."""
+    try:
+        with open(f"/sys/class/net/{name}/operstate", encoding="ascii") as fh:
+            return fh.read().strip() != "down"
+    except OSError:
+        return False
 
 
 class Nerd:
@@ -287,11 +342,9 @@ class Nerd:
             return False
         name = self.get("nerd_vpn_iface").strip()
         if name:
-            try:
-                names = [n for _i, n in socket.if_nameindex()]
-            except (OSError, AttributeError):
-                names = []
-            return name not in names or not _is_up(name)
+            if sys.platform.startswith("linux"):
+                return not _is_up(name)
+            return not any(name.lower() in t.lower() for t in active_tunnels())
         return not vpn_interfaces()
 
 

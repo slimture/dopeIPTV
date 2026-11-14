@@ -891,15 +891,16 @@ def _own_icon(kind: str, s: int, colour: str) -> QPixmap | None:
         arc.lineTo(f * 0.68, f * 0.44)
         pr.drawPath(arc)
     elif kind == "nerd":                    # a pair of glasses
-        for x in (0.08, 0.54):
-            pr.drawRoundedRect(QRectF(f * x, f * 0.38, f * 0.38, f * 0.3),
-                               f * 0.1, f * 0.1)
+        # Inside the same 0.1-0.9 box as the other icons, centred: temples
+        # out to the edges made it wider and lower than its neighbours.
+        for cx in (0.29, 0.71):
+            pr.drawEllipse(QPointF(f * cx, f * 0.55), f * 0.17, f * 0.17)
         bridge = QPainterPath()
-        bridge.moveTo(f * 0.46, f * 0.47)
-        bridge.quadTo(f * 0.5, f * 0.41, f * 0.54, f * 0.47)
+        bridge.moveTo(f * 0.44, f * 0.5)
+        bridge.quadTo(f * 0.5, f * 0.43, f * 0.56, f * 0.5)
         pr.drawPath(bridge)
-        pr.drawLine(QPointF(f * 0.08, f * 0.44), QPointF(f * 0.02, f * 0.36))
-        pr.drawLine(QPointF(f * 0.92, f * 0.44), QPointF(f * 0.98, f * 0.36))
+        pr.drawLine(QPointF(f * 0.13, f * 0.5), QPointF(f * 0.1, f * 0.3))
+        pr.drawLine(QPointF(f * 0.87, f * 0.5), QPointF(f * 0.9, f * 0.3))
     elif kind == "trakt":
         pr.drawEllipse(QRectF(f * 0.1, f * 0.1, f * 0.8, f * 0.8))
         tick = QPainterPath()

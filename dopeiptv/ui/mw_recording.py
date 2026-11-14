@@ -875,9 +875,18 @@ class _RecordingMixin:
 
     def _epg_delay_minutes(self) -> int:
         try:
-            return int(self.settings.value("epg_delay_min", 0))
+            base = int(self.settings.value("epg_delay_min", 0))
         except (TypeError, ValueError):
-            return 0
+            base = 0
+        # Nerd: a source's own guide shift on top (a provider whose guide
+        # runs an hour off, say).
+        from ..core import nerd
+        if nerd.current().on:
+            try:
+                base += int(float((nerd.source() or {}).get("epg_shift") or 0))
+            except (TypeError, ValueError):
+                pass
+        return base
 
     def _replay_delay_minutes(self) -> int:
         try:

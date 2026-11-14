@@ -293,6 +293,20 @@ class Enigma2Client(BoxClient):
         root = self.get_xml("/web/powerstate", {"newstate": str(int(state))})
         return root.tag == "e2powerstate"
 
+    def add_timer(self, stream_id: int | str, start: float, stop: float,
+                  title: str, description: str = "") -> tuple[bool, str]:
+        """A recording timer on the box: it records whether this app runs
+        or not. (ok, what the box said)."""
+        sref = self._sref_of(stream_id)
+        if not sref:
+            return False, ""
+        root = self.get_xml("/web/timeradd", {
+            "sRef": sref, "begin": str(int(start)), "end": str(int(stop)),
+            "name": title or "dopeIPTV", "description": description or "",
+            "justplay": "0", "afterevent": "3", "repeated": "0"})
+        return (child_text(root, "e2state").lower() == "true",
+                child_text(root, "e2statetext"))
+
     def _sref_of(self, stream_id: int | str) -> str:
         row = self._channel(stream_id)
         if row is None:

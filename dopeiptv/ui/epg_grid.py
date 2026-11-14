@@ -1273,6 +1273,9 @@ class EpgGridDialog(QDialog):
                     lambda: (self.window.tune_from_guide(ch), self.accept()))
         if ch.get("stream_id") is not None and p["stop_timestamp"] > time.time():
             m.addAction(tr("rec_record_programme"), lambda: self._record(ch, p))
+            box = getattr(self.window, "_box_record_action", None)
+            if box is not None:
+                box(m, ch, p.get("title") or "", p["start_timestamp"], p["stop_timestamp"])
         # Remind me when a future programme starts.
         if (ch.get("stream_id") is not None
                 and p["start_timestamp"] > time.time()

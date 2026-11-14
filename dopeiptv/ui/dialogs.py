@@ -96,6 +96,12 @@ class PlaylistDialog(QDialog):
         self._mac_lbl = QLabel(tr("playlist_mac"))
         form.addRow(tr("playlist_name"), self.name)
         form.addRow(tr("playlist_kind"), self.kind)
+        # Nerd: devices and servers with known playlist/guide addresses.
+        from ..core import nerd
+        if nerd.current().on:
+            from .source_presets import PresetButton
+            self.presets = PresetButton(self._preset_picked, self)
+            form.addRow("", self.presets)
         # A box on the home network can be found instead of typed.
         self.finder = FindOnNetwork(self)
         self.finder.picked.connect(self._box_found)
@@ -152,6 +158,16 @@ class PlaylistDialog(QDialog):
             self.finder.status.hide()
         if getattr(self, "nerd_panel", None) is not None:
             self.nerd_panel.set_kind(kind)
+
+    def _preset_picked(self, src: dict) -> None:
+        idx = self.kind.findData(src["kind"])
+        if idx >= 0:
+            self.kind.setCurrentIndex(idx)
+        self.server.setText(src["server"])
+        if src.get("epg_url"):
+            self.epg_url.setText(src["epg_url"])
+        if not self.name.text().strip():
+            self.name.setText(src["name"])
 
     def _box_found(self, found: dict) -> None:
         """A box picked from what answered on the network fills the form."""

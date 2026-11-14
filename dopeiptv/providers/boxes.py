@@ -240,6 +240,25 @@ class BoxClient(OfflineClient):
         r.raise_for_status()
         return r
 
+    def post(self, path: str, data: dict,
+             timeout: tuple[float, float] | None = None) -> Any:
+        """POST a form to the box, logging in as get() does."""
+        url = self.url(path)
+        r = self.session.post(url, data=data, auth=self._auth,
+                              timeout=timeout or self.TIMEOUT)
+        if r.status_code == 401 and self.username and self._auth is None:
+            challenge = r.headers.get("WWW-Authenticate", "").lower()
+            auth_mod = requests.auth
+            self._auth = (auth_mod.HTTPDigestAuth(self.username, self.password)
+                          if "digest" in challenge
+                          else auth_mod.HTTPBasicAuth(self.username, self.password))
+            r = self.session.post(url, data=data, auth=self._auth,
+                                  timeout=timeout or self.TIMEOUT)
+        if r.status_code == 401:
+            raise LocalizedError("err_wrong_login" if self.username else "err_box_login_needed")
+        r.raise_for_status()
+        return r
+
     def get_xml(self, path: str, params: dict | None = None,
                 timeout: tuple[float, float] | None = None) -> ET.Element:
         return parse_xml(self.get(path, params, timeout).content)

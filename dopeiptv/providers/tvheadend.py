@@ -10,6 +10,7 @@ where it is set so); none is needed for an anonymous one.
 
 from __future__ import annotations
 
+import json
 from typing import Any, Callable
 from urllib.parse import quote
 
@@ -112,6 +113,20 @@ class TvheadendClient(BoxClient):
                         "ext": name.rsplit(".", 1)[-1] if "." in name.rsplit("/", 1)[-1] else "ts",
                         "url": self.login_url(self.url("/" + rel))})
         return out
+
+    def add_timer(self, stream_id: int | str, start: float, stop: float,
+                  title: str, description: str = "") -> tuple[bool, str]:
+        """A DVR entry on the server (its own padding and profile apply)."""
+        row = self._channel(stream_id)
+        if row is None:
+            return False, ""
+        conf = {"start": int(start), "stop": int(stop), "channel": row["_key"],
+                "title": {"eng": title or "dopeIPTV"}, "comment": "dopeIPTV"}
+        if description:
+            conf["description"] = {"eng": description}
+        js = self.post("/api/dvr/entry/create", {"conf": json.dumps(conf)}).json()
+        uuid = str((js or {}).get("uuid") or "") if isinstance(js, dict) else ""
+        return bool(uuid), uuid
 
     def _guide(self, progress: Callable[[int], None] | None) -> bytes:
         """The server's own XMLTV (channel ids are the channel uuids, or

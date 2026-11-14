@@ -1024,6 +1024,7 @@ class _DetailMixin:
         if stop > now:
             m.addAction(tr("rec_record_programme"),
                         lambda: self._record_programme(it, post, start, stop))
+            self._box_record_action(m, it, post.get("title") or "", start, stop)
         rem = getattr(self, "reminders", None)
         if start > now and rem is not None:
             sid = it.get("stream_id")

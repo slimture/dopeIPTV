@@ -40,19 +40,26 @@ def _shown(shell, key):
     return not shell._items[key].isHidden()
 
 
-def test_the_nerd_page_is_not_there_until_chosen(app, settings):
+def test_nerd_is_a_category_whose_switch_shows_the_rest(app, settings):
     from dopeiptv.ui import nerd_settings
     shell, page = _shell()
     nerd_settings.build(page, settings, QDialog())
     shell.arrange([("System", ["general", "nerd"])])
-    shell.set_page_enabled("nerd", False)
-    assert not _shown(shell, "nerd") and _shown(shell, "general")
-    # Not even a search finds it while it is off.
-    shell.search.setText("proxy")
+    shell.show_page("nerd")
+    assert _shown(shell, "nerd")                      # always in the sidebar
+    switch_card, network = page.cards[0], page.cards[2]
+    assert not switch_card.isHidden() and network.isHidden()
+    # Off: a search does not reach what the switch keeps...
+    shell.search.setText("referer")
     assert not _shown(shell, "nerd")
+    # ...but one for what it holds finds the switch, which says so.
+    shell.search.setText("proxy")
+    assert _shown(shell, "nerd") and not switch_card.isHidden() and network.isHidden()
     shell.search.setText("")
-    shell.set_page_enabled("nerd", True)
-    assert _shown(shell, "nerd")
+    from dopeiptv.ui.settings_ui import ToggleSwitch
+    sw = switch_card.findChildren(ToggleSwitch)[0]
+    sw.setChecked(True)
+    assert not network.isHidden()
     shell.search.setText("proxy")
     assert _shown(shell, "nerd") and not _shown(shell, "general")
 

@@ -44,6 +44,9 @@ def _flag(options: dict, key: str, default: bool) -> bool:
 class SourceNerdPanel(QWidget):
     """A fold-out under the source form: "Nerd options"."""
 
+    # The rows every kind has; each kind's own come after.
+    COMMON_ROWS = 8
+
     def __init__(self, kind: str, options: dict, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._options = dict(options or {})
@@ -88,6 +91,18 @@ class SourceNerdPanel(QWidget):
         self.form.addRow(tr("nerd_headers"), self.headers)
         self.form.addRow(tr("nerd_proxy"), self.proxy)
         self.form.addRow("", self.proxy_custom)
+        self.udpxy = QLineEdit(str(o.get("udpxy") or ""))
+        self.udpxy.setPlaceholderText(tr("nerd_src_inherit"))
+        self.form.addRow("udpxy", self.udpxy)
+        self.epg_shift = QSpinBox()
+        self.epg_shift.setRange(-720, 720)
+        self.epg_shift.setSingleStep(15)
+        self.epg_shift.setSuffix(" min")
+        try:
+            self.epg_shift.setValue(int(float(o.get("epg_shift") or 0)))
+        except (TypeError, ValueError):
+            self.epg_shift.setValue(0)
+        self.form.addRow(tr("nerd_src_epg_shift"), self.epg_shift)
         # Each kind's own.
         self.port = QSpinBox()
         self.port.setRange(1, 65535)
@@ -139,8 +154,8 @@ class SourceNerdPanel(QWidget):
         if kind == self._kind:
             return
         self._kind = kind
-        while self.form.rowCount() > 6:
-            row = self.form.takeRow(6)
+        while self.form.rowCount() > self.COMMON_ROWS:
+            row = self.form.takeRow(self.COMMON_ROWS)
             for item in (row.labelItem, row.fieldItem):
                 if item is not None and item.widget() is not None:
                     item.widget().setParent(None)
@@ -162,7 +177,7 @@ class SourceNerdPanel(QWidget):
         setting back at its default left out)."""
         out = {k: v for k, v in self._options.items()
                if k not in ("user_agent", "referer", "headers", "proxy", "stream_port",
-                            "profile", "transcode")
+                            "profile", "transcode", "udpxy", "epg_shift")
                and k not in {key for sw in SWITCHES.values() for key, _l, _d in sw}}
         ua = self.ua.currentData()
         ua = self.ua_custom.text().strip() if ua == "custom" else ua
@@ -176,6 +191,10 @@ class SourceNerdPanel(QWidget):
         px = self.proxy_custom.text().strip() if px == "custom" else px
         if px:
             out["proxy"] = px
+        if self.udpxy.text().strip():
+            out["udpxy"] = self.udpxy.text().strip()
+        if self.epg_shift.value():
+            out["epg_shift"] = str(self.epg_shift.value())
         if self._kind == "enigma2" and self.port.value() != 8001:
             out["stream_port"] = str(self.port.value())
         if self._kind == "tvheadend":

@@ -55,16 +55,47 @@ def text_box(value: str, placeholder: str, lines: int = 4) -> QPlainTextEdit:
     return ed
 
 
-def build(page: SettingsPage, settings: Any, parent: QWidget) -> Callable[[Callable[[str, Any], None]], None]:
+BOX_NAMES = {"enigma2": "Enigma2", "tvheadend": "Tvheadend", "hdhomerun": "HDHomeRun"}
+
+
+def build(page: SettingsPage, settings: Any, parent: QWidget,
+          boxes: list[dict] | None = None,
+          edit: Callable[[str], None] | None = None,
+          add: Callable[[], None] | None = None) -> Callable[[Callable[[str, Any], None]], None]:
+    """*boxes*: the box sources, each listed with its options a click
+    away (*edit* opens a source by id)."""
     n = nerd.Nerd(settings)
 
     def val(key: str, default: str = "") -> str:
         return n.get(key, default)
 
+    # -- the switch: everything below it is there only while it is on -------
+    c = page.card()
+    switch = c.toggle(tr("nerd_switch"), n.on, tr("nerd_show_hint"))
+    teaser = c.note(tr("nerd_teaser"))
+    teaser_row = teaser.parentWidget()
+    gated_from = len(page.cards)
+
     # -- the overlay ------------------------------------------------------------
     c = page.card(tr("nerd_card_view"))
     overlay = c.toggle(tr("nerd_overlay"), n.flag("nerd_overlay_more", True), tr("nerd_overlay_hint"))
     c.note(tr("nerd_intro"))
+
+    # -- the boxes and servers ------------------------------------------------------
+    if boxes is not None:
+        c = page.card(tr("nerd_card_boxes"))
+        for pl in boxes:
+            btn = QPushButton(tr("nerd_box_options"))
+            btn.clicked.connect(lambda _c=False, pid=pl.get("id"): edit and pid and edit(pid))
+            c.row(str(pl.get("name") or pl.get("server") or ""), btn,
+                  f"{BOX_NAMES.get(pl.get('kind') or '', '')} · {pl.get('server') or ''}",
+                  search="box Enigma2 Tvheadend HDHomeRun")
+        if not boxes:
+            c.note(tr("nerd_no_boxes"))
+        if add is not None:
+            add_btn = QPushButton(tr("nerd_add_box"))
+            add_btn.clicked.connect(lambda _c=False: add())
+            c.layout_row(_hbox(add_btn), "box Enigma2 Tvheadend HDHomeRun add")
 
     # -- network ------------------------------------------------------------------
     c = page.card(tr("nerd_card_network"))
@@ -106,14 +137,51 @@ def build(page: SettingsPage, settings: Any, parent: QWidget) -> Callable[[Calla
     check = QPushButton(tr("nerd_vpn_check"))
 
     def show_vpn() -> None:
-        up = nerd.vpn_interfaces()
-        status.setText(tr("nerd_vpn_up", names=", ".join(up)) if up else tr("nerd_vpn_none"))
+        # Seen to happen: "Checking…" first, then the answer with the time,
+        # so a check that finds the same as before still says it looked.
+        from PyQt6.QtCore import QTime, QTimer
+        status.setText(tr("nerd_vpn_checking"))
+        check.setEnabled(False)
+
+        def answer() -> None:
+            up = nerd.vpn_interfaces()
+            at = QTime.currentTime().toString("HH:mm:ss")
+            status.setText((tr("nerd_vpn_up", names=", ".join(up)) if up else tr("nerd_vpn_none"))
+                           + f"  ({at})")
+            check.setEnabled(True)
+        QTimer.singleShot(250, answer)
     check.clicked.connect(show_vpn)
     row = QHBoxLayout()
     row.addWidget(status, 1)
     row.addWidget(check)
     c.layout_row(row, "VPN")
-    show_vpn()
+    if n.on:
+        show_vpn()
+
+    # -- channels and guide -----------------------------------------------------------
+    c = page.card(tr("nerd_card_lists"))
+    picon_dir = QLineEdit(val("nerd_picon_dir"))
+    picon_dir.setPlaceholderText("~/picons")
+    pick_picons = QPushButton(tr("nerd_choose"))
+
+    def choose_picons() -> None:
+        d = QFileDialog.getExistingDirectory(parent, tr("nerd_picon_dir"), picon_dir.text() or "")
+        if d:
+            picon_dir.setText(d)
+            picon_dir.editingFinished.emit()
+    pick_picons.clicked.connect(choose_picons)
+    picon_row = QHBoxLayout()
+    picon_row.setSpacing(8)
+    picon_row.addWidget(picon_dir, 1)
+    picon_row.addWidget(pick_picons)
+    c.row(tr("nerd_picon_dir"), picon_row, tr("nerd_picon_dir_hint"), stretch_control=True,
+          search="picon logo SNP")
+    picon_over = c.toggle(tr("nerd_picon_override"), n.flag("nerd_picon_override"))
+    udpxy = QLineEdit(val("nerd_udpxy"))
+    udpxy.setPlaceholderText("http://192.168.1.1:4022")
+    c.row("udpxy", udpxy, tr("nerd_udpxy_hint"), search="multicast udp rtp IPTV")
+    adelay = c.toggle(tr("nerd_adelay"), n.flag("nerd_adelay_per_channel", True), tr("nerd_adelay_hint"))
+    c.note(tr("nerd_epg_multi"))
 
     # -- the player -----------------------------------------------------------------
     c = page.card(tr("nerd_card_player"))
@@ -189,6 +257,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget) -> Callable[[Calla
 
         def put(key: str, value: Any) -> None:
             out[key] = str(value)
+        put("nerd_enabled", "true" if switch.isChecked() else "false")
         ua = ua_box.currentData()
         put("nerd_user_agent", ua_custom.text().strip() if ua == "custom" else ua)
         put("nerd_referer", referer.text().strip())
@@ -211,7 +280,24 @@ def build(page: SettingsPage, settings: Any, parent: QWidget) -> Callable[[Calla
         put("nerd_mpv_options", raw.toPlainText().strip())
         put("nerd_log_level", level.currentData())
         put("nerd_overlay_more", "true" if overlay.isChecked() else "false")
+        put("nerd_picon_dir", picon_dir.text().strip())
+        put("nerd_picon_override", "true" if picon_over.isChecked() else "false")
+        put("nerd_udpxy", udpxy.text().strip())
+        put("nerd_adelay_per_channel", "true" if adelay.isChecked() else "false")
         return out
+
+    # Off: the switch and what Nerd holds, nothing else. On: all of it.
+    first = page.cards[gated_from - 1]
+    first.shown_if(teaser_row, lambda: not switch.isChecked())
+    for card in page.cards[gated_from:]:
+        for row, _text in card.rows:
+            prev = card._shown_if.get(id(row))
+            card.shown_if(row, lambda prev=prev: switch.isChecked() and (prev is None or prev()))
+
+    def flip(_on: bool) -> None:
+        for card in page.cards:
+            card.refresh()
+    switch.toggled.connect(flip)
 
     shown = values()
 

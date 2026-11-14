@@ -61,6 +61,7 @@ from .mw_trakt import _TraktMixin
 from .mw_recording import _RecordingMixin
 from .mw_busy import _BusyMixin
 from .mw_cast import _CastMixin
+from .mw_box import _BoxMixin
 from .mw_donate import _DonateMixin
 from .mw_context import _ContextMenuMixin
 from .mw_favorites import _FavoritesMixin
@@ -106,7 +107,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _LocalFilesMixin,
                  _PopoutMixin, _MultiviewMixin, _HomeMixin, _MprisMixin,
                  _FollowMixin, _SubtitlesMixin, _CastMixin, _DonateMixin,
-                 QMainWindow):
+                 _BoxMixin, QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
     epg_progress = pyqtSignal(int)
@@ -2104,6 +2105,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.client, (pl or {}).get("epg_url") or None,
             cache_path=epg_cache_path(pid) if pid else None,
             progress_cb=self.epg_progress.emit)
+        # The new guide keeps the guide offset (Settings, and a source's own
+        # with Nerd); a refresh used to drop it until the app restarted.
+        self.xmltv.delay_minutes = self._epg_delay_minutes()
         self._info_cache.clear()
         # Name the wait after what the user did (refresh the playlist), not the
         # guide reload that happens to be the slow part of it. Shown in the top

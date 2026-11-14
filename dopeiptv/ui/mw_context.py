@@ -57,6 +57,8 @@ class _ContextMenuMixin:
         if not (self.mode == "series" and not self.series_ctx):
             m.addAction(tr("ctx_cast_to_chromecast"),
                         lambda: self._open_cast_dialog(it))
+        # A box source's own actions (zap, wake, standby); Nerd's copy.
+        self._box_channel_menu(m, it)
         # History / Watch Later / Watched and "All favorites" rows are
         # snapshots of channels, movies or series - their own kind decides
         # which actions they get.

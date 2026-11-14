@@ -25,6 +25,9 @@ class S(dict):
     def value(self, key, default=None):
         return self.get(key, default)
 
+    def setValue(self, key, value):
+        self[key] = value
+
 
 def on(**kw) -> Nerd:
     return Nerd(S(nerd_enabled="true", **kw))
@@ -152,20 +155,77 @@ def test_vpn_interfaces_by_name(monkeypatch):
 
 
 def test_vpn_guard(monkeypatch):
-    names = [(1, "lo"), (2, "eth0")]
-    monkeypatch.setattr(socket, "if_nameindex", lambda: names)
-    monkeypatch.setattr(nerd, "_is_up", lambda n: True)
+    tunnels = []
+    monkeypatch.setattr(nerd, "active_tunnels", lambda: list(tunnels))
+    monkeypatch.setattr(nerd.sys, "platform", "darwin")
     g = on(nerd_vpn_guard="true")
     assert g.vpn_blocks() is True
     assert g.vpn_blocks(local_source=True) is False
     assert on(nerd_vpn_guard="true", nerd_vpn_lan="true").vpn_blocks(local_source=True) is True
-    names.append((3, "wg0"))
+    tunnels.append("utun4")
     assert g.vpn_blocks() is False
-    named = on(nerd_vpn_guard="true", nerd_vpn_iface="proton0")
+    named = on(nerd_vpn_guard="true", nerd_vpn_iface="utun7")
     assert named.vpn_blocks() is True
-    names.append((4, "proton0"))
+    tunnels.append("utun7")
     assert named.vpn_blocks() is False
     assert on(nerd_vpn_guard="false").vpn_blocks() is False
+
+
+def test_vpn_guard_named_interface_on_linux(monkeypatch):
+    monkeypatch.setattr(nerd.sys, "platform", "linux")
+    monkeypatch.setattr(nerd, "_is_up", lambda n: n == "wg0")
+    assert on(nerd_vpn_guard="true", nerd_vpn_iface="wg0").vpn_blocks() is False
+    assert on(nerd_vpn_guard="true", nerd_vpn_iface="tun3").vpn_blocks() is True
+
+
+IFCONFIG_MAC = """lo0: flags=8049<UP,LOOPBACK,RUNNING,MULTICAST> mtu 16384
+\tinet 127.0.0.1 netmask 0xff000000
+en0: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST> mtu 1500
+\tinet 192.168.1.23 netmask 0xffffff00 broadcast 192.168.1.255
+utun0: flags=8051<UP,POINTOPOINT,RUNNING,MULTICAST> mtu 1380
+\tinet6 fe80::1c2b:3d4e:5f60:7182%utun0 prefixlen 64 scopeid 0x10
+utun1: flags=8051<UP,POINTOPOINT,RUNNING,MULTICAST> mtu 2000
+\tinet6 fe80::aa:bb%utun1 prefixlen 64 scopeid 0x11
+utun3: flags=8050<POINTOPOINT,RUNNING,MULTICAST> mtu 1280
+\tinet 10.9.0.2 --> 10.9.0.2 netmask 0xffffffff
+utun4: flags=8051<UP,POINTOPOINT,RUNNING,MULTICAST> mtu 1420
+\tinet 10.64.12.7 --> 10.64.12.7 netmask 0xffffffff
+"""
+
+IPCONFIG_WIN = """
+Windows IP Configuration
+
+
+Ethernet adapter Ethernet:
+
+   Connection-specific DNS Suffix  . : lan
+   IPv4 Address. . . . . . . . . . . : 192.168.1.40
+   Subnet Mask . . . . . . . . . . . : 255.255.255.0
+
+Unknown adapter WireGuard Tunnel:
+
+   IPv4 Address. . . . . . . . . . . : 10.66.66.2
+   Subnet Mask . . . . . . . . . . . : 255.255.255.255
+
+Unknown adapter Tailscale:
+
+   Media State . . . . . . . . . . . : Media disconnected
+
+Ethernet-kort OpenVPN TAP-Windows6:
+
+   IPv4-adress. . . . . . . . . . . : 10.8.0.6
+"""
+
+
+def test_vpn_seen_on_a_mac_only_with_an_ipv4_tunnel():
+    # utun0/utun1 are macOS's own (IPv6 link-local only), utun3 is down.
+    assert nerd.parse_ifconfig(IFCONFIG_MAC) == ["utun4"]
+    assert nerd.parse_ifconfig(IFCONFIG_MAC.split("utun3")[0]) == []
+
+
+def test_vpn_seen_on_windows_by_adapter_and_ipv4():
+    assert nerd.parse_ipconfig(IPCONFIG_WIN) == ["WireGuard Tunnel", "Ethernet-kort OpenVPN TAP-Windows6"]
+    assert nerd.parse_ipconfig("Ethernet adapter Ethernet:\n   IPv4 Address. . : 192.168.1.4\n") == []
 
 
 # -- a real mpv against fake servers -------------------------------------------------
@@ -173,7 +233,9 @@ def test_vpn_guard(monkeypatch):
 def _libmpv():
     try:
         import mpv
-        m = mpv.MPV(vo="null", ao="null", terminal=False)
+        # keep_open as the app has it: a clip played to its end stays
+        # loaded, so a check on a busy machine cannot miss it.
+        m = mpv.MPV(vo="null", ao="null", terminal=False, keep_open="yes")
     except Exception as e:     # no libmpv here: CI installs it, a dev box may not
         pytest.skip(f"libmpv not available: {e}")
     return m

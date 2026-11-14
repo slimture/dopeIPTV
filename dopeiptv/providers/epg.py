@@ -6,6 +6,7 @@ import gzip
 import io
 import os
 import pickle
+import re
 import shutil
 import subprocess
 import sys
@@ -73,6 +74,31 @@ def gunzip_gently(data: bytes) -> bytes:
             break           # padding after the last member
         view = memoryview(rest)
     return b"".join(out)
+
+
+def split_guide_urls(text: str | None) -> list[str]:
+    """Several guide addresses in one field: one a line, or separated by
+    commas or spaces before the next http(s)://. A comma inside one
+    address (a query) stays."""
+    t = (text or "").strip()
+    if not t:
+        return []
+    return [u.strip() for u in re.split(r"[\s,;|]+(?=https?://)", t) if u.strip()]
+
+
+def _tv_body(data: bytes) -> bytes:
+    """What is inside a guide's <tv ...> ... </tv>: its channels and
+    programmes, to sit beside another guide's."""
+    start = data.find(b"<tv")
+    if start < 0:
+        raise ValueError("not an XMLTV guide")
+    open_end = data.find(b">", start)
+    end = data.rfind(b"</tv>")
+    if open_end < 0:
+        raise ValueError("not an XMLTV guide")
+    if data[open_end - 1:open_end] == b"/":
+        return b""
+    return data[open_end + 1:end if end > open_end else len(data)]
 
 
 def normalize_name(s: str | None) -> str:
@@ -505,6 +531,9 @@ class XmltvGuide:
             if self.progress_cb:
                 self.progress_cb(100)
             return data
+        urls = split_guide_urls(url)
+        if len(urls) > 1:
+            return self._download_many(urls)
         if url:
             r = requests.get(url, stream=True, timeout=(20, 300))
         elif hasattr(self.client, "epg_url"):
@@ -538,6 +567,27 @@ class XmltvGuide:
             self.progress_cb(100)
         # Not cached here: the parse process keeps it (_parse_and_index).
         return b"".join(chunks)
+
+    def _download_many(self, urls: list[str]) -> bytes:
+        """Several guides as one: each fetched (gzip or not), their
+        channels and programmes in one <tv>. One that fails is left out;
+        all failing is a failure."""
+        parts: list[bytes] = []
+        for i, u in enumerate(urls):
+            try:
+                r = requests.get(u, timeout=(20, 300))
+                r.raise_for_status()
+                data = r.content
+                if data[:2] == b"\x1f\x8b":
+                    data = gunzip_gently(data)
+                parts.append(_tv_body(data))
+            except Exception as e:
+                log.info("EPG source %d of %d failed (%s)", i + 1, len(urls), e)
+            if self.progress_cb:
+                self.progress_cb(min(99, (i + 1) * 100 // len(urls)))
+        if not parts:
+            raise RuntimeError("none of the guide sources answered")
+        return (b'<?xml version="1.0" encoding="UTF-8"?>\n<tv>' + b"\n".join(parts) + b"</tv>\n")
 
     def is_loading(self) -> bool:
         """Whether a thread is loading the guide right now."""

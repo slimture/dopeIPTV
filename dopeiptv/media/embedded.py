@@ -387,6 +387,12 @@ def _sub_look(s, set_opt) -> None:
     set_opt("sub-back-color", "#B3000000" if box else "#00000000")
 
 
+def _delay_key(channel: str) -> str:
+    """Where a channel's own audio delay is kept (Nerd)."""
+    import zlib
+    return f"nerd_adelay/{zlib.crc32((channel or '').encode('utf-8')):08x}"
+
+
 class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
     """Video pane with libmpv OpenGL rendering, control bar, and fullscreen overlay."""
 
@@ -2503,6 +2509,13 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
                 self._nerd_applied = nerd.apply_stream(
                     m, nerd.source(), getattr(self, "_nerd_applied", False),
                     url=url)
+                # Nerd: each channel's own audio delay (lip sync), as set
+                # for it last; untouched while Nerd is off.
+                self._delay_key = None
+                if nerd.current().on and nerd.current().flag("nerd_adelay_per_channel", True):
+                    self._delay_key = _delay_key(buffer_key or url)
+                    m["audio-delay"] = float(
+                        self._settings.value(self._delay_key, 0) or 0) if self._settings else 0.0
             except Exception as e:
                 log.debug("nerd stream options: %s", e)
             # Remembered per-title track choices (resume): set before load,
@@ -2847,7 +2860,8 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
             act.setCheckable(True)
             act.setChecked(abs(current_delay - val) < 0.01)
             act.triggered.connect(
-                lambda _c, v=val: self._set_mpv("audio-delay", v))
+                lambda _c, v=val: (self._set_mpv("audio-delay", v),
+                                   self._remember_delay(v)))
 
         aspect = menu.addMenu(tr("opt_aspect_ratio"))
         for label, val in ((tr("opt_aspect_auto"), "-1"), ("16:9", "16:9"),
@@ -3108,6 +3122,15 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         lines += self._nerd_stats(prop)
         self._stats_overlay.setText("\n".join(lines))
         self._place_stats()
+
+    def _remember_delay(self, value: float) -> None:
+        """Nerd: the audio delay chosen, kept for the channel playing."""
+        key = getattr(self, "_delay_key", None)
+        if key and self._settings is not None:
+            if abs(value) < 0.001:
+                self._settings.remove(key)
+            else:
+                self._settings.setValue(key, f"{value:g}")
 
     def _nerd_stats(self, prop) -> list[str]:
         """More for a nerd, with Nerd on: the picture's colour and scan,

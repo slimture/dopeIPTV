@@ -885,12 +885,30 @@ def make_client(playlist: dict):
     user agent, headers and proxy on its session."""
     client = _make_client(playlist)
     from ..core import nerd
+    source = dict((playlist or {}).get("options") or {},
+                  _kind=(playlist or {}).get("kind") or "xtream")
     session = getattr(client, "session", None)
     if session is not None:
-        nerd.current().apply_session(
-            session, dict((playlist or {}).get("options") or {},
-                          _kind=(playlist or {}).get("kind") or "xtream"))
+        nerd.current().apply_session(session, source)
+    _nerd_lists(client, source, (playlist or {}).get("id"))
     return client
+
+
+def _nerd_lists(client, source: dict, pid: str | None) -> None:
+    """Channel lists through Nerd's picons and guide mapping, play
+    addresses through udpxy (core/nerd_lists.py) - each a no-op while
+    Nerd is off or the setting is empty."""
+    from ..core import nerd_lists
+    streams, url = client.live_streams, client.live_url
+
+    def live_streams(category_id: str | None = None) -> list[dict]:
+        return nerd_lists.decorate(streams(category_id), source, pid)
+
+    def live_url(stream_id: int | str, fmt: str = "ts") -> str:
+        return nerd_lists.udpxy_url(url(stream_id, fmt), source)
+
+    client.live_streams = live_streams
+    client.live_url = live_url
 
 
 def _make_client(playlist: dict):
