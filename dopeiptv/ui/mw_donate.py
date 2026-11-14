@@ -120,9 +120,13 @@ class _DonateMixin:
         else:
             self.open_donate(ref)
 
-    def open_supporter(self) -> None:
+    def open_supporter(self, key: str = "") -> None:
+        """The supporter window; *key* (from a dopeiptv://supporter link)
+        filled in, so the person sees it checked and kept."""
         from .dialogs import SupporterDialog
         d = SupporterDialog(self, self.settings, donate=lambda: self.open_donate("supporter"))
+        if key:
+            d.key.setText(key)
         d.exec()
         self._donate_heart_refresh()
 

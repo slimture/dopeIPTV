@@ -7,9 +7,11 @@ dopeiptv:// link, another program (the remote API asks the same way).
     dopeiptv dopeiptv://play?url=<address, url-encoded>
     dopeiptv dopeiptv://channel/<name>   (or ?name=<name>)
     dopeiptv dopeiptv://open             bring the window forward
+    dopeiptv dopeiptv://supporter?key=DS1-...   a supporter key from the
+                                         site's thank-you, shown to be kept
 
 A command is a small dict - {"play": url}, {"channel": name},
-{"open": True} - or None when there is nothing to do.
+{"open": True}, {"supporter": key} - or None when there is nothing to do.
 """
 
 from __future__ import annotations
@@ -38,6 +40,9 @@ def parse_link(link: str) -> dict | None:
         return {"channel": name} if name else None
     if what in ("open", ""):
         return {"open": True}
+    if what == "supporter":
+        key = "".join(q.get("key", "").split())
+        return {"supporter": key} if key.upper().startswith("DS1-") and 20 < len(key) < 200 else None
     return None
 
 

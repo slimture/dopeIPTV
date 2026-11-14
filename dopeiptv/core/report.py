@@ -39,6 +39,8 @@ _IPV6 = re.compile(r"(?<![\w:])(?:(?:[0-9A-Fa-f]{1,4}:){5,7}[0-9A-Fa-f]{1,4}"
                    r"|[0-9A-Fa-f:]{0,30}::[0-9A-Fa-f:]{0,30}[0-9A-Fa-f])(?![\w:])")
 _MAC = re.compile(r"(?<![0-9A-Fa-f])(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}(?![0-9A-Fa-f])")
 _EMAIL = re.compile(r"[\w.+-]{1,64}@[\w-]{1,63}(?:\.[\w-]{1,63})+")
+# A supporter key pasted into a report would be the one thing that could tie it to a donation.
+_SUPPORTER = re.compile(r"(?i)\bDS1-[A-Za-z0-9_-]{20,}")
 _KEYVAL = re.compile(r"(?i)\b(user(?:name)?|pass(?:word)?|pwd|token|key|api_key|apikey|secret|"
                      r"auth|sid|session|mac|play_token|login)(\s*[=:]\s*)([^\s&'\",;]+)")
 
@@ -50,6 +52,7 @@ def scrub(text: str, personal: Iterable[str] = ()) -> str:
     out = _URL.sub(lambda m: f"{m.group(1)}://<address>", text or "")
     for value in sorted({v.strip() for v in personal if v and len(v.strip()) >= 3}, key=len, reverse=True):
         out = re.sub(re.escape(value), "<private>", out, flags=re.IGNORECASE)
+    out = _SUPPORTER.sub("<supporter key>", out)
     out = _EMAIL.sub("<email>", out)
     out = _MAC.sub("<mac>", out)
     out = _IPV6.sub("<ip>", out)

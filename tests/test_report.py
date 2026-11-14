@@ -306,3 +306,10 @@ def test_only_the_short_answers_go_with_feedback():
         _ur.urlopen = real
     assert got["topic"] == "bug" and got["area"] == "guide" and got["often"] == "once"
     assert not {"name", "topicx", "area2", "often_"} & set(got)
+
+
+def test_a_supporter_key_never_goes_in_a_report():
+    from dopeiptv.core import supporter
+    key = supporter.make(bytes(32))
+    out = report.scrub(f"my key is {key} - does it work?")
+    assert key not in out and "<supporter key>" in out

@@ -54,6 +54,10 @@ def test_a_command_line(argv, want):
     ("DOPEIPTV://OPEN", {"open": True}),
     ("dopeiptv://", {"open": True}),
     ("dopeiptv://play?url=file%3A%2F%2F%2Fetc%2Fpasswd", {"play": "file:///etc/passwd"}),
+    # The site's thank-you hands a supporter key over; nothing else rides along.
+    ("dopeiptv://supporter?key=DS1-AQALYXcAAAAAAAAACmF8F1Jg", {"supporter": "DS1-AQALYXcAAAAAAAAACmF8F1Jg"}),
+    ("dopeiptv://supporter?key=hello", None),
+    ("dopeiptv://supporter", None),
     # A link may not run anything but a stream: no other scheme, no
     # unknown verb, no play without an address.
     ("dopeiptv://play?url=javascript%3Aalert(1)", None),
@@ -219,3 +223,29 @@ def test_the_window_carries_out_each_command():
     assert ["channel", "Sintel"] in calls
     assert any(c[0] == "toast" and "No such channel" in c[1] for c in calls)
     assert calls.count(["forward"]) == 6
+
+
+def test_a_supporter_link_opens_the_supporter_window_filled_in():
+    """The key is shown in the supporter window, checked there; the call
+    that asked returns at once (the window opens after)."""
+    pytest.importorskip("PyQt6.QtWidgets")
+    from PyQt6.QtWidgets import QApplication
+
+    from dopeiptv.ui.mw_commands import _CommandsMixin
+    app = QApplication.instance() or QApplication([])
+
+    class Host(_CommandsMixin):
+        def __init__(self):
+            self.opened, self.forward = [], 0
+
+        def _come_forward(self):
+            self.forward += 1
+
+        def open_supporter(self, key=""):
+            self.opened.append(key)
+    h = Host()
+    assert h.handle_command({"supporter": "DS1-abcdefghijklmnopqrstuv"}) == {"ok": True}
+    assert h.opened == [] and h.forward == 1
+    for _ in range(5):
+        app.processEvents()
+    assert h.opened == ["DS1-abcdefghijklmnopqrstuv"]

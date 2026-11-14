@@ -24,7 +24,7 @@ from .ed25519 import public_key, sign, verify
 
 #: The public half of dopeiptv.org's supporter key (32 bytes, hex). Empty
 #: until the site has one: then no key checks out.
-PUBLIC_KEY_HEX = ""
+PUBLIC_KEY_HEX = "65c72e1f1ac5df41e6f268aad6dacbf690f78679f61fa8321488b62637b98826"
 PREFIX = "DS1-"
 _DOMAIN = b"dopeIPTV supporter key v1\x00"
 _PAYLOAD = 11                  # version (1) + day (4) + id (6)

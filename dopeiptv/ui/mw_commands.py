@@ -45,8 +45,15 @@ class _CommandsMixin:
         if not isinstance(cmd, dict):
             return {"ok": False}
         log.info("command: %s", ", ".join(sorted(cmd)))
-        if cmd.get("open") or cmd.get("play") or cmd.get("channel"):
+        if cmd.get("open") or cmd.get("play") or cmd.get("channel") or cmd.get("supporter"):
             self._come_forward()
+        key = str(cmd.get("supporter") or "").strip()
+        if key and hasattr(self, "open_supporter"):
+            # Shown in the supporter window (checked there, offline), never
+            # taken silently; after this call returns - the asker is waiting.
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(0, lambda: self.open_supporter(key))
+            return {"ok": True}
         url = str(cmd.get("play") or "").strip()
         if url:
             self._play_address(url)
