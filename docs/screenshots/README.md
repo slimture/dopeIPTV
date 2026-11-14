@@ -21,6 +21,12 @@ the metainfo of every release already out points at them on `main`.
 
 ## Getting content for free (no personal provider needed)
 
+`stream-info-graphite.png` and `stream-info-oled.png` are synthetic UI
+previews of the channel stream-information feature. They show the actual
+channel delegate, technical banner and Playback switch with made-up
+channel/EPG data, without opening a provider stream. The last row has no
+observed metadata yet and deliberately has no technical line.
+
 - Load the public **iptv-org** M3U (add a playlist → type **M3U** →
   `https://iptv-org.github.io/iptv/index.m3u`), or just use the built-in
   **🎬 Demo channels** button.
