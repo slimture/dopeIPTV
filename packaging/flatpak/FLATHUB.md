@@ -57,7 +57,7 @@ same.
 
 ## Regenerating the vendored wheels (when bumping deps)
 
-Download the whole tree for the runtime's Python (24.08 → 3.12) and emit the
+Download the whole tree for the runtime's Python (25.08 → 3.13) and emit the
 `type: file` sources with their PyPI URL + sha256:
 
 ```bash
