@@ -61,6 +61,7 @@ from .mw_trakt import _TraktMixin
 from .mw_recording import _RecordingMixin
 from .mw_busy import _BusyMixin
 from .mw_cast import _CastMixin
+from .mw_privacy import _PrivacyMixin
 from .mw_commands import _CommandsMixin
 from .mw_box import _BoxMixin
 from .mw_donate import _DonateMixin
@@ -108,7 +109,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _LocalFilesMixin,
                  _PopoutMixin, _MultiviewMixin, _HomeMixin, _MprisMixin,
                  _FollowMixin, _SubtitlesMixin, _CastMixin, _DonateMixin,
-                 _BoxMixin, _CommandsMixin, QMainWindow):
+                 _BoxMixin, _CommandsMixin, _PrivacyMixin, QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
     epg_progress = pyqtSignal(int)
@@ -430,6 +431,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         multiview_action.triggered.connect(self._show_multiview)
         cast_action = app_menu.addAction(tr("ctx_cast_to_chromecast"))
         cast_action.triggered.connect(self.cast_playing)
+        app_menu.addSeparator()
+        private_action, clear_action = self._build_privacy_actions(app_menu)
         # Only while something is playing - there is nothing to send
         # otherwise, and a dead entry is worse than none.
         app_menu.aboutToShow.connect(
@@ -463,6 +466,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             multiview_action.setMenuRole(
                 QAction.MenuRole.ApplicationSpecificRole)
             cast_action.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
+            private_action.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
+            clear_action.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
             self._donate_action.setMenuRole(
                 QAction.MenuRole.ApplicationSpecificRole)
         # Kept for live language switching (see retranslate_ui).
@@ -476,6 +481,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             about_action: lambda: tr("menu_about"),
             quit_action: lambda: tr("menu_quit"),
             self._donate_action: lambda: tr("donate_support") + "…",
+            private_action: lambda: tr("private_menu"),
+            clear_action: lambda: tr("clear_menu") + "…",
         }
 
         root = QSplitter(Qt.Orientation.Horizontal)
@@ -831,6 +838,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._actions_box.addWidget(multiview_btn)
         sl.addLayout(self._actions_box)
         self._logo_row.addWidget(donate_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+        self._build_private_pill(self._logo_row)
         self._logo_row.addStretch(1)
         self._fit_logo(False)
         self._donate_heart_refresh()         # hidden for three months, maybe
@@ -4527,6 +4535,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         Trakt learns of the mark through the regular local->Trakt sync
         (the live scrobble usually beats it there anyway). Embedded player
         only - external players never report their position."""
+        from ..core import privacy
+        if privacy.private():
+            return                     # private viewing marks nothing
         last = getattr(self, "_last_playback", None)
         if not last or last.get("kind") not in ("movie", "episode"):
             return

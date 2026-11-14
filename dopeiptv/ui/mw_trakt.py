@@ -38,8 +38,9 @@ def device_pages(data: dict) -> tuple[str, str]:
 class _TraktMixin:
     """MainWindow mixin: Trakt sign-in, watched-history sync and the watchlist/history view."""
     def _trakt_start_for_item(self, kind: str, item) -> None:
-        if not item or not self.trakt.is_connected():
-            return
+        from ..core import privacy
+        if not item or not self.trakt.is_connected() or privacy.private():
+            return          # private viewing: Trakt is not told either
         if kind == "movie":
             title = item.get("name") or item.get("title") or ""
             if not title:

@@ -13,6 +13,8 @@ import json
 import time
 from typing import Any
 
+from ..core import privacy
+
 # Fields worth keeping in a resume snapshot so the "Continue watching" list
 # can render a row (and replay it) without re-fetching the provider.
 # _key and _url matter for rows that came from History: those carry no
@@ -61,6 +63,8 @@ class ResumeStore:
         user is effectively at the start or the end. For movies and episodes an
         *item* snapshot is kept (plus the episode's *series_ctx*) so the
         'Continue watching' list can render and replay it."""
+        if privacy.private():
+            return       # private viewing: where it stopped is not kept
         rkey = f"{group}:{key}"
         if dur > 0 and 60 < pos < dur * 0.95:
             entry: dict[str, Any] = {"pos": round(pos), "dur": round(dur),

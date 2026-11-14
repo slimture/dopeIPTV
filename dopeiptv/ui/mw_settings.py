@@ -166,17 +166,13 @@ class _SettingsMixin:
                 self._load_categories()
 
     def _clear_history(self) -> None:
-        # Delete only the currently selected history category (channels /
-        # movies / series), or everything when 'All' is selected.
+        """Recently viewed's Clear button: the Clear recent history window
+        (a time range, what to clear), with the list's own kind ticked -
+        channels from TV channels, titles from Movies or Series."""
         sub = getattr(self, "_history_subcat", None)
-        kinds = self._HISTORY_KINDS.get(sub)
-        if confirm(self, tr("msg_clear_history_title"),
-                   tr("msg_clear_history_body")):
-            if kinds:
-                self.history.clear_kind(kinds)
-            else:
-                self.history.clear()
-            self._load_items(sub)
+        pre = {"live": "channels", "movie": "titles", "series": "titles",
+               "local": "titles"}.get(sub or "")
+        self.open_clear_history(pre)
 
     # -- EPG guide -----------------------------------------------------------------
 
@@ -650,6 +646,16 @@ class _SettingsMixin:
         c = general.card(tr("set_card_language"))
         c.row(tr("setting_language"), lang_box,
               tr("setting_language_restart_hint"))
+        # Privacy: private viewing lasts until the app closes, so it is not
+        # stored (an untouched window still writes nothing).
+        from ..core import privacy as _privacy
+        c = general.card(tr("set_card_privacy"))
+        private_box = c.toggle(tr("private_menu"), _privacy.private(), tr("private_hint"))
+        private_box.toggled.connect(self.set_private_viewing)
+        clear_btn = QPushButton(tr("clear_btn"))
+        clear_btn.clicked.connect(lambda: self.open_clear_history())
+        c.row(tr("clear_menu"), clear_btn, tr("clear_hint"),
+              search="history incognito private recently viewed")
         c = general.card(tr("set_card_updates"))
         updates_box = c.toggle(tr("setting_check_updates"),
                                is_on("check_updates", "true"))

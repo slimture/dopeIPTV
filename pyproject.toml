@@ -78,6 +78,7 @@ files = [
     "dopeiptv/core/http_login.py",
     "dopeiptv/core/commands.py",
     "dopeiptv/core/nerd_check.py",
+    "dopeiptv/core/privacy.py",
     "dopeiptv/core/instance.py",
     "dopeiptv/providers/dlna.py",
     "dopeiptv/providers/stalker.py",

@@ -258,7 +258,9 @@ def layout(self):
     shell.search.setText("trakt")
     shown_heads = [nav.item(i).text() for i in heads
                    if not nav.item(i).isHidden()]
-    assert shown_heads == [tr("set_sec_services").upper()], shown_heads
+    # Trakt's page, and General's privacy row (private viewing tells
+    # Trakt nothing) - no other section.
+    assert shown_heads == [tr("set_sec_basics").upper(), tr("set_sec_services").upper()], shown_heads
     shell.search.setText("")
     page = {p.key: p for p in shell.pages}
     from PyQt6.QtWidgets import QLabel

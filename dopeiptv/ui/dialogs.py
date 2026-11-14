@@ -627,3 +627,73 @@ class ProblemDialog(QDialog):
         row.addLayout(col, 1)
         close.setDefault(True)
         close.setFocus()
+
+
+class ClearHistoryDialog(QDialog):
+    """Clear what was watched, as a browser clears its history: a time range
+    and what to clear. *preselect*: "channels" or "titles" ticks only that
+    (the Recently viewed list it was opened from)."""
+
+    def __init__(self, parent=None, preselect: str | None = None) -> None:
+        super().__init__(parent)
+        from PyQt6.QtWidgets import QCheckBox
+
+        from ..core.privacy import RANGES
+        self.setWindowTitle(tr("clear_title"))
+        self.setModal(True)
+        self.setMinimumWidth(460)
+        col = QVBoxLayout(self)
+        col.setContentsMargins(24, 22, 24, 20)
+        col.setSpacing(10)
+        head = QLabel(tr("clear_title"))
+        head.setStyleSheet(f"font-size:16px; font-weight:700; color:{P['text']};")
+        sub = QLabel(tr("clear_sub"))
+        sub.setWordWrap(True)
+        sub.setStyleSheet(f"font-size:13px; color:{P['muted']};")
+        col.addWidget(head)
+        col.addWidget(sub)
+        row = QHBoxLayout()
+        row.addWidget(QLabel(tr("clear_range")))
+        self.range = QComboBox()
+        for rid, secs in RANGES:
+            self.range.addItem(tr(f"clear_range_{rid}"), secs)
+        self.range.setCurrentIndex(0)
+        row.addWidget(self.range, 1)
+        col.addLayout(row)
+        self.channels = QCheckBox(tr("clear_channels"))
+        self.titles = QCheckBox(tr("clear_titles"))
+        self.positions = QCheckBox(tr("clear_positions"))
+        for box in (self.channels, self.titles, self.positions):
+            box.setChecked(True)
+            col.addWidget(box)
+        if preselect == "channels":
+            self.titles.setChecked(False)
+            self.positions.setChecked(False)
+        elif preselect == "titles":
+            self.channels.setChecked(False)
+        note = QLabel(tr("clear_note"))
+        note.setWordWrap(True)
+        note.setStyleSheet(f"font-size:12px; color:{P['muted']};")
+        col.addWidget(note)
+        col.addSpacing(6)
+        buttons = QHBoxLayout()
+        buttons.addStretch(1)
+        cancel = QPushButton(tr("common_cancel"))
+        self.go = QPushButton(tr("clear_go"), objectName="Danger")
+        cancel.clicked.connect(self.reject)
+        self.go.clicked.connect(self.accept)
+        buttons.addWidget(cancel)
+        buttons.addWidget(self.go)
+        col.addLayout(buttons)
+        for box in (self.channels, self.titles, self.positions):
+            box.toggled.connect(self._sync)
+        self._sync()
+
+    def _sync(self, *_a) -> None:
+        self.go.setEnabled(self.channels.isChecked() or self.titles.isChecked()
+                           or self.positions.isChecked())
+
+    def choice(self) -> dict:
+        return {"seconds": int(self.range.currentData() or 0),
+                "channels": self.channels.isChecked(), "titles": self.titles.isChecked(),
+                "positions": self.positions.isChecked()}

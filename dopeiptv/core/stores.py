@@ -15,6 +15,8 @@ from typing import Any
 
 from PyQt6.QtCore import QSettings
 
+from . import privacy
+
 
 # The implicit "just add it here" bucket every category has. Items land
 # here on a plain "Add to favorites"; user-made folders are any other group.
@@ -291,8 +293,8 @@ class HistoryStore:
 
     def add(self, url: str, title: str, icon_url: str | None,
             key: str, kind: str, extra: dict | None = None) -> None:
-        if not url:
-            return
+        if not url or privacy.private():
+            return       # private viewing: nothing played is kept
         # str() both sides: providers mix int and str ids, and a key that
         # round-tripped through JSON elsewhere may come back the other type -
         # a raw == then missed and the same title stacked up as duplicates.
