@@ -88,7 +88,8 @@ feedback with answers in the app, and a supporter key.
   beside Settings at the foot. Multiview lives in the View menu and on a
   channel's right-click.
 - The guide opens as a page in the middle, beside the player; Pop out
-  gives it its own window as before.
+  gives it its own window as before. Its hours fit the room it has, or
+  − / + (Ctrl + wheel, Ctrl + = / - / 0) pick how many.
 - Answers to feedback in a window of their own (Help > Answers to
   feedback, Settings > General), asked for soon after a report; the menus
   grouped as each system has them (File, View, History, Help on a Mac).
