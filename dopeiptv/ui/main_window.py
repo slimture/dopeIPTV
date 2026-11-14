@@ -61,6 +61,7 @@ from .mw_trakt import _TraktMixin
 from .mw_recording import _RecordingMixin
 from .mw_busy import _BusyMixin
 from .mw_cast import _CastMixin
+from .mw_commands import _CommandsMixin
 from .mw_box import _BoxMixin
 from .mw_donate import _DonateMixin
 from .mw_context import _ContextMenuMixin
@@ -107,7 +108,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _LocalFilesMixin,
                  _PopoutMixin, _MultiviewMixin, _HomeMixin, _MprisMixin,
                  _FollowMixin, _SubtitlesMixin, _CastMixin, _DonateMixin,
-                 _BoxMixin, QMainWindow):
+                 _BoxMixin, _CommandsMixin, QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
     epg_progress = pyqtSignal(int)

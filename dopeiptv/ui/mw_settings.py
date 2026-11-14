@@ -111,6 +111,7 @@ class _SettingsMixin:
             # missing - and one line here says which, instead of a round
             # trip of guessing.
             log.info("%s", desktop_entry.describe())
+            desktop_entry.take_links()
             if self.settings.value("desktop_entry_asked", "false") == "true":
                 return
             if not desktop_entry.can_offer():

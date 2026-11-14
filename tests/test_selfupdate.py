@@ -107,7 +107,8 @@ def test_installs_beside_the_old_one_and_moves_the_menu_entry(env):
     assert new.read_bytes() == GOOD and os.access(new, os.X_OK)
     assert current.exists(), "the old file goes only once the new one ran"
     assert _leftovers(current.parent) == [current.name, new.name]
-    assert f"Exec={new}\n" in desktop_entry.entry_path().read_text()
+    # Repointed, it still opens dopeiptv:// links.
+    assert f"Exec={new} %u\n" in desktop_entry.entry_path().read_text()
 
     # The new version, started, removes the old one.
     assert selfupdate.take_pending_cleanup(str(current), new)

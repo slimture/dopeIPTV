@@ -1085,6 +1085,9 @@ jobs:
           VER=$(defaults read "${APP}/Contents/Info" CFBundleShortVersionString)
           echo "CFBundleName=$NAME  CFBundleShortVersionString=$VER"
           test "$NAME" = "dopeIPTV" || { echo "::error::wrong CFBundleName ($NAME)"; hdiutil detach "$MOUNT" || true; exit 1; }
+          # dopeiptv:// links open the app (dopeiptv-mac.spec).
+          SCHEME=$(plutil -extract CFBundleURLTypes.0.CFBundleURLSchemes.0 raw "$PLIST" 2>/dev/null || true)
+          test "$SCHEME" = "dopeiptv" || { echo "::error::dopeiptv:// not registered in Info.plist ($SCHEME)"; hdiutil detach "$MOUNT" || true; exit 1; }
           # Signed with the Developer ID: Gatekeeper must take a release's
           # app as notarised, exactly as a Mac that downloaded it will. A
           # test build is not notarised; its signature must still hold.

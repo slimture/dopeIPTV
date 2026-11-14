@@ -1281,5 +1281,6 @@
   "nerd_add_box": "Thêm đầu thu hoặc máy chủ…",
   "nerd_switch": "Chế độ Nerd",
   "nerd_teaser": "Bên trong: đầu thu và máy chủ, mạng và proxy, bảo vệ VPN, hình ảnh và âm thanh, mpv, kênh và lịch phát sóng, chẩn đoán.",
-  "nerd_vpn_checking": "Đang kiểm tra…"
+  "nerd_vpn_checking": "Đang kiểm tra…",
+  "cmd_no_channel": "Không có kênh nào tên “{name}” trong nguồn này."
 }

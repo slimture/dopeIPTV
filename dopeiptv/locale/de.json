@@ -1281,5 +1281,6 @@
   "nerd_add_box": "Box oder Server hinzufügen…",
   "nerd_switch": "Nerd-Modus",
   "nerd_teaser": "Darin: Boxen und Server, Netzwerk und Proxy, VPN-Wächter, Bild und Ton, mpv, Sender und Guide, Diagnose.",
-  "nerd_vpn_checking": "Prüfe…"
+  "nerd_vpn_checking": "Prüfe…",
+  "cmd_no_channel": "Kein Sender namens „{name}“ in dieser Quelle."
 }

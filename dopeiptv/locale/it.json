@@ -1281,5 +1281,6 @@
   "nerd_add_box": "Aggiungi decoder o server…",
   "nerd_switch": "Modalità Nerd",
   "nerd_teaser": "Dentro: decoder e server, rete e proxy, guardia VPN, immagine e audio, mpv, canali e guida, diagnostica.",
-  "nerd_vpn_checking": "Controllo…"
+  "nerd_vpn_checking": "Controllo…",
+  "cmd_no_channel": "Nessun canale chiamato «{name}» in questa sorgente."
 }

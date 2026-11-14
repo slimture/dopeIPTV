@@ -325,7 +325,9 @@ def repoint_desktop_entry(new: Path, old: Path | None = None) -> bool:
             return False
         if named != old and named.exists():
             return False
-        lines[i] = "Exec=" + desktop_entry.quote_exec(str(new))
+        # Its arguments stay (%u: the links it opens).
+        rest = "".join(f" {a}" for a in argv[1:] if a.startswith("%"))
+        lines[i] = "Exec=" + desktop_entry.quote_exec(str(new)) + rest
         try:
             path.write_text("\n".join(lines) + "\n", encoding="utf-8")
         except OSError as e:

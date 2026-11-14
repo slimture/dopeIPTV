@@ -1281,5 +1281,6 @@
   "nerd_add_box": "Ajouter un boîtier ou un serveur…",
   "nerd_switch": "Mode Nerd",
   "nerd_teaser": "À l'intérieur : boîtiers et serveurs, réseau et proxy, garde VPN, image et son, mpv, chaînes et guide, diagnostic.",
-  "nerd_vpn_checking": "Vérification…"
+  "nerd_vpn_checking": "Vérification…",
+  "cmd_no_channel": "Aucune chaîne nommée « {name} » dans cette source."
 }

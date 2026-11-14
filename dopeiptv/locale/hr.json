@@ -1281,5 +1281,6 @@
   "nerd_add_box": "Dodaj prijemnik ili poslužitelj…",
   "nerd_switch": "Nerd način",
   "nerd_teaser": "Unutra: prijemnici i poslužitelji, mreža i proxy, VPN čuvar, slika i zvuk, mpv, kanali i vodič, dijagnostika.",
-  "nerd_vpn_checking": "Provjeravam…"
+  "nerd_vpn_checking": "Provjeravam…",
+  "cmd_no_channel": "U ovom izvoru nema kanala „{name}”."
 }

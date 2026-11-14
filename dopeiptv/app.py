@@ -294,6 +294,26 @@ def _install_crash_hooks() -> None:
             pass
 
 
+def _watch_link_events(app, window) -> None:
+    """macOS hands a dopeiptv:// link to a running app as an event, not on
+    the command line."""
+    from PyQt6.QtCore import QEvent, QObject
+
+    from .core.commands import parse_link
+
+    class _Links(QObject):
+        def eventFilter(self, obj, event):  # noqa: N802 - Qt's name
+            if event.type() == QEvent.Type.FileOpen:
+                url = event.url().toString() if event.url().isValid() else event.file()
+                cmd = parse_link(url) if url.lower().startswith("dopeiptv://") else None
+                if cmd is not None:
+                    window.handle_command(cmd)
+                    return True
+            return False
+    window._link_filter = _Links(window)
+    app.installEventFilter(window._link_filter)
+
+
 def main() -> int:
     """Launch the application."""
     # PyInstaller's windowed (no-console) build - our Windows release - leaves
@@ -440,6 +460,14 @@ def main() -> int:
             pass
 
     app = QApplication(sys.argv)
+    # A command (--play, --channel, a dopeiptv:// link) goes to the copy
+    # already running, if there is one; this start then ends here.
+    from .core.commands import parse_command
+    command = parse_command(sys.argv[1:])
+    if command is not None:
+        from .core.instance import send_to_running
+        if send_to_running(command):
+            return 0
     # Cyclic garbage collection on the GUI thread only: collected on a pool
     # thread, a cycle holding Qt objects segfaults (see core/gcguard.py).
     from .core.gcguard import GcGuard
@@ -544,6 +572,11 @@ def main() -> int:
 
     w = MainWindow(client, settings, store)
     w.show()
+    w._start_command_server()
+    _watch_link_events(app, w)
+    if command is not None:
+        # After the window and its source are up: a channel needs its list.
+        QTimer.singleShot(1500, lambda: w.handle_command(command))
     if welcome:
         w.show_welcome()
     if "--updated" in sys.argv:

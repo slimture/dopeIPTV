@@ -1281,5 +1281,6 @@
   "nerd_add_box": "添加机顶盒或服务器…",
   "nerd_switch": "Nerd 模式",
   "nerd_teaser": "包含：机顶盒与服务器、网络与代理、VPN 守卫、画面与声音、mpv、频道与节目单、诊断。",
-  "nerd_vpn_checking": "正在检查…"
+  "nerd_vpn_checking": "正在检查…",
+  "cmd_no_channel": "此来源中没有名为“{name}”的频道。"
 }

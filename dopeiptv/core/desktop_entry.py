@@ -38,6 +38,10 @@ ENTRY_NAME = "dopeiptv.desktop"
 ICON_NAME = "dopeiptv"
 
 
+# The menu entry says it opens these links (Exec ... %u).
+LINK_MIME = "x-scheme-handler/dopeiptv"
+
+
 def _exec_program(text: str) -> str | None:
     """The program an entry's Exec= line starts (past an ``env VAR=x``
     prefix, as some AppImage tools write), or None."""
@@ -190,16 +194,16 @@ def install() -> bool:
         "Type=Application\n"
         f"Name={APP_NAME}\n"
         "Comment=IPTV client with Xtream Codes and EPG\n"
-        # No %U: the app takes no file or URL arguments (only --self-check
-        # and --no-x11), and the entry the packages ship has none either.
-        # Two entries for the same app that disagree about what it accepts
-        # is how they start drifting.
-        f"Exec={quote_exec(cmd)}\n"
+        # %u and the scheme: a dopeiptv:// link opens here (core/commands.py),
+        # as with the entry the packages ship - two entries for the same app
+        # that disagree about what it accepts is how they start drifting.
+        f"Exec={quote_exec(cmd)} %u\n"
         f"Icon={ICON_NAME}\n"
         "Terminal=false\n"
         "Categories=AudioVideo;Video;TV;\n"
         "Keywords=iptv;tv;xtream;epg;\n"
         "StartupWMClass=dopeiptv\n"
+        f"MimeType={LINK_MIME};\n"
         # Written by us, for us: the switch in Settings reads this back so
         # it never offers to remove an entry a package manager owns.
         "X-dopeIPTV-Generated=true\n"
@@ -213,6 +217,35 @@ def install() -> bool:
         return False
     _refresh_database()
     log.info("desktop entry: installed %s -> %s", path, cmd)
+    return True
+
+
+def take_links() -> bool:
+    """An entry we wrote before dopeiptv:// links existed gets them: %u on
+    its Exec line and the scheme. Ours only; True when it changed."""
+    path = entry_path()
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    if "X-dopeIPTV-Generated=true" not in text or LINK_MIME in text:
+        return False
+    lines = []
+    for line in text.splitlines():
+        if line.startswith("Exec=") and "%u" not in line.split():
+            line += " %u"
+        lines.append(line)
+        if line.startswith("StartupWMClass="):
+            lines.append(f"MimeType={LINK_MIME};")
+    if not any(ln.startswith("MimeType=") for ln in lines):
+        lines.append(f"MimeType={LINK_MIME};")
+    try:
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    except OSError as e:
+        log.warning("desktop entry: could not update %s: %s", path, e)
+        return False
+    _refresh_database()
+    log.info("desktop entry: now opens dopeiptv:// links")
     return True
 
 

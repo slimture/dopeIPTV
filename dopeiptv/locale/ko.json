@@ -1281,5 +1281,6 @@
   "nerd_add_box": "셋톱박스 또는 서버 추가…",
   "nerd_switch": "Nerd 모드",
   "nerd_teaser": "포함: 셋톱박스와 서버, 네트워크와 프록시, VPN 가드, 영상과 소리, mpv, 채널과 편성표, 진단.",
-  "nerd_vpn_checking": "확인 중…"
+  "nerd_vpn_checking": "확인 중…",
+  "cmd_no_channel": "이 소스에 ‘{name}’ 채널이 없습니다."
 }

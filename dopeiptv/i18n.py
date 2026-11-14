@@ -1242,6 +1242,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "err_box_login_needed": {"en": "The box asks for a username and password."},
     "err_m3u_no_channels": {"en": "No channels found in the M3U playlist."},
     "demo_channels": {"en": "Demo channels"},
+    "cmd_no_channel": {"en": "No channel called “{name}” in this source."},
     "trakt_rejected": {"en": "Trakt rejected the sign-in (HTTP {code}{detail})."},
     "oauth_page_ok": {"en": "Connected to Trakt ✓"},
     "oauth_page_failed": {"en": "Sign-in was cancelled or failed."},

@@ -1281,5 +1281,6 @@
   "nerd_add_box": "Ontvanger of server toevoegen…",
   "nerd_switch": "Nerd-modus",
   "nerd_teaser": "Binnenin: ontvangers en servers, netwerk en proxy, VPN-bewaker, beeld en geluid, mpv, zenders en gids, diagnose.",
-  "nerd_vpn_checking": "Controleren…"
+  "nerd_vpn_checking": "Controleren…",
+  "cmd_no_channel": "Geen zender met de naam ‘{name}’ in deze bron."
 }

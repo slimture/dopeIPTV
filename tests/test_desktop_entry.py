@@ -34,7 +34,9 @@ def test_the_entry_points_at_the_appimage_not_the_mount(home, monkeypatch):
     assert desktop_entry.can_offer() == sys.platform.startswith("linux")
     assert desktop_entry.install() is True
     body = desktop_entry.entry_path().read_text(encoding="utf-8")
-    assert f"Exec={appimage}\n" in body
+    # %u and the scheme: dopeiptv:// links open the app (core/commands.py).
+    assert f"Exec={appimage} %u\n" in body
+    assert "MimeType=x-scheme-handler/dopeiptv;\n" in body
     # The icon name has to be the app_id, or Wayland never finds it.
     assert "Icon=dopeiptv" in body
     assert desktop_entry.entry_path().name == "dopeiptv.desktop"
@@ -48,7 +50,7 @@ def test_a_path_with_a_space_is_quoted(home, monkeypatch):
     monkeypatch.setenv("APPIMAGE", str(appimage))
     desktop_entry.install()
     body = desktop_entry.entry_path().read_text(encoding="utf-8")
-    assert f'Exec="{appimage}"\n' in body
+    assert f'Exec="{appimage}" %u\n' in body
 
 
 def test_nothing_is_offered_when_a_package_already_installed_one(
@@ -306,3 +308,34 @@ def test_our_entries_name_the_window_class(home, monkeypatch):
     monkeypatch.setenv("APPIMAGE", str(appimage))
     assert desktop_entry.install()
     assert "\nStartupWMClass=dopeiptv\n" in desktop_entry.entry_path().read_text()
+
+
+def test_an_entry_from_before_links_takes_them_once(home, monkeypatch):
+    """An entry written by an older version opens dopeiptv:// links after
+    one start of this one; anyone else's entry is never touched."""
+    path = desktop_entry.entry_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    old = ("[Desktop Entry]\nType=Application\nExec=/opt/dopeIPTV.AppImage\n"
+           "StartupWMClass=dopeiptv\nX-dopeIPTV-Generated=true\n")
+    path.write_text(old, encoding="utf-8")
+    assert desktop_entry.take_links() is True
+    body = path.read_text(encoding="utf-8")
+    assert "Exec=/opt/dopeIPTV.AppImage %u\n" in body
+    assert body.count("MimeType=x-scheme-handler/dopeiptv;") == 1
+    assert desktop_entry.take_links() is False          # once
+    assert path.read_text(encoding="utf-8") == body
+
+    theirs = old.replace("X-dopeIPTV-Generated=true\n", "")
+    path.write_text(theirs, encoding="utf-8")
+    assert desktop_entry.take_links() is False
+    assert path.read_text(encoding="utf-8") == theirs
+
+
+def test_the_packaged_entries_open_links():
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    for rel in ("dopeiptv.desktop",
+                "packaging/io.github.slimture.dopeIPTV.desktop"):
+        with open(os.path.join(root, rel), encoding="utf-8") as f:
+            body = f.read()
+        assert "Exec=dopeiptv %u\n" in body, rel
+        assert "MimeType=x-scheme-handler/dopeiptv;\n" in body, rel

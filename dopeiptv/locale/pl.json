@@ -1281,5 +1281,6 @@
   "nerd_add_box": "Dodaj dekoder lub serwer…",
   "nerd_switch": "Tryb Nerd",
   "nerd_teaser": "W środku: dekodery i serwery, sieć i proxy, strażnik VPN, obraz i dźwięk, mpv, kanały i przewodnik, diagnostyka.",
-  "nerd_vpn_checking": "Sprawdzam…"
+  "nerd_vpn_checking": "Sprawdzam…",
+  "cmd_no_channel": "Brak kanału o nazwie „{name}” w tym źródle."
 }

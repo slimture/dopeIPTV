@@ -1281,5 +1281,6 @@
   "nerd_add_box": "チューナーまたはサーバーを追加…",
   "nerd_switch": "Nerd モード",
   "nerd_teaser": "中身: チューナーとサーバー、ネットワークとプロキシ、VPN ガード、映像と音声、mpv、チャンネルと番組表、診断。",
-  "nerd_vpn_checking": "確認中…"
+  "nerd_vpn_checking": "確認中…",
+  "cmd_no_channel": "このソースに「{name}」というチャンネルはありません。"
 }

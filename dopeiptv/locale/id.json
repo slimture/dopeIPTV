@@ -1281,5 +1281,6 @@
   "nerd_add_box": "Tambah perangkat atau server…",
   "nerd_switch": "Mode Nerd",
   "nerd_teaser": "Di dalamnya: perangkat dan server, jaringan dan proxy, penjaga VPN, gambar dan suara, mpv, saluran dan panduan, diagnostik.",
-  "nerd_vpn_checking": "Memeriksa…"
+  "nerd_vpn_checking": "Memeriksa…",
+  "cmd_no_channel": "Tidak ada saluran bernama “{name}” di sumber ini."
 }

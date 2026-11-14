@@ -173,5 +173,11 @@ app = BUNDLE(
         'NSPrincipalClass': 'NSApplication',
         'NSHumanReadableCopyright': 'GPL-3.0-or-later',
         'LSApplicationCategoryType': 'public.app-category.video',
+        # dopeiptv:// links open the app (core/commands.py); macOS hands a
+        # running app the link as an event (app.py, _watch_link_events).
+        'CFBundleURLTypes': [{
+            'CFBundleURLName': 'io.github.slimture.dopeIPTV.link',
+            'CFBundleURLSchemes': ['dopeiptv'],
+        }],
     },
 )

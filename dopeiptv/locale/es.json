@@ -1281,5 +1281,6 @@
   "nerd_add_box": "Añadir receptor o servidor…",
   "nerd_switch": "Modo Nerd",
   "nerd_teaser": "Dentro: receptores y servidores, red y proxy, guardia VPN, imagen y sonido, mpv, canales y guía, diagnóstico.",
-  "nerd_vpn_checking": "Comprobando…"
+  "nerd_vpn_checking": "Comprobando…",
+  "cmd_no_channel": "No hay ningún canal llamado «{name}» en esta fuente."
 }

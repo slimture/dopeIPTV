@@ -1281,5 +1281,6 @@
   "nerd_add_box": "Cihaz veya sunucu ekle…",
   "nerd_switch": "Nerd modu",
   "nerd_teaser": "İçinde: cihazlar ve sunucular, ağ ve proxy, VPN koruması, görüntü ve ses, mpv, kanallar ve rehber, tanılama.",
-  "nerd_vpn_checking": "Kontrol ediliyor…"
+  "nerd_vpn_checking": "Kontrol ediliyor…",
+  "cmd_no_channel": "Bu kaynakta “{name}” adında bir kanal yok."
 }

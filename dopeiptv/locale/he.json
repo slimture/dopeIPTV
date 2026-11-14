@@ -1281,5 +1281,6 @@
   "nerd_add_box": "הוספת ממיר או שרת…",
   "nerd_switch": "מצב Nerd",
   "nerd_teaser": "בפנים: ממירים ושרתים, רשת ופרוקסי, שומר VPN, תמונה וקול, mpv, ערוצים ומדריך, אבחון.",
-  "nerd_vpn_checking": "בודק…"
+  "nerd_vpn_checking": "בודק…",
+  "cmd_no_channel": "אין ערוץ בשם „{name}” במקור הזה."
 }

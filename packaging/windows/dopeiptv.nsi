@@ -175,6 +175,13 @@ Section "dopeIPTV"
   ${GetSize} "$INSTDIR" "/S=0K" $0 $1 $2
   WriteRegDWORD HKCU "${UNINST_KEY}" "EstimatedSize" $0
 
+  ; dopeiptv:// links open the app (core/commands.py): the per-user
+  ; protocol handler, the app's path followed by the link.
+  WriteRegStr HKCU "Software\Classes\dopeiptv" "" "URL:dopeIPTV"
+  WriteRegStr HKCU "Software\Classes\dopeiptv" "URL Protocol" ""
+  WriteRegStr HKCU "Software\Classes\dopeiptv\DefaultIcon" "" '"$INSTDIR\${EXE}",0'
+  WriteRegStr HKCU "Software\Classes\dopeiptv\shell\open\command" "" '"$INSTDIR\${EXE}" "%1"'
+
   ; An update opens the new version while this window still shows - it is
   ; in front, so the new window comes to the front too - and stays a few
   ; seconds while the app starts: no gap with nothing on screen.
@@ -217,6 +224,7 @@ Section "Uninstall"
   ; Empty now unless the user kept something of their own in it: then it stays.
   RMDir "$INSTDIR"
   DeleteRegKey HKCU "${UNINST_KEY}"
+  DeleteRegKey HKCU "Software\Classes\dopeiptv"
 
   ; Nothing of dopeIPTV is left behind (the list packaging/WINDOWS-README.txt
   ; gives for the portable zip): settings, playlists, favourites and history

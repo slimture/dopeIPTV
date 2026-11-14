@@ -1281,5 +1281,6 @@
   "nerd_add_box": "Dodaj risiver ili server…",
   "nerd_switch": "Nerd režim",
   "nerd_teaser": "Unutra: risiveri i serveri, mreža i proksi, VPN čuvar, slika i zvuk, mpv, kanali i vodič, dijagnostika.",
-  "nerd_vpn_checking": "Proveravam…"
+  "nerd_vpn_checking": "Proveravam…",
+  "cmd_no_channel": "У овом извору нема канала „{name}“."
 }

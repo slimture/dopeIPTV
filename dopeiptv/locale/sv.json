@@ -1281,5 +1281,6 @@
   "nerd_add_box": "Lägg till box eller server…",
   "nerd_switch": "Nerd-läge",
   "nerd_teaser": "Inuti: boxar och servrar, nätverk och proxy, VPN-vakt, bild och ljud, mpv, kanaler och guide, felsökning.",
-  "nerd_vpn_checking": "Kollar…"
+  "nerd_vpn_checking": "Kollar…",
+  "cmd_no_channel": "Ingen kanal som heter ”{name}” i den här källan."
 }

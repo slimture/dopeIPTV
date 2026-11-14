@@ -1281,5 +1281,6 @@
   "nerd_add_box": "Ongeza kisanduku au seva…",
   "nerd_switch": "Hali ya Nerd",
   "nerd_teaser": "Ndani: visanduku na seva, mtandao na proksi, mlinzi wa VPN, picha na sauti, mpv, chaneli na mwongozo, uchunguzi.",
-  "nerd_vpn_checking": "Inakagua…"
+  "nerd_vpn_checking": "Inakagua…",
+  "cmd_no_channel": "Hakuna chaneli inayoitwa “{name}” katika chanzo hiki."
 }
