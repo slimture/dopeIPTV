@@ -18,7 +18,16 @@ device on the admin page (needs Python's cryptography package).
     POST /donate/session  {"amount": 5000, "currency": "sek"}
                           ->  {"clientSecret", "publishableKey"}
     POST /donate/wallet   {"amount", "currency", "paymentMethod", "email", "name"}
-                          ->  {"ok": true} | {"action": client_secret} | {"error"}
+                          ->  {"ok": true, "key"?} | {"action": client_secret} | {"error"}
+    POST /donate/key      {"cs": client_secret} | {"t": receipt token}
+                          ->  {"key", "since"} | {"pending": true} (202) | {"error"}
+
+A donation comes with a supporter key for the app (supporter.py): shown on
+the page when the payment goes through, and behind a link in Stripe's
+receipt (the PaymentIntent's description: ".../#key=<token>", the token
+also in its metadata) - so it can be fetched again later. The link only
+gives a key once that payment has succeeded; Stripe is asked every time.
+Nothing about the donor is kept here.
 
 The donor pays in their own currency: the page picks it from where the
 device says it is (nav.js), out of CURRENCIES below, and the amounts are
@@ -79,6 +88,10 @@ named by DONATE_CONFIG (default /usr/local/etc/iptv-donate.conf):
     ADMIN_SESSION_KEY_FILE  the key that signs the admin's session cookie
                             (default <STATS_DIR>/admin-session.key, made on
                             first use). Deleting it signs every browser out.
+    SUPPORTER_KEY_FILE      the supporter keys' signing key (default
+                            /usr/local/etc/iptv-donate-supporter.key; make it
+                            with supporter.py --new-key). Without it no keys
+                            and no receipt link - donations work as before.
     PUSH_CONTACT            who runs this, for the push services (a mailto:
                             or https URL; default DONATE_ORIGIN). The push key
                             and the devices live in STATS_DIR (push-vapid.pem,
@@ -246,9 +259,11 @@ def _allowed(addr: str, most: int = PER_WINDOW) -> bool:
         return True
 
 
-def _post(url: str, form: dict, key: str) -> tuple[int, dict]:
+def _post(url: str, form: dict | None, key: str) -> tuple[int, dict]:
+    """A Stripe call: POST *form*, or GET when *form* is None."""
     req = urllib.request.Request(
-        url, data=urllib.parse.urlencode(form).encode(), method="POST",
+        url, data=None if form is None else urllib.parse.urlencode(form).encode(),
+        method="GET" if form is None else "POST",
         headers={"Authorization": "Bearer " + key,
                  "Content-Type": "application/x-www-form-urlencoded"})
     if API_VERSION:
@@ -291,6 +306,88 @@ def _intent(form: dict, key: str) -> tuple[int, dict]:
             return status, body
 
 
+# -- supporter keys (supporter.py) ----------------------------------------------
+
+SUPPORTER_KEY_FILE = CONF.get("SUPPORTER_KEY_FILE", "/usr/local/etc/iptv-donate-supporter.key")
+_TOKEN = re.compile(r"^[A-Za-z0-9_-]{16,40}$")
+_PI = re.compile(r"^pi_[A-Za-z0-9]{8,64}$")
+
+
+def _supporter_seed() -> bytes | None:
+    import supporter
+    return supporter.load_seed(SUPPORTER_KEY_FILE)
+
+
+def _with_receipt_link(form: dict) -> dict:
+    """The PaymentIntent's description carries the way back to its key:
+    Stripe's receipt shows it. The token alone gives nothing until the
+    payment has succeeded."""
+    if _supporter_seed() is None:
+        return form
+    token = secrets.token_urlsafe(16)
+    form = dict(form)
+    form["metadata[supporter]"] = token
+    form["description"] = f"{NAME} - your supporter key for the app: {ORIGIN}/#key={token}"
+    return form
+
+
+def _stats_dir() -> str:
+    import admin
+    return CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats"))
+
+
+def key_for(pi: dict, how: str) -> dict | None:
+    """{"key", "since"} for a succeeded PaymentIntent, or None."""
+    import supporter
+    seed = _supporter_seed()
+    if seed is None or pi.get("status") != "succeeded" or not _PI.match(str(pi.get("id") or "")):
+        return None
+    key, ident = supporter.for_payment(seed, str(pi["id"]), int(pi.get("created") or time.time()))
+    try:
+        supporter.record(_stats_dir(), ident, how)
+    except OSError as e:
+        print(f"[donate] supporter count: {e!r}", file=sys.stderr, flush=True)
+    return {"key": key, "since": supporter.check(key, _public())["since"]}
+
+
+def _public() -> bytes:
+    import ed25519
+    seed = _supporter_seed()
+    return ed25519.public_key(seed) if seed else b""
+
+
+def find_key(data: dict) -> tuple[int, dict]:
+    """POST /donate/key: the page right after paying ({"cs"}), or the link
+    in the receipt ({"t"}). Stripe says whether the payment went through."""
+    stripe = _secret()
+    if not stripe or _supporter_seed() is None:
+        return 404, {"error": "no keys"}
+    cs, token = str(data.get("cs") or ""), str(data.get("t") or "")
+    if cs:
+        pid = cs.split("_secret_", 1)[0]
+        if not _PI.match(pid) or "_secret_" not in cs:
+            return 400, {"error": "bad"}
+        status, pi = _post(f"{STRIPE_PI}/{pid}", None, stripe)
+        if status != 200 or not hmac.compare_digest(str(pi.get("client_secret") or ""), cs):
+            return 404, {"error": "not found"}
+        how = "page"
+    elif _TOKEN.match(token):
+        query = urllib.parse.urlencode({"query": f"metadata['supporter']:'{token}'", "limit": "3"})
+        status, found = _post(f"{STRIPE_PI}/search?{query}", None, stripe)
+        hits = [p for p in (found.get("data") or []) if (p.get("metadata") or {}).get("supporter") == token] \
+            if status == 200 else []
+        if not hits:
+            return 404, {"error": "not found"}
+        pi = hits[0]
+        how = "receipt"
+    else:
+        return 400, {"error": "bad"}
+    if pi.get("status") in ("processing", "requires_action", "requires_confirmation"):
+        return 202, {"pending": True}
+    got = key_for(pi, how)
+    return (200, got) if got else (404, {"error": "not paid"})
+
+
 def wallet_pay(amount: int, currency: str, method: str, email: str, name: str) -> tuple[int, dict]:
     """Apple Pay / Google Pay: confirm a PaymentIntent with the payment
     method the wallet handed the page. Without redirects - a wallet card
@@ -312,11 +409,12 @@ def wallet_pay(amount: int, currency: str, method: str, email: str, name: str) -
         form["receipt_email"] = email
     if name:
         form["metadata[name]"] = name[:100]
-    status, body = _intent(form, key)
+    status, body = _intent(_with_receipt_link(form), key)
     if status == 200:
         state = body.get("status")
         if state == "succeeded" or state == "processing":
-            return 200, {"ok": True}
+            got = key_for(body, "wallet") if state == "succeeded" else None
+            return 200, dict({"ok": True}, **(got or {}))
         if state == "requires_action" and body.get("client_secret"):
             return 200, {"action": body["client_secret"]}
     err = (body.get("error") or {}) if isinstance(body, dict) else {}
@@ -341,7 +439,7 @@ def create_session(amount: int, currency: str) -> tuple[int, dict]:
         "description": NAME,
         "metadata[source]": "iptv.dope.rs donate dialog",
     }
-    status, body = _intent(form, key)
+    status, body = _intent(_with_receipt_link(form), key)
     if status == 200 and body.get("client_secret"):
         return 200, {"clientSecret": body["client_secret"], "publishableKey": PUBLISHABLE}
     err = (body.get("error") or {}) if isinstance(body, dict) else {}
@@ -674,7 +772,7 @@ ADMIN_FEEDBACK = ("/admin/feedback", "/admin/feedback-item")
 ADMIN_GET = ("/admin/admin.js", "/admin/analysis.js", "/admin/logtools.js", "/admin/account.js",
              "/admin/builds.js", "/admin/feedback.js", *ADMIN_DATA, *ADMIN_FEEDBACK)
 ADMIN_POST = ("/admin/notify-test", "/admin/push-subscribe", "/admin/push-unsubscribe", "/admin/pick",
-              "/admin/feedback-mark")
+              "/admin/feedback-mark", "/admin/supporter-key")
 # From the app: an error report or feedback, sent when its user pressed Send.
 FEEDBACK_POST = "/feedback/report"
 # The reports for reading elsewhere (a fixing session), with a read-only
@@ -1013,6 +1111,8 @@ class Handler(BaseHTTPRequestHandler):
             fb_dir = CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats"))
             ok = feedback.mark(fb_dir, str(data.get("key") or ""), str(data.get("state") or ""))
             return self._send(200 if ok else 400, {"ok": ok})
+        if path == "/admin/supporter-key":
+            return self._send(*self._supporter_key(data))
         if path == "/admin/notify-test":
             sent, why = push("Notifications work", "This is how a new donation will look.", tag="test")
             return self._send(200 if sent else 502, {"ok": bool(sent), "sent": sent, "error": why})
@@ -1024,6 +1124,33 @@ class Handler(BaseHTTPRequestHandler):
         else:
             push_remove([str(data.get("endpoint") or "")])
         return self._send(200, {"ok": True, "devices": len(push_subs())})
+
+    def _supporter_key(self, data: dict) -> tuple[int, dict]:
+        """A supporter key made by an admin: again for a payment (its pi_...
+        id from Stripe - the same key the donor got), or by hand for someone
+        who gave another way. Also how many have been handed out."""
+        import supporter
+        seed = _supporter_seed()
+        if seed is None:
+            return 503, {"error": "no signing key (supporter.py --new-key)"}
+        count = supporter.handed_out(_stats_dir())
+        if data.get("count"):
+            return 200, {"handed_out": count}
+        pid = str(data.get("pi") or "").strip()
+        if pid:
+            if not _PI.match(pid):
+                return 400, {"error": "not a payment id (pi_...)"}
+            status, pi = _post(f"{STRIPE_PI}/{pid}", None, _secret())
+            if status != 200:
+                return 404, {"error": "Stripe does not know that payment"}
+            got = key_for(pi, "admin")
+            if not got:
+                return 409, {"error": "that payment has not succeeded (" + str(pi.get("status")) + ")"}
+            return 200, dict(got, handed_out=supporter.handed_out(_stats_dir()))
+        key, ident = supporter.made_by_hand(seed)
+        supporter.record(_stats_dir(), ident, "hand")
+        return 200, {"key": key, "since": supporter.check(key, _public())["since"],
+                     "handed_out": count + 1}
 
     def _feedback(self) -> None:
         """A report from the app: kind, version, system and the text its user
@@ -1102,6 +1229,17 @@ class Handler(BaseHTTPRequestHandler):
                          # a page cached from before the currencies:
                          "min": row["min"], "max": row["max"], "presets": row["presets"]})
 
+    def _key(self) -> None:
+        if (self.headers.get("Origin") or "").rstrip("/") != ORIGIN:
+            return self._send(403, {"error": "origin"})
+        addr = self.headers.get("X-Real-IP") or "local"
+        if not _allowed("key:" + addr, 30):
+            return self._send(429, {"error": "slow down"})
+        data = self._body(1024)
+        if data is None:
+            return self._send(400, {"error": "body"})
+        return self._send(*find_key(data))
+
     def do_POST(self) -> None:
         path = self.path.split("?", 1)[0]
         if path.startswith(SIGN_IN):
@@ -1110,6 +1248,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._admin_post(path)
         if path == FEEDBACK_POST:
             return self._feedback()
+        if path == "/donate/key":
+            return self._key()
         if path not in ("/donate/session", "/donate/wallet"):
             return self._send(404, {"error": "not found"})
         origin = (self.headers.get("Origin") or "").rstrip("/")

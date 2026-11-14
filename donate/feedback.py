@@ -48,10 +48,12 @@ _EMAIL = re.compile(r"[\w.+-]{1,64}@[\w-]{1,63}(?:\.[\w-]{1,63})+")
 _MAC = re.compile(r"(?<![0-9A-Fa-f])(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}(?![0-9A-Fa-f])")
 _KEYVAL = re.compile(r"(?i)\b(user(?:name)?|pass(?:word)?|pwd|token|key|secret|auth|mac)(\s*[=:]\s*)([^\s&'\",;]+)")
 _VERSION = re.compile(r"^[0-9A-Za-z.+_-]{1,40}$")
+_SUPPORTER = re.compile(r"(?i)\bDS1-[A-Za-z0-9_-]{20,}")
 
 
 def scrub(text: str) -> str:
     out = _URL.sub(lambda m: f"{m.group(1)}://<address>", text or "")
+    out = _SUPPORTER.sub("<supporter key>", out)
     out = _EMAIL.sub("<email>", out)
     out = _MAC.sub("<mac>", out)
     out = _IPV4.sub(lambda m: m.group(0) if m.group(0).startswith("127.") else "<ip>", out)

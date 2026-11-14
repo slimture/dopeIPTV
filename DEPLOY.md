@@ -663,6 +663,37 @@ devices, like a donation.
    a place that keeps secrets (a cloud session's environment secret), never
    in a chat or a file in the repository.
 
+## Supporter keys
+
+A donation comes with a supporter key for the app: shown in the donate
+dialog when the payment goes through, and behind a link in Stripe's receipt
+(the payment's description), so it can be fetched again later. The app
+checks a key offline against the public half of a signing key made here.
+Without the signing key nothing changes: no key, no link in the receipt.
+
+Make the signing key once, in the jail (the service runs as iptv):
+
+```sh
+cd ~/dopeiptv && python3 donate/supporter.py --new-key
+chown iptv:iptv /usr/local/etc/iptv-donate-supporter.key
+```
+
+It prints one line of 64 hex characters: the PUBLIC half, safe to share -
+it goes into the app (dopeiptv/core/supporter.py, PUBLIC_KEY_HEX). The file
+itself is the secret: it stays in the jail, mode 600, and is never sent
+anywhere. `--new-key` never overwrites an existing file; `python3
+donate/supporter.py --public` prints the public half again. Lose the file
+and every key handed out stops being reissuable (the ones people have keep
+working in the app); make a new one only together with a new app release.
+
+Stripe: the restricted key needs "PaymentIntents: Write" (which reads as
+well); the receipt link finds its payment with Stripe's search.
+
+The admin page makes a key again for a payment (its pi_... id from
+Stripe's Dashboard - the same key the donor got) or by hand for someone who
+gave another way; it also counts the keys handed out. Nothing about the
+donor is kept: supporters.jsonl beside the statistics has an id and a time.
+
 ## Moving to dopeiptv.org
 
 The site's address is dopeiptv.org; iptv.dope.rs sends every request on to
