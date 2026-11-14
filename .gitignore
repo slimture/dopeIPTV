@@ -18,6 +18,8 @@ venv/
 .idea/
 .vscode/
 *.ts
+# The playback tests' clip (tests/test_nerd.py) is no recording.
+!tests/data/*.ts
 !dopeiptv.desktop
 recordings/
 .aider*
