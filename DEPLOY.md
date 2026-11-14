@@ -694,6 +694,22 @@ Stripe's Dashboard - the same key the donor got) or by hand for someone who
 gave another way; it also counts the keys handed out. Nothing about the
 donor is kept: supporters.jsonl beside the statistics has an id and a time.
 
+## Answers to feedback
+
+The app may keep a random code for a report and send only its SHA-256; an
+admin answers on the Feedback tab - one report, or a whole problem (all
+who reported it, and anyone who does later; "Fixed in 1.5.1" also marks it
+fixed) - with fixed answers the app shows in its own language and words of
+one's own. The app asks POST /feedback/replies with its hashes now and
+then for 30 days. Nothing names anyone; feedback-replies.json beside the
+statistics. Deploy: `donate/` and `service iptv_donate restart`, and the
+content server's file for the new `/feedback/replies` block (jail):
+
+```sh
+cp ~/dopeiptv/deploy/content-iptv.dope.rs.conf /usr/local/etc/nginx/conf.d/iptv.dope.rs.conf
+nginx -t && service nginx reload
+```
+
 ## Feedback from the site's footer
 
 The footer's "Feedback" (nav.js, words in site/lang `fbs_*`, reusing the

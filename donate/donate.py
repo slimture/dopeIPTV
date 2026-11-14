@@ -772,9 +772,11 @@ ADMIN_FEEDBACK = ("/admin/feedback", "/admin/feedback-item")
 ADMIN_GET = ("/admin/admin.js", "/admin/analysis.js", "/admin/logtools.js", "/admin/account.js",
              "/admin/builds.js", "/admin/feedback.js", *ADMIN_DATA, *ADMIN_FEEDBACK)
 ADMIN_POST = ("/admin/notify-test", "/admin/push-subscribe", "/admin/push-unsubscribe", "/admin/pick",
-              "/admin/feedback-mark", "/admin/supporter-key")
+              "/admin/feedback-mark", "/admin/feedback-reply", "/admin/supporter-key")
 # From the app: an error report or feedback, sent when its user pressed Send.
 FEEDBACK_POST = "/feedback/report"
+# The app asking whether its reports have answers (with the hashes of its codes).
+FEEDBACK_REPLIES = "/feedback/replies"
 # The reports for reading elsewhere (a fixing session), with a read-only
 # token of their own - FEEDBACK_READ_TOKEN in the config; off without one.
 FEEDBACK_EXPORT = "/feedback/export"
@@ -1111,6 +1113,14 @@ class Handler(BaseHTTPRequestHandler):
             fb_dir = CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats"))
             ok = feedback.mark(fb_dir, str(data.get("key") or ""), str(data.get("state") or ""))
             return self._send(200 if ok else 400, {"ok": ok})
+        if path == "/admin/feedback-reply":
+            import admin
+            import feedback
+            ok = feedback.add_reply(CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats")),
+                                    str(data.get("target") or ""), str(data.get("key") or ""),
+                                    str(data.get("code") or ""), str(data.get("text") or ""),
+                                    str(data.get("version") or ""))
+            return self._send(200 if ok else 400, {"ok": ok})
         if path == "/admin/supporter-key":
             return self._send(*self._supporter_key(data))
         if path == "/admin/notify-test":
@@ -1184,6 +1194,22 @@ class Handler(BaseHTTPRequestHandler):
                 "/admin/#feedback", "feedback"), daemon=True).start()
         return self._send(status, body)
 
+    def _feedback_replies(self) -> None:
+        """The app asks with the hashes of its reports' codes; answers to
+        those only. Nothing is kept of who asked."""
+        if self.headers.get("X-Dopeiptv-Report") != "1":
+            return self._send(400, {"error": "not from the app"})
+        addr = self.headers.get("X-Real-IP") or "local"
+        if not _allowed("rp:" + addr, 60):
+            return self._send(429, {"error": "slow down"})
+        data = self._body(4096)
+        if data is None or not isinstance(data.get("codes"), list):
+            return self._send(400, {"error": "body"})
+        import admin
+        import feedback
+        got = feedback.replies_for(CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats")), data["codes"])
+        return self._send(200, {"replies": got})
+
     def _feedback_export(self) -> None:
         token = CONF.get("FEEDBACK_READ_TOKEN", "")
         given = (self.headers.get("Authorization") or "")[7:].strip() \
@@ -1256,6 +1282,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._admin_post(path)
         if path == FEEDBACK_POST:
             return self._feedback()
+        if path == FEEDBACK_REPLIES:
+            return self._feedback_replies()
         if path == "/donate/key":
             return self._key()
         if path not in ("/donate/session", "/donate/wallet"):

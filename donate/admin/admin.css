@@ -775,3 +775,11 @@ tr:last-child td { border-bottom: 0; }
 .sk-key { font: 600 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all;
   background: var(--page); padding: 8px 10px; border-radius: 8px; user-select: all; }
 .chip.from-site { color: var(--text-2); background: color-mix(in srgb, var(--text) 9%, transparent); }
+/* Answering feedback (feedback.js): a quiet block above the report. */
+.fb-answer { margin: 10px 0; padding: 12px; border-radius: 10px; background: var(--page);
+  display: flex; flex-direction: column; gap: 8px; }
+.fb-answer-head { margin: 0; font-size: 13px; color: var(--text-2); }
+.fb-said { margin: 0; font-size: 13px; color: var(--text); }
+.fb-version, .fb-words-in { font: inherit; font-size: 14px; color: var(--text); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: min(100%, 560px); box-sizing: border-box; }
+.chip.answered { color: var(--up); background: color-mix(in srgb, var(--up) 12%, transparent); }

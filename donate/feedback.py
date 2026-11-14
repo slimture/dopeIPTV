@@ -17,6 +17,16 @@ are only counted (no text); past DAY_MOST reports a day, everyone
 together, none are taken until the next day; the file never grows past
 MAX_FILE. (The app waits a minute between two and stops at a few a day;
 nginx and donate.py limit each address as well.)
+
+Answers, without a support desk: the app keeps a random code for a report
+the person wants an answer to and sends only its SHA-256 ("reply"). An
+admin may answer one report, or a whole group - every report of one
+problem, those to come included ("fixed in 1.5.1" reaches all of them) -
+with a few fixed answers the app shows in its own language (REPLY_CODES)
+and words of their own. The app asks now and then with its codes (POST
+/feedback/replies) and is told the answers to the reports they hash to.
+Nobody is named anywhere: the code is the only link, and it never leaves
+the person's computer. Kept in feedback-replies.json.
 """
 
 from __future__ import annotations
@@ -37,6 +47,8 @@ CHOICES = {"topic": ("bug", "idea", "like", "question"),
            "area": ("playback", "guide", "recording", "lists", "settings", "cast", "updates", "other",
                     "website"),
            "often": ("always", "sometimes", "once")}
+REPLY_CODES = ("thanks", "known", "fixed", "needinfo", "note")
+_HASH = re.compile(r"^[0-9a-f]{64}$")
 DAY_MOST = 2000
 SAME_SIG_DAY = 50
 MAX_FILE = 64 << 20
@@ -131,6 +143,8 @@ def accept(stats_dir: str, body: dict) -> tuple[int, dict]:
     now = time.time()
     row = {"id": uuid.uuid4().hex[:12], "t": int(now), "kind": kind,
            "version": version, "os": system, "sig": signature(kind, text), "text": text}
+    if _HASH.match(str(body.get("reply") or "")):
+        row["reply"] = str(body["reply"])
     if kind == "feedback":
         row.update({k: str(body.get(k)) for k, allowed in CHOICES.items() if body.get(k) in allowed})
         if body.get("from") == "site":
@@ -207,6 +221,74 @@ def _sig_key(sig: str) -> str:
     return hashlib.sha1(sig.encode("utf-8")).hexdigest()[:16]
 
 
+# -- answers -------------------------------------------------------------------------
+
+def _replies_path(stats_dir: str) -> str:
+    return os.path.join(stats_dir, "feedback-replies.json")
+
+
+def _replies(stats_dir: str) -> dict:
+    try:
+        with open(_replies_path(stats_dir), encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        data = {}
+    data.setdefault("report", {})
+    data.setdefault("group", {})
+    return data
+
+
+def add_reply(stats_dir: str, target: str, key: str, code: str, text: str = "", version: str = "") -> bool:
+    """An answer to one report (*target* "report", its id) or to a group
+    ("group", its key): one of REPLY_CODES, words of the admin's own, and
+    for "fixed" the version it is fixed in (empty: the next one)."""
+    if target not in ("report", "group") or code not in REPLY_CODES or not re.match(r"^[0-9a-f]{8,40}$", key or ""):
+        return False
+    text = (text or "").strip()[:1500]
+    version = version.strip() if _VERSION.match(version.strip() or "-") else ""
+    if code == "note" and not text:
+        return False
+    entry = {"t": int(time.time()), "code": code}
+    if text:
+        entry["text"] = text
+    if version and code == "fixed":
+        entry["version"] = version
+    with _LOCK:
+        data = _replies(stats_dir)
+        data[target].setdefault(key, []).append(entry)
+        tmp = _replies_path(stats_dir) + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, ensure_ascii=False)
+        os.replace(tmp, _replies_path(stats_dir))
+    if code == "fixed" and target == "group":
+        mark(stats_dir, key, "fixed")
+    return True
+
+
+def _answers(row: dict, data: dict) -> list[dict]:
+    out = list(data["report"].get(row.get("id", ""), []))
+    if row.get("kind") != "feedback" and row.get("sig"):
+        out += data["group"].get(_sig_key(row["sig"]), [])
+    return sorted(out, key=lambda e: e.get("t", 0))
+
+
+def replies_for(stats_dir: str, hashes: list) -> dict:
+    """{hash: [answers]} for the codes' hashes that have any (the app asks
+    with up to 20)."""
+    want = {h for h in hashes[:20] if isinstance(h, str) and _HASH.match(h)}
+    if not want:
+        return {}
+    data = _replies(stats_dir)
+    out: dict[str, list] = {}
+    for r in _rows(stats_dir):
+        h = r.get("reply")
+        if h in want:
+            got = _answers(r, data)
+            if got:
+                out.setdefault(h, []).extend(got)
+    return out
+
+
 def summary(stats_dir: str, days: int) -> dict:
     """What the Feedback page shows: the numbers, a row a day, the problems
     grouped, the latest reports (without their full text)."""
@@ -214,6 +296,7 @@ def summary(stats_dir: str, days: int) -> dict:
     since = time.time() - days * 86400 if days > 0 else 0
     rows = [r for r in rows if r.get("t", 0) >= since]
     state = _state(stats_dir)
+    answered = _replies(stats_dir)
     per_day: dict[str, dict[str, int]] = {}
     by_version: dict[str, int] = {}
     by_os: dict[str, int] = {}
@@ -230,8 +313,10 @@ def summary(stats_dir: str, days: int) -> dict:
             key = _sig_key(r.get("sig") or "")
             g = groups.setdefault(key, {"key": key, "sig": r.get("sig") or "", "kind": r["kind"], "count": 0,
                                         "first": r["t"], "last": r["t"], "versions": set(), "systems": set(),
-                                        "latest": r["id"]})
+                                        "latest": r["id"], "answerable": 0,
+                                        "replies": len(answered["group"].get(key, []))})
             g["count"] += 1
+            g["answerable"] += 1 if r.get("reply") else 0
             g["first"] = min(g["first"], r["t"])
             if r["t"] >= g["last"]:
                 g["last"] = r["t"]
@@ -252,6 +337,7 @@ def summary(stats_dir: str, days: int) -> dict:
             topics[r.get("topic") or ""] = topics.get(r.get("topic") or "", 0) + 1
     items = [{"id": r["id"], "t": r["t"], "kind": r["kind"], "version": r["version"], "os": r["os"],
               "sig": r.get("sig") or "", "preview": _preview(r), "state": state.get(r["id"], "new"),
+              "answerable": bool(r.get("reply")), "replies": len(answered["report"].get(r["id"], [])),
               **{k: r[k] for k in (*CHOICES, "from") if r.get(k)}}
              for r in sorted(rows, key=lambda r: -r["t"]) if r.get("text")][:300]
     open_groups = sum(1 for g in group_list if g["state"] != "fixed")
@@ -275,8 +361,10 @@ def _preview(row: dict) -> str:
 def item(stats_dir: str, rid: str) -> dict | None:
     for r in _rows(stats_dir):
         if r.get("id") == rid:
-            out = dict(r)
+            out = {k: v for k, v in r.items() if k != "reply"}
             out["state"] = _state(stats_dir).get(rid, "new")
+            out["answerable"] = bool(r.get("reply"))
+            out["replies"] = _answers(r, _replies(stats_dir))
             return out
     return None
 
@@ -285,6 +373,6 @@ def export(stats_dir: str, days: int, most: int = 200) -> dict:
     """For reading elsewhere with the read token (GET /feedback/export): the
     summary, and the latest reports with their whole text."""
     out = summary(stats_dir, days)
-    texts = {r["id"]: r.get("text") or "" for r in _rows(stats_dir)}
+    texts = {r["id"]: r.get("text") or "" for r in _rows(stats_dir)}   # the reply hashes stay here
     out["items"] = [dict(i, text=texts.get(i["id"], "")) for i in out["items"][:most]]
     return out

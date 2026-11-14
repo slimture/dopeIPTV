@@ -22,6 +22,12 @@
                  website: "The website" };
   const OFTEN = { always: "every time", sometimes: "sometimes", once: "once" };
   let topic = "";
+  // Answers the app shows in its own language (feedback.py REPLY_CODES);
+  // words of one's own go with any of them, or alone as a note.
+  const REPLY = [["thanks", "Thanks, noted"], ["known", "Known problem, being worked on"],
+                 ["fixed", "Fixed in…"], ["needinfo", "Need more details"], ["note", "Own words only"]];
+  const SAID = { thanks: "Thanks - read and noted.", known: "A known problem, being worked on.",
+                 fixed: "Fixed in {v}.", needinfo: "More details would help.", note: "" };
   let res = null, loading = false, open = null;
   // How the problems are ordered and which show: most people hit first,
   // fixed ones out of the way, one version at a time if wanted.
@@ -169,11 +175,12 @@
       btn.type = "button";
       btn.append(mk("span", "chip kind-" + g.kind, KIND[g.kind]), mk("span", "sig", g.sig || "(no message)"),
                  mk("span", "count", "×" + num.format(g.count)), stateChip(g.state));
+      if (g.replies) { btn.append(mk("span", "chip answered", "Answered")); }
       const meta = mk("div", "fb-meta", "Versions " + g.versions.join(", ") + " · " + g.systems.join(", ") +
                       " · last " + when.format(new Date(g.last * 1000)));
       const body = mk("div", "fb-body");
       body.hidden = true;
-      btn.addEventListener("click", () => toggle(body, g.latest, g.key));
+      btn.addEventListener("click", () => toggle(body, g.latest, g.key, g));
       li.append(btn, meta, body);
       ul.append(li);
     });
@@ -211,6 +218,7 @@
       if (it.topic) { btn.append(mk("span", "chip t-" + it.topic, TOPIC[it.topic] || it.topic)); }
       if (it.from === "site") { btn.append(mk("span", "chip from-site", "Website")); }
       btn.append(mk("span", "sig words", it.preview || "(empty)"), stateChip(it.state));
+      if (it.replies) { btn.append(mk("span", "chip answered", "Answered")); }
       const where = [it.area && AREA[it.area], it.often && OFTEN[it.often]].filter(Boolean).join(", ");
       const origin = it.from === "site" ? "from the website" : it.version + " · " + it.os;
       const meta = mk("div", "fb-meta", when.format(new Date(it.t * 1000)) + " · " + origin +
@@ -226,7 +234,59 @@
 
   // A report in full: its text, a copy to paste where it gets fixed, and
   // the marks.
-  function toggle(body, id, key) {
+  // Answering: one report, or a group (everyone who reported that problem,
+  // and whoever reports it later). Only reports whose sender asked for
+  // answers in the app can be told; the rest are counted.
+  function answerBox(r, key, group) {
+    const box = mk("div", "fb-answer");
+    const can = group ? group.answerable : (r.answerable ? 1 : 0);
+    const head = mk("p", "fb-answer-head", group
+      ? (can ? "Answer everyone with this problem - " + num.format(can) + " of " + num.format(group.count) +
+               " asked for answers in the app, and anyone who reports it later is told too."
+             : "Nobody who reported this asked for answers in the app - an answer still reaches whoever reports it later.")
+      : (can ? "Answer - shown in their app, in their language (your own words as written)."
+             : "This person did not ask for answers in the app."));
+    box.append(head);
+    (r.replies || []).forEach((a) => {
+      const line = mk("p", "fb-said", when.format(new Date(a.t * 1000)) + " · " +
+        (SAID[a.code] || "").replace("{v}", a.version || "the next version") + (a.text ? " " + a.text : ""));
+      box.append(line);
+    });
+    if (!can && !group) { return box; }
+    let code = "thanks";
+    const chips = mk("div", "fb-chips");
+    const version = mk("input", "fb-version");
+    Object.assign(version, { placeholder: "1.5.1 (empty: the next version)", autocomplete: "off", spellcheck: false });
+    version.hidden = true;
+    REPLY.forEach(([k, label]) => {
+      const b = mk("button", "chip-f" + (k === code ? " on" : ""), label);
+      b.type = "button";
+      b.addEventListener("click", () => {
+        code = k;
+        [].forEach.call(chips.children, (c) => c.classList.toggle("on", c === b));
+        version.hidden = code !== "fixed";
+      });
+      chips.append(b);
+    });
+    const words = mk("textarea", "fb-words-in");
+    Object.assign(words, { rows: 3, maxLength: 1500, placeholder: "Words of your own (optional) - shown as written" });
+    const send = mk("button", "btn", group ? "Send to all of them" : "Send answer");
+    send.type = "button";
+    const said = mk("span", "muted");
+    send.addEventListener("click", () => {
+      if (code === "note" && !words.value.trim()) { said.textContent = "Write something first."; return; }
+      send.disabled = true;
+      post("/admin/feedback-reply", { target: group ? "group" : "report", key: key, code: code,
+                                      text: words.value, version: version.value.trim() })
+        .then((ok) => { if (ok) { res = null; show(); } else { said.textContent = "Could not save it."; send.disabled = false; } });
+    });
+    const row = mk("div", "fb-actions");
+    row.append(send, said);
+    box.append(chips, version, words, row);
+    return box;
+  }
+
+  function toggle(body, id, key, group) {
     if (!body.hidden) { body.hidden = true; open = null; return; }
     if (open && open !== body) { open.hidden = true; }
     open = body;
@@ -252,7 +312,7 @@
         }));
         bar.append(b);
       });
-      body.replaceChildren(bar, pre);
+      body.replaceChildren(bar, answerBox(r, key, group), pre);
       if (r.state === "new" && key === id) { post("/admin/feedback-mark", { key: id, state: "seen" }); }
     }).catch((e) => body.replaceChildren(mk("p", "error", "Could not load it: " + e.message)));
   }
