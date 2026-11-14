@@ -21,7 +21,6 @@ import os
 import platform
 import re
 import sys
-import urllib.request
 from typing import Any, Callable, Iterable
 
 from .log import log, recent_lines
@@ -187,31 +186,57 @@ def build(kind: str, message: str = "", trace: str = "", with_log: bool = True,
     return scrub("\n".join(parts), personal)[:MAX_TEXT]
 
 
+#: The most the site takes in one report, in bytes as sent.
+MAX_BODY = 56_000
+
+
+def _post(url: str, body: bytes, timeout: float) -> tuple[int, bytes]:
+    """POST JSON with requests, whose certificates (certifi) travel with the
+    app: urllib asks the system's OpenSSL for them, and a bundled Python on
+    macOS has none, so every report failed there."""
+    from .. import __version__
+    from ._lazy_requests import requests
+    r = requests.post(url, data=body, timeout=timeout, headers={
+        "Content-Type": "application/json; charset=utf-8",
+        "User-Agent": f"dopeIPTV/{__version__}", "X-Dopeiptv-Report": "1"})
+    return r.status_code, r.content
+
+
+def _fit(text: str, room: int) -> str:
+    """The text cut to ``room`` bytes of UTF-8, on a character boundary."""
+    raw = text.encode("utf-8")
+    return text if len(raw) <= room else raw[:max(0, room)].decode("utf-8", "ignore")
+
+
 def send(kind: str, text: str, timeout: float = 15.0, endpoint: str | None = None,
          extra: dict | None = None) -> bool:
     """POST the report as the person left it. True when it arrived."""
     from .. import __version__
-    body = json.dumps({"kind": kind if kind in ("error", "crash", "feedback") else "feedback",
-                       "version": __version__, "os": platform.system(),
-                       "text": (text or "")[:MAX_TEXT],
-                       # What feedback is about (a topic, an area, how often): words from a short list.
-                       **{k: v for k, v in (extra or {}).items()
-                          if k in ("topic", "area", "often") and isinstance(v, str) and v.isalpha() and len(v) <= 12},
-                       # The hash of the code this computer keeps to be told the answers.
-                       **({"reply": str((extra or {})["reply"])}
-                          if re.fullmatch(r"[0-9a-f]{64}", str((extra or {}).get("reply") or "")) else {})}
-                      ).encode("utf-8")
-    req = urllib.request.Request(endpoint or ENDPOINT, data=body, method="POST", headers={
-        "Content-Type": "application/json", "User-Agent": f"dopeIPTV/{__version__}",
-        "X-Dopeiptv-Report": "1"})
+    fields = {"kind": kind if kind in ("error", "crash", "feedback") else "feedback",
+              "version": __version__, "os": platform.system(),
+              "text": (text or "")[:MAX_TEXT],
+              # What feedback is about (a topic, an area, how often): words from a short list.
+              **{k: v for k, v in (extra or {}).items()
+              if k in ("topic", "area", "often") and isinstance(v, str) and v.isalpha() and len(v) <= 12},
+              # The hash of the code this computer keeps to be told the answers.
+              **({"reply": str((extra or {})["reply"])}
+              if re.fullmatch(r"[0-9a-f]{64}", str((extra or {}).get("reply") or "")) else {})}
+    # UTF-8 as it is (an escaped "å" is six bytes), and cut to what the site
+    # takes - a long log once made the whole report too big to be kept.
+    body = json.dumps(fields, ensure_ascii=False).encode("utf-8")
+    if len(body) > MAX_BODY:
+        fields["text"] = _fit(fields["text"], len(fields["text"].encode("utf-8")) - (len(body) - MAX_BODY) - 64)
+        body = json.dumps(fields, ensure_ascii=False).encode("utf-8")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            ok = 200 <= r.status < 300
+        status, _data = _post(endpoint or ENDPOINT, body, timeout)
     except Exception as e:
         log.info("report: not sent (%s)", type(e).__name__)
         return False
+    if not 200 <= status < 300:
+        log.info("report: not sent (HTTP %s)", status)
+        return False
     log.info("report: sent (%s)", kind)
-    return ok
+    return True
 
 
 # -- answers: a random code kept here, its hash sent with the report ---------------
@@ -257,15 +282,12 @@ def save_tickets(settings: Any, items: list[dict]) -> None:
 def fetch_replies(codes: list[str], timeout: float = 15.0, endpoint: str | None = None) -> dict | None:
     """{code: [answers]} for the codes whose reports were answered; None
     when the site could not be asked. Only the hashes are sent."""
-    from .. import __version__
     by_hash = {code_hash(c): c for c in codes[:20]}
-    req = urllib.request.Request(endpoint or REPLIES, method="POST",
-                                 data=json.dumps({"codes": list(by_hash)}).encode("utf-8"), headers={
-                                     "Content-Type": "application/json", "User-Agent": f"dopeIPTV/{__version__}",
-                                     "X-Dopeiptv-Report": "1"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            got = json.loads(r.read() or b"{}").get("replies") or {}
+        status, data = _post(endpoint or REPLIES, json.dumps({"codes": list(by_hash)}).encode("utf-8"), timeout)
+        if status != 200:
+            raise OSError(f"HTTP {status}")
+        got = json.loads(data or b"{}").get("replies") or {}
     except Exception as e:
         log.info("report: answers not asked (%s)", type(e).__name__)
         return None

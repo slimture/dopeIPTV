@@ -1433,9 +1433,9 @@ class _LocalFilesMixin:
         state: dict[str, bool] = {}
 
         def job():
-            import json as _json
             import urllib.parse
-            import urllib.request
+
+            from ..core._lazy_requests import requests
             out, changed = {}, False
             for t in todo:
                 artist, album = self._album_id(t["_d"])
@@ -1449,10 +1449,10 @@ class _LocalFilesMixin:
                         {"term": f"{artist} {album}".strip(),
                          "entity": "album", "limit": 1})
                     try:
-                        with urllib.request.urlopen(
-                                "https://itunes.apple.com/search?" + q,
-                                timeout=8) as fh:
-                            res = _json.loads(fh.read().decode("utf-8"))
+                        # requests, not urllib: its certificates travel with
+                        # the app (a bundled Python on macOS has none).
+                        res = requests.get("https://itunes.apple.com/search?" + q,
+                                           timeout=8).json()
                         hit = (res.get("results") or [None])[0] or {}
                         url = (hit.get("artworkUrl100") or "").replace(
                             "100x100bb", "600x600bb")

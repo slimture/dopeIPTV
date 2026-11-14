@@ -309,28 +309,18 @@ def test_only_the_short_answers_go_with_feedback():
     """topic/area/often travel as single words from a short list; anything
     else a caller passes stays home."""
     import json as _json
-    import urllib.request as _ur
     got = {}
 
-    class _Resp:
-        status = 200
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *a):
-            return False
-
-    def fake(req, timeout=0):
-        got.update(_json.loads(req.data))
-        return _Resp()
-    real, _ur.urlopen = _ur.urlopen, fake
+    def fake(url, body, timeout):
+        got.update(_json.loads(body))
+        return 200, b"{}"
+    real, report._post = report._post, fake
     try:
         assert report.send("feedback", "hi", endpoint="http://127.0.0.1:9/x",
                            extra={"topic": "bug", "area": "guide", "often": "once",
                                   "name": "Anna", "topicx": "y", "area2": "z", "often_": "a b"})
     finally:
-        _ur.urlopen = real
+        report._post = real
     assert got["topic"] == "bug" and got["area"] == "guide" and got["often"] == "once"
     assert not {"name", "topicx", "area2", "often_"} & set(got)
 
@@ -407,3 +397,31 @@ def test_asking_for_answers_sends_only_hashes(monkeypatch):
         assert report.fetch_replies(["x"], endpoint="http://127.0.0.1:9/replies", timeout=2) is None
     finally:
         inbox.close()
+
+
+def test_a_long_report_is_cut_to_what_the_site_takes():
+    """A long log with letters outside ASCII once made a report bigger than
+    the site keeps; it goes as UTF-8, cut to fit, on a character boundary."""
+    import json as _json
+    sent = []
+
+    def fake(url, body, timeout):
+        sent.append(body)
+        return 200, b"{}"
+    real, report._post = report._post, fake
+    try:
+        assert report.send("feedback", "Någon åt äpplet – ж" * 4000)
+    finally:
+        report._post = real
+    assert len(sent[0]) <= report.MAX_BODY
+    data = _json.loads(sent[0].decode("utf-8"))
+    assert data["text"].startswith("Någon åt äpplet") and "\\u00e5" not in sent[0].decode("utf-8")
+
+
+def test_a_refused_report_is_not_called_sent():
+    real, report._post = report._post, lambda url, body, timeout: (400, b'{"error": "empty"}')
+    try:
+        assert not report.send("feedback", "hello")
+        assert report.fetch_replies(["x"]) is None
+    finally:
+        report._post = real
