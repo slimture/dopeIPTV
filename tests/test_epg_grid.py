@@ -2,8 +2,10 @@
 
 Covers: channels without EPG data are clickable/playable; arrow-key cell
 navigation, description panel and progress fills; the rebuild when the
-guide finishes loading after the dialog opened; and the board opening on
-"now" in a right-to-left language.
+guide finishes loading after the guide opened; no timer running while the
+guide is off screen; and the board opening on "now" in a right-to-left
+language. The guide (EpgGrid) is tested here in its window (EpgGridDialog);
+tests/test_guide_page.py has it as the window's Guide page.
 
 Runs in a subprocess like the multiview test: the dialog needs a real
 MainWindow (whose embedded player owns an offscreen QOpenGLWidget), and
@@ -20,19 +22,22 @@ import pytest
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 _CHILD = r"""
-import os, time
+import os, tempfile, time
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtCore import QPointF, QSettings
+QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, tempfile.mkdtemp())
 from PyQt6.QtGui import QColor, QPixmap
-from PyQt6.QtWidgets import QApplication, QGraphicsPixmapItem
+from PyQt6.QtWidgets import (QApplication, QDialog, QGraphicsPixmapItem,
+                             QGraphicsSimpleTextItem)
 
 from dopeiptv.providers.client import DemoClient
 from dopeiptv.ui.epg_grid import EpgGridDialog
 from dopeiptv.ui.main_window import MainWindow
+from dopeiptv.ui.theme import P
 
 app = QApplication.instance() or QApplication([])
-settings = QSettings("dopeiptv-test", "epg-grid-child")
-settings.clear()
+settings = QSettings(os.path.join(tempfile.mkdtemp(), "s.ini"),
+                     QSettings.Format.IniFormat)
 w = MainWindow(DemoClient(), settings)
 now = time.time()
 
@@ -42,29 +47,35 @@ chans = [
     {"name": "No EPG", "stream_id": 2, "num": 2},
 ]
 d = EpgGridDialog(w, chans)
+g = d.grid
 d.resize(1200, 600)
 d.show()
 app.processEvents()
+# In its window: Close, no Pop out, the name in the title bar.
+assert g.close_btn.isVisible() and not g.popout_btn.isVisible()
+assert not g.title_lbl.isVisible()
 
-# The dialog opens scrolled to "now" (wall-clock dependent), which shifts
+# The guide opens scrolled to "now" (wall-clock dependent), which shifts
 # the pinned channel column in scene coords. Real clicks go through
 # mapToScene so the app is fine - but this test clicks raw scene points,
 # so pin the view at origin first to make them deterministic.
-d.view.horizontalScrollBar().setValue(0)
-d.view.verticalScrollBar().setValue(0)
+g.view.horizontalScrollBar().setValue(0)
+g.view.verticalScrollBar().setValue(0)
 app.processEvents()
 
-d._select_at(QPointF(50, d.HEADER_H + d.ROW_H + 10))     # name cell, row 1
-assert d._selected and d._selected["channel"]["name"] == "No EPG"
-assert d._selected["prog"] is None
-assert d.play_btn.isEnabled()
-d._select_at(QPointF(d.CH_COL_W + 300, d.HEADER_H + d.ROW_H + 10))
-assert d._selected["channel"]["name"] == "No EPG"
+g._select_at(QPointF(50, g.HEADER_H + g.ROW_H + 10))     # name cell, row 1
+assert g._selected and g._selected["channel"]["name"] == "No EPG"
+assert g._selected["prog"] is None
+assert g.play_btn.isEnabled()
+g._select_at(QPointF(g.CH_COL_W + 300, g.HEADER_H + g.ROW_H + 10))
+assert g._selected["channel"]["name"] == "No EPG"
 
 tuned = []
 w.tune_from_guide = lambda ch: tuned.append(ch["name"])
-d._play_selected()
+g._play_selected()
 assert tuned == ["No EPG"], tuned
+# Its window closes on a play, as the guide's window always did.
+assert d.result() == QDialog.DialogCode.Accepted and not d.isVisible()
 d.deleteLater(); app.processEvents()
 
 # ---- 2. Navigation, description panel, progress, day jumps ----------------
@@ -87,40 +98,47 @@ def fake_programmes(ch, a, b):
 
 w.xmltv.programmes_in = fake_programmes
 d = EpgGridDialog(w, chans)
+g = d.grid
 d.resize(1200, 600)
 d.show()
 app.processEvents()
 
-assert len(d._rows) == 2
-assert len(d._rows[0][1]) == 3          # three programme blocks
-assert len(d._rows[1][1]) == 1          # the no-EPG filler
+assert len(g._rows) == 2
+assert len(g._rows[0][1]) == 3          # three programme blocks
+assert len(g._rows[1][1]) == 1          # the no-EPG filler
 
-d._nav(1, 0)                            # first press -> the on-air block
-assert d._selected["prog"]["title"] == "On Air"
-assert d.desc.isVisible() and "described" in d.desc.text()
-d._nav(1, 0)                            # right -> next programme
-assert d._selected["prog"]["title"] == "Later"
-assert not d.desc.isVisible()
-d._nav(0, 1)                            # down -> the no-EPG row's filler
-assert d._selected["channel"]["name"] == "No EPG"
-assert d._selected["prog"] is None
-d._nav(0, -1)                           # up -> back to a programme
-assert d._selected["channel"]["name"] == "With EPG"
+g._nav(1, 0)                            # first press -> the on-air block
+assert g._selected["prog"]["title"] == "On Air"
+assert g.desc.isVisible() and "described" in g.desc.text()
+g._nav(1, 0)                            # right -> next programme
+assert g._selected["prog"]["title"] == "Later"
+assert not g.desc.isVisible()
+g._nav(0, 1)                            # down -> the no-EPG row's filler
+assert g._selected["channel"]["name"] == "No EPG"
+assert g._selected["prog"] is None
+g._nav(0, -1)                           # up -> back to a programme
+assert g._selected["channel"]["name"] == "With EPG"
 
 # Exactly one card is marked on-air ("now" state), and the live tick
 # (which rolls the highlight forward) must not raise.
-now_cards = [rb for _c, blocks in d._rows for rb in blocks
+now_cards = [rb for _c, blocks in g._rows for rb in blocks
              if rb.get("_state") == "now"]
 assert len(now_cards) == 1, len(now_cards)
-d._tick()
+g._tick()
+# The theme's own text colour on the cards and the channel names: white
+# ones were all but invisible on a light theme's pale board.
+assert now_cards[0]["label"].brush().color() == QColor(P["text"])
+names = [it for in_group, it in g._row_items[0]
+         if in_group and isinstance(it, QGraphicsSimpleTextItem)]
+assert names and names[0].brush().color() == QColor(P["text"])
 
-d._scroll_hours(24); d._scroll_hours(-24); d._scroll_tonight()
+g._scroll_hours(24); g._scroll_hours(-24); g._scroll_tonight()
 d.deleteLater(); app.processEvents()
 
 # ---- 3. Rebuild when the EPG finishes loading after open ------------------
 # The window's own startup guide load runs async and, when it concludes as
 # FAILED (no network on CI), sets xmltv._failed - which _epg_ready() treats
-# as "concluded", so the dialog would skip the loading-band state we're
+# as "concluded", so the guide would skip the loading-band state we're
 # testing. Wait for that load to conclude, then pin both flags under stubs.
 deadline = time.time() + 20
 while time.time() < deadline and not (w.xmltv.is_loaded()
@@ -133,15 +151,48 @@ w.xmltv.programmes_in = lambda ch, a, b: ([] if not state["loaded"] else [
     {"title": "P", "description": "",
      "start_timestamp": now - 600, "stop_timestamp": now + 600}])
 
-d = EpgGridDialog(w, [{"name": "One", "stream_id": 1, "num": 1,
-                       "epg_channel_id": "one.se"}])
+one = [{"name": "One", "stream_id": 1, "num": 1, "epg_channel_id": "one.se"}]
+d = EpgGridDialog(w, one)
+g = d.grid
 app.processEvents()
-assert d._epg_poll.isActive()                        # polling while unloaded
-assert d._rows[0][1][0]["data"]["prog"] is None      # loading band
+# Nothing ticks before the guide is on screen ...
+assert not g._epg_poll.isActive() and not g._refresh.isActive()
+d.show()
+app.processEvents()
+assert g._epg_poll.isActive()                        # polling while unloaded
+assert g._refresh.isActive()
+assert g._rows[0][1][0]["data"]["prog"] is None      # loading band
 state["loaded"] = True
-d._maybe_reload_epg()
-assert not d._epg_poll.isActive()
-assert d._rows[0][1][0]["data"]["prog"]["title"] == "P"
+g._maybe_reload_epg()
+assert not g._epg_poll.isActive()
+assert g._rows[0][1][0]["data"]["prog"]["title"] == "P"
+d.deleteLater(); app.processEvents()
+
+# ... nor once it is off screen; what came in meanwhile is drawn as it
+# comes back, and a refresh asked for is still waited for.
+state["loaded"] = False
+d = EpgGridDialog(w, one)
+g = d.grid
+d.show()
+app.processEvents()
+assert g._epg_poll.isActive() and g._refresh.isActive()
+w._refresh_epg_now = lambda: None
+w._guide_loading = object()
+g._refresh_guide()
+assert g._guide_poll.isActive()
+d.hide()
+app.processEvents()
+assert not any(t.isActive() for t in (g._refresh, g._epg_poll,
+                                      g._guide_poll, g._preload))
+state["loaded"] = True
+d.show()
+app.processEvents()
+assert g._refresh.isActive() and not g._epg_poll.isActive()
+assert g._guide_poll.isActive()
+assert g._rows[0][1][0]["data"]["prog"]["title"] == "P"
+w._guide_loading = None
+g._after_refresh()
+assert not g._guide_poll.isActive() and g.refresh_btn.isEnabled()
 d.deleteLater(); app.processEvents()
 
 # ---- 4. "All" with thousands of channels: every one has a row -------------
@@ -153,41 +204,42 @@ many = [{"name": f"Filler {i}", "stream_id": 1000 + i, "num": i}
         for i in range(3000)]
 many.append({"name": "V Sport Premium SE", "stream_id": 42, "num": 9999})
 d = EpgGridDialog(w, many)
+g = d.grid
 d.resize(1200, 600)
 d.show()
 app.processEvents()
 last = len(many) - 1
-assert len(d._rows) == len(many)
-assert 0 < len(d._row_items) <= d.KEEP_ROWS
-assert not d._rows[last][1]                    # far down: not drawn yet
+assert len(g._rows) == len(many)
+assert 0 < len(g._row_items) <= g.KEEP_ROWS
+assert not g._rows[last][1]                    # far down: not drawn yet
 # Scroll sideways first, then to the very bottom: the last row is drawn, and
 # its channel cell sits in the pinned column, not where the column was.
-d.view.horizontalScrollBar().setValue(600)
-vbar = d.view.verticalScrollBar()
+g.view.horizontalScrollBar().setValue(600)
+vbar = g.view.verticalScrollBar()
 vbar.setValue(vbar.maximum())
 app.processEvents()
-ch, blocks = d._rows[last]
+ch, blocks = g._rows[last]
 assert ch["name"] == "V Sport Premium SE" and blocks
-cell = next(it for in_group, it in d._row_items[last]
+cell = next(it for in_group, it in g._row_items[last]
             if in_group and isinstance(it.data(0), dict))
-col_left = d.view.mapToScene(0, 0).x()
+col_left = g.view.mapToScene(0, 0).x()
 assert col_left > 100, col_left
 assert abs(cell.sceneBoundingRect().x() - col_left) < 2, (
     cell.sceneBoundingRect().x(), col_left)
 # Walking the whole line-up keeps only a few hundred rows in the scene.
-for v in range(0, vbar.maximum() + 1, d.ROW_H * 25):
+for v in range(0, vbar.maximum() + 1, g.ROW_H * 25):
     vbar.setValue(v)
-    assert len(d._row_items) <= d.KEEP_ROWS, len(d._row_items)
-assert not d._rows[0][1]                       # the top was taken down
+    assert len(g._row_items) <= g.KEEP_ROWS, len(g._row_items)
+assert not g._rows[0][1]                       # the top was taken down
 # Keyboard navigation reaches a row that was taken down.
-d._focus = (0, 0)
-d._nav(0, 1)
-assert d._selected["channel"]["name"] == "Filler 1"
+g._focus = (0, 0)
+g._nav(0, 1)
+assert g._selected["channel"]["name"] == "Filler 1"
 # Filtering still searches the whole list.
-d.filter.setText("v sport")
+g.filter.setText("v sport")
 app.processEvents()
-assert [c.get("name") for c, _b in d._rows] == ["V Sport Premium SE"]
-assert d._rows[0][1]
+assert [c.get("name") for c, _b in g._rows] == ["V Sport Premium SE"]
+assert g._rows[0][1]
 d.deleteLater(); app.processEvents()
 
 # ---- 5. A logo arriving after the board scrolled lands in its row ---------
@@ -204,20 +256,21 @@ w.logos = _StubLogos()
 w.xmltv.programmes_in = lambda ch, a, b: []
 d = EpgGridDialog(w, [{"name": "Logo", "stream_id": 7, "num": 1,
                        "stream_icon": "http://example.invalid/logo.png"}])
+g = d.grid
 d.resize(900, 400)
 d.show()
 app.processEvents()
-d.view.horizontalScrollBar().setValue(600)     # pin the column away from x=0
+g.view.horizontalScrollBar().setValue(600)     # pin the column away from x=0
 app.processEvents()
 assert pending_logos, "no logo was requested"
 pm = QPixmap(38, 24); pm.fill(QColor("#ff0000"))
 pending_logos[0](pm)
-logo_items = [i for i in d.scene.items() if isinstance(i, QGraphicsPixmapItem)]
+logo_items = [i for i in g.scene.items() if isinstance(i, QGraphicsPixmapItem)]
 assert len(logo_items) == 1, logo_items
 lx = logo_items[0].sceneBoundingRect().x()
-col_left = d.view.mapToScene(0, 0).x()
+col_left = g.view.mapToScene(0, 0).x()
 assert col_left > 100, col_left                # the view really did scroll
-assert col_left <= lx <= col_left + d.CH_COL_W, (lx, col_left)
+assert col_left <= lx <= col_left + g.CH_COL_W, (lx, col_left)
 d.deleteLater(); app.processEvents()
 
 # ---- 6. Only the card is clickable - the title is paint on top of it ------
@@ -226,15 +279,16 @@ w.xmltv.programmes_in = lambda ch, a, b: [
     {"title": "Clickable Title", "description": "",
      "start_timestamp": now - 1800, "stop_timestamp": now + 3600}]
 d = EpgGridDialog(w, [{"name": "One", "stream_id": 1, "num": 1}])
+g = d.grid
 d.resize(1200, 600)
 d.show()
-d.view.horizontalScrollBar().setValue(0)
-d.view.verticalScrollBar().setValue(0)
+g.view.horizontalScrollBar().setValue(0)
+g.view.verticalScrollBar().setValue(0)
 app.processEvents()
-rb = d._rows[0][1][0]
+rb = g._rows[0][1][0]
 label_rect = rb["label"].sceneBoundingRect()
 assert rb["label"].data(0) is None             # carries no click payload
-item, data = d._hit(QPointF(label_rect.x() + 4, label_rect.center().y()))
+item, data = g._hit(QPointF(label_rect.x() + 4, label_rect.center().y()))
 assert item is rb["item"], item                # the card, not the text item
 assert data["prog"]["title"] == "Clickable Title"
 d.deleteLater(); app.processEvents()
@@ -246,14 +300,18 @@ d.deleteLater(); app.processEvents()
 from PyQt6.QtCore import Qt
 app.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
 d = EpgGridDialog(w, [{"name": "One", "stream_id": 1, "num": 1}])
+g = d.grid
 d.resize(1200, 600)
 d.show()
 app.processEvents()
-vp = d.view.viewport().rect()
-left = d.view.mapToScene(vp.topLeft()).x()
-right = d.view.mapToScene(vp.topRight()).x()
-now_x = d._x(time.time())
+vp = g.view.viewport().rect()
+left = g.view.mapToScene(vp.topLeft()).x()
+right = g.view.mapToScene(vp.topRight()).x()
+now_x = g._x(time.time())
 assert left <= now_x <= right, (left, now_x, right)
+# The day jumps run along the board's time axis there too: back on the left.
+assert (g.day_back_btn.mapTo(g, g.day_back_btn.rect().topLeft()).x()
+        < g.day_fwd_btn.mapTo(g, g.day_fwd_btn.rect().topLeft()).x())
 app.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
 d.deleteLater(); app.processEvents()
 
@@ -290,12 +348,12 @@ def test_recording_from_the_guide_takes_the_detail_panels_path():
     from types import SimpleNamespace
     from unittest import mock
 
-    from dopeiptv.ui.epg_grid import EpgGridDialog
+    from dopeiptv.ui.epg_grid import EpgGrid
 
     win = SimpleNamespace(_record_programme=mock.Mock())
     ch = {"stream_id": 5, "name": "One"}
     p = {"title": "News", "start_timestamp": 100.0, "stop_timestamp": 200.0}
     info = mock.Mock()
-    EpgGridDialog._record(SimpleNamespace(window=win, info=info), ch, p)
+    EpgGrid._record(SimpleNamespace(window=win, info=info), ch, p)
     win._record_programme.assert_called_once_with(
         ch, {"title": "News"}, 100.0, 200.0)

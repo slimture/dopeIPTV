@@ -144,7 +144,8 @@ map and the one-way import rule.
 | `ui/mw_local.py` | Local files: folders, library view, music queue |
 | `ui/mw_multiview.py` | Multiview: 2/4/6/9 live streams, an mpv per cell |
 | `ui/mw_donate.py` | Donating from the app: the sidebar heart, About's link, Home's one card after real use |
-| `ui/epg_grid.py` | The guide's timeline grid |
+| `ui/epg_grid.py` | The guide (`EpgGrid`): timeline grid, filter, its bar; the same widget on the Guide page or in its window (`EpgGridDialog`); timers only while on screen |
+| `ui/mw_guide.py` | The Guide page in the middle pane (a place in the nav): what it covers, kept for the next visit, Esc back, Pop out to its window |
 | `ui/epg_search.py` | Programme search across the whole guide |
 | `ui/welcome.py` | First-run welcome overlay |
 | `ui/category_flags.py` | Bundled SVG flags for category names (flag emoji, "SE \| …" prefixes) |
@@ -166,7 +167,8 @@ Watched filter, the nav's status), `mw_shortcuts`
 (update badge), `mw_reminders`, `mw_sort`, `mw_onboarding`,
 `mw_mpris` (desktop media controls, media keys), `mw_follow` (followed
 series, new-episode news), `mw_subtitles` (OpenSubtitles, subtitles
-remembered per title), `mw_cast` (Chromecast and DLNA: the cast
+remembered per title), `mw_guide` (the Guide page in the middle pane, its
+pop-out window), `mw_cast` (Chromecast and DLNA: the cast
 dialog, the strip, handing over from the archive), `mw_donate` (the
 sidebar heart, About's link, Home's card), `mw_failover` (failover to another
 source), `mw_series` (series recording rules), `mw_health` (stream

@@ -5,6 +5,11 @@ Built on a single QGraphicsView. The time header and the channel column are
 each a QGraphicsItemGroup pinned to the top / left by moving them to the
 current scroll offset, so they stay in view while the programme area scrolls
 under them.
+
+``EpgGrid`` is the guide itself - filter, board, the selected programme and
+the buttons - as a widget, so the same guide lives in the window's middle
+pane (the Guide page, ui/mw_guide.py) or in a window of its own
+(``EpgGridDialog``, the pop-out). Its timers run only while it is on screen.
 """
 
 from __future__ import annotations
@@ -12,15 +17,16 @@ from __future__ import annotations
 import time
 from datetime import datetime
 
-from PyQt6.QtCore import QPointF, QRectF, Qt, QTimer
+from PyQt6.QtCore import QEvent, QPointF, QRectF, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (
-    QBrush, QColor, QFont, QGradient, QIcon, QLinearGradient, QPainter,
-    QPainterPath, QPen, QPixmap,
+    QBrush, QColor, QFont, QFontMetrics, QGradient, QIcon, QLinearGradient,
+    QPainter, QPainterPath, QPen, QPixmap,
 )
 from PyQt6.QtWidgets import (
-    QDialog, QGraphicsItemGroup, QGraphicsPathItem, QGraphicsPixmapItem,
-    QGraphicsRectItem, QGraphicsScene, QGraphicsSimpleTextItem, QGraphicsView,
-    QHBoxLayout, QLabel, QLineEdit, QMenu, QPushButton, QVBoxLayout,
+    QApplication, QDialog, QGraphicsItemGroup, QGraphicsPathItem,
+    QGraphicsPixmapItem, QGraphicsRectItem, QGraphicsScene,
+    QGraphicsSimpleTextItem, QGraphicsView, QHBoxLayout, QLabel, QLineEdit,
+    QMenu, QPushButton, QVBoxLayout, QWidget,
 )
 
 from ..i18n import tr
@@ -29,25 +35,25 @@ from .theme import P, corner_radius
 
 
 class _GridView(QGraphicsView):
-    """Hands clicks / double-clicks / right-clicks back to the dialog as
+    """Hands clicks / double-clicks / right-clicks back to the guide as
     scene positions."""
 
-    def __init__(self, scene, dialog) -> None:
+    def __init__(self, scene, grid) -> None:
         super().__init__(scene)
-        self._dlg = dialog
+        self._grid = grid
 
     def mousePressEvent(self, e) -> None:
         if e.button() == Qt.MouseButton.RightButton:
-            self._dlg._context_at(self.mapToScene(e.pos()),
-                                  e.globalPosition().toPoint())
+            self._grid._context_at(self.mapToScene(e.pos()),
+                                   e.globalPosition().toPoint())
             e.accept()
             return
         if e.button() == Qt.MouseButton.LeftButton:
-            self._dlg._select_at(self.mapToScene(e.pos()))
+            self._grid._select_at(self.mapToScene(e.pos()))
         super().mousePressEvent(e)
 
     def mouseDoubleClickEvent(self, e) -> None:
-        self._dlg._play_at(self.mapToScene(e.pos()))
+        self._grid._play_at(self.mapToScene(e.pos()))
         super().mouseDoubleClickEvent(e)
 
     def keyPressEvent(self, e) -> None:
@@ -55,22 +61,22 @@ class _GridView(QGraphicsView):
         # programme blocks instead of just scrolling the view.
         k = e.key()
         if k == Qt.Key.Key_Left:
-            self._dlg._nav(-1, 0)
+            self._grid._nav(-1, 0)
         elif k == Qt.Key.Key_Right:
-            self._dlg._nav(1, 0)
+            self._grid._nav(1, 0)
         elif k == Qt.Key.Key_Up:
-            self._dlg._nav(0, -1)
+            self._grid._nav(0, -1)
         elif k == Qt.Key.Key_Down:
-            self._dlg._nav(0, 1)
+            self._grid._nav(0, 1)
         elif k in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-            self._dlg._play_selected()
+            self._grid._play_selected()
         else:
             super().keyPressEvent(e)
             return
         e.accept()
 
 
-class EpgGridDialog(QDialog):
+class EpgGrid(QWidget):
     """The full EPG guide: a scrollable channel x time grid with now/next, day jumps, search and playable rows."""
     ROW_H = 60
     HEADER_H = 34
@@ -79,25 +85,43 @@ class EpgGridDialog(QDialog):
     LABEL_DY = 21            # vertical inset of a card's title text
     FUTURE_HOURS = 12       # how far ahead the board reaches
     MAX_PAST_HOURS = 48     # cap on how far back timeshift opens the board
+    # A board kept to be shown again (the Guide page) is drawn afresh once
+    # the day has turned or less than this much of the future is left on it.
+    FRESH_AHEAD_HOURS = 6
     # Every channel gets a row, but only the rows near the viewport are drawn
     # (a row is some sixty scene items). "All" used to be cut to the first 300
     # channels, which with a big provider was one country's - the rest of the
     # line-up was simply not in the guide.
     PRELOAD_ROWS = 12        # drawn beyond each edge of the viewport
     KEEP_ROWS = 240          # past this many drawn rows, the farthest go
+    # Below this width the bar's longer buttons show their icon alone (the
+    # middle pane is narrower than the guide's window used to be); above
+    # WIDE_W they get their words back - apart, so it does not flicker.
+    COMPACT_W = 860
+    WIDE_W = 900
 
-    def __init__(self, window, channels, category_name=None) -> None:
-        super().__init__(window)
+    #: A programme was played from the guide (the window closes on it).
+    played = pyqtSignal()
+    #: The guide's Close button (shown in its window only).
+    close_requested = pyqtSignal()
+    #: The Pop out button (shown on the Guide page only).
+    pop_out_requested = pyqtSignal()
+
+    def __init__(self, window, channels, category_name=None,
+                 parent=None) -> None:
+        super().__init__(parent)
         self.window = window
+        self.category_name = category_name
+        self.scope_key = None     # what the window keeps it for (mw_guide)
         self._all_channels = list(channels)
         self.channels = self._all_channels
         self._selected = None
-        title = tr("btn_epg_guide")
-        if category_name:
-            title += f" — {category_name}"
-        self.setWindowTitle(title)
+        self._compact: bool | None = None
+        self._refresh_pending = False
+        self._built_unready = False
 
         now = time.time()
+        self._built_day = datetime.fromtimestamp(now).date()
         now_floor = (now // 1800) * 1800
         # Open the board further back for timeshift channels so their past
         # (catch-up-able) programmes are scrollable into view. Only a channel
@@ -120,15 +144,95 @@ class EpgGridDialog(QDialog):
         self._grid_w = int((self._stop - self._start) / 60 * self.PX_PER_MIN)
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(10, 10, 10, 10)
+        outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(8)
+
+        # Top: the guide's name and what it covers (on the page - its window
+        # has them in the title bar), the channel filter, Pop out.
+        top = QHBoxLayout()
+        top.setSpacing(8)
+        self.title_lbl = QLabel(tr("nav_guide"))
+        self.title_lbl.setObjectName("GuideTitle")
+        top.addWidget(self.title_lbl)
+        self.scope_lbl = QLabel("")
+        self.scope_lbl.setObjectName("GuideScope")
+        top.addWidget(self.scope_lbl)
         self.filter = QLineEdit(placeholderText=tr("epg_filter_channels"))
-        # Bound methods, not lambdas, for every signal of this dialog's own
+        self.filter.setObjectName("Search")
+        self.filter.setClearButtonEnabled(True)
+        # Bound methods, not lambdas, for every signal of this guide's own
         # widgets and timers: PyQt lets go of a bound method with its object,
         # while a lambda holding *self* outlived a guide closed and collected -
         # its timer then called into freed memory (PyQt 6.9/6.10 crashed).
         self.filter.textChanged.connect(self._on_filter)
-        outer.addWidget(self.filter)
+        top.addWidget(self.filter, 1)
+        self.popout_btn = QPushButton(objectName="InlineToggle")
+        self.popout_btn.setToolTip(tr("tooltip_popout"))
+        self.popout_btn.setAccessibleName(tr("tooltip_popout"))
+        self.popout_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.popout_btn.setFixedSize(34, 34)
+        self.popout_btn.clicked.connect(self.pop_out_requested)
+        top.addWidget(self.popout_btn)
+        outer.addLayout(top)
+
+        # The bar: search, the day and the moments to jump to, then what
+        # the guide leads on to (refresh, reminders, scheduled recordings).
+        bar = QHBoxLayout()
+        bar.setSpacing(6)
+        self.search_btn = self._tile(tr("epg_search_btn"))
+        self.search_btn.clicked.connect(self._open_search)
+        bar.addWidget(self.search_btn)
+        # The jumps run along the board's own time axis, which is left to
+        # right in every language: so do they, or under a right-to-left
+        # layout "a day back" sat right of "a day forward".
+        days = QWidget()
+        days.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
+        dl = QHBoxLayout(days)
+        dl.setContentsMargins(0, 0, 0, 0)
+        dl.setSpacing(6)
+        self.day_back_btn = self._tile("")
+        self.day_back_btn.setToolTip(tr("epg_day_back"))
+        self.day_back_btn.setAccessibleName(tr("epg_day_back"))
+        self.day_back_btn.clicked.connect(self._day_back)
+        dl.addWidget(self.day_back_btn)
+        self.now_btn = self._tile(tr("epg_jump_now"))
+        self.now_btn.clicked.connect(self._scroll_to_now)
+        dl.addWidget(self.now_btn)
+        self.tonight_btn = self._tile(tr("epg_tonight"))
+        self.tonight_btn.clicked.connect(self._scroll_tonight)
+        dl.addWidget(self.tonight_btn)
+        self.day_fwd_btn = self._tile("")
+        self.day_fwd_btn.setToolTip(tr("epg_day_fwd"))
+        self.day_fwd_btn.setAccessibleName(tr("epg_day_fwd"))
+        self.day_fwd_btn.clicked.connect(self._day_fwd)
+        dl.addWidget(self.day_fwd_btn)
+        for b in (self.day_back_btn, self.day_fwd_btn):
+            b.setFixedWidth(30)
+        bar.addWidget(days)
+        # Jumps the board back up to the channel you're watching (handy after
+        # scrolling far down a long line-up). Only shown when one is playing.
+        self.playing_btn = self._tile(tr("epg_jump_playing"))
+        self.playing_btn.clicked.connect(self._scroll_to_playing)
+        self.playing_btn.hide()
+        bar.addWidget(self.playing_btn)
+        bar.addStretch(1)
+        # Fetch the guide again from here - where you notice it is missing.
+        # Drawn, not "↻": that glyph is an empty box in fonts without it.
+        self.refresh_btn = self._tile("")
+        self.refresh_btn.setToolTip(tr("btn_refresh_epg"))
+        self.refresh_btn.setAccessibleName(tr("btn_refresh_epg"))
+        self.refresh_btn.setFixedWidth(30)
+        self.refresh_btn.clicked.connect(self._refresh_guide)
+        bar.addWidget(self.refresh_btn)
+        self.reminders_btn = self._tile(tr("reminders_title"))
+        self.reminders_btn.clicked.connect(self.window._open_reminders)
+        bar.addWidget(self.reminders_btn)
+        # Manage upcoming recordings without leaving the guide.
+        self.rec_sched_btn = self._tile(tr("rec_scheduled_title"))
+        self.rec_sched_btn.setToolTip(tr("rec_manage_scheduled"))
+        self.rec_sched_btn.clicked.connect(self.window._show_scheduled_manager)
+        bar.addWidget(self.rec_sched_btn)
+        outer.addLayout(bar)
 
         self.scene = QGraphicsScene(self)
         self.view = _GridView(self.scene, self)
@@ -153,21 +257,7 @@ class EpgGridDialog(QDialog):
         # make mapToScene(0,0) negative and push the pinned header off-view).
         self.view.setAlignment(
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-        self.view.setBackgroundBrush(QColor(P["bg"]))
-        # Chunky, accent-coloured scrollbars: the thin grey default blended
-        # into the background and was easy to miss, and the horizontal one
-        # matters here since the board is wide.
-        self.view.setStyleSheet(
-            "QScrollBar:horizontal{height:18px;margin:0;"
-            "background:rgba(128,128,128,40);}"
-            "QScrollBar:vertical{width:18px;margin:0;"
-            "background:rgba(128,128,128,40);}"
-            "QScrollBar::handle{background:%s;border-radius:7px;}"
-            "QScrollBar::handle:horizontal{min-width:70px;}"
-            "QScrollBar::handle:vertical{min-height:70px;}"
-            "QScrollBar::handle:hover{background:%s;}"
-            "QScrollBar::add-line,QScrollBar::sub-line{width:0;height:0;}"
-            % (P["accent"], P["text"]))
+        self.view.setFrameShape(QGraphicsView.Shape.NoFrame)
         self.view.horizontalScrollBar().valueChanged.connect(self._pin)
         self.view.verticalScrollBar().valueChanged.connect(self._pin)
         self.view.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -177,71 +267,24 @@ class EpgGridDialog(QDialog):
         # block is selected - the data was always there, just never shown.
         self.desc = QLabel("")
         self.desc.setWordWrap(True)
-        self.desc.setStyleSheet(f"color:{P['muted']}; font-size:12px;")
         self.desc.setMaximumHeight(56)
         self.desc.hide()
         outer.addWidget(self.desc)
 
-        bar = QHBoxLayout()
-        self.search_btn = QPushButton(tr("epg_search_btn"))
-        self.search_btn.setIcon(self._bar_icon("search"))
-        self.search_btn.clicked.connect(self._open_search)
-        bar.addWidget(self.search_btn)
-        self.day_back_btn = QPushButton()
-        self.day_back_btn.setIcon(self._tri_icon(left=True))
-        self.day_back_btn.setToolTip(tr("epg_day_back"))
-        self.day_back_btn.setFixedWidth(34)
-        self.day_back_btn.clicked.connect(self._day_back)
-        bar.addWidget(self.day_back_btn)
-        self.now_btn = QPushButton(tr("epg_jump_now"))
-        self.now_btn.clicked.connect(self._scroll_to_now)
-        bar.addWidget(self.now_btn)
-        self.tonight_btn = QPushButton(tr("epg_tonight"))
-        self.tonight_btn.clicked.connect(self._scroll_tonight)
-        bar.addWidget(self.tonight_btn)
-        self.day_fwd_btn = QPushButton()
-        self.day_fwd_btn.setIcon(self._tri_icon(left=False))
-        self.day_fwd_btn.setToolTip(tr("epg_day_fwd"))
-        self.day_fwd_btn.setFixedWidth(34)
-        self.day_fwd_btn.clicked.connect(self._day_fwd)
-        bar.addWidget(self.day_fwd_btn)
-        # Fetch the guide again from here - where you notice it is missing.
-        # Drawn, not "↻": that glyph is an empty box in fonts without it.
-        self.refresh_btn = QPushButton()
-        self.refresh_btn.setIcon(self._bar_icon("refresh"))
-        self.refresh_btn.setToolTip(tr("btn_refresh_epg"))
-        self.refresh_btn.setAccessibleName(tr("btn_refresh_epg"))
-        self.refresh_btn.setFixedWidth(34)
-        self.refresh_btn.clicked.connect(self._refresh_guide)
-        bar.addWidget(self.refresh_btn)
-        self.reminders_btn = QPushButton(tr("reminders_title"))
-        self.reminders_btn.setIcon(self._bar_icon("bell"))
-        self.reminders_btn.clicked.connect(self.window._open_reminders)
-        bar.addWidget(self.reminders_btn)
-        # Manage upcoming recordings without leaving the guide.
-        self.rec_sched_btn = QPushButton(tr("rec_scheduled_title"))
-        self.rec_sched_btn.setIcon(self._bar_icon("record"))
-        self.rec_sched_btn.setToolTip(tr("rec_manage_scheduled"))
-        self.rec_sched_btn.clicked.connect(self.window._show_scheduled_manager)
-        bar.addWidget(self.rec_sched_btn)
-        # Jumps the board back up to the channel you're watching (handy after
-        # scrolling far down a long line-up). Only shown when one is playing.
-        self.playing_btn = QPushButton(tr("epg_jump_playing"))
-        self.playing_btn.clicked.connect(self._scroll_to_playing)
-        self.playing_btn.hide()
-        bar.addWidget(self.playing_btn)
+        foot = QHBoxLayout()
+        foot.setSpacing(8)
         self.info = QLabel(tr("epg_select_channel"))
-        self.info.setStyleSheet(f"color:{P['muted']}; font-size:12px;")
         self.info.setWordWrap(True)
-        bar.addWidget(self.info, 1)
+        foot.addWidget(self.info, 1)
         self.play_btn = QPushButton(tr("epg_play_channel"), objectName="Primary")
         self.play_btn.setEnabled(False)
         self.play_btn.clicked.connect(self._play_selected)
-        bar.addWidget(self.play_btn)
+        foot.addWidget(self.play_btn)
         self.close_btn = QPushButton(tr("common_close"))
-        self.close_btn.clicked.connect(self.reject)
-        bar.addWidget(self.close_btn)
-        outer.addLayout(bar)
+        self.close_btn.clicked.connect(self.close_requested)
+        foot.addWidget(self.close_btn)
+        outer.addLayout(foot)
+        self.restyle()
 
         # Keyboard-navigation and live-refresh state. _rows has one entry per
         # channel, (channel, blocks): blocks is a list of {"item": block,
@@ -257,15 +300,13 @@ class EpgGridDialog(QDialog):
         self._preload.setInterval(80)
         self._preload.timeout.connect(self._preload_rows)
         self._focus: tuple[int, int] | None = None
-        # Keep the board alive while open: the now-line and the progress
-        # fills tick along instead of freezing at open time.
+        # Keep the board alive while it is on screen: the on-air cards and
+        # the playing channel follow the clock instead of freezing at open.
+        # None of the timers run while the guide is hidden (showEvent /
+        # hideEvent) - a page left, a window closed, the pane folded away.
         self._refresh = QTimer(self)
         self._refresh.setInterval(30_000)
         self._refresh.timeout.connect(self._tick)
-        self._refresh.start()
-
-        self._build()
-
         # Opened before the EPG finished loading (startup race)? Every row
         # then draws as a bare band. Poll until the guide reports loaded and
         # rebuild once, so the board fills in by itself instead of needing a
@@ -273,32 +314,13 @@ class EpgGridDialog(QDialog):
         self._epg_poll = QTimer(self)
         self._epg_poll.setInterval(1500)
         self._epg_poll.timeout.connect(self._maybe_reload_epg)
-        if not self._epg_ready():
-            self._epg_poll.start()
-        # Stop both timers the moment the dialog closes: a late _tick or
-        # load-poll rebuild firing after teardown would work a dead scene.
         self._guide_poll = QTimer(self)
         self._guide_poll.setInterval(500)
         self._guide_poll.timeout.connect(self._after_refresh)
-        self.finished.connect(self._stop_timers)
 
-        scr = self.screen().availableGeometry() if self.screen() else None
-        want_w = self.CH_COL_W + self._grid_w + 40
-        want_h = self.HEADER_H + len(self.channels) * self.ROW_H + 110
-        # Cap to the main window, not the whole screen, so the guide stays in
-        # proportion to the app instead of ballooning to 1500 px on a big
-        # display while the window itself is small.
-        mw = self.window
-        if mw is not None and mw.width() > 200:
-            cap_w, cap_h = int(mw.width() * 0.94), int(mw.height() * 0.94)
-        else:
-            cap_w = (scr.width() - 80) if scr else 1200
-            cap_h = (scr.height() - 80) if scr else 800
-        w = min(want_w, cap_w, 1500)
-        h = min(want_h, cap_h, 900)
-        self.resize(max(min(760, cap_w), w), max(min(460, cap_h), h))
-        # Centring happens in showEvent - a move() here (before the window is
-        # shown) doesn't stick on macOS, which then opens it low/offset.
+        self.set_in_window(False)
+        self._build()
+
         now_x = self.CH_COL_W + (now - self._start) / 60 * self.PX_PER_MIN
         self.view.horizontalScrollBar().setValue(max(0, int(now_x
                                                              - self.CH_COL_W - 40)))
@@ -307,50 +329,159 @@ class EpgGridDialog(QDialog):
         if getattr(self, "_playing_row", None) is not None:
             self._scroll_to_playing()
 
+    def _tile(self, text: str) -> QPushButton:
+        """A button of the bar: the same small tile as the list's own
+        control strip in the middle pane."""
+        b = QPushButton(text, objectName="InlineToggle")
+        b.setFixedHeight(28)
+        b.setCursor(Qt.CursorShape.PointingHandCursor)
+        return b
+
+    # -- where it lives --------------------------------------------------------
+
+    def title(self) -> str:
+        t = tr("btn_epg_guide")
+        if self.category_name:
+            t += f" — {self.category_name}"
+        return t
+
+    def set_in_window(self, on: bool) -> None:
+        """In its own window the title bar names it and Close ends it; on the
+        page it says what it covers itself, and offers to pop out."""
+        self._in_window = on
+        self.close_btn.setVisible(on)
+        for w in (self.title_lbl, self.scope_lbl, self.popout_btn):
+            w.setVisible(not on)
+        self.scope_lbl.setVisible(not on and bool(self.category_name))
+
+    def restyle(self) -> None:
+        """Colours and drawn icons from the current theme (P)."""
+        self.title_lbl.setStyleSheet(
+            f"color:{P['text']}; font-size:15px; font-weight:700;")
+        self.scope_lbl.setStyleSheet(f"color:{P['muted']}; font-size:13px;")
+        self.desc.setStyleSheet(f"color:{P['muted']}; font-size:12px;")
+        self.info.setStyleSheet(f"color:{P['muted']}; font-size:12px;")
+        self._set_scope_text()
+        for btn, kind in ((self.search_btn, "search"),
+                          (self.refresh_btn, "refresh"),
+                          (self.reminders_btn, "bell"),
+                          (self.rec_sched_btn, "record"),
+                          (self.popout_btn, "popout")):
+            btn.setIcon(self._bar_icon(kind))
+            btn.setIconSize(QSize(14, 14))
+        self.day_back_btn.setIcon(self._tri_icon(left=True))
+        self.day_fwd_btn.setIcon(self._tri_icon(left=False))
+        self.view.setBackgroundBrush(QColor(P["bg"]))
+        # Chunky, accent-coloured scrollbars: the thin grey default blended
+        # into the background and was easy to miss, and the horizontal one
+        # matters here since the board is wide.
+        self.view.setStyleSheet(
+            "QGraphicsView{border:none;}"
+            "QScrollBar:horizontal{height:18px;margin:0;"
+            "background:rgba(128,128,128,40);}"
+            "QScrollBar:vertical{width:18px;margin:0;"
+            "background:rgba(128,128,128,40);}"
+            "QScrollBar::handle{background:%s;border-radius:7px;}"
+            "QScrollBar::handle:horizontal{min-width:70px;}"
+            "QScrollBar::handle:vertical{min-height:70px;}"
+            "QScrollBar::handle:hover{background:%s;}"
+            "QScrollBar::add-line,QScrollBar::sub-line{width:0;height:0;}"
+            "QAbstractScrollArea::corner{background:%s;}"
+            % (P["accent"], P["text"], P["bg"]))
+
+    def _set_scope_text(self) -> None:
+        name = self.category_name or ""
+        f = QFont(self.scope_lbl.font())
+        f.setPixelSize(13)
+        fm = QFontMetrics(f)
+        self.scope_lbl.setText(
+            fm.elidedText(name, Qt.TextElideMode.ElideRight, 220))
+        self.scope_lbl.setToolTip(name)
+
+    def stale(self) -> bool:
+        """True once the board kept for showing again should be drawn afresh:
+        the day has turned, or the future it reaches is nearly used up."""
+        now = time.time()
+        return (datetime.fromtimestamp(now).date() != self._built_day
+                or now > self._stop - self.FRESH_AHEAD_HOURS * 3600)
+
+    def _apply_compact(self, compact: bool) -> None:
+        if compact == self._compact:
+            return
+        self._compact = compact
+        for btn, key in ((self.search_btn, "epg_search_btn"),
+                         (self.reminders_btn, "reminders_title"),
+                         (self.rec_sched_btn, "rec_scheduled_title")):
+            btn.setText("" if compact else tr(key))
+            if compact:
+                btn.setFixedWidth(30)
+                btn.setToolTip(tr("rec_manage_scheduled")
+                               if btn is self.rec_sched_btn else tr(key))
+            else:
+                btn.setMinimumWidth(0)
+                btn.setMaximumWidth(16777215)
+
+    def _update_compact(self) -> None:
+        w = self.width()
+        if self._compact is True:
+            self._apply_compact(w < self.WIDE_W)
+        else:
+            self._apply_compact(w < self.COMPACT_W)
+
+    # -- on screen or not --------------------------------------------------------
+
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
+        self._update_compact()
         # A taller window shows rows that were not drawn yet.
         self._pin()
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
+        self._update_compact()
+        self._start_timers()
         self._pin()
-        # Centre in the screen once, after the window has its final size and a
-        # real screen - doing it in __init__ (pre-show) doesn't stick on macOS.
-        # Keyboard navigation should work immediately - focus the grid, not
-        # the filter field (typing still lands in the filter on click).
-        self.view.setFocus()
-        if getattr(self, "_centred", False):
-            return
-        self._centred = True
-        mw = self.window
-        if mw is not None and mw.isVisible():
-            c = mw.frameGeometry().center()
-            x, y = c.x() - self.width() // 2, c.y() - self.height() // 2
-        else:
-            scr0 = self.screen()
-            g = scr0.availableGeometry() if scr0 else None
-            if g is None:
-                return
-            x, y = g.x() + (g.width() - self.width()) // 2, \
-                g.y() + (g.height() - self.height()) // 2
-        # Keep it fully on-screen even when the window sits near an edge.
-        scr = (mw.screen() if mw else None) or self.screen()
-        if scr is not None:
-            a = scr.availableGeometry()
-            x = max(a.x(), min(x, a.x() + a.width() - self.width()))
-            y = max(a.y(), min(y, a.y() + a.height() - self.height()))
-        self.move(x, y)
+
+    def hideEvent(self, event) -> None:
+        super().hideEvent(event)
+        self._stop_timers()
+
+    def _start_timers(self) -> None:
+        """The guide came (back) on screen: catch up with the clock and the
+        channel playing, and run the timers again."""
+        self._refresh.start()
+        self._mark_now()
+        self.refresh_playing()
+        if not self._epg_ready():
+            self._epg_poll.start()
+        elif self._built_unready:
+            self._maybe_reload_epg()
+        if self._refresh_pending:
+            self._guide_poll.start()
+
+    def event(self, e) -> bool:
+        # N and P are the guide's own keys. On the page, inside the main
+        # window, the window's shortcuts would take P (pop the player out)
+        # before the guide ever saw it - in its own window it always had it.
+        if (e.type() == QEvent.Type.ShortcutOverride
+                and e.key() in (Qt.Key.Key_N, Qt.Key.Key_P)
+                and not (e.modifiers() & ~Qt.KeyboardModifier.KeypadModifier)
+                and not isinstance(QApplication.focusWidget(), QLineEdit)):
+            e.accept()
+            return True
+        return super().event(e)
 
     def keyPressEvent(self, event) -> None:
         # In-guide shortcuts: N jumps to now, P to the playing channel, Enter
-        # plays the selected programme. Esc closes (QDialog default).
+        # plays the selected programme. Esc is the host's: its window closes
+        # (QDialog), the page goes back (the main window's Esc).
         k = event.key()
         if k == Qt.Key.Key_N:
             self._scroll_to_now()
             return
-        if k == Qt.Key.Key_P and getattr(self, "_playing_row", None) is not None:
-            self._scroll_to_playing()
+        if k == Qt.Key.Key_P:
+            if getattr(self, "_playing_row", None) is not None:
+                self._scroll_to_playing()
             return
         if k in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and self._selected:
             self._play_selected()
@@ -435,6 +566,18 @@ class EpgGridDialog(QDialog):
             head.lineTo(s * 0.50, s * 0.36)
             head.closeSubpath()
             pr.drawPath(head)
+        elif kind == "popout":
+            # The player's pop-out mark: two squares, one lifted off the other.
+            pen = QPen(col)
+            pen.setWidthF(s * 0.09)
+            pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+            pr.setPen(pen)
+            pr.setBrush(Qt.BrushStyle.NoBrush)
+            side, off = s * 0.50, s * 0.20
+            pr.drawRoundedRect(QRectF(s * 0.14, s * 0.14 + off, side, side),
+                               s * 0.06, s * 0.06)
+            pr.drawRoundedRect(QRectF(s * 0.14 + off, s * 0.14, side, side),
+                               s * 0.06, s * 0.06)
         else:                                   # "record": a plain filled dot
             pr.setPen(Qt.PenStyle.NoPen)
             pr.setBrush(col)
@@ -555,6 +698,9 @@ class EpgGridDialog(QDialog):
         self._sel_outline = None   # dropped by scene.clear(); recreated on pick
         self._build_gen += 1       # invalidates in-flight logo callbacks
         self._focus = None
+        # Drawn while the guide still loads: drawn again once it is in, also
+        # when that happened while the guide was off screen.
+        self._built_unready = not self._epg_ready()
         self.play_btn.setEnabled(False)
         self.desc.hide()
         text = self.filter.text().lower().strip()
@@ -593,7 +739,7 @@ class EpgGridDialog(QDialog):
     # -- rows on demand --------------------------------------------------------
 
     def _visible_rows(self) -> tuple[int, int]:
-        """The rows in the viewport, [top, bottom). Before the dialog is shown
+        """The rows in the viewport, [top, bottom). Before the guide is shown
         the viewport has no real height yet; assume a tall one."""
         v = self.view.verticalScrollBar().value()
         h = max(self.view.viewport().height(),
@@ -621,7 +767,9 @@ class EpgGridDialog(QDialog):
         hi = min(len(self._rows), bottom + extra)
         for row in range(lo, hi):
             self._ensure_row(row)
-        if not preload:
+        # Nothing ticks while the guide is off screen: a scroll set by code
+        # meanwhile (a rebuild keeping its place) waits for showEvent.
+        if not preload and self.isVisible():
             self._preload.start()
         if len(self._row_items) <= self.KEEP_ROWS:
             return
@@ -657,14 +805,17 @@ class EpgGridDialog(QDialog):
         band.setBrush(QBrush(QColor(P["pane"])))
         band.setPen(QPen(Qt.PenStyle.NoPen))
         self._header_group.addToGroup(band)
+        # Every half hour, the hours in the text colour: the middle pane shows
+        # an hour of the board or so, often no hour mark at all.
         t = self._start
         while t <= self._stop:
             lbl = QGraphicsSimpleTextItem(
                 datetime.fromtimestamp(t).strftime("%H:%M"))
-            lbl.setBrush(QColor(P["text"]))
+            lbl.setBrush(QColor(P["text"] if int(t) % 3600 == 0
+                                else P["muted"]))
             lbl.setPos(self._x(t) + 4, 7)
             self._header_group.addToGroup(lbl)
-            t += 3600
+            t += 1800
 
     def _is_playing(self, ch: dict) -> bool:
         """True if this channel is the one currently playing live, so the row
@@ -726,7 +877,7 @@ class EpgGridDialog(QDialog):
         cell = QGraphicsRectItem(0, y, self.CH_COL_W, self.ROW_H)
         if playing:
             cell.setBrush(QBrush(QColor(P["accent"])))
-            cell.setPen(QPen(QColor("#ffffff"), 2))
+            cell.setPen(QPen(QColor(P["on_accent"]), 2))
         else:
             cell.setBrush(QBrush(tones["cell"]))
             cell.setPen(QPen(QColor(P["bg"]), 1))
@@ -789,7 +940,9 @@ class EpgGridDialog(QDialog):
         f.setBold(True)
         f.setPointSize(11)
         name.setFont(f)
-        name.setBrush(QColor("#ffffff"))
+        # The theme's text, not white: on a light theme's pale column white
+        # names were all but invisible (the accent cell takes its own ink).
+        name.setBrush(QColor(P["on_accent"] if playing else P["text"]))
         self._elide(name, self.CH_COL_W - text_x - 8)
         # No data(0) on the text: hit-testing takes the topmost item carrying a
         # payload, so a click on the name would select via the *text* item and
@@ -858,7 +1011,7 @@ class EpgGridDialog(QDialog):
             # No label on sliver cards (clipped overlaps): "…" alone is noise.
             label = (self._block_label(text, x1, x2, y,
                                        QColor(P["muted"]) if faded
-                                       else QColor("#ffffff"))
+                                       else QColor(P["text"]))
                      if x2 - x1 >= 26 else None)
             row_blocks.append({"item": block, "data": data, "label": label,
                                "x1": x1, "x2": x2, "y": y, "text": text,
@@ -877,7 +1030,7 @@ class EpgGridDialog(QDialog):
                     else tr("status_loading_programme_guide"))
             label = self._block_label(text, self.CH_COL_W, self.CH_COL_W
                                       + self._grid_w, y,
-                                      QColor("#9aa3b2"))
+                                      QColor(P["muted"]))
             row_blocks.append({"item": block, "data": data, "label": label,
                                "x1": self.CH_COL_W,
                                "x2": self.CH_COL_W + self._grid_w,
@@ -987,12 +1140,29 @@ class EpgGridDialog(QDialog):
                 lbl = rb.get("label")
                 if lbl is not None:
                     lbl.setBrush(QColor(P["muted"]) if state == "past"
-                                 else QColor("#ffffff"))
+                                 else QColor(P["text"]))
 
     def _tick(self) -> None:
-        """30 s live refresh: roll the on-air card highlight forward. The block
-        layout itself stays put."""
+        """30 s live refresh: roll the on-air card highlight forward, and
+        follow a channel change made elsewhere (the guide on the page sits
+        beside the player). The block layout itself stays put."""
         self._mark_now()
+        self.refresh_playing()
+
+    def refresh_playing(self) -> None:
+        """Mark the channel playing now: its row and the one it took over
+        from are drawn again, the rest stay as they are."""
+        new = next((i for i, (ch, _b) in enumerate(self._rows)
+                    if self._is_playing(ch)), None)
+        old = getattr(self, "_playing_row", None)
+        if new == old:
+            return
+        self._playing_row = new
+        for row in {old, new} - {None}:
+            if row in self._row_items:
+                self._drop_row(row)
+        self._fill_rows()
+        self.playing_btn.setVisible(new is not None)
 
     @staticmethod
     def _elide(item: QGraphicsSimpleTextItem, max_w: float) -> None:
@@ -1086,7 +1256,7 @@ class EpgGridDialog(QDialog):
         if getattr(self, "_sel_outline", None) is None \
                 or self._sel_outline.scene() is None:
             self._sel_outline = self.scene.addRect(
-                item.sceneBoundingRect(), QPen(QColor("#ffffff"), 2),
+                item.sceneBoundingRect(), QPen(QColor(P["text"]), 2),
                 QBrush(Qt.BrushStyle.NoBrush))
             self._sel_outline.setZValue(17)
             self._sel_outline.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
@@ -1231,20 +1401,24 @@ class EpgGridDialog(QDialog):
         ch, p = self._selected["channel"], self._selected["prog"]
         # A finished programme on a timeshift channel plays as catch-up;
         # everything else (incl. a no-EPG channel, prog=None) tunes live.
-        if p is None:
-            self.window.tune_from_guide(ch)
-            self.accept()
-            return
-        if p["stop_timestamp"] < time.time() and self.window._timeshift_days(ch):
+        if p is not None and p["stop_timestamp"] < time.time() \
+                and self.window._timeshift_days(ch):
             self.window._play_timeshift(ch, prog=p)
+            self.played.emit()
         else:
-            self.window.tune_from_guide(ch)
-        self.accept()
+            self._tune(ch)
+
+    def _tune(self, ch: dict) -> None:
+        """Play *ch* live. Its window closes on it (``played``); the page
+        stays, beside the player, with the channel marked."""
+        self.window.tune_from_guide(ch)
+        self.played.emit()
 
     def _refresh_guide(self) -> None:
         """Fetch the guide again and redraw the board when it is in."""
         if self._guide_poll.isActive():
             return
+        self._refresh_pending = True
         self.refresh_btn.setEnabled(False)
         self.info.setText(tr("status_loading_programme_guide"))
         self.window._refresh_epg_now()
@@ -1254,6 +1428,7 @@ class EpgGridDialog(QDialog):
         if getattr(self.window, "_guide_loading", None) is not None:
             return
         self._guide_poll.stop()
+        self._refresh_pending = False
         self.refresh_btn.setEnabled(True)
         self.info.setText(tr("epg_select_channel"))
         hbar = self.view.horizontalScrollBar()
@@ -1276,9 +1451,7 @@ class EpgGridDialog(QDialog):
         if p is None:
             # No-EPG channel: no programme to time-shift/record/remind about,
             # so the menu is "play it live" - and fetch the guide again.
-            m.addAction(tr("epg_play_channel"),
-                        lambda: (self.window.tune_from_guide(ch),
-                                 self.accept()))
+            m.addAction(tr("epg_play_channel"), lambda: self._tune(ch))
             m.addSeparator()
             m.addAction(tr("btn_refresh_epg"), self._refresh_guide)
             m.exec(global_pos)
@@ -1287,7 +1460,7 @@ class EpgGridDialog(QDialog):
         if past and self.window._timeshift_days(ch):
             m.addAction(tr("epg_play_this_programme"), self._play_selected)
         m.addAction(tr("ts_go_live") if past else tr("epg_play_channel"),
-                    lambda: (self.window.tune_from_guide(ch), self.accept()))
+                    lambda: self._tune(ch))
         if ch.get("stream_id") is not None and p["stop_timestamp"] > time.time():
             m.addAction(tr("rec_record_programme"), lambda: self._record(ch, p))
             box = getattr(self.window, "_box_record_action", None)
@@ -1329,3 +1502,81 @@ class EpgGridDialog(QDialog):
         rule = self.window._record_series(ch, p.get("title") or "", parent=self)
         if rule:
             self.info.setText("● " + rule["text"])
+
+
+class EpgGridDialog(QDialog):
+    """The guide in a window of its own: an ``EpgGrid`` of its own, or the
+    one the Guide page popped out (*grid*), handed back by release_grid()."""
+
+    def __init__(self, window, channels=None, category_name=None,
+                 grid: EpgGrid | None = None) -> None:
+        super().__init__(window)
+        self.window = window
+        self.grid = grid if grid is not None else EpgGrid(
+            window, channels or [], category_name)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(10, 10, 10, 10)
+        lay.addWidget(self.grid)
+        self.grid.set_in_window(True)
+        self.grid.show()
+        self.grid.played.connect(self.accept)
+        self.grid.close_requested.connect(self.reject)
+        self.setWindowTitle(self.grid.title())
+
+        g = self.grid
+        scr = self.screen().availableGeometry() if self.screen() else None
+        want_w = g.CH_COL_W + g._grid_w + 40
+        want_h = g.HEADER_H + len(g.channels) * g.ROW_H + 150
+        # Cap to the main window, not the whole screen, so the guide stays in
+        # proportion to the app instead of ballooning to 1500 px on a big
+        # display while the window itself is small.
+        mw = self.window
+        if mw is not None and mw.width() > 200:
+            cap_w, cap_h = int(mw.width() * 0.94), int(mw.height() * 0.94)
+        else:
+            cap_w = (scr.width() - 80) if scr else 1200
+            cap_h = (scr.height() - 80) if scr else 800
+        w = min(want_w, cap_w, 1500)
+        h = min(want_h, cap_h, 900)
+        self.resize(max(min(760, cap_w), w), max(min(460, cap_h), h))
+        # Centring happens in showEvent - a move() here (before the window is
+        # shown) doesn't stick on macOS, which then opens it low/offset.
+
+    def release_grid(self) -> EpgGrid:
+        """Take the guide back out (for the Guide page to keep it)."""
+        g = self.grid
+        g.played.disconnect(self.accept)
+        g.close_requested.disconnect(self.reject)
+        self.layout().removeWidget(g)
+        g.setParent(None)
+        g.set_in_window(False)
+        return g
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        # Keyboard navigation should work immediately - focus the grid, not
+        # the filter field (typing still lands in the filter on click).
+        self.grid.view.setFocus()
+        # Centre in the screen once, after the window has its final size and a
+        # real screen - doing it in __init__ (pre-show) doesn't stick on macOS.
+        if getattr(self, "_centred", False):
+            return
+        self._centred = True
+        mw = self.window
+        if mw is not None and mw.isVisible():
+            c = mw.frameGeometry().center()
+            x, y = c.x() - self.width() // 2, c.y() - self.height() // 2
+        else:
+            scr0 = self.screen()
+            geo = scr0.availableGeometry() if scr0 else None
+            if geo is None:
+                return
+            x, y = geo.x() + (geo.width() - self.width()) // 2, \
+                geo.y() + (geo.height() - self.height()) // 2
+        # Keep it fully on-screen even when the window sits near an edge.
+        scr = (mw.screen() if mw else None) or self.screen()
+        if scr is not None:
+            a = scr.availableGeometry()
+            x = max(a.x(), min(x, a.x() + a.width() - self.width()))
+            y = max(a.y(), min(y, a.y() + a.height() - self.height()))
+        self.move(x, y)

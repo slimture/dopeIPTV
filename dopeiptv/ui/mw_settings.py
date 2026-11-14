@@ -56,7 +56,6 @@ class _WheelGuard(QObject):
 from .. import APP_NAME, BUILD_VERSION, VERSION
 from ..i18n import tr
 from .dialogs import PlaylistDialog
-from .epg_grid import EpgGridDialog
 from ..providers.metadata import CacheFiles, TmdbClient, bundled_tmdb_key
 from ..providers.opensubtitles import OpenSubtitles
 from ..providers.opensubtitles import bundled_key as bundled_os_key
@@ -176,59 +175,6 @@ class _SettingsMixin:
 
     # -- EPG guide -----------------------------------------------------------------
 
-    def _open_epg_guide(self, global_scope: bool = False) -> None:
-        """Open the TV guide. Scoped to the current list in TV / Favorites
-        mode; *global_scope* (Home's guide button) skips those - whatever
-        category the hidden classic view happens to have selected is not a
-        choice the user made from Home."""
-        self._ensure_xmltv_loaded()
-        if not global_scope and self.mode == "live" and self.all_items:
-            cat = self.cat_list.currentItem()
-            cat_name = cat.text() if cat else "All"
-            EpgGridDialog(self, list(self.all_items), cat_name).exec()
-            return
-        # In Favorites, scope the guide to the favorite CHANNELS shown (a
-        # folder, or all of them) - movies/series have no EPG. Other Trakt/
-        # media sections simply have no live channels to guide.
-        if not global_scope and self.mode == "fav":
-            chans = self._favorite_channels_for_guide()
-            cat = self.cat_list.currentItem()
-            EpgGridDialog(self, chans,
-                          cat.text().strip() if cat else tr("nav_favorites")
-                          ).exec()
-            return
-        # No meaningful live scope (Home, Movies, Series, ...). The guide
-        # used to cover an arbitrary slice here: an auto-selected first
-        # category, or the first 300 of the provider's full dump. Favorite
-        # channels are the lineup the user actually curated - guide those
-        # when any exist; the full lineup stays the fallback.
-        try:
-            exclude = (() if self.parental.session_unlocked
-                       else self.favs.locked_groups())
-            favs = self.favs.items(None, exclude_groups=exclude)
-        except Exception:
-            favs = []
-        if favs:
-            EpgGridDialog(self, favs, tr("nav_favorites")).exec()
-            return
-        dlg = QDialog(self)
-        dlg.setWindowTitle(tr("btn_epg_guide"))
-        lay = QVBoxLayout(dlg)
-        lay.addWidget(QLabel(tr("status_loading_channels")))
-        dlg.resize(300, 100)
-        dlg.show()
-
-        def done(channels):
-            dlg.close()
-            EpgGridDialog(self, channels).exec()
-
-        keep = self._catalog_filter("live")
-        client = self.client
-        run_async(self.pool,
-                  lambda: [c for c in client.live_streams(None) or []
-                           if keep(c)],
-                  done, lambda _: dlg.close())
-
     def _open_epg_search(self) -> None:
         """Open the guide search (Ctrl+Shift+F): find a programme by name across
         every live channel this week and tune in or set a reminder."""
@@ -337,6 +283,7 @@ class _SettingsMixin:
         if (getattr(self, "_home_page", None) is not None
                 and self._home_showing()):
             self._home_page.refresh()
+        self._guide_restyle()        # the Guide page's board, in the new colours
 
     def _reset_all_settings(self, parent_dialog) -> None:
         """Wipe every stored preference (theme, layout, playlists, favorites,
@@ -557,6 +504,7 @@ class _SettingsMixin:
         # Player control tooltips (embedded bar + fullscreen overlay).
         if self.player:
             self.player.retranslate_ui()
+        self._guide_restyle()        # the Guide page, in the new language
 
     def _inline_view_changed(self, *_) -> None:
         # Density and grid are global; the sort dropdown applies only to the

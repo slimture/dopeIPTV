@@ -116,7 +116,7 @@ def one_language(lang: str, out: str) -> int:
     os.environ.setdefault("QT_SCALE_FACTOR", SCALE)
     from PyQt6.QtCore import QRectF, QSettings, Qt
     from PyQt6.QtGui import QColor, QFont, QImage, QPainter, QPainterPath
-    from PyQt6.QtWidgets import QApplication, QDialog
+    from PyQt6.QtWidgets import QApplication
 
     app = QApplication(sys.argv)
     tmp = tempfile.mkdtemp(prefix="dopeiptv-site-")
@@ -267,19 +267,15 @@ def one_language(lang: str, out: str) -> int:
     settle(1.5)
     save(w.grab().toImage(), "main")
 
-    # 2. The programme guide.
-    def grab_guide(dialog: QDialog) -> int:
-        dialog.resize(*SIZE)
-        dialog.move(0, 0)
-        dialog.show()
-        spin(2.5)
-        save(dialog.grab().toImage(), "guide")
-        return 0
-
-    real_exec = QDialog.exec
-    QDialog.exec = grab_guide  # type: ignore[method-assign,assignment]
+    # 2. The programme guide, on its page beside the player.
     w._open_epg_guide()
-    QDialog.exec = real_exec  # type: ignore[method-assign]
+    spin(2.5)
+    if QApplication.focusWidget() is not None:
+        QApplication.focusWidget().clearFocus()
+    settle(1)
+    save(w.grab().toImage(), "guide")
+    w._leave_guide_page()
+    spin(0.5)
 
     # 3. Multiview: four channels in their own window, over the app.
     for n, name in enumerate(("Orbit", "Cosmos", "Planet Watch", "Launchpad")):

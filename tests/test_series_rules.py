@@ -540,14 +540,14 @@ def test_the_guides_menu_hands_the_programme_to_the_window():
     from types import SimpleNamespace
     from unittest import mock
 
-    from dopeiptv.ui.epg_grid import EpgGridDialog
+    from dopeiptv.ui.epg_grid import EpgGrid
 
     win = SimpleNamespace(_record_series=mock.Mock(return_value={"text": "News"}))
     grid = SimpleNamespace(window=win, info=mock.Mock())
     ch = {"stream_id": 5, "name": "One"}
-    EpgGridDialog._record_series(grid, ch, {"title": "News", "start_timestamp": 1.0})
+    EpgGrid._record_series(grid, ch, {"title": "News", "start_timestamp": 1.0})
     win._record_series.assert_called_once_with(ch, "News", parent=grid)
     grid.info.setText.assert_called_once_with("● News")
     win._record_series.return_value = None                   # cancelled: nothing said
-    EpgGridDialog._record_series(grid, ch, {"title": "News"})
+    EpgGrid._record_series(grid, ch, {"title": "News"})
     assert grid.info.setText.call_count == 1

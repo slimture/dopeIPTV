@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QBoxLayout, QButtonGroup, QFrame,
     QHBoxLayout, QLabel, QLineEdit, QListWidgetItem,
     QMainWindow, QMenu, QMessageBox, QProgressBar, QPushButton, QScrollArea,
-    QSizePolicy, QSplitter, QToolButton, QVBoxLayout, QWidget,
+    QSizePolicy, QSplitter, QStackedWidget, QToolButton, QVBoxLayout, QWidget,
 )
 
 from .. import ORG
@@ -87,6 +87,7 @@ from .mw_detail import _DetailMixin
 from .mw_nav import _NavMixin
 from .mw_mpris import _MprisMixin
 from .mw_multiview import _MultiviewMixin
+from .mw_guide import _GuideMixin
 from .mw_home import _HomeMixin
 from .mw_local import _LocalFilesMixin
 from .mw_onboarding import _OnboardingMixin
@@ -124,7 +125,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _BusyMixin, _UpdatesMixin, _SearchMixin, _SidebarMixin,
                  _NavMixin, _ShortcutsMixin, _OnboardingMixin, _SortMixin,
                  _LocalFilesMixin,
-                 _PopoutMixin, _MultiviewMixin, _HomeMixin, _MprisMixin,
+                 _PopoutMixin, _MultiviewMixin, _HomeMixin, _GuideMixin,
+                 _MprisMixin,
                  _FollowMixin, _SubtitlesMixin, _CastMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
                  _HealthMixin, _ChannelPrefsMixin, _RemoteMixin, _EventsMixin, _ReportMixin,
@@ -513,7 +515,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         root.setHandleWidth(6)
         # The central area is a stack: page 0 is the classic three-column
         # view, page 1 (added lazily) is the full-window Home section.
-        from PyQt6.QtWidgets import QStackedWidget
         self._center_stack = QStackedWidget()
         self._center_stack.addWidget(root)
         self.setCentralWidget(self._center_stack)
@@ -617,8 +618,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._history_filter = "all"
 
         def _make_nav(key: str, text: str, into, primary: bool = False) -> None:
-            # The Guide opens a window, it is no place to be: never checked.
-            b = NavButton(key, text, checkable=key != "guide")
+            # The Guide is a place too: its page in the middle pane.
+            b = NavButton(key, text)
             b.setToolTip(text)
             b.setAccessibleName(text)
             # Places (TV, Guide, Movies, ...) are the primary tier: a couple
@@ -637,8 +638,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._apply_nav_color(key)
 
         # Places: where content lives, always at the top. Home first - it is
-        # not a MODE (it swaps the whole central stack), and the Guide opens
-        # its own window; _on_nav_clicked sends each where it belongs.
+        # not a MODE (it swaps the whole central stack), and the Guide is a
+        # page over the list, no mode either; _on_nav_clicked sends each
+        # where it belongs.
         for key, text in (("home", tr("nav_home")), ("live", tr("nav_tv")),
                           ("guide", tr("nav_guide")),
                           ("vod", tr("nav_movies")),
@@ -783,6 +785,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cat_list.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.cat_list.currentItemChanged.connect(self._category_changed)
+        # A category clicked while the Guide shows: that category's list.
+        self.cat_list.itemClicked.connect(self._guide_category_clicked)
         self.cat_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.cat_list.customContextMenuRequested.connect(self._cat_menu)
         sl.addWidget(self.cat_list, 1)
@@ -862,9 +866,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.rec.jobs_changed.connect(self._refresh_nav_status)
         self._refresh_nav_status()
 
-        # Middle column
+        # Middle column: a stack of its pages - the list (page 0) and the
+        # Guide (added the first time it opens, ui/mw_guide.py). The pane
+        # itself stays the splitter's column, so focus mode, fullscreen and
+        # the width logic that show, hide and measure self._mid cover both.
         mid = QWidget(objectName="MiddlePane")
-        ml = QVBoxLayout(mid)
+        _mid_l = QVBoxLayout(mid)
+        _mid_l.setContentsMargins(0, 0, 0, 0)
+        _mid_l.setSpacing(0)
+        self._mid_stack = QStackedWidget()
+        _mid_l.addWidget(self._mid_stack)
+        self._list_page = QWidget(objectName="ListPage")
+        self._mid_stack.addWidget(self._list_page)
+        ml = QVBoxLayout(self._list_page)
         # No horizontal margins on the middle pane. Qt's IconMode reserves
         # ~16 px at the end of each row for its internal wrap check, and any
         # extra inset on either side compounds with that - even 6-8 px of
@@ -2028,9 +2042,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _on_escape(self) -> None:
         """Single Escape handler so the key is never ambiguous: dismiss the
-        onboarding wizard if it's up, otherwise leave fullscreen."""
+        onboarding wizard if it's up, else leave the Guide page if it shows,
+        otherwise leave fullscreen."""
         if self._welcome is not None and self._welcome.isVisible():
             self._welcome.dismiss()
+            return
+        # The Guide page on screen goes back where you were. (In fullscreen
+        # the pane is hidden and this falls through to leaving it.)
+        if self._guide_page_visible():
+            self._leave_guide_page()
             return
         self._exit_player_fullscreen()
 
@@ -2278,6 +2298,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._home_poster_cache = None
             self._home_chan_cache = None
             self._recent_cache = {}
+            self._guide_source_changed()    # the old source's guide goes
             if self._home_showing():
                 self._home_page.refresh()
             # Switching rebuilds the list but loads the guide from cache when
@@ -2300,8 +2321,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Any mode switch drops back from the Home page to the classic view.
         if getattr(self, "_center_stack", None) is not None:
             self._center_stack.setCurrentIndex(0)
+        # ... and from the Guide page to the list - unless the guide itself
+        # tunes a channel: tune_from_guide's jump in the list runs under it.
+        if not getattr(self, "_guide_hold", False):
+            self._close_guide_page()
         # Watched is History's second filter: History is the entry lit.
-        self._check_nav(self._nav_key_for_mode(mode))
+        self._check_nav("guide" if self._guide_page_showing()
+                        else self._nav_key_for_mode(mode))
         self.mode = mode
         self.series_ctx = None
         self.back_btn.hide()
@@ -3351,10 +3377,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._pending_jump_key = self._item_key(ch)
         self._pending_jump_cat = ch.get("category_id")
         QTimer.singleShot(8000, self._clear_pending_jump)
-        if self.mode != "live":
-            self.switch_mode("live")
-        else:
-            self._load_categories()
+        # Tuned from the Guide page: the page stays, beside the player, and
+        # the list follows the channel underneath it.
+        keep = self._guide_page_showing()
+        self._guide_hold = keep
+        try:
+            if self.mode != "live":
+                self.switch_mode("live")
+            else:
+                self._load_categories()
+        finally:
+            self._guide_hold = False
+        if keep:
+            self._guide_followed_play()
 
     def _visible_catalog(self, items, mode: str) -> list:
         """*items* from a provider-wide list (category None) with what the

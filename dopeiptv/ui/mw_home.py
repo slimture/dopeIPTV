@@ -866,9 +866,9 @@ class HomePage(QWidget):
         fn()
 
     def _open_guide(self) -> None:
-        self.window._leave_home()
         # Global scope: from Home the guide must not inherit whatever
-        # category the hidden classic view had auto-selected.
+        # category the hidden classic view had auto-selected. It leaves
+        # Home itself, and Esc on the Guide page comes back here.
         self.window._open_epg_guide(global_scope=True)
 
     def _play_channel(self, it: dict) -> None:
@@ -1092,6 +1092,7 @@ class _HomeMixin:
         # Clear any classic-view loading strip/overlay so it doesn't linger
         # behind (and reappear on) the Home page.
         self._hide_busy()
+        self._close_guide_page()      # a place of its own: the Guide page goes
         page = self._ensure_home_page()
         page.refresh()
         self._center_stack.setCurrentWidget(page)

@@ -129,6 +129,7 @@ dopeiptv/
     mw_follow.py       Follow a series: new-episode checks and news
     mw_subtitles.py    Subtitles from OpenSubtitles; remembered per title
     mw_home.py         The Home page (shelves: resume, favourites, new)
+    mw_guide.py        The Guide page in the middle pane, and its pop-out
     home_widgets.py    Home's featured strip, shelves and cards
     mw_local.py        Local files: folders, library view, music queue
     mw_onboarding.py   First-run setup wizard
@@ -140,7 +141,8 @@ dopeiptv/
     welcome.py         First-run welcome overlay (connect / explore)
     channel_list.py    Virtualized list: model, view, painted delegate
     dialogs.py         Playlist editor, content manager
-    epg_grid.py        EPG timeline grid view
+    epg_grid.py        The guide (EpgGrid): timeline grid, filter, bar -
+                       on the Guide page or in its window (EpgGridDialog)
     epg_search.py      Programme search across the whole guide
     reminders.py       Reminders manager dialog
     shortcuts.py       Keyboard-shortcuts card (Settings > Advanced)

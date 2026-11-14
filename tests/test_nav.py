@@ -1,7 +1,7 @@
 """The sidebar's navigation: places on top (Home, TV, Guide, Movies, Series,
 Recordings, Local files), MINE (Favourites, Watch later, History) under
-them, Settings and Multiview named at the foot. The Guide opens its window
-and is never the current entry; Watched is History's second filter; the
+them, Settings and Multiview named at the foot. The Guide is a place too,
+its page in the middle pane; Watched is History's second filter; the
 entries carry a quiet status (a recording running, new episodes, what waits
 under Watch later); the selected entry is a light wash with a leading bar;
 the rail keeps its groups apart with hairlines."""
@@ -178,29 +178,27 @@ assert w._multiview_btn.text() == tr("menu_multiview")
 assert not w._settings_btn.icon().isNull() and not w._multiview_btn.icon().isNull()
 assert all(not b.icon().isNull() for b in w.nav_btns.values())
 
-# -- the guide: a window, never the current entry ------------------------------
+# -- the guide: a place, its page in the middle pane --------------------------
 w.switch_mode("live")
 pump()
-opened = []
-import dopeiptv.ui.mw_settings as ms
-class FakeGuide:
-    def __init__(self, parent, channels, title=""):
-        opened.append((parent, len(channels), title))
-    def exec(self):
-        return 0
-ms.EpgGridDialog = FakeGuide
 w.all_items = [{"name": "Kanal", "stream_id": 1}]
 guide = w.nav_btns["guide"]
-assert not guide.isCheckable()
+assert guide.isCheckable()
 guide.click()
 pump()
-assert opened and opened[-1][0] is w and opened[-1][1] == 1, opened
-assert w.mode == "live" and w.nav_btns["live"].isChecked() and not guide.isChecked()
-# Its shortcut and the TV entry's menu still open it, the same way.
-n = len(opened)
-w._shortcut_epg_guide()
-assert len(opened) == n + 1
+assert w._guide_page_showing() and len(w._guide_grid.channels) == 1
+assert guide.isChecked() and not w.nav_btns["live"].isChecked()
 assert w.mode == "live"
+# TV, the list under it, takes the page away; the list is as it was.
+w.nav_btns["live"].click()
+pump()
+assert not w._guide_page_showing()
+assert w.nav_btns["live"].isChecked() and not guide.isChecked()
+# Its shortcut opens it the same way.
+w._shortcut_epg_guide()
+assert w._guide_page_showing() and guide.isChecked()
+w._leave_guide_page()
+assert w.mode == "live" and w.nav_btns["live"].isChecked()
 
 # -- Watched: History's second filter ------------------------------------------
 w.switch_mode("watched")
