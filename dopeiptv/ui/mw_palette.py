@@ -13,8 +13,12 @@ window. It finds, as it is typed in:
   a programme offers play, record and remind, as the guide does.
 
 The channels and the guide are folded once per opening on a worker
-(core/palette_match.py), so a query over tens of thousands of them is a pass
-of substring tests on the window's thread. Settings are read from the
+(core/palette_match.py). A query over a few thousand of them is a pass of
+substring tests on the window's thread; over more (tens of thousands of
+channels, hundreds of thousands of programmes: a few tenths of a second, a
+stutter in the video) it runs on a worker of its own, the actions and
+settings shown at once and the channels added when they are in - only
+while the query is still the one typed. Settings are read from the
 Settings window itself, built once (and once more after a language change)
 for its index. Nothing searched is kept anywhere but in memory, and not even
 there during private viewing.
@@ -26,7 +30,7 @@ import time
 from functools import partial
 
 from PyQt6 import sip
-from PyQt6.QtCore import QPoint, QTimer
+from PyQt6.QtCore import QObject, QPoint, QThreadPool, QTimer
 from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QApplication, QMenu
 
@@ -46,6 +50,9 @@ GUIDE_HOURS = 12
 LIMITS = {"actions": 4, "settings": 4, "channels": 4, "programmes": 3}
 #: Shown before anything is typed.
 FIRST_ACTIONS = 8
+#: Channel names and programme titles matched on the window's thread at
+#: most; a guide bigger than this is matched on a worker.
+MATCH_HERE = 5000
 #: Rebindable actions that act on the player: offered while it is up.
 _PLAYER_ONLY = frozenset({"pause", "fullscreen", "mute", "popout", "record", "stats"})
 _PLAYER_KIND = _PLAYER_ONLY | {"zap_next", "zap_prev", "last_channel", "night_mode"}
@@ -76,6 +83,26 @@ class PaletteCatalogue:
 def _number(value) -> str:
     text = str(value if value is not None else "").strip()
     return text.lstrip("0") or ("0" if text else "")
+
+
+def _channel_hits(cat: PaletteCatalogue, query: str, terms: list[str],
+                  latest: list[int] | None = None, gen: int = 0) -> tuple | None:
+    """(channels, programmes): the positions of what *query* finds in
+    *cat*, the best first - the channel by its number, then by name. On a
+    worker for a big guide; None there when a newer query came meanwhile
+    (*latest* holds the newest one's *gen*)."""
+    if latest is not None and latest[0] != gen:
+        return None
+    hits: list[int] = []
+    q = query.strip()
+    if q.isdigit():
+        hits = cat.by_number.get(_number(q), [])[:2]
+    for i in cat.names.search(query, LIMITS["channels"], terms):
+        if i not in hits:
+            hits.append(i)
+    if latest is not None and latest[0] != gen:
+        return None
+    return hits[:LIMITS["channels"]], cat.titles.search(query, LIMITS["programmes"] * 3, terms)
 
 
 class _PaletteMixin:
@@ -245,8 +272,47 @@ class _PaletteMixin:
             return acts[:FIRST_ACTIONS]
         out = [acts[i] for i in self._pal_action_index.search(query, LIMITS["actions"], terms)]
         out += self._palette_find_settings(query, terms)
+        cat = getattr(self, "_pal_catalogue", None)
+        if cat is not None and len(cat.names) + len(cat.titles) > MATCH_HERE:
+            self._palette_match_later(cat, query, terms, out)
+            return out
         out += self._palette_find_channels(query, terms)
         return out
+
+    def _palette_match_later(self, cat: PaletteCatalogue, query: str, terms: list[str],
+                             now: list[Entry]) -> None:
+        """A big guide's channels and programmes for *query*, matched on a
+        worker of the palette's own; *now* (the actions and settings) and
+        what it finds go in once it is done - if the query is still the
+        one typed (CommandPalette.deliver)."""
+        pal = getattr(self, "_palette", None)        # opening: not on screen yet
+        if pal is None or sip.isdeleted(pal):
+            return
+        latest = getattr(self, "_pal_latest", None)
+        if latest is None:
+            latest = self._pal_latest = [0]
+        latest[0] += 1
+        pool = getattr(self, "_pal_pool", None)
+        if pool is None:
+            pool = self._pal_pool = QThreadPool(self) if isinstance(self, QObject) else QThreadPool()
+            pool.setMaxThreadCount(1)              # one at a time: the newest wins anyway
+        pal.expect(query)
+        run_async(pool, partial(_channel_hits, cat, query, terms, latest, latest[0]),
+                  partial(self._palette_matched, latest[0], cat, query, now),
+                  partial(self._palette_match_failed, latest[0], cat, query, now))
+
+    def _palette_matched(self, gen: int, cat: PaletteCatalogue, query: str,
+                         now: list[Entry], hits) -> None:
+        pal = self._palette_open()
+        if (hits is None or pal is None or gen != getattr(self, "_pal_latest", [0])[0]
+                or getattr(self, "_pal_catalogue", None) is not cat):
+            return
+        pal.deliver(query, now + self._palette_channel_entries(cat, *hits))
+
+    def _palette_match_failed(self, gen: int, cat: PaletteCatalogue, query: str,
+                              now: list[Entry], err) -> None:
+        log.debug("palette: the channels were not looked through: %s", err)
+        self._palette_matched(gen, cat, query, now, ([], []))
 
     def _palette_find_settings(self, query: str, terms: list[str]) -> list[Entry]:
         idx = self._palette_settings_lookup()
@@ -270,16 +336,15 @@ class _PaletteMixin:
         cat = getattr(self, "_pal_catalogue", None)
         if cat is None:
             return []
-        hits: list[int] = []
-        q = query.strip()
-        if q.isdigit():
-            hits = cat.by_number.get(_number(q), [])[:2]
-        for i in cat.names.search(query, LIMITS["channels"], terms):
-            if i not in hits:
-                hits.append(i)
+        found = _channel_hits(cat, query, terms)
+        return self._palette_channel_entries(cat, *found) if found else []
+
+    def _palette_channel_entries(self, cat: PaletteCatalogue, hits: list[int],
+                                 titles: list[int]) -> list[Entry]:
+        """The rows of what _channel_hits found (the window's thread)."""
         source = self._palette_source_name()
         out: list[Entry] = []
-        for i in hits[:LIMITS["channels"]]:
+        for i in hits:
             ch = cat.chans[i]
             category = cat.cats.get(str(ch.get("category_id")), "")
             where = " · ".join(t for t in (cat.numbers[i], source, category) if t)
@@ -287,7 +352,7 @@ class _PaletteMixin:
                              where=where, more=where, payload=("channel", ch)))
         now = time.time()
         shown = 0
-        for i in cat.titles.search(query, LIMITS["programmes"] * 3, terms):
+        for i in titles:
             ch, p = cat.airings[i]
             if p["stop_timestamp"] <= now:
                 continue

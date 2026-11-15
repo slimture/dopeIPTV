@@ -216,6 +216,10 @@ class CommandPalette(QWidget):
         self._run = run
         self._open_key = open_key
         self.entries: list[Entry] = []
+        #: The query whose rows are still being looked for off the window's
+        #: thread (expect / deliver), and whether Enter waits for them.
+        self._pending = ""
+        self._run_when_in = False
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
         self.setStyleSheet(self._style())
 
@@ -436,7 +440,10 @@ QLabel#PaletteMore {{ color: {p['text2']}; font-size: 12px; padding: 8px 14px;
         elif k in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             if self._debounce.isActive():
                 self.refresh()
-            self.activate()
+            if self._pending and self._pending == self.field.text():
+                self._run_when_in = True       # run once what was typed is found
+            else:
+                self.activate()
         elif k in (Qt.Key.Key_Tab, Qt.Key.Key_Backtab):
             self.toggle_more()
         else:
@@ -460,6 +467,7 @@ QLabel#PaletteMore {{ color: {p['text2']}; font-size: 12px; padding: 8px 14px;
         if sip.isdeleted(self) or not self.isVisible():
             return
         self._debounce.stop()
+        self._pending, self._run_when_in = "", False
         self.hide()
         self.closed.emit()
 
@@ -472,6 +480,7 @@ QLabel#PaletteMore {{ color: {p['text2']}; font-size: 12px; padding: 8px 14px;
     # -- the rows ------------------------------------------------------------------
 
     def _typed(self, _text: str) -> None:
+        self._run_when_in = False
         self._debounce.start()
 
     def query(self) -> str:
@@ -483,8 +492,37 @@ QLabel#PaletteMore {{ color: {p['text2']}; font-size: 12px; padding: 8px 14px;
         if sip.isdeleted(self):
             return
         q = self.field.text()
+        self._pending = ""
         entries = self._search(q)
         self.set_entries(entries, q)
+
+    def expect(self, query: str) -> None:
+        """More rows for *query* are being looked for off the window's
+        thread (deliver): "nothing found" is not said meanwhile, and Enter
+        waits for them."""
+        self._pending = query
+
+    def deliver(self, query: str, entries: list[Entry]) -> bool:
+        """The rows for *query*, found off the window's thread: shown only
+        while it is still what the field says (the row chosen meanwhile kept
+        chosen), and run if Enter waited for them. False when too late."""
+        if sip.isdeleted(self) or not self._pending or query != self._pending:
+            return False
+        self._pending = ""
+        if query != self.field.text() or self._debounce.isActive():
+            self._run_when_in = False
+            return False
+        chosen = self.current()
+        self.set_entries(entries, query)
+        if chosen is not None:
+            for row in range(self.list.count()):
+                if self._entry_at(row) is chosen:
+                    self.list.setCurrentRow(row)
+                    break
+        if self._run_when_in:
+            self._run_when_in = False
+            self.activate()
+        return True
 
     def set_entries(self, entries: list[Entry], query: str = "") -> None:
         self.entries = list(entries)
@@ -504,7 +542,7 @@ QLabel#PaletteMore {{ color: {p['text2']}; font-size: 12px; padding: 8px 14px;
                 self.list.addItem(it)
         found = any(self._entry_at(i) is not None for i in range(self.list.count()))
         self.none.setText(tr("pal_none", q=query.strip()) if query.strip() else "")
-        self.none.setVisible(bool(query.strip()) and not found)
+        self.none.setVisible(bool(query.strip()) and not found and not self._pending)
         self.more.hide()
         if found:
             self.move_selection(1, start=-1)

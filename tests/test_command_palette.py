@@ -150,6 +150,106 @@ def test_enter_right_after_typing_runs_what_was_typed(app):
     host.close()
 
 
+def test_a_big_guide_is_never_matched_on_the_window_s_thread(app, monkeypatch):
+    """50,000 channels and a guide: a one-letter query took a few tenths of
+    a second on the window's thread, every key typed, and the video drawn
+    there stuttered. The actions come at once, the channels and programmes
+    from a worker - found exactly as before, and only for the query still
+    typed; Enter right after typing still runs what was typed."""
+    import threading
+
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtTest import QTest
+    from PyQt6.QtWidgets import QWidget
+
+    from dopeiptv.ui import mw_palette
+    from dopeiptv.ui.command_palette import CommandPalette, Entry
+
+    now = time.time()
+    chans = [{"name": f"Kanal {i} {'Sport' if i % 7 else 'Nyheter Ström'} HD", "stream_id": i,
+              "category_id": "1"} for i in range(50_000)]
+    airings = [(chans[i], {"title": f"Programme {i} at night", "description": "",
+                           "start_timestamp": now + 60, "stop_timestamp": now + 3600})
+               for i in range(0, 50_000, 5)]
+    cat = mw_palette.PaletteCatalogue(("k",), chans, {"1": "Sweden"}, [str(i + 1) for i in range(50_000)],
+                                      airings)
+    on_window: list[int] = []
+    search = pm.Index.search
+    ours = [False]                    # the test's own reference match, not the window's
+    most = getattr(mw_palette, "MATCH_HERE", 5000)
+
+    def watched(self, *a, **k):
+        if (not ours[0] and threading.current_thread() is threading.main_thread()
+                and len(self) > most):
+            on_window.append(len(self))
+        return search(self, *a, **k)
+    monkeypatch.setattr(pm.Index, "search", watched)
+
+    class Host(QWidget, mw_palette._PaletteMixin):
+        pass
+
+    host = Host()
+    host.resize(1000, 700)
+    played = []
+    host.tune_from_guide = lambda ch: played.append(ch["name"])
+    act = Entry("actions", "View", "Stats for nerds", payload=("call", lambda: None))
+    host._pal_actions = [act]
+    host._pal_action_index = pm.Index([act.text])
+    host._pal_catalogue = cat
+    pal = CommandPalette(host, host._palette_search, host._palette_run)
+    host._palette = pal
+    host.show()
+    pal.open()
+
+    def settled(secs=10.0):
+        end = time.monotonic() + secs
+        while pal._pending and time.monotonic() < end:
+            app.processEvents()
+            time.sleep(0.005)
+        app.processEvents()
+        return not pal._pending
+
+    def expected(q):
+        ours[0] = True
+        try:
+            hits, titles = mw_palette._channel_hits(cat, q, pm.words(q))
+        finally:
+            ours[0] = False
+        return ([chans[i]["name"] for i in hits]
+                + [f"{airings[i][1]['title']}" for i in titles][:mw_palette.LIMITS["programmes"]])
+
+    for q in ("s", "strom", "kanal 4999", "night 12"):
+        pal.field.setText(q)
+        pal.refresh()
+        assert on_window == [], f"matched on the window's thread: {on_window}"
+        assert not pal.none.isVisibleTo(pal), "nothing found is not said while it looks"
+        assert settled(), q
+        got = [e.text.split(" · ")[0] for e in pal.entries if e.group == "channels"]
+        assert got == expected(q), (q, got)
+    assert on_window == []
+
+    # Typed on before the answer came: only the newest query's rows go in.
+    pal.field.setText("sport")
+    pal.refresh()
+    pal.field.setText("nyheter")
+    pal.refresh()
+    assert settled()
+    names = [e.text for e in pal.entries if e.group == "channels" and e.payload[0] == "channel"]
+    assert names and all("Nyheter" in n for n in names), names
+
+    # Enter right after typing: run once it is found, the channel typed.
+    pal.field.clear()
+    QTest.keyClicks(pal.field, "kanal 49999")
+    QTest.keyClick(pal.field, Qt.Key.Key_Return)
+    end = time.monotonic() + 10
+    while not played and time.monotonic() < end:
+        app.processEvents()
+        time.sleep(0.005)
+    assert played == ["Kanal 49999 Sport HD"], played
+    assert on_window == []
+    host.close()
+
+
 def test_a_click_beside_it_closes_it(app):
     from PyQt6.QtCore import QPoint, Qt
     from PyQt6.QtTest import QTest
