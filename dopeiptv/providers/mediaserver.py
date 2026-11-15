@@ -535,6 +535,24 @@ class MediaServerClient(BoxClient):
             return hit[1]
         return None
 
+    #: A channel that opens has an address of its own to hand out, played as
+    #: a file and opened by the server then (Jellyfin's /Videos/<id>/stream);
+    #: Plex's is the tune itself.
+    LIVE_FILE = True
+
+    def copy_url(self, stream_id: int | str) -> str:
+        """A live channel's address to copy (Nerd), with nothing asked of
+        the server: never PlaybackInfo or a tune, which open the channel -
+        a tuner - for an address nobody may ever play. One that opens gives
+        the address it plays from as a file where the server has one, else
+        the one opened a moment ago; "" when there is neither."""
+        row = self._channel(stream_id) if self._loaded else None
+        if row is None:
+            return ""
+        if not row.get("_open") or (self.LIVE_FILE and row.get("_url")):
+            return str(row.get("_url") or "")
+        return self._fresh_live(int(row["stream_id"])) or ""
+
     def live_url(self, stream_id: int | str, fmt: str = "ts") -> str:
         self._ensure(refresh=False)
         row = self._channel(stream_id)

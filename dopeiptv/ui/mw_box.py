@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import os
 import time
+from functools import partial
 from typing import Any, Callable
 
 from PyQt6.QtWidgets import QApplication, QMenu
@@ -31,6 +32,12 @@ from .widgets import confirm
 BOX_SIGNAL_MS = 2000
 # How much of a recorded file is read to tell whether it is encrypted.
 SCRAMBLE_FILE_BYTES = 188 * 2000
+
+
+def _live_address_of(win: Any, sid: Any) -> str:
+    """What Copy stream address asks the source playing for (the window's
+    plan for MainWindow._links_later)."""
+    return win.client.live_url(sid)
 
 
 class _BoxMixin:
@@ -99,13 +106,44 @@ class _BoxMixin:
             self._on_current_changed(cur)
 
     def _copy_stream_url(self, it: dict) -> None:
+        """A live channel's address to the clipboard. A media server's is
+        never asked for (that opens the channel - a tuner - for an address
+        nobody may play): the one it has without asking, or said there is
+        none. One slow to get (a portal's) comes off the window's thread."""
+        sid = it.get("stream_id")
+        copy = getattr(self.client, "copy_url", None)
         try:
-            url = self.client.live_url(it["stream_id"])
+            if callable(copy):
+                url = copy(sid)
+                if not url:
+                    self._show_toast(tr("nerd_url_none"), 5000)
+                    return
+            else:
+                later = getattr(self, "_links_later", None)
+                if later is not None and later(partial(_live_address_of, self, sid),
+                                               partial(self._copy_stream_url, it), key="copy"):
+                    return
+                url = self.client.live_url(sid)
         except Exception:
             url = ""
         if url:
             QApplication.clipboard().setText(url)
             self._show_toast(tr("nerd_url_copied"), 3000)
+
+    def _copy_row_address(self, it: dict) -> None:
+        """The list's Copy stream URL for a row whose address is slow to get
+        (asked only when chosen, never as the menu opens): a live channel as
+        _copy_stream_url copies it, anything else once it is in."""
+        waits = self._link_waits(partial(self._stream_for, it))
+        if waits is not None and waits[0] == "live_url":
+            self._copy_stream_url(it)
+            return
+        if self._links_later(partial(self._stream_for, it), partial(self._copy_row_address, it),
+                             key="copy"):
+            return
+        url, _title = self._stream_for(it)
+        if url:
+            QApplication.clipboard().setText(url)
 
     def _box_record_action(self, menu: QMenu, ch: dict, title: str,
                            start: float, stop: float) -> None:

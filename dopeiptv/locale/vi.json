@@ -2697,5 +2697,6 @@
   "conn_limit_unknown": "Nhà cung cấp không cho biết tài khoản của bạn được phép bao nhiêu kết nối. Hầu hết chỉ cho phép một, và khi đó nhà cung cấp có thể từ chối hoặc cắt việc truyền.",
   "conn_what_test": "Bài kiểm tra này đọc một kênh trực tiếp trong vài giây, việc đó mở thêm một kết nối tới nhà cung cấp.",
   "conn_test_unknown": "Đang có nội dung phát từ tài khoản này, và nhà cung cấp không cho biết được phép bao nhiêu kết nối. Hầu hết chỉ cho phép một, và khi đó nhà cung cấp có thể cắt nội dung đang phát.",
-  "ct_skip_conn": "Chưa thử – việc đó sẽ mở thêm một kết nối tới nhà cung cấp"
+  "ct_skip_conn": "Chưa thử – việc đó sẽ mở thêm một kết nối tới nhà cung cấp",
+  "nerd_url_none": "Máy chủ này chỉ dò kênh khi phát, nên không có địa chỉ nào để sao chép."
 }

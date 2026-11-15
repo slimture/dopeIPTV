@@ -2697,5 +2697,6 @@
   "conn_limit_unknown": "Mtoa huduma wako hasemi akaunti yako inaruhusu miunganisho mingapi. Nyingi huruhusu mmoja tu, na hapo mtoa huduma anaweza kukataa utumaji au kuukata.",
   "conn_what_test": "Jaribio hili husoma chaneli ya moja kwa moja kwa sekunde chache, na hilo hufungua muunganisho mmoja zaidi kwa mtoa huduma wako.",
   "conn_test_unknown": "Kuna kitu kinachocheza tayari kutoka akaunti hii, na mtoa huduma wako hasemi inaruhusu miunganisho mingapi. Nyingi huruhusu mmoja tu, na hapo mtoa huduma anaweza kukata kinachocheza.",
-  "ct_skip_conn": "Haikujaribiwa – ingefungua muunganisho mmoja zaidi kwa mtoa huduma wako"
+  "ct_skip_conn": "Haikujaribiwa – ingefungua muunganisho mmoja zaidi kwa mtoa huduma wako",
+  "nerd_url_none": "Seva hii hupokea chaneli tu ili kuicheza, kwa hiyo hakuna anwani ya kunakili."
 }

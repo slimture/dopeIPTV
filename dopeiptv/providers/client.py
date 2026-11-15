@@ -1101,8 +1101,13 @@ def _nerd_lists(client, source: dict, pid: str | None) -> None:
 
     client.live_streams = live_streams
     client.live_url = live_url
-    vod, episode, archive = (getattr(client, n, None)
-                             for n in ("vod_url", "episode_url", "timeshift_urls"))
+    vod, episode, archive, copy = (getattr(client, n, None)
+                                   for n in ("vod_url", "episode_url", "timeshift_urls", "copy_url"))
+    if copy is not None:
+        def copy_url(stream_id: int | str) -> str:
+            got = copy(stream_id)
+            return nerd_lists.udpxy_url(rewrite(got, source), source) if got else got
+        client.copy_url = copy_url
     if vod is not None:
         def vod_url(stream_id: int | str, ext: str | None = None) -> str:
             return rewrite(vod(stream_id, ext), source)

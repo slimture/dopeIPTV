@@ -2697,5 +2697,6 @@
   "conn_limit_unknown": "Il tuo provider non dice quante connessioni consente il tuo account. La maggior parte ne consente una sola, e allora il provider può rifiutare la trasmissione o interromperla.",
   "conn_what_test": "Questo test legge un canale in diretta per qualche secondo, e così apre un'altra connessione con il tuo provider.",
   "conn_test_unknown": "Da questo account sta già andando qualcosa, e il tuo provider non dice quante connessioni consente. La maggior parte ne consente una sola, e allora il provider può interrompere ciò che è in riproduzione.",
-  "ct_skip_conn": "Non provato – aprirebbe un'altra connessione con il tuo provider"
+  "ct_skip_conn": "Non provato – aprirebbe un'altra connessione con il tuo provider",
+  "nerd_url_none": "Questo server sintonizza un canale solo per riprodurlo, quindi non c'è un indirizzo da copiare."
 }

@@ -631,6 +631,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "nerd_src_transcode_more": {"en": "Transcoded when cast or in multiview too"},
     "nerd_copy_url": {"en": "Copy stream address"},
     "nerd_url_copied": {"en": "Stream address copied."},
+    "nerd_url_none": {"en": "This server tunes a channel only to play it, so it has no address to copy."},
     "nerd_epg_map": {"en": "Guide channel…"},
     "nerd_epg_map_hint": {"en": "Which guide channel has the programmes for {name}?"},
     "nerd_epg_auto": {"en": "Automatic"},

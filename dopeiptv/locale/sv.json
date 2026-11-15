@@ -2697,5 +2697,6 @@
   "conn_limit_unknown": "Din leverantör säger inte hur många anslutningar ditt konto tillåter. De flesta tillåter bara en, och då kan leverantören neka casten eller bryta den.",
   "conn_what_test": "Det här testet läser en livekanal i några sekunder, och det öppnar ytterligare en anslutning till din leverantör.",
   "conn_test_unknown": "Något från det här kontot spelas redan, och din leverantör säger inte hur många anslutningar det tillåter. De flesta tillåter bara en, och då kan leverantören bryta det som spelas.",
-  "ct_skip_conn": "Inte provat – det skulle öppna ytterligare en anslutning till din leverantör"
+  "ct_skip_conn": "Inte provat – det skulle öppna ytterligare en anslutning till din leverantör",
+  "nerd_url_none": "Den här servern ställer bara in en kanal för att spela den, så det finns ingen adress att kopiera."
 }

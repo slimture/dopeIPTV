@@ -67,6 +67,12 @@ def _source_address(playlist: dict, stream_id) -> str:
     return make_client(playlist).live_url(stream_id, "ts") or ""
 
 
+def _window_live(win, stream_id) -> str:
+    """What a recording asks the source playing for (the window's plan for
+    MainWindow._links_later)."""
+    return win.client.live_url(stream_id, "ts") or ""
+
+
 class _RecordingMixin:
     """MainWindow mixin: recording, scheduling and timeshift/catch-up controls."""
     def _job_item(self, j: dict) -> dict:
@@ -569,7 +575,7 @@ class _RecordingMixin:
             if self.player.start_stream_record(path):
                 self.rec.add_inplayer_job(
                     title, path, stop_ts,
-                    url=self.client.live_url(it["stream_id"], "ts"),
+                    url=self._rec_inplayer_url(it),
                     icon=it.get("stream_icon"),
                     recorder=self.player.take_buffer_recorder(),
                     channel=self.channel_display_name(it))
@@ -606,6 +612,17 @@ class _RecordingMixin:
 
         if not self._recorder_ready():
             return
+        # A media server opens the channel to give its address, a portal
+        # asks create_link: off the window's thread first, as the player's.
+        go = partial(self._record_in_background, it, title, now, stop_ts, length)
+        later = getattr(self, "_links_later", None)
+        if later is not None and later(partial(_window_live, self, it["stream_id"]), go,
+                                       key=f"record-{it['stream_id']}"):
+            return
+        go()
+
+    def _record_in_background(self, it, title: str, now: float, stop_ts, length: str) -> None:
+        """A recording of *it* over a connection of its own, from now."""
         url = self.client.live_url(it["stream_id"], "ts")
         # A connection of its own from a box: a tuner of its own too.
         tuner_ok = getattr(self, "_tuner_ok", None)
@@ -619,9 +636,25 @@ class _RecordingMixin:
                                    length=length,
                                    folder=self.rec.directory()))
 
+    def _rec_inplayer_url(self, it) -> str:
+        """The address a recording of the player's own stream keeps: the
+        source's - unless that one is slow to get (a media server would
+        open the channel once more for it, a portal ask create_link), then
+        the one the player was given."""
+        waits = getattr(self, "_link_waits", None)
+        if waits is not None and waits(partial(_window_live, self, it["stream_id"])) is not None:
+            return str((getattr(self, "_last_playback", None) or {}).get("url") or "")
+        return self.client.live_url(it["stream_id"], "ts")
+
     def _switch_and_record(self, it, stop_ts, length: str) -> None:
         """Switch the embedded player to this channel and record the
         stream we're now watching - one connection, no conflict."""
+        # The address first, off the window's thread when it is slow to get:
+        # then the player starts the channel at once, and it is what records.
+        later = getattr(self, "_links_later", None)
+        if later is not None and later(partial(_window_live, self, it["stream_id"]),
+                                       partial(self._switch_and_record, it, stop_ts, length)):
+            return
         title = self.channel_display_name(it)
         try:
             path = self.rec.build_path(title, channel=self.channel_display_name(it))
@@ -632,7 +665,7 @@ class _RecordingMixin:
         if self.player and self.player.start_stream_record(path):
             self.rec.add_inplayer_job(
                 title, path, stop_ts,
-                url=self.client.live_url(it["stream_id"], "ts"),
+                url=self._rec_inplayer_url(it),
                 icon=it.get("stream_icon"),
                 recorder=self.player.take_buffer_recorder())
             self._set_status("● " + tr("rec_started_inplayer",

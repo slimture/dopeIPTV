@@ -2697,5 +2697,6 @@
   "conn_limit_unknown": "O seu provedor não informa quantas conexões a sua conta permite. A maioria permite só uma, e então o provedor pode recusar a transmissão ou cortá-la.",
   "conn_what_test": "Este teste lê um canal ao vivo por alguns segundos, o que abre mais uma conexão com o seu provedor.",
   "conn_test_unknown": "Algo desta conta já está tocando, e o seu provedor não informa quantas conexões permite. A maioria permite só uma, e então o provedor pode cortar o que está tocando.",
-  "ct_skip_conn": "Não tentado – abriria mais uma conexão com o seu provedor"
+  "ct_skip_conn": "Não tentado – abriria mais uma conexão com o seu provedor",
+  "nerd_url_none": "Este servidor só sintoniza um canal para reproduzi-lo, então não há endereço para copiar."
 }

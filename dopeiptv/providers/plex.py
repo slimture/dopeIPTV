@@ -245,6 +245,8 @@ class PlexClient(MediaServerClient):
     KIND = "Plex"
     DEFAULT_PORT = DEFAULT_PORT
     GUIDE_HOURS = 48
+    # A channel's own address is the tune request: nothing to hand out.
+    LIVE_FILE = False
 
     def __init__(self, server: str, token: str, server_id: str = "", account: str = "",
                  options: dict | None = None) -> None:

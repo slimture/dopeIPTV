@@ -2697,5 +2697,6 @@
   "conn_limit_unknown": "Tvoj provajder ne kaže koliko veza tvoj nalog dozvoljava. Većina dozvoljava samo jednu, a tada provajder može da odbije prebacivanje ili da ga prekine.",
   "conn_what_test": "Ovaj test nekoliko sekundi čita kanal uživo, a to otvara još jednu vezu ka tvom provajderu.",
   "conn_test_unknown": "Sa ovog naloga već se nešto pušta, a tvoj provajder ne kaže koliko veza dozvoljava. Većina dozvoljava samo jednu, a tada provajder može da prekine ono što se pušta.",
-  "ct_skip_conn": "Nije pokušano – otvorilo bi još jednu vezu ka tvom provajderu"
+  "ct_skip_conn": "Nije pokušano – otvorilo bi još jednu vezu ka tvom provajderu",
+  "nerd_url_none": "Ovaj server podešava kanal samo da bi ga pustio, pa nema adrese za kopiranje."
 }

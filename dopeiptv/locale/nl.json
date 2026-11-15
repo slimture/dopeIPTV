@@ -2697,5 +2697,6 @@
   "conn_limit_unknown": "Je provider zegt niet hoeveel verbindingen je account toestaat. De meeste staan er maar één toe, en dan kan de provider het casten weigeren of afbreken.",
   "conn_what_test": "Deze test leest een paar seconden een live zender, en dat opent nog een verbinding met je provider.",
   "conn_test_unknown": "Er speelt al iets van dit account, en je provider zegt niet hoeveel verbindingen het toestaat. De meeste staan er maar één toe, en dan kan de provider afbreken wat er speelt.",
-  "ct_skip_conn": "Niet geprobeerd – het zou nog een verbinding met je provider openen"
+  "ct_skip_conn": "Niet geprobeerd – het zou nog een verbinding met je provider openen",
+  "nerd_url_none": "Deze server stemt een zender alleen af om hem af te spelen, dus er is geen adres om te kopiëren."
 }

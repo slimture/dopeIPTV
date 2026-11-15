@@ -3755,21 +3755,24 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     # -- playback ------------------------------------------------------------------
 
-    def _links_later(self, plan, again) -> bool:
-        """A portal (StalkerClient.slow_links) hands out a play address per
-        title through create_link, which can take seconds - on the window's
-        thread, a frozen window. Run *plan* (the code that would ask the
-        client for an address) against a stand-in to learn which address it
-        wants; when that one is not ready, fetch it off the window's thread
-        and call *again* once it is in - the client then has it at once.
-        False when there is nothing to wait for: the caller goes on."""
+    def _link_waits(self, plan) -> tuple | None:
+        """(method, args, kwargs) of the address *plan* (the code that would
+        ask the client for one) wants, when getting it would wait on the
+        network - a portal's create_link, a media server opening a live
+        channel (StalkerClient / BoxClient slow_links); None when it answers
+        at once. *plan* runs against a stand-in that has the client's own
+        methods and nothing else, so its getattr(client, ..., None) tests
+        come out as they would on the client."""
         client = self.client
         if not getattr(client, "slow_links", False):
-            return False
+            return None
         asked: list = []
 
         class _StandIn:
             def __getattr__(self, name):
+                if not hasattr(client, name):
+                    raise AttributeError(name)
+
                 def call(*a, **k):
                     asked.append((name, a, k))
                     return ""
@@ -3783,20 +3786,36 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         finally:
             self.client = client
         if not asked:
-            return False
+            return None
         name, a, k = asked[0]
         ready = getattr(client, "link_ready", None)
         if ready is None or not a or ready(name, a[0]):
+            return None
+        return name, a, k
+
+    def _links_later(self, plan, again, key: str = "play") -> bool:
+        """When the address *plan* wants is slow to get (_link_waits), fetch
+        it off the window's thread and call *again* once it is in - the
+        client then has it at once. Only the newest ask of each *key* goes
+        on ("play": the player's; a multiview cell, a cast, a recording have
+        their own), and only on the same provider. False when there is
+        nothing to wait for: the caller goes on."""
+        waits = MainWindow._link_waits(self, plan)
+        if waits is None:
             return False
-        self._link_gen = gen = getattr(self, "_link_gen", 0) + 1
+        client = self.client
+        name, a, k = waits
+        gens = getattr(self, "_link_gens", None)
+        if gens is None:
+            gens = self._link_gens = {}
+        gens[key] = gen = gens.get(key, 0) + 1
         self._set_status(tr("status_loading_content"))
 
         def work():
             return getattr(client, name)(*a, **k)
 
         def done(_url) -> None:
-            # Only the newest ask, and only on the same provider.
-            if gen == self._link_gen and self.client is client:
+            if gen == self._link_gens.get(key) and self.client is client:
                 again()
 
         run_async(self.pool, work, done, lambda _e: done(""))

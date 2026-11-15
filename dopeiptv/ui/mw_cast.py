@@ -40,6 +40,7 @@ from __future__ import annotations
 import threading
 import time
 from datetime import datetime, timedelta
+from functools import partial
 
 from PyQt6 import sip
 from PyQt6.QtWidgets import (
@@ -59,6 +60,17 @@ from .theme import P
 from .widgets import cast_strip_icon
 
 
+def _live_cast_address(win, sid) -> str:
+    """A live channel's address for a cast: its HLS, or what a box that
+    transcodes gives for a cast (ui/mw_box.py)."""
+    play = getattr(win, "_live_play_url", None)
+    return play(sid, "m3u8", "cast") if play is not None else win.client.live_url(sid, "m3u8")
+
+
+def _live_hls(win, sid) -> str:
+    return win.client.live_url(sid, "m3u8")
+
+
 class _CastMixin:
     """MainWindow mixin: casting to a Chromecast or a DLNA TV."""
 
@@ -76,6 +88,20 @@ class _CastMixin:
                 and ctx.get("key") == self._item_key(it)):
             self.manage_cast()
             return
+        row_kind = it.get("_kind")
+        if row_kind:
+            live = row_kind == "live"
+        else:
+            live = (self._content_kind() in ("live", "fav")
+                    or (self.mode == "fav" and self._fav_section == "chan"))
+        sid = it.get("stream_id")
+        # A media server opens the channel to give its address, a portal asks
+        # create_link: off the window's thread first, as the player's.
+        later = getattr(self, "_links_later", None)
+        if live and sid is not None and later is not None and later(
+                partial(_live_cast_address, self, sid), partial(self._open_cast_dialog, it),
+                key="cast"):
+            return
         url, title = self._stream_for(it)
         if not url:
             url = it.get("_url")
@@ -91,23 +117,14 @@ class _CastMixin:
         # channel: a movie row in Favorites was handed a /live/ address built
         # from its own id, which the panel answers with a 4XX - to the
         # receiver, to the converter, to everything.
-        row_kind = it.get("_kind")
-        if row_kind:
-            live = row_kind == "live"
-        else:
-            live = (self._content_kind() in ("live", "fav")
-                    or (self.mode == "fav" and self._fav_section == "chan"))
         # Two addresses for the same channel. HLS is the one a Chromecast can
         # take directly; the plain stream is the one the player is watching -
         # and some channels are not served as HLS at all, which is a 4XX to
         # everything that asks. The converter reads that one, since ffmpeg has
         # no trouble with a transport stream and the receiver never sees it.
         source = url
-        sid = it.get("stream_id")
         if live and sid is not None:
-            play = getattr(self, "_live_play_url", None)
-            url = (play(sid, "m3u8", "cast") if play is not None
-                   else self.client.live_url(sid, "m3u8"))
+            url = _live_cast_address(self, sid)
         elif row_kind in ("movie", "vod") and sid is not None:
             # Build the film's own address rather than trust what the section
             # produced. In the Favorites channel folders _stream_for answers
@@ -695,8 +712,15 @@ class _CastMixin:
         # The same two addresses the cast dialog takes: HLS for a receiver
         # that fetches it itself, the plain stream for the converter and
         # for a TV or Kodi, which play it as it is.
+        waits = getattr(self, "_link_waits", None)
         try:
-            hls = self.client.live_url(sid, "m3u8") or url
+            if waits is not None and waits(partial(_live_hls, self, sid)) is not None:
+                # Slow to get - a media server would open the channel once
+                # more, a portal ask create_link - and theirs is the same
+                # address whatever the format: the one the play path got.
+                hls = url
+            else:
+                hls = self.client.live_url(sid, "m3u8") or url
         except Exception as e:
             log.debug("cast: no HLS address for the channel (%s)", e)
             hls = url

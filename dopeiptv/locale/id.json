@@ -2697,5 +2697,6 @@
   "conn_limit_unknown": "Penyediamu tidak menyebutkan berapa koneksi yang diizinkan akunmu. Sebagian besar hanya mengizinkan satu, dan penyedia lalu bisa menolak pengiriman atau memutusnya.",
   "conn_what_test": "Tes ini membaca saluran langsung selama beberapa detik, dan itu membuka satu koneksi lagi ke penyediamu.",
   "conn_test_unknown": "Sesuatu dari akun ini sedang diputar, dan penyediamu tidak menyebutkan berapa koneksi yang diizinkan. Sebagian besar hanya mengizinkan satu, dan penyedia lalu bisa memutus yang sedang diputar.",
-  "ct_skip_conn": "Tidak dicoba – itu akan membuka satu koneksi lagi ke penyediamu"
+  "ct_skip_conn": "Tidak dicoba – itu akan membuka satu koneksi lagi ke penyediamu",
+  "nerd_url_none": "Server ini hanya menyetel saluran untuk memutarnya, jadi tidak ada alamat untuk disalin."
 }

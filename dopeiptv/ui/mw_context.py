@@ -5,6 +5,8 @@ Verbatim move - self.* access and behaviour unchanged.
 
 from __future__ import annotations
 
+from functools import partial
+
 from .dialogs import ContentManagerDialog
 from ..core.stores import FAV_DEFAULT_GROUP
 from ..i18n import tr
@@ -304,12 +306,18 @@ class _ContextMenuMixin:
                         lambda: self._remove_history_selected(it))
         if (not (self.mode == "series" and not self.series_ctx)
                 and self.mode != "history"):
-            url, _ = self._stream_for(it)
-            if url:
+            if self._link_waits(partial(self._stream_for, it)) is not None:
+                # Slow to get - a media server would open the channel for
+                # it, a portal ask create_link: asked only when chosen.
                 m.addSeparator()
-                m.addAction(
-                    tr("ctx_copy_stream_url"),
-                    lambda: QApplication.clipboard().setText(url))
+                m.addAction(tr("ctx_copy_stream_url"), partial(self._copy_row_address, it))
+            else:
+                url, _ = self._stream_for(it)
+                if url:
+                    m.addSeparator()
+                    m.addAction(
+                        tr("ctx_copy_stream_url"),
+                        lambda: QApplication.clipboard().setText(url))
         m.exec(self.listw.viewport().mapToGlobal(pos))
 
     # -- channel customizations ----------------------------------------------------

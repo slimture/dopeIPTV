@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime
+from functools import partial
 
 from PyQt6.QtCore import QPointF, QRectF, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap, QPolygonF
@@ -1284,11 +1285,20 @@ class _MultiviewMixin:
         if sid is None:
             return
         fmt = self.settings.value("stream_format", "ts")
-        try:
+
+        def address():
             # A box that transcodes says which address (ui/mw_box.py).
             play = getattr(self, "_live_play_url", None)
-            url = (play(sid, fmt, "multiview") if play is not None
-                   else self.client.live_url(sid, fmt))
+            return (play(sid, fmt, "multiview") if play is not None
+                    else self.client.live_url(sid, fmt))
+        # A media server opens the channel to give its address, a portal
+        # asks create_link: off the window's thread first, as the player's.
+        later = getattr(self, "_links_later", None)
+        came = partial(self._mv_address_came, it, cell, getattr(self, "_multiview_win", None))
+        if later is not None and later(address, came, key=f"multiview-{sid}-{cell}"):
+            return
+        try:
+            url = address()
         except Exception:
             url = it.get("_url")
         # Watching in multiview counts as watching - record it in History
@@ -1306,6 +1316,13 @@ class _MultiviewMixin:
             url, it.get("name") or it.get("title") or "", cell,
             item=it, client=self.client, guide=getattr(self, "xmltv", None),
             playlist=self._active_playlist_name(), source=self._mv_source())
+
+    def _mv_address_came(self, it, cell: int | None, win) -> None:
+        """The address a cell waited for is in: added - unless the grid it
+        was asked for in has been closed meanwhile."""
+        if win is not None and getattr(self, "_multiview_win", None) is not win:
+            return
+        self._add_channel_to_multiview(it, cell)
 
     def _multiview_available(self) -> bool:
         """Multiview is made of OpenGL video surfaces, and on a display with
