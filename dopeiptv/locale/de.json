@@ -53,6 +53,8 @@
   "tab_recording": "Aufnahme",
   "tab_trakt": "Trakt",
   "setting_autoplay_preview": "Vorschau bei Auswahl automatisch abspielen",
+  "setting_stream_info": "Streaminformationen anzeigen",
+  "setting_stream_info_hint": "Auflösung, Quellbildrate und Codec beim Senderwechsel kurz und unter dem Programmfortschrittsbalken anzeigen. Die Senderliste nutzt die zuletzt bei der Wiedergabe erfassten Werte, ohne zusätzliche Streams zu öffnen.",
   "setting_autoplay_next": "Nächste Folge automatisch abspielen",
   "setting_auto_reconnect": "Live-Streams automatisch neu verbinden",
   "setting_stream_format": "Livestream-Format",

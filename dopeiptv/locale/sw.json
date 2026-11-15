@@ -53,6 +53,8 @@
   "tab_recording": "Kurekodi",
   "tab_trakt": "Trakt",
   "setting_autoplay_preview": "Cheza onyesho la awali kiotomatiki wakati wa kuchagua",
+  "setting_stream_info": "Onyesha taarifa za mtiririko",
+  "setting_stream_info_hint": "Onyesha mwonekano, FPS ya chanzo na kodeki kwa muda mfupi unapobadili chaneli na chini ya upau wa maendeleo ya kipindi. Orodha hutumia thamani za mwisho zilizoonekana wakati wa kucheza, bila kufungua mitiririko ya ziada.",
   "setting_autoplay_next": "Cheza kipindi kinachofuata kiotomatiki",
   "setting_auto_reconnect": "Unganisha upya mitiririko ya moja kwa moja kiotomatiki",
   "setting_stream_format": "Muundo wa mtiririko wa moja kwa moja",

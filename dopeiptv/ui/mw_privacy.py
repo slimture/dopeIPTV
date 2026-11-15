@@ -151,6 +151,13 @@ class _PrivacyMixin:
             from ..services.resume import ResumeStore
             pl = self.playlist_store.active() if self.playlist_store else None
             self.resume = ResumeStore(resume_settings, (pl or {}).get("id"))
+        # So do the channels' stream details, gone with the channels.
+        if c["channels"] and hasattr(self, "_stream_info_forget"):
+            self._stream_info_forget()
+            try:
+                self.listw.viewport().update()
+            except Exception:
+                pass
         total = sum(counts.values())
         self._show_toast(tr("clear_done", n=total) if total else tr("clear_nothing"), 5000)
         self._after_clear()

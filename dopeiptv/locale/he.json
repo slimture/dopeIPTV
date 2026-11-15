@@ -53,6 +53,8 @@
   "tab_recording": "הקלטה",
   "tab_trakt": "Trakt",
   "setting_autoplay_preview": "השמע תצוגה מקדימה אוטומטית בבחירה",
+  "setting_stream_info": "הצגת פרטי השידור",
+  "setting_stream_info_hint": "הצגת רזולוציה, קצב פריימים של המקור וקודק לזמן קצר בהחלפת ערוץ ומתחת לפס התקדמות התוכנית. הרשימה משתמשת בנתונים האחרונים שנצפו בניגון, בלי לפתוח שידורים נוספים.",
   "setting_autoplay_next": "השמע את הפרק הבא אוטומטית",
   "setting_auto_reconnect": "התחבר מחדש אוטומטית לשידורים חיים",
   "setting_stream_format": "פורמט שידור חי",

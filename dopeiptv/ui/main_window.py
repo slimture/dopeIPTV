@@ -78,6 +78,7 @@ from .mw_connections import _ConnectionsMixin
 from .mw_mirrors import _MirrorsMixin
 from .mw_portal_archive import _PortalArchiveMixin
 from .mw_health import _HealthMixin
+from .mw_stream_info import _StreamInfoMixin
 from .mw_remote import _RemoteMixin
 from .mw_phone import _PhoneMixin
 from .mw_calendar import _CalendarMixin
@@ -142,7 +143,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _MprisMixin,
                  _FollowMixin, _SubtitlesMixin, _CastMixin, _AirPlayMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
-                 _HealthMixin, _ChannelPrefsMixin, _RemoteMixin, _PhoneMixin, _CalendarMixin,
+                 _HealthMixin, _StreamInfoMixin, _ChannelPrefsMixin, _RemoteMixin, _PhoneMixin, _CalendarMixin,
                  _EventsMixin, _ReportMixin,
                  _PortalArchiveMixin, _SeriesMixin, _SyncMixin,
                  _ConnectionsMixin, _MirrorsMixin, _TogetherMixin, _StatsMixin,
@@ -1325,6 +1326,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.contested.connect(self._on_stream_contested)
             self.player.reopen_live.connect(self._reopen_live_edge)
             self.player.first_frame.connect(self._health_frame)
+            self.player.stream_info_changed.connect(self._remember_stream_info)
             # Before _on_player_finished, which may start the next episode.
             self.player.finished.connect(self._events_finished)
             self.player.finished.connect(self._stats_end)

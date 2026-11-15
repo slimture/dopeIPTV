@@ -53,6 +53,8 @@
   "tab_recording": "Inspelning",
   "tab_trakt": "Trakt",
   "setting_autoplay_preview": "Spela förhandsvisning automatiskt vid val",
+  "setting_stream_info": "Visa ströminformation",
+  "setting_stream_info_hint": "Visa upplösning, källans bildfrekvens och kodek kort vid kanalbyte och under programmets förloppsindikator. Listan använder senast observerade värden från uppspelningen utan att öppna fler strömmar.",
   "setting_autoplay_next": "Spela nästa avsnitt automatiskt",
   "setting_auto_reconnect": "Återanslut live-streamar automatiskt",
   "setting_stream_format": "Format för liveström",

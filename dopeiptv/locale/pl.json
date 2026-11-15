@@ -53,6 +53,8 @@
   "tab_recording": "Nagrywanie",
   "tab_trakt": "Trakt",
   "setting_autoplay_preview": "Automatycznie odtwarzaj podgląd po zaznaczeniu",
+  "setting_stream_info": "Pokaż informacje o strumieniu",
+  "setting_stream_info_hint": "Pokazuj krótko rozdzielczość, źródłową liczbę klatek i kodek po zmianie kanału oraz pod paskiem postępu programu. Lista korzysta z ostatnich danych odczytanych podczas odtwarzania, bez otwierania dodatkowych strumieni.",
   "setting_autoplay_next": "Automatycznie odtwarzaj następny odcinek",
   "setting_auto_reconnect": "Automatycznie łącz ponownie transmisje na żywo",
   "setting_stream_format": "Format transmisji na żywo",

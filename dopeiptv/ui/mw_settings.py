@@ -1094,6 +1094,9 @@ class _SettingsMixin:
                ("240", tr("dur_4h")), ("360", tr("dur_6h"))],
             str(self.settings.value("live_rewind_minutes", "2")))
         c = play.card(tr("set_card_behaviour"))
+        stream_info_box = c.toggle(
+            tr("setting_stream_info"), is_on("show_stream_info", "false"),
+            tr("setting_stream_info_hint"))
         autoplay_box = c.toggle(tr("setting_autoplay_preview"),
                                 self._autoplay_preview())
         autoplay_next_box = c.toggle(
@@ -2345,6 +2348,7 @@ class _SettingsMixin:
             # Stored inverted: the switch asks whether to *show* the prompt.
             put("hide_upcoming_prompt",
                 "false" if upcoming_box.isChecked() else "true")
+            put("show_stream_info", flag(stream_info_box))
             put("autoplay_preview", flag(autoplay_box))
             put("autoplay_next_episode", flag(autoplay_next_box))
             put("nextup_lead_secs", nextup_box.currentData())
@@ -2497,7 +2501,9 @@ class _SettingsMixin:
                 self.cover.reload()
             if changed & player_keys and self.player:
                 self.player.apply_default_options()
-            if changed & {"view_density", "sort_order"}:
+            if "show_stream_info" in changed and self.player:
+                self.player._read_stream_info()
+            if changed & {"view_density", "sort_order", "show_stream_info"}:
                 self._apply_view_settings()
                 self.list_model.refresh_all()
             visit.update(changed)

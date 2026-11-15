@@ -53,6 +53,8 @@
   "tab_recording": "ضبط",
   "tab_trakt": "Trakt",
   "setting_autoplay_preview": "پخش خودکار پیش‌نمایش هنگام انتخاب",
+  "setting_stream_info": "نمایش اطلاعات پخش",
+  "setting_stream_info_hint": "وضوح، نرخ فریم منبع و کدک را هنگام تغییر کانال برای مدت کوتاه و زیر نوار پیشرفت برنامه نشان بده. فهرست از آخرین مقادیر مشاهده‌شده هنگام پخش استفاده می‌کند، بدون باز کردن جریان اضافی.",
   "setting_autoplay_next": "پخش خودکار قسمت بعدی",
   "setting_auto_reconnect": "اتصال مجدد خودکار پخش‌های زنده",
   "setting_stream_format": "قالب پخش زنده",

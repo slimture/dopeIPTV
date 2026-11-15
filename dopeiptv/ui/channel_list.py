@@ -530,6 +530,9 @@ class ChannelDelegate(QStyledItemDelegate):
         self.level = level if level in self.DENSITIES else "medium"
         self.row_h, self.logo_sz, self.name_pt, self.sub_pt = \
             self.DENSITIES[self.level]
+        from ..core.stream_info import enabled
+        if enabled(getattr(self.window, "settings", None)):
+            self.row_h += self.sub_pt + 10
         self.cell_w, self.cell_h, self.grid_logo, self.grid_name_pt = \
             self.GRID[self.level]
 
@@ -980,7 +983,10 @@ class ChannelDelegate(QStyledItemDelegate):
         name_h = self.name_pt + 8
         sub_h = (self.sub_pt + 6) if now else 0
         bar_h = 6 if (now or resume_pct is not None) else 0
-        block_h = name_h + sub_h + bar_h
+        info_get = getattr(self.window, "channel_stream_info", None)
+        info = info_get(it, kind) if info_get else ""
+        info_h = self.sub_pt + 10 if info else 0
+        block_h = name_h + sub_h + bar_h + info_h
         y = rect.top() + (rect.height() - block_h) // 2
 
         painter.setPen(
@@ -1045,4 +1051,13 @@ class ChannelDelegate(QStyledItemDelegate):
                 painter.drawRoundedRect(
                     QRect(bar_rect.x(), bar_rect.y(),
                           fill_w, bar_rect.height()), 2, 2)
+        if info:
+            fsub = QFont()
+            fsub.setPointSize(self.sub_pt)
+            painter.setFont(fsub)
+            painter.setPen(QColor(P["muted"]))
+            painter.drawText(
+                QRect(text_x, y + name_h + sub_h + bar_h, text_w, info_h),
+                Qt.AlignmentFlag.AlignVCenter,
+                painter.fontMetrics().elidedText(info, Qt.TextElideMode.ElideRight, text_w))
         painter.restore()

@@ -175,6 +175,8 @@ _STRINGS: dict[str, dict[str, str]] = {
     # ── Settings labels (Playback) ────────────────────────────────────────
 
     "setting_autoplay_preview": {"en": "Auto-play preview on selection"},
+    "setting_stream_info": {"en": "Show stream information"},
+    "setting_stream_info_hint": {"en": "Show resolution, source FPS and codec briefly when changing channels and below the programme progress bar. Channel lists use the last values observed during playback; no extra streams are opened."},
     "setting_autoplay_next": {"en": "Auto-play next episode"},
     "setting_nextup_lead": {"en": "Show \"Next episode\" before the end"},
     "setting_auto_reconnect": {"en": "Auto-reconnect live streams"},

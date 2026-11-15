@@ -28,6 +28,7 @@ from .dvr_player import DvrPlayerMixin
 from .rewind_bar import RewindBarMixin
 from .seek_slider import _SeekSlider, _format_time
 from .subtitle_text import fixed_bytes
+from .stream_info import StreamInfoMixin
 from .video_surface import _MpvGLWidget, _RasterMirror
 from ..ui.theme import P
 
@@ -500,9 +501,12 @@ def _delay_key(channel: str) -> str:
     return channel_prefs.legacy_key(channel)
 
 
-class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
+class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
     """Video pane with libmpv OpenGL rendering, control bar, and fullscreen overlay."""
 
+    _info_loaded = pyqtSignal(str)
+    _info_reconfig = pyqtSignal()
+    stream_info_changed = pyqtSignal(str, object)
     double_clicked = pyqtSignal()
     playback_error = pyqtSignal(str)
     zap = pyqtSignal(int)
@@ -1023,6 +1027,7 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         self._stats_timer = QTimer(self)
         self._stats_timer.setInterval(1000)
         self._stats_timer.timeout.connect(self._update_stats_text)
+        self._init_stream_info(P)
 
         # Top-left "am I live?" badge: red LIVE at the live edge, a neutral
         # TIMESHIFT pill when watching the catch-up archive. A sibling of the
@@ -1464,7 +1469,7 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         self._ov_surface = m
         m.installEventFilter(self)      # its resizes re-place the bars
         for ov in (self.seek_overlay, self.ts_timeline, self._stats_overlay,
-                   self.nextup_btn, self.local_buffer_bar):
+                   self.nextup_btn, self.local_buffer_bar, self.stream_info_badge):
             if ov is not None:
                 ov.setParent(parent)
                 ov.hide()
@@ -1658,7 +1663,7 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         # Overlays back onto the docked player.
         self._ov_surface = self.video
         for ov in (self.seek_overlay, self.ts_timeline, self._stats_overlay,
-                   self.nextup_btn, self.local_buffer_bar):
+                   self.nextup_btn, self.local_buffer_bar, self.stream_info_badge):
             if ov is not None:
                 ov.setParent(self)
                 ov.hide()
@@ -2207,6 +2212,8 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         """Re-place the bars that float over the bottom of the video - the
         seek bar, the timeshift timeline and the DVR row - that are showing.
         The timeline first: the DVR row goes above it when both show."""
+        if self.stream_info_badge.isVisible():
+            self._place_stream_info()
         if self.seek_overlay is not None and self.seek_overlay.isVisible():
             self._place_seek_overlay()
         if self.ts_timeline.isVisible():
@@ -2701,6 +2708,7 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         # Nerd: the channel this is (set_channel, one-shot) and the settings
         # of its own it plays with - none for anything else.
         chan, self._chan_armed = self._chan_armed, None
+        self._reset_stream_info()
         self._chan_key = chan
         self._chan_own = self._channel_own(chan, buffer_key or url)
         local_buffer = local_buffer and self._live_rewind_minutes() > 0
@@ -2891,6 +2899,10 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
                 m["start"] = str(float(start)) if start and start > 1 else "none"
             except Exception:
                 pass
+            try:
+                self._arm_stream_info(m, source or url)
+            except Exception as e:
+                log.debug("Stream info unavailable: %s", e)
             m.play(source or url)
             self.current_url = url
             # Unpause AGAIN, after the load. keep-open=yes pauses mpv when a
@@ -2920,6 +2932,7 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         except Exception as e:
             log.error("Embedded playback failed: %s: %s", type(e).__name__, e)
             self.current_url = None
+            self._reset_stream_info()
             self._end_dvr()
             return False
 
@@ -3963,6 +3976,7 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
             pass
 
     def stop(self) -> None:
+        self._reset_stream_info()
         self._end_dvr()
         self._local_buffer_enabled = False
         self._local_buffer_ready = False
