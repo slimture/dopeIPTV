@@ -2173,6 +2173,8 @@ _STRINGS: dict[str, dict[str, str]] = {
     "conn_times": {"en": "{what} ×{n}"},
     "conn_anyway": {"en": "Go ahead anyway"},
     "conn_what_multiview": {"en": "Playing this in multiview opens another connection to your provider."},
+    "conn_k_cast": {"en": "cast to a TV"},
+    "conn_what_cast": {"en": "Casting this opens another connection to your provider."},
     # -- Nerd: own DNS, low latency, an IP version per source, a trusted certificate --
     "nerd_card_dns": {"en": "Own DNS"},
     "nerd_dns_intro": {"en": "Your sources' names looked up over HTTPS (DNS over HTTPS): your network's DNS, often your internet provider's, never sees them."},

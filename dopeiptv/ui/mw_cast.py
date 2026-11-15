@@ -91,6 +91,10 @@ class _CastMixin:
             url = source = it["_cast_url"]
         if not url:
             return
+        # The way in every stream takes: Nerd's VPN guard, and the account's
+        # connections - the TV, Kodi or the converter here holds one.
+        if self._vpn_guard_blocks(source) or not self._conn_ok_cast(source):
+            return
         # Remember what is being cast, not just where to. Pausing a live
         # channel is answered from the provider's archive, and that needs the
         # channel's own id long after this dialog is gone.

@@ -102,7 +102,7 @@ class _DiscordMixin:
         try:
             # Kept while the switch is off too, so turning it on shows what
             # plays; never during private viewing.
-            if not discord_offered() or privacy.private():
+            if not discord_offered() or privacy.playback_private(kind, key):
                 self._discord_now = None
                 return
             prev = self._discord_now or {}

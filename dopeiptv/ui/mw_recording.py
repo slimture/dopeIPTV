@@ -360,7 +360,9 @@ class _RecordingMixin:
         uses = getattr(self, "_conn_uses", None)
         if check is None or uses is None:
             return None
-        return check(uses(free_player=free_player))
+        # A cast ends as the docked player starts (mw_cast), and never runs
+        # next to a busy player: it is not one of the rest here.
+        return check([u for u in uses(free_player=free_player) if u.kind != "cast"])
 
     def _with_conn_warning(self, body: str, verdict) -> str:
         add = getattr(self, "_conn_with_warning", None)

@@ -19,7 +19,7 @@ from typing import Any
 
 from PyQt6.QtCore import QTimer
 
-from ..core import viewing_stats
+from ..core import privacy, viewing_stats
 from ..core.log import log
 
 
@@ -51,7 +51,6 @@ class _StatsMixin:
     def _stats_seed(self, vlog: viewing_stats.ViewingLog) -> None:
         import json
 
-        from ..core import privacy
         rs = getattr(self, "_resume_settings", None) or self.settings
         found = []
         for key in privacy.resume_keys(rs):
@@ -94,7 +93,9 @@ class _StatsMixin:
         this one from now."""
         try:
             self._stats_flush()
-            self._stats_now = self._stats_what(key, title, item, kind)
+            # A playback that was private counts nothing, to its end.
+            self._stats_now = (None if privacy.playback_private(kind, key)
+                               else self._stats_what(key, title, item, kind))
             self._stats_mark = time.monotonic()
             self._stats_paused = False
             if self._stats_timer is None:

@@ -2216,5 +2216,7 @@
   "airplay_pick": "اختر جهاز Apple TV من قائمة AirPlay — يفتحها زر AirPlay هنا.",
   "airplay_on_tv": "يُعرض على Apple TV. ينقله زر AirPlay هنا إلى جهاز آخر.",
   "airplay_cpu": "تُحوَّل الصورة على هذا الـ Mac من أجل Apple TV، ما يُشغل المعالج طوال التشغيل.",
-  "airplay_menu_note": "يعرض Apple TV صورة البث وصوته كما هما — ويُختار من قائمة AirPlay في لوحة الإرسال."
+  "airplay_menu_note": "يعرض Apple TV صورة البث وصوته كما هما — ويُختار من قائمة AirPlay في لوحة الإرسال.",
+  "conn_k_cast": "بث إلى تلفاز",
+  "conn_what_cast": "إرسال هذا يفتح اتصالًا إضافيًا بمزوّدك."
 }

@@ -2216,5 +2216,7 @@
   "airplay_pick": "Välj din Apple TV i AirPlay-menyn — AirPlay-knappen här öppnar den.",
   "airplay_on_tv": "Spelas på din Apple TV. AirPlay-knappen här flyttar den till en annan.",
   "airplay_cpu": "Bilden konverteras på den här Macen för din Apple TV, vilket håller processorn sysselsatt medan den spelas.",
-  "airplay_menu_note": "Din Apple TV spelar strömmens egen bild och ljud — den väljs i AirPlay-menyn i cast-panelen."
+  "airplay_menu_note": "Din Apple TV spelar strömmens egen bild och ljud — den väljs i AirPlay-menyn i cast-panelen.",
+  "conn_k_cast": "castning till tv:n",
+  "conn_what_cast": "Att casta det här öppnar ytterligare en anslutning till din leverantör."
 }

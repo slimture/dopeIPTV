@@ -1,7 +1,7 @@
 """Connections to the account in the window (core/connections.py): the
 app's own counted as they are now - the player, the rewind buffers, a
-recording over a connection of its own, each multiview cell - and, before
-the app opens one more itself, a plain warning when that would go over
+recording over a connection of its own, each multiview cell, a cast - and,
+before the app opens one more itself, a plain warning when that would go over
 what the account allows, with the choice to go ahead anyway.
 
 For everyone, not only Nerd. Nothing is said while the account gives no
@@ -21,7 +21,8 @@ from ..i18n import tr
 #: still stands next to the app's own count now.
 SEEN_FRESH_SECS = 15.0
 KIND_WORDS = {"player": "conn_k_player", "buffer": "conn_k_buffer",
-              "recording": "conn_k_recording", "multiview": "conn_k_multiview"}
+              "recording": "conn_k_recording", "multiview": "conn_k_multiview",
+              "cast": "conn_k_cast"}
 
 
 class _ConnectionsMixin:
@@ -77,7 +78,22 @@ class _ConnectionsMixin:
         for c in (getattr(win, "cells", None) or []):
             if c is not free_cell and connections.is_network(getattr(c, "url", None)):
                 uses.append(Use("multiview", str(getattr(c, "source_id", "") or "")))
+        if self._conn_casting():
+            uses.append(Use("cast", self._conn_source()))
         return uses
+
+    def _conn_casting(self) -> bool:
+        """A cast of a stream runs: whether the TV or Kodi fetches it or the
+        converter here does, it is one connection to the account (a file
+        of this computer's is none)."""
+        cast = getattr(self, "cast", None)
+        try:
+            if cast is None or getattr(cast, "active", None) is None:
+                return False
+        except Exception:
+            return False
+        ctx = getattr(self, "_cast_ctx", None) or {}
+        return connections.is_network(ctx.get("row_source") or ctx.get("row_url"))
 
     def _conn_seen(self, source: str | None = None, info: dict | None = None,
                    own: int | None = None) -> None:
@@ -176,3 +192,13 @@ class _ConnectionsMixin:
                               getattr(win, "_focused", None) or cells[0])
         v = self._conn_verdict(self._conn_uses(free_player=free_player, free_cell=target))
         return v is None or self._conn_ask(v, "conn_what_multiview")
+
+    def _conn_ok_cast(self, url: str = "") -> bool:
+        """*url* cast to a TV: the player hands its stream over (it stops
+        once the cast plays) and a cast running already gives way, so the
+        cast is one more next to the rest."""
+        if not connections.is_network(url):
+            return True
+        uses = [u for u in self._conn_uses(free_player=True) if u.kind != "cast"]
+        v = self._conn_verdict(uses)
+        return v is None or self._conn_ask(v, "conn_what_cast")

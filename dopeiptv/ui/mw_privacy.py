@@ -90,18 +90,33 @@ class _PrivacyMixin:
         """Turn private viewing on or off (it ends with the app anyway)."""
         on = bool(on)
         was = privacy.private()
+        if on and not was and hasattr(self, "_stats_flush"):
+            self._stats_flush()         # what played before counts
         privacy.set_private(on)
         if on:
+            # What plays now is private to the end of its run (core/privacy).
+            p = getattr(self, "player", None)
+            lp = getattr(self, "_last_playback", None) or {}
+            if p is not None and getattr(p, "current_url", None) and lp:
+                privacy.playback_started(lp.get("kind") or "", lp.get("key"))
             # A Trakt or Simkl scrobble already under way is let go, not
             # stopped: a stop would report the progress and file it in the
             # history.
             self._trakt_active = None
             self._simkl_active = None
+            # The statistics count nothing more of it; a media server hears
+            # where it got to, and no more.
+            self._stats_now = None
+            if hasattr(self, "_ms_leave"):
+                self._ms_leave()
             # Watch together tells the others what plays: out of the room.
             if hasattr(self, "_together_private_on"):
                 self._together_private_on()
-        # Discord's status goes as private viewing starts, and comes back
-        # (for what plays then) as it ends.
+        # Home Assistant's retained state says it at once, either way.
+        if hasattr(self, "_events_private_changed"):
+            self._events_private_changed(on)
+        # Discord's status goes as private viewing starts; what is chosen
+        # after it ends shows again.
         if hasattr(self, "_discord_push"):
             self._discord_push()
         action = getattr(self, "_private_action", None)

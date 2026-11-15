@@ -2216,5 +2216,7 @@
   "airplay_pick": "Choisissez votre Apple TV dans le menu AirPlay — le bouton AirPlay ici l'ouvre.",
   "airplay_on_tv": "Lecture sur l'Apple TV. Le bouton AirPlay ici la déplace vers une autre.",
   "airplay_cpu": "L'image est convertie sur ce Mac pour l'Apple TV, ce qui occupe le processeur pendant la lecture.",
-  "airplay_menu_note": "L'Apple TV lit l'image et le son du flux tels quels — elle se choisit dans le menu AirPlay du panneau de diffusion."
+  "airplay_menu_note": "L'Apple TV lit l'image et le son du flux tels quels — elle se choisit dans le menu AirPlay du panneau de diffusion.",
+  "conn_k_cast": "une diffusion vers la télé",
+  "conn_what_cast": "Diffuser ceci ouvre une connexion de plus chez ton fournisseur."
 }

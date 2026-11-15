@@ -2216,5 +2216,7 @@
   "airplay_pick": "AirPlay menüsünden Apple TV'nizi seçin — buradaki AirPlay düğmesi menüyü açar.",
   "airplay_on_tv": "Apple TV'de oynatılıyor. Buradaki AirPlay düğmesi başka birine taşır.",
   "airplay_cpu": "Görüntü Apple TV için bu Mac'te dönüştürülüyor; oynatma süresince işlemciyi meşgul eder.",
-  "airplay_menu_note": "Apple TV yayının kendi görüntüsünü ve sesini oynatır — yayın panelindeki AirPlay menüsünden seçilir."
+  "airplay_menu_note": "Apple TV yayının kendi görüntüsünü ve sesini oynatır — yayın panelindeki AirPlay menüsünden seçilir.",
+  "conn_k_cast": "TV'ye yayın",
+  "conn_what_cast": "Bunu yayınlamak sağlayıcına bir bağlantı daha açar."
 }

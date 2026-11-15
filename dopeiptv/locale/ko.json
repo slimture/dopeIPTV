@@ -2216,5 +2216,7 @@
   "airplay_pick": "AirPlay 메뉴에서 Apple TV를 선택하세요 — 여기 있는 AirPlay 버튼으로 열 수 있습니다.",
   "airplay_on_tv": "Apple TV에서 재생 중입니다. 여기 있는 AirPlay 버튼으로 다른 기기로 옮길 수 있습니다.",
   "airplay_cpu": "화면을 이 Mac에서 Apple TV용으로 변환하므로 재생하는 동안 프로세서를 사용합니다.",
-  "airplay_menu_note": "Apple TV는 스트림의 원래 화면과 소리를 재생합니다 — 전송 패널의 AirPlay 메뉴에서 선택합니다."
+  "airplay_menu_note": "Apple TV는 스트림의 원래 화면과 소리를 재생합니다 — 전송 패널의 AirPlay 메뉴에서 선택합니다.",
+  "conn_k_cast": "TV로 전송",
+  "conn_what_cast": "이것을 전송하면 제공자와의 연결이 하나 더 열립니다."
 }

@@ -19,6 +19,8 @@ from ..services import failover
 class _FailoverMixin:
     _failover_source: dict | None = None
     _failover_url: str | None = None
+    _failover_row: dict | None = None       # the other source's row of it
+    _failover_key: Any = None
     _failover_tried: Any = None
     # Moves on with every start and stop: a lookup that comes back after the
     # user played something else, or pressed Stop, must not take over.
@@ -75,9 +77,19 @@ class _FailoverMixin:
         self._failover_url = url
         source = str(pl.get("name") or pl.get("server") or "")
         title = f"{row.get('name') or name} · {source}"
-        self._start_playback(url, title, row.get("stream_icon"), f"failover:{pl.get('id')}:{row.get('stream_id')}",
+        self._failover_row = dict(row)
+        self._failover_key = f"failover:{pl.get('id')}:{row.get('stream_id')}"
+        self._start_playback(url, title, row.get("stream_icon"), self._failover_key,
                              "live", record=False)
         self._show_toast(tr("failover_playing", name=name, source=source), 6000)
+
+    def _failover_row_for(self, key: Any) -> dict | None:
+        """The other source's row of the channel playing from it as *key* -
+        what Watch together tells the room it is (the same channel, so the
+        room stays on it)."""
+        if self._failover_source is not None and key is not None and key == self._failover_key:
+            return self._failover_row
+        return None
 
     def _failover_stopped(self) -> None:
         """Stop was pressed: a lookup under way is no longer wanted."""
@@ -93,5 +105,7 @@ class _FailoverMixin:
             nerd.set_source(store.active() if store is not None else None)
             self._failover_source = None
             self._failover_url = None
+            self._failover_row = None
+            self._failover_key = None
         if url != self._failover_url and key != self._failover_tried:
             self._failover_tried = None

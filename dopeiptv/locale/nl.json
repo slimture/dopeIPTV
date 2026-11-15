@@ -2216,5 +2216,7 @@
   "airplay_pick": "Kies je Apple TV in het AirPlay-menu — de AirPlay-knop hier opent het.",
   "airplay_on_tv": "Speelt af op de Apple TV. Met de AirPlay-knop hier zet je het op een andere.",
   "airplay_cpu": "Het beeld wordt op deze Mac voor de Apple TV omgezet, wat de processor bezighoudt zolang het speelt.",
-  "airplay_menu_note": "De Apple TV speelt het beeld en geluid van de stream zelf — je kiest hem in het AirPlay-menu in het cast-paneel."
+  "airplay_menu_note": "De Apple TV speelt het beeld en geluid van de stream zelf — je kiest hem in het AirPlay-menu in het cast-paneel.",
+  "conn_k_cast": "een cast naar de tv",
+  "conn_what_cast": "Dit casten opent nog een verbinding met je provider."
 }

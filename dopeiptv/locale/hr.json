@@ -2216,5 +2216,7 @@
   "airplay_pick": "Odaberi svoj Apple TV u AirPlay izborniku — AirPlay gumb ovdje ga otvara.",
   "airplay_on_tv": "Reproducira se na Apple TV-u. AirPlay gumb ovdje ga prebacuje na drugi.",
   "airplay_cpu": "Slika se na ovom Macu pretvara za Apple TV, što opterećuje procesor dok se reproducira.",
-  "airplay_menu_note": "Apple TV reproducira sliku i zvuk samog streama — odabire se u AirPlay izborniku na ploči za emitiranje."
+  "airplay_menu_note": "Apple TV reproducira sliku i zvuk samog streama — odabire se u AirPlay izborniku na ploči za emitiranje.",
+  "conn_k_cast": "emitiranje na TV",
+  "conn_what_cast": "Emitiranje ovoga otvara još jednu vezu prema tvom davatelju."
 }

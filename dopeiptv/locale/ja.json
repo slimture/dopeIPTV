@@ -2216,5 +2216,7 @@
   "airplay_pick": "AirPlay メニューで Apple TV を選んでください — ここの AirPlay ボタンで開きます。",
   "airplay_on_tv": "Apple TV で再生中です。ここの AirPlay ボタンで別の Apple TV に切り替えられます。",
   "airplay_cpu": "映像はこの Mac で Apple TV 用に変換されるため、再生中はプロセッサに負荷がかかります。",
-  "airplay_menu_note": "Apple TV ではストリーム本来の映像と音声が再生されます — Apple TV はキャストパネルの AirPlay メニューで選びます。"
+  "airplay_menu_note": "Apple TV ではストリーム本来の映像と音声が再生されます — Apple TV はキャストパネルの AirPlay メニューで選びます。",
+  "conn_k_cast": "テレビへのキャスト",
+  "conn_what_cast": "これをキャストすると、プロバイダーへの接続がもう 1 つ開きます。"
 }

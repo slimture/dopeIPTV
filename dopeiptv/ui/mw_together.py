@@ -424,7 +424,18 @@ class _TogetherMixin:
             return None
         if lp.get("kind") == "live" and getattr(self, "_playing_catchup", False):
             return None
-        return self._together_describe(lp.get("kind") or "", lp.get("item"), lp.get("series_ctx"))
+        if privacy.playback_private(lp.get("kind") or "", lp.get("key")):
+            return None         # watched privately: never told to a room
+        item = lp.get("item")
+        if item is None and lp.get("kind") == "live":
+            item = self._together_failover_row(lp.get("key"))
+        return self._together_describe(lp.get("kind") or "", item, lp.get("series_ctx"))
+
+    def _together_failover_row(self, key: Any) -> dict | None:
+        """Failover plays the channel from another source (no row of this
+        one's): it is still the room's channel."""
+        look = getattr(self, "_failover_row_for", None)
+        return look(key) if callable(look) else None
 
     def _together_describe(self, kind: str, item: Any, series: Any) -> together.Media | None:
         tmdb = getattr(self, "tmdb", None)
@@ -455,7 +466,10 @@ class _TogetherMixin:
             if self._together_room is None:
                 return
             lp = getattr(self, "_last_playback", None) or {}
-            media = None if catchup else self._together_describe(
+            if item is None and kind == "live":
+                item = self._together_failover_row(key)
+            private = privacy.playback_private(kind, key)
+            media = None if catchup or private else self._together_describe(
                 kind, item, lp.get("series_ctx") if kind == "episode" else None)
             self._together_on_local(media)
         except Exception:

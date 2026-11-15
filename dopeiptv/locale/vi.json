@@ -2216,5 +2216,7 @@
   "airplay_pick": "Chọn Apple TV của bạn trong menu AirPlay — nút AirPlay ở đây sẽ mở menu.",
   "airplay_on_tv": "Đang phát trên Apple TV. Nút AirPlay ở đây chuyển sang thiết bị khác.",
   "airplay_cpu": "Hình ảnh được chuyển đổi trên máy Mac này cho Apple TV, khiến bộ xử lý bận trong suốt lúc phát.",
-  "airplay_menu_note": "Apple TV phát hình ảnh và âm thanh gốc của luồng — chọn thiết bị trong menu AirPlay ở bảng truyền."
+  "airplay_menu_note": "Apple TV phát hình ảnh và âm thanh gốc của luồng — chọn thiết bị trong menu AirPlay ở bảng truyền.",
+  "conn_k_cast": "truyền tới TV",
+  "conn_what_cast": "Truyền nội dung này sẽ mở thêm một kết nối tới nhà cung cấp."
 }

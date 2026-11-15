@@ -2216,5 +2216,7 @@
   "airplay_pick": "Escolha sua Apple TV no menu AirPlay — o botão AirPlay aqui o abre.",
   "airplay_on_tv": "Reproduzindo na Apple TV. O botão AirPlay aqui passa para outra.",
   "airplay_cpu": "A imagem é convertida neste Mac para a Apple TV, o que mantém o processador ocupado durante a reprodução.",
-  "airplay_menu_note": "A Apple TV reproduz a imagem e o som da própria transmissão — ela é escolhida no menu AirPlay do painel de transmissão."
+  "airplay_menu_note": "A Apple TV reproduz a imagem e o som da própria transmissão — ela é escolhida no menu AirPlay do painel de transmissão.",
+  "conn_k_cast": "uma transmissão para a TV",
+  "conn_what_cast": "Transmitir isto abre mais uma conexão com o seu provedor."
 }

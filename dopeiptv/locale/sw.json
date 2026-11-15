@@ -2216,5 +2216,7 @@
   "airplay_pick": "Chagua Apple TV yako kwenye menyu ya AirPlay — kitufe cha AirPlay hapa kinaifungua.",
   "airplay_on_tv": "Inacheza kwenye Apple TV. Kitufe cha AirPlay hapa kinaihamishia nyingine.",
   "airplay_cpu": "Picha inabadilishwa kwenye Mac hii kwa ajili ya Apple TV, jambo linaloshughulisha prosesa wakati inacheza.",
-  "airplay_menu_note": "Apple TV inacheza picha na sauti ya mtiririko wenyewe — inachaguliwa kwenye menyu ya AirPlay katika paneli ya kutuma."
+  "airplay_menu_note": "Apple TV inacheza picha na sauti ya mtiririko wenyewe — inachaguliwa kwenye menyu ya AirPlay katika paneli ya kutuma.",
+  "conn_k_cast": "kutuma kwa TV",
+  "conn_what_cast": "Kutuma hiki kunafungua muunganisho mmoja zaidi kwa mtoa huduma wako."
 }

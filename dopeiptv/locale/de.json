@@ -2216,5 +2216,7 @@
   "airplay_pick": "Wähle dein Apple TV im AirPlay-Menü — die AirPlay-Taste hier öffnet es.",
   "airplay_on_tv": "Läuft auf dem Apple TV. Mit der AirPlay-Taste hier wechselst du zu einem anderen.",
   "airplay_cpu": "Das Bild wird auf diesem Mac für das Apple TV umgewandelt, was den Prozessor beschäftigt, solange es läuft.",
-  "airplay_menu_note": "Das Apple TV zeigt Bild und Ton des Streams selbst — ausgewählt wird es im AirPlay-Menü im Streaming-Fenster."
+  "airplay_menu_note": "Das Apple TV zeigt Bild und Ton des Streams selbst — ausgewählt wird es im AirPlay-Menü im Streaming-Fenster.",
+  "conn_k_cast": "Streaming zum Fernseher",
+  "conn_what_cast": "Das zu streamen öffnet eine weitere Verbindung zu deinem Anbieter."
 }

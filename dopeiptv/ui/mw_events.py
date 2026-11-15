@@ -155,10 +155,25 @@ class _EventsMixin:
         d = self._events
         return d if d is not None and d.active else None
 
+    def _events_private(self) -> bool:
+        """While viewing privately - and for the rest of a playback that was
+        private (core/privacy.py): what happened, not what."""
+        return privacy.private() or bool((self._events_now or {}).get("private"))
+
     def _events_publish_state(self) -> None:
         d = self._events_live()
         if d is not None:
-            d.set_state(self._events_state, self._events_state_fields(), privacy.private())
+            d.set_state(self._events_state, self._events_state_fields(), self._events_private())
+
+    def _events_private_changed(self, on: bool) -> None:
+        """Private viewing turned on or off: what plays now is private for
+        the rest of its run, and the retained state says so at once."""
+        try:
+            if on and self._events_now is not None:
+                self._events_now["private"] = True
+            self._events_publish_state()
+        except Exception:
+            log.debug("events: private viewing", exc_info=True)
 
     def _events_state_fields(self) -> dict | None:
         """What the state says plays: the events' fields, and - for Home
@@ -168,18 +183,20 @@ class _EventsMixin:
             return None
         fields = dict(now.get("fields") or {})
         key = now["id"][1] if now["id"][0] == "live" else None
-        if key is not None and self._events_favs:
+        if key is not None and self._events_favs and not self._events_private():
             name = next((n for n, row in self._events_favs.items()
                          if str(row.get("stream_id")) == str(key)), None)
             if name:
                 fields["favorite"] = name
         return fields
 
-    def _events_send(self, event: str, fields: dict | None, state: str | None = None) -> None:
+    def _events_send(self, event: str, fields: dict | None, state: str | None = None,
+                     playback: bool = True) -> None:
+        """*playback*: an event of what plays (a recording's is not)."""
         d = self._events_live()
         if d is None:
             return
-        d.emit(event, fields, privacy.private(),
+        d.emit(event, fields, self._events_private() if playback else privacy.private(),
                state=(state, self._events_state_fields()) if state is not None else None)
 
     def _events_quit(self) -> None:
@@ -235,12 +252,16 @@ class _EventsMixin:
             if prev is not None and prev["id"] == ident and was != "idle":
                 return      # a reconnect, a seek in the archive: the same playback
             fields = self._events_what(title, item, kind, catchup)
-            self._events_now = {"id": ident, "fields": fields}
+            self._events_now = {"id": ident, "fields": fields,
+                                "private": privacy.playback_private(kind, key)}
             self._events_state = "playing"
             self._events_send("playback_started", fields, "playing")
             if prev is not None and was != "idle" and prev["id"][0] == "live" and kind == "live":
+                # Never the name of a channel watched privately.
+                was_private = bool(prev.get("private"))
                 self._events_send("channel_changed",
-                                  dict(fields, previous=prev["fields"].get("channel") or ""))
+                                  dict(fields, previous="" if was_private
+                                       else prev["fields"].get("channel") or ""))
         except Exception:
             log.debug("events: started", exc_info=True)
 
@@ -307,7 +328,7 @@ class _EventsMixin:
             told = watch.update(list(self.rec.jobs))
             if self._events_live() is not None:
                 for event, fields in told:
-                    self._events_send(event, fields)
+                    self._events_send(event, fields, playback=False)
             if watch.pending:
                 QTimer.singleShot(int(events.RecordingWatch.SETTLE_S * 1000) + 200, self._events_jobs)
         except Exception:

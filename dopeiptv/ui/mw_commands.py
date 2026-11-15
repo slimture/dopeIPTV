@@ -87,7 +87,9 @@ class _CommandsMixin:
         client = self.client
 
         def done(rows: Any) -> None:
-            it = find_channel(list(rows or []), name)
+            # Only what the lists show, as by number and from the phone:
+            # none from a hidden category, or a locked one while locked.
+            it = find_channel(self._chno_rows(list(rows or [])), name)
             if it is None:
                 from ..i18n import tr
                 self._show_toast(tr("cmd_no_channel", name=name), 5000)

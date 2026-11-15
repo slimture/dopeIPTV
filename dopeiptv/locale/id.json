@@ -2216,5 +2216,7 @@
   "airplay_pick": "Pilih Apple TV Anda di menu AirPlay — tombol AirPlay di sini membukanya.",
   "airplay_on_tv": "Diputar di Apple TV. Tombol AirPlay di sini memindahkannya ke yang lain.",
   "airplay_cpu": "Gambar dikonversi di Mac ini untuk Apple TV, yang membuat prosesor sibuk selama diputar.",
-  "airplay_menu_note": "Apple TV memutar gambar dan suara siaran apa adanya — dipilih di menu AirPlay pada panel kirim."
+  "airplay_menu_note": "Apple TV memutar gambar dan suara siaran apa adanya — dipilih di menu AirPlay pada panel kirim.",
+  "conn_k_cast": "pengiriman ke TV",
+  "conn_what_cast": "Mengirim ini membuka satu koneksi lagi ke penyediamu."
 }

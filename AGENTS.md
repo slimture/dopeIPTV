@@ -75,7 +75,7 @@ map and the one-way import rule.
 | `core/wakelock.py` | Screensaver inhibitor |
 | `core/gcguard.py` | Cyclic garbage collection on the GUI thread only |
 | `core/contest.py` | `ContestWatch`: tells another device taking the account's connection from repeated drops |
-| `core/connections.py` | Connections to the account (for everyone): what user_info says (`numbers`), which streams count (`is_network`), the app's own (`Use`) against the limit, another device's from the provider's last answer while fresh (`Ledger`), the `Verdict` when one more would go over; it only counts |
+| `core/connections.py` | Connections to the account (for everyone): what user_info says (`numbers`), which streams count (`is_network`), the app's own (`Use`: player, rewind buffer, recording, multiview cell, cast) against the limit, another device's from the provider's last answer while fresh (`Ledger`), the `Verdict` when one more would go over; it only counts |
 | `core/mirrors.py` | Nerd: a source's backup addresses (`backup_servers` in its options, one per line; bad lines refused with their reason), when to try the next (unreachable, TLS, 5xx/52x - never 401/403/404), the one in use per source (`nerd_mirror_<source id>`), `Picker`; its line and Test |
 | `core/conn_test.py` | Nerd: Test connection - DNS, TCP, TLS, login (Xtream's account end and connections), a live channel's first byte and speed against SD/HD/Full HD/4K, step by step with times, on a thread of its own, cancelable; `copy_text` scrubbed by `core/report.py` |
 | `core/health.py` | Nerd's stream health per channel (source + stream id): starts, failures, time to picture, drops, last error (scrubbed), last played; one settings value, 500 channels at most; it only watches |
@@ -105,7 +105,7 @@ map and the one-way import rule.
 | `core/http_login.py` | `get_with_login`: a login in a stream's address answered as the server asks (basic or digest) |
 | `core/commands.py` | What the app is asked from outside: `--play`, `--channel`, `dopeiptv://` links |
 | `core/instance.py` | A second start hands its command to the copy running (local socket, the user's alone; `$XDG_RUNTIME_DIR` on Linux) |
-| `core/privacy.py` | Private viewing (nothing kept until the app closes; `for_log` keeps titles out of the log) and Clear recent history by time range, for every source (the viewing statistics' time too) |
+| `core/privacy.py` | Private viewing (nothing kept until the app closes; `for_log` keeps titles out of the log; a playback that was private stays so to its end for every reporter, `playback_private`) and Clear recent history by time range, for every source (the viewing statistics' time too) |
 | `core/night_mode.py` | Night mode for the sound: the one audio filter (`dynaudnorm`, its values explained), put on and taken off the core by its own label; the setting |
 | `core/viewing_stats.py` | Your statistics: the log of seconds watched per title and hour (`viewing_stats`, this computer only, never synced; private viewing adds nothing), seeded once from the resume positions; the sums (week/month/year, weekday, hour, top channels/movies/series, streaks) |
 | `core/rec_extras.py` | Nerd for recordings: file name template (folders, never outside), the command after a recording (no shell), their checks |

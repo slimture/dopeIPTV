@@ -2216,5 +2216,7 @@
   "airplay_pick": "在 AirPlay 菜单中选择你的 Apple TV — 这里的 AirPlay 按钮可以打开它。",
   "airplay_on_tv": "正在 Apple TV 上播放。这里的 AirPlay 按钮可切换到另一台。",
   "airplay_cpu": "画面会在这台 Mac 上为 Apple TV 转换，播放期间会占用处理器。",
-  "airplay_menu_note": "Apple TV 播放流本身的画面和声音 — 在投放面板的 AirPlay 菜单中选择设备。"
+  "airplay_menu_note": "Apple TV 播放流本身的画面和声音 — 在投放面板的 AirPlay 菜单中选择设备。",
+  "conn_k_cast": "投放到电视",
+  "conn_what_cast": "投放它会再打开一个到服务商的连接。"
 }

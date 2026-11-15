@@ -45,6 +45,7 @@ from ..services.reminders import ReminderStore
 from ..core.series_rules import SeriesRuleStore
 from ..media.players import embedded_playback_supported, launch_player
 from ..core.contest import ContestWatch
+from ..core import privacy
 from ..core.privacy import for_log
 from ..core.health import StreamHealth
 from ..core.recording import RecordingManager
@@ -1930,7 +1931,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.play("mpv")
         elif state == "stop":
             if self.player:
-                self.player.stop()
+                # The button, not player.stop(): it is what also ends the
+                # recording, the Trakt / Simkl scrobble and the wake lock.
+                self.player.stop_btn.click()
         else:                       # pause / resume
             if self.player:
                 self.player.toggle_pause()
@@ -4306,7 +4309,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
              (tr("ext_play_keep_open"), "normal"),
              (tr("common_cancel"), "normal")])
         if idx == 0:
-            self.player.stop()          # free the connection first
+            # Free the connection first - by the button, which also ends the
+            # recording, the scrobbles and the wake lock.
+            self.player.stop_btn.click()
             return True
         return idx == 1                 # 1 = open anyway; else cancel
 
@@ -4377,6 +4382,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # with autoplay-preview on, this IS how channels get played.
         self._stop_cast_for_local_playback()
         self._maybe_close_multiview_for_playback()
+        # What played before - a film, an episode - keeps its place, its
+        # watched mark, and its Trakt / Simkl scrobble ends.
+        self._save_resume_position()
+        self._maybe_auto_mark_watched()
+        self._trakt_stop_current()
+        self._simkl_stop_current()
         if kind != "history":
             self.history.add(
                 url, title, it.get("stream_icon"), self._item_key(it), "live",
@@ -4397,6 +4408,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                                "icon_url": it.get("stream_icon"),
                                "key": self._item_key(it),
                                "kind": "live", "item": it}
+        privacy.playback_started("live", self._item_key(it))
         self._sync_player_buttons()
         self.listw.viewport().update()
         self.setWindowTitle(title or self._base_title)
@@ -4723,6 +4735,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._save_resume_position()
         self._maybe_auto_mark_watched()
         self._failover_stopped()
+        privacy.playback_stopped()
         self._playing_key = None
         self._playing_group = None
         self._playing_item = None
@@ -4922,6 +4935,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                                "key": key, "kind": kind, "item": item,
                                "series_ctx": (self.series_ctx
                                               if kind == "episode" else None)}
+        privacy.playback_started(kind, key)
         # Snapshot the ordered episode queue + current index so a natural
         # end-of-episode can autoplay the next one, even if the user browses
         # away meanwhile. An override (set by autoplay itself) carries the same
@@ -5251,6 +5265,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._health_failed(msg)
         self._events_failed()
         self._discord_stopped()
+        self._ms_leave()
+        self._together_stopped()
         url = (lp or {}).get("url")
         # Nerd: the same channel from another source, before giving up.
         if url and self._try_failover(lambda u=url: self._diagnose_stream_failure(u)):

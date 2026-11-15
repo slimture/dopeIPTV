@@ -437,7 +437,8 @@ A rule for everything new, and the reason for a review once a batch is in:
   stream health and casting.
 - **A combined review after each batch**, with tests for the pairs that
   matter (box + recording + multiview, phone remote + transponder check,
-  Watch together + failover, casting + the rewind buffer).
+  Watch together + failover, casting + the rewind buffer) - kept together
+  in `tests/test_feature_pairs.py`.
 
 ## How changes are written
 

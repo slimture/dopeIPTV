@@ -147,6 +147,8 @@ class _MultiviewCell(QWidget):
         # The source (id) the stream is from: whose account's connection
         # it takes (core/connections.py).
         self.source_id = ""
+        # Nerd's stream options were set on this cell's mpv (nerd.apply_stream).
+        self._nerd_applied = False
         self._focused = False
         self._muted = True
         self._drag_from = None
@@ -452,6 +454,14 @@ class _MultiviewCell(QWidget):
             # handover position can't leak into a later load (a timeshift
             # segment or a go-live swap through this same mpv).
             m["start"] = str(float(start)) if start and start > 1 else "none"
+            # Nerd: the source's user agent, headers, proxy and route (own
+            # DNS, IP version, a trusted certificate), as the docked player
+            # takes them - nothing while Nerd is off and never was.
+            try:
+                self._nerd_applied = nerd.apply_stream(
+                    m, nerd.source(), self._nerd_applied, url=url)
+            except Exception as e:
+                log.debug("multiview: Nerd's stream options not set: %s", e)
             m.play(url)
             return True
         except Exception as e:
@@ -1409,6 +1419,11 @@ class _MultiviewMixin:
                          client=None, guide=None, playlist: str = "",
                          start: float = 0.0, source: str = "") -> None:
         if not url or not self._multiview_available():
+            return
+        # Nerd's VPN guard, said as the docked player says it - before the
+        # docked player lets its stream go for a cell that would stay black.
+        guard = getattr(self, "_vpn_guard_blocks", None)
+        if guard is not None and guard(url):
             return
         # One more connection to the account: said first when the account
         # does not allow it (core/connections.py), and only then.

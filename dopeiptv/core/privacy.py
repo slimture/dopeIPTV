@@ -42,6 +42,37 @@ def private() -> bool:
     return _private
 
 
+# The playback (kind, key) that was private at some point. The same playback
+# going on after private viewing ends - a reconnect, a backup address, a seek
+# in the archive - stays private to the end of its run, for every reporter
+# (Discord, the media servers, Watch together, the statistics, the events).
+_private_playback: tuple[str, Any] | None = None
+
+
+def playback_started(kind: str, key: Any) -> None:
+    """The window's player took a stream (or private viewing was turned on
+    while one plays): marked private while private viewing is on; anything
+    else chosen after it ended is not."""
+    global _private_playback
+    ident = (str(kind or ""), key)
+    if private():
+        _private_playback = ident
+    elif _private_playback != ident:
+        _private_playback = None
+
+
+def playback_stopped() -> None:
+    """Stop: what is played next is a new playback."""
+    global _private_playback
+    if not private():
+        _private_playback = None
+
+
+def playback_private(kind: str, key: Any) -> bool:
+    """Whether the playback (*kind*, *key*) is to be kept to this computer."""
+    return private() or _private_playback == (str(kind or ""), key)
+
+
 def for_log(text: Any) -> Any:
     """What a log line may say of what is played: its title or name, or
     "<private>" while private viewing is on - the log is kept on disk and

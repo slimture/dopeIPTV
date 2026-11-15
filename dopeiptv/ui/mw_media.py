@@ -44,7 +44,8 @@ class _MediaServerMixin:
         try:
             self._ms_leave()
             client = self._ms_client()
-            if client is None or kind not in ("movie", "episode", "live") or privacy.private():
+            if (client is None or kind not in ("movie", "episode", "live")
+                    or privacy.playback_private(kind, key)):
                 return
             target = client.report_target(key, kind, item, url or "")
             if target is None:
@@ -72,7 +73,7 @@ class _MediaServerMixin:
             pos, dur = self._ms_position()
             if pos > 0:
                 now["pos"], now["dur"] = pos, dur or now["dur"]
-            if not now["paused"]:
+            if not now["paused"] and not privacy.private():
                 now["client"].report("progress", now["target"], now["pos"], now["dur"])
         except Exception:
             log.debug("media server: progress", exc_info=True)
