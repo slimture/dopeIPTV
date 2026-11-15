@@ -87,6 +87,8 @@ _LEFT_OUT = frozenset({
     # Caches the app fills again by itself.
     "local_tmdb_posters", "local_tmdb_posters_v2", "music_art_v1",
     "cast_devices", "subtitle_files", "nerd_health_data",
+    # Recordings of this computer still to be saved as MP4 (its own paths).
+    "rec_mp4_pending",
 })
 # update_*: the update channel and what its check last found; ts_*: what a
 # source's timeshift probe learned; "_": the files' own markers;

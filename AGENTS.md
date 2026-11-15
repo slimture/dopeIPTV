@@ -57,7 +57,8 @@ map and the one-way import rule.
 | `core/dvr_session.py` | `DvrSession`: ingest, store and server for one live channel |
 | `core/dvr_pool.py` | `DvrPool`: every channel's buffer this session (frozen history, one space budget) |
 | `core/dvr_record.py` | `BufferRecorder`: a recording read from a buffer, no connection of its own |
-| `core/recording.py` | Recording manager |
+| `core/recording.py` | Recording manager; a finished recording saved as MP4 off the window's thread (`_remux`, the command after it with the final file) |
+| `core/rec_mp4.py` | Recordings as MP4: the remux (stream copy, faststart, `.mp4.part` until it passed), what ffmpeg says of a file, when the MP4 is plausibly whole (streams, length, size), the .ts deleted only then; the journal of remuxes left for the next start |
 | `core/updates.py` | GitHub latest-release check |
 | `core/selfupdate.py` | AppImage in-place update (download, checksum, self-check, swap); every update's signed checksum check (`signed_asset`) |
 | `core/winupdate.py` / `core/macupdate.py` | The same for an installed Windows copy (the installer) and the Mac app (the .dmg) |
@@ -95,10 +96,12 @@ map and the one-way import rule.
 | `core/http_login.py` | `get_with_login`: a login in a stream's address answered as the server asks (basic or digest) |
 | `core/commands.py` | What the app is asked from outside: `--play`, `--channel`, `dopeiptv://` links |
 | `core/instance.py` | A second start hands its command to the copy running (local socket, the user's alone; `$XDG_RUNTIME_DIR` on Linux) |
-| `core/privacy.py` | Private viewing (nothing kept until the app closes; `for_log` keeps titles out of the log) and Clear recent history by time range, for every source |
+| `core/privacy.py` | Private viewing (nothing kept until the app closes; `for_log` keeps titles out of the log) and Clear recent history by time range, for every source (the viewing statistics' time too) |
+| `core/night_mode.py` | Night mode for the sound: the one audio filter (`dynaudnorm`, its values explained), put on and taken off the core by its own label; the setting |
+| `core/viewing_stats.py` | Your statistics: the log of seconds watched per title and hour (`viewing_stats`, this computer only, never synced; private viewing adds nothing), seeded once from the resume positions; the sums (week/month/year, weekday, hour, top channels/movies/series, streaks) |
 | `core/rec_extras.py` | Nerd for recordings: file name template (folders, never outside), the command after a recording (no shell), their checks |
 | `core/catchup.py` | Nerd: a source's own catch-up address - Kodi's placeholders and the M3U modes (default, append, shift, flussonic), tried before the app's own; its checks |
-| `core/series_rules.py` | Series recordings: rules (exact title or a word, one channel or any), the guide looked through for their airings, the plan (padding, nothing twice, one copy of a programme on two channels, a cancelled one not again), their store; recording padding |
+| `core/series_rules.py` | Series recordings: rules (exact title or a word, one channel or any; record or remind), the guide looked through for their airings, the plan (padding, nothing twice, one copy of a programme on two channels, a cancelled one not again), the reminders' plan (at the programme's start, none twice, a removed one not again, moved with its programme), their store; recording padding |
 | `core/url_rewrite.py` | Nerd: a source's rewrite rules for its stream addresses (find -> replace, plain or regex, in order; bad ones refused, skipped in playback), applied by `make_client` to every address it hands out; the preview line and its Test |
 | `core/hls_cap.py` | Nerd: the highest quality adaptive (HLS) streams play at - `hls-bitrate`, and the variant (picture and sound together) the player switches to at file-loaded for a size cap |
 | `core/remote_api.py` | The remote API and shared lists' small HTTP server (token on every request, this computer only unless chosen) |
@@ -115,7 +118,7 @@ map and the one-way import rule.
 | `services/together.py` | Watch together, the catalogue side: what plays here as a `Media`, the same title (TMDB id, else title and year; an episode by its season and number; a channel as failover matches it), what the room plays found in this source (`locate`, off the window's thread) |
 | `core/platform_macos.py` | macOS-specific helpers |
 | `core/platform_windows.py` | Windows-specific helpers |
-| `media/embedded.py` | Embedded mpv player widget |
+| `media/embedded.py` | Embedded mpv player widget (night mode's switch in the options menu, `_sync_night` on each play; the equaliser's labelled filter) |
 | `media/players.py` | External player launch, libmpv detection |
 | `media/dvr_player.py` | The player's side of the app-kept buffer (`DvrPlayerMixin`) |
 | `media/rewind_bar.py` | The DVR row and timeshift timeline over the video, and their switch (`RewindBarMixin`) |
@@ -147,7 +150,9 @@ map and the one-way import rule.
 | `ui/mw_box.py` | The box from the app: zap, wake, standby, record on the box from the guide; Nerd's copy address and guide channel |
 | `ui/mw_commands.py` | Commands from outside carried out: play an address or file, a channel by name, come forward |
 | `ui/mw_privacy.py` | Private viewing and Clear recent history in the window: app-menu entries and shortcuts, the sidebar marker |
-| `ui/mw_series.py` | Series recordings in the window: "Record series…", the rules' look through the guide on the pool when it loads and with its 20-minute check, the jobs added |
+| `ui/mw_series.py` | Series recordings in the window: "Record series…" (Record or Remind me), the rules' look through the guide on the pool when it loads and with its 20-minute check, the jobs added, a reminder rule's reminders set |
+| `ui/mw_stats.py` | Your statistics in the window: the time the docked player plays counted into the log (hooks beside health/events; not while paused, capped per tick), saved every few minutes and on close; "Your statistics…" in the History menu |
+| `ui/stats_window.py` | The statistics window: tiles, the period switch, two one-series column charts (P's accent, a hairline baseline, the peak's value, tooltips), the top lists, its empty state |
 | `ui/mw_failover.py` | Failover in the window: once per channel, the other source's options while it plays, a note |
 | `ui/mw_connections.py` | Connections to the account in the window: the app's own counted (player, rewind buffers, recordings over their own connection, multiview cells), the warning before a multiview cell, a recording while watching or the buffer next to a recording would go over the limit, with go ahead anyway |
 | `ui/mw_mirrors.py` | Nerd's backup addresses in the window: a live stream whose server is down asked of the next address (off the window's thread), the channel started again from it |
@@ -202,6 +207,7 @@ before one more), `mw_mirrors` (a source's backup addresses for a stream
 whose server is down) and `mw_popout` (detached-window player). What stays in `main_window.py` is
 computers), `mw_together` (watch together: a room, its strip, keeping in
 step) and `mw_popout` (detached-window player). What stays in `main_window.py` is
+computers), `mw_stats` (your viewing statistics) and `mw_popout` (detached-window player). What stays in `main_window.py` is
 the `__init__`/`_build_ui` composition and the playback path (start/stop,
 seek, fullscreen, reconnect) - keep playback code there.
 When making changes:
@@ -277,7 +283,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
   epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log,
-  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, connections, mirrors, conn_test, health, nerd, nerd_lists, channel_numbers, shortcut_keys, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, catchup, url_rewrite, hls_cap, remote_api, events, mqtt, report, supporter, sync, chacha20poly1305, together, backup, doh, cert_pin, net_route, net_adapter, net_bridge, live_latency) and `services/` (failover, share, resume,
+  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, connections, mirrors, conn_test, health, nerd, nerd_lists, channel_numbers, shortcut_keys, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, night_mode, rec_mp4, viewing_stats, catchup, url_rewrite, hls_cap, remote_api, events, mqtt, report, supporter, sync, chacha20poly1305, together, backup, doh, cert_pin, net_route, net_adapter, net_bridge, live_latency) and `services/` (failover, share, resume,
   coverart, reminders, mpris, media_session, media_macos, media_windows, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list

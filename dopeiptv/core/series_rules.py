@@ -1,13 +1,20 @@
-"""Series recordings: every upcoming airing of a programme, recorded.
+"""Series recordings: every upcoming airing of a programme, recorded - or
+a reminder set for it.
 
 A rule is a title - the exact title, or a word the title contains - on one
-channel or on any channel of the source. The window looks through the guide
-with ``find_airings`` when the guide is (re)loaded and every so often, and
+channel or on any channel of the source, and what to do with each airing:
+record it (``RECORD``, what every rule did before there was a choice) or
+remind (``REMIND``). The window looks through the guide with
+``find_airings`` when the guide is (re)loaded and every so often, and
 ``plan`` turns what was found into recordings to schedule: the next
 ``DAYS`` days, the padding from Settings > Recording, nothing on a channel
 already being recorded then, nothing a rule scheduled before (a recording
 the user cancelled stays cancelled), and one recording when the same
-programme airs at the same time on two channels.
+programme airs at the same time on two channels. ``remind_plan`` does the
+same for reminders - at the programme's own start, never padded: none set
+twice, one the user removed not set again, one for a programme on two
+channels at once - and ``remind_retimed`` moves a rule's reminder with its
+programme when the guide moves it.
 
 Pure logic and the store the rules live in; nothing here starts a recorder.
 """
@@ -48,6 +55,8 @@ EXACT = "title"
 WORD = "word"
 THIS = "channel"
 ANY = "any"
+RECORD = "record"
+REMIND = "remind"
 
 # Channel fields kept in a rule, enough to find the channel's guide and
 # stream again without the whole line-up.
@@ -95,14 +104,16 @@ def stream_key(channel: dict | None) -> str:
 
 
 def make_rule(text: str, kind: str = EXACT,
-              channel: dict | None = None) -> dict | None:
+              channel: dict | None = None,
+              action: str = RECORD) -> dict | None:
     """A new rule: *text* as an exact title or (WORD) a word in the title,
-    on *channel* only or, without one, on any channel. None for no text."""
+    on *channel* only or, without one, on any channel; each airing recorded
+    or (REMIND) reminded of. None for no text."""
     text = " ".join(str(text or "").split())
-    if not text or kind not in (EXACT, WORD):
+    if not text or kind not in (EXACT, WORD) or action not in (RECORD, REMIND):
         return None
     rule: dict[str, Any] = {"id": uuid.uuid4().hex[:10], "kind": kind,
-                            "text": text, "scope": ANY,
+                            "text": text, "scope": ANY, "action": action,
                             "created": int(time.time())}
     if channel is not None and stream_key(channel):
         rule["scope"] = THIS
@@ -118,6 +129,27 @@ def rule_key(rule: dict) -> str:
     return stream_key(rule.get("channel"))
 
 
+def action(rule: dict | None) -> str:
+    """What a rule does with an airing: REMIND, or RECORD (a rule from
+    before there was a choice records)."""
+    return REMIND if (rule or {}).get("action") == REMIND else RECORD
+
+
+def of_action(rules: Iterable[dict], what: str) -> set[str]:
+    """The ids of the rules that do *what*."""
+    return {str(r["id"]) for r in rules if r.get("id") and action(r) == what}
+
+
+def taken_for(taken: Iterable[dict], rule_ids: set[str],
+              legacy: bool = False) -> list[dict]:
+    """What the rules *rule_ids* scheduled before - and, with *legacy*,
+    what was kept without a rule (before reminders, every entry was a
+    recording's)."""
+    return [t for t in taken if isinstance(t, dict)
+            and (str(t.get("rule") or "") in rule_ids
+                 or (legacy and not t.get("rule")))]
+
+
 def matches(rule: dict, title: str) -> bool:
     t, want = norm(title), norm(rule.get("text"))
     if not want:
@@ -128,6 +160,7 @@ def matches(rule: dict, title: str) -> bool:
 def _valid(rule: object) -> bool:
     return (isinstance(rule, dict) and bool(rule.get("id"))
             and rule.get("kind") in (EXACT, WORD) and bool(norm(rule.get("text")))
+            and rule.get("action", RECORD) in (RECORD, REMIND)
             and (rule.get("scope") == ANY
                  or (rule.get("scope") == THIS and bool(rule_key(rule)))))
 
@@ -197,7 +230,8 @@ def find_airings(rules: list[dict], channels: Iterable[dict],
                  shift: float = 0.0, source: str = "") -> list[Airing]:
     """Every airing in the next *days* days that a rule asks for, soonest
     first, at most *per_rule* for one rule. A channel listed twice in the
-    line-up counts once; an airing two rules want goes to the first.
+    line-up counts once; an airing two rules want goes to the first - of
+    each action: a recording rule and a reminder rule both get it.
     *shift*: seconds the guide's times are off the clock (the guide offset
     in Settings) - the airings come back in clock time. *source*: the id
     of the source the channels are in, kept with each airing."""
@@ -205,9 +239,10 @@ def find_airings(rules: list[dict], channels: Iterable[dict],
     if not rules:
         return []
     match = Matcher(rules)
+    acts = {str(r["id"]): action(r) for r in rules}
     lo, hi = now + LEAD_S, now + days * 86400
     out: list[Airing] = []
-    seen: set[tuple[str, float]] = set()
+    seen: set[tuple[str, float, str]] = set()
     for ch in channels:
         key = stream_key(ch)
         if not key:
@@ -222,12 +257,14 @@ def find_airings(rules: list[dict], channels: Iterable[dict],
                 stop = float(p["stop_timestamp"]) + shift
             except (KeyError, TypeError, ValueError):
                 continue
-            if start < lo or start >= hi or stop <= start or (key, start) in seen:
+            if start < lo or start >= hi or stop <= start:
                 continue
             title = str(p.get("title") or "")
-            rid = next((r for r in match(title) if r in here), None)
-            if rid is not None:
-                seen.add((key, start))
+            for rid in match(title):
+                what = acts.get(rid, RECORD)
+                if rid not in here or (key, start, what) in seen:
+                    continue
+                seen.add((key, start, what))
                 out.append(Airing(rid, ch, key, title, start, stop,
                                   source=str(source or "")))
     out.sort(key=lambda a: (a.start, a.key))
@@ -476,6 +513,90 @@ def retimed(airings: Iterable[Airing], jobs: Iterable[dict],
     return out
 
 
+def _start(v: Any) -> int | None:
+    try:
+        return int(float(v))
+    except (TypeError, ValueError):
+        return None
+
+
+def remind_plan(airings: Iterable[Airing], reminders: Iterable[dict],
+                taken: Iterable[dict], now: float,
+                per_rule: int = MAX_PER_RULE) -> list[Airing]:
+    """The airings a reminder rule wants a reminder set for now, soonest
+    first; a reminder is for a programme's own start (padding is for
+    recordings). Left out: one set already for that channel and start (by
+    hand or by a rule), one a rule set before (*taken*, from the store - a
+    reminder the user removed is not set again), the same programme at the
+    same time on a second channel after the first, and a rule's airings
+    past *per_rule* upcoming reminders of its own. *reminders* are the
+    ReminderStore's: stream_id, start, title, and the rule that set it."""
+    have: set[tuple[str, int]] = set()
+    titled: set[tuple[str, int]] = set()
+    count: dict[str, int] = {}
+    for r in reminders:
+        if not isinstance(r, dict):
+            continue
+        st = _start(r.get("start"))
+        if st is None:
+            continue
+        have.add((stream_key(r), st))
+        if norm(r.get("title")):
+            titled.add((norm(r.get("title")), st))
+        if r.get("rule") and st > now:
+            count[str(r["rule"])] = count.get(str(r["rule"]), 0) + 1
+    for t in taken:
+        st = _start(t.get("start")) if isinstance(t, dict) else None
+        if st is None:
+            continue
+        have.add((str(t.get("key") or ""), st))
+        if t.get("title"):
+            titled.add((norm(t.get("title")), st))
+    out: list[Airing] = []
+    for a in sorted(airings, key=lambda a: (a.start, a.key)):
+        st = int(a.start)
+        if a.start < now + LEAD_S or count.get(a.rule, 0) >= per_rule:
+            continue
+        if (a.key, st) in have or (norm(a.title) and (norm(a.title), st) in titled):
+            continue
+        out.append(a)
+        have.add((a.key, st))
+        if norm(a.title):
+            titled.add((norm(a.title), st))
+        count[a.rule] = count.get(a.rule, 0) + 1
+    return out
+
+
+def remind_retimed(airings: Iterable[Airing], reminders: Iterable[dict],
+                   now: float) -> list[tuple[dict, Airing]]:
+    """Reminders a rule set whose programme the guide now has at another
+    time, each with the airing it should follow: the same rule, channel
+    and title, mostly at the same time - the reminder moves with it rather
+    than a second one being set at the new time."""
+    airings = list(airings)
+    at = {(a.rule, a.key, int(a.start)) for a in airings}
+    out: list[tuple[dict, Airing]] = []
+    used: set[int] = set()
+    for r in reminders:
+        if not isinstance(r, dict) or not r.get("rule"):
+            continue
+        st = _start(r.get("start"))
+        stop = _num(r.get("stop"), 0.0)
+        if st is None or st <= now or stop <= st:
+            continue
+        rule, key, title = str(r["rule"]), stream_key(r), norm(r.get("title"))
+        if (rule, key, st) in at:
+            continue
+        w = _Window(key, "", st, stop, st, stop, title)
+        hit = next((a for a in airings if id(a) not in used and a.rule == rule
+                    and a.key == key and norm(a.title) == title
+                    and _mostly_overlap(a, w)), None)
+        if hit is not None:
+            used.add(id(hit))
+            out.append((r, hit))
+    return out
+
+
 class SeriesRuleStore:
     """A source's series rules, and the airings they scheduled (kept a
     while so a cancelled recording is not scheduled again). One JSON value
@@ -510,8 +631,9 @@ class SeriesRuleStore:
         if not _valid(rule):
             return None
         for r in self._rules:
-            if (r.get("kind"), norm(r.get("text")), rule_key(r)) == (
-                    rule.get("kind"), norm(rule.get("text")), rule_key(rule)):
+            if (r.get("kind"), norm(r.get("text")), rule_key(r), action(r)) == (
+                    rule.get("kind"), norm(rule.get("text")), rule_key(rule),
+                    action(rule)):
                 return dict(r)
         self._rules.append(dict(rule))
         self._save()

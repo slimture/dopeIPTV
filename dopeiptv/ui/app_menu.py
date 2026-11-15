@@ -21,7 +21,7 @@ GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("prefs", "app", ("settings",)),
     ("file", "file", ("open_video", "refresh", "reminders")),
     ("view", "view", ("multiview", "cast", "together")),
-    ("history", "history", ("private", "clear")),
+    ("history", "history", ("stats", "private", "clear")),
     ("help", "help", ("feedback", "answers", "report_wait", "website")),
     ("support", "app", ("supporter", "donate")),
     ("quit", "app", ("quit",)),

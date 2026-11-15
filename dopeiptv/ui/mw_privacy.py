@@ -121,8 +121,10 @@ class _PrivacyMixin:
             return None
         c = d.choice()
         resume_settings = getattr(self, "_resume_settings", self.settings)
+        self._stats_drop_pending()
         counts = privacy.clear_recent(self.settings, resume_settings, self.history,
-                                      c["seconds"], c["channels"], c["titles"], c["positions"])
+                                      c["seconds"], c["channels"], c["titles"], c["positions"],
+                                      viewing=self._stats_store())
         # The resume store holds its positions in memory: read them again.
         if c["positions"] and getattr(self, "resume", None) is not None:
             from ..services.resume import ResumeStore

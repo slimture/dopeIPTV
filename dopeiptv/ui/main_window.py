@@ -97,6 +97,7 @@ from .mw_onboarding import _OnboardingMixin
 from .mw_popout import _PopoutMixin
 from .mw_reminders import _RemindersMixin
 from .mw_series import _SeriesMixin
+from .mw_stats import _StatsMixin
 from .mw_search import _SearchMixin
 from .mw_shortcuts import _ShortcutsMixin
 from .mw_sidebar import _SidebarMixin
@@ -134,7 +135,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
                  _HealthMixin, _ChannelPrefsMixin, _RemoteMixin, _EventsMixin, _ReportMixin,
                  _PortalArchiveMixin, _SeriesMixin, _SyncMixin,
-                 _ConnectionsMixin, _MirrorsMixin, _TogetherMixin,
+                 _ConnectionsMixin, _MirrorsMixin, _TogetherMixin, _StatsMixin,
                  QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
@@ -456,6 +457,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         open_video_action = action(tr("menu_open_video"), self.open_local_video)
         open_video_action.setShortcut("Ctrl+O")
         reminders_action = action(tr("reminders_menu"), self._open_reminders)
+        stats_action = action(tr("stats_menu") + "…", self.open_stats)
         multiview_action = action(tr("menu_multiview"), self._show_multiview)
         cast_action = action(tr("ctx_cast_to_chromecast"), self.cast_playing)
         together_action = action(tr("together_title") + "…", self.open_together)
@@ -478,6 +480,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             "reminders": reminders_action, "multiview": multiview_action,
             "cast": cast_action, "together": together_action,
             "private": private_action, "clear": clear_action,
+            "stats": stats_action,
             **report_actions, "website": website_action,
             "supporter": self._supporter_action, "donate": self._donate_action,
             "quit": quit_action}, sys.platform == "darwin")
@@ -505,6 +508,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             website_action: lambda: tr("menu_website"),
             private_action: lambda: tr("private_menu"),
             clear_action: lambda: tr("clear_menu") + "…",
+            stats_action: lambda: tr("stats_menu") + "…",
         }
         if sys.platform == "darwin":
             for key, title in MAC_MENUS:
@@ -1282,6 +1286,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.stop_btn.clicked.connect(self._exit_popout_if_active)
             self.player.stopped.connect(self._on_player_stopped)
             self.player.stopped.connect(self._events_stopped)
+            # Your statistics: the time it plays (mw_stats; it only watches).
+            self.player.stopped.connect(self._stats_end)
+            self.player.playback_error.connect(self._stats_end)
+            self.player.paused_changed.connect(self._stats_paused_changed)
             self.player.resume_requested.connect(self._resume_last)
             self.player.stalled.connect(self._on_player_stalled)
             self.player.contested.connect(self._on_stream_contested)
@@ -1289,6 +1297,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.first_frame.connect(self._health_frame)
             # Before _on_player_finished, which may start the next episode.
             self.player.finished.connect(self._events_finished)
+            self.player.finished.connect(self._stats_end)
             self.player.finished.connect(self._on_player_finished)
             self.player.next_episode.connect(self._play_next_episode)
             # Keep the poster overlay's play/pause/stop glyph in sync with the
@@ -1319,6 +1328,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self.settings.value("vis_on", "true") == "true",
                 self.settings.value("vis_style", "bars"))
             self.player.vis_choose = self._vis_choose
+            # Night mode's key in the player's menu (the window's keys).
+            self.player.night_key = self._night_key_text
             dl.addWidget(self.player)
 
         # Everything below the video lives in ONE scroll column. This is the
@@ -4374,6 +4385,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._health_begin(self._item_key(it), title, it, "live", False)
             self._events_started(self._item_key(it), title, it, "live", False)
             self._together_started(self._item_key(it), title, it, "live", False)
+            self._stats_begin(self._item_key(it), title, it, "live", False)
         self._apply_seek_mode(it, "live")
         # Refresh the poster overlay glyph (play -> pause for a timeshift
         # channel, -> stop for plain live). Unlike _start_playback, the preview
@@ -4943,6 +4955,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self._health_begin(key, title, item, kind, catchup)
                 self._events_started(key, title, item, kind, catchup)
                 self._together_started(key, title, item, kind, catchup)
+                self._stats_begin(key, title, item, kind, catchup)
             else:
                 log.warning("embedded play() refused %s - falling back to an "
                             "external mpv window", redact_url(url))
@@ -5789,6 +5802,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._save_resume_position()
             self._maybe_auto_mark_watched()
             self._sync_on_close()
+            self._stats_close()
         self.wake.release()
         self._stop_media_session()
         self._together_close()

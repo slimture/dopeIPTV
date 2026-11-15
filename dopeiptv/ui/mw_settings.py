@@ -61,6 +61,7 @@ from ..providers.opensubtitles import OpenSubtitles
 from ..providers.opensubtitles import bundled_key as bundled_os_key
 from ..providers.client import make_client
 from ..core import connections
+from ..core import night_mode, rec_mp4
 from ..core.local_buffer import MEMORY_MAX_MINUTES
 from ..core.log import log
 from ..core.xdg import open_url
@@ -1041,6 +1042,10 @@ class _SettingsMixin:
         upcoming_box = c.toggle(
             tr("set_upcoming_prompt"),
             self.settings.value("hide_upcoming_prompt", "false") != on)
+        # Night mode: the player's menu and its key turn it on too, live.
+        c = play.card(tr("set_card_sound"))
+        night_box = c.toggle(tr("night_mode"), night_mode.enabled(self.settings),
+                             tr("night_mode_hint"))
         c = play.card(tr("set_card_stream"))
         c.row(tr("setting_stream_format"), fmt_box)
         c.row(tr("setting_network_buffer"), buf_box)
@@ -1522,6 +1527,9 @@ class _SettingsMixin:
         rec_max_box = Stepper(rec_max_spin, width=rec_max_spin.widest() + 80)
         rec_total_box = Stepper(rec_total_spin,
                                 width=rec_total_spin.widest() + 80)
+        # Saved as MP4 once a recording ended well (core/rec_mp4.py).
+        mp4_box = c.toggle(tr("rec_mp4_setting"), rec_mp4.enabled(self.settings),
+                           tr("rec_mp4_hint"))
         c = rec.card(tr("set_card_limits"))
         c.row(tr("rec_max_label"), rec_max_box)
         c.row(tr("rec_total_label"), rec_total_box)
@@ -1550,12 +1558,17 @@ class _SettingsMixin:
         series_card = rec.card(tr("set_card_series"))
         rule_list = QListWidget(objectName="SeriesRuleList")
         rec_icon = page_icon("rec", self._action_pixmap, 16)
+        # A rule that reminds instead of recording wears the guide's bell.
+        from .epg_grid import EpgGrid
+        bell_icon = QIcon(EpgGrid._bar_pixmap("bell", QColor(P["text2"])))
 
         def fill_rules() -> None:
             rule_list.clear()
             for r in sorted(self.series_rules.rules(),
                             key=lambda r: srules.norm(r.get("text"))):
-                item = QListWidgetItem(rec_icon, self._series_rule_label(r))
+                item = QListWidgetItem(
+                    bell_icon if srules.action(r) == srules.REMIND else rec_icon,
+                    self._series_rule_label(r))
                 item.setData(Qt.ItemDataRole.UserRole, r["id"])
                 rule_list.addItem(item)
             rule_list.setCurrentRow(0)
@@ -1576,6 +1589,7 @@ class _SettingsMixin:
             lambda: rule_list.count() > 0)
         series_card.layout_row(hbox(rule_add, rule_del))
         series_card.note(tr("series_note", days=srules.DAYS))
+        series_card.note(tr("series_remind_note"))
 
         def rules_sync() -> None:
             rule_del.setEnabled(rule_list.currentItem() is not None)
@@ -2263,6 +2277,11 @@ class _SettingsMixin:
             put("autoplay_next_episode", flag(autoplay_next_box))
             put("nextup_lead_secs", nextup_box.currentData())
             put("auto_reconnect_live", flag(autorecon_box))
+            # These two only when switched: off and never set is no setting.
+            if night_box.isChecked() != night_mode.enabled(self.settings):
+                put(night_mode.KEY, flag(night_box))
+            if night_mode.KEY in changed and self.player:
+                self.player.set_night_mode(night_box.isChecked())
             put("check_updates", flag(updates_box))
             if heart_box.isChecked() != self._donate_heart_due():
                 if heart_box.isChecked():
@@ -2335,6 +2354,8 @@ class _SettingsMixin:
             put("live_rewind_kept", flag(kept_box))
             put("live_rewind_space_gb", space_box.currentData())
             put("replay_delay_min", replay_delay_box.value())
+            if mp4_box.isChecked() != rec_mp4.enabled(self.settings):
+                put(rec_mp4.SETTING, flag(mp4_box))
             put("epg_delay_min", epg_delay_box.value())
             if "epg_delay_min" in changed:
                 self.xmltv.delay_minutes = self._epg_delay_minutes()

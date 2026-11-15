@@ -82,6 +82,12 @@ class _RecordingMixin:
         # Why it failed, where it failed - a bare [Failed] said nothing.
         if j["status"] == "failed" and j.get("error"):
             name += f"  —  {rec_reason(j['error'])}"
+        # Saved as MP4 (Settings > Recording): while it is copied, and when
+        # the .ts had to be kept.
+        if j.get("remux") == "running":
+            name += f"  —  {tr('rec_mp4_saving')}"
+        elif j.get("remux") == "failed":
+            name += f"  —  {tr('rec_mp4_kept_ts')}"
         return {"name": name,
                 "_job": j["id"], "_key": f"job:{j['id']}",
                 "_kind": "recjob", "_status": j["status"],

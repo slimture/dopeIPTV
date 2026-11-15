@@ -46,7 +46,13 @@ dopeiptv/
     dvr_pool.py        Every channel's buffer this session, one budget
     dvr_record.py      A recording read from a buffer
     recording.py       RecordingManager - ffmpeg/mpv stream-copy, timers
-    series_rules.py    Series recordings: rules, airings found, the plan, padding
+    rec_mp4.py         Recordings as MP4: the remux (stream copy, faststart),
+                       the plausibility check, the .ts kept unless it passed
+    series_rules.py    Series recordings: rules, airings found, the plan, padding;
+                       a rule that reminds instead, its reminders' plan
+    night_mode.py      Night mode for the sound: one labelled audio filter
+    viewing_stats.py   Your statistics: seconds watched per title and hour, the
+                       sums (this computer only, never synced)
     updates.py         GitHub latest-release check (is_newer, fetch)
     selfupdate.py      AppImage in-place update: download, verify, test, swap
     wakelock.py        Screensaver/suspend inhibitor (DBus + caffeinate)
@@ -141,6 +147,9 @@ dopeiptv/
     mw_series.py       Series recordings: "Record series…", the rules' check
     mw_mpris.py        The system's media controls (media_session host) +
                        media keys
+    mw_stats.py        Your statistics: playback time counted, its window
+    stats_window.py    The statistics window: tiles, two column charts, top lists
+    mw_mpris.py        Desktop media controls (MPRIS host) + media keys
     mw_follow.py       Follow a series: new-episode checks and news
     mw_subtitles.py    Subtitles from OpenSubtitles; remembered per title
     mw_home.py         The Home page (shelves: resume, favourites, new)
@@ -210,7 +219,9 @@ for player-overlay colours, which is why `ui/__init__` exposes
    for standalone recordings, mpv's `--stream-record` for in-player
    capture, or `BufferRecorder` (`dvr_record.py`) reading from the app's
    own buffer when that is on - no extra connection, and whole while the
-   player is paused.
+   player is paused. With "Save recordings as MP4" on, a finished .ts is
+   remuxed into an MP4 off the window's thread (`rec_mp4.py`) and the .ts
+   deleted only once the MP4 is plausibly whole.
 
 ## Key patterns
 

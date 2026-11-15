@@ -67,6 +67,17 @@ class _ShortcutsMixin:
         if not self._typing() and self._player_up():
             self.player.toggle_mute()
 
+    def _shortcut_night_mode(self) -> None:
+        """Night mode for the sound, on or off - the docked player's core,
+        which the pop-out shows too; said in the picture's corner."""
+        if self._typing() or not self.player:
+            return
+        on = self.player.toggle_night_mode()
+        if self.player.isVisible() and self.player.current_url:
+            self.player.show_number_entry(tr("night_on" if on else "night_off"), 1500)
+        else:
+            self._flash_status(tr("night_on" if on else "night_off"))
+
     def _shortcut_zap(self, step: int) -> None:
         if self._multiview_active() is None:
             self._zap(step)
@@ -167,6 +178,7 @@ class _ShortcutsMixin:
             "pause": self._toggle_pause_shortcut,
             "fullscreen": self._toggle_fullscreen_shortcut,
             "mute": self._shortcut_mute,
+            "night_mode": self._shortcut_night_mode,
             "popout": self._shortcut_popout,
             "record": self._shortcut_record,
             "stats": self._shortcut_stats,
@@ -185,6 +197,11 @@ class _ShortcutsMixin:
     def shortcut_sequence(self, sid: str) -> str:
         """The key in force for *sid* ("" when it has none)."""
         return self.shortcut_keys().get(sid, "")
+
+    def _night_key_text(self) -> str:
+        """Night mode's key as this system writes it, for the player's menu."""
+        seq = self.shortcut_sequence("night_mode")
+        return QKeySequence(seq).toString(QKeySequence.SequenceFormat.NativeText) if seq else ""
 
     def _install_shortcuts(self) -> None:
         """Create every rebindable QShortcut from the key in force. Kept in

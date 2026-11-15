@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QWidget, QPushButton,
 )
 
-from ..core import channel_prefs
+from ..core import channel_prefs, night_mode
 from ..core.log import log, redact_url
 from ..core.local_buffer import rewind_bytes
 from ..i18n import current_language, tr
@@ -530,6 +530,7 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
     program_seek = pyqtSignal(int)     # seconds from the picked programme start
     track_selected = pyqtSignal(str, object)  # "aid"/"sid", track id or "no"
     subtitle_added = pyqtSignal(str)          # a subtitle file now showing
+    night_mode_changed = pyqtSignal(bool)     # turned on/off from the menu
 
     OVERLAY_HIDE_MS = 3000
     VIDEO_BOX_HEIGHT = 260
@@ -598,6 +599,15 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         self._delay_chan: str | None = None
         self._delay_key: str | None = None
         self._delay_set = False
+        # Night mode for the sound (core/night_mode.py): whether it is
+        # wanted, and what the core was last given (its weakref, on/off) -
+        # so a play() that changes nothing writes nothing to mpv, and a core
+        # never given the filter is never touched while it is off.
+        self._night_on = night_mode.enabled(settings)
+        self._night_core = None
+        self._night_now = False
+        # The window's key for it, shown in the options menu ("" for none).
+        self.night_key = None
         # Docked video-box height scales with the display so the mini player
         # is usefully large on a 27"/4K screen and modest on a laptop -
         # computed once here, then constant (nothing resizes on its own).
@@ -2515,10 +2525,13 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         except Exception as e:
             log.debug("visualiser %s failed: %s", "on" if on else "off", e)
 
+    EQ_LABEL = "dopeiptv-eq"
+
     def set_equaliser(self, gains, enabled: bool = True) -> None:
         """Apply a ten-band equaliser (gains in dB, -12..+12). Disabled or
         all-flat means no filter at all, so the untouched path stays
-        bit-exact."""
+        bit-exact. Its own labelled entry on the audio chain, first in it -
+        night mode's, after it, stays as it is."""
         m = self.video.mpv
         if m is None:
             return
@@ -2533,13 +2546,63 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
                 return                 # already applied: leave mpv alone
             self._eq_now = want
             if not enabled or not any(abs(g) > 0.05 for g in gains):
-                m["af"] = ""
+                night_mode.remove(m, self.EQ_LABEL)
                 return
             parts = [f"equalizer=f={f}:width_type=o:width=1:g={g:.1f}"
                      for f, g in zip(self.EQ_BANDS, gains, strict=True)]
-            m["af"] = "lavfi=[" + ",".join(parts) + "]"
+            m.command("af", "pre",
+                      f"@{self.EQ_LABEL}:lavfi=[" + ",".join(parts) + "]")
         except Exception as e:
             log.debug("equaliser failed: %s", e)
+
+    # -- night mode (the sound) ------------------------------------------------
+
+    def night_mode_on(self) -> bool:
+        return self._night_on
+
+    def set_night_mode(self, on: bool) -> None:
+        """Night mode on or off, onto the core at once while the stream
+        plays on, and kept for every stream after (core/night_mode.py).
+        Only the audio chain changes. Storing the choice is the caller's
+        (toggle_night_mode stores it)."""
+        self._night_on = bool(on)
+        self._sync_night()
+
+    def toggle_night_mode(self) -> bool:
+        """The options menu's entry and the window's key: flipped,
+        remembered and applied. The new state."""
+        on = not self._night_on
+        night_mode.store(self._settings, on)
+        self.set_night_mode(on)
+        self.night_mode_changed.emit(on)
+        return on
+
+    def _night_from_menu(self, _checked: bool = False) -> None:
+        self.toggle_night_mode()
+
+    def _sync_night(self) -> None:
+        """The core as night mode wants it. Written only when that differs
+        from what this core was given: a play() with nothing changed writes
+        nothing, and a core created after the choice (its GL surface builds
+        it lazily) gets it on its first play()."""
+        m = self.video.mpv
+        if m is None:
+            return
+        core = self._night_core() if self._night_core is not None else None
+        given = self._night_now if core is m else False
+        if given == self._night_on:
+            return
+        if not night_mode.apply(m, self._night_on):
+            log.info("night mode: the player did not take its audio filter")
+            return
+        import weakref
+        try:
+            self._night_core = weakref.ref(m)
+        except TypeError:
+            self._night_core = None
+            return
+        self._night_now = self._night_on
+        log.info("night mode %s", "on" if self._night_on else "off")
 
     def set_track_prefs(self, aid=None, sid=None) -> None:
         """Arm one-shot audio/subtitle track ids for the next play() - the
@@ -2722,6 +2785,9 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
             except Exception:
                 pass
             self.apply_default_options(load=True, live=live)
+            # Night mode: on a core that has not had it yet (nothing at all
+            # is written while it is off and always was).
+            self._sync_night()
             # Nerd: user agent, headers and proxy for this source (nothing
             # while Nerd is off and never was; the defaults back once it was).
             try:
@@ -3082,6 +3148,14 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
                 lambda _c, tid=t.get("id"): self._pick_track("aid", tid))
         if audio.isEmpty():
             audio.addAction(tr("opt_no_audio_tracks")).setEnabled(False)
+        # Night mode next to the tracks: loud and quiet evened out, on the
+        # fly. The key the window gives it, after a tab, is only shown.
+        key = self.night_key() if callable(self.night_key) else ""
+        night = menu.addAction(tr("night_mode") + (f"\t{key}" if key else ""))
+        night.setCheckable(True)
+        night.setChecked(self._night_on)
+        night.setToolTip(tr("night_mode_hint"))
+        night.triggered.connect(self._night_from_menu)
 
         subs = menu.addMenu(tr("opt_subtitles"))
         off = subs.addAction(tr("opt_off"))
