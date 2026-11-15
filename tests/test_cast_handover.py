@@ -547,6 +547,26 @@ def test_the_position_goes_to_the_profile_that_started_the_cast():
     assert now.saved == []
 
 
+def test_the_cast_goes_into_the_history_of_the_profile_that_started_it():
+    """The receiver says it plays a few seconds after the cast was asked
+    for - by then the phone may have switched the profile: the cast is in
+    the History of whoever started it."""
+    class Hist:
+        def __init__(self):
+            self.added = []
+
+        def add(self, url, title, icon, key, kind, extra=None):
+            self.added.append((key, kind))
+
+    w = _with_strip()
+    started, now = Hist(), Hist()
+    w.history = now
+    w._cast_ctx = {"row_url": "http://p/film.mkv", "key": "42", "kind": "movie",
+                   "title": "Film", "item": {"name": "Film"}, "history": started}
+    w._record_cast_history()
+    assert started.added == [("42", "movie")] and now.added == []
+
+
 def test_a_cast_that_just_started_does_not_wipe_the_resume_point():
     """A position too small to be worth keeping is a reason to leave the
     store alone, not to write to it - writing one drops what was there, and

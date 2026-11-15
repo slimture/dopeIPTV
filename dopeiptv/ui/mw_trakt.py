@@ -10,6 +10,7 @@ from __future__ import annotations
 import secrets
 import threading
 import time
+from ..core import profiles
 from ..core.log import log
 from ..i18n import tr
 from ..providers.metadata import PosterResolver
@@ -25,6 +26,21 @@ from PyQt6.QtWidgets import (
     QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
     QListWidget, QMessageBox, QPushButton, QTabWidget, QVBoxLayout)
 from datetime import datetime
+
+
+def _sync_ended(win) -> bool:
+    """A watched sync's run ended (its worker said for whom): its profile
+    may sync again. True when it was the profile in use's - the running
+    flag goes, and the lists show what it brought."""
+    ends = win.__dict__.get("_watched_sync_ends") or []
+    pid = ends.pop(0) if ends else profiles.active_id()
+    running = win.__dict__.get("_watched_sync_pids")
+    if running is not None:
+        running.discard(pid)
+    if pid != profiles.active_id():
+        return False
+    win._watched_sync_running = False
+    return True
 
 
 def device_pages(data: dict) -> tuple[str, str]:
@@ -58,12 +74,14 @@ class _TraktMixin:
                  and getattr(self, attr).is_connected()]
         return " + ".join(names)
 
-    def _accounts_push(self, method: str, *args) -> None:
+    def _accounts_push(self, method: str, *args, accounts: list | None = None) -> None:
         """Tell every signed-in account the same change (a method of the
         account clients: add_movie_history, remove_show_watchlist, ...), on
         a daemon thread - killed at quit, so a request in flight never
-        crashes teardown."""
-        accounts = self._watch_accounts()
+        crashes teardown. *accounts*: those of the profile that asked (a
+        late answer), else the profile in use's."""
+        if accounts is None:
+            accounts = self._watch_accounts()
         if not accounts:
             return
 
@@ -144,6 +162,12 @@ class _TraktMixin:
 
     def _maybe_sync_watched(self, force: bool = False) -> None:
         accounts = self._watch_accounts()
+        # One sync per profile at a time: _watched_sync_running is the
+        # profile in use's (a switch sets it from the profiles' runs), so
+        # one still running for the profile before does not hold this one's
+        # back - its answer goes to that profile's own stores, below.
+        pid = profiles.active_id()
+        running = self.__dict__.setdefault("_watched_sync_pids", set())
         if not accounts or self._watched_sync_running:
             return
         if not force:
@@ -151,6 +175,8 @@ class _TraktMixin:
             if age < self._WATCHED_SYNC_TTL:
                 return
         self._watched_sync_running = True
+        running.add(pid)
+        ends = self.__dict__.setdefault("_watched_sync_ends", [])
         # The profile's own stores, as they are now: a switch while this runs
         # leaves its answer with the profile it was asked for.
         mine = {"watched": self.watched, "watchlist": self.watchlist,
@@ -188,6 +214,7 @@ class _TraktMixin:
                 # Marshal back to the main thread just to flip the
                 # running flag; QTimer.singleShot from a non-Qt thread
                 # is safe as long as the target QObject lives there.
+                ends.append(pid)
                 QTimer.singleShot(0, self._on_watched_sync_failed)
                 return
             try:
@@ -203,8 +230,10 @@ class _TraktMixin:
                 # Without this the running flag stayed set and no sync ran
                 # again until the app was restarted.
                 log.warning("trakt: watched sync failed: %s", e)
+                ends.append(pid)
                 QTimer.singleShot(0, self._on_watched_sync_failed)
                 return
+            ends.append(pid)
             QTimer.singleShot(0, self._on_watched_sync_done)
 
         threading.Thread(target=worker, daemon=True).start()
@@ -280,7 +309,8 @@ class _TraktMixin:
                         pass
 
     def _on_watched_sync_done(self) -> None:
-        self._watched_sync_running = False
+        if not _sync_ended(self):
+            return      # the profile before's: its marks are in its own stores
         # Nudge the visible list so the newly-known 'seen' markers
         # paint without needing a category switch.
         self.list_model.refresh_all()
@@ -290,7 +320,7 @@ class _TraktMixin:
             self._load_items(self._watched_subcat)
 
     def _on_watched_sync_failed(self) -> None:
-        self._watched_sync_running = False
+        _sync_ended(self)
 
     # -- Watched (Sedda) list ------------------------------------------------
 
@@ -622,21 +652,27 @@ class _TraktMixin:
                 self._accounts_push("add_movie_history", tid)
             elif self.tmdb is not None:
                 # Not resolved yet - look the id up on demand, then
-                # upgrade the local mark to tmdb-keyed and push.
+                # upgrade the local mark to tmdb-keyed and push: into the
+                # marks and accounts of the profile marking it, whoever is
+                # in use when the answer comes.
+                watched, accounts = self.watched, self._watch_accounts()
                 self._resolve_tmdb_id_async(
                     item, "vod",
-                    lambda tid: self._on_movie_id_for_trakt(item, tid))
+                    lambda tid: self._on_movie_id_for_trakt(item, tid, watched, accounts))
             else:
                 self._error(tr("mark_needs_tmdb"))
         self.list_model.refresh_all()
 
-    def _on_movie_id_for_trakt(self, item: dict, tid: int | None) -> None:
+    def _on_movie_id_for_trakt(self, item: dict, tid: int | None,
+                               watched=None, accounts: list | None = None) -> None:
         if not isinstance(tid, int):
             self._error(tr("mark_needs_tmdb"))
             return
-        self.watched.mark_movie_local(tid)
-        self.watched.add_local_item(item, "vod", tid)
-        self._accounts_push("add_movie_history", tid)
+        if watched is None:
+            watched = self.watched
+        watched.mark_movie_local(tid)
+        watched.add_local_item(item, "vod", tid)
+        self._accounts_push("add_movie_history", tid, accounts=accounts)
         self.list_model.refresh_all()
 
     def _unmark_movie_watched(self, item: dict,
@@ -681,22 +717,28 @@ class _TraktMixin:
             if sid is not None:
                 self._accounts_push("add_episode_history", sid, season, episode)
             elif self.tmdb is not None and self.series_ctx is not None:
+                # The series and the profile asked for, kept to the answer.
+                series, watched = self.series_ctx, self.watched
+                accounts = self._watch_accounts()
                 self._resolve_tmdb_id_async(
-                    self.series_ctx, "series",
+                    series, "series",
                     lambda tid, s=season, e=episode: self._on_show_id_for_trakt(
-                        self.series_ctx, tid, s, e))
+                        series, tid, s, e, watched, accounts))
             else:
                 self._error(tr("mark_needs_tmdb"))
         self.list_model.refresh_all()
 
     def _on_show_id_for_trakt(self, series_item: dict, tid: int | None,
-                              season: int, episode: int) -> None:
+                              season: int, episode: int, watched=None,
+                              accounts: list | None = None) -> None:
         if not isinstance(tid, int):
             self._error(tr("mark_needs_tmdb"))
             return
-        self.watched.mark_episode_local(tid, season, episode)
-        self.watched.add_local_item(series_item, "series", tid)
-        self._accounts_push("add_episode_history", tid, season, episode)
+        if watched is None:
+            watched = self.watched
+        watched.mark_episode_local(tid, season, episode)
+        watched.add_local_item(series_item, "series", tid)
+        self._accounts_push("add_episode_history", tid, season, episode, accounts=accounts)
         self.list_model.refresh_all()
 
     def _unmark_episode_watched(self, item: dict,
@@ -757,25 +799,31 @@ class _TraktMixin:
             # sync). Without a resolved id there's nothing Trakt can key
             # on, hence the mark_needs_tmdb notice only for the +Trakt
             # variant when we have no resolver at all.
+            watched, accounts = self.watched, self._watch_accounts()
             self._resolve_tmdb_id_async(
                 item, "series",
                 lambda rid: self._on_series_id_resolved(item, rid,
-                                                        push_to_trakt))
+                                                        push_to_trakt, watched, accounts))
         elif push_to_trakt:
             self._error(tr("mark_needs_tmdb"))
         self.list_model.refresh_all()
 
     def _on_series_id_resolved(self, item: dict, tid: int | None,
-                               push_to_trakt: bool) -> None:
+                               push_to_trakt: bool, watched=None,
+                               accounts: list | None = None) -> None:
         if not isinstance(tid, int):
             if push_to_trakt:
                 self._error(tr("mark_needs_tmdb"))
             return
-        self.watched.mark_show_local(tid)
-        self.watched.add_local_item(item, "series", tid)
-        if push_to_trakt and self._watch_accounts():
-            self.watched.mark_show_synced(tid)
-            self._accounts_push("add_show_history", tid)
+        if watched is None:
+            watched = self.watched
+        if accounts is None:
+            accounts = self._watch_accounts()
+        watched.mark_show_local(tid)
+        watched.add_local_item(item, "series", tid)
+        if push_to_trakt and accounts:
+            watched.mark_show_synced(tid)
+            self._accounts_push("add_show_history", tid, accounts=accounts)
         self.list_model.refresh_all()
 
     def _unmark_series_watched(self, item: dict,
@@ -932,6 +980,9 @@ class _TraktMixin:
         if not self.trakt.client_id:
             QMessageBox.information(parent, "Trakt", tr("msg_trakt_enter_creds"))
             return
+        # The account of the profile signing in, whoever is in use by the
+        # time the browser hands the code back (a switch from the phone).
+        trakt, gen = self.trakt, getattr(self, "_profile_gen", 0)
 
         d = QDialog(parent)
         d.setWindowTitle(tr("trakt_connect_title"))
@@ -984,7 +1035,7 @@ class _TraktMixin:
             info.setText(tr("trakt_finishing"))
             run_async(
                 self.pool,
-                lambda code=params.get("code", ""): self.trakt.exchange_code(
+                lambda code=params.get("code", ""): trakt.exchange_code(
                     code, verifier),
                 exchanged, exchange_failed)
 
@@ -996,7 +1047,10 @@ class _TraktMixin:
             if state["cancelled"]:
                 return
             info.setText(tr("trakt_connected_excl"))
-            self._maybe_sync_watched(force=True)
+            # Signed in for the profile that asked; another in use by now
+            # syncs at its own time, not with this account.
+            if gen == getattr(self, "_profile_gen", 0):
+                self._maybe_sync_watched(force=True)
             QTimer.singleShot(700, d.accept)
 
         def exchange_failed(msg) -> None:
@@ -1016,7 +1070,7 @@ class _TraktMixin:
                 OAUTH_PORT, timeout=180.0,
                 should_cancel=lambda: state["cancelled"]),
             captured, capture_failed)
-        open_url(self.trakt.authorize_url(state["token"], challenge))
+        open_url(trakt.authorize_url(state["token"], challenge))
         d.exec()
 
     def _trakt_device_auth_dialog(self, parent) -> None:
@@ -1034,6 +1088,8 @@ class _TraktMixin:
 
         state = {"cancelled": False, "device_code": None,
                  "interval": 5, "expires_at": 0.0}
+        # The account of the profile signing in (see the browser's).
+        trakt = self.trakt
 
         def poll() -> None:
             if state["cancelled"] or not state["device_code"]:
@@ -1042,7 +1098,7 @@ class _TraktMixin:
                 info.setText(tr("trakt_code_expired"))
                 return
             run_async(self.pool,
-                      lambda: self.trakt.poll_device_token(
+                      lambda: trakt.poll_device_token(
                           state["device_code"]),
                       poll_done, poll_failed)
 
@@ -1077,7 +1133,7 @@ class _TraktMixin:
 
         # Closed any way at all: stop polling (see the browser dialog).
         d.finished.connect(lambda _r: state.__setitem__("cancelled", True))
-        run_async(self.pool, self.trakt.start_device_auth,
+        run_async(self.pool, trakt.start_device_auth,
                   started, start_failed)
         d.exec()
 

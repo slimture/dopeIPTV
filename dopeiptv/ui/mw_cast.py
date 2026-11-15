@@ -192,8 +192,10 @@ class _CastMixin:
             "key": key,
             "item": it,
             # The profile's own Continue watching, kept past a switch: where
-            # the TV got to belongs to whoever started the cast.
+            # the TV got to belongs to whoever started the cast - and its
+            # History, written when the receiver says it plays.
             "resume": getattr(self, "resume", None),
+            "history": getattr(self, "history", None),
             # For History: the row's own kind and address, kept apart from
             # the address currently on the receiver, which an archive resume
             # or a track change replaces.
@@ -743,6 +745,7 @@ class _CastMixin:
                             and not getattr(self.client,
                                             "archive_by_programme", False)),
             "title": title, "group": None, "key": key, "item": item,
+            "history": getattr(self, "history", None),
             "kind": "live", "row_url": hls, "row_source": url,
             "url": hls, "source": url, "codecs": [], "height": 0, "fps": 0.0,
             "audio": None, "subs": None, "duration": 0.0, "tracks": {},
@@ -791,6 +794,7 @@ class _CastMixin:
             "sid": None, "archive": False, "title": title,
             "group": self._RESUME_GROUP.get(rkind or ""), "key": key,
             "resume": getattr(self, "resume", None),
+            "history": getattr(self, "history", None),
             "item": item, "kind": kind, "row_url": url, "row_source": url,
             "url": url, "source": url, "codecs": [], "height": 0, "fps": 0.0,
             "audio": audio, "subs": subs, "duration": 0.0, "tracks": {},
@@ -1127,7 +1131,12 @@ class _CastMixin:
         url, key, kind = ctx.get("row_url"), ctx.get("key"), ctx.get("kind")
         if not url or key is None or not kind:
             return
-        self.history.add(url, ctx.get("title") or "",
+        # The History of the profile that started the cast: the receiver
+        # says it plays a few seconds on, perhaps after a switch.
+        store = ctx.get("history")
+        if store is None:
+            store = self.history
+        store.add(url, ctx.get("title") or "",
                          it.get("stream_icon") or it.get("cover"), key, kind,
                          extra=self._history_extra(kind, it,
                                                    ctx.get("title") or ""))

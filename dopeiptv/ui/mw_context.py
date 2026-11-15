@@ -531,17 +531,20 @@ class _ContextMenuMixin:
             store.add(group or FAV_DEFAULT_GROUP, snap)
         else:
             store.remove(ident)
-        # Mirror to the Trakt 'dopeIPTV Favorites' list when connected.
-        if self.trakt.is_connected():
+        # Mirror to the Trakt 'dopeIPTV Favorites' list when connected - the
+        # account of the profile that asked, whoever is in use by the time
+        # a TMDB id comes back.
+        trakt = self.trakt
+        if trakt.is_connected():
             if isinstance(tid, int):
                 self._trakt_push(
-                    (lambda: self.trakt.add_favorite(tid, kind)) if add
-                    else (lambda: self.trakt.remove_favorite(tid, kind)))
+                    (lambda: trakt.add_favorite(tid, kind)) if add
+                    else (lambda: trakt.remove_favorite(tid, kind)))
             elif add and self.tmdb is not None:
                 self._resolve_tmdb_id_async(
                     item, kind,
                     lambda rid, k=kind: self._trakt_push(
-                        lambda: self.trakt.add_favorite(rid, k))
+                        lambda: trakt.add_favorite(rid, k))
                     if isinstance(rid, int) else None)
         if (self.mode == "fav"
                 and self._fav_section in (section, "all")

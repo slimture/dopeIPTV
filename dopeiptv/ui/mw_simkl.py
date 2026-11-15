@@ -126,10 +126,13 @@ class _SimklMixin:
     def _simkl_connect_dialog(self, parent) -> bool:
         """The PIN sign-in: Simkl's code shown, simkl.com/pin opened, and
         the answer asked for until it comes or the code runs out. True once
-        signed in."""
+        signed in - for the profile in use: one switched to meanwhile (from
+        the phone) is not the one that signed in, and is not synced with
+        this account. The dialog signs in the account it was opened with."""
+        gen = getattr(self, "_profile_gen", 0)
         d = _SimklPinDialog(parent, self)
         d.exec()
-        return self.simkl.is_connected()
+        return d.simkl.is_connected() and gen == getattr(self, "_profile_gen", 0)
 
     def _open_simkl_dialog(self, parent) -> None:
         if not self.simkl.is_connected():

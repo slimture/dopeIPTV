@@ -328,6 +328,9 @@ class _ProfilesMixin:
         self._trakt_active = None
         self._simkl_active = None
         self._fav_trakt_ids = ([], [])
+        # A watched sync still running is the profile before's (its answer
+        # goes to its own stores): this one syncs at its own time.
+        self._watched_sync_running = pid in self.__dict__.get("_watched_sync_pids", ())
         # Watch together: the next room takes this profile's name.
         type(self)._together_name = ""
         self._last_cat = {}
