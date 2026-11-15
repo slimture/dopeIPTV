@@ -236,6 +236,49 @@ def run_async(pool: QThreadPool, fn: Callable, on_done: Callable,
     return w
 
 
+class _GuiCalls(QObject):
+    """Calls handed to the GUI thread (on_gui_thread). Made on whichever
+    thread asks first and moved to the GUI thread at once, so the queued
+    signal is always delivered there."""
+
+    call = pyqtSignal(object)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.call.connect(self._run, Qt.ConnectionType.QueuedConnection)
+
+    @pyqtSlot(object)
+    def _run(self, job: object) -> None:
+        fn, args = job  # type: ignore[misc]
+        try:
+            fn(*args)
+        except Exception as e:
+            log.info("a call for the window's thread failed: %s", e)
+
+
+_gui_calls: _GuiCalls | None = None
+_gui_lock = threading.Lock()
+
+
+def on_gui_thread(fn: Callable[..., Any], *args: Any) -> None:
+    """Run fn(*args) on the GUI thread: at once when called there (or
+    before there is an application), else queued to it - for what must
+    never happen on a worker, a QSettings write above all (one QSettings
+    object is not safe to share between threads)."""
+    from PyQt6.QtCore import QCoreApplication, QThread
+    app = QCoreApplication.instance()
+    if app is None or QThread.currentThread() is app.thread():
+        fn(*args)
+        return
+    global _gui_calls
+    with _gui_lock:
+        if _gui_calls is None:
+            calls = _GuiCalls()
+            calls.moveToThread(app.thread())
+            _gui_calls = calls
+    _gui_calls.call.emit((fn, args))
+
+
 def _image_get(url: str) -> Callable[..., Any]:
     """requests.get for an image - on the playing source's route while
     Nerd gives it one (core/net_route.py: own DNS, IP version, a pinned

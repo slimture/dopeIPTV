@@ -1079,7 +1079,10 @@ def _use_mirrors(client, playlist: dict) -> None:
     settings: Any = nerd.current().s
 
     def remember(address: str) -> None:
-        mirrors.remember(settings, pid, address)
+        # Told on whichever thread got the answer (the lists, the guide,
+        # the player's probe): the setting is written on the window's.
+        from ..core.workers import on_gui_thread
+        on_gui_thread(mirrors.remember, settings, pid, address)
     use(mirrors.Picker(found, mirrors.remembered(settings, pid), remember, name=kind))
 
 

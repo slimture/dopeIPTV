@@ -244,6 +244,36 @@ def test_a_dead_server_hands_over_to_the_next(nerd_on, servers):
     assert c.xmltv() == b"<tv></tv>"
 
 
+def test_the_one_that_answered_is_written_on_the_window_s_thread(nerd_on, servers):
+    """The lists, the guide and the player's probe meet a dead server on
+    whichever worker asked, and the address that answered was written into
+    the settings right there: one QSettings object written from two
+    threads. Now the write is queued to the window's thread."""
+    import time
+    pytest.importorskip("PyQt6.QtWidgets")
+    from PyQt6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    wrote: list[bool] = []
+    set_value = nerd_on.setValue
+
+    def recording(key, value):
+        wrote.append(threading.current_thread() is threading.main_thread())
+        set_value(key, value)
+    nerd_on.setValue = recording
+    good = servers()
+    c = xtream(nerd_on, dead_address(), good.url)
+    t = threading.Thread(target=c.authenticate)
+    t.start()
+    t.join(20)
+    assert c.server == good.url, "the worker went on with the one that answered"
+    assert wrote == [] and mirrors.pick_key("pl1") not in nerd_on, wrote
+    end = time.monotonic() + 5
+    while not wrote and time.monotonic() < end:
+        app.processEvents()
+        time.sleep(0.01)
+    assert wrote == [True] and nerd_on[mirrors.pick_key("pl1")] == good.url, wrote
+
+
 def test_the_remembered_one_is_asked_first(nerd_on, servers):
     first, second = servers(), servers()
     nerd_on[mirrors.pick_key("pl1")] = second.url
