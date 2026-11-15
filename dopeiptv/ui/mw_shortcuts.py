@@ -192,6 +192,7 @@ class _ShortcutsMixin:
             "focus_mode": self._shortcut_focus_mode,
             "palette": self._open_palette,
             "tv_mode": self.toggle_tv_mode,
+            "teletext": self.toggle_teletext,
         }
 
     def shortcut_keys(self) -> dict[str, str]:

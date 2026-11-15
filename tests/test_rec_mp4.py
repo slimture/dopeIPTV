@@ -145,6 +145,30 @@ def test_anything_short_of_a_whole_mp4_keeps_the_ts_and_leaves_no_half_mp4(tmp_p
     assert sorted(os.listdir(tmp_path)) == ["Show.ts", "Show.ts.info.json"]
 
 
+def test_keep_teletext_and_subtitles_leaves_such_a_recording_a_ts(tmp_path):
+    class S(dict):
+        def value(self, key, default=None):
+            return self.get(key, default)
+
+    assert not rec_mp4.keep_subs(S()) and not rec_mp4.keep_subs(None)
+    assert rec_mp4.keep_subs(S({rec_mp4.SUBS_SETTING: "true"}))
+    src = _ts(tmp_path)
+    run = FakeRun()
+    res = rec_mp4.remux(src, "ffmpeg", run, free=_room, keep_subtitles=True)
+    # Asked what it holds (teletext), nothing copied, the .ts as it was.
+    assert res == rec_mp4.Result(False, src, rec_mp4.SUBS_KEPT)
+    assert [c[-1] for c in run.calls] == [src]
+    assert sorted(os.listdir(tmp_path)) == ["Show.ts", "Show.ts.info.json"]
+    # A recording without any is saved as MP4 all the same.
+    plain = FakeRun()
+    plain_probe = TS_PROBE.replace("Subtitle: dvb_teletext", "Data: bin_data")
+
+    def run_plain(argv, timeout):
+        code, said = plain(argv, timeout)
+        return code, (plain_probe if said == TS_PROBE else said)
+    assert rec_mp4.remux(src, "ffmpeg", run_plain, free=_room, keep_subtitles=True).ok
+
+
 def test_too_little_room_keeps_the_ts_without_asking_ffmpeg(tmp_path):
     src = _ts(tmp_path)
     run = FakeRun()

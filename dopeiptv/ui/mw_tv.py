@@ -707,6 +707,11 @@ class _TvMixin:
 
     @staticmethod
     def _tv_track_name(t: dict) -> str:
+        from ..core import teletext_subs
+        if teletext_subs.track_kind(t):
+            # Teletext and DVB subtitles by language, as the player's menu.
+            from ..media.teletext_subs import choice_label
+            return choice_label(teletext_subs.choices(t)[0])
         label = " ".join(x for x in (t.get("lang") or "", t.get("title") or "") if x).strip()
         return label or tr("player_track_n", n=t.get("id"))
 

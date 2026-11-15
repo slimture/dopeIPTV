@@ -429,9 +429,26 @@ Not decided: each needs a word with the maintainer first.
 - **SAT>IP client**: minisatip, Digital Devices, Telestar, and Enigma2 or
   Tvheadend serving SAT>IP. RTSP with the tuning in the address, the
   server's channel list where it has one (an M3U), else a scan.
-- **Teletext and DVB subtitles** through ffmpeg/libzvbi: teletext pages
-  (page 199 and the like in the Nordics) as subtitles, and a teletext
-  viewer. Recordings keep them only as .ts (MP4 cannot carry them).
+- **Teletext and DVB subtitles**: built. Both in the subtitle menu by
+  language and page ("Swedish - teletext 199"; the pages from the PMT, read
+  from the rewind buffer or a local .ts), mpv's `teletext-page` set before
+  the track and changed while it plays, the page kept per channel
+  (`teletext_pages`), the preferred subtitle language picking a teletext
+  page (`core/teletext_subs.py`, `media/teletext_subs.py`). The viewer
+  (Teletext…, T) decodes the rewind buffer in plain Python
+  (`core/teletext.py`, `ui/teletext_view.py`); without the buffer it says
+  so - never a second connection. Recordings keep them only as .ts:
+  "Keep teletext and subtitles" leaves such a recording a .ts when MP4 is
+  on. Teletext subtitles need libmpv's FFmpeg built with libzvbi
+  (`media/players.teletext_decoder`; else shown unavailable, and a track mpv
+  drops says so once): Ubuntu/Debian's has it (AppImage, .deb), Homebrew's
+  (the Mac app) does not, Windows' (zhongfly/mpv-winbuild) and the
+  Flatpak's (ffmpeg-full) are not checked. mpv before 0.38 has no "any
+  subtitle page" and defaults to page 100: without the PMT a page is
+  guessed from the language. Checked with generated streams only (pages,
+  subpages, Fastext, national subsets; mpv 0.37 showing 199 and switching
+  to 333 live); a real broadcast should confirm DVB subtitles, X/26
+  accents and Greek/Arabic/Hebrew pages (not drawn by the viewer).
 - **TS analysis in Nerd**: in - `core/ts_analysis.py` with its window
   (`ui/ts_analysis_dialog.py`, `ui/mw_ts_analysis.py`): "Stream analysis…"
   in the player's options menu and the playing channel's menu while Nerd

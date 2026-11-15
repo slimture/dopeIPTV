@@ -29,7 +29,7 @@ A source's own options are on its own page, under Sources (below).
 - (only without the embedded player) why playback opens in mpv
 
 **Picture & sound** (`audio`)
-- Audio & subtitles: `audio_lang`, `sub_mode`, `sub_lang`, `sub_lang2`
+- Audio & subtitles: `audio_lang`, `sub_mode`, `sub_lang`, `sub_lang2` (the language picks a teletext subtitle page too; the page chosen per channel in the player's menu is `teletext_pages`, no row)
 - How subtitles look: `sub_scale`, `sub_color`, `sub_background`
 - Video: `aspect_mode`, `video_deinterlace`, `video_sharpen`, `video_tonemapping`
 - Decoding: `hwdec_mode`; link → Nerd › Player (passthrough, video sync,
@@ -46,7 +46,7 @@ A source's own options are on its own page, under Sources (below).
 - Controls: `mv_autohide_secs`, `mv_seek_step_min`, show the tips again (`mv_info_seen`)
 
 **Recording** (`recording`)
-- Folder: `recordings_dir`, `rec_save_mp4`; link → Nerd › Remote and
+- Folder: `recordings_dir`, `rec_save_mp4`, `rec_mp4_keep_subs` (only while saving as MP4); link → Nerd › Remote and
   automation (file names, what runs after)
 - Limits: `rec_max_value` + `rec_max_unit`, `rec_total_value` + `rec_total_unit`
 - Padding: `rec_pad_before_min`, `rec_pad_after_min`

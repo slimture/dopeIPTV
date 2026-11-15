@@ -116,6 +116,8 @@ files = [
     "dopeiptv/core/hls_cap.py",
     "dopeiptv/core/ts_scramble.py",
     "dopeiptv/core/ts_analysis.py",
+    "dopeiptv/core/teletext.py",
+    "dopeiptv/core/teletext_subs.py",
     "dopeiptv/core/remote_api.py",
     "dopeiptv/core/exclusive_bind.py",
     "dopeiptv/core/events.py",

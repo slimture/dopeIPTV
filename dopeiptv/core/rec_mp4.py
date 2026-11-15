@@ -6,7 +6,8 @@ copies it into an MP4 - stream copy, nothing re-encoded, so it takes as
 long as reading the file once - with its index at the front (faststart),
 so it opens at once in any player and on a TV. Picture and sound go in;
 the subtitles, teletext and data a channel sends cannot go in an MP4 and
-stay only in a .ts.
+stay only in a .ts - so with "Keep teletext and subtitles" (``SUBS_SETTING``)
+a recording that has them stays a .ts.
 
 The .ts is deleted only once the MP4 is plausibly whole: ffmpeg ended
 well, the MP4 has the same kinds of streams (video, audio), it lasts as
@@ -39,6 +40,10 @@ from .log import log
 
 #: The setting: "true" saves recordings as MP4.
 SETTING = "rec_save_mp4"
+#: The setting: "true" keeps a recording with teletext or subtitles a .ts.
+SUBS_SETTING = "rec_mp4_keep_subs"
+#: Result.why of a recording kept as .ts for them - by choice, no failure.
+SUBS_KEPT = "it has teletext or subtitles, which an MP4 cannot carry"
 #: Remuxes still to do (the app closed first): JSON list of entries.
 JOURNAL = "rec_mp4_pending"
 #: The MP4 while it is written; renamed once it passed.
@@ -80,6 +85,16 @@ def enabled(settings: Readable | None) -> bool:
         return False
     try:
         return str(settings.value(SETTING, "false")).lower() == "true"
+    except Exception:
+        return False
+
+
+def keep_subs(settings: Readable | None) -> bool:
+    """Whether a recording with teletext or DVB subtitles stays a .ts."""
+    if settings is None:
+        return False
+    try:
+        return str(settings.value(SUBS_SETTING, "false")).lower() == "true"
     except Exception:
         return False
 
@@ -131,6 +146,11 @@ class Probe:
     duration: float | None = None
     kinds: frozenset[str] = field(default_factory=frozenset)
     hevc: bool = False
+
+    @property
+    def subtitles(self) -> bool:
+        """Teletext or subtitles in it (ffmpeg lists both as Subtitle)."""
+        return "subtitle" in self.kinds
 
 
 def parse_probe(text: str) -> Probe:
@@ -225,10 +245,12 @@ def _tail(text: str, n: int = 300) -> str:
 
 
 def remux(src: str, ffmpeg: str, run: Runner = _run,
-          free: Callable[[str], int] | None = None) -> Result:
+          free: Callable[[str], int] | None = None,
+          keep_subtitles: bool = False) -> Result:
     """*src* into an MP4 beside it, and *src* deleted once the MP4 passed;
     *src* kept, and nothing left of the MP4, otherwise. Never raises for a
-    file or ffmpeg that fails: the Result says why."""
+    file or ffmpeg that fails: the Result says why. *keep_subtitles*: a
+    recording with teletext or subtitles is left a .ts (why: SUBS_KEPT)."""
     try:
         size = os.path.getsize(src)
     except OSError as e:
@@ -240,6 +262,8 @@ def remux(src: str, ffmpeg: str, run: Runner = _run,
         return Result(False, src, "too little room on the disk for the MP4")
     _code, said = run(probe_command(ffmpeg, src), PROBE_TIMEOUT_S)
     before = parse_probe(said)
+    if keep_subtitles and before.subtitles:
+        return Result(False, src, SUBS_KEPT)
     _drop(part)
     code, said = run(command(ffmpeg, src, part, before.hevc),
                      BASE_TIMEOUT_S + size / BYTES_PER_S)

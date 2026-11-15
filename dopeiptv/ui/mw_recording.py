@@ -89,6 +89,9 @@ class _RecordingMixin:
             name += f"  —  {tr('rec_mp4_saving')}"
         elif j.get("remux") == "failed":
             name += f"  —  {tr('rec_mp4_kept_ts')}"
+        elif j.get("remux") == "subs":
+            # Kept as .ts on purpose: teletext and subtitles stay in it.
+            name += f"  —  {tr('rec_mp4_kept_subs')}"
         return {"name": name,
                 "_job": j["id"], "_key": f"job:{j['id']}",
                 "_kind": "recjob", "_status": j["status"],

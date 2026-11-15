@@ -193,6 +193,79 @@ def embedded_playback_supported() -> bool:
     return embedded_playback_reason() is None
 
 
+_TELETEXT_DECODER = "libzvbi_teletextdec"
+_teletext_answer: list[bool | None] = []
+
+
+def _loaded_avcodec() -> list[str]:
+    """The libavcodec files loaded in this process (libmpv's), where the
+    system tells: /proc/self/maps on Linux, dyld's images on macOS, the
+    usual DLL names on Windows."""
+    found: list[str] = []
+    try:
+        if sys.platform.startswith("linux"):
+            with open("/proc/self/maps", encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    path = line.rsplit(" ", 1)[-1].strip()
+                    if "libavcodec" in os.path.basename(path) and path not in found:
+                        found.append(path)
+        elif sys.platform == "darwin":
+            import ctypes
+            dyld = ctypes.CDLL(None)
+            dyld._dyld_image_count.restype = ctypes.c_uint32
+            dyld._dyld_get_image_name.restype = ctypes.c_char_p
+            dyld._dyld_get_image_name.argtypes = [ctypes.c_uint32]
+            for i in range(dyld._dyld_image_count()):
+                name = (dyld._dyld_get_image_name(i) or b"").decode("utf-8", "replace")
+                if "libavcodec" in os.path.basename(name):
+                    found.append(name)
+        elif sys.platform == "win32":
+            import ctypes
+            kernel = ctypes.WinDLL("kernel32")
+            kernel.GetModuleHandleW.restype = ctypes.c_void_p
+            for v in range(58, 64):
+                if kernel.GetModuleHandleW(f"avcodec-{v}.dll"):
+                    found.append(f"avcodec-{v}.dll")
+    except Exception as e:
+        log.debug("teletext: libavcodec not looked up: %s", e)
+    return found
+
+
+def teletext_decoder() -> bool | None:
+    """Can the FFmpeg inside this libmpv decode teletext - was it built with
+    libzvbi? True / False, or None when it cannot tell (an FFmpeg linked
+    into libmpv itself, as on Windows): then a track that will not play
+    says so once tried (media/teletext_subs.py). Asked once."""
+    if _teletext_answer:
+        return _teletext_answer[0]
+    answer: bool | None = None
+    if _libmpv is not None:
+        import ctypes
+        libs: list[object] = [getattr(_libmpv, "backend", None)]
+        for path in _loaded_avcodec():
+            try:
+                libs.append(ctypes.CDLL(path))
+            except OSError:
+                continue
+        for lib in libs:
+            find = getattr(lib, "avcodec_find_decoder_by_name", None) if lib is not None else None
+            if find is None:
+                continue
+            try:
+                find.restype = ctypes.c_void_p
+                find.argtypes = [ctypes.c_char_p]
+                answer = bool(find(_TELETEXT_DECODER.encode()))
+            except Exception as e:
+                log.debug("teletext: decoder not asked: %s", e)
+                continue
+            if answer:
+                break
+    log.info("teletext decoder (libzvbi) in libmpv's FFmpeg: %s",
+             {True: "yes", False: "no", None: "cannot tell"}[answer])
+    _teletext_answer.append(answer)
+    return answer
+
+
 # Spawning a system player from inside a frozen bundle needs the bundle's
 # library paths stripped first, or the player loads OUR Qt/libmpv/ffmpeg and
 # never starts. That now lives in core.xdg, because opening a LINK has

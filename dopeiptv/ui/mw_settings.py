@@ -1259,7 +1259,8 @@ class _SettingsMixin:
         c.row(tr("setting_audio_lang"), alang_box, tr("set_next_stream_note"))
         c.row(tr("setting_subtitles"), sub_box)
         subs_on = lambda: sub_box.currentData() != "off"  # noqa: E731
-        c.shown_if(c.row(tr("setting_sub_lang"), slang_box), subs_on)
+        c.shown_if(c.row(tr("setting_sub_lang"), slang_box,
+                         tr("setting_sub_lang_ttx_hint")), subs_on)
         c.shown_if(c.row(tr("setting_sub_lang_fallback"), slang2_box),
                    subs_on)
         sub_box.currentIndexChanged.connect(lambda _i: subs_card.refresh())
@@ -1644,6 +1645,13 @@ class _SettingsMixin:
         # Saved as MP4 once a recording ended well (core/rec_mp4.py).
         mp4_box = c.toggle(tr("rec_mp4_setting"), rec_mp4.enabled(self.settings),
                            tr("rec_mp4_hint"))
+        # Teletext and DVB subtitles cannot go in an MP4: such a recording
+        # may stay a .ts (only asked while recordings become MP4s).
+        keep_subs_box = c.toggle(tr("rec_mp4_keep_subs"), rec_mp4.keep_subs(self.settings),
+                                 tr("rec_mp4_keep_subs_hint"))
+        mp4_card = c
+        c.shown_if(c.rows[-1][0], mp4_box.isChecked)
+        mp4_box.toggled.connect(lambda _on: mp4_card.refresh())
         nerd_link(c, "set_link_rec",
                   [tr("nerd_card_rec_files"), tr("nerd_card_rec_after")],
                   "serve")
@@ -2556,6 +2564,8 @@ class _SettingsMixin:
             put("replay_delay_min", replay_delay_box.value())
             if mp4_box.isChecked() != rec_mp4.enabled(self.settings):
                 put(rec_mp4.SETTING, flag(mp4_box))
+            if keep_subs_box.isChecked() != rec_mp4.keep_subs(self.settings):
+                put(rec_mp4.SUBS_SETTING, flag(keep_subs_box))
             put("epg_delay_min", epg_delay_box.value())
             if "epg_delay_min" in changed:
                 self.xmltv.delay_minutes = self._epg_delay_minutes()

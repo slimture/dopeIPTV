@@ -540,16 +540,18 @@ class RecordingManager(QObject):
             j["remux"] = "running"
             self.jobs_changed.emit()
         recorder = j.get("recorder") if j is not None else None
-        threading.Thread(target=self._remux_work, args=(path, ff, recorder),
+        keep = rec_mp4.keep_subs(self.settings)
+        threading.Thread(target=self._remux_work, args=(path, ff, recorder, keep),
                          name="rec-mp4", daemon=True).start()
 
-    def _remux_work(self, path: str, ff: str, recorder: Any = None) -> None:
+    def _remux_work(self, path: str, ff: str, recorder: Any = None,
+                    keep_subtitles: bool = False) -> None:
         """(a thread of its own) The remux, its outcome handed back. A
         recording from the rewind buffer has written its last bytes first."""
         try:
             if recorder is not None:
                 recorder.join(30.0)
-            res = rec_mp4.remux(path, ff)
+            res = rec_mp4.remux(path, ff, keep_subtitles=keep_subtitles)
         except Exception as e:          # never lose the .ts over a bug here
             res = rec_mp4.Result(False, path, f"{type(e).__name__}: {e}")
         try:
@@ -564,13 +566,16 @@ class RecordingManager(QObject):
         journal = rec_mp4.Journal(self.settings)
         entry = journal.get(src) or {}
         journal.done(src)
-        if why:
+        if why == rec_mp4.SUBS_KEPT:
+            log.info("recording kept as .ts: %s", why)
+        elif why:
             log.warning("recording kept as .ts, not saved as MP4: %s", why)
         else:
             log.info("recording saved as MP4: %s", for_log(os.path.basename(final)))
         for j in self.jobs:
             if j.get("path") == src and j.get("remux") == "running":
-                j["remux"] = "failed" if why else "done"
+                j["remux"] = ("subs" if why == rec_mp4.SUBS_KEPT
+                              else "failed" if why else "done")
                 if why:
                     j["remux_error"] = why
                 else:

@@ -119,6 +119,7 @@ from .mw_updates import _UpdatesMixin
 from .mw_radio import _RadioMixin
 from .mw_webstreams import _WebStreamsMixin
 from .mw_tv import _TvMixin
+from .mw_teletext import _TeletextMixin
 from ..core.workers import (
     LogoLoader, default_image_cache_dir, run_async)
 
@@ -154,7 +155,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _PortalArchiveMixin, _SeriesMixin, _SyncMixin,
                  _ConnectionsMixin, _MirrorsMixin, _TogetherMixin, _StatsMixin,
                  _SimklMixin, _DiscordMixin, _MediaServerMixin, _TvMixin,
-                 QMainWindow):
+                 _TeletextMixin, QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
     epg_progress = pyqtSignal(int)
@@ -507,6 +508,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         together_action = action(tr("together_title") + "…", self.open_together)
         phone_action = action(tr("phone_menu"), self.open_phone_remote)
         tv_action = action(tr("tv_mode"), self.toggle_tv_mode)
+        teletext_action = action(tr("ttx_menu"), self.open_teletext)
+        self._teletext_action = teletext_action
         calendar_action = action(tr("cal_menu"), self.open_calendar_export)
         private_action, clear_action = self._build_privacy_actions()
         self._donate_action = action(tr("donate_support") + "…", lambda: self.open_donate("app-menu"))
@@ -528,7 +531,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             "refresh": refresh_action, "reminders": reminders_action, "calendar": calendar_action,
             "multiview": multiview_action, "cast": cast_action,
             "together": together_action, "phone": phone_action,
-            "tv_mode": tv_action, "private": private_action, "clear": clear_action,
+            "tv_mode": tv_action, "teletext": teletext_action,
+            "private": private_action, "clear": clear_action,
             "stats": stats_action,
             **report_actions, "website": website_action,
             "supporter": self._supporter_action, "donate": self._donate_action,
@@ -539,11 +543,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # otherwise, and a dead entry is worse than none.
         menus["view"].aboutToShow.connect(
             lambda: cast_action.setEnabled(self.can_cast_playing()))
+        # Teletext is a live channel's.
+        menus["view"].aboutToShow.connect(self._ttx_menu_state)
         # Kept for live language switching (see retranslate_ui).
         self._i18n_actions = {
             settings_action: lambda: tr("btn_settings") + "…",
             refresh_action: lambda: tr("menu_refresh_playlist"),
             open_video_action: lambda: tr("menu_open_video"),
+            teletext_action: lambda: tr("ttx_menu"),
             open_address_action: lambda: tr("menu_open_address"),
             reminders_action: lambda: tr("reminders_menu"),
             multiview_action: lambda: tr("menu_multiview"),
@@ -1405,6 +1412,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.vis_choose = self._vis_choose
             # Night mode's key in the player's menu (the window's keys).
             self.player.night_key = self._night_key_text
+            # The teletext viewer, in the player's menu while a channel plays.
+            self.player.open_teletext = self.open_teletext
+            self.player.teletext_key = self._ttx_key_text
             dl.addWidget(self.player)
 
         # Everything below the video lives in ONE scroll column. This is the

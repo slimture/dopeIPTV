@@ -69,7 +69,7 @@ map and the one-way import rule.
 | `core/dvr_pool.py` | `DvrPool`: every channel's buffer this session (frozen history, one space budget) |
 | `core/dvr_record.py` | `BufferRecorder`: a recording read from a buffer, no connection of its own |
 | `core/recording.py` | Recording manager; a finished recording saved as MP4 off the window's thread (`_remux`, the command after it with the final file) |
-| `core/rec_mp4.py` | Recordings as MP4: the remux (stream copy, faststart, `.mp4.part` until it passed), what ffmpeg says of a file, when the MP4 is plausibly whole (streams, length, size), the .ts deleted only then; the journal of remuxes left for the next start |
+| `core/rec_mp4.py` | Recordings as MP4: the remux (stream copy, faststart, `.mp4.part` until it passed), what ffmpeg says of a file, when the MP4 is plausibly whole (streams, length, size), the .ts deleted only then (a recording with teletext or subtitles left a .ts on request, `rec_mp4_keep_subs`); the journal of remuxes left for the next start |
 | `core/updates.py` | GitHub latest-release check |
 | `core/selfupdate.py` | AppImage in-place update (download, checksum, self-check, swap); every update's signed checksum check (`signed_asset`) |
 | `core/winupdate.py` / `core/macupdate.py` | The same for an installed Windows copy (the installer) and the Mac app (the .dmg) |
@@ -122,6 +122,8 @@ map and the one-way import rule.
 | `core/url_rewrite.py` | Nerd: a source's rewrite rules for its stream addresses (find -> replace, plain or regex, in order; bad ones refused, skipped in playback), applied by `make_client` to every address it hands out; the preview line and its Test |
 | `core/ts_scramble.py` | Is a transport stream encrypted? Its first packets' transport_scrambling_control bits (`verdict`) |
 | `core/ts_analysis.py` | Nerd: a simple TR 101 290 (`Analyzer`): sync, PAT/PMT (PIDs, stream types named), the SDT's service, bitrate per PID over a sliding window, continuity errors (a discontinuity respected, a duplicate allowed once), PCR interval and jitter against arrival (an estimate), PAT/PMT/PTS repetition, scrambled PIDs, null share; priorities 1 and 2 counted by their TR names, in the stream's own time; bounded; `Runner` reads a live channel's rewind buffer on a thread of its own, its work capped - never a second connection |
+| `core/teletext.py` | Teletext in plain Python: TS -> PES (EN 300 472, data_identifier 0x10-0x1F) -> packets, Hamming 8/4 and 24/18, odd parity, pages per magazine (serial or parallel, erase, subpages), Fastext links (X/27/0), the national option subsets and the G0 designations of X/28/0 and M/29/0, a page as 40 x 25 cells (`render`: colours, mosaics, double height, flash, conceal, boxes); the PMT's teletext and DVB subtitle descriptors; `StoreFeed`, the rewind buffer read on a thread of its own (never a connection of its own) |
+| `core/teletext_subs.py` | Teletext and DVB subtitles as subtitle tracks: a track's menu entries by language and page (`choices`), a language's page (`pick`), mpv's `teletext-page` on an old and a new mpv (`mpv_page`, `default_page`), the page kept per channel for everyone (`teletext_pages`, `PageStore`) |
 | `core/hls_cap.py` | Nerd: the highest quality adaptive (HLS) streams play at - `hls-bitrate`, and the variant (picture and sound together) the player switches to at file-loaded for a size cap |
 | `core/remote_api.py` | The remote API and shared lists' small HTTP server (token on every request, this computer only unless chosen; the calendar at `/calendar.ics` with remote control on) |
 | `core/events.py` | Nerd: events pushed out - webhooks (POST JSON, token header, retries) and MQTT (event, retained state, last will, Home Assistant discovery); a queue and a thread per receiver; private viewing sends what happened, not what; the recordings' statuses as events; its checks |
@@ -144,7 +146,8 @@ map and the one-way import rule.
 | `core/platform_macos.py` | macOS-specific helpers |
 | `core/platform_windows.py` | Windows-specific helpers |
 | `media/embedded.py` | Embedded mpv player widget (night mode's switch in the options menu, `_sync_night` on each play; the equaliser's labelled filter) |
-| `media/players.py` | External player launch, libmpv detection |
+| `media/players.py` | External player launch, libmpv detection; whether libmpv's FFmpeg decodes teletext (`teletext_decoder`: libzvbi) |
+| `media/teletext_subs.py` | Teletext and DVB subtitles in the player (`TeletextSubsMixin`): their subtitle menu entries ("Swedish - teletext 199"), the page set before the track, the PMT's pages from the rewind buffer or a local .ts, the channel's page and the preferred language's, a libmpv without libzvbi said so (never an error); the options menu's Teletext… |
 | `media/dvr_player.py` | The player's side of the app-kept buffer (`DvrPlayerMixin`) |
 | `media/rewind_bar.py` | The DVR row and timeshift timeline over the video, and their switch (`RewindBarMixin`) |
 | `media/stream_info.py` | Channel-change technical banner, reading the current mpv track |
@@ -215,6 +218,8 @@ map and the one-way import rule.
 | `ui/mw_tv.py` | TV mode in the window: on and off (View menu, Ctrl+Shift+T, `--tv`, `tv_mode_start`), its page in the central stack full screen, the one key filter while it is on (every key without Ctrl/Alt/Meta, `QT_KEYS`), the pad's and LIRC's actions (keys for a dialog), the picture through the docked fullscreen with the info bar, zapping, the red key's favorite; it plays through the window's own path |
 | `ui/tv_mode.py` | TV mode's page (`TvPage`: tabs, safe margins, colour keys, the arrows' moves, Back) and its screens' base, Home (continue watching, favorites, live now), Channels (categories, channels with now/next), Options (sound, subtitles, sleep, start in TV mode, leave) |
 | `ui/tv_screens.py` | TV mode's bigger screens: the guide (`TvGuide`, the app's `EpgGrid` in large), Movies/Series (posters, a series' episodes), Search (keyboard on screen, results in shelves) |
+| `ui/mw_teletext.py` | Teletext in the window: Teletext… (View menu, the player's options menu, T while a live channel plays), the pages read from the channel's rewind buffer (`StoreFeed`; without the buffer the viewer says it is needed), a few channels' pages kept for the session |
+| `ui/teletext_view.py` | The teletext viewer: `TeletextPage` (40 x 25 cells scaled to the window, teletext palette, mosaics) and `TeletextDialog` (three digits, P+/P-, subpages, colour keys, index, hold, reveal; its keys kept from the window's single-key shortcuts) |
 | `ui/tv_widgets.py` | TV mode's pieces drawn for the sofa: tiles with the focus ring, shelves, big lists and the poster grid (`ChannelListModel`), the keyboard, the colour legend, the info bar over the picture |
 | `ui/mw_multiview.py` | Multiview: 2/4/6/9 live streams, an mpv per cell |
 | `ui/mw_donate.py` | Donating from the app: the sidebar heart, About's link, Home's one card after real use |
@@ -235,7 +240,7 @@ in the `mw_*` mixins beside it, each mixed into `MainWindow`:
 `mw_simkl` (Simkl), `mw_discord` (Discord status), `mw_recording`, `mw_context`, `mw_favorites`
 (several favorites at once, move between folders, drag-and-drop), `mw_home`
 (Home), `mw_local` (local files), `mw_radio` (internet radio),
-`mw_webstreams` (YouTube, Twitch through yt-dlp), `mw_tv` (TV mode, the 10-foot
+`mw_webstreams` (YouTube, Twitch through yt-dlp), `mw_teletext` (the teletext viewer), `mw_tv` (TV mode, the 10-foot
 layout run from a remote), `mw_multiview` (multiview), `mw_detail`,
 `mw_search` (sidebar search), `mw_sidebar` (panel collapse / icon rail),
 `mw_nav` (focus mode, nav colours/icons, the MINE group, History's
@@ -365,7 +370,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   `DOPEIPTV_LOG=debug` shows debug traces; `DOPEIPTV_LOG_FILE=/path` tees
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
-  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, cast_feed, stalker, boxes, enigma2, autotimer, tvheadend, hdhomerun, lan_scan, radio_browser, airplay_bridge), mediaserver, jellyfin, plex), kodi, mdns, simkl), lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log, player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, connections, tuners, mirrors, conn_test, health, nerd, nerd_lists, channel_numbers, shortcut_keys, palette_match, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, night_mode, rec_mp4, viewing_stats, catchup, url_rewrite, hls_cap, ts_scramble, ts_analysis, remote_api, events, mqtt, mqtt_control, phone_remote, phone_page, qr, ical, report, supporter, sync, chacha20poly1305, discord_rpc, together, backup, doh, cert_pin, net_route, net_adapter, net_bridge, live_latency, ytdlp, tv_input, tv_nav) and `services/` (failover, share, resume,
+  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, cast_feed, stalker, boxes, enigma2, autotimer, tvheadend, hdhomerun, lan_scan, radio_browser, airplay_bridge), mediaserver, jellyfin, plex), kodi, mdns, simkl), lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log, player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, connections, tuners, mirrors, conn_test, health, nerd, nerd_lists, channel_numbers, shortcut_keys, palette_match, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, night_mode, rec_mp4, viewing_stats, catchup, url_rewrite, hls_cap, ts_scramble, teletext, teletext_subs, ts_analysis, remote_api, events, mqtt, mqtt_control, phone_remote, phone_page, qr, ical, report, supporter, sync, chacha20poly1305, discord_rpc, together, backup, doh, cert_pin, net_route, net_adapter, net_bridge, live_latency, ytdlp, tv_input, tv_nav) and `services/` (failover, share, resume,
   coverart, reminders, mpris, media_session, media_macos, media_windows, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list

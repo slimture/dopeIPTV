@@ -29,6 +29,7 @@ from .rewind_bar import RewindBarMixin
 from .seek_slider import _SeekSlider, _format_time
 from .subtitle_text import fixed_bytes
 from .stream_info import StreamInfoMixin
+from .teletext_subs import TeletextSubsMixin
 from .video_surface import _MpvGLWidget, _RasterMirror
 from ..ui.theme import P
 
@@ -531,11 +532,14 @@ def load_with_options(m, url: str, options: dict[str, str]) -> bool:
     return False
 
 
-class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
+class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
+                     DvrPlayerMixin, QWidget):
     """Video pane with libmpv OpenGL rendering, control bar, and fullscreen overlay."""
 
     _info_loaded = pyqtSignal(str)
     _info_reconfig = pyqtSignal()
+    # (a thread) the PMT's teletext pages of stream number n: teletext_subs.
+    _ttx_streams_ready = pyqtSignal(int, object)
     stream_info_changed = pyqtSignal(str, object)
     double_clicked = pyqtSignal()
     playback_error = pyqtSignal(str)
@@ -631,6 +635,8 @@ class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
         self._chan_key: str | None = None
         self._chan_own: dict = {}
         self._chan_store = None
+        # Teletext and DVB subtitle tracks (media/teletext_subs.py).
+        self._ttx_streams_ready.connect(self._ttx_streams_got)
         # Where the playing stream's audio delay is kept, if it is: its
         # channel's settings or (anything else) a key of its own.
         self._delay_chan: str | None = None
@@ -2323,6 +2329,7 @@ class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
             self._sub_defaults(sub_mode, live, set_opt)
             if channel_prefs.own_subtitles(own):
                 self._own_subtitles(own, live, set_opt)
+            self._ttx_before_load(set_opt)
         elif channel_prefs.own_subtitles(own):
             pass            # the channel's own choice stays while it plays
         elif sub_mode == "off":
@@ -2802,6 +2809,7 @@ class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
         chan, self._chan_armed = self._chan_armed, None
         self._reset_stream_info()
         self._chan_key = chan
+        self._ttx_reset(live)
         self._chan_own = self._channel_own(chan, buffer_key or url)
         local_buffer = local_buffer and self._live_rewind_minutes() > 0
         # A session of the app's own buffer ends here: its provider
@@ -3268,6 +3276,10 @@ class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
         night.setChecked(self._night_on)
         night.setToolTip(tr("night_mode_hint"))
         night.triggered.connect(self._night_from_menu)
+        if self.open_teletext is not None and self._ttx_live and self.current_url:
+            key = self.teletext_key() if callable(self.teletext_key) else ""
+            ttx_act = menu.addAction(tr("ttx_menu") + (f"\t{key}" if key else ""))
+            ttx_act.triggered.connect(self.open_teletext)
 
         subs = menu.addMenu(tr("opt_subtitles"))
         off = subs.addAction(tr("opt_off"))
@@ -3283,11 +3295,17 @@ class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
                                           for t in sub_tracks)))
         off.triggered.connect(lambda _c: self._pick_track("sid", "no"))
         for t in sub_tracks:
+            if self._ttx_is_track(t):
+                # Teletext and DVB subtitles: language and page.
+                self._ttx_add_entries(subs, t, shown)
+                continue
             act = subs.addAction(track_label(t))
             act.setCheckable(True)
             act.setChecked(bool(t.get("selected")) and shown)
             act.triggered.connect(
                 lambda _c, tid=t.get("id"): self._pick_track("sid", tid))
+        if m and sub_tracks:
+            self._ttx_menu_tail(subs)
         if m and self.current_url:
             subs.addSeparator()
             subs.addAction(tr("opt_sub_load_file"), self._load_subtitle_file)
@@ -3727,6 +3745,8 @@ class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
         showing it: choosing a track is what makes mpv drop its buffer and
         ask the provider again (_sub_defaults), so it happens only when the
         track asked for is another one."""
+        if prop == "sid":
+            self._ttx_forget()
         if prop != "sid":
             self._set_mpv(prop, tid)
         elif tid == "no":
@@ -3844,6 +3864,8 @@ class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
         self._sync_pause_label(paused)
         if getattr(self, "_sub_rule", None) is not None:
             self._apply_sub_rule(m)
+        if self._ttx_pending:
+            self._ttx_poll(m)
         played = pos
         if self._dvr is not None:
             pos = self._dvr_pos(pos)    # the app's own buffer keeps its time
@@ -4081,6 +4103,8 @@ class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
 
     def stop(self) -> None:
         self._reset_stream_info()
+        self._ttx_reset()
+        self._ttx_pending = False
         self._end_dvr()
         self._local_buffer_enabled = False
         self._local_buffer_ready = False
