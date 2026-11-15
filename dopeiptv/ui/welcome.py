@@ -29,7 +29,7 @@ from PyQt6.QtWidgets import (
 
 from ..i18n import LANGUAGES, tr
 from .box_finder import (
-    BOX_KINDS, LOGIN_KINDS, MEDIA_KINDS, PLACEHOLDERS, FindOnNetwork, add_box_kinds,
+    BOX_KINDS, LOGIN_KINDS, MEDIA_KINDS, PIN_KINDS, PLACEHOLDERS, FindOnNetwork, add_box_kinds,
     add_media_kinds, retranslate_box_kinds,
 )
 from .dialogs import PlaylistDialog, stalker_available
@@ -389,11 +389,15 @@ class WelcomeOverlay(QWidget):
             w.setVisible(kind != "plex")
         login = (not (m3u or stalker or box or media) or kind in LOGIN_KINDS
                  or kind in ("jellyfin", "emby"))
-        for w in (self._lbl_user, self._user, self._lbl_pw, self._pw):
+        pin = kind in PIN_KINDS
+        for w in (self._lbl_user, self._user):
+            w.setVisible(login and not pin)
+        for w in (self._lbl_pw, self._pw):
             w.setVisible(login)
+        self._lbl_pw.setText(tr("login_pin") if pin else tr("login_password"))
         hint = tr("playlist_login_optional") if box else ""
         self._user.setPlaceholderText(hint)
-        self._pw.setPlaceholderText(hint)
+        self._pw.setPlaceholderText(tr("playlist_pin_hint") if pin else hint)
         for w in (self._lbl_mac, self._mac):
             w.setVisible(stalker)
         self._finder.row.setVisible(box or media)
@@ -487,7 +491,7 @@ class WelcomeOverlay(QWidget):
                 self._show_error(tr("playlist_box_required"))
                 return
             self._hide_error()
-            user = self._user.text().strip() if kind in LOGIN_KINDS else ""
+            user = self._user.text().strip() if kind in LOGIN_KINDS and kind not in PIN_KINDS else ""
             pw = self._pw.text().strip() if kind in LOGIN_KINDS else ""
             self._on_connect(server, user, pw, kind, name)
             self._stack.setCurrentIndex(2)
@@ -545,7 +549,8 @@ class WelcomeOverlay(QWidget):
         self._lbl_name.setText(tr("playlist_name"))
         self._name.setPlaceholderText(tr("playlist_name_hint"))
         self._lbl_user.setText(tr("login_username"))
-        self._lbl_pw.setText(tr("login_password"))
+        self._lbl_pw.setText(tr("login_pin") if self._conn_kind.currentData() in PIN_KINDS
+                             else tr("login_password"))
         self._lbl_mac.setText(tr("playlist_mac"))
         for kind, key in (("xtream", "playlist_kind_xtream"), ("m3u", "playlist_kind_m3u"),
                           ("stalker", "playlist_kind_stalker")):

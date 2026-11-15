@@ -2674,5 +2674,20 @@
   "build_copy_report": "העתקת הדיווח",
   "build_report_copied": "הדיווח הועתק ללוח.",
   "about_build_modified": "גרסה לא רשמית - השירותים המקוונים כבויים. את האפליקציה הרשמית אפשר להוריד מ-dopeiptv.org.",
-  "about_build_source": "פועל מקוד המקור"
+  "about_build_source": "פועל מקוד המקור",
+  "playlist_kind_vdr": "VDR (restfulapi או streamdev)",
+  "playlist_kind_dvbviewer": "DVBViewer Media Server",
+  "playlist_kind_nextpvr": "שרת NextPVR",
+  "playlist_kind_mythtv": "שרת MythTV",
+  "login_pin": "PIN",
+  "playlist_pin_hint": "0000 אם לא שינית אותו",
+  "err_wrong_pin": "PIN שגוי.",
+  "vdr_streamdev_only": "ב־VDR הזה עונה רק streamdev: הערוצים מתנגנים, אבל אין מדריך שידורים. התוסף restfulapi (פורט 8002) נותן מדריך ומאפשר להקליט ממנו.",
+  "vdr_no_streamdev": "ה־VDR עונה, אבל streamdev-server אינו בין התוספים שלו: הערוצים וההקלטות שלו מתנגנים רק דרכו.",
+  "myth_no_live": "MythTV מעביר שידור חי רק לממשקים שלו, לא ככתובת שנגן יכול לפתוח. מדריך השידורים שלו כאן - אפשר להקליט ממנו בשרת - וההקלטות שלו נמצאות תחת סרטים.",
+  "nerd_src_streamdev_port": "פורט streamdev",
+  "nerd_src_streamdev_hint": "פורט ה־HTTP של streamdev-server ב־VDR: משם מתנגנים הערוצים וההקלטות.",
+  "nerd_src_dvb_port_hint": "פורט הסטרימינג של שרת המדיה (HTTP/UPnP), 7522 אלא אם שונה.",
+  "nerd_src_fav_groups": "המועדפים שלו כקבוצות",
+  "nerd_src_radio_channels": "ערוצי רדיו"
 }

@@ -2674,5 +2674,20 @@
   "build_copy_report": "Rapport kopiëren",
   "build_report_copied": "Het rapport staat op het klembord.",
   "about_build_modified": "Geen officiële build - online diensten staan uit. Haal de officiële app op dopeiptv.org.",
-  "about_build_source": "Draait vanuit de broncode"
+  "about_build_source": "Draait vanuit de broncode",
+  "playlist_kind_vdr": "VDR (restfulapi of streamdev)",
+  "playlist_kind_dvbviewer": "DVBViewer Media Server",
+  "playlist_kind_nextpvr": "NextPVR-server",
+  "playlist_kind_mythtv": "MythTV-backend",
+  "login_pin": "Pincode",
+  "playlist_pin_hint": "0000, tenzij je hem hebt gewijzigd",
+  "err_wrong_pin": "Onjuiste pincode.",
+  "vdr_streamdev_only": "Op deze VDR antwoordt alleen streamdev: de zenders spelen af, maar er is geen gids. De plug-in restfulapi (poort 8002) levert er een en laat je daaruit opnemen.",
+  "vdr_no_streamdev": "De VDR antwoordt, maar streamdev-server staat niet tussen zijn plug-ins: zijn zenders en opnames spelen alleen daarlangs af.",
+  "myth_no_live": "MythTV geeft live-tv alleen aan zijn eigen frontends, niet als adres dat een speler kan openen. Zijn gids staat hier – neem daaruit op op de server – en zijn opnames staan onder Films.",
+  "nerd_src_streamdev_port": "streamdev-poort",
+  "nerd_src_streamdev_hint": "De HTTP-poort van streamdev-server op de VDR: daarvandaan spelen zenders en opnames.",
+  "nerd_src_dvb_port_hint": "De streamingpoort van de mediaserver (HTTP/UPnP), 7522 tenzij gewijzigd.",
+  "nerd_src_fav_groups": "Zijn favorieten als groepen",
+  "nerd_src_radio_channels": "Radiozenders"
 }

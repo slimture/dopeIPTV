@@ -2674,5 +2674,20 @@
   "build_copy_report": "Αντιγραφή αναφοράς",
   "build_report_copied": "Η αναφορά είναι στο πρόχειρο.",
   "about_build_modified": "Μη επίσημη έκδοση - οι διαδικτυακές υπηρεσίες είναι απενεργοποιημένες. Κατεβάστε την επίσημη εφαρμογή από το dopeiptv.org.",
-  "about_build_source": "Εκτέλεση από τον πηγαίο κώδικα"
+  "about_build_source": "Εκτέλεση από τον πηγαίο κώδικα",
+  "playlist_kind_vdr": "VDR (restfulapi ή streamdev)",
+  "playlist_kind_dvbviewer": "DVBViewer Media Server",
+  "playlist_kind_nextpvr": "Διακομιστής NextPVR",
+  "playlist_kind_mythtv": "Backend MythTV",
+  "login_pin": "PIN",
+  "playlist_pin_hint": "0000, αν δεν έχει αλλάξει",
+  "err_wrong_pin": "Λάθος PIN.",
+  "vdr_streamdev_only": "Σε αυτόν τον VDR απαντά μόνο το streamdev: τα κανάλια παίζουν, αλλά δεν υπάρχει οδηγός προγράμματος. Το πρόσθετο restfulapi (θύρα 8002) δίνει έναν και επιτρέπει εγγραφή από αυτόν.",
+  "vdr_no_streamdev": "Ο VDR απαντά, αλλά το streamdev-server δεν είναι στα πρόσθετά του: τα κανάλια και οι εγγραφές του παίζουν μόνο μέσω αυτού.",
+  "myth_no_live": "Το MythTV δίνει ζωντανή TV μόνο στα δικά του frontends, όχι ως διεύθυνση που ανοίγει ένα πρόγραμμα αναπαραγωγής. Ο οδηγός του είναι εδώ - από αυτόν γίνεται η εγγραφή στον διακομιστή - και οι εγγραφές του βρίσκονται στις Ταινίες.",
+  "nerd_src_streamdev_port": "Θύρα streamdev",
+  "nerd_src_streamdev_hint": "Η θύρα HTTP του streamdev-server στον VDR: από εκεί παίζουν τα κανάλια και οι εγγραφές.",
+  "nerd_src_dvb_port_hint": "Η θύρα ροής του media server (HTTP/UPnP), 7522 αν δεν έχει αλλάξει.",
+  "nerd_src_fav_groups": "Τα αγαπημένα του ως ομάδες",
+  "nerd_src_radio_channels": "Ραδιοφωνικά κανάλια"
 }

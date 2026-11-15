@@ -299,3 +299,32 @@ def test_in_the_settings_window(tmp_path):
     proc = subprocess.run([sys.executable, "-c", _CHILD], capture_output=True, text=True,
                           env=env, cwd=_REPO_ROOT, timeout=180)
     assert "SOURCE_PAGE_OK" in proc.stdout, f"stdout={proc.stdout!r}\nstderr={proc.stderr[-3000:]!r}"
+
+
+def test_the_home_servers_fields_on_their_tabs(settings):
+    d = source_page({"name": "VDR", "kind": "vdr", "server": "http://10.0.0.9:8002"})
+    p = d.nerd_panel
+    assert tab_of(d, p.streamdev_port) == "streams" and shown(d, p.streamdev_port)
+    assert not shown(d, p.dvb_port) and not shown(d, p.port) and shown(d, d.finder.row)
+    for kind, key in (("vdr", "radio"), ("vdr", "recordings"), ("dvbviewer", "favourites"),
+                      ("nextpvr", "radio"), ("mythtv", "recordings")):
+        assert tab_of(d, p.kind_switches[kind][key]) == "adv", (kind, key)
+    assert shown(d, p.kind_switches["vdr"]["radio"]) and not shown(d, p.kind_switches["mythtv"]["recordings"])
+    assert not shown(d, p.mirrors_box) and not shown(d, p.cu_template)
+    # Its own options, stored as the kind reads them.
+    p.streamdev_port.setValue(3001)
+    p.kind_switches["vdr"]["radio"].setChecked(False)
+    assert d.values()["options"] == {"streamdev_port": "3001", "radio": False}
+    d.kind.setCurrentIndex(d.kind.findData("dvbviewer"))
+    assert shown(d, p.dvb_port) and not shown(d, p.streamdev_port) and p.dvb_port.value() == 7522
+    assert shown(d, p.kind_switches["dvbviewer"]["favourites"]) and shown(d, d.user)
+    p.dvb_port.setValue(7600)
+    assert d.values()["options"] == {"stream_port": "7600"}
+    d.kind.setCurrentIndex(d.kind.findData("nextpvr"))
+    assert not shown(d, d.user) and shown(d, d.pw) and d.pw_row.label.text() == tr("login_pin")
+    d.kind.setCurrentIndex(d.kind.findData("mythtv"))
+    assert shown(d, d.user) and d.pw_row.label.text() == tr("login_password")
+    assert shown(d, p.kind_switches["mythtv"]["recordings"]) and not shown(d, p.dvb_port)
+    # Without Nerd: the connection alone, the PIN named so.
+    off = source_page({"name": "NextPVR", "kind": "nextpvr", "server": "http://10.0.0.9:8866"}, nerd_on=False)
+    assert not shown(off, off.user) and shown(off, off.pw) and off.pw_row.label.text() == tr("login_pin")

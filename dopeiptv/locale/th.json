@@ -2674,5 +2674,20 @@
   "build_copy_report": "คัดลอกรายงาน",
   "build_report_copied": "คัดลอกรายงานไปยังคลิปบอร์ดแล้ว",
   "about_build_modified": "ไม่ใช่บิลด์ทางการ - บริการออนไลน์ถูกปิด ดาวน์โหลดแอปทางการได้ที่ dopeiptv.org",
-  "about_build_source": "กำลังรันจากซอร์สโค้ด"
+  "about_build_source": "กำลังรันจากซอร์สโค้ด",
+  "playlist_kind_vdr": "VDR (restfulapi หรือ streamdev)",
+  "playlist_kind_dvbviewer": "DVBViewer Media Server",
+  "playlist_kind_nextpvr": "เซิร์ฟเวอร์ NextPVR",
+  "playlist_kind_mythtv": "แบ็กเอนด์ MythTV",
+  "login_pin": "PIN",
+  "playlist_pin_hint": "0000 หากคุณยังไม่ได้เปลี่ยน",
+  "err_wrong_pin": "PIN ไม่ถูกต้อง",
+  "vdr_streamdev_only": "VDR เครื่องนี้มีเพียง streamdev ที่ตอบ: ช่องต่าง ๆ เล่นได้ แต่ไม่มีผังรายการ ปลั๊กอิน restfulapi (พอร์ต 8002) ให้ผังรายการและให้บันทึกจากผังได้",
+  "vdr_no_streamdev": "VDR ตอบ แต่ไม่มี streamdev-server อยู่ในปลั๊กอิน: ช่องและรายการบันทึกเล่นได้ผ่านปลั๊กอินนั้นเท่านั้น",
+  "myth_no_live": "MythTV ส่งทีวีสดให้เฉพาะฟรอนต์เอนด์ของตัวเอง ไม่ใช่เป็นที่อยู่ที่เครื่องเล่นเปิดได้ ผังรายการอยู่ที่นี่ (บันทึกบนเซิร์ฟเวอร์จากผังได้) และรายการบันทึกอยู่ใน ภาพยนตร์",
+  "nerd_src_streamdev_port": "พอร์ต streamdev",
+  "nerd_src_streamdev_hint": "พอร์ต HTTP ของ streamdev-server บน VDR: ช่องและรายการบันทึกเล่นจากที่นั่น",
+  "nerd_src_dvb_port_hint": "พอร์ตสตรีมของมีเดียเซิร์ฟเวอร์ (HTTP/UPnP) คือ 7522 หากไม่ได้เปลี่ยน",
+  "nerd_src_fav_groups": "รายการโปรดของเซิร์ฟเวอร์เป็นกลุ่ม",
+  "nerd_src_radio_channels": "ช่องวิทยุ"
 }

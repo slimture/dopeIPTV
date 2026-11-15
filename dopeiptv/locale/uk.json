@@ -2674,5 +2674,20 @@
   "build_copy_report": "Копіювати звіт",
   "build_report_copied": "Звіт скопійовано в буфер обміну.",
   "about_build_modified": "Неофіційна збірка - онлайн-сервіси вимкнено. Офіційний застосунок - на dopeiptv.org.",
-  "about_build_source": "Запущено з вихідного коду"
+  "about_build_source": "Запущено з вихідного коду",
+  "playlist_kind_vdr": "VDR (restfulapi або streamdev)",
+  "playlist_kind_dvbviewer": "DVBViewer Media Server",
+  "playlist_kind_nextpvr": "Сервер NextPVR",
+  "playlist_kind_mythtv": "Бекенд MythTV",
+  "login_pin": "PIN-код",
+  "playlist_pin_hint": "0000, якщо ви його не змінювали",
+  "err_wrong_pin": "Неправильний PIN-код.",
+  "vdr_streamdev_only": "На цьому VDR відповідає лише streamdev: канали відтворюються, але телегіду немає. Плагін restfulapi (порт 8002) дає його й дозволяє записувати з нього.",
+  "vdr_no_streamdev": "VDR відповідає, але streamdev-server немає серед його плагінів: канали й записи відтворюються лише через нього.",
+  "myth_no_live": "MythTV віддає пряму трансляцію лише своїм фронтендам, а не як адресу, яку може відкрити програвач. Його телегід тут — із нього можна записувати на сервері, — а записи в розділі «Фільми».",
+  "nerd_src_streamdev_port": "Порт streamdev",
+  "nerd_src_streamdev_hint": "HTTP-порт streamdev-server на VDR: звідти відтворюються канали й записи.",
+  "nerd_src_dvb_port_hint": "Порт потокової передачі медіасервера (HTTP/UPnP), 7522, якщо не змінювали.",
+  "nerd_src_fav_groups": "Його обране як групи",
+  "nerd_src_radio_channels": "Радіоканали"
 }

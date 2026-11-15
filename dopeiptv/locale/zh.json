@@ -2674,5 +2674,20 @@
   "build_copy_report": "复制报告",
   "build_report_copied": "报告已复制到剪贴板。",
   "about_build_modified": "非官方版本 - 在线服务已关闭。请从 dopeiptv.org 获取官方应用。",
-  "about_build_source": "从源代码运行"
+  "about_build_source": "从源代码运行",
+  "playlist_kind_vdr": "VDR（restfulapi 或 streamdev）",
+  "playlist_kind_dvbviewer": "DVBViewer Media Server",
+  "playlist_kind_nextpvr": "NextPVR 服务器",
+  "playlist_kind_mythtv": "MythTV 后端",
+  "login_pin": "PIN",
+  "playlist_pin_hint": "未更改过则为 0000",
+  "err_wrong_pin": "PIN 错误。",
+  "vdr_streamdev_only": "这台 VDR 只有 streamdev 应答：频道可以播放，但没有节目单。restfulapi 插件（端口 8002）提供节目单，并可从中录制。",
+  "vdr_no_streamdev": "VDR 有应答，但 streamdev-server 不在其插件之列：它的频道和录像只能通过它播放。",
+  "myth_no_live": "MythTV 只把直播电视交给自己的前端，而不是作为播放器能打开的地址。它的节目单在这里（可从中在服务器上录制），录像在“电影”中。",
+  "nerd_src_streamdev_port": "streamdev 端口",
+  "nerd_src_streamdev_hint": "VDR 上 streamdev-server 的 HTTP 端口：频道和录像从这里播放。",
+  "nerd_src_dvb_port_hint": "媒体服务器的串流端口（HTTP/UPnP），未更改则为 7522。",
+  "nerd_src_fav_groups": "将其收藏作为分组",
+  "nerd_src_radio_channels": "广播频道"
 }

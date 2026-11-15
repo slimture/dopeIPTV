@@ -2674,5 +2674,20 @@
   "build_copy_report": "Raporu kopyala",
   "build_report_copied": "Rapor panoya kopyalandı.",
   "about_build_modified": "Resmi bir derleme değil - çevrim içi hizmetler kapalı. Resmi uygulamayı dopeiptv.org'dan edinin.",
-  "about_build_source": "Kaynak koddan çalışıyor"
+  "about_build_source": "Kaynak koddan çalışıyor",
+  "playlist_kind_vdr": "VDR (restfulapi veya streamdev)",
+  "playlist_kind_dvbviewer": "DVBViewer Media Server",
+  "playlist_kind_nextpvr": "NextPVR sunucusu",
+  "playlist_kind_mythtv": "MythTV arka ucu",
+  "login_pin": "PIN",
+  "playlist_pin_hint": "Değiştirilmediyse 0000",
+  "err_wrong_pin": "Yanlış PIN.",
+  "vdr_streamdev_only": "Bu VDR'de yalnızca streamdev yanıt veriyor: kanallar oynatılıyor ama rehber yok. restfulapi eklentisi (port 8002) bir rehber sağlar ve oradan kayıt yapmayı mümkün kılar.",
+  "vdr_no_streamdev": "VDR yanıt veriyor ama streamdev-server eklentileri arasında değil: kanalları ve kayıtları yalnızca onun üzerinden oynatılır.",
+  "myth_no_live": "MythTV canlı yayını yalnızca kendi ön uçlarına verir, bir oynatıcının açabileceği bir adres olarak değil. Rehberi burada - oradan sunucuda kayıt yapılabilir - ve kayıtları Filmler altında.",
+  "nerd_src_streamdev_port": "streamdev portu",
+  "nerd_src_streamdev_hint": "VDR üzerindeki streamdev-server'ın HTTP portu: kanallar ve kayıtlar oradan oynatılır.",
+  "nerd_src_dvb_port_hint": "Medya sunucusunun yayın portu (HTTP/UPnP), değiştirilmediyse 7522.",
+  "nerd_src_fav_groups": "Favorileri grup olarak",
+  "nerd_src_radio_channels": "Radyo kanalları"
 }

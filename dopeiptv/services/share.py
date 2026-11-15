@@ -79,7 +79,9 @@ class Share:
             held = self._lists.get(pid)
             if held is not None and time.monotonic() - held[0] < self.ttl:
                 return held[1], held[2]
-        rows = [r for r in (client.live_streams(None) or []) if r.get("stream_id") is not None]
+        # A channel listed only for the guide (MythTV's) has nothing to share.
+        rows = [r for r in (client.live_streams(None) or [])
+                if r.get("stream_id") is not None and not r.get("_no_live")]
         cats: dict[str, str] = {}
         try:
             for c in client.live_categories() or []:

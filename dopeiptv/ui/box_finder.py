@@ -17,19 +17,27 @@ from ..i18n import tr
 from . import theme
 from .theme import P
 
-BOX_KINDS = ("enigma2", "tvheadend", "hdhomerun")
+BOX_KINDS = ("enigma2", "tvheadend", "hdhomerun", "vdr", "dvbviewer", "nextpvr", "mythtv")
 # Media servers (ui/media_signin.py signs in to them).
 MEDIA_KINDS = ("jellyfin", "emby", "plex")
 KIND_LABELS = {"enigma2": "playlist_kind_enigma2", "tvheadend": "playlist_kind_tvheadend",
-               "hdhomerun": "playlist_kind_hdhomerun", "jellyfin": "playlist_kind_jellyfin",
+               "hdhomerun": "playlist_kind_hdhomerun", "vdr": "playlist_kind_vdr",
+               "dvbviewer": "playlist_kind_dvbviewer", "nextpvr": "playlist_kind_nextpvr",
+               "mythtv": "playlist_kind_mythtv", "jellyfin": "playlist_kind_jellyfin",
                "emby": "playlist_kind_emby", "plex": "playlist_kind_plex"}
 SHORT_NAMES = {"enigma2": "Enigma2", "tvheadend": "Tvheadend", "hdhomerun": "HDHomeRun",
+               "vdr": "VDR", "dvbviewer": "DVBViewer", "nextpvr": "NextPVR", "mythtv": "MythTV",
                "jellyfin": "Jellyfin", "emby": "Emby", "plex": "Plex"}
+# Each with the port its kind listens on (a bare host gets it too).
 PLACEHOLDERS = {"enigma2": "http://192.168.1.10", "tvheadend": "http://192.168.1.20:9981",
-                "hdhomerun": "http://192.168.1.30", "jellyfin": "http://192.168.1.40:8096",
+                "hdhomerun": "http://192.168.1.30", "vdr": "http://192.168.1.50:8002",
+                "dvbviewer": "http://192.168.1.51:8089", "nextpvr": "http://192.168.1.52:8866",
+                "mythtv": "http://192.168.1.53:6544", "jellyfin": "http://192.168.1.40:8096",
                 "emby": "http://192.168.1.41:8096"}
 # Kinds that log in at all (an HDHomeRun never asks).
-LOGIN_KINDS = ("enigma2", "tvheadend")
+LOGIN_KINDS = ("enigma2", "tvheadend", "vdr", "dvbviewer", "nextpvr", "mythtv")
+# Kinds whose login is a PIN alone (the password field, named so).
+PIN_KINDS = ("nextpvr",)
 
 
 def add_box_kinds(combo) -> None:

@@ -225,8 +225,13 @@ class _MediaServerMixin:
     # -- live TV ------------------------------------------------------------------------
 
     def _ms_live_note(self, categories: list) -> None:
-        """Live TV with no channels: why, when the server says (Plex)."""
-        client = self._ms_client()
-        note = str(getattr(client, "live_note", "") or "") if client is not None else ""
-        if note and not categories:
+        """Live TV with no channels: why, when the server says (Plex). A box
+        says it whenever it has one - MythTV lists its channels for the
+        guide only, VDR's may lack streamdev - or else what its guide lacks
+        (a VDR with streamdev alone)."""
+        client = getattr(self, "client", None)
+        note, guide = (getattr(client, name, "") for name in ("live_note", "guide_note"))
+        if isinstance(note, str) and note and (not categories or self._ms_client() is None):
             self._set_status(note)
+        elif isinstance(guide, str) and guide:
+            self._set_status(guide)

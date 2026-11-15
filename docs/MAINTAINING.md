@@ -550,12 +550,32 @@ Not decided: each needs a word with the maintainer first.
   sources side by side (picture size, bitrate, drops), and the better one
   chosen - built on failover's matching.
 
-**More home backends** (Enigma2, Tvheadend, HDHomeRun, Jellyfin, Emby and
-Plex are in)
+**More home backends**: built - VDR, DVBViewer Media Server, NextPVR and
+MythTV are source kinds beside Enigma2, Tvheadend, HDHomeRun, Jellyfin,
+Emby and Plex, each on `BoxClient` (`providers/vdr.py`, `dvbviewer.py`,
+`nextpvr.py`, `mythtv.py`): the Add source form with their ports, their own
+options on the source's page, Find on my network on their ports, the
+guide as XMLTV, recordings under Movies › Recordings on the box, and
+"Record on the box" from the guide (restfulapi's timers, DVBViewer's
+`timeradd`, NextPVR's `recording.save`, MythTV's `AddRecordSchedule`).
+Each module's docstring says what was checked against the project's
+documentation and what was not; every test runs against a fake server.
+Still to be seen on real servers:
 
-- **VDR** through streamdev or the restfulapi plugin.
-- **DVBViewer Media Server** (big on Windows, above all in Germany).
-- **NextPVR** and **MythTV**.
+- **VDR**: restfulapi's `inode` (with or without `.rec`) and streamdev
+  playing a recording by it; how streamdev's `channels.m3u` writes a group;
+  a timer's answer; a big channel list's guide (one question per channel).
+- **DVBViewer**: the stream port and paths (`upnp/channelstream/<nr>.ts`,
+  `upnp/recordings/<id>.ts` on 7522 - they differ between DMS versions,
+  hence the option), the favourites answer's shape, the times as the
+  server's local time, a timer's `dor`/minutes on a real DMS.
+- **NextPVR**: that a stream takes any `client=`, `recording.save` with
+  only these fields, `setting.list`'s padding names, NextPVR 4's fields.
+- **MythTV**: `ChannelGroupID` on versions before v31 (a group then lists
+  every channel), v34's API authorisation, AddRecordSchedule matching the
+  guide's programme on a real backend. Live TV is not offered: MythTV gives
+  it only over the Myth protocol; its channels are listed for the guide and
+  recording, and say why they do not play.
 
 **Other kinds of streams** (yt-dlp's sites and radio-browser.info are in:
 `core/ytdlp.py`, `ui/mw_webstreams.py`, `providers/radio_browser.py`,

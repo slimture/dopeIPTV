@@ -2674,5 +2674,20 @@
   "build_copy_report": "Kopiraj izveštaj",
   "build_report_copied": "Izveštaj je u privremenoj memoriji.",
   "about_build_modified": "Nije zvanična verzija - mrežne usluge su isključene. Zvaničnu aplikaciju preuzmi sa dopeiptv.org.",
-  "about_build_source": "Pokrenuto iz izvornog koda"
+  "about_build_source": "Pokrenuto iz izvornog koda",
+  "playlist_kind_vdr": "VDR (restfulapi ili streamdev)",
+  "playlist_kind_dvbviewer": "DVBViewer Media Server",
+  "playlist_kind_nextpvr": "NextPVR server",
+  "playlist_kind_mythtv": "MythTV bekend",
+  "login_pin": "PIN",
+  "playlist_pin_hint": "0000 ako nije promenjen",
+  "err_wrong_pin": "Pogrešan PIN.",
+  "vdr_streamdev_only": "Na ovom VDR-u odgovara samo streamdev: kanali se puštaju, ali nema vodiča. Dodatak restfulapi (port 8002) daje vodič i omogućava snimanje iz njega.",
+  "vdr_no_streamdev": "VDR odgovara, ali streamdev-server nije među njegovim dodacima: kanali i snimci se puštaju samo preko njega.",
+  "myth_no_live": "MythTV daje TV uživo samo svojim interfejsima, ne kao adresu koju plejer može da otvori. Njegov vodič je ovde - iz njega se snima na serveru - a snimci su pod Filmovi.",
+  "nerd_src_streamdev_port": "streamdev port",
+  "nerd_src_streamdev_hint": "HTTP port streamdev-servera na VDR-u: odatle se puštaju kanali i snimci.",
+  "nerd_src_dvb_port_hint": "Port za striming medijskog servera (HTTP/UPnP), 7522 ako nije promenjen.",
+  "nerd_src_fav_groups": "Njegovi omiljeni kao grupe",
+  "nerd_src_radio_channels": "Radio kanali"
 }

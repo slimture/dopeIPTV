@@ -2674,5 +2674,20 @@
   "build_copy_report": "رپورٹ کاپی کریں",
   "build_report_copied": "رپورٹ کلپ بورڈ پر ہے۔",
   "about_build_modified": "سرکاری بلڈ نہیں - آن لائن سروسز بند ہیں۔ سرکاری ایپ dopeiptv.org سے حاصل کریں۔",
-  "about_build_source": "سورس سے چل رہا ہے"
+  "about_build_source": "سورس سے چل رہا ہے",
+  "playlist_kind_vdr": "VDR (restfulapi یا streamdev)",
+  "playlist_kind_dvbviewer": "DVBViewer Media Server",
+  "playlist_kind_nextpvr": "NextPVR سرور",
+  "playlist_kind_mythtv": "MythTV بیک اینڈ",
+  "login_pin": "PIN",
+  "playlist_pin_hint": "0000، جب تک آپ نے اسے بدلا نہ ہو",
+  "err_wrong_pin": "غلط PIN۔",
+  "vdr_streamdev_only": "اس VDR پر صرف streamdev جواب دیتا ہے: اس کے چینل چلتے ہیں، لیکن کوئی گائیڈ نہیں۔ restfulapi پلگ اِن (پورٹ 8002) گائیڈ دیتا ہے اور اس سے ریکارڈ کرنے دیتا ہے۔",
+  "vdr_no_streamdev": "VDR جواب دیتا ہے، لیکن streamdev-server اس کے پلگ اِنز میں نہیں: اس کے چینل اور ریکارڈنگز صرف اسی کے ذریعے چلتی ہیں۔",
+  "myth_no_live": "MythTV لائیو ٹی وی صرف اپنے فرنٹ اینڈز کو دیتا ہے، ایسے پتے کے طور پر نہیں جسے کوئی پلیئر کھول سکے۔ اس کی گائیڈ یہاں ہے - اس سے سرور پر ریکارڈ کریں - اور اس کی ریکارڈنگز فلمیں میں ہیں۔",
+  "nerd_src_streamdev_port": "streamdev پورٹ",
+  "nerd_src_streamdev_hint": "VDR پر streamdev-server کا HTTP پورٹ: چینل اور ریکارڈنگز وہیں سے چلتی ہیں۔",
+  "nerd_src_dvb_port_hint": "میڈیا سرور کا اسٹریمنگ پورٹ (HTTP/UPnP)، اگر بدلا نہ گیا ہو تو 7522۔",
+  "nerd_src_fav_groups": "اس کے پسندیدہ بطور گروپ",
+  "nerd_src_radio_channels": "ریڈیو چینلز"
 }

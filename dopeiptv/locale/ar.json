@@ -2674,5 +2674,20 @@
   "build_copy_report": "نسخ التقرير",
   "build_report_copied": "التقرير في الحافظة.",
   "about_build_modified": "ليست نسخة رسمية - الخدمات عبر الإنترنت متوقفة. احصل على التطبيق الرسمي من dopeiptv.org.",
-  "about_build_source": "يعمل من الشيفرة المصدرية"
+  "about_build_source": "يعمل من الشيفرة المصدرية",
+  "playlist_kind_vdr": "VDR (restfulapi أو streamdev)",
+  "playlist_kind_dvbviewer": "DVBViewer Media Server",
+  "playlist_kind_nextpvr": "خادم NextPVR",
+  "playlist_kind_mythtv": "خادم MythTV الخلفي",
+  "login_pin": "رمز PIN",
+  "playlist_pin_hint": "0000 ما لم تغيّره",
+  "err_wrong_pin": "رمز PIN غير صحيح.",
+  "vdr_streamdev_only": "لا يجيب على جهاز VDR هذا إلا streamdev: تعمل قنواته، لكن لا يوجد دليل برامج. الإضافة restfulapi (المنفذ 8002) توفّر دليلًا وتتيح لك التسجيل منه.",
+  "vdr_no_streamdev": "يجيب VDR، لكن streamdev-server ليس من إضافاته: قنواته وتسجيلاته لا تعمل إلا من خلاله.",
+  "myth_no_live": "لا يقدّم MythTV البث المباشر إلا لواجهاته الخاصة، لا كعنوان يستطيع مشغّل فتحه. دليله هنا - سجّل منه على الخادم - وتسجيلاته في أفلام.",
+  "nerd_src_streamdev_port": "منفذ streamdev",
+  "nerd_src_streamdev_hint": "منفذ HTTP الخاص بـ streamdev-server على جهاز VDR: من هناك تعمل القنوات والتسجيلات.",
+  "nerd_src_dvb_port_hint": "منفذ البث في خادم الوسائط (HTTP/UPnP)، وهو 7522 ما لم يُغيَّر.",
+  "nerd_src_fav_groups": "مفضلاته كمجموعات",
+  "nerd_src_radio_channels": "قنوات الراديو"
 }

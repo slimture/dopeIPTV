@@ -3852,6 +3852,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 lambda: self.play_live_channel(it)):
             return
         url = self._live_stream_address(it.get("stream_id"), fmt)
+        if not url and self._box_no_live(it):
+            return
         title = it.get("name") or "dopeIPTV"
         self._start_playback(url, title, it.get("stream_icon"),
                              self._item_key(it), "live", item=it)
@@ -3974,6 +3976,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             icon = it.get("stream_icon") or it.get("cover")
             key, kind = self._item_key(it), self._play_kind_for(it)
         if not url:
+            self._box_no_live(it)
             return
 
         if external or player == "vlc":

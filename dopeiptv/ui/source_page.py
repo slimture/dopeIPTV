@@ -38,8 +38,9 @@ from .theme import P, _mix, ink_on
 
 #: Each kind as the page and the list of sources name it.
 KIND_NAMES = {"xtream": "Xtream", "m3u": "M3U", "stalker": "Stalker", "enigma2": "Enigma2",
-              "tvheadend": "Tvheadend", "hdhomerun": "HDHomeRun", "jellyfin": "Jellyfin",
-              "emby": "Emby", "plex": "Plex"}
+              "tvheadend": "Tvheadend", "hdhomerun": "HDHomeRun", "vdr": "VDR",
+              "dvbviewer": "DVBViewer", "nextpvr": "NextPVR", "mythtv": "MythTV",
+              "jellyfin": "Jellyfin", "emby": "Emby", "plex": "Plex"}
 TABS = ("conn", "net", "streams", "guide", "adv")
 #: A kind's switches that are about its streams or its guide; the rest are
 #: on Advanced.
@@ -417,8 +418,10 @@ class SourcePage(SourceFields, QScrollArea):
         c.shown_if(self.server_row, lambda: self._parts.get("server", True))
         finder = c.widget(self.finder.row)
         c.shown_if(finder, lambda: self._parts.get("finder", False))
-        for label, field in ((tr("login_username"), self.user), (tr("login_password"), self.pw)):
-            c.shown_if(c.row(label, field), lambda: self._parts.get("login", True))
+        c.shown_if(c.row(tr("login_username"), self.user),
+                   lambda: self._parts.get("login", True) and self._parts.get("user", True))
+        self.pw_row = c.row(tr("login_password"), self.pw)
+        c.shown_if(self.pw_row, lambda: self._parts.get("login", True))
         signin = c.widget(self.signin)
         c.shown_if(signin, lambda: self.kind.currentData() in MEDIA_KINDS)
         c.shown_if(c.row(tr("playlist_mac"), self.mac), lambda: self._parts.get("mac", False))
@@ -570,6 +573,10 @@ class SourcePage(SourceFields, QScrollArea):
         only(c.row(tr("nerd_src_e2_transcode"), p.e2_transcode, tr("nerd_src_e2_transcode_hint")), "enigma2")
         only(c.row(tr("nerd_src_profile"), p.profile), "tvheadend")
         only(c.row(tr("nerd_src_transcode"), p.transcode), "hdhomerun")
+        only(c.row(tr("nerd_src_streamdev_port"), Stepper(p.streamdev_port), tr("nerd_src_streamdev_hint")),
+             "vdr")
+        only(c.row(tr("nerd_src_stream_port"), Stepper(p.dvb_port), tr("nerd_src_dvb_port_hint")),
+             "dvbviewer")
         only(c.row(tr("ms_opt_quality"), p.ms_quality), *MEDIA_KINDS)
         self._switch_rows(c, STREAM_SWITCHES)
 
@@ -631,6 +638,7 @@ class SourcePage(SourceFields, QScrollArea):
     def _update_kind(self, *_a: Any) -> None:
         self._parts = self._kind_fields()
         self.server_row.label.setText(self._parts["server_label"])
+        self.pw_row.label.setText(self._parts["pw_label"])
         for c in self._cards:
             c.refresh()
         self._update_header()

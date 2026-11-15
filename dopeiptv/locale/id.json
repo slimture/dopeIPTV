@@ -2674,5 +2674,20 @@
   "build_copy_report": "Salin laporan",
   "build_report_copied": "Laporan ada di papan klip.",
   "about_build_modified": "Bukan build resmi - layanan online dimatikan. Dapatkan aplikasi resmi di dopeiptv.org.",
-  "about_build_source": "Berjalan dari kode sumber"
+  "about_build_source": "Berjalan dari kode sumber",
+  "playlist_kind_vdr": "VDR (restfulapi atau streamdev)",
+  "playlist_kind_dvbviewer": "DVBViewer Media Server",
+  "playlist_kind_nextpvr": "Server NextPVR",
+  "playlist_kind_mythtv": "Backend MythTV",
+  "login_pin": "PIN",
+  "playlist_pin_hint": "0000 kecuali sudah diubah",
+  "err_wrong_pin": "PIN salah.",
+  "vdr_streamdev_only": "Di VDR ini hanya streamdev yang menjawab: salurannya bisa diputar, tetapi tidak ada panduan acara. Plugin restfulapi (port 8002) menyediakannya dan memungkinkan merekam dari panduan itu.",
+  "vdr_no_streamdev": "VDR menjawab, tetapi streamdev-server tidak ada di antara plugin-nya: saluran dan rekamannya hanya bisa diputar melaluinya.",
+  "myth_no_live": "MythTV memberikan TV langsung hanya ke frontend-nya sendiri, bukan sebagai alamat yang bisa dibuka pemutar. Panduan acaranya ada di sini - rekam di server dari sana - dan rekamannya ada di Film.",
+  "nerd_src_streamdev_port": "Port streamdev",
+  "nerd_src_streamdev_hint": "Port HTTP streamdev-server di VDR: saluran dan rekaman diputar dari sana.",
+  "nerd_src_dvb_port_hint": "Port streaming server media (HTTP/UPnP), 7522 kecuali diubah.",
+  "nerd_src_fav_groups": "Favoritnya sebagai grup",
+  "nerd_src_radio_channels": "Saluran radio"
 }

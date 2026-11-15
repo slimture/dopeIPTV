@@ -2674,5 +2674,20 @@
   "build_copy_report": "Bericht kopieren",
   "build_report_copied": "Der Bericht ist in der Zwischenablage.",
   "about_build_modified": "Kein offizieller Build – Online-Dienste sind aus. Die offizielle App gibt es auf dopeiptv.org.",
-  "about_build_source": "Läuft aus dem Quellcode"
+  "about_build_source": "Läuft aus dem Quellcode",
+  "playlist_kind_vdr": "VDR (restfulapi oder streamdev)",
+  "playlist_kind_dvbviewer": "DVBViewer Media Server",
+  "playlist_kind_nextpvr": "NextPVR-Server",
+  "playlist_kind_mythtv": "MythTV-Backend",
+  "login_pin": "PIN",
+  "playlist_pin_hint": "0000, wenn du sie nicht geändert hast",
+  "err_wrong_pin": "Falsche PIN.",
+  "vdr_streamdev_only": "Auf diesem VDR antwortet nur streamdev: Die Sender laufen, aber es gibt keinen Programmführer. Das Plugin restfulapi (Port 8002) liefert einen und lässt dich daraus aufnehmen.",
+  "vdr_no_streamdev": "Der VDR antwortet, aber streamdev-server ist nicht unter seinen Plugins: Seine Sender und Aufnahmen laufen nur darüber.",
+  "myth_no_live": "MythTV gibt Live-TV nur an seine eigenen Frontends weiter, nicht als Adresse, die ein Player öffnen kann. Sein Programmführer ist hier – nimm daraus auf dem Server auf – und seine Aufnahmen findest du unter Filme.",
+  "nerd_src_streamdev_port": "streamdev-Port",
+  "nerd_src_streamdev_hint": "HTTP-Port von streamdev-server auf dem VDR: Von dort laufen Sender und Aufnahmen.",
+  "nerd_src_dvb_port_hint": "Der Streaming-Port des Media Servers (HTTP/UPnP), 7522, sofern nicht geändert.",
+  "nerd_src_fav_groups": "Seine Favoriten als Gruppen",
+  "nerd_src_radio_channels": "Radiosender"
 }

@@ -2674,5 +2674,20 @@
   "build_copy_report": "Copia la segnalazione",
   "build_report_copied": "La segnalazione è negli appunti.",
   "about_build_modified": "Non è una build ufficiale - i servizi online sono disattivati. Scarica l'app ufficiale da dopeiptv.org.",
-  "about_build_source": "In esecuzione dal codice sorgente"
+  "about_build_source": "In esecuzione dal codice sorgente",
+  "playlist_kind_vdr": "VDR (restfulapi o streamdev)",
+  "playlist_kind_dvbviewer": "DVBViewer Media Server",
+  "playlist_kind_nextpvr": "Server NextPVR",
+  "playlist_kind_mythtv": "Backend MythTV",
+  "login_pin": "PIN",
+  "playlist_pin_hint": "0000 se non l'hai cambiato",
+  "err_wrong_pin": "PIN errato.",
+  "vdr_streamdev_only": "Su questo VDR risponde solo streamdev: i canali si vedono, ma non c'è la guida. Il plugin restfulapi (porta 8002) ne fornisce una e ti permette di registrare da lì.",
+  "vdr_no_streamdev": "Il VDR risponde, ma streamdev-server non è tra i suoi plugin: canali e registrazioni si vedono solo tramite quello.",
+  "myth_no_live": "MythTV dà la TV in diretta solo ai propri frontend, non come indirizzo che un player possa aprire. La sua guida è qui (registra sul server da lì) e le sue registrazioni sono in Film.",
+  "nerd_src_streamdev_port": "Porta streamdev",
+  "nerd_src_streamdev_hint": "La porta HTTP di streamdev-server sul VDR: canali e registrazioni partono da lì.",
+  "nerd_src_dvb_port_hint": "La porta di streaming del media server (HTTP/UPnP), 7522 se non è stata cambiata.",
+  "nerd_src_fav_groups": "I suoi preferiti come gruppi",
+  "nerd_src_radio_channels": "Canali radio"
 }

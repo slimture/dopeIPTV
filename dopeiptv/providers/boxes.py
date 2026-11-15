@@ -1,11 +1,12 @@
 """Boxes and servers on the home network, behind XtreamClient's interface.
 
-What the Enigma2, Tvheadend and HDHomeRun clients share: the address and an
-optional login (basic or digest, whichever the box asks for), a catalogue
-loaded once and kept when a refresh fails, stable channel ids (a favourite
-survives a box that reorders its bouquets), the box's recordings as films,
-and the box's own programme guide handed to the guide as XMLTV
-(``own_guide``), so the guide grid, search and reminders work unchanged.
+What the Enigma2, Tvheadend, HDHomeRun, VDR, DVBViewer, NextPVR and MythTV
+clients share: the address and an optional login (basic or digest,
+whichever the box asks for), a catalogue loaded once and kept when a
+refresh fails, stable channel ids (a favourite survives a box that reorders
+its bouquets), the box's recordings as films, and the box's own programme
+guide handed to the guide as XMLTV (``own_guide``), so the guide grid,
+search and reminders work unchanged.
 """
 
 from __future__ import annotations
@@ -177,6 +178,10 @@ class BoxClient(OfflineClient):
 
     LOG_NAME = "box"
     KIND = "box"
+    # Why the live channels do not play, or what the guide lacks, in the
+    # user's words ("" = nothing to say); the window shows it.
+    live_note = ""
+    guide_note = ""
     DEFAULT_PORT = 80
     TIMEOUT = (6.0, 30.0)
     # A failed load is tried again after this long, not on every call.
@@ -299,7 +304,8 @@ class BoxClient(OfflineClient):
 
     def _load(self) -> tuple[list[dict], list[dict]]:
         """(channels, recordings). A channel: key (what names it on the box),
-        name, category, url, and optionally icon, epg_id, num. A recording:
+        name, category, url (or no_live: listed without one), and
+        optionally icon, epg_id, num. A recording:
         key, title, url, and optionally plot, channel, start, secs, ext."""
         raise NotImplementedError
 
@@ -340,7 +346,9 @@ class BoxClient(OfflineClient):
         seen: set[tuple[int, str]] = set()
         for ch in channels:
             key = str(ch.get("key") or ch.get("url") or "")
-            if not key or not ch.get("url"):
+            # A channel without an address is kept only when its kind says
+            # it has none to give (MythTV: for the guide, and to record on).
+            if not key or not (ch.get("url") or ch.get("no_live")):
                 continue
             sid = ids.get(key)
             if sid is None:
@@ -356,7 +364,9 @@ class BoxClient(OfflineClient):
                    "epg_channel_id": str(ch.get("epg_id") or ""),
                    "category_id": cat, "category_name": cat,
                    "tv_archive": 0, "tv_archive_duration": 0,
-                   "_url": str(ch["url"]), "_key": key}
+                   "_url": str(ch.get("url") or ""), "_key": key}
+            if not row["_url"]:
+                row["_no_live"] = True
             rows.append(row)
             by_id.setdefault(sid, row)
         recs: list[dict] = []

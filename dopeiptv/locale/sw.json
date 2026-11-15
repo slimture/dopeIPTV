@@ -2674,5 +2674,20 @@
   "build_copy_report": "Nakili ripoti",
   "build_report_copied": "Ripoti iko kwenye ubao wa kunakili.",
   "about_build_modified": "Si toleo rasmi - huduma za mtandaoni zimezimwa. Pata programu rasmi kwenye dopeiptv.org.",
-  "about_build_source": "Inaendeshwa kutoka msimbo chanzo"
+  "about_build_source": "Inaendeshwa kutoka msimbo chanzo",
+  "playlist_kind_vdr": "VDR (restfulapi au streamdev)",
+  "playlist_kind_dvbviewer": "DVBViewer Media Server",
+  "playlist_kind_nextpvr": "Seva ya NextPVR",
+  "playlist_kind_mythtv": "Seva ya nyuma ya MythTV",
+  "login_pin": "PIN",
+  "playlist_pin_hint": "0000 isipokuwa umeibadilisha",
+  "err_wrong_pin": "PIN si sahihi.",
+  "vdr_streamdev_only": "Kwenye VDR hii ni streamdev pekee inayojibu: chaneli zake zinacheza, lakini hakuna mwongozo. Programu-jalizi ya restfulapi (lango 8002) inatoa mwongozo na hukuruhusu kurekodi kutoka kwake.",
+  "vdr_no_streamdev": "VDR inajibu, lakini streamdev-server haimo kati ya programu-jalizi zake: chaneli na rekodi zake zinacheza kupitia hiyo tu.",
+  "myth_no_live": "MythTV hutoa TV mubashara kwa violesura vyake pekee, si kama anwani ambayo kicheza kinaweza kufungua. Mwongozo wake uko hapa - rekodi kwenye seva kutoka kwake - na rekodi zake ziko chini ya Filamu.",
+  "nerd_src_streamdev_port": "Lango la streamdev",
+  "nerd_src_streamdev_hint": "Lango la HTTP la streamdev-server kwenye VDR: chaneli na rekodi zinacheza kutoka hapo.",
+  "nerd_src_dvb_port_hint": "Lango la utiririshaji la seva ya midia (HTTP/UPnP), 7522 isipobadilishwa.",
+  "nerd_src_fav_groups": "Vipendwa vyake kama vikundi",
+  "nerd_src_radio_channels": "Chaneli za redio"
 }

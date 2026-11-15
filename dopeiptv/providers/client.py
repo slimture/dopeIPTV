@@ -982,7 +982,7 @@ def _list_cache_path(playlist: dict) -> str | None:
 
 # Boxes and servers on the home network (providers/boxes.py): an address,
 # an optional login, and their own options under "options".
-BOX_KINDS = ("enigma2", "tvheadend", "hdhomerun")
+BOX_KINDS = ("enigma2", "tvheadend", "hdhomerun", "vdr", "dvbviewer", "nextpvr", "mythtv")
 
 
 def make_box_client(playlist: dict):
@@ -997,6 +997,18 @@ def make_box_client(playlist: dict):
     if kind == "tvheadend":
         from .tvheadend import TvheadendClient
         return TvheadendClient(*args)
+    if kind == "vdr":
+        from .vdr import VdrClient
+        return VdrClient(*args)
+    if kind == "dvbviewer":
+        from .dvbviewer import DVBViewerClient
+        return DVBViewerClient(*args)
+    if kind == "nextpvr":
+        from .nextpvr import NextPVRClient
+        return NextPVRClient(*args)
+    if kind == "mythtv":
+        from .mythtv import MythTVClient
+        return MythTVClient(*args)
     from .hdhomerun import HDHomeRunClient
     return HDHomeRunClient(*args)
 

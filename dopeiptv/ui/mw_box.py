@@ -1,8 +1,10 @@
 """The box itself, from the app: zap it to a channel, wake it, put it to
 standby, and set a recording on it from the guide (it records whether
 the app runs or not). Only there when the source is such a box - an
-Enigma2 receiver zaps and records, a Tvheadend server records - so no one
-else sees a thing. Nerd adds Copy stream address.
+Enigma2 receiver zaps and records; Tvheadend, VDR (restfulapi), DVBViewer,
+NextPVR and MythTV servers record - so no one else sees a thing. Nerd adds
+Copy stream address. A channel a source lists without a play address
+(MythTV's, for the guide) says why it does not play.
 
 An Enigma2 box also has: its info, a screenshot of its TV and its remote
 (ui/box_tools.py); its recordings renamed, moved and deleted from the
@@ -119,6 +121,17 @@ class _BoxMixin:
             return tr("box_timer_set", title=title or "") if ok else tr("box_failed", why=text)
         menu.addAction(tr("box_record"), lambda: self._box_run(
             c.add_timer, said, sid, start, stop, title or ""))
+
+    def _box_no_live(self, it: dict | None) -> bool:
+        """A channel its source lists without a play address (MythTV's,
+        there for the guide and to record on): say why it does not play.
+        True when it was one."""
+        if not (it or {}).get("_no_live"):
+            return False
+        note = str(getattr(self.client, "live_note", "") or "")
+        if note:
+            self._show_toast(note, 6000)
+        return True
 
     # -- the address a live channel plays from (a box's transcoding) -----------
 

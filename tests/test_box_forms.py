@@ -64,3 +64,39 @@ def test_finder_offers_what_it_found(app):
     one = {"kind": "enigma2", "server": "http://10.0.0.2", "name": "Vu+ Duo 4K - 10.0.0.2"}
     f._done([one])
     assert got == [one] and f.isEnabled()
+
+
+def test_the_home_servers_ask_for_what_they_need(app):
+    from dopeiptv.i18n import tr
+    d = PlaylistDialog()
+    for kind, port in (("vdr", 8002), ("dvbviewer", 8089), ("nextpvr", 8866), ("mythtv", 6544)):
+        assert d.kind.findData(kind) >= 0, kind
+        d.kind.setCurrentIndex(d.kind.findData(kind))
+        # The address shows the port the kind listens on.
+        assert d.server.placeholderText().endswith(f":{port}"), kind
+        assert _shown(d.finder.row) and _shown(d.pw) and not _shown(d.mac)
+    d.kind.setCurrentIndex(d.kind.findData("dvbviewer"))
+    assert _shown(d.user) and d._pw_lbl.text() == tr("login_password")
+    assert d.user.placeholderText() == tr("playlist_login_optional")
+    # NextPVR logs in with a PIN alone.
+    d.kind.setCurrentIndex(d.kind.findData("nextpvr"))
+    assert not _shown(d.user) and _shown(d.pw) and d._pw_lbl.text() == tr("login_pin")
+    assert d.pw.placeholderText() == tr("playlist_pin_hint")
+    d.user.setText("left over")
+    d.pw.setText("1234")
+    d.server.setText("10.0.0.5")
+    v = d.values()
+    assert (v["kind"], v["username"], v["password"]) == ("nextpvr", "", "1234")
+    d.kind.setCurrentIndex(d.kind.findData("mythtv"))
+    assert _shown(d.user) and d._pw_lbl.text() == tr("login_password")
+
+
+def test_a_found_home_server_fills_the_form(app):
+    d = PlaylistDialog()
+    d._box_found({"kind": "vdr", "server": "http://192.168.1.50:8002", "name": "VDR 2.6.4 - 192.168.1.50"})
+    assert d.kind.currentData() == "vdr" and d.server.text() == "http://192.168.1.50:8002"
+    assert d.name.text() == "VDR 2.6.4" and d.problem() is None
+    d = PlaylistDialog()
+    d._box_found({"kind": "nextpvr", "server": "http://192.168.1.52:8866", "name": "NextPVR - 192.168.1.52",
+                  "login": True})
+    assert d.kind.currentData() == "nextpvr" and d.name.text() == "NextPVR"

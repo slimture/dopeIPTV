@@ -4,8 +4,9 @@ the Nerd page's), rewrite rules for its stream addresses
 (core/url_rewrite.py, ui/rewrite_rules.py), its backup addresses
 (core/mirrors.py), its catch-up address (core/catchup.py), and what each
 kind of box can be told - Enigma2's stream port and its box's transcoding
-(port 8002), Tvheadend's stream profile, HDHomeRun's transcoding. Only
-there while Nerd is on. Only what differs from the default is stored."""
+(port 8002), Tvheadend's stream profile, HDHomeRun's transcoding, VDR's
+streamdev port, DVBViewer's stream port, each kind's switches. Only there
+while Nerd is on. Only what differs from the default is stored."""
 
 from __future__ import annotations
 
@@ -53,7 +54,15 @@ SWITCHES = {
     "tvheadend": [("recordings", "nerd_src_recordings", True)],
     "hdhomerun": [("show_drm", "nerd_src_show_drm", False), ("cloud_guide", "nerd_src_cloud_guide", True),
                   ("hd_group", "nerd_src_hd_group", False)],
+    "vdr": [("radio", "nerd_src_radio_channels", True), ("recordings", "nerd_src_recordings", True)],
+    "dvbviewer": [("favourites", "nerd_src_fav_groups", True), ("recordings", "nerd_src_recordings", True)],
+    "nextpvr": [("radio", "nerd_src_radio_channels", True), ("recordings", "nerd_src_recordings", True)],
+    "mythtv": [("recordings", "nerd_src_recordings", True)],
 }
+# Ports a kind streams from, with their defaults: VDR's streamdev-server,
+# the DVBViewer Media Server's HTTP/UPnP side.
+STREAMDEV_PORT = 3000
+DVB_STREAM_PORT = 7522
 
 
 def _flag(options: dict, key: str, default: bool) -> bool:
@@ -144,6 +153,8 @@ class SourceNerdPanel(QWidget):
         except (TypeError, ValueError):
             self.port.setValue(8001)
         self.port_row_label = tr("nerd_src_stream_port")
+        self.streamdev_port = self._port_box(o.get("streamdev_port"), STREAMDEV_PORT)
+        self.dvb_port = self._port_box(o.get("stream_port"), DVB_STREAM_PORT)
         self.profile = QComboBox()
         self.profile.setEditable(True)
         for p in TVH_PROFILES:
@@ -193,6 +204,16 @@ class SourceNerdPanel(QWidget):
         self._shown()
 
     @staticmethod
+    def _port_box(stored: Any, default: int) -> QSpinBox:
+        box = QSpinBox()
+        box.setRange(1, 65535)
+        try:
+            box.setValue(int(stored or default))
+        except (TypeError, ValueError):
+            box.setValue(default)
+        return box
+
+    @staticmethod
     def _e2_step_label(step: str) -> str:
         """An Enigma2 transcoding step as the list shows it: its name, what
         it asks the box for."""
@@ -234,6 +255,7 @@ class SourceNerdPanel(QWidget):
         setting back at its default left out)."""
         out = {k: v for k, v in self._options.items()
                if k not in ("user_agent", "referer", "headers", "proxy", "stream_port",
+                            "streamdev_port",
                             "profile", "transcode", "udpxy", "epg_shift", "ms_quality",
                             "catchup_template", "catchup_mode", url_rewrite.KEY,
                             mirrors.KEY)
@@ -266,6 +288,10 @@ class SourceNerdPanel(QWidget):
                 out["catchup_mode"] = self.cu_mode.currentData()
         if self._kind == "enigma2" and self.port.value() != 8001:
             out["stream_port"] = str(self.port.value())
+        if self._kind == "vdr" and self.streamdev_port.value() != STREAMDEV_PORT:
+            out["streamdev_port"] = str(self.streamdev_port.value())
+        if self._kind == "dvbviewer" and self.dvb_port.value() != DVB_STREAM_PORT:
+            out["stream_port"] = str(self.dvb_port.value())
         if self._kind == "tvheadend":
             prof = self.profile.currentData() if self.profile.currentText() == self.profile.itemText(
                 self.profile.currentIndex()) else self.profile.currentText().strip()
@@ -463,7 +489,7 @@ class SourceNerdPanel(QWidget):
         if ":" in host:
             host = f"[{host}]"
         user, pw = str(s.get("username") or ""), str(s.get("password") or "")
-        login = f"{user}:{pw}@" if user and kind in ("enigma2", "tvheadend") else ""
+        login = f"{user}:{pw}@" if user and kind in ("enigma2", "tvheadend", "vdr", "dvbviewer") else ""
         origin = f"{parts.scheme}://{host}{f':{port}' if port else ''}"
         if kind == "enigma2":
             url = f"http://{login}{host}:{self.port.value()}/1:0:19:283D:3FB:1:C00000:0:0:0:"
@@ -475,6 +501,12 @@ class SourceNerdPanel(QWidget):
                    + (f"?profile={prof}" if prof else ""))
         elif kind == "hdhomerun":
             url = f"http://{host}:5004/auto/v5.1"
+        elif kind == "vdr":
+            url = f"http://{login}{host}:{self.streamdev_port.value()}/TS/S19.2E-1-1019-10301"
+        elif kind == "dvbviewer":
+            url = f"http://{login}{host}:{self.dvb_port.value()}/upnp/channelstream/1.ts"
+        elif kind == "nextpvr":
+            url = origin + "/live?channeloid=7179&client=dopeIPTV&sid=…"
         else:
             url = origin + "/channel/1.ts"
         return {"live_url": url, "_example": True}

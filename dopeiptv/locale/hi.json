@@ -2674,5 +2674,20 @@
   "build_copy_report": "रिपोर्ट कॉपी करें",
   "build_report_copied": "रिपोर्ट क्लिपबोर्ड पर है।",
   "about_build_modified": "आधिकारिक बिल्ड नहीं - ऑनलाइन सेवाएँ बंद हैं। आधिकारिक ऐप dopeiptv.org से लें।",
-  "about_build_source": "सोर्स से चल रहा है"
+  "about_build_source": "सोर्स से चल रहा है",
+  "playlist_kind_vdr": "VDR (restfulapi या streamdev)",
+  "playlist_kind_dvbviewer": "DVBViewer Media Server",
+  "playlist_kind_nextpvr": "NextPVR सर्वर",
+  "playlist_kind_mythtv": "MythTV बैकएंड",
+  "login_pin": "PIN",
+  "playlist_pin_hint": "0000, जब तक आपने इसे बदला न हो",
+  "err_wrong_pin": "गलत PIN।",
+  "vdr_streamdev_only": "इस VDR पर केवल streamdev जवाब देता है: इसके चैनल चलते हैं, पर कोई गाइड नहीं है। restfulapi प्लगइन (पोर्ट 8002) गाइड देता है और उससे रिकॉर्ड करने देता है।",
+  "vdr_no_streamdev": "VDR जवाब देता है, पर streamdev-server उसके प्लगइन में नहीं है: इसके चैनल और रिकॉर्डिंग केवल उसी के ज़रिए चलते हैं।",
+  "myth_no_live": "MythTV लाइव टीवी केवल अपने फ़्रंटएंड को देता है, ऐसे पते के रूप में नहीं जिसे कोई प्लेयर खोल सके। इसकी गाइड यहाँ है - उससे सर्वर पर रिकॉर्ड करें - और इसकी रिकॉर्डिंग फ़िल्में में हैं।",
+  "nerd_src_streamdev_port": "streamdev पोर्ट",
+  "nerd_src_streamdev_hint": "VDR पर streamdev-server का HTTP पोर्ट: चैनल और रिकॉर्डिंग वहीं से चलते हैं।",
+  "nerd_src_dvb_port_hint": "मीडिया सर्वर का स्ट्रीमिंग पोर्ट (HTTP/UPnP), बदला न गया हो तो 7522।",
+  "nerd_src_fav_groups": "इसके पसंदीदा समूहों के रूप में",
+  "nerd_src_radio_channels": "रेडियो चैनल"
 }

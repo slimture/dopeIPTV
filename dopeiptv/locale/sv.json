@@ -2674,5 +2674,20 @@
   "build_copy_report": "Kopiera rapporten",
   "build_report_copied": "Rapporten finns i urklipp.",
   "about_build_modified": "Inte en officiell version – onlinetjänsterna är avstängda. Hämta den officiella appen på dopeiptv.org.",
-  "about_build_source": "Körs från källkoden"
+  "about_build_source": "Körs från källkoden",
+  "playlist_kind_vdr": "VDR (restfulapi eller streamdev)",
+  "playlist_kind_dvbviewer": "DVBViewer Media Server",
+  "playlist_kind_nextpvr": "NextPVR-server",
+  "playlist_kind_mythtv": "MythTV-backend",
+  "login_pin": "PIN-kod",
+  "playlist_pin_hint": "0000 om du inte har ändrat den",
+  "err_wrong_pin": "Fel PIN-kod.",
+  "vdr_streamdev_only": "På den här VDR:en svarar bara streamdev: kanalerna spelas, men det finns ingen tablå. Insticksprogrammet restfulapi (port 8002) ger en och låter dig spela in därifrån.",
+  "vdr_no_streamdev": "VDR:en svarar, men streamdev-server finns inte bland dess insticksprogram: kanalerna och inspelningarna spelas bara genom det.",
+  "myth_no_live": "MythTV ger direktsänd tv bara till sina egna frontends, inte som en adress en spelare kan öppna. Dess tablå finns här – spela in på servern därifrån – och inspelningarna ligger under Filmer.",
+  "nerd_src_streamdev_port": "streamdev-port",
+  "nerd_src_streamdev_hint": "streamdev-servers HTTP-port på VDR:en: kanalerna och inspelningarna spelas därifrån.",
+  "nerd_src_dvb_port_hint": "Mediaserverns streamingport (HTTP/UPnP), 7522 om den inte ändrats.",
+  "nerd_src_fav_groups": "Dess favoriter som grupper",
+  "nerd_src_radio_channels": "Radiokanaler"
 }

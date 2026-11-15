@@ -2221,7 +2221,7 @@ class _SettingsMixin:
         nerd_commit = nerd_settings.build(
             nerd_page, self.settings, d,
             boxes=[p for p in (self.playlist_store.playlists() if self.playlist_store else [])
-                   if p.get("kind") in ("enigma2", "tvheadend", "hdhomerun")],
+                   if p.get("kind") in nerd_settings.BOX_NAMES],
             edit=lambda pid: edit_source(pid, "nerd_boxes"),
             add=lambda: add_playlist({"kind": "enigma2"}),
             pages=nerd_pages, show_pages=show_nerd_pages,

@@ -1,26 +1,36 @@
 """Find TV boxes and servers on the home network: Enigma2 receivers,
-Tvheadend servers and HDHomeRun tuners (and what imitates one), and the
-media servers - Jellyfin, Emby and Plex; and, for the cast window, what can
-be cast to on another part of the network: Chromecasts, Kodis and DLNA TVs.
+Tvheadend servers, HDHomeRun tuners (and what imitates one), VDR
+(restfulapi, else streamdev), DVBViewer Media Servers, NextPVR and MythTV
+backends, and the media servers - Jellyfin, Emby and Plex; and, for the
+cast window, what can be cast to on another part of the network:
+Chromecasts, Kodis and DLNA TVs.
 
 HDHomeRun tuners, Jellyfin and Emby (UDP 7359) and Plex (GDM, UDP 32414)
 answer a broadcast; everything is also asked directly, every address of the
-local /24 at once with short timeouts, on the port its kind listens on (a
-server in a container often never hears a broadcast). Only private networks
-are scanned, only when the user asks.
+local /24 on the port its kind listens on (a server in a container often
+never hears a broadcast). Only private networks are scanned, only when the
+user asks.
 
 A broadcast or a multicast search (mDNS, SSDP) does not cross to another
 part of a network split in VLANs unless the router passes it on; a question
 to one address does. The other networks Nerd > Network lists
-(core/home_net.py) are asked that way: every address and port at once
-(``open_ports``: a few hundred connections in flight, each given a moment),
-then only the addresses that answered, each kind on its own port - an
-Enigma2's /web/about, Tvheadend's /api/serverinfo, an HDHomeRun's
-discover.json, Jellyfin's and Emby's /System/Info/Public, Plex's /identity,
-a Kodi's JSON-RPC (8080), a Chromecast's eureka_info (8008), a DLNA TV by
-UPnP's unicast search (UDP 1900) or the paths renderers keep their
-description at. Off the window's thread; *cancel* (a threading.Event) stops
-a search at its next step.
+(core/home_net.py) are asked that way, together with the local /24.
+
+Every address and port is tried at once (``open_ports``; ``sweep`` per
+address): a few hundred connections in flight without a thread each, well
+under the process's file limit (macOS allows 256), each given a moment - an
+address where nothing is there costs one short wait, not one per port.
+IPv4 or IPv6 addresses, no names. Only an address that took a connection is
+asked further, and only on the ports that did; each kind is told by what it
+answers there, never by the port alone - an Enigma2's /web/about,
+Tvheadend's /api/serverinfo, an HDHomeRun's discover.json, Jellyfin's and
+Emby's /System/Info/Public, Plex's /identity, VDR's restfulapi (8002) or
+streamdev's channels.m3u (3000), a DVBViewer Media Server's version (8089),
+NextPVR's session.initiate (8866), MythTV's GetHostName (6544); for the
+cast window a Kodi's JSON-RPC (8080), a Chromecast's eureka_info (8008), a
+DLNA TV by UPnP's unicast search (UDP 1900) or the paths renderers keep
+their description at. Off the window's thread; *cancel* (a threading.Event)
+stops a search at its next step.
 """
 
 from __future__ import annotations
@@ -44,14 +54,15 @@ from ..core.nerd_check import OK, WARN, Check
 from . import dlna, hdhomerun, jellyfin, plex
 from .boxes import USER_AGENT, child_text, parse_xml
 
-PORTS = {"enigma2": 80, "tvheadend": 9981, "hdhomerun": 80, "jellyfin": 8096, "plex": 32400}
+PORTS = {"enigma2": 80, "tvheadend": 9981, "hdhomerun": 80, "jellyfin": 8096, "plex": 32400,
+         "vdr": 8002, "streamdev": 3000, "dvbviewer": 8089, "nextpvr": 8866, "mythtv": 6544}
 #: What can be cast to, and where each listens: Kodi's web server, a
 #: Chromecast's setup page (DLNA answers on UDP 1900).
 CAST_PORTS = {"kodi": 8080, "chromecast": 8008}
 CAST_KINDS = ("chromecast", "dlna", "kodi")
 CONNECT = 0.35
 READ = 2.5
-#: Connections in flight at once while sweeping other networks.
+#: The most connections a sweep has in flight at once.
 IN_FLIGHT = 384
 
 
@@ -83,6 +94,7 @@ def local_networks() -> list[ipaddress.IPv4Network]:
 
 
 def _open(host: str, port: int, timeout: float = CONNECT) -> bool:
+    """One port, one connection (a name is looked up)."""
     try:
         with socket.create_connection((host, port), timeout=timeout):
             return True
@@ -96,11 +108,13 @@ def _http_host(host: str) -> str:
 
 # -- many connections at once ------------------------------------------------------
 
-def _in_flight() -> int:
-    """How many connections a sweep keeps open at once: what the system's
-    limits allow (select() on Windows takes 512 sockets at most)."""
+def _socket_budget() -> int:
+    """How many connects a sweep has on the way at once: well under the
+    process's file limit (macOS allows 256 by default; 128 are left to the
+    rest of the app), IN_FLIGHT at most, and within what select() takes on
+    Windows (512 sockets)."""
     if sys.platform == "win32":
-        return 200
+        return 256
     try:
         import resource
         soft = resource.getrlimit(resource.RLIMIT_NOFILE)[0]
@@ -108,23 +122,26 @@ def _in_flight() -> int:
         return 128
     if soft == resource.RLIM_INFINITY:
         return IN_FLIGHT
-    return max(16, min(IN_FLIGHT, soft // 2 - 64))
+    return max(16, min(IN_FLIGHT, soft - 128))
 
 
-_PENDING = {errno.EINPROGRESS, errno.EWOULDBLOCK, errno.EALREADY, 10035}
+# A connect that has not finished yet, as each system says it (10035:
+# Windows' WSAEWOULDBLOCK).
+_PENDING = {errno.EINPROGRESS, errno.EWOULDBLOCK, errno.EAGAIN, errno.EALREADY, 10035}
 
 
 def open_ports(targets: Iterable[tuple[str, int]], timeout: float = CONNECT,
                limit: int | None = None, cancel: threading.Event | None = None
                ) -> set[tuple[str, int]]:
-    """Which (address, port) of *targets* take a TCP connection: many in
-    flight at once without a thread each, every one given *timeout* - an
-    address where nothing is there costs that once, not once per port in a
-    row. Addresses only, no names."""
+    """Which (address, port) of *targets* take a TCP connection: up to
+    *limit* (else ``_socket_budget()``) in flight at once without a thread
+    each, every one given *timeout* - an address where nothing is there
+    costs that once, not once per port in a row. IPv4 or IPv6 addresses
+    only, no names; *cancel* stops it at its next step."""
     sel = selectors.DefaultSelector()
-    todo = list(targets)
+    todo = [(h, p) for h, p in targets if 0 < p < 65536]
     todo.reverse()
-    cap = max(1, limit or _in_flight())
+    cap = max(1, limit or _socket_budget())
     flying: OrderedDict[socket.socket, float] = OrderedDict()
     found: set[tuple[str, int]] = set()
 
@@ -165,10 +182,11 @@ def open_ports(targets: Iterable[tuple[str, int]], timeout: float = CONNECT,
                     sock.close()             # refused, or no route there
             if not flying:
                 continue
+            # Every one has the same timeout: the oldest is the first due.
             first = next(iter(flying.values()))
             for key, _ev in sel.select(max(0.0, min(first - time.monotonic(), 0.25))):
                 ready = key.fileobj
-                if not isinstance(ready, socket.socket):
+                if not isinstance(ready, socket.socket) or ready not in flying:
                     continue
                 try:
                     ok = ready.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR) == 0
@@ -190,23 +208,42 @@ def open_ports(targets: Iterable[tuple[str, int]], timeout: float = CONNECT,
     return found
 
 
+def sweep(hosts: Iterable[str], ports: Iterable[int], timeout: float = CONNECT,
+          budget: int | None = None, cancel: threading.Event | None = None
+          ) -> dict[str, set[int]]:
+    """{address: its open ports} of those of *hosts* where any of *ports*
+    takes a connection: every (address, port) tried at once (open_ports, up
+    to *budget* on the way) - a /24 and ten ports in a few short waits, not
+    one wait per port and host."""
+    wanted = sorted(set(ports))
+    opened: dict[str, set[int]] = {}
+    for host, port in open_ports([(h, p) for h in hosts for p in wanted], timeout, budget, cancel):
+        opened.setdefault(host, set()).add(port)
+    return opened
+
+
+def _open_ports(host: str, ports: Iterable[int]) -> set[int]:
+    return sweep([host], ports).get(host, set())
+
+
 # -- boxes and media servers ------------------------------------------------------------
 
 def probe(host: str, ports: dict[str, int] | None = None,
           opened: set[int] | None = None) -> list[dict]:
     """What answers on *host*: [{"kind", "server", "name"}]. *opened*: the
-    ports a sweep found taking a connection; no other is tried."""
+    ports a sweep found taking a connection, no other is asked; None: the
+    host's ports are tried here, all at once."""
     ports = dict(PORTS, **(ports or {}))
     found: list[dict] = []
     h = _http_host(host)
-
-    def is_open(port: int) -> bool:
-        return port in opened if opened is not None else _open(host, port)
+    up = _open_ports(host, ports.values()) if opened is None else opened
+    if not up:
+        return found
     sess = requests.Session()
     sess.headers["User-Agent"] = USER_AGENT
     with sess:
         p = ports["enigma2"]
-        if is_open(p):
+        if p in up:
             base = f"http://{h}" + ("" if p == 80 else f":{p}")
             try:
                 r = sess.get(base + "/web/about", timeout=(CONNECT * 3, READ))
@@ -228,11 +265,11 @@ def probe(host: str, ports: dict[str, int] | None = None,
                 pass
             if ports["hdhomerun"] == p:
                 _hdhr(sess, base, host, found)
-        if ports["hdhomerun"] != p and is_open(ports["hdhomerun"]):
+        if ports["hdhomerun"] != p and ports["hdhomerun"] in up:
             q = ports["hdhomerun"]
             _hdhr(sess, f"http://{h}" + ("" if q == 80 else f":{q}"), host, found)
         p = ports["tvheadend"]
-        if is_open(p):
+        if p in up:
             base = f"http://{h}:{p}"
             try:
                 r = sess.get(base + "/api/serverinfo", timeout=(CONNECT * 3, READ))
@@ -248,12 +285,72 @@ def probe(host: str, ports: dict[str, int] | None = None,
             except Exception:
                 pass
         p = ports["jellyfin"]
-        if is_open(p):
+        if p in up:
             _jellyfin(sess, f"http://{h}:{p}", host, found)
         p = ports["plex"]
-        if is_open(p):
+        if p in up:
             _plex(sess, f"http://{h}:{p}", host, found)
+        _home_servers(sess, h, host, ports, up, found)
     return found
+
+
+def _home_servers(sess: Any, h: str, host: str, ports: dict[str, int], up: set[int],
+                  found: list[dict]) -> None:
+    """VDR, DVBViewer, NextPVR and MythTV, each on its port, each told by
+    its own answer (a 401 only when it names the kind)."""
+    def ask(kind: str, path: str, **kw: Any) -> Any:
+        if ports[kind] not in up:
+            return None
+        try:
+            return sess.get(f"http://{h}:{ports[kind]}{path}", timeout=(CONNECT * 3, READ), **kw)
+        except Exception:
+            return None
+
+    def base(kind: str) -> str:
+        return f"http://{h}:{ports[kind]}"
+
+    def wants_login(r: Any, *words: str) -> bool:
+        said = (r.headers.get("WWW-Authenticate", "") + r.headers.get("Server", "")).lower()
+        return r.status_code == 401 and any(w in said for w in words)
+
+    def js(r: Any) -> Any:
+        try:
+            return r.json() if r is not None and r.ok else None
+        except ValueError:
+            return None
+
+    info = js(ask("vdr", "/info.json"))
+    if isinstance(info, dict) and ("vdr" in info or "diskusage" in info):
+        vdr: dict = info["vdr"] if isinstance(info.get("vdr"), dict) else {}
+        found.append({"kind": "vdr", "server": base("vdr"),
+                      "name": " ".join(f"VDR {vdr.get('version') or ''}".split()) + f" - {host}"})
+    else:
+        r = ask("streamdev", "/channels.m3u")
+        if r is not None and r.ok and r.content.lstrip()[:7] == b"#EXTM3U":
+            found.append({"kind": "vdr", "server": base("streamdev"), "name": f"VDR (streamdev) - {host}"})
+    r = ask("dvbviewer", "/api/version.html")
+    if r is not None and wants_login(r, "dvbviewer", "recording service", "media server"):
+        found.append({"kind": "dvbviewer", "server": base("dvbviewer"), "name": f"DVBViewer - {host}",
+                      "login": True})
+    elif r is not None and r.ok and b"<version" in r.content[:2048]:
+        try:
+            name = " ".join((parse_xml(r.content).text or "").split())
+        except Exception:
+            name = ""
+        if "dvbviewer" in name.lower() or "recording service" in name.lower():
+            found.append({"kind": "dvbviewer", "server": base("dvbviewer"), "name": f"{name} - {host}"})
+    r = ask("nextpvr", "/service", params={"method": "session.initiate", "ver": "1.0", "device": "dopeIPTV"})
+    if r is not None and r.ok and b"<rsp" in r.content[:2048] and b"<salt>" in r.content:
+        found.append({"kind": "nextpvr", "server": base("nextpvr"), "name": f"NextPVR - {host}",
+                      "login": True})
+    r = ask("mythtv", "/Myth/GetHostName", headers={"Accept": "application/json"})
+    if r is not None and wants_login(r, "mythtv"):
+        found.append({"kind": "mythtv", "server": base("mythtv"), "name": f"MythTV - {host}", "login": True})
+    else:
+        got = js(r)
+        if isinstance(got, dict) and isinstance(got.get("String"), str):
+            found.append({"kind": "mythtv", "server": base("mythtv"),
+                          "name": f"MythTV ({' '.join(got['String'].split())}) - {host}"})
 
 
 def _jellyfin(sess: Any, base: str, host: str, found: list[dict]) -> None:
@@ -303,25 +400,16 @@ def _hdhr(sess, base: str, host: str, found: list[dict]) -> None:
                       "name": f"{name} ({model}) - {host}" if model else f"{name} - {host}"})
 
 
-def _sweep(hosts: list[str], ports: Iterable[int], cancel: threading.Event | None
-           ) -> dict[str, set[int]]:
-    """{address: its open ports} of those of *hosts* where any is."""
-    wanted = sorted(set(ports))
-    opened: dict[str, set[int]] = {}
-    for host, port in open_ports([(h, p) for h in hosts for p in wanted], cancel=cancel):
-        opened.setdefault(host, set()).add(port)
-    return opened
-
-
 def scan(progress: Callable[[int], None] | None = None, hosts: list[str] | None = None,
          ports: dict[str, int] | None = None, workers: int = 64,
          broadcast: bool = True, extra: list[str] | None = None,
          cancel: threading.Event | None = None) -> list[dict]:
     """Every box and server found: the broadcasts first (HDHomeRun,
-    Jellyfin and Emby, Plex's GDM), then each host of the local networks (or
-    *hosts*) asked directly, then the other networks Nerd lists (*extra*:
-    their addresses; None: as the settings say) - swept first, and only an
-    address that took a connection asked further. One entry per address."""
+    Jellyfin and Emby, Plex's GDM), then each address of the local networks
+    (or *hosts*) and of the other networks Nerd lists (*extra*: their
+    addresses; None: as the settings say) asked directly - all of them swept
+    at once first, and only an address that took a connection asked what it
+    is. One entry per address; stopped (*cancel*), what was found so far."""
     found: dict[tuple[str, str], dict] = {}
     if broadcast:
         # The three listen at once: each waits out its own answers.
@@ -346,39 +434,35 @@ def scan(progress: Callable[[int], None] | None = None, hosts: list[str] | None 
         extra = home_net.configured()
     mine = set(hosts)
     extra = [h for h in extra if h not in mine]
-    total = len(hosts) + (len(extra) if extra else 0)
-    if not total:
+    everyone = list(dict.fromkeys([*hosts, *extra]))
+    if not everyone:
         return list(found.values())
-    done = 0
 
-    def took(got: list[dict]) -> None:
-        nonlocal done
-        done += 1
-        for d in got:
-            # Asked directly, a box names itself better than a broadcast.
-            found[(d["kind"], d["server"].rstrip("/"))] = d
-        if progress:
-            progress(min(99, done * 100 // total))
-    if hosts:
-        with ThreadPoolExecutor(max_workers=max(1, min(workers, len(hosts)))) as pool:
-            for got in pool.map(lambda h: [] if cancel is not None and cancel.is_set()
-                                else probe(h, ports), hosts):
-                took(got)
-    if extra and not (cancel is not None and cancel.is_set()):
-        want = dict(PORTS, **(ports or {}))
-        opened = _sweep(extra, want.values(), cancel)
-        done += len(extra) - len(opened)
-        alive = sorted(opened)
-        if alive:
-            with ThreadPoolExecutor(max_workers=max(1, min(workers, len(alive)))) as pool:
-                for got in pool.map(lambda h: [] if cancel is not None and cancel.is_set()
-                                    else probe(h, ports, opened[h]), alive):
-                    took(got)
-        log.info("lan scan: %d address(es) of other networks asked, %d answered",
-                 len(extra), len(alive))
+    def stopped() -> bool:
+        return cancel is not None and cancel.is_set()
+    every = dict(PORTS, **(ports or {}))
+    # Which addresses have one of the ports open at all, every one asked at
+    # once; only those are asked what they are.
+    opened = sweep(everyone, every.values(), cancel=cancel)
+    alive = [h for h in everyone if opened.get(h)]
+    if progress:
+        progress(50)
+    done = 0
+    if alive and not stopped():
+        with ThreadPoolExecutor(max_workers=max(1, min(workers, len(alive)))) as pool:
+            for got in pool.map(lambda h: [] if stopped() else probe(h, ports, opened[h]), alive):
+                done += 1
+                for d in got:
+                    # Asked directly, a box names itself better than a broadcast.
+                    found[(d["kind"], d["server"].rstrip("/"))] = d
+                if progress:
+                    progress(min(99, 50 + done * 50 // len(alive)))
     if progress:
         progress(100)
-    log.info("lan scan: %d box(es) on %d address(es)", len(found), total)
+    if extra:
+        log.info("lan scan: %d address(es) of other networks asked, %d answered",
+                 len(extra), sum(1 for h in extra if opened.get(h)))
+    log.info("lan scan: %d box(es) on %d address(es), %d answering", len(found), len(everyone), len(alive))
     return sorted(found.values(), key=lambda d: (d["kind"], d["server"]))
 
 
@@ -496,7 +580,7 @@ def scan_cast(hosts: list[str], ports: dict[str, int] | None = None, ssdp_port: 
         return []
     want = dict(CAST_PORTS, **(ports or {}))
     with ThreadPoolExecutor(max_workers=2) as pool:
-        tcp = pool.submit(_sweep, hosts, want.values(), cancel)
+        tcp = pool.submit(sweep, hosts, want.values(), cancel=cancel)
         udp = pool.submit(dlna.ssdp_unicast, hosts, 2.0, ssdp_port, cancel)
         opened = tcp.result()
         answers = udp.result()

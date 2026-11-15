@@ -2674,5 +2674,20 @@
   "build_copy_report": "Sao chép báo cáo",
   "build_report_copied": "Báo cáo đã được sao chép vào bộ nhớ tạm.",
   "about_build_modified": "Không phải bản dựng chính thức - các dịch vụ trực tuyến đã tắt. Tải ứng dụng chính thức tại dopeiptv.org.",
-  "about_build_source": "Đang chạy từ mã nguồn"
+  "about_build_source": "Đang chạy từ mã nguồn",
+  "playlist_kind_vdr": "VDR (restfulapi hoặc streamdev)",
+  "playlist_kind_dvbviewer": "DVBViewer Media Server",
+  "playlist_kind_nextpvr": "Máy chủ NextPVR",
+  "playlist_kind_mythtv": "Backend MythTV",
+  "login_pin": "PIN",
+  "playlist_pin_hint": "0000 nếu bạn chưa đổi",
+  "err_wrong_pin": "PIN không đúng.",
+  "vdr_streamdev_only": "Trên VDR này chỉ có streamdev trả lời: các kênh phát được nhưng không có lịch phát sóng. Plugin restfulapi (cổng 8002) cung cấp lịch và cho phép ghi từ đó.",
+  "vdr_no_streamdev": "VDR có trả lời, nhưng streamdev-server không có trong các plugin của nó: kênh và bản ghi chỉ phát được qua plugin đó.",
+  "myth_no_live": "MythTV chỉ đưa truyền hình trực tiếp cho các frontend của chính nó, không phải dưới dạng địa chỉ mà trình phát mở được. Lịch phát sóng của nó ở đây - ghi trên máy chủ từ đó - và các bản ghi nằm trong Phim.",
+  "nerd_src_streamdev_port": "Cổng streamdev",
+  "nerd_src_streamdev_hint": "Cổng HTTP của streamdev-server trên VDR: kênh và bản ghi phát từ đó.",
+  "nerd_src_dvb_port_hint": "Cổng phát luồng của máy chủ đa phương tiện (HTTP/UPnP), 7522 nếu chưa đổi.",
+  "nerd_src_fav_groups": "Mục yêu thích của nó thành nhóm",
+  "nerd_src_radio_channels": "Kênh radio"
 }

@@ -2674,5 +2674,20 @@
   "build_copy_report": "کپی گزارش",
   "build_report_copied": "گزارش در کلیپ‌بورد است.",
   "about_build_modified": "نسخهٔ رسمی نیست - سرویس‌های آنلاین خاموش‌اند. برنامهٔ رسمی را از dopeiptv.org بگیرید.",
-  "about_build_source": "اجرا از کد منبع"
+  "about_build_source": "اجرا از کد منبع",
+  "playlist_kind_vdr": "VDR (restfulapi یا streamdev)",
+  "playlist_kind_dvbviewer": "DVBViewer Media Server",
+  "playlist_kind_nextpvr": "سرور NextPVR",
+  "playlist_kind_mythtv": "بک‌اند MythTV",
+  "login_pin": "PIN",
+  "playlist_pin_hint": "0000 مگر اینکه آن را تغییر داده باشید",
+  "err_wrong_pin": "PIN نادرست است.",
+  "vdr_streamdev_only": "در این VDR فقط streamdev پاسخ می‌دهد: کانال‌ها پخش می‌شوند، اما راهنمای برنامه‌ای نیست. افزونهٔ restfulapi (درگاه 8002) راهنما می‌دهد و امکان ضبط از آن را فراهم می‌کند.",
+  "vdr_no_streamdev": "VDR پاسخ می‌دهد، اما streamdev-server در میان افزونه‌هایش نیست: کانال‌ها و ضبط‌هایش فقط از طریق آن پخش می‌شوند.",
+  "myth_no_live": "MythTV پخش زنده را فقط به رابط‌های خودش می‌دهد، نه به‌صورت نشانی‌ای که پخش‌کننده بتواند باز کند. راهنمای آن اینجاست - از آن روی سرور ضبط کنید - و ضبط‌هایش در فیلم‌ها هستند.",
+  "nerd_src_streamdev_port": "درگاه streamdev",
+  "nerd_src_streamdev_hint": "درگاه HTTP مربوط به streamdev-server روی VDR: کانال‌ها و ضبط‌ها از آنجا پخش می‌شوند.",
+  "nerd_src_dvb_port_hint": "درگاه پخش سرور رسانه (HTTP/UPnP)، اگر تغییر نکرده باشد 7522.",
+  "nerd_src_fav_groups": "علاقه‌مندی‌هایش به‌صورت گروه",
+  "nerd_src_radio_channels": "کانال‌های رادیویی"
 }

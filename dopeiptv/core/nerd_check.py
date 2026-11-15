@@ -100,7 +100,10 @@ def probe_url(source: dict | None) -> str | None:
             {"username": s.get("username") or "", "password": s.get("password") or ""})
     return server + {"enigma2": "/web/about", "tvheadend": "/api/serverinfo",
                      "hdhomerun": "/discover.json", "jellyfin": "/System/Info/Public",
-                     "emby": "/emby/System/Info/Public", "plex": "/identity"}.get(kind, "")
+                     "emby": "/emby/System/Info/Public", "plex": "/identity",
+                     "vdr": "/info.json", "dvbviewer": "/api/version.html",
+                     "nextpvr": "/service?method=session.initiate&ver=1.0&device=dopeIPTV",
+                     "mythtv": "/Myth/GetHostName"}.get(kind, "")
 
 
 # -- the network -------------------------------------------------------------

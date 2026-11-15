@@ -2674,5 +2674,20 @@
   "build_copy_report": "レポートをコピー",
   "build_report_copied": "レポートをクリップボードにコピーしました。",
   "about_build_modified": "公式ビルドではありません - オンラインサービスはオフです。公式アプリは dopeiptv.org から入手できます。",
-  "about_build_source": "ソースから実行中"
+  "about_build_source": "ソースから実行中",
+  "playlist_kind_vdr": "VDR（restfulapi または streamdev）",
+  "playlist_kind_dvbviewer": "DVBViewer Media Server",
+  "playlist_kind_nextpvr": "NextPVR サーバー",
+  "playlist_kind_mythtv": "MythTV バックエンド",
+  "login_pin": "PIN",
+  "playlist_pin_hint": "変更していなければ 0000",
+  "err_wrong_pin": "PIN が正しくありません。",
+  "vdr_streamdev_only": "この VDR では streamdev だけが応答しています。チャンネルは再生できますが、番組表はありません。restfulapi プラグイン（ポート 8002）があれば番組表が使え、そこから録画もできます。",
+  "vdr_no_streamdev": "VDR は応答していますが、streamdev-server がプラグインに含まれていません。チャンネルと録画はそれを通してのみ再生されます。",
+  "myth_no_live": "MythTV はライブ TV を自身のフロントエンドにしか渡さず、プレーヤーが開けるアドレスとしては提供しません。番組表はここにあり（そこからサーバーで録画できます）、録画は「映画」にあります。",
+  "nerd_src_streamdev_port": "streamdev ポート",
+  "nerd_src_streamdev_hint": "VDR 上の streamdev-server の HTTP ポート。チャンネルと録画はここから再生されます。",
+  "nerd_src_dvb_port_hint": "メディアサーバーのストリーミングポート（HTTP/UPnP）。変更していなければ 7522。",
+  "nerd_src_fav_groups": "お気に入りをグループとして",
+  "nerd_src_radio_channels": "ラジオチャンネル"
 }

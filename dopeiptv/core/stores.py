@@ -598,6 +598,7 @@ class PlaylistStore:
 
             kind = field("kind") if field("kind") in (
                 "m3u", "stalker", "enigma2", "tvheadend", "hdhomerun",
+                "vdr", "dvbviewer", "nextpvr", "mythtv",
                 "jellyfin", "emby", "plex") \
                 else "xtream"
             server = field("server")

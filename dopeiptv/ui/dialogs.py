@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
 
 from ..i18n import tr
 from .box_finder import (
-    BOX_KINDS, LOGIN_KINDS, MEDIA_KINDS, PLACEHOLDERS, FindOnNetwork, add_box_kinds,
+    BOX_KINDS, LOGIN_KINDS, MEDIA_KINDS, PIN_KINDS, PLACEHOLDERS, FindOnNetwork, add_box_kinds,
     add_media_kinds,
 )
 from .media_signin import MediaSignIn
@@ -152,8 +152,9 @@ class SourceFields:
             else "http://portal.example.com/c/" if stalker
             else PLACEHOLDERS.get(kind, "http://server:port"))
         hint = tr("playlist_login_optional") if box else ""
+        pin = kind in PIN_KINDS
         self.user.setPlaceholderText(hint)
-        self.pw.setPlaceholderText(hint)
+        self.pw.setPlaceholderText(tr("playlist_pin_hint") if pin else hint)
         self.finder.wanted = MEDIA_KINDS if media else BOX_KINDS
         if not (box or media):
             self.finder.status.hide()
@@ -168,6 +169,9 @@ class SourceFields:
             "server": kind != "plex",
             "login": (not (m3u or stalker or box or media) or kind in LOGIN_KINDS
                       or kind in ("jellyfin", "emby")),
+            # A PIN alone (NextPVR): the password field, named so.
+            "user": not pin,
+            "pw_label": tr("login_pin") if pin else tr("login_password"),
             "mac": stalker,
             "finder": box or media,
         }
@@ -176,7 +180,7 @@ class SourceFields:
         """The source as the form has it now, without its Nerd options (what
         the Nerd tests ask)."""
         out = {"kind": self.kind.currentData(), "server": self.server.text().strip(),
-               "username": self.user.text().strip(), "password": self.pw.text().strip(),
+               "username": self._username(), "password": self.pw.text().strip(),
                "mac": self.normal_mac(self.mac.text()) or "",
                "name": self.name.text().strip()}
         if out["kind"] in MEDIA_KINDS and self.signin.signed_in():
@@ -187,6 +191,10 @@ class SourceFields:
         if self._pid:
             out["id"] = self._pid
         return out
+
+    def _username(self) -> str:
+        """The user name, none for a kind that logs in with a PIN alone."""
+        return "" if self.kind.currentData() in PIN_KINDS else self.user.text().strip()
 
     def _preset_picked(self, src: dict) -> None:
         idx = self.kind.findData(src["kind"])
@@ -207,7 +215,7 @@ class SourceFields:
         if not self.name.text().strip():
             self.name.setText(str(found.get("name", "")).split(" - ")[0])
         if found.get("login") or found.get("kind") in ("jellyfin", "emby"):
-            self.user.setFocus()
+            (self.pw if found.get("kind") in PIN_KINDS else self.user).setFocus()
         if found.get("kind") in MEDIA_KINDS:
             self.signin.prefer(found)
 
@@ -276,7 +284,7 @@ class SourceFields:
             "name": name,
             "kind": self.kind.currentData(),
             "server": self.server.text().strip(),
-            "username": self.user.text().strip(),
+            "username": self._username(),
             "password": self.pw.text().strip(),
             "epg_url": self.epg_url.text().strip(),
             "refresh": self.refresh.currentData(),
@@ -380,8 +388,11 @@ class PlaylistDialog(SourceFields, QDialog):
         self._server_lbl.setText(shown["server_label"])
         for w in (self._server_lbl, self.server):
             w.setVisible(shown["server"])
-        for w in (self._user_lbl, self.user, self._pw_lbl, self.pw):
+        for w in (self._user_lbl, self.user):
+            w.setVisible(shown["login"] and shown["user"])
+        for w in (self._pw_lbl, self.pw):
             w.setVisible(shown["login"])
+        self._pw_lbl.setText(shown["pw_label"])
         for w in (self._mac_lbl, self.mac):
             w.setVisible(shown["mac"])
         self.finder.row.setVisible(shown["finder"])
