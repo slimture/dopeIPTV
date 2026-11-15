@@ -35,7 +35,7 @@ from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QApplication, QMenu
 
 from .. import APP_NAME
-from ..core import channel_numbers, privacy, shortcut_keys
+from ..core import channel_numbers, privacy, profiles, shortcut_keys
 from ..core.log import log
 from ..core.palette_match import Index, fold, words
 from ..core.workers import run_async
@@ -231,7 +231,10 @@ class _PaletteMixin:
         answer meanwhile, while they are the same source's."""
         client = self.client
         xmltv = getattr(self, "xmltv", None)
-        key = (id(client), id(xmltv), self._chno_pid())
+        # Whose catalogue: another profile (a kids one sees less), or the
+        # household's lock opened or shut, is another one.
+        key = (id(client), id(xmltv), self._chno_pid(), profiles.active_id(),
+               bool(self.parental.session_unlocked))
         have = getattr(self, "_pal_catalogue", None)
         if have is not None and have.key != key:
             self._pal_catalogue = None

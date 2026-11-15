@@ -19,6 +19,11 @@ from ..core.remote_api import DEFAULT_PORT, RemoteServer, new_token
 from ..i18n import tr
 
 _WAIT_S = 5.0
+#: What waits while "Who's watching?" asks a profile's PIN at start: what
+#: plays or lists the profile's own (stop, pause, the volume and seeking
+#: harm nobody, and TV mode has the picker of its own).
+_LOCKED_OUT = frozenset({"_shown", "_calendar", "play", "resume", "playpause", "next",
+                         "previous"})
 
 
 class _Job:
@@ -135,6 +140,14 @@ class _RemoteMixin:
         if action == "channels":
             client = bridge.call("_client", {})
             rows = [r for r in (client.live_streams(None) or []) if r.get("stream_id") is not None]
+            # Only what may be played from here (the window's thread): none
+            # from a hidden or locked category, none for adults in a kids
+            # profile (its categories read here first, off the window's
+            # thread), nothing while who is watching waits for a PIN.
+            kids = bridge.call("_kids", {})
+            if kids is not None:
+                kids.ready()
+            rows = bridge.call("_shown", {"rows": rows})
             q = str(params.get("q") or "").casefold().strip()
             if q:
                 rows = [r for r in rows if q in str(r.get("name") or "").casefold()]
@@ -147,6 +160,14 @@ class _RemoteMixin:
     def _remote_do(self, action: str, params: dict) -> Any:
         if action == "_client":
             return self.client
+        if action in _LOCKED_OUT and getattr(self, "_profile_locked", lambda: False)():
+            # "Who's watching?" waits for the PIN at start: nothing of the
+            # profile's is played or listed before it is given.
+            self._profile_refuse_locked()
+        if action == "_kids":
+            return getattr(self, "_kids_keep", lambda _m: None)("live")
+        if action == "_shown":
+            return self._chno_rows(list(params.get("rows") or []))
         if action == "_calendar":
             return self._calendar_text()
         if action == "_sources_full":
@@ -228,6 +249,8 @@ class _RemoteMixin:
         out: dict[str, Any] = {"state": state, "volume": int(round(float(snap.get("volume") or 0) * 100)),
                                "source": (active or {}).get("name"),
                                "tv_mode": bool(getattr(self, "_tv_on", False))}
+        if getattr(self, "_profile_locked", lambda: False)():
+            out["locked"] = True        # who is watching waits for a PIN
         prof = self._profile() if hasattr(self, "_profile") else None
         if prof is not None:
             out["profile"] = prof.name

@@ -194,16 +194,18 @@ class _GuideMixin:
         The key tells a guide kept from an earlier visit apart: the source,
         the scope and its channels."""
         src = id(self.client)
+        # A kids profile: no channel for adults in any of them (mw_profiles).
+        kids = getattr(self, "_kids_only", lambda rows, _m="live": list(rows or []))
         if not global_scope and self.mode == "live" and self.all_items:
             cat = self.cat_list.currentItem()
             title = cat.text() if cat else "All"
-            chans = list(self.all_items)
+            chans = kids(self.all_items)
             return ("live", src, title, _lineup_sig(chans)), title, chans
         # In Favorites, scope the guide to the favorite CHANNELS shown (a
         # folder, or all of them) - movies/series have no EPG. Other Trakt/
         # media sections simply have no live channels to guide.
         if not global_scope and self.mode == "fav":
-            chans = self._favorite_channels_for_guide()
+            chans = kids(self._favorite_channels_for_guide())
             cat = self.cat_list.currentItem()
             title = cat.text().strip() if cat else tr("nav_favorites")
             return ("fav", src, title, _lineup_sig(chans)), title, chans
@@ -215,13 +217,14 @@ class _GuideMixin:
         try:
             exclude = (() if self.parental.session_unlocked
                        else self.favs.locked_groups())
-            favs = self.favs.items(None, exclude_groups=exclude)
+            favs = kids(self.favs.items(None, exclude_groups=exclude))
         except Exception:
             favs = []
         if favs:
             title = tr("nav_favorites")
             return ("favs", src, _lineup_sig(favs)), title, favs
-        return ("all", src, bool(self.parental.session_unlocked)), None, None
+        return ("all", src, bool(self.parental.session_unlocked),
+                getattr(self, "_profile_kids", lambda: False)()), None, None
 
     def _kept_guide(self, key) -> EpgGrid | None:
         """The guide from an earlier visit, when it covers the same and is

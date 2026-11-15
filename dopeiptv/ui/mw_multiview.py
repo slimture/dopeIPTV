@@ -1284,6 +1284,8 @@ class _MultiviewMixin:
         sid = it.get("stream_id")
         if sid is None:
             return
+        if not getattr(self, "_kids_allows", lambda _it, _m="live": True)(it, "live"):
+            return          # a kids profile: nothing for adults (mw_profiles)
         fmt = self.settings.value("stream_format", "ts")
 
         def address():

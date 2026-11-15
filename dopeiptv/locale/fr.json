@@ -2698,5 +2698,6 @@
   "conn_what_test": "Ce test lit une chaîne en direct pendant quelques secondes, ce qui ouvre une connexion de plus chez ton fournisseur.",
   "conn_test_unknown": "Quelque chose de ce compte est déjà en lecture, et ton fournisseur n'indique pas combien de connexions il autorise. La plupart n'en autorisent qu'une, et le fournisseur peut alors couper ce qui est en lecture.",
   "ct_skip_conn": "Pas essayé – cela ouvrirait une connexion de plus chez ton fournisseur",
-  "nerd_url_none": "Ce serveur ne règle une chaîne que pour la lire : il n'y a donc pas d'adresse à copier."
+  "nerd_url_none": "Ce serveur ne règle une chaîne que pour la lire : il n'y a donc pas d'adresse à copier.",
+  "phone_page_locked": "Qui regarde ? Choisissez d'abord votre profil dans l'appli."
 }

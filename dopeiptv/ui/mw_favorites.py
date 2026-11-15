@@ -36,7 +36,11 @@ class _FavoritesMixin:
     def _favorite_channels(self) -> list[dict]:
         """The source's favourite channels, each once, in their folders'
         order (the default bucket first) - none from a folder that is
-        locked while it is (the phone remote, Home Assistant's list)."""
+        locked while it is (the phone remote, Home Assistant's list), none
+        for adults in a kids profile, and none while who is watching waits
+        for a PIN at start."""
+        if getattr(self, "_profile_locked", lambda: False)():
+            return []
         store = self.favs
         locked = set() if self.parental.session_unlocked else store.locked_groups()
         seen: set[str] = set()
@@ -49,7 +53,8 @@ class _FavoritesMixin:
                 if sid is not None and str(sid) not in seen:
                     seen.add(str(sid))
                     out.append(it)
-        return out
+        kids = getattr(self, "_kids_keep", lambda _m: None)("live")
+        return out if kids is None else [it for it in out if kids(it)]
 
     def _row_content_kind(self, it: dict) -> tuple[str, dict]:
         """The kind a row's actions follow, and the row they act on.

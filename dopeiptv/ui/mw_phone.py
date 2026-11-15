@@ -230,7 +230,13 @@ class _PhoneMixin:
 
     def _phone_rows(self, bridge: _Bridge) -> list[dict]:
         client = bridge.call("_client", {})
-        return [r for r in (client.live_streams(None) or []) if r.get("stream_id") is not None]
+        rows = [r for r in (client.live_streams(None) or []) if r.get("stream_id") is not None]
+        # A kids profile's categories read here, off the window's thread:
+        # the window's goes through the rows (_chno_rows) at once.
+        kids = bridge.call("_kids", {})
+        if kids is not None:
+            kids.ready()
+        return rows
 
     def _phone_call(self, action: str, params: dict) -> Any:
         bridge = self._phone_bridge
@@ -300,12 +306,19 @@ class _PhoneMixin:
     def _phone_do(self, action: str, params: dict) -> Any:
         if action == "_client":
             return self.client
+        if action == "_kids":
+            return getattr(self, "_kids_keep", lambda _m: None)("live")
         if action == "_page":
             from ..core import phone_page
             from ..i18n import current_language, is_rtl
             from .theme import effective_theme, is_light
             dark, light = page_palettes(is_light(effective_theme(self.settings)))
             return phone_page.render(dark, light, page_words(), current_language(), is_rtl())
+        if action in ("_play", "toggle", "next", "previous", "calendar") \
+                and getattr(self, "_profile_locked", lambda: False)():
+            # "Who's watching?" waits for the PIN at start: nothing of the
+            # profile's is played before it is given (the page says why).
+            self._profile_refuse_locked()
         if action == "_channels":
             return self._phone_channels(params.get("rows") or [])
         if action == "_play":
@@ -355,6 +368,9 @@ class _PhoneMixin:
         raise ValueError(f"unknown action: {action}")
 
     def _phone_channels(self, rows: list[dict]) -> dict[str, Any]:
+        if getattr(self, "_profile_locked", lambda: False)():
+            # Who is watching is not said yet: no list of the profile's.
+            return {"channels": [], "favorites": [], "_icons": {}}
         shown = self._chno_rows(rows)
         numbers = channel_numbers.active(self._chno_pid())
         picons = _picon_files()
@@ -397,9 +413,14 @@ class _PhoneMixin:
 
     def _phone_stamp(self) -> str:
         """Changes when the page should list the channels again: another
-        source, a list fetched again, the favourites changed."""
+        source, a list fetched again, the favourites changed, another
+        profile, who is watching said at start, a kids profile's limits
+        known (mw_profiles)."""
+        from ..core import profiles
         favs = ",".join(str(f.get("stream_id")) for f in self._favorite_channels())
-        raw = f"{self._chno_pid()}|{id(self.client)}|{favs}"
+        locked = getattr(self, "_profile_locked", lambda: False)()
+        raw = (f"{self._chno_pid()}|{id(self.client)}|{profiles.active_id()}|{locked}"
+               f"|{self.__dict__.get('_kids_ver', 0)}|{favs}")
         return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
 
     def _phone_state(self) -> dict[str, Any]:
@@ -414,6 +435,12 @@ class _PhoneMixin:
                                "source": st.get("source") or "", "stamp": self._phone_stamp(),
                                "tv_mode": bool(st.get("tv_mode"))}
         note = self._phone_note_now()
+        locked = getattr(self, "_profile_locked", lambda: False)()
+        if locked:
+            # Who is watching waits for a PIN at start: said, and nothing of
+            # the profile's shown (the lists come empty, _phone_channels).
+            out["locked"] = True
+            note = tr("phone_page_locked")
         if note:
             out["note"] = note
         if getattr(self, "_profile_many", lambda: False)():
@@ -425,7 +452,7 @@ class _PhoneMixin:
                 if row is not None:
                     row["fill"] = fills.get(row["id"], "")
             out.update(state)
-        if st["state"] == "stopped":
+        if st["state"] == "stopped" or locked:
             return out
         last = getattr(self, "_last_playback", None) or {}
         kind = st.get("kind") or ""

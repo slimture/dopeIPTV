@@ -12,6 +12,7 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QListWidgetItem
 
+from ..core.profiles import adult_category
 from ..core.workers import run_async
 from ..i18n import tr
 
@@ -52,6 +53,9 @@ class _SearchMixin:
         items = [it for it in (self.all_items or [])
                  if not it.get("_header")
                  and not (hidden and self._channel_hidden(it, kind))]
+        kids = getattr(self, "_kids_keep", lambda _m: None)(kind)
+        if kids is not None:
+            items = [it for it in items if kids(it)]
         name = self._display_name_fn()
         if text:
             items = [it for it in items if text in name(it).lower()]
@@ -70,6 +74,8 @@ class _SearchMixin:
         fetch = {"live": self.client.live_streams,
                  "vod": self.client.vod_streams,
                  "series": self.client.series_list}[mode]
+        # A kids profile: no title for adults among the samples either.
+        kids = getattr(self, "_kids_keep", lambda _m: None)(mode)
 
         def build() -> dict:
             # On the worker, names lowered once: done on the GUI thread, and
@@ -79,7 +85,7 @@ class _SearchMixin:
             idx: dict = defaultdict(list)
             for it in fetch(None) or []:
                 cid = it.get("category_id")
-                if cid is None:
+                if cid is None or (kids is not None and not kids(it)):
                     continue
                 n = it.get("name") or it.get("title") or ""
                 idx[cid].append((n, n.lower()))
@@ -93,12 +99,19 @@ class _SearchMixin:
 
     def _render_cat_search(self, q: str, idx: dict) -> None:
         results = []
+        # A kids profile: no category named for adults, and no locked one
+        # (as the category list leaves them out, main_window).
+        kids = getattr(self, "_profile_kids", lambda: False)()
         for c in getattr(self, "_raw_categories", []):
             cid = c.get("category_id")
             if self.overrides.is_hidden(self.mode, cid):
                 continue
             cname = self.overrides.display_name(
                 self.mode, cid, c.get("category_name", "?"))
+            if kids and (adult_category(cname) or (
+                    self.overrides.is_locked(self.mode, cid)
+                    and not self.parental.session_unlocked)):
+                continue
             name_match = q in cname.lower()
             chans = idx.get(cid, [])
             matches = [n for n, low in chans if q in low]

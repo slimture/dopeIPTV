@@ -239,11 +239,18 @@ class Found:
     queue: list[dict] | None = None
 
 
-def locate(client: Any, want: Media, tmdb_of: TmdbOf | None = None) -> Found | None:
-    """*want* in *client*'s source, or None. Blocking (the provider's lists)."""
+def locate(client: Any, want: Media, tmdb_of: TmdbOf | None = None,
+           keep: Callable[[str, dict], bool] | None = None) -> Found | None:
+    """*want* in *client*'s source, or None. Blocking (the provider's lists).
+    *keep*(catalogue, row): only rows the lists show here ("live", "vod",
+    "series") - none hidden or locked, none for adults in a kids profile."""
+    def shown(kind: str, rows: Any) -> list[dict]:
+        rows = list(rows or [])
+        return rows if keep is None else [r for r in rows if keep(kind, r)]
+
     try:
         if want.kind == "live":
-            rows = list(client.live_streams(None) or [])
+            rows = shown("live", client.live_streams(None))
             row = same_channel(rows, {"epg_channel_id": want.guide, "name": want.name})
             if row is None:
                 return None
@@ -251,7 +258,7 @@ def locate(client: Any, want: Media, tmdb_of: TmdbOf | None = None) -> Found | N
         if want.kind == "movie":
             if not hasattr(client, "vod_streams"):
                 return None
-            row = best_title(list(client.vod_streams(None) or []), want, "vod", tmdb_of)
+            row = best_title(shown("vod", client.vod_streams(None)), want, "vod", tmdb_of)
             if row is None or row.get("stream_id") is None:
                 return None
             url = client.vod_url(row["stream_id"], row.get("container_extension"))
@@ -259,7 +266,7 @@ def locate(client: Any, want: Media, tmdb_of: TmdbOf | None = None) -> Found | N
         if want.kind == "episode":
             if not hasattr(client, "series_list"):
                 return None
-            series = best_title(list(client.series_list(None) or []), want, "series", tmdb_of)
+            series = best_title(shown("series", client.series_list(None)), want, "series", tmdb_of)
             if series is None or series.get("series_id") is None:
                 return None
             info = client.series_info(series["series_id"])

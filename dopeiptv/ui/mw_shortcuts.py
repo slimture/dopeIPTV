@@ -8,6 +8,8 @@ self.player / self.* - no playback logic lives here.
 """
 from __future__ import annotations
 
+from functools import partial
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QLineEdit
@@ -17,6 +19,9 @@ from ..core.log import log
 from ..i18n import tr
 from ..media.embedded import _is_bare_arrow, _is_shift_arrow
 from .shortcuts import tip_with_key
+
+#: The one rebindable key that acts while "Who's watching?" waits for a PIN.
+_OPEN_WHILE_LOCKED = frozenset({"tv_mode"})
 
 
 class _ShortcutsMixin:
@@ -127,6 +132,8 @@ class _ShortcutsMixin:
             return False
         if self._multiview_active() is not None:
             return False
+        if getattr(self, "_profile_locked", lambda: False)():
+            return False            # who is watching first: no number zaps
         txt = event.text()
         if len(txt) == 1 and txt.isdecimal():
             if not (self._live_playing() or self.mode in ("live", "fav")):
@@ -195,6 +202,16 @@ class _ShortcutsMixin:
             "teletext": self.toggle_teletext,
         }
 
+    def _shortcut_run(self, sid: str) -> None:
+        """A rebindable key pressed. While "Who's watching?" waits for a
+        profile's PIN at start only TV mode's (which shows that picker of
+        its own) acts - as TV mode's keys reach only the profiles' tiles."""
+        if getattr(self, "_profile_locked", lambda: False)() and sid not in _OPEN_WHILE_LOCKED:
+            return
+        cb = self._shortcut_callbacks().get(sid)
+        if cb is not None:
+            cb()
+
     def shortcut_keys(self) -> dict[str, str]:
         """Each action's key in force, in Qt's portable text ("" for none):
         the user's over the app's own."""
@@ -217,12 +234,11 @@ class _ShortcutsMixin:
         moved = shortcut_keys.migrate(self.settings)
         if moved:
             log.info("shortcuts: %d key(s) of the old editor carried over", moved)
-        cbs = self._shortcut_callbacks()
         keys = self.shortcut_keys()
         self._shortcuts = {}
         for sid, _default, _label in self.SHORTCUT_ACTIONS:
             sc = QShortcut(QKeySequence(keys.get(sid, "")), self)
-            sc.activated.connect(cbs[sid])
+            sc.activated.connect(partial(self._shortcut_run, sid))
             # Application-wide, not window-wide. Qt's default context only
             # fires a shortcut while THIS window is the active one, and in
             # fullscreen on macOS the active window is the pop-out mirror -

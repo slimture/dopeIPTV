@@ -2698,5 +2698,6 @@
   "conn_what_test": "Bu test birkaç saniye boyunca canlı bir kanalı okur; bu da sağlayıcına bir bağlantı daha açar.",
   "conn_test_unknown": "Bu hesaptan zaten bir şey oynatılıyor ve sağlayıcın kaç bağlantıya izin verdiğini söylemiyor. Çoğu yalnızca bire izin verir; o zaman sağlayıcı oynatılanı kesebilir.",
   "ct_skip_conn": "Denenmedi – sağlayıcına bir bağlantı daha açardı",
-  "nerd_url_none": "Bu sunucu bir kanalı yalnızca oynatmak için ayarlar, bu yüzden kopyalanacak bir adres yok."
+  "nerd_url_none": "Bu sunucu bir kanalı yalnızca oynatmak için ayarlar, bu yüzden kopyalanacak bir adres yok.",
+  "phone_page_locked": "Kim izliyor? Önce uygulamada profilinizi seçin."
 }

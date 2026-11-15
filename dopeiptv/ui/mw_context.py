@@ -363,16 +363,20 @@ class _ContextMenuMixin:
         from ..core import channel_numbers
         return channel_numbers.shown(it, channel_numbers.active(self._chno_pid()))
 
-    def _chno_rows(self, rows: list[dict]) -> list[dict]:
+    def _chno_rows(self, rows: list[dict], kids: bool = True) -> list[dict]:
         """The channels a number may reach or be given: what the lists show
         - none from a hidden category, or a locked one while it is locked,
-        nor one hidden by hand."""
+        nor one hidden by hand, nor (a kids profile) one for adults. The
+        phone remote, the remote API and Home Assistant list and play these.
+        *kids* False: the household's numbering, the same for everyone."""
         excluded = self.overrides.excluded_ids(
             "live", include_locked=not self.parental.session_unlocked)
         hidden = self.channel_ov.anything_hidden()
+        keep = getattr(self, "_kids_keep", lambda _m: None)("live") if kids else None
         return [r for r in rows if r.get("stream_id") is not None and not r.get("_header")
                 and str(r.get("category_id")) not in excluded
-                and not (hidden and self._channel_hidden(r, "live"))]
+                and not (hidden and self._channel_hidden(r, "live"))
+                and (keep is None or keep(r))]
 
     def _chno_menu(self, menu, it: dict) -> None:
         """Nerd: Set channel number… and, when it has one, Clear."""
@@ -454,7 +458,8 @@ class _ContextMenuMixin:
             if client is not self.client or self._chno_pid() != pid:
                 done(-1)
                 return
-            got = channel_numbers.number_all(self.settings, pid, self._chno_rows(list(rows or [])), keep)
+            got = channel_numbers.number_all(self.settings, pid,
+                                             self._chno_rows(list(rows or []), kids=False), keep)
             self._chno_refresh()
             done(len(got))
         run_async(self.pool, lambda: client.live_streams(None), numbered, lambda _e=None: done(-1))

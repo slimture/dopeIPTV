@@ -2668,6 +2668,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 return
             self._hide_busy()
             self._raw_categories = cats or []
+            if hasattr(self, "_kids_note_cats"):
+                self._kids_note_cats(request_mode, self._raw_categories)
             if request_mode == "live":
                 self._ms_live_note(self._raw_categories)
             self._search_index_cache.pop(request_mode, None)  # rebuild on search
@@ -3522,6 +3524,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         excluded = self.overrides.excluded_ids(
             mode, include_locked=not self.parental.session_unlocked)
         hidden = self._channel_hidden
+        # A kids profile: nothing for adults either (mw_profiles).
+        kids = getattr(self, "_kids_keep", lambda _m: None)(mode)
+        if kids is not None:
+            return lambda it: (str(it.get("category_id")) not in excluded
+                               and not hidden(it, mode) and kids(it))
         return lambda it: (str(it.get("category_id")) not in excluded
                            and not hidden(it, mode))
 
@@ -3581,10 +3588,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # Nothing hidden (most lists): asking each of 80,000 films
             # took a third of a second on the GUI thread.
             items = list(self.all_items)
-        if getattr(self, "_profile_kids", lambda: False)():
-            # A kids profile: nothing the provider marks for adults.
-            from ..core.profiles import adult_item
-            items = [it for it in items if not adult_item(it)]
+        kids = getattr(self, "_kids_keep", lambda _m: None)(kind)
+        if kids is not None:
+            # A kids profile: nothing the provider marks for adults, nor a
+            # category named for them - "All" and "Recently added" too.
+            items = [it for it in items if kids(it)]
         if text:
             name = self._display_name_fn()
             filtered = [it for it in items if text in name(it).lower()]
@@ -5949,6 +5957,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._load_items(getattr(self, "_history_subcat", None))
 
     def _delete_pressed(self) -> None:
+        if self._profile_locked():
+            return          # who is watching first: nothing of theirs goes
         if self.mode == "history":
             self._remove_history_selected()
         elif self.mode == "rec":

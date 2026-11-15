@@ -159,7 +159,12 @@ class _MediaServerMixin:
     def _continue_rows(self) -> list[dict]:
         """Continue watching: this computer's partly watched titles and the
         server's, the newest first. One the server says was finished since
-        is left out."""
+        is left out; a kids profile sees none for adults (mw_profiles)."""
+        rows = self._continue_rows_all()
+        only = getattr(self, "_kids_only", None)
+        return only(rows, "vod") if callable(only) else rows
+
+    def _continue_rows_all(self) -> list[dict]:
         rows = self.resume.continue_watching()
         client = self._ms_client()
         if client is None:

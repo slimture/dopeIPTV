@@ -51,11 +51,29 @@ def candidates(playlists: list[dict], active_id: str | None) -> list[dict]:
     return [p for p in playlists if p.get("id") != active_id and p.get("kind") != "local"]
 
 
+def kids_rows(client: Any, rows: list[dict]) -> list[dict]:
+    """*rows* of another source as a kids profile may see them: none the
+    provider marks for adults, none in a category named for them. A source
+    whose categories cannot be read gives none of its categorised rows."""
+    from ..core.profiles import adult_category, adult_item
+    rows = [r for r in rows if not adult_item(r)]
+    try:
+        cats = list(client.live_categories() or [])
+    except Exception as e:
+        log.info("failover: no categories to check for a kids profile: %s", type(e).__name__)
+        return [r for r in rows if r.get("category_id") in (None, "")]
+    adult = {str(c.get("category_id")) for c in cats
+             if isinstance(c, dict) and adult_category(str(c.get("category_name") or ""))}
+    return [r for r in rows if str(r.get("category_id")) not in adult]
+
+
 def find_elsewhere(playlists: list[dict], active_id: str | None, item: dict,
-                   make_client: Callable[[dict], Any] | None = None) -> tuple[dict, dict, str] | None:
+                   make_client: Callable[[dict], Any] | None = None,
+                   kids: bool = False) -> tuple[dict, dict, str] | None:
     """(source, row, play address) of *item*'s channel in the first other
     source that has it, or None. Runs off the window's thread (it asks
-    each source for its channel list)."""
+    each source for its channel list). *kids*: a kids profile asks - none
+    of a source's rows for adults (kids_rows)."""
     if make_client is None:
         from ..providers.client import make_client as _make
         make_client = _make
@@ -67,6 +85,8 @@ def find_elsewhere(playlists: list[dict], active_id: str | None, item: dict,
         except Exception as e:
             log.info("failover: %s has no channel list now: %s", name, e)
             continue
+        if kids:
+            rows = kids_rows(client, rows)
         row = same_channel(rows, item)
         if row is None:
             continue

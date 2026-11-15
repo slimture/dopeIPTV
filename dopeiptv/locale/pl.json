@@ -2698,5 +2698,6 @@
   "conn_what_test": "Ten test przez kilka sekund odczytuje kanał na żywo, co otwiera kolejne połączenie z twoim dostawcą.",
   "conn_test_unknown": "Z tego konta już coś jest odtwarzane, a twój dostawca nie podaje, ile połączeń dopuszcza. Większość pozwala tylko na jedno, a wtedy dostawca może przerwać to, co jest odtwarzane.",
   "ct_skip_conn": "Nie próbowano – otworzyłoby to kolejne połączenie z twoim dostawcą",
-  "nerd_url_none": "Ten serwer dostraja kanał tylko po to, żeby go odtworzyć, więc nie ma adresu do skopiowania."
+  "nerd_url_none": "Ten serwer dostraja kanał tylko po to, żeby go odtworzyć, więc nie ma adresu do skopiowania.",
+  "phone_page_locked": "Kto ogląda? Najpierw wybierz swój profil w aplikacji."
 }

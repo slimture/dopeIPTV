@@ -32,6 +32,13 @@ from .home_widgets import (  # noqa: F401 - _Card/_Shelf are this page's API
 )
 from .theme import P, rounded
 
+
+def _kids(w, rows, mode: str = "live") -> list:
+    """*rows* as the profile in use may see them: a kids profile's limits
+    (mw_profiles' one test), every row for anyone else."""
+    only = getattr(w, "_kids_only", None)
+    return only(rows, mode) if callable(only) else list(rows or [])
+
 def _rgba(key: str, a: float) -> str:
     c = QColor(P[key])
     return f"rgba({c.red()}, {c.green()}, {c.blue()}, {a})"
@@ -267,7 +274,8 @@ class HomePage(QWidget):
         if on("home_sh_new_eps"):
             rows = []
             try:
-                rows = w.followed.with_new()[:20]
+                rows = [r for r in w.followed.with_new()
+                        if _kids(w, [r.get("snap") or {}], "series")][:20]
             except Exception:
                 pass
             if rows:
@@ -312,7 +320,7 @@ class HomePage(QWidget):
                 body.addWidget(shelf)
 
         if on("home_sh_history"):
-            rows = list(getattr(w.history, "entries", []))
+            rows = _kids(w, getattr(w.history, "entries", []))
             # Keep the two shelves in sync: a partly-watched title already
             # sits on Continue watching, repeating it under Recently viewed
             # is pure redundancy. Only filtered while that shelf is shown -
@@ -373,6 +381,7 @@ class HomePage(QWidget):
                         r = dict(it)
                         r["_kind"] = "series"
                         rows.append(r)
+            rows = _kids(w, rows)
             if rows:
                 shelf = _Shelf(tr("nav_watchlist"))
                 for it in rows[:20]:
@@ -462,7 +471,7 @@ class HomePage(QWidget):
                 if sid is not None and sid not in seen:
                     seen.add(sid)
                     out.append(it)
-        return out
+        return _kids(w, out)
 
     def _favorite_media(self) -> list[dict]:
         """Favourited movies and series, tagged with the kind so a card can
@@ -487,7 +496,7 @@ class HomePage(QWidget):
                     row = dict(it)
                     row["_kind"] = kind
                     out.append(row)
-        return out
+        return _kids(w, out)
 
     @staticmethod
     def _is_movie(it: dict) -> bool:

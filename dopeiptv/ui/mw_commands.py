@@ -34,6 +34,13 @@ def find_channel(rows: list[dict], name: str) -> dict | None:
     return None
 
 
+def _rows_job(win: Any, client: Any):
+    """For the pool: *client*'s channels (with a kids profile's categories
+    read beside them, mw_profiles)."""
+    job = getattr(win, "_live_rows_job", None)
+    return job(client) if callable(job) else (lambda: client.live_streams(None))
+
+
 class _CommandsMixin:
     def _start_command_server(self) -> None:
         from ..core.instance import CommandServer
@@ -52,6 +59,12 @@ class _CommandsMixin:
             self._come_forward()
         if cmd.get("tv") is True and hasattr(self, "enter_tv_mode"):
             self.enter_tv_mode()
+        if (cmd.get("play") or cmd.get("channel") or cmd.get("number") is not None) \
+                and getattr(self, "_profile_locked", lambda: False)():
+            # "Who's watching?" waits for the PIN at start (it is in front
+            # now): nothing is played for the profile before it is given.
+            log.info("command: nothing played - who is watching is not chosen yet")
+            return {"ok": False, "locked": True}
         key = str(cmd.get("supporter") or "").strip()
         if key and hasattr(self, "open_supporter"):
             # Shown in the supporter window (checked there, offline), never
@@ -105,7 +118,7 @@ class _CommandsMixin:
                 self._show_toast(tr("cmd_no_channel", name=name), 5000)
                 return
             self.play_live_channel(it)
-        run_async(self.pool, lambda: client.live_streams(None), done,
+        run_async(self.pool, _rows_job(self, client), done,
                   lambda _e=None: done([]))
 
     def _play_channel_step(self, direction: int) -> bool:
@@ -139,7 +152,7 @@ class _CommandsMixin:
             at = next((i for i, r in enumerate(shown) if str(r.get("stream_id")) == str(cur)), None)
             if at is not None and len(shown) > 1:
                 self.play_live_channel(shown[(at + direction) % len(shown)])
-        run_async(self.pool, lambda: client.live_streams(None), done, lambda _e=None: None)
+        run_async(self.pool, _rows_job(self, client), done, lambda _e=None: None)
         return True
 
     def _play_channel_number(self, number: int) -> None:
@@ -158,5 +171,5 @@ class _CommandsMixin:
                 self._chan_not_found(number)
                 return
             self.play_live_channel(it)
-        run_async(self.pool, lambda: client.live_streams(None), done,
+        run_async(self.pool, _rows_job(self, client), done,
                   lambda _e=None: done([]))

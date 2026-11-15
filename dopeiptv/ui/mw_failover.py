@@ -50,6 +50,8 @@ class _FailoverMixin:
         name = str(item.get("name") or "")
         self._set_status(tr("failover_looking", name=name), emphasis=True)
         playlists, active, wanted = store.playlists(), store.active_id, dict(item)
+        # A kids profile: the other source's channel for adults is no choice.
+        kids = bool(getattr(self, "_profile_kids", lambda: False)())
         gen = self._failover_gen
 
         def done(found) -> None:
@@ -67,7 +69,7 @@ class _FailoverMixin:
             if gen == self._failover_gen:
                 fallback()
 
-        run_async(self.pool, lambda: failover.find_elsewhere(playlists, active, wanted),
+        run_async(self.pool, lambda: failover.find_elsewhere(playlists, active, wanted, kids=kids),
                   done, failed)
         return True
 

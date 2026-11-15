@@ -8,6 +8,7 @@ remote, the remote API and Home Assistant see and switch it."""
 
 from __future__ import annotations
 
+import threading
 import time
 from typing import Any
 
@@ -17,10 +18,11 @@ from PyQt6.QtWidgets import QMessageBox
 
 from ..core import profiles
 from ..core.log import log
-from ..core.profiles import Profile, ProfileSettings
+from ..core.profiles import Profile, ProfileSettings, adult_category, adult_item
 from ..core.stores import (
     FavoriteStore, FollowedSeriesStore, HistoryStore, WatchedStore, WatchlistStore,
 )
+from ..core.workers import run_async
 from ..i18n import tr
 
 #: Wrong PINs asked over the network (the phone remote, the remote API, Home
@@ -29,6 +31,102 @@ from ..i18n import tr
 #: script runs through in minutes.
 REMOTE_PIN_TRIES = 5
 REMOTE_PIN_SECS = 300.0
+
+#: What the phone remote, the remote API and Home Assistant are told while
+#: "Who's watching?" waits for a profile's PIN at start.
+LOCKED = "who is watching is not chosen yet: pick a profile in the app first"
+
+#: A row's own kind -> the catalogue its category is one of (as
+#: MainWindow._channel_hidden reads it); an episode's is its series'.
+_KIDS_KIND = {"live": "live", "fav": "live", "catchup": "live", "movie": "vod", "vod": "vod",
+              "series": "series", "episode": "series"}
+_CATS = {"live": "live_categories", "vod": "vod_categories", "series": "series_categories"}
+
+
+def _gone(obj: Any) -> bool:
+    try:
+        return sip.isdeleted(obj)
+    except TypeError:           # not a Qt object (a test's window)
+        return False
+
+
+def adult_ids(cats: Any, overrides: Any, mode: str) -> frozenset[str]:
+    """The ids of *cats* (a source's categories of *mode*) named for adults,
+    by the name the lists show them under."""
+    out: set[str] = set()
+    for c in cats or []:
+        if not isinstance(c, dict) or c.get("category_id") is None:
+            continue
+        cid, name = c.get("category_id"), str(c.get("category_name") or "")
+        try:
+            if overrides is not None:
+                name = overrides.display_name(mode, cid, name)
+        except Exception:
+            pass
+        if adult_category(name):
+            out.add(str(cid))
+    return frozenset(out)
+
+
+class KidsFilter:
+    """A kids profile's test for one row - True when it may be shown or
+    played: nothing the provider marks for adults, nothing from a category
+    named for them (core/profiles.py), in any list, shelf or remote. Made on
+    the window's thread; it may run on a worker, which reads a source's
+    categories itself when the window does not know them yet. On the
+    window's thread a row of a category not known yet is held back until
+    they are (read meanwhile on the pool, MainWindow._kids_fetch_cats)."""
+
+    def __init__(self, window: Any, mode: str) -> None:
+        self.window, self.mode = window, mode
+        self.client = getattr(window, "client", None)
+        self.overrides = getattr(window, "overrides", None)
+        self.known: dict = window._kids_known()
+
+    def _ids(self, mode: str) -> frozenset[str] | None:
+        hit = self.known.get(mode)
+        if hit is not None and hit[0] is self.client:
+            return hit[1]
+        if threading.current_thread() is threading.main_thread():
+            self.window._kids_fetch_cats()
+            return None
+        fn = getattr(self.client, _CATS[mode], None)
+        try:
+            ids = adult_ids(fn() if fn is not None else [], self.overrides, mode)
+        except Exception:
+            return None
+        self.known[mode] = (self.client, ids)
+        return ids
+
+    def ready(self) -> KidsFilter:
+        """Off the window's thread: this catalogue's categories read now
+        when the window does not know them, so that rows tested on the
+        window's thread afterwards are decided at once."""
+        mode = _KIDS_KIND.get(self.mode)
+        if mode is not None and threading.current_thread() is not threading.main_thread():
+            self._ids(mode)
+        return self
+
+    def __call__(self, it: Any) -> bool:
+        if not isinstance(it, dict):
+            return True
+        ctx = it.get("_series_ctx")
+        ctx = ctx if isinstance(ctx, dict) else {}
+        if adult_item(it) or adult_item(ctx):
+            return False
+        mode = _KIDS_KIND.get(str(it.get("_kind") or it.get("_ekind") or self.mode))
+        if mode is None:
+            return True
+        cid = it.get("category_id")
+        if cid in (None, ""):
+            cid = ctx.get("category_id")
+        if cid in (None, ""):
+            return True
+        ids = self._ids(mode)
+        if ids is None:
+            self.window._kids_held = True
+            return False
+        return str(cid) not in ids
 
 
 class _ProfilesMixin:
@@ -57,6 +155,98 @@ class _ProfilesMixin:
     def _profile_kids(self) -> bool:
         p = self._profile()
         return bool(p is not None and p.kids)
+
+    # -- what a kids profile is let see, everywhere ------------------------------------
+
+    def _kids_keep(self, mode: str = "live") -> KidsFilter | None:
+        """The one test every list, shelf and remote puts a row through for
+        a kids profile (*mode*: the catalogue the rows are of when they do
+        not say); None for any other profile - nothing to test."""
+        return KidsFilter(self, mode) if self._profile_kids() else None
+
+    def _kids_only(self, rows: Any, mode: str = "live") -> list:
+        """*rows* as a kids profile may see them (all of them otherwise)."""
+        rows = list(rows or [])
+        keep = self._kids_keep(mode)
+        return rows if keep is None else [r for r in rows if keep(r)]
+
+    def _kids_allows(self, it: Any, mode: str = "live") -> bool:
+        keep = self._kids_keep(mode)
+        return keep is None or keep(it)
+
+    def _live_rows_job(self, client: Any):
+        """For a worker: *client*'s channels - and a kids profile's
+        categories read beside them, so the window's thread that goes
+        through the rows (_chno_rows) decides them at once."""
+        keep = self._kids_keep("live")
+
+        def job():
+            rows = client.live_streams(None)
+            if keep is not None:
+                keep.ready()
+            return rows
+        return job
+
+    def _kids_known(self) -> dict:
+        """mode -> (client, the ids of its categories named for adults)."""
+        return self.__dict__.setdefault("_kids_cats", {})
+
+    def _kids_note_cats(self, mode: str, cats: Any) -> None:
+        """A source's categories of *mode* as the window read them (its list)."""
+        if mode in _CATS:
+            self._kids_known()[mode] = (getattr(self, "client", None),
+                                        adult_ids(cats, getattr(self, "overrides", None), mode))
+
+    def _kids_fetch_cats(self) -> None:
+        """The source's categories read on the pool, once at a time: a row
+        held back on the window's thread for want of them is shown when
+        they are in (_kids_cats_in)."""
+        client = getattr(self, "client", None)
+        if client is None or self.__dict__.get("_kids_fetching") is client:
+            return
+        self._kids_fetching = client
+        overrides = getattr(self, "overrides", None)
+
+        def work():
+            out: dict[str, frozenset[str]] = {}
+            for mode, name in _CATS.items():
+                fn = getattr(client, name, None)
+                try:
+                    out[mode] = adult_ids(fn() if fn is not None else [], overrides, mode)
+                except Exception as e:
+                    log.debug("profiles: %s categories not read (%s)", mode, type(e).__name__)
+            return client, out
+
+        run_async(self.pool, work, self._kids_cats_in, self._kids_cats_failed)
+
+    def _kids_cats_failed(self, _msg: Any = None) -> None:
+        self._kids_fetching = None
+
+    def _kids_cats_in(self, got: Any) -> None:
+        client, found = got
+        self._kids_fetching = None
+        if _gone(self) or client is not getattr(self, "client", None):
+            return
+        known = self._kids_known()
+        for mode, ids in found.items():
+            known[mode] = (client, ids)
+        if not self.__dict__.pop("_kids_held", False):
+            return
+        # Held back while they were not known: shown now.
+        self._kids_ver = int(self.__dict__.get("_kids_ver", 0)) + 1
+        try:
+            if self._home_showing():
+                self._home_page.refresh()
+            elif getattr(self, "all_items", None) and not self._guide_page_showing():
+                self._apply_filter()
+            tv = getattr(self, "_tv_page", None)
+            if tv is not None and not _gone(tv) and getattr(self, "_tv_on", False) \
+                    and tv.current == "home" and tv.screens.get("home") is not None:
+                tv.screens["home"].rebuild()
+            if hasattr(self, "_events_favorites"):
+                self._events_favorites()
+        except Exception:
+            log.debug("profiles: the lists after the categories", exc_info=True)
 
     def _profile_many(self) -> bool:
         store = getattr(self, "profiles", None)
@@ -173,6 +363,7 @@ class _ProfilesMixin:
         self._home_poster_cache = None
         self._home_chan_cache = None
         self._recent_cache = {}
+        self._search_index_cache = {}     # the sidebar search's, made for the profile before
         self._guide_source_changed()      # its reminders' marks: drawn anew
         self._update_playlist_btn()
         self._refresh_nav_status()
@@ -242,7 +433,10 @@ class _ProfilesMixin:
             return False
         ok = self.switch_profile(pid)
         if ok:
+            was = self._profile_must_pick
             self._profile_must_pick = False
+            if was:
+                self._profile_lock_changed()
             self._profile_close_picker()
             if tv:
                 page = getattr(self, "_tv_page", None)
@@ -284,6 +478,8 @@ class _ProfilesMixin:
             return
         if (len(store.profiles()) > 1 and store.ask_at_start) or p.has_pin:
             self._profile_must_pick = p.has_pin
+            if p.has_pin:
+                self._profile_lock_changed()
             self.show_profile_picker()
 
     def show_profile_picker(self) -> None:
@@ -325,8 +521,26 @@ class _ProfilesMixin:
 
     def _profile_locked(self) -> bool:
         """Whether nothing but picking a profile may be done now (TV mode
-        asks it of every key)."""
+        asks it of every key; the window's shortcuts, the media keys, the
+        phone remote, the remote API and Home Assistant ask it before they
+        play or list anything of the profile's)."""
         return bool(self._profile_must_pick)
+
+    def _profile_refuse_locked(self) -> None:
+        """For the phone remote, the remote API and Home Assistant: a clear
+        "not yet" while who is watching waits for a PIN."""
+        if self._profile_locked():
+            raise ValueError(LOCKED)
+
+    def _profile_lock_changed(self) -> None:
+        """The start-up lock set or lifted: Home Assistant's favourites list
+        follows (the phone's page reads its lists again by itself)."""
+        fav = getattr(self, "_events_favorites", None)
+        if callable(fav):
+            try:
+                fav()
+            except Exception:
+                log.debug("profiles: favourites after the lock", exc_info=True)
 
     def _profile_manage_from_picker(self) -> None:
         if self._profile_must_pick:
@@ -407,6 +621,8 @@ class _ProfilesMixin:
         # Picked, as in the picker (_profile_pick): nothing is held back any
         # more - Settings, TV mode's keys.
         self._profile_must_pick = False
+        if at_start:
+            self._profile_lock_changed()
         self._profile_close_picker()
         page = getattr(self, "_tv_page", None)
         if at_start and page is not None and not sip.isdeleted(page) \

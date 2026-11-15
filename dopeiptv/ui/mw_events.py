@@ -82,6 +82,12 @@ class _EventsMixin:
             if sip.isdeleted(self) or self._events_live() is None or not self._events.cfg.commands:
                 return
             log.info("events: %s, asked over MQTT", name)
+            if name in ("playpause", "channel_up", "channel_down", "favorite", "play") \
+                    and getattr(self, "_profile_locked", lambda: False)():
+                # "Who's watching?" waits for the PIN at start: nothing of
+                # the profile's is played before it is given.
+                log.info("events: %s left - who is watching is not chosen yet", name)
+                return
             if name in ("playpause", "stop"):
                 self._remote_media(name)
             elif name in ("channel_up", "channel_down"):
@@ -117,7 +123,8 @@ class _EventsMixin:
                 log.debug("events: tv mode", exc_info=True)
 
     def _events_favorites(self) -> None:
-        """The favourite channels Home Assistant's list offers, again."""
+        """The favourite channels Home Assistant's list offers, again (none
+        while who is watching waits for a PIN at start: _favorite_channels)."""
         try:
             pairs = mqtt_control.favorite_options(self._favorite_channels())
             self._events_favs = dict(pairs)

@@ -2698,5 +2698,6 @@
   "conn_what_test": "Ovaj test nekoliko sekundi čita kanal uživo, a to otvara još jednu vezu prema tvom davatelju.",
   "conn_test_unknown": "S ovog računa već se nešto reproducira, a tvoj davatelj ne kaže koliko veza dopušta. Većina dopušta samo jednu, a tada davatelj može prekinuti ono što se reproducira.",
   "ct_skip_conn": "Nije pokušano – otvorilo bi još jednu vezu prema tvom davatelju",
-  "nerd_url_none": "Ovaj poslužitelj ugađa kanal samo da bi ga reproducirao, pa nema adrese za kopiranje."
+  "nerd_url_none": "Ovaj poslužitelj ugađa kanal samo da bi ga reproducirao, pa nema adrese za kopiranje.",
+  "phone_page_locked": "Tko gleda? Najprije odaberite svoj profil u aplikaciji."
 }

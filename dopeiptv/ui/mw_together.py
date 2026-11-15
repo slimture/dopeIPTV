@@ -58,8 +58,10 @@ def _derive(lid: int, code: str) -> tuple[int, str, str, bytes]:
     return lid, code, room_id, key
 
 
-def _locate(lid: int, media: together.Media, client: Any, tmdb_of: Any) -> tuple:
-    return lid, media, matching.locate(client, media, tmdb_of)
+def _locate(lid: int, media: together.Media, client: Any, tmdb_of: Any,
+            keeps: dict | None = None) -> tuple:
+    keep = (lambda kind, row: keeps[kind](row)) if keeps else None
+    return lid, media, matching.locate(client, media, tmdb_of, keep)
 
 
 class _TogetherMixin:
@@ -352,8 +354,13 @@ class _TogetherMixin:
         self._together_set_status("load")
         tmdb = getattr(self, "tmdb", None)
         tmdb_of = tmdb.tmdb_id_for if tmdb is not None else None
+        # Only what the lists show here: none hidden or locked, none for
+        # adults in a kids profile (main_window._catalog_filter).
+        catalog = getattr(self, "_catalog_filter", None)
+        keeps = ({k: catalog(k) for k in ("live", "vod", "series")}
+                 if callable(catalog) else None)
         run_async(self.pool, _locate, self._together_found, self._together_lookup_failed,
-                  self._together_lid, media, self.client, tmdb_of)
+                  self._together_lid, media, self.client, tmdb_of, keeps)
 
     def _together_lookup_failed(self, _msg: str = "") -> None:
         media = self._together_follow

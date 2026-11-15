@@ -241,6 +241,12 @@ class _MprisMixin:
             return
         if p is None:
             return
+        if name in ("playpause", "play", "next", "previous") \
+                and getattr(self, "_profile_locked", lambda: False)():
+            # "Who's watching?" waits for the PIN at start: Play would start
+            # the profile's last title, next and previous zap.
+            log.info("media control: %s left - who is watching is not chosen yet", name)
+            return
         mv = self._multiview_active()
         if mv is not None and name in ("playpause", "play", "pause"):
             self._toggle_pause_shortcut()

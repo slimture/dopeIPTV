@@ -2698,5 +2698,6 @@
   "conn_what_test": "Este teste lê um canal ao vivo por alguns segundos, o que abre mais uma conexão com o seu provedor.",
   "conn_test_unknown": "Algo desta conta já está tocando, e o seu provedor não informa quantas conexões permite. A maioria permite só uma, e então o provedor pode cortar o que está tocando.",
   "ct_skip_conn": "Não tentado – abriria mais uma conexão com o seu provedor",
-  "nerd_url_none": "Este servidor só sintoniza um canal para reproduzi-lo, então não há endereço para copiar."
+  "nerd_url_none": "Este servidor só sintoniza um canal para reproduzi-lo, então não há endereço para copiar.",
+  "phone_page_locked": "Quem está assistindo? Escolha primeiro seu perfil no app."
 }

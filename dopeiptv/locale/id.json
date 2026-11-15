@@ -2698,5 +2698,6 @@
   "conn_what_test": "Tes ini membaca saluran langsung selama beberapa detik, dan itu membuka satu koneksi lagi ke penyediamu.",
   "conn_test_unknown": "Sesuatu dari akun ini sedang diputar, dan penyediamu tidak menyebutkan berapa koneksi yang diizinkan. Sebagian besar hanya mengizinkan satu, dan penyedia lalu bisa memutus yang sedang diputar.",
   "ct_skip_conn": "Tidak dicoba – itu akan membuka satu koneksi lagi ke penyediamu",
-  "nerd_url_none": "Server ini hanya menyetel saluran untuk memutarnya, jadi tidak ada alamat untuk disalin."
+  "nerd_url_none": "Server ini hanya menyetel saluran untuk memutarnya, jadi tidak ada alamat untuk disalin.",
+  "phone_page_locked": "Siapa yang menonton? Pilih dulu profil Anda di aplikasi."
 }
