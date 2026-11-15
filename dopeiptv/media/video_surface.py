@@ -29,6 +29,38 @@ def _env_num(name: str, default, cast):
         return default
 
 
+
+# mpv's own on-screen tools, which the app does not use (it draws its own
+# menus and stats). Some keep a watch on the system's audio devices, and on
+# macOS a device change - an AirPlay route coming or going - has crashed
+# libmpv in that watch (hotplug_cb, a null log) as a core closed. Init-time
+# options: an older libmpv that lacks some is tried with fewer, then none.
+_UNUSED_SCRIPTS: tuple[dict[str, str], ...] = (
+    {"load_context_menu": "no", "load_select": "no", "load_commands": "no",
+     "load_positioning": "no", "load_console": "no"},
+    {"load_select": "no", "load_commands": "no", "load_positioning": "no",
+     "load_console": "no"},
+    {"load_console": "no"},
+    {},
+)
+
+
+def _create_core():
+    """The player's mpv core, without mpv's unused built-in scripts where
+    this libmpv knows the options to leave them out."""
+    last: Exception | None = None
+    for extra in _UNUSED_SCRIPTS:
+        try:
+            core = _libmpv.MPV(vo="libmpv", terminal=False, **extra)
+        except Exception as e:      # an option this libmpv does not have
+            last = e
+            continue
+        if extra:
+            log.debug("mpv: without its own %s", ", ".join(
+                k[5:].replace("_", "-") for k in extra))
+        return core
+    raise last or RuntimeError("mpv could not be created")
+
 class _MpvGLWidget(QOpenGLWidget):
     """Video surface that owns the mpv render context."""
 
@@ -264,7 +296,7 @@ class _MpvGLWidget(QOpenGLWidget):
         # libmpv build - create the instance with just that (plus a quiet
         # terminal), then apply the rest tolerantly below.
         log.info("Creating mpv instance...")
-        self.mpv = _libmpv.MPV(vo="libmpv", terminal=False)
+        self.mpv = _create_core()
         # Best-effort options. Some minimal libmpv builds (notably the one
         # compiled inside our Flatpak) don't implement every option - e.g.
         # 'osc'. Passing them all to the constructor makes ONE unknown

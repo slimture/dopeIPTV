@@ -26,6 +26,12 @@ class _AirPlayMixin:
         without AVFoundation or AVKit says so once in the debug log."""
         if sys.platform != "darwin":
             return
+        # An ffmpeg a crashed run left pulling a channel holds one of the
+        # account's connections: ended before anything plays.
+        import threading
+        from ..providers import airplay_bridge
+        threading.Thread(target=airplay_bridge.sweep_leftovers, daemon=True,
+                         name="airplay-sweep").start()
         try:
             from ..services import airplay_macos
             if not airplay_macos.supported():

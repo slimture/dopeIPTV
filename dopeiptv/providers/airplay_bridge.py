@@ -533,6 +533,14 @@ class AirPlayBridge:
         except OSError as e:
             self.stop()
             raise RuntimeError(f"ffmpeg did not start ({e})") from e
+        # Its pid beside its files: a run that crashes leaves ffmpeg pulling
+        # the channel - one of the account's connections - and the next
+        # start ends it (sweep_leftovers).
+        try:
+            with open(os.path.join(self.folder, PIDFILE), "w") as fh:
+                fh.write(str(self._proc.pid))
+        except OSError:
+            pass
         threading.Thread(target=self._drain, args=(self._proc,),
                          daemon=True).start()
         log.info("airplay bridge: serving on port %d (%s; picture %s, sound "
@@ -631,14 +639,66 @@ class AirPlayBridge:
         self.prefix, self.url = None, ""
 
 
+PIDFILE = "ffmpeg.pid"
+
+
+def _is_ffmpeg(pid: int, run: Callable[..., Any] = subprocess.run) -> bool:
+    """Whether process *pid* is an ffmpeg (a pid can have been reused)."""
+    try:
+        if sys.platform == "win32":
+            out = run(["tasklist", "/FI", f"PID eq {pid}", "/NH"],
+                      capture_output=True, text=True, timeout=3,
+                      creationflags=NO_WINDOW).stdout
+        else:
+            out = run(["ps", "-p", str(pid), "-o", "comm="],
+                      capture_output=True, text=True, timeout=3).stdout
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return "ffmpeg" in (out or "").lower()
+
+
+def _end(pid: int, run: Callable[..., Any] = subprocess.run) -> None:
+    try:
+        if sys.platform == "win32":
+            run(["taskkill", "/PID", str(pid), "/F"], capture_output=True,
+                timeout=3, creationflags=NO_WINDOW)
+        else:
+            import signal
+            os.kill(pid, signal.SIGTERM)
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
+def sweep_leftovers(base: str | None = None,
+                    run: Callable[..., Any] = subprocess.run) -> int:
+    """End the ffmpeg of an AirPlay run that could not tidy up (a crash, a
+    kill) and remove its files; how many ffmpeg were ended. Such an ffmpeg
+    goes on pulling the channel, which takes one of the account's
+    connections from the player."""
+    ended = 0
+    try:
+        base = base or cast_cache_dir()
+        names = [n for n in os.listdir(base) if n.startswith("airplay-")]
+    except OSError:
+        return 0
+    for name in names:
+        folder = os.path.join(base, name)
+        try:
+            with open(os.path.join(folder, PIDFILE)) as fh:
+                pid = int(fh.read().strip() or 0)
+        except (OSError, ValueError):
+            pid = 0
+        if pid > 0 and pid != os.getpid() and _is_ffmpeg(pid, run):
+            _end(pid, run)
+            ended += 1
+            log.info("airplay bridge: ended an ffmpeg a run before left")
+        shutil.rmtree(folder, ignore_errors=True)
+    return ended
+
+
 def _cache_dir() -> str:
     """The cast cache folder, swept of what an AirPlay run that could not
     tidy up (a crash, a kill) left behind."""
     base = cast_cache_dir()
-    try:
-        for name in os.listdir(base):
-            if name.startswith("airplay-"):
-                shutil.rmtree(os.path.join(base, name), ignore_errors=True)
-    except OSError:
-        pass
+    sweep_leftovers(base)
     return base
