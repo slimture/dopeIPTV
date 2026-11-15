@@ -30,7 +30,10 @@ dopeiptv/
     diagnostics.py     Plain-language "why won't this stream play?" probe
     chromecast.py      ChromecastManager, CastDialog
     dlna.py            DLNA / UPnP TVs: SSDP discovery, SOAP control, file share
-    casting.py         CastHub - Chromecast and DLNA behind one object
+    casting.py         CastHub - Chromecast, DLNA and Kodi behind one object
+    kodi.py            Kodi as a cast target over JSON-RPC (HTTP)
+    mdns.py            mDNS discovery in plain Python (finds Kodi)
+    simkl.py           Simkl sync (scrobbles, watched, Plan to watch)
     cast_bridge.py     Local bridge that re-encodes the audio a Chromecast
                        refuses (E-AC-3) so the stream still casts
     opensubtitles.py   OpenSubtitles.com REST client (search, download, hash)
@@ -121,7 +124,10 @@ dopeiptv/
                        cards, rows, switches, the playlist delegate
     qt_i18n.py         Qt's own strings (standard buttons, calendars) and
                        QLocale-formatted dates in the app's language
-    mw_trakt.py        Trakt / watched / watchlist mixin
+    mw_trakt.py        Trakt / watched / watchlist mixin (the sync reads
+                       every account signed in: Trakt, Simkl or both)
+    mw_simkl.py        Simkl: scrobbles, its Settings page, PIN sign-in
+    mw_discord.py      Discord status ("Watching ...") from the player
     mw_recording.py    Recording / timeshift mixin
     mw_portal_archive.py A Stalker portal's archive: by programme, its link
                        asked for off the window's thread
@@ -250,6 +256,6 @@ for player-overlay colours, which is why `ui/__init__` exposes
   their own system - the app runs without them)
 - ffmpeg CLI (standalone recording; bundled in every packaged build)
 
-Everything else (DLNA, MPRIS over D-Bus, OpenSubtitles, TMDB, Trakt, the
-Stalker portal protocol, music tags) is written against the standard
+Everything else (DLNA, Kodi and mDNS, MPRIS over D-Bus, Discord's IPC,
+OpenSubtitles, TMDB, Trakt, Simkl, the Stalker portal protocol, music tags) is written against the standard
 library and `requests`.

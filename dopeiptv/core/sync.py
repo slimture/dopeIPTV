@@ -241,7 +241,10 @@ SETTINGS_DENY = frozenset({
     # recordings still to save as MP4 are this computer's files.
     "viewing_stats", "rec_mp4_pending",
 })
-SETTINGS_DENY_PREFIX = ("sync_", "trakt_", "nerd_", "selfupdate_", "update_",
+# Simkl's sign-in like Trakt's; a Kodi's login, and Discord's status, are
+# this computer's.
+SETTINGS_DENY_PREFIX = ("sync_", "trakt_", "simkl_", "kodi_", "discord_",
+                        "nerd_", "selfupdate_", "update_",
                         "donate_", "feedback_", "parental_", "resume_positions",
                         "favorites", "movie_favorites", "series_favorites",
                         "history", "category_overrides", "channel_overrides",

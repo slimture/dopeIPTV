@@ -1,9 +1,10 @@
-"""One front for every kind of receiver: Chromecast and DLNA.
+"""One front for every kind of receiver: Chromecast, DLNA and Kodi.
 
 The window casts through a single object. Each call goes to the manager the
 chosen device belongs to - a DLNA renderer carries the " (DLNA)" suffix in
-its name - and everything the window asks about the running cast (where it
-has got to, its state, its volume) is answered by the one running it.
+its name, a Kodi " (Kodi)" - and everything the window asks about the
+running cast (where it has got to, its state, its volume) is answered by the
+one running it.
 """
 from __future__ import annotations
 
@@ -13,19 +14,40 @@ from typing import Any
 from ..core.log import log
 from .chromecast import ChromecastManager
 from .dlna import DlnaManager
+from .kodi import KodiManager
 
 
 class CastHub:
-    def __init__(self, chromecast: Any = None, dlna: Any = None) -> None:
+    def __init__(self, chromecast: Any = None, dlna: Any = None,
+                 kodi: Any = None) -> None:
         self.chromecast = chromecast if chromecast is not None \
             else ChromecastManager()
         self.dlna = dlna if dlna is not None else DlnaManager()
+        self.kodi = kodi if kodi is not None else KodiManager()
         self._current: Any = self.chromecast
+
+    def _managers(self) -> tuple[Any, ...]:
+        return (self.chromecast, self.dlna, self.kodi)
 
     def is_dlna(self, name: str | None) -> bool:
         return bool(name) and self.dlna.knows(name)
 
+    def is_kodi(self, name: str | None) -> bool:
+        return bool(name) and self.kodi.knows(name)
+
+    def plays_as_is(self, name: str | None) -> bool:
+        """A device that fetches the stream itself and plays it as it is -
+        a DLNA TV or a Kodi: no converter, so no track or picture choice."""
+        return self.is_dlna(name) or self.is_kodi(name)
+
+    def ended_elsewhere(self) -> bool:
+        """The running cast ended on the device itself (its own remote, or
+        another item took over) - only a Kodi says so."""
+        return bool(getattr(self._current, "gone", False))
+
     def _for(self, name: str) -> Any:
+        if self.is_kodi(name):
+            return self.kodi
         return self.dlna if self.is_dlna(name) else self.chromecast
 
     # -- the running cast, from whichever manager runs it ---------------------
@@ -77,7 +99,7 @@ class CastHub:
         # The one with a cast running goes first. On app close this races
         # the process exit, and tearing down Chromecast discovery must not
         # spend the time the TV's Stop needs.
-        managers = sorted((self.chromecast, self.dlna),
+        managers = sorted(self._managers(),
                           key=lambda m: getattr(m, "active", None) is None)
         for mgr in managers:
             try:
@@ -93,9 +115,9 @@ class CastHub:
         return ChromecastManager.available()
 
     def scan(self) -> list[str]:
-        """Chromecasts and DLNA renderers, looked for side by side - the
-        two searches take seconds each, and neither waits for the other."""
-        found: dict[str, list[str]] = {"cc": [], "dlna": []}
+        """Chromecasts, DLNA renderers and Kodis, looked for side by side -
+        each search takes seconds, and none waits for the others."""
+        found: dict[str, list[str]] = {"cc": [], "dlna": [], "kodi": []}
 
         def chromecasts() -> None:
             if not ChromecastManager.available():
@@ -111,19 +133,26 @@ class CastHub:
             except Exception as e:
                 log.info("dlna: looking for TVs failed (%s)", e)
 
+        def kodis() -> None:
+            try:
+                found["kodi"] = self.kodi.scan()
+            except Exception as e:
+                log.info("kodi: looking for Kodi failed (%s)", e)
+
         threads = [threading.Thread(target=fn, daemon=True)
-                   for fn in (chromecasts, renderers)]
+                   for fn in (chromecasts, renderers, kodis)]
         for t in threads:
             t.start()
         for t in threads:
             t.join(20)
-        return found["cc"] + found["dlna"]
+        return found["cc"] + found["dlna"] + found["kodi"]
 
     def cast(self, device_name: str, url: str, title: str,
              *args: Any, **kwargs: Any) -> str:
         mgr = self._for(device_name)
-        other = self.dlna if mgr is self.chromecast else self.chromecast
-        if getattr(other, "active", None) is not None:
+        for other in self._managers():
+            if other is mgr or getattr(other, "active", None) is None:
+                continue
             # One cast at a time: moving it to another kind of device ends
             # it on the old one, or two TVs would play the same channel.
             log.info("cast: moving to %s - stopping the cast on the other "

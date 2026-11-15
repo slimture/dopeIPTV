@@ -45,7 +45,10 @@ map and the one-way import rule.
 | `providers/trakt.py` | Trakt.tv sync |
 | `providers/chromecast.py` | Chromecast support |
 | `providers/dlna.py` | DLNA / UPnP TVs (discovery, control, local file share) |
-| `providers/casting.py` | `CastHub`: Chromecast and DLNA behind one object |
+| `providers/casting.py` | `CastHub`: Chromecast, DLNA and Kodi behind one object (`plays_as_is`, `ended_elsewhere`) |
+| `providers/kodi.py` | Kodi as a cast target over JSON-RPC (HTTP): Player.Open with the source's user agent/headers as Kodi's `\|` options (never a loopback address), pause, seek, volume, state polling, a cast ended on Kodi itself; Kodis added by hand with their login (`kodi_devices`, never logged) |
+| `providers/mdns.py` | mDNS service discovery in plain Python: one legacy-unicast PTR question, PTR/SRV/A/TXT read back (how Kodi's `_xbmc-jsonrpc-h._tcp` is found) |
+| `providers/simkl.py` | Simkl client: PIN sign-in, scrobble start/pause/stop, watched marks, Plan to watch, the account's lists read back (one all-items answer); client id baked at build time (`bundled_client_id`, `_simkl_key.py`), token `simkl_access_token` |
 | `providers/cast_bridge.py` | Re-encodes audio a Chromecast refuses (E-AC-3) so the stream still casts |
 | `providers/opensubtitles.py` | OpenSubtitles.com client (search, download, file hash) |
 | `core/stores.py` | Data persistence layer |
@@ -112,6 +115,7 @@ map and the one-way import rule.
 | `core/sync.py` | Settings sync for supporters: the sync code, slot and key (HKDF), what syncs (explicit allow/deny lists), stamping, merging (last writer per entry, tombstones), the round trip to dopeiptv.org, applying what came back |
 | `core/chacha20poly1305.py` | ChaCha20-Poly1305 (RFC 8439) in plain Python, many blocks at once - what sync encrypts with |
 | `core/together.py` | Watch together: the room code (8 characters, no look-alikes), its room id and key (PBKDF2, then HKDF), messages sealed and padded (ChaCha20-Poly1305), the relay's clock (shortest round trip), the room (who is in, what plays: the newest state wins), keeping in step (`Corrector`: nothing within a second, a hold when a little ahead, a seek beyond; `LocalWatch`: a seek made here), the link to dopeiptv.org/together/ (a long poll and a sender, its own threads) |
+| `core/discord_rpc.py` | Discord status over Discord's local IPC (Unix socket / named pipe `discord-ipc-N`): frames, where Discord listens, the activity, `Presence` on its own thread (reconnects quietly); `DISCORD_APP_ID` (empty: not offered) |
 | `core/report.py` | Error reports and feedback: scrubbed of anything identifying, shown in full, sent only on Send; the native crash file |
 | `services/share.py` | dopeIPTV as a server: every source's channels as one M3U, the downloaded guides as one XMLTV (streamed) |
 | `services/failover.py` | Failover: a live channel that will not play found in another source (guide id, else name) |
@@ -164,6 +168,8 @@ map and the one-way import rule.
 | `ui/mw_report.py` | Send feedback, and the offer of a report after an error or a crash (queued; while a video plays it waits in the menu); answers to feedback (their window, the menu entry's count, when they are asked) |
 | `ui/mw_together.py` | Watch together in the window: start, join and leave (never while private viewing is on), the playback path's hooks (start, pause, stop), what the room plays found here and started where the room is (no resume question), kept in step once a second through the player's play, pause and seek; a live channel only tuned |
 | `ui/together_ui.py` | Watch together's dialog (start a room or join one by its code, the code to share, who is in) and the calm strip under the video |
+| `ui/mw_simkl.py` | Simkl in the window: scrobbles of what plays, its Settings page (only with a client id), the PIN sign-in, its watchlist and history window; marks and the watched sync go to every account through `mw_trakt`'s `_watch_accounts` |
+| `ui/mw_discord.py` | Discord status in the window: the player's hooks (start, pause, stop), nothing in private viewing, names or only "Watching TV", the card in Settings, General (only with an application id); it only watches |
 | `ui/mw_sync.py` | Settings sync in the window: when a round runs (start, after a change, every half hour, Sync now; never in a stream's first seconds), what came back put in place, its card in Settings, General |
 | `ui/mw_home.py` | The Home page: which shelves, what goes in them (drawn by `home_widgets.py`) |
 | `ui/mw_local.py` | Local files: folders, library view, music queue |
@@ -182,7 +188,8 @@ map and the one-way import rule.
 
 `ui/main_window.py` is a thin composition root: the real behaviour lives
 in the `mw_*` mixins beside it, each mixed into `MainWindow`:
-`mw_settings`, `mw_trakt`, `mw_recording`, `mw_context`, `mw_favorites`
+`mw_settings`, `mw_trakt` (Trakt, and the watched sync over every account),
+`mw_simkl` (Simkl), `mw_discord` (Discord status), `mw_recording`, `mw_context`, `mw_favorites`
 (several favorites at once, move between folders, drag-and-drop), `mw_home`
 (Home), `mw_local` (local files), `mw_multiview` (multiview), `mw_detail`,
 `mw_search` (sidebar search), `mw_sidebar` (panel collapse / icon rail),
@@ -282,8 +289,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   `DOPEIPTV_LOG=debug` shows debug traces; `DOPEIPTV_LOG_FILE=/path` tees
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
-  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log,
-  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, connections, mirrors, conn_test, health, nerd, nerd_lists, channel_numbers, shortcut_keys, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, night_mode, rec_mp4, viewing_stats, catchup, url_rewrite, hls_cap, remote_api, events, mqtt, report, supporter, sync, chacha20poly1305, together, backup, doh, cert_pin, net_route, net_adapter, net_bridge, live_latency) and `services/` (failover, share, resume,
+  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan, kodi, mdns, simkl), lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log, player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, connections, mirrors, conn_test, health, nerd, nerd_lists, channel_numbers, shortcut_keys, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, night_mode, rec_mp4, viewing_stats, catchup, url_rewrite, hls_cap, remote_api, events, mqtt, report, supporter, sync, chacha20poly1305, discord_rpc, together, backup, doh, cert_pin, net_route, net_adapter, net_bridge, live_latency) and `services/` (failover, share, resume,
   coverart, reminders, mpris, media_session, media_macos, media_windows, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list

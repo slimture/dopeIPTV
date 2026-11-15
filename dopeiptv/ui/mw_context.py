@@ -185,7 +185,8 @@ class _ContextMenuMixin:
             # available either from a TMDB resolver or from an id the row
             # already carries (Watch Later / Watched snapshots). Without a
             # TMDB key AND without a carried id there's no way to reach Trakt.
-            trakt_ok = self.trakt.is_connected() and (
+            # Trakt, Simkl or both: the accounts signed in (mw_trakt).
+            trakt_ok = bool(self._watch_accounts()) and (
                 self.tmdb is not None
                 or isinstance(it.get("_tmdb_id"), int))
             if self.series_ctx:
@@ -208,13 +209,13 @@ class _ContextMenuMixin:
                     m.addAction(tr("ctx_unmark_watched"),
                                 lambda it=it: unmark(it, False))
                     if trakt_ok:
-                        m.addAction(tr("ctx_unmark_watched_trakt"),
+                        m.addAction(self._account_action("ctx_unmark_watched"),
                                     lambda it=it: unmark(it, True))
                 else:
                     m.addAction(tr("ctx_mark_watched"),
                                 lambda it=it: mark(it, False))
                     if trakt_ok:
-                        m.addAction(tr("ctx_mark_watched_trakt"),
+                        m.addAction(self._account_action("ctx_mark_watched"),
                                     lambda it=it: mark(it, True))
         # Watch Later toggle only for movies and shows (not episodes).
         # Also works from within the Watch Later view - the row's
@@ -233,14 +234,14 @@ class _ContextMenuMixin:
                 wl_kind = "vod" if it.get("_kind") == "movie" else None
         if wl_kind in ("vod", "series"):
             on_list = self.is_on_watchlist(it, wl_kind)
-            trakt_ok = self.trakt.is_connected() and self.tmdb is not None
+            trakt_ok = bool(self._watch_accounts()) and self.tmdb is not None
             if on_list:
                 m.addAction(
                     tr("ctx_watchlist_remove"),
                     lambda it=it, k=wl_kind: self._remove_watchlist(it, k, False))
                 if trakt_ok:
                     m.addAction(
-                        tr("ctx_watchlist_remove_trakt"),
+                        self._account_action("ctx_watchlist_remove"),
                         lambda it=it, k=wl_kind: self._remove_watchlist(
                             it, k, True))
             else:
@@ -249,7 +250,7 @@ class _ContextMenuMixin:
                     lambda it=it, k=wl_kind: self._add_watchlist(it, k, False))
                 if trakt_ok:
                     m.addAction(
-                        tr("ctx_watchlist_add_trakt"),
+                        self._account_action("ctx_watchlist_add"),
                         lambda it=it, k=wl_kind: self._add_watchlist(
                             it, k, True))
         if (self.mode in ("live", "vod", "series")
@@ -482,6 +483,14 @@ class _ContextMenuMixin:
             folder.addSeparator()
         folder.addAction(tr("ctx_new_folder"),
                          lambda: self._fav_add_many(section, items, None))
+
+    def _account_action(self, base: str) -> str:
+        """"Mark as watched + Trakt" - or + Simkl, or + both: the menu
+        entry that also tells the accounts signed in."""
+        name = self._accounts_name()
+        if name == "Trakt":
+            return tr(base + "_trakt")
+        return tr(base + "_on", service=name)
 
     def _toggle_media_fav(self, item, section: str, add: bool,
                           group: str | None = None) -> None:

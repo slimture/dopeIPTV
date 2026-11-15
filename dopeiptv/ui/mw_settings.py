@@ -737,6 +737,10 @@ class _SettingsMixin:
         clear_btn.clicked.connect(lambda: self.open_clear_history())
         c.row(tr("clear_menu"), clear_btn, tr("clear_hint"),
               search="history incognito private recently viewed")
+        # What plays, as a Discord status (mw_discord): only in a build that
+        # carries the Discord application's id.
+        if hasattr(self, "_build_discord_card"):
+            self._build_discord_card(general, d)
         c = general.card(tr("set_card_updates"))
         updates_box = c.toggle(tr("setting_check_updates"),
                                is_on("check_updates", "true"))
@@ -1815,8 +1819,9 @@ class _SettingsMixin:
                        movies=n_m, episodes=n_e))
             else:
                 sync_row.label.setText(tr("trakt_sync_never"))
+            # Trakt's, Simkl's or both: the one store they fill together.
             sync_now_btn.setEnabled(
-                self.trakt.is_connected()
+                bool(self._watch_accounts())
                 and not self._watched_sync_running)
 
         def do_sync_now():
@@ -1862,6 +1867,10 @@ class _SettingsMixin:
         trakt_watchlist_btn.clicked.connect(
             lambda: self._open_trakt_dialog(d))
         refresh_trakt_status()
+
+        # -- Simkl (mw_simkl): only in a build with its client id ------------
+        if hasattr(self, "_build_simkl_page"):
+            self._build_simkl_page(page, d)
 
         # -- Parental controls ------------------------------------------------
         par = page("parental", tr("tab_parental"),
@@ -2225,7 +2234,7 @@ class _SettingsMixin:
             (tr("set_sec_watching"), ["playback", "audio", "guide",
                                       "multiview"]),
             (tr("set_sec_library"), ["recording", "local"]),
-            (tr("set_sec_services"), ["metadata", "trakt"]),
+            (tr("set_sec_services"), ["metadata", "trakt", "simkl"]),
             # Nerd's own pages fold out under it while it is on.
             (tr("set_sec_system"), ["parental", "advanced", "nerd"]),
         ])

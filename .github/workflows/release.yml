@@ -107,6 +107,16 @@ jobs:
           else
             echo "::warning::DOPEIPTV_TMDB_KEY secret is empty - the built-in TMDB option will NOT appear in this build."
           fi
+      - name: Bake built-in Simkl client id
+        env:
+          DOPEIPTV_SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+        run: |
+          printf 'SIMKL_CLIENT_ID = "%s"\n' "${DOPEIPTV_SIMKL_CLIENT_ID}" > dopeiptv/_simkl_key.py
+          if [ -n "${DOPEIPTV_SIMKL_CLIENT_ID}" ]; then
+            echo "Built-in Simkl client id baked in (${#DOPEIPTV_SIMKL_CLIENT_ID} chars)."
+          else
+            echo "::warning::SIMKL_CLIENT_ID secret is empty - Simkl will NOT be offered in this build."
+          fi
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -229,6 +239,16 @@ jobs:
             echo "Built-in TMDB key baked in (${#DOPEIPTV_TMDB_KEY} chars)."
           else
             echo "::warning::DOPEIPTV_TMDB_KEY secret is empty - the built-in TMDB option will NOT appear in this build."
+          fi
+      - name: Bake built-in Simkl client id
+        env:
+          DOPEIPTV_SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+        run: |
+          printf 'SIMKL_CLIENT_ID = "%s"\n' "${DOPEIPTV_SIMKL_CLIENT_ID}" > dopeiptv/_simkl_key.py
+          if [ -n "${DOPEIPTV_SIMKL_CLIENT_ID}" ]; then
+            echo "Built-in Simkl client id baked in (${#DOPEIPTV_SIMKL_CLIENT_ID} chars)."
+          else
+            echo "::warning::SIMKL_CLIENT_ID secret is empty - Simkl will NOT be offered in this build."
           fi
       - uses: actions/setup-python@v6
         with:
@@ -782,6 +802,16 @@ jobs:
           else
             echo "::warning::DOPEIPTV_TMDB_KEY secret is empty - the built-in TMDB option will NOT appear in this build."
           fi
+      - name: Bake built-in Simkl client id
+        env:
+          DOPEIPTV_SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+        run: |
+          printf 'SIMKL_CLIENT_ID = "%s"\n' "${DOPEIPTV_SIMKL_CLIENT_ID}" > dopeiptv/_simkl_key.py
+          if [ -n "${DOPEIPTV_SIMKL_CLIENT_ID}" ]; then
+            echo "Built-in Simkl client id baked in (${#DOPEIPTV_SIMKL_CLIENT_ID} chars)."
+          else
+            echo "::warning::SIMKL_CLIENT_ID secret is empty - Simkl will NOT be offered in this build."
+          fi
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -1283,6 +1313,15 @@ jobs:
           if [ -z "${DOPEIPTV_TMDB_KEY}" ]; then
             echo "::warning::DOPEIPTV_TMDB_KEY secret is empty - the built-in TMDB option will NOT appear in this build."
           fi
+      - name: Bake built-in Simkl client id
+        shell: bash
+        env:
+          DOPEIPTV_SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+        run: |
+          printf 'SIMKL_CLIENT_ID = "%s"\n' "${DOPEIPTV_SIMKL_CLIENT_ID}" > dopeiptv/_simkl_key.py
+          if [ -z "${DOPEIPTV_SIMKL_CLIENT_ID}" ]; then
+            echo "::warning::SIMKL_CLIENT_ID secret is empty - Simkl will NOT be offered in this build."
+          fi
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -1637,6 +1676,16 @@ jobs:
             echo "Built-in TMDB key baked in (${#DOPEIPTV_TMDB_KEY} chars)."
           else
             echo "::warning::DOPEIPTV_TMDB_KEY secret is empty - the built-in TMDB option will NOT appear in this build."
+          fi
+      - name: Bake built-in Simkl client id
+        env:
+          DOPEIPTV_SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+        run: |
+          printf 'SIMKL_CLIENT_ID = "%s"\n' "${DOPEIPTV_SIMKL_CLIENT_ID}" > dopeiptv/_simkl_key.py
+          if [ -n "${DOPEIPTV_SIMKL_CLIENT_ID}" ]; then
+            echo "Built-in Simkl client id baked in (${#DOPEIPTV_SIMKL_CLIENT_ID} chars)."
+          else
+            echo "::warning::SIMKL_CLIENT_ID secret is empty - Simkl will NOT be offered in this build."
           fi
       - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:

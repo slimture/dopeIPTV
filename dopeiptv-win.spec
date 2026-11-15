@@ -116,6 +116,8 @@ if os.path.exists(os.path.join("dopeiptv", "_tmdb_key.py")):
     hiddenimports += ["dopeiptv._tmdb_key"]
 if os.path.exists(os.path.join("dopeiptv", "_opensubtitles_key.py")):
     hiddenimports += ["dopeiptv._opensubtitles_key"]
+if os.path.exists(os.path.join("dopeiptv", "_simkl_key.py")):
+    hiddenimports += ["dopeiptv._simkl_key"]
 
 _icon = os.path.join("packaging", "dopeIPTV.ico")
 icon = (_icon if os.path.exists(_icon)

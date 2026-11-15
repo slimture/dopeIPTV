@@ -1081,7 +1081,7 @@ class ChromecastManager:
 
 
 class CastDialog(QDialog):
-    """Scan for Chromecasts and DLNA TVs and cast a stream to one."""
+    """Scan for Chromecasts, DLNA TVs and Kodis and cast a stream to one."""
 
     def __init__(self, window: object, url: str, title: str,
                  codecs: list[str] | None = None,
@@ -1144,6 +1144,16 @@ class CastDialog(QDialog):
         self.list = QListWidget()
         self.list.itemDoubleClicked.connect(lambda _i: self._cast())
         lay.addWidget(self.list, 1)
+        # A Kodi that mDNS does not find (another subnet, announcing off), or
+        # one whose web server wants a login: added by hand. The window owns
+        # that form (ui/mw_cast.py), so the button is there only with it.
+        self.kodi_btn = QPushButton(tr("cast_add_kodi"))
+        self.kodi_btn.clicked.connect(self._add_kodi)
+        self.kodi_btn.setVisible(callable(getattr(window, "add_kodi", None)))
+        kodi_row = QHBoxLayout()
+        kodi_row.addWidget(self.kodi_btn)
+        kodi_row.addStretch(1)
+        lay.addLayout(kodi_row)
 
         # Audio and subtitle choice. Both are honoured by converting the
         # stream here, because the receiver plays whatever the stream hands it
@@ -1315,8 +1325,14 @@ class CastDialog(QDialog):
         return f"cast_quality_{device}"
 
     def _is_dlna(self, name: str | None) -> bool:
-        is_dlna = getattr(self.window.cast, "is_dlna", None)
-        return bool(callable(is_dlna) and is_dlna(name))
+        """A device that plays the stream as it is: a DLNA TV or a Kodi."""
+        hub = self.window.cast
+        as_is = getattr(hub, "plays_as_is", None) or getattr(hub, "is_dlna", None)
+        return bool(callable(as_is) and as_is(name))
+
+    def _is_kodi(self, name: str | None) -> bool:
+        is_kodi = getattr(self.window.cast, "is_kodi", None)
+        return bool(callable(is_kodi) and is_kodi(name))
 
     def _show_device_quality(self) -> None:
         """Show what this device is remembered as being."""
@@ -1327,6 +1343,10 @@ class CastDialog(QDialog):
         # is fed through.
         for row in self.track_rows:
             row.setVisible(not dlna)
+        if dlna:
+            self.dlna_note.setText(tr("cast_kodi_note")
+                                   if self._is_kodi(item.text())
+                                   else tr("cast_dlna_note"))
         self.dlna_note.setVisible(dlna)
         if dlna:
             self.track_note.hide()
@@ -1492,6 +1512,33 @@ class CastDialog(QDialog):
                                                  self.height,
                                                  self.fps, dvr),
                   done, failed)
+
+    def _add_kodi(self) -> None:
+        """Add a Kodi by its address, or give a listed one its login."""
+        item = self.list.currentItem()
+        current = item.text() if item is not None and self._is_kodi(item.text()) else None
+        label = self.window.add_kodi(self, current)
+        if label is None:
+            return
+        # The one it was opened on goes when it is forgotten, or now has
+        # another name at the same address; a Kodi at a new address is one
+        # more, beside it.
+        known = getattr(getattr(self.window.cast, "kodi", None), "devices", None)
+        if current and label != current and (known is None or current not in known):
+            for i in range(self.list.count()):
+                if self.list.item(i).text() == current:
+                    self.list.takeItem(i)
+                    break
+        if label:
+            if not any(self.list.item(i).text() == label
+                       for i in range(self.list.count())):
+                self.list.addItem(label)
+            for i in range(self.list.count()):
+                if self.list.item(i).text() == label:
+                    self.list.setCurrentRow(i)
+                    break
+        names = [self.list.item(i).text() for i in range(self.list.count())]
+        self.window.settings.setValue("cast_devices", "\n".join(names))
 
     def _banner(self, device: str | None, title: str) -> None:
         show = getattr(self.window, "show_cast_strip", None)

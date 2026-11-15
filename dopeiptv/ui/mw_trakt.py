@@ -1,6 +1,8 @@
 """Extracted from main_window.py (mixin); MainWindow inherits this.
 
-Verbatim move - self.* access and behaviour unchanged.
+Trakt's sign-in, its scrobbles, and the watched and watch-later sync - which
+reads and writes every watch account signed in: Trakt, Simkl (mw_simkl.py)
+or both. The stores' "Trakt" layer holds what those accounts say together.
 """
 
 from __future__ import annotations
@@ -37,6 +39,42 @@ def device_pages(data: dict) -> tuple[str, str]:
 
 class _TraktMixin:
     """MainWindow mixin: Trakt sign-in, watched-history sync and the watchlist/history view."""
+
+    # -- the watch accounts: Trakt, Simkl, both or none ------------------------
+
+    def _watch_accounts(self) -> list:
+        """The accounts that keep what is watched, signed in now."""
+        out = []
+        for name in ("trakt", "simkl"):
+            acc = getattr(self, name, None)
+            if acc is not None and acc.is_connected():
+                out.append(acc)
+        return out
+
+    def _accounts_name(self) -> str:
+        """"Trakt", "Simkl" or "Trakt + Simkl": the accounts signed in."""
+        names = [n for n, attr in (("Trakt", "trakt"), ("Simkl", "simkl"))
+                 if getattr(self, attr, None) is not None
+                 and getattr(self, attr).is_connected()]
+        return " + ".join(names)
+
+    def _accounts_push(self, method: str, *args) -> None:
+        """Tell every signed-in account the same change (a method of the
+        account clients: add_movie_history, remove_show_watchlist, ...), on
+        a daemon thread - killed at quit, so a request in flight never
+        crashes teardown."""
+        accounts = self._watch_accounts()
+        if not accounts:
+            return
+
+        def job() -> None:
+            for acc in accounts:
+                try:
+                    getattr(acc, method)(*args)
+                except Exception as e:
+                    log.debug("%s: %s failed (%s)", type(acc).__name__,
+                              method, type(e).__name__)
+        threading.Thread(target=job, daemon=True).start()
     def _trakt_start_for_item(self, kind: str, item) -> None:
         from ..core import privacy
         if not item or not self.trakt.is_connected() or privacy.private():
@@ -101,7 +139,8 @@ class _TraktMixin:
     _WATCHED_SYNC_TTL: int = 3600
 
     def _maybe_sync_watched(self, force: bool = False) -> None:
-        if not self.trakt.is_connected() or self._watched_sync_running:
+        accounts = self._watch_accounts()
+        if not accounts or self._watched_sync_running:
             return
         if not force:
             age = int(datetime.now().timestamp()) - self.watched.last_sync_at
@@ -118,11 +157,22 @@ class _TraktMixin:
         def worker() -> None:
             movie_titles: dict[int, str] = {}
             show_titles: dict[int, str] = {}
+            movies: list[int] = []
+            shows: dict[int, list[list[int]]] = {}
+            wl_movies: list[int] = []
+            wl_shows: list[int] = []
             try:
-                movies = self.trakt.watched_movies(movie_titles)
-                shows = self.trakt.watched_shows(show_titles)
-                wl_movies = self.trakt.watchlist_movies()
-                wl_shows = self.trakt.watchlist_shows()
+                # Every account signed in, together: what one of them says
+                # is watched is watched. One that cannot be read leaves all
+                # of it as it was - its titles would otherwise lose their
+                # marks until the next sync.
+                for acc in accounts:
+                    movies += acc.watched_movies(movie_titles)
+                    for tid, eps in acc.watched_shows(show_titles).items():
+                        have = shows.setdefault(tid, [])
+                        have += [e for e in eps if e not in have]
+                    wl_movies += acc.watchlist_movies()
+                    wl_shows += acc.watchlist_shows()
             except Exception:
                 # Marshal back to the main thread just to flip the
                 # running flag; QTimer.singleShot from a non-Qt thread
@@ -149,43 +199,44 @@ class _TraktMixin:
 
         threading.Thread(target=worker, daemon=True).start()
 
+    def _push_to_accounts(self, method: str, *args) -> bool:
+        """Runs on the sync worker thread: *method* on every signed-in
+        account; True when at least one took it."""
+        took = False
+        for acc in self._watch_accounts():
+            try:
+                getattr(acc, method)(*args)
+                took = True
+            except Exception:
+                continue
+        return took
+
     def _push_local_watched_to_trakt(self) -> None:
         """Runs on the sync worker thread. Best-effort POST of local-only
-        watched marks to Trakt; each accepted item is promoted to the
-        Trakt layer so the next sync keeps it and we never double-post."""
+        watched marks to the accounts (Trakt, Simkl); each accepted item is
+        promoted to the Trakt layer so the next sync keeps it and we never
+        double-post."""
         movies, episodes = self.watched.pending_trakt_pushes()
         for tid in movies:
-            try:
-                self.trakt.add_movie_history(tid)
-            except Exception:
-                continue
-            self.watched.mark_movie_synced(tid)
+            if self._push_to_accounts("add_movie_history", tid):
+                self.watched.mark_movie_synced(tid)
         for show_id, season, episode in episodes:
-            try:
-                self.trakt.add_episode_history(show_id, season, episode)
-            except Exception:
-                continue
-            self.watched.mark_episode_synced(show_id, season, episode)
+            if self._push_to_accounts("add_episode_history", show_id, season,
+                                      episode):
+                self.watched.mark_episode_synced(show_id, season, episode)
         for show_id in self.watched.pending_show_pushes():
-            try:
-                self.trakt.add_show_history(show_id)
-            except Exception:
-                continue
-            self.watched.mark_show_synced(show_id)
+            if self._push_to_accounts("add_show_history", show_id):
+                self.watched.mark_show_synced(show_id)
         wl_movies, wl_shows = self.watchlist.pending_trakt_pushes()
         for tid in wl_movies:
-            try:
-                self.trakt.add_movie_watchlist(tid)
-            except Exception:
-                continue
-            self.watchlist.mark_movie_synced(tid)
+            if self._push_to_accounts("add_movie_watchlist", tid):
+                self.watchlist.mark_movie_synced(tid)
         for tid in wl_shows:
-            try:
-                self.trakt.add_show_watchlist(tid)
-            except Exception:
-                continue
-            self.watchlist.mark_show_synced(tid)
-        self._push_local_favorites_to_trakt()
+            if self._push_to_accounts("add_show_watchlist", tid):
+                self.watchlist.mark_show_synced(tid)
+        # The favourites list is Trakt's own; Simkl has nothing like it.
+        if self.trakt.is_connected():
+            self._push_local_favorites_to_trakt()
 
     def _push_local_favorites_to_trakt(self) -> None:
         """Runs on the sync worker thread. Upload any movie/series
@@ -231,10 +282,9 @@ class _TraktMixin:
         lists, and only when a Trakt account is connected."""
         cur = self.cat_list.currentItem()
         data = cur.data(Qt.ItemDataRole.UserRole) if cur else None
-        show = self.trakt.is_connected() and (
-            self.mode == "watched"
-            or (self.mode == "fav" and isinstance(data, tuple)
-                and data[0] == "trakt"))
+        show = ((self.mode == "watched" and bool(self._watch_accounts()))
+                or (self.trakt.is_connected() and self.mode == "fav"
+                    and isinstance(data, tuple) and data[0] == "trakt"))
         # Never on the collapsed icon rail - a red text button has no place
         # there, and it belongs to the expanded sidebar only.
         show = show and not getattr(self, "_sidebar_collapsed", False)
@@ -535,9 +585,9 @@ class _TraktMixin:
             except (TypeError, ValueError):
                 return
         self.watched.add_local_item(item, "vod", tid)
-        if push_to_trakt and self.trakt.is_connected():
+        if push_to_trakt and self._watch_accounts():
             if tid is not None:
-                self._trakt_push(lambda: self.trakt.add_movie_history(tid))
+                self._accounts_push("add_movie_history", tid)
             elif self.tmdb is not None:
                 # Not resolved yet - look the id up on demand, then
                 # upgrade the local mark to tmdb-keyed and push.
@@ -554,7 +604,7 @@ class _TraktMixin:
             return
         self.watched.mark_movie_local(tid)
         self.watched.add_local_item(item, "vod", tid)
-        self._trakt_push(lambda: self.trakt.add_movie_history(tid))
+        self._accounts_push("add_movie_history", tid)
         self.list_model.refresh_all()
 
     def _unmark_movie_watched(self, item: dict,
@@ -568,13 +618,8 @@ class _TraktMixin:
         except (TypeError, ValueError):
             pass
         self.watched.remove_local_item("vod", tid, item.get("stream_id"))
-        if push_to_trakt and tid is not None and self.trakt.is_connected():
-            def job(tid=tid):
-                try:
-                    self.trakt.remove_movie_history(tid)
-                except Exception:
-                    pass
-            threading.Thread(target=job, daemon=True).start()
+        if push_to_trakt and tid is not None:
+            self._accounts_push("remove_movie_history", tid)
         self.list_model.refresh_all()
 
     def _mark_episode_watched(self, item: dict,
@@ -598,10 +643,9 @@ class _TraktMixin:
         if self.series_ctx:
             self.watched.add_local_item(self.series_ctx, "series", sid)
         if (push_to_trakt and season is not None
-                and self.trakt.is_connected()):
+                and self._watch_accounts()):
             if sid is not None:
-                self._trakt_push(
-                    lambda: self.trakt.add_episode_history(sid, season, episode))
+                self._accounts_push("add_episode_history", sid, season, episode)
             elif self.tmdb is not None and self.series_ctx is not None:
                 self._resolve_tmdb_id_async(
                     self.series_ctx, "series",
@@ -618,8 +662,7 @@ class _TraktMixin:
             return
         self.watched.mark_episode_local(tid, season, episode)
         self.watched.add_local_item(series_item, "series", tid)
-        self._trakt_push(
-            lambda: self.trakt.add_episode_history(tid, season, episode))
+        self._accounts_push("add_episode_history", tid, season, episode)
         self.list_model.refresh_all()
 
     def _unmark_episode_watched(self, item: dict,
@@ -648,14 +691,8 @@ class _TraktMixin:
                     self._as_int(series_sid)))
             if not still_watched:
                 self.watched.remove_local_item("series", sid, series_sid)
-        if (push_to_trakt and sid is not None and season is not None
-                and self.trakt.is_connected()):
-            def job(sid=sid, s=season, e=episode):
-                try:
-                    self.trakt.remove_episode_history(sid, s, e)
-                except Exception:
-                    pass
-            threading.Thread(target=job, daemon=True).start()
+        if push_to_trakt and sid is not None and season is not None:
+            self._accounts_push("remove_episode_history", sid, season, episode)
         self.list_model.refresh_all()
 
     def _mark_series_watched(self, item: dict,
@@ -675,8 +712,8 @@ class _TraktMixin:
             # can push it to Trakt even if the user chose the local-only
             # variant; the +Trakt variant also pushes right away.
             self.watched.mark_show_local(tid)
-            if push_to_trakt and self.trakt.is_connected():
-                self._trakt_push(lambda: self.trakt.add_show_history(tid))
+            if push_to_trakt and self._watch_accounts():
+                self._accounts_push("add_show_history", tid)
                 self.watched.mark_show_synced(tid)
         elif self.tmdb is not None:
             # No cached id yet - resolve it in the background so the show
@@ -700,9 +737,9 @@ class _TraktMixin:
             return
         self.watched.mark_show_local(tid)
         self.watched.add_local_item(item, "series", tid)
-        if push_to_trakt and self.trakt.is_connected():
+        if push_to_trakt and self._watch_accounts():
             self.watched.mark_show_synced(tid)
-            self._trakt_push(lambda: self.trakt.add_show_history(tid))
+            self._accounts_push("add_show_history", tid)
         self.list_model.refresh_all()
 
     def _unmark_series_watched(self, item: dict,
@@ -723,9 +760,8 @@ class _TraktMixin:
             self.watched._save()
         self.watched.remove_local_item(
             "series", tid, item.get("series_id") or item.get("stream_id"))
-        if (push_to_trakt and isinstance(tid, int)
-                and self.trakt.is_connected()):
-            self._trakt_push(lambda: self.trakt.remove_show_history(tid))
+        if push_to_trakt and isinstance(tid, int):
+            self._accounts_push("remove_show_history", tid)
         self.list_model.refresh_all()
 
     # -- Watch Later (local toggle + optional Trakt push) --------------------
@@ -749,21 +785,16 @@ class _TraktMixin:
         tid = self._tmdb_id_for_item(item, kind)
         if kind == "vod":
             self.watchlist.add_movie_local(item, tid)
-            trakt_fn = self.trakt.add_movie_watchlist
+            method = "add_movie_watchlist"
         else:
             self.watchlist.add_show_local(item, tid)
-            trakt_fn = self.trakt.add_show_watchlist
+            method = "add_show_watchlist"
         self._refresh_nav_status()      # Watch later's count
         if push_to_trakt:
             if tid is None:
                 self._error(tr("mark_needs_tmdb"))
-            elif self.trakt.is_connected():
-                def job(tid=tid, fn=trakt_fn):
-                    try:
-                        fn(tid)
-                    except Exception:
-                        pass
-                threading.Thread(target=job, daemon=True).start()
+            else:
+                self._accounts_push(method, tid)
 
     def _remove_watchlist(self, item: dict, kind: str,
                           push_to_trakt: bool) -> None:
@@ -776,18 +807,13 @@ class _TraktMixin:
             sid_int = None
         if kind == "vod":
             self.watchlist.remove_movie(tid, sid_int)
-            trakt_fn = self.trakt.remove_movie_watchlist
+            method = "remove_movie_watchlist"
         else:
             self.watchlist.remove_show(tid, sid_int)
-            trakt_fn = self.trakt.remove_show_watchlist
+            method = "remove_show_watchlist"
         self._refresh_nav_status()      # Watch later's count
-        if push_to_trakt and tid is not None and self.trakt.is_connected():
-            def job(tid=tid, fn=trakt_fn):
-                try:
-                    fn(tid)
-                except Exception:
-                    pass
-            threading.Thread(target=job, daemon=True).start()
+        if push_to_trakt and tid is not None:
+            self._accounts_push(method, tid)
         # If we're currently in the Watch Later view, drop the row.
         if self.mode == "watchlist":
             self._load_items(getattr(self, "_watchlist_subcat", None))

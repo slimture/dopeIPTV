@@ -29,5 +29,7 @@ recordings/
 dopeiptv/_tmdb_key.py
 # The same for the built-in OpenSubtitles key (_opensubtitles_key.py.example).
 dopeiptv/_opensubtitles_key.py
+# And the built-in Simkl client id (_simkl_key.py.example).
+dopeiptv/_simkl_key.py
 # Helper worktrees of a coding assistant, never part of the repo.
 .claude/worktrees/
