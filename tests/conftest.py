@@ -41,3 +41,14 @@ def _collect_between_tests():
     yield
     _gen, _state["last_full"] = collect_due(
         _state["last_full"], time.monotonic(), full_every=10.0)
+
+
+@pytest.fixture(autouse=True)
+def _build_from_source():
+    """Each test runs as a copy from source (core/build_check.py): the
+    verdict is kept for the session, and a test that pretends to be a
+    frozen bundle left "modified" behind for every test after it."""
+    from dopeiptv.core import build_check
+    build_check.set_verdict(build_check.Verdict(build_check.SOURCE))
+    yield
+    build_check.set_verdict(None)
