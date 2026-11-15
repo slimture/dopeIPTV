@@ -3,8 +3,8 @@ agent, headers and proxy (else the Nerd page's), rewrite rules for its
 stream addresses (core/url_rewrite.py, ui/rewrite_rules.py), a test of the
 connection to it (core/conn_test.py), its backup addresses
 (core/mirrors.py), its catch-up address (core/catchup.py), and what each
-kind of box can be told - Enigma2's stream port, Tvheadend's stream
-profile, HDHomeRun's transcoding. Only there while Nerd is on, and folded
+kind of box can be told - Enigma2's stream port and its box's transcoding
+(port 8002), Tvheadend's stream profile, HDHomeRun's transcoding. Only there while Nerd is on, and folded
 until opened. Only what differs from the default is stored."""
 
 from __future__ import annotations
@@ -29,6 +29,8 @@ TVH_PROFILES = ["", "pass", "matroska", "htsp", "audio", "webtv-h264-aac-mpegts"
                 "webtv-h264-aac-matroska", "webtv-vp8-vorbis-webm"]
 HDHR_TRANSCODE = ["", "heavy", "mobile", "internet720", "internet540", "internet480",
                   "internet360", "internet240"]
+# An Enigma2 box's hardware transcoding (port 8002): off, or a step.
+E2_TRANSCODE = ["", "low", "medium", "high", "full"]
 # What a backup address of each kind looks like.
 MIRROR_HINTS = {"xtream": "http://backup.example.com:8080",
                 "m3u": "https://backup.example.com/playlist.m3u",
@@ -48,7 +50,8 @@ EXAMPLE_LIVE = "http://example.com/channel/index.m3u8"
 SWITCHES = {
     "enigma2": [("stream_login", "nerd_src_stream_login", True), ("iptv_direct", "nerd_src_iptv_direct", True),
                 ("radio", "nerd_src_radio", True), ("picons", "nerd_src_picons", True),
-                ("recordings", "nerd_src_recordings", True)],
+                ("recordings", "nerd_src_recordings", True),
+                ("transcode_more", "nerd_src_transcode_more", False)],
     "tvheadend": [("recordings", "nerd_src_recordings", True)],
     "hdhomerun": [("show_drm", "nerd_src_show_drm", False), ("cloud_guide", "nerd_src_cloud_guide", True),
                   ("hd_group", "nerd_src_hd_group", False)],
@@ -174,6 +177,11 @@ class SourceNerdPanel(QWidget):
         for t in HDHR_TRANSCODE:
             self.transcode.addItem(t or tr("nerd_src_no_transcode"), t)
         self.transcode.setCurrentIndex(max(0, self.transcode.findData(str(o.get("transcode") or ""))))
+        self.e2_transcode = QComboBox()
+        for t in E2_TRANSCODE:
+            self.e2_transcode.addItem(self._e2_step_label(t), t)
+        self.e2_transcode.setCurrentIndex(max(0, self.e2_transcode.findData(str(o.get("transcode") or ""))))
+        self.e2_transcode.setToolTip(tr("nerd_src_e2_transcode_hint"))
         self.ms_quality = QComboBox()
         for q in MS_QUALITY:
             self.ms_quality.addItem(tr("ms_quality_mbps", n=q) if q else tr("ms_quality_original"), q)
@@ -207,6 +215,16 @@ class SourceNerdPanel(QWidget):
         self.set_kind(kind)
         self.toggle.setChecked(False)
         self._fold(False)
+
+    @staticmethod
+    def _e2_step_label(step: str) -> str:
+        """An Enigma2 transcoding step as the list shows it: its name, what
+        it asks the box for."""
+        from ..providers.enigma2 import TRANSCODE_STEPS
+        if step not in TRANSCODE_STEPS:
+            return tr("nerd_src_no_transcode")
+        rate, width, height = TRANSCODE_STEPS[step]
+        return f"{tr('e2_tc_' + step)} · {rate / 1e6:g} Mbit/s · {width}×{height}"
 
     @staticmethod
     def _set_editable(box: QComboBox, value: str) -> None:
@@ -256,6 +274,7 @@ class SourceNerdPanel(QWidget):
             self.cu_line.show_preview()
         if kind == "enigma2":
             self.form.addRow(tr("nerd_src_stream_port"), self.port)
+            self.form.addRow(tr("nerd_src_e2_transcode"), self.e2_transcode)
         elif kind == "tvheadend":
             self.form.addRow(tr("nerd_src_profile"), self.profile)
         elif kind == "hdhomerun":
@@ -313,6 +332,8 @@ class SourceNerdPanel(QWidget):
                 out["profile"] = str(prof)
         if self._kind == "hdhomerun" and self.transcode.currentData():
             out["transcode"] = self.transcode.currentData()
+        if self._kind == "enigma2" and self.e2_transcode.currentData():
+            out["transcode"] = self.e2_transcode.currentData()
         if self._kind in MEDIA_KINDS and self.ms_quality.currentData():
             out["ms_quality"] = self.ms_quality.currentData()
         for key, _label, default in SWITCHES.get(self._kind, []):

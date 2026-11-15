@@ -78,6 +78,11 @@ def format_size(nbytes: float) -> str:
     return f"{nbytes:.1f} TB"
 
 
+#: Why a recording from a box failed when what came is encrypted: the box
+#: has no card, CI module or rights for the channel (ui/mw_box.py).
+SCRAMBLED = "the box cannot decrypt this channel"
+
+
 class RecordingManager(QObject):
     """Records live streams to local files.
 

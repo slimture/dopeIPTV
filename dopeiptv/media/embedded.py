@@ -275,6 +275,8 @@ class _StatsLabel(QLabel):
     toggled = pyqtSignal()
     #: The lines of the compact view.
     COMPACT = ("Video", "Audio", "HW dec", "Dropped", "Bitrate", "Cache", "Net")
+    #: Lines in both views when there are any: a box's signal.
+    ALWAYS = ("SNR",)
 
     def __init__(self, parent) -> None:
         super().__init__("", parent)
@@ -303,7 +305,8 @@ class _StatsLabel(QLabel):
                 f"<tr><td style='color:#9A9AA8; padding:1px 12px 1px 0'>{escape(k)}</td>"
                 f"<td style='color:#F2F2F6; font-family:monospace; padding:1px 0'>{escape(str(v))}</td></tr>"
                 for k, v in rows) + "</table>")
-        shown = [[r for r in g if not self.compact or r[0] in self.COMPACT] for g in groups]
+        shown = [[r for r in g if not self.compact or r[0] in self.COMPACT or r[0] in self.ALWAYS]
+                 for g in groups]
         shown = [g for g in shown if g]
         if columns > 1 and len(shown) > 1:
             cells = "<td width='22'></td>".join(f"<td valign='top'>{table(g)}</td>" for g in shown)
@@ -527,6 +530,9 @@ class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
     # The stream play() opened is playing, once per play(): how many seconds
     # it had already played when the poll saw it (stream health, Nerd).
     first_frame = pyqtSignal(float)
+    # The stream stats (I) came up or went: what the window polls for them
+    # (a box's signal) runs only while they show.
+    stats_shown = pyqtSignal(bool)
     finished = pyqtSignal()
     next_episode = pyqtSignal()
     paused_changed = pyqtSignal(bool)
@@ -1022,6 +1028,9 @@ class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
         # froze the picture every time. As the player's child it no longer
         # touches the GL widget's child list.
         self._stats_overlay = _StatsLabel(self)
+        # Lines the window adds under the stats (a box's signal), as
+        # (name, value); kept up to date by it while stats_shown says so.
+        self.stats_extra: list[tuple[str, str]] = []
         self._stats_overlay.toggled.connect(lambda: self._update_stats_text())
         self._stats_overlay.hide()
         self._stats_timer = QTimer(self)
@@ -3441,12 +3450,15 @@ class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
         if self._stats_overlay.isVisible():
             self._stats_overlay.hide()
             self._stats_timer.stop()
+            self.stats_shown.emit(False)
             return
         self._update_stats_text()
         self._stats_overlay.show()
         self._stats_overlay.raise_()
         self._place_stats()
         self._stats_timer.start()
+        if self._stats_timer.isActive():
+            self.stats_shown.emit(True)
 
     def _keep_stats_up(self) -> None:
         """Stats that are on (their timer runs) stay on: shown over the
@@ -3468,7 +3480,9 @@ class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
         m = self.video.mpv
         if m is None:
             self._stats_overlay.hide()
-            self._stats_timer.stop()
+            if self._stats_timer.isActive():
+                self._stats_timer.stop()
+                self.stats_shown.emit(False)
             return
 
         def prop(name, fmt=str):
@@ -3541,7 +3555,7 @@ class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
             ("Format", prop('file-format')),
             ("Protocol", prop('stream-path', lambda v: v.split('://')[0] if '://' in str(v) else str(v))),
         ]
-        self._stats_groups = [stream, self._nerd_stats(prop)]
+        self._stats_groups = [stream, self._nerd_stats(prop), list(self.stats_extra)]
         self._place_stats()
 
     def _remember_delay(self, value: float) -> None:
@@ -4026,7 +4040,9 @@ class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
         self._pos_timer.stop()
         self._hide_seek_ui()
         self._stats_overlay.hide()
-        self._stats_timer.stop()
+        if self._stats_timer.isActive():
+            self._stats_timer.stop()
+            self.stats_shown.emit(False)
         self.live_badge.hide()
         self.ts_timeline.hide()
         self._sync_pause_label(True)

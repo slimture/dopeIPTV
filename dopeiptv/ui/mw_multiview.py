@@ -523,6 +523,33 @@ class _MultiviewCell(QWidget):
         self.title = self._title.text()
         self._title.setVisible(True)
         self._title.adjustSize()
+        self._check_scrambled()
+
+    def _check_scrambled(self) -> None:
+        """A box's channel that will not play: one the box cannot decrypt is
+        said so in the cell (asked off the window's thread, of the box's
+        own streams only)."""
+        check = getattr(self._client, "scrambled", None)
+        url = self._live_url
+        if not callable(check) or not url:
+            return
+        from PyQt6.QtCore import QThreadPool
+
+        from ..core.workers import run_async
+        self._scramble_url = url
+        run_async(QThreadPool.globalInstance(), check, self._scramble_said, None, url)
+
+    def _scramble_said(self, found) -> None:
+        from PyQt6 import sip
+        if sip.isdeleted(self) or found is not True:
+            return
+        if self._live_url != getattr(self, "_scramble_url", None) or self._ts_seg_start is not None:
+            return
+        name = (self._item or {}).get("name") or ""
+        self._title.setText(tr("mv_cell_scrambled", title=name))
+        self.title = self._title.text()
+        self._title.setVisible(True)
+        self._title.adjustSize()
 
     def set_focused(self, on: bool) -> None:
         self._focused = on
@@ -1258,7 +1285,10 @@ class _MultiviewMixin:
             return
         fmt = self.settings.value("stream_format", "ts")
         try:
-            url = self.client.live_url(sid, fmt)
+            # A box that transcodes says which address (ui/mw_box.py).
+            play = getattr(self, "_live_play_url", None)
+            url = (play(sid, fmt, "multiview") if play is not None
+                   else self.client.live_url(sid, fmt))
         except Exception:
             url = it.get("_url")
         # Watching in multiview counts as watching - record it in History

@@ -84,7 +84,9 @@ class _CastMixin:
         source = url
         sid = it.get("stream_id")
         if live and sid is not None:
-            url = self.client.live_url(sid, "m3u8")
+            play = getattr(self, "_live_play_url", None)
+            url = (play(sid, "m3u8", "cast") if play is not None
+                   else self.client.live_url(sid, "m3u8"))
         elif row_kind in ("movie", "vod") and sid is not None:
             # Build the film's own address rather than trust what the section
             # produced. In the Favorites channel folders _stream_for answers

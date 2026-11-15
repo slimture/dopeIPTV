@@ -268,6 +268,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.rec.address_for = self._rec_address_for
         self.rec.jobs_changed.connect(self._recordings_changed)
         self.rec.recording_stopped.connect(self._on_recording_stopped)
+        # A box's channel it cannot decrypt, said as the recording's reason.
+        self.rec.recording_stopped.connect(self._box_rec_stopped)
         # Events pushed out (Nerd): they only watch.
         self.rec.recording_stopped.connect(self._events_rec_stopped)
         self.rec.jobs_changed.connect(self._events_jobs)
@@ -1327,6 +1329,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.reopen_live.connect(self._reopen_live_edge)
             self.player.first_frame.connect(self._health_frame)
             self.player.stream_info_changed.connect(self._remember_stream_info)
+            # A box's signal in the stream stats, polled only while they show.
+            self.player.stats_shown.connect(self._box_stats_shown)
             # Before _on_player_finished, which may start the next episode.
             self.player.finished.connect(self._events_finished)
             self.player.finished.connect(self._stats_end)
@@ -3724,7 +3728,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if (self.mode == "live" or it.get("_kind") == "live" or (
                 self.mode == "fav" and self._fav_section == "chan")):
             fmt = self.settings.value("stream_format", "ts")
-            return self.client.live_url(it.get("stream_id"), fmt), title
+            return self._live_stream_address(it.get("stream_id"), fmt), title
         # Watch Later snapshots carry `_kind` set to "vod" or "series"
         # so the same movie playback code path works from that view
         # even though self.mode is 'watchlist'.
@@ -3743,13 +3747,21 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # /movie/user/pass/None.<ext> and a stream error.
         return it.get("_url"), title
 
+    def _live_stream_address(self, stream_id, fmt: str) -> str:
+        """A live channel's address for the player: what a transcoding box
+        gives (ui/mw_box.py), else the source's live_url."""
+        play = getattr(self, "_live_play_url", None)
+        if play is not None:
+            return play(stream_id, fmt)
+        return self.client.live_url(stream_id, fmt)
+
     def play_live_channel(self, it) -> None:
         fmt = self.settings.value("stream_format", "ts")
         if self._links_later(
                 lambda: self.client.live_url(it.get("stream_id"), fmt),
                 lambda: self.play_live_channel(it)):
             return
-        url = self.client.live_url(it.get("stream_id"), fmt)
+        url = self._live_stream_address(it.get("stream_id"), fmt)
         title = it.get("name") or "dopeIPTV"
         self._start_playback(url, title, it.get("stream_icon"),
                              self._item_key(it), "live", item=it)
@@ -4363,7 +4375,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # predates stream_id enrichment.
             if sid is not None:
                 fmt = self.settings.value("stream_format", "ts")
-                url = self.client.live_url(sid, fmt)
+                url = self._live_stream_address(sid, fmt)
             else:
                 url = it.get("_url")
             title = it.get("name") or "dopeIPTV"
@@ -5500,6 +5512,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # slow attempt. A successful play resets the counters after 20 s.
             self._health_stuck()
             self._arm_slow_reconnect()
+            # A box's channel it cannot decrypt is said so (ui/mw_box.py).
+            told = getattr(self, "_box_no_picture", None)
+            if told is not None:
+                told()
             return
         self._last_stream_error_ts = now
         self._stream_retries = getattr(self, "_stream_retries", 0) + 1

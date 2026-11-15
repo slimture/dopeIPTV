@@ -383,7 +383,8 @@ class BoxClient(OfflineClient):
                    "added": str(start), "category_id": RECORDINGS, "category_ids": [],
                    "container_extension": str(rec.get("ext") or "ts").lstrip(".") or "ts",
                    "rating": "", "rating_5based": 0, "is_adult": 0,
-                   "custom_sid": "", "direct_source": "", "_url": str(rec["url"]), "_info": info}
+                   "custom_sid": "", "direct_source": "", "_url": str(rec["url"]), "_info": info,
+                   "_key": key}
             recs.append(row)
             rec_by_id[rid] = row
         recs.sort(key=lambda r: int(r["added"] or 0), reverse=True)

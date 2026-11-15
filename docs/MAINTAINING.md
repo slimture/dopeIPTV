@@ -340,15 +340,21 @@ builds on that count instead of a second one:
   (`/web/getcurrent`, the service being watched), warn before a zap or a
   stream that would cut off a recording or someone watching, and mark the
   channels that can be seen without one.
-- **Signal values.** SNR, AGC and BER of the tuner in use (`/web/signal`),
-  live in the stream stats (`I`) and the box's info.
-- **Transcoding via port 8002**, per box, for boxes with a hardware
-  transcoder, with quality steps - also used when the box's channels are
-  cast or shown in multiview, if chosen.
-- **Encrypted channels said plainly.** When a channel will not play, read
-  the first TS packets (transport_scrambling_control) and say the box
-  cannot decrypt it (no card, CI module or rights) - in the player,
-  recordings, multiview and stream health; failover may then try another
+- **Signal values.** Built: SNR, AGC and BER (`/web/signal`) in the stream
+  stats (`I`, asked every 2 s only while they show) and the box's info
+  window. OpenWebif reports the tuner behind what the box itself shows,
+  not necessarily the one a stream comes from: said under the values.
+- **Transcoding via port 8002.** Built, in the source's own (Nerd) options:
+  off / Low / Medium / High / Full HD, brought to the bitrate limits and
+  sizes `/transcoding` reports (read, never set); the player uses it, cast
+  and multiview only with "Transcoded when cast or in multiview too";
+  recordings over their own connection keep the box's own stream. The
+  query follows OpenWebif's own (`&` on OpenPLi, SatDreamGR, Open Vision;
+  `?` between options elsewhere).
+- **Encrypted channels said plainly.** Built: `core/ts_scramble.py` reads
+  the first packets (box streams only) - in the failure diagnosis, a
+  frozen channel's last reconnect, a multiview cell, a box recording (its
+  file, else its stream), and stream health; failover then tries another
   source.
 
 Then the rest of what an Enigma2 box can do from a computer:
@@ -359,13 +365,19 @@ Then the rest of what an Enigma2 box can do from a computer:
 - **AutoTimer**: the box's own rules read, made and changed (OpenWebif's
   AutoTimer plugin), beside dopeIPTV's series rules - and said plainly
   which of the two records what.
-- **The box's recordings managed**: delete, move to another folder, rename.
-- **A screenshot from the box** (`/web/grab`): what the TV shows, picture,
-  OSD or both.
-- **The box's remote control in the app** (`/web/remotecontrol`), the
-  whole remote including the colour keys and the menus.
+- **The box's recordings managed**: built - rename, move to another folder,
+  delete (with a confirm) from the recording's menu (`/web/movierename`,
+  `/web/moviemove`, `/web/moviedelete`, folders from `/web/getlocations`).
+- **A screenshot from the box**: built - OpenWebif serves it at `/grab`
+  (not `/web/grab`): picture, OSD or both, with Save.
+- **The box's remote control in the app** (`/web/remotecontrol`): built -
+  numbers, arrows, OK, exit, menu, info, EPG, colour keys, volume, mute,
+  channel up/down, TV, radio, text, audio, power (OpenWebif's key codes).
 
-Check every endpoint against OpenWebif's source, and test on a real box.
+Checked against OpenWebif's source; the Dreambox WebInterface's answers
+for movierename/moviemove, `/grab` and `/web/signal` are not verified, and
+transcoding (the 8002 query and its units) needs a real box with an
+encoder.
 
 ### Planned: server mode, after the Enigma2 work
 

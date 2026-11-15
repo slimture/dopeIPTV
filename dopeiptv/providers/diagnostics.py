@@ -23,7 +23,24 @@ def diagnose_stream(url: str, client=None) -> str:
     reason = _account_reason(client)
     if reason:
         return reason
+    reason = box_reason(url, client)
+    if reason:
+        return reason
     return _probe_url(url)
+
+
+def box_reason(url: str, client=None) -> str | None:
+    """A box's channel the box cannot decrypt (no card, CI module or
+    rights), told from the first packets of its stream - asked only of a
+    client that can tell (an Enigma2 box) and only for its own streams."""
+    check = getattr(client, "scrambled", None)
+    if not callable(check) or not url:
+        return None
+    try:
+        return tr("diag_scrambled") if check(url) is True else None
+    except Exception as e:
+        log.debug("encryption check failed: %s: %s", type(e).__name__, e)
+        return None
 
 
 def _account_reason(client) -> str | None:

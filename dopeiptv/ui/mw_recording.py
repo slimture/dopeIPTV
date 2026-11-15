@@ -13,7 +13,7 @@ from ..providers.client import b64, epg_times
 from ..i18n import tr
 from ..core.log import log, redact_url
 from ..core.privacy import for_log
-from ..core.recording import RecordingManager, format_size, free_path, safe_filename
+from ..core.recording import SCRAMBLED, RecordingManager, format_size, free_path, safe_filename
 from .theme import P
 from .widgets import confirm
 from ..core.workers import run_async
@@ -41,6 +41,7 @@ _REC_REASONS = {
     "neither ffmpeg nor mpv found": "rec_reason_no_recorder",
     "stop time passed before the app could start it": "rec_reason_too_late",
     RecordingManager.NO_ADDRESS: "rec_reason_no_address",
+    SCRAMBLED: "rec_reason_scrambled",
 }
 
 
