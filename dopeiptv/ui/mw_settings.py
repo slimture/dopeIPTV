@@ -2511,6 +2511,11 @@ class _SettingsMixin:
 
         # Whatever changed during this visit, for what only runs on close.
         visit: set[str] = set()
+        # The profile the controls were read for: a switch while the window
+        # is open (the phone remote, the remote API, Home Assistant) must
+        # not put this profile's own values into the next one.
+        from ..core import profiles as _profiles
+        built_for = _profiles.active_id()
         player_keys = {
             "audio_lang", "sub_mode", "sub_lang", "sub_lang2", "sub_scale",
             "sub_color", "sub_background", "aspect_mode",
@@ -2525,6 +2530,8 @@ class _SettingsMixin:
             changed: set[str] = set()
 
             def put(key: str, value) -> None:
+                if _profiles.is_own(key) and _profiles.active_id() != built_for:
+                    return
                 cur = self.settings.value(key)
                 if cur is None or str(cur) != str(value):
                     self.settings.setValue(key, value)

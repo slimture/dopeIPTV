@@ -260,6 +260,72 @@ os._exit(0)
 """
 
 
+_CHILD_SETTINGS_OPEN = r"""
+import faulthandler, json, os, tempfile
+faulthandler.dump_traceback_later(200, exit=True)
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from PyQt6.QtCore import QSettings
+from PyQt6.QtWidgets import QApplication, QDialog
+app = QApplication.instance() or QApplication([])
+tmp = tempfile.mkdtemp()
+QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, tmp)
+
+from dopeiptv import i18n
+from dopeiptv.core import profiles
+from dopeiptv.core.profiles import MAIN_ID, ProfileSettings
+from dopeiptv.core.stores import PlaylistStore
+from dopeiptv.i18n import tr
+from dopeiptv.providers.client import DemoClient
+from dopeiptv.ui import main_window as mw, theme
+
+i18n.set_language("en")
+mw.launch_player = lambda *a, **k: None
+s = ProfileSettings(os.path.join(tmp, "s.ini"), QSettings.Format.IniFormat)
+reg = profiles.start(s, [], "Me")
+kid = reg.add("Lisa", colour="pink")
+mine, theirs = profiles.pinned(s, MAIN_ID), profiles.pinned(s, kid.id)
+for view, lang, shelf in ((mine, "swe", "true"), (theirs, "fre", "false")):
+    view.setValue("audio_lang", lang)
+    view.setValue("home_sh_resume", shelf)
+s.sync()
+theme.apply_theme(s)
+w = mw.MainWindow(DemoClient(), s, PlaylistStore(s))
+w.show()
+for _ in range(20):
+    app.processEvents()
+
+# The phone remote, the remote API or Home Assistant switches the profile
+# while Settings is open, built for the one in use before.
+real_exec = QDialog.exec
+switched = []
+
+
+def exec_(dlg):
+    if dlg.windowTitle() == tr("settings_title") and not switched:
+        switched.append(w._profile_switch_remote({"id": kid.id})["ok"])
+        return 0
+    return real_exec(dlg)
+
+
+QDialog.exec = exec_
+w.open_settings()
+assert switched == [True] and profiles.active_id() == kid.id
+# Closing it stores none of the other profile's own into this one.
+got = (theirs.value("audio_lang"), theirs.value("home_sh_resume"))
+assert got == ("fre", "false"), got
+assert (mine.value("audio_lang"), mine.value("home_sh_resume")) == ("swe", "true")
+print("SETTINGS_OPEN_OK", flush=True)
+os._exit(0)
+"""
+
+
+def test_a_switch_while_settings_is_open_writes_nothing_of_one_profile_into_another():
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+    out = subprocess.run([sys.executable, "-c", _CHILD_SETTINGS_OPEN], cwd=_REPO_ROOT, env=env,
+                         capture_output=True, text=True, timeout=240)
+    assert "SETTINGS_OPEN_OK" in out.stdout, out.stdout[-3000:] + out.stderr[-4000:]
+
+
 def test_profiles_in_the_window():
     env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
     out = subprocess.run([sys.executable, "-c", _CHILD], cwd=_REPO_ROOT, env=env,
