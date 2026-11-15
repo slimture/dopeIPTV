@@ -2404,11 +2404,10 @@ _STRINGS: dict[str, dict[str, str]] = {
     "airplay_no_route": {"en": "No Apple TV was chosen, so AirPlay stopped."},
     "airplay_unreachable": {"en": "The Apple TV has not reached this Mac. If macOS asked whether dopeIPTV may accept incoming connections, allow it (System Settings → Network → Firewall → Options), and check that the Apple TV is on the same network."},
     "airplay_button": {"en": "Choose an Apple TV"},
-    "airplay_note": {"en": "Press Cast, then choose your Apple TV in Apple's AirPlay menu."},
+    "airplay_note": {"en": "Press Cast: a small AirPlay window opens. Click the AirPlay button in it and choose your Apple TV."},
     "airplay_pick": {"en": "Choose your Apple TV in the AirPlay menu — the AirPlay button here opens it."},
     "airplay_on_tv": {"en": "Playing on the Apple TV. The AirPlay button here moves it to another one."},
     "airplay_cpu": {"en": "The picture is converted on this Mac for the Apple TV, which keeps the processor busy while it plays."},
-    "airplay_menu_note": {"en": "The Apple TV plays the stream's own picture and sound — it is chosen in the AirPlay menu in the cast panel."},
     "set_grp_watch": {"en": "Watch"},
     "set_grp_content": {"en": "Content"},
     "set_grp_accounts": {"en": "Accounts and integrations"},
@@ -2436,6 +2435,11 @@ _STRINGS: dict[str, dict[str, str]] = {
     "set_link_net": {"en": "{n} Nerd settings for how the app reaches your sources"},
     "set_link_lists": {"en": "{n} Nerd settings for boxes and channel lists"},
     "set_link_diag": {"en": "{n} Nerd settings for logs and fault-finding"},
+    "airplay_menu_note": {"en": "The Apple TV plays the stream's own picture and sound — it is chosen with the AirPlay button in the AirPlay window."},
+    "airplay_pick_window": {"en": "Click the AirPlay button in the AirPlay window and choose your Apple TV."},
+    "airplay_on_tv_window": {"en": "Playing on the Apple TV. The AirPlay button in the AirPlay window moves it to another one."},
+    "airplay_show_window": {"en": "Show the AirPlay window"},
+    "airplay_window_title": {"en": "AirPlay"},
 }
 
 

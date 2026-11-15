@@ -128,8 +128,9 @@ dopeiptv/
                        poll, commands queued onto the GUI thread
     media_macos.py     macOS Now Playing (PyObjC's MediaPlayer)
     media_windows.py   Windows' System Media Transport Controls (PyWinRT)
-    airplay_macos.py   AirPlay on macOS: AVPlayer + AVKit's route picker,
-                       a CastHub receiver (PyObjC's AVFoundation, AVKit)
+    airplay_macos.py   AirPlay on macOS: AVPlayer + AVKit's route picker
+                       in an NSPanel of its own, a CastHub receiver
+                       (PyObjC's AVFoundation, AVKit, AppKit)
     notify.py          Desktop notifications (org.freedesktop.Notifications)
     popular.py         Popular right now: TMDB's chart of the week matched
                        against the provider's catalogue (Home shelves)

@@ -1223,13 +1223,17 @@ class CastDialog(QDialog):
         self.dlna_note.setObjectName("DetailMeta")
         self.dlna_note.hide()
         lay.addWidget(self.dlna_note)
-        # AirPlay (macOS): Apple's own AirPlay button and what to do next,
-        # built by the receiver itself (services/airplay_macos.py).
+        # AirPlay (macOS): what to do next, built by the receiver itself
+        # (services/airplay_macos.py). Apple's AirPlay button is in a window
+        # of its own, which nothing here makes or refreshes.
         ap = self._airplay()
         self.airplay_row = ap.dialog_row(self) if ap is not None else None
         if self.airplay_row is not None:
             self.airplay_row.hide()
             lay.addWidget(self.airplay_row)
+            found = getattr(ap, "routes_changed", None)
+            if found is not None:
+                found.connect(self._airplay_found)
         self.kind_box.currentIndexChanged.connect(self._quality_changed)
         self.list.currentItemChanged.connect(
             lambda *_a: self._show_device_quality())
@@ -1350,6 +1354,22 @@ class CastDialog(QDialog):
             if getattr(mgr, "KIND", "") == "airplay":
                 return mgr
         return None
+
+    def _airplay_found(self, found: bool) -> None:
+        """AVRouteDetector found AirPlay routes after the list was filled:
+        the entry is added, never taken away while the dialog is open."""
+        ap = self._airplay()
+        if not found or ap is None or self.managing:
+            return
+        try:
+            if not self.isVisible():
+                return                 # a dialog closed earlier
+            names = [self.list.item(i).text() for i in range(self.list.count())]
+            for name in ap.entries():
+                if name not in names:
+                    self.list.insertItem(0, name)
+        except RuntimeError:
+            pass                       # the dialog is going
 
     def _show_device_quality(self) -> None:
         """Show what this device is remembered as being."""
@@ -1495,7 +1515,7 @@ class CastDialog(QDialog):
         # is running once this dialog is closed - local playback has stopped,
         # so the player pane is just black.
         def done(n):
-            self._set_status(tr("airplay_pick") if self._is_airplay(n)
+            self._set_status(tr("airplay_pick_window") if self._is_airplay(n)
                              else tr("cast_casting_to", name=n))
             self._banner(n, self.stream_title)
 

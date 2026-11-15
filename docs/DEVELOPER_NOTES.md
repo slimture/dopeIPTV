@@ -209,20 +209,61 @@ loads the bundled libmpv.
 
 ## AirPlay to Apple TV (macOS)
 
-AirPlay goes through Apple's own frameworks, so it is a macOS feature:
-`services/airplay_macos.py` makes an `AVPlayer` with
-`allowsExternalPlayback` and puts AVKit's `AVRoutePickerView`, with that
-player set, in the cast dialog's "AirPlay (Apple TV)" row (a native child
-of the dialog, never of the main window, where the video surface is). The
-user picks the Apple TV in Apple's own menu - the app opens it after Cast,
-and the button reopens it - and the Apple TV fetches the stream itself.
-The player never plays on the Mac: it starts when `externalPlaybackActive`
-turns on and pauses the moment it goes off (the cast ends after a few
-seconds without it, or two minutes with nothing picked). Everything on
-AVFoundation runs on the GUI thread: the cast's worker threads queue onto
-it, a 0.5 s poll reads time, status and the route, and the end and failure
-notifications run on the main queue. The receiver joins `CastHub` through
-`add_receiver` (`ui/mw_airplay.py`), so the strip drives it like any cast.
+AirPlay goes through Apple's own frameworks, so it is a macOS feature, and
+only the way Apple documents them - no private API, nothing reached inside
+Apple's views. `services/airplay_macos.py` makes an `AVPlayer` with
+`allowsExternalPlayback` and, after Cast, opens a small "AirPlay" window of
+its own (an `NSPanel`): an `AVPlayerLayer`, the player's video output, and
+AVKit's `AVRoutePickerView` with `player` set (macOS 10.15+), which is
+Apple's documented control for routing one AVPlayer's video. The user
+clicks Apple's AirPlay button there and picks the Apple TV; the app never
+clicks it. `AVPlayerView` was not used: its own play button and timeline
+would sit beside the cast strip, and its play plays on the Mac. The panel
+is made once per cast (a fallback or a seek keeps it), floats over the
+cast dialog and works while it is modal (`worksWhenModal`; Qt runs a modal
+dialog as an AppKit modal session). It is never an NSView inside a Qt
+widget: the first version put the picker into the dialog's row, and on a
+real Mac choosing the device flickered back and forth - Qt and AppKit
+painting over each other, each list refresh making the button again, and
+the app opening Apple's menu by clicking the button inside it. The
+dialog's row is plain Qt: what to do next, and "Show the AirPlay window".
+Closing the panel before an Apple TV is picked ends the cast; after, it
+goes on.
+
+The player never plays on the Mac: paused and muted from the start, it
+plays only once `externalPlaybackActive` has held for a second, is muted
+the moment it goes off and paused once that has held as long - so a route
+that blinks during the hand-over neither starts nor stops anything (the
+cast ends 4 s after the route is gone, or two minutes with nothing picked).
+The dialog lists "AirPlay (Apple TV)" when `AVRouteDetector` (on only while
+the dialog is open - Apple says it costs power) finds routes, and also when
+it gives no answer; the scan's worker waits up to 3 s for it, and routes
+found later add the entry. Everything on AVFoundation and AppKit runs on
+the GUI thread: the cast's worker threads queue onto it; key-value
+observing (`externalPlaybackActive`, `timeControlStatus`, the item's
+`status`) and the notifications (end, failure, stall, error-log entry, the
+route detector, the panel closing) and the picker's delegate only queue a
+kick to it; a 1 s tick reads the position and keeps the deadlines, and
+reads the route too should observing be unavailable. Each step is in the
+log ("airplay: ..."): the window opened, Apple's menu opened and closed,
+`externalPlaybackActive`, the stream's status, a failure as NSError domain
+and code (with the error under it), each AVFoundation error-log entry - no
+address with its login (`redact_url`) and not the bridge's token. The
+receiver joins `CastHub` through `add_receiver` (`ui/mw_airplay.py`), so
+the strip drives it like any cast. `NSBonjourServices` (`_airplay._tcp`,
+`_raop._tcp`), `NSLocalNetworkUsageDescription` and App Transport
+Security's media and local-network exceptions are in the Mac app's
+Info.plist (`dopeiptv-mac.spec`).
+
+Verified only on a real Mac with an Apple TV (CI has stand-ins for PyObjC,
+so none of this is proven there): that the panel and Apple's button show
+and take clicks over the modal cast dialog; that picking the Apple TV turns
+`externalPlaybackActive` on while the player is still paused, and that the
+picture - not only the sound - goes over with the layer attached; that the
+picture keeps going with the panel closed or hidden (the layer stays
+attached to the player); that KVO, the picker's delegate and
+`AVRouteDetector` fire as described; macOS 15's local-network prompt; and
+the firewall's question.
 
 An Apple TV plays HLS and MP4, not a running MPEG-TS, Matroska or MP2
 sound. `providers/airplay_bridge.py` decides (`plan`): what is already

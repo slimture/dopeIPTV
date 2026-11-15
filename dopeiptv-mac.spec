@@ -201,6 +201,10 @@ app = BUNDLE(
         # bridge, Chromecast, DLNA, Kodi, boxes); this is what it shows.
         'NSLocalNetworkUsageDescription':
             'dopeIPTV finds and plays on TVs, boxes and media servers on your home network.',
+        # The Bonjour services AirPlay looks for, declared as macOS 15's
+        # local-network rules want: Apple TVs (_airplay) and their sound
+        # (_raop).
+        'NSBonjourServices': ['_airplay._tcp', '_raop._tcp'],
         'CFBundleURLTypes': [{
             'CFBundleURLName': 'io.github.slimture.dopeIPTV.link',
             'CFBundleURLSchemes': ['dopeiptv'],

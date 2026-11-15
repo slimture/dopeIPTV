@@ -315,10 +315,26 @@ class _Time:
         self.value, self.timescale, self.flags = int(s * 600), 600, 1
 
 
-class _Item:
+class _Observable:
+    """Key-value observing as AVFoundation offers it: one observer a key."""
+
+    def addObserver_forKeyPath_options_context_(self, obs, key, _opts, _ctx):
+        self.kvo[key] = obs
+
+    def removeObserver_forKeyPath_(self, obs, key):
+        assert self.kvo.pop(key) is obs
+
+    def changed(self, key):
+        obs = self.kvo.get(key)
+        if obs is not None:
+            obs.observeValueForKeyPath_ofObject_change_context_(key, self, {}, None)
+
+
+class _Item(_Observable):
     def __init__(self, url):
-        self.url, self._status, self._dur = url, 1, _Time(0)
+        self.url, self._status, self._dur, self.kvo = url, 1, _Time(0), {}
         self._dur.flags = 17                       # indefinite: live
+        self.events = []
 
     def status(self):
         return self._status
@@ -329,13 +345,17 @@ class _Item:
     def error(self):
         return None
 
+    def errorLog(self):
+        return types.SimpleNamespace(events=lambda: self.events)
 
-class _Player:
+
+class _Player(_Observable):
     made = []
 
     def __init__(self, item):
-        self.item, self.calls = item, []
+        self.item, self.calls, self.kvo = item, [], {}
         self.external, self._rate, self.t, self.allows = False, 0.0, 0.0, None
+        self.muted = False
         _Player.made.append(self)
 
     @classmethod
@@ -345,8 +365,16 @@ class _Player:
     def setAllowsExternalPlayback_(self, on):
         self.allows = on
 
+    def allowsExternalPlayback(self):
+        return self.allows
+
     def isExternalPlaybackActive(self):
         return self.external
+
+    def route(self, on):
+        """The Apple TV picked (or gone): AVFoundation tells by KVO."""
+        self.external = on
+        self.changed("externalPlaybackActive")
 
     def play(self):
         self.calls.append(("play", threading.get_ident()))
@@ -361,6 +389,9 @@ class _Player:
 
     def timeControlStatus(self):
         return 2 if self._rate else 0
+
+    def reasonForWaitingToPlay(self):
+        return None
 
     def currentTime(self):
         return _Time(self.t)
@@ -381,9 +412,22 @@ class _Player:
         self.muted = m
 
 
-class _Picker:
+def _plays(p):
+    return [c[0] for c in p.calls if c[0] in ("play", "pause")]
+
+
+class _NSObject:
+    @classmethod
+    def alloc(cls):
+        return cls()
+
+    def init(self):
+        return self
+
+
+class _View:
     def __init__(self):
-        self.player, self.super_, self.button = None, None, _Button()
+        self.subviews, self.layer, self.wants = [], None, False
 
     @classmethod
     def alloc(cls):
@@ -393,54 +437,156 @@ class _Picker:
         self.frame = frame
         return self
 
-    def superview(self):
-        return self.super_
+    def setLayer_(self, layer):
+        self.layer = layer
 
-    def removeFromSuperview(self):
-        self.super_ = None
+    def setWantsLayer_(self, on):
+        self.wants = on
 
-    def setFrame_(self, f):
-        self.frame = f
+    def addSubview_(self, v):
+        self.subviews.append(v)
 
-    def setAutoresizingMask_(self, m):
-        self.mask = m
+
+class _Layer:
+    def __init__(self, player):
+        self.player = player
+
+    @classmethod
+    def playerLayerWithPlayer_(cls, player):
+        return cls(player)
 
     def setPlayer_(self, p):
         self.player = p
 
-    def subviews(self):
-        return [types.SimpleNamespace(isKindOfClass_=lambda _c: False),
-                self.button]
+    def setBackgroundColor_(self, c):
+        self.background = c
 
 
-class _Button:
-    clicks = 0
+class _Picker:
+    """Apple's button. Nothing here can be clicked from outside: it has no
+    subviews to reach into."""
+    made = []
 
-    def isKindOfClass_(self, cls):
-        return cls is _Button
+    def __init__(self):
+        self.player = self.delegate = None
+        _Picker.made.append(self)
 
-    def performClick_(self, _sender):
-        _Button.clicks += 1
+    @classmethod
+    def alloc(cls):
+        return cls()
+
+    def initWithFrame_(self, frame):
+        self.frame = frame
+        return self
+
+    def setPlayer_(self, p):
+        self.player = p
+
+    def setDelegate_(self, d):
+        self.delegate = d
+
+    def setRoutePickerButtonBordered_(self, on):
+        self.bordered = on
+
+    def setToolTip_(self, text):
+        self.tip = text
 
 
-class _View:
-    def bounds(self):
-        return ((0, 0), (36, 28))
+class _Label:
+    @classmethod
+    def wrappingLabelWithString_(cls, text):
+        label = cls()
+        label.text = text
+        return label
 
-    def addSubview_(self, v):
-        v.super_ = self
+    def setFrame_(self, f):
+        self.frame = f
+
+    def setStringValue_(self, text):
+        self.text = text
+
+
+class _NSPanel:
+    made = []
+
+    def __init__(self):
+        self.content, self.visible, self.closed, self.settings = _View(), False, 0, {}
+        _NSPanel.made.append(self)
+
+    @classmethod
+    def alloc(cls):
+        return cls()
+
+    def initWithContentRect_styleMask_backing_defer_(self, rect, style, _b, _d):
+        self.rect, self.style = rect, style
+        return self
+
+    def __getattr__(self, name):            # setTitle_, setWorksWhenModal_, ...
+        if name.startswith("set") and name.endswith("_"):
+            return lambda v: self.settings.__setitem__(name, v)
+        raise AttributeError(name)
+
+    def contentView(self):
+        return self.content
+
+    def orderFront_(self, _s):
+        self.visible = True
+
+    def orderOut_(self, _s):
+        self.visible = False
+
+    def close(self):
+        self.visible = False
+        self.closed += 1
+
+    def center(self):
+        self.settings["center"] = True
+
+    def label(self):
+        return next(v for v in self.content.subviews if isinstance(v, _Label))
+
+    def video(self):
+        return next(v for v in self.content.subviews if isinstance(v, _View))
+
+
+class _Detector:
+    found = True
+
+    def __init__(self):
+        self.enabled = None
+
+    @classmethod
+    def alloc(cls):
+        return cls()
+
+    def init(self):
+        return self
+
+    def setRouteDetectionEnabled_(self, on):
+        self.enabled = on
+
+    def multipleRoutesDetected(self):
+        return _Detector.found
 
 
 class _Center:
     def __init__(self):
         self.blocks = {}
 
-    def addObserverForName_object_queue_usingBlock_(self, name, item, q, block):
+    def addObserverForName_object_queue_usingBlock_(self, name, _obj, queue, block):
+        assert queue == "main"
         self.blocks[name] = block
         return name
 
     def removeObserver_(self, token):
         self.blocks.pop(token, None)
+
+    def post(self, name, note=None):
+        self.blocks[name](note)
+
+
+_ROUTES = "AVRouteDetectorMultipleRoutesDetectedDidChangeNotification"
+_CLOSE = "NSWindowWillCloseNotification"
 
 
 @pytest.fixture
@@ -448,23 +594,34 @@ def macos(monkeypatch):
     from dopeiptv.services import airplay_macos as am
     center = _Center()
     av = _module("AVFoundation", AVPlayer=_Player, AVPlayerItem=types.SimpleNamespace(
-        playerItemWithURL_=_Item))
+        playerItemWithURL_=_Item), AVPlayerLayer=_Layer, AVRouteDetector=_Detector)
     kit = _module("AVKit", AVRoutePickerView=_Picker)
-    fd = _module("Foundation",
+    fd = _module("Foundation", NSObject=_NSObject,
                  NSURL=types.SimpleNamespace(URLWithString_=lambda u: u or None),
                  NSNotificationCenter=types.SimpleNamespace(defaultCenter=lambda: center),
                  NSOperationQueue=types.SimpleNamespace(mainQueue=lambda: "main"))
-    ak = _module("AppKit", NSButton=_Button)
-    objc = _module("objc", objc_object=lambda c_void_p=None: _View())
+    ak = _module("AppKit", NSPanel=_NSPanel, NSView=_View, NSTextField=_Label,
+                 NSColor=types.SimpleNamespace(blackColor=lambda: types.SimpleNamespace(
+                     CGColor=lambda: "black")))
+    objc = _module("objc", typedSelector=lambda _sig: (lambda f: f))
     for mod in (av, kit, fd, ak, objc):
         monkeypatch.setitem(sys.modules, mod.__name__, mod)
     monkeypatch.setitem(sys.modules, "CoreMedia", None)
     monkeypatch.setattr(am, "supported", lambda: True)
+    monkeypatch.setattr(am, "_OBSERVER_CLASS", [])
     monkeypatch.setattr(am.ab, "firewall_blocks", lambda: False)
     from dopeiptv.services import media_session
     monkeypatch.setattr(media_session, "_said", set())
-    _Player.made.clear()
+    for cls in (_Player, _Picker, _NSPanel):
+        cls.made.clear()
+    _Detector.found = True
     return am, center
+
+
+def _settle(am, rx):
+    """ROUTE_SETTLE_S goes by with the route as it is."""
+    rx._raw_at -= am.ROUTE_SETTLE_S + 0.1
+    rx._sync()
 
 
 def test_nothing_plays_on_the_mac_until_the_apple_tv_has_it(qapp, macos):
@@ -480,28 +637,63 @@ def test_nothing_plays_on_the_mac_until_the_apple_tv_has_it(qapp, macos):
     p = _Player.made[-1]
     assert p.item.url == url and p.allows is True
     assert rx.active == am.NAME and not rx.bridged() and rx.duration == 0.0
-    assert [c[0] for c in p.calls if c[0] in ("play", "pause")] == ["pause"]
-    rx._poll()
+    assert _plays(p) == ["pause"] and p.muted        # silent and still here
+    assert set(p.kvo) == {"externalPlaybackActive", "timeControlStatus"}
+    assert set(p.item.kvo) == {"status"}
+    rx._sync()
     assert rx.state == "WAITING/ROUTE" and p.rate() == 0.0
-    p.external = True                       # picked in Apple's menu
-    rx._poll()
-    assert p.rate() == 1.0 and rx.state == "PLAYING/NONE"
+    # Picked in Apple's menu: KVO says so from AVFoundation's own thread,
+    # and the route is believed once it has held.
+    t = threading.Thread(target=p.route, args=(True,))
+    t.start()
+    t.join()
+    _pump(qapp)
+    assert p.rate() == 0.0 and p.muted and rx.state == "WAITING/ROUTE"
+    _settle(am, rx)
+    assert p.rate() == 1.0 and not p.muted and rx.state == "PLAYING/NONE"
+    assert all(c[1] == threading.get_ident() for c in p.calls if c[0] == "play")
     p.t = 12.5
-    rx._poll()
+    rx._sync()
     assert rx.position() == 12.5
     rx.pause()
-    rx._poll()
+    rx._sync()
     assert p.rate() == 0.0 and rx.state == "PAUSED/NONE"   # held, not resumed
     rx.resume()
     assert p.rate() == 1.0
-    # The Apple TV goes away: paused at once, over after the grace.
-    p.external = False
-    rx._poll()
+    # The Apple TV goes away: silent at once, paused once that holds, over
+    # after the grace.
+    p.route(False)
+    _pump(qapp)
+    assert p.muted and rx.active == am.NAME
+    _settle(am, rx)
     assert p.rate() == 0.0 and rx.active == am.NAME and not ended
     rx._lost_at -= am.ROUTE_GRACE_S + 1
-    rx._poll()
+    rx._sync()
     assert ended == ["airplay_route_lost"] and rx.active is None
-    assert p.item is None and not center.blocks
+    panel, picker = _NSPanel.made[-1], _Picker.made[-1]
+    assert p.item is None and not p.kvo and not center.blocks
+    assert panel.closed and picker.player is None and panel.video().layer.player is None
+
+
+def test_a_route_that_blinks_neither_starts_nor_stops_the_player(qapp, macos):
+    am, _ = macos
+    rx = am.AirPlayReceiver()
+    rx.context = lambda: {"kind": "live"}
+    rx.cast(am.NAME, "http://p/live/u/pw/1.m3u8", "SVT1", ["h264", "aac"])
+    p = _Player.made[-1]
+    before = len(_plays(p))
+    for on in (True, False, True, False, True):
+        p.route(on)
+        _pump(qapp)
+    assert _plays(p)[before:] == [] and p.muted
+    _settle(am, rx)
+    assert _plays(p)[before:] == ["play"] and not p.muted
+    for on in (False, True, False, True):          # moving between TVs
+        p.route(on)
+        _pump(qapp)
+    _settle(am, rx)
+    assert _plays(p)[before:] == ["play"] and not p.muted and rx.active
+    rx.stop()
 
 
 def test_nothing_picked_ends_the_cast_and_an_ending_is_noticed(qapp, macos):
@@ -515,16 +707,17 @@ def test_nothing_picked_ends_the_cast_and_an_ending_is_noticed(qapp, macos):
     p = _Player.made[-1]
     assert ("seek", (360000, 600, 1, 0)) in p.calls      # resumed there
     assert rx.duration == 5400.0
-    p.external = True
-    rx._poll()
-    center.blocks["AVPlayerItemDidPlayToEndTimeNotification"](None)
-    rx._poll()
+    p.route(True)
+    _pump(qapp)
+    _settle(am, rx)
+    center.post("AVPlayerItemDidPlayToEndTimeNotification")
+    _pump(qapp)
     assert rx.state == "IDLE/FINISHED"
     rx.stop()
     assert rx.active is None and p.item is None
     rx.cast(am.NAME, "http://p/movie/u/pw/7.mp4", "Film", [])
     rx._opened_at -= am.ROUTE_WAIT_S + 1
-    rx._poll()
+    rx._sync()
     assert ended == ["airplay_no_route"]
 
 
@@ -570,14 +763,17 @@ def test_a_transport_stream_goes_through_the_bridge(qapp, macos, fake_ffmpeg,
     p = _Player.made[-1]
     assert p.item.url == rx.bridge.url and rx.bridge.prefix in p.item.url
     assert "127.0.0.1" not in p.item.url or ab.lan_address() == "127.0.0.1"
+    assert rx.bridge.prefix.strip("/") not in rx._where(p.item.url)
     folder = rx.bridge.folder
     rx.stop()
     assert not rx.bridge.hls and not os.path.exists(folder)
 
 
 def test_a_direct_stream_the_tv_refuses_is_tried_once_through_the_bridge(
-        qapp, macos, fake_ffmpeg, monkeypatch):
-    am, _ = macos
+        qapp, macos, fake_ffmpeg, monkeypatch, caplog):
+    import logging
+    caplog.set_level(logging.DEBUG, logger="dopeiptv")
+    am, center = macos
     fake_ffmpeg(4, "live")
     monkeypatch.setattr(am.ab, "probe", lambda *a, **k: {
         "video": "h264", "audio": ["aac"], "duration": 0.0})
@@ -586,37 +782,171 @@ def test_a_direct_stream_the_tv_refuses_is_tried_once_through_the_bridge(
     rx.context = lambda: {"kind": "live"}
     rx.cast(am.NAME, "http://p/live/u/pw/1.m3u8", "SVT1", ["h264", "aac"])
     p = _Player.made[-1]
-    p.external = True
-    p.item._status = 2                               # the TV said no
-    rx._poll()
+    p.route(True)
+    _pump(qapp)
+    _settle(am, rx)
+    # The TV said no, and why: the error, with its domain and code, logged.
+    err = _nserror("CoreMediaErrorDomain", -12642, "Cannot play http://p/live/u/pw/1.m3u8")
+    p.item._status = 2
+    center.post("AVPlayerItemFailedToPlayToEndTimeNotification", types.SimpleNamespace(
+        userInfo=lambda: {"AVPlayerItemFailedToPlayToEndTimeErrorKey": err}))
+    _pump(qapp)
     end = time.monotonic() + 10
     while time.monotonic() < end and p.item.url != rx.bridge.url:
         _pump(qapp, 0.05)
     assert rx.bridged() and p.item.url == rx.bridge.url
+    # The same window and button: a new stream is not a new cast.
+    assert len(_NSPanel.made) == 1 and len(_Picker.made) == 1
+    assert _Picker.made[0].player is p and _plays(p)[-1] == "play"
+    said = "\n".join(r.getMessage() for r in caplog.records)
+    assert "CoreMediaErrorDomain -12642" in said and "/u/pw/" not in said
     rx.stop()
 
 
-def test_apple_s_button_is_in_the_cast_panel_row(qapp, macos):
-    am, _ = macos
-    from PyQt6.QtWidgets import QWidget
-    parent = QWidget()
+def _nserror(domain, code, text, under=None):
+    return types.SimpleNamespace(
+        domain=lambda: domain, code=lambda: code, localizedDescription=lambda: text,
+        userInfo=lambda: {"NSUnderlyingError": under} if under else {})
+
+
+def test_apple_s_button_is_in_a_window_of_its_own(qapp, macos):
+    am, center = macos
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import QDialog, QWidget
+    dialog = QDialog()
     rx = am.AirPlayReceiver()
-    row = rx.dialog_row(parent)
-    host, label = rx._row
-    assert label.text() == am.tr("airplay_note") and host.isHidden()
-    _Button.clicks = 0
+    row = rx.dialog_row(dialog)
+    label, button = rx._row
+    assert label.text() == am.tr("airplay_note") and button.isHidden()
+    # Plain Qt in the dialog: no native view of Apple's inside a Qt widget.
+    for w in [row, *row.findChildren(QWidget)]:
+        assert not w.testAttribute(Qt.WidgetAttribute.WA_NativeWindow)
     rx.cast(am.NAME, "http://p/live/u/pw/1.m3u8", "SVT1", ["h264", "aac"])
-    assert not host.isHidden() and label.text() == am.tr("airplay_pick")
-    assert rx._picker.player is _Player.made[-1]
-    _pump(qapp, 0.4)
-    assert _Button.clicks == 1                       # Apple's menu opened
-    _Player.made[-1].external = True
-    rx._poll()
-    assert label.text() == am.tr("airplay_on_tv")
-    rx.stop()
-    assert row is not None and rx._picker.player is None
-    parent.deleteLater()
+    p = _Player.made[-1]
+    assert len(_NSPanel.made) == 1 and len(_Picker.made) == 1
+    panel, picker = _NSPanel.made[0], _Picker.made[0]
+    assert picker.player is p and picker.delegate is rx._obs
+    video = panel.video()
+    assert video.layer.player is p and video.wants        # the video output
+    assert panel.visible and panel.settings["setWorksWhenModal_"] is True
+    assert panel.settings["setFloatingPanel_"] is True
+    assert panel.settings["setReleasedWhenClosed_"] is False
+    assert panel.label().text == am.tr("airplay_pick")
+    assert not button.isHidden() and label.text() == am.tr("airplay_pick_window")
+    # The dialog's list refreshed, the row redrawn, another stream: the same
+    # window and button, never made again.
+    rx._show_row()
+    rx._open("http://p/live/u/pw/2.m3u8", 0.0, 0.0)
+    assert len(_NSPanel.made) == 1 and len(_Picker.made) == 1 and picker.player is p
+    # Apple's menu tells the delegate; the app clicks nothing itself.
+    rx._obs.routePickerViewWillBeginPresentingRoutes_(picker)
+    rx._obs.routePickerViewDidEndPresentingRoutes_(picker)
     _pump(qapp)
+    assert rx._menu_timer.isActive()
+    p.route(True)
+    _pump(qapp)
+    _settle(am, rx)
+    assert label.text() == am.tr("airplay_on_tv_window")
+    assert panel.label().text == am.tr("airplay_on_tv")
+    # Closed once on the TV: the cast goes on, and the dialog brings it back.
+    center.post(_CLOSE)
+    panel.visible = False
+    _pump(qapp)
+    assert rx.active == am.NAME
+    button.click()
+    assert panel.visible
+    rx.stop()
+    assert panel.closed and picker.player is None and picker.delegate is None
+    assert video.layer.player is None
+    assert button.isHidden() and label.text() == am.tr("airplay_note")
+    dialog.deleteLater()
+    _pump(qapp)
+
+
+def test_closing_the_window_before_a_tv_is_picked_ends_the_cast(qapp, macos):
+    am, center = macos
+    rx = am.AirPlayReceiver()
+    ended = []
+    rx.ended.connect(ended.append)
+    rx.cast(am.NAME, "http://p/live/u/pw/1.m3u8", "SVT1", ["h264", "aac"])
+    center.post(_CLOSE)
+    _pump(qapp)
+    assert ended == ["airplay_no_route"] and rx.active is None
+    assert _plays(_Player.made[-1]) == ["pause", "pause"]     # never played
+
+
+def test_route_detection_decides_the_entry(qapp, macos, monkeypatch):
+    am, center = macos
+    from PyQt6.QtWidgets import QDialog
+    rx = am.AirPlayReceiver()
+    assert rx.entries() == [am.NAME]               # not looking: listed
+    _Detector.found = False
+    dialog = QDialog()
+    rx.dialog_row(dialog)
+    det = rx._detector
+    assert det.enabled is True and rx._routes is None
+    assert rx.entries() == [am.NAME]               # no answer yet
+    rx._detect_settled()                           # it looked: none
+    assert rx.entries() == []
+    found = []
+    rx.routes_changed.connect(found.append)
+    _Detector.found = True
+    center.post(_ROUTES)
+    _pump(qapp)
+    assert found == [True] and rx.entries() == [am.NAME]
+    # The scan's worker waits for the first answer, not longer.
+    _Detector.found = False
+    rx._detect(True)
+    out = []
+    t = threading.Thread(target=lambda: out.append(rx.entries()))
+    began = time.monotonic()
+    t.start()
+    _pump(qapp, 0.1)
+    _Detector.found = True
+    center.post(_ROUTES)
+    while t.is_alive():
+        _pump(qapp, 0.02)
+    assert out == [[am.NAME]] and time.monotonic() - began < am.DETECT_SETTLE_S
+    # Off with the dialog: Apple says it costs power.
+    dialog.finished.emit(0)
+    assert det.enabled is False and rx.entries() == [am.NAME] and rx._row is None
+    # No detector to be had: still listed.
+    monkeypatch.setattr(sys.modules["AVFoundation"], "AVRouteDetector", None)
+    other = am.AirPlayReceiver()
+    other.dialog_row(QDialog())
+    assert other._detector is None and other.entries() == [am.NAME]
+    dialog.deleteLater()
+    _pump(qapp)
+
+
+def test_errors_and_error_log_entries_are_logged_without_logins(qapp, macos, caplog):
+    import logging
+    caplog.set_level(logging.DEBUG, logger="dopeiptv")
+    am, center = macos
+    under = _nserror("NSURLErrorDomain", -1022, "App Transport Security")
+    text = am._error_text(_nserror("AVFoundationErrorDomain", -11800,
+                                   "http://h/live/user1/secret1/1.m3u8", under))
+    assert "AVFoundationErrorDomain -11800" in text and "NSURLErrorDomain -1022" in text
+    assert "secret1" not in text and am._error_text(None) == ""
+    rx = am.AirPlayReceiver()
+    rx.cast(am.NAME, "http://p/live/user1/secret1/1.m3u8", "SVT1", ["h264", "aac"])
+    p = _Player.made[-1]
+    p.item.events = [types.SimpleNamespace(
+        errorDomain=lambda: "CoreMediaErrorDomain", errorStatusCode=lambda: -12642,
+        errorComment=lambda: "Playlist parse error",
+        URI=lambda: "http://p/live/user1/secret1/1.m3u8")]
+    center.post("AVPlayerItemNewErrorLogEntryNotification")
+    _pump(qapp)
+    said = "\n".join(r.getMessage() for r in caplog.records)
+    assert "CoreMediaErrorDomain -12642: Playlist parse error" in said
+    assert "secret1" not in said and "user1" not in said
+    rx.stop()
+
+
+def test_no_private_tricks_and_no_view_inside_a_qt_widget():
+    src = (_REPO / "dopeiptv" / "services" / "airplay_macos.py").read_text()
+    for trick in ("performClick", "subviews()", "winId", "objc_object"):
+        assert trick not in src, trick
 
 
 def test_without_pyobjc_there_is_no_airplay(monkeypatch):
@@ -712,6 +1042,40 @@ def test_the_cast_panel_shows_the_airplay_row(qapp, macos, tmp_path):
     _pump(qapp)
 
 
+def test_the_cast_panel_lists_airplay_only_where_there_are_routes(
+        qapp, macos, tmp_path, monkeypatch):
+    am, center = macos
+    monkeypatch.setattr(am, "DETECT_SETTLE_S", 0.1)
+    from PyQt6.QtCore import QSettings, QThreadPool
+    from PyQt6.QtWidgets import QWidget
+
+    from dopeiptv.providers import casting, chromecast
+    hub = casting.CastHub(_Mgr(["Living room"]), _Mgr([]), _Mgr([]))
+    rx = am.AirPlayReceiver()
+    hub.add_receiver(rx)
+    win = QWidget()
+    win.settings = QSettings(str(tmp_path / "s.ini"), QSettings.Format.IniFormat)
+    win.cast, win.pool, win._cast_device = hub, QThreadPool(), None
+    _Detector.found = False
+    d = chromecast.CastDialog(win, "http://p/live/u/pw/1.m3u8", "SVT1",
+                              tracks={}, probe=False)
+    d.show()
+    end = time.monotonic() + 10
+    while time.monotonic() < end and not d.rescan_btn.isEnabled():
+        _pump(qapp, 0.02)
+    names = [d.list.item(i).text() for i in range(d.list.count())]
+    assert names == ["Living room"]                # it looked and found none
+    _Detector.found = True                         # an Apple TV woke up
+    center.post(_ROUTES)
+    _pump(qapp)
+    names = [d.list.item(i).text() for i in range(d.list.count())]
+    assert names == [am.NAME, "Living room"]
+    d.close()
+    assert rx._detector.enabled is False
+    win.deleteLater()
+    _pump(qapp)
+
+
 def test_linux_and_windows_add_no_airplay(monkeypatch):
     from dopeiptv.ui.mw_airplay import _AirPlayMixin
     for system in ("linux", "win32"):
@@ -746,3 +1110,11 @@ def test_copied_aac_from_a_ts_is_made_mp4_ready():
 def test_the_mac_app_may_load_http_media_for_airplay():
     spec = open("dopeiptv-mac.spec", encoding="utf-8").read()
     assert "NSAllowsArbitraryLoadsForMedia" in spec
+
+
+def test_the_mac_app_declares_airplay_s_bonjour_services():
+    spec = (_REPO / "dopeiptv-mac.spec").read_text(encoding="utf-8")
+    line = next(x for x in spec.splitlines() if "'NSBonjourServices'" in x)
+    assert "'_airplay._tcp'" in line and "'_raop._tcp'" in line
+    for key in ("NSAllowsLocalNetworking", "NSLocalNetworkUsageDescription"):
+        assert key in spec

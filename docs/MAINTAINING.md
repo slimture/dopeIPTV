@@ -111,8 +111,10 @@ Platform notes that are easy to forget:
   keys) before it ships.
 - AirPlay (macOS) comes through PyObjC's AVFoundation and AVKit in the same
   way, and `--self-check` fails a Mac bundle without them. A change in
-  `services/airplay_macos.py` is tried with a real Apple TV: Apple's menu,
-  a channel and a film, pause, seek, the firewall's question.
+  `services/airplay_macos.py` is tried with a real Apple TV: the AirPlay
+  window and Apple's menu in it, a channel and a film, pause, seek, the
+  firewall's question (what only a real Mac shows: DEVELOPER_NOTES.md,
+  AirPlay).
 
 ## Cutting a release
 
