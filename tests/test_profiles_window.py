@@ -252,6 +252,15 @@ QApplication.sendEvent(w._profile_picker, QKeyEvent(QEvent.Type.KeyPress, Qt.Key
                                                     Qt.KeyboardModifier.NoModifier))
 pump(3)
 assert w._profile_picker is not None                    # Esc does not get past it
+# Nor the phone remote, the remote API or Home Assistant asking for the
+# profile in use: its PIN is asked of them too, until it is given.
+try:
+    w._profile_switch_remote({"id": MAIN_ID})
+    raise AssertionError("switched without the PIN")
+except ValueError:
+    pass
+assert w._profile_must_pick and w._profile_picker is not None
+assert not w.menuBar().isEnabled()
 profiles_ui.ask_pin = lambda *a, **k: "2468"
 assert w._profile_pick(MAIN_ID)
 assert not w._profile_must_pick and w._profile_picker is None
