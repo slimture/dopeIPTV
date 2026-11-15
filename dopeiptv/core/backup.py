@@ -409,7 +409,7 @@ def _json(value: Any) -> Any:
 def _kind_of(key: str) -> str:
     """The summary's kind of an app settings key ("" counts nothing)."""
     if key in _SOURCE_KEYS or key in (_profiles.K_ACTIVE, _profiles.K_ASK,
-                                      _profiles.K_MIGRATED):
+                                      _profiles.K_MIGRATED, _profiles.K_REMOVED):
         return ""
     if _FAVORITES.fullmatch(key):
         return "" if key.endswith(("_locked", "_colors")) else "favorites"

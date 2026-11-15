@@ -435,6 +435,36 @@ def test_settings_sync_carries_every_profile(tmp_path):
     assert "d" not in doc_b["c"]["settings"][f"profiles/{kid.id}/theme"]
 
 
+def test_a_profile_removed_here_is_not_brought_back_by_the_next_sync(tmp_path):
+    # The synced copy still holds the profile (sync never takes one out):
+    # the next round read it as one another computer has, and Lisa came
+    # back - her favourites and theme with her - on the computer that had
+    # just removed her.
+    a = _computer(tmp_path, "a")
+    kid = a[3].add("Lisa")
+    profiles.pinned(a[0], kid.id).setValue("theme", "light")
+    FavoriteStore(profiles.pinned(a[0], kid.id), "favorites_a").add("all", {"stream_id": 9, "name": "B"})
+    cats = ("favorites", "settings")
+    doc = sync.empty_doc()
+    sync.stamp(doc, sync.collect(_ctx(*a), cats), cats, 1000)
+    assert a[3].remove(kid.id, [a[0], a[1]])
+    ctx = _ctx(*a)
+    before = sync.collect(ctx, cats)
+    stamped = sync._copy(doc)
+    sync.stamp(stamped, before, cats, 2000)
+    merged = sync.merge(doc, stamped)
+    result = sync.RoundResult(merged=merged, stamped=stamped, version=2, uploaded=True, size=0)
+    sync.apply(ctx, result, before, sync.collect(_ctx(*a), cats), cats)
+    a[3].reload()
+    assert a[3].get(kid.id) is None
+    assert profiles.pinned(a[0], kid.id).value("theme") is None
+    assert not [k for k in profiles.raw(a[0]).allKeys() if k.startswith(f"profiles/{kid.id}/")]
+    # Another computer still has her: she stays there, and is not added
+    # back here either.
+    assert not a[3].merge_public([{"id": kid.id, "name": "Lisa"}])
+    assert a[3].get(kid.id) is None
+
+
 def test_an_older_computer_syncs_on_with_the_first_profile(tmp_path):
     # A computer still on a version without profiles reads the first
     # profile's entries as it always did, and passes the others' by.

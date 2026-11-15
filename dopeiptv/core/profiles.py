@@ -51,6 +51,10 @@ K_ACTIVE = "profile_active"
 K_ASK = "profile_ask_start"
 #: The version that copied everything into the first profile.
 K_MIGRATED = "profiles_migrated"
+#: The profiles taken out on this computer (JSON list of ids): settings sync
+#: never takes one out, and must not bring one back here either.
+K_REMOVED = "profiles_removed"
+_REMOVED_KEPT = 64
 #: The first profile's id: the same on every computer, so settings sync
 #: carries it under the names it always had.
 MAIN_ID = "me"
@@ -118,7 +122,7 @@ SHARED_EXAMPLES = ("playlists", "active_playlist", "recording_jobs", "recordings
                    "window_geometry", "splitter_state", "language",
                    "parental_pin_hash", "parental_salt", "epg_delay_min",
                    "trakt_client_id", "trakt_client_secret", "home_enabled",
-                   K_LIST, K_ACTIVE, K_ASK, K_MIGRATED)
+                   K_LIST, K_ACTIVE, K_ASK, K_MIGRATED, K_REMOVED)
 
 
 def is_own(key: str) -> bool:
@@ -522,6 +526,8 @@ class ProfileStore:
             return False
         self.items = [p for p in self.items if p.id != pid]
         self._save()
+        gone = [x for x in self.removed() if x != pid] + [pid]
+        self._raw.setValue(K_REMOVED, json.dumps(gone[-_REMOVED_KEPT:]))
         head = f"{ROOT}/{pid}/"
         for s in files:
             if s is None:
@@ -532,14 +538,24 @@ class ProfileStore:
             r.sync()
         return True
 
+    def removed(self) -> list[str]:
+        """The ids of the profiles taken out on this computer."""
+        try:
+            got = json.loads(self._raw.value(K_REMOVED, "") or "[]")
+        except (TypeError, ValueError):
+            return []
+        return [str(x) for x in got] if isinstance(got, list) else []
+
     def merge_public(self, rows: Iterable[dict]) -> bool:
         """Profiles another computer has (settings sync): one not here is
         added, one here takes its name, colour, emoji and level. The PIN
-        stays each computer's own, and nothing is ever taken out."""
+        stays each computer's own, and nothing is ever taken out - nor one
+        taken out here brought back."""
         changed = False
+        gone = set(self.removed())
         for row in rows:
             p = Profile.from_dict(row) if isinstance(row, dict) else None
-            if p is None:
+            if p is None or p.id in gone:
                 continue
             mine = self.get(p.id)
             if mine is None:
