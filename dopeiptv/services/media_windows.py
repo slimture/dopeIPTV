@@ -19,7 +19,7 @@ from __future__ import annotations
 import time
 from datetime import timedelta
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 from PyQt6.QtCore import Qt, pyqtSignal
 
@@ -100,8 +100,8 @@ class SmtcSession(PolledSession):
         self._thumb_for = ""          # the art string seen
         self._thumb: Any = None       # its RandomAccessStreamReference
         self._loading: Any = None     # (art, stream, writer, operation)
-        self._stored.connect(self._thumb_stored,
-                             Qt.ConnectionType.QueuedConnection)
+        cast(Any, self._stored).connect(self._thumb_stored,
+                                       Qt.ConnectionType.QueuedConnection)
 
     # -- PolledSession ---------------------------------------------------------
 

@@ -69,7 +69,8 @@ def _classes(route: Route, resolve: bool) -> dict[str, type]:
             self.assert_fingerprint = None
             self.assert_hostname = False
             super().connect()
-            der = self.sock.getpeercert(binary_form=True) if self.sock is not None else None
+            sock: Any = self.sock
+            der = sock.getpeercert(binary_form=True) if sock is not None else None
             got = cert_pin.fingerprint(der or b"")
             if got != pinned:
                 cert_pin.record_mismatch(origin, port, got)

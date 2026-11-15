@@ -21,7 +21,7 @@ import importlib.util
 import os
 import sys
 import time
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from PyQt6.QtCore import QObject, Qt, QTimer, QUrl, pyqtSignal
 
@@ -203,7 +203,9 @@ class PolledSession(QObject):
         self._timer = QTimer(self)
         self._timer.setInterval(POLL_MS)
         self._timer.timeout.connect(self.refresh)
-        self._asked.connect(self._carry_out, Qt.ConnectionType.QueuedConnection)
+        # Through Any: PyQt6's stubs differ between versions on connect's type.
+        cast(Any, self._asked).connect(self._carry_out,
+                                       Qt.ConnectionType.QueuedConnection)
 
     # -- what a backend implements -------------------------------------------
 

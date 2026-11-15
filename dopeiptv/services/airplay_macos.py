@@ -26,7 +26,7 @@ import sys
 import threading
 import time
 import weakref
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 from PyQt6.QtCore import QObject, QThread, QTimer, Qt, pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
@@ -196,7 +196,8 @@ class AirPlayReceiver(QObject):
         self._timer = QTimer(self)
         self._timer.setInterval(POLL_MS)
         self._timer.timeout.connect(self._poll)
-        self._call.connect(self._carry_out, Qt.ConnectionType.QueuedConnection)
+        cast(Any, self._call).connect(self._carry_out,
+                                     Qt.ConnectionType.QueuedConnection)
 
     # -- what CastHub asks -------------------------------------------------------
 
