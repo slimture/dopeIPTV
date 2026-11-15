@@ -502,6 +502,7 @@ class _SettingsMixin:
         if strip is not None:
             strip.retranslate()
         self._guide_restyle()        # the Guide page, in the new language
+        self._palette_retranslate()
 
     def _inline_view_changed(self, *_) -> None:
         # Density and grid are global; the sort dropdown applies only to the
@@ -677,7 +678,12 @@ class _SettingsMixin:
         self._show_toast(tr("nerd_already") if already else tr("nerd_unlocked"),
                          4000)
 
-    def open_settings(self) -> None:
+    def open_settings(self, *_signal_args, at_page: str | None = None,
+                      at_row: tuple | None = None, index_only: bool = False) -> None:
+        """The Settings window - on page *at_page* and its row *at_row*
+        (card, row, name) when asked (the command palette), lit for a
+        moment. *index_only* builds it for ``_settings_index`` and shows
+        nothing."""
         d = QDialog(self)
         d.setWindowTitle(tr("settings_title"))
         d.setMinimumSize(860, 600)
@@ -2310,6 +2316,16 @@ class _SettingsMixin:
         ])
         # Back on the page that was open last time this session.
         shell.show_page(getattr(self, "_settings_page", None))
+        # What the command palette finds among the settings, in this language.
+        self._settings_index = shell.index()
+        if index_only:
+            # Built for the index alone: never shown, nothing to store. Left
+            # as every closed Settings window is, so an answer still on its
+            # way to one of its rows finds it there.
+            return
+        if at_page:
+            if not shell.highlight(at_page, *(at_row or (-1, -1, ""))):
+                shell.show_page(at_page)
         d.finished.connect(
             lambda _r: setattr(self, "_settings_page", shell.current_key()))
         # Picons and udpxy change the channel list: built again on close.

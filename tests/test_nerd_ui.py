@@ -307,11 +307,20 @@ def test_a_check_line_says_what_it_found(app):
     """A check's answer, in words and with its details a click away."""
     from PyQt6.QtTest import QTest
 
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import QWidget
+
     from dopeiptv.core.nerd_check import FAIL, Check
     from dopeiptv.ui.nerd_check_line import CheckLine
+    # In its row: made on its own, it waits for the row to show it (shown
+    # by itself it was a window of its own for a moment).
+    holder = QWidget()
     line = CheckLine(lambda: (lambda: Check(FAIL, "nerd_ck_denied", {"code": 403}, "GET http://h/\\nResult: HTTP 403")),
-                     "Your source", test=True)
+                     "Your source", test=True, parent=holder)
     assert line.text.text() == "Not tested yet." and not line.isHidden()
+    alone = CheckLine(lambda: None, "Your source", test=True)
+    assert not alone.isWindow() or not alone.isVisible()
+    assert not alone.testAttribute(Qt.WidgetAttribute.WA_WState_ExplicitShowHide)
     line.run()
     for _ in range(50):
         QTest.qWait(20)

@@ -2345,5 +2345,21 @@
   "ytdlp_none_system": "Auf diesem System wurde kein yt-dlp gefunden.",
   "ytdlp_offer": "YouTube, Twitch und ähnliche Websites laufen über yt-dlp, und das ist auf diesem Computer nicht vorhanden. Jetzt herunterladen? Es ist die offizielle Version von GitHub (etwa 35 MB), mit ihrer Prüfsumme geprüft, im eigenen Ordner der App abgelegt und aktualisiert, während du es benutzt.",
   "ytdlp_title": "yt-dlp",
-  "ytdlp_update_now": "Jetzt aktualisieren"
+  "ytdlp_update_now": "Jetzt aktualisieren",
+  "sc_palette": "Befehlspalette",
+  "pal_placeholder": "Aktion, Einstellung oder Sender suchen",
+  "pal_actions": "Aktionen",
+  "pal_settings": "Einstellungen",
+  "pal_channels": "Sender und Sendungen",
+  "pal_kind_player": "Player",
+  "pal_kind_setting": "Einstellung",
+  "pal_kind_channel": "Sender",
+  "pal_kind_programme": "Sendung",
+  "pal_hint_choose": "auswählen",
+  "pal_hint_run": "ausführen",
+  "pal_hint_more": "mehr zur Zeile",
+  "pal_hint_opens": "Öffnet überall mit {shortcut}",
+  "pal_none": "Nichts gefunden für „{q}“",
+  "pal_now": "jetzt",
+  "pal_record_remind": "aufnehmen / erinnern"
 }

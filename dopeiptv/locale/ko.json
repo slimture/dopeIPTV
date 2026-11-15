@@ -2345,5 +2345,21 @@
   "ytdlp_none_system": "이 시스템에서 yt-dlp를 찾을 수 없습니다.",
   "ytdlp_offer": "YouTube, Twitch 같은 사이트는 yt-dlp로 재생하는데 이 컴퓨터에 없습니다. 지금 내려받을까요? GitHub의 공식 릴리스(약 35MB)로, 체크섬으로 확인하고 앱 전용 폴더에 두며 사용하면서 업데이트합니다.",
   "ytdlp_title": "yt-dlp",
-  "ytdlp_update_now": "지금 업데이트"
+  "ytdlp_update_now": "지금 업데이트",
+  "sc_palette": "명령 팔레트",
+  "pal_placeholder": "작업, 설정 또는 채널 검색",
+  "pal_actions": "작업",
+  "pal_settings": "설정",
+  "pal_channels": "채널 및 프로그램",
+  "pal_kind_player": "플레이어",
+  "pal_kind_setting": "설정",
+  "pal_kind_channel": "채널",
+  "pal_kind_programme": "프로그램",
+  "pal_hint_choose": "선택",
+  "pal_hint_run": "실행",
+  "pal_hint_more": "이 행 자세히",
+  "pal_hint_opens": "어디서나 {shortcut}(으)로 열기",
+  "pal_none": "“{q}”에 대한 결과 없음",
+  "pal_now": "지금",
+  "pal_record_remind": "녹화 / 알림"
 }

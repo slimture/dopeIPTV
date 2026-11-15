@@ -877,6 +877,34 @@ class XmltvGuide:
         out.reverse()
         return out
 
+    def airings(self, items, win_start: float, win_stop: float,
+                limit: int = 200_000) -> list[tuple[dict, dict]]:
+        """Every programme on the air within [win_start, win_stop) on the
+        channels of *items*, as (channel item, programme): one airing per
+        title and channel, the first. Only a guide already in memory - this
+        never loads one (the command palette asks while it is typed in)."""
+        if not self._loaded:
+            return []
+        out: list[tuple[dict, dict]] = []
+        seen: set = set()
+        for item in items:
+            sched = self._sched_for(item)
+            if not sched:
+                continue
+            starts, stops, titles, _descs = sched
+            n = len(starts)
+            j = bisect_left(starts, win_start - self._MAX_PROG_SECS)
+            while j < n and starts[j] < win_stop:
+                if stops[j] > win_start and titles[j]:
+                    dedup = (item.get("name"), titles[j])
+                    if dedup not in seen:
+                        seen.add(dedup)
+                        out.append((item, self._entry(sched, j)))
+                        if len(out) >= limit:
+                            return out
+                j += 1
+        return out
+
     def search(self, items, query: str, win_start: float, win_stop: float,
                limit: int = 300) -> list[dict]:
         """Find programmes whose title or description contains *query*

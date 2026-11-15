@@ -2345,5 +2345,21 @@
   "ytdlp_none_system": "У цій системі yt-dlp не знайдено.",
   "ytdlp_offer": "YouTube, Twitch і схожі сайти відтворюються через yt-dlp, якого немає на цьому комп'ютері. Завантажити зараз? Це офіційний випуск із GitHub (близько 35 МБ): він перевіряється за контрольною сумою, зберігається в теці застосунку й оновлюється під час використання.",
   "ytdlp_title": "yt-dlp",
-  "ytdlp_update_now": "Оновити зараз"
+  "ytdlp_update_now": "Оновити зараз",
+  "sc_palette": "Палітра команд",
+  "pal_placeholder": "Знайти дію, налаштування чи канал",
+  "pal_actions": "Дії",
+  "pal_settings": "Налаштування",
+  "pal_channels": "Канали й передачі",
+  "pal_kind_player": "Плеєр",
+  "pal_kind_setting": "Налаштування",
+  "pal_kind_channel": "Канал",
+  "pal_kind_programme": "Передача",
+  "pal_hint_choose": "вибрати",
+  "pal_hint_run": "виконати",
+  "pal_hint_more": "докладніше про рядок",
+  "pal_hint_opens": "Відкривається будь-де за {shortcut}",
+  "pal_none": "Нічого не знайдено за «{q}»",
+  "pal_now": "зараз",
+  "pal_record_remind": "записати / нагадати"
 }

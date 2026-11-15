@@ -1,0 +1,371 @@
+"""The command palette: Ctrl+K over the window, three groups as it is
+typed in - the app's actions with their keys, every Settings row (Nerd's
+only while Nerd is on), the active source's channels and the guide's
+programmes - matched without case or accents, word starts first, fast on
+tens of thousands of channels; Enter runs a row, Esc closes; its key is
+the user's to change; nothing searched is kept while viewing privately."""
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+import time
+
+import pytest
+
+from dopeiptv.core import palette_match as pm
+from dopeiptv.core import shortcut_keys
+
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+# -- matching ---------------------------------------------------------------------
+
+def test_case_accents_and_punctuation_do_not_count():
+    assert pm.fold("Nätt-TV  HD!") == " natt tv hd "
+    assert pm.fold("Café Ørsted Łódź") == " cafe orsted lodz "
+    assert pm.words("  NATT,  tv ") == ["natt", "tv"]
+    idx = pm.Index(["Nätt-TV", "Café du Monde", "Sport 1"])
+    assert idx.search("natt", 5) == [0]
+    assert idx.search("CAFE", 5) == [1]
+    assert idx.search("", 5) == [] and idx.search("x", 0) == []
+
+
+def test_every_word_has_to_be_there_and_word_starts_weigh_more():
+    texts = ["Nightly news", "Midnight movie", "Night mode", "Sports at night", "Knight rider"]
+    idx = pm.Index(texts)
+    got = [texts[i] for i in idx.search("night", 10)]
+    # At the very start first (the shorter of two first), then at a word's
+    # start, then inside a word.
+    assert got[:2] == ["Night mode", "Nightly news"], got
+    assert got[2] == "Sports at night", got
+    assert set(got[3:]) == {"Midnight movie", "Knight rider"}, got
+    assert [texts[i] for i in idx.search("night mo", 10)] == ["Night mode", "Midnight movie"]
+    assert idx.search("night zebra", 10) == []
+    assert pm.score(["night"], pm.fold("Night")) > pm.score(["night"], pm.fold("Night mode"))
+
+
+def test_a_query_over_twenty_thousand_channels_is_quick():
+    names = [f"Channel {i} {'Sport' if i % 7 else 'Nyheter Ström'} HD" for i in range(20_000)]
+    idx = pm.Index(names)
+    assert len(idx) == 20_000
+    start = time.perf_counter()
+    for q in ("strom", "sport hd", "channel 1999", "zzz"):
+        idx.search(q, 4)
+    per_query = (time.perf_counter() - start) / 4
+    assert per_query < 0.15, per_query
+    assert names[idx.search("channel 1999", 1)[0]] == "Channel 1999 Sport HD"
+
+
+def test_the_palette_is_a_rebindable_action():
+    assert shortcut_keys.DEFAULTS["palette"] == "Ctrl+K"
+    assert shortcut_keys.reserved("Ctrl+K", "linux") is None
+    over, lost = shortcut_keys.assign({}, "palette", "Ctrl+Shift+P")
+    assert over == {"palette": "Ctrl+Shift+P"} and lost == []
+    assert shortcut_keys.effective(over)["palette"] == "Ctrl+Shift+P"
+
+
+# -- the overlay, with stand-ins for what it finds and does -------------------------
+
+@pytest.fixture(scope="module")
+def app():
+    pytest.importorskip("PyQt6.QtWidgets")
+    from PyQt6.QtWidgets import QApplication
+    return QApplication.instance() or QApplication([])
+
+
+def _overlay():
+    from PyQt6.QtWidgets import QWidget
+
+    from dopeiptv.ui.command_palette import CommandPalette, Entry
+    host = QWidget()
+    host.resize(1000, 700)
+    ran = []
+    rows = [Entry("actions", "Player", "Mute", keys="M", payload="mute"),
+            Entry("settings", "Setting", "Night mode", where="Playback › Behaviour",
+                  more="Evens out the loudness", payload="night"),
+            Entry("settings", "Nerd", "Audio delay", where="Nerd › Player", nerd=True,
+                  payload="delay"),
+            Entry("channels", "Channel", "Nätt-TV", where="1 · Demo", payload="chan")]
+
+    def search(q):
+        terms = pm.words(q)
+        return [e for e in rows if not terms or pm.score(terms, pm.fold(e.text))]
+
+    pal = CommandPalette(host, search, lambda e, _pos: ran.append(e.payload), "Ctrl+K")
+    host.show()
+    return host, pal, ran
+
+
+def test_the_overlay_opens_chooses_runs_and_closes(app):
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtTest import QTest
+    host, pal, ran = _overlay()
+    closed = []
+    pal.closed.connect(lambda: closed.append(1))
+    pal.open()
+    assert pal.isVisible()
+    assert pal.geometry() == host.rect()
+    # Three groups, each under its heading, the first row chosen.
+    assert [e.group for e in pal.entries] == ["actions", "settings", "settings", "channels"]
+    assert pal.current().payload == "mute"
+    QTest.keyClick(pal.field, Qt.Key.Key_Down)
+    assert pal.current().payload == "night"           # the heading is passed over
+    QTest.keyClick(pal.field, Qt.Key.Key_Down)
+    QTest.keyClick(pal.field, Qt.Key.Key_Down)
+    assert pal.current().payload == "chan"
+    QTest.keyClick(pal.field, Qt.Key.Key_Down)
+    assert pal.current().payload == "chan"            # stays on the last
+    QTest.keyClick(pal.field, Qt.Key.Key_Up)
+    assert pal.current().payload == "delay"
+    # Tab: more about the row.
+    QTest.keyClick(pal.field, Qt.Key.Key_Up)
+    QTest.keyClick(pal.field, Qt.Key.Key_Tab)
+    assert pal.more.isVisibleTo(pal) and pal.more.text() == "Evens out the loudness"
+    QTest.keyClick(pal.field, Qt.Key.Key_Tab)
+    assert not pal.more.isVisibleTo(pal)
+    # Typed: looked up again a moment later, accents left out.
+    QTest.keyClicks(pal.field, "natt")
+    assert pal.field.text() == "natt"
+    QTest.qWait(200)
+    assert [e.payload for e in pal.entries] == ["chan"]
+    QTest.keyClick(pal.field, Qt.Key.Key_Return)
+    assert ran == ["chan"]
+    pal.field.setText("zebra")
+    pal.refresh()
+    assert pal.entries == [] and pal.none.isVisibleTo(pal) and "zebra" in pal.none.text()
+    QTest.keyClick(pal.field, Qt.Key.Key_Escape)
+    assert not pal.isVisible() and closed == [1]
+    host.close()
+
+
+def test_enter_right_after_typing_runs_what_was_typed(app):
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtTest import QTest
+    host, pal, ran = _overlay()
+    pal.open()
+    QTest.keyClicks(pal.field, "night")
+    QTest.keyClick(pal.field, Qt.Key.Key_Return)      # before the pause is over
+    assert ran == ["night"]
+    host.close()
+
+
+def test_a_click_beside_it_closes_it(app):
+    from PyQt6.QtCore import QPoint, Qt
+    from PyQt6.QtTest import QTest
+    host, pal, _ran = _overlay()
+    pal.open()
+    QTest.mouseClick(pal, Qt.MouseButton.LeftButton, pos=QPoint(5, host.height() - 5))
+    assert not pal.isVisible()
+    host.close()
+
+
+def test_its_keys_are_shown_as_the_system_writes_them(app):
+    from dopeiptv.ui.command_palette import key_parts
+    if sys.platform != "darwin":
+        assert key_parts("Ctrl+Shift+N") == ["Ctrl", "Shift", "N"]
+        assert key_parts("Ctrl++") == ["Ctrl", "+"]
+    assert key_parts("") == []
+
+
+# -- the window: the real menu, Settings, channels; stand-ins where it would play --
+
+_WINDOW = r"""
+import json, os, sys, tempfile, time
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from PyQt6.QtCore import QSettings, Qt
+from PyQt6.QtGui import QKeySequence
+from PyQt6.QtTest import QTest
+from PyQt6.QtWidgets import QApplication, QDialog
+app = QApplication.instance() or QApplication([])
+tmp = tempfile.mkdtemp()
+QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, tmp)
+s = QSettings(os.path.join(tmp, "s.ini"), QSettings.Format.IniFormat)
+s.setValue("nerd_enabled", "false")
+from dopeiptv.core import nerd, privacy
+nerd.install(s)
+from dopeiptv.core.stores import PlaylistStore
+from dopeiptv.i18n import tr
+from dopeiptv.providers.client import DemoClient
+from dopeiptv.ui.main_window import MainWindow
+from dopeiptv.ui.settings_ui import SettingsShell
+
+w = MainWindow(DemoClient(), s, PlaylistStore(s))
+now = time.time()
+
+
+def airings(items, start, stop):
+    # The guide in memory, as it answers: one programme on Sintel in an hour.
+    ch = next(c for c in items if c.get("name") == "Sintel")
+    return [(ch, {"title": "Nattsändning: Musikvideor", "description": "Videos all night",
+                  "start_timestamp": now + 3600, "stop_timestamp": now + 7200})]
+
+
+w.xmltv.airings = airings
+w.show()
+w.activateWindow()
+QTest.qWaitForWindowActive(w, 3000)
+w.listw.setFocus()
+app.processEvents()
+
+
+def wait(cond, secs=8.0):
+    end = time.monotonic() + secs
+    while not cond() and time.monotonic() < end:
+        app.processEvents()
+        time.sleep(0.01)
+    return cond()
+
+
+def palette():
+    pal = getattr(w, "_palette", None)
+    return pal if pal is not None and pal.isVisible() else None
+
+
+def ask(text):
+    pal = palette()
+    pal.field.setText(text)
+    pal.refresh()
+    return pal.entries
+
+
+def choose(pal, pred):
+    rows = [i for i in range(pal.list.count()) if pal._entry_at(i) is not None]
+    row = next(i for i in rows if pred(pal._entry_at(i)))
+    pal.list.setCurrentRow(row)
+    QTest.keyClick(pal.field, Qt.Key.Key_Return)
+    app.processEvents()
+
+
+CTRL = Qt.KeyboardModifier.ControlModifier
+# -- Ctrl+K opens it, Esc closes it, the focus goes back.
+QTest.keyClick(w, Qt.Key.Key_K, CTRL)
+assert wait(lambda: palette() is not None), "Ctrl+K opens the palette"
+pal = palette()
+assert pal.field.hasFocus()
+assert pal.entries and all(e.group == "actions" for e in pal.entries)
+QTest.keyClick(pal.field, Qt.Key.Key_Escape)
+assert wait(lambda: palette() is None) and getattr(w, "_palette", None) is None
+assert w.listw.hasFocus(), app.focusWidget()
+
+# -- ACTIONS: a menu entry, and a rebindable one with its key; Enter runs it.
+QTest.keyClick(w, Qt.Key.Key_K, CTRL)
+assert wait(lambda: palette() is not None)
+assert wait(lambda: getattr(w, "_settings_index", None) is not None), "Settings indexed"
+assert wait(lambda: getattr(w, "_pal_catalogue", None) is not None), "channels folded"
+found = ask(tr("menu_multiview"))
+assert any(e.group == "actions" and e.payload[0] == "action"
+           and e.payload[1] is w._menu_actions["multiview"] for e in found), found
+side = next(e for e in ask(tr("sc_sidebar")) if e.group == "actions")
+assert side.keys == "Ctrl+B", side
+was = w.side_btn.isChecked()
+choose(palette(), lambda e: e is side)
+assert wait(lambda: w.side_btn.isChecked() != was), "Enter ran the action"
+assert palette() is None
+w.side_btn.setChecked(was)
+# A menu entry runs through its QAction.
+act = w._menu_actions["stats"]
+act.triggered.disconnect()
+fired = []
+act.triggered.connect(lambda *_a: fired.append("stats"))
+QTest.keyClick(w, Qt.Key.Key_K, CTRL)
+assert wait(lambda: palette() is not None)
+ask(tr("stats_menu"))
+choose(palette(), lambda e: e.payload[0] == "action" and e.payload[1] is act)
+assert wait(lambda: fired == ["stats"]), fired
+
+# -- SETTINGS: a row opens Settings on its page, lit; Nerd's only while it is on.
+rows = w._settings_index
+night = next(r for r in rows if r["name"] == tr("night_mode"))
+QTest.keyClick(w, Qt.Key.Key_K, CTRL)
+assert wait(lambda: palette() is not None)
+got = [e for e in ask(night["name"]) if e.group == "settings"]
+assert got and got[0].payload[1] is night and got[0].where == night["where"], got
+seen = {}
+
+
+def in_settings(dlg):
+    shell = dlg.findChild(SettingsShell)
+    seen["page"] = shell.current_key()
+    lit = shell.found_row()
+    seen["row"] = lit.label.text() if lit is not None else None
+    seen["prop"] = bool(lit is not None and lit.property("found"))
+    return 0
+
+
+QDialog.exec = in_settings
+choose(palette(), lambda e: e is got[0])
+assert wait(lambda: "page" in seen), seen
+assert seen == {"page": night["page"], "row": night["name"], "prop": True}, seen
+# Settings opened: its rows read again, the same.
+assert [(r["page"], r["name"]) for r in w._settings_index] == [(r["page"], r["name"]) for r in rows]
+nerd_row = next(r for r in rows if r["gated"])
+assert nerd_row["nerd"] and nerd_row["where"].startswith(tr("nerd_page"))
+
+
+def is_nerd_row(e):
+    return e.group == "settings" and (e.payload[1]["page"], e.payload[1]["name"]) == (
+        nerd_row["page"], nerd_row["name"])
+
+
+QTest.keyClick(w, Qt.Key.Key_K, CTRL)
+assert wait(lambda: palette() is not None)
+assert not any(is_nerd_row(e) for e in ask(nerd_row["name"]))
+s.setValue("nerd_enabled", "true")
+hit = [e for e in ask(nerd_row["name"]) if is_nerd_row(e)]
+assert hit and hit[0].nerd and hit[0].kind == tr("nerd_page"), hit
+s.setValue("nerd_enabled", "false")
+
+# -- CHANNELS AND PROGRAMMES: by name or number, accents left out; a channel plays.
+played = []
+w.tune_from_guide = lambda ch: played.append(ch.get("name"))
+chans = [e for e in ask("SINTEL") if e.group == "channels"]
+assert [(e.kind, e.text) for e in chans] == [(tr("pal_kind_channel"), "Sintel")], chans
+assert [e.text for e in ask("3") if e.group == "channels" and e.payload[0] == "channel"][:1] == ["Sintel"]
+prog = next(e for e in ask("nattsandning musik") if e.group == "channels")
+assert prog.payload[0] == "programme" and prog.kind == tr("pal_kind_programme")
+assert "Sintel" in prog.where and tr("pal_record_remind") in prog.where
+menu = w._palette_programme_menu(*prog.payload[1])
+words = [a.text() for a in menu.actions()]
+assert words[:2] == [tr("epg_play_channel"), tr("rec_record_programme")], words
+assert len(words) == 2 or words[2] in (tr("reminder_add"), tr("reminder_remove")), words
+ask("sintel")
+choose(palette(), lambda e: e.payload[0] == "channel")
+assert wait(lambda: played == ["Sintel"]), played
+
+# -- Private viewing: what was searched is not kept.
+QTest.keyClick(w, Qt.Key.Key_K, CTRL)
+assert wait(lambda: palette() is not None)
+assert palette().field.text() == "sintel"      # kept in memory for the session
+privacy.set_private(True)
+ask("secret")
+QTest.keyClick(palette().field, Qt.Key.Key_Escape)
+assert w._palette_last == ""
+QTest.keyClick(w, Qt.Key.Key_K, CTRL)
+assert wait(lambda: palette() is not None) and palette().field.text() == ""
+QTest.keyClick(palette().field, Qt.Key.Key_Escape)
+privacy.set_private(False)
+
+# -- Its key is the user's: another one opens it, Ctrl+K no longer.
+s.setValue("keyboard_shortcuts", json.dumps({"palette": "Ctrl+Shift+P"}))
+w.apply_shortcuts()
+assert w._shortcuts["palette"].key() == QKeySequence("Ctrl+Shift+P")
+w.listw.setFocus()
+QTest.keyClick(w, Qt.Key.Key_K, CTRL)
+app.processEvents()
+assert palette() is None, "the old key does nothing"
+QTest.keyClick(w, Qt.Key.Key_P, CTRL | Qt.KeyboardModifier.ShiftModifier)
+assert wait(lambda: palette() is not None), "the user's key opens it"
+w.hide()
+print("PALETTE_WINDOW_OK", flush=True)
+os._exit(0)
+"""
+
+
+def test_the_palette_in_the_window():
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+    for var in ("HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy", "ALL_PROXY", "all_proxy"):
+        env.pop(var, None)
+    out = subprocess.run([sys.executable, "-c", _WINDOW], cwd=_REPO_ROOT, env=env,
+                         capture_output=True, text=True, timeout=180)
+    assert "PALETTE_WINDOW_OK" in out.stdout, out.stdout[-2000:] + out.stderr[-4000:]

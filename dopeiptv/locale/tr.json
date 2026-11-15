@@ -2345,5 +2345,21 @@
   "ytdlp_none_system": "Bu sistemde yt-dlp bulunamadı.",
   "ytdlp_offer": "YouTube, Twitch ve benzeri siteler yt-dlp ile oynatılır ve bu bilgisayarda yt-dlp yok. Şimdi indirilsin mi? GitHub'daki resmi sürümdür (yaklaşık 35 MB); sağlama toplamıyla denetlenir, uygulamanın kendi klasöründe tutulur ve kullanıldıkça güncellenir.",
   "ytdlp_title": "yt-dlp",
-  "ytdlp_update_now": "Şimdi güncelle"
+  "ytdlp_update_now": "Şimdi güncelle",
+  "sc_palette": "Komut paleti",
+  "pal_placeholder": "Bir eylem, ayar ya da kanal ara",
+  "pal_actions": "Eylemler",
+  "pal_settings": "Ayarlar",
+  "pal_channels": "Kanallar ve programlar",
+  "pal_kind_player": "Oynatıcı",
+  "pal_kind_setting": "Ayar",
+  "pal_kind_channel": "Kanal",
+  "pal_kind_programme": "Program",
+  "pal_hint_choose": "seç",
+  "pal_hint_run": "çalıştır",
+  "pal_hint_more": "satır hakkında daha fazlası",
+  "pal_hint_opens": "Her yerden {shortcut} ile açılır",
+  "pal_none": "“{q}” için bir şey bulunamadı",
+  "pal_now": "şimdi",
+  "pal_record_remind": "kaydet / hatırlat"
 }

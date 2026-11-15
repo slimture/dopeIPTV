@@ -2345,5 +2345,21 @@
   "ytdlp_none_system": "ไม่พบ yt-dlp ในระบบนี้",
   "ytdlp_offer": "YouTube, Twitch และเว็บไซต์ทำนองเดียวกันเล่นผ่าน yt-dlp ซึ่งไม่มีในคอมพิวเตอร์เครื่องนี้ ดาวน์โหลดตอนนี้ไหม เป็นรุ่นทางการจาก GitHub (ประมาณ 35 MB) ตรวจสอบกับ checksum เก็บไว้ในโฟลเดอร์ของแอปเอง และอัปเดตไปตามการใช้งาน",
   "ytdlp_title": "yt-dlp",
-  "ytdlp_update_now": "อัปเดตตอนนี้"
+  "ytdlp_update_now": "อัปเดตตอนนี้",
+  "sc_palette": "แผงคำสั่ง",
+  "pal_placeholder": "ค้นหาคำสั่ง การตั้งค่า หรือช่อง",
+  "pal_actions": "คำสั่ง",
+  "pal_settings": "การตั้งค่า",
+  "pal_channels": "ช่องและรายการ",
+  "pal_kind_player": "เครื่องเล่น",
+  "pal_kind_setting": "การตั้งค่า",
+  "pal_kind_channel": "ช่อง",
+  "pal_kind_programme": "รายการ",
+  "pal_hint_choose": "เลือก",
+  "pal_hint_run": "เรียกใช้",
+  "pal_hint_more": "รายละเอียดของแถว",
+  "pal_hint_opens": "เปิดได้ทุกที่ด้วย {shortcut}",
+  "pal_none": "ไม่พบสิ่งใดสำหรับ “{q}”",
+  "pal_now": "ขณะนี้",
+  "pal_record_remind": "บันทึก / เตือน"
 }

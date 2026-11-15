@@ -2345,5 +2345,21 @@
   "ytdlp_none_system": "Hakuna yt-dlp iliyopatikana kwenye mfumo huu.",
   "ytdlp_offer": "YouTube, Twitch na tovuti kama hizo huchezwa kupitia yt-dlp, ambayo haipo kwenye kompyuta hii. Ipakue sasa? Ni toleo rasmi kutoka GitHub (takriban MB 35), hukaguliwa kwa checksum yake, huwekwa kwenye folda ya programu yenyewe na husasishwa inapotumika.",
   "ytdlp_title": "yt-dlp",
-  "ytdlp_update_now": "Sasisha sasa"
+  "ytdlp_update_now": "Sasisha sasa",
+  "sc_palette": "Paleti ya amri",
+  "pal_placeholder": "Tafuta kitendo, mpangilio au chaneli",
+  "pal_actions": "Vitendo",
+  "pal_settings": "Mipangilio",
+  "pal_channels": "Chaneli na vipindi",
+  "pal_kind_player": "Kicheza",
+  "pal_kind_setting": "Mpangilio",
+  "pal_kind_channel": "Chaneli",
+  "pal_kind_programme": "Kipindi",
+  "pal_hint_choose": "chagua",
+  "pal_hint_run": "endesha",
+  "pal_hint_more": "zaidi kuhusu safu",
+  "pal_hint_opens": "Hufunguka kwa {shortcut} popote",
+  "pal_none": "Hakuna kilichopatikana kwa “{q}”",
+  "pal_now": "sasa",
+  "pal_record_remind": "rekodi / kumbusha"
 }

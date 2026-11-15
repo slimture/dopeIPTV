@@ -2345,5 +2345,21 @@
   "ytdlp_none_system": "Không tìm thấy yt-dlp trên hệ thống này.",
   "ytdlp_offer": "YouTube, Twitch và các trang tương tự phát qua yt-dlp, mà máy này chưa có. Tải về ngay? Đây là bản phát hành chính thức từ GitHub (khoảng 35 MB), được kiểm tra bằng mã kiểm tra, cất trong thư mục riêng của ứng dụng và cập nhật trong lúc dùng.",
   "ytdlp_title": "yt-dlp",
-  "ytdlp_update_now": "Cập nhật ngay"
+  "ytdlp_update_now": "Cập nhật ngay",
+  "sc_palette": "Bảng lệnh",
+  "pal_placeholder": "Tìm thao tác, cài đặt hoặc kênh",
+  "pal_actions": "Thao tác",
+  "pal_settings": "Cài đặt",
+  "pal_channels": "Kênh và chương trình",
+  "pal_kind_player": "Trình phát",
+  "pal_kind_setting": "Cài đặt",
+  "pal_kind_channel": "Kênh",
+  "pal_kind_programme": "Chương trình",
+  "pal_hint_choose": "chọn",
+  "pal_hint_run": "thực hiện",
+  "pal_hint_more": "thêm về dòng này",
+  "pal_hint_opens": "Mở bằng {shortcut} ở bất cứ đâu",
+  "pal_none": "Không tìm thấy gì cho “{q}”",
+  "pal_now": "đang phát",
+  "pal_record_remind": "ghi / nhắc"
 }

@@ -189,7 +189,11 @@ class CheckLine(QWidget):
         self.state = state
         self.details.setVisible(bool(detail) and state in (FAIL, WARN, OK))
         self.details.setText(tr("nerd_ck_details") if state != OK else tr("nerd_ck_what"))
-        self.show()
+        # Not in its row yet (made with "untested" on it): it shows with the
+        # row. Shown on its own it was a window for a moment, which took the
+        # focus from the main window while Settings was being built.
+        if self.parentWidget() is not None:
+            self.show()
 
     def show_problem(self) -> None:
         r = self._result

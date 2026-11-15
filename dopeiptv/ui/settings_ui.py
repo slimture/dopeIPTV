@@ -541,6 +541,15 @@ class SettingsShell(QWidget):
         self._into_view_timer.setSingleShot(True)
         self._into_view_timer.timeout.connect(self._bring_into_view)
         self._aligned = False
+        # A row asked for from outside (the command palette): scrolled to
+        # once the window is up, lit for a moment.
+        self._found: QWidget | None = None
+        self._found_scroll = QTimer(self)
+        self._found_scroll.setSingleShot(True)
+        self._found_scroll.timeout.connect(self._scroll_to_found)
+        self._found_off = QTimer(self)
+        self._found_off.setSingleShot(True)
+        self._found_off.timeout.connect(self._unlight_found)
         self.nav.page_chosen.connect(self._show)
         self.search.textChanged.connect(self._filter)
 
@@ -821,6 +830,94 @@ class SettingsShell(QWidget):
             return []
         return [p.key for p in self._ordered_pages() if not p.body.isHidden()]
 
+    def index(self) -> list[dict]:
+        """Every row the search reaches, for the command palette: its page,
+        where it is ("Playback › Behaviour"), its name, the words it is found
+        under, its explanation, whether it is Nerd's (``nerd``) and shown only
+        while Nerd is on (``gated``), and its place (``card``, ``row``). A
+        row that only leads to another page is left out."""
+        gated = {k for keys in self._gated.values() for k in keys}
+        nerd_keys = set(gated)
+        for keys in self._gated.values():
+            section = self._section_of(keys[0]) if keys else None
+            if section is not None:
+                nerd_keys.update(it.data(Qt.ItemDataRole.UserRole) for it in section[1])
+        out: list[dict] = []
+        seen: set[tuple[str, str]] = set()
+        for page in self._ordered_pages() or self.pages:
+            group = page.group or page.title
+            for ci, card in enumerate(page.cards):
+                head = card.property("_title")
+                card_title = head.text() if head is not None else ""
+                if page.key in nerd_keys or not card_title:
+                    where = f"{group} › {page.title}"
+                else:
+                    where = f"{page.title} › {card_title}"
+                for ri, (w, text) in enumerate(card.rows):
+                    if getattr(w, "link", None) is not None or not text.strip():
+                        continue
+                    label = getattr(w, "label", None)
+                    name = label.text() if label is not None else (card_title or page.title)
+                    hint = getattr(w, "hint_label", None)
+                    if (page.key, name) in seen:
+                        continue
+                    seen.add((page.key, name))
+                    out.append({"page": page.key, "where": where, "name": name,
+                                "text": f"{name} {text} {card_title}",
+                                "hint": hint.text() if hint is not None else "",
+                                "nerd": page.key in nerd_keys, "gated": page.key in gated,
+                                "card": ci, "row": ri})
+        return out
+
+    def highlight(self, key: str, card: int, row: int, name: str = "") -> bool:
+        """Open page *key* on one of its rows - the one at (*card*, *row*),
+        or else the one named *name* - scrolled into sight and lit for a
+        moment. False when the page or the row is not there."""
+        page = next((p for p in self.pages if p.key == key), None)
+        if page is None or key in self._off:
+            return False
+        self.show_page(key)
+        target = None
+        if 0 <= card < len(page.cards) and 0 <= row < len(page.cards[card].rows):
+            w = page.cards[card].rows[row][0]
+            label = getattr(w, "label", None)
+            if not name or label is None or label.text() == name:
+                target = w
+        if target is None and name:
+            target = next((w for c in page.cards for w, _t in c.rows
+                           if getattr(w, "label", None) is not None
+                           and w.label.text() == name), None)
+        if target is None:
+            return False
+        self._unlight_found()
+        self._found = target
+        target.setProperty("found", True)
+        target.style().unpolish(target)
+        target.style().polish(target)
+        self._found_scroll.start(60)
+        self._found_off.start(2600)
+        return True
+
+    def _scroll_to_found(self) -> None:
+        w = self._found
+        if w is None or sip.isdeleted(w):
+            return
+        page = next((p for p in self.pages if p.isAncestorOf(w)), None)
+        if page is not None:
+            page.ensureWidgetVisible(w, 0, 120)
+
+    def _unlight_found(self) -> None:
+        w, self._found = self._found, None
+        if w is None or sip.isdeleted(w):
+            return
+        w.setProperty("found", False)
+        w.style().unpolish(w)
+        w.style().polish(w)
+
+    def found_row(self) -> QWidget | None:
+        """The row lit by ``highlight``, while it is lit."""
+        return self._found
+
 
 def settings_style() -> str:
     """The Settings window's own rules, on top of the app theme."""
@@ -965,6 +1062,9 @@ QLabel#SettingsGroupHead {{ color: {p['muted']}; font-size: 12px; }}
 QLabel#SliderValue {{ color: {p['text2']}; font-size: 12px; }}
 #SettingsResultsBody {{ background: {p['bg']}; }}
 #SettingsRow, QFrame#SettingsCard > QWidget {{ background: transparent; }}
+QFrame#SettingsCard > QWidget[found="true"] {{
+    background: {_mix(p['accent'], card, 0.18)}; border-radius: 8px;
+}}
 QLabel#SettingsLabel {{ font-size: 13px; color: {p['text']}; }}
 QLabel#SettingsHint {{ color: {p['muted']}; }}
 #SettingsFooter {{ background: {p['bg']}; border-top: 1px solid {p['border']}; }}

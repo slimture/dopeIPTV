@@ -2345,5 +2345,21 @@
   "ytdlp_none_system": "Nessun yt-dlp trovato su questo sistema.",
   "ytdlp_offer": "YouTube, Twitch e siti simili si riproducono con yt-dlp, che non è su questo computer. Scaricarlo ora? È la versione ufficiale da GitHub (circa 35 MB), controllata con il suo checksum, tenuta nella cartella dell'app e aggiornata man mano che la usi.",
   "ytdlp_title": "yt-dlp",
-  "ytdlp_update_now": "Aggiorna ora"
+  "ytdlp_update_now": "Aggiorna ora",
+  "sc_palette": "Tavolozza dei comandi",
+  "pal_placeholder": "Cerca un'azione, un'impostazione o un canale",
+  "pal_actions": "Azioni",
+  "pal_settings": "Impostazioni",
+  "pal_channels": "Canali e programmi",
+  "pal_kind_player": "Lettore",
+  "pal_kind_setting": "Impostazione",
+  "pal_kind_channel": "Canale",
+  "pal_kind_programme": "Programma",
+  "pal_hint_choose": "scegli",
+  "pal_hint_run": "esegui",
+  "pal_hint_more": "di più sulla riga",
+  "pal_hint_opens": "Si apre ovunque con {shortcut}",
+  "pal_none": "Nessun risultato per «{q}»",
+  "pal_now": "ora",
+  "pal_record_remind": "registra / promemoria"
 }

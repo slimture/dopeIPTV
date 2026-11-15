@@ -2345,5 +2345,21 @@
   "ytdlp_none_system": "В этой системе yt-dlp не найден.",
   "ytdlp_offer": "YouTube, Twitch и похожие сайты воспроизводятся через yt-dlp, а на этом компьютере его нет. Загрузить сейчас? Это официальная версия с GitHub (около 35 МБ): она проверяется по контрольной сумме, хранится в папке приложения и обновляется по мере использования.",
   "ytdlp_title": "yt-dlp",
-  "ytdlp_update_now": "Обновить сейчас"
+  "ytdlp_update_now": "Обновить сейчас",
+  "sc_palette": "Палитра команд",
+  "pal_placeholder": "Найти действие, настройку или канал",
+  "pal_actions": "Действия",
+  "pal_settings": "Настройки",
+  "pal_channels": "Каналы и передачи",
+  "pal_kind_player": "Плеер",
+  "pal_kind_setting": "Настройка",
+  "pal_kind_channel": "Канал",
+  "pal_kind_programme": "Передача",
+  "pal_hint_choose": "выбрать",
+  "pal_hint_run": "выполнить",
+  "pal_hint_more": "подробнее о строке",
+  "pal_hint_opens": "Открывается из любого места по {shortcut}",
+  "pal_none": "Ничего не найдено по запросу «{q}»",
+  "pal_now": "сейчас",
+  "pal_record_remind": "записать / напомнить"
 }

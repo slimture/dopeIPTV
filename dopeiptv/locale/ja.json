@@ -2345,5 +2345,21 @@
   "ytdlp_none_system": "このシステムに yt-dlp は見つかりません。",
   "ytdlp_offer": "YouTube・Twitch などのサイトは yt-dlp で再生しますが、このコンピューターにはありません。今ダウンロードしますか？ GitHub の公式リリース（約 35 MB）で、チェックサムで確認し、アプリ専用のフォルダーに置いて、使うたびに更新します。",
   "ytdlp_title": "yt-dlp",
-  "ytdlp_update_now": "今すぐ更新"
+  "ytdlp_update_now": "今すぐ更新",
+  "sc_palette": "コマンドパレット",
+  "pal_placeholder": "操作・設定・チャンネルを検索",
+  "pal_actions": "操作",
+  "pal_settings": "設定",
+  "pal_channels": "チャンネルと番組",
+  "pal_kind_player": "プレーヤー",
+  "pal_kind_setting": "設定",
+  "pal_kind_channel": "チャンネル",
+  "pal_kind_programme": "番組",
+  "pal_hint_choose": "選択",
+  "pal_hint_run": "実行",
+  "pal_hint_more": "行の詳細",
+  "pal_hint_opens": "どこでも {shortcut} で開きます",
+  "pal_none": "「{q}」は見つかりませんでした",
+  "pal_now": "放送中",
+  "pal_record_remind": "録画 / リマインド"
 }

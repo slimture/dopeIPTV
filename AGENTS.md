@@ -97,6 +97,7 @@ map and the one-way import rule.
 | `core/channel_numbers.py` | Nerd: channel numbers of the user's own per source (`nerd_chno_<source id>`), numbering in list order, a number's channel; they win over the source's `num` |
 | `core/channel_prefs.py` | Nerd: settings of a channel's own (`nerd_channel_prefs`, by source + stream id): audio/subtitle language, deinterlace, aspect, audio delay (the old `nerd_adelay/` keys move in on read); what each sets in mpv; applied only while Nerd is on |
 | `core/shortcut_keys.py` | Keyboard shortcuts: the rebindable actions and the app's keys, the user's over them always (`keyboard_shortcuts`, portable text), never two actions on one key, the keys the app keeps, the old editor's keys carried over |
+| `core/palette_match.py` | The command palette's matching: folded text (case, accents, punctuation left out), word starts weigh more, an `Index` folded once for tens of thousands of channels |
 | `core/doh.py` | Nerd's own DNS: names looked up over HTTPS (RFC 8484 wire format, or the JSON API), the presets by IP (Cloudflare, Quad9, Google), answers kept for their TTL |
 | `core/net_route.py` | A source's own way onto the network (`Route`): its DNS, IP version (per source: IPv4 / IPv6 only, prefer IPv6) and pinned certificate from its options and the Nerd page; `open_connection` as it says (home names and proxies left to the system); its checks |
 | `core/net_adapter.py` | The app's own requests on a source's route: a requests adapter that connects to the address own DNS gives under the request's name (Host, SNI, certificate check unchanged) and checks a pinned certificate by fingerprint; mounted by `make_client`, used by the guide, logos and the rewind buffer |
@@ -167,6 +168,8 @@ map and the one-way import rule.
 | `ui/rewrite_rules.py` | The rewrite rules' rows in a source's Nerd options (find, replace, regex switch, up, remove) |
 | `ui/shortcuts.py` | The Keyboard shortcuts card (Settings > Advanced, for everyone): each key a button that records the next combination, ✕ / ↺ / reset all, who lost a key and why one is refused said plainly |
 | `ui/nerd_check_line.py` | The ✓ / ! / ✗ line under a Nerd setting, its Test button and Details (the app's problem window) |
+| `ui/command_palette.py` | The command palette's overlay (Ctrl+K / ⌘K): the field, the three groups, a row's chip, text and keys, Up/Down/Enter/Tab/Esc |
+| `ui/mw_palette.py` | The command palette in the window: the menu's and the rebindable actions, every Settings row (`SettingsShell.index`, Nerd's while it is on), the active source's channels and the guide's programmes (folded on a worker), what a row does |
 | `ui/conn_test_dialog.py` | Test connection's window: each step's mark, result and time as it goes (polled, never waited on), SD/HD/Full HD/4K lit by the speed, Copy (scrubbed), Stop, Test again |
 | `ui/source_presets.py` | Presets in the source dialog (Fritz!Box, Channels DVR, Threadfin, xTeVe, Dispatcharr, ErsatzTV) |
 | `ui/mw_box.py` | The box from the app: zap, wake, standby, record on the box from the guide; Nerd's copy address and guide channel; an Enigma2 box's info, screenshot and remote, its recordings managed, its signal in the stream stats (asked only while they show), the play address a transcoding box gives (`_live_play_url`), a channel it cannot decrypt said so (player, stream health, recordings) |
@@ -222,7 +225,7 @@ in the `mw_*` mixins beside it, each mixed into `MainWindow`:
 `mw_search` (sidebar search), `mw_sidebar` (panel collapse / icon rail),
 `mw_nav` (focus mode, nav colours/icons, the MINE group, History's
 Watched filter, the nav's status), `mw_shortcuts`
-(keyboard shortcuts), `mw_busy` (loading indicator), `mw_updates`
+(keyboard shortcuts), `mw_palette` (the command palette), `mw_busy` (loading indicator), `mw_updates`
 (update badge), `mw_reminders`, `mw_sort`, `mw_onboarding`,
 `mw_mpris` (the system's media controls through `services/media_session.py` - MPRIS, Now Playing, the SMTC - and the media keys), `mw_follow` (followed
 series, new-episode news), `mw_subtitles` (OpenSubtitles, subtitles
@@ -346,7 +349,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   `DOPEIPTV_LOG=debug` shows debug traces; `DOPEIPTV_LOG_FILE=/path` tees
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
-  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan, radio_browser, airplay_bridge), mediaserver, jellyfin, plex), kodi, mdns, simkl), lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log, player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, connections, mirrors, conn_test, health, nerd, nerd_lists, channel_numbers, shortcut_keys, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, night_mode, rec_mp4, viewing_stats, catchup, url_rewrite, hls_cap, ts_scramble, remote_api, events, mqtt, mqtt_control, phone_remote, phone_page, qr, ical, report, supporter, sync, chacha20poly1305, discord_rpc, together, backup, doh, cert_pin, net_route, net_adapter, net_bridge, live_latency, ytdlp) and `services/` (failover, share, resume,
+  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan, radio_browser, airplay_bridge), mediaserver, jellyfin, plex), kodi, mdns, simkl), lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log, player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, connections, mirrors, conn_test, health, nerd, nerd_lists, channel_numbers, shortcut_keys, palette_match, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, night_mode, rec_mp4, viewing_stats, catchup, url_rewrite, hls_cap, ts_scramble, remote_api, events, mqtt, mqtt_control, phone_remote, phone_page, qr, ical, report, supporter, sync, chacha20poly1305, discord_rpc, together, backup, doh, cert_pin, net_route, net_adapter, net_bridge, live_latency, ytdlp) and `services/` (failover, share, resume,
   coverart, reminders, mpris, media_session, media_macos, media_windows, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list

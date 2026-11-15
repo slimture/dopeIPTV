@@ -2345,5 +2345,21 @@
   "ytdlp_none_system": "Geen yt-dlp gevonden op dit systeem.",
   "ytdlp_offer": "YouTube, Twitch en vergelijkbare sites spelen af via yt-dlp, en dat staat niet op deze computer. Nu downloaden? Het is de officiële release van GitHub (ongeveer 35 MB), gecontroleerd met de controlesom, bewaard in de eigen map van de app en bijgewerkt terwijl je het gebruikt.",
   "ytdlp_title": "yt-dlp",
-  "ytdlp_update_now": "Nu bijwerken"
+  "ytdlp_update_now": "Nu bijwerken",
+  "sc_palette": "Opdrachtenpalet",
+  "pal_placeholder": "Zoek een actie, instelling of zender",
+  "pal_actions": "Acties",
+  "pal_settings": "Instellingen",
+  "pal_channels": "Zenders en programma's",
+  "pal_kind_player": "Speler",
+  "pal_kind_setting": "Instelling",
+  "pal_kind_channel": "Zender",
+  "pal_kind_programme": "Programma",
+  "pal_hint_choose": "kiezen",
+  "pal_hint_run": "uitvoeren",
+  "pal_hint_more": "meer over de regel",
+  "pal_hint_opens": "Opent overal met {shortcut}",
+  "pal_none": "Niets gevonden voor ‘{q}’",
+  "pal_now": "nu",
+  "pal_record_remind": "opnemen / herinneren"
 }

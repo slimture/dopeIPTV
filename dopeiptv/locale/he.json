@@ -2345,5 +2345,21 @@
   "ytdlp_none_system": "לא נמצא yt-dlp במערכת הזו.",
   "ytdlp_offer": "YouTube, ‏Twitch ואתרים דומים מתנגנים דרך yt-dlp, שאינו במחשב הזה. להוריד אותו עכשיו? זו הגרסה הרשמית מ-GitHub (כ-35 MB), שנבדקת מול סכום הביקורת שלה, נשמרת בתיקייה של האפליקציה ומתעדכנת תוך כדי שימוש.",
   "ytdlp_title": "yt-dlp",
-  "ytdlp_update_now": "עדכון עכשיו"
+  "ytdlp_update_now": "עדכון עכשיו",
+  "sc_palette": "לוח פקודות",
+  "pal_placeholder": "חיפוש פעולה, הגדרה או ערוץ",
+  "pal_actions": "פעולות",
+  "pal_settings": "הגדרות",
+  "pal_channels": "ערוצים ותוכניות",
+  "pal_kind_player": "נגן",
+  "pal_kind_setting": "הגדרה",
+  "pal_kind_channel": "ערוץ",
+  "pal_kind_programme": "תוכנית",
+  "pal_hint_choose": "בחירה",
+  "pal_hint_run": "הפעלה",
+  "pal_hint_more": "עוד על השורה",
+  "pal_hint_opens": "נפתח עם {shortcut} מכל מקום",
+  "pal_none": "לא נמצא דבר עבור „{q}”",
+  "pal_now": "עכשיו",
+  "pal_record_remind": "הקלטה / תזכורת"
 }

@@ -2345,5 +2345,21 @@
   "ytdlp_none_system": "لم يُعثر على yt-dlp في هذا النظام.",
   "ytdlp_offer": "تُشغَّل مواقع يوتيوب وتويتش والمواقع المشابهة عبر yt-dlp، وهو غير موجود على هذا الحاسوب. هل تريد تنزيله الآن؟ إنه الإصدار الرسمي من GitHub (حوالي 35 م.ب)، يُتحقق من مجموعه الاختباري، ويُحفظ في مجلد التطبيق الخاص ويُحدَّث أثناء استخدامه.",
   "ytdlp_title": "yt-dlp",
-  "ytdlp_update_now": "التحديث الآن"
+  "ytdlp_update_now": "التحديث الآن",
+  "sc_palette": "لوحة الأوامر",
+  "pal_placeholder": "ابحث عن إجراء أو إعداد أو قناة",
+  "pal_actions": "الإجراءات",
+  "pal_settings": "الإعدادات",
+  "pal_channels": "القنوات والبرامج",
+  "pal_kind_player": "المشغّل",
+  "pal_kind_setting": "إعداد",
+  "pal_kind_channel": "قناة",
+  "pal_kind_programme": "برنامج",
+  "pal_hint_choose": "اختر",
+  "pal_hint_run": "تنفيذ",
+  "pal_hint_more": "المزيد عن السطر",
+  "pal_hint_opens": "يُفتح بـ {shortcut} من أي مكان",
+  "pal_none": "لم يُعثر على شيء لـ «{q}»",
+  "pal_now": "الآن",
+  "pal_record_remind": "تسجيل / تذكير"
 }

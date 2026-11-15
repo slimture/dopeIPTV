@@ -2345,5 +2345,21 @@
   "ytdlp_none_system": "Na ovom sustavu nije pronađen yt-dlp.",
   "ytdlp_offer": "YouTube, Twitch i slične stranice reproduciraju se pomoću yt-dlp, kojeg nema na ovom računalu. Preuzeti ga sada? To je službeno izdanje s GitHuba (oko 35 MB), provjereno kontrolnim zbrojem, spremljeno u vlastitu mapu aplikacije i ažurirano dok se koristi.",
   "ytdlp_title": "yt-dlp",
-  "ytdlp_update_now": "Ažuriraj sada"
+  "ytdlp_update_now": "Ažuriraj sada",
+  "sc_palette": "Paleta naredbi",
+  "pal_placeholder": "Potraži radnju, postavku ili kanal",
+  "pal_actions": "Radnje",
+  "pal_settings": "Postavke",
+  "pal_channels": "Kanali i emisije",
+  "pal_kind_player": "Reproduktor",
+  "pal_kind_setting": "Postavka",
+  "pal_kind_channel": "Kanal",
+  "pal_kind_programme": "Emisija",
+  "pal_hint_choose": "odaberi",
+  "pal_hint_run": "pokreni",
+  "pal_hint_more": "više o retku",
+  "pal_hint_opens": "Otvara se s {shortcut} bilo gdje",
+  "pal_none": "Ništa nije pronađeno za „{q}”",
+  "pal_now": "sada",
+  "pal_record_remind": "snimi / podsjeti"
 }

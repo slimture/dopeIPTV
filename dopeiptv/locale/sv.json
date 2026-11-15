@@ -2345,5 +2345,21 @@
   "ytdlp_none_system": "Ingen yt-dlp hittades på systemet.",
   "ytdlp_offer": "YouTube, Twitch och liknande webbplatser spelas upp genom yt-dlp, som inte finns på den här datorn. Ladda ner den nu? Det är den officiella versionen från GitHub (cirka 35 MB), kontrollerad mot sin kontrollsumma, sparad i appens egen mapp och uppdaterad medan du använder den.",
   "ytdlp_title": "yt-dlp",
-  "ytdlp_update_now": "Uppdatera nu"
+  "ytdlp_update_now": "Uppdatera nu",
+  "sc_palette": "Kommandopalett",
+  "pal_placeholder": "Sök kommando, inställning eller kanal",
+  "pal_actions": "Åtgärder",
+  "pal_settings": "Inställningar",
+  "pal_channels": "Kanaler och program",
+  "pal_kind_player": "Spelare",
+  "pal_kind_setting": "Inställning",
+  "pal_kind_channel": "Kanal",
+  "pal_kind_programme": "Program",
+  "pal_hint_choose": "välj",
+  "pal_hint_run": "kör",
+  "pal_hint_more": "mer om raden",
+  "pal_hint_opens": "Öppnas med {shortcut} var som helst",
+  "pal_none": "Inget hittades för ”{q}”",
+  "pal_now": "nu",
+  "pal_record_remind": "spela in / påminn"
 }

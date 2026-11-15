@@ -110,6 +110,7 @@ from .mw_series import _SeriesMixin
 from .mw_stats import _StatsMixin
 from .mw_search import _SearchMixin
 from .mw_shortcuts import _ShortcutsMixin
+from .mw_palette import _PaletteMixin
 from .mw_sidebar import _SidebarMixin
 from .mw_sort import _SortMixin
 from .mw_subtitles import _SubtitlesMixin
@@ -140,7 +141,7 @@ _COUNT_KEYS = {
 class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _ContextMenuMixin, _FavoritesMixin, _DetailMixin, _RemindersMixin,
                  _BusyMixin, _UpdatesMixin, _SearchMixin, _SidebarMixin,
-                 _NavMixin, _ShortcutsMixin, _OnboardingMixin, _SortMixin,
+                 _NavMixin, _ShortcutsMixin, _PaletteMixin, _OnboardingMixin, _SortMixin,
                  _LocalFilesMixin, _RadioMixin, _WebStreamsMixin,
                  _PopoutMixin, _MultiviewMixin, _HomeMixin, _GuideMixin,
                  _MprisMixin,
@@ -511,7 +512,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Grouped as each platform has it (app_menu): on macOS a menu bar of
         # its own - the application menu by the roles, File, View, History,
         # Help - with no second "dopeIPTV" menu; elsewhere the one menu.
-        menus = lay_out(self.menuBar(), {
+        # Kept by name: the command palette lists them.
+        self._menu_actions = {
             "about": about_action, "settings": settings_action,
             "open_video": open_video_action, "open_address": open_address_action,
             "refresh": refresh_action, "reminders": reminders_action, "calendar": calendar_action,
@@ -521,7 +523,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             "stats": stats_action,
             **report_actions, "website": website_action,
             "supporter": self._supporter_action, "donate": self._donate_action,
-            "quit": quit_action}, sys.platform == "darwin")
+            "quit": quit_action}
+        menus = lay_out(self.menuBar(), self._menu_actions, sys.platform == "darwin")
         self._answers_menu = menus["help"]
         # Only while something is playing - there is nothing to send
         # otherwise, and a dead entry is worse than none.

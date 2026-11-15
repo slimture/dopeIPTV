@@ -2345,5 +2345,21 @@
   "ytdlp_none_system": "اس سسٹم پر yt-dlp نہیں ملا۔",
   "ytdlp_offer": "YouTube، Twitch اور ان جیسی سائٹیں yt-dlp سے چلتی ہیں، جو اس کمپیوٹر پر نہیں ہے۔ ابھی ڈاؤن لوڈ کریں؟ یہ GitHub کی سرکاری ریلیز ہے (تقریباً 35 MB)، اس کے checksum سے جانچی جاتی ہے، ایپ کے اپنے فولڈر میں رکھی جاتی ہے اور استعمال کے ساتھ اپ ڈیٹ ہوتی ہے۔",
   "ytdlp_title": "yt-dlp",
-  "ytdlp_update_now": "ابھی اپ ڈیٹ کریں"
+  "ytdlp_update_now": "ابھی اپ ڈیٹ کریں",
+  "sc_palette": "کمانڈ پیلیٹ",
+  "pal_placeholder": "کوئی عمل، ترتیب یا چینل تلاش کریں",
+  "pal_actions": "اعمال",
+  "pal_settings": "ترتیبات",
+  "pal_channels": "چینل اور پروگرام",
+  "pal_kind_player": "پلیئر",
+  "pal_kind_setting": "ترتیب",
+  "pal_kind_channel": "چینل",
+  "pal_kind_programme": "پروگرام",
+  "pal_hint_choose": "منتخب کریں",
+  "pal_hint_run": "چلائیں",
+  "pal_hint_more": "اس قطار کے بارے میں مزید",
+  "pal_hint_opens": "کہیں سے بھی {shortcut} سے کھلتا ہے",
+  "pal_none": "“{q}” کے لیے کچھ نہیں ملا",
+  "pal_now": "ابھی",
+  "pal_record_remind": "ریکارڈ / یاد دہانی"
 }

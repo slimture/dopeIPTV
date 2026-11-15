@@ -2345,5 +2345,21 @@
   "ytdlp_none_system": "Tidak ditemukan yt-dlp di sistem ini.",
   "ytdlp_offer": "YouTube, Twitch, dan situs serupa diputar lewat yt-dlp, yang tidak ada di komputer ini. Unduh sekarang? Ini rilis resmi dari GitHub (sekitar 35 MB), diperiksa dengan checksum-nya, disimpan di folder milik aplikasi, dan diperbarui selama dipakai.",
   "ytdlp_title": "yt-dlp",
-  "ytdlp_update_now": "Perbarui sekarang"
+  "ytdlp_update_now": "Perbarui sekarang",
+  "sc_palette": "Palet perintah",
+  "pal_placeholder": "Cari tindakan, pengaturan, atau saluran",
+  "pal_actions": "Tindakan",
+  "pal_settings": "Pengaturan",
+  "pal_channels": "Saluran dan acara",
+  "pal_kind_player": "Pemutar",
+  "pal_kind_setting": "Pengaturan",
+  "pal_kind_channel": "Saluran",
+  "pal_kind_programme": "Acara",
+  "pal_hint_choose": "pilih",
+  "pal_hint_run": "jalankan",
+  "pal_hint_more": "lebih lanjut tentang baris",
+  "pal_hint_opens": "Dibuka dengan {shortcut} di mana saja",
+  "pal_none": "Tidak ada hasil untuk “{q}”",
+  "pal_now": "sekarang",
+  "pal_record_remind": "rekam / ingatkan"
 }

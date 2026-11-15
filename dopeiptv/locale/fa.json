@@ -2345,5 +2345,21 @@
   "ytdlp_none_system": "yt-dlp روی این سیستم پیدا نشد.",
   "ytdlp_offer": "یوتیوب، توییچ و سایت‌های مشابه با yt-dlp پخش می‌شوند که روی این رایانه نیست. همین حالا دانلود شود؟ نسخهٔ رسمی GitHub است (حدود ۳۵ مگابایت)، با جمع آزمایشی‌اش بررسی می‌شود، در پوشهٔ خود برنامه نگه داشته می‌شود و هنگام استفاده به‌روز می‌شود.",
   "ytdlp_title": "yt-dlp",
-  "ytdlp_update_now": "به‌روزرسانی الان"
+  "ytdlp_update_now": "به‌روزرسانی الان",
+  "sc_palette": "پالت فرمان",
+  "pal_placeholder": "جست‌وجوی فرمان، تنظیم یا کانال",
+  "pal_actions": "فرمان‌ها",
+  "pal_settings": "تنظیمات",
+  "pal_channels": "کانال‌ها و برنامه‌ها",
+  "pal_kind_player": "پخش‌کننده",
+  "pal_kind_setting": "تنظیم",
+  "pal_kind_channel": "کانال",
+  "pal_kind_programme": "برنامه",
+  "pal_hint_choose": "انتخاب",
+  "pal_hint_run": "اجرا",
+  "pal_hint_more": "بیشتر دربارهٔ این ردیف",
+  "pal_hint_opens": "از هر جا با {shortcut} باز می‌شود",
+  "pal_none": "چیزی برای «{q}» پیدا نشد",
+  "pal_now": "اکنون",
+  "pal_record_remind": "ضبط / یادآوری"
 }

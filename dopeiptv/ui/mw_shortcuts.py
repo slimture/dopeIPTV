@@ -50,7 +50,10 @@ class _ShortcutsMixin:
         The field that has the keys now, in whichever window is active - not
         this window's last one. Over the pop-out, and in fullscreen on macOS
         (the pop-out filling the screen), a search box clicked into earlier
-        still counted as typing, so I, M, P and R did nothing there."""
+        still counted as typing, so I, M, P and R did nothing there.
+        An action chosen in the command palette's field is not typing."""
+        if getattr(self, "_palette_running", False):
+            return False
         return isinstance(QApplication.focusWidget(), QLineEdit)
 
     def _player_up(self) -> bool:
@@ -187,6 +190,7 @@ class _ShortcutsMixin:
             "reminders": self._open_reminders,
             "sidebar": self._shortcut_sidebar,
             "focus_mode": self._shortcut_focus_mode,
+            "palette": self._open_palette,
         }
 
     def shortcut_keys(self) -> dict[str, str]:
