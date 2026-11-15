@@ -2065,6 +2065,8 @@ class _CastMixin:
         # not to write to it.
         if pos <= 60 or dur <= 0:
             return
+        if privacy.playback_private(ctx.get("kind") or "", key):
+            return      # private at some point: private to its end (core/privacy)
         log.info("cast: keeping the position, %d s into %d", pos, dur)
         store = ctx.get("resume")
         if store is None:

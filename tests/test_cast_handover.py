@@ -567,6 +567,42 @@ def test_the_cast_goes_into_the_history_of_the_profile_that_started_it():
     assert started.added == [("42", "movie")] and now.added == []
 
 
+def test_private_viewing_turned_on_mid_cast_keeps_the_cast_private_to_its_end():
+    """As the docked player's: what is cast when private viewing goes on is
+    private for every reporter to its end - where the TV got to is not kept
+    once private viewing is off again; a title cast after it is."""
+    import types
+
+    from dopeiptv.core import privacy
+    from dopeiptv.ui.main_window import MainWindow
+    w = _with_strip()
+    started = _Resume()
+    w.resume, w.player = started, None
+    w.cast = _CastAt(1830.0, 6000.0)
+    w._cast_device = "Alva TV"
+    w._show_toast = lambda *a, **k: None
+    private = types.MethodType(MainWindow.set_private_viewing, w)
+    try:
+        privacy.set_private(False)
+        privacy.playback_stopped()
+        w._cast_ctx = {"group": "vod", "key": "42", "kind": "movie",
+                       "item": {"name": "Film"}, "resume": started}
+        privacy.playback_started("movie", "42")       # the cast began
+        private(True)
+        private(False)
+        assert privacy.playback_private("movie", "42"), "History, events, Discord..."
+        w._save_cast_position()
+        assert started.saved == []
+        # The next title on the TV, chosen after private viewing: kept.
+        w._cast_ctx = dict(w._cast_ctx, key="43")
+        privacy.playback_started("movie", "43")
+        w._save_cast_position()
+        assert started.saved == [("vod", "43", 1830, 6000)]
+    finally:
+        privacy.set_private(False)
+        privacy.playback_stopped()
+
+
 def test_a_cast_that_just_started_does_not_wipe_the_resume_point():
     """A position too small to be worth keeping is a reason to leave the
     store alone, not to write to it - writing one drops what was there, and

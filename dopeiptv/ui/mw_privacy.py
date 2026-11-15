@@ -94,10 +94,17 @@ class _PrivacyMixin:
             self._stats_flush()         # what played before counts
         privacy.set_private(on)
         if on:
-            # What plays now is private to the end of its run (core/privacy).
+            # What plays now is private to the end of its run (core/privacy):
+            # here, or on a TV (casting stops the player here) - where the
+            # TV got to, History and the reporters keep nothing of it after
+            # private viewing ends either.
             p = getattr(self, "player", None)
             lp = getattr(self, "_last_playback", None) or {}
-            if p is not None and getattr(p, "current_url", None) and lp:
+            cast = getattr(self, "_cast_ctx", None) or {}
+            if getattr(self, "_cast_device", None) and cast.get("key") is not None \
+                    and cast.get("kind"):
+                privacy.playback_started(cast["kind"], cast["key"])
+            elif p is not None and getattr(p, "current_url", None) and lp:
                 privacy.playback_started(lp.get("kind") or "", lp.get("key"))
             # A Trakt or Simkl scrobble already under way is let go, not
             # stopped: a stop would report the progress and file it in the
