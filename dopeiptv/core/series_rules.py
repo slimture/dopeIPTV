@@ -16,6 +16,12 @@ twice, one the user removed not set again, one for a programme on two
 channels at once - and ``remind_retimed`` moves a rule's reminder with its
 programme when the guide moves it.
 
+A box that records by itself (an Enigma2 box's AutoTimer, after a
+simulate, and its timers) hands ``plan`` what it will record (*box*): an
+airing the box records is left to it - the box records even while the
+computer is off - said in ``left_out`` (``BOX``), and ``left_to_box``
+finds the recordings a rule scheduled before the box took them on.
+
 Pure logic and the store the rules live in; nothing here starts a recorder.
 """
 
@@ -402,13 +408,60 @@ def _at_once(windows: Iterable[_Window], start: float, stop: float) -> int:
 #: Why plan() left an airing out (the left_out list).
 AT_ONCE = "at once"
 CONNECTIONS = "connections"
+BOX = "box"
+
+
+def _box_window(b: dict) -> _Window:
+    """What the box records (key, start, stop, title, source), padding in."""
+    start, stop = _num(b.get("start"), 0.0), _num(b.get("stop"), 0.0)
+    return _Window(str(b.get("key") or ""), "", start, stop, start, stop,
+                   norm(b.get("title")), source=str(b.get("source") or ""))
+
+
+def _box_has(a: Airing, boxed: Iterable[_Window]) -> bool:
+    """The box records it: the same title at much the same time (on any
+    channel), or on this channel a recording that holds the whole programme
+    (a timer the box named otherwise) - never just the padding of the one
+    before it."""
+    title = norm(a.title)
+    for w in boxed:
+        if not _mostly_overlap(a, w):
+            continue
+        if title and w.title == title:
+            return True
+        if _same_channel(a, w) and w.start <= a.start and w.stop >= a.stop:
+            return True
+    return False
+
+
+def left_to_box(jobs: Iterable[dict], box: Iterable[dict],
+                now: float) -> list[dict]:
+    """The recordings rules scheduled that have not started and that the box
+    records itself: the box's take them, not a second copy here."""
+    boxed = [_box_window(b) for b in box if isinstance(b, dict)]
+    if not boxed:
+        return []
+    out = []
+    for j in jobs:
+        if (not isinstance(j, dict) or not j.get("rule") or j.get("status") != "scheduled"
+                or _num(j.get("start"), 0.0) <= now):
+            continue
+        w = _job_window(j)
+        a = Airing(w.rule, {}, w.key, str(j.get("title") or ""), w.start, w.stop,
+                   source=w.source)
+        # Only the box's own source: a rule of another source's records what
+        # that one has.
+        if _box_has(a, [b for b in boxed if _same_source(b.source, a.source)]):
+            out.append(j)
+    return out
 
 
 def plan(airings: Iterable[Airing], jobs: Iterable[dict],
          taken: Iterable[dict], now: float, before_min: int = 0,
          after_min: int = 0, per_rule: int = MAX_PER_RULE,
          wide: Iterable[str] = (), connections: int | None = None,
-         left_out: list[tuple[Airing, str]] | None = None) -> list[Plan]:
+         left_out: list[tuple[Airing, str]] | None = None,
+         box: Iterable[dict] = ()) -> list[Plan]:
     """The airings to schedule now, soonest first, each with its padded
     window. Left out: what is recorded or scheduled already (*jobs*, the
     recorder's list), what a rule scheduled before (*taken*, from the
@@ -417,8 +470,11 @@ def plan(airings: Iterable[Airing], jobs: Iterable[dict],
     past *per_rule* upcoming recordings. And, each said in *left_out*: a
     keyword rule's on any channel (*wide*, their ids) past MAX_AT_ONCE
     recordings of it at one time, and past *connections* recordings at
-    one time from the airing's source (the account's limit, when known)."""
+    one time from the airing's source (the account's limit, when known),
+    and what the box records itself (*box*: key, start, stop, title, source
+    of each - its AutoTimer's and its timers)."""
     jobs = [j for j in jobs if isinstance(j, dict)]
+    boxed = [_box_window(b) for b in box if isinstance(b, dict)]
     live = [j for j in jobs if j.get("status") in _JOB_LIVE]
     recs = [_job_window(j) for j in live]
     # What holds a connection of its own: not a recording riding the
@@ -436,6 +492,10 @@ def plan(airings: Iterable[Airing], jobs: Iterable[dict],
         if a.start < now + LEAD_S or count.get(a.rule, 0) >= per_rule:
             continue
         if _covered(a, recs) or _covered(a, earlier):
+            continue
+        if boxed and _box_has(a, boxed):
+            if left_out is not None:
+                left_out.append((a, BOX))
             continue
         if a.rule in wide and _at_once(
                 (w for w in busy if w.rule == a.rule and w.stop > now),
@@ -652,6 +712,18 @@ class SeriesRuleStore:
 
     def taken(self) -> list[dict]:
         return [dict(t) for t in self._taken]
+
+    def forget(self, jobs: Iterable[dict]) -> None:
+        """What *jobs* (a rule's recordings, by channel and programme start)
+        were scheduled for, out of the memory: the box records them now, and
+        should it stop, a rule may schedule them again."""
+        gone = {(str(j.get("stream_key") or ""), _num(j.get("prog_start"), -1.0))
+                for j in jobs if isinstance(j, dict)}
+        keep = [t for t in self._taken
+                if (str(t.get("key") or ""), _num(t.get("start"), -2.0)) not in gone]
+        if len(keep) != len(self._taken):
+            self._taken = keep
+            self._save()
 
     def remember(self, plans: Iterable[Plan], now: float | None = None) -> None:
         """What was scheduled, so it is not scheduled again; what ended long

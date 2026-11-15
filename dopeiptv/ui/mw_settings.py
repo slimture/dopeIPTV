@@ -1678,15 +1678,24 @@ class _SettingsMixin:
         # A rule that reminds instead of recording wears the guide's bell.
         from .epg_grid import EpgGrid
         bell_icon = QIcon(EpgGrid._bar_pixmap("bell", QColor(P["text2"])))
+        # An Enigma2 box's own AutoTimer rules join the app's, each row
+        # saying who records it (ui/autotimer_ui.py).
+        from .autotimer_ui import BoxRules, marked
+        box_rules = BoxRules(self, rule_list, lambda: refill_rules(), d,
+                             lambda: series_card.refresh())
+        box_icon = page_icon("tv", self._action_pixmap, 16)
 
         def fill_rules() -> None:
             rule_list.clear()
             for r in sorted(self.series_rules.rules(),
                             key=lambda r: srules.norm(r.get("text"))):
+                label = self._series_rule_label(r)
                 item = QListWidgetItem(
                     bell_icon if srules.action(r) == srules.REMIND else rec_icon,
-                    self._series_rule_label(r))
+                    marked(label, False) if box_rules.marks else label)
                 item.setData(Qt.ItemDataRole.UserRole, r["id"])
+                rule_list.addItem(item)
+            for item in box_rules.items(box_icon):
                 rule_list.addItem(item)
             rule_list.setCurrentRow(0)
 
@@ -1705,16 +1714,33 @@ class _SettingsMixin:
             series_card.widget(rule_list, tr("set_card_series")),
             lambda: rule_list.count() > 0)
         series_card.layout_row(hbox(rule_add, rule_del))
+        if box_rules.active:
+            series_card.shown_if(
+                series_card.layout_row(hbox(*box_rules.buttons.values()),
+                                       tr("set_card_series")),
+                lambda: box_rules.present)
+            series_card.shown_if(series_card.widget(box_rules.status, tr("set_card_series")),
+                                 lambda: bool(box_rules.status.text()))
+            series_card.shown_if(series_card.note(tr("series_by_note")).parentWidget(),
+                                 lambda: box_rules.marks)
         series_card.note(tr("series_note", days=srules.DAYS))
         series_card.note(tr("series_remind_note"))
 
         def rules_sync() -> None:
             rule_del.setEnabled(rule_list.currentItem() is not None)
+            box_rules.sync()
             series_card.refresh()
+
+        def refill_rules() -> None:
+            fill_rules()
+            rules_sync()
 
         def rule_delete() -> None:
             item = rule_list.currentItem()
             if item is None:
+                return
+            if box_rules.current() is not None:
+                box_rules.remove(box_rules.current())
                 return
             row = rule_list.row(item)
             self._delete_series_rule(item.data(Qt.ItemDataRole.UserRole))
@@ -1726,10 +1752,14 @@ class _SettingsMixin:
             if self._record_series(None, "", word=True, parent=d):
                 fill_rules()
                 rules_sync()
+            elif box_rules.active:
+                box_rules.load()        # it may have gone to the box
 
         rule_add.clicked.connect(rule_add_word)
         rule_del.clicked.connect(rule_delete)
+        rule_list.currentRowChanged.connect(lambda _row: rules_sync())
         rules_sync()
+        box_rules.load()
         rk, rexe = self.rec.recorder()
         c = rec.card()
         c.note(tr("rec_recorder_found", kind=rk, path=rexe) if rexe

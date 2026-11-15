@@ -19,14 +19,15 @@ whether a channel that will not play is one the box cannot decrypt (the
 first packets of its stream, core/ts_scramble.py). For the transponder
 check (core/tuners.py): its tuners, what it records and what its TV shows
 (``tuner_state``, off the window's thread), and the transponder a channel
-is on (``tuner_key``, from the list as loaded).
+is on (``tuner_key``, from the list as loaded). Its AutoTimer plugin's
+rules: providers/autotimer.py (``autotimer()``).
 """
 
 from __future__ import annotations
 
 import re
 import time
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 from urllib.parse import quote, unquote, urlsplit, urlunsplit
 
 from ..core import ts_scramble, tuners
@@ -34,6 +35,9 @@ from ..core._lazy_requests import requests
 from ..core.log import log, redact_url
 from ..i18n import LocalizedError, tr
 from .boxes import BoxClient, build_xmltv, child_text, clean_text
+
+if TYPE_CHECKING:
+    from .autotimer import AutoTimer
 
 TV_BOUQUETS = '1:7:1:0:0:0:0:0:0:0:FROM BOUQUET "bouquets.tv" ORDER BY bouquet'
 RADIO_BOUQUETS = '1:7:2:0:0:0:0:0:0:0:FROM BOUQUET "bouquets.radio" ORDER BY bouquet'
@@ -146,6 +150,9 @@ class Enigma2Client(BoxClient):
         # has (None: not asked yet, 0: it does not say).
         self._sref_by_key: dict[str, str] = {}
         self._tuner_total: int | None = None
+        # Each bouquet's reference, name and services, as the list has them.
+        self._bouquet_list: list[tuple[str, str, list[tuple[str, str]]]] = []
+        self._autotimer: AutoTimer | None = None
 
     @property
     def openwebif(self) -> bool:
@@ -340,7 +347,33 @@ class Enigma2Client(BoxClient):
         self._srefs = {ch["_sref"]: ch["key"] for ch in channels if ch.get("_sref")}
         self._sref_by_key = {key: sref for sref, key in self._srefs.items()}
         self._brefs = list(dict.fromkeys(ch["_bref"] for ch in channels if ch.get("_bref")))
+        bq: dict[str, tuple[str, list[tuple[str, str]]]] = {}
+        for ch in channels:
+            bref, sref = ch.get("_bref"), ch.get("_sref")
+            if bref and sref:
+                name, items = bq.setdefault(bref, (str(ch.get("category") or ""), []))
+                if all(s != sref for s, _n in items):
+                    items.append((sref, clean_text(ch.get("name"))))
+        self._bouquet_list = [(b, name, items) for b, (name, items) in bq.items()]
         super()._take(channels, recordings)
+
+    def bouquet_channels(self) -> list[tuple[str, str, list[tuple[str, str]]]]:
+        """(reference, name, [(service reference, name)]) of each bouquet in
+        the loaded list - what an AutoTimer rule's channels are picked from."""
+        return [(b, n, list(items)) for b, n, items in self._bouquet_list]
+
+    def stream_of(self, sref: str) -> int | None:
+        """The id a service of the box's has in this list, or None."""
+        key = ref_key(sref or "")
+        row = next((r for r in self._rows if r.get("_key") == key), None)
+        return None if row is None else int(row["stream_id"])
+
+    def autotimer(self) -> AutoTimer:
+        """The box's AutoTimer plugin (providers/autotimer.py)."""
+        if self._autotimer is None:
+            from .autotimer import AutoTimer
+            self._autotimer = AutoTimer(self)
+        return self._autotimer
 
     # -- the box itself (Nerd: zap along, wake, standby) ----------------------
 
@@ -371,6 +404,10 @@ class Enigma2Client(BoxClient):
             "justplay": "0", "afterevent": "3", "repeated": "0"})
         return (child_text(root, "e2state").lower() == "true",
                 child_text(root, "e2statetext"))
+
+    def service_ref(self, stream_id: int | str) -> str:
+        """A channel's service reference on the box ("" when not known)."""
+        return self._sref_of(stream_id)
 
     def _sref_of(self, stream_id: int | str) -> str:
         row = self._channel(stream_id)

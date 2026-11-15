@@ -7,6 +7,13 @@ fire as every reminder does (mw_reminders).
 The matching, the padding and the no-duplicates rules are core/series_rules.py;
 this is the glue: the dialog, the work on the pool, the jobs and reminders
 added on the window's thread.
+
+An Enigma2 box with the AutoTimer plugin records series by itself, even
+while the computer is off: "Record series…" offers a rule on the box
+(ui/autotimer_ui.py's editor), and the look through the guide asks the box
+what it will record (its timers and a simulate, on the pool) - an airing
+the box records is left to it and said so, and a recording a rule
+scheduled before the box took it on is taken off the list.
 """
 
 from __future__ import annotations
@@ -27,6 +34,28 @@ from ..i18n import tr
 from .theme import P
 
 
+class Airings(list):
+    """What _find found, and what the box records itself (``box``: key,
+    start, stop, title, source of each) - empty for any other source."""
+    box: list[dict] = []
+
+
+def _box_records(client, rules: list[dict], found: list, now: float,
+                 source: str) -> list[dict]:
+    """(pool thread) What a box with AutoTimer records itself, when a
+    recording rule found something: its timers and its rules' simulate."""
+    autotimer = getattr(client, "autotimer", None)
+    record = series_rules.of_action(rules, series_rules.RECORD)
+    if not callable(autotimer) or not any(a.rule in record for a in found):
+        return []
+    try:
+        got = autotimer().records(now)
+    except Exception as e:
+        log.info("[series] the box's own recordings not read: %s", e)
+        return []
+    return [dict(x, source=source) for x in got]
+
+
 def _find(client, guide, rules: list[dict], keep, now: float,
           shift: float, source: str = "") -> list:
     """(pool thread) The airings the rules ask for, each with its address.
@@ -38,8 +67,9 @@ def _find(client, guide, rules: list[dict], keep, now: float,
     chans = series_rules.rule_channels(rules)
     if keep is not None:
         chans = [c for c in client.live_streams(None) or [] if keep(c)] + chans
-    found = series_rules.find_airings(rules, chans, guide.programmes_in, now,
-                                      shift=shift, source=source)
+    found = Airings(series_rules.find_airings(rules, chans, guide.programmes_in, now,
+                                              shift=shift, source=source))
+    found.box = _box_records(client, rules, found, now, source)
     if links_later(client):
         return found
     # A reminder needs no address.
@@ -92,14 +122,20 @@ class _SeriesMixin:
         # airing it finds.
         record_btn = QRadioButton(tr("series_do_record"))
         remind_btn = QRadioButton(tr("series_do_remind"))
+        # A box with AutoTimer can take the rule itself (unless it is known
+        # to have none).
+        box_btn = QRadioButton(tr("at_do_box"))
         group = QButtonGroup(d)
         group.addButton(record_btn)
         group.addButton(remind_btn)
+        group.addButton(box_btn)
         (remind_btn if remind else record_btn).setChecked(True)
         choice = QHBoxLayout()
         choice.setSpacing(16)
         choice.addWidget(record_btn)
         choice.addWidget(remind_btn)
+        choice.addWidget(box_btn)
+        box_btn.setVisible(self._autotimer_offered())
         choice.addStretch(1)
         f.addRow(tr("series_do"), choice)
         f.addRow(tr("series_text"), text)
@@ -113,9 +149,11 @@ class _SeriesMixin:
         def say(_on: bool = False) -> None:
             on = remind_btn.isChecked()
             d.setWindowTitle(tr("series_remind_title" if on else "series_title"))
-            hint.setText(tr("series_remind_hint" if on else "series_hint"))
+            hint.setText(tr("at_series_hint" if box_btn.isChecked()
+                            else "series_remind_hint" if on else "series_hint"))
 
         remind_btn.toggled.connect(say)
+        box_btn.toggled.connect(say)
         say()
         bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
                               | QDialogButtonBox.StandardButton.Cancel)
@@ -123,6 +161,11 @@ class _SeriesMixin:
         bb.rejected.connect(d.reject)
         f.addRow(bb)
         if not d.exec():
+            return None
+        if box_btn.isChecked():
+            self._autotimer_for(text.text(), kind.currentData(),
+                                ch if where.currentData() == series_rules.THIS else None,
+                                parent or self)
             return None
         what = series_rules.REMIND if remind_btn.isChecked() else series_rules.RECORD
         rule = series_rules.make_rule(
@@ -140,6 +183,32 @@ class _SeriesMixin:
                             else "series_added", title=kept["text"]), 4000)
         self._check_series_rules()
         return kept
+
+    def _autotimer_offered(self) -> bool:
+        """Whether the source is a box whose AutoTimer can take a rule: an
+        Enigma2 box not known to be without the plugin."""
+        at = getattr(self.client, "autotimer", None)
+        return callable(at) and at().present is not False
+
+    def _autotimer_for(self, text: str, kind: str, ch: dict | None, parent) -> None:
+        """The box's AutoTimer editor, filled from "Record series…": the
+        words, exact or contained, this channel or any; the box's answer
+        said once it took the rule."""
+        from ..providers import autotimer as at
+        from .autotimer_ui import AutoTimerDialog
+        words = " ".join((text or "").split())
+        rule = at.Rule(match=words, name=words,
+                       search_type=at.EXACT if kind == series_rules.EXACT else at.PARTIAL)
+        if ch is not None and hasattr(self.client, "service_ref"):
+            sref = self.client.service_ref(ch.get("stream_id"))
+            if sref:
+                rule.services = [sref]
+        d = AutoTimerDialog(parent, self.client, self.pool, rule)
+        if d.exec():
+            log.info("[series] a rule set on the box's AutoTimer: %s", for_log(d.value().match))
+            self._show_toast(tr("at_saved", name=d.value().label), 4000)
+            self._check_series_rules()
+        d.deleteLater()
 
     def _series_channel_name(self, ch: dict) -> str:
         """A channel's name as the live list shows it (a rename included),
@@ -262,16 +331,49 @@ class _SeriesMixin:
             self._flash_status(tr("series_reminded_n", n=len(new)))
         return len(new)
 
+    def _series_to_box(self, box: list[dict], now: float) -> None:
+        """Recordings a rule scheduled that the box now records itself (its
+        AutoTimer took them on later): off the list, and out of the rules'
+        memory - should the box stop, they are scheduled here again."""
+        gone = series_rules.left_to_box(self.rec.jobs, box, now)
+        for j in gone:
+            self.rec.cancel(j["id"])
+            self.rec.remove_job(j["id"])
+        if gone:
+            self.series_rules.forget(gone)
+            log.info("[series] %d recording(s) left to the box, which records them itself",
+                     len(gone))
+        self._series_said_box([(str(j.get("stream_key") or ""), float(j.get("prog_start") or 0))
+                               for j in gone])
+
+    def _series_said_box(self, airings: list) -> None:
+        """Say once per programme that the box records it, not the app."""
+        said = getattr(self, "_series_box_said", None)
+        if said is None:
+            said = self._series_box_said = set()
+        new = set()
+        for a in airings:
+            key = a if isinstance(a, tuple) else (a.key, float(a.start))
+            if key not in said:
+                new.add(key)
+        if not new:
+            return
+        said.update(new)
+        log.info("[series] %d airing(s) left to the box's AutoTimer", len(new))
+        self._flash_status(tr("at_left_to_box_n", n=len(new)))
+
     def _series_schedule(self, found: list) -> int:
         """Schedule what the rules found and is not recorded yet, and set
         the reminders the reminder rules ask for; the number of recordings
         added."""
         store = self.series_rules
         now = time.time()
+        box = list(getattr(found, "box", None) or [])
         try:
             self._series_remind(found, now)
         except Exception as e:
             log.warning("[series] reminders not set: %s", e)
+        self._series_to_box(box, now)
         rules = store.rules()
         ids = series_rules.of_action(rules, series_rules.RECORD)
         later = links_later(self.client)
@@ -297,7 +399,10 @@ class _SeriesMixin:
         left_out: list = []
         plans = series_rules.plan(
             found, self.rec.jobs, series_rules.taken_for(store.taken(), ids, legacy=True),
-            now, before, after, wide=wide, connections=maxc, left_out=left_out)
+            now, before, after, wide=wide, connections=maxc, left_out=left_out, box=box)
+        boxed = [a for a, why in left_out if why == series_rules.BOX]
+        left_out = [(a, why) for a, why in left_out if why != series_rules.BOX]
+        self._series_said_box(boxed)
         if left_out:
             at_once = sum(1 for _a, why in left_out if why == series_rules.AT_ONCE)
             log.info("[series] %d airing(s) not scheduled: %d past %d at one time "

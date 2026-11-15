@@ -370,9 +370,17 @@ Then the rest of what an Enigma2 box can do from a computer:
 - **Bouquet editor** (as Dreamboxedit does): bouquets and their channels
   reordered, renamed, added and removed, markers, written back to the box
   and the box told to reload them.
-- **AutoTimer**: the box's own rules read, made and changed (OpenWebif's
-  AutoTimer plugin), beside dopeIPTV's series rules - and said plainly
-  which of the two records what.
+- **AutoTimer**: built - the box's own rules read, made, changed, turned
+  on and off and deleted beside dopeIPTV's series rules (Settings >
+  Recording > Series recordings, each row "Recorded by the box" or
+  "Recorded by dopeIPTV"), Run now and a rule's preview; "Record series…"
+  on a box's programme offers the rule on the box. What the box records
+  (its timers and a simulate) the app's rules leave to it and say so.
+  Checked against the plugin's source (OpenPLi's and oe-alliance's) and
+  OpenWebif's `controllers/AT.py`: there is no `change_status` - on/off is
+  `/autotimer/change` (oe-alliance) or `/autotimer/edit`. Needs a real box:
+  the edit's quoting of an IPTV entry and of non-ASCII words, a simulate's
+  time on a full guide, and OpenPLi's simulate (no id: every rule).
 - **The box's recordings managed**: built - rename, move to another folder,
   delete (with a confirm) from the recording's menu (`/web/movierename`,
   `/web/moviemove`, `/web/moviedelete`, folders from `/web/getlocations`).

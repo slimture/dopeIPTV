@@ -50,7 +50,10 @@ A source's own options are on its own page, under Sources (below).
   automation (file names, what runs after)
 - Limits: `rec_max_value` + `rec_max_unit`, `rec_total_value` + `rec_total_unit`
 - Padding: `rec_pad_before_min`, `rec_pad_after_min`
-- Series recordings: the rules (`series_rules_<source id>`), add a word, delete
+- Series recordings: the rules (`series_rules_<source id>`), add a word, delete;
+  on an Enigma2 box with AutoTimer also the box's own rules (kept on the box,
+  no key here) - new, edit, on/off, preview, run now - each row saying who
+  records it
 - (untitled): which recorder is used, how to record
 
 **Casting** (`casting`) - a page of one row for now; AirPlay's rows join it,
