@@ -67,7 +67,11 @@ _AUDIO = frozenset({
 HLS_PATHS = (".m3u8", ".m3u")
 MP4_PATHS = (".mp4", ".m4v", ".mov")
 
-SEGMENT_S = 2               # seconds per segment: a short wait to start
+# Seconds per segment - Apple's HLS authoring spec asks for 6. A copied
+# picture is cut only at its own keyframes, so with 2 s a provider's
+# longer GOP made segments far longer than the playlist's target, and
+# the Apple TV gave up (CoreMedia -12888, playlist unchanged too long).
+SEGMENT_S = 6
 LIVE_WINDOW_S = 300         # how much of a channel the playlist keeps
 LEAD = 3                    # segments a live playlist has before it goes
 READY_WAIT_S = 30.0         # how long the first playlist may take
