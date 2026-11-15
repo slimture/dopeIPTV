@@ -710,21 +710,30 @@ cp ~/dopeiptv/deploy/content-iptv.dope.rs.conf /usr/local/etc/nginx/conf.d/iptv.
 nginx -t && service nginx reload
 ```
 
-## Settings sync for supporters
+## Settings sync
 
-A supporter's app can keep favorites, settings, playlists and watch history
-the same on several computers (the app's Settings, General, "Sync between
-computers"). The app encrypts all of it with a key made from a random code
-that only the person's computers know; the service (donate/sync.py, routes
-`/sync/<slot>` in donate.py) keeps that ciphertext under a slot - another
-hash of the code - and cannot read it. Every request carries the supporter
-key, which the service checks against the signing key (the same one as
-"Supporter keys" above; without it /sync/ answers 503) and forgets: it is
-never stored, logged or tied to a slot, and nginx does not log /sync/.
+Anyone's app can keep favorites, settings, playlists and watch history the
+same on several computers (the app's Settings, Sync). The app encrypts all
+of it with a key made from a random code that only the person's computers
+know; the service (donate/sync.py, routes `/sync/<slot>` in donate.py)
+keeps that ciphertext under a slot - another hash of the code - and cannot
+read it. A request carries nothing about the person: no account and no key
+(an older app still sends its supporter key; it is not read). Nothing is
+tied to a slot or logged, and nginx does not log /sync/.
 Kept: `stats/sync/<slot>.json` (mode 600) - the ciphertext, a version and
 when it was written; at most 2 MB a slot. A slot nobody has read or written
-for 400 days is removed by the service once a day
-(`python3 donate/sync.py --cleanup` does the same by hand).
+for 180 days (the privacy policy) is removed by the service once a day
+(`python3 donate/sync.py --cleanup` does the same by hand, and says how
+much the rest take).
+
+Since anyone may store, the service limits it (donate.py, in memory only):
+120 requests, 30 writes (PUT, DELETE) and 20 new slots a day per address
+(429 past them), and all slots together `sync.MAX_TOTAL` (5 GB) - past it a
+new slot gets 507 while the slots there can still be written. Past 80 % the
+admin page says so at the top of Overview (Services, Settings sync shows
+the numbers) and the devices with notifications on are told, at most once
+a day. To make room: raise `MAX_TOTAL` in donate/sync.py and restart the
+service.
 
 1. The files and the service (jail):
 
@@ -747,7 +756,8 @@ for 400 days is removed by the service once a day
 **Check** (jail): `python3 -m pytest donate/test_sync.py` or
 `python3 donate/test_sync.py` - all pass; then
 `curl -s -o /dev/null -w '%{http_code}\n' https://dopeiptv.org/sync/$(printf 'ab%.0s' $(seq 32))`
-answers `401` (no supporter key), not 404 or 502.
+answers `404` (nothing under that slot, and no key asked for) - not 401
+(the service from before sync was for everyone) or 502.
 
 ## Watch together
 

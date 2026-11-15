@@ -54,6 +54,7 @@
   <p class="status" id="status" role="status">Loading…</p>
 
   <div id="tab-overview" class="tab">
+  <p class="msg" id="sync-warn" role="alert" hidden></p>
   <section class="summary" id="summary" aria-label="Summary"></section>
   <section class="kpis" id="kpis" aria-label="More numbers"></section>
 
@@ -111,6 +112,18 @@
       <div id="sk-out" class="sk-out" aria-live="polite"></div>
     </section>
     <div class="years" id="years"></div>
+  </section>
+
+  <section class="group">
+    <h3 class="group-head">Services</h3>
+    <section class="card" id="sync" hidden>
+      <div class="card-head"><h2>Settings sync</h2><span class="muted" id="sync-count"></span></div>
+      <p class="sk-help">For everyone who uses the app: each copy is encrypted on the person's computer and kept here
+        under a random number - nothing says whose it is. Copies nobody has used for 180 days go. Past the limit
+        (MAX_TOTAL in donate/sync.py) a new copy is refused, while the ones here can still be written.</p>
+      <div class="sync-meter" aria-hidden="true"><span id="sync-bar"></span></div>
+      <p class="muted sync-used" id="sync-used"></p>
+    </section>
   </section>
 
   </div>

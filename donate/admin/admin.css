@@ -792,6 +792,11 @@ tr:last-child td { border-bottom: 0; }
 
 /* Supporter keys (Donations): the key to copy, set apart. */
 .sk-help { font-size: 13.5px; color: var(--text-2); margin: 0 0 10px; line-height: 1.5; }
+.sync-meter { height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--text-2) 14%, transparent); overflow: hidden; }
+.sync-meter span { display: block; height: 100%; width: 0; background: var(--up); }
+.sync-meter span.warn { background: var(--down); }
+.sync-used { font-size: 13px; margin: 6px 0 0; }
+#sync-warn { margin: 0 0 12px; }
 .sk-row { flex-wrap: wrap; }
 .sk-out { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 .sk-out:empty { display: none; }

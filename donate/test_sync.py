@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Tests for settings sync (sync.py, and its routes in donate.py).
+"""Tests for settings sync (sync.py, and its routes in donate.py): for
+everyone, no key - and the limits that come with that: per slot, per
+address, and for all slots together.
 
 Plain Python: ``python3 donate/test_sync.py`` runs them all (pytest finds
 them too: ``python3 -m pytest donate/test_sync.py``). Everything in a
@@ -9,7 +11,9 @@ temporary directory; the service on 127.0.0.1 for the HTTP part.
 from __future__ import annotations
 
 import base64
+import contextlib
 import http.client
+import io
 import json
 import os
 import secrets
@@ -102,6 +106,7 @@ def test_one_writer_wins_a_race():
 
 
 def test_unused_slots_go_and_a_read_keeps_one():
+    assert sync.KEEP_DAYS == 180                         # what the privacy policy says
     d = tempfile.mkdtemp()
     old, used, fresh = "01" * 32, "02" * 32, "03" * 32
     for slot in (old, used, fresh):
@@ -118,6 +123,52 @@ def test_unused_slots_go_and_a_read_keeps_one():
     assert sync.get(d, old) is None and sync.get(d, used) and sync.get(d, fresh)
     assert not os.path.exists(stray)
     assert sync.cleanup(tempfile.mkdtemp()) == 0         # no sync folder yet
+    assert sync.usage(d)["slots"] == 2                   # counted again after it
+
+
+def _limit(monkeypatch_attrs: dict):
+    """Set module attributes for a test; returns a function putting them back."""
+    old = {(m, k): getattr(m, k) for (m, k) in monkeypatch_attrs}
+    for (m, k), v in monkeypatch_attrs.items():
+        setattr(m, k, v)
+    return lambda: [setattr(m, k, v) for (m, k), v in old.items()]
+
+
+def test_past_the_space_for_all_a_new_slot_waits_and_the_rest_are_written():
+    d = tempfile.mkdtemp()
+    back = _limit({(sync, "MAX_TOTAL"): 4000})
+    try:
+        one, two, three = "11" * 32, "12" * 32, "13" * 32
+        assert sync.put(d, one, 0, _blob(1000))[0] == 200
+        assert sync.put(d, two, 0, _blob(1000))[0] == 200
+        used = sync.usage(d)
+        assert used["slots"] == 2 and 2000 < used["bytes"] < 4000 and used["most"] == 4000
+        status, body = sync.put(d, three, 0, _blob(2000))
+        assert (status, body) == (507, {"error": "full"}) and sync.get(d, three) is None
+        assert sync.put(d, one, 1, _blob(2000))[0] == 200          # one there: still written
+        assert sync.usage(d)["slots"] == 2
+        assert sync.usage(d, recount=True)["bytes"] == sync.usage(d)["bytes"]
+        assert sync.delete(d, two)
+        assert sync.put(d, three, 0, _blob(500))[0] == 200          # room again
+        assert sync.usage(d) == sync.usage(d, recount=True)
+    finally:
+        back()
+
+
+def test_past_80_percent_it_says_so():
+    d = tempfile.mkdtemp()
+    sync.put(d, SLOT, 0, _blob(1000))
+    size = sync.usage(d)["bytes"]
+    back = _limit({(sync, "MAX_TOTAL"): int(size / 0.79)})
+    try:
+        assert not sync.usage(d)["warn"]
+        sync.put(d, SLOT, 1, _blob(1100))
+        used = sync.usage(d)
+        assert used["warn"] and not used["full"] and 0.8 <= used["share"] < 1
+        sync.put(d, SLOT, 2, _blob(1400))
+        assert sync.usage(d)["full"]
+    finally:
+        back()
 
 
 # -- the routes in donate.py ----------------------------------------------------------
@@ -148,10 +199,12 @@ def _service():
 
 
 def _call(srv, method, path, key=None, body=None, ip="198.51.100.7", headers=None):
+    """A request as the app makes it; *key*: a supporter key, as an app from
+    before sync was for everyone still sends one."""
     conn = http.client.HTTPConnection("127.0.0.1", srv.server_address[1], timeout=10)
     h = {"X-Real-IP": ip}
     if key is not None:
-        h[sync.HEADER] = key
+        h["X-Dopeiptv-Supporter"] = key
     data = None if body is None else json.dumps(body).encode()
     if data is not None:
         h["Content-Type"] = "application/json"
@@ -166,30 +219,28 @@ def _call(srv, method, path, key=None, body=None, ip="198.51.100.7", headers=Non
         return r.status, {}
 
 
-def test_the_routes_check_the_key_and_keep_only_ciphertext():
+def test_the_routes_need_no_key_and_keep_only_ciphertext():
     srv, key, stats, donate = _service()
     try:
         path = "/sync/" + SLOT
-        assert _call(srv, "GET", path)[0] == 401                          # no key
-        assert _call(srv, "GET", path, key="DS1-nonsense")[0] == 401
-        import supporter
-        other = supporter.make(secrets.token_bytes(32), 739000, b"\1" * 6)
-        assert _call(srv, "GET", path, key=other)[0] == 401              # another site's key
-        assert _call(srv, "GET", "/sync/xyz", key=key)[0] == 404
-        assert _call(srv, "GET", path, key=key)[0] == 404
+        assert _call(srv, "GET", path)[0] == 404                          # no key: fine
+        assert _call(srv, "GET", path, key="DS1-nonsense")[0] == 404      # an old app's: not read
+        assert _call(srv, "GET", "/sync/xyz")[0] == 404
         blob = _blob(300)
-        status, body = _call(srv, "PUT", path, key, {"version_seen": 0, "blob": blob})
+        status, body = _call(srv, "PUT", path, None, {"version_seen": 0, "blob": blob})
         assert status == 200 and body["version"] == 1
-        status, body = _call(srv, "GET", path, key=key)
+        status, body = _call(srv, "GET", path)
         assert status == 200 and body["blob"] == blob and body["version"] == 1
+        status, body = _call(srv, "GET", path, key=key)                  # with a key: the same
+        assert status == 200 and body["blob"] == blob
         status, body = _call(srv, "PUT", path, key, {"version_seen": 0, "blob": _blob()})
         assert status == 409 and body["blob"] == blob
-        assert _call(srv, "PUT", path, key, {"version_seen": 1})[0] == 400
-        assert _call(srv, "PUT", path, key, None)[0] == 400
-        status, _b = _call(srv, "PUT", path, key, None,
+        assert _call(srv, "PUT", path, None, {"version_seen": 1})[0] == 400
+        assert _call(srv, "PUT", path, None, None)[0] == 400
+        status, _b = _call(srv, "PUT", path, None, None,
                            headers={"Content-Length": str(sync.MAX_BODY + 1)})
         assert status == 413
-        assert _call(srv, "POST", path, key, {"version_seen": 1, "blob": _blob()})[0] == 404
+        assert _call(srv, "POST", path, None, {"version_seen": 1, "blob": _blob()})[0] == 404
         # Nothing about the person on disk: no key, only the ciphertext.
         for name in os.listdir(stats):
             full = os.path.join(stats, name)
@@ -210,11 +261,84 @@ def test_an_address_is_slowed_down():
     srv, key, _stats, donate = _service()
     try:
         ip = "203.0.113.9"
-        codes = [_call(srv, "GET", "/sync/" + SLOT, key=key, ip=ip)[0]
+        codes = [_call(srv, "GET", "/sync/" + SLOT, ip=ip)[0]
                  for _ in range(donate.SYNC_PER_WINDOW + 1)]
         assert codes[:-1] == [404] * donate.SYNC_PER_WINDOW and codes[-1] == 429
-        assert _call(srv, "GET", "/sync/" + SLOT, key=key, ip="203.0.113.10")[0] == 404
+        assert _call(srv, "GET", "/sync/" + SLOT, ip="203.0.113.10")[0] == 404
     finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_writes_and_new_slots_have_limits_of_their_own():
+    srv, _key, _stats, donate = _service()
+    try:
+        ip, path = "203.0.113.20", "/sync/" + SLOT
+        version, codes = 0, []
+        for _ in range(donate.SYNC_WRITES_PER_WINDOW + 1):
+            status, body = _call(srv, "PUT", path, None, {"version_seen": version, "blob": _blob()},
+                                 ip=ip)
+            codes.append(status)
+            version = body.get("version", version)
+        assert codes[:-1] == [200] * donate.SYNC_WRITES_PER_WINDOW and codes[-1] == 429
+        assert _call(srv, "GET", path, ip=ip)[0] == 200                   # reading goes on
+        assert _call(srv, "DELETE", path, ip=ip)[0] == 429                # a delete is a write
+        # New slots: a household has one; a few more a day, then no more.
+        donate.SYNC_NEW_PER_DAY = 3
+        ip = "203.0.113.21"
+        codes = [_call(srv, "PUT", "/sync/" + f"{n:02x}" * 32, None,
+                       {"version_seen": 0, "blob": _blob()}, ip=ip)[0] for n in range(4)]
+        assert codes == [200, 200, 200, 429]
+        status, _b = _call(srv, "PUT", "/sync/" + "00" * 32, None,      # one of its own: fine
+                           {"version_seen": 1, "blob": _blob()}, ip=ip)
+        assert status == 200
+        assert _call(srv, "PUT", "/sync/" + "aa" * 32, None,
+                     {"version_seen": 0, "blob": _blob()}, ip="203.0.113.22")[0] == 200
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_full_answers_507_and_the_owner_is_told_without_slots_or_addresses():
+    srv, _key, stats, donate = _service()
+    told = []
+    back = _limit({(donate, "push_ready"): lambda: True,
+                   (donate, "push"): lambda *a, **k: told.append(a) or (1, "")})
+    try:
+        ip = "198.51.100.33"
+        assert _call(srv, "PUT", "/sync/" + SLOT, None, {"version_seen": 0, "blob": _blob(1000)},
+                     ip=ip)[0] == 200
+        assert not told
+        size = sync.usage(stats)["bytes"]
+        sync.MAX_TOTAL = int(size / 0.85)                    # past 80 %
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            assert _call(srv, "PUT", "/sync/" + SLOT, None,
+                         {"version_seen": 1, "blob": _blob(1000)}, ip=ip)[0] == 200
+            for _ in range(50):
+                if told:
+                    break
+                time.sleep(0.02)
+            assert len(told) == 1 and "filling up" in told[0][0]
+            status, body = _call(srv, "PUT", "/sync/" + "cd" * 32, None,
+                                 {"version_seen": 0, "blob": _blob(2000)}, ip=ip)
+            assert (status, body) == (507, {"error": "full"})
+            assert _call(srv, "PUT", "/sync/" + SLOT, None,
+                         {"version_seen": 2, "blob": _blob(1000)}, ip=ip)[0] == 200
+            time.sleep(0.1)
+            assert len(told) == 1                            # once a day, not per write
+            donate._SYNC_WARNED[0] = 0.0
+            assert donate.sync_watch(stats)["warn"]
+            time.sleep(0.1)
+        log = err.getvalue() + " ".join(" ".join(map(str, a)) for a in told)
+        assert "for sync in use" in log
+        for secret in (SLOT, "cd" * 32, ip):
+            assert secret not in log
+        # The admin page gets the numbers (no slot in them).
+        assert set(sync.usage(stats)) == {"bytes", "slots", "most", "share", "warn", "full"}
+    finally:
+        back()
+        sync.MAX_TOTAL = 5 * 1024 ** 3
         srv.shutdown()
         srv.server_close()
 

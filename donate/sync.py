@@ -1,4 +1,4 @@
-"""Settings sync for the app's supporters: encrypted bytes kept per slot.
+"""Settings sync for everyone who uses the app: encrypted bytes kept per slot.
 
 The app (dopeiptv/core/sync.py on the testing branch) encrypts what it syncs
 on the person's own computer, with a key made from a random code that only
@@ -6,12 +6,18 @@ their computers know, and sends the result here under a "slot": 64 hex
 characters, another hash of that same code. This service cannot read a
 byte of it, and cannot tell from the slot whose it is.
 
-Each request carries the person's supporter key (X-Dopeiptv-Supporter):
-donate.py checks the signature (supporter.check) and forgets it. Nothing
-keeps the key, or ties it to a slot, or logs either; nginx does not log
+A request carries nothing about the person: no account, no name, no key
+(an older app still sends its supporter key in X-Dopeiptv-Supporter; it is
+not read). Nothing ties a slot to anyone or logs one; nginx does not log
 /sync/ at all. What is kept, per slot, is the ciphertext, a version number
 and when it was written. A slot nobody has read or written for KEEP_DAYS
 goes (cleanup, once a day).
+
+Since anyone may store, there are limits: MAX_BLOB per slot, a number of
+requests and of writes per address (donate.py, in memory only), and
+MAX_TOTAL for all slots together - past it a new slot is refused (507)
+while the slots there can still be written. Past WARN_SHARE of it the
+admin page says so and the owner's devices are told (donate.py).
 
     GET    /sync/<slot>   200 {"version", "t", "blob"} | 404
     PUT    /sync/<slot>   {"version_seen": n, "blob": base64}
@@ -20,6 +26,7 @@ goes (cleanup, once a day).
                             wrote since version n: the app merges and tries
                             again
                           | 413 more than MAX_BLOB
+                          | 507 a new slot while all of them keep MAX_TOTAL
     DELETE /sync/<slot>   200 {"deleted": true | false}
 
 Stored as <STATS_DIR>/sync/<slot>.json, mode 600, written whole (a temporary
@@ -41,7 +48,6 @@ import sys
 import threading
 import time
 
-HEADER = "X-Dopeiptv-Supporter"
 SLOT = re.compile(r"^[0-9a-f]{64}$")
 #: The most ciphertext one slot keeps (the app refuses more before sending).
 MAX_BLOB = 2 * 1024 * 1024
@@ -49,10 +55,21 @@ MAX_BLOB = 2 * 1024 * 1024
 MAX_BODY = (MAX_BLOB + 2) // 3 * 4 + 4096
 #: The smallest blob the app makes: a format byte, a nonce and a tag.
 MIN_BLOB = 1 + 12 + 16
-KEEP_DAYS = 400
+#: A slot nobody has read or written for this long goes (the privacy policy).
+KEEP_DAYS = 180
+#: All slots together, on disk: past it a new slot is refused (507).
+MAX_TOTAL = 5 * 1024 ** 3
+#: Past this share of MAX_TOTAL the admin page and the owner's devices are told.
+WARN_SHARE = 0.8
+#: How long a count of the folder holds before it is made again (put and
+#: delete keep it up to date in between).
+COUNT_SECS = 3600
 #: A read moves a slot's time on, at most once a day (not a write per read).
 TOUCH_SECS = 86400
 _LOCKS = [threading.Lock() for _ in range(64)]
+#: Per statistics folder: [bytes, slots, when counted] - the slots' files.
+_USAGE: dict[str, list] = {}
+_USAGE_LOCK = threading.Lock()
 
 
 def _lock(slot: str) -> threading.Lock:
@@ -110,6 +127,58 @@ def blob_size(blob: object) -> int:
         return -1
 
 
+def _size(path: str) -> int:
+    try:
+        return os.path.getsize(path)
+    except OSError:
+        return 0
+
+
+def _count(stats_dir: str) -> list:
+    """[bytes, slots] the slot files in the folder take, counted now."""
+    total = slots = 0
+    try:
+        names = os.listdir(folder(stats_dir))
+    except FileNotFoundError:
+        names = []
+    for name in names:
+        if name.endswith(".json") and SLOT.match(name[:-5]):
+            total += _size(os.path.join(folder(stats_dir), name))
+            slots += 1
+    return [total, slots]
+
+
+def _changed(stats_dir: str, by_bytes: int, by_slots: int) -> None:
+    with _USAGE_LOCK:
+        known = _USAGE.get(stats_dir)
+        if known is not None:
+            known[0] = max(0, known[0] + by_bytes)
+            known[1] = max(0, known[1] + by_slots)
+
+
+def usage(stats_dir: str, recount: bool = False) -> dict:
+    """What all the slots keep together: {"bytes", "slots", "most", "share",
+    "warn", "full"}. Counted from the folder at most every COUNT_SECS (or
+    when *recount*), kept up to date by put and delete in between."""
+    now = time.monotonic()
+    with _USAGE_LOCK:
+        known = _USAGE.get(stats_dir)
+        fresh = known is not None and not recount and now - known[2] < COUNT_SECS
+    if not fresh:
+        total, slots = _count(stats_dir)
+        with _USAGE_LOCK:
+            known = _USAGE[stats_dir] = [total, slots, now]
+    with _USAGE_LOCK:
+        total, slots = known[0], known[1]
+    share = total / MAX_TOTAL if MAX_TOTAL else 1.0
+    return {"bytes": total, "slots": slots, "most": MAX_TOTAL, "share": round(share, 4),
+            "warn": share >= WARN_SHARE, "full": total >= MAX_TOTAL}
+
+
+def exists(stats_dir: str, slot: str) -> bool:
+    return os.path.exists(_path(stats_dir, slot))
+
+
 def get(stats_dir: str, slot: str) -> dict | None:
     """{"version", "t", "blob"} kept under *slot*, or None."""
     path = _path(stats_dir, slot)
@@ -127,7 +196,9 @@ def get(stats_dir: str, slot: str) -> dict | None:
 
 def put(stats_dir: str, slot: str, version_seen: object, blob: object) -> tuple[int, dict]:
     """Keep *blob* as the next version of *slot* - if *version_seen* is the
-    version kept now (0: none yet). (status, body to answer)."""
+    version kept now (0: none yet). A new slot is refused while all the
+    slots keep MAX_TOTAL; one there already can still be written. (status,
+    body to answer)."""
     path = _path(stats_dir, slot)
     if not isinstance(version_seen, int) or isinstance(version_seen, bool) or version_seen < 0:
         return 400, {"error": "version_seen"}
@@ -145,24 +216,31 @@ def put(stats_dir: str, slot: str, version_seen: object, blob: object) -> tuple[
             if cur:
                 body["blob"] = cur["blob"]
             return 409, body
+        if cur is None and usage(stats_dir)["bytes"] + size > MAX_TOTAL:
+            return 507, {"error": "full"}
+        before = _size(path) if cur else 0
         now = int(time.time())
         _write(path, {"version": version + 1, "t": now, "blob": blob})
+        _changed(stats_dir, _size(path) - before, 0 if cur else 1)
     return 200, {"version": version + 1, "t": now}
 
 
 def delete(stats_dir: str, slot: str) -> bool:
     path = _path(stats_dir, slot)
     with _lock(slot):
+        size = _size(path)
         try:
             os.unlink(path)
-            return True
         except FileNotFoundError:
             return False
+        _changed(stats_dir, -size, -1)
+        return True
 
 
 def cleanup(stats_dir: str, now: float | None = None) -> int:
     """Remove the slots nobody has read or written for KEEP_DAYS (and
-    temporary files a crash left). Returns how many slots went."""
+    temporary files a crash left), then count what is left (usage).
+    Returns how many slots went."""
     now = time.time() if now is None else now
     where = folder(stats_dir)
     try:
@@ -184,6 +262,7 @@ def cleanup(stats_dir: str, now: float | None = None) -> int:
                 os.unlink(path)
         except OSError:
             continue
+    usage(stats_dir, recount=True)
     return gone
 
 
@@ -192,5 +271,8 @@ if __name__ == "__main__":
         target = sys.argv[2] if len(sys.argv) > 2 else os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "stats")
         print(f"{cleanup(target)} slot(s) removed")
+        used = usage(target)
+        print(f"{used['slots']} slot(s) kept, {used['bytes']} bytes, "
+              f"{used['share']:.1%} of {MAX_TOTAL} bytes")
     else:
         print(__doc__)

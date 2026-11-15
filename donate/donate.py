@@ -22,8 +22,9 @@ device on the admin page (needs Python's cryptography package).
     POST /donate/key      {"cs": client_secret} | {"t": receipt token}
                           ->  {"key", "since"} | {"pending": true} (202) | {"error"}
     GET/PUT/DELETE /sync/<slot>
-                          settings sync for supporters (sync.py): ciphertext
-                          kept per slot, the supporter key checked and forgotten
+                          settings sync, for everyone (sync.py): ciphertext
+                          kept per slot, nothing about the person; requests,
+                          writes and new slots limited per address
     GET/POST/DELETE /together/<room>
                           watch together (together.py): sealed messages passed
                           between the people in a room, in memory only
@@ -249,23 +250,35 @@ _LOCK = threading.Lock()
 WINDOW, PER_WINDOW = 600.0, 12
 FEEDBACK_PER_WINDOW = 20          # reports from one address in WINDOW (many can share one)
 SYNC_PER_WINDOW = 120             # sync requests from one address in WINDOW (a household's computers)
+# Anyone may store, so writes have limits of their own: a computer writes
+# half a minute after a change at the most, and a household has one slot.
+SYNC_WRITES_PER_WINDOW = 30       # PUTs and DELETEs from one address in WINDOW
+SYNC_NEW_PER_DAY = 20             # new slots from one address in a day
+DAY = 86400.0
 # Watch together: a member asks every 25 s or so, and again for each message
 # the others send - a room of eight on one address stays well under this.
 TOGETHER_PER_WINDOW = 1200
 
 
-def _allowed(addr: str, most: int = PER_WINDOW) -> bool:
+_SPAN: dict[str, float] = {}       # a limit's own window, where it is not WINDOW
+
+
+def _allowed(addr: str, most: int = PER_WINDOW, window: float = WINDOW) -> bool:
     now = time.monotonic()
     with _LOCK:
-        hits = [t for t in _SEEN.get(addr, []) if now - t < WINDOW]
+        hits = [t for t in _SEEN.get(addr, []) if now - t < window]
+        if window != WINDOW:
+            _SPAN[addr] = window
         if len(hits) >= most:
             _SEEN[addr] = hits
             return False
         hits.append(now)
         _SEEN[addr] = hits
         if len(_SEEN) > 5000:              # forget the quiet ones
-            for key in [k for k, v in _SEEN.items() if not v or now - v[-1] > WINDOW]:
+            for key in [k for k, v in _SEEN.items()
+                        if not v or now - v[-1] > _SPAN.get(k, WINDOW)]:
                 _SEEN.pop(key, None)
+                _SPAN.pop(key, None)
         return True
 
 
@@ -372,20 +385,6 @@ def _public() -> bytes:
         _PUBLIC.clear()
         _PUBLIC[seed] = ed25519.public_key(seed)
     return _PUBLIC[seed]
-
-
-def supporter_ok(key: str) -> int:
-    """0 when *key* is a supporter key this site signed; else the status to
-    answer (401, or 503 without a signing key). The key is not kept."""
-    import supporter
-    public = _public()
-    if not public:
-        return 503
-    try:
-        ok = bool(key) and len(key) < 200 and supporter.check(key, public) is not None
-    except Exception:  # noqa: BLE001 - a malformed key is just not a key
-        ok = False
-    return 0 if ok else 401
 
 
 def find_key(data: dict) -> tuple[int, dict]:
@@ -812,8 +811,11 @@ FEEDBACK_REPLIES = "/feedback/replies"
 # The reports for reading elsewhere (a fixing session), with a read-only
 # token of their own - FEEDBACK_READ_TOKEN in the config; off without one.
 FEEDBACK_EXPORT = "/feedback/export"
-# Settings sync for supporters (sync.py): GET, PUT and DELETE of one slot.
+# Settings sync, for everyone (sync.py): GET, PUT and DELETE of one slot.
 SYNC = "/sync/"
+#: The owner's devices are told about sync's space at most this often.
+SYNC_WARN_EVERY = DAY
+_SYNC_WARNED = [0.0]
 # Watch together (together.py): POST, GET (a long poll) and DELETE of a room.
 TOGETHER = "/together/"
 ACCOUNT = "/admin/account/"      # + an action: one's own sign-in, the other admins
@@ -976,6 +978,11 @@ class Handler(BaseHTTPRequestHandler):
                 body["help"] = analysis.help_questions(admin.SITE)
             except Exception as e:  # noqa: BLE001 - ids rather than no page
                 print(f"[donate] help questions unavailable: {e!r}", file=sys.stderr, flush=True)
+            try:
+                import sync
+                body["sync"] = sync.usage(stats_dir)
+            except Exception as e:  # noqa: BLE001 - the page without it rather than none
+                print(f"[donate] sync space unavailable: {type(e).__name__}", file=sys.stderr, flush=True)
             body["push"] = {"ready": push_ready(), "key": push_key() if push_ready() else "",
                             "devices": [{"label": d.get("label", ""), "added": d.get("added", 0)}
                                         for d in push_subs()]}
@@ -1272,10 +1279,10 @@ class Handler(BaseHTTPRequestHandler):
         return self._send(200, feedback.export(CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats")), days))
 
     def _sync(self) -> None:
-        """A supporter's encrypted copy under a slot (sync.py). The supporter
-        key in the header is checked and forgotten: never kept, never logged,
-        never tied to the slot. Nor is the address (the rate limit holds it
-        in memory only)."""
+        """Someone's encrypted copy under a slot (sync.py), for anyone: no
+        key, no account (a supporter key an older app still sends is not
+        read). The address is never kept, logged or tied to the slot: the
+        limits hold it in memory only."""
         import sync
         slot = self.path.split("?", 1)[0][len(SYNC):]
         if not sync.SLOT.match(slot):
@@ -1283,10 +1290,8 @@ class Handler(BaseHTTPRequestHandler):
         addr = self.headers.get("X-Real-IP") or "local"
         if not _allowed("sync:" + addr, SYNC_PER_WINDOW):
             return self._send(429, {"error": "slow down"})
-        refused = supporter_ok((self.headers.get(sync.HEADER) or "").strip())
-        if refused:
-            return self._send(refused, {"error": "supporter key" if refused == 401
-                                        else "not configured"})
+        if self.command != "GET" and not _allowed("sync-w:" + addr, SYNC_WRITES_PER_WINDOW):
+            return self._send(429, {"error": "slow down"})
         where = _stats_dir()
         if self.command == "GET":
             got = sync.get(where, slot)
@@ -1308,11 +1313,18 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(400, {"error": "body"})
         if not isinstance(data, dict):
             return self._send(400, {"error": "body"})
+        if not sync.exists(where, slot) and not _allowed("sync-new:" + addr, SYNC_NEW_PER_DAY, DAY):
+            return self._send(429, {"error": "slow down"})
         try:
             status, body = sync.put(where, slot, data.get("version_seen"), data.get("blob"))
         except OSError as e:
             print(f"[donate] sync: not stored ({type(e).__name__})", file=sys.stderr, flush=True)
             return self._send(503, {"error": "not stored"})
+        if status == 200:
+            try:
+                sync_watch(where)
+            except Exception as e:  # noqa: BLE001 - a warning never stops a write
+                print(f"[donate] sync space: {type(e).__name__}", file=sys.stderr, flush=True)
         return self._send(status, body)
 
     def _together(self) -> None:
@@ -1482,10 +1494,41 @@ class Handler(BaseHTTPRequestHandler):
 LISTEN = CONF.get("LISTEN", "unix:/var/run/iptv_donate/donate.sock")
 
 
+def _gb(n: int) -> str:
+    return f"{n / 1024 ** 3:.1f} GB" if n >= 1024 ** 3 else f"{n / 1024 ** 2:.0f} MB"
+
+
+def sync_watch(stats_dir: str) -> dict:
+    """sync.usage(), and past sync.WARN_SHARE a word in the log and on the
+    owner's devices - once a day at most, again at once after it was back
+    under. Neither says anything about a slot or an address."""
+    import sync
+    used = sync.usage(stats_dir)
+    now = time.time()
+    with _LOCK:
+        if not used["warn"]:
+            _SYNC_WARNED[0] = 0.0
+            return used
+        if now - _SYNC_WARNED[0] < SYNC_WARN_EVERY:
+            return used
+        _SYNC_WARNED[0] = now
+    what = (f"{used['share']:.0%} of the {_gb(used['most'])} for sync in use, "
+            f"{used['slots']} copies")
+    print(f"[donate] sync: {what}", file=sys.stderr, flush=True)
+    if push_ready():
+        threading.Thread(target=push, args=(
+            "Settings sync is full" if used["full"] else "Settings sync is filling up",
+            what + (" - new copies are refused" if used["full"]
+                    else " - past 100 % new copies are refused"),
+            "/admin/#sync", "sync-space"), daemon=True).start()
+    return used
+
+
 def _sync_cleanup() -> None:
-    """Once a day: the sync slots nobody has used for sync.KEEP_DAYS go, and
-    the reports older than feedback.KEEP_DAYS (the privacy policy's 12
-    months)."""
+    """Once a day: the sync slots nobody has used for sync.KEEP_DAYS go (the
+    privacy policy's 180 days), the space the rest take is looked at
+    (sync_watch), and the reports older than feedback.KEEP_DAYS go (the
+    privacy policy's 12 months)."""
     import sync
     while True:
         try:
@@ -1493,6 +1536,7 @@ def _sync_cleanup() -> None:
             if gone:
                 print(f"[donate] sync: {gone} slot(s) unused for {sync.KEEP_DAYS} days removed",
                       file=sys.stderr, flush=True)
+            sync_watch(_stats_dir())
         except Exception as e:  # noqa: BLE001 - the cleanup keeps its schedule
             print(f"[donate] sync cleanup: {type(e).__name__}", file=sys.stderr, flush=True)
         try:

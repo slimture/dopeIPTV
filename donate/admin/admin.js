@@ -683,6 +683,24 @@
     box.replaceChildren(row);
     if (list.length && P.ready) { box.append(mk("div", "muted devices", "Getting them: " + [...new Set(list)].join(", "))); }
   }
+  // Settings sync (donate/sync.py): the space all the copies take together,
+  // and a word at the top of the page past 80 % of it.
+  function syncSpace() {
+    const S = data.sync, card = $("sync"), warn = $("sync-warn");
+    card.hidden = !S;
+    warn.hidden = !(S && S.warn);
+    if (!S) { return; }
+    const gb = (b) => b >= 1073741824 ? (b / 1073741824).toFixed(1) + " GB" : Math.max(0, Math.round(b / 1048576)) + " MB";
+    const pct = Math.round(S.share * 1000) / 10;
+    $("sync-count").textContent = num.format(S.slots) + (S.slots === 1 ? " copy" : " copies");
+    $("sync-used").textContent = gb(S.bytes) + " of " + gb(S.most) + " in use (" + pct + " %)";
+    const bar = $("sync-bar");
+    bar.style.width = Math.min(100, pct) + "%";
+    bar.className = S.warn ? "warn" : "";
+    warn.textContent = S.full
+      ? "Settings sync is full (" + gb(S.bytes) + " of " + gb(S.most) + "): new copies are refused until there is room or MAX_TOTAL in donate/sync.py is raised."
+      : "Settings sync has used " + pct + " % of its " + gb(S.most) + ". At 100 % new copies are refused - raise MAX_TOTAL in donate/sync.py or make room.";
+  }
   // Supporter keys (donate/supporter.py): one again for a payment (the same
   // key its donor got), or one by hand; and how many have been handed out.
   let skWired = false;
@@ -1467,7 +1485,7 @@
     const S = data.series, best = S.reduce((a, d, i) => (d.downloads > (S[a] || {}).downloads ? i : a), 0);
     $("n-downloads").textContent = num.format(T.downloads) + (T.downloads === 1 ? " download" : " downloads") +
       (T.downloads && S[best] ? " · most on " + pointLabel(S[best].date, best) : "");
-    summary(); tiles(); funnel(); visitsChart(); downloadsChart(); visitsTable(); lists(); byChannel(); years(); donations(); supporterKeys();
+    summary(); tiles(); funnel(); visitsChart(); downloadsChart(); visitsTable(); lists(); byChannel(); years(); donations(); supporterKeys(); syncSpace();
     $("updated").textContent = data.updated ? "Counts updated " + stamp.format(new Date(data.updated)) + "." : "";
     $("kept").textContent = keptFor();
   }
