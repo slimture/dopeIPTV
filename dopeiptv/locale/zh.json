@@ -2232,5 +2232,9 @@
   "airplay_pick_window": "点按 AirPlay 窗口中的 AirPlay 按钮，然后选择你的 Apple TV。",
   "airplay_on_tv_window": "正在 Apple TV 上播放。AirPlay 窗口中的 AirPlay 按钮可切换到另一台。",
   "airplay_show_window": "显示 AirPlay 窗口",
-  "airplay_window_title": "AirPlay"
+  "airplay_window_title": "AirPlay",
+  "cast_pin_title": "不经受信任的证书就投放吗？",
+  "cast_pin_body": "{name} 只信任 {server} 的一个证书。投放时，电视、Kodi 或 Apple TV 会自行获取视频流，不做这项检查，因此那里换了证书也不会被发现。",
+  "cast_pin_anyway": "仍然投放",
+  "phone_answer_there": "请在电脑上回答。"
 }

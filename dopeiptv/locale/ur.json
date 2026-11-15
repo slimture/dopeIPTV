@@ -2232,5 +2232,9 @@
   "airplay_pick_window": "AirPlay ونڈو میں AirPlay بٹن پر کلک کریں اور اپنا Apple TV منتخب کریں۔",
   "airplay_on_tv_window": "Apple TV پر چل رہا ہے۔ AirPlay ونڈو کا AirPlay بٹن اسے کسی دوسرے پر لے جاتا ہے۔",
   "airplay_show_window": "AirPlay ونڈو دکھائیں",
-  "airplay_window_title": "AirPlay"
+  "airplay_window_title": "AirPlay",
+  "cast_pin_title": "بھروسے والے سرٹیفکیٹ کے بغیر کاسٹ کریں؟",
+  "cast_pin_body": "{name} {server} کے لیے صرف ایک سرٹیفکیٹ پر بھروسا کرتا ہے۔ کاسٹ کرنے پر ٹی وی، Kodi یا Apple TV خود سٹریم لیتا ہے، اس جانچ کے بغیر، اس لیے وہاں کوئی اور سرٹیفکیٹ پکڑا نہیں جائے گا۔",
+  "cast_pin_anyway": "پھر بھی کاسٹ کریں",
+  "phone_answer_there": "کمپیوٹر پر جواب دیں۔"
 }

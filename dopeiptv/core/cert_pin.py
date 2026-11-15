@@ -299,6 +299,19 @@ def pin_of(options: dict | None) -> tuple[str, int, str] | None:
     return host.strip("[]"), int(port), fp
 
 
+def covers(options: dict | None, *urls: str) -> tuple[str, int] | None:
+    """The (host, port) pinned in a source's *options* that one of *urls*
+    goes to over https - a connection the pin is what checks; None when
+    none does (or nothing is pinned)."""
+    pin = pin_of(options)
+    if pin is None:
+        return None
+    for url in urls:
+        if host_port(url) == (pin[0], pin[1]):
+            return pin[0], pin[1]
+    return None
+
+
 def pin_options(host: str, port: int, fp: str) -> dict[str, str]:
     h = f"[{host}]" if ":" in host else host
     return {KEY: normal(fp), KEY_FOR: f"{h.lower()}:{port}"}

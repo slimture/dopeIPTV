@@ -2160,6 +2160,10 @@ _STRINGS: dict[str, dict[str, str]] = {
     "conn_what_multiview": {"en": "Playing this in multiview opens another connection to your provider."},
     "conn_k_cast": {"en": "cast to a TV"},
     "conn_what_cast": {"en": "Casting this opens another connection to your provider."},
+    "cast_pin_title": {"en": "Cast without the trusted certificate?"},
+    "cast_pin_body": {"en": "{name} trusts one certificate for {server}. When you cast, the TV, Kodi or Apple TV fetches the stream itself, without that check, so a different certificate there would go unnoticed."},
+    "cast_pin_anyway": {"en": "Cast anyway"},
+    "phone_answer_there": {"en": "Answer on the computer."},
     # -- Nerd: own DNS, low latency, an IP version per source, a trusted certificate --
     "nerd_card_dns": {"en": "Own DNS"},
     "nerd_dns_intro": {"en": "Your sources' names looked up over HTTPS (DNS over HTTPS): your network's DNS, often your internet provider's, never sees them."},

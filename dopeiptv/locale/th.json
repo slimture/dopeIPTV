@@ -2232,5 +2232,9 @@
   "airplay_pick_window": "คลิกปุ่ม AirPlay ในหน้าต่าง AirPlay แล้วเลือก Apple TV ของคุณ",
   "airplay_on_tv_window": "กำลังเล่นบน Apple TV ปุ่ม AirPlay ในหน้าต่าง AirPlay ใช้ย้ายไปเครื่องอื่น",
   "airplay_show_window": "แสดงหน้าต่าง AirPlay",
-  "airplay_window_title": "AirPlay"
+  "airplay_window_title": "AirPlay",
+  "cast_pin_title": "แคสต์โดยไม่มีใบรับรองที่เชื่อถือหรือไม่",
+  "cast_pin_body": "{name} เชื่อถือใบรับรองเพียงใบเดียวสำหรับ {server} เมื่อแคสต์ ทีวี Kodi หรือ Apple TV จะดึงสตรีมเองโดยไม่มีการตรวจสอบนี้ ใบรับรองอื่นที่นั่นจึงไม่ถูกสังเกต",
+  "cast_pin_anyway": "แคสต์ต่อไป",
+  "phone_answer_there": "ตอบที่คอมพิวเตอร์"
 }

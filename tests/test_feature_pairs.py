@@ -402,6 +402,7 @@ nerd.blocks_stream = lambda url, kind=None: not nerd.is_own_file(url)
 blocked = tr("nerd_vpn_blocked")
 w._phone_do("_play", {"row": row})
 assert toasts[-1:] == [blocked] and not playing(), ("phone", toasts)
+assert w._phone_do("state", {}).get("note") == blocked, "the phone's page says it too"
 toasts.clear()
 w._events_command("favorite", row["name"])
 assert toasts[-1:] == [blocked] and not playing(), ("mqtt favorite", toasts)
@@ -427,6 +428,8 @@ w.rec.jobs.append(job)
 over = tr("conn_over", max=1, n=1)
 w._phone_do("_play", {"row": row})
 assert asked and over in asked[-1] and not playing(), ("phone limit", asked)
+note = w._phone_do("state", {}).get("note") or ""
+assert over in note and tr("phone_answer_there") in note, note
 asked.clear()
 w._events_command("favorite", row["name"])
 assert asked and over in asked[-1] and not playing(), ("mqtt limit", asked)
@@ -434,6 +437,34 @@ asked.clear()
 w._open_cast_dialog(dict(row, _kind="live"))
 assert asked and tr("conn_what_cast") in asked[-1] and over in asked[-1] and not casts, ("cast limit", asked)
 w.rec.jobs.remove(job)
+w.client.max_connections = None
+from dopeiptv.core import cert_pin
+
+
+class S(dict):
+    def value(self, key, default=None):
+        return self.get(key, default)
+
+
+nerd.install(S(nerd_enabled="true"))
+pinned = {"id": "pinned", "name": "Home box",
+          "options": cert_pin.pin_options("tv.example.com", 8443, "ab" * 32)}
+store_was = w.playlist_store
+w.playlist_store = SimpleNamespace(active=lambda: pinned, active_id="pinned",
+                                   playlists=lambda: [pinned])
+film = {"name": "Film", "_kind": "movie", "_cast_url": "https://tv.example.com:8443/movie/1.mkv"}
+asked.clear()
+w._open_cast_dialog(film)
+assert asked and tr("cast_pin_body", name="Home box", server="tv.example.com:8443") in asked[-1], asked
+assert not casts, "cancelled: not cast"
+w._choice_dialog = lambda title, message, options, dont_ask_setting=None: (asked.append(message), 0)[1]
+w._open_cast_dialog(film)
+assert casts, "cast anyway"
+asked.clear()
+w._open_cast_dialog(film)
+assert not any(tr("cast_pin_title") in a or "tv.example.com" in a for a in asked), "asked once per source"
+nerd.install(None)
+w.playlist_store = store_was
 print("PAIRS_WINDOW_OK")
 """
 
@@ -529,3 +560,90 @@ def test_a_multiview_cell_plays_with_the_sources_nerd_options_as_the_player_does
     finally:
         nerd.set_source(None)
         nerd.install(None)
+
+
+# -- a trusted certificate and a cast -------------------------------------------------------
+
+def test_a_pin_covers_only_https_to_its_own_server():
+    from dopeiptv.core import cert_pin
+    opts = cert_pin.pin_options("tv.example.com", 8443, "ab" * 32)
+    assert cert_pin.covers(opts, "https://tv.example.com:8443/live/1.m3u8") == ("tv.example.com", 8443)
+    assert cert_pin.covers(opts, "http://cdn.example.com/a.ts", "https://TV.example.com:8443/x") == (
+        "tv.example.com", 8443)
+    assert cert_pin.covers(opts, "https://tv.example.com/live/1.m3u8") is None       # port 443
+    assert cert_pin.covers(opts, "http://tv.example.com:8443/live/1.ts") is None     # no TLS
+    assert cert_pin.covers({}, "https://tv.example.com:8443/x") is None
+    v6 = cert_pin.pin_options("fd00::5", 443, "cd" * 32)
+    assert cert_pin.covers(v6, "https://[fd00::5]/live/1.ts") == ("fd00::5", 443)
+
+
+def test_a_cast_of_a_pinned_source_is_asked_about_once_per_source_this_session(app):
+    from dopeiptv.core import cert_pin, nerd
+    from dopeiptv.ui.mw_cast import _CastMixin
+
+    class W(_CastMixin):
+        def __init__(self):
+            self.active = {"id": "a", "name": "Box",
+                           "options": cert_pin.pin_options("box.example.com", 443, "ab" * 32)}
+            self.playlist_store = SimpleNamespace(active=lambda: self.active)
+            self.asked: list[tuple[str, str]] = []
+            self.answer = 1
+
+        def _choice_dialog(self, title, message, options, dont_ask_setting=None):
+            self.asked.append((title, message))
+            return self.answer
+
+    url = "https://box.example.com/live/u/p/1.m3u8"
+    w = W()
+    assert w._cast_pin_ok(url) and not w.asked                  # Nerd off: no pin in force
+    nerd.install(_S(nerd_enabled="true"))
+    try:
+        assert not w._cast_pin_ok(url)                          # Cancel
+        assert w.asked[-1] == (tr("cast_pin_title"),
+                               tr("cast_pin_body", name="Box", server="box.example.com:443"))
+        assert not w._cast_pin_ok(url) and len(w.asked) == 2    # asked again
+        w.answer = 0
+        assert w._cast_pin_ok(url) and len(w.asked) == 3        # Cast anyway
+        assert w._cast_pin_ok(url) and len(w.asked) == 3        # not again for this source
+        assert w._cast_pin_ok("http://box.example.com/live/1.ts", "/home/me/f.mkv")
+        w.active = {"id": "b", "name": "Other",
+                    "options": cert_pin.pin_options("other.example.com", 443, "cd" * 32)}
+        w.answer = 1
+        assert not w._cast_pin_ok("https://other.example.com/a.m3u8") and len(w.asked) == 4
+        assert w._cast_pin_ok("https://box.example.com/x.m3u8")  # not where this one's pin is
+    finally:
+        nerd.install(None)
+    assert not hasattr(_CastMixin, "_cast_pin_allowed")          # the window's, never stored
+
+
+# -- the phone's page hears what stopped its play ------------------------------------------
+
+def test_the_phone_note_is_the_phones_only_for_a_while_and_until_something_plays(monkeypatch):
+    from dopeiptv.core import phone_page
+    from dopeiptv.ui import mw_phone
+
+    clock = [100.0]
+    monkeypatch.setattr(mw_phone.time, "monotonic", lambda: clock[0])
+
+    class W(mw_phone._PhoneMixin):
+        def __init__(self):
+            self.player = SimpleNamespace(current_url="http://h.example.com/live/1.ts")
+
+    w = W()
+    w._phone_note("Not asked by the phone")
+    assert w._phone_note_now() == ""
+    w._phone_asked()
+    clock[0] += 2
+    w._phone_note(tr("nerd_vpn_blocked"))
+    assert w._phone_note_now() == tr("nerd_vpn_blocked")
+    clock[0] += mw_phone.PHONE_NOTE_S + 1
+    assert w._phone_note_now() == ""                              # its while is over
+    w._phone_asked()
+    w._phone_note("Over the limit")
+    w.player.current_url = "http://h.example.com/live/2.ts"       # it played after all
+    assert w._phone_note_now() == ""
+    clock[0] += mw_phone.PHONE_ASKED_S + 1
+    w._phone_note("Much later")                                   # not the phone's any more
+    assert w._phone_note_now() == ""
+    page, _policy = phone_page.render({}, {}, {}, "en", False)
+    assert "banner(s.note" in page.decode("utf-8")      # shown where it says it is offline

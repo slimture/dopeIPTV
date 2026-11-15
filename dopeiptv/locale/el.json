@@ -2232,5 +2232,9 @@
   "airplay_pick_window": "Κάντε κλικ στο κουμπί AirPlay στο παράθυρο AirPlay και επιλέξτε το Apple TV σας.",
   "airplay_on_tv_window": "Παίζει στο Apple TV. Το κουμπί AirPlay στο παράθυρο AirPlay το μεταφέρει σε άλλο.",
   "airplay_show_window": "Εμφάνιση του παραθύρου AirPlay",
-  "airplay_window_title": "AirPlay"
+  "airplay_window_title": "AirPlay",
+  "cast_pin_title": "Μετάδοση χωρίς το έμπιστο πιστοποιητικό;",
+  "cast_pin_body": "Το {name} εμπιστεύεται ένα μόνο πιστοποιητικό για το {server}. Όταν κάνεις μετάδοση, η τηλεόραση, το Kodi ή το Apple TV παίρνει τη ροή μόνο του, χωρίς αυτόν τον έλεγχο, οπότε ένα διαφορετικό πιστοποιητικό εκεί δεν θα γινόταν αντιληπτό.",
+  "cast_pin_anyway": "Μετάδοση ούτως ή άλλως",
+  "phone_answer_there": "Απάντησε στον υπολογιστή."
 }

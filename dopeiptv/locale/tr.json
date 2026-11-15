@@ -2232,5 +2232,9 @@
   "airplay_pick_window": "AirPlay penceresindeki AirPlay düğmesine tıklayın ve Apple TV'nizi seçin.",
   "airplay_on_tv_window": "Apple TV'de oynatılıyor. AirPlay penceresindeki AirPlay düğmesi başka birine taşır.",
   "airplay_show_window": "AirPlay penceresini göster",
-  "airplay_window_title": "AirPlay"
+  "airplay_window_title": "AirPlay",
+  "cast_pin_title": "Güvenilen sertifika olmadan yayınlansın mı?",
+  "cast_pin_body": "{name}, {server} için tek bir sertifikaya güveniyor. Yayınladığında TV, Kodi veya Apple TV yayını bu denetim olmadan kendisi alır; oradaki farklı bir sertifika fark edilmez.",
+  "cast_pin_anyway": "Yine de yayınla",
+  "phone_answer_there": "Bilgisayardan yanıtla."
 }

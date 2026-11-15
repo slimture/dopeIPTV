@@ -2232,5 +2232,9 @@
   "airplay_pick_window": "روی دکمهٔ AirPlay در پنجرهٔ AirPlay کلیک کنید و Apple TV خود را انتخاب کنید.",
   "airplay_on_tv_window": "روی Apple TV پخش می‌شود. دکمهٔ AirPlay در پنجرهٔ AirPlay آن را به دستگاه دیگری می‌برد.",
   "airplay_show_window": "نمایش پنجرهٔ AirPlay",
-  "airplay_window_title": "AirPlay"
+  "airplay_window_title": "AirPlay",
+  "cast_pin_title": "ارسال بدون گواهی مورد اعتماد؟",
+  "cast_pin_body": "{name} فقط به یک گواهی برای {server} اعتماد دارد. هنگام ارسال، تلویزیون، Kodi یا Apple TV خودش جریان را می‌گیرد، بدون این بررسی؛ پس گواهی دیگری در آنجا دیده نمی‌شود.",
+  "cast_pin_anyway": "در هر صورت ارسال کن",
+  "phone_answer_there": "روی رایانه پاسخ دهید."
 }

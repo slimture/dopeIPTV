@@ -93,7 +93,8 @@ class _CastMixin:
             return
         # The way in every stream takes: Nerd's VPN guard, and the account's
         # connections - the TV, Kodi or the converter here holds one.
-        if self._vpn_guard_blocks(source) or not self._conn_ok_cast(source):
+        if (self._vpn_guard_blocks(source) or not self._cast_pin_ok(url, source)
+                or not self._conn_ok_cast(source)):
             return
         # Remember what is being cast, not just where to. Pausing a live
         # channel is answered from the provider's archive, and that needs the
@@ -141,6 +142,38 @@ class _CastMixin:
                    self._local_tracks(it),
                    probe=not self._busy_elsewhere(it), source=source,
                    live=self._play_kind_for(it) == "live").exec()
+
+    def _cast_pin_ok(self, *urls: str) -> bool:
+        """Nerd: the source trusts one certificate for its server. A TV,
+        Kodi or an Apple TV fetches the stream itself, so the pin cannot
+        protect a cast: asked first, and "Cast anyway" holds for that source
+        until the app closes (never stored)."""
+        from ..core import cert_pin, nerd
+        if not nerd.current().on:
+            return True             # the pin is in force only with Nerd on
+        store = getattr(self, "playlist_store", None)
+        pl = (store.active() if store is not None else None) or {}
+        hit = cert_pin.covers(pl.get("options"), *urls)
+        if hit is None:
+            return True
+        allowed = getattr(self, "_cast_pin_allowed", None)
+        if allowed is None:
+            allowed = self._cast_pin_allowed = set()
+        sid = str(pl.get("id") or "")
+        if sid in allowed:
+            return True
+        host, port = hit
+        server = f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
+        idx = self._choice_dialog(
+            tr("cast_pin_title"),
+            tr("cast_pin_body", name=str(pl.get("name") or ""), server=server),
+            [(tr("cast_pin_anyway"), "normal"), (tr("common_cancel"), "primary")])
+        log.info("cast: the source's trusted certificate cannot cover a cast - %s",
+                 "cast anyway" if idx == 0 else "not cast")
+        if idx != 0:
+            return False
+        allowed.add(sid)
+        return True
 
     # The list vocabulary and the resume store's do not match: a movie row is
     # "vod" in one and "movie" in the other, and History rows carry their own.

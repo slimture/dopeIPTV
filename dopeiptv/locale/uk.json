@@ -2232,5 +2232,9 @@
   "airplay_pick_window": "Натисніть кнопку AirPlay у вікні AirPlay і виберіть свою Apple TV.",
   "airplay_on_tv_window": "Відтворюється на Apple TV. Кнопка AirPlay у вікні AirPlay переносить його на іншу.",
   "airplay_show_window": "Показати вікно AirPlay",
-  "airplay_window_title": "AirPlay"
+  "airplay_window_title": "AirPlay",
+  "cast_pin_title": "Транслювати без довіреного сертифіката?",
+  "cast_pin_body": "{name} довіряє одному сертифікату для {server}. Під час трансляції телевізор, Kodi або Apple TV сам отримує потік, без цієї перевірки, тож інший сертифікат лишиться непоміченим.",
+  "cast_pin_anyway": "Усе одно транслювати",
+  "phone_answer_there": "Дайте відповідь на комп'ютері."
 }

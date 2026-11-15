@@ -2232,5 +2232,9 @@
   "airplay_pick_window": "Klikni na AirPlay dugme u AirPlay prozoru i izaberi svoj Apple TV.",
   "airplay_on_tv_window": "Pušta se na Apple TV-u. AirPlay dugme u AirPlay prozoru ga prebacuje na drugi.",
   "airplay_show_window": "Prikaži AirPlay prozor",
-  "airplay_window_title": "AirPlay"
+  "airplay_window_title": "AirPlay",
+  "cast_pin_title": "Prebaciti bez pouzdanog sertifikata?",
+  "cast_pin_body": "{name} veruje jednom sertifikatu za {server}. Pri prebacivanju TV, Kodi ili Apple TV sam preuzima strim, bez te provere, pa drugi sertifikat ne bi bio primećen.",
+  "cast_pin_anyway": "Ipak prebaci",
+  "phone_answer_there": "Odgovori na računaru."
 }

@@ -158,11 +158,22 @@ class _ConnectionsMixin:
         return text + " " + tr("conn_risk")
 
     def _conn_with_warning(self, body: str, v: connections.Verdict | None) -> str:
-        return body if v is None else body + "\n\n" + self._conn_warning(v)
+        if v is None:
+            return body
+        self._conn_tell_phone(v)
+        return body + "\n\n" + self._conn_warning(v)
+
+    def _conn_tell_phone(self, v: connections.Verdict) -> None:
+        """A play the phone remote asked for waits on this question: its
+        page says it too (mw_phone), and where to answer."""
+        note = getattr(self, "_phone_note", None)
+        if callable(note):
+            note(self._conn_warning(v) + " " + tr("phone_answer_there"))
 
     def _conn_ask(self, v: connections.Verdict, what: str) -> bool:
         """Warn about *v* before *what* (an i18n key: what is about to
         open the connection); True to go ahead."""
+        self._conn_tell_phone(v)
         idx = self._choice_dialog(
             tr("conn_title"), tr(what) + "\n\n" + self._conn_warning(v),
             [(tr("conn_anyway"), "normal"), (tr("common_cancel"), "primary")])

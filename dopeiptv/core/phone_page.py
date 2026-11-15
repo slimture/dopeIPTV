@@ -346,7 +346,7 @@ async function poll() {
   if (gone) return;
   try {
     const s = await api("api/state");
-    fails = 0; banner("");
+    fails = 0; banner(s.note || "");
     show(s);
     if (s.stamp !== stamp) loadChannels(s.stamp);
   } catch (e) {

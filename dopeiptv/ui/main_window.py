@@ -5114,6 +5114,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not nerd.blocks_stream(url, src.get("_kind")):
             return False
         self._show_toast(tr("nerd_vpn_blocked"), 6000)
+        note = getattr(self, "_phone_note", None)   # a play the phone asked for
+        if note is not None:
+            note(tr("nerd_vpn_blocked"))
         return True
 
     def _show_toast(self, text: str, duration_ms: int = 0) -> None:

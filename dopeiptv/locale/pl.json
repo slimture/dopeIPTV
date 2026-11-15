@@ -2232,5 +2232,9 @@
   "airplay_pick_window": "Kliknij przycisk AirPlay w oknie AirPlay i wybierz swój Apple TV.",
   "airplay_on_tv_window": "Odtwarzanie na Apple TV. Przycisk AirPlay w oknie AirPlay przenosi je na inny.",
   "airplay_show_window": "Pokaż okno AirPlay",
-  "airplay_window_title": "AirPlay"
+  "airplay_window_title": "AirPlay",
+  "cast_pin_title": "Przesłać bez zaufanego certyfikatu?",
+  "cast_pin_body": "{name} ufa jednemu certyfikatowi dla {server}. Przy przesyłaniu telewizor, Kodi lub Apple TV pobiera strumień sam, bez tego sprawdzenia, więc inny certyfikat przeszedłby niezauważony.",
+  "cast_pin_anyway": "Przesyłaj mimo to",
+  "phone_answer_there": "Odpowiedz na komputerze."
 }

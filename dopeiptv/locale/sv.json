@@ -2232,5 +2232,9 @@
   "airplay_pick_window": "Klicka på AirPlay-knappen i AirPlay-fönstret och välj din Apple TV.",
   "airplay_on_tv_window": "Spelas på din Apple TV. AirPlay-knappen i AirPlay-fönstret flyttar den till en annan.",
   "airplay_show_window": "Visa AirPlay-fönstret",
-  "airplay_window_title": "AirPlay"
+  "airplay_window_title": "AirPlay",
+  "cast_pin_title": "Casta utan det betrodda certifikatet?",
+  "cast_pin_body": "{name} litar på ett enda certifikat för {server}. När du castar hämtar tv:n, Kodi eller Apple TV strömmen själv, utan den kontrollen, så ett annat certifikat där skulle inte märkas.",
+  "cast_pin_anyway": "Casta ändå",
+  "phone_answer_there": "Svara på datorn."
 }

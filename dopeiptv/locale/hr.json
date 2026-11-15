@@ -2232,5 +2232,9 @@
   "airplay_pick_window": "Klikni AirPlay gumb u AirPlay prozoru i odaberi svoj Apple TV.",
   "airplay_on_tv_window": "Reproducira se na Apple TV-u. AirPlay gumb u AirPlay prozoru prebacuje ga na drugi.",
   "airplay_show_window": "Prikaži AirPlay prozor",
-  "airplay_window_title": "AirPlay"
+  "airplay_window_title": "AirPlay",
+  "cast_pin_title": "Emitirati bez pouzdanog certifikata?",
+  "cast_pin_body": "{name} vjeruje jednom certifikatu za {server}. Pri emitiranju TV, Kodi ili Apple TV sam dohvaća stream, bez te provjere, pa drugi certifikat ne bi bio primijećen.",
+  "cast_pin_anyway": "Ipak emitiraj",
+  "phone_answer_there": "Odgovori na računalu."
 }

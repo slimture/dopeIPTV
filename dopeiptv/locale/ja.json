@@ -2232,5 +2232,9 @@
   "airplay_pick_window": "AirPlay ウインドウの AirPlay ボタンをクリックして Apple TV を選んでください。",
   "airplay_on_tv_window": "Apple TV で再生中です。AirPlay ウインドウの AirPlay ボタンで別の Apple TV に切り替えられます。",
   "airplay_show_window": "AirPlay ウインドウを表示",
-  "airplay_window_title": "AirPlay"
+  "airplay_window_title": "AirPlay",
+  "cast_pin_title": "信頼した証明書なしでキャストしますか？",
+  "cast_pin_body": "{name} は {server} の証明書を 1 つだけ信頼しています。キャストすると、テレビ、Kodi、Apple TV がその確認なしで自分でストリームを取得するため、別の証明書でも気付けません。",
+  "cast_pin_anyway": "それでもキャスト",
+  "phone_answer_there": "パソコンで答えてください。"
 }

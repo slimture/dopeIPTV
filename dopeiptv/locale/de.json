@@ -2232,5 +2232,9 @@
   "airplay_pick_window": "Klicke im AirPlay-Fenster auf die AirPlay-Taste und wähle dein Apple TV.",
   "airplay_on_tv_window": "Läuft auf dem Apple TV. Mit der AirPlay-Taste im AirPlay-Fenster wechselst du zu einem anderen.",
   "airplay_show_window": "AirPlay-Fenster anzeigen",
-  "airplay_window_title": "AirPlay"
+  "airplay_window_title": "AirPlay",
+  "cast_pin_title": "Ohne das vertraute Zertifikat streamen?",
+  "cast_pin_body": "{name} vertraut einem einzigen Zertifikat für {server}. Beim Streamen holt der Fernseher, Kodi oder das Apple TV den Stream selbst, ohne diese Prüfung – ein anderes Zertifikat dort fiele nicht auf.",
+  "cast_pin_anyway": "Trotzdem streamen",
+  "phone_answer_there": "Antworte am Computer."
 }

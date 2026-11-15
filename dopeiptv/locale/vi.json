@@ -2232,5 +2232,9 @@
   "airplay_pick_window": "Bấm nút AirPlay trong cửa sổ AirPlay rồi chọn Apple TV của bạn.",
   "airplay_on_tv_window": "Đang phát trên Apple TV. Nút AirPlay trong cửa sổ AirPlay chuyển sang thiết bị khác.",
   "airplay_show_window": "Hiện cửa sổ AirPlay",
-  "airplay_window_title": "AirPlay"
+  "airplay_window_title": "AirPlay",
+  "cast_pin_title": "Truyền mà không có chứng chỉ tin cậy?",
+  "cast_pin_body": "{name} chỉ tin một chứng chỉ cho {server}. Khi truyền, TV, Kodi hoặc Apple TV tự lấy luồng mà không có bước kiểm tra đó, nên một chứng chỉ khác ở đó sẽ không bị phát hiện.",
+  "cast_pin_anyway": "Vẫn truyền",
+  "phone_answer_there": "Hãy trả lời trên máy tính."
 }

@@ -2232,5 +2232,9 @@
   "airplay_pick_window": "Klik op de AirPlay-knop in het AirPlay-venster en kies je Apple TV.",
   "airplay_on_tv_window": "Speelt af op de Apple TV. Met de AirPlay-knop in het AirPlay-venster zet je het op een andere.",
   "airplay_show_window": "AirPlay-venster tonen",
-  "airplay_window_title": "AirPlay"
+  "airplay_window_title": "AirPlay",
+  "cast_pin_title": "Casten zonder het vertrouwde certificaat?",
+  "cast_pin_body": "{name} vertrouwt één certificaat voor {server}. Bij casten haalt de tv, Kodi of Apple TV de stream zelf op, zonder die controle, dus een ander certificaat daar valt niet op.",
+  "cast_pin_anyway": "Toch casten",
+  "phone_answer_there": "Beantwoord het op de computer."
 }

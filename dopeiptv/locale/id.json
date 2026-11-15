@@ -2232,5 +2232,9 @@
   "airplay_pick_window": "Klik tombol AirPlay di jendela AirPlay, lalu pilih Apple TV Anda.",
   "airplay_on_tv_window": "Diputar di Apple TV. Tombol AirPlay di jendela AirPlay memindahkannya ke yang lain.",
   "airplay_show_window": "Tampilkan jendela AirPlay",
-  "airplay_window_title": "AirPlay"
+  "airplay_window_title": "AirPlay",
+  "cast_pin_title": "Kirim tanpa sertifikat tepercaya?",
+  "cast_pin_body": "{name} hanya memercayai satu sertifikat untuk {server}. Saat mengirim, TV, Kodi, atau Apple TV mengambil siarannya sendiri tanpa pemeriksaan itu, jadi sertifikat lain di sana tidak akan ketahuan.",
+  "cast_pin_anyway": "Tetap kirim",
+  "phone_answer_there": "Jawab di komputer."
 }

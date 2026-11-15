@@ -2232,5 +2232,9 @@
   "airplay_pick_window": "انقر زر AirPlay في نافذة AirPlay واختر جهاز Apple TV.",
   "airplay_on_tv_window": "يُعرض على Apple TV. ينقله زر AirPlay في نافذة AirPlay إلى جهاز آخر.",
   "airplay_show_window": "إظهار نافذة AirPlay",
-  "airplay_window_title": "AirPlay"
+  "airplay_window_title": "AirPlay",
+  "cast_pin_title": "الإرسال دون الشهادة الموثوقة؟",
+  "cast_pin_body": "{name} يثق بشهادة واحدة لـ {server}. عند الإرسال يجلب التلفاز أو Kodi أو Apple TV البث بنفسه دون هذا التحقق، فلن يُلاحَظ وجود شهادة مختلفة هناك.",
+  "cast_pin_anyway": "أرسِل على أي حال",
+  "phone_answer_there": "أجب على الحاسوب."
 }

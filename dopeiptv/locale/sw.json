@@ -2232,5 +2232,9 @@
   "airplay_pick_window": "Bofya kitufe cha AirPlay kwenye dirisha la AirPlay kisha chagua Apple TV yako.",
   "airplay_on_tv_window": "Inacheza kwenye Apple TV. Kitufe cha AirPlay kwenye dirisha la AirPlay kinaihamishia nyingine.",
   "airplay_show_window": "Onyesha dirisha la AirPlay",
-  "airplay_window_title": "AirPlay"
+  "airplay_window_title": "AirPlay",
+  "cast_pin_title": "Kutuma bila cheti kinachoaminika?",
+  "cast_pin_body": "{name} kinaamini cheti kimoja tu cha {server}. Unapotuma, TV, Kodi au Apple TV huchukua mtiririko yenyewe bila ukaguzi huo, kwa hiyo cheti tofauti hapo hakingegunduliwa.",
+  "cast_pin_anyway": "Tuma hata hivyo",
+  "phone_answer_there": "Jibu kwenye kompyuta."
 }

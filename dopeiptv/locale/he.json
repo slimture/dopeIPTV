@@ -2232,5 +2232,9 @@
   "airplay_pick_window": "‏לחצו על כפתור ה-AirPlay בחלון AirPlay ובחרו את ה-Apple TV שלכם.",
   "airplay_on_tv_window": "‏מתנגן ב-Apple TV. כפתור ה-AirPlay בחלון AirPlay מעביר אותו למכשיר אחר.",
   "airplay_show_window": "‏הצגת חלון AirPlay",
-  "airplay_window_title": "AirPlay"
+  "airplay_window_title": "AirPlay",
+  "cast_pin_title": "להעביר בלי האישור המהימן?",
+  "cast_pin_body": "{name} סומך על אישור אחד בלבד עבור {server}. בהעברה, הטלוויזיה, Kodi או Apple TV מושכים את השידור בעצמם, בלי הבדיקה הזו, כך שאישור אחר שם לא יתגלה.",
+  "cast_pin_anyway": "להעביר בכל זאת",
+  "phone_answer_there": "ענו במחשב."
 }

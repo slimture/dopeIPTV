@@ -23,6 +23,10 @@ from .mw_remote import _Bridge
 ON_KEY = "phone_remote"
 TOKEN_KEY = "phone_remote_token"
 PORT_KEY = "phone_remote_port"
+#: How long after the phone asked for a channel what stops it is the phone's
+#: to hear, and how long its page then says it.
+PHONE_ASKED_S = 15.0
+PHONE_NOTE_S = 20.0
 #: Ports tried after the one used last: the default and the next few, then
 #: any the system gives.
 _PORTS = tuple(range(DEFAULT_PORT, DEFAULT_PORT + 10)) + (0,)
@@ -183,6 +187,7 @@ class _PhoneMixin:
             row = params.get("row") or {}
             if not self._chno_rows([row]):
                 raise ValueError("no such channel")
+            self._phone_asked()
             self._come_forward()
             self.play_live_channel(row)
             return {"ok": True}
@@ -197,6 +202,7 @@ class _PhoneMixin:
             self._remote_media("playpause" if action == "toggle" else "stop")
             return {"ok": True}
         if action in ("next", "previous"):
+            self._phone_asked()
             return {"ok": self._play_channel_step(1 if action == "next" else -1)}
         if action == "volume":
             try:
@@ -224,6 +230,35 @@ class _PhoneMixin:
         favs = [f.get("stream_id") for f in self._favorite_channels() if str(f.get("stream_id")) in here]
         return {"channels": listed, "favorites": favs, "_icons": icons}
 
+    # -- why a play the phone asked for did not start ------------------------------------
+
+    def _phone_asked(self) -> None:
+        """The phone asks for a channel: what stops it in the next moments
+        is told to its page (an earlier note goes)."""
+        self._phone_asked_at = time.monotonic()
+        self._phone_notice = None
+
+    def _phone_note(self, text: str) -> None:
+        """What stopped a play (the VPN guard, the connection question) -
+        on the phone's page too, when the phone asked for it just now."""
+        asked = getattr(self, "_phone_asked_at", None)
+        if not text or asked is None or time.monotonic() - asked > PHONE_ASKED_S:
+            return
+        p = getattr(self, "player", None)
+        self._phone_notice = (text, time.monotonic() + PHONE_NOTE_S, getattr(p, "current_url", None))
+
+    def _phone_note_now(self) -> str:
+        """The note while it stands: for a while, and only until something
+        else plays."""
+        n = getattr(self, "_phone_notice", None)
+        if n is None:
+            return ""
+        p = getattr(self, "player", None)
+        if time.monotonic() > n[1] or getattr(p, "current_url", None) != n[2]:
+            self._phone_notice = None
+            return ""
+        return n[0]
+
     def _phone_stamp(self) -> str:
         """Changes when the page should list the channels again: another
         source, a list fetched again, the favourites changed."""
@@ -241,6 +276,9 @@ class _PhoneMixin:
         now = time.time()
         out: dict[str, Any] = {"state": st["state"], "time": now, "volume": volume, "muted": muted,
                                "source": st.get("source") or "", "stamp": self._phone_stamp()}
+        note = self._phone_note_now()
+        if note:
+            out["note"] = note
         if st["state"] == "stopped":
             return out
         last = getattr(self, "_last_playback", None) or {}
