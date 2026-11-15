@@ -2,7 +2,7 @@
 <h2 id="kort">Kort sagt</h2>
 <ul>
 <li><strong>Appen sparar dina uppgifter på din dator.</strong> Dina källor, inloggningar, favoriter, din historik och dina inställningar stannar där. Appen har ingen analys eller telemetri, och du har inget konto hos oss.</li>
-<li><strong>Appen kontaktar oss bara när den har ett skäl:</strong> för att leta efter uppdateringar (det går att stänga av), när du själv skickar en felrapport eller feedback och – om du slår på det – för synkronisering av inställningar, som är krypterad så att vi inte kan läsa den.</li>
+<li><strong>Appen kontaktar oss bara när den har ett skäl:</strong> för att leta efter uppdateringar (det går att stänga av), när du själv skickar en felrapport eller feedback och – om du slår på det – för synkronisering av inställningar och för att titta tillsammans med vänner, båda krypterade så att vi inte kan läsa dem.</li>
 <li><strong>Webbplatsen räknar besök i egen statistik</strong>, utan kakor och utan externa analystjänster. Din IP-adress används för att räkna fram ett pseudonymt besökar-id och ett land. Den sparas inte i statistiken, och serverloggarna som innehåller den raderas efter kort tid.</li>
 <li><strong>Donationer:</strong> kortuppgifter går direkt till vår betalleverantör och aldrig till oss.</li>
 <li>Vi säljer inga personuppgifter, visar ingen reklam och använder inga spårare från andra företag.</li>
@@ -28,7 +28,7 @@
 
 <h2 id="ansvarig">1. Vem som ansvarar</h2>
 <p>Solecraft AB (org.nr 559601-3176), Mogatan 21, 702 13 Örebro, Sverige, är personuppgiftsansvarig för den behandling av personuppgifter som beskrivs här. Kontakta oss på <a href="mailto:info@solecraft.se">info@solecraft.se</a> – även när du vill använda dina rättigheter (avsnitt 10).</p>
-<p>Policyn gäller webbplatsen dopeiptv.org (den gamla adressen iptv.dope.rs skickar bara vidare dit), tjänsterna på den – donationer, feedback och felrapporter, synkronisering av inställningar och uppdateringar – och appen dopeIPTV så som vi ger ut den.</p>
+<p>Policyn gäller webbplatsen dopeiptv.org (den gamla adressen iptv.dope.rs skickar bara vidare dit), tjänsterna på den – donationer, feedback och felrapporter, synkronisering av inställningar, titta tillsammans och uppdateringar – och appen dopeIPTV så som vi ger ut den.</p>
 
 <h2 id="appen">2. Appen dopeIPTV</h2>
 <h3>Det som stannar på din dator</h3>
@@ -40,9 +40,10 @@
 <li><strong>Uppdateringar.</strong> En gång om dagen (var sjätte timme om du har valt testversioner) frågar appen dopeiptv.org vilken version som är den senaste, och en uppdatering som du installerar hämtas via dopeiptv.org. Anropet anger appens namn och version, operativsystem och processortyp – till exempel <code>dopeIPTV/1.5.0 (Linux; x86_64)</code> – och kommer, som alla anrop på internet, från din IP-adress. Vi räknar uppdateringar så som beskrivs i avsnitt 3. Om dopeiptv.org inte svarar frågar appen GitHub i stället. Du kan stänga av kontrollen i appens inställningar (<em>Sök efter uppdateringar vid start</em>).</li>
 <li><strong>Felrapporter och feedback</strong> skickas bara när du trycker på <em>Skicka</em>. Du ser hela rapporten först och kan ändra eller ta bort vad som helst i den. Innan du ser den har appen redan tagit bort webbadresser, IP- och MAC-adresser, e-postadresser, inloggningar och åtkomstnycklar, ditt användarnamn och din hemkatalog, dina källors namn, servrar och inloggningar, kanalnamn och titlar du har tittat på. Det som når oss är: typ av rapport (fel, krasch eller feedback), appens version, operativsystemets namn, texten, för feedback det ämne och område du valde, om appen har en supporternyckel (bara ”ja” – aldrig nyckeln) och, om du bad om svar, en hashsumma av en slumpad kod som bara din dator känner till. Vi rensar texten en gång till och sparar rapporten utan IP-adress och utan uppgifter om webbläsare. I 30 dagar frågar appen då och då om det finns ett svar och skickar då bara dessa hashsummor.</li>
 <li><strong>Synkronisering av inställningar</strong> (för supportrar, bara om du slår på den). Det du väljer att synka – favoriter, inställningar och, om du slår på dem, spellistor med inloggningar och tittarhistorik – krypteras på din dator med en nyckel som tas fram ur en synkkod som bara dina datorer känner till. Vår server sparar de krypterade uppgifterna under ett namn som också tas fram ur koden, tillsammans med ett versionsnummer och tidpunkten då de skrevs. Vi kan inte läsa dem och kan inte se vems de är. Varje anrop innehåller din supporternyckel så att servern kan kontrollera den; nyckeln kontrolleras och glöms sedan – den sparas aldrig och kopplas aldrig till dina uppgifter. Anrop för synkronisering loggas inte. Uppgifter som ingen har läst eller skrivit på 400 dagar raderas, och du kan själv radera dem i appen (<em>Sluta synka på den här datorn</em>, och radera också den synkade kopian).</li>
+<li><strong>Titta tillsammans</strong> (bara medan du är i ett rum). Appen håller din spelare i takt med dina vänners, och var och en spelar från sin egen källa. Vilka som är i rummet (namnet du väljer för det), vad som spelas och play, paus och spolning går mellan era datorer krypterat med en nyckel som tas fram ur rummets kod, som bara de som är i rummet känner till; vår server skickar bara de krypterade meddelandena vidare. Den ser rummet under ett namn som också tas fram ur koden, ett slumpat nummer för var och en i det, hur stora meddelandena är och när de skickas – inte vem du är, namnen eller vad du tittar på. Inget skrivs till disk: servern håller ett rums senaste meddelanden i minnet och glömmer rummet en timme efter det senaste anropet. Anrop för att titta tillsammans loggas inte. Det går inte att använda medan privat tittande är på.</li>
 <li><strong>Supporternyckeln</strong> kontrolleras i appen, utan uppkoppling. Inget skickas för att kontrollera den (utom vid synkronisering, ovan).</li>
 </ul>
-<p>Rättslig grund: vårt berättigade intresse av att leverera uppdateringar och veta hur många som installeras, och av att rätta de fel du rapporterar (artikel 6.1 f i dataskyddsförordningen); för synkronisering att tillhandahålla den tjänst du har bett om (artikel 6.1 b).</p>
+<p>Rättslig grund: vårt berättigade intresse av att leverera uppdateringar och veta hur många som installeras, och av att rätta de fel du rapporterar (artikel 6.1 f i dataskyddsförordningen); för synkronisering och titta tillsammans att tillhandahålla den tjänst du har bett om (artikel 6.1 b).</p>
 
 <h3>Tjänster som appen använder direkt</h3>
 <p>När du använder funktionerna nedan ansluter appen från din dator direkt till de här tjänsterna. Vi får inget av det, och varje tjänsts egna villkor och integritetspolicy gäller.</p>
@@ -63,9 +64,9 @@
 <h3>Serverloggar</h3>
 <p>För att kunna skicka en sida till dig behöver vår webbserver din IP-adress, och din webbläsare skickar dessutom sidans adress, tidpunkten, webbläsarens och systemets namn och version (user agent), sidan du kom från (referrer) och vilka språk du föredrar.</p>
 <ul>
-<li>Frontservern, som hanterar den krypterade anslutningen, för för drift och säkerhet en allmän teknisk logg över anrop och en logg över fel. De byts varje natt och sparas i högst 30 dagar, sedan tas de bort automatiskt. Anrop för synkronisering loggas aldrig.</li>
+<li>Frontservern, som hanterar den krypterade anslutningen, för för drift och säkerhet en allmän teknisk logg över anrop och en logg över fel. De byts varje natt och sparas i högst 30 dagar, sedan tas de bort automatiskt. Anrop för synkronisering och för att titta tillsammans loggas aldrig.</li>
 <li>För statistiken nedan för servern två separata loggar med IP-adress, tidpunkt, adress, status, referrer, webbläsare och språk: en över sidvisningar och sidornas visningssignal, som sparas i ungefär en vecka, och en över klick på nedladdningar, som roteras efter storlek och där de tio senaste delarna sparas.</li>
-<li>Tjänsterna bakom webbplatsen – donationer, feedback och synkronisering – håller IP-adresser bara i minnet, en kort stund, för att begränsa hur många anrop en adress kan göra.</li>
+<li>Tjänsterna bakom webbplatsen – donationer, feedback, synkronisering och titta tillsammans – håller IP-adresser bara i minnet, en kort stund, för att begränsa hur många anrop en adress kan göra.</li>
 </ul>
 <p>Rättslig grund: vårt berättigade intresse av att driva webbplatsen säkert (artikel 6.1 f).</p>
 
@@ -131,6 +132,7 @@
 <li>Besök i statistiken: 400 dagar, därefter anonyma. Besökar-id: 25 månader. Uppgifter om uppdateringar: 400 dagar.</li>
 <li>Felrapporter och feedback: 12 månader från att de skickades, sedan tas de bort automatiskt. De är utformade så att de inte pekar ut dig.</li>
 <li>Synkade data: tills du raderar dem, eller 400 dagar efter att de senast användes.</li>
+<li>Titta tillsammans: bara i minnet, tills en timme efter rummets senaste anrop.</li>
 <li>Uppgifter om donationer: hos betalleverantören enligt dess villkor, och i våra räkenskaper i sju år.</li>
 <li>E-post: så länge ärendet kräver.</li>
 <li>I din webbläsare: tills du rensar dem (språkkakan i ett år).</li>

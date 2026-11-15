@@ -24,6 +24,9 @@ device on the admin page (needs Python's cryptography package).
     GET/PUT/DELETE /sync/<slot>
                           settings sync for supporters (sync.py): ciphertext
                           kept per slot, the supporter key checked and forgotten
+    GET/POST/DELETE /together/<room>
+                          watch together (together.py): sealed messages passed
+                          between the people in a room, in memory only
 
 A donation comes with a supporter key for the app (supporter.py): shown on
 the page when the payment goes through, and behind a link in Stripe's
@@ -246,6 +249,9 @@ _LOCK = threading.Lock()
 WINDOW, PER_WINDOW = 600.0, 12
 FEEDBACK_PER_WINDOW = 20          # reports from one address in WINDOW (many can share one)
 SYNC_PER_WINDOW = 120             # sync requests from one address in WINDOW (a household's computers)
+# Watch together: a member asks every 25 s or so, and again for each message
+# the others send - a room of eight on one address stays well under this.
+TOGETHER_PER_WINDOW = 1200
 
 
 def _allowed(addr: str, most: int = PER_WINDOW) -> bool:
@@ -808,6 +814,8 @@ FEEDBACK_REPLIES = "/feedback/replies"
 FEEDBACK_EXPORT = "/feedback/export"
 # Settings sync for supporters (sync.py): GET, PUT and DELETE of one slot.
 SYNC = "/sync/"
+# Watch together (together.py): POST, GET (a long poll) and DELETE of a room.
+TOGETHER = "/together/"
 ACCOUNT = "/admin/account/"      # + an action: one's own sign-in, the other admins
 # Open to anyone (nginx asks nothing here either): the sign-in page and what
 # it needs, and the files a Home Screen app or the push worker fetch.
@@ -1307,20 +1315,72 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(503, {"error": "not stored"})
         return self._send(status, body)
 
+    def _together(self) -> None:
+        """Watch together's relay (together.py): a room's sealed messages,
+        in memory only. Neither the room, the member nor the address is
+        kept beyond memory or logged (the rate limit holds the address)."""
+        import together
+        path, _, query = self.path.partition("?")
+        room = path[len(TOGETHER):]
+        if not together.ROOM.match(room):
+            return self._send_quiet(404, {"error": "not found"})
+        member = (self.headers.get(together.MEMBER_HEADER) or "").strip().lower()
+        if not together.MEMBER.match(member):
+            return self._send_quiet(400, {"error": "member"})
+        addr = self.headers.get("X-Real-IP") or "local"
+        if not _allowed("tg:" + addr, TOGETHER_PER_WINDOW):
+            return self._send_quiet(429, {"error": "slow down"})
+        if self.command == "GET":
+            args = {k: v[0] for k, v in urllib.parse.parse_qs(query).items()}
+            try:
+                after = int(args.get("after", "0"))
+                wait = float(args.get("wait", "0"))
+            except ValueError:
+                return self._send_quiet(400, {"error": "after or wait"})
+            if wait != wait:                     # NaN
+                return self._send_quiet(400, {"error": "after or wait"})
+            return self._send_quiet(*together.RELAY.poll(room, member, after, wait, addr))
+        if self.command == "DELETE":
+            return self._send_quiet(*together.RELAY.leave(room, member))
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = -1
+        if length > together.MAX_MESSAGE:
+            self.close_connection = True
+            return self._send_quiet(413, {"error": "too big", "most": together.MAX_MESSAGE})
+        if length <= 0:
+            return self._send_quiet(400, {"error": "body"})
+        blob = self.rfile.read(length)
+        return self._send_quiet(*together.RELAY.post(room, member, blob))
+
+    def _send_quiet(self, status: int, body: dict) -> None:
+        """_send, for an answer whose asker may have gone meanwhile (a long
+        poll): a closed connection is no error worth a line in the log."""
+        try:
+            self._send(status, body)
+        except OSError:
+            self.close_connection = True
+
     def do_PUT(self) -> None:
         if self.path.split("?", 1)[0].startswith(SYNC):
             return self._sync()
         return self._send(404, {"error": "not found"})
 
     def do_DELETE(self) -> None:
-        if self.path.split("?", 1)[0].startswith(SYNC):
+        path = self.path.split("?", 1)[0]
+        if path.startswith(SYNC):
             return self._sync()
+        if path.startswith(TOGETHER):
+            return self._together()
         return self._send(404, {"error": "not found"})
 
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
         if path.startswith(SYNC):
             return self._sync()
+        if path.startswith(TOGETHER):
+            return self._together()
         if path == "/admin-session":
             # nginx's auth_request: a valid session cookie lets the browser
             # in without the password prompt, and names the admin.
@@ -1367,6 +1427,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = self.path.split("?", 1)[0]
+        if path.startswith(TOGETHER):
+            return self._together()
         if path.startswith(SIGN_IN):
             return self._sign_in(path[len(SIGN_IN):])
         if path in ADMIN_POST or path.startswith(ACCOUNT):
@@ -1433,6 +1495,14 @@ def _sync_cleanup() -> None:
                       file=sys.stderr, flush=True)
         except Exception as e:  # noqa: BLE001 - the cleanup keeps its schedule
             print(f"[donate] sync cleanup: {type(e).__name__}", file=sys.stderr, flush=True)
+        try:
+            import together
+            seen = together.RELAY.counts()
+            if seen["opened"]:
+                print(f"[donate] together: {seen['opened']} room(s) in the last day, "
+                      f"{seen['rooms']} open now", file=sys.stderr, flush=True)
+        except Exception as e:  # noqa: BLE001 - the cleanup keeps its schedule
+            print(f"[donate] together counts: {type(e).__name__}", file=sys.stderr, flush=True)
         try:
             import feedback
             gone = feedback.prune(_stats_dir())

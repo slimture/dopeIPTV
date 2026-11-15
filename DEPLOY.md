@@ -749,6 +749,46 @@ for 400 days is removed by the service once a day
 `curl -s -o /dev/null -w '%{http_code}\n' https://dopeiptv.org/sync/$(printf 'ab%.0s' $(seq 32))`
 answers `401` (no supporter key), not 404 or 502.
 
+## Watch together
+
+The app's "Watch together…" keeps friends' players in step, each playing
+from their own source: one starts a room and gets a short code
+(`K7PQ-M2XD`), the others join with it. The app makes from the code a room
+id and a key; every message - who is in the room, what plays, play, pause
+and seek - is encrypted on the sender's computer, and the service
+(donate/together.py, routes `/together/<room>` in donate.py) only passes
+the blobs on: POST one, GET the ones after a number (waiting up to 25 s
+for the next). It cannot read them and does not know whose they are.
+In memory only - nothing on disk, nothing logged but a daily count of
+rooms; at most 8 in a room, its last 300 messages (128 KB), a room
+forgotten after an hour without a request. A restart of the service
+forgets every room; the apps start over by themselves. nginx does not
+log /together/.
+
+1. The files and the service (jail):
+
+       cd ~/dopeiptv; git checkout website; git pull origin website
+       cp -R donate /usr/local/www/iptv/
+       service iptv_donate restart
+
+2. The content server (jail): the new `iptv_together` zone and the
+   `location ^~ /together/` block are in deploy/content-iptv.dope.rs.conf
+   (a read timeout longer than the 25 s a request waits, no buffering):
+
+       cp ~/dopeiptv/deploy/content-iptv.dope.rs.conf /usr/local/etc/nginx/conf.d/iptv.dope.rs.conf
+       nginx -t && service nginx reload
+
+3. The TLS-front proxy (`bastille console webproxy`): its own
+   `location ^~ /together/` block, now in deploy/proxy-dopeiptv.org.conf
+   (not logged, a 50 s read timeout, no buffering). Copy the block into
+   /usr/local/etc/nginx/conf.d/dopeiptv.org.conf (CONTENT_HOST as in the
+   file's other blocks), then `nginx -t && service nginx reload`.
+
+**Check** (jail): `python3 -m pytest donate/test_together.py` or
+`python3 donate/test_together.py` - all pass; then
+`curl -s -H 'X-Together-Member: 0123456789abcdef' "https://dopeiptv.org/together/$(printf 'ab%.0s' $(seq 32))?after=0&wait=0"`
+answers `{"seq": 0, "now": ..., "n": 1, "msgs": []}`, not 404 or 502.
+
 ## Feedback from the site's footer
 
 The footer's "Feedback" (nav.js, words in site/lang `fbs_*`, reusing the

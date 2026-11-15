@@ -2,7 +2,7 @@
 <h2 id="summary">In short</h2>
 <ul>
 <li><strong>The app keeps your data on your computer.</strong> Your sources, logins, favourites, history and settings stay there. The app has no analytics or telemetry, and you have no account with us.</li>
-<li><strong>The app only contacts us when it has a reason:</strong> to look for updates (you can turn this off), when you send an error report or feedback yourself and – if you turn it on – for settings sync, which is encrypted so that we cannot read it.</li>
+<li><strong>The app only contacts us when it has a reason:</strong> to look for updates (you can turn this off), when you send an error report or feedback yourself and – if you turn it on – for settings sync and for watching together with friends, both encrypted so that we cannot read them.</li>
 <li><strong>The website counts visits in its own statistics</strong>, without cookies and without outside analytics services. Your IP address is used to work out a pseudonymous visitor ID and a country. It is not stored in the statistics, and the server logs that contain it are deleted after a short time.</li>
 <li><strong>Donations:</strong> card details go straight to our payment provider and never to us.</li>
 <li>We do not sell personal data, show ads or use trackers from other companies.</li>
@@ -28,7 +28,7 @@
 
 <h2 id="controller">1. Who is responsible</h2>
 <p>Solecraft AB (company registration number 559601-3176), Mogatan 21, SE-702 13 Örebro, Sweden, is the controller for the processing of personal data described here. Contact us at <a href="mailto:info@solecraft.se">info@solecraft.se</a> – also when you want to use your rights (section 10).</p>
-<p>This policy covers the website dopeiptv.org (the old address iptv.dope.rs only forwards there), the services on it – donations, feedback and error reports, settings sync and updates – and the dopeIPTV app as we publish it.</p>
+<p>This policy covers the website dopeiptv.org (the old address iptv.dope.rs only forwards there), the services on it – donations, feedback and error reports, settings sync, watch together and updates – and the dopeIPTV app as we publish it.</p>
 
 <h2 id="app">2. The dopeIPTV app</h2>
 <h3>What stays on your computer</h3>
@@ -40,9 +40,10 @@
 <li><strong>Updates.</strong> Once a day (every six hours if you have chosen test builds) the app asks dopeiptv.org which version is the newest, and an update you install is downloaded through dopeiptv.org. The request names the app and its version, the operating system and the processor type – for example <code>dopeIPTV/1.5.0 (Linux; x86_64)</code> – and, like every request on the internet, comes from your IP address. We count updates as described in section 3. If dopeiptv.org does not answer, the app asks GitHub instead. You can turn the check off in the app's settings (<em>Check for updates on startup</em>).</li>
 <li><strong>Error reports and feedback</strong> are sent only when you press <em>Send</em>. You see the whole report first and can change or delete anything in it. Before you see it, the app has already removed web addresses, IP and MAC addresses, e-mail addresses, logins and access tokens, your user name and home folder, the names, servers and logins of your sources, channel names and the titles you have watched. What reaches us: the kind of report (error, crash or feedback), the app version, the name of the operating system, the text, for feedback the topic and area you chose, whether the app holds a supporter key (only “yes” – never the key) and, if you asked for an answer, a hash of a random code that only your computer knows. We clean the text once more and store the report without an IP address or browser details. For 30 days the app now and then asks whether there is an answer, sending only those hashes.</li>
 <li><strong>Settings sync</strong> (for supporters, only if you turn it on). What you choose to sync – favourites, settings and, if you turn them on, playlists with their logins and watch history – is encrypted on your computer with a key made from a sync code that only your computers know. Our server stores the encrypted data under a name that is also made from that code, with a version number and the time it was written. We cannot read it and cannot tell whose it is. Each request carries your supporter key so that the server can check it; the key is checked and then forgotten – it is never stored or linked to your data. Sync requests are not logged. Data that nobody has read or written for 400 days is deleted, and you can delete it yourself in the app (<em>Stop syncing on this computer</em>, then also delete the synced copy).</li>
+<li><strong>Watch together</strong> (only while you are in a room). The app keeps your player in step with your friends' players, each of you playing from your own source. Who is in the room (the name you choose for it), what plays and play, pause and seek go between your computers encrypted with a key made from the room code, which only the people in the room know; our server only passes the encrypted messages on. It sees the room under a name also made from the code, a random number for each person in it, how big the messages are and when they are sent – not who you are, the names or what you watch. Nothing is written to disk: the server keeps a room's latest messages in memory and forgets the room an hour after the last request. Watch together requests are not logged. It cannot be used while private viewing is on.</li>
 <li><strong>The supporter key</strong> is checked inside the app, offline. Nothing is sent to check it (except for sync, above).</li>
 </ul>
-<p>Legal basis: our legitimate interest in delivering updates and knowing how many are installed, and in fixing the problems you report (Article 6(1)(f) GDPR); for settings sync, providing the service you have asked for (Article 6(1)(b)).</p>
+<p>Legal basis: our legitimate interest in delivering updates and knowing how many are installed, and in fixing the problems you report (Article 6(1)(f) GDPR); for settings sync and watch together, providing the service you have asked for (Article 6(1)(b)).</p>
 
 <h3>Services the app uses directly</h3>
 <p>When you use the features below, the app connects from your computer straight to these services. We receive nothing from it, and each service's own terms and privacy policy apply.</p>
@@ -63,9 +64,9 @@
 <h3>Server logs</h3>
 <p>To send you a page, our web server needs your IP address, and your browser also sends the address of the page, the time, the name and version of your browser and system (the user agent), the page you came from (the referrer) and the languages you prefer.</p>
 <ul>
-<li>The front server, which handles the encrypted connection, keeps a general technical log of requests and a log of errors, for operation and security. They are rotated every night and kept for at most 30 days, then removed automatically. Settings sync requests are never logged.</li>
+<li>The front server, which handles the encrypted connection, keeps a general technical log of requests and a log of errors, for operation and security. They are rotated every night and kept for at most 30 days, then removed automatically. Settings sync and watch together requests are never logged.</li>
 <li>For the statistics below, the server keeps two separate logs with IP address, time, address, status, referrer, browser and language: one of page views and the pages' view signal, kept for about a week, and one of download clicks, which is rotated by size, the ten latest parts being kept.</li>
-<li>The services behind the website – donations, feedback and sync – keep IP addresses only in memory, briefly, to limit how many requests one address can make.</li>
+<li>The services behind the website – donations, feedback, sync and watch together – keep IP addresses only in memory, briefly, to limit how many requests one address can make.</li>
 </ul>
 <p>Legal basis: our legitimate interest in running the website securely (Article 6(1)(f)).</p>
 
@@ -131,6 +132,7 @@
 <li>Visits in the statistics: 400 days, then anonymous. Visitor IDs: 25 months. Update records: 400 days.</li>
 <li>Error reports and feedback: 12 months from when they were sent, then removed automatically. They are designed not to point to you.</li>
 <li>Synced data: until you delete it, or 400 days after it was last used.</li>
+<li>Watch together: in memory only, until an hour after the room's last request.</li>
 <li>Donation details: at the payment provider under its terms, and in our accounts for seven years.</li>
 <li>E-mail: as long as the matter needs.</li>
 <li>In your browser: until you clear it (the language cookie for a year).</li>
