@@ -264,6 +264,48 @@ def test_a_pin_is_four_digits_kept_hashed(tmp_path):
     assert not store.get(MAIN_ID).has_pin
 
 
+def test_a_pin_asked_over_the_network_cannot_be_guessed(tmp_path, monkeypatch):
+    # The phone remote, the remote API and Home Assistant switch to a
+    # profile with its PIN: four digits, so wrong ones are counted and the
+    # switch by PIN is refused for a while after a few - even the right PIN.
+    from dopeiptv.ui import mw_profiles
+    views, store, kid = _two(tmp_path)
+    profiles.activate(kid.id)
+    store.set_pin(MAIN_ID, "2468")
+    store.reload()
+    clock = [1000.0]
+    monkeypatch.setattr(mw_profiles.time, "monotonic", lambda: clock[0])
+
+    class W(mw_profiles._ProfilesMixin):
+        def __init__(self):
+            self.profiles = store
+            self.parental = type("P", (), {"has_pin": lambda s: False})()
+            self.switched: list[str] = []
+
+        def switch_profile(self, pid):
+            self.switched.append(pid)
+            return True
+
+        def _profile_close_picker(self):
+            pass
+
+        def _profile_state(self):
+            return {}
+
+    w = W()
+    with pytest.raises(ValueError, match="has a PIN"):
+        w._profile_switch_remote({"name": "Me"})        # none given: not a guess
+    for guess in ("0000", "1111", "2222", "3333", "4444"):
+        with pytest.raises(ValueError, match="has a PIN"):
+            w._profile_switch_remote({"name": "Me", "pin": guess})
+    with pytest.raises(ValueError, match="too many"):
+        w._profile_switch_remote({"name": "Me", "pin": "2468"})
+    assert w.switched == []
+    clock[0] += mw_profiles.REMOTE_PIN_SECS + 1
+    assert w._profile_switch_remote({"name": "Me", "pin": "2468"})["ok"] is True
+    assert w.switched == [MAIN_ID]
+
+
 def test_names_and_how_many(tmp_path):
     views, store, kid = _two(tmp_path)
     with pytest.raises(ValueError):

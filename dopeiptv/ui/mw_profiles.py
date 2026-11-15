@@ -8,6 +8,7 @@ remote, the remote API and Home Assistant see and switch it."""
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from PyQt6 import sip
@@ -21,6 +22,13 @@ from ..core.stores import (
     FavoriteStore, FollowedSeriesStore, HistoryStore, WatchedStore, WatchlistStore,
 )
 from ..i18n import tr
+
+#: Wrong PINs asked over the network (the phone remote, the remote API, Home
+#: Assistant) within REMOTE_PIN_SECS before a switch by PIN is refused until
+#: the oldest of them is that old: four digits are 10,000 guesses, which a
+#: script runs through in minutes.
+REMOTE_PIN_TRIES = 5
+REMOTE_PIN_SECS = 300.0
 
 
 class _ProfilesMixin:
@@ -373,9 +381,21 @@ class _ProfilesMixin:
         if p is None:
             raise ValueError("no such profile")
         if p.id != profiles.active_id() and p.has_pin:
+            now = time.monotonic()
+            fails = [t for t in (getattr(self, "_remote_pin_fails", None) or [])
+                     if now - t < REMOTE_PIN_SECS]
+            self._remote_pin_fails = fails
+            if len(fails) >= REMOTE_PIN_TRIES:
+                raise ValueError("too many wrong PINs - try again in a few minutes")
             pin = str(params.get("pin") or "")
             if not (pin and (p.verify(pin) or (self.parental.has_pin() and self.parental.verify(pin)))):
+                if pin:
+                    fails.append(now)
+                    if len(fails) >= REMOTE_PIN_TRIES:
+                        log.warning("profiles: %d wrong PINs over the network - a switch by PIN "
+                                    "is refused for a few minutes", len(fails))
                 raise ValueError("this profile has a PIN")
+            fails.clear()
         if not self.switch_profile(p.id):
             raise ValueError("profiles are not available")
         self._profile_close_picker()
