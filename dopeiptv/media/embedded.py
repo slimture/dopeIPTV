@@ -3421,7 +3421,9 @@ class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
         # window fills in, so the options button and the video right-click
         # both get it without this module learning what a Chromecast is.
         for label, action in (self.extra_options or []) if extras else []:
-            menu.addAction(label(), action)
+            text = label()
+            if text:            # "": not offered now (a Nerd entry, Nerd off)
+                menu.addAction(text, action)
 
     def _start_sleep_timer(self, minutes: int) -> None:
         """Stop playback after *minutes* (0 cancels a running timer)."""

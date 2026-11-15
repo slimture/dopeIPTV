@@ -178,6 +178,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
           health_store: Callable[[], Any] | None = None,
           numbers: Callable[[str, bool, Callable[[int], None]], None] | None = None,
           in_use: Callable[[Callable[[list[tuple[str, str]]], None]], None] | None = None,
+          analysis: Callable[[], None] | None = None,
           ) -> Callable[[Callable[[str, Any], None]], None]:
     """*page* is Nerd's own, Status: the switch, what is in Nerd, how it
     works. *pages* ("net", "boxes", "player", "serve", "diag") take the
@@ -196,7 +197,8 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     or "clear"; *done* gets how many have one now (-1: the list could not
     be read). *in_use(fill)*: what is in use now - the account's
     connections and each box's tuners - handed to *fill* as lines while
-    Diagnostics shows (ui/mw_connections.py)."""
+    Diagnostics shows (ui/mw_connections.py). *analysis*: opens the stream analysis of what plays (Settings
+    closes first, so the window sits beside the picture)."""
     n = _Defaults(settings)
     sub = pages or {}
 
@@ -805,6 +807,14 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     conn_btn.clicked.connect(test_connection)
     c.row(tr("ct_row"), conn_btn, tr("ct_row_hint"),
           search="connection test DNS TLS speed Mbit throughput ping")
+    # The stream that plays, packet by packet (core/ts_analysis.py): its
+    # window opens over the player, from the player's menu as well.
+    if analysis is not None:
+        tsa_btn = QPushButton(tr("tsa_open"))
+        tsa_btn.clicked.connect(lambda _c=False: analysis())
+        c.row(tr("tsa_row"), tsa_btn, tr("tsa_row_hint"),
+              search="TS analysis transport stream TR 101 290 PID PMT PCR jitter "
+                     "continuity CC errors bitrate scrambled")
 
     # -- diagnostics: stats over the video --------------------------------------------------
     c = at("diag").card(tr("nerd_card_view"))

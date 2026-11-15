@@ -78,6 +78,7 @@ from .mw_connections import _ConnectionsMixin
 from .mw_mirrors import _MirrorsMixin
 from .mw_portal_archive import _PortalArchiveMixin
 from .mw_health import _HealthMixin
+from .mw_ts_analysis import _TsAnalysisMixin
 from .mw_stream_info import _StreamInfoMixin
 from .mw_remote import _RemoteMixin
 from .mw_phone import _PhoneMixin
@@ -148,7 +149,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _MprisMixin,
                  _FollowMixin, _SubtitlesMixin, _CastMixin, _AirPlayMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
-                 _HealthMixin, _StreamInfoMixin, _ChannelPrefsMixin, _RemoteMixin, _PhoneMixin, _CalendarMixin,
+                 _HealthMixin, _TsAnalysisMixin, _StreamInfoMixin, _ChannelPrefsMixin, _RemoteMixin, _PhoneMixin, _CalendarMixin,
                  _EventsMixin, _ReportMixin,
                  _PortalArchiveMixin, _SeriesMixin, _SyncMixin,
                  _ConnectionsMixin, _MirrorsMixin, _TogetherMixin, _StatsMixin,
@@ -1388,6 +1389,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # does not need to know what a Chromecast is.
             self.player.extra_options = [
                 (lambda: tr("ctx_cast_to_chromecast"), self.cast_playing)]
+            # Nerd: the stream analysis of what plays (only while Nerd is
+            # on - an empty label leaves the entry out).
+            self.player.extra_options.append((self._tsa_menu_text, self.open_ts_analysis))
             # Subtitles from OpenSubtitles, and a subtitle loaded for a title
             # remembered for the next time it plays (mw_subtitles).
             self.player.find_subtitles = self._open_subtitle_search
@@ -6020,6 +6024,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.wake.release()
         self._stop_media_session()
         self._together_close()
+        self._tsa_quit()
         self._events_quit()
         self._discord_quit()
         self._remote_stop()

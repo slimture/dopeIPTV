@@ -111,6 +111,8 @@ class _ContextMenuMixin:
                         lambda it=it: self._remind_upcoming(it))
             # Nerd: how this channel has been playing (only while it counts).
             self._health_channel_menu(m, it)
+            # Nerd: the stream analysis, on the channel that plays.
+            self._tsa_channel_menu(m, it)
             # Nerd: the settings of this channel's own (audio, subtitles,
             # picture), marked when it has some.
             self._chanprefs_menu(m, it)

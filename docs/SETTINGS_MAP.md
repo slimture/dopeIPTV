@@ -212,7 +212,8 @@ while Nerd is on, and so are the link rows that lead to them.
 
 **Diagnostics** (`nerd_diag`)
 - (untitled): `nerd_log_level`, `nerd_log_file`, the log folder, the
-  diagnostics to copy, Test connection
+  diagnostics to copy, Test connection, Stream analysis (opens its window
+  over the player; Settings closes)
 - Stats for nerds: `nerd_overlay_more`
 - Stream health: `nerd_health`; the worst channels, clear
 - In use now (read-only, no key): the account's connections and each box

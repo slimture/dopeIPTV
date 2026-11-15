@@ -776,7 +776,9 @@ class _PopoutMixin:
             # menu's top level, not a second time in the submenu.
             p.populate_options_menu(opts, extras=False)
             for label, action in getattr(p, "extra_options", None) or []:
-                m.addAction(label(), action)
+                text = label()
+                if text:
+                    m.addAction(text, action)
         m.addSeparator()
         m.addAction(tr("tooltip_popout_exit"), self._exit_popout)
         exec_menu_over_video(m, global_pos)

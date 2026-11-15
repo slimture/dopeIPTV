@@ -432,8 +432,17 @@ Not decided: each needs a word with the maintainer first.
 - **Teletext and DVB subtitles** through ffmpeg/libzvbi: teletext pages
   (page 199 and the like in the Nordics) as subtitles, and a teletext
   viewer. Recordings keep them only as .ts (MP4 cannot carry them).
-- **TS analysis in Nerd**: PIDs and the PMT, bitrate per PID, continuity
-  errors, PCR jitter - a simple TR 101 290 for the stream that plays.
+- **TS analysis in Nerd**: in - `core/ts_analysis.py` with its window
+  (`ui/ts_analysis_dialog.py`, `ui/mw_ts_analysis.py`): "Stream analysis…"
+  in the player's options menu and the playing channel's menu while Nerd
+  is on, linked from Nerd > Diagnostics. PIDs and the PMT (types named),
+  the SDT's service, bitrate per PID, continuity errors, PCR interval and
+  jitter, priorities 1 and 2 of TR 101 290 by their names - read from the
+  app's own rewind buffer only (no second connection; HLS and the buffer
+  turned off are said plainly). Checked against streams made in the tests;
+  still to be seen on real streams: the PCR jitter against arrival (an
+  estimate - its 250 ms limit is a guess at what shows as stutter), an
+  MPTS from a box, and the CPU cap on a slow machine at high bitrates.
 - **Recordings compared between sources**: the same programme on two
   sources side by side (picture size, bitrate, drops), and the better one
   chosen - built on failover's matching.
