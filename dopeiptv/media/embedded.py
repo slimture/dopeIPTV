@@ -2725,10 +2725,14 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
             # Nerd: user agent, headers and proxy for this source (nothing
             # while Nerd is off and never was; the defaults back once it was).
             try:
-                from ..core import nerd
+                from ..core import live_latency, nerd
                 self._nerd_applied = nerd.apply_stream(
                     m, nerd.source(), getattr(self, "_nerd_applied", False),
-                    url=url)
+                    url=url, opened=source or url)
+                # Nerd: low latency for a live channel the player takes
+                # from the provider - not from the rewind buffer; anything
+                # else gets back what the last one changed.
+                live_latency.apply(m, live and source is None)
                 # Nerd: adaptive streams up to a picture size - the variant
                 # is chosen once mpv has opened the stream (core/hls_cap.py).
                 self._hls_cap = nerd.current().hls_cap()

@@ -637,6 +637,22 @@ class _SettingsMixin:
         except Exception as e:
             log.warning("nerd: player not updated: %s", e)
 
+    def _nerd_route_to_client(self) -> None:
+        """The active source's own route (core/net_route.py: own DNS, IP
+        version, a pinned certificate) onto its client's session, as the
+        Nerd page says now - or requests' own adapter back when it says
+        nothing (core/net_adapter.py)."""
+        from ..core import nerd, net_adapter, net_route
+        session = getattr(self.client, "session", None)
+        if session is None:
+            return
+        try:
+            route = net_route.route_for(nerd.source())
+            net_adapter.remount(session, route)
+            self.client.net_route = route
+        except Exception as e:
+            log.warning("nerd: the client's route not updated: %s", e)
+
     def _nerd_lists_rebuild(self) -> None:
         """Settings closed after a change to picons or udpxy: the channel
         list again, from the source (its cached copy carries the old logos
@@ -2365,6 +2381,9 @@ class _SettingsMixin:
                 nerd.install(self.settings)
                 # The player that is playing takes the change now.
                 self._nerd_to_player()
+                # The source's own route (own DNS, IP version): the client's
+                # next request takes it.
+                self._nerd_route_to_client()
                 if changed & {"nerd_enabled", "nerd_picon_dir", "nerd_picon_override", "nerd_udpxy"}:
                     self._nerd_lists_changed = True
                 if changed & {"nerd_enabled", "nerd_remote", "nerd_share", "nerd_remote_lan",

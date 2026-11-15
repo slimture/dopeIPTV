@@ -1792,7 +1792,10 @@ class RestoreBackupDialog(QDialog):
                      "rewrite": ("nerd_src_rewrite",),
                      "udpxy": ("nerd_card_udpxy",),
                      "catchup_template": ("nerd_src_catchup",),
-                     "backup_servers": ("nerd_src_mirrors",)}
+                     "backup_servers": ("nerd_src_mirrors",),
+                     "nerd_dns_url": ("nerd_card_dns", "nerd_dns_url"),
+                     "dns_url": ("nerd_card_dns", "nerd_dns_url"),
+                     "cert_pin": ("cert_row",)}
 
     @classmethod
     def _label(cls, key: str) -> str:

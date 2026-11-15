@@ -419,16 +419,25 @@ class Nerd:
             return []
         return [os.path.join(d, n) for n in names if n.endswith((".lua", ".js"))]
 
-    def stream_options(self, source: dict | None = None, url: str = "") -> dict[str, Any]:
+    def stream_options(self, source: dict | None = None, url: str = "",
+                       opened: str = "") -> dict[str, Any]:
         """Set before each stream opens: who the player says it is, extra
         headers, the proxy. With Nerd off: the app's own defaults, so a
-        stream after turning it off is as before."""
+        stream after turning it off is as before. *opened*: the address mpv
+        opens when it is not *url* (the rewind buffer's, on this computer)."""
         hdrs = self.headers(source)
         ref = hdrs.pop("Referer", "")
+        px = self.proxy(source, url) if self.flag("nerd_proxy_player", True) else ""
+        if not px and self.on:
+            # The source's own DNS, IP version or pinned certificate: the
+            # player through the bridge (core/net_bridge.py) - never where a
+            # proxy takes the stream, whose DNS that is.
+            from .net_bridge import address_for
+            px = address_for(source, opened or url, self)
         return {"user-agent": self.user_agent(source),
                 "http-header-fields": [f"{k}: {v}" for k, v in hdrs.items()],
                 "referrer": ref,
-                "http-proxy": self.proxy(source, url) if self.flag("nerd_proxy_player", True) else ""}
+                "http-proxy": px}
 
     # -- the VPN guard --------------------------------------------------------
 
@@ -521,6 +530,7 @@ def apply_options(mpv: Any, pairs: list[tuple[str, str]]) -> list[str]:
 # not take back (0 for "not set") is replaced by what that means.
 _before: dict[int, dict[str, Any]] = {}
 _UNSET_MEANS = {"demuxer-lavf-probesize": "5000000"}
+UNSET_MEANS = _UNSET_MEANS
 
 
 def _remember(mpv: Any, keys: list[str]) -> dict[str, Any]:
@@ -538,6 +548,18 @@ def _remember(mpv: Any, keys: list[str]) -> dict[str, Any]:
             except Exception:
                 saved[key] = None
     return saved
+
+
+def remember(mpv: Any, keys: list[str]) -> dict[str, Any]:
+    """Note what *mpv* has for *keys* before Nerd first sets them (a
+    per-stream overlay, core/live_latency.py, shares this with the core's
+    options: one record of what the core had)."""
+    return _remember(mpv, keys)
+
+
+def remembered(mpv: Any) -> dict[str, Any]:
+    """What *mpv* had before Nerd set each key (the record itself)."""
+    return _before.get(id(mpv), {})
 
 
 def apply_core(mpv: Any, picker: bool = True) -> list[str]:
@@ -591,14 +613,16 @@ def reapply_core(mpv: Any, picker: bool = True) -> dict[str, list[str]]:
     return {"set": took, "restored": restored}
 
 
-def apply_stream(mpv: Any, source: dict | None, was_applied: bool, url: str = "") -> bool:
+def apply_stream(mpv: Any, source: dict | None, was_applied: bool, url: str = "",
+                 opened: str = "") -> bool:
     """Before a stream opens: user agent, headers and proxy for its source.
     Nothing at all while Nerd is off and never was this session; once it
-    was, the defaults go back. Returns whether Nerd is in force."""
+    was, the defaults go back. Returns whether Nerd is in force. *opened*:
+    the address mpv opens, when not *url* (the rewind buffer's)."""
     n = current()
     if not n.on and not was_applied:
         return False
-    for key, value in n.stream_options(source, url).items():
+    for key, value in n.stream_options(source, url, opened).items():
         try:
             mpv[key] = value
         except Exception as e:

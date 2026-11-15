@@ -20,7 +20,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
-from ..core._lazy_requests import requests
 from PyQt6.QtCore import QStandardPaths
 
 from ..core.log import log
@@ -519,6 +518,12 @@ class XmltvGuide:
             return getattr(self.client, "epg_url", "") or ""
         return ""
 
+    def _get(self, url: str, **kw: Any) -> Any:
+        """A guide's GET on the source's route (Nerd: its own DNS, IP
+        version, pinned certificate); requests.get while that is off."""
+        from ..core.net_adapter import getter
+        return getter(getattr(self.client, "net_route", None))(url, **kw)
+
     def _download(self) -> bytes:
         url = self._effective_url()
         own = getattr(self.client, "own_guide", None)
@@ -535,7 +540,7 @@ class XmltvGuide:
         if len(urls) > 1:
             return self._download_many(urls)
         if url:
-            r = requests.get(url, stream=True, timeout=(20, 300))
+            r = self._get(url, stream=True, timeout=(20, 300))
         elif hasattr(self.client, "epg_url"):
             # An M3U/offline client with no guide URL: there is no Xtream
             # xmltv.php endpoint to fall back to, so report "no EPG" cleanly.
@@ -581,7 +586,7 @@ class XmltvGuide:
         parts: list[bytes] = []
         for i, u in enumerate(urls):
             try:
-                r = requests.get(u, timeout=(20, 300))
+                r = self._get(u, timeout=(20, 300))
                 r.raise_for_status()
                 data = r.content
                 if data[:2] == b"\x1f\x8b":

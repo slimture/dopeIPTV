@@ -91,6 +91,11 @@ class SourceNerdPanel(QWidget):
         self.form.setContentsMargins(0, 4, 0, 0)
         self.form.setSpacing(8)
         lay.addWidget(self.body)
+        # The source's own DNS, IP version and trusted certificate
+        # (ui/source_net.py), folded with the rest.
+        from .source_net import SourceNetOptions
+        self.net = SourceNetOptions(self._options, self._source_now, self, proxy=self._proxy_now)
+        lay.addWidget(self.net)
         o = self._options
         self.ua = QComboBox()
         self.ua.addItem(tr("nerd_src_inherit"), "")
@@ -205,6 +210,8 @@ class SourceNerdPanel(QWidget):
 
     def _fold(self, open_: bool) -> None:
         self.body.setVisible(open_)
+        self.net.setVisible(open_)
+        self.net.align_with(self.form)
         self.toggle.setText(tr("nerd_src_title") + ("  ▾" if open_ else "  ▸"))
         self._shown()
 
@@ -250,6 +257,7 @@ class SourceNerdPanel(QWidget):
             box.setChecked(_flag(self._options, key, default))
             self.form.addRow("", box)
             self.switches[key] = box
+        self.net.align_with(self.form)
 
     def values(self) -> dict[str, Any]:
         """The source's options: what was there, with these set (and a
@@ -299,6 +307,15 @@ class SourceNerdPanel(QWidget):
             on = self.switches[key].isChecked()
             if on != default:
                 out[key] = on
+        return self._with_net(out)
+
+    # -- the source's own network (ui/source_net.py) -------------------------------
+
+    def _with_net(self, out: dict[str, Any]) -> dict[str, Any]:
+        from .source_net import KEYS
+        for key in KEYS:
+            out.pop(key, None)
+        out.update(self.net.values())
         return out
 
     # -- the connection test --------------------------------------------------------
@@ -362,6 +379,13 @@ class SourceNerdPanel(QWidget):
             return mirrors.check_each(addrs, kind, src, in_use, ua, hdrs, px, secrets)
         return run
 
+    def _proxy_now(self) -> str:
+        """The proxy this source's requests take (its own, else the Nerd
+        page's): with one, the proxy looks names up."""
+        px = self.proxy.currentData()
+        px = self.proxy_custom.text().strip() if px == "custom" else px
+        return nerd.current().proxy({"proxy": px or "", "_kind": self._kind})
+
     # -- catch-up ----------------------------------------------------------------
 
     def _cu_mode_shown(self, *_a) -> None:
@@ -381,6 +405,7 @@ class SourceNerdPanel(QWidget):
         self._cu_gen += 1
         self.cu_line.changed()
         self._rw_source_changed()
+        self.net.source_changed()
 
     def _cu_example(self) -> dict:
         """A made-up channel of this source, until Test has found a real one:

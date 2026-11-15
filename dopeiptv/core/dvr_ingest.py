@@ -108,7 +108,9 @@ class Ingest:
         # wants digest, which requests alone never sends); the Nerd page's
         # user agent, headers and proxy apply as they do for the player -
         # the proxy only while "streams through the proxy too" is on.
-        from . import nerd
+        # The source's own route (own DNS, IP version, a pinned
+        # certificate) as the app's other requests have it.
+        from . import nerd, net_route
         from .http_login import get_with_login
         n = nerd.current()
         if n.on:
@@ -120,6 +122,10 @@ class Ingest:
             px = n.proxy(src, url) if n.flag("nerd_proxy_player", True) else ""
             if px:
                 kw["proxies"] = {"http": px, "https": px}
+            route = net_route.route_for(src, n)
+            if route.active:
+                from .net_adapter import session_for
+                return get_with_login(url, session_for(route).get, **kw)
         return get_with_login(url, **kw)
 
     def start(self) -> None:

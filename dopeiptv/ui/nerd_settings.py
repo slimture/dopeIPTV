@@ -71,12 +71,12 @@ PARTS = ("net", "boxes", "lists", "player", "rec", "serve")
 PART_KEYS = {
     "net": ("nerd_user_agent", "nerd_referer", "nerd_headers", "nerd_proxy", "nerd_proxy_player",
             "nerd_ip_family", "nerd_net_timeout", "nerd_reconnect_max", "nerd_vpn_guard",
-            "nerd_vpn_iface", "nerd_vpn_lan"),
+            "nerd_vpn_iface", "nerd_vpn_lan", "nerd_dns", "nerd_dns_url", "nerd_dns_fallback"),
     "lists": ("nerd_picon_dir", "nerd_picon_override", "nerd_udpxy", "nerd_failover", "nerd_health",
               "nerd_numbers_keep"),
     "player": ("nerd_spdif", "nerd_video_sync", "nerd_interpolation", "nerd_probe", "nerd_demux_max_mb",
                "nerd_mpv_config_dir", "nerd_shaders", "nerd_mpv_options", "nerd_adelay_per_channel",
-               "nerd_hls_quality", "nerd_hls_max_kbps"),
+               "nerd_hls_quality", "nerd_hls_max_kbps", "nerd_low_latency"),
     "rec": ("nerd_rec_template", "nerd_rec_post"),
     "serve": ("nerd_remote", "nerd_share", "nerd_remote_lan", "nerd_remote_port", "nerd_hooks",
               "nerd_hooks_urls", "nerd_mqtt", "nerd_mqtt_host", "nerd_mqtt_port", "nerd_mqtt_tls",
@@ -331,6 +331,10 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     c.row(tr("nerd_reconnect"), recon, tr("nerd_reconnect_hint"))
     c.note(tr("nerd_applies_conn"))
 
+    # -- network: own DNS (ui/net_advanced.py) ----------------------------------------------
+    from . import net_advanced
+    dns_values = net_advanced.dns_card(at("net"), n, lines, src, proxy_now)
+
     # -- network: the VPN guard ------------------------------------------------------------
     c = at("net").card(tr("nerd_card_vpn"))
     guard = c.toggle(tr("nerd_vpn_guard"), n.flag("nerd_vpn_guard"), tr("nerd_vpn_guard_hint"))
@@ -566,6 +570,9 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     c.row(tr("nerd_cache"), cache, tr("nerd_cache_hint"), search="demuxer-max-bytes")
     adelay = c.toggle(tr("nerd_adelay"), n.flag("nerd_adelay_per_channel", True), tr("nerd_adelay_hint"))
     c.note(tr("nerd_applies_stream"))
+
+    # -- the player: low latency for live (ui/net_advanced.py) ------------------------------------
+    latency_values = net_advanced.latency_card(at("player"), n, lines, throwaway_mpv)
 
     # -- the player: adaptive streams (HLS) ------------------------------------------------------
     from ..core import hls_cap
@@ -870,6 +877,8 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
         put("nerd_remote_port", port.value())
         put("nerd_remote_token", token.text().strip())
         out.update(hooks())
+        out.update(dns_values())
+        out.update(latency_values())
         return out
 
     # Off: the switch and what Nerd holds, nothing else. On: all of it - on
@@ -1254,14 +1263,15 @@ def diagnostics(settings: Any) -> str:
             "nerd_interpolation", "nerd_probe", "nerd_demux_max_mb", "nerd_log_level", "nerd_vpn_guard",
             "nerd_vpn_lan", "nerd_proxy_player", "nerd_failover", "nerd_health", "nerd_remote", "nerd_share",
             "nerd_remote_lan", "nerd_remote_port", "nerd_hls_quality", "nerd_hls_max_kbps",
-            "nerd_hooks", "nerd_mqtt", "nerd_mqtt_port", "nerd_mqtt_tls", "nerd_mqtt_ha"}
+            "nerd_hooks", "nerd_mqtt", "nerd_mqtt_port", "nerd_mqtt_tls", "nerd_mqtt_ha",
+            "nerd_dns", "nerd_dns_fallback", "nerd_low_latency"}
     for key in sorted(safe):
         v = n.get(key)
         if v:
             lines.append(f"  {key} = {v}")
     for key in ("nerd_user_agent", "nerd_referer", "nerd_headers", "nerd_proxy", "nerd_mpv_options",
                 "nerd_mpv_config_dir", "nerd_shaders", "nerd_vpn_iface", "nerd_hooks_urls",
-                "nerd_hooks_header", "nerd_mqtt_host", "nerd_mqtt_user", "nerd_mqtt_pass"):
+                "nerd_hooks_header", "nerd_mqtt_host", "nerd_mqtt_user", "nerd_mqtt_pass", "nerd_dns_url"):
         if n.get(key):
             lines.append(f"  {key} = (set)")
     up = nerd.vpn_interfaces()

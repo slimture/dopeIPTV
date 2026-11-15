@@ -85,6 +85,12 @@ map and the one-way import rule.
 | `core/channel_numbers.py` | Nerd: channel numbers of the user's own per source (`nerd_chno_<source id>`), numbering in list order, a number's channel; they win over the source's `num` |
 | `core/channel_prefs.py` | Nerd: settings of a channel's own (`nerd_channel_prefs`, by source + stream id): audio/subtitle language, deinterlace, aspect, audio delay (the old `nerd_adelay/` keys move in on read); what each sets in mpv; applied only while Nerd is on |
 | `core/shortcut_keys.py` | Keyboard shortcuts: the rebindable actions and the app's keys, the user's over them always (`keyboard_shortcuts`, portable text), never two actions on one key, the keys the app keeps, the old editor's keys carried over |
+| `core/doh.py` | Nerd's own DNS: names looked up over HTTPS (RFC 8484 wire format, or the JSON API), the presets by IP (Cloudflare, Quad9, Google), answers kept for their TTL |
+| `core/net_route.py` | A source's own way onto the network (`Route`): its DNS, IP version (per source: IPv4 / IPv6 only, prefer IPv6) and pinned certificate from its options and the Nerd page; `open_connection` as it says (home names and proxies left to the system); its checks |
+| `core/net_adapter.py` | The app's own requests on a source's route: a requests adapter that connects to the address own DNS gives under the request's name (Host, SNI, certificate check unchanged) and checks a pinned certificate by fingerprint; mounted by `make_client`, used by the guide, logos and the rewind buffer |
+| `core/net_bridge.py` | The player's and recordings' way onto a route: a loopback proxy (CONNECT for https, so ffmpeg keeps the stream's name for TLS) that looks names up as the route says and checks a pinned certificate before a tunnel opens |
+| `core/cert_pin.py` | Trusting one certificate for one source: read without trusting (a DER reader of its own), subject / issuer / expiry / SHA-256, the pin in the source's options, a changed one noted for the window (`PinMismatch`, `mismatch`); its check |
+| `core/live_latency.py` | Nerd's low latency for live: smaller buffer, quick probe, HLS from the newest segment - set before a live channel from the provider opens, put back before anything else (never the rewind buffer, catch-up, recordings, films); its check |
 | `core/nerd_check.py` | Does a Nerd setting work? Each tried for real (proxy, user agent, IP version, udpxy, picons, mpv folder, shaders, mpv options, VPN), no secrets in what it shows |
 | `core/http_login.py` | `get_with_login`: a login in a stream's address answered as the server asks (basic or digest) |
 | `core/commands.py` | What the app is asked from outside: `--play`, `--channel`, `dopeiptv://` links |
@@ -128,6 +134,9 @@ map and the one-way import rule.
 | `ui/box_finder.py` | Box kinds in the add-a-source forms and the "Find on my network" button |
 | `ui/nerd_settings.py` | Nerd in Settings: its own page (switch, how it works, diagnostics) and the five pages under NERD while it is on |
 | `ui/source_nerd.py` | A source's own Nerd options in the Add/Edit source dialog |
+| `ui/net_advanced.py` | Nerd's Own DNS card (Network page) and Low latency card (Player page), each with its check line |
+| `ui/source_net.py` | A source's own DNS, IP version and trusted certificate in its Nerd options, each with a Test |
+| `ui/cert_trust.py` | The window that shows a certificate before it is trusted, and the offer to review a pinned source's changed one (`offer_review`) |
 | `ui/rewrite_rules.py` | The rewrite rules' rows in a source's Nerd options (find, replace, regex switch, up, remove) |
 | `ui/shortcuts.py` | The Keyboard shortcuts card (Settings > Advanced, for everyone): each key a button that records the next combination, ✕ / ↺ / reset all, who lost a key and why one is refused said plainly |
 | `ui/nerd_check_line.py` | The ✓ / ! / ✗ line under a Nerd setting, its Test button and Details (the app's problem window) |
@@ -262,7 +271,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
   epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log,
-  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, connections, mirrors, conn_test, health, nerd, nerd_lists, channel_numbers, shortcut_keys, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, catchup, url_rewrite, hls_cap, remote_api, events, mqtt, report, supporter, sync, chacha20poly1305, backup) and `services/` (failover, share, resume,
+  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, connections, mirrors, conn_test, health, nerd, nerd_lists, channel_numbers, shortcut_keys, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, catchup, url_rewrite, hls_cap, remote_api, events, mqtt, report, supporter, sync, chacha20poly1305, backup, doh, cert_pin, net_route, net_adapter, net_bridge, live_latency) and `services/` (failover, share, resume,
   coverart, reminders, mpris, media_session, media_macos, media_windows, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list

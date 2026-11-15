@@ -2280,6 +2280,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         def fail(msg):
             self._hide_busy()
             self._set_status("")
+            # Nerd: its pinned server showed another certificate - said
+            # plainly, with the new one to look at (ui/cert_trust.py).
+            from .cert_trust import offer_review
+            if offer_review(self, self.playlist_store, pl, self.switch_playlist):
+                return
             QMessageBox.warning(
                 self, tr("playlist_msg_title"),
                 tr("msg_could_not_connect", name=pl['name'], msg=msg))

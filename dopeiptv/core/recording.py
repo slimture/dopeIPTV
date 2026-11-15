@@ -553,9 +553,11 @@ class RecordingManager(QObject):
             return
         secs = (max(1, int(j["stop"] - time.time()))
                 if j.get("stop") else None)
+        bridge = self._bridge(j)
         if kind == "ffmpeg":
             cmd = [exe, "-y", "-loglevel", "error",
-                   *self._input_options(j["url"]), "-i", j["url"],
+                   *self._input_options(j["url"]),
+                   *(["-http_proxy", bridge] if bridge else []), "-i", j["url"],
                    "-c", "copy"]
             if secs:
                 cmd += ["-t", str(secs)]
@@ -563,6 +565,8 @@ class RecordingManager(QObject):
         else:
             cmd = [exe, j["url"], f"--stream-record={path}", "--vo=null",
                    "--ao=null", "--no-terminal", f"--user-agent={RECORD_UA}"]
+            if bridge:
+                cmd.append(f"--http-proxy={bridge}")
             if secs:
                 cmd.append(f"--length={secs}")
         try:
@@ -577,6 +581,27 @@ class RecordingManager(QObject):
         except Exception as e:
             j["status"] = "failed"
             j["error"] = str(e)
+
+    def _bridge(self, j: dict) -> str:
+        """Nerd: the bridge (core/net_bridge.py) a recording connects
+        through when its source's own DNS, IP version or pinned certificate
+        asks for one - the source it was made from, else the one playing;
+        "" otherwise (and always while Nerd is off)."""
+        from . import nerd, net_bridge
+        if not nerd.current().on:
+            return ""
+        src = nerd.source()
+        pid = str(j.get("source") or "")
+        if pid:
+            try:
+                from .stores import PlaylistStore
+                pl = PlaylistStore(self.settings).get(pid)
+            except Exception as e:
+                log.debug("record: no source %s for its route: %s", pid, e)
+                pl = None
+            if pl:
+                src = dict(pl.get("options") or {}, _kind=pl.get("kind") or "xtream")
+        return net_bridge.address_for(src, str(j.get("url") or ""))
 
     @staticmethod
     def _input_options(url: str) -> list[str]:

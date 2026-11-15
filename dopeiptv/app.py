@@ -478,6 +478,11 @@ def main() -> int:
     # soon as the server answers (or from the on-disk list/EPG caches), and
     # a genuine credential rejection surfaces as an in-window warning that
     # points at Settings -> Playlists.
+    # Nerd's profile before the first client is made (the window installs it
+    # again): its user agent, headers and proxy, and the source's own route -
+    # own DNS, a pinned certificate - are on that client from the start.
+    from .core import nerd
+    nerd.install(settings)
     pl = store.active()
     welcome = pl is None
     if welcome:
@@ -530,6 +535,11 @@ def main() -> int:
                 QTimer.singleShot(500, _check_auth)
                 return
             e = auth_err[0]
+            # Nerd: the source's pinned server showed another certificate.
+            if e is not None:
+                from .ui.cert_trust import offer_review
+                if offer_review(w, store, pl, w.switch_playlist):
+                    return
             # Only a real credential rejection deserves a dialog; network
             # failures already surface through the list-load error paths and
             # recover by themselves (cooldown + caches).

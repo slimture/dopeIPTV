@@ -115,6 +115,36 @@ Two ways to rewind a live channel:
    is `media/dvr_player.py`; the bar (DVR | TIMESHIFT) is
    `media/rewind_bar.py`.
 
+## A source's own network (Nerd: own DNS, IP version, pinned certificate)
+
+All three are a `Route` (`core/net_route.py`), inactive - and changing
+nothing - while Nerd is off or nothing is set.
+
+- **The app's own requests** (API, guide, logos, the rewind buffer's
+  connection) go through `core/net_adapter.py`: a requests adapter whose
+  urllib3 connections resolve the host as the route says and connect to that
+  address, while Host, SNI and the certificate check stay the name's. A
+  pinned certificate is checked by its SHA-256 on its host and port only
+  (chain not asked, fingerprint compared after the handshake); verification
+  is never switched off anywhere else. Through a proxy, the proxy resolves.
+- **The player and recordings** (mpv, ffmpeg) go through
+  `core/net_bridge.py`, a loopback proxy set as `http-proxy` /
+  `-http_proxy`. Putting the IP in the address with a Host header would work
+  for plain http only: ffmpeg takes the TLS server name from the address, so
+  an https stream would send no SNI and a CDN would refuse it, and a
+  redirect or a playlist segment on another host would get the wrong Host.
+  Through a proxy, ffmpeg asks `CONNECT host:port` for https and does TLS
+  itself (name intact); plain http comes as an absolute address, sent on
+  with `Connection: close` so every request is resolved for its own host.
+  mpv does not check certificates (`tls-verify` is off by default), so for a
+  pinned source the bridge makes a TLS connection of its own before it opens
+  a tunnel and refuses it when the fingerprint differs (rechecked every
+  ten minutes).
+- **Not covered**: rtmp / rtsp / udp streams and multiview cells use the
+  system's resolver; names only the home network knows are never sent to a
+  public DNS; a custom DoH server's own name is resolved by the system (the
+  presets are addressed by IP).
+
 ## Home
 
 `ui/mw_home.py` builds the page; `ui/home_widgets.py` draws it (featured

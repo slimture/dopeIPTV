@@ -106,11 +106,13 @@ _PATHS = {"recordings_dir": "dir", "local_open_dir": "dir",
 #: names only (a value may be a token).
 RISKY = ("nerd_rec_post", "nerd_mpv_options", "nerd_mpv_config_dir", "nerd_proxy",
          "nerd_headers", "nerd_udpxy", "nerd_hooks_urls", "nerd_hooks_header",
-         "nerd_mqtt_host")
+         "nerd_mqtt_host", "nerd_dns_url")
 #: Switches that let others in or send out what is played: shown when on.
 RISKY_ON = ("nerd_remote", "nerd_share")
-#: A playlist's own options that do the same for its connections.
-RISKY_SOURCE = ("proxy", "headers", "rewrite", "udpxy", "catchup_template", "backup_servers")
+#: A playlist's own options that do the same for its connections (its
+#: backup addresses, a certificate trusted for it, its own DNS server).
+RISKY_SOURCE = ("proxy", "headers", "rewrite", "udpxy", "catchup_template",
+                "backup_servers", "dns_url", "cert_pin")
 _HEADERS = frozenset({"nerd_headers", "nerd_hooks_header", "headers"})
 _HEADER_NAME = re.compile(r"^\s*([A-Za-z0-9!#$%&'*+.^_`|~-]+)\s*[:=]")
 #: The kinds a summary counts, by the file that holds them.

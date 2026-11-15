@@ -1003,14 +1003,24 @@ def make_box_client(playlist: dict):
 
 def make_client(playlist: dict):
     """The client for *playlist* (see _make_client), with the Nerd page's
-    user agent, headers and proxy on its session."""
+    user agent, headers and proxy on its session - and the source's own
+    route (core/net_route.py: own DNS, IP version, a pinned certificate)
+    under it, which its guide download takes too (client.net_route)."""
     client = _make_client(playlist)
-    from ..core import nerd
+    from ..core import nerd, net_route
     source = dict((playlist or {}).get("options") or {},
                   _kind=(playlist or {}).get("kind") or "xtream")
+    route = net_route.route_for(source)
     session = getattr(client, "session", None)
     if session is not None:
         nerd.current().apply_session(session, source)
+        if route.active:
+            from ..core import net_adapter
+            net_adapter.mount(session, route)
+    try:
+        client.net_route = route
+    except AttributeError:
+        pass
     _use_mirrors(client, playlist or {})
     _nerd_lists(client, source, (playlist or {}).get("id"))
     return client
