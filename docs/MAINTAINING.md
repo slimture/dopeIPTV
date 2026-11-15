@@ -318,8 +318,11 @@ tests check that placeholders line up and that every `tr("…")` key exists.
 - **Flatpak** is built but not on Flathub (`packaging/flatpak/FLATHUB.md`
   has what a submission needs); its build leg is experimental.
 - **AirPlay** is macOS only (AVFoundation and AVKit; tvOS broke the API
-  other senders use) and has not been tried on a real Mac and Apple TV
-  yet - `docs/DEVELOPER_NOTES.md` says how it works.
+  other senders use). It plays on a real Apple TV through the bridge
+  (checked from a checkout, November 2026); the packaged app's direct way
+  (the provider's http HLS, allowed by NSAllowsArbitraryLoadsForMedia) is
+  still to be seen on a real Mac - `docs/DEVELOPER_NOTES.md` says how it
+  works.
 - Windows code signing (see above).
 - On the website, a few Serbian strings are in Cyrillic while the rest of
   the Serbian page is Latin.
