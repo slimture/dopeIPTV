@@ -18,7 +18,7 @@ class _RemindersMixin:
     def _add_reminder(self, ch: dict, p: dict) -> None:
         """Set an EPG reminder for a future programme."""
         self.reminders.add(ch, p.get("title"), p.get("start_timestamp"),
-                           p.get("stop_timestamp"))
+                           stop=p.get("stop_timestamp"))
         self._show_toast(
             tr("reminder_set", title=p.get("title") or ch.get("name") or ""),
             4000)
