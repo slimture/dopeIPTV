@@ -772,9 +772,11 @@ class _PopoutMixin:
                         p.toggle_pause)
             m.addAction(tr("btn_stop"), p.stop)
             opts = m.addMenu(tr("tooltip_audio_subs_aspect"))
-            p.populate_options_menu(opts)
-            if self.can_cast_playing():
-                m.addAction(tr("ctx_cast_to_chromecast"), self.cast_playing)
+            # The window's own entries (casting, Watch together) at this
+            # menu's top level, not a second time in the submenu.
+            p.populate_options_menu(opts, extras=False)
+            for label, action in getattr(p, "extra_options", None) or []:
+                m.addAction(label(), action)
         m.addSeparator()
         m.addAction(tr("tooltip_popout_exit"), self._exit_popout)
         exec_menu_over_video(m, global_pos)

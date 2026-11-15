@@ -3121,10 +3121,12 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
             menu.winId()
         menu.exec(anchor.mapToGlobal(anchor.rect().bottomLeft()))
 
-    def populate_options_menu(self, menu) -> None:
+    def populate_options_menu(self, menu, extras: bool = True) -> None:
         """Fill *menu* with the full playback options (audio/subtitle tracks,
         delay, aspect, video filters, buffer, sleep timer, stats). Shared by the
-        options button and the video right-click menu."""
+        options button and the video right-click menu. *extras*: the window's
+        own entries (casting, Watch together) at the end - left out by a menu
+        that puts them at its own top level."""
         m = self.video.mpv
 
         def tracks(kind):
@@ -3308,7 +3310,7 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         # knowing about - casting, today. A list of (label, callback) the
         # window fills in, so the options button and the video right-click
         # both get it without this module learning what a Chromecast is.
-        for label, action in (self.extra_options or []):
+        for label, action in (self.extra_options or []) if extras else []:
             menu.addAction(label(), action)
 
     def _start_sleep_timer(self, minutes: int) -> None:

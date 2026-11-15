@@ -1375,9 +1375,8 @@ class _MultiviewMixin:
         menu.addSeparator()
         p.populate_options_menu(menu)
         menu.addSeparator()
+        # Casting and Watch together come once, with the options above.
         menu.addAction(tr("mv_add"), self._send_docked_to_multiview)
-        if self.can_cast_playing():
-            menu.addAction(tr("ctx_cast_to_chromecast"), self.cast_playing)
         exec_menu_over_video(menu, global_pos)
 
     def _send_docked_to_multiview(self) -> None:
