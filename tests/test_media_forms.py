@@ -24,6 +24,7 @@ from dopeiptv.ui.box_finder import FindOnNetwork  # noqa: E402
 from dopeiptv.ui.dialogs import PlaylistDialog  # noqa: E402
 from dopeiptv.ui.mw_media import _MediaServerMixin  # noqa: E402
 from dopeiptv.ui.welcome import WelcomeOverlay  # noqa: E402
+from dopeiptv.i18n import LocalizedError, tr  # noqa: E402
 
 from .test_media_servers import TOKEN, UID, FakeServer, _auth_route  # noqa: E402
 
@@ -163,6 +164,102 @@ def test_plex_sign_in_in_the_browser_then_the_server(app, fake, monkeypatch):
     assert v["kind"] == "plex" and v["token"] == "attic-tok" and v["server"] == s.base
     assert v["options"] == {"server_id": "m2", "connections": s.base} and v["username"] == "anna"
     assert v["name"] == "Attic"
+
+
+def _quick_connect(monkeypatch, ready):
+    from dopeiptv.providers import jellyfin
+    monkeypatch.setattr(media_signin, "QC_EVERY_MS", 20)
+    monkeypatch.setattr(jellyfin, "quick_connect_enabled", lambda server: True)
+    monkeypatch.setattr(jellyfin, "quick_connect_start", lambda server: {"secret": "s", "code": "123456"})
+    monkeypatch.setattr(jellyfin, "quick_connect_ready", ready)
+    monkeypatch.setattr(jellyfin, "quick_connect_finish", lambda server, secret: {
+        "token": TOKEN, "user_id": UID, "user": "Anna", "server": server})
+    d = PlaylistDialog()
+    d.kind.setCurrentIndex(d.kind.findData("jellyfin"))
+    d.server.setText("http://10.0.0.5:8096")
+    return d
+
+
+def test_a_wait_rides_out_a_network_hiccup(app, fake, monkeypatch):
+    """Quick Connect waits five minutes and Plex's PIN fifteen, a poll every
+    few seconds: one that did not get through (Wi-Fi dropping, a server's
+    503) ended the whole sign-in. Now a few in a row are tried again, each
+    a little later; the code being gone still ends it at once."""
+    polls = {"n": 0}
+
+    def ready(server, secret):
+        polls["n"] += 1
+        if polls["n"] <= 2:
+            raise LocalizedError("err_box_not_found", kind="Jellyfin")
+        return polls["n"] > 3
+    d = _quick_connect(monkeypatch, ready)
+    d.signin.qc_btn.click()
+    assert _wait(lambda: d.signin.signed_in(), 10), d.signin.status.text()
+    assert polls["n"] == 4
+
+    # Plex: the PIN answered 503 twice, then signed in.
+    pins = {"n": 0}
+
+    def pin(_q, _b, _h):
+        pins["n"] += 1
+        if pins["n"] <= 2:
+            return 503, {"error": "busy"}
+        return {"id": 7, "code": "wxyz", "authToken": "acct-tok"}
+    s = fake({("POST", "/api/v2/pins"): {"id": 7, "code": "wxyz"},
+              ("GET", "/api/v2/pins/7"): pin,
+              ("GET", "/api/v2/user"): {"username": "anna"},
+              ("GET", "/identity"): {"MediaContainer": {"machineIdentifier": "m1"}}})
+    s.routes[("GET", "/api/v2/resources")] = [
+        {"name": "Den", "provides": "server", "clientIdentifier": "m1", "accessToken": "den-tok",
+         "owned": True, "connections": [{"uri": s.base, "local": True}]}]
+    monkeypatch.setattr(plex, "PLEX_TV", s.base)
+    monkeypatch.setattr(media_signin, "PIN_EVERY_MS", 20)
+    monkeypatch.setattr(xdg, "open_url", lambda u: True)
+    p = PlaylistDialog()
+    p.kind.setCurrentIndex(p.kind.findData("plex"))
+    p.signin.plex_btn.click()
+    assert _wait(lambda: p.signin.signed_in(), 10), p.signin.status.text()
+    assert pins["n"] == 3
+
+    # The code gone: no second try.
+    gone = {"n": 0}
+
+    def expired(server, secret):
+        gone["n"] += 1
+        raise LocalizedError("err_ms_qc_expired")
+    d = _quick_connect(monkeypatch, expired)
+    d.signin.qc_btn.click()
+    assert _wait(lambda: not d.signin.busy, 5)
+    QThreadPool.globalInstance().waitForDone(500)
+    assert gone["n"] == 1 and d.signin.status.text() == tr("err_ms_qc_expired")
+
+
+def test_a_wait_that_never_gets_through_gives_up_and_a_cancel_stops_it(app, monkeypatch):
+    calls = {"n": 0}
+
+    def down(server, secret):
+        calls["n"] += 1
+        raise LocalizedError("err_box_not_found", kind="Jellyfin")
+    d = _quick_connect(monkeypatch, down)
+    d.signin.qc_btn.click()
+    assert _wait(lambda: not d.signin.busy, 15)
+    assert calls["n"] == media_signin.POLL_HICCUPS + 1
+    assert d.signin.status.text() == tr("err_box_not_found", kind="Jellyfin")
+    assert not d.signin.signed_in()
+
+    # Cancelled (another kind picked) while it waits to try again: no poll after.
+    calls["n"] = 0
+    d = _quick_connect(monkeypatch, down)
+    d.signin.qc_btn.click()
+    assert _wait(lambda: calls["n"] >= 1, 5)
+    d.kind.setCurrentIndex(d.kind.findData("emby"))
+    seen = calls["n"]
+    end = time.monotonic() + 1.0
+    while time.monotonic() < end:
+        QApplication.processEvents()
+        time.sleep(0.01)
+    QThreadPool.globalInstance().waitForDone(500)
+    assert calls["n"] <= seen + 1 and not d.signin.busy and not d.signin._timer.isActive()
 
 
 def test_the_finder_offers_the_forms_kind_first(app):

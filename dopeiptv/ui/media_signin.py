@@ -27,6 +27,11 @@ QC_EVERY_MS = 3000
 QC_TRIES = 100            # five minutes
 PIN_EVERY_MS = 2000
 PIN_TRIES = 450           # fifteen minutes
+#: A wait's polls that may fail in a row (the network, a server's 5xx)
+#: before the sign-in gives up; each waits twice as long as the one before.
+POLL_HICCUPS = 4
+#: What a wait's poll may say that is the end of it: the code is gone.
+_FINAL = frozenset(("err_ms_qc_expired", "err_ms_pin_expired"))
 
 
 def _tagged(gen: int, fn: Callable[..., Any], *args: Any) -> tuple[int, Any, str]:
@@ -39,6 +44,30 @@ def _tagged(gen: int, fn: Callable[..., Any], *args: Any) -> tuple[int, Any, str
     except Exception as e:
         log.info("media sign-in: %s", type(e).__name__)
         return gen, None, tr("err_unexpected_response")
+
+
+class Hiccup:
+    """A wait's poll that did not get through (the network, the server):
+    one more try, not the end of the sign-in. *why*, in the user's language,
+    is said if it was the last."""
+
+    def __init__(self, why: str) -> None:
+        self.why = why
+
+
+def _patient(fn: Callable[..., Any], *args: Any) -> Any:
+    """(off the window's thread) *fn*'s answer - or a Hiccup when it failed
+    for a reason another try may not meet; the code being gone (_FINAL)
+    ends the wait as it did."""
+    try:
+        return fn(*args)
+    except LocalizedError as e:
+        if e.key in _FINAL:
+            raise
+        return Hiccup(e.localized())
+    except Exception as e:
+        log.info("media sign-in: a poll failed - %s", type(e).__name__)
+        return Hiccup(tr("err_unexpected_response"))
 
 
 def _server_of(text: str, kind: str) -> str:
@@ -334,7 +363,10 @@ class MediaSignIn(QWidget):
         _gen, result, why = got
         if why:
             self._failed(why)
+        elif isinstance(result, Hiccup):
+            self._hiccup(self._qc, result, QC_EVERY_MS)
         elif result is None:
+            self._qc["hiccups"] = 0
             self._qc["tries"] += 1
             if self._qc["tries"] >= QC_TRIES:
                 self._failed(tr("err_ms_qc_expired"))
@@ -377,7 +409,11 @@ class MediaSignIn(QWidget):
         if why:
             self._failed(why)
             return
+        if isinstance(token, Hiccup):
+            self._hiccup(self._pin, token, PIN_EVERY_MS)
+            return
         if not token:
+            self._pin["hiccups"] = 0
             self._pin["tries"] += 1
             if self._pin["tries"] >= PIN_TRIES:
                 self._failed(tr("err_ms_pin_expired"))
@@ -434,11 +470,25 @@ class MediaSignIn(QWidget):
 
     # -- waiting --------------------------------------------------------------------
 
+    def _hiccup(self, wait: dict, h: Hiccup, every_ms: int) -> None:
+        """A poll of *wait* did not get through: asked again a little later
+        (twice as long each time) - given up after POLL_HICCUPS in a row.
+        A cancel meanwhile stops the timer and drops the wait (_stop)."""
+        wait["hiccups"] = n = int(wait.get("hiccups", 0)) + 1
+        wait["tries"] = int(wait.get("tries", 0)) + 1      # still within the code's life
+        if n > POLL_HICCUPS:
+            self._failed(h.why)
+            return
+        log.info("media sign-in: a poll did not get through (%d of %d) - trying again", n, POLL_HICCUPS)
+        self._timer.start(every_ms * 2 ** n)
+
     def _poll(self) -> None:
         if sip.isdeleted(self):
             return
         if self._qc.get("secret"):
-            self._run(self._qc_check, self._qc_polled, self._qc["server"], self._qc["secret"])
+            self._run(_patient, self._qc_polled, self._qc_check, self._qc["server"],
+                      self._qc["secret"])
         elif self._pin.get("id"):
             from ..providers import plex
-            self._run(plex.check_pin, self._pin_polled, self._pin["id"], self._pin["code"])
+            self._run(_patient, self._pin_polled, plex.check_pin, self._pin["id"],
+                      self._pin["code"])
