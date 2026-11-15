@@ -314,6 +314,49 @@ tests check that placeholders line up and that every `tr("…")` key exists.
 - On the website, a few Serbian strings are in Cyrillic while the rest of
   the Serbian page is Latin.
 
+### Planned: Enigma2 for those with boxes at home
+
+After the account-connection count (the Nerd network tools) is in, so it
+builds on that count instead of a second one:
+
+- **Transponder check.** Channels on the same transponder share the
+  TSID/ONID/namespace of their service reference. With the box's tuner
+  count (`/web/about`) and what it records (`/web/timerlist`), warn before
+  a zap or a stream that would cut off a recording or someone watching,
+  and mark the channels that can be seen without one.
+- **Signal values.** SNR, AGC and BER of the tuner in use (`/web/signal`),
+  live in the stream stats (`I`) and the box's info.
+- **Transcoding via port 8002**, per box, for boxes with a hardware
+  transcoder, with quality steps - also used when the box's channels are
+  cast or shown in multiview, if chosen.
+- **Encrypted channels said plainly.** When a channel will not play, read
+  the first TS packets (transport_scrambling_control) and say the box
+  cannot decrypt it (no card, CI module or rights) - in the player,
+  recordings, multiview and stream health; failover may then try another
+  source.
+
+Check every endpoint against OpenWebif's source, and test on a real box.
+
+### Every feature works with the others
+
+A rule for everything new, and the reason for a review once a batch is in:
+
+- **One way in.** Whatever starts a stream - a zap in the app, the phone
+  remote, Home Assistant commands, Watch together, multiview, the rewind
+  buffer, recordings, casting (Chromecast, DLNA, Kodi, AirPlay), failover -
+  goes through the same path, so its checks (VPN guard, connection limit,
+  transponder check) apply everywhere without being rebuilt per feature.
+- **One count of connections and tuners**: an Xtream account's
+  connections and a box's tuners and transponders in the same place,
+  counting the player, each multiview cell, the rewind buffer, recordings
+  and casts.
+- **One way to say a problem**: an encrypted channel, a dead address or a
+  limit reached reads the same in the player, recordings, multiview,
+  stream health and casting.
+- **A combined review after each batch**, with tests for the pairs that
+  matter (box + recording + multiview, phone remote + transponder check,
+  Watch together + failover, casting + the rewind buffer).
+
 ## How changes are written
 
 - Commits and comments in English; the message says what changed for the
