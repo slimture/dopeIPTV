@@ -408,6 +408,17 @@ Plex are in)
   playlist and guide, the remote API and the HDHomeRun emulation let apps
   on the TV use dopeIPTV as their source.
 
+### For the help, when this batch is done
+
+Written once, when everything in the batch is in (GitHub's CHANGELOG,
+FEATURES and README; the website's help in every language):
+
+- **An Apple TV from Linux or Windows.** AirPlay is macOS only (Apple's
+  frameworks; tvOS 18 shut out other senders' video). Elsewhere: cast to a
+  Chromecast, a DLNA TV or Kodi - or let an IPTV app on the Apple TV (VLC,
+  iPlayTV and the like) read dopeIPTV's shared playlist and guide, and
+  Plex or Jellyfin find it as an HDHomeRun tuner once that is in.
+
 ### Every feature works with the others
 
 A rule for everything new, and the reason for a review once a batch is in:
