@@ -286,7 +286,7 @@ def _beside_front_window(width: float) -> tuple[float, float] | None:
         if win is None or primary is None:
             return None
         frame = win.frameGeometry()
-        room = win.screen().availableGeometry()
+        room = (win.screen() or primary).availableGeometry()
         x = frame.right() + 12
         if x + width > room.right():
             x = frame.left() - 12 - int(width)
