@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .. import VERSION
-from ..core import macupdate, selfupdate, winupdate
+from ..core import build_check, macupdate, selfupdate, winupdate
 from ..core.log import log
 from ..core.updates import GITHUB_REPO, fetch_update, offered
 from ..core.xdg import open_url
@@ -78,6 +78,11 @@ class _UpdatesMixin:
         'check for updates' setting."""
         if self.settings.value("check_updates", "true") != "true":
             return
+        # A modified build asks nobody: updates come with the official app
+        # (and a badge an earlier copy left goes).
+        if not build_check.allowed():
+            self._apply_update_state("")
+            return
         # Test hook: force the badge on without a network call, so the update
         # indicator can be seen even when you're already on the latest release.
         # Placed after the opt-out check so opting out still suppresses it.
@@ -113,6 +118,10 @@ class _UpdatesMixin:
         """Light the badge from the last cached result at startup so it appears
         right away, without waiting for (or making) a network call."""
         if self.settings.value("check_updates", "true") != "true":
+            return
+        # Never waits for the build check: the window is just up.
+        known = build_check.settled()
+        if known is not None and known.kind == build_check.MODIFIED:
             return
         if os.environ.get("DOPEIPTV_FAKE_UPDATE") == "1":
             self._apply_update_state("v99.0.0")
@@ -267,6 +276,9 @@ class _UpdatesMixin:
         restart into it. A worker does the work; a timer carries its
         progress to the dialog, which can cancel it."""
         if getattr(self, "_self_updating", False):
+            return
+        if not build_check.allowed():
+            self._show_toast(build_check.notice("updates"), 8000)
             return
         # None: an AppImage's own update, which says why it cannot run.
         updater = _updater() or selfupdate

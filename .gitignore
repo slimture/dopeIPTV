@@ -33,3 +33,7 @@ dopeiptv/_opensubtitles_key.py
 dopeiptv/_simkl_key.py
 # Helper worktrees of a coding assistant, never part of the repo.
 .claude/worktrees/
+# The signed list of a build's own files, made in the build only
+# (tools/build_manifest.py, dopeiptv/core/build_check.py).
+dopeiptv/_build_manifest.json
+dopeiptv/_build_manifest.json.sig

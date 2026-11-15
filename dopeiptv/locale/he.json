@@ -2665,5 +2665,14 @@
   "set_cast_added_none": "עדיין אין. Chromecast, טלוויזיה או Kodi שהחיפוש לא מוצא מוסיפים בחלון ההעברה, עם „הוספת מכשיר לפי כתובת…”.",
   "set_link_cast_net": "הגדרת Nerd למכשירים ברשתות אחרות",
   "phone_tv_picture": "הצג בטלוויזיה",
-  "phone_tv_now_playing": "מתנגן עכשיו"
+  "phone_tv_now_playing": "מתנגן עכשיו",
+  "build_not_official": "זו אינה גרסה רשמית של dopeIPTV. התכונה {service} זמינה רק באפליקציה הרשמית, מ-dopeiptv.org.",
+  "build_svc_together": "צפייה משותפת",
+  "build_svc_sync": "סנכרון הגדרות",
+  "build_svc_updates": "בדיקת עדכונים",
+  "build_reports_elsewhere": "זו אינה גרסה רשמית של dopeIPTV, ולכן הדיווחים מגיעים למי שבנה אותה.",
+  "build_copy_report": "העתקת הדיווח",
+  "build_report_copied": "הדיווח הועתק ללוח.",
+  "about_build_modified": "גרסה לא רשמית - השירותים המקוונים כבויים. את האפליקציה הרשמית אפשר להוריד מ-dopeiptv.org.",
+  "about_build_source": "פועל מקוד המקור"
 }

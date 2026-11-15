@@ -23,6 +23,7 @@ import re
 import sys
 from typing import Any, Callable, Iterable
 
+from . import build_check
 from .log import log, recent_lines
 
 ENDPOINT = "https://dopeiptv.org/feedback/report"
@@ -92,7 +93,8 @@ def personal_values(playlists: Iterable[dict], channels: Iterable[str] = (),
 
 def system_lines() -> list[str]:
     from .. import __version__
-    lines = [f"dopeIPTV {__version__}", f"System: {platform.system()} {platform.release()} ({platform.machine()})",
+    lines = [f"dopeIPTV {__version__}", build_check.verdict().line(),
+             f"System: {platform.system()} {platform.release()} ({platform.machine()})",
              f"Python {platform.python_version()}, frozen: {bool(getattr(sys, 'frozen', False))}"]
     try:
         from PyQt6.QtCore import PYQT_VERSION_STR, QT_VERSION_STR
@@ -199,7 +201,8 @@ def _post(url: str, body: bytes, timeout: float) -> tuple[int, bytes]:
     from ._lazy_requests import requests
     r = requests.post(url, data=body, timeout=timeout, headers={
         "Content-Type": "application/json; charset=utf-8",
-        "User-Agent": f"dopeIPTV/{__version__}", "X-Dopeiptv-Report": "1"})
+        "User-Agent": f"dopeIPTV/{__version__}", "X-Dopeiptv-Report": "1",
+        **build_check.headers()})
     return r.status_code, r.content
 
 
@@ -211,8 +214,12 @@ def _fit(text: str, room: int) -> str:
 
 def send(kind: str, text: str, timeout: float = 15.0, endpoint: str | None = None,
          extra: dict | None = None) -> bool:
-    """POST the report as the person left it. True when it arrived."""
+    """POST the report as the person left it. True when it arrived - never
+    from a modified build (its reports go to whoever made it)."""
     from .. import __version__
+    if not build_check.allowed():
+        log.info("report: not sent - not an official build")
+        return False
     extra = extra or {}
     fields = {"kind": kind if kind in ("error", "crash", "feedback") else "feedback",
               "version": __version__, "os": platform.system(),
@@ -285,7 +292,10 @@ def save_tickets(settings: Any, items: list[dict]) -> None:
 
 def fetch_replies(codes: list[str], timeout: float = 15.0, endpoint: str | None = None) -> dict | None:
     """{code: [answers]} for the codes whose reports were answered; None
-    when the site could not be asked. Only the hashes are sent."""
+    when the site could not be asked (never from a modified build). Only
+    the hashes are sent."""
+    if not build_check.allowed():
+        return None
     by_hash = {code_hash(c): c for c in codes[:20]}
     try:
         status, data = _post(endpoint or REPLIES, json.dumps({"codes": list(by_hash)}).encode("utf-8"), timeout)

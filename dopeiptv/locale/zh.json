@@ -2665,5 +2665,14 @@
   "set_cast_added_none": "还没有。搜索找不到的 Chromecast、电视或 Kodi，可以在投屏窗口里用“按地址添加设备…”添加。",
   "set_link_cast_net": "一项用于其他网络设备的 Nerd 设置",
   "phone_tv_picture": "在电视上显示",
-  "phone_tv_now_playing": "正在播放"
+  "phone_tv_now_playing": "正在播放",
+  "build_not_official": "这不是 dopeIPTV 的官方版本。“{service}”仅在来自 dopeiptv.org 的官方应用中提供。",
+  "build_svc_together": "一起看",
+  "build_svc_sync": "设置同步",
+  "build_svc_updates": "检查更新",
+  "build_reports_elsewhere": "这不是 dopeIPTV 的官方版本，因此报告会发给制作它的人。",
+  "build_copy_report": "复制报告",
+  "build_report_copied": "报告已复制到剪贴板。",
+  "about_build_modified": "非官方版本 - 在线服务已关闭。请从 dopeiptv.org 获取官方应用。",
+  "about_build_source": "从源代码运行"
 }

@@ -2665,5 +2665,14 @@
   "set_cast_added_none": "まだありません。検索で見つからない Chromecast、テレビ、Kodi は、キャストのウィンドウの「アドレスで機器を追加…」で追加します。",
   "set_link_cast_net": "ほかのネットワークの機器のための Nerd の設定",
   "phone_tv_picture": "テレビに表示",
-  "phone_tv_now_playing": "再生中"
+  "phone_tv_now_playing": "再生中",
+  "build_not_official": "これは dopeIPTV の公式版ではありません。「{service}」は dopeiptv.org の公式アプリでのみ使えます。",
+  "build_svc_together": "一緒に見る",
+  "build_svc_sync": "設定の同期",
+  "build_svc_updates": "アップデートの確認",
+  "build_reports_elsewhere": "これは dopeIPTV の公式版ではないため、レポートはこれを作った人に届きます。",
+  "build_copy_report": "レポートをコピー",
+  "build_report_copied": "レポートをクリップボードにコピーしました。",
+  "about_build_modified": "公式ビルドではありません - オンラインサービスはオフです。公式アプリは dopeiptv.org から入手できます。",
+  "about_build_source": "ソースから実行中"
 }

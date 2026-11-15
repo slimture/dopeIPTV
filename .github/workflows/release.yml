@@ -299,6 +299,16 @@ jobs:
           python -m pip install -r requirements.txt
       - name: PyInstaller bundle
         run: pyinstaller --noconfirm dopeiptv.spec   # -> dist/dopeiptv/
+      - name: Build manifest - the bundle's own files, signed
+        # How the app tells an official build (dopeiptv/core/build_check.py):
+        # the bundle's files and modules as it reads them itself, and the
+        # version, signed with the release key like SHA256SUMS - put in
+        # before the AppImage and the .deb are made of dist/dopeiptv, so
+        # both carry it. Without the key (a fork) nothing is signed and the
+        # build calls itself modified; a release without it stops here.
+        env:
+          DOPEIPTV_UPDATE_KEY: ${{ secrets.DOPEIPTV_UPDATE_KEY }}
+        run: python tools/build_manifest.py frozen dist/dopeiptv/dopeiptv ${{ startsWith(github.ref, 'refs/tags/') && '--require-key' || '' }}
       - name: Audit host Wayland libraries
         run: |
           found=$(find dist/dopeiptv -name 'libwayland-*.so*' -print)
@@ -935,6 +945,13 @@ jobs:
                 echo "rpath /usr/lib/swift: ${so#dist/dopeIPTV.app/}"
               fi
             done
+      - name: Build manifest - the bundle's own files, signed
+        # As on Linux (dopeiptv/core/build_check.py), before the app is
+        # signed: the list lies in Contents/Resources, linked from where
+        # the app reads it, and the signature seals it with the rest.
+        env:
+          DOPEIPTV_UPDATE_KEY: ${{ secrets.DOPEIPTV_UPDATE_KEY }}
+        run: python tools/build_manifest.py frozen dist/dopeIPTV.app/Contents/MacOS/dopeiptv ${{ startsWith(github.ref, 'refs/tags/') && '--require-key' || '' }}
       - name: Developer ID keychain
         id: sign
         env:
@@ -1195,6 +1212,15 @@ jobs:
             hdiutil detach "$MOUNT" || true; exit 1
           fi
           echo "::endgroup::"
+          # Signed and notarised, the app still holds what its build manifest
+          # lists - so it calls itself official on a Mac (build_check.py).
+          if [ -e "$APP/Contents/Resources/dopeiptv/_build_manifest.json" ]; then
+            "$BIN" --build-files "${RUNNER_TEMP}/build-files.json"
+            if ! python3 -c 'import json, sys; v = json.load(open(sys.argv[1]))["verdict"]; print("build:", v["summary"]); sys.exit(v["kind"] != "official")' "${RUNNER_TEMP}/build-files.json"; then
+              echo "::error::the signed app does not call itself official"
+              hdiutil detach "$MOUNT" || true; exit 1
+            fi
+          fi
           hdiutil detach "$MOUNT"
           echo "::endgroup::"
           # As a final sanity check try to launch the .app briefly. On a
@@ -1441,6 +1467,13 @@ jobs:
         env:
           LIBMPV_DIR: ${{ github.workspace }}/libmpv
         run: pyinstaller --noconfirm dopeiptv-win.spec   # -> dist/dopeiptv/
+      - name: Build manifest - the bundle's own files, signed
+        # As on Linux (dopeiptv/core/build_check.py): before the installer
+        # and the zip are made of dist/dopeiptv.
+        shell: bash
+        env:
+          DOPEIPTV_UPDATE_KEY: ${{ secrets.DOPEIPTV_UPDATE_KEY }}
+        run: python tools/build_manifest.py frozen dist/dopeiptv/dopeiptv.exe ${{ startsWith(github.ref, 'refs/tags/') && '--require-key' || '' }}
       - name: Audit - what the shipped DLLs import
         shell: bash
         run: |
@@ -1702,6 +1735,21 @@ jobs:
           else
             echo "::warning::SIMKL_CLIENT_ID secret is empty - Simkl will NOT be offered in this build."
           fi
+      - name: Build manifest - the package's own files, signed
+        # The Flatpak installs the package with pip, not frozen: the list
+        # names its .py files and the data pyproject.toml ships, signed into
+        # dopeiptv/ before the build installs it (tools/build_manifest.py
+        # tree, dopeiptv/core/build_check.py). Without a python3 here the
+        # Flatpak carries none and says it runs from source.
+        continue-on-error: true
+        env:
+          DOPEIPTV_UPDATE_KEY: ${{ secrets.DOPEIPTV_UPDATE_KEY }}
+        run: |
+          if ! command -v python3 >/dev/null 2>&1; then
+            echo "::warning::no python3 in this container - the Flatpak carries no build manifest"
+            exit 0
+          fi
+          python3 tools/build_manifest.py tree dopeiptv
       - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           bundle: dopeIPTV.flatpak
@@ -1726,6 +1774,18 @@ jobs:
           flatpak info io.github.slimture.dopeIPTV
           flatpak info --show-runtime io.github.slimture.dopeIPTV
           echo "::endgroup::"
+          # With its build manifest the installed app must call itself
+          # official; where flatpak cannot run it here, that is only said.
+          if [ -f dopeiptv/_build_manifest.json ]; then
+            got=$(flatpak run --command=python3 io.github.slimture.dopeIPTV -c \
+              'from dopeiptv.core import build_check as b; print(b.verdict().line())' 2>&1 | tail -1) || true
+            echo "${got}"
+            case "${got}" in
+              "Build: official") ;;
+              "Build: modified"*) echo "::error::the Flatpak calls itself modified: ${got}"; exit 1 ;;
+              *) echo "::warning::the Flatpak's build check could not run here" ;;
+            esac
+          fi
       - name: Name the bundle with the version
         if: startsWith(github.ref, 'refs/tags/')
         run: |

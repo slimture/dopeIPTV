@@ -2665,5 +2665,14 @@
   "set_cast_added_none": "Поки немає. Chromecast, телевізор або Kodi, яких пошук не знаходить, додаються у вікні трансляції: «Додати пристрій за адресою…».",
   "set_link_cast_net": "Налаштування Nerd для пристроїв в інших мережах",
   "phone_tv_picture": "Показати на ТБ",
-  "phone_tv_now_playing": "Зараз відтворюється"
+  "phone_tv_now_playing": "Зараз відтворюється",
+  "build_not_official": "Це не офіційна версія dopeIPTV. Функція «{service}» є лише в офіційному застосунку з dopeiptv.org.",
+  "build_svc_together": "Дивитися разом",
+  "build_svc_sync": "Синхронізація налаштувань",
+  "build_svc_updates": "Перевірка оновлень",
+  "build_reports_elsewhere": "Це не офіційна версія dopeIPTV, тож звіти отримує той, хто її зібрав.",
+  "build_copy_report": "Копіювати звіт",
+  "build_report_copied": "Звіт скопійовано в буфер обміну.",
+  "about_build_modified": "Неофіційна збірка - онлайн-сервіси вимкнено. Офіційний застосунок - на dopeiptv.org.",
+  "about_build_source": "Запущено з вихідного коду"
 }

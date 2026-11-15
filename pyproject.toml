@@ -52,7 +52,10 @@ include = ["dopeiptv*"]
 [tool.setuptools.package-data]
 # Ship the add-on locale JSONs (Turkish, Portuguese, Arabic, …) inside the
 # wheel/sdist; i18n.py loads them at import from dopeiptv/locale/.
-dopeiptv = ["locale/*.json", "assets/*.svg", "assets/flags/*.svg", "assets/flags/LICENSE", "assets/flags/SOURCE.txt"]
+# And the signed list of the package's files, when the build made one (the
+# Flatpak: tools/build_manifest.py tree; dopeiptv/core/build_check.py).
+dopeiptv = ["locale/*.json", "assets/*.svg", "assets/flags/*.svg", "assets/flags/LICENSE", "assets/flags/SOURCE.txt",
+            "_build_manifest.json", "_build_manifest.json.sig"]
 
 [tool.mypy]
 # Type gate scoped to the pure-logic layer (data, network, services) — the
@@ -155,6 +158,7 @@ files = [
     "dopeiptv/core/macupdate.py",
     "dopeiptv/core/ed25519.py",
     "dopeiptv/core/update_keys.py",
+    "dopeiptv/core/build_check.py",
     "dopeiptv/core/log.py",
     "dopeiptv/core/player_exec.py",
     "dopeiptv/core/wakelock.py",

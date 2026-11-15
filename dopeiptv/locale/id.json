@@ -2665,5 +2665,14 @@
   "set_cast_added_none": "Belum ada. Chromecast, TV, atau Kodi yang tidak ditemukan pencarian ditambahkan di jendela cast, dengan “Tambahkan perangkat lewat alamat…”.",
   "set_link_cast_net": "Satu pengaturan Nerd untuk perangkat di jaringan lain",
   "phone_tv_picture": "Tampilkan di TV",
-  "phone_tv_now_playing": "Sedang diputar"
+  "phone_tv_now_playing": "Sedang diputar",
+  "build_not_official": "Ini bukan versi resmi dopeIPTV. {service} hanya ada di aplikasi resmi, dari dopeiptv.org.",
+  "build_svc_together": "Nonton bareng",
+  "build_svc_sync": "Sinkronisasi pengaturan",
+  "build_svc_updates": "Pemeriksaan pembaruan",
+  "build_reports_elsewhere": "Ini bukan versi resmi dopeIPTV, jadi laporan dikirim ke siapa pun yang membuatnya.",
+  "build_copy_report": "Salin laporan",
+  "build_report_copied": "Laporan ada di papan klip.",
+  "about_build_modified": "Bukan build resmi - layanan online dimatikan. Dapatkan aplikasi resmi di dopeiptv.org.",
+  "about_build_source": "Berjalan dari kode sumber"
 }

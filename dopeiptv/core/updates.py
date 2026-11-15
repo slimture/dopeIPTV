@@ -24,6 +24,7 @@ import sys
 from urllib.parse import quote
 
 from .. import VERSION
+from . import build_check
 from ._lazy_requests import requests
 from .log import log
 
@@ -42,6 +43,22 @@ def user_agent() -> str:
 
 def _headers() -> dict:
     return {"Accept": "application/vnd.github+json", "User-Agent": user_agent()}
+
+
+def site_headers(url: str = SITE) -> dict:
+    """A request's headers: the user agent, and to dopeiptv.org which kind
+    of build asks (core/build_check.py) - the site serves no modified one."""
+    out = {"User-Agent": user_agent()}
+    if is_site(url):
+        out.update(build_check.headers())
+    return out
+
+
+def is_site(url: str) -> bool:
+    """Whether *url* is dopeiptv.org's."""
+    from urllib.parse import urlsplit
+    host = (urlsplit(str(url or "")).hostname or "").lower()
+    return host == "dopeiptv.org" or host.endswith(".dopeiptv.org")
 
 
 def _release(d: dict, nightly: bool = False) -> dict:
@@ -91,7 +108,7 @@ def _from_site(d: dict, nightly: bool = False) -> dict:
 
 def fetch_site_release() -> dict:
     """The release dopeiptv.org offers. Raises on network/HTTP error."""
-    r = requests.get(f"{SITE}/releases.json", headers={"User-Agent": user_agent()}, timeout=15)
+    r = requests.get(f"{SITE}/releases.json", headers=site_headers(), timeout=15)
     r.raise_for_status()
     return _from_site(r.json() or {})
 
@@ -124,7 +141,7 @@ def fetch_site_nightly() -> dict:
     """The test build dopeiptv.org knows of (its unlinked ``nightly.json``).
     Raises on network/HTTP error, and when the site has none - GitHub is
     asked then, so a site not yet writing the file loses no test build."""
-    r = requests.get(f"{SITE}/nightly.json", headers={"User-Agent": user_agent()}, timeout=15)
+    r = requests.get(f"{SITE}/nightly.json", headers=site_headers(), timeout=15)
     r.raise_for_status()
     rel = _from_site(r.json() or {}, nightly=True)
     if not is_nightly(rel["tag"]):
@@ -164,7 +181,9 @@ def fetch_github_nightly(repo: str = GITHUB_REPO) -> dict | None:
 
 def fetch_update(repo: str = GITHUB_REPO, channel: str = "stable") -> dict:
     """What *channel* offers: the newest release - or, on nightly, the
-    newest nightly build when that is newer still."""
+    newest nightly build when that is newer still. A modified build asks
+    nobody (build_check.NotOfficial): updates come from the official app."""
+    build_check.refuse("updates")
     stable = fetch_latest_release(repo)
     if channel != "nightly":
         return stable

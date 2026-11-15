@@ -122,6 +122,7 @@ def test_every_repo_file_a_workflow_names_actually_exists():
         "dopeiptv/_opensubtitles_key.py",   # "Bake built-in OpenSubtitles key"
         "dopeiptv/_simkl_key.py",       # "Bake built-in Simkl client id"
         "packaging/dopeIPTV.ico",       # "Build .ico from the app PNG" does
+        "dopeiptv/_build_manifest.json",    # "Build manifest" (tools/build_manifest.py)
     }
     missing = []
     for wf in glob.glob(os.path.join(_REPO, ".github/workflows/*.yml")):

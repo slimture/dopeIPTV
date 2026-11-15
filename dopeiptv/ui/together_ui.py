@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QSizePolicy, QStackedWidget, QVBoxLayout, QWidget,
 )
 
-from ..core import together
+from ..core import build_check, together
 from ..i18n import tr
 from .theme import P
 
@@ -101,6 +101,10 @@ class TogetherDialog(QDialog):
         self.private_lbl = _plain(QLabel(tr("together_private")))
         self.private_lbl.setStyleSheet(f"font-size:12px; color:{P['error']};")
         col.addWidget(self.private_lbl)
+        # A modified build: no room here - the relay is dopeiptv.org's.
+        self.official_lbl = _plain(QLabel(build_check.notice("together")))
+        self.official_lbl.setStyleSheet(f"font-size:12px; color:{P['warn']};")
+        col.addWidget(self.official_lbl)
         name_row = QHBoxLayout()
         name_lbl = QLabel(tr("together_name"))
         name_row.addWidget(name_lbl)
@@ -206,6 +210,7 @@ class TogetherDialog(QDialog):
             self.note.setVisible(bool(text))
         else:
             self.private_lbl.setVisible(bool(view.get("private")))
+            self.official_lbl.setVisible(bool(view.get("unofficial")))
             self._sync_buttons()
         if self.isVisible():
             self._fit()
@@ -229,7 +234,8 @@ class TogetherDialog(QDialog):
         self._fit()
 
     def _sync_buttons(self, *_a) -> None:
-        private = bool(self.win.together_view().get("private"))
+        view = self.win.together_view()
+        private = bool(view.get("private")) or bool(view.get("unofficial"))
         named = bool(together.clean_name(self.name.text()))
         self.start_btn.setEnabled(named and not private)
         self.join_btn.setEnabled(named and not private and bool(self.code.text().strip()))

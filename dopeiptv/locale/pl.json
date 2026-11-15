@@ -2665,5 +2665,14 @@
   "set_cast_added_none": "Jeszcze żadnych. Chromecasta, telewizor lub Kodi, których wyszukiwanie nie znajduje, dodaje się w oknie przesyłania przez „Dodaj urządzenie po adresie…”.",
   "set_link_cast_net": "Ustawienie Nerd dla urządzeń w innych sieciach",
   "phone_tv_picture": "Pokaż na TV",
-  "phone_tv_now_playing": "Teraz odtwarzane"
+  "phone_tv_now_playing": "Teraz odtwarzane",
+  "build_not_official": "To nie jest oficjalna wersja dopeIPTV. Funkcja „{service}” jest dostępna tylko w oficjalnej aplikacji z dopeiptv.org.",
+  "build_svc_together": "Wspólne oglądanie",
+  "build_svc_sync": "Synchronizacja ustawień",
+  "build_svc_updates": "Sprawdzanie aktualizacji",
+  "build_reports_elsewhere": "To nie jest oficjalna wersja dopeIPTV, więc raporty trafiają do tego, kto ją zrobił.",
+  "build_copy_report": "Kopiuj raport",
+  "build_report_copied": "Raport jest w schowku.",
+  "about_build_modified": "Nieoficjalna wersja - usługi online są wyłączone. Oficjalną aplikację pobierzesz z dopeiptv.org.",
+  "about_build_source": "Uruchomiono ze źródeł"
 }

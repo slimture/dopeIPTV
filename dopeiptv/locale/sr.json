@@ -2665,5 +2665,14 @@
   "set_cast_added_none": "Još nijedan. Chromecast, televizor ili Kodi koji pretraga ne pronalazi dodaje se u prozoru za emitovanje, pomoću „Dodaj uređaj po adresi…”.",
   "set_link_cast_net": "Jedno Nerd podešavanje za uređaje na drugim mrežama",
   "phone_tv_picture": "Prikaži na TV-u",
-  "phone_tv_now_playing": "Upravo se reprodukuje"
+  "phone_tv_now_playing": "Upravo se reprodukuje",
+  "build_not_official": "Ovo nije zvanična verzija dopeIPTV-a. {service} postoji samo u zvaničnoj aplikaciji, sa dopeiptv.org.",
+  "build_svc_together": "Gledanje zajedno",
+  "build_svc_sync": "Sinhronizacija podešavanja",
+  "build_svc_updates": "Provera ažuriranja",
+  "build_reports_elsewhere": "Ovo nije zvanična verzija dopeIPTV-a, pa izveštaji idu onome ko ju je napravio.",
+  "build_copy_report": "Kopiraj izveštaj",
+  "build_report_copied": "Izveštaj je u privremenoj memoriji.",
+  "about_build_modified": "Nije zvanična verzija - mrežne usluge su isključene. Zvaničnu aplikaciju preuzmi sa dopeiptv.org.",
+  "about_build_source": "Pokrenuto iz izvornog koda"
 }

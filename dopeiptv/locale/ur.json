@@ -2665,5 +2665,14 @@
   "set_cast_added_none": "ابھی کوئی نہیں۔ جو Chromecast، ٹی وی یا Kodi تلاش نہیں ڈھونڈ پاتی، اسے کاسٹ ونڈو میں «پتے سے آلہ شامل کریں…» سے شامل کیا جاتا ہے۔",
   "set_link_cast_net": "دوسرے نیٹ ورکس کے آلات کے لیے ایک Nerd ترتیب",
   "phone_tv_picture": "ٹی وی پر دکھائیں",
-  "phone_tv_now_playing": "ابھی چل رہا ہے"
+  "phone_tv_now_playing": "ابھی چل رہا ہے",
+  "build_not_official": "یہ dopeIPTV کا سرکاری ورژن نہیں ہے۔ «{service}» صرف dopeiptv.org کی سرکاری ایپ میں ہے۔",
+  "build_svc_together": "ساتھ دیکھیں",
+  "build_svc_sync": "سیٹنگز کی سنک",
+  "build_svc_updates": "اپ ڈیٹس کی جانچ",
+  "build_reports_elsewhere": "یہ dopeIPTV کا سرکاری ورژن نہیں ہے، اس لیے رپورٹیں اسے بنانے والے کو جاتی ہیں۔",
+  "build_copy_report": "رپورٹ کاپی کریں",
+  "build_report_copied": "رپورٹ کلپ بورڈ پر ہے۔",
+  "about_build_modified": "سرکاری بلڈ نہیں - آن لائن سروسز بند ہیں۔ سرکاری ایپ dopeiptv.org سے حاصل کریں۔",
+  "about_build_source": "سورس سے چل رہا ہے"
 }

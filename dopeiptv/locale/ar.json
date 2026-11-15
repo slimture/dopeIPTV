@@ -2665,5 +2665,14 @@
   "set_cast_added_none": "لا شيء بعد. يُضاف جهاز Chromecast أو تلفزيون أو Kodi لا يجده البحث من نافذة البث، عبر «إضافة جهاز بعنوانه…».",
   "set_link_cast_net": "إعداد Nerd للأجهزة على شبكات أخرى",
   "phone_tv_picture": "اعرض على التلفاز",
-  "phone_tv_now_playing": "قيد التشغيل الآن"
+  "phone_tv_now_playing": "قيد التشغيل الآن",
+  "build_not_official": "هذه ليست نسخة رسمية من dopeIPTV. ميزة «{service}» متاحة فقط في التطبيق الرسمي من dopeiptv.org.",
+  "build_svc_together": "المشاهدة معًا",
+  "build_svc_sync": "مزامنة الإعدادات",
+  "build_svc_updates": "التحقق من التحديثات",
+  "build_reports_elsewhere": "هذه ليست نسخة رسمية من dopeIPTV، لذا تذهب التقارير إلى من صنعها.",
+  "build_copy_report": "نسخ التقرير",
+  "build_report_copied": "التقرير في الحافظة.",
+  "about_build_modified": "ليست نسخة رسمية - الخدمات عبر الإنترنت متوقفة. احصل على التطبيق الرسمي من dopeiptv.org.",
+  "about_build_source": "يعمل من الشيفرة المصدرية"
 }

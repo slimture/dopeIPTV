@@ -2665,5 +2665,14 @@
   "set_cast_added_none": "아직 없습니다. 검색으로 찾지 못하는 Chromecast, TV, Kodi는 캐스트 창에서 “주소로 기기 추가…”로 추가합니다.",
   "set_link_cast_net": "다른 네트워크의 기기를 위한 Nerd 설정",
   "phone_tv_picture": "TV에 표시",
-  "phone_tv_now_playing": "재생 중"
+  "phone_tv_now_playing": "재생 중",
+  "build_not_official": "이것은 dopeIPTV의 공식 버전이 아닙니다. '{service}' 기능은 dopeiptv.org의 공식 앱에서만 쓸 수 있습니다.",
+  "build_svc_together": "함께 보기",
+  "build_svc_sync": "설정 동기화",
+  "build_svc_updates": "업데이트 확인",
+  "build_reports_elsewhere": "이것은 dopeIPTV의 공식 버전이 아니므로 보고서는 이 버전을 만든 사람에게 갑니다.",
+  "build_copy_report": "보고서 복사",
+  "build_report_copied": "보고서를 클립보드에 복사했습니다.",
+  "about_build_modified": "공식 빌드가 아닙니다 - 온라인 서비스가 꺼져 있습니다. 공식 앱은 dopeiptv.org에서 받으세요.",
+  "about_build_source": "소스에서 실행 중"
 }

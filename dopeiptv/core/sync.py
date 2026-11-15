@@ -58,6 +58,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from . import build_check
 from . import chacha20poly1305 as aead
 from . import profiles as _profiles
 from .log import log
@@ -94,7 +95,7 @@ class SyncError(Exception):
     full (the site has no room for a new copy; one kept there already can
     still be written), big (too much to sync), none (nothing under this
     code), read (the copy there could not be read with this code), newer (a
-    newer app made it)."""
+    newer app made it), modified (not asked: a modified build)."""
 
     def __init__(self, kind: str, size: int = 0) -> None:
         super().__init__(kind)
@@ -711,10 +712,13 @@ class Remote:
         self.timeout = timeout
         from .. import __version__
         self.headers = {"User-Agent": f"dopeIPTV/{__version__}",
-                        "Content-Type": "application/json"}
+                        "Content-Type": "application/json", **build_check.headers()}
 
     def _call(self, method: str, body: dict | None = None) -> Any:
         from ._lazy_requests import requests
+        if not build_check.allowed():
+            # Never asked from a modified build: the site refuses it anyway.
+            raise SyncError("modified")
         try:
             return requests.request(method, self.url, headers=self.headers,
                                     data=None if body is None

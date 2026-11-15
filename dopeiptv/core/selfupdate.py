@@ -30,10 +30,10 @@ import threading
 from collections.abc import Callable
 from pathlib import Path
 
-from . import desktop_entry, ed25519
+from . import build_check, desktop_entry, ed25519
 from ._lazy_requests import requests
 from .update_keys import UPDATE_KEYS
-from .updates import GITHUB_REPO, is_nightly, user_agent
+from .updates import GITHUB_REPO, is_nightly, site_headers, user_agent
 from ..i18n import LocalizedError
 from .log import log
 from .xdg import system_env
@@ -198,7 +198,7 @@ def download(asset: dict, dest: Path,
     got = 0
     try:
         with requests.get(asset["url"], stream=True, timeout=30,
-                          headers={"User-Agent": user_agent()}) as r:
+                          headers=site_headers(asset["url"])) as r:
             r.raise_for_status()
             total = size or int(r.headers.get("Content-Length") or 0)
             with open(dest, "wb") as fh:
@@ -271,6 +271,7 @@ def install(release: dict, current_version: str,
     """Download, verify, test and put the release's AppImage in place.
     Returns the path of the new file. Raises UpdateError, with nothing
     changed, on any failure."""
+    build_check.refuse("updates")
     current = appimage_path()
     cpu = arch()
     if current is None or cpu is None:

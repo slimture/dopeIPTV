@@ -48,6 +48,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from . import build_check
 from . import chacha20poly1305 as aead
 from .log import log
 from .sync import hkdf
@@ -581,7 +582,8 @@ class LocalWatch:
 class RelayError(Exception):
     """A request the relay did not answer as hoped. *kind*: net (no answer),
     busy (too many rooms, or too many requests), full (the room has
-    MAX_MEMBERS already), bad (refused as malformed)."""
+    MAX_MEMBERS already), bad (refused as malformed), modified (not asked:
+    a modified build)."""
 
     def __init__(self, kind: str) -> None:
         super().__init__(kind)
@@ -604,7 +606,8 @@ class Relay:
     def __init__(self, room: str, member: str, endpoint: str | None = None) -> None:
         self.url = (endpoint or ENDPOINT) + room
         from .. import __version__
-        self.headers = {MEMBER_HEADER: member, "User-Agent": f"dopeIPTV/{__version__}"}
+        self.headers = {MEMBER_HEADER: member, "User-Agent": f"dopeIPTV/{__version__}",
+                        **build_check.headers()}
         self._session: Any = None
 
     def _http(self) -> Any:
@@ -615,6 +618,9 @@ class Relay:
 
     def _call(self, method: str, timeout: float, headers: dict[str, str] | None = None,
               **kw: Any) -> Any:
+        if not build_check.allowed():
+            # Never asked from a modified build: the relay refuses it anyway.
+            raise RelayError("modified")
         try:
             r = self._http().request(method, self.url, headers=headers or self.headers,
                                      timeout=(6.0, timeout), **kw)
@@ -755,6 +761,8 @@ class Link:
                     break
                 fails += 1
                 self._tell(e.kind)
+                if e.kind == "modified":
+                    break
                 self._stop.wait(self.BACKOFF[min(fails, len(self.BACKOFF)) - 1])
                 continue
             except Exception:
@@ -802,7 +810,7 @@ class Link:
                 try:
                     now = relay.post(blob)
                 except RelayError as e:
-                    if e.kind in ("bad", "full") or attempt == self.SEND_TRIES - 1:
+                    if e.kind in ("bad", "full", "modified") or attempt == self.SEND_TRIES - 1:
                         self._tell(e.kind)
                         break
                     time.sleep(1.0 + attempt)

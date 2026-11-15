@@ -2665,5 +2665,14 @@
   "set_cast_added_none": "هنوز هیچ. Chromecast، تلویزیون یا Kodi که جست‌وجو پیدایش نمی‌کند در پنجرهٔ پخش با «افزودن دستگاه با نشانی…» اضافه می‌شود.",
   "set_link_cast_net": "یک تنظیم Nerd برای دستگاه‌های شبکه‌های دیگر",
   "phone_tv_picture": "نمایش روی تلویزیون",
-  "phone_tv_now_playing": "در حال پخش"
+  "phone_tv_now_playing": "در حال پخش",
+  "build_not_official": "این نسخهٔ رسمی dopeIPTV نیست. «{service}» فقط در برنامهٔ رسمی از dopeiptv.org هست.",
+  "build_svc_together": "تماشای با هم",
+  "build_svc_sync": "همگام‌سازی تنظیمات",
+  "build_svc_updates": "بررسی به‌روزرسانی‌ها",
+  "build_reports_elsewhere": "این نسخهٔ رسمی dopeIPTV نیست، پس گزارش‌ها به دست سازندهٔ آن می‌رسد.",
+  "build_copy_report": "کپی گزارش",
+  "build_report_copied": "گزارش در کلیپ‌بورد است.",
+  "about_build_modified": "نسخهٔ رسمی نیست - سرویس‌های آنلاین خاموش‌اند. برنامهٔ رسمی را از dopeiptv.org بگیرید.",
+  "about_build_source": "اجرا از کد منبع"
 }

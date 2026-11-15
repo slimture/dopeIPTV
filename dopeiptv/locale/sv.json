@@ -2665,5 +2665,14 @@
   "set_cast_added_none": "Inga än. En Chromecast, en tv eller en Kodi som sökningen inte hittar lägger du till i castfönstret, med ”Lägg till en enhet med adress…”.",
   "set_link_cast_net": "En Nerd-inställning för enheter på andra nätverk",
   "phone_tv_picture": "Visa på TV:n",
-  "phone_tv_now_playing": "Spelas nu"
+  "phone_tv_now_playing": "Spelas nu",
+  "build_not_official": "Det här är ingen officiell version av dopeIPTV. {service} finns bara i den officiella appen, från dopeiptv.org.",
+  "build_svc_together": "Titta tillsammans",
+  "build_svc_sync": "Synk mellan datorer",
+  "build_svc_updates": "Sökning efter uppdateringar",
+  "build_reports_elsewhere": "Det här är ingen officiell version av dopeIPTV, så rapporter går till den som har gjort den.",
+  "build_copy_report": "Kopiera rapporten",
+  "build_report_copied": "Rapporten finns i urklipp.",
+  "about_build_modified": "Inte en officiell version – onlinetjänsterna är avstängda. Hämta den officiella appen på dopeiptv.org.",
+  "about_build_source": "Körs från källkoden"
 }

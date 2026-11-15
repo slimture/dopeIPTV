@@ -227,7 +227,10 @@ The suite is import smoke tests + unit tests for pure logic (no GUI tests -
 they'd need a display server). `mypy` type-checks the pure-logic modules
 today (`[tool.mypy] files` in `pyproject.toml`); grow that list as modules
 gain type hints. A release build also runs a GUI-less `--self-check` that
-loads the bundled libmpv.
+loads the bundled libmpv, and signs the list of the bundle's own files
+(`tools/build_manifest.py` through the bundle's `--build-files`): what tells
+an official build from a modified one (`core/build_check.py`,
+docs/MAINTAINING.md "Official builds").
 
 ## AirPlay to Apple TV (macOS)
 

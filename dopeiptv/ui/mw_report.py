@@ -23,7 +23,7 @@ from PyQt6 import sip
 from PyQt6.QtCore import QObject, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction
 
-from ..core import report
+from ..core import build_check, report
 from ..core.log import log, log_dir
 from ..core.workers import run_async
 from ..i18n import tr
@@ -154,7 +154,7 @@ class _ReportMixin:
         """Ask the site for answers to the reports still asked about - off
         the window's thread, one request at a time."""
         settings = getattr(self, "settings", None)
-        if settings is None or self._answers_busy:
+        if settings is None or self._answers_busy or not build_check.allowed():
             return
         now = time.time()
         codes = report.open_codes(report.tickets(settings), now)
@@ -374,16 +374,19 @@ class _ReportMixin:
         fields: dict = {}
         words = code = first_words = ""
         settings = getattr(self, "settings", None)
+        # A modified build sends nothing: its reports go to whoever made it,
+        # and the window offers the text to copy instead.
+        copy_only = not build_check.allowed()
         if kind == "feedback":
             import time
             sent = report.sent_times(settings.value("feedback_sent", "") if settings else "")
-            wait = report.feedback_wait(sent, time.time())
+            wait = "" if copy_only else report.feedback_wait(sent, time.time())
             if wait:
                 self._show_toast(tr("fb_wait" if wait == "wait" else "fb_enough"), 6000)
                 return
             answered = self._answered()
             fd = FeedbackDialog(self, self._feedback_details, has_log_file=os.path.isfile(log_file()),
-                                answers=answered, all_answers=self.open_answers)
+                                answers=answered, all_answers=self.open_answers, copy_only=copy_only)
             if answered:                               # shown now: no longer new
                 self._answers_mark_seen()
             if not fd.exec():
@@ -392,21 +395,28 @@ class _ReportMixin:
             # A supporter's feedback is read first: only "yes" goes, never the key.
             if self._supporter_now():
                 fields["supporter"] = "yes"
-            if fd.answers.isChecked():
+            if fd.answers.isChecked() and not copy_only:
                 code, fields["reply"] = report.new_code()
             payload = report.scrub(fd.payload(), self._personal_values())
             words = report.text_hash(fd.message.toPlainText())
             first_words = " ".join(report.scrub(fd.message.toPlainText(), self._personal_values()).split())[:90]
-            if settings is not None and words == str(settings.value("feedback_last", "") or ""):
+            if not copy_only and settings is not None \
+                    and words == str(settings.value("feedback_last", "") or ""):
                 self._show_toast(tr("fb_same"), 5000)
                 return
         else:
             text = report.build(kind, trace=trace, personal=self._personal_values(), with_log=True)
-            d = ReportDialog(self, kind, text, intro)
+            d = ReportDialog(self, kind, text, intro, copy_only=copy_only)
             if not d.exec():
                 return
             payload = report.scrub(d.payload(), self._personal_values())
         if not payload.strip():
+            return
+        if copy_only:
+            from PyQt6.QtGui import QGuiApplication
+            QGuiApplication.clipboard().setText(payload)
+            self._show_toast(tr("build_report_copied"), 6000)
+            log.info("report: %s copied, not sent (not an official build)", kind)
             return
 
         def done(ok) -> None:

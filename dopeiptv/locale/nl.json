@@ -2665,5 +2665,14 @@
   "set_cast_added_none": "Nog geen. Een Chromecast, tv of Kodi die het zoeken niet vindt, voeg je toe in het castvenster, met ‘Apparaat toevoegen via adres…’.",
   "set_link_cast_net": "Een Nerd-instelling voor apparaten op andere netwerken",
   "phone_tv_picture": "Toon op tv",
-  "phone_tv_now_playing": "Speelt nu"
+  "phone_tv_now_playing": "Speelt nu",
+  "build_not_official": "Dit is geen officiële versie van dopeIPTV. {service} zit alleen in de officiële app, van dopeiptv.org.",
+  "build_svc_together": "Samen kijken",
+  "build_svc_sync": "Instellingen synchroniseren",
+  "build_svc_updates": "Zoeken naar updates",
+  "build_reports_elsewhere": "Dit is geen officiële versie van dopeIPTV, dus rapporten gaan naar wie deze versie heeft gemaakt.",
+  "build_copy_report": "Rapport kopiëren",
+  "build_report_copied": "Het rapport staat op het klembord.",
+  "about_build_modified": "Geen officiële build - online diensten staan uit. Haal de officiële app op dopeiptv.org.",
+  "about_build_source": "Draait vanuit de broncode"
 }

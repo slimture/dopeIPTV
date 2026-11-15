@@ -36,6 +36,7 @@ import threading
 from collections.abc import Callable
 from pathlib import Path
 
+from . import build_check
 from .log import log
 from .selfupdate import UpdateError, download, signed_asset
 from .updates import is_nightly
@@ -180,6 +181,7 @@ def install(release: dict, current_version: str,
     beside this one, checked again. Returns the staged app; the swap waits
     for :func:`restart_into` or :func:`on_exit`. Raises UpdateError, with
     nothing in place changed, on any failure."""
+    build_check.refuse("updates")
     app, cpu = app_bundle(), arch()
     if app is None or cpu is None or not can_self_update():
         raise UpdateError("upd_err_not_installed")

@@ -31,6 +31,7 @@ import threading
 from collections.abc import Callable
 from pathlib import Path
 
+from . import build_check
 from .log import log
 from .selfupdate import UpdateError, download, signed_asset
 
@@ -91,6 +92,7 @@ def install(release: dict, current_version: str,
     """Download and check the release's installer; returns its path. The
     installing itself waits for :func:`restart_into`, after this process.
     Raises UpdateError, with nothing changed, on any failure."""
+    build_check.refuse("updates")
     cpu = arch()
     if not can_self_update() or cpu is None:
         raise UpdateError("upd_err_not_installed")

@@ -2665,5 +2665,14 @@
   "set_cast_added_none": "Nenhum ainda. Um Chromecast, uma TV ou um Kodi que a busca não encontra é adicionado na janela de transmissão, com “Adicionar aparelho pelo endereço…”.",
   "set_link_cast_net": "Uma configuração Nerd para aparelhos em outras redes",
   "phone_tv_picture": "Mostrar na TV",
-  "phone_tv_now_playing": "Tocando agora"
+  "phone_tv_now_playing": "Tocando agora",
+  "build_not_official": "Esta não é uma versão oficial do dopeIPTV. {service} só existe no app oficial, do dopeiptv.org.",
+  "build_svc_together": "Assistir junto",
+  "build_svc_sync": "A sincronização de configurações",
+  "build_svc_updates": "A busca por atualizações",
+  "build_reports_elsewhere": "Esta não é uma versão oficial do dopeIPTV, então os relatórios vão para quem a fez.",
+  "build_copy_report": "Copiar relatório",
+  "build_report_copied": "O relatório está na área de transferência.",
+  "about_build_modified": "Não é uma versão oficial - os serviços online estão desligados. Baixe o app oficial em dopeiptv.org.",
+  "about_build_source": "Rodando a partir do código-fonte"
 }

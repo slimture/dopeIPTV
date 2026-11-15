@@ -2665,5 +2665,14 @@
   "set_cast_added_none": "Chưa có. Chromecast, TV hay Kodi mà lần tìm không thấy được thêm trong cửa sổ truyền, bằng “Thêm thiết bị bằng địa chỉ…”.",
   "set_link_cast_net": "Một cài đặt Nerd cho thiết bị ở mạng khác",
   "phone_tv_picture": "Hiện trên TV",
-  "phone_tv_now_playing": "Đang phát"
+  "phone_tv_now_playing": "Đang phát",
+  "build_not_official": "Đây không phải phiên bản chính thức của dopeIPTV. Tính năng “{service}” chỉ có trong ứng dụng chính thức từ dopeiptv.org.",
+  "build_svc_together": "Xem cùng nhau",
+  "build_svc_sync": "Đồng bộ cài đặt",
+  "build_svc_updates": "Kiểm tra cập nhật",
+  "build_reports_elsewhere": "Đây không phải phiên bản chính thức của dopeIPTV, nên báo cáo sẽ đến người đã tạo ra nó.",
+  "build_copy_report": "Sao chép báo cáo",
+  "build_report_copied": "Báo cáo đã được sao chép vào bộ nhớ tạm.",
+  "about_build_modified": "Không phải bản dựng chính thức - các dịch vụ trực tuyến đã tắt. Tải ứng dụng chính thức tại dopeiptv.org.",
+  "about_build_source": "Đang chạy từ mã nguồn"
 }

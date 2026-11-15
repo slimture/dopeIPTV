@@ -25,7 +25,7 @@ from typing import Any
 from PyQt6 import sip
 from PyQt6.QtCore import QObject, Qt, QTimer, pyqtSignal
 
-from ..core import privacy, together
+from ..core import build_check, privacy, together
 from ..core.log import log
 from ..core.privacy import for_log
 from ..core.workers import run_async
@@ -121,6 +121,8 @@ class _TogetherMixin:
     def together_view(self) -> dict[str, Any]:
         room = self._together_room
         view: dict[str, Any] = {"in": room is not None, "private": privacy.private()}
+        if not build_check.allowed():
+            view["unofficial"] = True       # a modified build: no room (build_check)
         if room is None:
             return view
         state = room.state
@@ -195,6 +197,8 @@ class _TogetherMixin:
     def _together_enter(self, code: str, name: str, joining: bool) -> str | None:
         if privacy.private():
             return tr("together_private")
+        if not build_check.allowed():
+            return build_check.notice("together")
         clean = together.clean_name(name)
         if not clean:
             return tr("together_name_needed")

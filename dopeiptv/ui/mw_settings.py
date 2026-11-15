@@ -846,6 +846,10 @@ class _SettingsMixin:
         c.row(tr("clear_menu"), clear_btn, tr("clear_hint"),
               search="history incognito private recently viewed")
         c = general.card(tr("set_card_updates"))
+        from ..core import build_check as _build
+        if not _build.allowed():
+            # A modified build checks for none: said once, above its rows.
+            c.note(_build.notice("updates"))
         updates_box = c.toggle(tr("setting_check_updates"),
                                is_on("check_updates", "true"))
         channel_box = self._combo(
@@ -2817,6 +2821,18 @@ class _SettingsMixin:
         desc = QLabel(tr("about_desc"))
         desc.setWordWrap(True)
         lay.addWidget(desc)
+        # Not the official app: a line says so (core/build_check.py); a
+        # modified build's online services are off, its update check too.
+        from ..core import build_check as _build
+        build = _build.kind()
+        if build != _build.OFFICIAL:
+            modified = build == _build.MODIFIED
+            line = QLabel(tr("about_build_modified" if modified else "about_build_source"))
+            line.setObjectName("AboutBuild")
+            line.setWordWrap(True)
+            line.setStyleSheet(f"color:{P['warn'] if modified else P['muted']}; font-size:12px;"
+                               + (" font-weight:600;" if modified else ""))
+            lay.addWidget(line)
 
         # -- update section: one clear status line, with an inline re-check --
         status = QLabel(tr("about_checking"))
@@ -2968,7 +2984,15 @@ class _SettingsMixin:
                       lambda: fetch_update(GITHUB_REPO, channel), done, fail)
 
         recheck.clicked.connect(check)
-        check()               # auto-check on open
+        if build == _build.MODIFIED:
+            # Nothing is asked; the line above says why - and no room is
+            # kept for release notes that never come.
+            status.hide()
+            recheck.hide()
+            keep.setRetainSizeWhenHidden(False)
+            notes.setSizePolicy(keep)
+        else:
+            check()               # auto-check on open
         d.exec()
 
     # -- EPG refresh with progress -------------------------------------------------

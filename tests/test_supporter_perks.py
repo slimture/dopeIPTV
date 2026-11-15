@@ -282,11 +282,12 @@ def test_the_window_opens_and_closes_the_perks_with_the_key():
 def test_sync_is_for_everyone_not_a_perk(key):
     """Sync was a thank-you for supporters; it is for everyone now. Nothing
     of a key goes with it, and nothing says it is a supporter's."""
-    from dopeiptv.core import sync
+    from dopeiptv.core import build_check, sync
     from dopeiptv.i18n import set_language, tr
     assert not hasattr(sync, "HEADER")
     remote = sync.Remote("ab" * 32)
-    assert set(remote.headers) == {"User-Agent", "Content-Type"}
+    # The build's kind goes to the site (official, modified or source) - no key.
+    assert set(remote.headers) == {"User-Agent", "Content-Type", build_check.HEADER}
     assert key not in " ".join(remote.headers.values())
     set_language("en")
     assert "sync" not in tr("supporter_perks").lower()

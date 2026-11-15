@@ -168,7 +168,7 @@ Only names here - the values are with the owner.
 | Apple Developer Program (Solecraft AB, team `6QR76TBT4J`) | the macOS builds' signature and notarisation - see "macOS signing" below | the .dmg is signed ad hoc and users allow the first start under Privacy & Security |
 | GitHub Actions secrets `MACOS_CERT_P12`, `MACOS_CERT_PASSWORD` | the Developer ID Application certificate with its private key (base64 of the exported .p12) and the export password | as above |
 | GitHub Actions secrets `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID` | an App Store Connect API team key (Developer access) for `notarytool` | a release fails at notarising - the certificate alone signs but is not enough |
-| GitHub Actions secret `DOPEIPTV_UPDATE_KEY` | dopeIPTV's release signing key (Ed25519, base64): release.yml's `checksums` job and nightly.yml sign each release's `SHA256SUMS` with it (`tools/sign_sums.py`); its public half is in `dopeiptv/core/update_keys.py`. Made once with `tools/make_update_key.py`; the only backup is the owner's password manager - see "The release key" below | a release fails at signing; a test build goes out unsigned and the app will not install it |
+| GitHub Actions secret `DOPEIPTV_UPDATE_KEY` | dopeIPTV's release signing key (Ed25519, base64): release.yml's `checksums` job and nightly.yml sign each release's `SHA256SUMS` with it (`tools/sign_sums.py`), and every build job its build manifest (`tools/build_manifest.py`, "Official builds" below); its public half is in `dopeiptv/core/update_keys.py`. Made once with `tools/make_update_key.py`; the only backup is the owner's password manager - see "The release key" below | a release fails at signing; a test build goes out unsigned, the app will not install it, and it calls itself modified (its online services off) |
 
 A source checkout works without any of these. For local testing, set
 `DOPEIPTV_TMDB_KEY` / `DOPEIPTV_OPENSUBTITLES_KEY` / `DOPEIPTV_SIMKL_CLIENT_ID` in
@@ -195,6 +195,61 @@ or a checksum changed beside the file, gets nothing installed.
 - `tools/sign_sums.py` refuses a secret whose public half the app does not
   carry, so a wrong secret stops the build instead of shipping a release
   no app will install.
+
+### Official builds (the build manifest)
+
+Every package a release or test build makes carries a list of the app's own
+files - each one's SHA-256, and the version - signed with the same release
+key (`dopeiptv/core/build_check.py`). The app reads it at start, on a
+thread of its own, and is then one of three:
+
+- **official** - a frozen build (AppImage, .deb, Windows, macOS) or the
+  Flatpak whose list is signed by a key in `update_keys.py`, made for this
+  version, with every file as listed and no code beside it. A nightly is
+  signed too, so it is official.
+- **modified** - a frozen build with no list, or one that does not check
+  out. The report header names the files: `Build: modified
+  (custom_skin.py, … 4 files)`. dopeiptv.org's services are off there and
+  each place says so in one line: Watch together, settings sync, the update
+  check and self-update, and feedback and error reports (their window offers
+  to copy the text instead - reports go to whoever made the build). About
+  says "Not an official build". Everything local works as ever.
+- **source** - a checkout or a pip install with no list (a git checkout
+  ignores a list left in it). Every service works; About says "Running from
+  source" and the report header `Build: from source (git <sha>)`.
+
+Every request to dopeiptv.org from those services carries the header
+`X-dopeIPTV-Build: official|modified|source` (the site refuses
+`modified`).
+
+**How the list is made.** `release.yml` runs `tools/build_manifest.py`
+in each build job right after PyInstaller (before the AppImage, .deb,
+installer and zip are made, and on macOS before the app is signed, the list
+in `Contents/Resources` linked from `Contents/Frameworks`). The tool asks the
+bundle itself what it holds (`dopeiptv --build-files OUT`: its data files on
+disk, and its modules as its PyInstaller archive stores them - a bundle has
+no .py files), signs that with `DOPEIPTV_UPDATE_KEY`, writes
+`_build_manifest.json` and `.sig` beside the package inside the bundle, and
+asks the bundle again: it must now say official, or the job fails. The
+macOS job asks the signed app on the mounted .dmg once more. The Flatpak
+installs the package with pip, so its job lists the tree's .py files and the
+data pyproject.toml ships (`tools/build_manifest.py tree dopeiptv`) before
+flatpak-builder; without a python3 in that container it carries no list and
+says "from source". Without the key (a fork) nothing is signed and the
+build is modified; a tag without the key fails at this step
+(`--require-key`). Both files are git-ignored: never commit them.
+
+To try it locally: build with PyInstaller, then
+`DOPEIPTV_UPDATE_KEY=<a test seed> python3 tools/build_manifest.py frozen
+dist/dopeiptv/dopeiptv` - with a key of your own the tool refuses unless its
+public half is in `update_keys.py`, so put a test key there in a scratch
+copy only (`tests/test_build_check.py` does the round trip with a test key).
+
+**The honest limit.** This stops the builds that do not bother: a changed
+or added file, a list copied from an official build, a bundle rebuilt from
+a fork. A fork that takes the check out of the code, or sends "official"
+itself, cannot be stopped by anything in the app - the code is open. And a
+pip install of a fork is "source", like any checkout.
 
 ### macOS signing
 

@@ -2877,6 +2877,15 @@ _STRINGS: dict[str, dict[str, str]] = {
     "set_card_cast_added": {"en": "Devices added by address"},
     "set_cast_added_none": {"en": "None yet. A Chromecast, a TV or a Kodi that the search does not find is added in the cast window, with “Add a device by address…”."},
     "set_link_cast_net": {"en": "A Nerd setting for devices on other networks"},
+    "build_not_official": {"en": "This is not an official version of dopeIPTV. {service} is only in the official app, from dopeiptv.org."},
+    "build_svc_together": {"en": "Watch together"},
+    "build_svc_sync": {"en": "Settings sync"},
+    "build_svc_updates": {"en": "Checking for updates"},
+    "build_reports_elsewhere": {"en": "This is not an official version of dopeIPTV, so reports go to whoever made it."},
+    "build_copy_report": {"en": "Copy report"},
+    "build_report_copied": {"en": "The report is on the clipboard."},
+    "about_build_modified": {"en": "Not an official build - online services are off. Get the official app at dopeiptv.org."},
+    "about_build_source": {"en": "Running from source"},
 }
 
 

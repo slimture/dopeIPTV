@@ -12,6 +12,12 @@ if sys.argv[1:2] == ["--epg-index"]:
     from dopeiptv.providers.epg import index_main
     sys.exit(index_main())
 
+# The build asking a bundle what it holds (tools/build_manifest.py): its
+# files as it reads them itself, written to a file - no window, no Qt.
+if sys.argv[1:2] == ["--build-files"]:
+    from dopeiptv.core.build_check import files_main
+    sys.exit(files_main(sys.argv[2:]))
+
 # Optionally re-exec with a custom memory allocator (jemalloc/mimalloc)
 # preloaded, before anything heavy is imported. Strict no-op unless a library
 # is actually found for this platform, so it can never affect a normal start.

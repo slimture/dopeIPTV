@@ -1053,9 +1053,10 @@ class FeedbackDialog(QDialog):
     OFTEN = (("always", "fb_o_always"), ("sometimes", "fb_o_sometimes"), ("once", "fb_o_once"))
 
     def __init__(self, parent, details, has_log_file: bool = False, answers: list | None = None,
-                 all_answers=None) -> None:
+                 all_answers=None, copy_only: bool = False) -> None:
         super().__init__(parent)
         self._all_answers = all_answers
+        self.copy_only = copy_only
         from PyQt6.QtGui import QFont
         from PyQt6.QtWidgets import QButtonGroup, QCheckBox, QComboBox, QGridLayout, QPlainTextEdit, QScrollArea
 
@@ -1076,6 +1077,11 @@ class FeedbackDialog(QDialog):
             return lbl
         col.addWidget(label(tr("feedback_title"), 17, P["text"]))
         col.addWidget(label(tr("feedback_intro"), 13, P["text2"], bold=False))
+        # A modified build: nothing goes to dopeiptv.org, the text can be copied.
+        self.not_official: QLabel | None = None
+        if copy_only:
+            self.not_official = label(tr("build_reports_elsewhere"), 13, P["warn"], bold=False)
+            col.addWidget(self.not_official)
         # Answers to earlier feedback (asked for with its code), first.
         self.answers_box: QWidget | None = None
         self.all_btn: QPushButton | None = None
@@ -1174,14 +1180,18 @@ class FeedbackDialog(QDialog):
         col.addWidget(self.preview)
         # An answer in the app: a code kept here, its hash with the report.
         self.answers = QCheckBox(tr("fb_answers_opt"))
-        self.answers.setChecked(True)
+        self.answers.setChecked(not copy_only)
         self.answers.setToolTip(tr("fb_answers_note"))
         col.addWidget(self.answers)
-        col.addWidget(label(tr("fb_answers_note") + " " + tr("report_privacy"), 12, bold=False))
+        note = label(tr("fb_answers_note") + " " + tr("report_privacy"), 12, bold=False)
+        col.addWidget(note)
+        self.answers.setVisible(not copy_only)
+        note.setVisible(not copy_only)
         buttons = QHBoxLayout()
         buttons.addStretch(1)
         cancel = QPushButton(tr("common_cancel"))
-        self.send_btn = QPushButton(tr("report_send"), objectName="Primary")
+        self.send_btn = QPushButton(tr("build_copy_report" if copy_only else "report_send"),
+                                    objectName="Primary")
         cancel.clicked.connect(self.reject)
         self.send_btn.clicked.connect(self.accept)
         buttons.addWidget(cancel)
@@ -1282,11 +1292,12 @@ class ReportDialog(QDialog):
     what it holds, that nothing in it identifies a stream or a person, and
     a box where any of it can be changed or deleted. Sent only on Send."""
 
-    def __init__(self, parent, kind: str, text: str, intro: str = "") -> None:
+    def __init__(self, parent, kind: str, text: str, intro: str = "", copy_only: bool = False) -> None:
         super().__init__(parent)
         from PyQt6.QtGui import QFont
         from PyQt6.QtWidgets import QCheckBox, QPlainTextEdit
         self.kind = kind
+        self.copy_only = copy_only
         feedback = kind == "feedback"
         self.setWindowTitle(tr("feedback_title") if feedback else tr("report_title"))
         self.setMinimumWidth(600)
@@ -1300,6 +1311,13 @@ class ReportDialog(QDialog):
         about.setWordWrap(True)
         about.setStyleSheet(f"font-size:13px; color:{P['text2']};")
         col.addWidget(about)
+        # A modified build: nothing goes to dopeiptv.org, the text can be copied.
+        self.not_official: QLabel | None = None
+        if copy_only:
+            self.not_official = QLabel(tr("build_reports_elsewhere"))
+            self.not_official.setWordWrap(True)
+            self.not_official.setStyleSheet(f"font-size:13px; color:{P['warn']};")
+            col.addWidget(self.not_official)
         box_style = (f"QPlainTextEdit {{ background: {P['input']}; color: {P['text']};"
                      f" border: none; border-radius: 8px; padding: 6px 8px;"
                      f" selection-background-color: {P['sel']}; }}")
@@ -1335,7 +1353,8 @@ class ReportDialog(QDialog):
         buttons = QHBoxLayout()
         buttons.addStretch(1)
         cancel = QPushButton(tr("common_cancel"))
-        self.send_btn = QPushButton(tr("report_send"), objectName="Primary")
+        self.send_btn = QPushButton(tr("build_copy_report" if copy_only else "report_send"),
+                                    objectName="Primary")
         cancel.clicked.connect(self.reject)
         self.send_btn.clicked.connect(self.accept)
         buttons.addWidget(cancel)

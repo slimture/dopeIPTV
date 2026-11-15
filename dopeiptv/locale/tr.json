@@ -2665,5 +2665,14 @@
   "set_cast_added_none": "Henüz yok. Aramanın bulamadığı bir Chromecast, televizyon ya da Kodi, yayın penceresinde “Adresle cihaz ekle…” ile eklenir.",
   "set_link_cast_net": "Diğer ağlardaki cihazlar için bir Nerd ayarı",
   "phone_tv_picture": "TV'de göster",
-  "phone_tv_now_playing": "Şimdi oynatılıyor"
+  "phone_tv_now_playing": "Şimdi oynatılıyor",
+  "build_not_official": "Bu, dopeIPTV'nin resmi bir sürümü değil. {service} yalnızca dopeiptv.org'daki resmi uygulamada var.",
+  "build_svc_together": "Birlikte izleme",
+  "build_svc_sync": "Ayar eşitleme",
+  "build_svc_updates": "Güncelleme denetimi",
+  "build_reports_elsewhere": "Bu, dopeIPTV'nin resmi bir sürümü değil; bu yüzden raporlar onu yapan kişiye gider.",
+  "build_copy_report": "Raporu kopyala",
+  "build_report_copied": "Rapor panoya kopyalandı.",
+  "about_build_modified": "Resmi bir derleme değil - çevrim içi hizmetler kapalı. Resmi uygulamayı dopeiptv.org'dan edinin.",
+  "about_build_source": "Kaynak koddan çalışıyor"
 }

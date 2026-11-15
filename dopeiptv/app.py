@@ -345,6 +345,13 @@ def main() -> int:
         return 0
 
     _install_crash_hooks()
+    # Official, modified or from source (core/build_check.py): worked out on
+    # a thread of its own while the window comes up, never in its way.
+    try:
+        from .core import build_check
+        build_check.start()
+    except Exception as e:
+        log.warning("build: check not started (%s)", e)
     global _original_msg_handler
     from PyQt6.QtCore import qInstallMessageHandler
     _original_msg_handler = qInstallMessageHandler(_qt_message_filter)

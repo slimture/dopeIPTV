@@ -27,7 +27,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .. import ORG
-from ..core import sync
+from ..core import build_check, sync
 from ..core.log import log
 from ..core.workers import run_async
 from ..i18n import tr
@@ -204,6 +204,10 @@ class _SyncMixin:
         runs already, sync is off, or (unless *manual*) a stream has only
         just started."""
         if self._sync_busy or not self._sync_on():
+            return False
+        if not build_check.allowed():
+            # A modified build asks nothing of dopeiptv.org: said in Settings.
+            self._sync_set_status("modified")
             return False
         now = time.monotonic()
         if not manual and now - getattr(self, "_sync_play_started", -1e9) < PLAY_GRACE:
@@ -465,7 +469,9 @@ class _SyncMixin:
             else:
                 line = tr("sync_never")
         problem = ""
-        if kind == "big":
+        if kind == "modified" or not build_check.allowed():
+            problem = build_check.notice("sync")
+        elif kind == "big":
             from ..core.recording import format_size
             problem = tr("sync_err_big", size=format_size(size),
                          limit=format_size(sync.MAX_BLOB))
@@ -497,6 +503,10 @@ class _SyncCard(QObject):
         join_btn = QPushButton(tr("sync_join"))
         start_btn.clicked.connect(self.start)
         join_btn.clicked.connect(self.join)
+        # A modified build: nothing to start - the line under it says why.
+        self.official = build_check.allowed()
+        start_btn.setEnabled(self.official)
+        join_btn.setEnabled(self.official)
         card.shown_if(card.row(tr("sync_title"), hbox(start_btn, join_btn, stretch=False),
                                tr("sync_off_hint"),
                                search="sync computers code encrypted privacy"),
@@ -557,7 +567,7 @@ class _SyncCard(QObject):
         self.show_btn.setText(tr("sync_hide") if self.revealed else tr("sync_show"))
         line, problem = self.win._sync_status_text()
         self.status_row.label.setText(line)
-        self.now_btn.setEnabled(not self.win._sync_busy)
+        self.now_btn.setEnabled(not self.win._sync_busy and self.official)
         self.problem.setText(problem)
         self.card.refresh()
 

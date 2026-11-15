@@ -2665,5 +2665,14 @@
   "set_cast_added_none": "अभी कोई नहीं। जिस Chromecast, टीवी या Kodi को खोज नहीं ढूँढ पाती, उसे कास्ट विंडो में “पते से डिवाइस जोड़ें…” से जोड़ा जाता है।",
   "set_link_cast_net": "दूसरे नेटवर्क के डिवाइस के लिए एक Nerd सेटिंग",
   "phone_tv_picture": "टीवी पर दिखाएँ",
-  "phone_tv_now_playing": "अभी चल रहा है"
+  "phone_tv_now_playing": "अभी चल रहा है",
+  "build_not_official": "यह dopeIPTV का आधिकारिक संस्करण नहीं है। {service} सिर्फ़ dopeiptv.org के आधिकारिक ऐप में है।",
+  "build_svc_together": "साथ में देखना",
+  "build_svc_sync": "सेटिंग्स सिंक",
+  "build_svc_updates": "अपडेट की जाँच",
+  "build_reports_elsewhere": "यह dopeIPTV का आधिकारिक संस्करण नहीं है, इसलिए रिपोर्ट उसे जाती हैं जिसने इसे बनाया।",
+  "build_copy_report": "रिपोर्ट कॉपी करें",
+  "build_report_copied": "रिपोर्ट क्लिपबोर्ड पर है।",
+  "about_build_modified": "आधिकारिक बिल्ड नहीं - ऑनलाइन सेवाएँ बंद हैं। आधिकारिक ऐप dopeiptv.org से लें।",
+  "about_build_source": "सोर्स से चल रहा है"
 }

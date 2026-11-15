@@ -2665,5 +2665,14 @@
   "set_cast_added_none": "ยังไม่มี Chromecast ทีวี หรือ Kodi ที่การค้นหาไม่พบ ให้เพิ่มในหน้าต่างแคสต์ด้วย “เพิ่มอุปกรณ์ด้วยที่อยู่…”",
   "set_link_cast_net": "การตั้งค่า Nerd สำหรับอุปกรณ์ในเครือข่ายอื่น",
   "phone_tv_picture": "แสดงบนทีวี",
-  "phone_tv_now_playing": "กำลังเล่น"
+  "phone_tv_now_playing": "กำลังเล่น",
+  "build_not_official": "นี่ไม่ใช่ dopeIPTV เวอร์ชันทางการ ฟีเจอร์ “{service}” มีเฉพาะในแอปทางการจาก dopeiptv.org",
+  "build_svc_together": "ดูด้วยกัน",
+  "build_svc_sync": "ซิงค์การตั้งค่า",
+  "build_svc_updates": "การตรวจหาการอัปเดต",
+  "build_reports_elsewhere": "นี่ไม่ใช่ dopeIPTV เวอร์ชันทางการ รายงานจึงส่งไปยังผู้ที่สร้างเวอร์ชันนี้",
+  "build_copy_report": "คัดลอกรายงาน",
+  "build_report_copied": "คัดลอกรายงานไปยังคลิปบอร์ดแล้ว",
+  "about_build_modified": "ไม่ใช่บิลด์ทางการ - บริการออนไลน์ถูกปิด ดาวน์โหลดแอปทางการได้ที่ dopeiptv.org",
+  "about_build_source": "กำลังรันจากซอร์สโค้ด"
 }

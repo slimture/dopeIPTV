@@ -2665,5 +2665,14 @@
   "set_cast_added_none": "Bado hakuna. Chromecast, TV au Kodi ambayo utafutaji hauipati huongezwa kwenye dirisha la kutuma, kwa “Ongeza kifaa kwa anwani…”.",
   "set_link_cast_net": "Mpangilio mmoja wa Nerd kwa vifaa kwenye mitandao mingine",
   "phone_tv_picture": "Onyesha kwenye TV",
-  "phone_tv_now_playing": "Inacheza sasa"
+  "phone_tv_now_playing": "Inacheza sasa",
+  "build_not_official": "Hili si toleo rasmi la dopeIPTV. Huduma ya “{service}” inapatikana tu kwenye programu rasmi, kutoka dopeiptv.org.",
+  "build_svc_together": "Tazama pamoja",
+  "build_svc_sync": "Kusawazisha mipangilio",
+  "build_svc_updates": "Kuangalia masasisho",
+  "build_reports_elsewhere": "Hili si toleo rasmi la dopeIPTV, kwa hiyo ripoti huenda kwa aliyelitengeneza.",
+  "build_copy_report": "Nakili ripoti",
+  "build_report_copied": "Ripoti iko kwenye ubao wa kunakili.",
+  "about_build_modified": "Si toleo rasmi - huduma za mtandaoni zimezimwa. Pata programu rasmi kwenye dopeiptv.org.",
+  "about_build_source": "Inaendeshwa kutoka msimbo chanzo"
 }
