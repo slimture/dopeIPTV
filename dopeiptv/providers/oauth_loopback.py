@@ -17,6 +17,7 @@ from typing import Callable
 from urllib.parse import parse_qs, urlparse
 
 from ..i18n import tr
+from ..core.exclusive_bind import ExclusiveBindMixin
 
 _PAGE = """<!doctype html><html><head><meta charset="utf-8">
 <title>dopeIPTV</title></head>
@@ -54,6 +55,10 @@ class _Handler(BaseHTTPRequestHandler):
         pass
 
 
+
+class _Server(ExclusiveBindMixin, HTTPServer):
+    """The sign-in listener; its port never shared (core/exclusive_bind.py)."""
+
 def capture_oauth_redirect(
         port: int, timeout: float = 180.0,
         should_cancel: Callable[[], bool] | None = None) -> dict | None:
@@ -63,7 +68,7 @@ def capture_oauth_redirect(
     Returns None if the wait is cancelled or *timeout* seconds elapse first.
     Raises OSError if the port can't be bound (e.g. already in use).
     """
-    httpd = HTTPServer(("127.0.0.1", port), _Handler)
+    httpd = _Server(("127.0.0.1", port), _Handler)
     httpd.oauth_result = None                    # type: ignore[attr-defined]
     httpd.timeout = 1.0                          # wake up once a second
     deadline = time.time() + timeout

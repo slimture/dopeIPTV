@@ -17,6 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from .dvr_store import SegmentStore
 from .log import log
+from .exclusive_bind import ExclusiveBindMixin
 
 _PATH = re.compile(r"^/([A-Za-z0-9_-]+)/(?:s/(\d+)|(live))\.ts$")
 # Join live this far behind the newest byte, so mpv has something to start from.
@@ -83,7 +84,7 @@ class _Handler(BaseHTTPRequestHandler):
             reader.close()
 
 
-class _Server(ThreadingHTTPServer):
+class _Server(ExclusiveBindMixin, ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = False
 

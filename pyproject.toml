@@ -109,6 +109,7 @@ files = [
     "dopeiptv/core/url_rewrite.py",
     "dopeiptv/core/hls_cap.py",
     "dopeiptv/core/remote_api.py",
+    "dopeiptv/core/exclusive_bind.py",
     "dopeiptv/core/events.py",
     "dopeiptv/core/mqtt.py",
     "dopeiptv/core/mqtt_control.py",

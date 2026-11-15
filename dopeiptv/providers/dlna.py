@@ -30,6 +30,7 @@ from ..core._lazy_requests import requests
 from ..core.log import log, redact_url
 from ..i18n import LocalizedError
 from .cast_bridge import lan_address
+from ..core.exclusive_bind import ExclusiveBindMixin
 
 SSDP_ADDR = ("239.255.255.250", 1900)
 SEARCH_TARGETS = ("urn:schemas-upnp-org:device:MediaRenderer:1",
@@ -327,7 +328,7 @@ class _FileHandler(BaseHTTPRequestHandler):
             log.info("dlna: serving the file stopped (%s)", e)
 
 
-class _FileServer(ThreadingHTTPServer):
+class _FileServer(ExclusiveBindMixin, ThreadingHTTPServer):
     daemon_threads = True
 
     def handle_error(self, request, client_address) -> None:

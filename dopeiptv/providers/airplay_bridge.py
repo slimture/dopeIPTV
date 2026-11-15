@@ -41,6 +41,7 @@ from urllib.parse import urlsplit
 
 from ..core.log import log
 from ..core.player_exec import NO_WINDOW
+from ..core.exclusive_bind import ExclusiveBindMixin
 from .cast_bridge import (_endless, _hls_file, _hls_name_ok, _timeshift,
                           cast_cache_dir, ffmpeg_path, lan_address,
                           video_encoder)
@@ -398,7 +399,7 @@ _TYPES = {".m3u8": "application/vnd.apple.mpegurl", ".m4s": "video/iso.segment",
           ".mp4": "video/mp4"}
 
 
-class _Server(ThreadingHTTPServer):
+class _Server(ExclusiveBindMixin, ThreadingHTTPServer):
     daemon_threads = True
     bridge: "AirPlayBridge"
 

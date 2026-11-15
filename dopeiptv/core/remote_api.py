@@ -31,6 +31,7 @@ from urllib.parse import parse_qs, quote, urlsplit
 
 from .log import log
 from .nerd_check import FAIL, OK, WARN, Check
+from .exclusive_bind import ExclusiveBindMixin
 
 DEFAULT_PORT = 3673            # D-O-P-E on a phone's keypad
 MAX_BODY = 64 * 1024
@@ -77,7 +78,7 @@ def _host_ok(host: str) -> bool:
     return 0 < len(host) <= 255 and all(c in allowed for c in host)
 
 
-class _Server(ThreadingHTTPServer):
+class _Server(ExclusiveBindMixin, ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
 

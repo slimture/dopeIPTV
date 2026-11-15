@@ -38,6 +38,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from ..core.log import log
 from ..core.player_exec import NO_WINDOW
+from ..core.exclusive_bind import ExclusiveBindMixin
 
 # What a Cast receiver decodes. Anything outside these has to be re-encoded;
 # anything inside is copied through untouched.
@@ -790,7 +791,7 @@ def _autoselect_subtitles(body: bytes, lang: str = "") -> bytes:
     return b"\n".join(out)
 
 
-class _Server(ThreadingHTTPServer):
+class _Server(ExclusiveBindMixin, ThreadingHTTPServer):
     """The bridge's own HTTP server, with the shouting turned off.
 
     A Chromecast opens connections, probes them and drops them as a matter
