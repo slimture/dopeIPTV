@@ -87,9 +87,10 @@ and Chromecast, DLNA and Kodi rows belong here
 - Simkl (only in a build with its client id): account (PIN sign-in), lists
 - Watched history: last sync, Sync now - one store, Trakt's and Simkl's
 
-**Sync between computers** (`sync`)
-- (untitled): a supporter's key first; then start or join, what syncs
-  (`sync_cats`), the code, Sync now, stop
+**Sync between computers** (`sync`) - "Sync" in the sidebar, for everyone
+- (untitled): start or join, what syncs (`sync_cats`), the code, Sync now,
+  stop
+- Encrypted, and nothing about you: what dopeiptv.org gets, in plain words
 
 **Integrations** (`integrations`)
 - OpenSubtitles.com: `os_api_key` (Test), `os_username` + `os_password`

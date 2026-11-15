@@ -7,6 +7,18 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+- Sync between computers is for everyone, not only supporters: no
+  supporter key is needed or sent. The Sync page says in plain words what
+  dopeiptv.org gets - bytes encrypted on the computer with a key from the
+  sync code, under a random number, nothing that identifies anyone - and
+  that a copy unused for 180 days is deleted. dopeiptv.org now limits
+  writes per address and the space all copies take (a new copy waits while
+  it is full; HTTP 507 reads "no room right now", 401/403 "turned down").
+  The supporter's icon and two themes stay theirs.
+- Settings' sidebar: "Sync" for Sync between computers, and shorter names
+  where a page's name was cut off (Remote and automation in 17 languages,
+  Greek's Boxes and lists, Russian's Parental lock).
+
 ## [1.5.0]
 
 Boxes on the home network as sources, Nerd for those who tinker, series

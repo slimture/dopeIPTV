@@ -10,8 +10,9 @@ What another computer changed is written to the stores here; a theme and
 shortcuts take effect at once, anything else that needs it with the next
 start (a toast says so). What plays is never touched.
 
-Only for supporters (core/supporter.py), and off until it is started here
-or joined with the code from another computer.
+For everyone, and off until it is started here or joined with the code
+from another computer. The page says plainly what dopeiptv.org gets: bytes
+encrypted here, under a random number - nothing about the person.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .. import ORG
-from ..core import supporter, sync
+from ..core import sync
 from ..core.log import log
 from ..core.workers import run_async
 from ..i18n import tr
@@ -42,7 +43,7 @@ _BACKOFF = (60, 120, 300, 900, 1800)
 _LIVE_KEYS = frozenset({"theme", "accent", "accent_custom", "theme_follow_system",
                         "theme_light", "corner_style"})
 #: A miss that trying again soon will not mend.
-_STUCK = ("key", "newer", "read", "big", "nokey")
+_STUCK = ("refused", "newer", "read", "big", "full")
 #: The chips' words: the app's own names for what they sync.
 _CHIP_TEXT = {"favorites": "nav_favorites", "settings": "settings_title",
               "sources": "tab_playlists", "history": "sync_cat_history"}
@@ -72,7 +73,7 @@ def _ignore(_result: object = None) -> None:
 
 
 class _SyncMixin:
-    """MainWindow mixin: settings sync between a supporter's computers."""
+    """MainWindow mixin: settings sync between a person's computers."""
 
     #: Tests point these elsewhere.
     _sync_endpoint: str | None = None
@@ -105,12 +106,6 @@ class _SyncMixin:
 
     def _sync_on(self) -> bool:
         return sync.code_of(self.settings) is not None
-
-    def _sync_supporter_key(self) -> str | None:
-        """The supporter key, when it checks out."""
-        if supporter.stored(self.settings) is None:
-            return None
-        return str(self.settings.value("supporter_key", "") or "").strip()
 
     def _sync_ctx(self) -> sync.Context:
         return sync.Context(self.settings, getattr(self, "_resume_settings", None),
@@ -182,18 +177,13 @@ class _SyncMixin:
 
     def sync_now(self, manual: bool = False) -> bool:
         """Start a round (on the sync thread). False when none starts: one
-        runs already, sync is off, no supporter key, or (unless *manual*) a
-        stream has only just started."""
+        runs already, sync is off, or (unless *manual*) a stream has only
+        just started."""
         if self._sync_busy or not self._sync_on():
             return False
         now = time.monotonic()
         if not manual and now - getattr(self, "_sync_play_started", -1e9) < PLAY_GRACE:
             self._sync_next = max(self._sync_next, now + PLAY_GRACE)
-            return False
-        key_text = self._sync_supporter_key()
-        if not key_text:
-            self._sync_set_status("nokey")
-            self._sync_next = now + PERIOD
             return False
         raw = sync.code_of(self.settings)
         if raw is None:
@@ -210,7 +200,7 @@ class _SyncMixin:
             self._sync_set_status("fail")
             self._sync_next = now + PERIOD
             return False
-        remote = sync.Remote(slot, key_text, self._sync_endpoint)
+        remote = sync.Remote(slot, self._sync_endpoint)
         self._sync_job = (self._sync_gen, snap, cats, state)
         self._sync_busy = True
         self._sync_set_status("running")
@@ -355,17 +345,15 @@ class _SyncMixin:
         self._sync_timer.start()
         self.sync_now(manual=True)
 
-    def _sync_start_here(self) -> str | None:
+    def _sync_start_here(self) -> str:
         """Sync on, with a new code (this is the first computer)."""
-        if self._sync_supporter_key() is None:
-            return None
         code = sync.new_code()
         self._sync_begin(code, joining=False)
         return code
 
     def _sync_join(self, text: str) -> bool:
         """Sync on with another computer's code; False for no code."""
-        if self._sync_supporter_key() is None or sync.parse_code(text) is None:
+        if sync.parse_code(text) is None:
             return False
         self._sync_begin(text, joining=True)
         return True
@@ -386,10 +374,9 @@ class _SyncMixin:
     def _sync_stop(self, delete_there: bool) -> None:
         """Sync off here; *delete_there*: the site's copy goes too."""
         raw = sync.code_of(self.settings)
-        key_text = self._sync_supporter_key()
-        if delete_there and raw is not None and key_text:
+        if delete_there and raw is not None:
             slot, _key = sync.derive(raw)
-            remote = sync.Remote(slot, key_text, self._sync_endpoint)
+            remote = sync.Remote(slot, self._sync_endpoint)
             run_async(self._sync_pool, remote.delete, _ignore, self._sync_delete_failed)
         self._sync_forget()
 
@@ -440,7 +427,7 @@ class _SyncMixin:
             from ..core.recording import format_size
             problem = tr("sync_err_big", size=format_size(size),
                          limit=format_size(sync.MAX_BLOB))
-        elif kind in ("net", "busy", "key", "read", "newer", "none", "nokey", "fail"):
+        elif kind in ("net", "busy", "refused", "read", "newer", "none", "full", "fail"):
             problem = tr(f"sync_err_{kind}")
         return line, problem
 
@@ -449,11 +436,13 @@ class _SyncMixin:
     def _build_sync_card(self, page, dlg) -> None:
         # On a page of its own, titled as the card was: no heading twice.
         _SyncCard(self, page.card(), dlg)
+        # What dopeiptv.org gets, in plain words, whether sync is on or off.
+        page.card(tr("sync_privacy_title")).note(tr("sync_privacy"))
 
 
 class _SyncCard(QObject):
-    """Settings, Sync between computers: the sync card, in its three states
-    - not a supporter, off, on. Lives as long as the dialog."""
+    """Settings, Sync between computers: the sync card, off or on. Lives as
+    long as the dialog."""
 
     def __init__(self, win, card, dlg) -> None:
         super().__init__(dlg)
@@ -462,19 +451,14 @@ class _SyncCard(QObject):
         self.revealed = False
         self._on = win._sync_on
 
-        key_btn = QPushButton(tr("set_supporter_enter"))
-        key_btn.clicked.connect(self.enter_key)
-        card.shown_if(card.row(tr("sync_title"), key_btn, tr("sync_supporter_only"),
-                               search="sync computers supporter"),
-                      self.not_supporter)
-
         start_btn = QPushButton(tr("sync_start"), objectName="Primary")
         join_btn = QPushButton(tr("sync_join"))
         start_btn.clicked.connect(self.start)
         join_btn.clicked.connect(self.join)
         card.shown_if(card.row(tr("sync_title"), hbox(start_btn, join_btn, stretch=False),
-                               tr("sync_off_hint"), search="sync computers code"),
-                      self.supporter_off)
+                               tr("sync_off_hint"),
+                               search="sync computers code encrypted privacy"),
+                      self.is_off)
 
         chosen = sync.chosen(win.settings)
         self.chips = {cat: Chip(tr(_CHIP_TEXT[cat]), cat in chosen)
@@ -483,8 +467,8 @@ class _SyncCard(QObject):
             chip.toggled.connect(self.cats_changed)
         groups = ChipGroups([(tr("sync_what"), list(self.chips.values()))])
         card.shown_if(card.widget(groups, " ".join(c.text() for c in self.chips.values())),
-                      self.supporter_on)
-        card.shown_if(card.note(tr("sync_sources_note")).parentWidget(), self.supporter_on)
+                      self._on)
+        card.shown_if(card.note(tr("sync_sources_note")).parentWidget(), self._on)
 
         self.show_btn = QPushButton(tr("sync_show"))
         self.copy_btn = QPushButton(tr("problem_copy"))
@@ -494,12 +478,12 @@ class _SyncCard(QObject):
                                  "…", search="sync code")
         self.code_row.hint_label.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse)
-        card.shown_if(self.code_row, self.supporter_on)
+        card.shown_if(self.code_row, self._on)
 
         self.now_btn = QPushButton(tr("sync_now"))
         self.now_btn.clicked.connect(self.sync_now)
         self.status_row = card.row(tr("sync_never"), self.now_btn, search="sync now")
-        card.shown_if(self.status_row, self.supporter_on)
+        card.shown_if(self.status_row, self._on)
 
         self.problem = QLabel()
         self.problem.setWordWrap(True)
@@ -510,26 +494,16 @@ class _SyncCard(QObject):
         stop_btn.clicked.connect(self.stop)
         card.shown_if(card.row(tr("sync_stop"), stop_btn, tr("sync_stop_hint"),
                                search="sync stop off"),
-                      self.supporter_on)
-        card.shown_if(card.note(tr("sync_privacy")).parentWidget(), self.is_supporter)
+                      self._on)
         win._sync_signals.changed.connect(self.refresh)
         self.refresh()
 
     # what shows when
-    def is_supporter(self) -> bool:
-        return self.win._sync_supporter_key() is not None
-
-    def not_supporter(self) -> bool:
-        return not self.is_supporter()
-
-    def supporter_off(self) -> bool:
-        return self.is_supporter() and not self._on()
-
-    def supporter_on(self) -> bool:
-        return self.is_supporter() and self._on()
+    def is_off(self) -> bool:
+        return not self._on()
 
     def has_problem(self) -> bool:
-        return bool(self.problem.text()) and self.is_supporter()
+        return bool(self.problem.text())
 
     def refresh(self) -> None:
         if sip.isdeleted(self.card) or sip.isdeleted(self.problem):
@@ -546,10 +520,6 @@ class _SyncCard(QObject):
         self.card.refresh()
 
     # what the buttons do
-    def enter_key(self) -> None:
-        self.win.open_supporter()
-        self.refresh()
-
     def start(self) -> None:
         if self.win._sync_start_here():
             self.revealed = True

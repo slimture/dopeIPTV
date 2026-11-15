@@ -272,7 +272,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.rec.jobs_changed.connect(self._events_jobs)
         self.wake = WakeLock()
         self._init_donate()
-        # Settings sync between a supporter's computers (off until started).
+        # Settings sync between a person's computers (off until started).
         self._init_sync()
         self._full_catalog: list | None = None
         self._poster_refresh_timer = QTimer(self)

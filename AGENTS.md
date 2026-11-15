@@ -123,7 +123,7 @@ map and the one-way import rule.
 | `core/ical.py` | Reminders and scheduled recordings as iCalendar (RFC 5545): stable UIDs, DTSTAMP, UTC times, escaping, folding at 75 octets, CRLF |
 | `core/supporter.py` | The supporter key: signed by dopeiptv.org, checked offline, nothing about the person in it |
 | `core/backup.py` | Full backup and restore: every setting a person would miss in one JSON file (logins included, caches, window layout and machine state left out); a restore over everything waits for the next start (`stage` / `apply_pending`) |
-| `core/sync.py` | Settings sync for supporters: the sync code, slot and key (HKDF), what syncs (explicit allow/deny lists), stamping, merging (last writer per entry, tombstones), the round trip to dopeiptv.org, applying what came back |
+| `core/sync.py` | Settings sync, for everyone: the sync code, slot and key (HKDF), what syncs (explicit allow/deny lists), stamping, merging (last writer per entry, tombstones), the round trip to dopeiptv.org (nothing about the person: no key, no account), applying what came back |
 | `core/chacha20poly1305.py` | ChaCha20-Poly1305 (RFC 8439) in plain Python, many blocks at once - what sync encrypts with |
 | `core/together.py` | Watch together: the room code (8 characters, no look-alikes), its room id and key (PBKDF2, then HKDF), messages sealed and padded (ChaCha20-Poly1305), the relay's clock (shortest round trip), the room (who is in, what plays: the newest state wins), keeping in step (`Corrector`: nothing within a second, a hold when a little ahead, a seek beyond; `LocalWatch`: a seek made here), the link to dopeiptv.org/together/ (a long poll and a sender, its own threads) |
 | `core/discord_rpc.py` | Discord status over Discord's local IPC (Unix socket / named pipe `discord-ipc-N`): frames, where Discord listens, the activity, `Presence` on its own thread (reconnects quietly); `DISCORD_APP_ID` (empty: not offered) |
@@ -228,8 +228,8 @@ health per channel), `mw_chanprefs` (a channel's own settings),
 `mw_events` (events pushed out: webhooks and MQTT), `mw_media` (media
 servers: playback reported, their resume points and watched marks), `mw_privacy` (private
 viewing, clear recent history), `mw_report` (feedback, error reports and
-the answers to them), `mw_sync` (settings sync between a supporter's
-computers), `mw_connections` (connections to the account, the warning
+the answers to them), `mw_sync` (settings sync between a person's
+computers, for everyone), `mw_connections` (connections to the account, the warning
 before one more), `mw_mirrors` (a source's backup addresses for a stream
 whose server is down) and `mw_popout` (detached-window player). What stays in `main_window.py` is
 computers), `mw_together` (watch together: a room, its strip, keeping in

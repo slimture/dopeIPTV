@@ -188,13 +188,17 @@ PROVIDER = {"name": "Home IPTV", "kind": "xtream", "server": "http://iptv.exampl
 
 class Site:
     """dopeiptv.org's /sync/ as donate/sync.py answers it: a version per
-    slot, 409 with the copy there for a stale version, a supporter key
-    checked on every request."""
+    slot, 409 with the copy there for a stale version, 507 for a new slot
+    while it is *full*, *refuse* for every request turned down - and the
+    headers of each request kept, to see that nothing about the person
+    goes along."""
 
     def __init__(self):
         self.slots: dict[str, tuple[int, str]] = {}
         self.calls: list[tuple[str, str]] = []
-        self.keys: list[str] = []
+        self.headers: list[dict[str, str]] = []
+        self.full = False
+        self.refuse = 0
         site = self
 
         class H(BaseHTTPRequestHandler):
@@ -210,10 +214,9 @@ class Site:
 
             def _slot(self):
                 site.calls.append((self.command, self.path))
-                key = self.headers.get(sync.HEADER) or ""
-                site.keys.append(key)
-                if supporter.parse(key) is None:
-                    self._send(401, {"error": "key"})
+                site.headers.append({k.lower(): v for k, v in self.headers.items()})
+                if site.refuse:
+                    self._send(site.refuse, {"error": "no"})
                     return None
                 return self.path.rsplit("/", 1)[-1]
 
@@ -234,6 +237,8 @@ class Site:
                 version, blob = site.slots.get(slot, (0, ""))
                 if body["version_seen"] != version:
                     return self._send(409, {"version": version, "t": 1, "blob": blob})
+                if site.full and slot not in site.slots:
+                    return self._send(507, {"error": "full"})
                 site.slots[slot] = (version + 1, body["blob"])
                 self._send(200, {"version": version + 1, "t": 1})
 
@@ -388,7 +393,7 @@ def test_history_keeps_the_newest_of_each_title_and_prunes_old_tombstones():
 def test_first_upload_join_and_both_ways(tmp_path, site):
     raw = sync.parse_code(sync.new_code())
     slot, key = sync.derive(raw)
-    remote = sync.Remote(slot, _key(), site.url, timeout=5)
+    remote = sync.Remote(slot, site.url, timeout=5)
     a = Computer(tmp_path, "a", slot)
     pid = a.playlists.add(dict(PROVIDER))["id"]
     a.favs(pid).add("all", {"stream_id": 1, "name": "One"})
@@ -400,7 +405,9 @@ def test_first_upload_join_and_both_ways(tmp_path, site):
     stored = base64.b64decode(site.slots[slot][1])
     for secret in (b"nord", b"anna", b"iptv.example", b"One"):
         assert secret not in stored                  # the site keeps ciphertext only
-    assert all(k == site.keys[0] for k in site.keys) and supporter.parse(site.keys[0])
+    # Nothing about the person goes along: the app's name, and the ciphertext.
+    assert site.headers and all("supporter" not in " ".join(h) for h in site.headers)
+    assert {h["user-agent"].split("/")[0] for h in site.headers} == {"dopeIPTV"}
 
     # Nothing changed: a round only looks.
     puts = site.puts()
@@ -435,7 +442,7 @@ def test_the_same_playlist_under_another_id_is_one_playlist(tmp_path, site):
     """Added by hand on both computers before syncing: favorites follow it by
     its address and login, and nothing is listed twice."""
     slot, key = sync.derive(os.urandom(32))
-    remote = sync.Remote(slot, _key(), site.url, timeout=5)
+    remote = sync.Remote(slot, site.url, timeout=5)
     a, b = Computer(tmp_path, "a", slot), Computer(tmp_path, "b", slot)
     apid = a.playlists.add(dict(PROVIDER, id="aaaa1111"))["id"]
     bpid = b.playlists.add(dict(PROVIDER, id="bbbb2222", name="Mine"))["id"]
@@ -461,7 +468,7 @@ def test_the_same_playlist_under_another_id_is_one_playlist(tmp_path, site):
 
 def test_the_playlist_in_use_is_never_removed_by_a_sync(tmp_path, site):
     slot, key = sync.derive(os.urandom(32))
-    remote = sync.Remote(slot, _key(), site.url, timeout=5)
+    remote = sync.Remote(slot, site.url, timeout=5)
     a, b = Computer(tmp_path, "a", slot), Computer(tmp_path, "b", slot)
     pid = a.playlists.add(dict(PROVIDER))["id"]
     a.round(remote, key, now=100)
@@ -481,7 +488,7 @@ def test_a_category_turned_on_later_takes_what_the_others_have(tmp_path, site):
     """Playlists turned on on B long after A synced them: A's newer password
     wins over B's old copy, and B's own playlist is added for A."""
     slot, key = sync.derive(os.urandom(32))
-    remote = sync.Remote(slot, _key(), site.url, timeout=5)
+    remote = sync.Remote(slot, site.url, timeout=5)
     a, b = Computer(tmp_path, "a", slot), Computer(tmp_path, "b", slot)
     pid = a.playlists.add(dict(PROVIDER))["id"]
     a.round(remote, key, now=100)
@@ -512,7 +519,7 @@ class Racing(sync.Remote):
 
 def test_two_computers_at_once_conflict_and_both_changes_stay(tmp_path, site):
     slot, key = sync.derive(os.urandom(32))
-    remote = sync.Remote(slot, _key(), site.url, timeout=5)
+    remote = sync.Remote(slot, site.url, timeout=5)
     a, b = Computer(tmp_path, "a", slot), Computer(tmp_path, "b", slot)
     pid = a.playlists.add(dict(PROVIDER))["id"]
     a.round(remote, key, now=100)
@@ -522,7 +529,7 @@ def test_two_computers_at_once_conflict_and_both_changes_stay(tmp_path, site):
     a.settings.setValue("theme", "nord")
     b.favs(pid).add("all", {"stream_id": 20, "name": "From B"})
     b.settings.setValue("accent", "red")
-    racing = Racing(slot, _key(), site.url, timeout=5)
+    racing = Racing(slot, site.url, timeout=5)
     racing.between = lambda: a.round(remote, key, now=300)
     version_before = site.slots[slot][0]
     result, _applied = b.round(racing, key, now=310)
@@ -535,21 +542,38 @@ def test_two_computers_at_once_conflict_and_both_changes_stay(tmp_path, site):
         assert c.settings.value("theme") == "nord" and c.settings.value("accent") == "red"
 
 
-def test_joining_a_code_with_nothing_under_it_and_a_refused_key(tmp_path, site):
+def test_joining_a_code_with_nothing_under_it_a_full_site_and_a_refusal(tmp_path, site):
     slot, key = sync.derive(os.urandom(32))
     b = Computer(tmp_path, "b", slot)
     b.state.fresh = b.state.joining = True
     with pytest.raises(sync.SyncError) as e:
-        b.round(sync.Remote(slot, _key(), site.url, timeout=5), key)
+        b.round(sync.Remote(slot, site.url, timeout=5), key)
     assert e.value.kind == "none" and not site.slots
-    other_seed, _pub = supporter.new_seed()
+    # Full: a new copy waits, one kept there already is still written.
+    site.full = True
     with pytest.raises(sync.SyncError) as e:
-        Computer(tmp_path, "c", slot).round(
-            sync.Remote(slot, supporter.make(other_seed), site.url, timeout=5), key)
-    assert e.value.kind == "key"
+        Computer(tmp_path, "c", slot).round(sync.Remote(slot, site.url, timeout=5), key)
+    assert e.value.kind == "full" and not site.slots
+    site.full = False
+    a = Computer(tmp_path, "a", slot)
+    a.settings.setValue("theme", "nord")
+    a.round(sync.Remote(slot, site.url, timeout=5), key, ["settings"], now=100)
+    site.full = True
+    a.settings.setValue("theme", "dawn")
+    result, _applied = a.round(sync.Remote(slot, site.url, timeout=5), key, ["settings"],
+                               now=200)
+    assert result.uploaded and site.slots[slot][0] == 2
+    site.full = False
+    for status in (401, 403):
+        site.refuse = status
+        with pytest.raises(sync.SyncError) as e:
+            Computer(tmp_path, f"r{status}", slot).round(
+                sync.Remote(slot, site.url, timeout=5), key)
+        assert e.value.kind == "refused"
+    site.refuse = 0
     with pytest.raises(sync.SyncError) as e:
         Computer(tmp_path, "d", slot).round(
-            sync.Remote(slot, _key(), "http://127.0.0.1:9/sync/", timeout=2), key)
+            sync.Remote(slot, "http://127.0.0.1:9/sync/", timeout=2), key)
     assert e.value.kind == "net"
 
 
@@ -561,13 +585,13 @@ def test_too_much_is_refused_before_it_is_sent(tmp_path, site, monkeypatch):
     for i in range(200):
         a.favs(pid).add("all", {"stream_id": i, "name": os.urandom(16).hex()})
     with pytest.raises(sync.SyncError) as e:
-        a.round(sync.Remote(slot, _key(), site.url, timeout=5), key, ["favorites"])
+        a.round(sync.Remote(slot, site.url, timeout=5), key, ["favorites"])
     assert e.value.kind == "big" and e.value.size > 2000 and site.puts() == 0
 
 
 def test_a_change_made_while_a_round_ran_is_left_for_the_next(tmp_path, site):
     slot, key = sync.derive(os.urandom(32))
-    remote = sync.Remote(slot, _key(), site.url, timeout=5)
+    remote = sync.Remote(slot, site.url, timeout=5)
     a, b = Computer(tmp_path, "a", slot), Computer(tmp_path, "b", slot)
     a.settings.setValue("theme", "nord")
     a.round(remote, key, ["settings"], now=100)
@@ -645,17 +669,23 @@ def _settle(w, secs=10.0):
     return False
 
 
-def test_off_and_without_a_supporter_key_nothing_runs(tmp_path, site, qapp):
+def test_off_nothing_runs_and_anyone_can_start(tmp_path, site, qapp):
+    """Sync is for everyone: no supporter key, and none sent when there is."""
     w = _window(tmp_path, "w", site)
     assert not w._sync_on() and not w._sync_timer.isActive()
     assert not w.sync_now(manual=True)
     w._sync_tick()
-    assert w._sync_start_here() is None and not w._sync_on()      # not a supporter
-    assert not w._sync_join(sync.new_code()) and not w._sync_on()
-    # A code left behind without a key: still nothing goes out.
-    w.settings.setValue(sync.K_CODE, sync.new_code())
-    assert not w.sync_now(manual=True) and w._sync_status[0] == "nokey"
     assert site.calls == []
+    assert w.settings.value("supporter_key") is None
+    code = w._sync_start_here()                                   # no key at all
+    assert sync.parse_code(code) and w._sync_on() and _settle(w)
+    assert w._sync_status[0] == "ok" and len(site.slots) == 1
+    w.settings.setValue("supporter_key", _key())                  # a supporter's
+    w.settings.setValue("theme", "nord")
+    assert w.sync_now(manual=True) and _settle(w) and w._sync_status[0] == "ok"
+    for h in site.headers:
+        assert "supporter" not in " ".join(h) and _key() not in " ".join(h.values())
+    w._sync_forget()
     w._sync_pool.waitForDone(2000)
 
 
@@ -668,28 +698,38 @@ def _shown_rows(card):
     return out
 
 
-def test_the_settings_card_offers_sync_to_supporters_only(tmp_path, site, qapp):
-    from PyQt6.QtWidgets import QDialog
+def test_the_settings_page_offers_sync_to_everyone_and_says_what_is_sent(
+        tmp_path, site, qapp):
+    from PyQt6.QtWidgets import QDialog, QLabel
 
     from dopeiptv.ui.mw_sync import _SyncCard
     from dopeiptv.ui.settings_ui import SettingsPage
 
     w = _window(tmp_path, "w", site)
     dlg = QDialog()
-    page = SettingsPage("general", "General")
-    card = page.card("Sync")
-    _SyncCard(w, card, dlg)
-    assert _shown_rows(card) == [tr("sync_title")]                   # a key first
-    w.settings.setValue("supporter_key", _key())
+    page = SettingsPage("sync", tr("sync_title"), nav_title=tr("sync_nav"))
+    w._build_sync_card(page, dlg)
+    card, privacy = page.cards
+    assert _shown_rows(card) == [tr("sync_title")]                   # start or join, no key
+    # What dopeiptv.org gets, said on the page, on or off.
+    assert privacy.property("_title").text() == tr("sync_privacy_title")
+    assert tr("sync_privacy") in [lbl.text() for lbl in privacy.findChildren(QLabel)]
+    for word in ("encrypted", "random number", "cannot read", "No account", "180 days"):
+        assert word in tr("sync_privacy")
+    assert "supporter" not in (tr("sync_privacy") + tr("set_page_sync_sub")
+                               + tr("sync_off_hint")).lower()
+    assert page.nav_title == "Sync" and page.title == "Sync between computers"
+    assert page.apply_filter("sync")
     dlg2 = QDialog()
-    card2 = SettingsPage("general", "General").card("Sync")
+    card2 = SettingsPage("sync", "Sync").card("Sync")
     ui = _SyncCard(w, card2, dlg2)
-    assert _shown_rows(card2) == [tr("sync_title"), "widget"]        # start or join, privacy
     ui.start()
     assert _settle(w)
     shown = _shown_rows(card2)
     assert tr("sync_code") in shown and tr("sync_stop") in shown
     assert w.settings.value(sync.K_CODE) in ui.code_row.hint_label.text()   # shown once made
+    w._sync_status = ("full", 0)
+    assert w._sync_status_text()[1] == tr("sync_err_full")
     w._sync_forget()
     dlg.deleteLater()
     dlg2.deleteLater()
@@ -699,7 +739,6 @@ def test_two_windows_start_join_and_sync_both_ways(tmp_path, site, qapp):
     a = _window(tmp_path, "a", site)
     b = _window(tmp_path, "b", site)
     for w in (a, b):
-        w.settings.setValue("supporter_key", _key())
         sync.set_chosen(w.settings, ALL)          # playlists too (off by default)
     pid = a.playlist_store.add(dict(PROVIDER))["id"]
     FavoriteStore(a.settings, f"favorites_{pid}").add("all", {"stream_id": 5, "name": "Five"})
@@ -735,14 +774,12 @@ def test_two_windows_start_join_and_sync_both_ways(tmp_path, site, qapp):
 
 def test_a_typo_in_a_code_does_not_join(tmp_path, site, qapp):
     w = _window(tmp_path, "w", site)
-    w.settings.setValue("supporter_key", _key())
     assert w._sync_join(sync.new_code()) and _settle(w)
     assert w._sync_status[0] == "none" and not w._sync_on() and not site.slots
 
 
 def test_no_round_in_a_streams_first_seconds_and_a_change_is_noticed(tmp_path, site, qapp):
     w = _window(tmp_path, "w", site)
-    w.settings.setValue("supporter_key", _key())
     assert w._sync_start_here() and _settle(w)
     calls = len(site.calls)
     w._sync_mark_play()
@@ -763,7 +800,6 @@ def test_closing_keeps_when_a_change_was_made(tmp_path, site, qapp):
     """A change made just before closing gets its time then - not at the
     next start, where it would beat a later change on another computer."""
     w = _window(tmp_path, "w", site)
-    w.settings.setValue("supporter_key", _key())
     assert w._sync_start_here() and _settle(w)
     w.settings.setValue("theme", "dawn")
     before = int(time.time())

@@ -701,8 +701,8 @@ class _SettingsMixin:
         outer.addWidget(shell, 1)
 
         def page(key: str, title: str, subtitle: str,
-                 icon: str, tint: str | None = None) -> SettingsPage:
-            pg = SettingsPage(key, title, subtitle)
+                 icon: str, tint: str | None = None, nav: str = "") -> SettingsPage:
+            pg = SettingsPage(key, title, subtitle, nav)
             pg.icon_kind, pg.icon_base = icon, self._action_pixmap
             return shell.add_page(pg, page_icon(icon, self._action_pixmap, tint=tint))
 
@@ -741,8 +741,9 @@ class _SettingsMixin:
         history = page("history", tr("set_page_history"),
                        tr("set_page_history_sub" if simkl_offered
                           else "set_page_trakt_sub"), "trakt")
+        # Its whole title is too long for the sidebar in most languages.
         sync_page = page("sync", tr("sync_title"), tr("set_page_sync_sub"),
-                         "sync")
+                         "sync", nav=tr("sync_nav"))
         integrations = page("integrations", tr("set_page_integrations"),
                             tr("set_page_integrations_sub"), "plug")
         general = page("general", tr("set_page_general"),
@@ -892,7 +893,7 @@ class _SettingsMixin:
             c.shown_if(c.rows[-1][0], lambda: key_state["mine"] is not None)
         heart_box = c.toggle(tr("set_donate_heart"), self._donate_heart_due(),
                              tr("set_donate_heart_hint"))
-        # Sync between computers: a supporter's thank-you (mw_sync).
+        # Sync between computers, for everyone (mw_sync).
         if hasattr(self, "_build_sync_card"):
             self._build_sync_card(sync_page, d)
 

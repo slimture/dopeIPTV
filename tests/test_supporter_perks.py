@@ -1,7 +1,8 @@
 """What a supporter key opens: the supporter's app icon (unless switched
 off) and two themes of their own - and what happens without one: the
 themes shown with a heart that opens the supporter window, and a supporter
-theme stored from before giving way to the default, quietly."""
+theme stored from before giving way to the default, quietly. Sync between
+computers is not among them any more: it is for everyone."""
 from __future__ import annotations
 
 import os
@@ -276,3 +277,18 @@ def test_the_window_opens_and_closes_the_perks_with_the_key():
     out = subprocess.run([sys.executable, "-c", _WINDOW], cwd=_REPO_ROOT, env=env,
                          capture_output=True, text=True, timeout=180)
     assert "PERKS_OK" in out.stdout, out.stdout + out.stderr[-3000:]
+
+
+def test_sync_is_for_everyone_not_a_perk(key):
+    """Sync was a thank-you for supporters; it is for everyone now. Nothing
+    of a key goes with it, and nothing says it is a supporter's."""
+    from dopeiptv.core import sync
+    from dopeiptv.i18n import set_language, tr
+    assert not hasattr(sync, "HEADER")
+    remote = sync.Remote("ab" * 32)
+    assert set(remote.headers) == {"User-Agent", "Content-Type"}
+    assert key not in " ".join(remote.headers.values())
+    set_language("en")
+    assert "sync" not in tr("supporter_perks").lower()
+    for k in ("set_page_sync_sub", "sync_off_hint", "sync_privacy"):
+        assert "supporter" not in tr(k).lower(), k

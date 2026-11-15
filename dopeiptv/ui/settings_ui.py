@@ -274,10 +274,13 @@ class SettingsCard(QFrame):
 class SettingsPage(QScrollArea):
     """One page: a title, a line saying what is on it, and its cards."""
 
-    def __init__(self, key: str, title: str, subtitle: str = "") -> None:
+    def __init__(self, key: str, title: str, subtitle: str = "",
+                 nav_title: str = "") -> None:
         super().__init__()
         self.key = key
         self.title = title
+        #: Its name in the sidebar, when the title does not fit there.
+        self.nav_title = nav_title or title
         self.subtitle = subtitle
         #: How its sidebar icon is drawn (set by whoever adds the page).
         self.icon_kind = ""
@@ -373,7 +376,8 @@ class SettingsPage(QScrollArea):
         return c
 
     def apply_filter(self, needle: str) -> bool:
-        whole = bool(needle) and needle in self.title.casefold()
+        whole = bool(needle) and (needle in self.title.casefold()
+                                  or needle in self.nav_title.casefold())
         shown = False
         for c in self.cards:
             # A section's heading found shows the section ("trakt": its
@@ -567,7 +571,7 @@ class SettingsShell(QWidget):
     def add_page(self, page: SettingsPage, icon: QIcon) -> SettingsPage:
         self.pages.append(page)
         self.stack.addWidget(page)
-        item = QListWidgetItem(icon, page.title)
+        item = QListWidgetItem(icon, page.nav_title)
         item.setData(Qt.ItemDataRole.UserRole, page.key)
         # 32 px, not 36: with the group headings, the pages at 36 no longer
         # fitted the sidebar of a window of the default height.

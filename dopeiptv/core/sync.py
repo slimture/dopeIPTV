@@ -1,18 +1,16 @@
-"""Settings sync for supporters: favorites, settings, playlists and watch
+"""Settings sync for everyone: favorites, settings, playlists and watch
 history kept the same on several computers through dopeiptv.org, end-to-end
 encrypted.
 
-Privacy. The supporter key is signed by dopeiptv.org, so the site knows
-everything derived from it alone. The secret here is something else: a
-random 256-bit *sync code*, made on the first computer and typed or pasted
-on the others. From it come (HKDF-SHA256) the *slot* - the name the site
-keeps the data under - and the key it is encrypted with (ChaCha20-Poly1305,
-core/chacha20poly1305.py). The site sees the slot, the size and when; it
-never sees the code or the key, and cannot read a byte of what is kept.
-Each request carries the supporter key so the site can check, offline,
-that a supporter asks; it keeps neither the key nor a link from it to the
-slot (donate/sync.py on the website branch). Nothing else about the person
-goes along.
+Privacy. The secret is a random 256-bit *sync code*, made on the first
+computer and typed or pasted on the others. From it come (HKDF-SHA256) the
+*slot* - the random-looking number the site keeps the data under - and the
+key it is encrypted with (ChaCha20-Poly1305, core/chacha20poly1305.py),
+here, before anything is sent. The site sees the slot, the size and when;
+it never sees the code or the key, and cannot read a byte of what is kept.
+No account, no e-mail, no name and no supporter key go along: nothing that
+says who asks (donate/sync.py on the website branch). A copy no computer
+has read or written for 180 days is deleted there.
 
 What syncs (one switch each): favorites with their folders, settings from
 an explicit allow-list (never window sizes, folders and paths of this
@@ -57,7 +55,6 @@ from .log import log
 from .stores import FavoriteStore, HistoryStore
 
 ENDPOINT = "https://dopeiptv.org/sync/"
-HEADER = "X-Dopeiptv-Supporter"
 #: The most the site keeps for one slot (the ciphertext).
 MAX_BLOB = 2 * 1024 * 1024
 FORMAT = 1
@@ -84,9 +81,11 @@ MAX_RESUME = 300
 
 class SyncError(Exception):
     """A round that did not finish. *kind*: net (no answer), busy (the site
-    is busy, or rate-limited), key (the supporter key was not taken), big
-    (too much to sync), none (nothing under this code), read (the copy
-    there could not be read with this code), newer (a newer app made it)."""
+    is busy, or rate-limited), refused (the site turned the request down),
+    full (the site has no room for a new copy; one kept there already can
+    still be written), big (too much to sync), none (nothing under this
+    code), read (the copy there could not be read with this code), newer (a
+    newer app made it)."""
 
     def __init__(self, kind: str, size: int = 0) -> None:
         super().__init__(kind)
@@ -589,15 +588,16 @@ def live(doc: dict[str, Any], cat: str) -> dict[str, Any]:
 # -- the site ---------------------------------------------------------------------------
 
 class Remote:
-    """GET, PUT and DELETE of one slot on dopeiptv.org, the supporter key in
-    a header. Blocking: a worker thread's."""
+    """GET, PUT and DELETE of one slot on dopeiptv.org - with nothing about
+    the person: the app's name and version, and the ciphertext. Blocking: a
+    worker thread's."""
 
-    def __init__(self, slot: str, supporter_key: str, endpoint: str | None = None,
+    def __init__(self, slot: str, endpoint: str | None = None,
                  timeout: float = 20.0) -> None:
         self.url = (endpoint or ENDPOINT) + slot
         self.timeout = timeout
         from .. import __version__
-        self.headers = {HEADER: supporter_key, "User-Agent": f"dopeIPTV/{__version__}",
+        self.headers = {"User-Agent": f"dopeIPTV/{__version__}",
                         "Content-Type": "application/json"}
 
     def _call(self, method: str, body: dict | None = None) -> Any:
@@ -614,9 +614,11 @@ class Remote:
     @staticmethod
     def _fail(status: int) -> SyncError:
         if status in (401, 403):
-            return SyncError("key")
+            return SyncError("refused")
         if status == 413:
             return SyncError("big")
+        if status == 507:
+            return SyncError("full")
         if status in (429, 502, 503, 504):
             return SyncError("busy")
         return SyncError("net")

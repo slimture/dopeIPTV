@@ -307,6 +307,11 @@ def layout(self):
     assert tr("tab_trakt") in card_titles("history")
     assert page["metadata"].title == tr("set_page_posters")
     assert page["sync"].title == tr("sync_title")
+    # Its sidebar entry is short: the whole title was cut off there.
+    names = {nav.item(i).data(256): nav.item(i).text() for i in range(nav.count())}
+    assert names["sync"] == tr("sync_nav") != page["sync"].title
+    assert names["metadata"] == page["metadata"].title
+    assert tr("sync_privacy_title") in card_titles("sync")
     return 0
 QDialog.exec = layout
 w.open_settings()
