@@ -33,6 +33,7 @@ from PyQt6.QtWidgets import (
 
 from ..core import tv_nav
 from ..core.log import log
+from ..core.profiles import adult_category, adult_item
 from ..core.workers import run_async
 from ..i18n import tr
 from .theme import P
@@ -67,6 +68,12 @@ def now_next(window, it: dict) -> tuple[str, str, float | None]:
 
 def _sig(channels: list) -> tuple:
     return tuple((c.get("stream_id"), c.get("name")) for c in channels)
+
+
+def _kids(window) -> bool:
+    """A kids profile in use: no category named for adults and nothing the
+    provider marks for them, as in the window's own lists (mw_profiles)."""
+    return bool(getattr(window, "_profile_kids", lambda: False)())
 
 
 def _set_image(tile: TvTile, url, loader) -> None:
@@ -270,7 +277,9 @@ class HomeScreen(TvScreen):
             if sid not in seen:
                 seen.add(sid)
                 out.append(it)
-        out = list(w._visible_catalog(out, "live"))[:self.LIVE_MAX]
+        kids = _kids(w)
+        out = [it for it in w._visible_catalog(out, "live")
+               if not (kids and adult_item(it))][:self.LIVE_MAX]
         return sorted(out, key=lambda it: now_next(w, it)[2] is None)
 
     def _fetch_lineup(self) -> None:
@@ -364,6 +373,20 @@ class ChannelsScreen(TvScreen):
         else:
             self.chans.viewport().update()
 
+    def rebuild(self) -> None:
+        """Another profile (mw_profiles): its categories and channels, read
+        again - never what the one before was let see."""
+        self._loaded = False
+        self._gen += 1
+        self._timer.stop()
+        self.cats.set_items([], "cat")
+        self.chans.set_items([], "live")
+        self.head.setText("")
+        self.note.setText(tr("status_loading_channels"))
+        self.note.show()
+        if self.page.current == self.key:
+            self.enter()
+
     def _failed(self, msg) -> None:
         log.info("tv: channels did not load: %s", msg)
         self.note.setText(tr("detail_epg_failed"))
@@ -376,14 +399,17 @@ class ChannelsScreen(TvScreen):
             rows.append({"name": tr("nav_favorites"), "_cat": "__fav__"})
         rows.append({"name": tr("cat_all"), "_cat": None})
         unlocked = w.parental.session_unlocked
+        kids = _kids(w)
         for c in cats or []:
             cid = c.get("category_id")
             if w.overrides.is_hidden("live", cid):
                 continue
             if w.overrides.is_locked("live", cid) and not unlocked:
                 continue
-            rows.append({"name": w.overrides.display_name(
-                "live", cid, c.get("category_name", "?")), "_cat": cid})
+            name = w.overrides.display_name("live", cid, c.get("category_name", "?"))
+            if kids and adult_category(name):
+                continue
+            rows.append({"name": name, "_cat": cid})
         # Favorites first when there are some, else the first real category
         # (as the window's list lands), else All.
         start = 0
@@ -412,11 +438,12 @@ class ChannelsScreen(TvScreen):
         client, cid = w.client, cat.get("_cat")
         keep = w._catalog_filter("live")
         hidden = w._channel_hidden
+        kids = _kids(w)
 
         def work():
             return gen, [c for c in (client.live_streams(cid) or [])
                          if c.get("stream_id") is not None and keep(c)
-                         and not hidden(c, "live")]
+                         and not hidden(c, "live") and not (kids and adult_item(c))]
 
         run_async(w.pool, work, self._chans_in, self._failed)
 
@@ -751,6 +778,8 @@ class TvPage(QWidget):
 
     def _tab_clicked(self) -> None:
         tab = self.sender()
+        if getattr(self.window, "_profile_locked", lambda: False)():
+            return          # who is watching first (a click, as handle's keys)
         if isinstance(tab, TvTile) and isinstance(tab.payload, tuple):
             self.show_screen(str(tab.payload[1]))
 

@@ -240,6 +240,10 @@ class _TvMixin:
                     self.setGeometry(geo)
         QTimer.singleShot(0, self._update_mid_compact)
         self._events_tv_mode()
+        if getattr(self, "_profile_must_pick", False):
+            # TV mode's "Who's watching?" was up for a profile's PIN: the
+            # window's own picker again, never the profile without it.
+            self.show_profile_picker()
 
     def _tv_wire(self) -> None:
         if self._tv_wired:
@@ -407,6 +411,13 @@ class _TvMixin:
 
     def _tv_action(self, action: str) -> None:
         if not self._tv_on:
+            return
+        page = self._tv_page
+        if page is not None and getattr(self, "_profile_locked", lambda: False)():
+            # Who is watching first: a number, the volume or Play would
+            # reach the profile behind the PIN; the page takes only the
+            # profiles' tiles.
+            page.handle(action)
             return
         if self._tv_watching:
             self._tv_watch_action(action)

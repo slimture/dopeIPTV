@@ -16,11 +16,14 @@ from PyQt6.QtWidgets import (
 )
 
 from ..core.log import log
+from ..core.profiles import adult_category, adult_item
 from ..core.workers import run_async
 from ..i18n import tr
 from .epg_grid import EpgGrid
 from .theme import P
-from .tv_mode import ChannelsScreen, TvPage, TvScreen, _art, _set_image, _sig, now_next
+from .tv_mode import (
+    ChannelsScreen, TvPage, TvScreen, _art, _kids, _set_image, _sig, now_next,
+)
 from .tv_widgets import TvGrid, TvKeyboard, TvList, TvShelf, TvTile, colour, font, px
 
 
@@ -116,13 +119,29 @@ class GuideScreen(TvScreen):
         self._gen += 1
         gen, client = self._gen, w.client
         keep = w._catalog_filter("live")
+        kids = _kids(w)
         self.note.setText(tr("status_loading_channels"))
         self.note.show()
 
         def work():
-            return gen, [c for c in client.live_streams(None) or [] if keep(c)]
+            return gen, [c for c in client.live_streams(None) or []
+                         if keep(c) and not (kids and adult_item(c))]
 
         run_async(w.pool, work, self._lineup_in, lambda _e: None)
+
+    def rebuild(self) -> None:
+        """Another profile (mw_profiles): the guide of its channels, made
+        again - never the one the profile before was let see."""
+        self._gen += 1
+        if self.grid is not None:
+            self._lay.removeWidget(self.grid)
+            self.grid.hide()
+            self.grid.deleteLater()
+            self.grid = None
+        self.note.setText(tr("status_loading_channels"))
+        self.note.show()
+        if self.page.current == self.key:
+            self.enter()
 
     def _lineup_in(self, got) -> None:
         gen, rows = got
@@ -249,6 +268,21 @@ class MediaScreen(TvScreen):
               else self.w.client.series_categories)
         run_async(self.w.pool, fn, self._cats_in, self._failed)
 
+    def rebuild(self) -> None:
+        """Another profile (mw_profiles): its categories and titles, read
+        again - never what the one before was let see."""
+        self._loaded = False
+        self._gen += 1
+        self._timer.stop()
+        self.series = None
+        self.cats.set_items([], "cat")
+        self.grid.set_items([], self.kind)
+        self.episodes.set_items([], "episode")
+        self.stack.setCurrentWidget(self.grid)
+        self.head.setText("")
+        if self.page.current == self.key:
+            self.enter()
+
     def _failed(self, msg) -> None:
         log.info("tv: %s did not load: %s", self.kind, msg)
         self.note.setText(tr("tv_nothing_here"))
@@ -258,14 +292,17 @@ class MediaScreen(TvScreen):
         w = self.w
         rows: list[dict] = [{"name": tr("cat_all"), "_cat": None}]
         unlocked = w.parental.session_unlocked
+        kids = _kids(w)
         for c in cats or []:
             cid = c.get("category_id")
             if w.overrides.is_hidden(self.kind, cid):
                 continue
             if w.overrides.is_locked(self.kind, cid) and not unlocked:
                 continue
-            rows.append({"name": w.overrides.display_name(
-                self.kind, cid, c.get("category_name", "?")), "_cat": cid})
+            name = w.overrides.display_name(self.kind, cid, c.get("category_name", "?"))
+            if kids and adult_category(name):
+                continue
+            rows.append({"name": name, "_cat": cid})
         self.cats.set_items(rows, "cat", 1 if len(rows) > 1 else 0)
         self.load_items()
 
@@ -289,10 +326,11 @@ class MediaScreen(TvScreen):
         keep = w._catalog_filter(kind)
         hidden = w._channel_hidden
         id_key = "stream_id" if kind == "vod" else "series_id"
+        kids = _kids(w)
 
         def work():
             return gen, [c for c in (fn(cid) or []) if c.get(id_key) is not None
-                         and keep(c) and not hidden(c, kind)]
+                         and keep(c) and not hidden(c, kind) and not (kids and adult_item(c))]
 
         run_async(w.pool, work, self._items_in, self._failed)
 
@@ -415,6 +453,7 @@ class SearchScreen(TvScreen):
         self.query = ""
         self.shelves: list[TvShelf] = []
         self._index: dict[str, list] | None = None
+        self._index_gen = 0
         self._loading = False
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
@@ -463,6 +502,7 @@ class SearchScreen(TvScreen):
         self._loading = True
         w, client = self.w, self.w.client
         keeps = {k: w._catalog_filter(k) for k in ("live", "vod", "series")}
+        kids, gen = _kids(w), self._index_gen
 
         def work():
             out: dict[str, list] = {}
@@ -473,16 +513,34 @@ class SearchScreen(TvScreen):
                     rows = fn(None) or []
                 except Exception:
                     rows = []
-                out[kind] = [r for r in rows if r.get(id_key) is not None and keeps[kind](r)]
-            return out
+                out[kind] = [r for r in rows if r.get(id_key) is not None and keeps[kind](r)
+                             and not (kids and adult_item(r))]
+            return gen, out
 
-        run_async(w.pool, work, self._index_in, lambda _e: self._index_in({}))
+        run_async(w.pool, work, self._index_in, self._index_failed)
 
-    def _index_in(self, index) -> None:
+    def _index_failed(self, _e=None) -> None:
+        self._index_in((self._index_gen, {}))
+
+    def _index_in(self, got) -> None:
+        gen, index = got
+        if gen != self._index_gen or sip.isdeleted(self):
+            return              # made for the profile before (rebuild)
         self._loading = False
         self._index = dict(index or {})
         if self.query:
             self.search()
+
+    def rebuild(self) -> None:
+        """Another profile (mw_profiles): what it searches is read again -
+        never what the one before was let see - and the query goes."""
+        self._index_gen += 1
+        self._index = None
+        self._loading = False
+        self._timer.stop()
+        self.query = ""
+        self._show_query()
+        self._results([])
 
     def search(self) -> None:
         self._timer.stop()

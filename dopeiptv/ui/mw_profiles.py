@@ -184,7 +184,10 @@ class _ProfilesMixin:
             self._home_page.refresh()
         self._load_categories()
         tv = getattr(self, "_tv_page", None)
-        if tv is not None and not sip.isdeleted(tv) and getattr(self, "_tv_on", False):
+        # TV mode's page stays made once it is left: its screens read the
+        # new profile's anew even while it is off, or the next time it is
+        # on they showed what the profile before was let see.
+        if tv is not None and not sip.isdeleted(tv):
             for scr in tv.screens.values():
                 if hasattr(scr, "rebuild"):
                     scr.rebuild()
@@ -380,7 +383,10 @@ class _ProfilesMixin:
             (x for x in store.profiles() if x.name.casefold() == want.casefold()), None)
         if p is None:
             raise ValueError("no such profile")
-        if p.id != profiles.active_id() and p.has_pin:
+        # "Who's watching?" waiting for the PIN at start: the profile in use
+        # is not open yet either - its PIN is asked as the picker asks it.
+        at_start = bool(self._profile_must_pick)
+        if (p.id != profiles.active_id() or at_start) and p.has_pin:
             now = time.monotonic()
             fails = [t for t in (getattr(self, "_remote_pin_fails", None) or [])
                      if now - t < REMOTE_PIN_SECS]
@@ -398,7 +404,14 @@ class _ProfilesMixin:
             fails.clear()
         if not self.switch_profile(p.id):
             raise ValueError("profiles are not available")
+        # Picked, as in the picker (_profile_pick): nothing is held back any
+        # more - Settings, TV mode's keys.
+        self._profile_must_pick = False
         self._profile_close_picker()
+        page = getattr(self, "_tv_page", None)
+        if at_start and page is not None and not sip.isdeleted(page) \
+                and getattr(page, "current", "") == "profiles":
+            page.show_screen("home")
         return dict(self._profile_state(), ok=True)
 
     def _events_profile(self) -> None:
