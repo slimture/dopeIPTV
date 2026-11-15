@@ -403,6 +403,8 @@ class _TraktMixin:
     def is_movie_watched(self, item: dict) -> bool:
         if not item:
             return False
+        if item.get("_played"):
+            return True          # a media server says so (mw_media)
         if self.watched.is_movie_watched(self._tmdb_id_for_item(item, "vod")):
             return True
         sid = item.get("stream_id")
@@ -418,6 +420,8 @@ class _TraktMixin:
             self._tmdb_id_for_item(item, "series"))
         if count > 0:
             return count
+        if item.get("_played"):
+            return 1             # a media server: every episode seen
         # Fall back to the stream-id local mark so a series marked
         # watched before TMDB resolved still shows a badge (count 1).
         sid = item.get("series_id") or item.get("stream_id")
@@ -429,6 +433,8 @@ class _TraktMixin:
         return 0
 
     def is_episode_watched(self, item: dict) -> bool:
+        if item and item.get("_played"):
+            return True          # a media server says so (mw_media)
         if not item or not self.series_ctx:
             return False
         if self.tmdb:
@@ -573,6 +579,7 @@ class _TraktMixin:
 
     def _mark_movie_watched(self, item: dict,
                             push_to_trakt: bool) -> None:
+        self._ms_mark(item, True, "movie")
         tid = self._tmdb_id_for_item(item, "vod")
         if tid is not None:
             self.watched.mark_movie_local(tid)
@@ -609,6 +616,7 @@ class _TraktMixin:
 
     def _unmark_movie_watched(self, item: dict,
                               push_to_trakt: bool) -> None:
+        self._ms_mark(item, False, "movie")
         tid = self._tmdb_id_for_item(item, "vod")
         if tid is not None:
             self.watched.unmark_movie(tid)
@@ -624,6 +632,7 @@ class _TraktMixin:
 
     def _mark_episode_watched(self, item: dict,
                               push_to_trakt: bool) -> None:
+        self._ms_mark(item, True, "episode")
         sid = self._show_tmdb_id_for_episode()
         try:
             season = int(item.get("season"))
@@ -667,6 +676,7 @@ class _TraktMixin:
 
     def _unmark_episode_watched(self, item: dict,
                                 push_to_trakt: bool) -> None:
+        self._ms_mark(item, False, "episode")
         sid = self._show_tmdb_id_for_episode()
         try:
             season = int(item.get("season"))
@@ -700,6 +710,7 @@ class _TraktMixin:
         """'Seen the whole show' toggle. Locally it's a stream-keyed
         flag; the +Trakt variant marks the entire show watched on Trakt
         (a show payload adds every aired episode)."""
+        self._ms_mark(item, True, "series")
         sid = item.get("series_id") or item.get("stream_id")
         try:
             self.watched.mark_series_local_by_stream(int(sid))
@@ -744,6 +755,7 @@ class _TraktMixin:
 
     def _unmark_series_watched(self, item: dict,
                                push_to_trakt: bool) -> None:
+        self._ms_mark(item, False, "series")
         sid = item.get("series_id") or item.get("stream_id")
         try:
             self.watched.unmark_series_by_stream(int(sid))

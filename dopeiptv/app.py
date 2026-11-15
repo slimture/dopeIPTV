@@ -471,6 +471,9 @@ def main() -> int:
         else:
             log.info("Embedded playback: enabled")
     store = PlaylistStore(settings)
+    # This install's id at Jellyfin, Emby and Plex, before the first client.
+    from .providers import mediaserver
+    mediaserver.install_device_store(settings)
 
     # Open the window IMMEDIATELY - no splash, no blocking authenticate.
     # The client is built from the stored playlist and credentials are

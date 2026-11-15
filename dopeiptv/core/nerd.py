@@ -56,6 +56,8 @@ VPN_PATTERNS = re.compile(r"^(wg|tun|tap|ppp|ipsec|tailscale|nordlynx|proton|mul
 _TRUE = ("1", "true", "yes", "on")
 # Sources on the home network: no proxy unless one is named for them.
 BOX_KINDS = ("enigma2", "tvheadend", "hdhomerun")
+# Media servers: the same while their address is on the home network.
+MEDIA_KINDS = ("jellyfin", "emby", "plex")
 
 
 def _is_loopback(url: str) -> bool:
@@ -333,6 +335,11 @@ class Nerd:
         if src.lower() in ("direct", "none", "off"):
             return ""
         if not src and (source or {}).get("_kind") in BOX_KINDS:
+            return ""
+        # A media server is a box when it is on the home network (Jellyfin
+        # in the cupboard), a provider when it is not (Plex's relay).
+        if not src and (source or {}).get("_kind") in MEDIA_KINDS and is_lan_url(
+                url or str((source or {}).get("_server") or "")):
             return ""
         return src or self.get("nerd_proxy").strip()
 

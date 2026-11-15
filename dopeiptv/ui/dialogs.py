@@ -14,8 +14,10 @@ from PyQt6.QtWidgets import (
 
 from ..i18n import tr
 from .box_finder import (
-    BOX_KINDS, LOGIN_KINDS, PLACEHOLDERS, FindOnNetwork, add_box_kinds,
+    BOX_KINDS, LOGIN_KINDS, MEDIA_KINDS, PLACEHOLDERS, FindOnNetwork, add_box_kinds,
+    add_media_kinds,
 )
+from .media_signin import MediaSignIn
 from .theme import P
 
 
@@ -106,8 +108,12 @@ class PlaylistDialog(QDialog):
         if stalker_available():
             self.kind.addItem(tr("playlist_kind_stalker"), "stalker")
         add_box_kinds(self.kind)
+        add_media_kinds(self.kind)
         # A box's own options (stream port, profile...) ride along unchanged.
         self._options = dict(playlist.get("options") or {})
+        # A media server's sign-in: a token, never kept for another kind.
+        self._had_token = bool(playlist.get("token"))
+        self._accept_signed = False
         kidx = self.kind.findData(playlist.get("kind", "xtream"))
         if kidx >= 0:
             self.kind.setCurrentIndex(kidx)
@@ -151,6 +157,14 @@ class PlaylistDialog(QDialog):
         form.addRow("", self.finder.row)
         form.addRow(self._user_lbl, self.user)
         form.addRow(self._pw_lbl, self.pw)
+        # A media server is signed in to here (ui/media_signin.py).
+        self.signin = MediaSignIn(self, self.server, self.user, self.pw,
+                                  playlist if editing else None)
+        self.signin.changed.connect(self._fit)
+        self.signin.finished.connect(self._signin_finished)
+        self.server.textChanged.connect(self.signin.form_changed)
+        self.user.textChanged.connect(self.signin.form_changed)
+        form.addRow("", self.signin)
         form.addRow(self._mac_lbl, self.mac)
         form.addRow(tr("playlist_custom_epg_url"), self.epg_url)
         form.addRow(tr("playlist_auto_refresh"), self.refresh)
@@ -184,6 +198,11 @@ class PlaylistDialog(QDialog):
                "username": self.user.text().strip(), "password": self.pw.text().strip(),
                "mac": self.normal_mac(self.mac.text()) or "",
                "name": self.name.text().strip()}
+        if out["kind"] in MEDIA_KINDS and self.signin.signed_in():
+            # Its ids beside the options, which the panel brings its own of.
+            got = self.signin.values()
+            out.update(server=got["server"], username=got["username"], password="",
+                       token=got["token"], **got["options"])
         if self._pid:
             out["id"] = self._pid
         return out
@@ -202,18 +221,24 @@ class PlaylistDialog(QDialog):
         kind = self.kind.currentData()
         m3u, stalker = kind == "m3u", kind == "stalker"
         box = kind in BOX_KINDS
+        media = kind in MEDIA_KINDS
         # M3U needs only a URL, a portal its URL and a MAC address - hide
         # the username/password rows and relabel the address field. A box
-        # on the home network takes its address and, if it asks, a login.
+        # on the home network takes its address and, if it asks, a login;
+        # a media server is signed in to (Plex: in the browser, its address
+        # then comes from the account).
         self._server_lbl.setText(
             tr("playlist_m3u_url") if m3u
             else tr("playlist_portal_url") if stalker
-            else tr("playlist_box_address") if box else tr("login_server"))
+            else tr("playlist_box_address") if box or media else tr("login_server"))
         self.server.setPlaceholderText(
             "https://example.com/playlist.m3u" if m3u
             else "http://portal.example.com/c/" if stalker
             else PLACEHOLDERS.get(kind, "http://server:port"))
-        login = not (m3u or stalker or box) or kind in LOGIN_KINDS
+        for w in (self._server_lbl, self.server):
+            w.setVisible(kind != "plex")
+        login = (not (m3u or stalker or box or media) or kind in LOGIN_KINDS
+                 or kind in ("jellyfin", "emby"))
         for w in (self._user_lbl, self.user, self._pw_lbl, self.pw):
             w.setVisible(login)
         hint = tr("playlist_login_optional") if box else ""
@@ -221,9 +246,11 @@ class PlaylistDialog(QDialog):
         self.pw.setPlaceholderText(hint)
         for w in (self._mac_lbl, self.mac):
             w.setVisible(stalker)
-        self.finder.row.setVisible(box)
-        if not box:
+        self.finder.row.setVisible(box or media)
+        self.finder.wanted = MEDIA_KINDS if media else BOX_KINDS
+        if not (box or media):
             self.finder.status.hide()
+        self.signin.set_kind(kind)
         if getattr(self, "nerd_panel", None) is not None:
             self.nerd_panel.set_kind(kind)
         self._fit()
@@ -246,8 +273,19 @@ class PlaylistDialog(QDialog):
         self.server.setText(found.get("server", ""))
         if not self.name.text().strip():
             self.name.setText(str(found.get("name", "")).split(" - ")[0])
-        if found.get("login"):
+        if found.get("login") or found.get("kind") in ("jellyfin", "emby"):
             self.user.setFocus()
+        if found.get("kind") in MEDIA_KINDS:
+            self.signin.prefer(found)
+
+    def _signin_finished(self, ok: bool) -> None:
+        """A sign-in OK asked for has ended: the source is added if it worked."""
+        if self._accept_signed and ok and self.signin.signed_in():
+            self._accept_signed = False
+            self.accept()
+            return
+        self._accept_signed = False
+        self._fit()
 
     def _maybe_autodetect_link(self) -> None:
         """Recognise a pasted provider link and configure the dialog: Xtream
@@ -306,6 +344,18 @@ class PlaylistDialog(QDialog):
                 return
             self.accept()
             return
+        if self.kind.currentData() in MEDIA_KINDS:
+            if self.signin.signed_in():
+                self.accept()
+                return
+            if self.signin.busy:
+                return
+            # Name and password typed, Sign in not pressed: OK does it.
+            if self.signin.sign_in():
+                self._accept_signed = True
+                return
+            QMessageBox.warning(self, tr("playlist_msg_title"), tr("ms_sign_in_needed"))
+            return
         if self.kind.currentData() == "m3u":
             ok = bool(self.server.text().strip())
         else:
@@ -333,6 +383,20 @@ class PlaylistDialog(QDialog):
         }
         options = (self.nerd_panel.values() if self.nerd_panel is not None
                    else dict(self._options))
+        if out["kind"] in MEDIA_KINDS:
+            # What the sign-in left: the token and the ids, never a password.
+            got = self.signin.values()
+            out.update(server=got["server"], username=got["username"], password="",
+                       token=got["token"])
+            for key in ("user_id", "server_id", "connections"):
+                options.pop(key, None)
+            options.update(got["options"])
+            if not self.name.text().strip():
+                out["name"] = got["name"] or got["server"].split("//")[-1].split("/")[0]
+        elif self._had_token:
+            out["token"] = ""
+            for key in ("user_id", "server_id", "connections"):
+                options.pop(key, None)
         if options:
             out["options"] = options
         return out

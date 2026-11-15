@@ -1001,6 +1001,29 @@ def make_box_client(playlist: dict):
     return HDHomeRunClient(*args)
 
 
+# Media servers (providers/mediaserver.py): an address and the token the
+# sign-in left ("token"; never a password), their ids under "options".
+MEDIA_KINDS = ("jellyfin", "emby", "plex")
+
+
+def make_media_client(playlist: dict):
+    """The client for a media server (kind in MEDIA_KINDS)."""
+    kind = playlist.get("kind")
+    options = dict(playlist.get("options") or {})
+    for key in ("user_id", "server_id", "connections"):
+        # The source form's Test hands them over beside the options.
+        if not options.get(key) and playlist.get(key):
+            options[key] = playlist[key]
+    server, token = str(playlist.get("server") or ""), str(playlist.get("token") or "")
+    account = str(playlist.get("username") or "")
+    if kind == "plex":
+        from .plex import PlexClient
+        return PlexClient(server, token, str(options.get("server_id") or ""), account, options)
+    from .jellyfin import EmbyClient, JellyfinClient
+    cls = EmbyClient if kind == "emby" else JellyfinClient
+    return cls(server, token, str(options.get("user_id") or ""), account, options)
+
+
 def make_client(playlist: dict):
     """The client for *playlist* (see _make_client), with the Nerd page's
     user agent, headers and proxy on its session - and the source's own
@@ -1009,7 +1032,8 @@ def make_client(playlist: dict):
     client = _make_client(playlist)
     from ..core import nerd, net_route
     source = dict((playlist or {}).get("options") or {},
-                  _kind=(playlist or {}).get("kind") or "xtream")
+                  _kind=(playlist or {}).get("kind") or "xtream",
+                  _server=str((playlist or {}).get("server") or ""))
     route = net_route.route_for(source)
     session = getattr(client, "session", None)
     if session is not None:
@@ -1086,7 +1110,8 @@ def _nerd_lists(client, source: dict, pid: str | None) -> None:
 def _make_client(playlist: dict):
     """Build the right provider client for a stored playlist: an M3U-backed
     client when kind == 'm3u', a box on the home network for the kinds in
-    BOX_KINDS, a Stalker / Ministra portal client when kind == 'stalker',
+    BOX_KINDS, a media server for those in MEDIA_KINDS, a Stalker / Ministra
+    portal client when kind == 'stalker',
     otherwise the Xtream API client (the API clients with a
     per-playlist on-disk list cache so a down provider still shows the last
     known lineup)."""
@@ -1095,6 +1120,8 @@ def _make_client(playlist: dict):
         return M3UClient(playlist.get("server", ""))
     if kind in BOX_KINDS:
         return make_box_client(playlist)
+    if kind in MEDIA_KINDS:
+        return make_media_client(playlist)
     if kind == "stalker":
         # Imported here: stalker.py builds on this module, and a playlist
         # of another kind never needs it.

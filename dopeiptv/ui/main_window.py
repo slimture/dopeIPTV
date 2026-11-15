@@ -80,6 +80,7 @@ from .mw_remote import _RemoteMixin
 from .mw_phone import _PhoneMixin
 from .mw_calendar import _CalendarMixin
 from .mw_events import _EventsMixin
+from .mw_media import _MediaServerMixin
 from .mw_report import _ReportMixin
 from .mw_sync import _SyncMixin
 from .mw_together import _TogetherMixin
@@ -143,7 +144,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _EventsMixin, _ReportMixin,
                  _PortalArchiveMixin, _SeriesMixin, _SyncMixin,
                  _ConnectionsMixin, _MirrorsMixin, _TogetherMixin, _StatsMixin,
-                 _SimklMixin, _DiscordMixin, QMainWindow):
+                 _SimklMixin, _DiscordMixin, _MediaServerMixin,
+                 QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
     epg_progress = pyqtSignal(int)
@@ -164,6 +166,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         from ..core import nerd
         nerd.install(settings)
         nerd.set_source(active_pl)
+        # This install's id at Jellyfin, Emby and Plex lives in the settings.
+        from ..providers import mediaserver
+        mediaserver.install_device_store(settings)
         # Reclaim EPG guides left behind by playlists that no longer exist -
         # each is hundreds of MB and they were never cleaned up.
         try:
@@ -1310,6 +1315,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.playback_error.connect(self._stats_end)
             self.player.paused_changed.connect(self._stats_paused_changed)
             self.player.stopped.connect(self._discord_stopped)
+            self.player.stopped.connect(self._ms_stopped)
             self.player.resume_requested.connect(self._resume_last)
             self.player.stalled.connect(self._on_player_stalled)
             self.player.contested.connect(self._on_stream_contested)
@@ -1319,6 +1325,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.finished.connect(self._events_finished)
             self.player.finished.connect(self._stats_end)
             self.player.finished.connect(self._discord_finished)
+            self.player.finished.connect(self._ms_finished)
             self.player.finished.connect(self._on_player_finished)
             self.player.next_episode.connect(self._play_next_episode)
             # Keep the poster overlay's play/pause/stop glyph in sync with the
@@ -1328,6 +1335,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.paused_changed.connect(self._discord_paused)
             self.player.paused_changed.connect(self._simkl_paused)
             self.player.vol.valueChanged.connect(self._events_volume)
+            self.player.paused_changed.connect(self._ms_paused)
             self.player.stopped.connect(self._apply_play_icon)
             self.player.finished.connect(self._apply_play_icon)
             self.player.timeshift_seek.connect(self._on_timeshift_seek)
@@ -2598,6 +2606,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 return
             self._hide_busy()
             self._raw_categories = cats or []
+            if request_mode == "live":
+                self._ms_live_note(self._raw_categories)
             self._search_index_cache.pop(request_mode, None)  # rebuild on search
             self.cat_list.blockSignals(True)
             self.cat_list.clear()
@@ -4407,6 +4417,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._pause_started = None
         # Nerd: the channel it is, for the settings of its own.
         self._chanprefs_arm(self._item_key(it), it, "live")
+        self._ms_leave()
         if self.player.play(url, title, local_buffer=True,
                             buffer_key=f"live:{self._item_key(it)}"):
             self.wake.acquire(tr("wake_playing", title=title))
@@ -4415,6 +4426,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._together_started(self._item_key(it), title, it, "live", False)
             self._stats_begin(self._item_key(it), title, it, "live", False)
             self._discord_started(self._item_key(it), title, it, "live", False)
+            self._ms_started(url, self._item_key(it), "live", it)
         self._apply_seek_mode(it, "live")
         # Refresh the poster overlay glyph (play -> pause for a timeshift
         # channel, -> stop for plain live). Unlike _start_playback, the preview
@@ -4560,8 +4572,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.series_ctx = saved
 
     def _continue_items(self, kind: str) -> list:
-        """Continue-watching rows of one kind ('vod' or 'episode')."""
-        return [it for it in self.resume.continue_watching()
+        """Continue-watching rows of one kind ('vod' or 'episode'), a media
+        server's own among them (mw_media)."""
+        return [it for it in self._continue_rows()
                 if it.get("_kind") == kind]
 
     def _remove_continue(self, it) -> None:
@@ -4569,6 +4582,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         then refresh the list - the category disappears once it's empty."""
         group = "episode" if it.get("_kind") == "episode" else "vod"
         self.resume.clear(group, self._item_key(it))
+        self._ms_forget(it)
         cur = self.cat_list.currentItem()
         cur_cat = cur.data(Qt.ItemDataRole.UserRole) if cur else None
         if self.mode in ("vod", "series") and cur_cat == "__continue__":
@@ -4580,10 +4594,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             else:
                 self._load_categories()
 
-    def _resume_offset(self, key, kind: str) -> float:
+    def _resume_offset(self, key, kind: str, item=None) -> float:
         """Ask whether to resume a partly-watched title; return the start
-        offset in seconds (0 to start from the beginning)."""
-        pos = self.resume.saved_position(key, kind)
+        offset in seconds (0 to start from the beginning). A media server's
+        own resume point counts when it is the newer (mw_media)."""
+        pos = self._ms_resume_at(key, kind, item,
+                                 self.resume.saved_position(key, kind))
         if pos <= 0:
             # Nothing to offer: either never watched >1 min, watched past 95%
             # (counted as finished), or saved under another kind pre-fix.
@@ -4860,13 +4876,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # and give the outgoing title its watched mark if it earned one.
         self._save_resume_position()
         self._maybe_auto_mark_watched()
+        self._ms_leave()          # a media server hears where it got to
         # Watch together: what the room plays starts where the room is,
         # without the resume question.
         together_at = self._together_take_start()
         if together_at is not None:
             resume_at = together_at
         else:
-            resume_at = (self._resume_offset(key, kind)
+            resume_at = (self._resume_offset(key, kind, item)
                          if kind in self._RESUMABLE else 0.0)
         if catchup and start_at > 0:
             resume_at = float(start_at)
@@ -4989,6 +5006,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self._together_started(key, title, item, kind, catchup)
                 self._stats_begin(key, title, item, kind, catchup)
                 self._discord_started(key, title, item, kind, catchup)
+                if not catchup:
+                    self._ms_started(url, key, kind, item, resume_at)
             else:
                 log.warning("embedded play() refused %s - falling back to an "
                             "external mpv window", redact_url(url))
@@ -5836,6 +5855,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._save_layout()
             self._save_resume_position()
             self._maybe_auto_mark_watched()
+            self._ms_close()
             self._sync_on_close()
             self._stats_close()
         self.wake.release()

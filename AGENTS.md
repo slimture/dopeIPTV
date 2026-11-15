@@ -38,7 +38,10 @@ map and the one-way import rule.
 | `providers/enigma2.py` | Enigma2 receivers (VU+, Dreambox, Zgemma...) over the classic `/web/` API of OpenWebif and the Dreambox WebInterface |
 | `providers/tvheadend.py` | Tvheadend servers (channel tags, stream profiles, XMLTV, DVR recordings, digest login) |
 | `providers/hdhomerun.py` | HDHomeRun tuners and their emulators (discover/lineup, SiliconDust guide, UDP discovery) |
-| `providers/lan_scan.py` | "Find on my network": HDHomeRun broadcast plus a probe of the local /24 |
+| `providers/lan_scan.py` | "Find on my network": the HDHomeRun, Jellyfin/Emby (UDP 7359) and Plex (GDM) broadcasts plus a probe of the local /24 |
+| `providers/mediaserver.py` | `MediaServerClient`, what Jellyfin, Emby and Plex share on `BoxClient`: a token (never a password), one device id per install (`device_id`, never in a backup), films/series/episodes/channels as the app's rows with the server's artwork, resume points and watched marks (`_server_pos`, `_played`), the server's Continue watching (`resume_items`), reports and marks back on a thread of its own (`report`, `mark`) |
+| `providers/jellyfin.py` | Jellyfin and Emby (one client; Emby's `/emby` prefix and `X-Emby-*` headers): AuthenticateByName, Quick Connect, libraries, Live TV opened by `PlaybackInfo`, its guide as XMLTV, direct file or HLS (`master.m3u8`), `/Sessions/Playing` reports, UDP 7359 discovery |
+| `providers/plex.py` | Plex: the PIN sign-in (plex.tv, app.plex.tv in the browser), the account's servers and their best connection, libraries, direct play or the HLS transcoder, the timeline, scrobble; Live TV/DVR when the server has it (`live_note` says why not), GDM discovery |
 | `providers/epg.py` | EPG/XMLTV parser, cache and compact index |
 | `providers/epg_index.py` | The guide parser as a process of its own (`--epg-index`) |
 | `providers/metadata.py` | TMDB client, PosterResolver |
@@ -145,7 +148,9 @@ map and the one-way import rule.
 | `ui/subtitle_search.py` | OpenSubtitles search dialog |
 | `ui/widgets.py` | Small standalone widgets |
 | `ui/nav_widgets.py` | The sidebar's `NavButton` (leading bar when selected, a dot / pill / muted count painted over it), `SideRule`, the hairline between its groups, and `SourceAvatar` at its foot (the active source's initials on the accent, `source_initials`) |
-| `ui/box_finder.py` | Box kinds in the add-a-source forms and the "Find on my network" button |
+| `ui/box_finder.py` | Box and media-server kinds in the add-a-source forms and the "Find on my network" button (the form's own kinds first) |
+| `ui/media_signin.py` | Signing in to a media server in the source dialog and the welcome: Jellyfin/Emby name and password (sent once, never kept) or Quick Connect, Plex's PIN in the browser and the server picked; the network off the window's thread |
+| `ui/mw_media.py` | Media servers in the window: what plays reported (start, every 10 s, pause, stop), the newer of the server's and this computer's resume points, the server's titles under Continue watching (`_continue_rows`), a watched mark sent back, why there is no live TV; it only watches, nothing in private viewing |
 | `ui/nerd_settings.py` | Nerd in Settings: its own page (switch, how it works, diagnostics) and the five pages under NERD while it is on |
 | `ui/source_nerd.py` | A source's own Nerd options in the Add/Edit source dialog |
 | `ui/net_advanced.py` | Nerd's Own DNS card (Network page) and Low latency card (Player page), each with its check line |
@@ -216,6 +221,8 @@ source), `mw_series` (series recording rules), `mw_health` (stream
 health per channel), `mw_chanprefs` (a channel's own settings),
 `mw_portal_archive` (a Stalker portal's archive, by programme),
 `mw_events` (events pushed out: webhooks and MQTT, Home Assistant's commands), `mw_phone` (the phone remote), `mw_calendar` (reminders and recordings as a calendar), `mw_privacy` (private
+`mw_events` (events pushed out: webhooks and MQTT), `mw_media` (media
+servers: playback reported, their resume points and watched marks), `mw_privacy` (private
 viewing, clear recent history), `mw_report` (feedback, error reports and
 the answers to them), `mw_sync` (settings sync between a supporter's
 computers), `mw_connections` (connections to the account, the warning
@@ -298,7 +305,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   `DOPEIPTV_LOG=debug` shows debug traces; `DOPEIPTV_LOG_FILE=/path` tees
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
-  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan, kodi, mdns, simkl), lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log, player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, connections, mirrors, conn_test, health, nerd, nerd_lists, channel_numbers, shortcut_keys, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, night_mode, rec_mp4, viewing_stats, catchup, url_rewrite, hls_cap, remote_api, events, mqtt, mqtt_control, phone_remote, phone_page, qr, ical, report, supporter, sync, chacha20poly1305, discord_rpc, together, backup, doh, cert_pin, net_route, net_adapter, net_bridge, live_latency) and `services/` (failover, share, resume,
+  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan, mediaserver, jellyfin, plex), kodi, mdns, simkl), lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log, player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, connections, mirrors, conn_test, health, nerd, nerd_lists, channel_numbers, shortcut_keys, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, night_mode, rec_mp4, viewing_stats, catchup, url_rewrite, hls_cap, remote_api, events, mqtt, mqtt_control, phone_remote, phone_page, qr, ical, report, supporter, sync, chacha20poly1305, discord_rpc, together, backup, doh, cert_pin, net_route, net_adapter, net_bridge, live_latency) and `services/` (failover, share, resume,
   coverart, reminders, mpris, media_session, media_macos, media_windows, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list

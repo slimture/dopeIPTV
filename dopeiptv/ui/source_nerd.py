@@ -33,6 +33,10 @@ HDHR_TRANSCODE = ["", "heavy", "mobile", "internet720", "internet540", "internet
 MIRROR_HINTS = {"xtream": "http://backup.example.com:8080",
                 "m3u": "https://backup.example.com/playlist.m3u",
                 "stalker": "http://backup.example.com/c/"}
+# A media server's films and episodes: the file itself, or its HLS at a
+# bitrate (Mbit/s).
+MS_QUALITY = ["", "40", "20", "8", "4", "2"]
+MEDIA_KINDS = ("jellyfin", "emby", "plex")
 # (mode, label) of the catch-up modes; a name of a product stays as it is.
 CATCHUP_MODES = [("auto", "nerd_cu_auto"), ("default", "nerd_cu_default"),
                  ("append", "nerd_cu_append"), ("shift", "nerd_cu_shift"),
@@ -170,6 +174,10 @@ class SourceNerdPanel(QWidget):
         for t in HDHR_TRANSCODE:
             self.transcode.addItem(t or tr("nerd_src_no_transcode"), t)
         self.transcode.setCurrentIndex(max(0, self.transcode.findData(str(o.get("transcode") or ""))))
+        self.ms_quality = QComboBox()
+        for q in MS_QUALITY:
+            self.ms_quality.addItem(tr("ms_quality_mbps", n=q) if q else tr("ms_quality_original"), q)
+        self.ms_quality.setCurrentIndex(max(0, self.ms_quality.findData(str(o.get("ms_quality") or ""))))
         # Address rewrite: every kind's addresses (after the kind's own
         # widgets, which the example address reads).
         self._rw_channel: dict | None = None
@@ -252,6 +260,8 @@ class SourceNerdPanel(QWidget):
             self.form.addRow(tr("nerd_src_profile"), self.profile)
         elif kind == "hdhomerun":
             self.form.addRow(tr("nerd_src_transcode"), self.transcode)
+        elif kind in MEDIA_KINDS:
+            self.form.addRow(tr("ms_opt_quality"), self.ms_quality)
         for key, label, default in SWITCHES.get(kind, []):
             box = QCheckBox(tr(label))
             box.setChecked(_flag(self._options, key, default))
@@ -264,7 +274,7 @@ class SourceNerdPanel(QWidget):
         setting back at its default left out)."""
         out = {k: v for k, v in self._options.items()
                if k not in ("user_agent", "referer", "headers", "proxy", "stream_port",
-                            "profile", "transcode", "udpxy", "epg_shift",
+                            "profile", "transcode", "udpxy", "epg_shift", "ms_quality",
                             "catchup_template", "catchup_mode", url_rewrite.KEY,
                             mirrors.KEY)
                and k not in {key for sw in SWITCHES.values() for key, _l, _d in sw}}
@@ -303,6 +313,8 @@ class SourceNerdPanel(QWidget):
                 out["profile"] = str(prof)
         if self._kind == "hdhomerun" and self.transcode.currentData():
             out["transcode"] = self.transcode.currentData()
+        if self._kind in MEDIA_KINDS and self.ms_quality.currentData():
+            out["ms_quality"] = self.ms_quality.currentData()
         for key, _label, default in SWITCHES.get(self._kind, []):
             on = self.switches[key].isChecked()
             if on != default:

@@ -87,6 +87,9 @@ _LEFT_OUT = frozenset({
     # The phone remote: its address (the token in it), its port and whether
     # it is on belong to this computer and its home network.
     "phone_remote", "phone_remote_token", "phone_remote_port",
+    # This install's own id at Jellyfin, Emby and Plex: each computer has its
+    # own (providers/mediaserver.py).
+    "media_device_id",
     # Caches the app fills again by itself.
     "local_tmdb_posters", "local_tmdb_posters_v2", "music_art_v1",
     "cast_devices", "subtitle_files", "nerd_health_data",

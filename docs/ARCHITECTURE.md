@@ -1,8 +1,9 @@
 # Architecture
 
 dopeIPTV is a desktop IPTV client built with PyQt6 and libmpv that
-connects to Xtream Codes providers, M3U playlists and Stalker / Ministra
-portals.  The codebase is grouped into layered subpackages inside the
+connects to Xtream Codes providers, M3U playlists, Stalker / Ministra
+portals, boxes on the home network and Jellyfin, Emby and Plex servers.
+The codebase is grouped into layered subpackages inside the
 `dopeiptv/` package - `providers/` (data sources), `core/` (storage,
 background work, OS glue), `media/` (playback), `services/`
 (window-agnostic application services) and `ui/` (everything the user
@@ -22,6 +23,12 @@ dopeiptv/
   providers/           Data sources (the network / provider edge)
     client.py          XtreamClient, OfflineClient/M3UClient/DemoClient
     stalker.py         StalkerClient - Stalker / Ministra MAC portals
+    mediaserver.py     MediaServerClient - what Jellyfin, Emby and Plex share:
+                       a token, one device id per install, films / series /
+                       channels as the app's rows, reports back on a thread
+    jellyfin.py        JellyfinClient / EmbyClient - sign-in, Quick Connect,
+                       libraries, Live TV, UDP 7359 discovery
+    plex.py            PlexClient - PIN sign-in, servers, libraries, DVR, GDM
     epg.py             XmltvGuide - XMLTV parser with disk cache + index
     epg_index.py       The guide parser as a process of its own (--epg-index)
     metadata.py        TMDB client, PosterResolver (cover art)
@@ -138,6 +145,8 @@ dopeiptv/
     mw_recording.py    Recording / timeshift mixin
     mw_portal_archive.py A Stalker portal's archive: by programme, its link
                        asked for off the window's thread
+    mw_media.py        Media servers: what plays reported, their resume
+                       points and watched marks (media_signin.py: signing in)
     mw_context.py      Right-click context-menu mixin
     mw_favorites.py    Favorites in bulk: multi-row actions, move, drag-and-drop
     mw_detail.py       EPG / detail-panel mixin
