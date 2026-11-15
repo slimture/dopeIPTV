@@ -174,6 +174,9 @@ class _CastMixin:
             "group": self._RESUME_GROUP.get(rkind or ""),
             "key": key,
             "item": it,
+            # The profile's own Continue watching, kept past a switch: where
+            # the TV got to belongs to whoever started the cast.
+            "resume": getattr(self, "resume", None),
             # For History: the row's own kind and address, kept apart from
             # the address currently on the receiver, which an archive resume
             # or a track change replaces.
@@ -763,6 +766,7 @@ class _CastMixin:
         self._cast_ctx = {
             "sid": None, "archive": False, "title": title,
             "group": self._RESUME_GROUP.get(rkind or ""), "key": key,
+            "resume": getattr(self, "resume", None),
             "item": item, "kind": kind, "row_url": url, "row_source": url,
             "url": url, "source": url, "codecs": [], "height": 0, "fps": 0.0,
             "audio": audio, "subs": subs, "duration": 0.0, "tracks": {},
@@ -2029,7 +2033,10 @@ class _CastMixin:
         if pos <= 60 or dur <= 0:
             return
         log.info("cast: keeping the position, %d s into %d", pos, dur)
-        self.resume.record(group, key, pos, dur, item=ctx.get("item"))
+        store = ctx.get("resume")
+        if store is None:
+            store = self.resume
+        store.record(group, key, pos, dur, item=ctx.get("item"))
 
     def _end_cast(self, why: str) -> None:
         """Stop a running cast and take the strip down.

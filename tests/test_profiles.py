@@ -242,6 +242,25 @@ def test_a_trakt_sign_in_is_the_profiles_own(tmp_path):
         "simkl_access_token", "") == ""
 
 
+def test_a_simkl_sign_in_is_the_profiles_own_with_its_refresh_token(tmp_path):
+    # The access token alone was a profile's own: the refresh token and its
+    # expiry were the household's, so a second sign-in took the first
+    # profile's renewals, and a sign-out revoked the other's grant.
+    from dopeiptv.providers import simkl
+    views, store, kid = _two(tmp_path)
+    me = simkl.SimklClient(profiles.pinned(views["main"], MAIN_ID), client_id="c")
+    lisa = simkl.SimklClient(profiles.pinned(views["main"], kid.id), client_id="c")
+    me._store({"access_token": "me-a", "refresh_token": "me-r", "expires_in": 7 * 86400})
+    lisa._store({"access_token": "lisa-a", "refresh_token": "lisa-r", "expires_in": 60})
+    assert me.settings.value(simkl.REFRESH_KEY) == "me-r"
+    assert int(me.settings.value(simkl.EXPIRES_KEY)) > int(lisa.settings.value(simkl.EXPIRES_KEY))
+    assert not me._due() and lisa._due()
+    lisa._forget()
+    assert me.access_token == "me-a" and me.settings.value(simkl.REFRESH_KEY) == "me-r"
+    for key in (simkl.TOKEN_KEY, simkl.REFRESH_KEY, simkl.EXPIRES_KEY):
+        assert profiles.is_own(key), key
+
+
 # -- the PIN, kids, removing one --------------------------------------------------------------
 
 def test_a_pin_is_four_digits_kept_hashed(tmp_path):

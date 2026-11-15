@@ -532,6 +532,21 @@ def test_where_the_tv_got_to_is_kept_as_the_resume_point():
     assert w.resume.saved == [("vod", "42", 1830, 6000)]
 
 
+def test_the_position_goes_to_the_profile_that_started_the_cast():
+    """A profile switch while a cast runs leaves the cast going: where the
+    TV got to is the Continue watching of whoever started it, not of the
+    profile in use when it ends."""
+    w = _with_strip()
+    started, now = _Resume(), _Resume()
+    w.resume = now
+    w.cast = _CastAt(1830.0, 6000.0)
+    w._cast_ctx = {"group": "vod", "key": "42", "item": {"name": "Film"},
+                   "resume": started}
+    w._save_cast_position()
+    assert started.saved == [("vod", "42", 1830, 6000)]
+    assert now.saved == []
+
+
 def test_a_cast_that_just_started_does_not_wipe_the_resume_point():
     """A position too small to be worth keeping is a reason to leave the
     store alone, not to write to it - writing one drops what was there, and

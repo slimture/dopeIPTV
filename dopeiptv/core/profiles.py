@@ -74,7 +74,8 @@ OWN_KEYS = frozenset({
     "trakt_watched_cache", "trakt_watchlist_cache",
     # The Trakt and Simkl accounts: each person signs in to their own.
     "trakt_access_token", "trakt_refresh_token", "trakt_expires_at",
-    "trakt_fav_list_slug", "simkl_access_token",
+    "trakt_fav_list_slug", "simkl_access_token", "simkl_refresh_token",
+    "simkl_token_expires",
     # Recently searched (kept here when a search remembers them).
     "recent_searches",
     # How the app looks.
