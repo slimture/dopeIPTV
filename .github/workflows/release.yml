@@ -921,6 +921,20 @@ jobs:
         # conda-forge's libraries find each other through @rpath; this copies
         # in what the bundle lacks and points every reference inside it.
         run: python packaging/macos_bundle_dylibs.py dist/dopeIPTV.app "$DOPEIPTV_LIBMPV_DIR"
+      - name: PyObjC's Swift-linked modules find the system's Swift runtime
+        # Some PyObjC extensions (CoreMedia on the Intel build) load
+        # @rpath/libswift*.dylib, which macOS keeps in /usr/lib/swift;
+        # PyInstaller rewrites their rpath to the bundle, so add that one
+        # back before the app is signed.
+        run: |
+          find dist/dopeIPTV.app/Contents/Frameworks -name '*.so' -print0 |
+            while IFS= read -r -d '' so; do
+              if otool -L "$so" | grep -q '@rpath/libswift'; then
+                otool -l "$so" | grep -q 'path /usr/lib/swift ' \
+                  || install_name_tool -add_rpath /usr/lib/swift "$so"
+                echo "rpath /usr/lib/swift: ${so#dist/dopeIPTV.app/}"
+              fi
+            done
       - name: Developer ID keychain
         id: sign
         env:
