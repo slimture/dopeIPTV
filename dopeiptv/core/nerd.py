@@ -445,14 +445,19 @@ class Nerd:
                      opened: str = "") -> tuple[str, bool]:
         """(the proxy the player takes a stream through, whether that is the
         bridge checking a certificate the source pins for it)."""
-        px = self.proxy(source, url) if self.flag("nerd_proxy_player", True) else ""
+        target = opened or url
+        # Never the proxy for the rewind buffer's own server on this
+        # computer (its ingest takes the provider through it): mpv sent the
+        # loopback address, token and all, to the proxy, which cannot
+        # reach it.
+        px = (self.proxy(source, url)
+              if self.flag("nerd_proxy_player", True) and not _is_loopback(target) else "")
         if px or not self.on:
             return px, False
         # The source's own DNS, IP version or pinned certificate: the
         # player through the bridge (core/net_bridge.py) - never where a
         # proxy takes the stream, whose DNS that is.
         from .net_bridge import address_for, checks_pin
-        target = opened or url
         px = address_for(source, target, self)
         return px, bool(px) and checks_pin(source, target, self)
 

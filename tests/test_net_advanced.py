@@ -519,6 +519,22 @@ def test_the_player_is_pointed_at_the_bridge_only_where_the_route_changes_someth
     assert nerd.Nerd(S(nerd_dns="cloudflare")).stream_options({}, "http://provider.example/1.ts")["http-proxy"] == ""
 
 
+def test_the_rewind_buffer_on_this_computer_is_never_asked_through_the_proxy():
+    """The app-kept rewind buffer: its ingest takes the provider through
+    the proxy, the player reads the buffer's own server here. mpv sends any
+    address to its http-proxy (loopback too), so the proxy given for that
+    stream got the loopback address and its token - and a proxy elsewhere
+    cannot reach it: the channel never played."""
+    proxied = on(nerd_proxy="http://10.0.0.1:3128")
+    nerd.install(proxied.s)
+    opts = proxied.stream_options({}, "http://provider.example/live/1.ts",
+                                  opened="http://127.0.0.1:41234/tok/live.ts")
+    assert opts["http-proxy"] == ""
+    # The provider's own address still goes through it.
+    assert proxied.stream_options({}, "http://provider.example/live/1.ts")["http-proxy"] \
+        == "http://10.0.0.1:3128"
+
+
 def _bridge_case(servers, tmp_path, pin_right=True):
     """The bridge, the provider (http), the home server (https, its own
     certificate) and the source whose options give that route: own DNS and
