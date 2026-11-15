@@ -23,6 +23,7 @@ from typing import Any
 
 import logging
 import os
+import re
 import sys
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -54,6 +55,20 @@ _CRED_PARAMS = frozenset((
 # indistinguishable from an ordinary three-segment URL, and the account's
 # own values are masked by register_secrets() anyway.
 _CRED_PREFIXES = frozenset(("live", "movie", "series", "timeshift"))
+
+#: An address inside free text - the pattern the error report takes whole
+#: addresses out by (core/report.py uses this one).
+URL_IN_TEXT = re.compile(r"\b([a-zA-Z][a-zA-Z0-9+.-]{1,15})://[^\s'\"<>()\[\]]+")
+
+# In text the app did not write (an ffmpeg or mpv line, an exception), the
+# query values kept: they say what was asked, never who asked. Every other
+# value goes - a plain M3U's ?token=..., a CDN's signature by any name.
+_PLAIN_PARAMS = frozenset((
+    "action", "type", "output", "format", "category_id", "stream_id",
+    "vod_id", "series_id", "page", "limit", "offset"))
+
+# The last segment of the bare Xtream form /<username>/<password>/<id>.<ext>.
+_STREAM_ID = re.compile(r"\d+(?:\.[A-Za-z0-9]{1,5})?")
 
 
 def register_secrets(*values: str | None) -> None:
@@ -121,36 +136,91 @@ def redact_url(url: object) -> str:
         return redact(text)
 
 
+def _masked_pair(pair: str) -> str:
+    key, eq, value = pair.partition("=")
+    if not eq:
+        return "***" if pair else pair       # a bare value: "?<token>"
+    if not value or key.lower() in _PLAIN_PARAMS:
+        return pair
+    return key + "=***"
+
+
+def _address_masked(url: str) -> str:
+    """An address found in free text, its account taken out: the login
+    before the host, an Xtream account in the path - the bare
+    /<user>/<pass>/<id> form too, which in text the app did not write
+    cannot be told from a plain path and is masked either way - and every
+    query value but those that only say what was asked."""
+    end = len(url)
+    while end and url[end - 1] in ".,;:!?":
+        end -= 1                             # the sentence's, not the address's
+    url, tail = url[:end], url[end:]
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return url.split("://", 1)[0] + "://***" + tail
+    netloc = parts.netloc
+    if "@" in netloc:
+        netloc = "***@" + netloc.rsplit("@", 1)[1]
+    segs = parts.path.split("/")
+    if len(segs) > 3 and segs[1] in _CRED_PREFIXES:
+        segs[2] = segs[3] = "***"
+    elif len(segs) == 4 and segs[1] and segs[2] and _STREAM_ID.fullmatch(segs[3]):
+        segs[1] = segs[2] = "***"
+    query = "&".join(_masked_pair(p) for p in parts.query.split("&")) if parts.query else ""
+    frag = parts.fragment
+    if "=" in frag:
+        frag = "&".join(_masked_pair(p) for p in frag.split("&"))
+    return urlunsplit((parts.scheme, netloc, "/".join(segs), query, frag)) + tail
+
+
+def redact_text(text: str) -> str:
+    """*text* the app did not write - a line ffmpeg or mpv printed, an
+    exception's message - safe to log: every address in it masked
+    (_address_masked), then every registered value. Never raises."""
+    try:
+        if "://" in text:
+            text = URL_IN_TEXT.sub(lambda m: _address_masked(m.group(0)), text)
+    except Exception:
+        pass
+    return redact(text)
+
+
 def _redact_arg(value: object) -> object:
     """One argument of a record, masked. A number stays what it is (%d and
     friends need it); anything else that is not text - an exception, above
     all, whose message quotes the URL it failed on - becomes its masked
-    text when it holds a registered value, and is left alone otherwise."""
+    text when masking changes it, and is left alone otherwise."""
     if isinstance(value, str):
-        return redact(value)
+        return redact_text(value)
     if value is None or isinstance(value, (int, float)):
         return value
     try:
         text = str(value)
     except Exception:
         return value
-    clean = redact(text)
+    clean = redact_text(text)
     return value if clean == text else clean
 
 
 class _RedactFilter(logging.Filter):
-    """The safety net: mask registered values in every record, whether or
-    not the call site remembered to - its message, its arguments and the
-    traceback a record carries (exc_info). Failure here must lose nothing,
-    so any error leaves the record as it was."""
+    """The safety net: every record masked, whether or not the call site
+    remembered to - the addresses in it (an ffmpeg or mpv line quoting a
+    stream's address with its token or login, redact_text) and the
+    registered values, in its message, its arguments and the traceback it
+    carries (exc_info). Failure here must lose nothing, so any error leaves
+    the record as it was."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        if not _secrets:
-            return True
         try:
-            record.msg = _redact_arg(record.msg)
-            if isinstance(record.args, tuple):
-                record.args = tuple(_redact_arg(a) for a in record.args)
+            if record.args:
+                # Formatted first, then masked whole: an address can be
+                # split between the message and an argument, and masking
+                # the message alone could eat a %s an argument needs.
+                text = record.getMessage()
+                record.msg, record.args = redact_text(text), ()
+            else:
+                record.msg = _redact_arg(record.msg)
         except Exception:
             pass
         try:
@@ -159,9 +229,9 @@ class _RedactFilter(logging.Filter):
             if record.exc_info and not record.exc_text:
                 record.exc_text = logging.Formatter().formatException(record.exc_info)
             if record.exc_text:
-                record.exc_text = redact(record.exc_text)
+                record.exc_text = redact_text(record.exc_text)
             if record.stack_info:
-                record.stack_info = redact(record.stack_info)
+                record.stack_info = redact_text(record.stack_info)
         except Exception:
             pass
         return True

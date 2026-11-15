@@ -214,11 +214,11 @@ def shown_url(url: str) -> str:
     try:
         u = urlsplit(url)
         host = u.hostname or ""
-    except ValueError:
+        port = f":{u.port}" if u.port else ""
+    except ValueError:                    # a port out of range, a broken [host]
         return MASK
     if ":" in host:
         host = f"[{host}]"
-    port = f":{u.port}" if u.port else ""
     rest = "/" + MASK if (u.path not in ("", "/") or u.query) else "/"
     return f"{u.scheme}://{host}{port}{rest}"
 
@@ -391,7 +391,20 @@ def opener_for(url: str) -> urllib.request.OpenerDirector:
 
 def post(url: str, message: dict[str, Any], header: tuple[str, str] | None,
          timeout: float = HTTP_TIMEOUT) -> tuple[int, str]:
-    """POST *message* as JSON: (HTTP status, "") or (0, what went wrong)."""
+    """POST *message* as JSON: (HTTP status, "") or (0, what went wrong) -
+    said without the address: urllib quotes a mistyped one whole ("unknown
+    url type: 'ha.local/api/webhook/<id>'"), and the webhook's id is its
+    secret."""
+    code, err = _post(url, message, header, timeout)
+    if err and url:
+        err = err.replace(url, shown_url(url))
+        if url.strip() and url.strip() != url:
+            err = err.replace(url.strip(), shown_url(url))
+    return code, err
+
+
+def _post(url: str, message: dict[str, Any], header: tuple[str, str] | None,
+          timeout: float) -> tuple[int, str]:
     data = json.dumps(message, ensure_ascii=False).encode("utf-8")
     try:
         req = urllib.request.Request(url, data=data, method="POST")

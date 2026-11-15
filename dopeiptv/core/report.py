@@ -24,7 +24,7 @@ import sys
 from typing import Any, Callable, Iterable
 
 from . import build_check
-from .log import log, recent_lines
+from .log import URL_IN_TEXT, log, recent_lines
 
 ENDPOINT = "https://dopeiptv.org/feedback/report"
 REPLIES = "https://dopeiptv.org/feedback/replies"
@@ -34,7 +34,7 @@ MAX_TEXT = 48_000
 #: What the native crash handler writes to, in the log folder.
 CRASH_FILE = "last-crash.txt"
 
-_URL = re.compile(r"\b([a-zA-Z][a-zA-Z0-9+.-]{1,15})://[^\s'\"<>()\[\]]+")
+_URL = URL_IN_TEXT
 _IPV4 = re.compile(r"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])")
 # IPv6 in full (six groups or more, so a time like 21:05:03 is left alone)
 # or shortened with "::" (fe80::1, ::1).

@@ -997,3 +997,38 @@ def test_the_broker_is_never_named_in_the_log():
         events.log.setLevel(level)
     lines = [m for m in seen if "MQTT" in m]
     assert lines and not [m for m in lines if "127.0.0.1" in m], lines
+
+
+def test_a_mistyped_webhook_address_keeps_its_id_out_of_the_log_and_the_check(monkeypatch):
+    """urllib says "unknown url type: '<the whole address>'" for an address
+    typed without its http://, and the webhook's id in it is its secret:
+    that text went into the log line and the check's details. A port out
+    of range made the line itself fail on its way to the log."""
+    import logging
+    secret = "SECRETWEBHOOKID42"
+    typos = (f"homeassistant.local/api/webhook/{secret}", f"http//ha.local/api/webhook/{secret}",
+             f" homeassistant.local/api/webhook/{secret} ")
+    for url in typos:
+        code, err = events.post(url, {"event": "test"}, None, timeout=0.5)
+        assert code == 0 and err and secret not in err, err
+    assert events.shown_url(f"http://ha.local:99999/api/webhook/{secret}") == events.MASK
+    check = events.check_hooks([typos[0]], None, timeout=0.5)
+    assert secret not in check.detail, check.detail
+
+    seen: list[str] = []
+
+    class Catch(logging.Handler):
+        def emit(self, record):
+            seen.append(record.getMessage())
+    monkeypatch.setattr(events, "RETRY_WAITS", ())
+    h = Catch()
+    level = events.log.level
+    events.log.setLevel(logging.INFO)
+    events.log.addHandler(h)
+    try:
+        for url in (typos[0], f"http://ha.local:99999/api/webhook/{secret}"):
+            events.WebhookSink(url, None)._send("event", {"event": "test"})
+    finally:
+        events.log.removeHandler(h)
+        events.log.setLevel(level)
+    assert len(seen) == 2 and not [m for m in seen if secret in m], seen

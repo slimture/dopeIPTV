@@ -222,3 +222,47 @@ def test_an_uncaught_exception_reaches_the_log_masked():
     assert records and "CRASH" in records[0]
     assert "ValueError: boom" in records[0]
     assert "hunter2pw" not in records[0]
+
+
+def _filtered(fmt, *args):
+    rec = logging.LogRecord("dopeiptv", logging.INFO, __file__, 1, fmt, args or None, None)
+    assert _RedactFilter().filter(rec) is True
+    return rec.getMessage()
+
+
+def test_an_ffmpeg_line_loses_the_address_s_token_and_login_with_nothing_registered():
+    """ffmpeg and mpv print the address they failed on, and their lines go
+    to the log as they are (cast bridge, cast feed, AirPlay bridge). A
+    plain M3U's address carries its token in the query, or an Xtream
+    account in the bare /user/pass/id form, and neither is a registered
+    value - the filter let them through, and did nothing at all while no
+    account was registered."""
+    assert not logmod._secrets
+    line = ("[in#0 @ 0x55d0] Error opening input: Server returned 403 Forbidden "
+            "for http://cdn.example:8080/hls/x.m3u8?token=ab12cd34ef&exp=1700000000&action=play.")
+    out = _filtered("cast bridge: ffmpeg: %s", line)
+    assert "ab12cd34ef" not in out and "1700000000" not in out, out
+    assert "token=***" in out and "action=play" in out and out.endswith(".")
+    assert "cdn.example:8080/hls/x.m3u8" in out, "where it went still shows"
+
+    for addr, gone in (("http://joe:hunter2@box.example/stream.ts", ("joe", "hunter2")),
+                       ("http://box.example:8080/joe99/hunter2/1234.ts", ("joe99", "hunter2")),
+                       ("http://box.example:8080/live/joe99/hunter2/1234.ts", ("joe99", "hunter2")),
+                       ("https://cdn.example/seg?Policy=abc&Signature=def&Key-Pair-Id=ghi",
+                        ("abc", "def", "ghi"))):
+        out = _filtered("mpv: Failed to open %s.", addr)
+        assert not [g for g in gone if g in out], out
+        assert "box.example" in out or "cdn.example" in out
+    # A message with no arguments: its own text, masked the same way.
+    out = _filtered("Opening 'http://box.example/get.php?username=joe99&password=hunter2' for reading")
+    assert "joe99" not in out and "hunter2" not in out and "for reading" in out, out
+
+
+def test_masking_an_address_never_breaks_the_formatting():
+    """An address split between the message and an argument, a %s in a
+    query, a percent sign: the line comes out whole."""
+    out = _filtered("probe http://%s:%d/live.ts?token=%s at %d%%", "box.example", 8080, "s3cr3t", 50)
+    assert out == "probe http://box.example:8080/live.ts?token=*** at 50%", out
+    # A local path and a plain address stay readable.
+    keep = "using /home/pontus/Videos/1.ts and https://image.tmdb.org/t/p/w500/abc.jpg"
+    assert _filtered("%s", keep) == keep
