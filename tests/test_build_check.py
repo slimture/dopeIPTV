@@ -642,3 +642,57 @@ def test_the_bundle_answers_the_build_before_anything_else_starts():
     script = (ROOT / "dopeiptv.py").read_text(encoding="utf-8")
     assert 'if sys.argv[1:2] == ["--build-files"]:' in script
     assert script.index("--build-files") < script.index("maybe_preload_allocator()")
+
+
+def test_the_start_never_waits_for_the_verdict_on_the_window_s_thread(monkeypatch):
+    """About 4 s after the start the update check, and the offer of last
+    run's crash report, asked allowed() - which waited up to 10 s for the
+    check (hashing the bundle) on the window's thread: on a slow disk or a
+    cold AppImage the window and the video froze. They go on once the
+    verdict is in, and never wait for it."""
+    import threading
+    import time
+    app = _qapp()
+    from PyQt6.QtCore import QObject
+
+    from dopeiptv.ui import mw_report, mw_updates
+    release = threading.Event()
+
+    def slow() -> Verdict:
+        release.wait(3)
+        return Verdict(OFFICIAL)
+    monkeypatch.setattr(build_check, "_compute", slow)
+    monkeypatch.setattr(mw_updates, "BUILD_POLL_MS", 20)
+    asked: list = []
+    monkeypatch.setattr(mw_updates, "run_async", lambda pool, fn, done, fail: asked.append(fn))
+
+    class Settings(dict):
+        def value(self, key, default=None):
+            return self.get(key, default)
+
+        def setValue(self, key, value):  # noqa: N802 - Qt's name
+            self[key] = value
+
+    class Host(QObject, mw_updates._UpdatesMixin, mw_report._ReportMixin):
+        pool = None
+        settings = Settings()
+
+        def _apply_update_state(self, tag):
+            pass
+
+    offered: list = []
+    h = Host()
+    h._offer_report = lambda kind, trace, intro: offered.append(kind)
+    h._report_crash = "Fatal Python error: Segmentation fault"
+    build_check.start()
+    t0 = time.monotonic()
+    h._maybe_check_updates()
+    h._offer_crash_report()
+    assert time.monotonic() - t0 < 1.0, "waited for the build's check"
+    assert asked == [] and offered == [] and build_check.settled() is None
+    release.set()
+    end = time.monotonic() + 5
+    while not (asked and offered) and time.monotonic() < end:
+        app.processEvents()
+        time.sleep(0.01)
+    assert len(asked) == 1 and offered == ["crash"], (asked, offered)

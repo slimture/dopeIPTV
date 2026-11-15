@@ -27,6 +27,25 @@ from ..i18n import tr
 from .dialogs import UpdateDialog
 from .theme import P
 
+#: How soon a step that needs the build's verdict looks again while the
+#: check that works it out (core/build_check.py) is still running.
+BUILD_POLL_MS = 500
+
+
+def build_known(again) -> bool:
+    """Whether this copy's verdict - official, modified, from source - is
+    in, asked without ever waiting for it on the window's thread: the check
+    hashes the bundle, and on a slow disk or a cold AppImage that can take
+    longer than the first seconds, which froze the window and the video.
+    When it is not in yet, *again* (a bound method) is called once more in
+    a moment, the check started if nothing started it."""
+    if build_check.settled() is not None:
+        return True
+    build_check.start()
+    QTimer.singleShot(BUILD_POLL_MS, again)
+    return False
+
+
 # Where "Download" sends people - the website, not the raw GitHub release.
 # ?ref= tells the site's statistics the visit came from the app: a link
 # opened from a desktop app carries no referrer, so it counted as "direct".
@@ -77,6 +96,8 @@ class _UpdatesMixin:
         GitHub every launch and works offline (fails silently). Opt-out via the
         'check for updates' setting."""
         if self.settings.value("check_updates", "true") != "true":
+            return
+        if not build_known(self._maybe_check_updates):
             return
         # A modified build asks nobody: updates come with the official app
         # (and a badge an earlier copy left goes).

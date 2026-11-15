@@ -205,6 +205,11 @@ class _SyncMixin:
         just started."""
         if self._sync_busy or not self._sync_on():
             return False
+        if not manual and build_check.settled() is None:
+            # The build's verdict is still being worked out: never waited
+            # for on the window's thread - the next tick asks again.
+            build_check.start()
+            return False
         if not build_check.allowed():
             # A modified build asks nothing of dopeiptv.org: said in Settings.
             self._sync_set_status("modified")

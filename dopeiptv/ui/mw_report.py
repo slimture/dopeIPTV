@@ -27,6 +27,7 @@ from ..core import build_check, report
 from ..core.log import log, log_dir
 from ..core.workers import run_async
 from ..i18n import tr
+from .mw_updates import build_known
 
 
 class _Relay(QObject):
@@ -56,7 +57,7 @@ class _ReportMixin:
         # first a little after the start, not while the app is busy starting.
         self._answers_timer = QTimer(self)
         self._answers_timer.setSingleShot(True)
-        self._answers_timer.timeout.connect(self._ask_answers)
+        self._answers_timer.timeout.connect(self._answers_due)
         self._schedule_answers(self.ANSWERS_AT_START)
         self._show_unread()
         self._report_crash = report.pending_crash()
@@ -149,6 +150,12 @@ class _ReportMixin:
             timer.stop()
             return
         timer.start(int(max(wait, at_least, 1.0) * 1000))
+
+    def _answers_due(self) -> None:
+        """The timer's ask: once the build's verdict is in, never waiting
+        for it on the window's thread (the first one comes at the start)."""
+        if build_known(self._answers_due):
+            self._ask_answers()
 
     def _ask_answers(self) -> None:
         """Ask the site for answers to the reports still asked about - off
@@ -293,6 +300,9 @@ class _ReportMixin:
         self._offer_report("error", trace, "report_error_intro")
 
     def _offer_crash_report(self) -> None:
+        # The report says the build: never waited for on the window's thread.
+        if getattr(self, "_report_crash", "") and not build_known(self._offer_crash_report):
+            return
         crash, self._report_crash = getattr(self, "_report_crash", ""), ""
         if crash:
             self._offer_report("crash", crash, "report_crash_intro")
