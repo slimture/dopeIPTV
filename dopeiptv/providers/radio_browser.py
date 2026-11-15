@@ -264,8 +264,10 @@ class RadioBrowser:
                      "reverse": "true", "limit": int(limit)}))
 
     def lists(self, kind: str) -> list[dict]:
-        return {COUNTRY: self.countries, LANGUAGE: self.languages,
-                TAG: self.tags}[kind]()
+        # Typed: older mypy joins three bound methods into "function".
+        fetch: dict[str, Callable[[], list[dict]]] = {
+            COUNTRY: self.countries, LANGUAGE: self.languages, TAG: self.tags}
+        return fetch[kind]()
 
     def click(self, uuid: str) -> bool:
         """Tell the directory a station was played (only when the person
