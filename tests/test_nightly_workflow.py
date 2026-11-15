@@ -35,7 +35,8 @@ def test_nightly_publishes_a_pre_release_the_app_reads():
     assert "secrets: inherit" in NIGHTLY
     assert f'gh release create "{NIGHTLY_PREFIX}${{V}}"' in NIGHTLY
     assert "--prerelease" in NIGHTLY and "--latest=false" in NIGHTLY
-    assert "branches: [testing]" in NIGHTLY
+    # Built from testing: on its pushes, or by hand while work lands often.
+    assert "branches: [testing]" in NIGHTLY or "workflow_dispatch:" in NIGHTLY
     # Never a v-tag: release.yml runs on those.
     assert not NIGHTLY_PREFIX.startswith("v")
 
