@@ -177,6 +177,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
           open_page: Callable[[str], None] | None = None,
           health_store: Callable[[], Any] | None = None,
           numbers: Callable[[str, bool, Callable[[int], None]], None] | None = None,
+          in_use: Callable[[Callable[[list[tuple[str, str]]], None]], None] | None = None,
           ) -> Callable[[Callable[[str, Any], None]], None]:
     """*page* is Nerd's own, Status: the switch, what is in Nerd, how it
     works. *pages* ("net", "boxes", "player", "serve", "diag") take the
@@ -193,7 +194,9 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     stored in *settings*. *numbers(action, keep, done)*: the active
     source's channel numbers - "count", "all" (number them in list order)
     or "clear"; *done* gets how many have one now (-1: the list could not
-    be read)."""
+    be read). *in_use(fill)*: what is in use now - the account's
+    connections and each box's tuners - handed to *fill* as lines while
+    Diagnostics shows (ui/mw_connections.py)."""
     n = _Defaults(settings)
     sub = pages or {}
 
@@ -837,6 +840,16 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     show_worst()
     at("diag").installEventFilter(_OnShow(at("diag"), show_worst))
 
+    # -- diagnostics: what is in use now (read-only) -----------------------------------------
+    if in_use is not None:
+        c = at("diag").card(tr("inuse_title"))
+        used = InUseList()
+        c.widget(used, "in use now connections tuners transponder box recording TV")
+
+        def show_used() -> None:
+            in_use(used.fill)
+        at("diag").installEventFilter(_OnShow(at("diag"), show_used))
+
 
     def values() -> dict[str, str]:
         out: dict[str, str] = {}
@@ -1168,6 +1181,37 @@ class HealthList(QWidget):
             line.setWordWrap(True)
             self._col.addWidget(line)
             self.rows.append((name, numbers))
+
+
+class InUseList(QWidget):
+    """In use now: the account's connections and each box's tuners, a line
+    each - ("head" | "item" | "note", text)."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._col = QVBoxLayout(self)
+        self._col.setContentsMargins(0, 0, 0, 0)
+        self._col.setSpacing(6)
+        self.lines: list[tuple[str, str]] = []
+
+    def fill(self, lines: list[tuple[str, str]]) -> None:
+        from PyQt6.QtWidgets import QLabel
+
+        from .theme import P
+        while self._col.count():
+            item = self._col.takeAt(0)
+            w = item.widget() if item is not None else None
+            if w is not None:
+                w.deleteLater()
+        self.lines = list(lines)
+        style = {"head": f"color:{P['text']}; font-weight:600;",
+                 "item": f"color:{P['text2']}; font-size:12px;",
+                 "note": f"color:{P['muted']}; font-size:12px;"}
+        for kind, text in self.lines:
+            label = QLabel(text)
+            label.setWordWrap(True)
+            label.setStyleSheet(style.get(kind, style["item"]))
+            self._col.addWidget(label)
 
 
 def _how_block(items: list[tuple[str, str]]) -> QWidget:

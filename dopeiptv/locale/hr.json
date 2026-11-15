@@ -2406,5 +2406,22 @@
   "tv_volume": "Glasnoća {n} %",
   "tv_muted": "Zvuk isključen",
   "tv_paused": "Pauzirano",
-  "set_page_shortcuts_sub": "Svaka tipka na koju aplikacija reagira - kliknite jednu da je promijenite."
+  "set_page_shortcuts_sub": "Svaka tipka na koju aplikacija reagira - kliknite jednu da je promijenite.",
+  "tuner_title": "Tuneri prijemnika",
+  "tuner_what": "Ovaj kanal nije na transponderu koji prijemnik sada prima, pa mu treba vlastiti tuner.",
+  "tuner_what_rec": "Snimanje ovog kanala zauzima zaseban tuner prijemnika.",
+  "tuner_full": "Svi tuneri prijemnika su u upotrebi ({n} od {n}).",
+  "tuner_cuts": "Još jedan bi prekinuo {what} ili prijemnik može odbiti ovaj kanal.",
+  "tuner_w_rec": "snimanje „{name}”",
+  "tuner_w_tv": "ono što prijemnik prikazuje na svom televizoru ({name})",
+  "tuner_w_tv_any": "ono što prijemnik prikazuje na svom televizoru",
+  "tuner_w_own": "stream ove aplikacije ({what})",
+  "inuse_title": "Sada u upotrebi",
+  "inuse_source": "{name}: {count}.",
+  "inuse_none": "Trenutačno se ništa ne reproducira ni s jednog izvora.",
+  "inuse_box_tuners": "{name}: u upotrebi {n} od {total} tunera.",
+  "inuse_box_asking": "{name}: pitam prijemnik…",
+  "inuse_box_silent": "{name}: prijemnik nije odgovorio.",
+  "inuse_box_unknown": "{name}: prijemnik ne kaže koliko tunera ima.",
+  "inuse_mark_note": "Kanali na istom transponderu dijele tuner. Prsten pokraj kanala na popisu prijemnika: gledanje sada prekinulo bi snimanje ili ono što prijemnik prikazuje na svom televizoru."
 }

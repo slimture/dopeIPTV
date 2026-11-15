@@ -2406,5 +2406,22 @@
   "tv_volume": "Âm lượng {n}%",
   "tv_muted": "Tắt tiếng",
   "tv_paused": "Đã tạm dừng",
-  "set_page_shortcuts_sub": "Mọi phím mà ứng dụng phản hồi - nhấp vào một phím để thay đổi."
+  "set_page_shortcuts_sub": "Mọi phím mà ứng dụng phản hồi - nhấp vào một phím để thay đổi.",
+  "tuner_title": "Bộ dò sóng của đầu thu",
+  "tuner_what": "Kênh này không nằm trên bộ phát đáp (transponder) mà đầu thu đang bắt, nên cần một bộ dò sóng riêng.",
+  "tuner_what_rec": "Ghi kênh này sẽ chiếm một bộ dò sóng riêng của đầu thu.",
+  "tuner_full": "Mọi bộ dò sóng của đầu thu đều đang dùng ({n} trên {n}).",
+  "tuner_cuts": "Thêm một nữa sẽ cắt ngang {what}, hoặc đầu thu có thể từ chối kênh này.",
+  "tuner_w_rec": "bản ghi “{name}”",
+  "tuner_w_tv": "những gì đầu thu đang chiếu trên TV của nó ({name})",
+  "tuner_w_tv_any": "những gì đầu thu đang chiếu trên TV của nó",
+  "tuner_w_own": "một luồng của ứng dụng này ({what})",
+  "inuse_title": "Đang dùng",
+  "inuse_source": "{name}: {count}.",
+  "inuse_none": "Hiện không phát gì từ nguồn nào.",
+  "inuse_box_tuners": "{name}: đang dùng {n} trên {total} bộ dò sóng.",
+  "inuse_box_asking": "{name}: đang hỏi đầu thu…",
+  "inuse_box_silent": "{name}: đầu thu không trả lời.",
+  "inuse_box_unknown": "{name}: đầu thu không cho biết có bao nhiêu bộ dò sóng.",
+  "inuse_mark_note": "Các kênh trên cùng một bộ phát đáp dùng chung một bộ dò sóng. Vòng tròn bên cạnh một kênh trong danh sách của đầu thu: xem nó lúc này sẽ cắt ngang một bản ghi hoặc những gì đầu thu đang chiếu trên TV của nó."
 }

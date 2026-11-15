@@ -3,8 +3,9 @@ with the others"): casting next to the rewind buffer in one count of the
 account's connections, Watch together through a failover, private viewing
 and every reporter - during it and for the rest of a playback that was
 private - the statistics and Discord on a channel switch, and the phone
-remote, Home Assistant, casting and multiview meeting the VPN guard and the
-connection limit the way the player does."""
+remote, Home Assistant, casting and multiview meeting the VPN guard, the
+connection limit and a box's tuners (the transponder check) the way the
+player does."""
 from __future__ import annotations
 
 import os
@@ -1073,3 +1074,100 @@ def test_the_phone_note_is_the_phones_only_for_a_while_and_until_something_plays
     assert w._phone_note_now() == ""
     page, _policy = phone_page.render({}, {}, {}, "en", False)
     assert "banner(s.note" in page.decode("utf-8")      # shown where it says it is offline
+
+
+# -- the phone remote and a box's tuners ----------------------------------------------------
+
+_TUNER_CHILD = r"""
+import os, tempfile
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from types import SimpleNamespace
+from PyQt6.QtCore import QSettings
+from PyQt6.QtWidgets import QApplication
+
+tmp = tempfile.mkdtemp()
+QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, tmp)
+from dopeiptv.core import tuners
+from dopeiptv.i18n import tr
+from dopeiptv.providers.client import DemoClient
+from dopeiptv.ui import main_window as mw
+
+app = QApplication.instance() or QApplication([])
+settings = QSettings(os.path.join(tmp, "settings.ini"), QSettings.Format.IniFormat)
+w = mw.MainWindow(DemoClient(), settings)
+w.show()
+app.processEvents()
+
+asked = []
+w._show_toast = lambda text, ms=0: None
+w._choice_dialog = lambda title, message, options, dont_ask_setting=None: (asked.append(message), len(options) - 1)[1]
+
+# The source is a box with one tuner, its TV on another transponder than
+# every channel here; what it said is kept (never asked again in this run).
+BOX = "http://box.example.com:8001/"
+c = w.client
+row = c.live_streams(None)[0]
+
+
+def never_here():
+    raise AssertionError("the box asked on the window's thread")
+
+
+c.live_url = lambda sid, fmt="ts": BOX + "1:0:19:1:802:1:C00000:0:0:0:"
+c.own_stream = lambda url: str(url).startswith(BOX)
+c.tuner_state = never_here
+c.tuner_key = lambda sid: "802:1:C00000"
+w._tuner_states = tuners.StateCache(clock=lambda: 1.0)
+w._tuner_states.put(w._conn_source(), tuners.BoxState(1, tuners.Tune("tv", "SVT1 HD", "3FB:1:C00000")))
+
+
+class D:
+    active = True
+    cfg = SimpleNamespace(commands=True)
+    def emit(self, *a, **k): pass
+    def set_state(self, *a, **k): pass
+    def set_favorites(self, *a, **k): pass
+
+
+w._events = D()
+w._events_favs = {row["name"]: row}
+
+
+def playing():
+    return bool(w.player is not None and w.player.current_url)
+
+
+cut = tr("tuner_cuts", what=tr("tuner_w_tv", name="SVT1 HD"))
+w._phone_do("_play", {"row": row})
+assert asked and cut in asked[-1] and not playing(), ("phone", asked)
+note = w._phone_do("state", {}).get("note") or ""
+assert cut in note and tr("phone_answer_there") in note, note
+asked.clear()
+w._events_command("favorite", row["name"])
+assert asked and cut in asked[-1] and not playing(), ("mqtt favorite", asked)
+asked.clear()
+if w._multiview_available():
+    w.add_to_multiview(c.live_url(row["stream_id"]), row["name"])
+    assert asked and cut in asked[-1] and w._multiview_win is None, ("multiview", asked)
+# The list's ring says the same, and a channel beside the TV's is free.
+assert w.tuner_mark({"stream_id": row["stream_id"]}, "live")
+assert w._tuner_verdict(BOX + "1:0:19:2:3FB:1:C00000:0:0:0:", []) is None
+print("TUNERS_WINDOW_OK")
+"""
+
+
+def test_the_phone_remote_and_home_assistant_meet_the_transponder_check():
+    try:
+        import PyQt6  # noqa: F401
+    except Exception:
+        pytest.skip("PyQt6 not available")
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+    for _attempt in (1, 2):
+        proc = subprocess.run(
+            [sys.executable, "-c", _TUNER_CHILD], capture_output=True, text=True,
+            env=env, cwd=_REPO_ROOT, timeout=180)
+        if "TUNERS_WINDOW_OK" in proc.stdout:
+            return
+    assert "TUNERS_WINDOW_OK" in proc.stdout, (
+        f"a play from the phone or Home Assistant missed the box's tuners\n"
+        f"stdout={proc.stdout!r}\nstderr={proc.stderr[-3000:]!r}")

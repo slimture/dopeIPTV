@@ -6,15 +6,26 @@ what the account allows, with the choice to go ahead anyway.
 
 For everyone, not only Nerd. Nothing is said while the account gives no
 limit, and nothing is ever stopped: the warning is a question.
+
+An Enigma2 box's tuners are in the same count (core/tuners.py): before a
+zap, a multiview cell, a cast or a recording over its own connection opens
+a stream from the box that would cut off a recording or what the box shows
+on its TV, the same question says so. The box is asked off the window's
+thread and its answer kept a few seconds (every ~20 s while a box is the
+source); a box that does not answer says nothing and stops nothing. A ring
+in the channel list marks the channels that would cut something off now,
+and Nerd > Diagnostics shows what is in use ("In use now").
 """
 
 from __future__ import annotations
 
 import time
+from typing import Any, Callable
 
-from ..core import connections
+from ..core import connections, tuners
 from ..core.connections import Use
 from ..core.log import log
+from ..core.workers import run_async
 from ..i18n import tr
 
 #: How long after the provider answered its count of connections in use
@@ -23,6 +34,17 @@ SEEN_FRESH_SECS = 15.0
 KIND_WORDS = {"player": "conn_k_player", "buffer": "conn_k_buffer",
               "recording": "conn_k_recording", "multiview": "conn_k_multiview",
               "cast": "conn_k_cast"}
+#: How often a box that is the source is asked what its tuners do.
+TUNER_TICK_MS = 20000
+
+
+def _tuner_fetch(pid: str, client: Any) -> tuple[str, Any, Any]:
+    """(off the window's thread) (source id, the box's state or None, why
+    not) - never raises."""
+    try:
+        return pid, client.tuner_state(), None
+    except Exception as e:
+        return pid, None, e
 
 
 class _ConnectionsMixin:
@@ -59,27 +81,29 @@ class _ConnectionsMixin:
         try:
             if dvr is not None and dvr.streaming:
                 if not free_player or dvr.recording:
-                    uses.append(Use("buffer", src))
+                    uses.append(Use("buffer", src, str(getattr(dvr, "url", "") or "")))
             elif (p is not None and getattr(p, "current_url", None)
                   and connections.is_network(p.current_url) and not free_player):
-                uses.append(Use("player", src))
+                uses.append(Use("player", src, str(p.current_url)))
             pool = getattr(p, "_dvr_pool", None) if p is not None else None
             for s in (pool.sessions if pool is not None else []):
-                if s is not dvr and s.streaming:
-                    uses.append(Use("buffer", ""))     # kept by a recording
+                if s is not dvr and s.streaming:      # kept by a recording
+                    uses.append(Use("buffer", "", str(getattr(s, "url", "") or "")))
         except Exception as e:      # the player half torn down
             log.debug("connections: player not counted: %s", e)
         rec = getattr(self, "rec", None)
         for j in (rec.jobs if rec is not None else []):
             if (j.get("status") == "recording" and not j.get("inplayer")
                     and j.get("recorder") is None and connections.is_network(j.get("url"))):
-                uses.append(Use("recording", str(j.get("source") or "")))
+                uses.append(Use("recording", str(j.get("source") or ""), str(j.get("url"))))
         win = getattr(self, "_multiview_win", None)
         for c in (getattr(win, "cells", None) or []):
             if c is not free_cell and connections.is_network(getattr(c, "url", None)):
-                uses.append(Use("multiview", str(getattr(c, "source_id", "") or "")))
+                uses.append(Use("multiview", str(getattr(c, "source_id", "") or ""), str(c.url)))
         if self._conn_casting():
-            uses.append(Use("cast", self._conn_source()))
+            ctx = getattr(self, "_cast_ctx", None) or {}
+            uses.append(Use("cast", self._conn_source(),
+                            str(ctx.get("row_source") or ctx.get("row_url") or "")))
         return uses
 
     def _conn_casting(self) -> bool:
@@ -139,13 +163,17 @@ class _ConnectionsMixin:
     def _conn_words(self, v: connections.Verdict) -> str:
         """The connections in use, by whom: "player, multiview window ×2,
         another device"."""
+        return self._conn_who(v.kinds, v.others)
+
+    @staticmethod
+    def _conn_who(kinds, others: int = 0) -> str:
         parts = []
-        for kind, n in connections.counted(v.kinds):
+        for kind, n in connections.counted(kinds):
             word = tr(KIND_WORDS.get(kind, "conn_k_player"))
             parts.append(word if n == 1 else tr("conn_times", what=word, n=n))
-        if v.others:
+        if others:
             word = tr("conn_k_other")
-            parts.append(word if v.others == 1 else tr("conn_times", what=word, n=v.others))
+            parts.append(word if others == 1 else tr("conn_times", what=word, n=others))
         return ", ".join(parts)
 
     def _conn_warning(self, v: connections.Verdict) -> str:
@@ -163,23 +191,37 @@ class _ConnectionsMixin:
         self._conn_tell_phone(v)
         return body + "\n\n" + self._conn_warning(v)
 
-    def _conn_tell_phone(self, v: connections.Verdict) -> None:
+    def _conn_tell_phone(self, v: connections.Verdict | None,
+                         tuner: tuners.Verdict | None = None) -> None:
         """A play the phone remote asked for waits on this question: its
         page says it too (mw_phone), and where to answer."""
         note = getattr(self, "_phone_note", None)
-        if callable(note):
-            note(self._conn_warning(v) + " " + tr("phone_answer_there"))
+        said = " ".join(x for x in (self._conn_warning(v) if v is not None else "",
+                                    self._tuner_warning(tuner) if tuner is not None else "") if x)
+        if callable(note) and said:
+            note(said + " " + tr("phone_answer_there"))
 
-    def _conn_ask(self, v: connections.Verdict, what: str) -> bool:
-        """Warn about *v* before *what* (an i18n key: what is about to
-        open the connection); True to go ahead."""
-        self._conn_tell_phone(v)
+    def _conn_ask(self, v: connections.Verdict | None, what: str,
+                  tuner: tuners.Verdict | None = None) -> bool:
+        """Warn about *v* (the account's limit) and *tuner* (the box's
+        tuners) before *what* (an i18n key: what is about to open the
+        stream); True to go ahead."""
+        self._conn_tell_phone(v, tuner)
+        parts = [tr(what)]
+        if v is not None:
+            parts.append(self._conn_warning(v))
+        if tuner is not None:
+            parts.append(self._tuner_warning(tuner))
         idx = self._choice_dialog(
-            tr("conn_title"), tr(what) + "\n\n" + self._conn_warning(v),
+            tr("conn_title" if v is not None else "tuner_title"), "\n\n".join(parts),
             [(tr("conn_anyway"), "normal"), (tr("common_cancel"), "primary")])
         go = idx == 0
-        log.info("connections: %d of %d in use - one more %s", v.in_use, v.limit,
-                 "anyway" if go else "not opened")
+        if v is not None:
+            log.info("connections: %d of %d in use - one more %s", v.in_use, v.limit,
+                     "anyway" if go else "not opened")
+        if tuner is not None:
+            log.info("tuners: %d of %d in use on the box - one more %s", tuner.in_use,
+                     tuner.tuners, "anyway" if go else "not opened")
         return go
 
     # -- the places a connection is opened -----------------------------------------------
@@ -201,8 +243,12 @@ class _ConnectionsMixin:
             else:
                 target = next((c for c in cells if c.url is None),
                               getattr(win, "_focused", None) or cells[0])
-        v = self._conn_verdict(self._conn_uses(free_player=free_player, free_cell=target))
-        return v is None or self._conn_ask(v, "conn_what_multiview")
+        uses = self._conn_uses(free_player=free_player, free_cell=target)
+        v = self._conn_verdict(uses)
+        t = self._tuner_verdict(url, uses)
+        if v is None and t is None:
+            return True
+        return self._conn_ask(v, "conn_what_multiview" if v is not None else "tuner_what", t)
 
     def _conn_ok_cast(self, url: str = "") -> bool:
         """*url* cast to a TV: the player hands its stream over (it stops
@@ -212,4 +258,312 @@ class _ConnectionsMixin:
             return True
         uses = [u for u in self._conn_uses(free_player=True) if u.kind != "cast"]
         v = self._conn_verdict(uses)
-        return v is None or self._conn_ask(v, "conn_what_cast")
+        t = self._tuner_verdict(url, uses)
+        if v is None and t is None:
+            return True
+        return self._conn_ask(v, "conn_what_cast" if v is not None else "tuner_what", t)
+
+    # -- a box's tuners (core/tuners.py) -------------------------------------------------
+
+    def _tuner_cache(self) -> tuners.StateCache:
+        cache = getattr(self, "_tuner_states", None)
+        if cache is None:
+            cache = self._tuner_states = tuners.StateCache()
+        return cache
+
+    def _tuner_source_name(self, pid: str) -> str:
+        store = getattr(self, "playlist_store", None)
+        get = getattr(store, "get", None)
+        try:
+            pl = get(pid) if callable(get) and pid else None
+        except Exception:
+            pl = None
+        name = str((pl or {}).get("name") or "")
+        if not name and pid == self._conn_source():
+            name = str((getattr(self.client, "box_info", None) or {}).get("name") or "")
+        return name or tr("box_info_title")
+
+    def _tuner_boxes(self) -> list[tuple[str, str, Any]]:
+        """(source id, name, client) of each Enigma2 box source: the active
+        one's own client, the others' made once (no request)."""
+        active = self._conn_source()
+        out: list[tuple[str, str, Any]] = []
+        client = getattr(self, "client", None)
+        if hasattr(client, "tuner_state"):
+            out.append((active, self._tuner_source_name(active), client))
+        lists = getattr(getattr(self, "playlist_store", None), "playlists", None)
+        try:
+            pls = list(lists()) if callable(lists) else []
+        except Exception:
+            pls = []
+        made = getattr(self, "_tuner_clients", None)
+        if made is None:
+            made = self._tuner_clients = {}
+        for pl in pls:
+            pid = str(pl.get("id") or "")
+            if pl.get("kind") != "enigma2" or not pid or pid == active:
+                continue
+            mark = (pl.get("server"), pl.get("username"), pl.get("password"),
+                    repr(sorted((pl.get("options") or {}).items())))
+            got = made.get(pid)
+            if got is None or got[0] != mark:
+                try:
+                    from ..providers.client import make_client
+                    got = made[pid] = (mark, make_client(pl))
+                except Exception as e:
+                    log.debug("tuners: no client for a box source: %s", e)
+                    continue
+            out.append((pid, str(pl.get("name") or "") or tr("box_info_title"), got[1]))
+        return out
+
+    def _tuner_box_for(self, url: str) -> tuple[str, Any] | None:
+        """(source id, client) of the box *url* streams from, or None."""
+        for pid, _name, client in self._tuner_boxes():
+            own = getattr(client, "own_stream", None)
+            try:
+                if callable(own) and own(url):
+                    return pid, client
+            except Exception:
+                continue
+        return None
+
+    def _tuner_state(self, pid: str, client: Any, ask: bool = True) -> tuners.BoxState | None:
+        """What box *pid* last said (asked again, off the window's thread,
+        once it is a few seconds old), or None: nothing yet, or it did not
+        answer."""
+        cache = self._tuner_cache()
+        if ask and cache.due(pid):
+            self._tuner_ask(pid, client)
+        return cache.state(pid)
+
+    def _tuner_ask(self, pid: str, client: Any) -> None:
+        pool = getattr(self, "pool", None)
+        if pool is None:
+            return
+        cache = self._tuner_cache()
+        cache.asking(pid)
+        try:
+            run_async(pool, _tuner_fetch, self._tuner_came, None, pid, client)
+        except Exception as e:
+            cache.failed(pid)
+            log.debug("tuners: the box not asked: %s", e)
+
+    def _tuner_came(self, result: Any) -> None:
+        try:
+            pid, state, why = result
+        except (TypeError, ValueError):
+            return
+        cache = self._tuner_cache()
+        if state is None:
+            cache.failed(pid)
+            log.debug("tuners: the box did not answer (%s) - nothing checked against it",
+                      type(why).__name__ if why is not None else "-")
+        else:
+            cache.put(pid, state)
+        self._tuner_marks = None
+        lst = getattr(self, "listw", None)
+        if lst is not None and pid == self._conn_source():
+            try:
+                lst.viewport().update()
+            except Exception:
+                pass
+        self._in_use_refill()
+
+    def _tuner_own(self, uses: list[Use], client: Any) -> list[tuners.Tune]:
+        """The app's own streams from *client*'s box (as *uses* are), each
+        on its transponder."""
+        own = getattr(client, "own_stream", None)
+        out: list[tuners.Tune] = []
+        for u in uses:
+            try:
+                mine = bool(u.url) and callable(own) and bool(own(u.url))
+            except Exception:
+                mine = False
+            key = tuners.stream_key(u.url) if mine else None
+            if key:
+                out.append(tuners.Tune(u.kind, "", key))
+        return out
+
+    def _tuner_verdict(self, url: str, uses: list[Use]) -> tuners.Verdict | None:
+        """Would *url*, from a box, cut off a recording or what the box shows
+        on its TV, next to *uses* (the app's own as they will be)? The
+        Verdict when it would; None when not, or when it cannot be told."""
+        try:
+            key = tuners.stream_key(url)
+            box = self._tuner_box_for(url) if key else None
+            if box is None:
+                return None
+            pid, client = box
+            self._tuner_tick_on()
+            state = self._tuner_state(pid, client)
+            if state is None:
+                log.debug("tuners: nothing known of the box yet - not checked")
+                return None
+            v = tuners.verdict(state, key, self._tuner_own(uses, client))
+        except Exception as e:      # the check must never stand in the way
+            log.debug("tuners: not checked: %s", e)
+            return None
+        if v is not None and v.kind == tuners.LAST:
+            log.debug("tuners: this takes the box's last free tuner")
+        return v if v is not None and v.kind == tuners.CUTS else None
+
+    def _tune_words(self, users) -> str:
+        """What holds a tuner, said: "the recording “News”, this app's
+        player"."""
+        parts: list[str] = []
+        for t in users:
+            if t.what == tuners.TV:
+                word = tr("tuner_w_tv", name=t.name) if t.name else tr("tuner_w_tv_any")
+            elif t.what == tuners.RECORDING and t.name:
+                word = tr("tuner_w_rec", name=t.name)
+            else:
+                word = tr("tuner_w_own", what=tr(KIND_WORDS.get(t.what, "conn_k_player")))
+            if word not in parts:
+                parts.append(word)
+        return ", ".join(parts)
+
+    def _tuner_warning(self, v: tuners.Verdict) -> str:
+        return tr("tuner_full", n=v.tuners) + " " + tr("tuner_cuts", what=self._tune_words(v.cut))
+
+    def _tuner_ok(self, url: str, uses: list[Use] | None = None,
+                  what: str = "tuner_what") -> bool:
+        """*url* about to play in the docked player (*uses* None: the app's
+        own as they will be once the player lets its stream go, a cast
+        giving way too) or recorded (*uses* as they are): asked first when
+        it would cut off a recording or the box's TV. True to go on."""
+        if uses is None:
+            p = getattr(self, "player", None)
+            if p is not None and url and url == getattr(p, "current_url", None):
+                return True
+            uses = [u for u in self._conn_uses(free_player=True) if u.kind != "cast"]
+        t = self._tuner_verdict(url, uses)
+        return t is None or self._conn_ask(None, what, t)
+
+    # -- kept fresh while a box is the source, and the list's ring ------------------------
+
+    def _tuner_tick_on(self) -> None:
+        try:
+            from PyQt6.QtCore import QObject, QTimer
+        except Exception:
+            return
+        if not isinstance(self, QObject):
+            return
+        timer = getattr(self, "_tuner_timer", None)
+        if timer is None:
+            timer = self._tuner_timer = QTimer(self)
+            timer.setInterval(TUNER_TICK_MS)
+            timer.timeout.connect(self._tuner_tick)
+        if not timer.isActive():
+            timer.start()
+
+    def _tuner_tick(self) -> None:
+        client = getattr(self, "client", None)
+        if not hasattr(client, "tuner_state"):
+            timer = getattr(self, "_tuner_timer", None)
+            if timer is not None:
+                timer.stop()
+            self._tuner_marks = None
+            return
+        visible = getattr(self, "isVisible", None)
+        if callable(visible) and not visible():
+            return
+        pid = self._conn_source()
+        if self._tuner_cache().due(pid):
+            self._tuner_ask(pid, client)
+
+    def tuner_mark(self, it: dict | None, kind: str) -> bool:
+        """Whether a box's channel in the list carries the quiet ring: it
+        cannot be watched now without cutting off a recording or what the
+        box shows on its TV."""
+        try:
+            client = getattr(self, "client", None)
+            key_of = getattr(client, "tuner_key", None)
+            sid = (it or {}).get("stream_id")
+            if kind != "live" or sid is None or not callable(key_of):
+                return False
+            self._tuner_tick_on()
+            state = self._tuner_state(self._conn_source(), client)
+            if state is None:
+                return False
+            memo = getattr(self, "_tuner_marks", None)
+            if memo is None or memo[0] is not state:
+                uses = [u for u in self._conn_uses(free_player=True) if u.kind != "cast"]
+                memo = self._tuner_marks = (state, self._tuner_own(uses, client), {})
+            marks = memo[2]
+            if sid not in marks:
+                v = tuners.verdict(state, key_of(sid), memo[1])
+                marks[sid] = v is not None and v.kind == tuners.CUTS
+            return bool(marks[sid])
+        except Exception as e:
+            log.debug("tuners: no mark: %s", e)
+            return False
+
+    # -- Nerd > Diagnostics: In use now ---------------------------------------------------
+
+    def _in_use_lines(self, ask: bool = True) -> list[tuple[str, str]]:
+        """The card's lines, ("head" | "item" | "note", text): the
+        connections the app holds to each source (and another device's, as
+        the provider last said), then each box's tuners and what each is
+        used for. *ask*: a box not asked a moment ago is asked again."""
+        lines: list[tuple[str, str]] = []
+        uses = self._conn_uses()
+        led = self._conn_ledger()
+        active = self._conn_source()
+        try:
+            self._conn_seen()
+        except Exception as e:
+            log.debug("in use: the provider's count not read: %s", e)
+        by_source: dict[str, list[Use]] = {}
+        for u in uses:
+            by_source.setdefault(u.source or active, []).append(u)
+        if active not in by_source and self._conn_limit():
+            by_source[active] = []
+        for pid, used in by_source.items():
+            limit = (self._conn_limit() if pid == active else None) or led.limit(pid)
+            others = led.others(pid)
+            n = len(used) + others
+            count = tr("conn_in_use", n=n, max=limit) if limit else tr("conn_in_use_only", n=n)
+            line = tr("inuse_source", name=self._tuner_source_name(pid), count=count)
+            who = self._conn_who(connections.kinds_of(used, pid), others)
+            lines.append(("head", line + (" " + tr("conn_used_by", who=who) if who else "")))
+        if not lines:
+            lines.append(("item", tr("inuse_none")))
+        boxes = self._tuner_boxes()
+        cache = self._tuner_cache()
+        for pid, name, client in boxes:
+            state = self._tuner_state(pid, client, ask=ask)
+            if state is None:
+                key = "inuse_box_asking" if cache.is_asking(pid) else "inuse_box_silent"
+                lines.append(("head", tr(key, name=name)))
+                continue
+            if not state.tuners:
+                lines.append(("head", tr("inuse_box_unknown", name=name)))
+                continue
+            held = tuners.groups(state.users(self._tuner_own(uses, client)))
+            lines.append(("head", tr("inuse_box_tuners", name=name, n=len(held), total=state.tuners)))
+            lines += [("item", "• " + self._tune_words(users)) for users in held.values()]
+        if boxes:
+            lines.append(("note", tr("inuse_mark_note")))
+        return lines
+
+    def _in_use_card(self, fill: Callable[[list[tuple[str, str]]], None]) -> None:
+        """Nerd > Diagnostics' In use now, shown: *fill* gets its lines now,
+        and again as each box answers while the card shows."""
+        self._in_use_fill = fill
+        fill(self._in_use_lines())
+
+    def _in_use_refill(self) -> None:
+        fill = getattr(self, "_in_use_fill", None)
+        if fill is None:
+            return
+        owner = getattr(fill, "__self__", None)
+        try:
+            from PyQt6 import sip
+            if owner is not None and sip.isdeleted(owner):
+                self._in_use_fill = None
+                return
+            if owner is not None and not owner.isVisible():
+                return
+            fill(self._in_use_lines(ask=False))
+        except Exception as e:
+            log.debug("in use: not shown again: %s", e)

@@ -2406,5 +2406,22 @@
   "tv_volume": "Volumen {n} %",
   "tv_muted": "Sin sonido",
   "tv_paused": "En pausa",
-  "set_page_shortcuts_sub": "Todas las teclas a las que responde la app: haz clic en una para cambiarla."
+  "set_page_shortcuts_sub": "Todas las teclas a las que responde la app: haz clic en una para cambiarla.",
+  "tuner_title": "Los sintonizadores del receptor",
+  "tuner_what": "Este canal no está en un transpondedor que el receptor sintonice ahora, así que necesita un sintonizador propio.",
+  "tuner_what_rec": "Grabar este canal ocupa un sintonizador propio del receptor.",
+  "tuner_full": "Todos los sintonizadores del receptor están en uso ({n} de {n}).",
+  "tuner_cuts": "Uno más cortaría {what}, o el receptor puede rechazar este canal.",
+  "tuner_w_rec": "la grabación «{name}»",
+  "tuner_w_tv": "lo que el receptor muestra en su televisor ({name})",
+  "tuner_w_tv_any": "lo que el receptor muestra en su televisor",
+  "tuner_w_own": "una emisión de esta app ({what})",
+  "inuse_title": "En uso ahora",
+  "inuse_source": "{name}: {count}.",
+  "inuse_none": "Ahora no se reproduce nada de ninguna fuente.",
+  "inuse_box_tuners": "{name}: {n} de {total} sintonizadores en uso.",
+  "inuse_box_asking": "{name}: preguntando al receptor…",
+  "inuse_box_silent": "{name}: el receptor no respondió.",
+  "inuse_box_unknown": "{name}: el receptor no dice cuántos sintonizadores tiene.",
+  "inuse_mark_note": "Los canales de un mismo transpondedor comparten sintonizador. Un aro junto a un canal en la lista de un receptor: verlo ahora cortaría una grabación o lo que el receptor muestra en su televisor."
 }

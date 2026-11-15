@@ -2406,5 +2406,22 @@
   "tv_volume": "Głośność {n}%",
   "tv_muted": "Dźwięk wyłączony",
   "tv_paused": "Wstrzymano",
-  "set_page_shortcuts_sub": "Każdy klawisz, na który reaguje aplikacja - kliknij, aby go zmienić."
+  "set_page_shortcuts_sub": "Każdy klawisz, na który reaguje aplikacja - kliknij, aby go zmienić.",
+  "tuner_title": "Tunery dekodera",
+  "tuner_what": "Ten kanał nie jest na transponderze, który dekoder teraz odbiera, więc potrzebuje własnego tunera.",
+  "tuner_what_rec": "Nagrywanie tego kanału zajmuje osobny tuner dekodera.",
+  "tuner_full": "Wszystkie tunery dekodera są w użyciu ({n} z {n}).",
+  "tuner_cuts": "Jeszcze jeden przerwałby {what} albo dekoder może odmówić tego kanału.",
+  "tuner_w_rec": "nagranie „{name}”",
+  "tuner_w_tv": "to, co dekoder pokazuje na swoim telewizorze ({name})",
+  "tuner_w_tv_any": "to, co dekoder pokazuje na swoim telewizorze",
+  "tuner_w_own": "strumień tej aplikacji ({what})",
+  "inuse_title": "W użyciu teraz",
+  "inuse_source": "{name}: {count}.",
+  "inuse_none": "Teraz nic nie gra z żadnego źródła.",
+  "inuse_box_tuners": "{name}: w użyciu {n} z {total} tunerów.",
+  "inuse_box_asking": "{name}: pytam dekoder…",
+  "inuse_box_silent": "{name}: dekoder nie odpowiedział.",
+  "inuse_box_unknown": "{name}: dekoder nie podaje, ile ma tunerów.",
+  "inuse_mark_note": "Kanały na jednym transponderze dzielą tuner. Pierścień przy kanale na liście dekodera: oglądanie go teraz przerwałoby nagranie albo to, co dekoder pokazuje na swoim telewizorze."
 }

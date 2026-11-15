@@ -154,6 +154,7 @@ files = [
     "dopeiptv/core/gcguard.py",
     "dopeiptv/core/contest.py",
     "dopeiptv/core/connections.py",
+    "dopeiptv/core/tuners.py",
     "dopeiptv/core/mirrors.py",
     "dopeiptv/core/conn_test.py",
     "dopeiptv/core/health.py",

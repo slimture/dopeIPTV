@@ -17,7 +17,7 @@ It only counts and says: nothing here stops a stream. Unknown numbers
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable
 
 #: The app's own kinds of connection, in the order a sentence names them.
@@ -30,10 +30,13 @@ FRESH_SECS = 180.0
 @dataclass(frozen=True)
 class Use:
     """One connection the app holds: its kind and the source (id) it is
-    to - "" when not known, which counts as the source asked about."""
+    to - "" when not known, which counts as the source asked about - and
+    the address it plays (what a box's tuners are asked about,
+    core/tuners.py)."""
 
     kind: str
     source: str = ""
+    url: str = field(default="", compare=False, repr=False)
 
 
 @dataclass(frozen=True)

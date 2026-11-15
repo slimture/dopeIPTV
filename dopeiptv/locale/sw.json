@@ -2406,5 +2406,22 @@
   "tv_volume": "Sauti {n}%",
   "tv_muted": "Sauti imezimwa",
   "tv_paused": "Imesitishwa",
-  "set_page_shortcuts_sub": "Kila kitufe ambacho programu inakijibu - bofya kimoja ili kukibadilisha."
+  "set_page_shortcuts_sub": "Kila kitufe ambacho programu inakijibu - bofya kimoja ili kukibadilisha.",
+  "tuner_title": "Vitafutaji vya kisanduku",
+  "tuner_what": "Chaneli hii haiko kwenye transponda ambayo kisanduku kinapokea sasa, kwa hiyo inahitaji kitafutaji chake.",
+  "tuner_what_rec": "Kurekodi chaneli hii kunatumia kitafutaji tofauti cha kisanduku.",
+  "tuner_full": "Vitafutaji vyote vya kisanduku vinatumika ({n} kati ya {n}).",
+  "tuner_cuts": "Kimoja zaidi kingekatiza {what}, au kisanduku kinaweza kukataa chaneli hii.",
+  "tuner_w_rec": "rekodi “{name}”",
+  "tuner_w_tv": "kile ambacho kisanduku kinaonyesha kwenye TV yake ({name})",
+  "tuner_w_tv_any": "kile ambacho kisanduku kinaonyesha kwenye TV yake",
+  "tuner_w_own": "mtiririko wa programu hii ({what})",
+  "inuse_title": "Kinachotumika sasa",
+  "inuse_source": "{name}: {count}.",
+  "inuse_none": "Hakuna kinachochezwa kutoka chanzo chochote sasa hivi.",
+  "inuse_box_tuners": "{name}: vitafutaji {n} kati ya {total} vinatumika.",
+  "inuse_box_asking": "{name}: kuuliza kisanduku…",
+  "inuse_box_silent": "{name}: kisanduku hakikujibu.",
+  "inuse_box_unknown": "{name}: kisanduku hakisemi kina vitafutaji vingapi.",
+  "inuse_mark_note": "Chaneli kwenye transponda moja hushiriki kitafutaji kimoja. Pete kando ya chaneli kwenye orodha ya kisanduku: kuitazama sasa kungekatiza rekodi au kile ambacho kisanduku kinaonyesha kwenye TV yake."
 }

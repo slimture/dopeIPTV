@@ -2406,5 +2406,22 @@
   "tv_volume": "Volume {n}%",
   "tv_muted": "Suara mati",
   "tv_paused": "Dijeda",
-  "set_page_shortcuts_sub": "Setiap tombol yang ditanggapi aplikasi - klik salah satu untuk mengubahnya."
+  "set_page_shortcuts_sub": "Setiap tombol yang ditanggapi aplikasi - klik salah satu untuk mengubahnya.",
+  "tuner_title": "Tuner receiver",
+  "tuner_what": "Saluran ini tidak berada di transponder yang sedang ditangkap receiver, jadi perlu tuner sendiri.",
+  "tuner_what_rec": "Merekam saluran ini memakai satu tuner tersendiri di receiver.",
+  "tuner_full": "Semua tuner receiver sedang dipakai ({n} dari {n}).",
+  "tuner_cuts": "Satu lagi akan memutus {what}, atau receiver bisa menolak saluran ini.",
+  "tuner_w_rec": "rekaman “{name}”",
+  "tuner_w_tv": "apa yang ditampilkan receiver di TV-nya ({name})",
+  "tuner_w_tv_any": "apa yang ditampilkan receiver di TV-nya",
+  "tuner_w_own": "stream dari aplikasi ini ({what})",
+  "inuse_title": "Dipakai sekarang",
+  "inuse_source": "{name}: {count}.",
+  "inuse_none": "Saat ini tidak ada yang diputar dari sumber mana pun.",
+  "inuse_box_tuners": "{name}: {n} dari {total} tuner dipakai.",
+  "inuse_box_asking": "{name}: menanyai receiver…",
+  "inuse_box_silent": "{name}: receiver tidak menjawab.",
+  "inuse_box_unknown": "{name}: receiver tidak menyebutkan berapa tuner yang dimilikinya.",
+  "inuse_mark_note": "Saluran di satu transponder berbagi satu tuner. Cincin di samping saluran dalam daftar receiver: menontonnya sekarang akan memutus rekaman atau apa yang ditampilkan receiver di TV-nya."
 }

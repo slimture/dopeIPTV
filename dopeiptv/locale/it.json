@@ -2406,5 +2406,22 @@
   "tv_volume": "Volume {n}%",
   "tv_muted": "Audio disattivato",
   "tv_paused": "In pausa",
-  "set_page_shortcuts_sub": "Ogni tasto a cui l'app risponde: fai clic su uno per cambiarlo."
+  "set_page_shortcuts_sub": "Ogni tasto a cui l'app risponde: fai clic su uno per cambiarlo.",
+  "tuner_title": "I sintonizzatori del decoder",
+  "tuner_what": "Questo canale non è su un transponder che il decoder sta sintonizzando, quindi gli serve un sintonizzatore tutto suo.",
+  "tuner_what_rec": "Registrare questo canale occupa un sintonizzatore a parte del decoder.",
+  "tuner_full": "Tutti i sintonizzatori del decoder sono in uso ({n} su {n}).",
+  "tuner_cuts": "Uno in più interromperebbe {what}, oppure il decoder può rifiutare questo canale.",
+  "tuner_w_rec": "la registrazione «{name}»",
+  "tuner_w_tv": "ciò che il decoder mostra sulla sua TV ({name})",
+  "tuner_w_tv_any": "ciò che il decoder mostra sulla sua TV",
+  "tuner_w_own": "uno stream di questa app ({what})",
+  "inuse_title": "In uso ora",
+  "inuse_source": "{name}: {count}.",
+  "inuse_none": "Al momento non si riproduce nulla da una sorgente.",
+  "inuse_box_tuners": "{name}: {n} sintonizzatori in uso su {total}.",
+  "inuse_box_asking": "{name}: richiesta al decoder…",
+  "inuse_box_silent": "{name}: il decoder non ha risposto.",
+  "inuse_box_unknown": "{name}: il decoder non dice quanti sintonizzatori ha.",
+  "inuse_mark_note": "I canali di uno stesso transponder condividono un sintonizzatore. Un anello accanto a un canale nell'elenco di un decoder: guardarlo ora interromperebbe una registrazione o ciò che il decoder mostra sulla sua TV."
 }

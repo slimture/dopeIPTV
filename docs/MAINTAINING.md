@@ -333,13 +333,21 @@ tests check that placeholders line up and that every `tr("…")` key exists.
 After the account-connection count (the Nerd network tools) is in, so it
 builds on that count instead of a second one:
 
-- **Transponder check.** Channels on the same transponder share the
-  TSID/ONID/namespace of their service reference. With the box's tuner
-  count (`/web/about`), what it records (`/web/timerlist` - recordings
-  only) and what the box itself shows on the TV right now
-  (`/web/getcurrent`, the service being watched), warn before a zap or a
-  stream that would cut off a recording or someone watching, and mark the
-  channels that can be seen without one.
+- **Transponder check.** Built, on the connection count
+  (`core/tuners.py`, `ui/mw_connections.py`): channels on one transponder
+  share the TSID/ONID/namespace of their service reference. With the
+  box's tuner count (`/web/about`), what it records (`/web/timerlist`,
+  running recordings only) and what it shows on the TV (`/web/getcurrent`),
+  a zap, a multiview cell, a cast or a recording over its own connection
+  that would cut off a recording or the TV is asked about first, as the
+  connection limit is (phone remote and Home Assistant included); a ring
+  in the channel list marks such channels, and Nerd > Diagnostics shows
+  what is in use. The box is asked off the window's thread and kept a few
+  seconds (every 20 s while it is the source); one that does not answer
+  says nothing. Still to see on a real box: FBC tuners (each demodulator
+  counts as a tuner), mixed tuner types (a DVB-T channel cannot use a
+  DVB-S tuner - all are counted as one pool), and whether a box with no
+  free tuner cuts the TV or refuses the stream.
 - **Signal values.** Built: SNR, AGC and BER (`/web/signal`) in the stream
   stats (`I`, asked every 2 s only while they show) and the box's info
   window. OpenWebif reports the tuner behind what the box itself shows,

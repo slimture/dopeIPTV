@@ -2406,5 +2406,22 @@
   "tv_volume": "볼륨 {n}%",
   "tv_muted": "음소거",
   "tv_paused": "일시 정지됨",
-  "set_page_shortcuts_sub": "앱이 반응하는 모든 키 - 하나를 클릭해 바꿀 수 있습니다."
+  "set_page_shortcuts_sub": "앱이 반응하는 모든 키 - 하나를 클릭해 바꿀 수 있습니다.",
+  "tuner_title": "셋톱박스의 튜너",
+  "tuner_what": "이 채널은 셋톱박스가 지금 수신 중인 트랜스폰더에 있지 않아서 튜너가 따로 하나 필요합니다.",
+  "tuner_what_rec": "이 채널을 녹화하면 셋톱박스의 튜너를 하나 따로 씁니다.",
+  "tuner_full": "셋톱박스의 튜너가 모두 사용 중입니다({n}/{n}).",
+  "tuner_cuts": "하나를 더 쓰면 {what}이(가) 끊기거나 셋톱박스가 이 채널을 거부할 수 있습니다.",
+  "tuner_w_rec": "녹화 “{name}”",
+  "tuner_w_tv": "셋톱박스가 TV에 표시 중인 채널({name})",
+  "tuner_w_tv_any": "셋톱박스가 TV에 표시 중인 채널",
+  "tuner_w_own": "이 앱의 스트림({what})",
+  "inuse_title": "현재 사용 중",
+  "inuse_source": "{name}: {count}.",
+  "inuse_none": "지금은 어떤 소스에서도 재생하고 있지 않습니다.",
+  "inuse_box_tuners": "{name}: 튜너 {total}개 중 {n}개 사용 중.",
+  "inuse_box_asking": "{name}: 셋톱박스에 묻는 중…",
+  "inuse_box_silent": "{name}: 셋톱박스가 응답하지 않았습니다.",
+  "inuse_box_unknown": "{name}: 셋톱박스가 튜너 수를 알려 주지 않습니다.",
+  "inuse_mark_note": "같은 트랜스폰더의 채널은 튜너 하나를 함께 씁니다. 셋톱박스 채널 목록에서 채널 옆의 고리: 지금 보면 녹화나 셋톱박스가 TV에 표시 중인 채널이 끊깁니다."
 }

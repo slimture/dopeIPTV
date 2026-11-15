@@ -16,7 +16,10 @@ a picture of what the TV shows (``/grab``), its remote control
 transcoded by a box with a hardware encoder (its stream port 8002, asked
 for a bitrate and a size its transcoding accepts, ``/transcoding``), and
 whether a channel that will not play is one the box cannot decrypt (the
-first packets of its stream, core/ts_scramble.py).
+first packets of its stream, core/ts_scramble.py). For the transponder
+check (core/tuners.py): its tuners, what it records and what its TV shows
+(``tuner_state``, off the window's thread), and the transponder a channel
+is on (``tuner_key``, from the list as loaded).
 """
 
 from __future__ import annotations
@@ -26,7 +29,7 @@ import time
 from typing import Any, Callable
 from urllib.parse import quote, unquote, urlsplit, urlunsplit
 
-from ..core import ts_scramble
+from ..core import ts_scramble, tuners
 from ..core._lazy_requests import requests
 from ..core.log import log, redact_url
 from ..i18n import LocalizedError, tr
@@ -139,6 +142,10 @@ class Enigma2Client(BoxClient):
         # channels while a step is chosen: {} not asked, present False when
         # the box says it has none.
         self.transcoder: dict[str, Any] = {}
+        # A channel's key -> its service reference; how many tuners the box
+        # has (None: not asked yet, 0: it does not say).
+        self._sref_by_key: dict[str, str] = {}
+        self._tuner_total: int | None = None
 
     @property
     def openwebif(self) -> bool:
@@ -154,12 +161,13 @@ class Enigma2Client(BoxClient):
         image = " ".join(x for x in (child_text(about, "e2distroversion"),
                                      child_text(about, "e2imageversion")) if x)
         owif = "owif" in webif.lower() or "openwebif" in webif.lower()
-        tuners = [child_text(n, "name") for n in about.iter("e2nim")]
+        names = tuners.tuner_names(about)
+        self._tuner_total = len(names)
         return {"kind": "enigma2", "name": " ".join(x for x in (model, f"({image})" if image else "") if x),
                 "model": model, "image": image, "webif": webif, "openwebif": owif,
                 "distro": child_text(about, "e2distroversion").lower(),
                 "enigma": child_text(about, "e2enigmaversion"),
-                "tuners": [t for t in tuners if t]}
+                "tuners": names}
 
     # -- channels -------------------------------------------------------------
 
@@ -330,6 +338,7 @@ class Enigma2Client(BoxClient):
     def _take(self, channels: list[dict], recordings: list[dict]) -> None:
         # The guide asks per bouquet (OpenWebif) or per service: keep both.
         self._srefs = {ch["_sref"]: ch["key"] for ch in channels if ch.get("_sref")}
+        self._sref_by_key = {key: sref for sref, key in self._srefs.items()}
         self._brefs = list(dict.fromkeys(ch["_bref"] for ch in channels if ch.get("_bref")))
         super()._take(channels, recordings)
 
@@ -375,6 +384,33 @@ class Enigma2Client(BoxClient):
         IPTV entry in a bouquet): what its signal and transcoding are for."""
         sref = self._sref_of(stream_id)
         return bool(sref) and not iptv_address(sref)
+
+    # -- its tuners: the transponder check (core/tuners.py) ---------------------
+
+    STATE_TIMEOUT = (2.0, 4.0)
+
+    def own_stream(self, url: str) -> bool:
+        """Whether *url* is one of the box's own streams (it takes a tuner)."""
+        return self._own_stream(url)
+
+    def tuner_key(self, stream_id: int | str) -> str | None:
+        """The transponder a channel is on - None for an IPTV entry, or one
+        not in the list as loaded (never a request)."""
+        row = self._channel(stream_id)
+        if row is None:
+            return None
+        return tuners.transponder(self._sref_by_key.get(str(row.get("_key") or ""), ""))
+
+    def tuner_state(self) -> tuners.BoxState:
+        """(off the window's thread) How many tuners the box has (/web/about,
+        asked once), what it records now (/web/timerlist) and what its TV
+        shows (/web/getcurrent). Raises when the box does not answer."""
+        if self._tuner_total is None:
+            about = self.get_xml("/web/about", timeout=self.STATE_TIMEOUT)
+            self._tuner_total = len(tuners.tuner_names(about))
+        recs = tuners.running_recordings(self.get_xml("/web/timerlist", timeout=self.STATE_TIMEOUT))
+        tv = tuners.on_tv(self.get_xml("/web/getcurrent", timeout=self.STATE_TIMEOUT))
+        return tuners.BoxState(self._tuner_total or None, tv, recs)
 
     # -- the tuner's signal -----------------------------------------------------
 

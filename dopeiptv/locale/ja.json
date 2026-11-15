@@ -2406,5 +2406,22 @@
   "tv_volume": "音量 {n}%",
   "tv_muted": "消音",
   "tv_paused": "一時停止中",
-  "set_page_shortcuts_sub": "アプリが反応するすべてのキー - クリックして変更できます。"
+  "set_page_shortcuts_sub": "アプリが反応するすべてのキー - クリックして変更できます。",
+  "tuner_title": "チューナーの受信部",
+  "tuner_what": "このチャンネルはチューナーがいま受信しているトランスポンダーにないため、専用の受信部が必要です。",
+  "tuner_what_rec": "このチャンネルを録画すると、チューナーの受信部を 1 つ別に使います。",
+  "tuner_full": "チューナーの受信部はすべて使用中です（{n} / {n}）。",
+  "tuner_cuts": "もう 1 つ使うと {what} が途切れるか、チューナーがこのチャンネルを拒否することがあります。",
+  "tuner_w_rec": "録画「{name}」",
+  "tuner_w_tv": "チューナーがテレビに表示中の番組（{name}）",
+  "tuner_w_tv_any": "チューナーがテレビに表示中の番組",
+  "tuner_w_own": "このアプリのストリーム（{what}）",
+  "inuse_title": "現在の使用状況",
+  "inuse_source": "{name}: {count}。",
+  "inuse_none": "いまはどのソースからも再生していません。",
+  "inuse_box_tuners": "{name}: 受信部 {total} 個中 {n} 個を使用中。",
+  "inuse_box_asking": "{name}: チューナーに問い合わせ中…",
+  "inuse_box_silent": "{name}: チューナーが応答しませんでした。",
+  "inuse_box_unknown": "{name}: チューナーが受信部の数を返しません。",
+  "inuse_mark_note": "同じトランスポンダーのチャンネルは受信部を共有します。チューナーのチャンネル一覧で横に輪が付いたチャンネルは、いま見ると録画またはテレビに表示中の番組が途切れます。"
 }

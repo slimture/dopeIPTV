@@ -2406,5 +2406,22 @@
   "tv_volume": "Jačina zvuka {n}%",
   "tv_muted": "Zvuk isključen",
   "tv_paused": "Pauzirano",
-  "set_page_shortcuts_sub": "Svaki taster na koji aplikacija reaguje - kliknite jedan da ga promenite."
+  "set_page_shortcuts_sub": "Svaki taster na koji aplikacija reaguje - kliknite jedan da ga promenite.",
+  "tuner_title": "Tjuneri risivera",
+  "tuner_what": "Ovaj kanal nije na transponderu koji risiver sada prima, pa mu treba sopstveni tjuner.",
+  "tuner_what_rec": "Snimanje ovog kanala zauzima poseban tjuner risivera.",
+  "tuner_full": "Svi tjuneri risivera su u upotrebi ({n} od {n}).",
+  "tuner_cuts": "Još jedan bi prekinuo {what} ili risiver može da odbije ovaj kanal.",
+  "tuner_w_rec": "snimanje „{name}”",
+  "tuner_w_tv": "ono što risiver prikazuje na svom televizoru ({name})",
+  "tuner_w_tv_any": "ono što risiver prikazuje na svom televizoru",
+  "tuner_w_own": "strim ove aplikacije ({what})",
+  "inuse_title": "Sada u upotrebi",
+  "inuse_source": "{name}: {count}.",
+  "inuse_none": "Trenutno se ništa ne reprodukuje ni sa jednog izvora.",
+  "inuse_box_tuners": "{name}: u upotrebi {n} od {total} tjunera.",
+  "inuse_box_asking": "{name}: pitam risiver…",
+  "inuse_box_silent": "{name}: risiver nije odgovorio.",
+  "inuse_box_unknown": "{name}: risiver ne kaže koliko tjunera ima.",
+  "inuse_mark_note": "Kanali na istom transponderu dele tjuner. Prsten pored kanala na spisku risivera: gledanje sada bi prekinulo snimanje ili ono što risiver prikazuje na svom televizoru."
 }

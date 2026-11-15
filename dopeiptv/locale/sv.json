@@ -2406,5 +2406,22 @@
   "tv_volume": "Volym {n} %",
   "tv_muted": "Ljud av",
   "tv_paused": "Pausad",
-  "set_page_shortcuts_sub": "Alla tangenter appen svarar på - klicka på en för att ändra den."
+  "set_page_shortcuts_sub": "Alla tangenter appen svarar på - klicka på en för att ändra den.",
+  "tuner_title": "Boxens tuners",
+  "tuner_what": "Kanalen ligger inte på en transponder som boxen tar emot nu, så den behöver en egen tuner.",
+  "tuner_what_rec": "Att spela in kanalen tar en egen tuner i boxen.",
+  "tuner_full": "Alla boxens tuners används ({n} av {n}).",
+  "tuner_cuts": "En till skulle avbryta {what}, eller så vägrar boxen kanalen.",
+  "tuner_w_rec": "inspelningen ”{name}”",
+  "tuner_w_tv": "det boxen visar på sin tv ({name})",
+  "tuner_w_tv_any": "det boxen visar på sin tv",
+  "tuner_w_own": "en ström i den här appen ({what})",
+  "inuse_title": "Används nu",
+  "inuse_source": "{name}: {count}.",
+  "inuse_none": "Inget spelas från någon källa just nu.",
+  "inuse_box_tuners": "{name}: {n} av {total} tuners används.",
+  "inuse_box_asking": "{name}: frågar boxen …",
+  "inuse_box_silent": "{name}: boxen svarade inte.",
+  "inuse_box_unknown": "{name}: boxen säger inte hur många tuners den har.",
+  "inuse_mark_note": "Kanaler på samma transponder delar en tuner. En ring vid en kanal i boxens lista: att titta på den nu skulle avbryta en inspelning eller det boxen visar på sin tv."
 }

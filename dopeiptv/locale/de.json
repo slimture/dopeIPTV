@@ -2406,5 +2406,22 @@
   "tv_volume": "Lautstärke {n} %",
   "tv_muted": "Ton aus",
   "tv_paused": "Pausiert",
-  "set_page_shortcuts_sub": "Jede Taste, auf die die App reagiert - zum Ändern anklicken."
+  "set_page_shortcuts_sub": "Jede Taste, auf die die App reagiert - zum Ändern anklicken.",
+  "tuner_title": "Die Tuner der Box",
+  "tuner_what": "Dieser Sender liegt auf keinem Transponder, den die Box gerade empfängt – er braucht einen eigenen Tuner.",
+  "tuner_what_rec": "Diesen Sender aufzunehmen belegt einen eigenen Tuner der Box.",
+  "tuner_full": "Alle Tuner der Box sind belegt ({n} von {n}).",
+  "tuner_cuts": "Ein weiterer würde {what} unterbrechen, oder die Box lehnt diesen Sender ab.",
+  "tuner_w_rec": "die Aufnahme „{name}“",
+  "tuner_w_tv": "das, was die Box auf ihrem Fernseher zeigt ({name})",
+  "tuner_w_tv_any": "das, was die Box auf ihrem Fernseher zeigt",
+  "tuner_w_own": "einen Stream dieser App ({what})",
+  "inuse_title": "Gerade in Benutzung",
+  "inuse_source": "{name}: {count}.",
+  "inuse_none": "Gerade läuft nichts von einer Quelle.",
+  "inuse_box_tuners": "{name}: {n} von {total} Tunern belegt.",
+  "inuse_box_asking": "{name}: Box wird gefragt …",
+  "inuse_box_silent": "{name}: Die Box hat nicht geantwortet.",
+  "inuse_box_unknown": "{name}: Die Box sagt nicht, wie viele Tuner sie hat.",
+  "inuse_mark_note": "Sender auf einem Transponder teilen sich einen Tuner. Ein Ring neben einem Sender in der Liste einer Box: Ihn jetzt anzusehen würde eine Aufnahme unterbrechen oder das, was die Box auf ihrem Fernseher zeigt."
 }

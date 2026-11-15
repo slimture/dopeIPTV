@@ -1062,6 +1062,19 @@ class ChannelDelegate(QStyledItemDelegate):
             painter.drawEllipse(QRectF(text_x, y + (name_h - d) / 2, d, d))
             painter.restore()
             name_x, name_w = text_x + d + 6, max(0, text_w - d - 6)
+        # A box's channel that would cut off a recording or what the box
+        # shows on its TV (core/tuners.py): a quiet ring, never a colour.
+        tuner_mark = getattr(self.window, "tuner_mark", None)
+        if tuner_mark is not None and tuner_mark(it, kind):
+            d = max(7, self.name_pt - 2)
+            painter.save()
+            pen = QPen(QColor(P["muted"]))
+            pen.setWidthF(1.4)
+            painter.setPen(pen)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawEllipse(QRectF(name_x + 0.7, y + (name_h - d) / 2 + 0.7, d - 1.4, d - 1.4))
+            painter.restore()
+            name_x, name_w = name_x + d + 6, max(0, name_w - d - 6)
         painter.drawText(
             QRect(name_x, y, name_w, name_h),
             Qt.AlignmentFlag.AlignVCenter,

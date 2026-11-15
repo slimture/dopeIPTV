@@ -175,6 +175,15 @@ class _RecordingMixin:
         return chosen["idx"]
 
     def _guard_stream_switch(self, url: str, title: str) -> bool:
+        """The docked player about to play *url*, from any way in (a zap,
+        the phone remote, Home Assistant...): the recordings' question
+        first, then the box's tuners (mw_connections). True to go on."""
+        if not self._guard_rec_switch(url, title):
+            return False
+        tuner_ok = getattr(self, "_tuner_ok", None)
+        return tuner_ok is None or tuner_ok(url)
+
+    def _guard_rec_switch(self, url: str, title: str) -> bool:
         if not url or not str(url).startswith("http"):
             return True
         active = [j for j in self.rec.jobs if j["status"] == "recording"]
@@ -595,6 +604,10 @@ class _RecordingMixin:
         if not self._recorder_ready():
             return
         url = self.client.live_url(it["stream_id"], "ts")
+        # A connection of its own from a box: a tuner of its own too.
+        tuner_ok = getattr(self, "_tuner_ok", None)
+        if tuner_ok is not None and not tuner_ok(url, self._conn_uses(), "tuner_what_rec"):
+            return
         self.rec.add_job(url, title, now, stop_ts,
                          icon=it.get("stream_icon"),
                          channel=self.channel_display_name(it),

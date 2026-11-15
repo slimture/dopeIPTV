@@ -2406,5 +2406,22 @@
   "tv_volume": "音量 {n}%",
   "tv_muted": "已静音",
   "tv_paused": "已暂停",
-  "set_page_shortcuts_sub": "应用响应的每个按键——点击即可更改。"
+  "set_page_shortcuts_sub": "应用响应的每个按键——点击即可更改。",
+  "tuner_title": "机顶盒的调谐器",
+  "tuner_what": "此频道不在机顶盒当前接收的转发器上，因此需要单独一个调谐器。",
+  "tuner_what_rec": "录制此频道会单独占用机顶盒的一个调谐器。",
+  "tuner_full": "机顶盒的调谐器已全部占用（{n}/{n}）。",
+  "tuner_cuts": "再用一个会中断{what}，或者机顶盒可能拒绝此频道。",
+  "tuner_w_rec": "录制“{name}”",
+  "tuner_w_tv": "机顶盒在其电视上显示的内容（{name}）",
+  "tuner_w_tv_any": "机顶盒在其电视上显示的内容",
+  "tuner_w_own": "本应用的一路串流（{what}）",
+  "inuse_title": "当前占用",
+  "inuse_source": "{name}：{count}。",
+  "inuse_none": "当前没有从任何来源播放内容。",
+  "inuse_box_tuners": "{name}：已占用 {n}/{total} 个调谐器。",
+  "inuse_box_asking": "{name}：正在询问机顶盒…",
+  "inuse_box_silent": "{name}：机顶盒没有响应。",
+  "inuse_box_unknown": "{name}：机顶盒没有说明它有几个调谐器。",
+  "inuse_mark_note": "同一转发器上的频道共用一个调谐器。机顶盒频道列表中频道旁的圆环表示：现在观看它会中断录制，或中断机顶盒在其电视上显示的内容。"
 }

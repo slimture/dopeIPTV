@@ -2406,5 +2406,22 @@
   "tv_volume": "Ses %{n}",
   "tv_muted": "Ses kapalı",
   "tv_paused": "Duraklatıldı",
-  "set_page_shortcuts_sub": "Uygulamanın yanıt verdiği her tuş - değiştirmek için birine tıklayın."
+  "set_page_shortcuts_sub": "Uygulamanın yanıt verdiği her tuş - değiştirmek için birine tıklayın.",
+  "tuner_title": "Cihazın tunerları",
+  "tuner_what": "Bu kanal cihazın şu an aldığı bir transponderda değil, bu yüzden kendine ait bir tunera ihtiyaç duyar.",
+  "tuner_what_rec": "Bu kanalı kaydetmek cihazda ayrı bir tuner kullanır.",
+  "tuner_full": "Cihazın tüm tunerları kullanımda ({n}/{n}).",
+  "tuner_cuts": "Bir tane daha şunu keserdi: {what}. Ya da cihaz bu kanalı reddedebilir.",
+  "tuner_w_rec": "“{name}” kaydı",
+  "tuner_w_tv": "cihazın kendi televizyonunda gösterdiği yayın ({name})",
+  "tuner_w_tv_any": "cihazın kendi televizyonunda gösterdiği yayın",
+  "tuner_w_own": "bu uygulamanın bir akışı ({what})",
+  "inuse_title": "Şu an kullanımda",
+  "inuse_source": "{name}: {count}.",
+  "inuse_none": "Şu an hiçbir kaynaktan bir şey oynatılmıyor.",
+  "inuse_box_tuners": "{name}: {total} tunerın {n} tanesi kullanımda.",
+  "inuse_box_asking": "{name}: cihaza soruluyor…",
+  "inuse_box_silent": "{name}: cihaz yanıt vermedi.",
+  "inuse_box_unknown": "{name}: cihaz kaç tuneri olduğunu söylemiyor.",
+  "inuse_mark_note": "Aynı transponderdaki kanallar bir tuneri paylaşır. Bir cihazın listesinde kanalın yanındaki halka: onu şimdi izlemek bir kaydı ya da cihazın kendi televizyonunda gösterdiğini keserdi."
 }

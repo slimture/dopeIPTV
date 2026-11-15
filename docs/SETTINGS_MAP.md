@@ -212,3 +212,5 @@ while Nerd is on, and so are the link rows that lead to them.
   diagnostics to copy, Test connection
 - Stats for nerds: `nerd_overlay_more`
 - Stream health: `nerd_health`; the worst channels, clear
+- In use now (read-only, no key): the account's connections and each box
+  source's tuners, what each is used for

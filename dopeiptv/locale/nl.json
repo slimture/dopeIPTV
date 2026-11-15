@@ -2406,5 +2406,22 @@
   "tv_volume": "Volume {n}%",
   "tv_muted": "Geluid uit",
   "tv_paused": "Gepauzeerd",
-  "set_page_shortcuts_sub": "Elke toets waarop de app reageert - klik erop om hem te wijzigen."
+  "set_page_shortcuts_sub": "Elke toets waarop de app reageert - klik erop om hem te wijzigen.",
+  "tuner_title": "De tuners van de ontvanger",
+  "tuner_what": "Deze zender zit niet op een transponder die de ontvanger nu ontvangt, dus hij heeft een eigen tuner nodig.",
+  "tuner_what_rec": "Deze zender opnemen kost een eigen tuner van de ontvanger.",
+  "tuner_full": "Alle tuners van de ontvanger zijn in gebruik ({n} van {n}).",
+  "tuner_cuts": "Nog één zou {what} afbreken, of de ontvanger weigert deze zender.",
+  "tuner_w_rec": "de opname ‘{name}’",
+  "tuner_w_tv": "wat de ontvanger op zijn tv laat zien ({name})",
+  "tuner_w_tv_any": "wat de ontvanger op zijn tv laat zien",
+  "tuner_w_own": "een stream van deze app ({what})",
+  "inuse_title": "Nu in gebruik",
+  "inuse_source": "{name}: {count}.",
+  "inuse_none": "Er speelt nu niets van een bron.",
+  "inuse_box_tuners": "{name}: {n} van {total} tuners in gebruik.",
+  "inuse_box_asking": "{name}: de ontvanger wordt gevraagd…",
+  "inuse_box_silent": "{name}: de ontvanger antwoordde niet.",
+  "inuse_box_unknown": "{name}: de ontvanger zegt niet hoeveel tuners hij heeft.",
+  "inuse_mark_note": "Zenders op één transponder delen een tuner. Een ring naast een zender in de lijst van een ontvanger: hem nu bekijken zou een opname afbreken, of wat de ontvanger op zijn tv laat zien."
 }

@@ -2406,5 +2406,22 @@
   "tv_volume": "Volume {n} %",
   "tv_muted": "Son coupé",
   "tv_paused": "En pause",
-  "set_page_shortcuts_sub": "Toutes les touches auxquelles l'app répond - cliquez sur l'une pour la changer."
+  "set_page_shortcuts_sub": "Toutes les touches auxquelles l'app répond - cliquez sur l'une pour la changer.",
+  "tuner_title": "Les tuners du boîtier",
+  "tuner_what": "Cette chaîne n'est pas sur un transpondeur que le boîtier capte en ce moment : il lui faut un tuner à elle.",
+  "tuner_what_rec": "Enregistrer cette chaîne prend un tuner à part sur le boîtier.",
+  "tuner_full": "Tous les tuners du boîtier sont utilisés ({n} sur {n}).",
+  "tuner_cuts": "Un de plus couperait {what}, ou le boîtier peut refuser cette chaîne.",
+  "tuner_w_rec": "l'enregistrement « {name} »",
+  "tuner_w_tv": "ce que le boîtier affiche sur sa télé ({name})",
+  "tuner_w_tv_any": "ce que le boîtier affiche sur sa télé",
+  "tuner_w_own": "un flux de cette app ({what})",
+  "inuse_title": "Utilisé maintenant",
+  "inuse_source": "{name} : {count}.",
+  "inuse_none": "Rien n'est lu depuis une source en ce moment.",
+  "inuse_box_tuners": "{name} : {n} tuners utilisés sur {total}.",
+  "inuse_box_asking": "{name} : question au boîtier…",
+  "inuse_box_silent": "{name} : le boîtier n'a pas répondu.",
+  "inuse_box_unknown": "{name} : le boîtier ne dit pas combien de tuners il a.",
+  "inuse_mark_note": "Les chaînes d'un même transpondeur partagent un tuner. Un anneau à côté d'une chaîne dans la liste d'un boîtier : la regarder maintenant couperait un enregistrement ou ce que le boîtier affiche sur sa télé."
 }
