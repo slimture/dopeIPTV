@@ -498,6 +498,9 @@ class _SettingsMixin:
         # Player control tooltips (embedded bar + fullscreen overlay).
         if self.player:
             self.player.retranslate_ui()
+        strip = getattr(self, "_together_strip", None)
+        if strip is not None:
+            strip.retranslate()
         self._guide_restyle()        # the Guide page, in the new language
 
     def _inline_view_changed(self, *_) -> None:

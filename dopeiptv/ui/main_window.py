@@ -78,6 +78,7 @@ from .mw_remote import _RemoteMixin
 from .mw_events import _EventsMixin
 from .mw_report import _ReportMixin
 from .mw_sync import _SyncMixin
+from .mw_together import _TogetherMixin
 from .mw_privacy import _PrivacyMixin
 from .mw_commands import _CommandsMixin
 from .mw_box import _BoxMixin
@@ -133,7 +134,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
                  _HealthMixin, _ChannelPrefsMixin, _RemoteMixin, _EventsMixin, _ReportMixin,
                  _PortalArchiveMixin, _SeriesMixin, _SyncMixin,
-                 _ConnectionsMixin, _MirrorsMixin,
+                 _ConnectionsMixin, _MirrorsMixin, _TogetherMixin,
                  QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
@@ -344,6 +345,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.setWindowTitle(self._base_title)
         self.resize(1240, 780)
         self._build_ui()
+        # Watch together (off until a room is started or joined).
+        self._init_together()
         self._watch_color_scheme()
         # The guide is loaded at start; an app left open - overnight, or a
         # Mac that slept - kept yesterday's. Look again now and then, and
@@ -455,6 +458,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         reminders_action = action(tr("reminders_menu"), self._open_reminders)
         multiview_action = action(tr("menu_multiview"), self._show_multiview)
         cast_action = action(tr("ctx_cast_to_chromecast"), self.cast_playing)
+        together_action = action(tr("together_title") + "…", self.open_together)
         private_action, clear_action = self._build_privacy_actions()
         self._donate_action = action(tr("donate_support") + "…", lambda: self.open_donate("app-menu"))
         # Where a supporter key goes, in plain sight (the site's thank-you
@@ -472,7 +476,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             "about": about_action, "settings": settings_action,
             "open_video": open_video_action, "refresh": refresh_action,
             "reminders": reminders_action, "multiview": multiview_action,
-            "cast": cast_action, "private": private_action, "clear": clear_action,
+            "cast": cast_action, "together": together_action,
+            "private": private_action, "clear": clear_action,
             **report_actions, "website": website_action,
             "supporter": self._supporter_action, "donate": self._donate_action,
             "quit": quit_action}, sys.platform == "darwin")
@@ -489,6 +494,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             reminders_action: lambda: tr("reminders_menu"),
             multiview_action: lambda: tr("menu_multiview"),
             cast_action: lambda: tr("ctx_cast_to_chromecast"),
+            together_action: lambda: tr("together_title") + "…",
             about_action: lambda: tr("menu_about"),
             quit_action: lambda: tr("menu_quit"),
             self._donate_action: lambda: tr("donate_support") + "…",
@@ -4367,6 +4373,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.wake.acquire(tr("wake_playing", title=title))
             self._health_begin(self._item_key(it), title, it, "live", False)
             self._events_started(self._item_key(it), title, it, "live", False)
+            self._together_started(self._item_key(it), title, it, "live", False)
         self._apply_seek_mode(it, "live")
         # Refresh the poster overlay glyph (play -> pause for a timeshift
         # channel, -> stop for plain live). Unlike _start_playback, the preview
@@ -4812,8 +4819,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # and give the outgoing title its watched mark if it earned one.
         self._save_resume_position()
         self._maybe_auto_mark_watched()
-        resume_at = (self._resume_offset(key, kind)
-                     if kind in self._RESUMABLE else 0.0)
+        # Watch together: what the room plays starts where the room is,
+        # without the resume question.
+        together_at = self._together_take_start()
+        if together_at is not None:
+            resume_at = together_at
+        else:
+            resume_at = (self._resume_offset(key, kind)
+                         if kind in self._RESUMABLE else 0.0)
         if catchup and start_at > 0:
             resume_at = float(start_at)
         self._trakt_stop_current()
@@ -4929,6 +4942,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self.wake.acquire(tr("wake_playing", title=title))
                 self._health_begin(key, title, item, kind, catchup)
                 self._events_started(key, title, item, kind, catchup)
+                self._together_started(key, title, item, kind, catchup)
             else:
                 log.warning("embedded play() refused %s - falling back to an "
                             "external mpv window", redact_url(url))
@@ -5777,6 +5791,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._sync_on_close()
         self.wake.release()
         self._stop_media_session()
+        self._together_close()
         self._events_quit()
         self._remote_stop()
         self.cover.flush()

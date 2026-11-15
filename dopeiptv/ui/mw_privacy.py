@@ -95,6 +95,9 @@ class _PrivacyMixin:
             # A Trakt scrobble already under way is let go, not stopped: a
             # stop would report the progress and file it in the history.
             self._trakt_active = None
+            # Watch together tells the others what plays: out of the room.
+            if hasattr(self, "_together_private_on"):
+                self._together_private_on()
         action = getattr(self, "_private_action", None)
         if action is not None and action.isChecked() != on:
             action.blockSignals(True)
