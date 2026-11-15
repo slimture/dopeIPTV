@@ -5100,7 +5100,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._chanprefs_arm(key, item, kind)
             if self.player.play(url, title, start=resume_at,
                                 local_buffer=kind == "live" and not catchup,
-                                buffer_key=f"{kind}:{key}" if key else None):
+                                buffer_key=f"{kind}:{key}" if key else None,
+                                web=kind == "web"):
                 self.wake.acquire(tr("wake_playing", title=title))
                 self._health_begin(key, title, item, kind, catchup)
                 self._events_started(key, title, item, kind, catchup)

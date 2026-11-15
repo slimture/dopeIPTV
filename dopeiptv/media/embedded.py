@@ -504,6 +504,33 @@ def _delay_key(channel: str) -> str:
     return channel_prefs.legacy_key(channel)
 
 
+#: A web page through yt-dlp (YouTube, Twitch...) opens as mpv itself opens
+#: it. The reconnect, short probe and buffer tuned for IPTV providers broke
+#: YouTube's HLS - blocks and smears on its live streams, which played
+#: cleanly in mpv on the same computer. Set for that file only: the next
+#: stream has the app's own again. (probesize cannot be mpv's 0; 5 MB is
+#: FFmpeg's own default.)
+WEB_FILE_OPTIONS = {"demuxer-lavf-o": "", "demuxer-lavf-analyzeduration": "0",
+                    "demuxer-lavf-probesize": "5000000", "cache-secs": "3600000",
+                    "network-timeout": "60"}
+
+
+def load_with_options(m, url: str, options: dict[str, str]) -> bool:
+    """loadfile with options for this file alone. mpv 0.38 put an index
+    before the options, and python-mpv's loadfile follows the libmpv only in
+    its newer releases - so both forms are tried, then a plain play. Whether
+    the options were taken."""
+    opts = ",".join(f"{k}={v}" for k, v in options.items())
+    for args in ((url, "replace", "-1", opts), (url, "replace", opts)):
+        try:
+            m.command("loadfile", *args)
+            return True
+        except Exception as e:
+            log.debug("loadfile with options (%d args): %s", len(args), e)
+    m.play(url)
+    return False
+
+
 class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
     """Video pane with libmpv OpenGL rendering, control bar, and fullscreen overlay."""
 
@@ -2766,7 +2793,7 @@ class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
 
     def play(self, url: str, title: str, start: float = 0.0,
              *, local_buffer: bool = False,
-             buffer_key: str | None = None) -> bool:
+             buffer_key: str | None = None, web: bool = False) -> bool:
         # local_buffer: a live channel, which gets the rewind buffer unless
         # Settings turned it off.
         live = local_buffer
@@ -2865,8 +2892,10 @@ class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
             # while Nerd is off and never was; the defaults back once it was).
             try:
                 from ..core import live_latency, nerd
+                # A web page is no source's: not its proxy or headers.
                 self._nerd_applied = nerd.apply_stream(
-                    m, nerd.source(), getattr(self, "_nerd_applied", False),
+                    m, None if web else nerd.source(),
+                    getattr(self, "_nerd_applied", False),
                     url=url, opened=source or url)
                 # Nerd: low latency for a live channel the player takes
                 # from the provider - not from the rewind buffer; anything
@@ -2968,7 +2997,10 @@ class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
                 self._arm_stream_info(m, source or url)
             except Exception as e:
                 log.debug("Stream info unavailable: %s", e)
-            m.play(source or url)
+            if web:
+                load_with_options(m, url, WEB_FILE_OPTIONS)
+            else:
+                m.play(source or url)
             self.current_url = url
             # Unpause AGAIN, after the load. keep-open=yes pauses mpv when a
             # file ends, and that pause is PLAYER state, not file state: it
