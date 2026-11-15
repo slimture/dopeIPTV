@@ -4377,6 +4377,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         if self._vpn_guard_blocks(url):
             return
+        if self._cast_zap(url, title, it.get("stream_icon"),
+                          self._item_key(it), "live", it, False):
+            return
         self._failover_leave(url, self._item_key(it))
         # The preview path never reaches _start_playback, so it must carry the
         # same side effects itself: the multiview-conflict question (close it
@@ -4851,20 +4854,27 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         last = getattr(self, "_last_playback", None)
         if not last:
             return
+        # Play after a Stop plays here, as it always has - not on a cast.
         self._start_playback(last["url"], last["title"], last["icon_url"],
                              last["key"], last["kind"], record=False,
-                             item=last["item"])
+                             item=last["item"], to_cast=False)
 
     def _start_playback(self, url: str, title: str, icon_url,
                         key, kind: str, record: bool = True,
                         item=None, catchup: bool = False,
-                        start_at: float = 0.0) -> None:
+                        start_at: float = 0.0, to_cast: bool = True) -> None:
         # start_at: how far into a catch-up link to start (a portal's
         # archive link plays a programme from its own start).
+        # to_cast: a live channel may go to a running cast (False: here).
         if not self._guard_stream_switch(url, title):
             return
         # The guard is about streams: the user's own files always play.
         if kind not in ("local", "recording") and self._vpn_guard_blocks(url):
+            return
+        # A cast runs: a live channel goes to the same receiver and the
+        # player stays as it is (mw_cast). Stopping the cast is explicit.
+        if to_cast and self._cast_zap(url, title, icon_url, key, kind, item,
+                                      catchup):
             return
         self._failover_leave(url, key)
         # A click that led here also armed the auto-preview timer; kill it so
@@ -5663,7 +5673,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._chan_timer.start(self.CHAN_ENTRY_MS)
 
     def _live_playing(self) -> bool:
-        return self._player_up() and getattr(self, "_playing_item", None) is not None
+        if self._player_up() and getattr(self, "_playing_item", None) is not None:
+            return True
+        # A channel on a cast: a typed number zaps it too (mw_cast).
+        return self._cast_live_item() is not None
 
     def _chan_entry_show(self, text: str, ms: int) -> None:
         """The digits typed (or that no channel has them) on screen: over

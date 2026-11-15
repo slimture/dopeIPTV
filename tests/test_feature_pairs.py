@@ -341,6 +341,40 @@ def test_statistics_and_discord_move_on_with_a_channel_switch(reporters):
     assert w._stats_now is None
 
 
+def test_a_zap_on_a_cast_moves_the_reporters_on_once(reporters):
+    """A cast is what is watched: its start, each zap on it and its end
+    reach the events and Discord once each, as a local zap does - and the
+    statistics count the player only, as they say."""
+    from dopeiptv.ui.mw_cast import _CastMixin
+    from tests.test_integrations_ui import FakePresence
+    w, clock = reporters
+
+    def on_tv(key, name):
+        return {"key": key, "kind": "live", "title": name,
+                "item": {"name": name, "stream_id": key}}
+
+    _CastMixin._cast_began(w, on_tv(1, "SVT1"))
+    clock[0] += 50
+    _CastMixin._cast_began(w, on_tv(2, "SVT2"))       # a zap on the cast
+    got = [(m["event"], m.get("channel"), m.get("previous")) for m in w._events.sent]
+    assert got == [("playback_started", "SVT1", None),
+                   ("playback_started", "SVT2", None),
+                   ("channel_changed", "SVT2", "SVT1")], got
+    (presence,) = FakePresence.made
+    assert [a["details"] for a in presence.shown] == ["Watching SVT1", "Watching SVT2"]
+    _CastMixin._cast_hooks_end(w)                     # Stop casting
+    _CastMixin._cast_hooks_end(w)                     # and the strip again
+    assert [m["event"] for m in w._events.sent][3:] == ["playback_stopped"]
+    assert presence.shown[-1] is None and w.counted() == 0
+    # Private viewing: the cast is private like a play here.
+    privacy.set_private(True)
+    _CastMixin._cast_began(w, on_tv(3, "Kanal 5"))
+    assert privacy.playback_private("live", 3)
+    assert w._events.sent[-1].get("private") and "title" not in w._events.sent[-1]
+    assert presence.shown[-1] is None
+    _CastMixin._cast_hooks_end(w)
+
+
 # -- the window: phone remote, Home Assistant, casting and multiview -----------------------
 
 _CHILD = r"""
@@ -484,6 +518,290 @@ def test_every_way_in_meets_the_vpn_guard_and_the_connection_limit():
     assert "PAIRS_WINDOW_OK" in proc.stdout, (
         f"the ways in did not meet the same checks\n"
         f"stdout={proc.stdout!r}\nstderr={proc.stderr[-3000:]!r}")
+
+
+# -- zapping while casting: every way in, the same receiver --------------------------------
+
+_ZAP_CHILD = r"""
+import os, tempfile, threading, time
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from types import SimpleNamespace
+from PyQt6.QtCore import QSettings
+from PyQt6.QtWidgets import QApplication
+
+tmp = tempfile.mkdtemp()
+QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, tmp)
+from dopeiptv.core import nerd
+from dopeiptv.i18n import tr
+from dopeiptv.providers import casting
+from dopeiptv.providers.client import DemoClient
+from dopeiptv.ui import main_window as mw, mw_cast
+
+app = QApplication.instance() or QApplication([])
+settings = QSettings(os.path.join(tmp, "settings.ini"), QSettings.Format.IniFormat)
+w = mw.MainWindow(DemoClient(), settings)
+w.show()
+app.processEvents()
+
+
+class Rx:
+    # One kind of receiver as CastHub sees it: what it is asked, and when.
+    def __init__(self, names, kind=""):
+        self.names, self.KIND, self.active, self.casts, self.stops = names, kind, None, [], 0
+        self.state, self.duration, self.gone, self.hold, self.volumes = "PLAYING/NONE", 0.0, False, None, []
+        self.bridge = SimpleNamespace(cap=0, hls=False)
+    def knows(self, name): return name in self.names
+    def entries(self): return list(self.names)
+    def scan(self): return list(self.names)
+    def cast(self, name, url, title, *a, **k):
+        if self.hold is not None:
+            self.hold.wait(10)
+        self.casts.append((name, url, title))
+        self.active = name
+        return name
+    def stop(self): self.stops += 1; self.active = None
+    def shutdown(self): pass
+    def position(self): return 0.0
+    def bridged(self): return False
+    def volume(self): return 0.5, False
+    def set_volume(self, v): self.volumes.append(v)
+    def set_muted(self, m): self.volumes.append(("mute", m))
+    def show_window(self, *_a): self.shown = getattr(self, "shown", 0) + 1
+
+
+class Menu:
+    # The strip's menu, read rather than shown.
+    made = []
+    def __init__(self, *a): self.acts = []; Menu.made.append(self)
+    def addAction(self, label, slot=None):
+        self.acts.append((label, slot))
+        return SimpleNamespace(setEnabled=lambda on: None, setCheckable=lambda on: None,
+                               setChecked=lambda on: None,
+                               triggered=SimpleNamespace(connect=lambda f: None))
+    def addMenu(self, label): return Menu()
+    def addSeparator(self): pass
+    def exec(self, *a): pass
+
+
+def strip_menu():
+    Menu.made.clear()
+    real, mw_cast.QMenu = mw_cast.QMenu, Menu
+    try:
+        w._cast_tracks_menu()
+    finally:
+        mw_cast.QMenu = real
+    return dict(Menu.made[0].acts)
+
+
+cc, tv, kodi = Rx(["Kitchen"]), Rx(["TV (DLNA)"]), Rx(["Den (Kodi)"])
+ap = Rx(["AirPlay (Apple TV)"], "airplay")
+w.cast = casting.CastHub(cc, tv, kodi)
+w.cast.add_receiver(ap)
+picked = ["Kitchen"]
+
+
+def dialog(win, url, title, *a, **k):
+    # What the cast dialog does once a device is picked and the cast plays.
+    def run():
+        win.stop_local_playback_for_cast()
+        win._cast_ctx.update(url=url, source=k.get("source"))
+        win.cast.cast(picked[0], url, title)
+        win.show_cast_strip(picked[0], title)
+    return SimpleNamespace(exec=run)
+
+
+mw_cast.CastDialog = dialog
+sent, toasts, asked = [], [], []
+
+
+class D:
+    active = True
+    cfg = SimpleNamespace(commands=True)
+    def emit(self, event, fields=None, private=False, state=None, now=None):
+        sent.append((event, (fields or {}).get("channel"), (fields or {}).get("previous")))
+    def set_state(self, *a, **k): pass
+    def set_favorites(self, *a, **k): pass
+
+
+w._events = D()
+w._show_toast = lambda text, ms=0: toasts.append(text)
+w._choice_dialog = lambda title, message, options, dont_ask_setting=None: (asked.append(message), len(options) - 1)[1]
+
+
+def spin(cond, timeout=10.0):
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        app.processEvents()
+        w.pool.waitForDone(10)
+        if cond():
+            return True
+    return False
+
+
+def playing():
+    return bool(w.player is not None and w.player.current_url)
+
+
+def zapped(rx, n, row, how):
+    assert spin(lambda: len(rx.casts) >= n), (how, rx.casts)
+    assert len(rx.casts) == n, (how, rx.casts)
+    name, url, title = rx.casts[-1]
+    assert name == rx.names[0] and title == row["name"], (how, rx.casts[-1])
+    assert url == w.client.live_url(row["stream_id"], "m3u8"), (how, url)
+    assert spin(lambda: w.cast_bar_title.text() == row["name"]), (how, w.cast_bar_title.text())
+    assert w._cast_device == rx.names[0] and not playing(), how
+    assert w._last_playback["key"] == row["stream_id"], how
+
+
+rows = w.client.live_streams(None)
+a, b, c, d, e = rows[:5]
+
+# A channel cast from the dialog: the player hands over; the cast is told.
+w._open_cast_dialog(dict(a, _kind="live"))
+assert cc.casts == [("Kitchen", w.client.live_url(a["stream_id"], "m3u8"), a["name"])]
+assert not w.cast_bar.isHidden() and not playing()
+assert sent == [("playback_started", a["name"], None)], sent
+
+# The guide, Home, a reminder, the phone's list: play_live_channel. The same
+# Chromecast; the old channel ends and the new starts, once each.
+w.play_live_channel(b)
+zapped(cc, 2, b, "play_live_channel")
+assert sent[1:] == [("playback_started", b["name"], None),
+                    ("channel_changed", b["name"], a["name"])], sent
+assert not cc.stops and (w.player is None or not w.player.isVisible())
+# The same channel again changes nothing.
+w.play_live_channel(b)
+assert not spin(lambda: len(cc.casts) > 2, 0.5) and len(sent) == 3
+
+# The list: a double-click / Enter (play), and channel up/down (zap).
+w.switch_mode("live")
+assert spin(lambda: w.list_model.rowCount() >= 5), w.list_model.rowCount()
+order = [w.list_model.item_at(i) for i in range(w.list_model.rowCount())]
+i = next(k for k, r in enumerate(order) if r["stream_id"] == c["stream_id"])
+nxt = order[(i + 1) % len(order)]
+w.listw.setCurrentIndex(w.list_model.index(i))
+w.play()
+zapped(cc, 3, c, "the list's play")
+w._zap(1)
+zapped(cc, 4, nxt, "channel up")
+w._zap(-1)
+zapped(cc, 5, c, "channel down")
+w._last_channel()
+zapped(cc, 6, nxt, "the last channel")
+
+# A number: typed (whatever the list shows), the source's numbers.
+target = e if e["stream_id"] != nxt["stream_id"] else a
+w.switch_mode("vod")
+assert w._live_playing(), "a channel on the cast takes a typed number"
+for digit in str(target["num"]):
+    w._channel_digit(digit, from_player=True)
+w._channel_jump()
+zapped(cc, 7, target, "a typed number")
+w._play_channel_number(b["num"])
+zapped(cc, 8, b, "a number asked for")
+
+# The phone remote and Home Assistant.
+w._phone_do("_play", {"row": a})
+zapped(cc, 9, a, "the phone's play")
+assert w._phone_do("next", {}) == {"ok": True}
+zapped(cc, 10, b, "the phone's next")
+w._events_command("play", d["name"])
+zapped(cc, 11, d, "Home Assistant's play")
+w._events_command("channel_down", None)
+zapped(cc, 12, c, "Home Assistant's channel down")
+
+# The media keys: next and previous, from the channel on the TV.
+if w.player is not None:
+    snap = w.mpris_snapshot()
+    assert snap["status"] == "Stopped" and snap["can_next"] and snap["can_prev"], snap
+    w.mpris_command("next")
+    zapped(cc, 13, d, "the media key next")
+    w.mpris_command("previous")
+    zapped(cc, 14, c, "the media key previous")
+n = len(cc.casts)
+
+# Picked fast, one after another: one at a time, the newest last.
+cc.hold = threading.Event()
+w.play_live_channel(a)
+w.play_live_channel(b)
+w.play_live_channel(e)
+assert w.cast_bar_title.text() == e["name"]
+cc.hold.set()
+assert spin(lambda: len(cc.casts) == n + 2), cc.casts
+assert [t for _n, _u, t in cc.casts[n:]] == [a["name"], e["name"]], cc.casts[n:]
+cc.hold = None
+n = len(cc.casts)
+
+# The VPN guard and the connection limit still say no - and the cast goes on.
+real_blocks = nerd.blocks_stream
+nerd.blocks_stream = lambda url, kind=None: not nerd.is_own_file(url)
+w.play_live_channel(a)
+assert toasts[-1:] == [tr("nerd_vpn_blocked")], toasts
+nerd.blocks_stream = real_blocks
+w.client.max_connections = 1
+job = {"id": 999, "status": "recording", "url": "https://rec.example.com/live/9.ts",
+       "title": "Rec", "stop": None}
+w.rec.jobs.append(job)
+w._multi_stream_ok = True          # the recording's own question answered
+w.play_live_channel(a)
+assert asked and tr("conn_what_cast") in asked[-1], asked
+assert tr("conn_over", max=1, n=1) in asked[-1], asked
+w.rec.jobs.remove(job)
+w._multi_stream_ok = False
+w.client.max_connections = None
+assert not spin(lambda: len(cc.casts) > n, 0.5) and cc.active == "Kitchen"
+assert w.cast_bar_title.text() == e["name"] and not playing()
+
+# A DLNA TV, a Kodi and an Apple TV: the same, each on its own device.
+for rx in (tv, kodi, ap):
+    picked[0] = rx.names[0]
+    w._open_cast_dialog(dict(a, _kind="live"))
+    assert rx.casts[-1][0] == rx.names[0]
+    w.play_live_channel(b)
+    zapped(rx, 2, b, rx.names[0])
+    assert w.cast.active == rx.names[0]
+# AirPlay: the Apple TV's remote sets its volume - no slider, nothing sent.
+assert w.cast_bar_vol.isHidden() and w.cast_bar_mute.isHidden()
+w._cast_volume(0.3)
+w._toggle_cast_mute()
+assert not spin(lambda: ap.volumes, 0.5), ap.volumes
+# The AirPlay window, closed, is one click from the strip's own menu.
+acts = strip_menu()
+assert tr("airplay_show_window") in acts and tr("airplay_menu_note") in acts, acts
+acts[tr("airplay_show_window")]()
+assert getattr(ap, "shown", 0) == 1
+
+# Stop casting is the one way off the cast: told once, and the next
+# channel plays here again.
+before = len(sent)
+w.cast_bar_stop.click()
+assert spin(lambda: ap.stops == 1) and w._cast_device is None
+assert [s[0] for s in sent[before:]] == ["playback_stopped"], sent[before:]
+assert not w._cast_zap(w.client.live_url(c["stream_id"]), c["name"], None,
+                       c["stream_id"], "live", c, False)
+# Back on a Chromecast, the slider and the mute are there again.
+picked[0] = "Kitchen"
+w._open_cast_dialog(dict(a, _kind="live"))
+assert not w.cast_bar_vol.isHidden() and not w.cast_bar_mute.isHidden()
+w._cast_volume(0.3)
+assert spin(lambda: cc.volumes), "a Chromecast's volume is still set"
+assert tr("airplay_show_window") not in strip_menu()
+print("CAST_ZAP_OK")
+"""
+
+
+def test_zapping_while_casting_stays_on_the_same_receiver():
+    try:
+        import PyQt6  # noqa: F401
+    except Exception:
+        pytest.skip("PyQt6 not available")
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+    proc = subprocess.run(
+        [sys.executable, "-c", _ZAP_CHILD], capture_output=True, text=True,
+        env=env, cwd=_REPO_ROOT, timeout=180)
+    assert "CAST_ZAP_OK" in proc.stdout, (
+        f"zapping during a cast\nstdout={proc.stdout!r}\n"
+        f"stderr={proc.stderr[-4000:]!r}")
 
 
 def test_a_channel_asked_for_by_name_is_one_the_lists_show():

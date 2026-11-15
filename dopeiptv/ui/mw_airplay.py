@@ -56,6 +56,17 @@ class _AirPlayMixin:
         return bool(callable(is_airplay)
                     and is_airplay(getattr(self, "_cast_device", None)))
 
+    def _airplay_show_window(self) -> None:
+        """The cast strip's menu: the AirPlay window (Apple's button) back
+        to the front while the cast runs."""
+        name = getattr(self, "_cast_device", None)
+        hub = getattr(self, "cast", None)
+        for rx in (self._airplay, *getattr(hub, "added", ())):
+            if rx is not None and rx.knows(name) \
+                    and callable(getattr(rx, "show_window", None)):
+                rx.show_window()
+                return
+
     def _airplay_ended(self, why: str) -> None:
         """The Apple TV stopped playing by itself: the strip comes down,
         the point a film reached is kept, and why is said."""

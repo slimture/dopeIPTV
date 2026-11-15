@@ -117,6 +117,11 @@ class _MprisMixin:
         return bool(p is not None and getattr(p, "current_url", None)
                     and self._playing_key is not None)
 
+    def _media_cast_channel(self) -> bool:
+        """A channel on a cast (mw_cast): next and previous zap it there."""
+        casting = getattr(self, "_cast_live_item", None)
+        return bool(callable(casting) and casting() is not None)
+
     def mpris_position(self) -> float:
         p = self.player
         if p is None or not self._media_active():
@@ -126,8 +131,13 @@ class _MprisMixin:
     def mpris_snapshot(self) -> dict[str, Any]:
         p = self.player
         if p is None or not self._media_active():
-            return {"status": "Stopped",
-                    "volume": (p.vol.value() / 100.0) if p is not None else 0}
+            snap: dict[str, Any] = {
+                "status": "Stopped",
+                "volume": (p.vol.value() / 100.0) if p is not None else 0}
+            if self._media_cast_channel():
+                # Nothing plays here, a channel plays on the TV.
+                snap.update(can_next=True, can_prev=True, live=True)
+            return snap
         last = getattr(self, "_last_playback", None) or {}
         kind = last.get("kind") or ""
         title = last.get("title") or ""
@@ -248,6 +258,10 @@ class _MprisMixin:
                 # The button, not player.stop(): it is what also ends the
                 # recording, the Trakt scrobble and the wake lock.
                 p.stop_btn.click()
+        elif name in ("next", "previous") and not active \
+                and self._media_cast_channel():
+            # The channel on the cast, from the one it shows (mw_commands).
+            self._play_channel_step(1 if name == "next" else -1)
         elif name == "next":
             if kind == "episode":
                 if self._has_next_episode():

@@ -524,6 +524,11 @@ class ChromecastManager:
             # follows local playback, and a refusal is not fatal any more -
             # the converter tries again by itself, so guessing low costs a
             # retry at worst and saves the wait every other time.
+            if self.bridged():
+                # Another channel on this cast (a zap): the converter of
+                # the last one holds that connection - it goes first.
+                log.info("cast: stopping the converter of the last stream")
+                self.bridge.stop()
             log.info("cast: letting the provider release the connection")
             time.sleep(1.5)
         if not url:
@@ -617,6 +622,12 @@ class ChromecastManager:
         if verdict:
             log.info("cast: %s is playing the provider's own stream - "
                      "nothing converted", device_name)
+        if verdict is not False and self.bridged():
+            # The receiver reads the provider now: a converter left from
+            # the last stream would only hold a connection.
+            log.info("cast: the converter of the last stream is not read "
+                     "any more - stopping it")
+            self.bridge.stop()
         # None means the receiver has not answered yet. Leave it alone: a
         # second load would replace a cast that is merely slow to start, and
         # that is a channel killed by the retry meant to save it.

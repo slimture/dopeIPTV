@@ -803,6 +803,102 @@ def test_a_direct_stream_the_tv_refuses_is_tried_once_through_the_bridge(
     rx.stop()
 
 
+# -- zapping while casting: another channel in the same player --------------------
+
+def test_a_zap_swaps_the_item_and_keeps_the_player_route_and_window(qapp, macos):
+    am, _ = macos
+    rx = am.AirPlayReceiver()
+    rx.context = lambda: {"kind": "live"}
+    ended = []
+    rx.ended.connect(ended.append)
+    rx.cast(am.NAME, "http://p/live/u/pw/1.m3u8", "SVT1")
+    p = _Player.made[-1]
+    p.route(True)
+    _pump(qapp)
+    _settle(am, rx)
+    assert rx.state == "PLAYING/NONE" and not p.muted
+    # Another channel: direct HLS goes direct, into the same AVPlayer - no
+    # new player, no new window, no new button, the Apple TV stays picked.
+    assert rx.cast(am.NAME, "http://p/live/u/pw/2.m3u8", "SVT2") == am.NAME
+    assert len(_Player.made) == 1 and len(_NSPanel.made) == 1
+    assert len(_Picker.made) == 1 and _Picker.made[0].player is p
+    assert not _NSPanel.made[0].closed and _NSPanel.made[0].visible
+    assert p.item.url == "http://p/live/u/pw/2.m3u8" and not rx.bridged()
+    assert _plays(p)[-1] == "play" and not p.muted   # on the TV at once
+    # The route goes while the TV loads the new item: not the end of the
+    # cast, however long the ordinary grace would have been.
+    p.item._status = 0
+    p.route(False)
+    _pump(qapp)
+    _settle(am, rx)
+    rx._lost_at -= am.ROUTE_GRACE_S + 5
+    rx._sync()
+    assert rx.active == am.NAME and not ended
+    p.item._status = 1                              # loaded; the route is back
+    rx._sync()
+    assert rx.active == am.NAME and not ended       # a grace from now
+    p.route(True)
+    _pump(qapp)
+    _settle(am, rx)
+    assert rx.state == "PLAYING/NONE" and _plays(p)[-1] == "play" and not ended
+    # A route that really went still ends it - after the swap's grace.
+    rx.cast(am.NAME, "http://p/live/u/pw/3.m3u8", "SVT3")
+    p.item._status = 0
+    p.route(False)
+    _pump(qapp)
+    _settle(am, rx)
+    rx._swapped_at -= am.SWAP_GRACE_S + 1
+    rx._lost_at -= am.ROUTE_GRACE_S + 1
+    rx._sync()
+    assert ended == ["airplay_route_lost"] and rx.active is None
+
+
+def test_a_zap_through_the_bridge_stops_the_old_ffmpeg_first(
+        qapp, macos, fake_ffmpeg, monkeypatch):
+    am, _ = macos
+    fake_ffmpeg(4, "live")
+    monkeypatch.setattr(am, "SETTLE_S", 0.0)
+    monkeypatch.setattr(am.ab, "probe", lambda *a, **k: {
+        "video": "h264", "audio": ["mp2"], "duration": 0.0})
+    rx = am.AirPlayReceiver()
+    rx.bridge.exe = sys.executable
+    rx.context = lambda: {"kind": "live"}
+    out = {}
+
+    def cast(url, settle=False):
+        def run():
+            try:
+                out["name"] = rx.cast(am.NAME, url, "TV", settle=settle)
+            except Exception as e:                 # pragma: no cover
+                out["error"] = e
+        out.clear()
+        t = threading.Thread(target=run)
+        t.start()
+        while t.is_alive():
+            _pump(qapp, 0.02)
+        assert out.get("name") == am.NAME, out
+
+    cast("http://p/live/u/pw/1.ts")
+    p = _Player.made[-1]
+    p.route(True)
+    _pump(qapp)
+    _settle(am, rx)
+    first, old_proc = rx.bridge.folder, rx.bridge._proc
+    stopped = []
+    real_stop = rx.bridge.stop
+    monkeypatch.setattr(rx.bridge, "stop", lambda: (stopped.append(
+        rx.bridge._proc is old_proc), real_stop()))
+    cast("http://p/live/u/pw/2.ts", settle=True)
+    # The old ffmpeg went before the new one asked the provider; the new
+    # one serves under a new token, in the same player and window.
+    assert stopped and stopped[0] is True and old_proc.poll() is not None
+    assert not os.path.exists(first) and rx.bridge.running()
+    assert p.item.url == rx.bridge.url and rx.bridged()
+    assert len(_Player.made) == 1 and len(_NSPanel.made) == 1
+    assert rx.active == am.NAME
+    rx.stop()
+
+
 def _nserror(domain, code, text, under=None):
     return types.SimpleNamespace(
         domain=lambda: domain, code=lambda: code, localizedDescription=lambda: text,

@@ -44,7 +44,8 @@ _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_effective_ts_minutes", "_show_cast_edge",
             "_set_cast_quality", "_toggle_cast_mute", "_show_cast_volume",
             "_cast_tracks_menu", "manage_cast", "_cast_ended_there",
-            "_cast_plays_as_is", "_cast_is_kodi")
+            "_cast_plays_as_is", "_cast_is_kodi", "_cast_began",
+            "_cast_hooks_end", "_cast_on_airplay")
 
 
 class _Resume0:
@@ -79,7 +80,8 @@ def _window():
     # a borrowed method as its body is.
     ns.update({name: getattr(MainWindow, name)
                for name in ("ARCHIVE_LAG", "TIMESHIFT_STEPS",
-                            "CAST_TIMELINE_MIN",
+                            "CAST_TIMELINE_MIN", "_cast_zap_gen",
+                            "_cast_hooked",
                             "_CAST_RESUME_KIND", "_RESUME_GROUP")})
     cls = type("_StubWindow", (), ns)
     return cls()
@@ -733,6 +735,32 @@ def test_the_provider_is_given_a_moment_after_local_playback_stopped(
     # Kept short: this is on every cast that follows local playback, and a
     # refusal is no longer fatal - the converter tries again by itself.
     assert max(long_waits()) <= 2, slept
+
+
+def test_a_zap_stops_the_last_channel_s_converter_first(monkeypatch):
+    """Another channel on the same Chromecast (the window zaps with settle
+    while a converter runs): the old ffmpeg lets go of the account's
+    connection before the provider is given its moment and the new one is
+    asked for - and none is left running that the receiver no longer
+    reads."""
+    from dopeiptv.providers import chromecast as cm
+    order = []
+    m = _manager(monkeypatch)
+    monkeypatch.setattr(cm.time, "sleep",
+                        lambda s: order.append("wait") if s >= 1 else None)
+    monkeypatch.setattr(m.bridge, "stop", lambda: (order.append("stop"),
+                                                   setattr(m.bridge, "path", None)))
+    m.scan()
+    m.bridge.path = "/token/"                     # the last channel, converted
+    m.cast("Alva TV", "http://p/live/u/pw/2.m3u8", "SVT2", settle=True)
+    assert order[:2] == ["stop", "wait"] and not m.bridged()
+    assert m.active.played[0] == "http://p/live/u/pw/2.m3u8"
+    # A track put back to its default: native again, and the converter
+    # that fed the receiver goes once the receiver has the new stream.
+    order.clear()
+    m.bridge.path = "/token/"
+    m.cast("Alva TV", "http://p/live/u/pw/3.m3u8", "SVT3")
+    assert order == ["stop"] and not m.bridged()
 
 
 def test_an_empty_address_is_refused_rather_than_cast(monkeypatch):

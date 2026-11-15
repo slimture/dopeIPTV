@@ -102,10 +102,15 @@ class _CommandsMixin:
         """The next (1) or previous (-1) channel from the one playing, as
         a remote's channel up and down: in the list on screen when it
         holds it (the list follows), else in the whole source. False when
-        no channel plays."""
+        no channel plays - here or on a cast (mw_cast), which then gets
+        the next."""
         last = getattr(self, "_last_playback", None) or {}
         cur = (last.get("item") or {}).get("stream_id")
-        if last.get("kind") != "live" or cur is None or self.player is None \
+        casting = getattr(self, "_cast_live_item", None)
+        on_cast = casting() if callable(casting) else None
+        if on_cast is not None:
+            cur = on_cast.get("stream_id")
+        elif last.get("kind") != "live" or cur is None or self.player is None \
                 or not self._media_active():
             return False
         if self.mode in ("live", "fav") and not self.series_ctx:

@@ -7,6 +7,13 @@ channel handed over from the provider's archive at the moment it was
 paused; and the position a film reached on the TV, kept for resume. The
 devices themselves are providers/casting.py's CastHub. Kept out of
 main_window.py to keep that file lean.
+
+Zapping while casting: a live channel picked while a cast runs - from the
+list, the guide, a number, channel up/down, the phone, Home Assistant, the
+media keys - goes to the same receiver, not to the player (_cast_zap,
+asked by the playback path after its checks). One at a time: a channel
+picked while the last is still on its way waits, and only the newest goes.
+Only Stop casting ends the cast. A film or an episode still plays here.
 """
 from __future__ import annotations
 
@@ -20,10 +27,11 @@ from PyQt6.QtWidgets import (
     QPushButton, QVBoxLayout,
 )
 
+from ..core import privacy
 from ..core.log import log
 from ..core.privacy import for_log
 from ..core.workers import run_async
-from ..i18n import tr
+from ..i18n import LocalizedError, tr
 from ..providers.chromecast import CastDialog
 from ..providers.kodi import DEFAULT_PORT, parse_address
 from .theme import P
@@ -358,6 +366,180 @@ class _CastMixin:
         """
         self._end_cast("local playback took over")
 
+    # -- zapping while casting -------------------------------------------------
+
+    _cast_zap_busy = False
+    _cast_zap_sent: int | None = None   # the cast's generation it went in
+    _cast_zap_gen = 0                   # one up as a cast ends
+    _cast_hooked = False
+
+    def _cast_runs(self) -> bool:
+        """A cast is on a receiver now - not one that ended on the device
+        itself (a Kodi's own remote)."""
+        cc = getattr(self, "cast", None)
+        if (not getattr(self, "_cast_device", None) or cc is None
+                or getattr(cc, "active", None) is None):
+            return False
+        ended = getattr(cc, "ended_elsewhere", None)
+        return not (callable(ended) and ended())
+
+    def _cast_live_item(self) -> dict | None:
+        """The channel a running cast shows, or None (nothing cast, or a
+        film): what channel up/down and a typed number go on from."""
+        ctx = getattr(self, "_cast_ctx", None) or {}
+        if ctx.get("sid") is None or not self._cast_runs():
+            return None
+        return ctx.get("item") or None
+
+    def _cast_zap(self, url: str, title: str, icon_url, key, kind: str,
+                  item, catchup: bool) -> bool:
+        """A live channel picked while a cast runs: sent to the same
+        receiver, the player left as it is. True when it was taken (sent,
+        or refused by a check the user answered); False for the player.
+
+        Asked by the playback path after its own checks (a recording, the
+        VPN guard); a cast's own come here: the source's trusted
+        certificate and the account's connections."""
+        if (kind != "live" or catchup or not item
+                or item.get("stream_id") is None or not self._cast_runs()):
+            return False
+        timer = getattr(self, "_preview_timer", None)
+        if timer is not None:
+            timer.stop()
+        device = self._cast_device
+        old = self._cast_ctx or {}
+        if old.get("sid") is not None and old.get("key") == key:
+            log.info("cast: that channel is on %s already", device)
+            return True
+        sid = item.get("stream_id")
+        # The same two addresses the cast dialog takes: HLS for a receiver
+        # that fetches it itself, the plain stream for the converter and
+        # for a TV or Kodi, which play it as it is.
+        try:
+            hls = self.client.live_url(sid, "m3u8") or url
+        except Exception as e:
+            log.debug("cast: no HLS address for the channel (%s)", e)
+            hls = url
+        if not self._cast_pin_ok(hls, url) or not self._conn_ok_cast(url):
+            return True
+        # The one on the TV ends as it would here: a film keeps its point,
+        # its scrobbles end, failover may try again.
+        self._save_cast_position()
+        self._failover_leave(url, key)
+        self._trakt_stop_current()
+        self._simkl_stop_current()
+        self._ms_leave()
+        if old.get("sid") is not None and old.get("item"):
+            self._prev_live_item = old["item"]
+        self._cast_ctx = {
+            "sid": sid,
+            "archive": bool(item.get("tv_archive")
+                            and not getattr(self.client,
+                                            "archive_by_programme", False)),
+            "title": title, "group": None, "key": key, "item": item,
+            "kind": "live", "row_url": hls, "row_source": url,
+            "url": hls, "source": url, "codecs": [], "height": 0, "fps": 0.0,
+            "audio": None, "subs": None, "duration": 0.0, "tracks": {},
+            "_zap_pending": True,       # picked, not sent yet
+        }
+        # Play after Stop, the media keys and the phone go on from here.
+        self._last_playback = {"url": url, "title": title,
+                               "icon_url": icon_url, "key": key,
+                               "kind": "live", "item": item,
+                               "series_ctx": None}
+        log.info("cast: zapping %s to %s", device, for_log(title))
+        self._set_status(tr("cast_starting", name=device))
+        # The strip says the new channel at once: History, the reporters.
+        self.show_cast_strip(device, title)
+        self._cast_zap_send()
+        return True
+
+    def _cast_zap_send(self) -> None:
+        """Send the channel the cast should show, unless one is on its way:
+        then the newest goes once that one is in (two at once would race
+        on the receiver, its converter and the account's one connection)."""
+        if self._cast_zap_busy:
+            return
+        ctx, device = self._cast_ctx or {}, self._cast_device
+        if not device or not ctx.pop("_zap_pending", False) or not ctx.get("url"):
+            return
+        self._cast_zap_busy = True
+        self._cast_zap_sent = self._cast_zap_gen
+        # A converter feeding the old channel lets go of its connection
+        # first, and the provider is given a moment to notice.
+        settle = bool(self.cast.bridged())
+        run_async(self.pool, self._cast_zap_work, self._cast_zap_done,
+                  self._cast_zap_failed, device, ctx, self._cast_quality(),
+                  settle, self._cast_zap_gen)
+
+    def _cast_zap_work(self, device: str, ctx: dict, quality: str,
+                       settle: bool, gen: int) -> int:
+        """Off the window's thread: the receiver's own cast call, to the
+        device it is on (AirPlay swaps the item in the player it has)."""
+        if gen != self._cast_zap_gen:
+            raise LocalizedError("cast_stopped")
+        self.cast.cast(device, ctx["url"], ctx.get("title") or "dopeIPTV",
+                       [], None, None, 0.0, 0.0, settle, ctx.get("source"),
+                       quality, 0, 0.0, dvr=bool(ctx.get("archive")))
+        return gen
+
+    def _cast_zap_next(self) -> int:
+        """After one went: when it was sent (the cast's generation), and
+        the channel picked meanwhile, if any, on its way now."""
+        gen = -1 if self._cast_zap_sent is None else self._cast_zap_sent
+        self._cast_zap_busy, self._cast_zap_sent = False, None
+        self._cast_zap_send()
+        return gen
+
+    def _cast_zap_done(self, _gen) -> None:
+        gen = self._cast_zap_next()
+        if self._cast_zap_busy:
+            return                      # a newer channel is on its way
+        if gen == self._cast_zap_gen and self._cast_device:
+            device, ctx = self._cast_device, self._cast_ctx or {}
+            self._set_status(tr("cast_casting_to", name=device))
+            self.show_cast_strip(device, ctx.get("title") or "")
+            return
+        cc = getattr(self, "cast", None)
+        if not self._cast_device and cc is not None \
+                and getattr(cc, "active", None) is not None:
+            # Stopped while it was on its way: the TV stops as it was told.
+            threading.Thread(target=cc.stop, daemon=True).start()
+
+    def _cast_zap_failed(self, msg: str) -> None:
+        gen = self._cast_zap_next()
+        if self._cast_zap_busy or not self._cast_device \
+                or gen != self._cast_zap_gen:
+            return
+        self._error(tr("cast_failed", msg=msg))
+        if getattr(self.cast, "active", None) is None:
+            self.show_cast_strip(None)          # the receiver let go of it
+
+    def _cast_began(self, ctx: dict) -> None:
+        """What a cast shows is what is watched: the reporters (events,
+        Discord) hear of it as of a play here, so a zap on the cast moves
+        them on as a local zap does. Statistics count the player only."""
+        key, kind = ctx.get("key"), ctx.get("kind")
+        if key is None or not kind:
+            return
+        privacy.playback_started(kind, key)
+        self._cast_hooked = True
+        title, item = ctx.get("title") or "", ctx.get("item")
+        for name in ("_events_started", "_discord_started"):
+            hook = getattr(self, name, None)
+            if callable(hook):
+                hook(key, title, item, kind, False)
+
+    def _cast_hooks_end(self) -> None:
+        if not self._cast_hooked:
+            return
+        self._cast_hooked = False
+        privacy.playback_stopped()
+        for name in ("_events_stopped", "_discord_stopped"):
+            hook = getattr(self, name, None)
+            if callable(hook):
+                hook()
+
     def show_cast_strip(self, device: str | None, title: str = "") -> None:
         """Show - or take down - the "Casting to X" strip above the player.
 
@@ -368,6 +550,11 @@ class _CastMixin:
         """
         self._cast_device = device
         ctx = getattr(self, "_cast_ctx", None) or {}
+        if not device:
+            # The cast is over: a channel still on its way is not sent, and
+            # whoever heard of it hears it stopped.
+            self._cast_zap_gen += 1
+            self._cast_hooks_end()
         self._cast_key = ctx.get("key") if device else None
         self._cast_group = ctx.get("group") if device else None
         if self._cast_group is None and device:
@@ -408,6 +595,7 @@ class _CastMixin:
             ctx["_counted"] = True
             self._cast_behind = 0.0
             self._cast_paused_at = None
+            self._cast_began(ctx)
         # The player pane goes with it. Casting stops local playback - the
         # receiver pulls the stream itself, and on a one-connection account
         # two readers is one too many - so what is left behind is a black
@@ -512,10 +700,16 @@ class _CastMixin:
                    chosen=(ctx.get("audio"), ctx.get("subs")),
                    live=ctx.get("kind") == "live").exec()
 
+    def _cast_on_airplay(self) -> bool:
+        is_airplay = getattr(getattr(self, "cast", None), "is_airplay", None)
+        return bool(callable(is_airplay)
+                    and is_airplay(getattr(self, "_cast_device", None)))
+
     def _cast_volume(self, level: float) -> None:
         """Set the TV's volume. Off the UI thread: it is a message to a device
-        on the network, and nothing here should wait for it."""
-        if getattr(self.cast, "active", None) is None:
+        on the network, and nothing here should wait for it. Not AirPlay's:
+        the Apple TV's remote sets its volume (_show_cast_volume)."""
+        if getattr(self.cast, "active", None) is None or self._cast_on_airplay():
             return
         self._cast_level = int(round(level * 100))
         if getattr(self, "_cast_muted", False) and level > 0:
@@ -533,7 +727,7 @@ class _CastMixin:
         with the mute and comes back to where it was when the sound does -
         the level itself is never changed, so unmuting needs no guess.
         """
-        if getattr(self.cast, "active", None) is None:
+        if getattr(self.cast, "active", None) is None or self._cast_on_airplay():
             return
         self._cast_muted = not getattr(self, "_cast_muted", False)
         if self._cast_muted:
@@ -551,7 +745,16 @@ class _CastMixin:
 
     def _show_cast_volume(self) -> None:
         """Put the TV's own level on the slider, so it starts where the
-        television actually is rather than where the app guessed."""
+        television actually is rather than where the app guessed.
+
+        Not for AirPlay: AVPlayer's volume does nothing while the Apple TV
+        plays the video - its own remote (or the TV) sets it - so the
+        slider and the mute are not shown for it."""
+        airplay = self._cast_on_airplay()
+        self.cast_bar_vol.setVisible(not airplay)
+        self.cast_bar_mute.setVisible(not airplay)
+        if airplay:
+            return
         try:
             level, muted = self.cast.volume()
         except Exception:
@@ -593,6 +796,11 @@ class _CastMixin:
             # fed through it. AirPlay's own choices are in Apple's menu, in
             # the panel.
             if airplay:
+                # Closed, the AirPlay window (Apple's button) is one click
+                # from here - the cast dialog closes as AirPlay starts.
+                show = getattr(self, "_airplay_show_window", None)
+                if callable(show):
+                    menu.addAction(tr("airplay_show_window"), show)
                 text = tr("airplay_menu_note")
             elif self._cast_is_kodi(self._cast_device):
                 text = tr("cast_kodi_note")

@@ -24,6 +24,12 @@ externalPlaybackActive has stayed on for ROUTE_SETTLE_S, muted the moment
 it goes off and paused once it has stayed off as long - a route that blinks
 while the Apple TV takes over neither starts nor stops anything.
 
+Another channel while it casts (a zap, a track, the bridge's second try)
+is a new item in the same player (replaceCurrentItemWithPlayerItem): the
+route, Apple's button and the window stay, the Apple TV stays picked. The
+bridge stops the old ffmpeg and starts the new one; a route that goes while
+the Apple TV loads the new item does not end the cast (SWAP_GRACE_S).
+
 Whether the cast dialog lists AirPlay is AVRouteDetector's answer while the
 dialog is open (listed when it gives none).
 
@@ -67,6 +73,7 @@ TICK_MS = 1000          # the position and the deadlines; changes come by KVO
 ROUTE_SETTLE_S = 1.0    # externalPlaybackActive held this long is believed
 ROUTE_WAIT_S = 120.0    # how long Apple's button may go unclicked
 ROUTE_GRACE_S = 4.0     # moving to another Apple TV drops the route a moment
+SWAP_GRACE_S = 20.0     # another stream on the route: the TV loading it
 UNREACHED_S = 20.0      # on the TV that long and nothing asked the bridge
 OPEN_WAIT_S = 10.0      # the GUI thread making the player
 SETTLE_S = 2.0          # a provider still counting the player's connection
@@ -432,6 +439,8 @@ class AirPlayReceiver(QObject):
         self._external_since = 0.0
         self._lost_at = 0.0
         self._opened_at = 0.0
+        # When a new item went into a player already on the Apple TV.
+        self._swapped_at = 0.0
         self._user_paused = False
         self._fell_back = False
         self._said_unreached = False
@@ -619,6 +628,11 @@ class AirPlayReceiver(QObject):
             if ab.firewall_blocks():
                 raise LocalizedError("airplay_firewall")
             if req.get("settle"):
+                # Another channel on this cast: the old ffmpeg goes first,
+                # so the provider has let go of its connection before this
+                # one asks (the old item failing meanwhile is _busy).
+                if self.bridge.running():
+                    self.bridge.stop()
                 time.sleep(SETTLE_S)
             if not req["codecs"] or force_bridge:
                 found = ab.probe(p.url, net, self.bridge.exe)
@@ -729,7 +743,7 @@ class AirPlayReceiver(QObject):
             p.setAllowsExternalPlayback_(True)
             self._player = p
             self._raw_ext = self._external = self._ever_external = False
-            self._raw_at, self._lost_at = now, 0.0
+            self._raw_at, self._lost_at, self._swapped_at = now, 0.0, 0.0
             self._errors_said = 0
             log.info("airplay: AVPlayer made, external playback allowed (%s)",
                      bool(p.allowsExternalPlayback()))
@@ -740,6 +754,10 @@ class AirPlayReceiver(QObject):
             # over, not from before the new stream was readied.
             if self._ever_external and not self._external:
                 self._lost_at = now
+            if self._ever_external:
+                self._swapped_at = now
+            log.info("airplay: a new stream in the same player - the route "
+                     "and the AirPlay window stay")
         self._offset, self._pos, self._note, self._note_error = (
             offset, 0.0, "", "")
         self._opened_at = now
@@ -1049,6 +1067,7 @@ class AirPlayReceiver(QObject):
         finally:
             self._closing = False
         self._raw_ext = self._external = self._ever_external = False
+        self._swapped_at = 0.0
         self._panel_said = ""
         self.state = "IDLE/NONE"
         self._show_row()
@@ -1146,7 +1165,7 @@ class AirPlayReceiver(QObject):
         if not raw and not self._external and float(p.rate()) != 0.0:
             p.pause()                   # nothing plays on this Mac
             log.debug("airplay: paused - not on an AirPlay route")
-        if self._external or self._busy:
+        if self._external or self._busy or self._swapping(p, now):
             return True
         if self._ever_external:
             if self._lost_at and now - self._lost_at > ROUTE_GRACE_S:
@@ -1156,6 +1175,24 @@ class AirPlayReceiver(QObject):
             self._finish("airplay_no_route")
             return False
         return True
+
+    def _swapping(self, p: Any, now: float) -> bool:
+        """A new item on a route the Apple TV had, not ready yet (for
+        SWAP_GRACE_S at most): the route going meanwhile is the TV loading
+        it, not the cast ending."""
+        if not self._swapped_at or now - self._swapped_at > SWAP_GRACE_S:
+            return False
+        item = p.currentItem()
+        try:
+            ready = item is not None and int(item.status()) == 1
+        except Exception:
+            ready = False
+        if ready:
+            # Loaded: a route still gone has the ordinary grace from now.
+            self._swapped_at = 0.0
+            if self._lost_at:
+                self._lost_at = now
+        return not ready
 
     def _failed(self, item: Any) -> None:
         why = self._note_error

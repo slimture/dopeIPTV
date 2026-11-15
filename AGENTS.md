@@ -220,9 +220,11 @@ Watched filter, the nav's status), `mw_shortcuts`
 `mw_mpris` (the system's media controls through `services/media_session.py` - MPRIS, Now Playing, the SMTC - and the media keys), `mw_follow` (followed
 series, new-episode news), `mw_subtitles` (OpenSubtitles, subtitles
 remembered per title), `mw_guide` (the Guide page in the middle pane, its
-pop-out window), `mw_cast` (Chromecast and DLNA: the cast
-dialog, the strip, handing over from the archive), `mw_airplay` (AirPlay
-to an Apple TV on macOS: the receiver added, its own endings), `mw_donate` (the
+pop-out window), `mw_cast` (Chromecast, DLNA and Kodi: the cast
+dialog, the strip, handing over from the archive, zapping while casting -
+a live channel picked then goes to the same receiver), `mw_airplay` (AirPlay
+to an Apple TV on macOS: the receiver added, its own endings, its window
+from the strip), `mw_donate` (the
 sidebar heart, About's link, Home's card), `mw_failover` (failover to another
 source), `mw_series` (series recording rules), `mw_health` (stream
 health per channel), `mw_stream_info` (stream details per channel), `mw_chanprefs` (a channel's own settings),

@@ -304,6 +304,18 @@ loopback rewind-buffer address never goes to the TV. A firewall that
 blocks the app (`socketfilterfw`) refuses the cast with the way to allow
 it; a TV that never reaches the bridge after 20 s is told the same.
 
+Zapping while casting (any receiver: `ui/mw_cast.py`, `_cast_zap`): a live
+channel picked during a cast goes to the same receiver, through the
+playback path's checks, one at a time (the newest picked goes once the one
+on its way is in). For AirPlay that is a new item in the same AVPlayer
+(`replaceCurrentItemWithPlayerItem`): Apple's button, the window and the
+picked Apple TV stay; with the bridge the old ffmpeg stops before the new
+one asks the provider (`settle`), and a route that goes while the Apple TV
+loads the new item does not end the cast (`SWAP_GRACE_S`, until the item
+is ready). The strip has no volume for AirPlay - AVPlayer's has no effect
+while the Apple TV plays the video, its remote sets it - and its menu
+brings the AirPlay window back.
+
 Why not elsewhere: pyatv was tried on real hardware in July 2026 (an Apple
 TV 4K pairs and connects, `play_url` fails with HTTP 500 on
 `/playback-info` even for Apple's own demo stream; tvOS 18 broke the legacy
