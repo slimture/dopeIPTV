@@ -733,3 +733,16 @@ def test_the_mac_build_bundles_and_checks_airplay():
         assert module not in (_REPO / "dopeiptv.spec").read_text()
     app = (_REPO / "dopeiptv" / "app.py").read_text()
     assert "airplay_macos import bundle_problem" in app
+
+
+def test_copied_aac_from_a_ts_is_made_mp4_ready():
+    from dopeiptv.providers import airplay_bridge as b
+    p = b.refine(b.Plan(False, "http://x/1.ts"), {"video": "h264", "audio": ["aac", "aac"]})
+    assert p.adts and "aac_adtstoasc" in b.ffmpeg_args("ffmpeg", p)
+    p = b.refine(b.Plan(False, "http://x/1.ts"), {"video": "h264", "audio": ["ac3"]})
+    assert not p.adts and "aac_adtstoasc" not in b.ffmpeg_args("ffmpeg", p)
+
+
+def test_the_mac_app_may_load_http_media_for_airplay():
+    spec = open("dopeiptv-mac.spec", encoding="utf-8").read()
+    assert "NSAllowsArbitraryLoadsForMedia" in spec

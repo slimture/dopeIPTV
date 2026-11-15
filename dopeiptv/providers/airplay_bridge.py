@@ -126,6 +126,7 @@ class Plan:
     audio: str = "copy"     # "copy" or "aac"
     audio_track: int = 0    # what -map 0:a:N counts
     hevc: bool = False      # copied HEVC: tagged hvc1, or Apple plays nothing
+    adts: bool = False      # copied AAC: from a TS it is ADTS, and MP4 wants ASC
     why: str = ""
 
     @property
@@ -161,6 +162,7 @@ def plan(url: str, source: str = "", codecs: list[str] | tuple[str, ...] = (),
                 audio="copy" if a_ok else "aac",
                 audio_track=max(0, int(audio_track)),
                 hevc=v_ok and "hevc" in video,
+                adts=a_ok and bool(audio) and all(c == "aac" for c in audio),
                 why="; ".join(reasons) or "not HLS or MP4")
 
 
@@ -177,7 +179,8 @@ def refine(p: Plan, probed: dict[str, Any]) -> Plan:
     a_ok = all(c in COPY_AUDIO for c in audio)
     return replace(p, video="copy" if v_ok else "h264",
                    audio="copy" if a_ok else "aac",
-                   hevc=v_ok and "hevc" in video)
+                   hevc=v_ok and "hevc" in video,
+                   adts=a_ok and audio == ["aac"])
 
 
 # -- reading the provider -------------------------------------------------------
@@ -299,7 +302,10 @@ def ffmpeg_args(exe: str, p: Plan, start: float = 0.0,
             # A keyframe at every segment boundary, or the segments come out
             # as long as the encoder's own idea of a GOP.
             "-force_key_frames", f"expr:gte(t,n_forced*{SEGMENT_S})"]
-    audio = (["-c:a", "copy"] if p.audio == "copy" else
+    # Copied AAC out of a TS comes as ADTS; the MP4 segments need it as
+    # ASC, or ffmpeg stops at the first packet ("Malformed AAC bitstream").
+    audio = (["-c:a", "copy", *(["-bsf:a", "aac_adtstoasc"] if p.adts else [])]
+             if p.audio == "copy" else
              ["-c:a", "aac", "-ac", "2", "-b:a", "192k"])
     keep = (["-hls_list_size", str(LIVE_WINDOW_S // SEGMENT_S),
              "-hls_flags", "delete_segments+temp_file"] if p.live else

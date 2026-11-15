@@ -190,6 +190,17 @@ app = BUNDLE(
         'LSApplicationCategoryType': 'public.app-category.video',
         # dopeiptv:// links open the app (core/commands.py); macOS hands a
         # running app the link as an event (app.py, _watch_link_events).
+        # AirPlay: AVFoundation loads an http:// stream (most providers'
+        # HLS, and the bridge on this computer) only with this; nothing
+        # else in the app goes through App Transport Security.
+        'NSAppTransportSecurity': {
+            'NSAllowsArbitraryLoadsForMedia': True,
+            'NSAllowsLocalNetworking': True,
+        },
+        # macOS 15 asks before an app reaches the home network (AirPlay's
+        # bridge, Chromecast, DLNA, Kodi, boxes); this is what it shows.
+        'NSLocalNetworkUsageDescription':
+            'dopeIPTV finds and plays on TVs, boxes and media servers on your home network.',
         'CFBundleURLTypes': [{
             'CFBundleURLName': 'io.github.slimture.dopeIPTV.link',
             'CFBundleURLSchemes': ['dopeiptv'],
