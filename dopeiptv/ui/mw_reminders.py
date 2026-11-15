@@ -17,7 +17,8 @@ class _RemindersMixin:
     """MainWindow mixin: the reminders menu and firing a reminder when a programme starts."""
     def _add_reminder(self, ch: dict, p: dict) -> None:
         """Set an EPG reminder for a future programme."""
-        self.reminders.add(ch, p.get("title"), p.get("start_timestamp"))
+        self.reminders.add(ch, p.get("title"), p.get("start_timestamp"),
+                           stop=p.get("stop_timestamp"))
         self._show_toast(
             tr("reminder_set", title=p.get("title") or ch.get("name") or ""),
             4000)

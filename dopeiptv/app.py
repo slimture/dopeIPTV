@@ -300,6 +300,28 @@ def main() -> int:
                 len(missing), ", ".join(missing))
             return 1
         log.info("self-check: all %d languages loaded", len(LANGUAGES))
+        if sys.platform in ("darwin", "win32") and getattr(sys, "frozen", False):
+            # The system's media controls come through a bridge (PyObjC's
+            # MediaPlayer, PyWinRT) whose pieces the freezer has to be told
+            # about; a bundle without them runs - without the controls.
+            from .services.media_session import bundle_problem
+            problem = bundle_problem()
+            if problem:
+                log.error("self-check: the system's media controls are not "
+                          "in this bundle: %s", problem)
+                return 1
+            log.info("self-check: the system's media controls are in the "
+                     "bundle")
+        if sys.platform == "darwin" and getattr(sys, "frozen", False):
+            # AirPlay goes through PyObjC's AVFoundation and AVKit, which
+            # the freezer has to be told about just the same.
+            from .services.airplay_macos import bundle_problem as airplay_problem
+            problem = airplay_problem()
+            if problem:
+                log.error("self-check: AirPlay (AVFoundation, AVKit) is not "
+                          "in this bundle: %s", problem)
+                return 1
+            log.info("self-check: AirPlay is in the bundle")
         # The programme guide is parsed by this same executable started as a
         # process of its own (providers/epg.py). A bundle that cannot do that
         # still parses in the app, slowly - the regression this catches.
@@ -459,6 +481,9 @@ def main() -> int:
         else:
             log.info("Embedded playback: enabled")
     store = PlaylistStore(settings)
+    # This install's id at Jellyfin, Emby and Plex, before the first client.
+    from .providers import mediaserver
+    mediaserver.install_device_store(settings)
 
     # Open the window IMMEDIATELY - no splash, no blocking authenticate.
     # The client is built from the stored playlist and credentials are
@@ -466,6 +491,11 @@ def main() -> int:
     # soon as the server answers (or from the on-disk list/EPG caches), and
     # a genuine credential rejection surfaces as an in-window warning that
     # points at Settings -> Playlists.
+    # Nerd's profile before the first client is made (the window installs it
+    # again): its user agent, headers and proxy, and the source's own route -
+    # own DNS, a pinned certificate - are on that client from the start.
+    from .core import nerd
+    nerd.install(settings)
     pl = store.active()
     welcome = pl is None
     if welcome:
@@ -486,6 +516,7 @@ def main() -> int:
                       else tr("restore_failed_start"), 8000)
     w._start_command_server()
     w._remote_apply()
+    w._phone_apply()
     w._events_apply(started=True)
     _watch_link_events(app, w)
     if command is not None:
@@ -518,6 +549,11 @@ def main() -> int:
                 QTimer.singleShot(500, _check_auth)
                 return
             e = auth_err[0]
+            # Nerd: the source's pinned server showed another certificate.
+            if e is not None:
+                from .ui.cert_trust import offer_review
+                if offer_review(w, store, pl, w.switch_playlist):
+                    return
             # Only a real credential rejection deserves a dialog; network
             # failures already surface through the list-load error paths and
             # recover by themselves (cooldown + caches).

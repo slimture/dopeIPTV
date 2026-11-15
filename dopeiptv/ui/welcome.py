@@ -6,7 +6,8 @@ child widget, not a modal dialog, so it feels part of the app):
   1. Welcome - a greeting that flashes through languages, plus a language
                picker for the whole app.
   2. Connect - Xtream Codes server / username / password (or an M3U URL,
-               or a Stalker / Ministra portal and a MAC address), with a short tour of what the app does right below it. A whole
+               or a Stalker / Ministra portal and a MAC address, or a
+               Jellyfin, Emby or Plex server to sign in to), with a short tour of what the app does right below it. A whole
                Xtream link pasted into the server field auto-fills the three
                credential fields.
   3. Trakt   - optional Trakt.tv sync.
@@ -28,10 +29,11 @@ from PyQt6.QtWidgets import (
 
 from ..i18n import LANGUAGES, tr
 from .box_finder import (
-    BOX_KINDS, LOGIN_KINDS, PLACEHOLDERS, FindOnNetwork, add_box_kinds,
-    retranslate_box_kinds,
+    BOX_KINDS, LOGIN_KINDS, MEDIA_KINDS, PLACEHOLDERS, FindOnNetwork, add_box_kinds,
+    add_media_kinds, retranslate_box_kinds,
 )
 from .dialogs import PlaylistDialog, stalker_available
+from .media_signin import MediaSignIn
 from .theme import P
 
 
@@ -50,7 +52,8 @@ class WelcomeOverlay(QWidget):
 
     def __init__(self, parent: QWidget, *, settings,
                  # (server, user, password, kind, name) - and a portal's MAC
-                 # address as a sixth for kind "stalker".
+                 # address as a sixth for kind "stalker", a media server's
+                 # sign-in ({"token", "options"}) as a seventh.
                  on_connect: Callable[..., None],
                  on_explore: Callable[[], None],
                  on_connect_trakt: Callable[[], None],
@@ -220,6 +223,9 @@ class WelcomeOverlay(QWidget):
         self._conn_kind.addItem(tr("playlist_kind_m3u"), "m3u")
         if stalker_available():
             self._conn_kind.addItem(tr("playlist_kind_stalker"), "stalker")
+        # Jellyfin, Emby and Plex for everyone; boxes on the home network
+        # with Nerd.
+        add_media_kinds(self._conn_kind)
         if self._nerd_on():
             add_box_kinds(self._conn_kind)
         self._conn_kind.currentIndexChanged.connect(self._update_conn_kind)
@@ -255,6 +261,14 @@ class WelcomeOverlay(QWidget):
         form.addRow("", self._finder.row)
         form.addRow(self._lbl_user, self._user)
         form.addRow(self._lbl_pw, self._pw)
+        # A media server is signed in to here (ui/media_signin.py).
+        self._signin = MediaSignIn(page, self._server, self._user, self._pw)
+        self._signin.changed.connect(self._signin_changed)
+        self._signin.finished.connect(self._signin_finished)
+        self._server.textChanged.connect(self._signin.form_changed)
+        self._user.textChanged.connect(self._signin.form_changed)
+        self._connect_signed = False
+        form.addRow("", self._signin)
         form.addRow(self._lbl_mac, self._mac)
 
         self._c_err = QLabel("", objectName="OnbErr")
@@ -359,17 +373,22 @@ class WelcomeOverlay(QWidget):
         kind = self._conn_kind.currentData()
         m3u, stalker = kind == "m3u", kind == "stalker"
         box = kind in BOX_KINDS
+        media = kind in MEDIA_KINDS
         # M3U needs only a URL, a portal its URL and a MAC address, a box
-        # on the home network its address and, if it asks, a login.
+        # on the home network its address and, if it asks, a login, a media
+        # server a sign-in (Plex's in the browser, the address from it).
         self._lbl_server.setText(
             tr("playlist_m3u_url") if m3u
             else tr("playlist_portal_url") if stalker
-            else tr("playlist_box_address") if box else tr("login_server"))
+            else tr("playlist_box_address") if box or media else tr("login_server"))
         self._server.setPlaceholderText(
             "https://example.com/playlist.m3u" if m3u
             else "http://portal.example.com/c/" if stalker
             else PLACEHOLDERS.get(kind, "http://server:port"))
-        login = not (m3u or stalker or box) or kind in LOGIN_KINDS
+        for w in (self._lbl_server, self._server):
+            w.setVisible(kind != "plex")
+        login = (not (m3u or stalker or box or media) or kind in LOGIN_KINDS
+                 or kind in ("jellyfin", "emby"))
         for w in (self._lbl_user, self._user, self._lbl_pw, self._pw):
             w.setVisible(login)
         hint = tr("playlist_login_optional") if box else ""
@@ -377,18 +396,40 @@ class WelcomeOverlay(QWidget):
         self._pw.setPlaceholderText(hint)
         for w in (self._lbl_mac, self._mac):
             w.setVisible(stalker)
-        self._finder.row.setVisible(box)
-        if not box:
+        self._finder.row.setVisible(box or media)
+        self._finder.wanted = MEDIA_KINDS if media else BOX_KINDS
+        if not (box or media):
             self._finder.status.hide()
+        self._signin.set_kind(kind)
         self._fit_card(self._stack.currentIndex())
+
+    def _signin_changed(self) -> None:
+        self._fit_card(self._stack.currentIndex())
+
+    def _signin_finished(self, ok: bool) -> None:
+        """A sign-in Connect asked for has ended: connect if it worked."""
+        pending, self._connect_signed = self._connect_signed, False
+        if pending and ok and self._signin.signed_in():
+            self._connect_media(str(self._conn_kind.currentData()))
+        self._fit_card(self._stack.currentIndex())
+
+    def _connect_media(self, kind: str) -> None:
+        got = self._signin.values()
+        name = self._name.text().strip() or got["name"]
+        self._hide_error()
+        self._on_connect(got["server"], got["username"], "", kind, name, "",
+                         {"token": got["token"], "options": got["options"]})
+        self._stack.setCurrentIndex(2)
 
     def _box_found(self, found: dict) -> None:
         self._set_kind(found.get("kind", ""))
         self._server.setText(found.get("server", ""))
         if not self._name.text().strip():
             self._name.setText(str(found.get("name", "")).split(" - ")[0])
-        if found.get("login"):
+        if found.get("login") or found.get("kind") in ("jellyfin", "emby"):
             self._user.setFocus()
+        if found.get("kind") in MEDIA_KINDS:
+            self._signin.prefer(found)
         self._fit_card(self._stack.currentIndex())
 
     def _set_kind(self, kind: str) -> None:
@@ -403,7 +444,7 @@ class WelcomeOverlay(QWidget):
         shape is left alone so manual entry keeps working. A portal's
         address is never taken for one of those."""
         if self._conn_kind.currentData() == "stalker" \
-                or self._conn_kind.currentData() in BOX_KINDS:
+                or self._conn_kind.currentData() in BOX_KINDS + MEDIA_KINDS:
             return
         from ..providers.client import detect_provider_link
         detected = detect_provider_link(self._server.text())
@@ -428,6 +469,18 @@ class WelcomeOverlay(QWidget):
             self._hide_error()
             self._on_connect(server, "", "", kind, name, mac)
             self._stack.setCurrentIndex(2)
+            return
+        if kind in MEDIA_KINDS:
+            if self._signin.signed_in():
+                self._connect_media(kind)
+            elif self._signin.busy:
+                return
+            elif self._signin.sign_in():
+                # Name and password typed, Sign in not pressed: Connect does it.
+                self._connect_signed = True
+                self._hide_error()
+            else:
+                self._show_error(tr("ms_sign_in_needed"))
             return
         if kind in BOX_KINDS:
             if not server:
@@ -501,6 +554,7 @@ class WelcomeOverlay(QWidget):
                 self._conn_kind.setItemText(i, tr(key))
         retranslate_box_kinds(self._conn_kind)
         self._finder.retranslate()
+        self._signin.retranslate()
         self._sync_nerd_link()
         self._c_hint.setText(tr("onb_xtream_link_hint"))
         self._update_conn_kind()   # re-labels the server row for the mode

@@ -1,8 +1,9 @@
 # Architecture
 
 dopeIPTV is a desktop IPTV client built with PyQt6 and libmpv that
-connects to Xtream Codes providers, M3U playlists and Stalker / Ministra
-portals.  The codebase is grouped into layered subpackages inside the
+connects to Xtream Codes providers, M3U playlists, Stalker / Ministra
+portals, boxes on the home network and Jellyfin, Emby and Plex servers.
+The codebase is grouped into layered subpackages inside the
 `dopeiptv/` package - `providers/` (data sources), `core/` (storage,
 background work, OS glue), `media/` (playback), `services/`
 (window-agnostic application services) and `ui/` (everything the user
@@ -22,6 +23,12 @@ dopeiptv/
   providers/           Data sources (the network / provider edge)
     client.py          XtreamClient, OfflineClient/M3UClient/DemoClient
     stalker.py         StalkerClient - Stalker / Ministra MAC portals
+    mediaserver.py     MediaServerClient - what Jellyfin, Emby and Plex share:
+                       a token, one device id per install, films / series /
+                       channels as the app's rows, reports back on a thread
+    jellyfin.py        JellyfinClient / EmbyClient - sign-in, Quick Connect,
+                       libraries, Live TV, UDP 7359 discovery
+    plex.py            PlexClient - PIN sign-in, servers, libraries, DVR, GDM
     epg.py             XmltvGuide - XMLTV parser with disk cache + index
     epg_index.py       The guide parser as a process of its own (--epg-index)
     metadata.py        TMDB client, PosterResolver (cover art)
@@ -30,9 +37,14 @@ dopeiptv/
     diagnostics.py     Plain-language "why won't this stream play?" probe
     chromecast.py      ChromecastManager, CastDialog
     dlna.py            DLNA / UPnP TVs: SSDP discovery, SOAP control, file share
-    casting.py         CastHub - Chromecast and DLNA behind one object
+    casting.py         CastHub - Chromecast, DLNA and Kodi behind one object
+    kodi.py            Kodi as a cast target over JSON-RPC (HTTP)
+    mdns.py            mDNS discovery in plain Python (finds Kodi)
+    simkl.py           Simkl sync (scrobbles, watched, Plan to watch)
     cast_bridge.py     Local bridge that re-encodes the audio a Chromecast
                        refuses (E-AC-3) so the stream still casts
+    airplay_bridge.py  AirPlay: what goes to an Apple TV as it is, the rest
+                       as HLS by ffmpeg on the LAN (token, cleanup)
     opensubtitles.py   OpenSubtitles.com REST client (search, download, hash)
 
   core/                Storage, background work, OS integration
@@ -46,12 +58,24 @@ dopeiptv/
     dvr_pool.py        Every channel's buffer this session, one budget
     dvr_record.py      A recording read from a buffer
     recording.py       RecordingManager - ffmpeg/mpv stream-copy, timers
-    series_rules.py    Series recordings: rules, airings found, the plan, padding
+    rec_mp4.py         Recordings as MP4: the remux (stream copy, faststart),
+                       the plausibility check, the .ts kept unless it passed
+    series_rules.py    Series recordings: rules, airings found, the plan, padding;
+                       a rule that reminds instead, its reminders' plan
+    night_mode.py      Night mode for the sound: one labelled audio filter
+    viewing_stats.py   Your statistics: seconds watched per title and hour, the
+                       sums (this computer only, never synced)
     updates.py         GitHub latest-release check (is_newer, fetch)
     selfupdate.py      AppImage in-place update: download, verify, test, swap
     wakelock.py        Screensaver/suspend inhibitor (DBus + caffeinate)
     gcguard.py         Cyclic garbage collection on the GUI thread only
     contest.py         ContestWatch: another device taking the account's connection
+    connections.py     Connections to the account: the app's own counted, the
+                       limit, a warning before one more would go over it
+    mirrors.py         Nerd: a source's backup addresses - the next when the
+                       one in use is down (never on a refused login)
+    conn_test.py       Nerd: test the connection to a source step by step
+                       (DNS, TCP, TLS, login, first byte, speed)
     health.py          Nerd's stream health per channel (it only watches)
     channel_prefs.py   Nerd: a channel's own audio/subtitle language,
                        deinterlace, aspect, audio delay (what each sets in mpv)
@@ -60,6 +84,13 @@ dopeiptv/
     events.py          Nerd: events pushed out - webhooks and MQTT (queue +
                        a thread per receiver; it only watches)
     mqtt.py            A small MQTT 3.1.1 client (standard library only)
+    mqtt_control.py    Nerd: Home Assistant's commands over MQTT (topics,
+                       parsing, the controls' discovery)
+    phone_remote.py    The phone remote's server (home network, token in the
+                       address, rate limit and lock-out, nothing else)
+    phone_page.py      The phone remote's page (HTML/CSS/JS, nothing fetched)
+    qr.py              QR code encoder (byte mode, level M, versions 1-40)
+    ical.py            Reminders and recordings as iCalendar (RFC 5545)
     shortcut_keys.py   Keyboard shortcuts: the actions, the app's keys, the
                        user's over them, never two on one key
     log.py             Central logging (configure_logging, DOPEIPTV_LOG)
@@ -92,6 +123,13 @@ dopeiptv/
     resume.py          ResumeStore - per-playlist resume positions
                        (persistence + keep/drop rule)
     mpris.py           MPRIS media session on the D-Bus session bus (Linux)
+    media_session.py   The system's media controls: one host, the session
+                       for this system (MPRIS / Now Playing / SMTC), the
+                       poll, commands queued onto the GUI thread
+    media_macos.py     macOS Now Playing (PyObjC's MediaPlayer)
+    media_windows.py   Windows' System Media Transport Controls (PyWinRT)
+    airplay_macos.py   AirPlay on macOS: AVPlayer + AVKit's route picker,
+                       a CastHub receiver (PyObjC's AVFoundation, AVKit)
     notify.py          Desktop notifications (org.freedesktop.Notifications)
     popular.py         Popular right now: TMDB's chart of the week matched
                        against the provider's catalogue (Home shelves)
@@ -104,10 +142,15 @@ dopeiptv/
                        cards, rows, switches, the playlist delegate
     qt_i18n.py         Qt's own strings (standard buttons, calendars) and
                        QLocale-formatted dates in the app's language
-    mw_trakt.py        Trakt / watched / watchlist mixin
+    mw_trakt.py        Trakt / watched / watchlist mixin (the sync reads
+                       every account signed in: Trakt, Simkl or both)
+    mw_simkl.py        Simkl: scrobbles, its Settings page, PIN sign-in
+    mw_discord.py      Discord status ("Watching ...") from the player
     mw_recording.py    Recording / timeshift mixin
     mw_portal_archive.py A Stalker portal's archive: by programme, its link
                        asked for off the window's thread
+    mw_media.py        Media servers: what plays reported, their resume
+                       points and watched marks (media_signin.py: signing in)
     mw_context.py      Right-click context-menu mixin
     mw_favorites.py    Favorites in bulk: multi-row actions, move, drag-and-drop
     mw_detail.py       EPG / detail-panel mixin
@@ -119,12 +162,22 @@ dopeiptv/
                        History's Watched filter, the nav's status)
     mw_shortcuts.py    Keyboard shortcuts + registry
     mw_cast.py         Casting: the cast dialog, the strip, archive hand-over
+    mw_airplay.py      AirPlay (macOS): the receiver added, its own endings
     mw_popout.py       Detached-window ("pop out") player mixin
     mw_multiview.py    Multiview: 2/4/6/9 live streams (own mpv per cell)
+    mw_connections.py  Connections to the account: counted, warned about
+    mw_mirrors.py      Nerd: a stream whose server is down, on the next address
+    conn_test_dialog.py Nerd: Test connection's window
     mw_busy.py         Loading indicator + spinner overlay
     mw_updates.py      Update-check badge/status wiring, "Update now"
     mw_reminders.py    Programme-reminder UI (set / list / fire)
+    mw_calendar.py     Reminders and recordings as a calendar (file, served)
+    mw_phone.py        The phone remote: on/off, its requests on the window's thread
     mw_series.py       Series recordings: "Record series…", the rules' check
+    mw_mpris.py        The system's media controls (media_session host) +
+                       media keys
+    mw_stats.py        Your statistics: playback time counted, its window
+    stats_window.py    The statistics window: tiles, two column charts, top lists
     mw_mpris.py        Desktop media controls (MPRIS host) + media keys
     mw_follow.py       Follow a series: new-episode checks and news
     mw_subtitles.py    Subtitles from OpenSubtitles; remembered per title
@@ -146,6 +199,8 @@ dopeiptv/
                        on the Guide page or in its window (EpgGridDialog)
     epg_search.py      Programme search across the whole guide
     reminders.py       Reminders manager dialog
+    calendar_export.py Export to calendar… (an .ics, the subscription addresses)
+    phone_remote.py    Phone remote… dialog: the code (QrView), the address
     shortcuts.py       Keyboard-shortcuts card (Settings > Advanced)
     tmdb_match.py      Manual TMDB match dialog
     subtitle_search.py OpenSubtitles search dialog
@@ -195,7 +250,9 @@ for player-overlay colours, which is why `ui/__init__` exposes
    for standalone recordings, mpv's `--stream-record` for in-player
    capture, or `BufferRecorder` (`dvr_record.py`) reading from the app's
    own buffer when that is on - no extra connection, and whole while the
-   player is paused.
+   player is paused. With "Save recordings as MP4" on, a finished .ts is
+   remuxed into an MP4 off the window's thread (`rec_mp4.py`) and the .ts
+   deleted only once the MP4 is plausibly whole.
 
 ## Key patterns
 
@@ -219,8 +276,13 @@ for player-overlay colours, which is why `ui/__init__` exposes
 - python-mpv + libmpv (the embedded player - required in practice; the
   packaged builds bundle libmpv)
 - pychromecast (Chromecast; bundled in every packaged build)
-- ffmpeg CLI (standalone recording; bundled in every packaged build)
+- PyObjC's MediaPlayer wrapper on macOS and PyWinRT's Windows.Media packages
+  on Windows (the system's media controls; installed and bundled only on
+  their own system - the app runs without them); PyObjC's AVFoundation and
+  AVKit on macOS for AirPlay, the same way
+- ffmpeg CLI (standalone recording, the cast and AirPlay bridges; bundled in
+  every packaged build)
 
-Everything else (DLNA, MPRIS over D-Bus, OpenSubtitles, TMDB, Trakt, the
-Stalker portal protocol, music tags) is written against the standard
+Everything else (DLNA, Kodi and mDNS, MPRIS over D-Bus, Discord's IPC,
+OpenSubtitles, TMDB, Trakt, Simkl, the Stalker portal protocol, music tags) is written against the standard
 library and `requests`.

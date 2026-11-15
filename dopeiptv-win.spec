@@ -96,10 +96,28 @@ hiddenimports += [
     "PyQt6.QtNetwork",
 ]
 
+# The System Media Transport Controls (services/media_windows.py) go through
+# PyWinRT, where every namespace is a module plus a table it reads from
+# beside itself. winrt-runtime brings a PyInstaller hook that collects both;
+# the namespaces the app uses are named here again in case it does not run.
+# Without them the app still builds and runs, only without the system's
+# media controls - which --self-check refuses.
+hiddenimports += ["winrt.runtime", "winrt.system"]
+for ns in ("winrt.windows.foundation", "winrt.windows.foundation.collections",
+           "winrt.windows.media", "winrt.windows.media.playback",
+           "winrt.windows.storage.streams"):
+    try:
+        datas += collect_data_files(ns, includes=["_table.pywinrt"])
+        hiddenimports.append(ns)
+    except Exception as e:
+        print(f"WARNING: {ns} not collected ({e}); no media controls.")
+
 if os.path.exists(os.path.join("dopeiptv", "_tmdb_key.py")):
     hiddenimports += ["dopeiptv._tmdb_key"]
 if os.path.exists(os.path.join("dopeiptv", "_opensubtitles_key.py")):
     hiddenimports += ["dopeiptv._opensubtitles_key"]
+if os.path.exists(os.path.join("dopeiptv", "_simkl_key.py")):
+    hiddenimports += ["dopeiptv._simkl_key"]
 
 _icon = os.path.join("packaging", "dopeIPTV.ico")
 icon = (_icon if os.path.exists(_icon)

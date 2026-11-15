@@ -14,7 +14,8 @@ import os
 import shutil
 import tempfile
 
-from PyInstaller.utils.hooks import collect_all, collect_data_files
+from PyInstaller.utils.hooks import (collect_all, collect_data_files,
+                                   collect_submodules)
 
 
 APP_NAME = "dopeIPTV"
@@ -107,6 +108,20 @@ hiddenimports += [
     "PyQt6.QtOpenGLWidgets",
     "PyQt6.QtNetwork",
 ]
+
+# Now Playing and the media keys (services/media_macos.py) and AirPlay
+# (services/airplay_macos.py: AVFoundation's player, AVKit's route picker) go
+# through PyObjC, whose framework wrappers import one another inside
+# functions: every module of each is named here. Without them the app still
+# builds and runs, only without the system's media controls or AirPlay -
+# which --self-check refuses.
+for pkg in ("objc", "CoreFoundation", "Foundation", "AppKit", "CoreAudio",
+            "CoreMedia", "AVFAudio", "AVFoundation", "MediaPlayer", "Quartz",
+            "AVKit"):
+    try:
+        hiddenimports += collect_submodules(pkg)
+    except Exception as e:
+        print(f"WARNING: {pkg} not collected ({e}); no media controls.")
 
 
 a = Analysis(

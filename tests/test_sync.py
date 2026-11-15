@@ -276,7 +276,9 @@ def test_collect_and_apply_take_the_allowed_settings_and_never_the_rest(tmp_path
     never = {"window_geometry": "geo", "supporter_key": _key(), "sync_code": sync.new_code(),
              "sync_cats": "settings", "recordings_dir": "/home/anna/rec", "local_dirs": "[]",
              "nerd_proxy": "socks5://x", "nerd_mpv_config_dir": "/x", "parental_pin_hash": "h",
-             "trakt_access_token": "t", "tmdb_api_key": "k", "os_password": "p",
+             "trakt_access_token": "t", "simkl_access_token": "t",
+             "kodi_devices": "[]", "discord_presence": "true",
+             "tmdb_api_key": "k", "os_password": "p",
              "hwdec_mode": "auto-safe", "splitter_state": "s", "playlists": "[]",
              "favorites_abc": "{}", "feedback_tickets": "[]", "volume": "80",
              "live_rewind_space_gb": "8", "mv_geometry": "g", "made_up_key": "x"}

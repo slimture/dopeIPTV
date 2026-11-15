@@ -9,7 +9,8 @@ can forget to.
 
 Clearing takes a time range - the last hour, 3 hours, 24 hours, 5 days or
 all of it - and what to clear: channels, movies and episodes, and where
-playback stopped.
+playback stopped. The time counted for the viewing statistics
+(core/viewing_stats.py) goes with the channels and the titles cleared.
 """
 
 from __future__ import annotations
@@ -125,11 +126,14 @@ def history_keys(settings: Any) -> list[str]:
 
 def clear_recent(settings: Any, resume_settings: Any, history: Any, seconds: int,
                  channels: bool = True, titles: bool = True,
-                 positions: bool = True) -> dict[str, int]:
+                 positions: bool = True, viewing: Any = None) -> dict[str, int]:
     """Clear what was watched in the last *seconds* (0: all), for every
     source - *history* is the active one's store, which the window shows.
-    Returns the counts per part, for the note that says what went."""
+    The viewing statistics' time goes with them: *viewing* is the log the
+    window counts into (one is read from *settings* without it). Returns
+    the counts per part, for the note that says what went."""
     from .stores import HistoryStore
+    from . import viewing_stats
     since = cutoff(seconds)
     out = {"channels": 0, "titles": 0, "positions": 0}
     stores = [history]
@@ -146,5 +150,14 @@ def clear_recent(settings: Any, resume_settings: Any, history: Any, seconds: int
             out["titles"] += clear_history(store, since, None)
     if positions:
         out["positions"] = clear_resume(resume_settings, since)
+    kinds: set[str] = set()
+    if channels:
+        kinds.add(viewing_stats.CHANNEL)
+    if titles:
+        kinds.update((viewing_stats.FILM, viewing_stats.SERIES, viewing_stats.OTHER))
+    if kinds:
+        vlog = viewing if viewing is not None else viewing_stats.ViewingLog(settings)
+        if vlog.clear(since, kinds):
+            vlog.save()
     log.info("cleared recent history (%s): %s", seconds or "all", out)
     return out

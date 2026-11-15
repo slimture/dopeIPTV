@@ -1,0 +1,17 @@
+"""Built-in Simkl client id (optional).
+
+Simkl is offered in Settings only when a client id is available here or in
+the DOPEIPTV_SIMKL_CLIENT_ID environment variable. To ship one:
+
+  1. Copy this file to  dopeiptv/_simkl_key.py  (git-ignored), or
+  2. export DOPEIPTV_SIMKL_CLIENT_ID=<the client id>  before running, or
+  3. for release builds, set a SIMKL_CLIENT_ID GitHub Actions secret so it
+     is baked into the packaged artifacts without ever touching git.
+
+The client id is that of dopeIPTV's own app at https://simkl.com/settings/developer/
+(the PIN sign-in needs no client secret, and none is used).
+
+The real id is deliberately never committed to the public repository.
+"""
+
+SIMKL_CLIENT_ID = ""

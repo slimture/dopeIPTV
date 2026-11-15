@@ -407,5 +407,6 @@ def test_a_failed_watched_sync_lets_the_next_one_run(monkeypatch):
         watchlist=SimpleNamespace(replace=lambda *_a: None))
     w._on_watched_sync_failed = lambda: _TraktMixin._on_watched_sync_failed(w)
     w._push_local_watched_to_trakt = lambda: None
+    w._watch_accounts = lambda: _TraktMixin._watch_accounts(w)
     _TraktMixin._maybe_sync_watched(w, force=True)
     assert w._watched_sync_running is False

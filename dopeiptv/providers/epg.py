@@ -20,7 +20,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
-from ..core._lazy_requests import requests
 from PyQt6.QtCore import QStandardPaths
 
 from ..core.log import log
@@ -519,6 +518,12 @@ class XmltvGuide:
             return getattr(self.client, "epg_url", "") or ""
         return ""
 
+    def _get(self, url: str, **kw: Any) -> Any:
+        """A guide's GET on the source's route (Nerd: its own DNS, IP
+        version, pinned certificate); requests.get while that is off."""
+        from ..core.net_adapter import getter
+        return getter(getattr(self.client, "net_route", None))(url, **kw)
+
     def _download(self) -> bytes:
         url = self._effective_url()
         own = getattr(self.client, "own_guide", None)
@@ -535,17 +540,23 @@ class XmltvGuide:
         if len(urls) > 1:
             return self._download_many(urls)
         if url:
-            r = requests.get(url, stream=True, timeout=(20, 300))
+            r = self._get(url, stream=True, timeout=(20, 300))
         elif hasattr(self.client, "epg_url"):
             # An M3U/offline client with no guide URL: there is no Xtream
             # xmltv.php endpoint to fall back to, so report "no EPG" cleanly.
             raise RuntimeError("no EPG source for this playlist")
         else:
-            r = self.client.session.get(
-                f"{self.client.server}/xmltv.php",
-                params={"username": self.client.username,
-                        "password": self.client.password},
-                stream=True, timeout=(20, 300))
+            params = {"username": self.client.username,
+                      "password": self.client.password}
+            mirrored = getattr(self.client, "get_from_server", None)
+            if callable(mirrored):
+                # Nerd's backup addresses: the guide from the next one when
+                # the server in use is down (core/mirrors.py).
+                r = mirrored("/xmltv.php", params, (20, 300), "xmltv", stream=True)
+            else:
+                r = self.client.session.get(
+                    f"{self.client.server}/xmltv.php",
+                    params=params, stream=True, timeout=(20, 300))
         r.raise_for_status()
         total = int(r.headers.get("content-length") or 0)
         chunks: list[bytes] = []
@@ -575,7 +586,7 @@ class XmltvGuide:
         parts: list[bytes] = []
         for i, u in enumerate(urls):
             try:
-                r = requests.get(u, timeout=(20, 300))
+                r = self._get(u, timeout=(20, 300))
                 r.raise_for_status()
                 data = r.content
                 if data[:2] == b"\x1f\x8b":

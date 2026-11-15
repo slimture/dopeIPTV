@@ -41,7 +41,7 @@ modern interface, supporting the **Xtream Codes API**, **M3U playlists** and
 - **Recording & Timeshift** — record on a timer/schedule (single-connection friendly) and watch catch-up archives from the EPG; the guide refreshes itself when it gets old
 - **Cast to a Chromecast or a smart TV** — Samsung, LG, Sony and other DLNA/UPnP TVs show up beside the Chromecasts; pause, seek and volume from the app
 - **Subtitles from OpenSubtitles** — find subtitles for the film or episode you are watching right from the player, remembered for next time, or load a subtitle file
-- **Desktop media controls** (Linux, MPRIS) — the keyboard's media keys, headphone buttons, GNOME/KDE media controls and KDE Connect pause, play and skip
+- **System media controls** — the keyboard's media keys and the system's own controls pause, play and skip, and show what is playing: GNOME/KDE media controls, headphone buttons and KDE Connect on Linux (MPRIS), Control Center, the lock screen and AirPods on macOS (Now Playing), the media box by the volume and the lock screen on Windows
 - **Follow a series** — new episodes land on Home with a notification
 - **Trakt** scrobbling, **multiple playlists** (drag to reorder, export/import, or drop an M3U file or link on the window), parental control, content manager and editable channel lists
 - **Themes** — 25 themes picked from previews — dark and light, and some with a colour of their own (sea, forest, wine, neon, an amber terminal, coffee, sand, sky) — 10 accent colours or any colour you like, follow the desktop's light/dark mode, corner style and interface size — all applied live

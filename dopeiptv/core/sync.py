@@ -237,8 +237,14 @@ SETTINGS_DENY = frozenset({
     "live_rewind_space_gb", "cast_pause_gb", "recording_jobs", "cast_devices",
     "tmdb_api_key", "os_api_key", "os_username", "os_password",
     "feedback_tickets", "force_x11", "desktop_entry", "mpris",
+    # The viewing statistics stay on the computer that counted them; the
+    # recordings still to save as MP4 are this computer's files.
+    "viewing_stats", "rec_mp4_pending",
 })
-SETTINGS_DENY_PREFIX = ("sync_", "trakt_", "nerd_", "selfupdate_", "update_",
+# Simkl's sign-in like Trakt's; a Kodi's login, and Discord's status, are
+# this computer's.
+SETTINGS_DENY_PREFIX = ("sync_", "trakt_", "simkl_", "kodi_", "discord_",
+                        "nerd_", "selfupdate_", "update_",
                         "donate_", "feedback_", "parental_", "resume_positions",
                         "favorites", "movie_favorites", "series_favorites",
                         "history", "category_overrides", "channel_overrides",

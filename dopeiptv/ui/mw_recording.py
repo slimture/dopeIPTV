@@ -82,6 +82,12 @@ class _RecordingMixin:
         # Why it failed, where it failed - a bare [Failed] said nothing.
         if j["status"] == "failed" and j.get("error"):
             name += f"  —  {rec_reason(j['error'])}"
+        # Saved as MP4 (Settings > Recording): while it is copied, and when
+        # the .ts had to be kept.
+        if j.get("remux") == "running":
+            name += f"  —  {tr('rec_mp4_saving')}"
+        elif j.get("remux") == "failed":
+            name += f"  —  {tr('rec_mp4_kept_ts')}"
         return {"name": name,
                 "_job": j["id"], "_key": f"job:{j['id']}",
                 "_kind": "recjob", "_status": j["status"],
@@ -192,10 +198,13 @@ class _RecordingMixin:
             if can_cont:
                 options.append((tr("rec_guard_switch_keep"), "normal"))
             options.append((tr("rec_guard_keep_watching"), "primary"))
+            # Going on over a new connection: the recording's own and the
+            # new channel's, where the player had one.
+            over = self._one_more_over() if can_cont else None
             idx = self._choice_dialog(
                 tr("rec_guard_title"),
-                tr("rec_guard_inplayer_body", recording=j["title"],
-                   target=title),
+                self._with_conn_warning(
+                    tr("rec_guard_inplayer_body", recording=j["title"], target=title), over),
                 options)
             if idx == 0:
                 self.rec.finish_all_inplayer("stopped")
@@ -214,8 +223,9 @@ class _RecordingMixin:
         j = active[0]
         idx = self._choice_dialog(
             tr("rec_guard_title"),
-            tr("rec_guard_separate_body", recording=j["title"],
-               target=title),
+            self._with_conn_warning(
+                tr("rec_guard_separate_body", recording=j["title"], target=title),
+                self._one_more_over(free_player=True)),
             [(tr("rec_guard_watch_recorded"), "primary"),
              (tr("rec_guard_stop_switch"), "danger"),
              (tr("rec_guard_play_anyway"), "normal"),
@@ -342,6 +352,20 @@ class _RecordingMixin:
                             settings=tr("settings_title"),
                             page=tr("tab_playback")), 10000)
 
+    def _one_more_over(self, free_player: bool = False):
+        """core/connections.py's Verdict when one more connection would go
+        over the account's limit (*free_player*: the player lets its
+        stream go first) - None when not, or not known."""
+        check = getattr(self, "_conn_verdict", None)
+        uses = getattr(self, "_conn_uses", None)
+        if check is None or uses is None:
+            return None
+        return check(uses(free_player=free_player))
+
+    def _with_conn_warning(self, body: str, verdict) -> str:
+        add = getattr(self, "_conn_with_warning", None)
+        return add(body, verdict) if add is not None and verdict is not None else body
+
     def _guard_buffer_switch(self, j: dict, title: str) -> bool:
         """Another channel, while the one on screen is recorded from its
         rewind buffer: stop, or let the recording go on in the background -
@@ -352,10 +376,14 @@ class _RecordingMixin:
         if not one:
             options.append((tr("rec_guard_buffer_keep"), "normal"))
         options.append((tr("rec_guard_keep_watching"), "primary"))
+        # The buffer goes on streaming for the recording; the new channel
+        # takes one more.
         idx = self._choice_dialog(
             tr("rec_guard_title"),
-            tr("rec_guard_buffer_one_body" if one else "rec_guard_buffer_body",
-               recording=j["title"], target=title),
+            self._with_conn_warning(
+                tr("rec_guard_buffer_one_body" if one else "rec_guard_buffer_body",
+                   recording=j["title"], target=title),
+                None if one else self._one_more_over()),
             options)
         if idx == 0:
             self.rec.finish_all_inplayer("stopped")
@@ -545,9 +573,13 @@ class _RecordingMixin:
                 and self._playing_key is not None)
         if busy:
             playing = (self._last_playback or {}).get("title") or ""
+            # Recording in the background: a connection of its own next to
+            # the player's.
             idx = self._choice_dialog(
                 tr("rec_switch_title"),
-                tr("rec_switch_body", playing=playing, target=title),
+                self._with_conn_warning(
+                    tr("rec_switch_body", playing=playing, target=title),
+                    self._one_more_over()),
                 [(tr("rec_switch_and_record"), "primary"),
                  (tr("rec_record_background"), "normal"),
                  (tr("common_cancel"), "normal")])

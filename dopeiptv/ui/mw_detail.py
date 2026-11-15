@@ -1029,6 +1029,9 @@ class _DetailMixin:
         if (post.get("title") or "").strip():
             m.addAction(tr("series_record_menu"),
                         lambda: self._record_series(it, post.get("title") or ""))
+            m.addAction(tr("series_remind_menu"),
+                        lambda: self._record_series(it, post.get("title") or "",
+                                                    remind=True))
         rem = getattr(self, "reminders", None)
         if start > now and rem is not None:
             sid = it.get("stream_id")

@@ -43,7 +43,8 @@ _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_cast_timeline", "_show_cast_timeline", "_cast_programme_at",
             "_effective_ts_minutes", "_show_cast_edge",
             "_set_cast_quality", "_toggle_cast_mute", "_show_cast_volume",
-            "_cast_tracks_menu", "manage_cast")
+            "_cast_tracks_menu", "manage_cast", "_cast_ended_there",
+            "_cast_plays_as_is", "_cast_is_kodi")
 
 
 class _Resume0:
@@ -2347,5 +2348,29 @@ def test_every_path_announces_what_the_receiver_can_actually_do(monkeypatch):
     m.scan()
     m.cast("Alva TV", "http://p/live/u/pw/9851.m3u8", "SVT1")
     assert m.devices[0].announced[-1] == ("LIVE", None, None)
+
+
+def test_a_kodi_stopped_by_its_own_remote_takes_the_strip_down():
+    """Kodi stopped with its own remote, or playing something else now: the
+    strip says what is true, the film's place is kept - and Kodi is not told
+    to stop, which would end whatever it plays now."""
+    w = _with_strip()
+    w.resume = _Resume0()
+    w._cast_ctx = {"group": "vod", "key": 42, "title": "Film"}
+    w.show_cast_strip("Den (Kodi)", "Film")
+    assert w.cast_bar.shown
+
+    class _Gone(_Cast):
+        duration = 6000.0
+
+        def ended_elsewhere(self):
+            return True
+
+    w.cast = _Gone(active=False)
+    w.cast.at = 2400.0
+    w._show_cast_progress()
+    assert not w.cast_bar.shown and w._cast_device is None
+    assert w.resume.saved["vod:42"] == 2400
+    assert not w.cast.stopped.is_set()
 
 

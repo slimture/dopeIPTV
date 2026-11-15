@@ -71,16 +71,16 @@ PARTS = ("net", "boxes", "lists", "player", "rec", "serve")
 PART_KEYS = {
     "net": ("nerd_user_agent", "nerd_referer", "nerd_headers", "nerd_proxy", "nerd_proxy_player",
             "nerd_ip_family", "nerd_net_timeout", "nerd_reconnect_max", "nerd_vpn_guard",
-            "nerd_vpn_iface", "nerd_vpn_lan"),
+            "nerd_vpn_iface", "nerd_vpn_lan", "nerd_dns", "nerd_dns_url", "nerd_dns_fallback"),
     "lists": ("nerd_picon_dir", "nerd_picon_override", "nerd_udpxy", "nerd_failover", "nerd_health",
               "nerd_numbers_keep"),
     "player": ("nerd_spdif", "nerd_video_sync", "nerd_interpolation", "nerd_probe", "nerd_demux_max_mb",
                "nerd_mpv_config_dir", "nerd_shaders", "nerd_mpv_options", "nerd_adelay_per_channel",
-               "nerd_hls_quality", "nerd_hls_max_kbps"),
+               "nerd_hls_quality", "nerd_hls_max_kbps", "nerd_low_latency"),
     "rec": ("nerd_rec_template", "nerd_rec_post"),
     "serve": ("nerd_remote", "nerd_share", "nerd_remote_lan", "nerd_remote_port", "nerd_hooks",
               "nerd_hooks_urls", "nerd_mqtt", "nerd_mqtt_host", "nerd_mqtt_port", "nerd_mqtt_tls",
-              "nerd_mqtt_client", "nerd_mqtt_prefix", "nerd_mqtt_ha"),
+              "nerd_mqtt_client", "nerd_mqtt_prefix", "nerd_mqtt_ha", "nerd_mqtt_commands"),
 }
 
 
@@ -331,6 +331,10 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     c.row(tr("nerd_reconnect"), recon, tr("nerd_reconnect_hint"))
     c.note(tr("nerd_applies_conn"))
 
+    # -- network: own DNS (ui/net_advanced.py) ----------------------------------------------
+    from . import net_advanced
+    dns_values = net_advanced.dns_card(at("net"), n, lines, src, proxy_now)
+
     # -- network: the VPN guard ------------------------------------------------------------
     c = at("net").card(tr("nerd_card_vpn"))
     guard = c.toggle(tr("nerd_vpn_guard"), n.flag("nerd_vpn_guard"), tr("nerd_vpn_guard_hint"))
@@ -566,6 +570,9 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     c.row(tr("nerd_cache"), cache, tr("nerd_cache_hint"), search="demuxer-max-bytes")
     adelay = c.toggle(tr("nerd_adelay"), n.flag("nerd_adelay_per_channel", True), tr("nerd_adelay_hint"))
     c.note(tr("nerd_applies_stream"))
+
+    # -- the player: low latency for live (ui/net_advanced.py) ------------------------------------
+    latency_values = net_advanced.latency_card(at("player"), n, lines, throwaway_mpv)
 
     # -- the player: adaptive streams (HLS) ------------------------------------------------------
     from ..core import hls_cap
@@ -808,6 +815,21 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
                       diagnostics(settings), state="info").exec()
     info_btn.clicked.connect(show_diag)
     c.row(tr("nerd_diag_row"), info_btn, tr("nerd_diag_hint"), search="diagnostics bug report copy")
+    # The active source's connection, step by step (core/conn_test.py).
+    conn_btn = QPushButton(tr("ct_button"))
+
+    def test_connection() -> None:
+        s = src()
+        if not s:
+            from .dialogs import ProblemDialog
+            ProblemDialog(parent, tr("ct_title"), tr("nerd_ck_no_source"), "-", state="info").exec()
+            return
+        from ..providers.client import make_client
+        from .conn_test_dialog import ConnTestDialog
+        ConnTestDialog(parent, dict(s), settings, make_client).exec()
+    conn_btn.clicked.connect(test_connection)
+    c.row(tr("ct_row"), conn_btn, tr("ct_row_hint"),
+          search="connection test DNS TLS speed Mbit throughput ping")
 
     def values() -> dict[str, str]:
         out: dict[str, str] = {}
@@ -855,6 +877,8 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
         put("nerd_remote_port", port.value())
         put("nerd_remote_token", token.text().strip())
         out.update(hooks())
+        out.update(dns_values())
+        out.update(latency_values())
         return out
 
     # Off: the switch and what Nerd holds, nothing else. On: all of it - on
@@ -1018,12 +1042,15 @@ def _events_cards(page: SettingsPage, n: nerd.Nerd, lines: list[CheckLine]) -> C
     prefix.setAccessibleName(tr("nerd_mqtt_prefix"))
     ha = ToggleSwitch(n.flag("nerd_mqtt_ha"))
     ha.setAccessibleName(tr("nerd_mqtt_ha"))
+    commands = ToggleSwitch(n.flag("nerd_mqtt_commands"))
+    commands.setAccessibleName(tr("nerd_mqtt_commands"))
 
     def mqtt_now() -> events.Config:
         return events.Config(mqtt_host=host.text().strip(), mqtt_port=port.value(), mqtt_tls=tls.isChecked(),
                              mqtt_user=user.text().strip(), mqtt_pass=password.text(),
                              client_id=client.text().strip() or events.default_client_id(),
-                             prefix=events.clean_prefix(prefix.text()), ha=ha.isChecked())
+                             prefix=events.clean_prefix(prefix.text()), ha=ha.isChecked(),
+                             commands=commands.isChecked())
 
     def mqtt_preview() -> Check | None:
         if not mqtt_on.isChecked():
@@ -1044,13 +1071,15 @@ def _events_cards(page: SettingsPage, n: nerd.Nerd, lines: list[CheckLine]) -> C
                    search="MQTT user name password login"),
              c.row(tr("nerd_mqtt_client"), client, search="MQTT client id"),
              c.row(tr("nerd_mqtt_prefix"), prefix, tr("nerd_mqtt_prefix_hint"), search="MQTT topic prefix"),
+             c.row(tr("nerd_mqtt_commands"), commands, tr("nerd_mqtt_commands_hint"),
+                   search="MQTT commands control Home Assistant button volume favorite channel play pause"),
              c.row(tr("nerd_mqtt_ha"), ha, tr("nerd_mqtt_ha_hint"),
                    search="Home Assistant discovery sensor device", below=mqtt_line)]
     for r in shown:
         c.shown_if(r, mqtt_on.isChecked)
     mqtt_on.toggled.connect(lambda _on, c=c: c.refresh())
     for sig in (mqtt_on.toggled, host.textChanged, port.valueChanged, tls.toggled, user.textChanged,
-                password.textChanged, client.textChanged, prefix.textChanged, ha.toggled):
+                password.textChanged, client.textChanged, prefix.textChanged, ha.toggled, commands.toggled):
         sig.connect(mqtt_line.changed)
     c.note(tr("nerd_applies_hooks"))
 
@@ -1060,7 +1089,8 @@ def _events_cards(page: SettingsPage, n: nerd.Nerd, lines: list[CheckLine]) -> C
                 "nerd_mqtt_host": host.text().strip(), "nerd_mqtt_port": str(port.value()),
                 "nerd_mqtt_tls": flag(tls), "nerd_mqtt_user": user.text().strip(),
                 "nerd_mqtt_pass": password.text(), "nerd_mqtt_client": client.text().strip(),
-                "nerd_mqtt_prefix": prefix.text().strip(), "nerd_mqtt_ha": flag(ha)}
+                "nerd_mqtt_prefix": prefix.text().strip(), "nerd_mqtt_ha": flag(ha),
+                "nerd_mqtt_commands": flag(commands)}
     return values
 
 
@@ -1239,14 +1269,15 @@ def diagnostics(settings: Any) -> str:
             "nerd_interpolation", "nerd_probe", "nerd_demux_max_mb", "nerd_log_level", "nerd_vpn_guard",
             "nerd_vpn_lan", "nerd_proxy_player", "nerd_failover", "nerd_health", "nerd_remote", "nerd_share",
             "nerd_remote_lan", "nerd_remote_port", "nerd_hls_quality", "nerd_hls_max_kbps",
-            "nerd_hooks", "nerd_mqtt", "nerd_mqtt_port", "nerd_mqtt_tls", "nerd_mqtt_ha"}
+            "nerd_hooks", "nerd_mqtt", "nerd_mqtt_port", "nerd_mqtt_tls", "nerd_mqtt_ha",
+            "nerd_dns", "nerd_dns_fallback", "nerd_low_latency", "nerd_mqtt_commands"}
     for key in sorted(safe):
         v = n.get(key)
         if v:
             lines.append(f"  {key} = {v}")
     for key in ("nerd_user_agent", "nerd_referer", "nerd_headers", "nerd_proxy", "nerd_mpv_options",
                 "nerd_mpv_config_dir", "nerd_shaders", "nerd_vpn_iface", "nerd_hooks_urls",
-                "nerd_hooks_header", "nerd_mqtt_host", "nerd_mqtt_user", "nerd_mqtt_pass"):
+                "nerd_hooks_header", "nerd_mqtt_host", "nerd_mqtt_user", "nerd_mqtt_pass", "nerd_dns_url"):
         if n.get(key):
             lines.append(f"  {key} = (set)")
     up = nerd.vpn_interfaces()

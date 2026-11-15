@@ -92,9 +92,18 @@ class _PrivacyMixin:
         was = privacy.private()
         privacy.set_private(on)
         if on:
-            # A Trakt scrobble already under way is let go, not stopped: a
-            # stop would report the progress and file it in the history.
+            # A Trakt or Simkl scrobble already under way is let go, not
+            # stopped: a stop would report the progress and file it in the
+            # history.
             self._trakt_active = None
+            self._simkl_active = None
+            # Watch together tells the others what plays: out of the room.
+            if hasattr(self, "_together_private_on"):
+                self._together_private_on()
+        # Discord's status goes as private viewing starts, and comes back
+        # (for what plays then) as it ends.
+        if hasattr(self, "_discord_push"):
+            self._discord_push()
         action = getattr(self, "_private_action", None)
         if action is not None and action.isChecked() != on:
             action.blockSignals(True)
@@ -118,8 +127,10 @@ class _PrivacyMixin:
             return None
         c = d.choice()
         resume_settings = getattr(self, "_resume_settings", self.settings)
+        self._stats_drop_pending()
         counts = privacy.clear_recent(self.settings, resume_settings, self.history,
-                                      c["seconds"], c["channels"], c["titles"], c["positions"])
+                                      c["seconds"], c["channels"], c["titles"], c["positions"],
+                                      viewing=self._stats_store())
         # The resume store holds its positions in memory: read them again.
         if c["positions"] and getattr(self, "resume", None) is not None:
             from ..services.resume import ResumeStore

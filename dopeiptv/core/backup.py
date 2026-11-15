@@ -84,13 +84,23 @@ _LEFT_OUT = frozenset({
     # Whoever has it controls the player: never from a file (a new one is
     # made here when remote control or sharing is turned on).
     "nerd_remote_token",
+    # The phone remote: its address (the token in it), its port and whether
+    # it is on belong to this computer and its home network.
+    "phone_remote", "phone_remote_token", "phone_remote_port",
+    # This install's own id at Jellyfin, Emby and Plex: each computer has its
+    # own (providers/mediaserver.py).
+    "media_device_id",
     # Caches the app fills again by itself.
     "local_tmdb_posters", "local_tmdb_posters_v2", "music_art_v1",
     "cast_devices", "subtitle_files", "nerd_health_data",
+    # Recordings of this computer still to be saved as MP4 (its own paths).
+    "rec_mp4_pending",
 })
 # update_*: the update channel and what its check last found; ts_*: what a
-# source's timeshift probe learned; "_": the files' own markers.
-_LEFT_OUT_PREFIXES = ("update_", "home_pcache_", "ts_broken/", "ts_depth/", "_")
+# source's timeshift probe learned; "_": the files' own markers;
+# nerd_mirror_*: the backup address that answered last on this computer.
+_LEFT_OUT_PREFIXES = ("update_", "home_pcache_", "ts_broken/", "ts_depth/", "_",
+                      "nerd_mirror_")
 _TMDB_CACHE = re.compile(r"tmdb_.*(cache|matcher)")
 
 #: Settings naming a folder ("dir"), a JSON list of folders ("dirs") or files
@@ -104,11 +114,15 @@ _PATHS = {"recordings_dir": "dir", "local_open_dir": "dir",
 #: names only (a value may be a token).
 RISKY = ("nerd_rec_post", "nerd_mpv_options", "nerd_mpv_config_dir", "nerd_proxy",
          "nerd_headers", "nerd_udpxy", "nerd_hooks_urls", "nerd_hooks_header",
-         "nerd_mqtt_host")
+         "nerd_mqtt_host", "nerd_dns_url")
 #: Switches that let others in or send out what is played: shown when on.
-RISKY_ON = ("nerd_remote", "nerd_share")
-#: A playlist's own options that do the same for its connections.
-RISKY_SOURCE = ("proxy", "headers", "rewrite", "udpxy", "catchup_template")
+RISKY_ON = ("nerd_remote", "nerd_share", "nerd_mqtt_commands")
+#: Those of them that the home network choice (nerd_remote_lan) opens wider.
+_LAN_ON = ("nerd_remote", "nerd_share")
+#: A playlist's own options that do the same for its connections (its
+#: backup addresses, a certificate trusted for it, its own DNS server).
+RISKY_SOURCE = ("proxy", "headers", "rewrite", "udpxy", "catchup_template",
+                "backup_servers", "dns_url", "cert_pin")
 _HEADERS = frozenset({"nerd_headers", "nerd_hooks_header", "headers"})
 _HEADER_NAME = re.compile(r"^\s*([A-Za-z0-9!#$%&'*+.^_`|~-]+)\s*[:=]")
 #: The kinds a summary counts, by the file that holds them.
@@ -515,7 +529,7 @@ def risky(b: Backup) -> list[tuple[str, str]]:
     out = [(key, shown) for key in RISKY
            if isinstance(main.get(key), str) and (shown := _shown(key, main[key]))]
     lan = "nerd_remote_lan" if _on(main.get("nerd_remote_lan")) else ""
-    out += [(key, lan) for key in RISKY_ON if _on(main.get(key))]
+    out += [(key, lan if key in _LAN_ON else "") for key in RISKY_ON if _on(main.get(key))]
     return out
 
 
@@ -539,7 +553,7 @@ def new_token_here(b: Backup) -> bool:
     """Whether a restore should say that the remote control's token is not
     taken from *b*: it has one, or turns remote control or sharing on."""
     main = b.stores.get("main", {})
-    return "nerd_remote_token" in main or any(_on(main.get(k)) for k in RISKY_ON)
+    return "nerd_remote_token" in main or any(_on(main.get(k)) for k in _LAN_ON)
 
 
 # -- putting it back -------------------------------------------------------------

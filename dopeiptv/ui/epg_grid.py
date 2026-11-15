@@ -1917,6 +1917,8 @@ class EpgGrid(QWidget):
         if (ch.get("stream_id") is not None and (p.get("title") or "").strip()
                 and hasattr(self.window, "_record_series")):
             m.addAction(tr("series_record_menu"), lambda: self._record_series(ch, p))
+            m.addAction(tr("series_remind_menu"),
+                        lambda: self._record_series(ch, p, remind=True))
         # Remind me when a future programme starts.
         if (ch.get("stream_id") is not None
                 and p["start_timestamp"] > time.time()
@@ -1945,10 +1947,14 @@ class EpgGrid(QWidget):
             p["start_timestamp"], p["stop_timestamp"])
         self.info.setText("● " + (p.get("title") or ch.get("name") or ""))
 
-    def _record_series(self, ch: dict, p: dict) -> None:
-        rule = self.window._record_series(ch, p.get("title") or "", parent=self)
+    def _record_series(self, ch: dict, p: dict, remind: bool = False) -> None:
+        if remind:
+            rule = self.window._record_series(ch, p.get("title") or "", parent=self,
+                                              remind=True)
+        else:
+            rule = self.window._record_series(ch, p.get("title") or "", parent=self)
         if rule:
-            self.info.setText("● " + rule["text"])
+            self.info.setText(("🔔 " if remind else "● ") + rule["text"])
 
 
 class EpgGridDialog(QDialog):

@@ -60,6 +60,8 @@ from ..providers.metadata import CacheFiles, TmdbClient, bundled_tmdb_key
 from ..providers.opensubtitles import OpenSubtitles
 from ..providers.opensubtitles import bundled_key as bundled_os_key
 from ..providers.client import make_client
+from ..core import connections
+from ..core import night_mode, rec_mp4
 from ..core.local_buffer import MEMORY_MAX_MINUTES
 from ..core.log import log
 from ..core.xdg import open_url
@@ -78,7 +80,7 @@ from .settings_ui import (
     ValueSlider, size_text,
     SettingsShell, ThemeTile, fit_to_rows, hbox, page_icon, settings_style,
 )
-from .widgets import confirm
+from .widgets import confirm, file_dialog_options
 from ..core.updates import GITHUB_REPO, fetch_update, offered
 from ..core.workers import (
     clear_directory, default_image_cache_dir, dir_size_bytes, run_async)
@@ -157,8 +159,7 @@ class _SettingsMixin:
     def _choose_rec_dir(self) -> None:
         d = QFileDialog.getExistingDirectory(
             self, tr("rec_choose_folder_title"), self.rec.directory(),
-            QFileDialog.Option.DontUseNativeDialog
-            | QFileDialog.Option.ShowDirsOnly)
+            file_dialog_options(QFileDialog.Option.ShowDirsOnly))
         if d:
             self.rec.set_directory(d)
             if self.mode == "rec":
@@ -350,7 +351,7 @@ class _SettingsMixin:
             parent, tr("backup_title"),
             f"dopeIPTV-backup-{date.today().isoformat()}.json",
             tr("file_filter_json"),
-            options=QFileDialog.Option.DontUseNativeDialog)
+            options=file_dialog_options())
         if not path:
             return
         doc = backup.collect(self._backup_stores(), VERSION)
@@ -376,7 +377,7 @@ class _SettingsMixin:
         path, _f = QFileDialog.getOpenFileName(
             parent, tr("restore_title"), "",
             tr("file_filter_json") + ";;" + tr("file_filter_all"),
-            options=QFileDialog.Option.DontUseNativeDialog)
+            options=file_dialog_options())
         if not path:
             return
         try:
@@ -497,6 +498,9 @@ class _SettingsMixin:
         # Player control tooltips (embedded bar + fullscreen overlay).
         if self.player:
             self.player.retranslate_ui()
+        strip = getattr(self, "_together_strip", None)
+        if strip is not None:
+            strip.retranslate()
         self._guide_restyle()        # the Guide page, in the new language
 
     def _inline_view_changed(self, *_) -> None:
@@ -603,12 +607,18 @@ class _SettingsMixin:
                             if days >= 0 else f" ({tr('account_expired')})")
             except (TypeError, ValueError, OSError):
                 exp_txt = str(exp)
-        active = ui.get("active_cons", "?")
-        maxc = ui.get("max_connections", "?")
+        limit, active = connections.numbers(ui)
+        if limit is not None and active is not None:
+            conns = tr("conn_in_use", n=active, max=limit)
+        elif active is not None:
+            conns = tr("conn_in_use_only", n=active)
+        else:
+            conns = (f"{tr('account_connections')}: {ui.get('active_cons', '?')}"
+                     f" / {ui.get('max_connections', '?')}")
         return "     ·     ".join([
             f"{tr('account_status')}: {status or '—'}",
             f"{tr('account_expiry')}: {exp_txt}",
-            f"{tr('account_connections')}: {active} / {maxc}",
+            conns,
         ])
 
     def _nerd_to_player(self) -> None:
@@ -629,6 +639,22 @@ class _SettingsMixin:
                 nerd.reapply_core(m)
         except Exception as e:
             log.warning("nerd: player not updated: %s", e)
+
+    def _nerd_route_to_client(self) -> None:
+        """The active source's own route (core/net_route.py: own DNS, IP
+        version, a pinned certificate) onto its client's session, as the
+        Nerd page says now - or requests' own adapter back when it says
+        nothing (core/net_adapter.py)."""
+        from ..core import nerd, net_adapter, net_route
+        session = getattr(self.client, "session", None)
+        if session is None:
+            return
+        try:
+            route = net_route.route_for(nerd.source())
+            net_adapter.remount(session, route)
+            self.client.net_route = route
+        except Exception as e:
+            log.warning("nerd: the client's route not updated: %s", e)
 
     def _nerd_lists_rebuild(self) -> None:
         """Settings closed after a change to picons or udpxy: the channel
@@ -710,6 +736,10 @@ class _SettingsMixin:
         clear_btn.clicked.connect(lambda: self.open_clear_history())
         c.row(tr("clear_menu"), clear_btn, tr("clear_hint"),
               search="history incognito private recently viewed")
+        # What plays, as a Discord status (mw_discord): only in a build that
+        # carries the Discord application's id.
+        if hasattr(self, "_build_discord_card"):
+            self._build_discord_card(general, d)
         c = general.card(tr("set_card_updates"))
         updates_box = c.toggle(tr("setting_check_updates"),
                                is_on("check_updates", "true"))
@@ -743,6 +773,17 @@ class _SettingsMixin:
                                        tr("setting_desktop_entry_hint"))
             mpris_box = c.toggle(tr("setting_mpris"), is_on("mpris", "true"),
                                  tr("setting_mpris_hint"))
+        elif sys.platform in ("darwin", "win32"):
+            # The same switch for Now Playing / the System Media Transport
+            # Controls, where this build has the bridge to them.
+            from ..services import media_session as _ms
+            if _ms.supported():
+                c = general.card(tr("set_card_system"))
+                mpris_box = c.toggle(
+                    tr("setting_media_controls"), is_on("mpris", "true"),
+                    tr("setting_media_controls_hint_mac"
+                       if sys.platform == "darwin"
+                       else "setting_media_controls_hint_win"))
         # The sidebar's heart, last and quiet: off hides it for three months.
         c = support_card = general.card(tr("donate_support"))
         # What the supporter key opens: read once here, again only after the
@@ -1007,6 +1048,10 @@ class _SettingsMixin:
         upcoming_box = c.toggle(
             tr("set_upcoming_prompt"),
             self.settings.value("hide_upcoming_prompt", "false") != on)
+        # Night mode: the player's menu and its key turn it on too, live.
+        c = play.card(tr("set_card_sound"))
+        night_box = c.toggle(tr("night_mode"), night_mode.enabled(self.settings),
+                             tr("night_mode_hint"))
         c = play.card(tr("set_card_stream"))
         c.row(tr("setting_stream_format"), fmt_box)
         c.row(tr("setting_network_buffer"), buf_box)
@@ -1280,7 +1325,8 @@ class _SettingsMixin:
             tr("pl_in_use"), {"xtream": "Xtream", "m3u": "M3U",
                               "stalker": "Stalker", "enigma2": "Enigma2",
                               "tvheadend": "Tvheadend",
-                              "hdhomerun": "HDHomeRun"}, pl_list))
+                              "hdhomerun": "HDHomeRun", "jellyfin": "Jellyfin",
+                              "emby": "Emby", "plex": "Plex"}, pl_list))
         pl_list.setMouseTracking(True)
         # Drag a playlist to change its place; the sidebar's playlist menu
         # lists them in this same order.
@@ -1451,8 +1497,7 @@ class _SettingsMixin:
         def pick_rec_dir():
             path = QFileDialog.getExistingDirectory(
                 d, tr("rec_choose_folder_title"), self.rec.directory(),
-                QFileDialog.Option.DontUseNativeDialog
-                | QFileDialog.Option.ShowDirsOnly)
+                file_dialog_options(QFileDialog.Option.ShowDirsOnly))
             if path:
                 self.rec.set_directory(path)
                 rec_dir_row.hint_label.setText(path)
@@ -1488,6 +1533,9 @@ class _SettingsMixin:
         rec_max_box = Stepper(rec_max_spin, width=rec_max_spin.widest() + 80)
         rec_total_box = Stepper(rec_total_spin,
                                 width=rec_total_spin.widest() + 80)
+        # Saved as MP4 once a recording ended well (core/rec_mp4.py).
+        mp4_box = c.toggle(tr("rec_mp4_setting"), rec_mp4.enabled(self.settings),
+                           tr("rec_mp4_hint"))
         c = rec.card(tr("set_card_limits"))
         c.row(tr("rec_max_label"), rec_max_box)
         c.row(tr("rec_total_label"), rec_total_box)
@@ -1516,12 +1564,17 @@ class _SettingsMixin:
         series_card = rec.card(tr("set_card_series"))
         rule_list = QListWidget(objectName="SeriesRuleList")
         rec_icon = page_icon("rec", self._action_pixmap, 16)
+        # A rule that reminds instead of recording wears the guide's bell.
+        from .epg_grid import EpgGrid
+        bell_icon = QIcon(EpgGrid._bar_pixmap("bell", QColor(P["text2"])))
 
         def fill_rules() -> None:
             rule_list.clear()
             for r in sorted(self.series_rules.rules(),
                             key=lambda r: srules.norm(r.get("text"))):
-                item = QListWidgetItem(rec_icon, self._series_rule_label(r))
+                item = QListWidgetItem(
+                    bell_icon if srules.action(r) == srules.REMIND else rec_icon,
+                    self._series_rule_label(r))
                 item.setData(Qt.ItemDataRole.UserRole, r["id"])
                 rule_list.addItem(item)
             rule_list.setCurrentRow(0)
@@ -1542,6 +1595,7 @@ class _SettingsMixin:
             lambda: rule_list.count() > 0)
         series_card.layout_row(hbox(rule_add, rule_del))
         series_card.note(tr("series_note", days=srules.DAYS))
+        series_card.note(tr("series_remind_note"))
 
         def rules_sync() -> None:
             rule_del.setEnabled(rule_list.currentItem() is not None)
@@ -1632,8 +1686,7 @@ class _SettingsMixin:
                      or os.path.expanduser("~"))
             path = QFileDialog.getExistingDirectory(
                 d, tr("local_add_folder_title"), start,
-                QFileDialog.Option.DontUseNativeDialog
-                | QFileDialog.Option.ShowDirsOnly)
+                file_dialog_options(QFileDialog.Option.ShowDirsOnly))
             dirs = self._local_dirs()
             if path and path not in dirs:
                 self._save_local_dirs(dirs + [path])
@@ -1767,8 +1820,9 @@ class _SettingsMixin:
                        movies=n_m, episodes=n_e))
             else:
                 sync_row.label.setText(tr("trakt_sync_never"))
+            # Trakt's, Simkl's or both: the one store they fill together.
             sync_now_btn.setEnabled(
-                self.trakt.is_connected()
+                bool(self._watch_accounts())
                 and not self._watched_sync_running)
 
         def do_sync_now():
@@ -1814,6 +1868,10 @@ class _SettingsMixin:
         trakt_watchlist_btn.clicked.connect(
             lambda: self._open_trakt_dialog(d))
         refresh_trakt_status()
+
+        # -- Simkl (mw_simkl): only in a build with its client id ------------
+        if hasattr(self, "_build_simkl_page"):
+            self._build_simkl_page(page, d)
 
         # -- Parental controls ------------------------------------------------
         par = page("parental", tr("tab_parental"),
@@ -2040,6 +2098,11 @@ class _SettingsMixin:
                 account_lbl.setText(tr("account_unavailable"))
                 return
             account_lbl.setText(tr("account_loading"))
+            # The app's own connections to it as it is asked: what the
+            # provider counts besides them is another device's.
+            seen = getattr(self, "_conn_seen", None)
+            own = (connections.own_count(self._conn_uses(), str(pid))
+                   if seen is not None else 0)
 
             def fetch(pl=pl):
                 try:
@@ -2048,6 +2111,8 @@ class _SettingsMixin:
                     return {}
 
             def done(info, pid=pid):
+                if seen is not None and info:
+                    seen(str(pid), info, own)
                 # Ignore a stale answer if the selection moved on meanwhile.
                 if selected_pid() == pid:
                     account_lbl.setText(self._format_account(info))
@@ -2170,7 +2235,7 @@ class _SettingsMixin:
             (tr("set_sec_watching"), ["playback", "audio", "guide",
                                       "multiview"]),
             (tr("set_sec_library"), ["recording", "local"]),
-            (tr("set_sec_services"), ["metadata", "trakt"]),
+            (tr("set_sec_services"), ["metadata", "trakt", "simkl"]),
             # Nerd's own pages fold out under it while it is on.
             (tr("set_sec_system"), ["parental", "advanced", "nerd"]),
         ])
@@ -2224,6 +2289,11 @@ class _SettingsMixin:
             put("autoplay_next_episode", flag(autoplay_next_box))
             put("nextup_lead_secs", nextup_box.currentData())
             put("auto_reconnect_live", flag(autorecon_box))
+            # These two only when switched: off and never set is no setting.
+            if night_box.isChecked() != night_mode.enabled(self.settings):
+                put(night_mode.KEY, flag(night_box))
+            if night_mode.KEY in changed and self.player:
+                self.player.set_night_mode(night_box.isChecked())
             put("check_updates", flag(updates_box))
             if heart_box.isChecked() != self._donate_heart_due():
                 if heart_box.isChecked():
@@ -2296,6 +2366,8 @@ class _SettingsMixin:
             put("live_rewind_kept", flag(kept_box))
             put("live_rewind_space_gb", space_box.currentData())
             put("replay_delay_min", replay_delay_box.value())
+            if mp4_box.isChecked() != rec_mp4.enabled(self.settings):
+                put(rec_mp4.SETTING, flag(mp4_box))
             put("epg_delay_min", epg_delay_box.value())
             if "epg_delay_min" in changed:
                 self.xmltv.delay_minutes = self._epg_delay_minutes()
@@ -2345,6 +2417,9 @@ class _SettingsMixin:
                 nerd.install(self.settings)
                 # The player that is playing takes the change now.
                 self._nerd_to_player()
+                # The source's own route (own DNS, IP version): the client's
+                # next request takes it.
+                self._nerd_route_to_client()
                 if changed & {"nerd_enabled", "nerd_picon_dir", "nerd_picon_override", "nerd_udpxy"}:
                     self._nerd_lists_changed = True
                 if changed & {"nerd_enabled", "nerd_remote", "nerd_share", "nerd_remote_lan",

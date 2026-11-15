@@ -1,10 +1,11 @@
 """Nerd options of one source, in the Add/Edit source dialog: its own user
 agent, headers and proxy (else the Nerd page's), rewrite rules for its
-stream addresses (core/url_rewrite.py, ui/rewrite_rules.py), its catch-up
-address (core/catchup.py), and what each kind of box can be told - Enigma2's
-stream port, Tvheadend's stream profile, HDHomeRun's transcoding. Only
-there while Nerd is on, and folded until opened. Only what differs from
-the default is stored."""
+stream addresses (core/url_rewrite.py, ui/rewrite_rules.py), a test of the
+connection to it (core/conn_test.py), its backup addresses
+(core/mirrors.py), its catch-up address (core/catchup.py), and what each
+kind of box can be told - Enigma2's stream port, Tvheadend's stream
+profile, HDHomeRun's transcoding. Only there while Nerd is on, and folded
+until opened. Only what differs from the default is stored."""
 
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
-from ..core import catchup, nerd, nerd_check, url_rewrite
+from ..core import catchup, mirrors, nerd, nerd_check, url_rewrite
 from ..core.log import log
 from ..i18n import tr
 from .nerd_check_line import CheckLine
@@ -28,6 +29,14 @@ TVH_PROFILES = ["", "pass", "matroska", "htsp", "audio", "webtv-h264-aac-mpegts"
                 "webtv-h264-aac-matroska", "webtv-vp8-vorbis-webm"]
 HDHR_TRANSCODE = ["", "heavy", "mobile", "internet720", "internet540", "internet480",
                   "internet360", "internet240"]
+# What a backup address of each kind looks like.
+MIRROR_HINTS = {"xtream": "http://backup.example.com:8080",
+                "m3u": "https://backup.example.com/playlist.m3u",
+                "stalker": "http://backup.example.com/c/"}
+# A media server's films and episodes: the file itself, or its HLS at a
+# bitrate (Mbit/s).
+MS_QUALITY = ["", "40", "20", "8", "4", "2"]
+MEDIA_KINDS = ("jellyfin", "emby", "plex")
 # (mode, label) of the catch-up modes; a name of a product stays as it is.
 CATCHUP_MODES = [("auto", "nerd_cu_auto"), ("default", "nerd_cu_default"),
                  ("append", "nerd_cu_append"), ("shift", "nerd_cu_shift"),
@@ -59,7 +68,7 @@ class SourceNerdPanel(QWidget):
     """A fold-out under the source form: "Nerd options"."""
 
     # The rows every kind has; each kind's own come after.
-    COMMON_ROWS = 10
+    COMMON_ROWS = 11
 
     def __init__(self, kind: str, options: dict, parent: QWidget | None = None,
                  source: Callable[[], dict] | None = None) -> None:
@@ -86,6 +95,11 @@ class SourceNerdPanel(QWidget):
         self.form.setContentsMargins(0, 4, 0, 0)
         self.form.setSpacing(8)
         lay.addWidget(self.body)
+        # The source's own DNS, IP version and trusted certificate
+        # (ui/source_net.py), folded with the rest.
+        from .source_net import SourceNetOptions
+        self.net = SourceNetOptions(self._options, self._source_now, self, proxy=self._proxy_now)
+        lay.addWidget(self.net)
         o = self._options
         self.ua = QComboBox()
         self.ua.addItem(tr("nerd_src_inherit"), "")
@@ -160,6 +174,10 @@ class SourceNerdPanel(QWidget):
         for t in HDHR_TRANSCODE:
             self.transcode.addItem(t or tr("nerd_src_no_transcode"), t)
         self.transcode.setCurrentIndex(max(0, self.transcode.findData(str(o.get("transcode") or ""))))
+        self.ms_quality = QComboBox()
+        for q in MS_QUALITY:
+            self.ms_quality.addItem(tr("ms_quality_mbps", n=q) if q else tr("ms_quality_original"), q)
+        self.ms_quality.setCurrentIndex(max(0, self.ms_quality.findData(str(o.get("ms_quality") or ""))))
         # Address rewrite: every kind's addresses (after the kind's own
         # widgets, which the example address reads).
         self._rw_channel: dict | None = None
@@ -171,6 +189,17 @@ class SourceNerdPanel(QWidget):
         self.rewrite.edited.connect(self.rw_line.changed)
         self.form.addRow(tr("nerd_src_rewrite"), self.rewrite)
         self.form.addRow("", self.rw_line)
+        # The connection to the source, tried step by step (every kind).
+        self.test_conn = QPushButton(tr("ct_button"))
+        self.test_conn.setToolTip(tr("ct_row_hint"))
+        self.test_conn.clicked.connect(self.test_connection)
+        self.form.addRow(tr("ct_row"), self.test_conn)
+        # Backup addresses: for the kinds whose clients take them.
+        self.mirrors_box = text_box(str(o.get(mirrors.KEY) or ""), MIRROR_HINTS["xtream"], 3)
+        self.mirrors_box.setToolTip(tr("nerd_src_mirrors_hint"))
+        self.mr_line = CheckLine(self._mr_job, tr("nerd_ck_title_mirrors"), test=True,
+                                 preview=self._mr_preview, test_text=tr("nerd_mr_test"))
+        self.mirrors_box.textChanged.connect(self.mr_line.changed)
         self.switches: dict[str, QCheckBox] = {}
         self._kind = ""
         self.ua.currentIndexChanged.connect(self._shown)
@@ -189,6 +218,8 @@ class SourceNerdPanel(QWidget):
 
     def _fold(self, open_: bool) -> None:
         self.body.setVisible(open_)
+        self.net.setVisible(open_)
+        self.net.align_with(self.form)
         self.toggle.setText(tr("nerd_src_title") + ("  ▾" if open_ else "  ▸"))
         self._shown()
 
@@ -212,6 +243,11 @@ class SourceNerdPanel(QWidget):
                 if item is not None and item.widget() is not None:
                     item.widget().setParent(None)
         self.switches = {}
+        if kind in mirrors.KINDS:
+            self.mirrors_box.setPlaceholderText(MIRROR_HINTS.get(kind, MIRROR_HINTS["xtream"]))
+            self.form.addRow(tr("nerd_src_mirrors"), self.mirrors_box)
+            self.form.addRow("", self.mr_line)
+            self.mr_line.show_preview()
         if kind in catchup.KINDS:
             self.form.addRow(tr("nerd_src_catchup_mode"), self.cu_mode)
             self.form.addRow(tr("nerd_src_catchup"), self.cu_template)
@@ -224,19 +260,23 @@ class SourceNerdPanel(QWidget):
             self.form.addRow(tr("nerd_src_profile"), self.profile)
         elif kind == "hdhomerun":
             self.form.addRow(tr("nerd_src_transcode"), self.transcode)
+        elif kind in MEDIA_KINDS:
+            self.form.addRow(tr("ms_opt_quality"), self.ms_quality)
         for key, label, default in SWITCHES.get(kind, []):
             box = QCheckBox(tr(label))
             box.setChecked(_flag(self._options, key, default))
             self.form.addRow("", box)
             self.switches[key] = box
+        self.net.align_with(self.form)
 
     def values(self) -> dict[str, Any]:
         """The source's options: what was there, with these set (and a
         setting back at its default left out)."""
         out = {k: v for k, v in self._options.items()
                if k not in ("user_agent", "referer", "headers", "proxy", "stream_port",
-                            "profile", "transcode", "udpxy", "epg_shift",
-                            "catchup_template", "catchup_mode", url_rewrite.KEY)
+                            "profile", "transcode", "udpxy", "epg_shift", "ms_quality",
+                            "catchup_template", "catchup_mode", url_rewrite.KEY,
+                            mirrors.KEY)
                and k not in {key for sw in SWITCHES.values() for key, _l, _d in sw}}
         ua = self.ua.currentData()
         ua = self.ua_custom.text().strip() if ua == "custom" else ua
@@ -257,6 +297,8 @@ class SourceNerdPanel(QWidget):
         rules = self.rewrite.stored()
         if rules:
             out[url_rewrite.KEY] = rules
+        if self._kind in mirrors.KINDS and self.mirrors_box.toPlainText().strip():
+            out[mirrors.KEY] = self.mirrors_box.toPlainText().strip()
         if self._kind in catchup.KINDS:
             if self.cu_template.text().strip():
                 out["catchup_template"] = self.cu_template.text().strip()
@@ -271,11 +313,90 @@ class SourceNerdPanel(QWidget):
                 out["profile"] = str(prof)
         if self._kind == "hdhomerun" and self.transcode.currentData():
             out["transcode"] = self.transcode.currentData()
+        if self._kind in MEDIA_KINDS and self.ms_quality.currentData():
+            out["ms_quality"] = self.ms_quality.currentData()
         for key, _label, default in SWITCHES.get(self._kind, []):
             on = self.switches[key].isChecked()
             if on != default:
                 out[key] = on
+        return self._with_net(out)
+
+    # -- the source's own network (ui/source_net.py) -------------------------------
+
+    def _with_net(self, out: dict[str, Any]) -> dict[str, Any]:
+        from .source_net import KEYS
+        for key in KEYS:
+            out.pop(key, None)
+        out.update(self.net.values())
         return out
+
+    # -- the connection test --------------------------------------------------------
+
+    def test_source(self) -> dict:
+        """The source as it would be saved now: what Test connection tries."""
+        src = dict(self._source_now(), options=self.values())
+        src["kind"] = src.get("kind") or self._kind
+        return src
+
+    def test_connection(self) -> None:
+        from ..providers.client import make_client
+        from .conn_test_dialog import ConnTestDialog
+        ConnTestDialog(self.window(), self.test_source(), nerd.current().s, make_client).exec()
+
+    # -- backup addresses -------------------------------------------------------------
+
+    def _mr_now(self) -> tuple[str, str, str]:
+        """(kind, the source's own address, the one in use) as the form has
+        them."""
+        s = self._source_now()
+        kind = str(s.get("kind") or self._kind)
+        in_use = mirrors.remembered(nerd.current().s, str(s.get("id") or ""))
+        return kind, str(s.get("server") or ""), in_use
+
+    def _mr_preview(self) -> nerd_check.Check:
+        kind, primary, in_use = self._mr_now()
+        return mirrors.check_list(self.mirrors_box.toPlainText(), kind, primary, in_use)
+
+    def mirrors_ok(self) -> nerd_check.Check | None:
+        """None when every line can be an address; else what the line says
+        about the first that cannot (the dialog refuses to close on it)."""
+        if self._kind not in mirrors.KINDS:
+            return None
+        shown = self._mr_preview()
+        return shown if shown.state == nerd_check.FAIL else None
+
+    def _mr_job(self) -> Callable[[], nerd_check.Check] | None:
+        """Test: the source's own address and each backup one, asked as the
+        client asks them first, with the source's user agent, headers and
+        proxy."""
+        shown = self._mr_preview()
+        if shown.state == nerd_check.FAIL:
+            return lambda: shown
+        kind, primary, in_use = self._mr_now()
+        if not primary.strip():
+            return None
+        backups = [a for a in mirrors.parse(self.mirrors_box.toPlainText(), kind)
+                   if not mirrors.same(a, primary)]
+        if not backups:
+            return None
+        addrs = [mirrors.normalize(primary)] + backups
+        src = dict(self._source_now(), kind=kind)
+        opts = dict(self.values(), _kind=kind)
+        n = nerd.current()
+        ua, hdrs = n.user_agent(opts), n.headers(opts)
+        px = n.proxy(opts, primary)
+        secrets = catchup.secrets_of(src)
+
+        def run() -> nerd_check.Check:
+            return mirrors.check_each(addrs, kind, src, in_use, ua, hdrs, px, secrets)
+        return run
+
+    def _proxy_now(self) -> str:
+        """The proxy this source's requests take (its own, else the Nerd
+        page's): with one, the proxy looks names up."""
+        px = self.proxy.currentData()
+        px = self.proxy_custom.text().strip() if px == "custom" else px
+        return nerd.current().proxy({"proxy": px or "", "_kind": self._kind})
 
     # -- catch-up ----------------------------------------------------------------
 
@@ -296,6 +417,7 @@ class SourceNerdPanel(QWidget):
         self._cu_gen += 1
         self.cu_line.changed()
         self._rw_source_changed()
+        self.net.source_changed()
 
     def _cu_example(self) -> dict:
         """A made-up channel of this source, until Test has found a real one:

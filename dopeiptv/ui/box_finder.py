@@ -1,6 +1,6 @@
-"""Boxes on the home network in the add-a-source forms: what each kind is
-called and asks for, and the "Find on my network" button that fills the form
-in from what answers (providers/lan_scan.py)."""
+"""Boxes on the home network and media servers in the add-a-source forms:
+what each kind is called and asks for, and the "Find on my network" button
+that fills the form in from what answers (providers/lan_scan.py)."""
 
 from __future__ import annotations
 
@@ -13,11 +13,16 @@ from . import theme
 from .theme import P
 
 BOX_KINDS = ("enigma2", "tvheadend", "hdhomerun")
+# Media servers (ui/media_signin.py signs in to them).
+MEDIA_KINDS = ("jellyfin", "emby", "plex")
 KIND_LABELS = {"enigma2": "playlist_kind_enigma2", "tvheadend": "playlist_kind_tvheadend",
-               "hdhomerun": "playlist_kind_hdhomerun"}
-SHORT_NAMES = {"enigma2": "Enigma2", "tvheadend": "Tvheadend", "hdhomerun": "HDHomeRun"}
+               "hdhomerun": "playlist_kind_hdhomerun", "jellyfin": "playlist_kind_jellyfin",
+               "emby": "playlist_kind_emby", "plex": "playlist_kind_plex"}
+SHORT_NAMES = {"enigma2": "Enigma2", "tvheadend": "Tvheadend", "hdhomerun": "HDHomeRun",
+               "jellyfin": "Jellyfin", "emby": "Emby", "plex": "Plex"}
 PLACEHOLDERS = {"enigma2": "http://192.168.1.10", "tvheadend": "http://192.168.1.20:9981",
-                "hdhomerun": "http://192.168.1.30"}
+                "hdhomerun": "http://192.168.1.30", "jellyfin": "http://192.168.1.40:8096",
+                "emby": "http://192.168.1.41:8096"}
 # Kinds that log in at all (an HDHomeRun never asks).
 LOGIN_KINDS = ("enigma2", "tvheadend")
 
@@ -27,18 +32,25 @@ def add_box_kinds(combo) -> None:
         combo.addItem(tr(KIND_LABELS[kind]), kind)
 
 
+def add_media_kinds(combo) -> None:
+    for kind in MEDIA_KINDS:
+        combo.addItem(tr(KIND_LABELS[kind]), kind)
+
+
 def retranslate_box_kinds(combo) -> None:
-    for kind in BOX_KINDS:
+    for kind in BOX_KINDS + MEDIA_KINDS:
         i = combo.findData(kind)
         if i >= 0:
             combo.setItemText(i, tr(KIND_LABELS[kind]))
 
 
 class FindOnNetwork(QPushButton):
-    """Looks for boxes on the local network off the window's thread, then
-    hands over the one picked ({"kind", "server", "name", "login"?}). One
-    found is taken at once; several are offered in a menu; none says so in
-    *status*, a line the form places under the address."""
+    """Looks for boxes and servers on the local network off the window's
+    thread, then hands over the one picked ({"kind", "server", "name",
+    "login"?, "id"?}). One found is taken at once; several are offered in a
+    menu, those of the kinds in *wanted* first (the form's: boxes or media
+    servers); none says so in *status*, a line the form places under the
+    address."""
 
     picked = pyqtSignal(dict)
 
@@ -68,6 +80,7 @@ class FindOnNetwork(QPushButton):
         lay.addWidget(self.status, 1)
         self.clicked.connect(self._start)
         self._busy = False
+        self.wanted: tuple[str, ...] = ()
 
     def retranslate(self) -> None:
         if not self._busy:
@@ -102,6 +115,7 @@ class FindOnNetwork(QPushButton):
         if not found:
             self._say(tr("playlist_nothing_found"))
             return
+        found.sort(key=lambda d: d.get("kind") not in self.wanted)
         if len(found) == 1:
             self.picked.emit(found[0])
             return

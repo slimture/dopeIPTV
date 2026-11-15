@@ -1,5 +1,5 @@
-"""MainWindow mixin: casting - a Chromecast or a DLNA TV plays what the
-window would.
+"""MainWindow mixin: casting - a Chromecast, a DLNA TV or a Kodi plays what
+the window would.
 
 The cast dialog; the strip under the list while a cast runs (pause, volume,
 tracks, quality, the timeshift menu and the progress timeline); a live
@@ -14,13 +14,18 @@ import threading
 import time
 from datetime import datetime, timedelta
 
-from PyQt6.QtWidgets import QMenu
+from PyQt6 import sip
+from PyQt6.QtWidgets import (
+    QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit, QMenu,
+    QPushButton, QVBoxLayout,
+)
 
 from ..core.log import log
 from ..core.privacy import for_log
 from ..core.workers import run_async
 from ..i18n import tr
 from ..providers.chromecast import CastDialog
+from ..providers.kodi import DEFAULT_PORT, parse_address
 from .theme import P
 from .widgets import cast_strip_icon
 
@@ -543,10 +548,20 @@ class _CastMixin:
         self._last_menu_subs = len(subs)
         menu = QMenu(self)
         menu.addAction(tr("cast_title"), self.manage_cast)
-        if self.cast.is_dlna(self._cast_device):
-            # A TV plays the stream as it is. Tracks and the picture setting
-            # are the converter's, and only a Chromecast is fed through it.
-            note = menu.addAction(tr("cast_dlna_note"))
+        is_airplay = getattr(self.cast, "is_airplay", None)
+        airplay = bool(callable(is_airplay) and is_airplay(self._cast_device))
+        if airplay or self._cast_plays_as_is(self._cast_device):
+            # A TV or a Kodi plays the stream as it is. Tracks and the
+            # picture setting are the converter's, and only a Chromecast is
+            # fed through it. AirPlay's own choices are in Apple's menu, in
+            # the panel.
+            if airplay:
+                text = tr("airplay_menu_note")
+            elif self._cast_is_kodi(self._cast_device):
+                text = tr("cast_kodi_note")
+            else:
+                text = tr("cast_dlna_note")
+            note = menu.addAction(text)
             note.setEnabled(False)
             menu.exec(self.cast_bar_tracks.mapToGlobal(
                 self.cast_bar_tracks.rect().bottomLeft()))
@@ -744,6 +759,28 @@ class _CastMixin:
                  at.strftime("%H:%M:%S"))
         self._cast_from_archive(at)
 
+    def _cast_plays_as_is(self, name: str | None) -> bool:
+        """A DLNA TV or a Kodi: it plays the stream as it is."""
+        as_is = (getattr(self.cast, "plays_as_is", None)
+                 or getattr(self.cast, "is_dlna", None))
+        return bool(callable(as_is) and as_is(name))
+
+    def _cast_is_kodi(self, name: str | None) -> bool:
+        is_kodi = getattr(self.cast, "is_kodi", None)
+        return bool(callable(is_kodi) and is_kodi(name))
+
+    def _cast_ended_there(self) -> bool:
+        """The cast ended on the device itself - a Kodi stopped with its own
+        remote, or playing something else now: the strip comes down, and
+        the device is left alone (a stop would end what it plays now)."""
+        ended = getattr(self.cast, "ended_elsewhere", None)
+        if not (self._cast_device and callable(ended) and ended()):
+            return False
+        log.info("cast: %s stopped by itself", self._cast_device)
+        self._save_cast_position()
+        self.show_cast_strip(None)
+        return True
+
     def _show_cast_progress(self) -> None:
         """Put the receiver's own position on the strip.
 
@@ -752,6 +789,8 @@ class _CastMixin:
         """
         bar = getattr(self, "cast_bar_seek", None)
         if bar is None:
+            return
+        if self._cast_ended_there():
             return
         span = self._cast_timeline()
         dur = float(getattr(self.cast, "duration", 0.0) or 0.0)
@@ -1145,6 +1184,19 @@ class _CastMixin:
         log.info("cast: stopping - %s", why)
         threading.Thread(target=cc.stop, daemon=True).start()
 
+    def add_kodi(self, parent, current: str | None = None) -> str | None:
+        """The cast panel's "Add Kodi…": a Kodi's address and its web
+        server's login, checked before it is kept. Opened on a listed Kodi,
+        it changes that one (or forgets it). Returns the name it now has in
+        the device list, "" when it was forgotten, None when nothing changed."""
+        kodi = getattr(self.cast, "kodi", None)
+        if kodi is None:
+            return None
+        d = _KodiAddDialog(parent, kodi, current, self.pool)
+        if d.exec() != QDialog.DialogCode.Accepted:
+            return None
+        return d.result_label
+
     def stop_local_playback_for_cast(self) -> bool:
         """Free the local stream when a cast starts. The Chromecast pulls the
         URL itself (one connection from the device), so on a single-connection
@@ -1162,3 +1214,103 @@ class _CastMixin:
             except Exception:
                 pass
         return False
+
+
+class _KodiAddDialog(QDialog):
+    """A Kodi by its address: the web server's port (8080 unless changed in
+    Kodi) and, when it has one, its login. Kept only once Kodi answers."""
+
+    def __init__(self, parent, kodi, current: str | None, pool) -> None:
+        super().__init__(parent)
+        self.kodi = kodi
+        self.pool = pool
+        self.current = current
+        self.result_label: str | None = None
+        self._checking = False
+        dev = kodi.device(current) if current else None
+        self.setWindowTitle(tr("kodi_add_title"))
+        self.setMinimumWidth(420)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(18, 18, 18, 18)
+        lay.setSpacing(10)
+        intro = QLabel(tr("kodi_add_intro"))
+        intro.setWordWrap(True)
+        intro.setObjectName("DetailMeta")
+        lay.addWidget(intro)
+        form = QFormLayout()
+        self.address = QLineEdit(
+            "" if dev is None else (dev.address if dev.port != DEFAULT_PORT
+                                    else dev.host))
+        self.address.setPlaceholderText(tr("kodi_address_ph"))
+        self.user = QLineEdit("" if dev is None else dev.user)
+        self.user.setPlaceholderText("kodi")
+        self.password = QLineEdit("" if dev is None else dev.password)
+        self.password.setEchoMode(QLineEdit.EchoMode.Password)
+        form.addRow(tr("kodi_address"), self.address)
+        form.addRow(tr("login_username"), self.user)
+        form.addRow(tr("login_password"), self.password)
+        lay.addLayout(form)
+        self.status = QLabel("")
+        self.status.setWordWrap(True)
+        self.status.hide()
+        lay.addWidget(self.status)
+        self.buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel)
+        self.ok_btn = self.buttons.button(QDialogButtonBox.StandardButton.Ok)
+        self.ok_btn.setText(tr("common_save") if dev is not None else tr("btn_connect"))
+        self.forget_btn = None
+        if dev is not None and getattr(dev, "manual", False):
+            self.forget_btn = QPushButton(tr("kodi_forget"))
+            self.buttons.addButton(self.forget_btn,
+                                   QDialogButtonBox.ButtonRole.DestructiveRole)
+            self.forget_btn.clicked.connect(self._forget)
+        self.buttons.accepted.connect(self._check)
+        self.buttons.rejected.connect(self.reject)
+        lay.addWidget(self.buttons)
+
+    def _say(self, text: str, error: bool = False) -> None:
+        self.status.setText(text)
+        self.status.setStyleSheet(
+            f"color:{P['error'] if error else P['muted']}; font-size:12px;")
+        if self.status.isHidden():
+            self.status.show()
+            # Room for the line: the fields are not squeezed to make it.
+            self.adjustSize()
+
+    def _forget(self) -> None:
+        self.kodi.forget(self.current)
+        self.result_label = ""
+        self.accept()
+
+    def _check(self) -> None:
+        if self._checking:
+            return
+        where = parse_address(self.address.text())
+        if where is None:
+            self._say(tr("kodi_bad_address"), error=True)
+            return
+        host, port = where
+        user, password = self.user.text().strip(), self.password.text()
+        self._checking = True
+        self.ok_btn.setEnabled(False)
+        self._say(tr("kodi_checking", address=f"{host}:{port}"))
+        run_async(self.pool, self.kodi.add, self._added, self._failed,
+                  host, port, user, password)
+
+    def _alive(self) -> bool:
+        return not sip.isdeleted(self) and self.isVisible()
+
+    def _added(self, label: str) -> None:
+        if not self._alive():
+            return
+        self._checking = False
+        self.result_label = label
+        self.accept()
+
+    def _failed(self, msg: str) -> None:
+        if not self._alive():
+            return
+        self._checking = False
+        self.ok_btn.setEnabled(True)
+        self._say(msg, error=True)

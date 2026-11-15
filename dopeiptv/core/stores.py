@@ -66,8 +66,17 @@ class FavoriteStore:
             str(g): [x for x in items if isinstance(x, dict)]
             for g, items in raw.items() if isinstance(items, list)}
 
+    #: Told after every change (the window passes the list on to Home
+    #: Assistant); never allowed to break the save.
+    on_change: Any = None
+
     def _save(self) -> None:
         self.settings.setValue(self.key, json.dumps(self.groups))
+        if self.on_change is not None:
+            try:
+                self.on_change()
+            except Exception:
+                pass
 
     def group_names(self) -> list[str]:
         return sorted(self.groups, key=str.lower)
@@ -196,6 +205,11 @@ class FavoriteStore:
         (current.add if locked else current.discard)(group)
         self.settings.setValue(f"{self.key}_locked",
                                json.dumps(sorted(current)))
+        if self.on_change is not None:
+            try:
+                self.on_change()
+            except Exception:
+                pass
 
     def is_locked(self, group: str) -> bool:
         return group in self.locked_groups()
@@ -555,6 +569,9 @@ class PlaylistStore:
             row = {k: p.get(k, "") for k in self.EXPORT_FIELDS}
             row["kind"] = p.get("kind") or "xtream"
             row["refresh"] = p.get("refresh") or "never"
+            if p.get("token"):
+                # A media server's sign-in, as a password goes along.
+                row["token"] = p["token"]
             if p.get("options"):
                 row["options"] = dict(p["options"])
             out.append(row)
@@ -580,7 +597,8 @@ class PlaylistStore:
                 return value.strip() if isinstance(value, str) else ""
 
             kind = field("kind") if field("kind") in (
-                "m3u", "stalker", "enigma2", "tvheadend", "hdhomerun") \
+                "m3u", "stalker", "enigma2", "tvheadend", "hdhomerun",
+                "jellyfin", "emby", "plex") \
                 else "xtream"
             server = field("server")
             user, pw = field("username"), field("password")
@@ -601,6 +619,8 @@ class PlaylistStore:
                    "refresh": field("refresh") or "never"}
             if kind == "stalker":
                 row["mac"] = mac
+            if field("token"):
+                row["token"] = field("token")
             if isinstance(entry.get("options"), dict):
                 row["options"] = {str(k): v for k, v in entry["options"].items()
                                   if isinstance(v, (str, int, float, bool))}

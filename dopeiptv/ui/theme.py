@@ -1081,6 +1081,14 @@ QLineEdit {{
     padding: 8px 10px;
 }}
 QLineEdit:focus {{ border: 1px solid {ACCENT}; }}
+/* A few typed lines of a source's Nerd options (its headers, its backup
+   addresses): a field like the line edits - the style's own was the
+   theme's light text on white. Settings styles its own. */
+QPlainTextEdit#NerdText {{
+    background: {field}; border: 1px solid {edge}; border-radius: 8px;
+    padding: 4px 6px; color: {p['text']};
+}}
+QPlainTextEdit#NerdText:focus {{ border: 1px solid {ACCENT}; }}
 
 /* Check boxes: a clearly bordered indicator that fills with the accent when
    checked (drawn check-mark image - see _check_png). Styled explicitly so it
@@ -1142,6 +1150,7 @@ QFileDialog QTreeView::item:hover, QFileDialog QListView::item:hover {{
 QFileDialog QTreeView::item:selected, QFileDialog QListView::item:selected {{
     background: {ACCENT}; color: {ON};
 }}
+QHeaderView {{ background: {p['btn']}; border: none; }}
 QHeaderView::section {{
     background: {p['btn']}; color: {p['text2']}; border: none;
     padding: 4px 8px; font-size: 11px;

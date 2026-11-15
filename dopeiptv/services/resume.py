@@ -22,9 +22,11 @@ from ..core import privacy
 # history entry then got key=None and stacked up as a DUPLICATE that could not
 # resume) and no way to build a URL (Continue watching played
 # /movie/user/pass/None.mp4 -> stream error).
+# _ms_id: a media server's own id of the title, so what plays from this list
+# is still reported to the server (ui/mw_media.py).
 _SNAP_FIELDS = ("name", "title", "stream_id", "series_id", "id",
                 "container_extension", "stream_icon", "cover", "category_id",
-                "season", "episode_num", "_tmdb_id", "_key", "_url")
+                "season", "episode_num", "_tmdb_id", "_key", "_url", "_ms_id")
 # Series-context fields kept for an episode so it can be replayed from the
 # flat Continue-watching list (episode_url needs the series id) and so the row
 # can show the series' name + artwork instead of a bare episode title.
@@ -157,3 +159,13 @@ class ResumeStore:
             return 0.0
         pos = float(saved.get("pos") or 0)
         return pos if pos > 60 else 0.0
+
+    def saved_at(self, key, kind: str) -> int:
+        """When a title's resume point was kept here (Unix time), 0 for none:
+        a media server's own point wins when it is newer."""
+        group = self._KIND_TO_GROUP.get(kind)
+        saved = self._data.get(f"{group}:{key}") if group else None
+        try:
+            return int((saved or {}).get("ts") or 0)
+        except (TypeError, ValueError):
+            return 0

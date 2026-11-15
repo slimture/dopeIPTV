@@ -12,6 +12,7 @@ from typing import Any
 
 from ..core._lazy_requests import requests
 
+from ..core import mirrors
 from ..core.log import log, register_secrets
 from ..i18n import LocalizedError, tr
 
@@ -248,7 +249,104 @@ class ListCache:
             self._refetch_after = time.time()
 
 
-class XtreamClient(ListCache):
+class Mirrored:
+    """Nerd's backup addresses on a client (core/mirrors.py): the addresses
+    a request tries, the one that answered kept as ``server``. Without a
+    Picker - no backup addresses, or Nerd off - a request asks ``server``
+    alone, as it always did."""
+
+    server: str
+    session: Any
+    picker: mirrors.Picker | None = None
+    LOG_NAME = "list"
+
+    def use_mirrors(self, picker: mirrors.Picker | None) -> None:
+        self.picker = picker
+        if picker is not None:
+            self.server = picker.current
+
+    def _bases(self) -> list[str]:
+        """The addresses a request tries, the one in use first."""
+        m = self.picker
+        if m is None or len(m.addresses) < 2:
+            return [self.server]
+        from ..core import nerd
+        if not nerd.current().on:
+            # Nerd turned off since: the source's own address again.
+            self.server = m.primary
+            return [self.server]
+        return m.order()
+
+    def _landed(self, base: str) -> None:
+        m = self.picker
+        if m is not None and m.worked(base):
+            self.server = base
+
+    def _next_address(self, what: str, base: str, after: str, why: str) -> None:
+        log.warning("%s %s @ %s: %s - trying the next address, %s",
+                    self.LOG_NAME, what, mirrors.shown(base), why,
+                    mirrors.shown(after))
+
+    def get_from_server(self, path: str, params: dict[str, Any] | None,
+                        timeout: Any, what: str = "", stream: bool = False) -> Any:
+        """GET *path* of the server - of the next address when the one in
+        use cannot be reached or answers 5xx. Raises what the last address
+        tried raised; an answer that is not 5xx (401, 404...) is returned
+        as it came, from the address that gave it."""
+        bases = self._bases()
+        for i, base in enumerate(bases):
+            after = bases[i + 1] if i + 1 < len(bases) else None
+            kw: dict[str, Any] = {"params": params, "timeout": timeout}
+            if stream:
+                kw["stream"] = True
+            try:
+                r = self.session.get(base + path, **kw)
+            except (requests.Timeout, requests.ConnectionError) as e:
+                if after is not None and mirrors.fails_over_error(e):
+                    self._next_address(what, base, after, type(e).__name__)
+                    continue
+                raise
+            if after is not None and mirrors.fails_over_status(r.status_code):
+                self._next_address(what, base, after, f"HTTP {r.status_code}")
+                try:
+                    r.close()
+                except Exception:
+                    pass
+                continue
+            if len(bases) > 1:
+                self._landed(base)
+            return r
+        raise requests.ConnectionError("no address to ask")
+
+    def stream_failover(self, url: str, status: int | None) -> str | None:
+        """(worker thread) A stream of this client did not play, and asked
+        again it answered *status* (None: it could not be reached at all).
+        When that says the address in use is down, the next address that
+        serves the same stream is used from now on - its address returned;
+        None when nothing changed."""
+        bases = self._bases()
+        if len(bases) < 2 or (status is not None and not mirrors.fails_over_status(status)):
+            return None
+        rest = mirrors.tail(url, bases[0])
+        if rest is None:
+            return None                 # rewritten elsewhere: not this server's
+        for base in bases[1:]:
+            try:
+                r = self.session.get(base + rest, stream=True, timeout=(4, 4))
+                code = r.status_code
+                r.close()
+            except requests.RequestException as e:
+                log.info("%s stream @ %s: %s", self.LOG_NAME, mirrors.shown(base),
+                         type(e).__name__)
+                continue
+            if 200 <= code < 400:
+                self._landed(base)
+                return base
+            log.info("%s stream @ %s: HTTP %s", self.LOG_NAME, mirrors.shown(base), code)
+        return None
+
+
+class XtreamClient(Mirrored, ListCache):
     """HTTP client for the Xtream Codes player_api.php endpoint."""
 
     LOG_NAME = "xtream"
@@ -261,6 +359,9 @@ class XtreamClient(ListCache):
         self.username = username
         self.password = password
         self.max_connections: int | None = None
+        # What the provider last said of the account's connections: limit,
+        # in use, and when (time.monotonic) - core/connections.py.
+        self.account_seen: dict[str, Any] | None = None
         # From here on these two strings are masked out of every log record,
         # wherever they turn up - a stream URL, a requests exception, a line
         # written long after this call.
@@ -301,7 +402,6 @@ class XtreamClient(ListCache):
         # troubleshooting: which action, to which server, the HTTP status and
         # timing. Credentials are never logged (only the server host). Turn it
         # on with DOPEIPTV_LOG=debug (successes) - warnings always show.
-        url = f"{self.server}/player_api.php"
         base: dict[str, Any] = {"username": self.username, "password": self.password}
         base.update(params)
         action = params.get("action") or "authenticate"
@@ -313,7 +413,9 @@ class XtreamClient(ListCache):
         t0 = time.monotonic()
         read_to = 60 if action in self._BIG_ACTIONS else 20
         try:
-            r = self.session.get(url, params=base, timeout=(10, read_to))
+            # Nerd's backup addresses, when the source has them: the next
+            # one when this one is down (core/mirrors.py).
+            r = self.get_from_server("/player_api.php", base, (10, read_to), action)
         except (requests.Timeout, requests.ConnectionError) as e:
             self._net_down_until = time.monotonic() + self.NET_COOLDOWN_SECS
             log.warning("xtream %s @ %s: request failed - %s: %s "
@@ -365,6 +467,7 @@ class XtreamClient(ListCache):
             self.max_connections = int(ui.get("max_connections") or 0) or None
         except (TypeError, ValueError):
             self.max_connections = None
+        self._saw_account(ui)
         log.info(
             "xtream auth @ %s: ok - status=%s exp=%s connections=%s/%s trial=%s",
             self.server, ui.get("status"), ui.get("exp_date"),
@@ -385,8 +488,18 @@ class XtreamClient(ListCache):
             return {}
         if not isinstance(data, dict):
             return {}
-        return {"user_info": data.get("user_info") or {},
+        ui = data.get("user_info") or {}
+        if isinstance(ui, dict):
+            self._saw_account(ui)
+        return {"user_info": ui,
                 "server_info": data.get("server_info") or {}}
+
+    def _saw_account(self, ui: dict) -> None:
+        """What user_info says of the connections, kept with when."""
+        from ..core import connections
+        limit, active = connections.numbers(ui)
+        if limit is not None or active is not None:
+            self.account_seen = {"max": limit, "active": active, "at": time.monotonic()}
 
     def live_categories(self) -> list[dict]:
         return self._cached_list(
@@ -450,10 +563,10 @@ class XtreamClient(ListCache):
         """The provider's full XMLTV guide."""
         t0 = time.monotonic()
         try:
-            r = self.session.get(f"{self.server}/xmltv.php",
-                                 params={"username": self.username,
-                                         "password": self.password},
-                                 timeout=(20, 180))
+            r = self.get_from_server("/xmltv.php",
+                                     {"username": self.username,
+                                      "password": self.password},
+                                     (20, 180), "xmltv")
         except requests.RequestException as e:
             log.warning("xtream xmltv @ %s: request failed - %s: %s",
                         self.server, type(e).__name__,
@@ -515,7 +628,7 @@ class XtreamClient(ListCache):
         return out
 
 
-class OfflineClient:
+class OfflineClient(Mirrored):
     """A do-nothing stand-in for :class:`XtreamClient`, used when the app is
     opened without a provider (first-run "explore" mode).
 
@@ -598,6 +711,8 @@ class M3UClient(OfflineClient):
     can still come from the playlist's separate EPG URL). Channels are grouped
     by their ``group-title`` into categories."""
 
+    LOG_NAME = "m3u"
+
     # A quoted attribute may hold a comma (group-title="News, Sports"); the
     # loose form still reads a line whose quotes do not balance.
     _EXTINF = re.compile(
@@ -625,7 +740,9 @@ class M3UClient(OfflineClient):
     def _fetch(self) -> str:
         url = self.server
         if url.startswith(("http://", "https://")):
-            r = self.session.get(url, timeout=(20, 180))
+            # Nerd's backup addresses are other addresses of the playlist
+            # itself: the next one when this one is down.
+            r = self.get_from_server("", None, (20, 180), "playlist")
             r.raise_for_status()
             # UTF-8 first, whatever the server claims: requests falls back to
             # ISO-8859-1 for a text/* type without a charset, which turned
@@ -884,18 +1001,74 @@ def make_box_client(playlist: dict):
     return HDHomeRunClient(*args)
 
 
+# Media servers (providers/mediaserver.py): an address and the token the
+# sign-in left ("token"; never a password), their ids under "options".
+MEDIA_KINDS = ("jellyfin", "emby", "plex")
+
+
+def make_media_client(playlist: dict):
+    """The client for a media server (kind in MEDIA_KINDS)."""
+    kind = playlist.get("kind")
+    options = dict(playlist.get("options") or {})
+    for key in ("user_id", "server_id", "connections"):
+        # The source form's Test hands them over beside the options.
+        if not options.get(key) and playlist.get(key):
+            options[key] = playlist[key]
+    server, token = str(playlist.get("server") or ""), str(playlist.get("token") or "")
+    account = str(playlist.get("username") or "")
+    if kind == "plex":
+        from .plex import PlexClient
+        return PlexClient(server, token, str(options.get("server_id") or ""), account, options)
+    from .jellyfin import EmbyClient, JellyfinClient
+    cls = EmbyClient if kind == "emby" else JellyfinClient
+    return cls(server, token, str(options.get("user_id") or ""), account, options)
+
+
 def make_client(playlist: dict):
     """The client for *playlist* (see _make_client), with the Nerd page's
-    user agent, headers and proxy on its session."""
+    user agent, headers and proxy on its session - and the source's own
+    route (core/net_route.py: own DNS, IP version, a pinned certificate)
+    under it, which its guide download takes too (client.net_route)."""
     client = _make_client(playlist)
-    from ..core import nerd
+    from ..core import nerd, net_route
     source = dict((playlist or {}).get("options") or {},
-                  _kind=(playlist or {}).get("kind") or "xtream")
+                  _kind=(playlist or {}).get("kind") or "xtream",
+                  _server=str((playlist or {}).get("server") or ""))
+    route = net_route.route_for(source)
     session = getattr(client, "session", None)
     if session is not None:
         nerd.current().apply_session(session, source)
+        if route.active:
+            from ..core import net_adapter
+            net_adapter.mount(session, route)
+    try:
+        client.net_route = route
+    except AttributeError:
+        pass
+    _use_mirrors(client, playlist or {})
     _nerd_lists(client, source, (playlist or {}).get("id"))
     return client
+
+
+def _use_mirrors(client, playlist: dict) -> None:
+    """Nerd: the source's backup addresses on its client, starting from the
+    one that answered last time (core/mirrors.py) - nothing while Nerd is
+    off or the source has none."""
+    use = getattr(client, "use_mirrors", None)
+    kind = playlist.get("kind") or "xtream"
+    primary = str(getattr(client, "server", "") or "")
+    if use is None or not primary.startswith(("http://", "https://")):
+        return
+    found = mirrors.addresses(primary, playlist.get("options") or {}, kind)
+    if len(found) < 2:
+        return
+    from ..core import nerd
+    pid = str(playlist.get("id") or "")
+    settings: Any = nerd.current().s
+
+    def remember(address: str) -> None:
+        mirrors.remember(settings, pid, address)
+    use(mirrors.Picker(found, mirrors.remembered(settings, pid), remember, name=kind))
 
 
 def _nerd_lists(client, source: dict, pid: str | None) -> None:
@@ -937,7 +1110,8 @@ def _nerd_lists(client, source: dict, pid: str | None) -> None:
 def _make_client(playlist: dict):
     """Build the right provider client for a stored playlist: an M3U-backed
     client when kind == 'm3u', a box on the home network for the kinds in
-    BOX_KINDS, a Stalker / Ministra portal client when kind == 'stalker',
+    BOX_KINDS, a media server for those in MEDIA_KINDS, a Stalker / Ministra
+    portal client when kind == 'stalker',
     otherwise the Xtream API client (the API clients with a
     per-playlist on-disk list cache so a down provider still shows the last
     known lineup)."""
@@ -946,6 +1120,8 @@ def _make_client(playlist: dict):
         return M3UClient(playlist.get("server", ""))
     if kind in BOX_KINDS:
         return make_box_client(playlist)
+    if kind in MEDIA_KINDS:
+        return make_media_client(playlist)
     if kind == "stalker":
         # Imported here: stalker.py builds on this module, and a playlist
         # of another kind never needs it.

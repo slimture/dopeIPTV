@@ -236,7 +236,7 @@ class HomePage(QWidget):
         if on("home_sh_resume"):
             rows = []
             try:
-                rows = w.resume.continue_watching()[:14]
+                rows = w._continue_rows()[:14]
             except Exception:
                 pass
             if rows:
@@ -322,7 +322,7 @@ class HomePage(QWidget):
             if on("home_sh_resume"):
                 skip = set()
                 try:
-                    for r in w.resume.continue_watching():
+                    for r in w._continue_rows():
                         k = ("movie" if r.get("_kind") == "vod"
                              else r.get("_kind"))
                         skip.add((k, str(w._item_key(r))))

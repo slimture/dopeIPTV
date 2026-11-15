@@ -69,6 +69,10 @@ class RemindersDialog(QDialog):
         self.remove_btn = QPushButton(tr("reminders_remove"))
         self.remove_btn.clicked.connect(self._remove_selected)
         btns.addWidget(self.remove_btn)
+        # The same reminders, and the scheduled recordings, in a calendar app.
+        self.calendar_btn = QPushButton(tr("cal_menu"))
+        self.calendar_btn.clicked.connect(self._export_calendar)
+        btns.addWidget(self.calendar_btn)
         btns.addStretch(1)
         close = QPushButton(tr("common_close"))
         close.clicked.connect(self.accept)
@@ -137,6 +141,9 @@ class RemindersDialog(QDialog):
                     else tr("reminders_remove"),
                     self._remove_selected)
         m.exec(self.list.mapToGlobal(pos))
+
+    def _export_calendar(self) -> None:
+        self.window.open_calendar_export()
 
     def _tune(self, item: QListWidgetItem) -> None:
         r = item.data(Qt.ItemDataRole.UserRole)

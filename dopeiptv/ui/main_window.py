@@ -33,6 +33,7 @@ from .channel_list import (
     FolderDropList,
 )
 from ..providers.casting import CastHub
+from ..providers.kodi import KodiManager
 from ..providers.client import (
     DemoClient, OfflineClient, XtreamClient, dropped_playlist, make_client,
 )
@@ -54,6 +55,7 @@ from ..core.stores import (
 from .theme import P, rounded
 from .player_resize import PlayerResizeHandle
 from ..providers.trakt import TraktClient
+from ..providers.simkl import SimklClient
 from ..core.wakelock import WakeLock
 from .dialogs import PlaylistDialog
 from .nav_widgets import NavButton, SideRule, SourceAvatar
@@ -61,21 +63,30 @@ from .nav_widgets import NavButton, SideRule, SourceAvatar
 from .app_menu import MAC_MENUS, fold_into_app_menu, lay_out, open_website  # noqa: F401
 from .widgets import (
     FlowRow, HeartButton, _SidebarLogo, _Toast,
-    cast_strip_icon, confirm,
+    cast_strip_icon, confirm, file_dialog_options,
 )
 from .mw_settings import _SettingsMixin
 from .mw_trakt import _TraktMixin
 from .mw_recording import _RecordingMixin
 from .mw_busy import _BusyMixin
+from .mw_airplay import _AirPlayMixin
 from .mw_cast import _CastMixin
 from .mw_chanprefs import _ChannelPrefsMixin
 from .mw_failover import _FailoverMixin
+from .mw_connections import _ConnectionsMixin
+from .mw_mirrors import _MirrorsMixin
 from .mw_portal_archive import _PortalArchiveMixin
 from .mw_health import _HealthMixin
 from .mw_remote import _RemoteMixin
+from .mw_phone import _PhoneMixin
+from .mw_calendar import _CalendarMixin
 from .mw_events import _EventsMixin
+from .mw_media import _MediaServerMixin
 from .mw_report import _ReportMixin
 from .mw_sync import _SyncMixin
+from .mw_together import _TogetherMixin
+from .mw_simkl import _SimklMixin
+from .mw_discord import _DiscordMixin
 from .mw_privacy import _PrivacyMixin
 from .mw_commands import _CommandsMixin
 from .mw_box import _BoxMixin
@@ -94,6 +105,7 @@ from .mw_onboarding import _OnboardingMixin
 from .mw_popout import _PopoutMixin
 from .mw_reminders import _RemindersMixin
 from .mw_series import _SeriesMixin
+from .mw_stats import _StatsMixin
 from .mw_search import _SearchMixin
 from .mw_shortcuts import _ShortcutsMixin
 from .mw_sidebar import _SidebarMixin
@@ -127,10 +139,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _LocalFilesMixin,
                  _PopoutMixin, _MultiviewMixin, _HomeMixin, _GuideMixin,
                  _MprisMixin,
-                 _FollowMixin, _SubtitlesMixin, _CastMixin, _DonateMixin,
+                 _FollowMixin, _SubtitlesMixin, _CastMixin, _AirPlayMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
-                 _HealthMixin, _ChannelPrefsMixin, _RemoteMixin, _EventsMixin, _ReportMixin,
+                 _HealthMixin, _ChannelPrefsMixin, _RemoteMixin, _PhoneMixin, _CalendarMixin,
+                 _EventsMixin, _ReportMixin,
                  _PortalArchiveMixin, _SeriesMixin, _SyncMixin,
+                 _ConnectionsMixin, _MirrorsMixin, _TogetherMixin, _StatsMixin,
+                 _SimklMixin, _DiscordMixin, _MediaServerMixin,
                  QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
@@ -152,6 +167,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         from ..core import nerd
         nerd.install(settings)
         nerd.set_source(active_pl)
+        # This install's id at Jellyfin, Emby and Plex lives in the settings.
+        from ..providers import mediaserver
+        mediaserver.install_device_store(settings)
         # Reclaim EPG guides left behind by playlists that no longer exist -
         # each is hundreds of MB and they were never cleaned up.
         try:
@@ -215,6 +233,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.xmltv.delay_minutes = self._epg_delay_minutes()
         self.favs = FavoriteStore(
             settings, f"favorites_{pid}" if pid else "favorites")
+        self.favs.on_change = self._favorites_changed
         # Flat, single-group favourites for movies and series - the
         # split Favorites column shows these under 'Movies' and 'Series'
         # alongside the grouped channel favourites.
@@ -237,8 +256,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.channel_ov = ChannelOverrides(
             settings, f"channel_overrides_{pid}" if pid else "channel_overrides")
         self.parental = ParentalControl(settings)
-        # Chromecasts and DLNA TVs alike, behind one object (casting.py).
-        self.cast = CastHub()
+        # Chromecasts, DLNA TVs and Kodis alike, behind one object
+        # (casting.py); a Kodi added by hand is remembered in the settings.
+        self.cast = CastHub(kodi=KodiManager(settings))
+        # AirPlay to an Apple TV joins it on macOS (mw_airplay).
+        self._init_airplay()
         self.rec = RecordingManager(settings, self)
         # A portal's recording asks for its address as it starts.
         self.rec.address_for = self._rec_address_for
@@ -278,6 +300,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             lambda: self._poster_refresh_timer.start(150))
         self.trakt = TraktClient(settings)
         self._trakt_active: dict | None = None
+        # Simkl beside Trakt (mw_simkl): offered only when the build carries
+        # its client id.
+        self.simkl = SimklClient(settings)
+        self._simkl_active: dict | None = None
         self.watched = WatchedStore(self._cache_settings)
         self.watchlist = WatchlistStore(self._cache_settings)
         self._watched_sync_running = False
@@ -341,6 +367,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.setWindowTitle(self._base_title)
         self.resize(1240, 780)
         self._build_ui()
+        # Watch together (off until a room is started or joined).
+        self._init_together()
         self._watch_color_scheme()
         # The guide is loaded at start; an app left open - overnight, or a
         # Mac that slept - kept yesterday's. Look again now and then, and
@@ -472,8 +500,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         open_video_action = action(tr("menu_open_video"), self.open_local_video)
         open_video_action.setShortcut("Ctrl+O")
         reminders_action = action(tr("reminders_menu"), self._open_reminders)
+        stats_action = action(tr("stats_menu") + "…", self.open_stats)
         multiview_action = action(tr("menu_multiview"), self._show_multiview)
         cast_action = action(tr("ctx_cast_to_chromecast"), self.cast_playing)
+        together_action = action(tr("together_title") + "…", self.open_together)
+        phone_action = action(tr("phone_menu"), self.open_phone_remote)
+        calendar_action = action(tr("cal_menu"), self.open_calendar_export)
         private_action, clear_action = self._build_privacy_actions()
         self._donate_action = action(tr("donate_support") + "…", lambda: self.open_donate("app-menu"))
         # Where a supporter key goes, in plain sight (the site's thank-you
@@ -490,8 +522,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         menus = lay_out(self.menuBar(), {
             "about": about_action, "settings": settings_action,
             "open_video": open_video_action, "refresh": refresh_action,
-            "reminders": reminders_action, "multiview": multiview_action,
-            "cast": cast_action, "private": private_action, "clear": clear_action,
+            "reminders": reminders_action, "calendar": calendar_action,
+            "multiview": multiview_action, "cast": cast_action,
+            "together": together_action, "phone": phone_action,
+            "private": private_action, "clear": clear_action,
+            "stats": stats_action,
             **report_actions, "website": website_action,
             "supporter": self._supporter_action, "donate": self._donate_action,
             "quit": quit_action}, sys.platform == "darwin")
@@ -508,6 +543,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             reminders_action: lambda: tr("reminders_menu"),
             multiview_action: lambda: tr("menu_multiview"),
             cast_action: lambda: tr("ctx_cast_to_chromecast"),
+            together_action: lambda: tr("together_title") + "…",
+            phone_action: lambda: tr("phone_menu"),
+            calendar_action: lambda: tr("cal_menu"),
             about_action: lambda: tr("menu_about"),
             quit_action: lambda: tr("menu_quit"),
             self._donate_action: lambda: tr("donate_support") + "…",
@@ -518,6 +556,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             website_action: lambda: tr("menu_website"),
             private_action: lambda: tr("private_menu"),
             clear_action: lambda: tr("clear_menu") + "…",
+            stats_action: lambda: tr("stats_menu") + "…",
         }
         if sys.platform == "darwin":
             for key, title in MAC_MENUS:
@@ -1287,6 +1326,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 lambda: self.rec.finish_all_inplayer("playback stopped"))
             self.player.stop_btn.clicked.connect(self._release_wake)
             self.player.stop_btn.clicked.connect(self._trakt_stop_current)
+            self.player.stop_btn.clicked.connect(self._simkl_stop_current)
             self.player.playback_error.connect(self._playback_error)
             self.player.zap.connect(self._zap)
             self.player.popout_requested.connect(self._toggle_popout)
@@ -1295,6 +1335,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.stop_btn.clicked.connect(self._exit_popout_if_active)
             self.player.stopped.connect(self._on_player_stopped)
             self.player.stopped.connect(self._events_stopped)
+            # Your statistics: the time it plays (mw_stats; it only watches).
+            self.player.stopped.connect(self._stats_end)
+            self.player.playback_error.connect(self._stats_end)
+            self.player.paused_changed.connect(self._stats_paused_changed)
+            self.player.stopped.connect(self._discord_stopped)
+            self.player.stopped.connect(self._ms_stopped)
             self.player.resume_requested.connect(self._resume_last)
             self.player.stalled.connect(self._on_player_stalled)
             self.player.contested.connect(self._on_stream_contested)
@@ -1303,12 +1349,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.stream_info_changed.connect(self._remember_stream_info)
             # Before _on_player_finished, which may start the next episode.
             self.player.finished.connect(self._events_finished)
+            self.player.finished.connect(self._stats_end)
+            self.player.finished.connect(self._discord_finished)
+            self.player.finished.connect(self._ms_finished)
             self.player.finished.connect(self._on_player_finished)
             self.player.next_episode.connect(self._play_next_episode)
             # Keep the poster overlay's play/pause/stop glyph in sync with the
             # player (guarded: the overlay is built later in this constructor).
             self.player.paused_changed.connect(self._on_paused_changed)
             self.player.paused_changed.connect(self._events_paused)
+            self.player.paused_changed.connect(self._discord_paused)
+            self.player.paused_changed.connect(self._simkl_paused)
+            self.player.vol.valueChanged.connect(self._events_volume)
+            self.player.paused_changed.connect(self._ms_paused)
             self.player.stopped.connect(self._apply_play_icon)
             self.player.finished.connect(self._apply_play_icon)
             self.player.timeshift_seek.connect(self._on_timeshift_seek)
@@ -1333,6 +1386,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self.settings.value("vis_on", "true") == "true",
                 self.settings.value("vis_style", "bars"))
             self.player.vis_choose = self._vis_choose
+            # Night mode's key in the player's menu (the window's keys).
+            self.player.night_key = self._night_key_text
             dl.addWidget(self.player)
 
         # Everything below the video lives in ONE scroll column. This is the
@@ -2261,6 +2316,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # Another provider's category ids say nothing about this one's.
             self._last_cat = {}
             self.favs = FavoriteStore(self.settings, f"favorites_{pid}")
+            self._watch_favorites()
             self.movie_favs = FavoriteStore(
                 self.settings, f"movie_favorites_{pid}", id_key="stream_id")
             self.series_favs = FavoriteStore(
@@ -2300,6 +2356,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         def fail(msg):
             self._hide_busy()
             self._set_status("")
+            # Nerd: its pinned server showed another certificate - said
+            # plainly, with the new one to look at (ui/cert_trust.py).
+            from .cert_trust import offer_review
+            if offer_review(self, self.playlist_store, pl, self.switch_playlist):
+                return
             QMessageBox.warning(
                 self, tr("playlist_msg_title"),
                 tr("msg_could_not_connect", name=pl['name'], msg=msg))
@@ -2543,13 +2604,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # combined 'All') only appear when connected - a user with
             # no Trakt account just sees their local list.
             self.cat_list.blockSignals(True)
-            connected = self.trakt.is_connected()
+            # Trakt, Simkl or both (mw_trakt): one row for what they say.
+            accounts = self._accounts_name()
+            connected = bool(accounts)
             rows = []
             if connected:
                 rows.append((tr("cat_all"), None))
             rows.append((tr("watched_local"), "local"))
             if connected:
-                rows.append((tr("watched_trakt"), "trakt"))
+                rows.append((tr("watched_trakt") if accounts == "Trakt"
+                             else accounts, "trakt"))
             for label, data in rows:
                 it = QListWidgetItem(label)
                 it.setData(Qt.ItemDataRole.UserRole, data)
@@ -2568,6 +2632,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 return
             self._hide_busy()
             self._raw_categories = cats or []
+            if request_mode == "live":
+                self._ms_live_note(self._raw_categories)
             self._search_index_cache.pop(request_mode, None)  # rebuild on search
             self.cat_list.blockSignals(True)
             self.cat_list.clear()
@@ -3865,7 +3931,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self, tr("open_video_title"), start,
             f"{tr('open_video_filter')} ({pattern});;"
             + tr("file_filter_all"),
-            options=QFileDialog.Option.DontUseNativeDialog)
+            options=file_dialog_options(
+                QFileDialog.Option.HideNameFilterDetails))
         if not path:
             return
         self.settings.setValue("local_open_dir", os.path.dirname(path))
@@ -4377,11 +4444,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._pause_started = None
         # Nerd: the channel it is, for the settings of its own.
         self._chanprefs_arm(self._item_key(it), it, "live")
+        self._ms_leave()
         if self.player.play(url, title, local_buffer=True,
                             buffer_key=f"live:{self._item_key(it)}"):
             self.wake.acquire(tr("wake_playing", title=title))
             self._health_begin(self._item_key(it), title, it, "live", False)
             self._events_started(self._item_key(it), title, it, "live", False)
+            self._together_started(self._item_key(it), title, it, "live", False)
+            self._stats_begin(self._item_key(it), title, it, "live", False)
+            self._discord_started(self._item_key(it), title, it, "live", False)
+            self._ms_started(url, self._item_key(it), "live", it)
         self._apply_seek_mode(it, "live")
         # Refresh the poster overlay glyph (play -> pause for a timeshift
         # channel, -> stop for plain live). Unlike _start_playback, the preview
@@ -4527,8 +4599,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.series_ctx = saved
 
     def _continue_items(self, kind: str) -> list:
-        """Continue-watching rows of one kind ('vod' or 'episode')."""
-        return [it for it in self.resume.continue_watching()
+        """Continue-watching rows of one kind ('vod' or 'episode'), a media
+        server's own among them (mw_media)."""
+        return [it for it in self._continue_rows()
                 if it.get("_kind") == kind]
 
     def _remove_continue(self, it) -> None:
@@ -4536,6 +4609,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         then refresh the list - the category disappears once it's empty."""
         group = "episode" if it.get("_kind") == "episode" else "vod"
         self.resume.clear(group, self._item_key(it))
+        self._ms_forget(it)
         cur = self.cat_list.currentItem()
         cur_cat = cur.data(Qt.ItemDataRole.UserRole) if cur else None
         if self.mode in ("vod", "series") and cur_cat == "__continue__":
@@ -4547,10 +4621,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             else:
                 self._load_categories()
 
-    def _resume_offset(self, key, kind: str) -> float:
+    def _resume_offset(self, key, kind: str, item=None) -> float:
         """Ask whether to resume a partly-watched title; return the start
-        offset in seconds (0 to start from the beginning)."""
-        pos = self.resume.saved_position(key, kind)
+        offset in seconds (0 to start from the beginning). A media server's
+        own resume point counts when it is the newer (mw_media)."""
+        pos = self._ms_resume_at(key, kind, item,
+                                 self.resume.saved_position(key, kind))
         if pos <= 0:
             # Nothing to offer: either never watched >1 min, watched past 95%
             # (counted as finished), or saved under another kind pre-fix.
@@ -4827,23 +4903,33 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # and give the outgoing title its watched mark if it earned one.
         self._save_resume_position()
         self._maybe_auto_mark_watched()
-        resume_at = (self._resume_offset(key, kind)
-                     if kind in self._RESUMABLE else 0.0)
+        self._ms_leave()          # a media server hears where it got to
+        # Watch together: what the room plays starts where the room is,
+        # without the resume question.
+        together_at = self._together_take_start()
+        if together_at is not None:
+            resume_at = together_at
+        else:
+            resume_at = (self._resume_offset(key, kind, item)
+                         if kind in self._RESUMABLE else 0.0)
         if catchup and start_at > 0:
             resume_at = float(start_at)
         self._trakt_stop_current()
+        self._simkl_stop_current()
         if record and kind:
             self.history.add(url, title, icon_url, key, kind,
                              extra=self._history_extra(kind, item, title))
         if kind in ("movie", "episode"):
             self._trakt_start_for_item(kind, item)
+            self._simkl_start_for_item(kind, item)
         elif (kind == "local" and item is not None
                 and not item.get("_no_scrobble")):
             # A local file scrobbles as a movie when Trakt can match the
             # cleaned title; an unmatched file just scrobbles nothing.
-            self._trakt_start_for_item(
-                "movie", {"name": item.get("_clean_title")
-                          or item.get("name") or ""})
+            local_movie = {"name": item.get("_clean_title")
+                           or item.get("name") or ""}
+            self._trakt_start_for_item("movie", local_movie)
+            self._simkl_start_for_item("movie", local_movie)
         self.stream_error.hide()
         # Remember the channel we're leaving so the "last channel" key can
         # bounce back to it.
@@ -4944,6 +5030,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self.wake.acquire(tr("wake_playing", title=title))
                 self._health_begin(key, title, item, kind, catchup)
                 self._events_started(key, title, item, kind, catchup)
+                self._together_started(key, title, item, kind, catchup)
+                self._stats_begin(key, title, item, kind, catchup)
+                self._discord_started(key, title, item, kind, catchup)
+                if not catchup:
+                    self._ms_started(url, key, kind, item, resume_at)
             else:
                 log.warning("embedded play() refused %s - falling back to an "
                             "external mpv window", redact_url(url))
@@ -5102,6 +5193,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.rec.finish_all_inplayer("stream error")
         self._release_wake()
         self._trakt_active = None
+        self._simkl_active = None
         # A catch-up segment that fails right after starting is usually the
         # wrong archive-URL format for this provider - walk to the next
         # candidate. Only while still probing (early failure); once a format has
@@ -5181,6 +5273,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # The reconnects are spent: for stream health, it did not play.
         self._health_failed(msg)
         self._events_failed()
+        self._discord_stopped()
         url = (lp or {}).get("url")
         # Nerd: the same channel from another source, before giving up.
         if url and self._try_failover(lambda u=url: self._diagnose_stream_failure(u)):
@@ -5243,6 +5336,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         hkey = self.health.current
 
         def done(code, gen=gen, item=item):
+            # Nerd's backup addresses: a server that is down, asked again.
+            self._mirror_probe_said(url, code)
             if (gen != getattr(self, "_diag_gen", -1)
                     or getattr(self, "_diag_shown", False)
                     or (self.player and self.player.current_url)
@@ -5787,11 +5882,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._save_layout()
             self._save_resume_position()
             self._maybe_auto_mark_watched()
+            self._ms_close()
             self._sync_on_close()
+            self._stats_close()
         self.wake.release()
         self._stop_media_session()
+        self._together_close()
         self._events_quit()
+        self._discord_quit()
         self._remote_stop()
+        self.phone_remote_stop(keep=True)
         self.cover.flush()
         if self._trakt_active:
             active = self._trakt_active
@@ -5800,6 +5900,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 target=lambda: self.trakt.scrobble_stop(
                     active["payload"], progress),
                 daemon=True).start()
+        self._simkl_stop_current()
         self.rec.shutdown()
         if self.player:
             self.player.shutdown()

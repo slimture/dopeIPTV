@@ -59,6 +59,17 @@ def test_persists_across_instances():
     assert ReminderStore(s, "p").has(5, 1000)
 
 
+def test_the_programmes_end_is_kept_for_the_calendar():
+    s = FakeSettings()
+    r = ReminderStore(s, "p")
+    r.add(_ch(5), "News", 1000, stop=2800)
+    r.add(_ch(6), "Film", 1000, stop=900)         # an end before the start says nothing
+    r.add(_ch(7), "Sport", 1000, stop="soon")
+    again = {x["stream_id"]: x for x in ReminderStore(s, "p").all()}
+    assert again[5]["stop"] == 2800
+    assert "stop" not in again[6] and "stop" not in again[7]
+
+
 def test_playlist_scoped_key():
     assert ReminderStore(FakeSettings(), "abc")._key == "epg_reminders_abc"
     assert ReminderStore(FakeSettings(), None)._key == "epg_reminders"

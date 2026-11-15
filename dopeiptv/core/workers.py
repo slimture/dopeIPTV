@@ -235,6 +235,18 @@ def run_async(pool: QThreadPool, fn: Callable, on_done: Callable,
     return w
 
 
+def _image_get(url: str) -> Callable[..., Any]:
+    """requests.get for an image - on the playing source's route while
+    Nerd gives it one (core/net_route.py: own DNS, IP version, a pinned
+    certificate)."""
+    from . import net_route
+    route = net_route.current()
+    if not route.active:
+        return requests.get
+    from .net_adapter import getter
+    return getter(route)
+
+
 def _ignore_result(_result: object) -> None:
     """on_done for work that is done for its side effect."""
 
@@ -523,7 +535,7 @@ class LogoLoader(QObject):
             # worker ~3 s, not the full read timeout - with hundreds
             # of URLs on one dead provider host that difference is
             # what keeps the queue from starving the working hosts.
-            r = requests.get(u, headers=_IMG_HEADERS, timeout=(3.05, 15))
+            r = _image_get(u)(u, headers=_IMG_HEADERS, timeout=(3.05, 15))
             # ANY HTTP response - even a 404 - proves the host itself
             # is alive, so reset its circuit-breaker strikes. Only
             # connection-level failures (reset, timeout, DNS) should

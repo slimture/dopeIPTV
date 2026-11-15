@@ -104,7 +104,8 @@ class _RemoteMixin:
         bridge = self._remote_bridge
         share = Share(lambda: bridge.call("_sources_full", {})) if cfg["share"] else None
         srv = RemoteServer(cfg["host"], cfg["port"], cfg["token"], self._remote_call,
-                           share=share, remote=cfg["remote"])
+                           share=share, remote=cfg["remote"],
+                           calendar=lambda: bridge.call("_calendar", {}))
         try:
             srv.start()
         except OSError as e:
@@ -145,6 +146,8 @@ class _RemoteMixin:
     def _remote_do(self, action: str, params: dict) -> Any:
         if action == "_client":
             return self.client
+        if action == "_calendar":
+            return self._calendar_text()
         if action == "_sources_full":
             store = getattr(self, "playlist_store", None)
             return [dict(p) for p in store.playlists()] if store is not None else []
@@ -201,7 +204,8 @@ class _RemoteMixin:
     def _remote_media(self, name: str, arg: Any = None) -> None:
         # The media keys' guard against one press arriving twice is no
         # business of a script asking twice in a row.
-        self.__dict__.setdefault("_media_pressed", {}).pop(name, None)
+        self.__dict__.setdefault("_media_pressed", {}).pop(
+            self._media_press_key(name), None)
         self.mpris_command(name, arg)
 
     def _remote_status(self) -> dict[str, Any]:

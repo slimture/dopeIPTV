@@ -28,6 +28,24 @@ class _FavoritesMixin:
         return {"chan": self.favs, "movie": self.movie_favs,
                 "series": self.series_favs}.get(section)
 
+    def _favorite_channels(self) -> list[dict]:
+        """The source's favourite channels, each once, in their folders'
+        order (the default bucket first) - none from a folder that is
+        locked while it is (the phone remote, Home Assistant's list)."""
+        store = self.favs
+        locked = set() if self.parental.session_unlocked else store.locked_groups()
+        seen: set[str] = set()
+        out: list[dict] = []
+        for group in [FAV_DEFAULT_GROUP] + store.custom_groups():
+            if group in locked:
+                continue
+            for it in store.groups.get(group, []):
+                sid = it.get("stream_id")
+                if sid is not None and str(sid) not in seen:
+                    seen.add(str(sid))
+                    out.append(it)
+        return out
+
     def _row_content_kind(self, it: dict) -> tuple[str, dict]:
         """The kind a row's actions follow, and the row they act on.
 

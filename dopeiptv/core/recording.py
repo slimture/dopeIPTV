@@ -15,6 +15,7 @@ from typing import Any, Callable
 
 from PyQt6.QtCore import QObject, QSettings, Qt, QTimer, pyqtSignal
 
+from . import rec_mp4
 from .log import log
 from .player_exec import NO_WINDOW, find_player_executable
 from .privacy import for_log
@@ -89,6 +90,13 @@ class RecordingManager(QObject):
     recording_stopped = pyqtSignal(str, str)
     # (from the thread that asked) job id, its address ("" for none), why not.
     _address_in = pyqtSignal(str, str, str)
+    # (from a remux's thread) the .ts, the file it is now, why not an MP4
+    # ("" when it is one).
+    _remuxed = pyqtSignal(str, str, str)
+
+    #: How long after the start the remuxes left from the last run begin:
+    #: well clear of the start's own work.
+    REMUX_RESUME_MS = 20_000
 
     #: A job that asks for its address when it starts keeps what that takes
     #: here - {"source": playlist id, "stream_id": ...} - and no address: a
@@ -120,6 +128,14 @@ class RecordingManager(QObject):
         self.address_for: Callable[[dict], Callable[[], str] | None] | None = None
         self._address_in.connect(self._address_came,
                                  Qt.ConnectionType.QueuedConnection)
+        # Recordings saved as MP4 (rec_mp4): the .ts files being copied now,
+        # and whether the app is closing (a remux due then waits for the
+        # next start).
+        self._remuxing: set[str] = set()
+        self._closing = False
+        self._remuxed.connect(self._remux_done, Qt.ConnectionType.QueuedConnection)
+        if rec_mp4.Journal(settings).items():
+            QTimer.singleShot(self.REMUX_RESUME_MS, self._resume_remuxes)
 
     # -- storage location ---------------------------------------------------
 
@@ -226,9 +242,15 @@ class RecordingManager(QObject):
     # -- recorder backend ---------------------------------------------------
 
     @staticmethod
+    def ffmpeg() -> str | None:
+        """The app's ffmpeg: the one a packaged build bundles, else the
+        system's."""
+        return _bundled_ffmpeg() or shutil.which("ffmpeg")
+
+    @staticmethod
     def recorder() -> tuple[str | None, str | None]:
         """(kind, executable) of the available recorder, or (None, None)."""
-        ff = _bundled_ffmpeg() or shutil.which("ffmpeg")
+        ff = RecordingManager.ffmpeg()
         if ff:
             return "ffmpeg", ff
         mpv = find_player_executable("mpv")
@@ -459,18 +481,113 @@ class RecordingManager(QObject):
         return path
 
     def _after(self, j: dict) -> None:
-        """A recording is done and has data: the Nerd page's command for it,
-        if there is one - once."""
-        from . import nerd
-        from .rec_extras import run_post
+        """A recording is done and has data - once: saved as MP4 when
+        Settings > Recording says so, then the Nerd page's command for it
+        (if there is one) with the file it is in the end."""
         if j.get("_after_ran"):
             return
         j["_after_ran"] = True
+        path = j.get("path") or ""
+        if not self._has_data(path):
+            return
+        if rec_mp4.enabled(self.settings) and rec_mp4.wanted(path):
+            self._remux(path, j.get("title") or "", j.get("channel") or "", j)
+            return
+        self._post(path, j.get("title") or "", j.get("channel") or "")
+
+    @staticmethod
+    def _has_data(path: str) -> bool:
+        try:
+            return bool(path) and os.path.getsize(path) > 0
+        except OSError:
+            return False
+
+    def _post(self, path: str, title: str, channel: str) -> None:
+        """The Nerd page's command after a recording, for *path*."""
+        from . import nerd
+        from .rec_extras import run_post
         n_ = nerd.current()
         cmd = n_.get("nerd_rec_post").strip() if n_.on else ""
-        path = j.get("path") or ""
-        if cmd and path and os.path.exists(path) and os.path.getsize(path) > 0:
-            run_post(cmd, path, j.get("title") or "", j.get("channel") or "")
+        if cmd and self._has_data(path):
+            run_post(cmd, path, title, channel)
+
+    # -- saved as MP4 (rec_mp4) ------------------------------------------------
+
+    def _remux(self, path: str, title: str, channel: str,
+               j: dict | None = None) -> None:
+        """Copy the finished *path* into an MP4 off this thread; the command
+        after it follows with the file it ends up as. Kept in the journal
+        until done, so a closing app does it at the next start."""
+        rec_mp4.Journal(self.settings).add(path, title, channel)
+        if self._closing or path in self._remuxing:
+            return
+        ff = self.ffmpeg()
+        if not ff:
+            rec_mp4.Journal(self.settings).done(path)
+            log.info("recording: kept as .ts - no ffmpeg to save it as MP4")
+            if j is not None:
+                j["remux"], j["remux_error"] = "failed", "no ffmpeg"
+                self.jobs_changed.emit()
+            self._post(path, title, channel)
+            return
+        self._remuxing.add(path)
+        if j is not None:
+            j["remux"] = "running"
+            self.jobs_changed.emit()
+        recorder = j.get("recorder") if j is not None else None
+        threading.Thread(target=self._remux_work, args=(path, ff, recorder),
+                         name="rec-mp4", daemon=True).start()
+
+    def _remux_work(self, path: str, ff: str, recorder: Any = None) -> None:
+        """(a thread of its own) The remux, its outcome handed back. A
+        recording from the rewind buffer has written its last bytes first."""
+        try:
+            if recorder is not None:
+                recorder.join(30.0)
+            res = rec_mp4.remux(path, ff)
+        except Exception as e:          # never lose the .ts over a bug here
+            res = rec_mp4.Result(False, path, f"{type(e).__name__}: {e}")
+        try:
+            self._remuxed.emit(path, res.path, res.why)
+        except RuntimeError:            # the app closed meanwhile
+            pass
+
+    def _remux_done(self, src: str, final: str, why: str) -> None:
+        self._remuxing.discard(src)
+        if self._closing:
+            return                      # cut short: done at the next start
+        journal = rec_mp4.Journal(self.settings)
+        entry = journal.get(src) or {}
+        journal.done(src)
+        if why:
+            log.warning("recording kept as .ts, not saved as MP4: %s", why)
+        else:
+            log.info("recording saved as MP4: %s", for_log(os.path.basename(final)))
+        for j in self.jobs:
+            if j.get("path") == src and j.get("remux") == "running":
+                j["remux"] = "failed" if why else "done"
+                if why:
+                    j["remux_error"] = why
+                else:
+                    j["path"] = final
+        self.jobs_changed.emit()
+        self._post(final, str(entry.get("title") or ""),
+                   str(entry.get("channel") or ""))
+
+    def _resume_remuxes(self) -> None:
+        """The remuxes the last run left: each whose .ts is still there done
+        now (a half MP4 of it removed first), the rest forgotten."""
+        journal = rec_mp4.Journal(self.settings)
+        for e in journal.items():
+            ts = e["ts"]
+            if not os.path.isfile(ts):
+                journal.done(ts)
+                continue
+            try:
+                os.remove(rec_mp4.part_path(ts))
+            except OSError:
+                pass
+            self._remux(ts, str(e.get("title") or ""), str(e.get("channel") or ""))
 
     @classmethod
     def address_later(cls, j: dict) -> bool:
@@ -553,9 +670,11 @@ class RecordingManager(QObject):
             return
         secs = (max(1, int(j["stop"] - time.time()))
                 if j.get("stop") else None)
+        bridge = self._bridge(j)
         if kind == "ffmpeg":
             cmd = [exe, "-y", "-loglevel", "error",
-                   *self._input_options(j["url"]), "-i", j["url"],
+                   *self._input_options(j["url"]),
+                   *(["-http_proxy", bridge] if bridge else []), "-i", j["url"],
                    "-c", "copy"]
             if secs:
                 cmd += ["-t", str(secs)]
@@ -563,6 +682,8 @@ class RecordingManager(QObject):
         else:
             cmd = [exe, j["url"], f"--stream-record={path}", "--vo=null",
                    "--ao=null", "--no-terminal", f"--user-agent={RECORD_UA}"]
+            if bridge:
+                cmd.append(f"--http-proxy={bridge}")
             if secs:
                 cmd.append(f"--length={secs}")
         try:
@@ -577,6 +698,27 @@ class RecordingManager(QObject):
         except Exception as e:
             j["status"] = "failed"
             j["error"] = str(e)
+
+    def _bridge(self, j: dict) -> str:
+        """Nerd: the bridge (core/net_bridge.py) a recording connects
+        through when its source's own DNS, IP version or pinned certificate
+        asks for one - the source it was made from, else the one playing;
+        "" otherwise (and always while Nerd is off)."""
+        from . import nerd, net_bridge
+        if not nerd.current().on:
+            return ""
+        src = nerd.source()
+        pid = str(j.get("source") or "")
+        if pid:
+            try:
+                from .stores import PlaylistStore
+                pl = PlaylistStore(self.settings).get(pid)
+            except Exception as e:
+                log.debug("record: no source %s for its route: %s", pid, e)
+                pl = None
+            if pl:
+                src = dict(pl.get("options") or {}, _kind=pl.get("kind") or "xtream")
+        return net_bridge.address_for(src, str(j.get("url") or ""))
 
     @staticmethod
     def _input_options(url: str) -> list[str]:
@@ -722,6 +864,12 @@ class RecordingManager(QObject):
         recording runs for them in after_shutdown(), once the player has
         let go of its file - their usual check, 1.5 s later, never comes."""
         self._ended_on_quit = [j for j in self.jobs if j["status"] == "recording"]
+        # MP4s being written are ended: each keeps its .ts and is done at
+        # the next start (rec_mp4's journal), as is any due from now on.
+        self._closing = True
+        stopped = rec_mp4.stop_all()
+        if stopped:
+            log.info("recording: %d MP4(s) left for the next start", stopped)
         self.finish_all_inplayer("app closed")
         for j in self.jobs:
             if j["status"] == "recording" and j.get("recorder") is not None:

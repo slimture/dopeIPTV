@@ -75,7 +75,7 @@ def scrub(text: str, secrets: list[str]) -> str:
 
 def source_secrets(source: dict | None) -> list[str]:
     s = source or {}
-    return [str(s.get(k) or "") for k in ("username", "password", "mac")]
+    return [str(s.get(k) or "") for k in ("username", "password", "mac", "token")]
 
 
 def _shown_headers(headers: dict[str, str]) -> list[str]:
@@ -99,7 +99,8 @@ def probe_url(source: dict | None) -> str | None:
         return f"{server}/player_api.php?" + urlencode(
             {"username": s.get("username") or "", "password": s.get("password") or ""})
     return server + {"enigma2": "/web/about", "tvheadend": "/api/serverinfo",
-                     "hdhomerun": "/discover.json"}.get(kind, "")
+                     "hdhomerun": "/discover.json", "jellyfin": "/System/Info/Public",
+                     "emby": "/emby/System/Info/Public", "plex": "/identity"}.get(kind, "")
 
 
 # -- the network -------------------------------------------------------------

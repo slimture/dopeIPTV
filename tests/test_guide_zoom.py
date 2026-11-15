@@ -116,8 +116,13 @@ def check_layout(g):
     assert abs(area(g) / ppm / 60 - g.span_hours()) <= (
         g.span_hours() * g.REFIT_TOLERANCE * 1.1 + 0.01), (
         area(g), ppm, g.span_hours())
-    # Every programme drawn where its time is, the on-air card under "now".
+    # Every programme drawn where its time is, the on-air card under "now" -
+    # now as the check runs: the test takes minutes, and a programme ending
+    # meanwhile (a five-minute one, or the half hour) made the card marked
+    # at the start the wrong one (CI failed so, once, at 19:30).
     x = lambda ts: g.CH_COL_W + (ts - g._start) / 60 * ppm
+    g._mark_now()
+    t_now = time.time()
     seen = on_air = 0
     for _ch, blocks in g._rows:
         for rb in blocks:
@@ -131,7 +136,8 @@ def check_layout(g):
             assert abs(r.width() - (x2 - x1 - 3)) < 0.5, (r.width(), x2 - x1)
             if rb["_state"] == "now":
                 on_air += 1
-                assert r.left() <= x(now) <= r.right()
+                assert p["start_timestamp"] <= t_now < p["stop_timestamp"] + 1, (
+                    p["start_timestamp"], t_now, p["stop_timestamp"])
             seen += 1
     assert seen and on_air, (seen, on_air)
     # The header: a label at every half hour, or the hours alone once a

@@ -33,6 +33,7 @@ ACTIONS: tuple[tuple[str, str, str], ...] = (
     ("pause", "Space", "sc_play_pause"),
     ("fullscreen", "F", "sc_fullscreen"),
     ("mute", "M", "sc_mute"),
+    ("night_mode", "N", "sc_night_mode"),
     ("popout", "P", "sc_popout"),
     ("record", "R", "sc_record"),
     ("stats", "I", "sc_stats"),

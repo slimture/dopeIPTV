@@ -1,10 +1,12 @@
 """Series recordings in the window: "Record series…" on a programme, the
 rules looked through the guide when it loads and with the guide's own
-20-minute check, and what they find scheduled with the recorder.
+20-minute check, and what they find scheduled with the recorder - or, for a
+rule that reminds ("Remind me" in the same dialog), set as reminders, which
+fire as every reminder does (mw_reminders).
 
 The matching, the padding and the no-duplicates rules are core/series_rules.py;
-this is the glue: the dialog, the work on the pool, the jobs added on the
-window's thread.
+this is the glue: the dialog, the work on the pool, the jobs and reminders
+added on the window's thread.
 """
 
 from __future__ import annotations
@@ -13,7 +15,8 @@ import time
 
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import (
-    QComboBox, QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit,
+    QButtonGroup, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
+    QHBoxLayout, QLabel, QLineEdit, QRadioButton,
 )
 
 from ..core import series_rules
@@ -39,7 +42,11 @@ def _find(client, guide, rules: list[dict], keep, now: float,
                                       shift=shift, source=source)
     if links_later(client):
         return found
+    # A reminder needs no address.
+    remind = series_rules.of_action(rules, series_rules.REMIND)
     for a in found:
+        if a.rule in remind:
+            continue
         try:
             a.url = client.live_url(a.channel.get("stream_id"), "ts") or ""
         except Exception as e:
@@ -60,12 +67,13 @@ class _SeriesMixin:
     """MainWindow mixin: series recording rules."""
 
     def _record_series(self, ch: dict | None, title: str = "",
-                       word: bool = False, parent=None) -> dict | None:
+                       word: bool = False, parent=None,
+                       remind: bool = False) -> dict | None:
         """Ask how to record a series - the exact title or a word in it, on
-        *ch* only or on any channel - keep the rule and schedule what the
-        guide has of it. The rule, or None when nothing was added."""
+        *ch* only or on any channel, each airing recorded or (*remind*, the
+        dialog's other choice) reminded of - keep the rule and schedule what
+        the guide has of it. The rule, or None when nothing was added."""
         d = QDialog(parent or self)
-        d.setWindowTitle(tr("series_title"))
         d.setMinimumWidth(420)
         f = QFormLayout(d)
         f.setSpacing(10)
@@ -80,13 +88,35 @@ class _SeriesMixin:
                              channel=self._series_channel_name(ch)),
                           series_rules.THIS)
         where.addItem(tr("series_where_any"), series_rules.ANY)
+        # Record, or remind: the same rule, another thing done with each
+        # airing it finds.
+        record_btn = QRadioButton(tr("series_do_record"))
+        remind_btn = QRadioButton(tr("series_do_remind"))
+        group = QButtonGroup(d)
+        group.addButton(record_btn)
+        group.addButton(remind_btn)
+        (remind_btn if remind else record_btn).setChecked(True)
+        choice = QHBoxLayout()
+        choice.setSpacing(16)
+        choice.addWidget(record_btn)
+        choice.addWidget(remind_btn)
+        choice.addStretch(1)
+        f.addRow(tr("series_do"), choice)
         f.addRow(tr("series_text"), text)
         f.addRow(tr("series_match"), kind)
         f.addRow(tr("series_where"), where)
-        hint = QLabel(tr("series_hint"))
+        hint = QLabel()
         hint.setWordWrap(True)
         hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         f.addRow(hint)
+
+        def say(_on: bool = False) -> None:
+            on = remind_btn.isChecked()
+            d.setWindowTitle(tr("series_remind_title" if on else "series_title"))
+            hint.setText(tr("series_remind_hint" if on else "series_hint"))
+
+        remind_btn.toggled.connect(say)
+        say()
         bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
                               | QDialogButtonBox.StandardButton.Cancel)
         bb.accepted.connect(d.accept)
@@ -94,17 +124,20 @@ class _SeriesMixin:
         f.addRow(bb)
         if not d.exec():
             return None
+        what = series_rules.REMIND if remind_btn.isChecked() else series_rules.RECORD
         rule = series_rules.make_rule(
             text.text(), kind.currentData(),
-            ch if where.currentData() == series_rules.THIS else None)
+            ch if where.currentData() == series_rules.THIS else None, what)
         if rule is None:
             return None
         kept = self.series_rules.add(rule)
         if kept is None:
             return None
-        log.info("[series] rule: %s %r on %s", kept["kind"], for_log(kept["text"]),
+        log.info("[series] rule: %s %s %r on %s", series_rules.action(kept),
+                 kept["kind"], for_log(kept["text"]),
                  series_rules.rule_key(kept) or "any channel")
-        self._show_toast(tr("series_added", title=kept["text"]), 4000)
+        self._show_toast(tr("series_remind_added" if what == series_rules.REMIND
+                            else "series_added", title=kept["text"]), 4000)
         self._check_series_rules()
         return kept
 
@@ -126,10 +159,14 @@ class _SeriesMixin:
         text = rule.get("text") or ""
         if rule.get("scope") == series_rules.THIS:
             name = self._series_channel_name(rule.get("channel") or {})
-            return (tr("series_row_word_on", word=text, channel=name) if word
-                    else tr("series_row_title_on", title=text, channel=name))
-        return (tr("series_row_word_any", word=text) if word
-                else tr("series_row_title_any", title=text))
+            label = (tr("series_row_word_on", word=text, channel=name) if word
+                     else tr("series_row_title_on", title=text, channel=name))
+        else:
+            label = (tr("series_row_word_any", word=text) if word
+                     else tr("series_row_title_any", title=text))
+        if series_rules.action(rule) == series_rules.REMIND:
+            return tr("series_row_remind", rule=label)
+        return label
 
     def _delete_series_rule(self, rule_id: str) -> None:
         """Drop a rule, and the recordings it scheduled that have not
@@ -139,6 +176,10 @@ class _SeriesMixin:
         for j in list(self.rec.jobs):
             if j.get("rule") == rule_id and j.get("status") == "scheduled":
                 self.rec.cancel(j["id"])
+        # A reminder rule's reminders still to come go with it.
+        reminders = getattr(self, "reminders", None)
+        if reminders is not None:
+            reminders.remove_rule(rule_id, time.time())
         log.info("[series] rule %s deleted", rule_id)
 
     # -- the check --------------------------------------------------------
@@ -196,18 +237,48 @@ class _SeriesMixin:
             self._series_again = False
             QTimer.singleShot(0, self._check_series_rules)
 
-    def _series_schedule(self, found: list) -> int:
-        """Schedule what the rules found and is not recorded yet; the
-        number of recordings added."""
-        store = self.series_rules
+    def _series_remind(self, found: list, now: float) -> int:
+        """Set a reminder for each airing a reminder rule found that has
+        none yet - at the programme's start, no padding; one the guide moved
+        follows it. The number set."""
+        store, reminders = self.series_rules, getattr(self, "reminders", None)
+        if reminders is None:
+            return 0
         rules = store.rules()
-        ids = {r["id"] for r in rules}
+        remind = series_rules.of_action(rules, series_rules.REMIND)
+        found = [a for a in found if a.rule in remind]
+        moved = []
+        for r, a in series_rules.remind_retimed(found, reminders.all(), now):
+            reminders.move(r.get("stream_id"), r.get("start"), a.start, a.stop)
+            moved.append(series_rules.Plan(a, a.start, a.stop))
+        taken = series_rules.taken_for(store.taken(), remind)
+        new = series_rules.remind_plan(found, reminders.all(), taken, now)
+        for a in new:
+            reminders.add(a.channel, a.title, a.start, rule=a.rule, stop=a.stop)
+        if moved or new:
+            store.remember(moved + [series_rules.Plan(a, a.start, a.stop) for a in new], now)
+        if new:
+            log.info("[series] %d reminder(s) set", len(new))
+            self._flash_status(tr("series_reminded_n", n=len(new)))
+        return len(new)
+
+    def _series_schedule(self, found: list) -> int:
+        """Schedule what the rules found and is not recorded yet, and set
+        the reminders the reminder rules ask for; the number of recordings
+        added."""
+        store = self.series_rules
+        now = time.time()
+        try:
+            self._series_remind(found, now)
+        except Exception as e:
+            log.warning("[series] reminders not set: %s", e)
+        rules = store.rules()
+        ids = series_rules.of_action(rules, series_rules.RECORD)
         later = links_later(self.client)
         # A rule deleted meanwhile asks for nothing; a channel without an
         # address cannot be recorded (one whose address is asked for when
         # the recording starts has none yet).
         found = [a for a in found if a.rule in ids and (a.url or later)]
-        now = time.time()
         before, after = series_rules.padding(self.settings)
         moved = []
         for job, a in series_rules.retimed(found, self.rec.jobs, now):
@@ -225,8 +296,8 @@ class _SeriesMixin:
         maxc = getattr(self.client, "max_connections", None)
         left_out: list = []
         plans = series_rules.plan(
-            found, self.rec.jobs, store.taken(), now, before, after,
-            wide=wide, connections=maxc, left_out=left_out)
+            found, self.rec.jobs, series_rules.taken_for(store.taken(), ids, legacy=True),
+            now, before, after, wide=wide, connections=maxc, left_out=left_out)
         if left_out:
             at_once = sum(1 for _a, why in left_out if why == series_rules.AT_ONCE)
             log.info("[series] %d airing(s) not scheduled: %d past %d at one time "

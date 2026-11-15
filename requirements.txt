@@ -2,3 +2,17 @@ PyQt6>=6.5,<7
 requests>=2.28,<3
 python-mpv>=1.0,<2
 pychromecast>=13.0,<15
+# The system's media controls (services/media_session.py), each only on its
+# own system: Now Playing on macOS through PyObjC, the System Media Transport
+# Controls on Windows through PyWinRT. Without them the app runs as before.
+pyobjc-framework-MediaPlayer>=10.0,<14; sys_platform == "darwin"
+pyobjc-framework-Cocoa>=10.0,<14; sys_platform == "darwin"
+# AirPlay to an Apple TV (services/airplay_macos.py): an AVPlayer and AVKit's
+# route picker, through PyObjC - macOS only. Without them, no AirPlay entry.
+pyobjc-framework-AVFoundation>=10.0,<14; sys_platform == "darwin"
+pyobjc-framework-AVKit>=10.0,<14; sys_platform == "darwin"
+winrt-runtime>=4.0,<5; sys_platform == "win32"
+winrt-Windows.Foundation>=4!10.0.28000,<5!0; sys_platform == "win32"
+winrt-Windows.Media>=4!10.0.28000,<5!0; sys_platform == "win32"
+winrt-Windows.Media.Playback>=4!10.0.28000,<5!0; sys_platform == "win32"
+winrt-Windows.Storage.Streams>=4!10.0.28000,<5!0; sys_platform == "win32"

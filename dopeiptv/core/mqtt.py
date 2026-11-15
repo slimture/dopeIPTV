@@ -1,9 +1,9 @@
 """A small MQTT 3.1.1 client, in the standard library only: CONNECT (a
 login, a last will, keepalive), PUBLISH at QoS 0, retained or not,
-SUBSCRIBE (the Nerd page's Test reads its own message back), PINGREQ and
-DISCONNECT. That is all the app needs to tell a broker what happens - no
-QoS 1/2, no session kept by the broker (clean session), nothing read but
-the answers to what it asked.
+SUBSCRIBE (the Nerd page's Test reads its own message back, and the app
+takes Home Assistant's commands: take()), PINGREQ and DISCONNECT. That is
+all the app needs to tell a broker what happens and hear what it is asked
+- no QoS 1/2, no session kept by the broker (clean session).
 
 Plain TCP on 1883, or TLS (8883) through the ssl module, the broker's
 certificate checked against the system's and requests' certificates.
@@ -13,6 +13,7 @@ window's thread.
 
 from __future__ import annotations
 
+import select
 import socket
 import ssl
 import time
@@ -210,6 +211,42 @@ class Client:
                 self._read(end, want=PUBLISH)
             except TimeoutError:
                 return False
+
+    def raw_socket(self) -> socket.socket | None:
+        """The connection, to wait on (select) with something else."""
+        return self._sock
+
+    def pending(self) -> bool:
+        """Bytes already read that no packet was made of yet - kept here or
+        in TLS's own buffer, where select does not see them."""
+        sock = self._sock
+        return bool(self._buf) or (isinstance(sock, ssl.SSLSocket) and sock.pending() > 0)
+
+    def take(self, wait: float = 0.0) -> list[tuple[str, bytes, bool]]:
+        """The PUBLISHes the broker sent - those read on the way to another
+        answer (inbox) and those waiting now - waiting at most *wait* for
+        one when there is none. Raises as a read does (the broker went)."""
+        end = time.monotonic() + max(0.0, wait)
+        while self._sock is not None:
+            if not self.pending():
+                left = max(0.0, end - time.monotonic())
+                try:
+                    ready, _w, _x = select.select([self._sock], [], [], left)
+                except (OSError, ValueError):
+                    self._drop()
+                    raise ConnectionError("the connection is gone") from None
+                if not ready:
+                    break
+            ptype, flags, body = self._read_one(time.monotonic() + self.timeout)
+            if ptype == PUBLISH:
+                self.inbox.append(parse_publish(flags, body))
+                del self.inbox[:-64]
+            elif ptype not in (PINGRESP, SUBACK):
+                self._drop()
+                raise MqttError(f"not an MQTT answer (packet type {ptype})")
+            end = 0.0                 # after the first, only what is there already
+        out, self.inbox = self.inbox, []
+        return out
 
     def close(self, clean: bool = True) -> None:
         """DISCONNECT (the broker then keeps the will to itself) and close."""

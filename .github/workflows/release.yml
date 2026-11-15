@@ -107,6 +107,16 @@ jobs:
           else
             echo "::warning::DOPEIPTV_TMDB_KEY secret is empty - the built-in TMDB option will NOT appear in this build."
           fi
+      - name: Bake built-in Simkl client id
+        env:
+          DOPEIPTV_SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+        run: |
+          printf 'SIMKL_CLIENT_ID = "%s"\n' "${DOPEIPTV_SIMKL_CLIENT_ID}" > dopeiptv/_simkl_key.py
+          if [ -n "${DOPEIPTV_SIMKL_CLIENT_ID}" ]; then
+            echo "Built-in Simkl client id baked in (${#DOPEIPTV_SIMKL_CLIENT_ID} chars)."
+          else
+            echo "::warning::SIMKL_CLIENT_ID secret is empty - Simkl will NOT be offered in this build."
+          fi
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -229,6 +239,16 @@ jobs:
             echo "Built-in TMDB key baked in (${#DOPEIPTV_TMDB_KEY} chars)."
           else
             echo "::warning::DOPEIPTV_TMDB_KEY secret is empty - the built-in TMDB option will NOT appear in this build."
+          fi
+      - name: Bake built-in Simkl client id
+        env:
+          DOPEIPTV_SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+        run: |
+          printf 'SIMKL_CLIENT_ID = "%s"\n' "${DOPEIPTV_SIMKL_CLIENT_ID}" > dopeiptv/_simkl_key.py
+          if [ -n "${DOPEIPTV_SIMKL_CLIENT_ID}" ]; then
+            echo "Built-in Simkl client id baked in (${#DOPEIPTV_SIMKL_CLIENT_ID} chars)."
+          else
+            echo "::warning::SIMKL_CLIENT_ID secret is empty - Simkl will NOT be offered in this build."
           fi
       - uses: actions/setup-python@v6
         with:
@@ -782,6 +802,16 @@ jobs:
           else
             echo "::warning::DOPEIPTV_TMDB_KEY secret is empty - the built-in TMDB option will NOT appear in this build."
           fi
+      - name: Bake built-in Simkl client id
+        env:
+          DOPEIPTV_SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+        run: |
+          printf 'SIMKL_CLIENT_ID = "%s"\n' "${DOPEIPTV_SIMKL_CLIENT_ID}" > dopeiptv/_simkl_key.py
+          if [ -n "${DOPEIPTV_SIMKL_CLIENT_ID}" ]; then
+            echo "Built-in Simkl client id baked in (${#DOPEIPTV_SIMKL_CLIENT_ID} chars)."
+          else
+            echo "::warning::SIMKL_CLIENT_ID secret is empty - Simkl will NOT be offered in this build."
+          fi
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -891,6 +921,20 @@ jobs:
         # conda-forge's libraries find each other through @rpath; this copies
         # in what the bundle lacks and points every reference inside it.
         run: python packaging/macos_bundle_dylibs.py dist/dopeIPTV.app "$DOPEIPTV_LIBMPV_DIR"
+      - name: PyObjC's Swift-linked modules find the system's Swift runtime
+        # Some PyObjC extensions (CoreMedia on the Intel build) load
+        # @rpath/libswift*.dylib, which macOS keeps in /usr/lib/swift;
+        # PyInstaller rewrites their rpath to the bundle, so add that one
+        # back before the app is signed.
+        run: |
+          find dist/dopeIPTV.app/Contents/Frameworks -name '*.so' -print0 |
+            while IFS= read -r -d '' so; do
+              if otool -L "$so" | grep -q '@rpath/libswift'; then
+                otool -l "$so" | grep -q 'path /usr/lib/swift ' \
+                  || install_name_tool -add_rpath /usr/lib/swift "$so"
+                echo "rpath /usr/lib/swift: ${so#dist/dopeIPTV.app/}"
+              fi
+            done
       - name: Developer ID keychain
         id: sign
         env:
@@ -1133,11 +1177,13 @@ jobs:
             hdiutil detach "$MOUNT" || true; exit 1
           fi
           # And they must actually LOAD from the frozen bundle: --self-check
-          # runs GUI-less (no window server needed) and verifies both the
-          # bundled libmpv and that every shipped language registers.
-          echo "::group::--self-check (bundled libmpv + languages)"
+          # runs GUI-less (no window server needed) and verifies the bundled
+          # libmpv, that every shipped language registers, that PyObjC's
+          # MediaPlayer (Now Playing, the media keys) imports and that
+          # AVFoundation and AVKit (AirPlay) do.
+          echo "::group::--self-check (bundled libmpv + languages + media controls + AirPlay)"
           if ! "$BIN" --self-check; then
-            echo "::error::--self-check failed on the mounted .app (libmpv or languages)"
+            echo "::error::--self-check failed on the mounted .app (libmpv, languages, media controls or AirPlay)"
             # Why libmpv does not load: dlopen's own message names the
             # library it could not find.
             echo "::group::libmpv: links, rpaths and dlopen"
@@ -1282,6 +1328,15 @@ jobs:
           if [ -z "${DOPEIPTV_TMDB_KEY}" ]; then
             echo "::warning::DOPEIPTV_TMDB_KEY secret is empty - the built-in TMDB option will NOT appear in this build."
           fi
+      - name: Bake built-in Simkl client id
+        shell: bash
+        env:
+          DOPEIPTV_SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+        run: |
+          printf 'SIMKL_CLIENT_ID = "%s"\n' "${DOPEIPTV_SIMKL_CLIENT_ID}" > dopeiptv/_simkl_key.py
+          if [ -z "${DOPEIPTV_SIMKL_CLIENT_ID}" ]; then
+            echo "::warning::SIMKL_CLIENT_ID secret is empty - Simkl will NOT be offered in this build."
+          fi
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -1395,17 +1450,18 @@ jobs:
           # happens to have installed. Reading the import tables can.
           python tools/win_dll_audit.py \
             dist/dopeiptv/_internal/mpv-2.dll dist/dopeiptv/_internal/vulkan-1.dll
-      - name: Smoke test - self-check the frozen exe (libmpv + languages)
+      - name: Smoke test - self-check the frozen exe (libmpv + languages + media controls)
         shell: pwsh
         run: |
           # The exe is a windowed app, so PowerShell won't wait on its own -
           # Start-Process -Wait does. Exit code 0 = bundled libmpv loads, the
           # vulkan-1.dll it pulls in is the bundled copy (not the runner's),
-          # AND every shipped language registers from the bundle.
+          # every shipped language registers from the bundle AND PyWinRT's
+          # Windows.Media namespaces (the system's media controls) import.
           $p = Start-Process -FilePath "dist\dopeiptv\dopeiptv.exe" `
                  -ArgumentList "--self-check" -Wait -PassThru
           if ($p.ExitCode -ne 0) {
-            Write-Error "self-check failed (exit $($p.ExitCode)) - libmpv or languages missing from the bundle"
+            Write-Error "self-check failed (exit $($p.ExitCode)) - libmpv, languages or the media controls (PyWinRT) missing from the bundle"
             exit 1
           }
           Write-Output "self-check OK"
@@ -1635,6 +1691,16 @@ jobs:
             echo "Built-in TMDB key baked in (${#DOPEIPTV_TMDB_KEY} chars)."
           else
             echo "::warning::DOPEIPTV_TMDB_KEY secret is empty - the built-in TMDB option will NOT appear in this build."
+          fi
+      - name: Bake built-in Simkl client id
+        env:
+          DOPEIPTV_SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+        run: |
+          printf 'SIMKL_CLIENT_ID = "%s"\n' "${DOPEIPTV_SIMKL_CLIENT_ID}" > dopeiptv/_simkl_key.py
+          if [ -n "${DOPEIPTV_SIMKL_CLIENT_ID}" ]; then
+            echo "Built-in Simkl client id baked in (${#DOPEIPTV_SIMKL_CLIENT_ID} chars)."
+          else
+            echo "::warning::SIMKL_CLIENT_ID secret is empty - Simkl will NOT be offered in this build."
           fi
       - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:

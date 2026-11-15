@@ -102,6 +102,17 @@ Platform notes that are easy to forget:
   Start menu entry and an entry under Settings -> Apps - and the portable
   zip. The release job installs it, installs it again over itself the way
   the app's update does (`/S /relaunch`), self-checks and removes it.
+- The system's media controls off Linux come through PyObjC (macOS, Now
+  Playing) and PyWinRT (Windows, the SMTC): `requirements.txt` installs
+  them with platform markers, the specs name their modules, and
+  `--self-check` fails a bundle without them. CI cannot press a media key:
+  a change in `services/media_macos.py` or `media_windows.py` is tried on
+  a real Mac or PC (Control Center, the lock screen, the volume flyout, the
+  keys) before it ships.
+- AirPlay (macOS) comes through PyObjC's AVFoundation and AVKit in the same
+  way, and `--self-check` fails a Mac bundle without them. A change in
+  `services/airplay_macos.py` is tried with a real Apple TV: Apple's menu,
+  a channel and a film, pause, seek, the firewall's question.
 
 ## Cutting a release
 
@@ -143,6 +154,8 @@ Only names here - the values are with the owner.
 |---|---|---|
 | GitHub Actions secret `DOPEIPTV_TMDB_KEY` | written into `dopeiptv/_tmdb_key.py` (git-ignored) by every release/nightly build | builds have no bundled TMDB key: posters need the user's own key, Home's popular shelves stay empty |
 | GitHub Actions secret `DOPEIPTV_OPENSUBTITLES_KEY` | bundled the same way for subtitle search | users must enter their own free OpenSubtitles key |
+| GitHub Actions secret `SIMKL_CLIENT_ID` | the client id of dopeIPTV's app at simkl.com/settings/developer (no secret is used: the PIN sign-in needs none), written into `dopeiptv/_simkl_key.py` (git-ignored) by every release build ("Bake built-in Simkl client id") | Simkl is not offered in Settings |
+| Discord application | its application id is `DISCORD_APP_ID` in `dopeiptv/core/discord_rpc.py` (public, not a secret: discord.com/developers → Applications, named "dopeIPTV", since Discord shows "Watching <its name>"); a Rich Presence art asset named `dopeiptv` gives the status its picture | the Discord switch is not offered |
 | Trakt app registration | its client id is `DEFAULT_CLIENT_ID` in `providers/trakt.py`; the redirect goes through the website (see its README) | users can enter their own client id in Settings → Trakt |
 | The web server | runs the site and its cron sync (website branch: `README.md`, `DEPLOY.md`) | the site stops updating; the app is unaffected |
 | GitHub repository settings | releases, Actions, the Security tab for private reports | - |
@@ -155,7 +168,8 @@ Only names here - the values are with the owner.
 | GitHub Actions secret `DOPEIPTV_UPDATE_KEY` | dopeIPTV's release signing key (Ed25519, base64): release.yml's `checksums` job and nightly.yml sign each release's `SHA256SUMS` with it (`tools/sign_sums.py`); its public half is in `dopeiptv/core/update_keys.py`. Made once with `tools/make_update_key.py`; the only backup is the owner's password manager - see "The release key" below | a release fails at signing; a test build goes out unsigned and the app will not install it |
 
 A source checkout works without any of these. For local testing, set
-`DOPEIPTV_TMDB_KEY` / `DOPEIPTV_OPENSUBTITLES_KEY` in the environment.
+`DOPEIPTV_TMDB_KEY` / `DOPEIPTV_OPENSUBTITLES_KEY` / `DOPEIPTV_SIMKL_CLIENT_ID` in
+the environment.
 
 ### The release key
 
@@ -301,11 +315,118 @@ tests check that placeholders line up and that every `tr("…")` key exists.
   When it has had a release or two without trouble, drop the label.
 - **Flatpak** is built but not on Flathub (`packaging/flatpak/FLATHUB.md`
   has what a submission needs); its build leg is experimental.
-- **AirPlay** was tried and parked (tvOS broke the API third-party senders
-  use) - `docs/DEVELOPER_NOTES.md` says how to re-check.
+- **AirPlay** is macOS only (AVFoundation and AVKit; tvOS broke the API
+  other senders use) and has not been tried on a real Mac and Apple TV
+  yet - `docs/DEVELOPER_NOTES.md` says how it works.
 - Windows code signing (see above).
 - On the website, a few Serbian strings are in Cyrillic while the rest of
   the Serbian page is Latin.
+
+### Planned: Enigma2 for those with boxes at home
+
+After the account-connection count (the Nerd network tools) is in, so it
+builds on that count instead of a second one:
+
+- **Transponder check.** Channels on the same transponder share the
+  TSID/ONID/namespace of their service reference. With the box's tuner
+  count (`/web/about`), what it records (`/web/timerlist` - recordings
+  only) and what the box itself shows on the TV right now
+  (`/web/getcurrent`, the service being watched), warn before a zap or a
+  stream that would cut off a recording or someone watching, and mark the
+  channels that can be seen without one.
+- **Signal values.** SNR, AGC and BER of the tuner in use (`/web/signal`),
+  live in the stream stats (`I`) and the box's info.
+- **Transcoding via port 8002**, per box, for boxes with a hardware
+  transcoder, with quality steps - also used when the box's channels are
+  cast or shown in multiview, if chosen.
+- **Encrypted channels said plainly.** When a channel will not play, read
+  the first TS packets (transport_scrambling_control) and say the box
+  cannot decrypt it (no card, CI module or rights) - in the player,
+  recordings, multiview and stream health; failover may then try another
+  source.
+
+Then the rest of what an Enigma2 box can do from a computer:
+
+- **Bouquet editor** (as Dreamboxedit does): bouquets and their channels
+  reordered, renamed, added and removed, markers, written back to the box
+  and the box told to reload them.
+- **AutoTimer**: the box's own rules read, made and changed (OpenWebif's
+  AutoTimer plugin), beside dopeIPTV's series rules - and said plainly
+  which of the two records what.
+- **The box's recordings managed**: delete, move to another folder, rename.
+- **A screenshot from the box** (`/web/grab`): what the TV shows, picture,
+  OSD or both.
+- **The box's remote control in the app** (`/web/remotecontrol`), the
+  whole remote including the colour keys and the menus.
+
+Check every endpoint against OpenWebif's source, and test on a real box.
+
+### Ideas to talk through before anything is built
+
+Not decided: each needs a word with the maintainer first.
+
+**Reception and the stream itself**
+
+- **SAT>IP client**: minisatip, Digital Devices, Telestar, and Enigma2 or
+  Tvheadend serving SAT>IP. RTSP with the tuning in the address, the
+  server's channel list where it has one (an M3U), else a scan.
+- **Teletext and DVB subtitles** through ffmpeg/libzvbi: teletext pages
+  (page 199 and the like in the Nordics) as subtitles, and a teletext
+  viewer. Recordings keep them only as .ts (MP4 cannot carry them).
+- **TS analysis in Nerd**: PIDs and the PMT, bitrate per PID, continuity
+  errors, PCR jitter - a simple TR 101 290 for the stream that plays.
+- **Recordings compared between sources**: the same programme on two
+  sources side by side (picture size, bitrate, drops), and the better one
+  chosen - built on failover's matching.
+
+**More home backends** (Enigma2, Tvheadend, HDHomeRun, Jellyfin, Emby and
+Plex are in)
+
+- **VDR** through streamdev or the restfulapi plugin.
+- **DVBViewer Media Server** (big on Windows, above all in Germany).
+- **NextPVR** and **MythTV**.
+
+**Other kinds of streams**
+
+- **Live streams through yt-dlp** (YouTube Live, Twitch and more): mpv's
+  ytdl hook already plays them; what is missing is a way to add and
+  bundle yt-dlp (it changes often, so it must update without a release).
+- **Internet radio from radio-browser.info**: stations with logos and
+  genres, beside the music library.
+
+**On the TV, from the sofa**
+
+- **A 10-foot mode**: a large interface run entirely with a remote. The
+  app has nothing for HDMI-CEC, a gamepad or LIRC today; a CEC remote works
+  only where the system turns it into keys. TV mode on the list from
+  "build everything" is the same thing.
+- **dopeIPTV as an HDHomeRun tuner** (`discover.json`, `lineup.json`), so
+  Plex, Jellyfin and Emby on the network see it as one - beside the M3U
+  and XMLTV it already shares.
+- **Android TV and Fire TV**: PyQt6 does not get there in practice; an
+  app of its own would be a separate project. Until then the shared
+  playlist and guide, the remote API and the HDHomeRun emulation let apps
+  on the TV use dopeIPTV as their source.
+
+### Every feature works with the others
+
+A rule for everything new, and the reason for a review once a batch is in:
+
+- **One way in.** Whatever starts a stream - a zap in the app, the phone
+  remote, Home Assistant commands, Watch together, multiview, the rewind
+  buffer, recordings, casting (Chromecast, DLNA, Kodi, AirPlay), failover -
+  goes through the same path, so its checks (VPN guard, connection limit,
+  transponder check) apply everywhere without being rebuilt per feature.
+- **One count of connections and tuners**: an Xtream account's
+  connections and a box's tuners and transponders in the same place,
+  counting the player, each multiview cell, the rewind buffer, recordings
+  and casts.
+- **One way to say a problem**: an encrypted channel, a dead address or a
+  limit reached reads the same in the player, recordings, multiview,
+  stream health and casting.
+- **A combined review after each batch**, with tests for the pairs that
+  matter (box + recording + multiview, phone remote + transponder check,
+  Watch together + failover, casting + the rewind buffer).
 
 ## How changes are written
 
