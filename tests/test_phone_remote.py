@@ -463,7 +463,9 @@ assert w._phone.port == port and w._phone.token == token
 w.phone_remote_stop()
 assert s.value("phone_remote") == "false" and not w.phone_remote_running()
 try:
-    socket.create_connection(("127.0.0.1", port), timeout=2).close()
+    # Windows tries a refused connection to this computer again for about
+    # two seconds before it says so: room for that, not a timeout.
+    socket.create_connection(("127.0.0.1", port), timeout=10).close()
     raise AssertionError("still listening")
 except ConnectionRefusedError:
     pass

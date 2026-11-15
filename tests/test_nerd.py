@@ -246,14 +246,24 @@ def test_vpn_seen_on_windows_by_adapter_and_ipv4():
 # -- a real mpv against fake servers -------------------------------------------------
 
 def _libmpv():
+    said: list[str] = []
     try:
         import mpv
         # keep_open as the app has it: a clip played to its end stays
-        # loaded, so a check on a busy machine cannot miss it.
-        m = mpv.MPV(vo="null", ao="null", terminal=False, keep_open="yes")
+        # loaded, so a check on a busy machine cannot miss it. What mpv
+        # warns of is kept for a failure's message (_why).
+        m = mpv.MPV(vo="null", ao="null", terminal=False, keep_open="yes", loglevel="warn",
+                    log_handler=lambda level, prefix, text: said.append(f"{level} {prefix}: {text.strip()}"))
     except Exception as e:     # no libmpv here: CI installs it, a dev box may not
         pytest.skip(f"libmpv not available: {e}")
+    m._said = said
     return m
+
+
+def _why(m, *servers) -> str:
+    """What mpv said and what each fake server was asked: a failure's message."""
+    asked = [getattr(s, "requests", None) or getattr(s, "paths", None) for s in servers]
+    return f"mpv {getattr(m, 'mpv_version', '?')}: {getattr(m, '_said', [])[-12:]}; asked: {asked}"
 
 
 class Recorder:
@@ -408,9 +418,9 @@ def test_real_mpv_answers_tvheadends_digest_login_from_the_address(player, serve
     from dopeiptv.providers.boxes import with_login
     tvh = server(auth=("digest", "kodi", "s3cret"))
     url = with_login(f"http://127.0.0.1:{tvh.port}/stream/channel/c1?profile=pass", "kodi", "s3cret")
-    assert _plays(player, url)
-    assert tvh.requests[0]["headers"].get("authorization") is None       # challenged first
-    assert tvh.requests[-1]["headers"]["authorization"].lower().startswith("digest ")
+    assert _plays(player, url), _why(player, tvh)
+    assert tvh.requests[0]["headers"].get("authorization") is None, _why(player, tvh)   # challenged first
+    assert tvh.requests[-1]["headers"]["authorization"].lower().startswith("digest "), _why(player, tvh)
 
 
 def test_settings_changed_while_playing_reach_the_player_and_go_back(tmp_path):

@@ -166,6 +166,7 @@ class EpgGrid(QWidget):
         self.channels = self._all_channels
         self._selected = None
         self._compact: bool | None = None
+        self._words_w: dict[str, int] = {}
         self._refresh_pending = False
         self._built_unready = False
         # The time scale (px per minute) and how it is chosen: fitted to the
@@ -523,15 +524,34 @@ class EpgGrid(QWidget):
                 btn.setToolTip(tr("rec_manage_scheduled")
                                if btn is self.rec_sched_btn else tr(key))
             else:
-                btn.setMinimumWidth(0)
+                # The words are no minimum: one would keep the bar from
+                # being narrowed to where they go (a big font made it wider
+                # than COMPACT_W, so it never got there). What they take is
+                # noted for _words_need.
+                btn.setMinimumWidth(30)
                 btn.setMaximumWidth(16777215)
+                btn.ensurePolished()
+                self._words_w[key] = btn.sizeHint().width()
+
+    def _words_need(self) -> int:
+        """The bar's width with the longer buttons' words and the zoom
+        buttons, in the font it has."""
+        zoom = self._zoom_box
+        extra = zoom.sizeHint().width() + self._bar.spacing() if zoom.isHidden() else 0
+        words = sum(max(0, w - 30) for w in self._words_w.values())
+        # Measured now, not as the last layout pass left it: a button's
+        # minimum (or the stylesheet's padding) may just have changed.
+        self._bar.invalidate()
+        return self._bar.minimumSize().width() + extra + words
 
     def _update_compact(self) -> None:
         w = self.width()
+        # Where the words fit: COMPACT_W, or more in a font that needs it.
+        need = self._words_need()
         if self._compact is True:
-            self._apply_compact(w < self.WIDE_W)
+            self._apply_compact(w < max(self.WIDE_W, need + self.WIDE_W - self.COMPACT_W))
         else:
-            self._apply_compact(w < self.COMPACT_W)
+            self._apply_compact(w < max(self.COMPACT_W, need))
         self._fit_bar()
 
     def _fit_bar(self) -> None:

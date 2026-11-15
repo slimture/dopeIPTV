@@ -680,11 +680,12 @@ class RecordingManager(QObject):
             return
         secs = (max(1, int(j["stop"] - time.time()))
                 if j.get("stop") else None)
-        bridge = self._bridge(j)
+        from .net_bridge import recorder_options
+        through = recorder_options(kind, *self._bridge(j))
         if kind == "ffmpeg":
             cmd = [exe, "-y", "-loglevel", "error",
                    *self._input_options(j["url"]),
-                   *(["-http_proxy", bridge] if bridge else []), "-i", j["url"],
+                   *through, "-i", j["url"],
                    "-c", "copy"]
             if secs:
                 cmd += ["-t", str(secs)]
@@ -692,8 +693,7 @@ class RecordingManager(QObject):
         else:
             cmd = [exe, j["url"], f"--stream-record={path}", "--vo=null",
                    "--ao=null", "--no-terminal", f"--user-agent={RECORD_UA}"]
-            if bridge:
-                cmd.append(f"--http-proxy={bridge}")
+            cmd += through
             if secs:
                 cmd.append(f"--length={secs}")
         try:
@@ -709,14 +709,16 @@ class RecordingManager(QObject):
             j["status"] = "failed"
             j["error"] = str(e)
 
-    def _bridge(self, j: dict) -> str:
+    def _bridge(self, j: dict) -> tuple[str, bool]:
         """Nerd: the bridge (core/net_bridge.py) a recording connects
         through when its source's own DNS, IP version or pinned certificate
         asks for one - the source it was made from, else the one playing;
-        "" otherwise (and always while Nerd is off)."""
+        "" otherwise (and always while Nerd is off) - and whether the bridge
+        checks the stream's pinned certificate (the recorder then does not
+        check the chain itself)."""
         from . import nerd, net_bridge
         if not nerd.current().on:
-            return ""
+            return "", False
         src = nerd.source()
         pid = str(j.get("source") or "")
         if pid:
@@ -728,7 +730,9 @@ class RecordingManager(QObject):
                 pl = None
             if pl:
                 src = dict(pl.get("options") or {}, _kind=pl.get("kind") or "xtream")
-        return net_bridge.address_for(src, str(j.get("url") or ""))
+        url = str(j.get("url") or "")
+        address = net_bridge.address_for(src, url)
+        return address, bool(address) and net_bridge.checks_pin(src, url)
 
     @staticmethod
     def _input_options(url: str) -> list[str]:

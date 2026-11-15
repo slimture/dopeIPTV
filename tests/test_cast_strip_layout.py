@@ -161,6 +161,7 @@ def test_a_hidden_control_takes_no_room():
     bar, controls = _strip()
     _settle(bar, 420)
     full, before = bar.heightForWidth(420), spots()
+    line = [c for c in controls[1:7] if c.geometry().top() == controls[2].geometry().top()]
 
     # Hide the timeshift button (controls[2], the rewind icon).
     controls[2].hide()
@@ -168,11 +169,25 @@ def test_a_hidden_control_takes_no_room():
     assert bar.heightForWidth(420) <= full
     # Everything after it closed up: nothing moved further along the line or
     # down onto another one, which is what an empty reserved slot would do.
-    for c in controls:
+    for c in controls[3:]:
         if c.isHidden():
             continue
         assert spots()[id(c)] <= before[id(c)], \
             f"{c.__class__.__name__} moved away from the hidden button"
+    # Before it, nothing went down a line either; on its line the controls
+    # stay together at the right edge, so with the label taking the slack
+    # they may move along by what the hidden one took. Where nothing came up
+    # from the next line - the fonts of a big desktop - they do.
+    for c in (controls[0], controls[1]):
+        assert spots()[id(c)][0] <= before[id(c)][0], \
+            f"{c.__class__.__name__} went down a line"
+    # No hole where it was: its neighbours on the line are a spacing apart.
+    k = line.index(controls[2])
+    if 0 < k < len(line) - 1:
+        left, right = line[k - 1], line[k + 1]
+        if left.geometry().top() == right.geometry().top():
+            gap = right.geometry().left() - left.geometry().right() - 1
+            assert gap == bar.layout().itemAt(0).layout().spacing(), gap
     assert not _overlaps([c for c in controls if not c.isHidden()])
 
     # And with everything optional gone, the strip is shorter still.
@@ -186,8 +201,18 @@ def test_it_can_be_narrower_than_the_widest_control_asks_for():
     """The minimum is one item per line, not the sum of them - that sum is
     what a plain row insists on, and being refused it is what made it
     overlap."""
+    from PyQt6.QtGui import QFontMetrics
     bar, controls = _strip()
-    assert bar.minimumSizeHint().width() <= 160
+    # The widest one alone, in the fonts this desktop has, and the margins
+    # (the strip's own, and the position row's two pixels each side).
+    left, _top, right, _bottom = bar.layout().getContentsMargins()
+    widest = max(max(c.minimumSize().width(), c.minimumSizeHint().width()) for c in controls)
+    least = bar.minimumSizeHint().width()
+    assert least <= widest + 4 + left + right, (least, widest)
+    assert least < sum(c.minimumSizeHint().width() for c in controls[:7]), least
+    # In the fonts of a desktop at 100 % that is a 160-pixel column.
+    if QFontMetrics(controls[-2].font()).horizontalAdvance(controls[-2].text()) <= 120:
+        assert least <= 160
     _settle(bar, 130)
     assert not _overlaps(controls)
 

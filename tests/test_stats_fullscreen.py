@@ -118,13 +118,21 @@ up("macOS fullscreen, I twice", w._popout_mirror)
 w._exit_player_fullscreen()
 up("after macOS fullscreen", p.video)
 
-# The pop-out, its own fullscreen and back, then docked again.
+# The pop-out, its own fullscreen and back, then docked again. Its picture:
+# the mirror on Linux and macOS, the player's own moved there on Windows.
+from dopeiptv.ui.mw_popout import _use_mirror_popout
+
+
+def popped():
+    return w._popout_mirror if _use_mirror_popout() else p.video
+
+
 w._toggle_popout()
-up("pop-out", w._popout_mirror)
+up("pop-out", popped())
 popout_fullscreen()
-up("pop-out fullscreen", w._popout_mirror)
+up("pop-out fullscreen", popped())
 popout_fullscreen()
-up("pop-out after fullscreen", w._popout_mirror)
+up("pop-out after fullscreen", popped())
 w._toggle_popout()
 up("docked again", p.video)
 

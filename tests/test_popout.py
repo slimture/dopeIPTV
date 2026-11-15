@@ -36,16 +36,20 @@ from PyQt6.QtCore import QSettings
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget)
 from dopeiptv.media.embedded import EmbeddedPlayer
-from dopeiptv.ui.mw_popout import _PopoutMixin
+from dopeiptv.ui.mw_popout import _PopoutMixin, _use_mirror_popout
 
 app = QApplication.instance() or QApplication([])
+# Linux and macOS mirror the stream into the pop-out; Windows moves the
+# player itself there (test_windows_pops_out_by_reparenting).
+MIRROR = _use_mirror_popout()
 
 
 class Host(QMainWindow, _PopoutMixin):
     def __init__(self):
         super().__init__()
-        self.settings = QSettings("dopeiptv-test", "popout-sub")
-        self.settings.clear()
+        import tempfile
+        self.settings = QSettings(os.path.join(tempfile.mkdtemp(), "popout.ini"),
+                                  QSettings.Format.IniFormat)
         self._pip_win = None
         self._popout_win = None
         self._popout_placeholder = None
@@ -80,11 +84,19 @@ assert player.parent() is det
 h._toggle_popout()
 app.processEvents()
 assert h._popout_win is not None
-assert player.parent() is det, "the real player must stay docked"
-assert getattr(h, "_popout_mirror", None) is not None
-assert h._popout_mirror.parent() is h._popout_win
-assert player.bar.parent() is not player, "control bar moves to the pop-out"
-assert buttons(h) == [], "no placeholder button in the pane (player stays)"
+if MIRROR:
+    assert player.parent() is det, "the real player must stay docked"
+    assert getattr(h, "_popout_mirror", None) is not None
+    assert h._popout_mirror.parent() is h._popout_win
+    assert player.bar.parent() is not player, "control bar moves to the pop-out"
+    assert buttons(h) == [], "no placeholder button in the pane (player stays)"
+else:
+    # Windows: the player itself, its bar with it; a placeholder holds its
+    # place in the pane and brings it home when clicked.
+    assert player.parent() is h._popout_win, "the player moves to the window"
+    assert getattr(h, "_popout_mirror", None) is None
+    assert player.bar.parent() is player
+    assert buttons(h) == [h._popout_placeholder]
 
 # Pop-out fullscreen toggles must not raise.
 h._popout_fs_toggled_at = 0.0
@@ -177,7 +189,7 @@ assert h._popout_win is not None
 h._toggle_popout()
 app.processEvents()
 assert h._popout_win is None
-assert h._popout_mirror is None
+assert getattr(h, "_popout_mirror", None) is None
 assert player.parent() is det
 assert player.bar.parent() is player, "control bar back on the player"
 assert player._mirror is None
@@ -193,7 +205,7 @@ assert h._popout_win is None
 assert player.parent() is det
 assert player.bar.parent() is player
 
-print("POPOUT_OK")
+print("POPOUT_OK", flush=True)
 """
 
 

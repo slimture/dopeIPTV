@@ -19,7 +19,11 @@ load balancer).
 A pinned certificate cannot be read inside the tunnel (TLS 1.3 sends it
 encrypted). Before a tunnel to a pinned host opens, the bridge makes a TLS
 connection of its own to it and checks the fingerprint - again after
-PIN_RECHECK seconds - and refuses the tunnel when it differs.
+PIN_RECHECK seconds - and refuses the tunnel when it differs. That check is
+the trust for a pinned host: a home server's own certificate is signed by
+no authority, and a newer ffmpeg or mpv checks the chain by default (FFmpeg
+9 and mpv 0.42 here; FFmpeg 6 and mpv 0.37 did not), so for a stream to a
+pinned host - and only there - they are told not to (checks_pin).
 
 Only this computer connects (127.0.0.1), each route has a bridge of its own
 on a port of its own, and what is not a proxy's request (a web page's
@@ -269,6 +273,27 @@ def describe(route: Route) -> str:
     if route.pins:
         parts.append("pinned certificate")
     return ", ".join(parts) or "-"
+
+
+def checks_pin(source: dict | None, url: str, n: object = None) -> bool:
+    """Does the bridge check a certificate *source* pins for the stream at
+    *url* (https, to the pinned host and port)? Then that check is the trust
+    for it, and the player and the recorder are told not to check the chain
+    themselves (see the module's docstring)."""
+    route = net_route.route_for(source, n)
+    where = net_route.url_host(url)
+    return (route.active and where is not None and where[0] == "https"
+            and route.pin(where[1], where[2]) is not None)
+
+
+def recorder_options(kind: str, address: str, pinned: bool) -> list[str]:
+    """What a recorder (ffmpeg or mpv) is told to go through the bridge at
+    *address*; *pinned*: it checks the stream's pinned certificate."""
+    if not address:
+        return []
+    if kind == "ffmpeg":
+        return ["-http_proxy", address, *(["-tls_verify", "0"] if pinned else [])]
+    return [f"--http-proxy={address}", *(["--tls-verify=no"] if pinned else [])]
 
 
 def address_for(source: dict | None, url: str, n: object = None) -> str:

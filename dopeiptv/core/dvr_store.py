@@ -377,6 +377,8 @@ class SegmentStore:
                 return
             self._pins.pop(seq, None)
             path = self._doomed.pop(seq, None)
+            if not self._pins:
+                self._cond.notify_all()         # wipe() may be waiting for this
         if path is not None:
             self._unlink(path)
 
@@ -394,9 +396,25 @@ class SegmentStore:
             self._close_current()
             self._cond.notify_all()
 
+    #: How long wipe() waits for readers to let go of what they have open.
+    WIPE_WAIT = 5.0
+
     def wipe(self) -> None:
-        """Delete everything held (after close)."""
+        """Delete everything held (after close; off the window's thread).
+        Windows refuses to delete a file that is open, so a segment a reader
+        still had open stayed behind with its folder: the close wakes the
+        readers, they let go, and what is left goes then."""
         self.close()
+        shutil.rmtree(self.root, ignore_errors=True)
+        if not self.root.exists():
+            return
+        deadline = time.monotonic() + self.WIPE_WAIT
+        with self._cond:
+            while self._pins:
+                left = deadline - time.monotonic()
+                if left <= 0:
+                    break
+                self._cond.wait(left)
         shutil.rmtree(self.root, ignore_errors=True)
 
 

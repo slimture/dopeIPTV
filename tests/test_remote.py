@@ -580,7 +580,9 @@ assert ask("GET", "/api/status")[0] == 404 and ask("GET", "/playlist.m3u")[0] ==
 s.setValue("nerd_share", "false"); nerd.install(s)
 assert not w._remote_apply()["running"]
 try:
-    socket.create_connection(("127.0.0.1", port), timeout=2).close()
+    # Windows tries a refused connection to this computer again for about
+    # two seconds before it says so: room for that, not a timeout.
+    socket.create_connection(("127.0.0.1", port), timeout=10).close()
     raise AssertionError("still listening")
 except ConnectionRefusedError:
     pass
@@ -597,7 +599,7 @@ busy.close()
 assert w._remote_apply({k: st[k] for k in ("remote", "share", "port", "host", "token")})["running"]
 w._remote_stop()
 xt.close()
-print("REMOTE_WINDOW_OK")
+print("REMOTE_WINDOW_OK", flush=True)
 """
 
 

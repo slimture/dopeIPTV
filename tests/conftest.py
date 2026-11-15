@@ -25,6 +25,9 @@ os.environ["XDG_STATE_HOME"] = tempfile.mkdtemp(prefix="dopeiptv-test-state-")
 # output is buffered, so it was lost - "exit 0, stdout=''" on the CI runner,
 # while a shell that sets PYTHONUNBUFFERED passed. Children inherit this.
 os.environ["PYTHONUNBUFFERED"] = "1"
+# And a child that dies in Qt or mpv says where, instead of exiting with
+# nothing but a Qt warning on stderr (as on a Windows run).
+os.environ["PYTHONFAULTHANDLER"] = "1"
 
 
 @pytest.fixture(autouse=True, scope="session")

@@ -68,7 +68,7 @@ print("PAGES", " ".join(seen["pages"]))
 print("HISTORY", " ".join(seen["history"]))
 print("INTEGRATIONS", " ".join(seen["integrations"]))
 print("DISCORD", seen["discord"], seen.get("on"))
-print("SIMKL", w.simkl.available())
+print("SIMKL", w.simkl.available(), flush=True)   # os._exit flushes nothing
 os._exit(0)
 """
 

@@ -20,6 +20,20 @@ from dopeiptv.core.log import log as _blog
 from dopeiptv.providers.cast_bridge import CastBridge, ffmpeg_args, lan_address
 
 
+@pytest.fixture
+def quick_exit(monkeypatch):
+    """A converter that ends at once whatever it is asked - what /bin/true
+    stood in for, which Windows does not have: this Python, told to do
+    nothing. Returns what to set as the bridge's exe."""
+    import dopeiptv.providers.cast_bridge as cb
+
+    def nothing(*_a, **_k):
+        return [sys.executable, "-c", "pass"]
+    for name in ("ffmpeg_args", "hls_args", "feed_args"):
+        monkeypatch.setattr(cb, name, nothing)
+    return sys.executable
+
+
 def test_the_video_is_copied_when_only_the_audio_is_the_problem():
     """Re-encoding 1080p live would cook the machine, and it is not what the
     receiver choked on."""
@@ -74,20 +88,52 @@ def test_a_local_file_is_linked_under_a_name_nothing_can_misread(tmp_path):
     in every ffmpeg version - and "Ocean's Eleven 2026-07-28.ts" is an
     ordinary recording. Local files get a plain name instead of a quoting
     argument."""
-    awkward = tmp_path / "Ocean's: Eleven.mkv"
+    # Windows allows no colon in a file name, and its own paths start with
+    # one ("C:\\..."): there the name has the apostrophe only.
+    awkward = tmp_path / ("Ocean's Eleven.mkv" if sys.platform == "win32" else "Ocean's: Eleven.mkv")
     awkward.write_bytes(b"not really a film")
     b = CastBridge()
     b.exe = sys.executable
     try:
         b.start(str(awkward), ["h264"])
         assert b.source is not None
-        assert "'" not in b.source and ":" not in b.source, b.source
-        assert b.source.endswith(".mkv")
-        assert os.path.realpath(b.source) == os.path.realpath(awkward)
+        name = os.path.basename(b.source)
+        assert name == "source.mkv", b.source
+        if sys.platform != "win32":
+            assert "'" not in b.source and ":" not in b.source, b.source
+            assert os.path.realpath(b.source) == os.path.realpath(awkward)
+        # A symbolic link, or a hard link where only that may be made
+        # (Windows without Developer Mode): the same file either way.
+        assert os.path.samefile(b.source, awkward)
     finally:
         tmp = b._tmp
         b.stop()
         assert tmp and not os.path.exists(tmp), "the link is cleaned up"
+    assert awkward.read_bytes() == b"not really a film", "and the film is not"
+
+
+def test_a_file_is_linked_where_symbolic_links_are_refused(tmp_path, monkeypatch):
+    """Windows makes a symbolic link only for an administrator or with
+    Developer Mode on: a hard link then, and the file itself where even
+    that fails (another drive)."""
+    film = tmp_path / "Ocean's Eleven.mkv"
+    film.write_bytes(b"film")
+
+    def refused(*_a, **_k):
+        raise OSError(1314, "A required privilege is not held by the client")
+    monkeypatch.setattr(os, "symlink", refused)
+    b = CastBridge()
+    b.exe = sys.executable
+    try:
+        b.start(str(film), ["h264"])
+        assert os.path.basename(b.source) == "source.mkv"
+        assert os.path.samefile(b.source, film) and not os.path.islink(b.source)
+        monkeypatch.setattr(os, "link", refused)
+        b.start(str(film), ["h264"])
+        assert b.source == str(film)
+    finally:
+        b.stop()
+    assert film.read_bytes() == b"film"
 
 
 def test_a_url_is_never_linked():
@@ -778,13 +824,13 @@ def test_a_broadcast_rolls_its_window_and_a_film_keeps_everything():
         assert "temp_file" in args[args.index("-hls_flags") + 1]
 
 
-def test_the_hls_files_are_served_with_the_types_the_receiver_needs():
+def test_the_hls_files_are_served_with_the_types_the_receiver_needs(quick_exit):
     """A Cast receiver fetches the WebVTT rendition cross-origin and drops it
     silently without the CORS header, which looks exactly like a stream that
     has no subtitles at all. And a playlist served as video/mp4 plays
     nothing."""
     b = CastBridge()
-    b.exe = "/bin/true"
+    b.exe = quick_exit
     try:
         url = b.start("http://p/movie/u/pw/5.mkv", subs=0, sub_codec="subrip")
         folder = b.hls_dir
@@ -1032,13 +1078,13 @@ def test_a_text_subtitle_is_no_reason_to_re_encode_the_picture():
             b.stop()
 
 
-def test_the_subtitle_log_says_it_once():
+def test_the_subtitle_log_says_it_once(quick_exit):
     """It was one line per segment for the length of a film - forty a
     minute, saying the same thing forty times. It is worth saying that the
     receiver reads the subtitles at all, because nothing else on this side
     can tell; it is not worth saying it again."""
     b = CastBridge()
-    b.exe = "/bin/true"
+    b.exe = quick_exit
     said = []
     import dopeiptv.providers.cast_bridge as cb
     real = cb.log.info
@@ -1068,7 +1114,7 @@ def test_the_subtitle_log_says_it_once():
     assert b.said_subs is False
 
 
-def test_a_new_run_waits_for_the_provider_to_forget_the_last_one():
+def test_a_new_run_waits_for_the_provider_to_forget_the_last_one(quick_exit):
     """A panel counts a session for a moment after the socket closes, and
     this account allows one. Changing subtitle three times in a row does
     three tear-downs in a few seconds, and the third found the panel still
@@ -1080,7 +1126,7 @@ def test_a_new_run_waits_for_the_provider_to_forget_the_last_one():
     freezes between BUFFERING and PLAYING for ever.
     """
     b = CastBridge()
-    b.exe = "/bin/true"
+    b.exe = quick_exit
     b.start("http://p/movie/u/pw/5.mkv")
     b.stop()
     assert b.stopped_at > 0
@@ -1088,13 +1134,13 @@ def test_a_new_run_waits_for_the_provider_to_forget_the_last_one():
     # start() tears the last run down, so the clock starts there.
     # A run that had something to tear down: the next one waits.
     b2 = CastBridge()
-    b2.exe = "/bin/true"
+    b2.exe = quick_exit
     try:
         b2.start("http://p/movie/u/pw/5.mkv")
         b2.stop()
         b2.start("http://p/movie/u/pw/5.mkv")
         began = time.monotonic()
-        b2.spawn()
+        assert b2.spawn() is not None
         waited = time.monotonic() - began
         assert waited > 1.0, f"it started after only {waited:.1f} s"
         assert waited < b2.SETTLE_AFTER_STOP + 1
@@ -1106,7 +1152,7 @@ def test_a_new_run_waits_for_the_provider_to_forget_the_last_one():
     # it builds, always - so a blanket wait here put two seconds on every
     # cast in the app for a connection that had never been opened.
     b3 = CastBridge()
-    b3.exe = "/bin/true"
+    b3.exe = quick_exit
     try:
         began = time.monotonic()
         b3.start("http://p/movie/u/pw/5.mkv")

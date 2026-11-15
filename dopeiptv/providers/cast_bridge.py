@@ -1108,6 +1108,11 @@ class CastBridge:
         which sidesteps the whole quoting question. A URL is left alone: they
         are percent-encoded, so the only troublesome character they can carry
         is the colon in the port, which escaping handles.
+
+        Windows lets only an administrator (or Developer Mode) make a
+        symbolic link; a hard link needs no right, only the same drive. Where
+        neither can be made the file is used under its own name - it goes to
+        ffmpeg as an argument of its own, never inside a filtergraph now.
         """
         if "://" in source:
             return source
@@ -1115,10 +1120,20 @@ class CastBridge:
             self._tmp = tempfile.mkdtemp(prefix="cast-", dir=cast_cache_dir())
             link = os.path.join(
                 self._tmp, "source" + os.path.splitext(source)[1])
-            os.symlink(os.path.abspath(source), link)
-            return link
         except Exception as e:
             log.info("cast bridge: could not link the file (%s)", e)
+            return source
+        target = os.path.abspath(source)
+        try:
+            os.symlink(target, link)
+            return link
+        except Exception as e:
+            why = e
+        try:
+            os.link(target, link)
+            return link
+        except Exception as e:
+            log.info("cast bridge: could not link the file (%s; %s)", why, e)
             return source
 
     def start(self, source: str, codecs: list[str] | None = None,

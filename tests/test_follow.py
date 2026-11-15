@@ -131,10 +131,15 @@ def test_episode_label():
 
 
 _CHILD = r"""
-import os, time
+import os, tempfile, time
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtCore import QSettings
 from PyQt6.QtWidgets import QApplication, QLabel, QMenu
+# Every settings file of the window's (followed series have one of their
+# own) in a folder of this run's: Windows and macOS do not look at
+# XDG_CONFIG_HOME, and the real ones are the user's.
+_tmp = tempfile.mkdtemp()
+QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, _tmp)
 
 from dopeiptv.i18n import tr
 from dopeiptv.providers.client import DemoClient
@@ -143,8 +148,7 @@ from dopeiptv.ui import mw_follow
 from dopeiptv.ui.main_window import MainWindow
 
 app = QApplication.instance() or QApplication([])
-settings = QSettings("dopeiptv-test", "follow-child")
-settings.clear()
+settings = QSettings(os.path.join(_tmp, "s.ini"), QSettings.Format.IniFormat)
 w = MainWindow(DemoClient(), settings)
 
 answers = {"12": {"episodes": {"1": [
@@ -232,7 +236,7 @@ settings.setValue("follow_notify", "true")
 
 w._unfollow_series(show)
 assert not w.followed.is_followed(12)
-print("FOLLOW_OK")
+print("FOLLOW_OK", flush=True)
 """
 
 

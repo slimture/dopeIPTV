@@ -47,6 +47,30 @@ def test_a_command_line(argv, want):
     assert parse_command(argv) == want
 
 
+def test_a_windows_path_on_the_command_line(monkeypatch):
+    from dopeiptv.core import commands
+    monkeypatch.setattr(commands.sys, "platform", "win32")
+    assert parse_command(["--play", r"C:\Films\a.mkv"]) == {"play": r"C:\Films\a.mkv"}
+    assert parse_command([r"--play=\\nas\films\a.mkv"]) == {"play": r"\\nas\films\a.mkv"}
+    assert parse_command(["--play", r"Films\a.mkv"]) is None          # relative: no
+    monkeypatch.setattr(commands.sys, "platform", "linux")
+    assert parse_command(["--play", r"C:\Films\a.mkv"]) is None
+
+
+@pytest.mark.parametrize("url, posix, windows", [
+    ("file:///home/u/My%20Film.mkv", "/home/u/My Film.mkv", r"\home\u\My Film.mkv"),
+    ("file:///C:/Films/My%20Film.mkv", "/C:/Films/My Film.mkv", r"C:\Films\My Film.mkv"),
+    ("file://localhost/C:/Films/a.mkv", "/C:/Films/a.mkv", r"C:\Films\a.mkv"),
+    ("file://C:/Films/a.mkv", "/Films/a.mkv", r"C:\Films\a.mkv"),
+    ("file:///C|/Films/a.mkv", "/C|/Films/a.mkv", r"C:\Films\a.mkv"),
+    ("file://nas/films/a.mkv", "/films/a.mkv", r"\\nas\films\a.mkv"),
+])
+def test_a_file_address_is_the_path_it_names(url, posix, windows):
+    from dopeiptv.core.commands import file_url_path
+    assert file_url_path(url, windows=False) == posix
+    assert file_url_path(url, windows=True) == windows
+
+
 @pytest.mark.parametrize("link, want", [
     ("dopeiptv://play?url=http%3A%2F%2Fh%2Fx.ts", {"play": "http://h/x.ts"}),
     ("dopeiptv://channel?name=TV4%20HD", {"channel": "TV4 HD"}),
@@ -258,14 +282,16 @@ w._come_forward = lambda: calls.append(["forward"])
 
 film = os.path.join(tempfile.mkdtemp(), "Film.mkv")
 open(film, "wb").close()
+from pathlib import Path
+# The file's address as the system makes one: file:///C:/... on Windows.
 for cmd in ({"play": "http://h/live/ch.ts?x=1"}, {"play": film},
-            {"play": "file://" + film.replace(" ", "%20")},
+            {"play": Path(film).as_uri()},
             {"channel": "sintel"}, {"channel": "No such channel"}, {"open": True}):
     w.handle_command(cmd)
     for _ in range(200):
         app.processEvents()
         w.pool.waitForDone(10)
-print("CALLS" + json.dumps(calls))
+print("CALLS" + json.dumps(calls), flush=True)
 """
 
 

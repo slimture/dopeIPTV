@@ -18,6 +18,7 @@ is nothing to do.
 
 from __future__ import annotations
 
+import sys
 from urllib.parse import parse_qs, unquote, urlsplit
 
 SCHEME = "dopeiptv"
@@ -56,6 +57,40 @@ def _ok_url(url: str) -> bool:
     return url.lower().startswith(_PLAYABLE)
 
 
+def _is_path(value: str, windows: bool | None = None) -> bool:
+    """A file's own path on this computer: /... - and on Windows one with
+    its drive (C:\\Films\\a.mkv) or a network path (\\\\nas\\films\\a.mkv)."""
+    if value.startswith("/"):
+        return True
+    if windows is None:
+        windows = sys.platform == "win32"
+    if not windows:
+        return False
+    drive = len(value) > 2 and value[0].isalpha() and value[1] == ":" and value[2] in "\\/"
+    return drive or value.startswith("\\\\")
+
+
+def file_url_path(url: str, windows: bool | None = None) -> str:
+    """The path a file:// address names, percent-decoded: on Windows with
+    its drive (file:///C:/Films/a.mkv is C:\\Films\\a.mkv) or the computer
+    of a network path (file://nas/films/a.mkv is \\\\nas\\films\\a.mkv)."""
+    if windows is None:
+        windows = sys.platform == "win32"
+    u = urlsplit(url)
+    if not windows:
+        return unquote(u.path)
+    host, path = u.netloc, u.path
+    if host[1:2] in (":", "|"):                 # file://C:/Films/a.mkv
+        path = host + path
+    elif host and host.lower() != "localhost":
+        path = "//" + host + path
+    elif path[:1] == "/" and path[2:3] in (":", "|"):
+        path = path[1:]                          # /C:/Films -> C:/Films
+    if path[1:2] == "|":
+        path = path[:1] + ":" + path[2:]
+    return unquote(path).replace("/", "\\")
+
+
 def stream_url_ok(url: str) -> bool:
     """A stream's address, as a link or the remote API may ask to play:
     no file:// and no path - a page or a program on the network must not
@@ -80,11 +115,11 @@ def _parse_command(args: list[str]) -> dict | None:
         if a in ("--play", "--channel") and i + 1 < len(args):
             value = args[i + 1].strip()
             if a == "--play":
-                return {"play": value} if (_ok_url(value) or value.startswith("/")) else None
+                return {"play": value} if (_ok_url(value) or _is_path(value)) else None
             return {"channel": value} if value else None
         if a.startswith("--play="):
             value = a.split("=", 1)[1].strip()
-            return {"play": value} if (_ok_url(value) or value.startswith("/")) else None
+            return {"play": value} if (_ok_url(value) or _is_path(value)) else None
         if a.startswith("--channel="):
             value = a.split("=", 1)[1].strip()
             return {"channel": value} if value else None

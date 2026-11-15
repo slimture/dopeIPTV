@@ -122,6 +122,62 @@ def test_closing_ends_every_reader(tmp_path):
     assert not s.root.exists()
 
 
+def test_wiping_waits_for_a_reader_where_an_open_file_cannot_go(tmp_path, monkeypatch):
+    """Windows refuses to delete a file that is open: the segment a reader
+    still had open stayed behind with its folder. As Windows has it here -
+    every open file counted, and an rmtree that leaves those."""
+    import builtins
+    import os
+
+    from dopeiptv.core import dvr_store
+    held: list[str] = []
+    real_open = builtins.open
+
+    class Held:
+        def __init__(self, path, mode="r"):
+            self.f, self.p = real_open(path, mode), os.path.abspath(path)
+            held.append(self.p)
+
+        def __getattr__(self, name):
+            return getattr(self.f, name)
+
+        def close(self):
+            if self.p in held:
+                held.remove(self.p)
+            self.f.close()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            self.close()
+
+    def windows_rmtree(path, ignore_errors=False):
+        if not os.path.isdir(path):
+            return
+        for name in os.listdir(path):
+            p = os.path.abspath(os.path.join(path, name))
+            if p not in held:
+                os.unlink(p)
+        if not os.listdir(path):
+            os.rmdir(path)
+    monkeypatch.setattr(dvr_store, "open", Held, raising=False)
+    monkeypatch.setattr(dvr_store.shutil, "rmtree", windows_rmtree)
+    s, _clock = store(tmp_path)
+    s.append(b"a" * 188)
+    reading, done = threading.Event(), threading.Event()
+
+    def read():
+        for _ in s.read_from(0, wait=0.05):
+            reading.set()
+        done.set()
+    threading.Thread(target=read, daemon=True).start()
+    assert reading.wait(5) and len(held) == 2           # the writer's and the reader's
+    s.wipe()
+    assert done.wait(5) and held == []
+    assert not s.root.exists()
+
+
 def test_low_disk_keeps_little_and_drops_what_has_no_room(tmp_path):
     clock = Clock()
     s = SegmentStore(tmp_path / "s", 3600.0, 10**9, clock=clock,

@@ -435,17 +435,26 @@ class Nerd:
         opens when it is not *url* (the rewind buffer's, on this computer)."""
         hdrs = self.headers(source)
         ref = hdrs.pop("Referer", "")
-        px = self.proxy(source, url) if self.flag("nerd_proxy_player", True) else ""
-        if not px and self.on:
-            # The source's own DNS, IP version or pinned certificate: the
-            # player through the bridge (core/net_bridge.py) - never where a
-            # proxy takes the stream, whose DNS that is.
-            from .net_bridge import address_for
-            px = address_for(source, opened or url, self)
+        px, _pinned = self.player_route(source, url, opened)
         return {"user-agent": self.user_agent(source),
                 "http-header-fields": [f"{k}: {v}" for k, v in hdrs.items()],
                 "referrer": ref,
                 "http-proxy": px}
+
+    def player_route(self, source: dict | None = None, url: str = "",
+                     opened: str = "") -> tuple[str, bool]:
+        """(the proxy the player takes a stream through, whether that is the
+        bridge checking a certificate the source pins for it)."""
+        px = self.proxy(source, url) if self.flag("nerd_proxy_player", True) else ""
+        if px or not self.on:
+            return px, False
+        # The source's own DNS, IP version or pinned certificate: the
+        # player through the bridge (core/net_bridge.py) - never where a
+        # proxy takes the stream, whose DNS that is.
+        from .net_bridge import address_for, checks_pin
+        target = opened or url
+        px = address_for(source, target, self)
+        return px, bool(px) and checks_pin(source, target, self)
 
     # -- the VPN guard --------------------------------------------------------
 
@@ -635,4 +644,52 @@ def apply_stream(mpv: Any, source: dict | None, was_applied: bool, url: str = ""
             mpv[key] = value
         except Exception as e:
             log.debug("nerd: %s not set: %s", key, e)
+    pinned = n.player_route(source, url, opened)[1]
+    _trust_pin(mpv, pinned and "tls-verify" not in dict(n.core_options()))
     return n.on
+
+
+# What tls-verify each core had before a stream to a pinned host turned it off.
+_tls_own: dict[int, Any] = {}
+_tls_watched: set[int] = set()
+
+
+def _forget_tls(key: int) -> None:
+    _tls_own.pop(key, None)
+    _tls_watched.discard(key)
+
+
+def _trust_pin(mpv: Any, pinned: bool) -> None:
+    """A stream to a host whose certificate the source pins goes through the
+    bridge, which checks the certificate against the pin before the tunnel
+    opens (core/net_bridge.py): that check is the trust, so mpv does not
+    check the chain itself for that stream - a pinned home server's
+    certificate is its own, signed by no authority mpv knows, and a newer
+    mpv checks by default (0.42 here; 0.37 did not). Any other stream gets
+    the core's own setting back. A tls-verify typed in Nerd's mpv options
+    is the user's and left alone."""
+    key = id(mpv)
+    if pinned:
+        if key not in _tls_own:
+            try:
+                _tls_own[key] = mpv["tls-verify"]
+            except Exception as e:
+                log.debug("nerd: tls-verify not read: %s", e)
+                return
+            if key not in _tls_watched:
+                try:
+                    weakref.finalize(mpv, _forget_tls, key)
+                    _tls_watched.add(key)
+                except TypeError:
+                    pass
+        try:
+            mpv["tls-verify"] = False
+        except Exception as e:
+            log.debug("nerd: tls-verify not set: %s", e)
+        return
+    if key in _tls_own:
+        value = _tls_own.pop(key)
+        try:
+            mpv["tls-verify"] = value
+        except Exception as e:
+            log.debug("nerd: tls-verify not put back: %s", e)

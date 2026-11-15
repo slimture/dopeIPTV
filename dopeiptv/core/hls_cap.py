@@ -20,15 +20,23 @@ at 4 are both real. So:
                variant together (with the video alone, mpv went on fetching
                the smallest variant for its sound: two downloads).
 
+A newer mpv (0.42 here; 0.37 still had the tracks) opens only the variant
+it chose and lists them all as editions instead - "Bitrate: 3.000 Mbps
+(h264 1280x720 ...)", the announced bitrate in the edition's metadata
+(``variant_bitrate``). There the switch is to the edition, for this stream
+only (``file-local-options/edition``): mpv changes variant in place, at the
+position it plays, picture and sound together.
+
 A variant is measured by its lines as a 16:9 picture would have them: a
 1920x800 film is 1080p, not 800p. ``hls-bitrate`` only ever decides between
 HLS variants (a track of any other stream has no variant bitrate, so all
-tie), and the switch is only made for a stream with two variants or more:
-every other stream plays as it did.
+tie; a film's editions have none either), and the switch is only made for a
+stream with two variants or more: every other stream plays as it did.
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -135,6 +143,24 @@ def _same_variant_audio(tracks: list[dict], video: dict) -> dict | None:
     return mine[0]
 
 
+def _tallest_within(video: list[dict], cap: Cap) -> dict:
+    """The tallest of *video* (variants of known size) *cap* allows - the
+    smallest there is when none fits."""
+    fits = [t for t in video if lines(t) <= cap.height + _SLACK
+            and (not cap.bits or _int(t["hls-bitrate"]) <= cap.bits)]
+    if fits:
+        return max(fits, key=lambda t: (lines(t), _int(t["hls-bitrate"])))
+    return min(video, key=lambda t: (lines(t), _int(t["hls-bitrate"])))
+
+
+def _best_sound(audio: list[dict], cap: Cap) -> dict:
+    """Sound only (radio): no picture to cap, the best announced within the
+    bitrate - the smallest when none is."""
+    ok = [t for t in audio if not cap.bits or _int(t["hls-bitrate"]) <= cap.bits]
+    return (max(ok, key=lambda t: _int(t["hls-bitrate"])) if ok
+            else min(audio, key=lambda t: _int(t["hls-bitrate"])))
+
+
 def pick(tracks: list[dict] | None, cap: Cap) -> dict[str, int]:
     """The tracks to switch to so a stream plays at the best variant *cap*
     allows: {"vid": id, "aid": id}, only what differs from what plays -
@@ -149,18 +175,9 @@ def pick(tracks: list[dict] | None, cap: Cap) -> dict[str, int]:
         audio = _variants(tracks, "audio")
         if any_video or len(audio) < 2:
             return {}
-        # Sound only (radio): no picture to cap, the best announced within
-        # the bitrate.
-        ok = [t for t in audio if not cap.bits or _int(t["hls-bitrate"]) <= cap.bits]
-        best = (max(ok, key=lambda t: _int(t["hls-bitrate"])) if ok
-                else min(audio, key=lambda t: _int(t["hls-bitrate"])))
+        best = _best_sound(audio, cap)
         return {} if best.get("selected") else {"aid": int(best["id"])}
-    fits = [t for t in video if lines(t) <= cap.height + _SLACK
-            and (not cap.bits or _int(t["hls-bitrate"]) <= cap.bits)]
-    if fits:
-        best = max(fits, key=lambda t: (lines(t), _int(t["hls-bitrate"])))
-    else:
-        best = min(video, key=lambda t: (lines(t), _int(t["hls-bitrate"])))
+    best = _tallest_within(video, cap)
     out: dict[str, int] = {}
     if not best.get("selected"):
         out["vid"] = int(best["id"])
@@ -170,14 +187,88 @@ def pick(tracks: list[dict] | None, cap: Cap) -> dict[str, int]:
     return out
 
 
+# "1280x720" in an edition's title, as mpv describes a picture.
+_SIZE = re.compile(r"(?<![\dx])(\d{2,5})x(\d{2,5})(?![\dx])")
+
+
+def _edition_variants(editions: list[dict]) -> list[dict]:
+    """A newer mpv's variants, one per edition, as tracks would have them
+    (id, hls-bitrate, demux-w/h from the title: 0 when it says none); []
+    unless every edition is one (a film's editions announce no bitrate)."""
+    out: list[dict] = []
+    for e in editions:
+        meta = e.get("metadata") if isinstance(e, dict) else None
+        bits = _int(meta.get("variant_bitrate")) if isinstance(meta, dict) else 0
+        if bits <= 0 or e.get("id") is None:
+            return []
+        size = _SIZE.search(str(e.get("title") or ""))
+        out.append({"id": _int(e["id"]), "hls-bitrate": bits,
+                    "demux-w": int(size.group(1)) if size else 0,
+                    "demux-h": int(size.group(2)) if size else 0})
+    return out
+
+
+def pick_edition(editions: list[dict] | None, current: Any, tracks: list[dict] | None,
+                 cap: Cap) -> int | None:
+    """The edition to switch to on a newer mpv, which lists an HLS stream's
+    variants as editions and only the one it opened in the track list: the
+    tallest *cap* allows, as pick() chooses among tracks (the best sound
+    within the bitrate for a stream of sound only). None when nothing is to
+    change: not variants, fewer than two, sizes not known (it stays on the
+    smallest, inside the cap), or the right one plays already."""
+    if not cap.picks:
+        return None
+    variants = _edition_variants([e for e in editions or [] if isinstance(e, dict)])
+    if len(variants) < 2:
+        return None
+    sized = [v for v in variants if lines(v)]
+    if len(sized) >= 2:
+        best = _tallest_within(sized, cap)
+    elif not sized and not _variants(list(tracks or []), "video") \
+            and _variants(list(tracks or []), "audio"):
+        best = _best_sound(variants, cap)
+    else:
+        return None
+    if current is not None and best["id"] == _int(current):
+        return None
+    return int(best["id"])
+
+
+def _one_variant_shown(tracks: list[dict]) -> bool:
+    """An HLS stream of which the track list shows one variant - all a newer
+    mpv shows (the others are editions). Only then are editions asked for:
+    nothing more is read from the core for any other stream."""
+    video, audio = _variants(tracks, "video"), _variants(tracks, "audio")
+    return bool(video or audio) and len(video) <= 1 and len(audio) <= 1
+
+
+def _apply_edition(mpv: Any, tracks: list[dict], cap: Cap) -> dict[str, int]:
+    editions = getattr(mpv, "edition_list", None)
+    if not editions:
+        return {}
+    ed = pick_edition(editions, getattr(mpv, "current_edition", None), tracks, cap)
+    if ed is None:
+        return {}
+    # For this stream only: the next one opens as mpv chooses.
+    mpv.command("set", "file-local-options/edition", str(ed))
+    v = next((x for x in _edition_variants(editions) if x["id"] == ed), {})
+    log.info("nerd: adaptive stream at %s (cap %s, edition %d)",
+             f"{v.get('demux-w')}x{v.get('demux-h')} {_int(v.get('hls-bitrate')) // 1000} kbit/s",
+             describe(cap), ed)
+    return {"edition": ed}
+
+
 def apply_pick(mpv: Any, cap: Cap) -> dict[str, int]:
     """(mpv's event thread, at file-loaded) Switch *mpv* to the variant
-    *cap* picks. Never raises: a stream stays on what it opened with."""
+    *cap* picks - by track, or by edition on a newer mpv. Never raises: a
+    stream stays on what it opened with."""
     try:
         tracks = mpv.track_list or []
         chosen = pick(tracks, cap)
         for key, tid in chosen.items():
             mpv[key] = tid
+        if not chosen and _one_variant_shown(tracks):
+            return _apply_edition(mpv, tracks, cap)
     except Exception as e:
         log.info("nerd: adaptive stream left on its first variant: %s", e)
         return {}

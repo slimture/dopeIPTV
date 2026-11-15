@@ -149,6 +149,88 @@ def test_apply_pick_switches_and_never_raises():
     assert hls_cap.apply_pick(Broken(), Cap(height=480)) == {}
 
 
+def _editions(*specs, sizes=True):
+    """(w, h, bits) per variant: a newer mpv's edition-list (0.42 lists an
+    HLS stream's variants so, with only the opened one in track-list)."""
+    out = []
+    for i, (w, h, bits) in enumerate(specs):
+        title = (f"Bitrate: {bits / 1e6:.3f} Mbps (h264 [High] {w}x{h} 25 fps {bits // 1000} kbps) "
+                 "(aac 2ch 48000 Hz)" if sizes else f"Bitrate: {bits // 1000} kbps (aac 2ch 48000 Hz)")
+        out.append({"id": i, "title": title, "default": False,
+                    "metadata": {"variant_bitrate": str(bits), "title": title}})
+    return out
+
+
+def _opened(w, h, bits, prog):
+    """track-list on a newer mpv: the opened variant's tracks only."""
+    return [{"id": prog + 1, "type": "video", "demux-w": w, "demux-h": h, "hls-bitrate": bits,
+             "program-id": prog, "selected": True},
+            {"id": prog + 1, "type": "audio", "hls-bitrate": bits, "program-id": prog, "selected": True}]
+
+
+def test_a_newer_mpv_switches_the_variant_by_edition():
+    eds, now = _editions(*LADDER), _opened(*LADDER[3], 3)
+    assert pick(now, Cap(height=720)) == {}                       # nothing to switch to by track
+    assert hls_cap.pick_edition(eds, 3, now, Cap(height=720)) == 1
+    assert hls_cap.pick_edition(eds, 3, now, Cap(height=1080)) == 0
+    assert hls_cap.pick_edition(eds, 3, now, Cap(height=1080, bits=2_000_000)) == 2
+    assert hls_cap.pick_edition(eds, 1, now, Cap(height=720)) is None      # on it already
+    assert hls_cap.pick_edition(eds[:2], 0, now, Cap(height=480)) == 1     # none fits: the smallest
+    films = _editions((1920, 800, 5_000_000), (1280, 536, 2_500_000))
+    assert hls_cap.pick_edition(films, 1, now, Cap(height=1080)) == 0
+    # Nothing to do: no cap by size, one variant, sizes not told, a film's editions.
+    for no in (Cap(), Cap(lowest=True), Cap(bits=2_000_000)):
+        assert hls_cap.pick_edition(eds, 3, now, no) is None
+    assert hls_cap.pick_edition(eds[:1], 0, now, Cap(height=720)) is None
+    assert hls_cap.pick_edition(_editions(*LADDER, sizes=False), 3, now, Cap(height=720)) is None
+    film = [{"id": 0, "title": "Theatrical 1920x1080"}, {"id": 1, "title": "Director's cut 1920x1080"}]
+    assert hls_cap.pick_edition(film, 0, now, Cap(height=720)) is None
+    assert hls_cap.pick_edition(film + eds, 0, now, Cap(height=720)) is None
+    assert hls_cap.pick_edition(None, None, now, Cap(height=720)) is None
+    # Sound only: the best within the bitrate.
+    radio = _editions((0, 0, 320_000), (0, 0, 128_000), (0, 0, 48_000), sizes=False)
+    sound = [{"id": 3, "type": "audio", "hls-bitrate": 48_000, "program-id": 2, "selected": True}]
+    assert hls_cap.pick_edition(radio, 2, sound, Cap(height=720)) == 0
+    assert hls_cap.pick_edition(radio, 2, sound, Cap(height=720, bits=200_000)) == 1
+
+
+def test_apply_pick_switches_the_edition_for_this_stream_only():
+    class NewerMpv(dict):
+        track_list = _opened(*LADDER[3], 3)
+        edition_list = _editions(*LADDER)
+        current_edition = 3
+
+        def __init__(self):
+            super().__init__()
+            self.commands = []
+
+        def command(self, *args):
+            self.commands.append(args)
+    m = NewerMpv()
+    assert hls_cap.apply_pick(m, Cap(height=480)) == {"edition": 2}
+    assert m.commands == [("set", "file-local-options/edition", "2")] and m == {}
+    m = NewerMpv()
+    m.current_edition = 2
+    assert hls_cap.apply_pick(m, Cap(height=480)) == {} and m.commands == []
+
+    # Every variant in the track list (an older mpv), or no HLS at all:
+    # nothing more is read from the core.
+    asked = []
+
+    class Core(dict):
+        @property
+        def edition_list(self):
+            asked.append(1)
+            return _editions(*LADDER)
+    on_it = Core()
+    on_it.track_list = _variants(*LADDER, selected=1)
+    plain = Core()
+    plain.track_list = [{"id": 1, "type": "video", "selected": True, "demux-w": 1920, "demux-h": 1080}]
+    assert hls_cap.apply_pick(on_it, Cap(height=720)) == {}
+    assert hls_cap.apply_pick(plain, Cap(height=720)) == {}
+    assert asked == []
+
+
 # -- a core without the player's variant switch (a multiview cell) ---------------------------
 
 @pytest.mark.parametrize("quality, kbps, options", [
@@ -393,9 +475,22 @@ def _playing(m) -> tuple[int, object, object]:
     ("true", "", "2000", 480),
     ("true", "720", "1000", 240),
 ])
-def test_real_mpv_plays_the_variant_the_cap_allows(hls, on, quality, kbps, height):
+def test_real_mpv_plays_the_variant_the_cap_allows(hls, on, quality, kbps, height, monkeypatch):
     m = _libmpv()
     kw = {"nerd_enabled": on, "nerd_hls_quality": quality, "nerd_hls_max_kbps": kbps}
+    # The core is torn down only once the player's hook at file-loaded has
+    # run: python-mpv's terminate() while the event thread still asks the
+    # core something crashed the test process.
+    picked = threading.Event()
+    real_pick = hls_cap.apply_pick
+
+    def pick_and_say(core, cap):
+        try:
+            return real_pick(core, cap)
+        finally:
+            picked.set()
+    monkeypatch.setattr(hls_cap, "apply_pick", pick_and_say)
+    p = None
     try:
         nerd.install(S(**kw))
         nerd.apply_core(m)
@@ -411,10 +506,12 @@ def test_real_mpv_plays_the_variant_the_cap_allows(hls, on, quality, kbps, heigh
             if now[0] == height and now[1] is not None and now[1] == now[2]:
                 break
             time.sleep(0.05)
-        assert now[0] == height, (kw, now, m.track_list)
+        assert now[0] == height, (kw, now, m.track_list, getattr(m, "edition_list", None))
         assert now[1] == now[2], ("picture and sound from one variant", now)
         assert p._hls_cap.picks == (on == "true" and quality in ("480", "720", "1080"))
     finally:
+        if p is not None and p._hls_cap.picks:
+            picked.wait(10)
         m.terminate()
 
 

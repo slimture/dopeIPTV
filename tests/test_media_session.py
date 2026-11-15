@@ -392,7 +392,11 @@ def test_macos_now_playing_shows_what_plays(qapp, monkeypatch, tmp_path):
     assert info["now.ExcludeFromSuggestions"] is True
     assert "item.PlaybackDuration" not in info               # a channel
     art = info["item.Artwork"]
-    assert art.size == (64.0, 32.0) and art.handler((10, 10)).path == path
+    assert art.size == (64.0, 32.0)
+    # The picture made from the file itself (a path's case and separators
+    # as Windows writes them).
+    made = art.handler((10, 10)).path
+    assert os.path.normcase(os.path.normpath(made)) == os.path.normcase(path), (made, path)
     assert commands["nextTrackCommand"].enabled
     assert not commands["skipForwardCommand"].enabled
     assert not commands["changePlaybackPositionCommand"].enabled

@@ -48,7 +48,7 @@ import os, tempfile, time
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtCore import QEvent, QPoint, QPointF, QSettings, Qt
 QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, tempfile.mkdtemp())
-from PyQt6.QtGui import QKeyEvent, QWheelEvent
+from PyQt6.QtGui import QFontMetricsF, QKeyEvent, QWheelEvent
 from PyQt6.QtWidgets import QApplication, QGraphicsSimpleTextItem
 
 from dopeiptv.providers.client import DemoClient
@@ -149,11 +149,14 @@ def check_layout(g):
     want = {round(x(t) + 4): datetime.fromtimestamp(t).strftime("%H:%M") for t in marks}
     for lx, text in labels:
         assert want.get(round(lx)) == text, (lx, text)
+    # Room for a label: its width in the header's font and a little more
+    # (a desktop's bigger font needs more of it).
+    room = QFontMetricsF(g._label_font()).horizontalAdvance("00:00") + 14
     if len(labels) < len(marks):             # the hours alone: narrow ones
-        assert 30 * ppm < 60 and len(labels) <= (len(marks) + 1) // 2, (
-            ppm, len(labels), len(marks))
+        assert 30 * ppm < room and len(labels) <= (len(marks) + 1) // 2, (
+            ppm, room, len(labels), len(marks))
     else:                                    # every half hour: room for each
-        assert 30 * ppm >= 40, ppm
+        assert 30 * ppm >= room, (ppm, room)
     return len(labels) < len(marks)
 
 
@@ -324,12 +327,16 @@ check_layout(g)
 d.resize(700, 640)
 settle(g)
 assert check_layout(g)                       # the hours alone in the header
-d.resize(900, 640)
-settle(g)
-# Narrow cards: the title cut with "…", whole in the tooltip with its time.
-cut = [rb for _c, bl in g._rows for rb in bl
-       if rb.get("label") is not None and rb["data"]["prog"]
-       and rb["data"]["prog"]["title"] == LONG]
+# Narrow cards: the title cut with "…", whole in the tooltip with its time -
+# at 900 px, or wider where a bigger font cuts every title to nothing there.
+for width in (900, 1100, 1400, 1800):
+    d.resize(width, 640)
+    settle(g)
+    cut = [rb for _c, bl in g._rows for rb in bl
+           if rb.get("label") is not None and rb["data"]["prog"]
+           and rb["data"]["prog"]["title"] == LONG]
+    if cut:
+        break
 assert cut
 for rb in cut:
     assert rb["label"].text().endswith("…"), rb["label"].text()
@@ -338,9 +345,13 @@ p = cut[0]["data"]["prog"]
 tip = cut[0]["item"].toolTip()
 assert LONG in tip and time.strftime("%H:%M", time.localtime(p["start_timestamp"])) in tip
 assert "–" in tip
-# A card too narrow for two letters shows no title at all.
+# A card too narrow for two letters shows no title at all (one sliding off
+# at the left edge hides the one it had).
 assert not any(rb["label"].text().rstrip("…") == "" for _c, bl in g._rows
-               for rb in bl if rb.get("label") is not None)
+               for rb in bl if rb.get("label") is not None and not rb.get("_hidden"))
+if d.width() != 900:
+    d.resize(900, 640)
+    settle(g)
 writes.clear()
 g.fit_btn.click()
 settle(g)

@@ -73,7 +73,7 @@ class Client(DemoClient):
 
 w = mw.MainWindow(Client(), s, PlaylistStore(s))
 if w.player is None:
-    print("TV_SKIP: no embedded player here")
+    print("TV_SKIP: no embedded player here", flush=True)
     os._exit(0)
 played = []
 
@@ -367,7 +367,7 @@ assert len(played) == n and not w._tv_on and w._phone_state()["tv_mode"] is Fals
 # On and off again from the phone.
 assert w.tv_command("tv", "toggle")["tv_mode"] and w._tv_on and w.isFullScreen()
 assert not w.tv_command("tv", "off")["tv_mode"] and not w._tv_on and w.menuBar().isVisible()
-print("TV_OK")
+print("TV_OK", flush=True)
 os._exit(0)
 """
 

@@ -80,8 +80,9 @@ class _CommandsMixin:
         (mw_webstreams); any other address as a stream. Kept out of
         Recently viewed - it is no channel or title of a source."""
         if url.startswith("file://"):
-            from urllib.parse import unquote, urlsplit
-            url = unquote(urlsplit(url).path)
+            # file:///C:/Films/a.mkv is C:\Films\a.mkv on Windows.
+            from ..core.commands import file_url_path
+            url = file_url_path(url)
         if url.startswith("/") or os.path.isfile(url):
             self._play_local_path(url)
             return

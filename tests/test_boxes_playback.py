@@ -16,7 +16,7 @@ from dopeiptv.providers.enigma2 import Enigma2Client
 from dopeiptv.providers.hdhomerun import HDHomeRunClient
 from dopeiptv.providers.tvheadend import TvheadendClient
 from tests.test_boxes import SVT1, openwebif_routes, tvh_routes
-from tests.test_nerd import TS, Recorder, _libmpv, _plays
+from tests.test_nerd import TS, Recorder, _libmpv, _plays, _why
 
 
 @pytest.fixture
@@ -123,10 +123,10 @@ def test_tvheadend_channel_and_recording_play_behind_digest(player, boxes):
     c = TvheadendClient(srv.base, "kodi", "s3cret", {"profile": "pass"})
     c.authenticate()
     ch = c.live_streams("Nyheter")[0]
-    assert _plays(player, c.live_url(ch["stream_id"]))
+    assert _plays(player, c.live_url(ch["stream_id"])), _why(player, srv)
     assert "/stream/channel/c1?profile=pass" in srv.paths
     rec = c.vod_streams()[0]
-    assert _plays(player, c.vod_url(rec["stream_id"]))
+    assert _plays(player, c.vod_url(rec["stream_id"])), _why(player, srv)
     assert "/dvrfile/r1" in srv.paths
 
 
