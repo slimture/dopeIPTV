@@ -363,20 +363,13 @@ def settings(tmp_path, app, monkeypatch):
     return s
 
 
-def _rows(panel):
-    from PyQt6.QtWidgets import QFormLayout
-    out = []
-    for i in range(panel.form.rowCount()):
-        item = panel.form.itemAt(i, QFormLayout.ItemRole.FieldRole)
-        if item is not None and item.widget() is not None:
-            out.append(item.widget())
-    return out
-
-
 def test_the_panel_stores_the_template_and_mode_only_when_set(settings):
-    from dopeiptv.ui.source_nerd import SourceNerdPanel
-    p = SourceNerdPanel("m3u", {"keep_me": "x", "catchup_template": "?utc={utc}", "catchup_mode": "append"})
-    assert p.cu_template in _rows(p) and p.cu_mode in _rows(p) and p.cu_line in _rows(p)
+    from tests.test_source_page import shown, source_page
+    d = source_page({"name": "TV", "kind": "m3u", "server": "http://h/tv.m3u",
+                     "options": {"keep_me": "x", "catchup_template": "?utc={utc}",
+                                 "catchup_mode": "append"}})
+    p = d.nerd_panel
+    assert shown(d, p.cu_template) and shown(d, p.cu_mode) and shown(d, p.cu_line)
     assert p.cu_template.text() == "?utc={utc}" and p.cu_mode.currentData() == "append"
     assert p.values() == {"keep_me": "x", "catchup_template": "?utc={utc}", "catchup_mode": "append"}
     p.cu_mode.setCurrentIndex(p.cu_mode.findData("flussonic"))
@@ -389,17 +382,18 @@ def test_the_panel_stores_the_template_and_mode_only_when_set(settings):
     p.cu_template.setText("http://a/{utc}")
     p.cu_mode.setCurrentIndex(p.cu_mode.findData("default"))
     # A kind without an archive: the rows go, and so do the options.
-    p.set_kind("enigma2")
-    assert p.cu_template not in _rows(p) and p.cu_line not in _rows(p)
+    d.kind.setCurrentIndex(d.kind.findData("enigma2"))
+    assert not shown(d, p.cu_template) and not shown(d, p.cu_line)
     assert "catchup_template" not in p.values() and "catchup_mode" not in p.values()
-    p.set_kind("xtream")
+    d.kind.setCurrentIndex(d.kind.findData("xtream"))
     assert p.values()["catchup_template"] == "http://a/{utc}" and p.values()["catchup_mode"] == "default"
 
 
-def test_the_source_dialog_keeps_the_catchup_options(settings):
-    from dopeiptv.ui.dialogs import PlaylistDialog
-    d = PlaylistDialog(playlist={"name": "IPTV", "kind": "m3u", "server": "http://h/tv.m3u",
-                                 "options": {"catchup_mode": "shift"}})
+def test_the_source_page_keeps_the_catchup_options(settings):
+    from tests.test_source_page import source_page
+    pl = {"name": "IPTV", "kind": "m3u", "server": "http://h/tv.m3u",
+          "options": {"catchup_mode": "shift"}}
+    d = source_page(pl)
     assert d.nerd_panel.cu_mode.currentData() == "shift"
     d.nerd_panel.cu_mode.setCurrentIndex(d.nerd_panel.cu_mode.findData("default"))
     d.nerd_panel.cu_template.setText("http://arch/{catchup-id}/{utc}.ts")
@@ -408,8 +402,7 @@ def test_the_source_dialog_keeps_the_catchup_options(settings):
     # Nerd off: no panel, and what the source had rides along unchanged.
     settings.setValue("nerd_enabled", "false")
     nerd.install(settings)
-    d = PlaylistDialog(playlist={"name": "IPTV", "kind": "m3u", "server": "http://h/tv.m3u",
-                                 "options": {"catchup_mode": "shift"}})
+    d = source_page(pl, nerd_on=False)
     assert d.nerd_panel is None and d.values()["options"] == {"catchup_mode": "shift"}
 
 
@@ -424,19 +417,19 @@ def _wait(cond, secs=20.0):
     return False
 
 
-def test_the_dialogs_line_and_its_test_against_a_panel(settings):
+def test_the_pages_line_and_its_test_against_a_panel(settings):
     """The line shows a programme two hours ago on an example channel (the
     login masked); Test finds a real channel of the account, asks its
     archive with the source's own user agent and says it streams; from
     then on the line shows that channel."""
     from dopeiptv.i18n import tr
-    from dopeiptv.ui.dialogs import PlaylistDialog
+    from tests.test_source_page import source_page
     from tests.test_sources_side_by_side import Xtream
     xt = Xtream()
     try:
-        d = PlaylistDialog(playlist={"name": "Anna", "kind": "xtream", "server": xt.base,
-                                     "username": "anna", "password": "pw-anna",
-                                     "options": {"catchup_mode": "shift", "user_agent": "kodi"}})
+        d = source_page({"name": "Anna", "kind": "xtream", "server": xt.base,
+                         "username": "anna", "password": "pw-anna",
+                         "options": {"catchup_mode": "shift", "user_agent": "kodi"}})
         line = d.nerd_panel.cu_line
         line.show_preview()
         text = _plain(line.text.text())

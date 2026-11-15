@@ -116,7 +116,6 @@ def test_a_sources_network_only_where_it_differs(app, settings):
 
 def test_trusting_is_offered_only_for_an_https_address(app, settings):
     p, form = _panel(server="http://10.0.0.2:9981")
-    p.toggle.setChecked(True)
     assert not p.net.trust_btn.isEnabled() and p.net.pin_label.text() == tr("cert_plain")
     p.net.cert_line.show_preview()
     assert p.net.cert_line.result.key == "nerd_ck_pin_plain"

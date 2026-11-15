@@ -1,11 +1,11 @@
-"""Nerd options of one source, in the Add/Edit source dialog: its own user
-agent, headers and proxy (else the Nerd page's), rewrite rules for its
-stream addresses (core/url_rewrite.py, ui/rewrite_rules.py), a test of the
-connection to it (core/conn_test.py), its backup addresses
+"""Nerd options of one source, on its page in Settings (ui/source_page.py
+lays them out on its tabs): its own user agent, headers and proxy (else
+the Nerd page's), rewrite rules for its stream addresses
+(core/url_rewrite.py, ui/rewrite_rules.py), its backup addresses
 (core/mirrors.py), its catch-up address (core/catchup.py), and what each
 kind of box can be told - Enigma2's stream port and its box's transcoding
-(port 8002), Tvheadend's stream profile, HDHomeRun's transcoding. Only there while Nerd is on, and folded
-until opened. Only what differs from the default is stored."""
+(port 8002), Tvheadend's stream profile, HDHomeRun's transcoding. Only
+there while Nerd is on. Only what differs from the default is stored."""
 
 from __future__ import annotations
 
@@ -13,10 +13,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 from urllib.parse import urlsplit
 
-from PyQt6.QtWidgets import (
-    QCheckBox, QComboBox, QFormLayout, QLineEdit, QPushButton, QSpinBox,
-    QVBoxLayout, QWidget,
-)
+from PyQt6.QtWidgets import QComboBox, QLineEdit, QSpinBox, QWidget
 
 from ..core import catchup, mirrors, nerd, nerd_check, url_rewrite
 from ..core.log import log
@@ -24,6 +21,7 @@ from ..i18n import tr
 from .nerd_check_line import CheckLine
 from .nerd_settings import UA_CHOICES, text_box
 from .rewrite_rules import RulesEditor
+from .settings_ui import ToggleSwitch
 
 TVH_PROFILES = ["", "pass", "matroska", "htsp", "audio", "webtv-h264-aac-mpegts",
                 "webtv-h264-aac-matroska", "webtv-vp8-vorbis-webm"]
@@ -68,10 +66,9 @@ def _flag(options: dict, key: str, default: bool) -> bool:
 
 
 class SourceNerdPanel(QWidget):
-    """A fold-out under the source form: "Nerd options"."""
-
-    # The rows every kind has; each kind's own come after.
-    COMMON_ROWS = 11
+    """The source's own Nerd options: their controls and what they mean,
+    without a layout - the source's page puts each on its tab. Never shown
+    itself (it only holds them)."""
 
     def __init__(self, kind: str, options: dict, parent: QWidget | None = None,
                  source: Callable[[], dict] | None = None) -> None:
@@ -85,24 +82,11 @@ class SourceNerdPanel(QWidget):
         # line shows its address from then on (until the source changes).
         self._cu_channel: dict | None = None
         self._cu_gen = 0
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(0, 4, 0, 0)
-        self.toggle = QPushButton(tr("nerd_src_title") + "  ▸")
-        self.toggle.setCheckable(True)
-        self.toggle.setFlat(True)
-        self.toggle.setObjectName("NerdFold")
-        self.toggle.toggled.connect(self._fold)
-        lay.addWidget(self.toggle)
-        self.body = QWidget()
-        self.form = QFormLayout(self.body)
-        self.form.setContentsMargins(0, 4, 0, 0)
-        self.form.setSpacing(8)
-        lay.addWidget(self.body)
+        self.hide()
         # The source's own DNS, IP version and trusted certificate
-        # (ui/source_net.py), folded with the rest.
+        # (ui/source_net.py).
         from .source_net import SourceNetOptions
         self.net = SourceNetOptions(self._options, self._source_now, self, proxy=self._proxy_now)
-        lay.addWidget(self.net)
         o = self._options
         self.ua = QComboBox()
         self.ua.addItem(tr("nerd_src_inherit"), "")
@@ -125,15 +109,8 @@ class SourceNerdPanel(QWidget):
             px if px in ("", "direct") else "custom")))
         self.proxy_custom = QLineEdit(px if px not in ("", "direct") else "")
         self.proxy_custom.setPlaceholderText("http://10.8.0.1:3128")
-        self.form.addRow(tr("nerd_user_agent"), self.ua)
-        self.form.addRow("", self.ua_custom)
-        self.form.addRow("Referer", self.referer)
-        self.form.addRow(tr("nerd_headers"), self.headers)
-        self.form.addRow(tr("nerd_proxy"), self.proxy)
-        self.form.addRow("", self.proxy_custom)
         self.udpxy = QLineEdit(str(o.get("udpxy") or ""))
         self.udpxy.setPlaceholderText(tr("nerd_src_inherit"))
-        self.form.addRow("udpxy", self.udpxy)
         self.epg_shift = QSpinBox()
         self.epg_shift.setRange(-720, 720)
         self.epg_shift.setSingleStep(15)
@@ -142,7 +119,6 @@ class SourceNerdPanel(QWidget):
             self.epg_shift.setValue(int(float(o.get("epg_shift") or 0)))
         except (TypeError, ValueError):
             self.epg_shift.setValue(0)
-        self.form.addRow(tr("nerd_src_epg_shift"), self.epg_shift)
         # Catch-up: for the kinds whose channels have an archive.
         self.cu_mode = QComboBox()
         for value, label in CATCHUP_MODES:
@@ -195,26 +171,26 @@ class SourceNerdPanel(QWidget):
         self.rw_line = CheckLine(self._rw_job, tr("nerd_ck_title_rewrite"), test=True,
                                  preview=self._rw_preview)
         self.rewrite.edited.connect(self.rw_line.changed)
-        self.form.addRow(tr("nerd_src_rewrite"), self.rewrite)
-        self.form.addRow("", self.rw_line)
-        # The connection to the source, tried step by step (every kind).
-        self.test_conn = QPushButton(tr("ct_button"))
-        self.test_conn.setToolTip(tr("ct_row_hint"))
-        self.test_conn.clicked.connect(self.test_connection)
-        self.form.addRow(tr("ct_row"), self.test_conn)
         # Backup addresses: for the kinds whose clients take them.
         self.mirrors_box = text_box(str(o.get(mirrors.KEY) or ""), MIRROR_HINTS["xtream"], 3)
         self.mirrors_box.setToolTip(tr("nerd_src_mirrors_hint"))
         self.mr_line = CheckLine(self._mr_job, tr("nerd_ck_title_mirrors"), test=True,
                                  preview=self._mr_preview, test_text=tr("nerd_mr_test"))
         self.mirrors_box.textChanged.connect(self.mr_line.changed)
-        self.switches: dict[str, QCheckBox] = {}
+        # Each kind's switches, made once: the kind's own are the ones read.
+        self.kind_switches: dict[str, dict[str, ToggleSwitch]] = {}
+        for k, rows in SWITCHES.items():
+            self.kind_switches[k] = {}
+            for key, label, default in rows:
+                box = ToggleSwitch(_flag(o, key, default))
+                box.setAccessibleName(tr(label))
+                self.kind_switches[k][key] = box
+        self.switches: dict[str, ToggleSwitch] = {}
         self._kind = ""
         self.ua.currentIndexChanged.connect(self._shown)
         self.proxy.currentIndexChanged.connect(self._shown)
         self.set_kind(kind)
-        self.toggle.setChecked(False)
-        self._fold(False)
+        self._shown()
 
     @staticmethod
     def _e2_step_label(step: str) -> str:
@@ -234,59 +210,24 @@ class SourceNerdPanel(QWidget):
         else:
             box.setEditText(value)
 
-    def _fold(self, open_: bool) -> None:
-        self.body.setVisible(open_)
-        self.net.setVisible(open_)
-        self.net.align_with(self.form)
-        self.toggle.setText(tr("nerd_src_title") + ("  ▾" if open_ else "  ▸"))
-        self._shown()
-
     def _shown(self, *_a) -> None:
-        for w, show in ((self.ua_custom, self.ua.currentData() == "custom"),
-                        (self.proxy_custom, self.proxy.currentData() == "custom")):
-            w.setVisible(show)
-            label = self.form.labelForField(w)
-            if label is not None:
-                label.setVisible(show)
+        self.ua_custom.setVisible(self.ua.currentData() == "custom")
+        self.proxy_custom.setVisible(self.proxy.currentData() == "custom")
 
     def set_kind(self, kind: str) -> None:
-        """The rows the source's kind has (the common ones always)."""
+        """The source's kind: which of its switches count, and what its
+        backup and catch-up lines say (which rows show is the page's)."""
         if kind == self._kind:
             return
         self._kind = kind
         self._rw_source_changed()
-        while self.form.rowCount() > self.COMMON_ROWS:
-            row = self.form.takeRow(self.COMMON_ROWS)
-            for item in (row.labelItem, row.fieldItem):
-                if item is not None and item.widget() is not None:
-                    item.widget().setParent(None)
-        self.switches = {}
+        self.switches = self.kind_switches.get(kind, {})
         if kind in mirrors.KINDS:
             self.mirrors_box.setPlaceholderText(MIRROR_HINTS.get(kind, MIRROR_HINTS["xtream"]))
-            self.form.addRow(tr("nerd_src_mirrors"), self.mirrors_box)
-            self.form.addRow("", self.mr_line)
             self.mr_line.show_preview()
         if kind in catchup.KINDS:
-            self.form.addRow(tr("nerd_src_catchup_mode"), self.cu_mode)
-            self.form.addRow(tr("nerd_src_catchup"), self.cu_template)
-            self.form.addRow("", self.cu_line)
             self.source_changed()
             self.cu_line.show_preview()
-        if kind == "enigma2":
-            self.form.addRow(tr("nerd_src_stream_port"), self.port)
-            self.form.addRow(tr("nerd_src_e2_transcode"), self.e2_transcode)
-        elif kind == "tvheadend":
-            self.form.addRow(tr("nerd_src_profile"), self.profile)
-        elif kind == "hdhomerun":
-            self.form.addRow(tr("nerd_src_transcode"), self.transcode)
-        elif kind in MEDIA_KINDS:
-            self.form.addRow(tr("ms_opt_quality"), self.ms_quality)
-        for key, label, default in SWITCHES.get(kind, []):
-            box = QCheckBox(tr(label))
-            box.setChecked(_flag(self._options, key, default))
-            self.form.addRow("", box)
-            self.switches[key] = box
-        self.net.align_with(self.form)
 
     def values(self) -> dict[str, Any]:
         """The source's options: what was there, with these set (and a
@@ -358,11 +299,6 @@ class SourceNerdPanel(QWidget):
         src = dict(self._source_now(), options=self.values())
         src["kind"] = src.get("kind") or self._kind
         return src
-
-    def test_connection(self) -> None:
-        from ..providers.client import make_client
-        from .conn_test_dialog import ConnTestDialog
-        ConnTestDialog(self.window(), self.test_source(), nerd.current().s, make_client).exec()
 
     # -- backup addresses -------------------------------------------------------------
 

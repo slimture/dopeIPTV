@@ -1307,7 +1307,6 @@
   "nerd_log_level_hint": "Debug は問題を突き止めるために、はるかに多く書き出します。",
   "nerd_log_info": "通常",
   "nerd_log_debug": "Debug",
-  "nerd_src_title": "Nerd オプション",
   "nerd_src_inherit": "Nerd ページと同じ",
   "nerd_src_direct": "直接（プロキシなし）",
   "nerd_src_stream_port": "ストリームポート",
@@ -2359,5 +2358,15 @@
   "pal_hint_opens": "どこでも {shortcut} で開きます",
   "pal_none": "「{q}」は見つかりませんでした",
   "pal_now": "放送中",
-  "pal_record_remind": "録画 / リマインド"
+  "pal_record_remind": "録画 / リマインド",
+  "src_tab_connection": "接続",
+  "src_tab_streams": "ストリーム",
+  "src_own": "このソース専用",
+  "src_shared": "共通",
+  "src_system": "システムのもの",
+  "src_follows": "{where} の共通設定に従います。",
+  "src_not_saved": "この変更は保存されていません。",
+  "src_last_test": "最新の接続テスト",
+  "src_no_test": "まだテストしていません。上の「{button}」で各ステップを試し、結果がここに表示されます。",
+  "src_settings_menu": "このソースの設定…"
 }

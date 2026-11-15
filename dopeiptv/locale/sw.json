@@ -1307,7 +1307,6 @@
   "nerd_log_level_hint": "Debug huandika mengi zaidi, ili kufuatilia tatizo.",
   "nerd_log_info": "Kawaida",
   "nerd_log_debug": "Debug",
-  "nerd_src_title": "Chaguo za Nerd",
   "nerd_src_inherit": "Kama kwenye ukurasa wa Nerd",
   "nerd_src_direct": "Moja kwa moja (bila proksi)",
   "nerd_src_stream_port": "Lango la mtiririko",
@@ -2359,5 +2358,15 @@
   "pal_hint_opens": "Hufunguka kwa {shortcut} popote",
   "pal_none": "Hakuna kilichopatikana kwa “{q}”",
   "pal_now": "sasa",
-  "pal_record_remind": "rekodi / kumbusha"
+  "pal_record_remind": "rekodi / kumbusha",
+  "src_tab_connection": "Muunganisho",
+  "src_tab_streams": "Mitiririko",
+  "src_own": "Cha chanzo hiki pekee",
+  "src_shared": "Ya pamoja",
+  "src_system": "Ya mfumo",
+  "src_follows": "Inafuata mpangilio wa pamoja ulio chini ya {where}.",
+  "src_not_saved": "Badiliko hili halikuhifadhiwa.",
+  "src_last_test": "Jaribio la mwisho la muunganisho",
+  "src_no_test": "Bado haijajaribiwa. “{button}”, juu, hujaribu kila hatua na kuonyesha hapa ilichopata.",
+  "src_settings_menu": "Mipangilio ya chanzo hiki…"
 }

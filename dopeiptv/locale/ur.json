@@ -1307,7 +1307,6 @@
   "nerd_log_level_hint": "Debug مسئلہ ڈھونڈنے کے لیے کہیں زیادہ لکھتا ہے۔",
   "nerd_log_info": "عام",
   "nerd_log_debug": "Debug",
-  "nerd_src_title": "Nerd اختیارات",
   "nerd_src_inherit": "Nerd صفحے کی طرح",
   "nerd_src_direct": "براہ راست (بغیر پراکسی)",
   "nerd_src_stream_port": "اسٹریم پورٹ",
@@ -2359,5 +2358,15 @@
   "pal_hint_opens": "کہیں سے بھی {shortcut} سے کھلتا ہے",
   "pal_none": "“{q}” کے لیے کچھ نہیں ملا",
   "pal_now": "ابھی",
-  "pal_record_remind": "ریکارڈ / یاد دہانی"
+  "pal_record_remind": "ریکارڈ / یاد دہانی",
+  "src_tab_connection": "کنکشن",
+  "src_tab_streams": "اسٹریمز",
+  "src_own": "اس ماخذ کا اپنا",
+  "src_shared": "مشترکہ",
+  "src_system": "سسٹم کا",
+  "src_follows": "{where} میں دی گئی مشترکہ ترتیب کے مطابق۔",
+  "src_not_saved": "یہ تبدیلی محفوظ نہیں ہوئی۔",
+  "src_last_test": "کنکشن کا آخری ٹیسٹ",
+  "src_no_test": "ابھی ٹیسٹ نہیں ہوا۔ اوپر «{button}» ہر مرحلہ آزماتا ہے اور جو ملا وہ یہاں دکھاتا ہے۔",
+  "src_settings_menu": "اس ماخذ کی ترتیبات…"
 }

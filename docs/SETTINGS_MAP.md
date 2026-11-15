@@ -13,8 +13,7 @@ The pages are built in `ui/mw_settings.py` (`open_settings`), Nerd's in
 `ui/shortcuts.py`, Simkl in `ui/mw_simkl.py`, sync in `ui/mw_sync.py`,
 Discord in `ui/mw_discord.py`. A row without a key is an action or a
 status. "(inverted)" is stored the other way round from what the row says.
-A source's own options are not here: they are in its Add/Edit dialog
-(`ui/dialogs.py`, its Nerd part in `ui/source_nerd.py`, `ui/source_net.py`).
+A source's own options are on its own page, under Sources (below).
 
 ## WATCH
 
@@ -61,12 +60,45 @@ and Chromecast, DLNA and Kodi rows belong here
 ## CONTENT
 
 **Sources** (`playlists`)
-- (untitled): the sources (`playlists`, `active_playlist`): add, edit, remove,
-  use, drag to reorder
+- (untitled): the sources (`playlists`, `active_playlist`): add (the quick
+  form - presets, Find on my network, a media server's sign-in - then on to
+  the new source's page), open its page (its ›, a double click, Edit),
+  remove, use, drag to reorder; a search finds a source by name, kind or
+  host
 - Selected playlist: its account (expiry, connections), Refresh
 - (untitled): link → Nerd › Network (identity, proxy, connection, own DNS,
   VPN guard); link → Nerd › Boxes and lists (boxes, picons, udpxy, failover,
   channel numbers)
+
+**A source's own page** - not in the sidebar: opened in place of Sources
+(or of Nerd › Boxes and lists, from a box's Options), with a way back, and
+from the source menu's "Settings for this source…". Built in
+`ui/source_page.py` from the fields of `ui/dialogs.py` (`SourceFields`) and
+the Nerd options of `ui/source_nerd.py` and `ui/source_net.py`. Stored in
+the source's entry in `playlists`, its own options under `options`; a
+change a moment after it is made, the source in use connected again once
+the page is left. A row with a shared setting says "Own for this source"
+or "Shared" and where the shared one lives. Nerd's rows only while it is on.
+- Header: initials, name, kind and account (expiry, connections); Test
+  connection (Nerd)
+- Connection: `name`, `kind`, `server` (Find on my network for a box or
+  media server), `username` + `password`, a media server's sign-in (`token`,
+  options `user_id`, `server_id`, `connections`), `mac` (Stalker)
+- Network (Nerd, the whole tab): options `user_agent`, `referer`, `headers`,
+  `proxy` (shared: Nerd › Network), `dns` + `dns_url`, `ip_family`,
+  `backup_servers`, `cert_pin` + `cert_pin_for` (shared: the system's); the
+  latest connection test this session (Copy)
+- Streams: stream format → Playback (shared: `stream_format`); Nerd:
+  `udpxy` (shared: Nerd › Boxes and lists), `catchup_mode`,
+  `catchup_template`, `rewrite`; each kind's: `stream_port`, `transcode`,
+  `transcode_more`, `stream_login`, `iptv_direct` (Enigma2), `profile`
+  (Tvheadend), `transcode` (HDHomeRun), `ms_quality` (media servers)
+- Guide: `epg_url`; Nerd: `epg_shift` (on top of Guide's shared
+  `epg_delay_min`), `picons` (Enigma2), `cloud_guide` (HDHomeRun); picons →
+  Nerd › Boxes and lists (shared: `nerd_picon_dir`); channel numbers
+  (`nerd_chno_<source id>`) → Nerd › Boxes and lists; a channel's guide by hand
+- Advanced: `refresh`; Nerd: `radio`, `recordings` (Enigma2, Tvheadend),
+  `show_drm`, `hd_group` (HDHomeRun)
 
 **Home** (`home`)
 - (untitled): `home_enabled`, `home_start`

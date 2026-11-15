@@ -1307,7 +1307,6 @@
   "nerd_log_level_hint": "Debug skriver mycket mer, för att jaga ett problem.",
   "nerd_log_info": "Normal",
   "nerd_log_debug": "Debug",
-  "nerd_src_title": "Nerd-alternativ",
   "nerd_src_inherit": "Som på Nerd-sidan",
   "nerd_src_direct": "Direkt (ingen proxy)",
   "nerd_src_stream_port": "Stream-port",
@@ -2359,5 +2358,15 @@
   "pal_hint_opens": "Öppnas med {shortcut} var som helst",
   "pal_none": "Inget hittades för ”{q}”",
   "pal_now": "nu",
-  "pal_record_remind": "spela in / påminn"
+  "pal_record_remind": "spela in / påminn",
+  "src_tab_connection": "Anslutning",
+  "src_tab_streams": "Strömmar",
+  "src_own": "Eget för källan",
+  "src_shared": "Gemensamt",
+  "src_system": "Systemets",
+  "src_follows": "Följer den gemensamma inställningen under {where}.",
+  "src_not_saved": "Ändringen sparades inte.",
+  "src_last_test": "Senaste anslutningstest",
+  "src_no_test": "Inte testad än. ”{button}” högst upp provar varje steg och visar här vad den hittade.",
+  "src_settings_menu": "Inställningar för källan…"
 }

@@ -452,6 +452,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if p["id"] != active:
                 act.triggered.connect(
                     lambda _c=False, pid=p["id"]: self.switch_playlist(pid))
+        if active and store.get(active):
+            menu.addSeparator()
+            act = menu.addAction(tr("src_settings_menu"))
+            act.triggered.connect(lambda _c=False, pid=active: self.open_source_settings(pid))
 
     def _show_playlist_menu(self) -> None:
         """Pop the source switcher just above the avatar at the sidebar's

@@ -131,18 +131,16 @@ def test_a_sources_own_options_only_where_they_differ(app):
     assert p.values()["profile"] == "my-profile"
 
 
-def test_the_source_dialog_has_nerd_options_only_with_nerd_on(app, settings):
+def test_the_add_dialog_leaves_a_sources_nerd_options_to_its_page(app, settings):
+    """The quick Add form has no Nerd options (the source's page, which
+    opens once it is added, has them); what a source came with rides
+    along. The page itself: tests/test_source_page.py."""
     from dopeiptv.ui.dialogs import PlaylistDialog
-    nerd.install(settings)
-    assert PlaylistDialog().nerd_panel is None
     settings.setValue("nerd_enabled", "true")
     nerd.install(settings)
-    d = PlaylistDialog(playlist={"name": "Vu", "kind": "enigma2", "server": "http://10.0.0.2",
-                                 "options": {"stream_port": "17999"}})
-    assert d.nerd_panel is not None and d.nerd_panel.port.value() == 17999
-    assert d.values()["options"] == {"stream_port": "17999"}
-    d.nerd_panel.port.setValue(8001)
-    assert "options" not in d.values()
+    d = PlaylistDialog(prefill={"name": "Vu", "kind": "enigma2", "server": "http://10.0.0.2",
+                                "options": {"stream_port": "17999"}})
+    assert d.nerd_panel is None and d.values()["options"] == {"stream_port": "17999"}
 
 
 def _welcome(settings):
@@ -217,35 +215,6 @@ def test_diagnostics_never_carry_a_secret(app, settings):
     text = diagnostics(settings)
     assert "hunter2" not in text and "s3cr3t" not in text and "10.0.0.1" not in text
     assert "nerd_proxy = (set)" in text and "nerd_spdif = ac3" in text and "Nerd: on" in text
-
-
-def test_the_source_dialog_scrolls_rather_than_outgrow_the_screen(app, settings):
-    """With Nerd on and a source's own options open, the form is taller
-    than a laptop's screen: it scrolls, OK and Cancel stay in view, and it
-    shrinks again when they fold shut."""
-    from PyQt6.QtTest import QTest
-    from PyQt6.QtWidgets import QDialogButtonBox
-
-    from dopeiptv.ui.dialogs import PlaylistDialog
-    settings.setValue("nerd_enabled", "true")
-    nerd.install(settings)
-    d = PlaylistDialog(playlist={"name": "Vu", "kind": "enigma2", "server": "http://10.0.0.2"})
-    d.show()
-    QTest.qWait(30)
-    shut = d.height()
-    d.nerd_panel.toggle.setChecked(True)
-    QTest.qWait(30)
-    screen = d.screen().availableGeometry().height()
-    assert d.frameGeometry().height() <= screen
-    content = d._scroll.widget().sizeHint().height()
-    assert content > d._scroll.viewport().height()          # more than shown...
-    assert d._scroll.verticalScrollBar().maximum() > 0      # ...so it scrolls
-    buttons = d.findChild(QDialogButtonBox)
-    assert buttons.parent() is d and buttons.isVisible()    # never scrolled away
-    d.nerd_panel.toggle.setChecked(False)
-    QTest.qWait(30)
-    assert d.height() == shut
-    d.close()
 
 
 def test_check_now_keeps_the_focus(app, settings):

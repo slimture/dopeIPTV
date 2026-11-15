@@ -1307,7 +1307,6 @@
   "nerd_log_level_hint": "Debug écrit beaucoup plus, pour traquer un problème.",
   "nerd_log_info": "Normal",
   "nerd_log_debug": "Debug",
-  "nerd_src_title": "Options Nerd",
   "nerd_src_inherit": "Comme sur la page Nerd",
   "nerd_src_direct": "Direct (sans proxy)",
   "nerd_src_stream_port": "Port de flux",
@@ -2359,5 +2358,15 @@
   "pal_hint_opens": "S'ouvre partout avec {shortcut}",
   "pal_none": "Rien trouvé pour « {q} »",
   "pal_now": "en cours",
-  "pal_record_remind": "enregistrer / rappel"
+  "pal_record_remind": "enregistrer / rappel",
+  "src_tab_connection": "Connexion",
+  "src_tab_streams": "Flux",
+  "src_own": "Propre à cette source",
+  "src_shared": "Commun",
+  "src_system": "Du système",
+  "src_follows": "Suit le réglage commun sous {where}.",
+  "src_not_saved": "Cette modification n'a pas été enregistrée.",
+  "src_last_test": "Dernier test de connexion",
+  "src_no_test": "Pas encore testée. « {button} », en haut, essaie chaque étape et affiche ici ce qu'il a trouvé.",
+  "src_settings_menu": "Réglages de cette source…"
 }

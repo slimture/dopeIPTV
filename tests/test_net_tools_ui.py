@@ -11,7 +11,7 @@ import pytest
 
 pytest.importorskip("PyQt6.QtWidgets")
 
-from PyQt6.QtWidgets import QApplication, QFormLayout  # noqa: E402
+from PyQt6.QtWidgets import QApplication  # noqa: E402
 
 from dopeiptv.core import connections, mirrors, nerd  # noqa: E402
 from dopeiptv.i18n import tr  # noqa: E402
@@ -50,41 +50,31 @@ def _wait(cond, secs=20.0) -> bool:
     return False
 
 
-def _fields(panel) -> list:
-    out = []
-    for i in range(panel.form.rowCount()):
-        item = panel.form.itemAt(i, QFormLayout.ItemRole.FieldRole)
-        if item is not None and item.widget() is not None:
-            out.append(item.widget())
-    return out
-
-
-# -- backup addresses in the source dialog -------------------------------------------
+# -- backup addresses on the source's page --------------------------------------------
 
 def test_the_backup_addresses_rows_follow_the_kind(nerd_on):
-    from dopeiptv.ui.dialogs import PlaylistDialog
-    d = PlaylistDialog(playlist={"id": "pl1", "name": "IPTV", "kind": "xtream",
-                                 "server": "http://main.example.com", "username": "u",
-                                 "password": "p",
-                                 "options": {mirrors.KEY: "b.example.com:8080"}})
+    from tests.test_source_page import shown, source_page, tab_of
+    d = source_page({"id": "pl1", "name": "IPTV", "kind": "xtream",
+                     "server": "http://main.example.com", "username": "u", "password": "p",
+                     "options": {mirrors.KEY: "b.example.com:8080"}})
     p = d.nerd_panel
-    assert p.mirrors_box in _fields(p) and p.mr_line in _fields(p) and p.test_conn in _fields(p)
+    assert tab_of(d, p.mirrors_box) == "net" and shown(d, p.mirrors_box) and shown(d, p.mr_line)
+    assert d.test_btn is not None
     assert d.values()["options"][mirrors.KEY] == "b.example.com:8080"
-    p.set_kind("enigma2")
-    assert p.mirrors_box not in _fields(p) and p.test_conn in _fields(p)
+    d.kind.setCurrentIndex(d.kind.findData("enigma2"))
+    assert not shown(d, p.mirrors_box) and d.test_btn is not None
     assert mirrors.KEY not in p.values()
-    p.set_kind("m3u")
-    assert p.mirrors_box in _fields(p)
+    d.kind.setCurrentIndex(d.kind.findData("m3u"))
+    assert shown(d, p.mirrors_box)
     assert p.mirrors_box.placeholderText().endswith(".m3u")
 
 
 def test_the_line_says_which_address_is_in_use(nerd_on):
-    from dopeiptv.ui.dialogs import PlaylistDialog
+    from tests.test_source_page import source_page
     nerd_on[mirrors.pick_key("pl1")] = "http://b.example.com:8080"
-    d = PlaylistDialog(playlist={"id": "pl1", "name": "IPTV", "kind": "xtream",
-                                 "server": "http://main.example.com", "username": "u",
-                                 "password": "p",
-                                 "options": {mirrors.KEY: "b.example.com:8080\nc.example.com"}})
+    d = source_page({"id": "pl1", "name": "IPTV", "kind": "xtream",
+                     "server": "http://main.example.com", "username": "u", "password": "p",
+                     "options": {mirrors.KEY: "b.example.com:8080\nc.example.com"}})
     line = d.nerd_panel.mr_line
     line.show_preview()
     assert line.result.key == "nerd_ck_mr_list"
@@ -92,22 +82,23 @@ def test_the_line_says_which_address_is_in_use(nerd_on):
     assert d.nerd_panel.test_source()["id"] == "pl1"
 
 
-def test_a_bad_line_keeps_the_dialog_open(nerd_on, monkeypatch):
+def test_a_bad_line_keeps_the_page_open(nerd_on, monkeypatch):
     from PyQt6.QtWidgets import QMessageBox
 
-    from dopeiptv.ui.dialogs import PlaylistDialog
+    from tests.test_source_page import source_page
     said: list[str] = []
     monkeypatch.setattr(QMessageBox, "warning", lambda _p, _t, text, *a, **k: said.append(text))
-    d = PlaylistDialog(playlist={"id": "pl1", "name": "IPTV", "kind": "xtream",
-                                 "server": "http://main.example.com", "username": "u",
-                                 "password": "p", "options": {}})
+    backs: list[int] = []
+    d = source_page({"id": "pl1", "name": "IPTV", "kind": "xtream",
+                     "server": "http://main.example.com", "username": "u", "password": "p",
+                     "options": {}}, back=lambda: backs.append(1))
     d.nerd_panel.mirrors_box.setPlainText("ok.example.com\nrtmp://wrong.example.com")
-    d._validate()
-    assert said == [tr("nerd_ck_mr_scheme", n=2)] and d.result() == 0
-    assert d.nerd_panel.toggle.isChecked()
+    d.go_back()
+    assert said == [tr("nerd_ck_mr_scheme", n=2)] and not backs
+    assert d.current_tab() == "net"
     d.nerd_panel.mirrors_box.setPlainText("ok.example.com")
-    d._validate()
-    assert d.result() == 1
+    d.go_back()
+    assert backs == [1]
 
 
 # -- Test connection's window ------------------------------------------------------------

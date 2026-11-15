@@ -477,15 +477,15 @@ def test_the_line_under_the_rules_and_its_test_against_a_panel(settings):
     login masked); Test finds a real channel, asks the rewritten address
     with the source's user agent and says it streams - or that nothing is
     there."""
-    from dopeiptv.ui.dialogs import PlaylistDialog
     from tests.test_catchup import _wait
+    from tests.test_source_page import source_page
     from tests.test_sources_side_by_side import Xtream
     xt = Xtream()
     try:
-        d = PlaylistDialog(playlist={"name": "Anna", "kind": "xtream", "server": xt.base,
-                                     "username": "anna", "password": "pw-anna",
-                                     "options": {"user_agent": "kodi",
-                                                 "rewrite": dump([Rule(".ts", ".m3u8")])}})
+        d = source_page({"name": "Anna", "kind": "xtream", "server": xt.base,
+                         "username": "anna", "password": "pw-anna",
+                         "options": {"user_agent": "kodi",
+                                     "rewrite": dump([Rule(".ts", ".m3u8")])}})
         line = d.nerd_panel.rw_line
         line.show_preview()
         assert line.result.key == "nerd_ck_rw_would_example"
@@ -512,23 +512,25 @@ def test_the_line_under_the_rules_and_its_test_against_a_panel(settings):
         xt.close()
 
 
-def test_a_rule_that_cannot_work_is_refused_by_the_dialog(settings, monkeypatch):
+def test_a_rule_that_cannot_work_is_refused_by_the_page(settings, monkeypatch):
     from PyQt6.QtWidgets import QMessageBox
 
     from dopeiptv.i18n import tr
-    from dopeiptv.ui.dialogs import PlaylistDialog
+    from tests.test_source_page import source_page
     said = []
     monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: said.append(a[2]))
-    d = PlaylistDialog(playlist={"name": "TV", "kind": "m3u", "server": "http://h/tv.m3u"})
+    backs = []
+    d = source_page({"name": "TV", "kind": "m3u", "server": "http://h/tv.m3u"},
+                    back=lambda: backs.append(1))
     row = d.nerd_panel.rewrite.add()
     row.find.setText("(unclosed")
     row.regex.setChecked(True)
-    d._validate()
-    assert d.result() == 0 and said and said[0].startswith(tr("nerd_ck_rw_bad", n=1, error="")[:8])
-    assert d.nerd_panel.toggle.isChecked() and d.nerd_panel.rw_line.result.state == FAIL
+    d.go_back()
+    assert not backs and said and said[0].startswith(tr("nerd_ck_rw_bad", n=1, error="")[:8])
+    assert d.current_tab() == "streams" and d.nerd_panel.rw_line.result.state == FAIL
     row.find.setText("(closed)")
-    d._validate()
-    assert d.result() == 1
+    d.go_back()
+    assert backs == [1]
     assert parse(d.values()["options"]["rewrite"]) == [Rule("(closed)", "", True)]
 
 

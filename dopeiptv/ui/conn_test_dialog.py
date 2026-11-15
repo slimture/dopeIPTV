@@ -52,7 +52,7 @@ def step_time(step: ct.Step) -> str:
     return tr("ct_ms", ms=step.ms) if step.ms is not None and step.state != ct.SKIP else ""
 
 
-class _StepRow(QWidget):
+class StepRow(QWidget):
     def __init__(self, name: str) -> None:
         super().__init__()
         self.setObjectName("CtRow")
@@ -150,14 +150,14 @@ class ConnTestDialog(QDialog):
         rows = QVBoxLayout(surface)
         rows.setContentsMargins(16, 4, 16, 4)
         rows.setSpacing(0)
-        self.rows: dict[str, _StepRow] = {}
+        self.rows: dict[str, StepRow] = {}
         for i, name in enumerate(ct.STEPS):
             if i:
                 hair = QFrame()
                 hair.setObjectName("CtLine")
                 hair.setFixedHeight(1)
                 rows.addWidget(hair)
-            row = _StepRow(name)
+            row = StepRow(name)
             self.rows[name] = row
             rows.addWidget(row)
         col.addWidget(surface)

@@ -150,8 +150,8 @@ map and the one-way import rule.
 | `ui/main_window.py` | MainWindow composition root (+ `mw_*` mixins) |
 | `ui/app_menu.py` | The app's menus per platform: macOS's menu bar (app menu by roles, File, View, History, Help), elsewhere the one menu in the same groups |
 | `ui/channel_list.py` | List model, view, delegate painting |
-| `ui/dialogs.py` | Dialog windows |
-| `ui/settings_ui.py` | Settings building blocks: sidebar shell (group headings, a group's pages shown only while it is on), search view (each page's group over it), pages, sections (`card`), rows, link rows to a page elsewhere, switches, steppers, chips |
+| `ui/dialogs.py` | Dialog windows; `SourceFields` (a source's connection fields and what they mean, no layout) and the Add source quick form (`PlaylistDialog`) |
+| `ui/settings_ui.py` | Settings building blocks: sidebar shell (group headings, a group's pages shown only while it is on), search view (each page's group over it), pages, a page below a page (`open_sub`: a source's own, in place of Sources), sections (`card`), rows (with a mark before the control: a source's own or shared), link rows to a page elsewhere, switches, steppers, chips |
 | `ui/qt_i18n.py` | Qt's own strings and QLocale dates in the app's language |
 | `ui/home_widgets.py` | Home's featured strip, shelves and cards (pure presentation) |
 | `ui/tmdb_match.py` | Manual TMDB match dialog |
@@ -162,7 +162,8 @@ map and the one-way import rule.
 | `ui/media_signin.py` | Signing in to a media server in the source dialog and the welcome: Jellyfin/Emby name and password (sent once, never kept) or Quick Connect, Plex's PIN in the browser and the server picked; the network off the window's thread |
 | `ui/mw_media.py` | Media servers in the window: what plays reported (start, every 10 s, pause, stop), the newer of the server's and this computer's resume points, the server's titles under Continue watching (`_continue_rows`), a watched mark sent back, why there is no live TV; it only watches, nothing in private viewing |
 | `ui/nerd_settings.py` | Nerd in Settings: Status (switch, what is in Nerd, how it works) and, while it is on, the five pages beside it under NERD - Network, Boxes and lists, Player, Remote and automation, Diagnostics |
-| `ui/source_nerd.py` | A source's own Nerd options in the Add/Edit source dialog |
+| `ui/source_page.py` | A source's own page in Settings (under Sources): header (initials, name, kind and account, Test connection), tabs Connection / Network (Nerd) / Streams / Guide / Advanced, each row marked own for this source or shared (and where), Nerd rows only while it is on, a change stored a moment later when it can be, the latest connection test |
+| `ui/source_nerd.py` | A source's own Nerd options: their controls and what they mean, without a layout (its page puts them on its tabs) |
 | `ui/net_advanced.py` | Nerd's Own DNS card (Network page) and Low latency card (Player page), each with its check line |
 | `ui/source_net.py` | A source's own DNS, IP version and trusted certificate in its Nerd options, each with a Test |
 | `ui/cert_trust.py` | The window that shows a certificate before it is trusted, and the offer to review a pinned source's changed one (`offer_review`) |
@@ -316,7 +317,8 @@ group, every row on one page, and that the map names every page).
   second copy.
 - A feature with a few settings gets a section on the page it belongs to,
   not a page of its own; a new page only for a service of its own.
-- A source's own option goes in that source's page, marked as its own,
+- A source's own option goes in that source's page (`ui/source_page.py`,
+  on the tab it belongs to, with an `Origin` mark), marked as its own,
   with the shared one shown as shared.
 - A Nerd-only option goes under NERD, and the everyday page it belongs
   beside gets one link row to it ("4 Nerd settings for ... -> Nerd >

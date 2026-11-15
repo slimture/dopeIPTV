@@ -135,11 +135,13 @@ class SettingsCard(QFrame):
 
     def row(self, label: str, control=None, hint: str = "",
             stretch_control: bool = False, search: str = "",
-            below: QWidget | None = None) -> QWidget:
+            below: QWidget | None = None, badge: QWidget | None = None) -> QWidget:
         """Label on the left (and its explanation under it), the control -
         a widget or a layout - on the right. *search* adds words the row is
         found under besides its label and hint. *below*: a line across the
-        whole row under both (what a check of the setting found)."""
+        whole row under both (what a check of the setting found). *badge*:
+        a small mark just before the control (a source's "Own" or
+        "Shared")."""
         w = QWidget()
         w.setObjectName("SettingsRow")
         if below is None:
@@ -167,6 +169,8 @@ class SettingsCard(QFrame):
             w.hint_label = _muted(hint)
             text.addWidget(w.hint_label)
         h.addLayout(text, 1)
+        if badge is not None:
+            h.addWidget(badge, 0, Qt.AlignmentFlag.AlignVCenter)
         if isinstance(control, QLayout):
             holder = QWidget()
             control.setContentsMargins(0, 0, 0, 0)
@@ -222,7 +226,7 @@ class SettingsCard(QFrame):
         return lbl
 
     def link(self, label: str, hint: str, target: str,
-             on_click: Callable[[], None]) -> QWidget:
+             on_click: Callable[[], None], badge: QWidget | None = None) -> QWidget:
         """A row that leads to settings kept on another page ("4 Nerd
         settings for stream and buffer", what they are, "Nerd › Player →"):
         one setting has one place, and the page beside it says where."""
@@ -232,10 +236,15 @@ class SettingsCard(QFrame):
         btn.setFlat(True)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.clicked.connect(lambda _c=False: on_click())
-        w = self.row(label, btn, hint, search=target)
+        w = self.row(label, btn, hint, search=target, badge=badge)
         w.label.setObjectName("SettingsLinkLabel")
         w.link = btn
         return w
+
+    def set_search(self, row: QWidget, text: str) -> None:
+        """The words *row* is found under, from now on (a list whose
+        entries change: the sources by name)."""
+        self.rows = [(w, text.casefold() if w is row else t) for w, t in self.rows]
 
     def shown_if(self, row: QWidget, predicate) -> None:
         """Show *row* only while *predicate()* holds (re-checked by
@@ -550,8 +559,12 @@ class SettingsShell(QWidget):
         self._found_off = QTimer(self)
         self._found_off.setSingleShot(True)
         self._found_off.timeout.connect(self._unlight_found)
+        #: A page below a page (a source's own, under Sources), shown in its
+        #: place while open: see open_sub.
+        self.sub: QWidget | None = None
         self.nav.page_chosen.connect(self._show)
         self.search.textChanged.connect(self._filter)
+        self.stack.currentChanged.connect(self._stack_changed)
 
     def showEvent(self, event) -> None:
         # Measured on show, not as the rows are built: a size hint is only
@@ -567,15 +580,7 @@ class SettingsShell(QWidget):
         width of its own text, so a long entry ("Default (provider order)")
         stuck out past the dropdowns above it. Only the minimum is set: a
         control whose text grows later widens instead of being cut off."""
-        controls = [c for p in self.pages for c in p.column]
-        if not controls:
-            return
-        for c in controls:
-            c.ensurePolished()
-        widest = max(c.sizeHint().width() for c in controls)
-        for c in controls:
-            c.setMinimumWidth(min(max(widest, c.minimumWidth()),
-                                  c.maximumWidth()))
+        align_controls([c for p in self.pages for c in p.column])
 
     def add_page(self, page: SettingsPage, icon: QIcon) -> SettingsPage:
         self.pages.append(page)
@@ -724,6 +729,38 @@ class SettingsShell(QWidget):
         # (Nerd's, while it is off) stays out.
         self._filter(self.search.text())
 
+    def open_sub(self, widget: QWidget, under: str) -> None:
+        """Show *widget* in place of the page *under*, which stays picked in
+        the sidebar. Showing anything else - another page, a search - closes
+        it: its leave() runs, then it goes."""
+        self.close_sub()
+        if self.search.text():
+            self.search.clear()
+        self.show_page(under)
+        self.sub = widget
+        self.stack.addWidget(widget)
+        self.stack.setCurrentWidget(widget)
+
+    def close_sub(self) -> None:
+        w, self.sub = self.sub, None
+        if w is None or sip.isdeleted(w):
+            return
+        leave = getattr(w, "leave", None)
+        if leave is not None:
+            leave()
+        if not sip.isdeleted(self.stack):
+            self.stack.removeWidget(w)
+        w.deleteLater()
+
+    def leave_sub(self) -> None:
+        """Back from the page below to the page it is under."""
+        if self.sub is not None:
+            self.stack.setCurrentWidget(self._page_at(self.nav.currentRow()) or self._none)
+
+    def _stack_changed(self, _index: int) -> None:
+        if self.sub is not None and self.stack.currentWidget() is not self.sub:
+            self.close_sub()
+
     def _page_at(self, row: int) -> SettingsPage | None:
         item = self.nav.item(row)
         key = item.data(Qt.ItemDataRole.UserRole) if item else None
@@ -803,10 +840,11 @@ class SettingsShell(QWidget):
                 break
         row = self.nav.currentRow()
         if not needle:
+            was = self._searching
             self._leave_search()
             if row < 0 or self.nav.item(row).isHidden():
                 self.nav.setCurrentRow(first if first is not None else -1)
-            else:
+            elif was or self.sub is None:      # a page below stays open
                 self._show(row)
             return
         if first is None:
@@ -917,6 +955,19 @@ class SettingsShell(QWidget):
     def found_row(self) -> QWidget | None:
         """The row lit by ``highlight``, while it is lit."""
         return self._found
+
+
+def align_controls(controls: list[QWidget]) -> None:
+    """The widest control's width for all of *controls* (a column down a
+    page), within their bounds; only the minimum, so one whose text grows
+    later widens rather than being cut off."""
+    if not controls:
+        return
+    for c in controls:
+        c.ensurePolished()
+    widest = max(c.sizeHint().width() for c in controls)
+    for c in controls:
+        c.setMinimumWidth(min(max(widest, c.minimumWidth()), c.maximumWidth()))
 
 
 def settings_style() -> str:
@@ -1143,8 +1194,18 @@ class PlaylistDelegate(QStyledItemDelegate):
             for dy in (-5.0, 0.0, 5.0):
                 pr.drawEllipse(QPointF(gx + dx, cy + dy), 1.6, 1.6)
         lead = 32.0
-        left = r.left() + (12.0 if rtl else lead)
-        right = r.right() - (lead if rtl else 12.0)
+        # A › at the trailing end: the row opens the source's page.
+        chev = 26.0 if info.get("opens") else 0.0
+        if chev:
+            pr.setPen(QColor(P["muted"]))
+            f = QFont(option.font)
+            f.setPixelSize(18)
+            pr.setFont(f)
+            box = (QRectF(r.left() + 4, r.top(), chev, r.height()) if rtl
+                   else QRectF(r.right() - 4 - chev, r.top(), chev, r.height()))
+            pr.drawText(box, int(Qt.AlignmentFlag.AlignCenter), "‹" if rtl else "›")
+        left = r.left() + (12.0 + chev if rtl else lead)
+        right = r.right() - (lead if rtl else 12.0 + chev)
         align = (Qt.AlignmentFlag.AlignRight if rtl
                  else Qt.AlignmentFlag.AlignLeft) | Qt.AlignmentFlag.AlignVCenter
         base = QFont(option.font)
@@ -1418,18 +1479,40 @@ def hbox(*widgets, stretch: bool = True, spacing: int = 8) -> QHBoxLayout:
 
 class ReorderList(QListWidget):
     """A list whose rows are dragged into a new order; says so once the
-    drop has landed."""
+    drop has landed. With *open_zone* set, a click within that many pixels
+    of a row's trailing end (where its delegate draws a ›) opens it."""
 
     reordered = pyqtSignal()
+    open_requested = pyqtSignal(QListWidgetItem)
 
     def __init__(self) -> None:
         super().__init__()
         self.setDragDropMode(QListWidget.DragDropMode.InternalMove)
         self.setDefaultDropAction(Qt.DropAction.MoveAction)
+        self.open_zone = 0
+        self._pressed: QPoint | None = None
 
     def dropEvent(self, event) -> None:
         super().dropEvent(event)
         self.reordered.emit()
+
+    def mousePressEvent(self, event) -> None:
+        self._pressed = event.position().toPoint()
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:
+        super().mouseReleaseEvent(event)
+        at, self._pressed = event.position().toPoint(), self._pressed
+        item = self.itemAt(at) if self.open_zone else None
+        if item is None or at is None or self._moved(at):
+            return
+        r = self.visualItemRect(item)
+        edge = r.left() + self.open_zone if self.isRightToLeft() else r.right() - self.open_zone
+        if (at.x() <= edge) if self.isRightToLeft() else (at.x() >= edge):
+            self.open_requested.emit(item)
+
+    def _moved(self, at: QPoint) -> bool:
+        return self._pressed is None or (at - self._pressed).manhattanLength() > 6
 
 
 def fit_to_rows(lst: QListWidget, most: int = 6) -> None:

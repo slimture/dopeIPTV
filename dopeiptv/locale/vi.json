@@ -1307,7 +1307,6 @@
   "nerd_log_level_hint": "Debug ghi nhiều hơn hẳn, để truy tìm sự cố.",
   "nerd_log_info": "Bình thường",
   "nerd_log_debug": "Debug",
-  "nerd_src_title": "Tùy chọn Nerd",
   "nerd_src_inherit": "Như trên trang Nerd",
   "nerd_src_direct": "Trực tiếp (không proxy)",
   "nerd_src_stream_port": "Cổng luồng",
@@ -2359,5 +2358,15 @@
   "pal_hint_opens": "Mở bằng {shortcut} ở bất cứ đâu",
   "pal_none": "Không tìm thấy gì cho “{q}”",
   "pal_now": "đang phát",
-  "pal_record_remind": "ghi / nhắc"
+  "pal_record_remind": "ghi / nhắc",
+  "src_tab_connection": "Kết nối",
+  "src_tab_streams": "Luồng phát",
+  "src_own": "Riêng cho nguồn này",
+  "src_shared": "Dùng chung",
+  "src_system": "Của hệ thống",
+  "src_follows": "Theo thiết lập dùng chung trong {where}.",
+  "src_not_saved": "Thay đổi này chưa được lưu.",
+  "src_last_test": "Lần kiểm tra kết nối gần nhất",
+  "src_no_test": "Chưa kiểm tra. “{button}” ở trên cùng thử từng bước và hiện kết quả ở đây.",
+  "src_settings_menu": "Cài đặt của nguồn này…"
 }

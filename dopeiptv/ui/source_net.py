@@ -1,8 +1,8 @@
-"""A source's own network in its Nerd options (the Add/Edit source dialog,
-under ui/source_nerd.py's rows): its own DNS (DNS over HTTPS), its own IP
-version, and the certificate trusted for it - each with a line and a Test
-(core/net_route.py, core/cert_pin.py). Only what differs from the Nerd page
-is stored, under KEYS in the source's options.
+"""A source's own network in its Nerd options (the Network tab of its page
+in Settings, with ui/source_nerd.py's rows): its own DNS (DNS over HTTPS),
+its own IP version, and the certificate trusted for it - each with a line
+and a Test (core/net_route.py, core/cert_pin.py). Only what differs from
+the Nerd page is stored, under KEYS in the source's options.
 """
 
 from __future__ import annotations
@@ -10,8 +10,9 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from PyQt6 import sip
+from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
-    QComboBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QWidget,
+    QComboBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QWidget,
 )
 
 from ..core import cert_pin, doh, nerd, nerd_check, net_route
@@ -35,19 +36,13 @@ def _combo(items: list[tuple[str, str]], current: str) -> QComboBox:
     return box
 
 
-def _labels(form: QFormLayout) -> list[QWidget]:
-    out = []
-    for row in range(form.rowCount()):
-        item = form.itemAt(row, QFormLayout.ItemRole.LabelRole)
-        w = item.widget() if item is not None else None
-        if w is not None and not sip.isdeleted(w):
-            out.append(w)
-    return out
-
-
 class SourceNetOptions(QWidget):
-    """*source()*: the source as the dialog has it now (kind, address,
-    login) - what the Tests ask."""
+    """*source()*: the source as the page has it now (kind, address,
+    login) - what the Tests ask. Holds the controls, never shown itself:
+    the page places them."""
+
+    #: A certificate was trusted or forgotten (no control says so).
+    pinned = pyqtSignal()
 
     def __init__(self, options: dict, source: Callable[[], dict], parent: QWidget | None = None,
                  proxy: Callable[[], str] | None = None) -> None:
@@ -56,12 +51,7 @@ class SourceNetOptions(QWidget):
         self._source = source
         self._proxy = proxy
         self._pin = cert_pin.pin_of(o)
-        self.form = QFormLayout(self)
-        self.form.setContentsMargins(0, 8, 0, 0)
-        self.form.setSpacing(8)
-        head = QLabel(tr("nerd_src_net"))
-        head.setStyleSheet(f"color:{P['text']}; font-weight:650;")
-        self.form.addRow(head)
+        self.hide()
         # Own DNS.
         self.dns = _combo(DNS_CHOICES, str(o.get("dns") or ""))
         self.dns.setToolTip(tr("nerd_dns_hint"))
@@ -69,23 +59,18 @@ class SourceNetOptions(QWidget):
         self.dns_url.setPlaceholderText("https://dns.example/dns-query")
         self.dns_url.setAccessibleName(tr("nerd_dns_url"))
         self.dns_line = CheckLine(self._dns_job, tr("nerd_ck_title_dns"), test=True, preview=self._dns_preview)
-        self.form.addRow(tr("nerd_dns"), self.dns)
-        self.form.addRow("", self.dns_url)
-        self.form.addRow("", self.dns_line)
         # IP version.
         self.family = _combo(FAMILY_CHOICES, str(o.get("ip_family") or ""))
         self.family.setToolTip(tr("nerd_src_ip_hint"))
         self.family_line = CheckLine(self._family_job, tr("nerd_ck_title_ip"), test=True,
                                      preview=self._family_preview)
-        self.form.addRow(tr("nerd_ip_family"), self.family)
-        self.form.addRow("", self.family_line)
         # The certificate trusted for it.
         self.trust_btn = QPushButton(tr("cert_trust_action"))
         self.trust_btn.setToolTip(tr("cert_trust_hint"))
         self.forget_btn = QPushButton(tr("cert_forget"))
         self.trust_btn.clicked.connect(self.trust)
         self.forget_btn.clicked.connect(self.forget)
-        buttons = QWidget()
+        self.cert_buttons = buttons = QWidget()
         h = QHBoxLayout(buttons)
         h.setContentsMargins(0, 0, 0, 0)
         h.setSpacing(8)
@@ -96,9 +81,6 @@ class SourceNetOptions(QWidget):
         self.pin_label.setWordWrap(True)
         self.pin_label.setStyleSheet(f"color:{P['text2']}; font-size:12px;")
         self.cert_line = CheckLine(self._cert_job, tr("nerd_ck_title_pin"), test=True, preview=self._cert_preview)
-        self.form.addRow(tr("cert_row"), buttons)
-        self.form.addRow("", self.pin_label)
-        self.form.addRow("", self.cert_line)
         self._fetch = CertFetch(self, self._cert_came, self._cert_failed)
         self.dns.currentIndexChanged.connect(self._shown)
         for sig in (self.dns.currentIndexChanged, self.dns_url.textChanged):
@@ -146,11 +128,7 @@ class SourceNetOptions(QWidget):
             line.changed()
 
     def _shown(self, *_a: Any) -> None:
-        custom = self.dns.currentData() == "custom"
-        self.dns_url.setVisible(custom)
-        label = self.form.labelForField(self.dns_url)
-        if label is not None:
-            label.setVisible(custom)
+        self.dns_url.setVisible(self.dns.currentData() == "custom")
         https = self._https()
         self.trust_btn.setEnabled(https is not None)
         self.forget_btn.setVisible(self._pin is not None)
@@ -159,14 +137,6 @@ class SourceNetOptions(QWidget):
             self.pin_label.setText(tr("cert_pinned", server=f"{host}:{port}", fp=cert_pin.pretty(fp)[:23] + "…"))
         else:
             self.pin_label.setText(tr("cert_none") if https else tr("cert_plain"))
-
-    def align_with(self, other: QFormLayout) -> None:
-        """One label column with the form above (another layout, so its
-        own widths otherwise)."""
-        labels = [w for form in (self.form, other) for w in _labels(form)]
-        width = max((w.sizeHint().width() for w in labels), default=0)
-        for w in labels:
-            w.setMinimumWidth(width)
 
     # -- own DNS ------------------------------------------------------------------
 
@@ -256,6 +226,7 @@ class SourceNetOptions(QWidget):
             cert_pin.clear_mismatch(host, port)
             self._shown()
             self.cert_line.changed()
+            self.pinned.emit()
 
     def _cert_failed(self, message: str) -> None:
         if sip.isdeleted(self):
@@ -267,3 +238,7 @@ class SourceNetOptions(QWidget):
         self._pin = None
         self._shown()
         self.cert_line.changed()
+        self.pinned.emit()
+
+    def has_pin(self) -> bool:
+        return self._pin is not None

@@ -1307,7 +1307,6 @@
   "nerd_log_level_hint": "Debug כותב הרבה יותר, כדי לאתר בעיה.",
   "nerd_log_info": "רגיל",
   "nerd_log_debug": "Debug",
-  "nerd_src_title": "אפשרויות Nerd",
   "nerd_src_inherit": "כמו בעמוד Nerd",
   "nerd_src_direct": "ישיר (ללא פרוקסי)",
   "nerd_src_stream_port": "פורט שידור",
@@ -2359,5 +2358,15 @@
   "pal_hint_opens": "נפתח עם {shortcut} מכל מקום",
   "pal_none": "לא נמצא דבר עבור „{q}”",
   "pal_now": "עכשיו",
-  "pal_record_remind": "הקלטה / תזכורת"
+  "pal_record_remind": "הקלטה / תזכורת",
+  "src_tab_connection": "חיבור",
+  "src_tab_streams": "שידורים",
+  "src_own": "ייחודי למקור הזה",
+  "src_shared": "משותף",
+  "src_system": "של המערכת",
+  "src_follows": "פועל לפי ההגדרה המשותפת ב{where}.",
+  "src_not_saved": "השינוי הזה לא נשמר.",
+  "src_last_test": "בדיקת החיבור האחרונה",
+  "src_no_test": "עדיין לא נבדק. „{button}” למעלה בודק כל שלב ומציג כאן מה נמצא.",
+  "src_settings_menu": "הגדרות המקור הזה…"
 }

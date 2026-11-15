@@ -1307,7 +1307,6 @@
   "nerd_log_level_hint": "Debug เขียนมากกว่ามาก เพื่อตามหาปัญหา",
   "nerd_log_info": "ปกติ",
   "nerd_log_debug": "Debug",
-  "nerd_src_title": "ตัวเลือก Nerd",
   "nerd_src_inherit": "เหมือนในหน้า Nerd",
   "nerd_src_direct": "ตรง (ไม่ใช้พร็อกซี)",
   "nerd_src_stream_port": "พอร์ตสตรีม",
@@ -2359,5 +2358,15 @@
   "pal_hint_opens": "เปิดได้ทุกที่ด้วย {shortcut}",
   "pal_none": "ไม่พบสิ่งใดสำหรับ “{q}”",
   "pal_now": "ขณะนี้",
-  "pal_record_remind": "บันทึก / เตือน"
+  "pal_record_remind": "บันทึก / เตือน",
+  "src_tab_connection": "การเชื่อมต่อ",
+  "src_tab_streams": "สตรีม",
+  "src_own": "เฉพาะแหล่งนี้",
+  "src_shared": "ใช้ร่วมกัน",
+  "src_system": "ของระบบ",
+  "src_follows": "ใช้ตามการตั้งค่าที่ใช้ร่วมกันใน {where}",
+  "src_not_saved": "การเปลี่ยนแปลงนี้ไม่ได้บันทึก",
+  "src_last_test": "การทดสอบการเชื่อมต่อล่าสุด",
+  "src_no_test": "ยังไม่ได้ทดสอบ ปุ่ม “{button}” ด้านบนจะลองทีละขั้นและแสดงผลที่พบไว้ที่นี่",
+  "src_settings_menu": "การตั้งค่าของแหล่งนี้…"
 }

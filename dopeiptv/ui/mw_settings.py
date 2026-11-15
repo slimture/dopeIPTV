@@ -56,11 +56,12 @@ class _WheelGuard(QObject):
 from .. import APP_NAME, BUILD_VERSION, VERSION
 from ..i18n import tr
 from .dialogs import PlaylistDialog
+from .source_page import KIND_NAMES, SourcePage
 from ..providers.metadata import CacheFiles, TmdbClient, bundled_tmdb_key
 from ..providers.opensubtitles import OpenSubtitles
 from ..providers.opensubtitles import bundled_key as bundled_os_key
 from ..providers.client import make_client
-from ..core import connections
+from ..core import connections, mirrors
 from ..core import night_mode, rec_mp4
 from ..core.local_buffer import MEMORY_MAX_MINUTES
 from ..core.log import log
@@ -677,6 +678,11 @@ class _SettingsMixin:
         nerd.install(self.settings)
         self._show_toast(tr("nerd_already") if already else tr("nerd_unlocked"),
                          4000)
+
+    def open_source_settings(self, pid: str) -> None:
+        """Settings, opened on source *pid*'s own page."""
+        self._settings_source = pid
+        self.open_settings()
 
     def open_settings(self, *_signal_args, at_page: str | None = None,
                       at_row: tuple | None = None, index_only: bool = False) -> None:
@@ -1398,13 +1404,11 @@ class _SettingsMixin:
         store = self.playlist_store
         pl_list = ReorderList()
         pl_list.setObjectName("PlaylistList")
-        pl_list.setItemDelegate(PlaylistDelegate(
-            tr("pl_in_use"), {"xtream": "Xtream", "m3u": "M3U",
-                              "stalker": "Stalker", "enigma2": "Enigma2",
-                              "tvheadend": "Tvheadend",
-                              "hdhomerun": "HDHomeRun", "jellyfin": "Jellyfin",
-                              "emby": "Emby", "plex": "Plex"}, pl_list))
+        pl_list.setItemDelegate(PlaylistDelegate(tr("pl_in_use"), KIND_NAMES, pl_list))
         pl_list.setMouseTracking(True)
+        # Each row opens its source's page: a click on its › (or a double
+        # click, or Edit).
+        pl_list.open_zone = 36
         # Drag a playlist to change its place; the sidebar's playlist menu
         # lists them in this same order.
         pl_list.setStyleSheet(
@@ -1415,7 +1419,8 @@ class _SettingsMixin:
         remove_btn = QPushButton(tr("btn_remove"))
         use_btn = QPushButton(tr("btn_use"), objectName="Primary")
         c = playlists.card()
-        c.widget(pl_list, tr("tab_playlists"))
+        pl_card = c
+        pl_row = c.widget(pl_list, tr("tab_playlists"))
         # As tall as its playlists: a fixed 200 px left one playlist above
         # an empty well.
         fit_to_rows(pl_list, most=6)
@@ -2104,7 +2109,7 @@ class _SettingsMixin:
             nerd_page, self.settings, d,
             boxes=[p for p in (self.playlist_store.playlists() if self.playlist_store else [])
                    if p.get("kind") in ("enigma2", "tvheadend", "hdhomerun")],
-            edit=lambda pid: edit_source(pid),
+            edit=lambda pid: edit_source(pid, "nerd_boxes"),
             add=lambda: add_playlist({"kind": "enigma2"}),
             pages=nerd_pages, show_pages=show_nerd_pages,
             source=lambda: self.playlist_store.active() if self.playlist_store else None,
@@ -2136,6 +2141,7 @@ class _SettingsMixin:
                 pl_list.setDragDropMode(
                     QAbstractItemView.DragDropMode.NoDragDrop)
                 return
+            words = [tr("tab_playlists")]
             for p in store.playlists():
                 item = QListWidgetItem(p.get("name", ""))
                 item.setData(Qt.ItemDataRole.UserRole, p["id"])
@@ -2143,9 +2149,16 @@ class _SettingsMixin:
                     "name": p.get("name", ""),
                     "server": p.get("server", ""),
                     "kind": p.get("kind") or "xtream",
-                    "active": p["id"] == store.active_id})
+                    "active": p["id"] == store.active_id,
+                    "opens": True})
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsDropEnabled)
                 pl_list.addItem(item)
+                # Found by its name, its kind and where it is (never a path
+                # or query: an M3U address may carry a login).
+                server = str(p.get("server") or "")
+                words += [str(p.get("name") or ""), KIND_NAMES.get(p.get("kind") or "xtream", ""),
+                          mirrors.shown(server) if "://" in server else server]
+            pl_card.set_search(pl_row, " ".join(words))
 
         def selected_pid():
             item = pl_list.currentItem()
@@ -2157,6 +2170,29 @@ class _SettingsMixin:
                 if pl_list.item(i).data(Qt.ItemDataRole.UserRole) == pid:
                     pl_list.setCurrentRow(i)
                     return
+
+        def account_of(pl, done) -> None:
+            """The account behind source *pl* (looked up off the window's
+            thread), handed to *done(info)*; the app's own connections to
+            it as it is asked: what the provider counts besides them is
+            another device's."""
+            pid = pl.get("id")
+            seen = getattr(self, "_conn_seen", None)
+            own = (connections.own_count(self._conn_uses(), str(pid))
+                   if seen is not None else 0)
+
+            def fetch(pl=pl):
+                try:
+                    return make_client(pl).account_info()
+                except Exception:
+                    return {}
+
+            def got(info):
+                if seen is not None and info:
+                    seen(str(pid), info, own)
+                done(info)
+
+            run_async(self.pool, fetch, got, lambda _e: done({}))
 
         def refresh_account(pid):
             pl = store.get(pid) if (store and pid) else None
@@ -2172,28 +2208,13 @@ class _SettingsMixin:
                 account_lbl.setText(tr("account_unavailable"))
                 return
             account_lbl.setText(tr("account_loading"))
-            # The app's own connections to it as it is asked: what the
-            # provider counts besides them is another device's.
-            seen = getattr(self, "_conn_seen", None)
-            own = (connections.own_count(self._conn_uses(), str(pid))
-                   if seen is not None else 0)
-
-            def fetch(pl=pl):
-                try:
-                    return make_client(pl).account_info()
-                except Exception:
-                    return {}
 
             def done(info, pid=pid):
-                if seen is not None and info:
-                    seen(str(pid), info, own)
                 # Ignore a stale answer if the selection moved on meanwhile.
                 if selected_pid() == pid:
                     account_lbl.setText(self._format_account(info))
 
-            run_async(
-                self.pool, fetch, done,
-                lambda _e: account_lbl.setText(tr("account_unavailable")))
+            account_of(pl, done)
 
         pl_list.currentItemChanged.connect(
             lambda *_: refresh_account(selected_pid()))
@@ -2209,26 +2230,46 @@ class _SettingsMixin:
         pl_list.reordered.connect(playlist_moved)
 
         def add_playlist(prefill=None):
+            # The quick form, then on to the new source's page.
             dlg = PlaylistDialog(d, prefill=prefill)
             if dlg.exec():
                 pl = store.add(dlg.values())
                 reload_pl_list()
                 select_pid(pl["id"])
+                edit_source(pl["id"], shell.current_key())
 
         def edit_playlist():
             edit_source(selected_pid())
 
-        def edit_source(pid):
+        def source_saved(pid) -> None:
+            reload_pl_list()
+            select_pid(pid)
+
+        def source_left(pid, changed: bool) -> None:
+            # The source in use connects again with what was changed.
+            if changed and store and pid == store.active_id:
+                self.switch_playlist(pid)
+
+        def source_account(pl, done) -> None:
+            if (pl.get("kind") or "xtream") == "m3u":
+                return
+            account_of(pl, lambda info: done(
+                self._format_account(info) if (info or {}).get("user_info") else ""))
+
+        def edit_source(pid, under=None):
+            """The source's own page, in place of the page it is opened
+            from (Sources, or Nerd's boxes), with a way back to it."""
             pl = store.get(pid) if (store and pid) else None
             if not pl:
                 return
-            dlg = PlaylistDialog(d, pl)
-            if dlg.exec():
-                store.update(pid, **dlg.values())
-                reload_pl_list()
-                select_pid(pid)
-                if pid == store.active_id:
-                    self.switch_playlist(pid)
+            under = under or "playlists"
+            title = next((p.title for p in shell.pages if p.key == under), "")
+            src_page = SourcePage(pl, store=store, nerd_on=nerd_on(), crumb=title,
+                                  back=shell.leave_sub, open_page=shell.show_page,
+                                  account=source_account, saved=source_saved,
+                                  left=source_left, settings=self.settings)
+            self._install_wheel_guard(src_page)
+            shell.open_sub(src_page, under)
 
         def remove_playlist():
             pid = selected_pid()
@@ -2271,6 +2312,8 @@ class _SettingsMixin:
         export_btn.clicked.connect(export_playlists)
         import_btn.clicked.connect(import_playlists)
         pl_list.itemDoubleClicked.connect(lambda _i: edit_playlist())
+        pl_list.open_requested.connect(
+            lambda item: edit_source(item.data(Qt.ItemDataRole.UserRole)))
         if not store:
             for b in (add_btn, edit_btn, remove_btn,
                       refresh_pl_btn, use_btn, export_btn, import_btn):
@@ -2328,6 +2371,8 @@ class _SettingsMixin:
                 shell.show_page(at_page)
         d.finished.connect(
             lambda _r: setattr(self, "_settings_page", shell.current_key()))
+        # A source's page open: what it says is stored as Settings closes.
+        d.finished.connect(lambda _r: shell.close_sub())
         # Picons and udpxy change the channel list: built again on close.
         self._nerd_lists_changed = False
         d.finished.connect(lambda _r: self._nerd_lists_rebuild())
@@ -2566,6 +2611,11 @@ class _SettingsMixin:
             text.textChanged.connect(soon)
         # The key rows change no control watched above: they say so.
         key_editor.changed.connect(soon)
+        # Asked to open on a source's page (the source menu's entry).
+        pending, self._settings_source = getattr(self, "_settings_source", None), None
+        if pending:
+            shell.show_page("playlists")
+            edit_source(pending)
 
         d.exec()
         live.stop()

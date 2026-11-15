@@ -745,7 +745,6 @@ _STRINGS: dict[str, dict[str, str]] = {
     "nerd_log_level_hint": {"en": "Debug writes much more, for hunting down a problem."},
     "nerd_log_info": {"en": "Normal"},
     "nerd_log_debug": {"en": "Debug"},
-    "nerd_src_title": {"en": "Nerd options"},
     "nerd_src_inherit": {"en": "As on the Nerd page"},
     "nerd_src_direct": {"en": "Direct (no proxy)"},
     "nerd_src_stream_port": {"en": "Stream port"},
@@ -2568,6 +2567,16 @@ _STRINGS: dict[str, dict[str, str]] = {
     "ytdlp_offer": {"en": "YouTube, Twitch and similar sites play through yt-dlp, which is not on this computer. Download it now? It is the official release from GitHub (about 35 MB), checked against its checksum, kept in the app's own folder and updated as it is used."},
     "ytdlp_title": {"en": "yt-dlp"},
     "ytdlp_update_now": {"en": "Update now"},
+    "src_tab_connection": {"en": "Connection"},
+    "src_tab_streams": {"en": "Streams"},
+    "src_own": {"en": "Own for this source"},
+    "src_shared": {"en": "Shared"},
+    "src_system": {"en": "System's"},
+    "src_follows": {"en": "Follows the shared setting under {where}."},
+    "src_not_saved": {"en": "This change was not saved."},
+    "src_last_test": {"en": "Latest connection test"},
+    "src_no_test": {"en": "Not tested yet. {button}, at the top, tries each step and shows here what it found."},
+    "src_settings_menu": {"en": "Settings for this source…"},
 }
 
 

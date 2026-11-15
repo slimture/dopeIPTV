@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from typing import Any
 
 from PyQt6.QtCore import QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
@@ -64,8 +65,14 @@ class FitScroll(QScrollArea):
         return QSize(hint.width(), min(hint.height(), 200))
 
 
-class PlaylistDialog(QDialog):
-    """Add or edit a playlist (Xtream provider)."""
+class SourceFields:
+    """A source's connection fields and what they mean - name, kind,
+    address, login, MAC, guide address, refresh, a media server's sign-in,
+    Find on my network - without a layout of their own: the Add dialog puts
+    them in a form, a source's page in Settings (ui/source_page.py) on its
+    tabs. Mixed into the QWidget that holds them (it parents the sign-in and
+    the finder); *nerd_panel*, the source's own Nerd options, is the page's
+    while Nerd is on."""
 
     # (value, i18n key) - the label is translated at construction time.
     REFRESH_OPTIONS = [
@@ -75,31 +82,12 @@ class PlaylistDialog(QDialog):
         ("1w", "refresh_weekly"),
     ]
 
-    def __init__(self, parent=None, playlist=None,
-                 prefill: dict | None = None) -> None:
-        """*playlist* edits a stored playlist; *prefill* starts a new one
-        with fields already filled in (a playlist file dropped on the
-        window)."""
-        super().__init__(parent)
-        editing = bool(playlist)
-        playlist = playlist or prefill or {}
+    nerd_panel: Any = None
+
+    def _build_fields(self, playlist: dict, editing: bool) -> None:
         # The stored source's id: its history and the backup address in use
         # (what a Nerd test asks of it).
         self._pid = str(playlist.get("id") or "") if editing else ""
-        self.setWindowTitle(tr("playlist_edit_title") if editing
-                            else tr("playlist_add_title"))
-        self.setMinimumWidth(520)
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(22, 22, 22, 22)
-        # The form scrolls, the buttons stay: with Nerd on it can be taller
-        # than the screen.
-        body = QWidget()
-        lay = QVBoxLayout(body)
-        lay.setContentsMargins(0, 0, 0, 0)
-        self._scroll = FitScroll(body, self)
-        outer.addWidget(self._scroll, 1)
-        form = QFormLayout()
-        form.setSpacing(10)
         self.name = QLineEdit(playlist.get("name", ""))
         self.name.setPlaceholderText(tr("playlist_name_placeholder"))
         self.kind = QComboBox()
@@ -137,59 +125,52 @@ class PlaylistDialog(QDialog):
         idx = self.refresh.findData(playlist.get("refresh", "never"))
         if idx >= 0:
             self.refresh.setCurrentIndex(idx)
-        # Explicit labels so the login rows can be hidden for M3U playlists.
-        self._server_lbl = QLabel()
-        self._user_lbl = QLabel(tr("login_username"))
-        self._pw_lbl = QLabel(tr("login_password"))
-        self._mac_lbl = QLabel(tr("playlist_mac"))
-        form.addRow(tr("playlist_name"), self.name)
-        form.addRow(tr("playlist_kind"), self.kind)
-        # Nerd: devices and servers with known playlist/guide addresses.
-        from ..core import nerd
-        if nerd.current().on:
-            from .source_presets import PresetButton
-            self.presets = PresetButton(self._preset_picked, self)
-            form.addRow("", self.presets)
         # A box on the home network can be found instead of typed.
         self.finder = FindOnNetwork(self)
         self.finder.picked.connect(self._box_found)
-        form.addRow(self._server_lbl, self.server)
-        form.addRow("", self.finder.row)
-        form.addRow(self._user_lbl, self.user)
-        form.addRow(self._pw_lbl, self.pw)
         # A media server is signed in to here (ui/media_signin.py).
         self.signin = MediaSignIn(self, self.server, self.user, self.pw,
                                   playlist if editing else None)
-        self.signin.changed.connect(self._fit)
-        self.signin.finished.connect(self._signin_finished)
         self.server.textChanged.connect(self.signin.form_changed)
         self.user.textChanged.connect(self.signin.form_changed)
-        form.addRow("", self.signin)
-        form.addRow(self._mac_lbl, self.mac)
-        form.addRow(tr("playlist_custom_epg_url"), self.epg_url)
-        form.addRow(tr("playlist_auto_refresh"), self.refresh)
-        lay.addLayout(form)
-        # The source's own Nerd options: only while Nerd is on, folded.
-        self.nerd_panel = None
-        from ..core import nerd
-        if nerd.current().on:
-            from .source_nerd import SourceNerdPanel
-            self.nerd_panel = SourceNerdPanel(self.kind.currentData(), self._options, self,
-                                              source=self._source_now)
-            lay.addWidget(self.nerd_panel)
-            self.nerd_panel.toggle.toggled.connect(lambda _on: self._fit())
-            for field in (self.server, self.user, self.pw):
-                field.textChanged.connect(self.nerd_panel.source_changed)
-        lay.addStretch(1)
 
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(self._validate)
-        buttons.rejected.connect(self.reject)
-        outer.addWidget(buttons)
-        self.kind.currentIndexChanged.connect(self._update_kind)
-        self._update_kind()
+    def _kind_fields(self) -> dict[str, Any]:
+        """What the kind shows: the address's label, which rows (address,
+        login, MAC, Find on my network) - and tells the sign-in, the finder
+        and the Nerd options which kind it is."""
+        kind = self.kind.currentData()
+        m3u, stalker = kind == "m3u", kind == "stalker"
+        box = kind in BOX_KINDS
+        media = kind in MEDIA_KINDS
+        # M3U needs only a URL, a portal its URL and a MAC address - hide
+        # the username/password rows and relabel the address field. A box
+        # on the home network takes its address and, if it asks, a login;
+        # a media server is signed in to (Plex: in the browser, its address
+        # then comes from the account).
+        self.server.setPlaceholderText(
+            "https://example.com/playlist.m3u" if m3u
+            else "http://portal.example.com/c/" if stalker
+            else PLACEHOLDERS.get(kind, "http://server:port"))
+        hint = tr("playlist_login_optional") if box else ""
+        self.user.setPlaceholderText(hint)
+        self.pw.setPlaceholderText(hint)
+        self.finder.wanted = MEDIA_KINDS if media else BOX_KINDS
+        if not (box or media):
+            self.finder.status.hide()
+        self.signin.set_kind(kind)
+        if self.nerd_panel is not None:
+            self.nerd_panel.set_kind(kind)
+        return {
+            "server_label": (tr("playlist_m3u_url") if m3u
+                             else tr("playlist_portal_url") if stalker
+                             else tr("playlist_box_address") if box or media
+                             else tr("login_server")),
+            "server": kind != "plex",
+            "login": (not (m3u or stalker or box or media) or kind in LOGIN_KINDS
+                      or kind in ("jellyfin", "emby")),
+            "mac": stalker,
+            "finder": box or media,
+        }
 
     def _source_now(self) -> dict:
         """The source as the form has it now, without its Nerd options (what
@@ -206,54 +187,6 @@ class PlaylistDialog(QDialog):
         if self._pid:
             out["id"] = self._pid
         return out
-
-    def _fit(self) -> None:
-        """Grow or shrink with the form (rows shown for the kind, the Nerd
-        options folded open or shut) - after the layouts have taken the
-        change in."""
-        def fit() -> None:
-            self._scroll.widget().adjustSize()
-            self._scroll.updateGeometry()
-            self.adjustSize()
-        QTimer.singleShot(0, fit)
-
-    def _update_kind(self) -> None:
-        kind = self.kind.currentData()
-        m3u, stalker = kind == "m3u", kind == "stalker"
-        box = kind in BOX_KINDS
-        media = kind in MEDIA_KINDS
-        # M3U needs only a URL, a portal its URL and a MAC address - hide
-        # the username/password rows and relabel the address field. A box
-        # on the home network takes its address and, if it asks, a login;
-        # a media server is signed in to (Plex: in the browser, its address
-        # then comes from the account).
-        self._server_lbl.setText(
-            tr("playlist_m3u_url") if m3u
-            else tr("playlist_portal_url") if stalker
-            else tr("playlist_box_address") if box or media else tr("login_server"))
-        self.server.setPlaceholderText(
-            "https://example.com/playlist.m3u" if m3u
-            else "http://portal.example.com/c/" if stalker
-            else PLACEHOLDERS.get(kind, "http://server:port"))
-        for w in (self._server_lbl, self.server):
-            w.setVisible(kind != "plex")
-        login = (not (m3u or stalker or box or media) or kind in LOGIN_KINDS
-                 or kind in ("jellyfin", "emby"))
-        for w in (self._user_lbl, self.user, self._pw_lbl, self.pw):
-            w.setVisible(login)
-        hint = tr("playlist_login_optional") if box else ""
-        self.user.setPlaceholderText(hint)
-        self.pw.setPlaceholderText(hint)
-        for w in (self._mac_lbl, self.mac):
-            w.setVisible(stalker)
-        self.finder.row.setVisible(box or media)
-        self.finder.wanted = MEDIA_KINDS if media else BOX_KINDS
-        if not (box or media):
-            self.finder.status.hide()
-        self.signin.set_kind(kind)
-        if getattr(self, "nerd_panel", None) is not None:
-            self.nerd_panel.set_kind(kind)
-        self._fit()
 
     def _preset_picked(self, src: dict) -> None:
         idx = self.kind.findData(src["kind"])
@@ -278,17 +211,8 @@ class PlaylistDialog(QDialog):
         if found.get("kind") in MEDIA_KINDS:
             self.signin.prefer(found)
 
-    def _signin_finished(self, ok: bool) -> None:
-        """A sign-in OK asked for has ended: the source is added if it worked."""
-        if self._accept_signed and ok and self.signin.signed_in():
-            self._accept_signed = False
-            self.accept()
-            return
-        self._accept_signed = False
-        self._fit()
-
     def _maybe_autodetect_link(self) -> None:
-        """Recognise a pasted provider link and configure the dialog: Xtream
+        """Recognise a pasted provider link and configure the form: Xtream
         (split into server/username/password, preferred) or M3U (a plain
         playlist URL). A bare host is left alone so manual entry keeps working."""
         from ..providers.client import detect_provider_link
@@ -298,7 +222,7 @@ class PlaylistDialog(QDialog):
         kind, server, user, pw = detected
         idx = self.kind.findData(kind)
         if idx >= 0:
-            self.kind.setCurrentIndex(idx)   # fires _update_kind
+            self.kind.setCurrentIndex(idx)   # fires the kind's update
         self.server.setText(server)
         if kind == "xtream":
             self.user.setText(user)
@@ -313,59 +237,36 @@ class PlaylistDialog(QDialog):
             return None
         return ":".join(hexd[i:i + 2] for i in range(0, 12, 2)).upper()
 
-    def _validate(self) -> None:
+    def problem(self) -> tuple[str, str, str] | None:
+        """Why the form cannot be stored as it is - (title, what to say,
+        which part: "rewrite", "mirrors" or "") - or None when it can. A
+        media server not signed in to cannot."""
         # Nerd: a rewrite rule that cannot work is refused here, not
-        # stored to be skipped at every channel.
-        bad = self.nerd_panel.rules_ok() if self.nerd_panel is not None else None
+        # stored to be skipped at every channel ...
+        p = self.nerd_panel
+        bad = p.rules_ok() if p is not None else None
         if bad is not None:
-            self.nerd_panel.toggle.setChecked(True)
-            self.nerd_panel.rw_line.show_preview()
-            QMessageBox.warning(self, tr("nerd_ck_title_rewrite"), tr(bad.key, **bad.params))
-            return
+            return tr("nerd_ck_title_rewrite"), tr(bad.key, **bad.params), "rewrite"
         # ... and so is a backup address that is no address.
-        bad = self.nerd_panel.mirrors_ok() if self.nerd_panel is not None else None
+        bad = p.mirrors_ok() if p is not None else None
         if bad is not None:
-            self.nerd_panel.toggle.setChecked(True)
-            self.nerd_panel.mr_line.show_preview()
-            QMessageBox.warning(self, tr("nerd_ck_title_mirrors"), tr(bad.key, **bad.params))
-            return
-        if self.kind.currentData() == "stalker":
-            if not (self.server.text().strip()
-                    and self.normal_mac(self.mac.text())):
-                QMessageBox.warning(self, tr("playlist_msg_title"),
-                                    tr("playlist_portal_required"))
-                return
-            self.accept()
-            return
-        if self.kind.currentData() in BOX_KINDS:
-            if not self.server.text().strip():
-                QMessageBox.warning(self, tr("playlist_msg_title"),
-                                    tr("playlist_box_required"))
-                return
-            self.accept()
-            return
-        if self.kind.currentData() in MEDIA_KINDS:
-            if self.signin.signed_in():
-                self.accept()
-                return
-            if self.signin.busy:
-                return
-            # Name and password typed, Sign in not pressed: OK does it.
-            if self.signin.sign_in():
-                self._accept_signed = True
-                return
-            QMessageBox.warning(self, tr("playlist_msg_title"), tr("ms_sign_in_needed"))
-            return
-        if self.kind.currentData() == "m3u":
-            ok = bool(self.server.text().strip())
+            return tr("nerd_ck_title_mirrors"), tr(bad.key, **bad.params), "mirrors"
+        kind = self.kind.currentData()
+        server = self.server.text().strip()
+        if kind == "stalker":
+            if server and self.normal_mac(self.mac.text()):
+                return None
+            return tr("playlist_msg_title"), tr("playlist_portal_required"), ""
+        if kind in BOX_KINDS:
+            return None if server else (tr("playlist_msg_title"), tr("playlist_box_required"), "")
+        if kind in MEDIA_KINDS:
+            return None if self.signin.signed_in() else (
+                tr("playlist_msg_title"), tr("ms_sign_in_needed"), "")
+        if kind == "m3u":
+            ok = bool(server)
         else:
-            ok = bool(self.server.text().strip() and self.user.text().strip()
-                      and self.pw.text().strip())
-        if not ok:
-            QMessageBox.warning(self, tr("playlist_msg_title"),
-                                tr("playlist_required_fields"))
-            return
-        self.accept()
+            ok = bool(server and self.user.text().strip() and self.pw.text().strip())
+        return None if ok else (tr("playlist_msg_title"), tr("playlist_required_fields"), "")
 
     def values(self) -> dict:
         name = self.name.text().strip()
@@ -402,6 +303,112 @@ class PlaylistDialog(QDialog):
         return out
 
 
+class PlaylistDialog(SourceFields, QDialog):
+    """Add a source: the quick form - its kind, address and login, the
+    presets (Nerd), Find on my network, a media server's sign-in. Its own
+    options are on its page in Settings, which opens once it is added."""
+
+    def __init__(self, parent=None, playlist=None,
+                 prefill: dict | None = None) -> None:
+        """*playlist* edits a stored playlist; *prefill* starts a new one
+        with fields already filled in (a playlist file dropped on the
+        window)."""
+        super().__init__(parent)
+        editing = bool(playlist)
+        playlist = playlist or prefill or {}
+        self._build_fields(playlist, editing)
+        self.setWindowTitle(tr("playlist_edit_title") if editing
+                            else tr("playlist_add_title"))
+        self.setMinimumWidth(520)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(22, 22, 22, 22)
+        # The form scrolls, the buttons stay: a media server's sign-in can
+        # make it taller than a small screen.
+        body = QWidget()
+        lay = QVBoxLayout(body)
+        lay.setContentsMargins(0, 0, 0, 0)
+        self._scroll = FitScroll(body, self)
+        outer.addWidget(self._scroll, 1)
+        form = QFormLayout()
+        form.setSpacing(10)
+        # Explicit labels so the login rows can be hidden for M3U playlists.
+        self._server_lbl = QLabel()
+        self._user_lbl = QLabel(tr("login_username"))
+        self._pw_lbl = QLabel(tr("login_password"))
+        self._mac_lbl = QLabel(tr("playlist_mac"))
+        form.addRow(tr("playlist_name"), self.name)
+        form.addRow(tr("playlist_kind"), self.kind)
+        # Nerd: devices and servers with known playlist/guide addresses.
+        from ..core import nerd
+        if nerd.current().on:
+            from .source_presets import PresetButton
+            self.presets = PresetButton(self._preset_picked, self)
+            form.addRow("", self.presets)
+        form.addRow(self._server_lbl, self.server)
+        form.addRow("", self.finder.row)
+        form.addRow(self._user_lbl, self.user)
+        form.addRow(self._pw_lbl, self.pw)
+        self.signin.changed.connect(self._fit)
+        self.signin.finished.connect(self._signin_finished)
+        form.addRow("", self.signin)
+        form.addRow(self._mac_lbl, self.mac)
+        form.addRow(tr("playlist_custom_epg_url"), self.epg_url)
+        form.addRow(tr("playlist_auto_refresh"), self.refresh)
+        lay.addLayout(form)
+        lay.addStretch(1)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self._validate)
+        buttons.rejected.connect(self.reject)
+        outer.addWidget(buttons)
+        self.kind.currentIndexChanged.connect(self._update_kind)
+        self._update_kind()
+
+    def _fit(self) -> None:
+        """Grow or shrink with the form (rows shown for the kind, the
+        sign-in's) - after the layouts have taken the change in."""
+        def fit() -> None:
+            self._scroll.widget().adjustSize()
+            self._scroll.updateGeometry()
+            self.adjustSize()
+        QTimer.singleShot(0, fit)
+
+    def _update_kind(self) -> None:
+        shown = self._kind_fields()
+        self._server_lbl.setText(shown["server_label"])
+        for w in (self._server_lbl, self.server):
+            w.setVisible(shown["server"])
+        for w in (self._user_lbl, self.user, self._pw_lbl, self.pw):
+            w.setVisible(shown["login"])
+        for w in (self._mac_lbl, self.mac):
+            w.setVisible(shown["mac"])
+        self.finder.row.setVisible(shown["finder"])
+        self._fit()
+
+    def _signin_finished(self, ok: bool) -> None:
+        """A sign-in OK asked for has ended: the source is added if it worked."""
+        if self._accept_signed and ok and self.signin.signed_in():
+            self._accept_signed = False
+            self.accept()
+            return
+        self._accept_signed = False
+        self._fit()
+
+    def _validate(self) -> None:
+        if self.kind.currentData() in MEDIA_KINDS and not self.signin.signed_in():
+            if self.signin.busy:
+                return
+            # Name and password typed, Sign in not pressed: OK does it.
+            if self.signin.sign_in():
+                self._accept_signed = True
+                return
+        bad = self.problem()
+        if bad is not None:
+            QMessageBox.warning(self, bad[0], bad[1])
+            return
+        self.accept()
 
 
 class ContentManagerDialog(QDialog):

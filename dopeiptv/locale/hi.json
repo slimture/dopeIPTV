@@ -1307,7 +1307,6 @@
   "nerd_log_level_hint": "Debug समस्या खोजने के लिए कहीं ज़्यादा लिखता है।",
   "nerd_log_info": "सामान्य",
   "nerd_log_debug": "Debug",
-  "nerd_src_title": "Nerd विकल्प",
   "nerd_src_inherit": "Nerd पेज जैसा",
   "nerd_src_direct": "सीधा (बिना प्रॉक्सी)",
   "nerd_src_stream_port": "स्ट्रीम पोर्ट",
@@ -2359,5 +2358,15 @@
   "pal_hint_opens": "कहीं से भी {shortcut} से खुलता है",
   "pal_none": "“{q}” के लिए कुछ नहीं मिला",
   "pal_now": "अभी",
-  "pal_record_remind": "रिकॉर्ड / याद दिलाएँ"
+  "pal_record_remind": "रिकॉर्ड / याद दिलाएँ",
+  "src_tab_connection": "कनेक्शन",
+  "src_tab_streams": "स्ट्रीम",
+  "src_own": "इस स्रोत का अपना",
+  "src_shared": "साझा",
+  "src_system": "सिस्टम का",
+  "src_follows": "{where} में दी गई साझा सेटिंग का पालन करता है।",
+  "src_not_saved": "यह बदलाव सहेजा नहीं गया।",
+  "src_last_test": "पिछला कनेक्शन परीक्षण",
+  "src_no_test": "अभी परीक्षण नहीं हुआ। ऊपर दिया «{button}» हर चरण आज़माता है और जो मिला वह यहाँ दिखाता है।",
+  "src_settings_menu": "इस स्रोत की सेटिंग…"
 }

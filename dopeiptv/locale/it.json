@@ -1307,7 +1307,6 @@
   "nerd_log_level_hint": "Debug scrive molto di più, per scovare un problema.",
   "nerd_log_info": "Normale",
   "nerd_log_debug": "Debug",
-  "nerd_src_title": "Opzioni Nerd",
   "nerd_src_inherit": "Come nella pagina Nerd",
   "nerd_src_direct": "Diretto (nessun proxy)",
   "nerd_src_stream_port": "Porta dello stream",
@@ -2359,5 +2358,15 @@
   "pal_hint_opens": "Si apre ovunque con {shortcut}",
   "pal_none": "Nessun risultato per «{q}»",
   "pal_now": "ora",
-  "pal_record_remind": "registra / promemoria"
+  "pal_record_remind": "registra / promemoria",
+  "src_tab_connection": "Connessione",
+  "src_tab_streams": "Stream",
+  "src_own": "Proprio di questa sorgente",
+  "src_shared": "Comune",
+  "src_system": "Del sistema",
+  "src_follows": "Segue l'impostazione comune in {where}.",
+  "src_not_saved": "Questa modifica non è stata salvata.",
+  "src_last_test": "Ultimo test di connessione",
+  "src_no_test": "Non ancora provata. «{button}», in alto, prova ogni passo e mostra qui cosa ha trovato.",
+  "src_settings_menu": "Impostazioni di questa sorgente…"
 }

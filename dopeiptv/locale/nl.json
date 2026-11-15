@@ -1307,7 +1307,6 @@
   "nerd_log_level_hint": "Debug schrijft veel meer, om een probleem op te sporen.",
   "nerd_log_info": "Normaal",
   "nerd_log_debug": "Debug",
-  "nerd_src_title": "Nerd-opties",
   "nerd_src_inherit": "Zoals op de Nerd-pagina",
   "nerd_src_direct": "Direct (geen proxy)",
   "nerd_src_stream_port": "Streampoort",
@@ -2359,5 +2358,15 @@
   "pal_hint_opens": "Opent overal met {shortcut}",
   "pal_none": "Niets gevonden voor ‘{q}’",
   "pal_now": "nu",
-  "pal_record_remind": "opnemen / herinneren"
+  "pal_record_remind": "opnemen / herinneren",
+  "src_tab_connection": "Verbinding",
+  "src_tab_streams": "Streams",
+  "src_own": "Eigen voor deze bron",
+  "src_shared": "Gedeeld",
+  "src_system": "Van het systeem",
+  "src_follows": "Volgt de gedeelde instelling onder {where}.",
+  "src_not_saved": "Deze wijziging is niet opgeslagen.",
+  "src_last_test": "Laatste verbindingstest",
+  "src_no_test": "Nog niet getest. ‘{button}’, bovenaan, probeert elke stap en laat hier zien wat het vond.",
+  "src_settings_menu": "Instellingen van deze bron…"
 }

@@ -1307,7 +1307,6 @@
   "nerd_log_level_hint": "Debug piše puno više, za lov na problem.",
   "nerd_log_info": "Normalno",
   "nerd_log_debug": "Debug",
-  "nerd_src_title": "Nerd opcije",
   "nerd_src_inherit": "Kao na stranici Nerd",
   "nerd_src_direct": "Izravno (bez proxyja)",
   "nerd_src_stream_port": "Port streama",
@@ -2359,5 +2358,15 @@
   "pal_hint_opens": "Otvara se s {shortcut} bilo gdje",
   "pal_none": "Ništa nije pronađeno za „{q}”",
   "pal_now": "sada",
-  "pal_record_remind": "snimi / podsjeti"
+  "pal_record_remind": "snimi / podsjeti",
+  "src_tab_connection": "Veza",
+  "src_tab_streams": "Streamovi",
+  "src_own": "Vlastito za ovaj izvor",
+  "src_shared": "Zajedničko",
+  "src_system": "Sustavno",
+  "src_follows": "Prati zajedničku postavku pod {where}.",
+  "src_not_saved": "Ova promjena nije spremljena.",
+  "src_last_test": "Posljednji test veze",
+  "src_no_test": "Još nije testirano. „{button}” na vrhu isprobava svaki korak i ovdje pokazuje što je pronašao.",
+  "src_settings_menu": "Postavke ovog izvora…"
 }

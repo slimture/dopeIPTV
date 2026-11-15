@@ -1307,7 +1307,6 @@
   "nerd_log_level_hint": "يكتب Debug أكثر بكثير، لتعقّب مشكلة.",
   "nerd_log_info": "عادي",
   "nerd_log_debug": "Debug",
-  "nerd_src_title": "خيارات Nerd",
   "nerd_src_inherit": "كما في صفحة Nerd",
   "nerd_src_direct": "مباشر (بلا وكيل)",
   "nerd_src_stream_port": "منفذ البث",
@@ -2359,5 +2358,15 @@
   "pal_hint_opens": "يُفتح بـ {shortcut} من أي مكان",
   "pal_none": "لم يُعثر على شيء لـ «{q}»",
   "pal_now": "الآن",
-  "pal_record_remind": "تسجيل / تذكير"
+  "pal_record_remind": "تسجيل / تذكير",
+  "src_tab_connection": "الاتصال",
+  "src_tab_streams": "البثوث",
+  "src_own": "خاص بهذا المصدر",
+  "src_shared": "مشترك",
+  "src_system": "من النظام",
+  "src_follows": "يتبع الإعداد المشترك في {where}.",
+  "src_not_saved": "لم يُحفظ هذا التغيير.",
+  "src_last_test": "آخر اختبار للاتصال",
+  "src_no_test": "لم يُختبر بعد. يجرّب «{button}» في الأعلى كل خطوة ويعرض هنا ما وجده.",
+  "src_settings_menu": "إعدادات هذا المصدر…"
 }
