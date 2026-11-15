@@ -17,10 +17,14 @@ context window.
    [`docs/DEVELOPER_NOTES.md`](docs/DEVELOPER_NOTES.md) - how the parts
    fit together and why.
 
-**Three rules above all others:** stability first - never break video
+**Four rules above all others:** stability first - never break video
 playback; Linux is the primary platform and a change for macOS or
-Windows must not make Linux worse; run the quality gate yourself before
-you say something works.
+Windows must not make Linux worse; one connection - assume the account
+allows one connection to the provider (nearly every account does), so
+nothing may open a second one by itself: a feature that needs one is off
+until the person turns it on knowing what it costs, and asks first when
+the limit is full or unknown; run the quality gate yourself before you
+say something works.
 
 ## Module responsibilities
 
