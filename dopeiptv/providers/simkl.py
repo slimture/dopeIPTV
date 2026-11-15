@@ -4,10 +4,19 @@ on Simkl instead (or on both).
 
 Every request names the app three ways, as Simkl asks: its client id, an
 app-name and an app-version (URL parameters), and a User-Agent. The client
-id is dopeIPTV's own Simkl application, baked into release builds from a CI
+id is dopeIPTV's own Simkl application (AUTH V2, "TV, devices & command
+line": a client id and no secret), baked into release builds from a CI
 secret exactly like the TMDB key (bundled_client_id); while there is none,
-Simkl is not offered at all. A sign-in is a token that does not run out, in
-the "simkl_access_token" setting - never logged, never synced.
+Simkl is not offered at all.
+
+Sign-in is AUTH V2's device flow (RFC 8628, api.simkl.org's "Device / PIN
+flow"): POST /oauth2/device gives a code the person approves at
+simkl.com/pin, and /oauth2/token is asked until they have. That gives an
+access token for 7 days and a refresh token for 180 days that slides on
+every use (non-rotating); the access token is renewed shortly before it runs
+out, or once on a 401. Signing out revokes the grant. The tokens live in the
+"simkl_access_token", "simkl_refresh_token" and "simkl_token_expires"
+settings - never logged, never synced.
 
 Titles are found by their TMDB id (what the app resolves its posters with),
 with the title and year beside it: Simkl takes the first id it knows and
@@ -31,11 +40,17 @@ API = "https://api.simkl.com"
 PIN_PAGE = "https://simkl.com/pin/"
 APP_NAME = "dopeiptv"
 TOKEN_KEY = "simkl_access_token"
+REFRESH_KEY = "simkl_refresh_token"
+#: When the access token stops being accepted (unix seconds; 0: not known).
+EXPIRES_KEY = "simkl_token_expires"
+#: Scrobbles and marks write; without media:write the token is read-only.
+SCOPE = "media:read media:write"
+DEVICE_GRANT = "urn:ietf:params:oauth:grant-type:device_code"
+#: Renewed this long before it runs out (it lasts 7 days).
+REFRESH_EARLY_S = 6 * 3600
 UA = f"dopeIPTV/{VERSION}"
 #: The four lists read in one sync come from one answer, this long.
 ALL_ITEMS_TTL = 60.0
-#: Simkl's own words while the PIN waits for its person.
-_PENDING = ("pending", "authorization pending")
 
 
 class Settings(Protocol):
@@ -52,19 +67,26 @@ class SimklAuthError(LocalizedError):
 
 
 _baked: str | None = None
+#: dopeIPTV's own AUTH V2 app ("TV, devices & command line"). Simkl: "Client
+#: IDs are public and safe on GitHub for every type" - no secret goes with
+#: it. Empty: a release build's baked id, else Simkl is not offered.
+PUBLIC_CLIENT_ID = ""
 
 
 def bundled_client_id() -> str:
     """dopeIPTV's Simkl client id: DOPEIPTV_SIMKL_CLIENT_ID for local
-    development, else the git-ignored dopeiptv/_simkl_key.py release builds
-    get from the SIMKL_CLIENT_ID secret ("Bake built-in Simkl client id" in
-    .github/workflows/release.yml). Never in the public repository. The
-    file is looked for once: a missing module is not remembered by Python,
-    and this is asked whenever the menus want to know who is signed in."""
+    development, else PUBLIC_CLIENT_ID, else the git-ignored
+    dopeiptv/_simkl_key.py release builds get from the SIMKL_CLIENT_ID
+    secret ("Bake built-in Simkl client id" in .github/workflows/release.yml).
+    The file is looked for once: a missing module is not remembered by
+    Python, and this is asked whenever the menus want to know who is signed
+    in."""
     global _baked
     key = (os.environ.get("DOPEIPTV_SIMKL_CLIENT_ID") or "").strip()
     if key:
         return key
+    if PUBLIC_CLIENT_ID:
+        return PUBLIC_CLIENT_ID
     if _baked is None:
         try:
             from .._simkl_key import SIMKL_CLIENT_ID  # type: ignore
@@ -236,6 +258,10 @@ class SimklClient:
         self._client_id = client_id
         self._items: tuple[float, Any] | None = None
         self._lock = threading.Lock()
+        self._token_lock = threading.Lock()
+        #: user_code -> device_code for a sign-in under way (the device code
+        #: is what is polled with; never shown, never logged).
+        self._device: dict[str, str] = {}
 
     # -- the account ----------------------------------------------------------
 
@@ -255,8 +281,83 @@ class SimklClient:
         return bool(self.available() and self.access_token)
 
     def disconnect(self) -> None:
-        self.settings.remove(TOKEN_KEY)
+        """Signed out here, and the grant revoked at Simkl (on a thread of
+        its own, best effort: revoke always answers 200)."""
+        token = str(self.settings.value(REFRESH_KEY, "") or "") or self.access_token
+        self._forget()
+        if token and self.client_id:
+            threading.Thread(target=self._revoke, args=(token,), daemon=True,
+                             name="simkl-revoke").start()
+
+    def _forget(self) -> None:
+        for key in (TOKEN_KEY, REFRESH_KEY, EXPIRES_KEY):
+            self.settings.remove(key)
         self._items = None
+
+    def _revoke(self, token: str) -> None:
+        try:
+            self._http().post(f"{API}/oauth2/revoke", data={
+                "client_id": self.client_id, "token": token},
+                headers=self._form_headers(), timeout=10)
+        except Exception as e:  # noqa: BLE001 - signing out never fails here
+            log.debug("simkl: revoke not sent (%s)", type(e).__name__)
+
+    # -- the tokens -------------------------------------------------------------
+
+    def _store(self, data: Mapping[str, Any]) -> bool:
+        """An /oauth2/token answer kept. False when it carried no token."""
+        token = str(data.get("access_token") or "")
+        if not token:
+            return False
+        self.settings.setValue(TOKEN_KEY, token)
+        refresh = str(data.get("refresh_token") or "")
+        if refresh:
+            self.settings.setValue(REFRESH_KEY, refresh)
+        try:
+            life = int(data.get("expires_in") or 0)
+        except (TypeError, ValueError):
+            life = 0
+        self.settings.setValue(EXPIRES_KEY, int(time.time()) + life if life > 0 else 0)
+        scope = str(data.get("scope") or "")
+        if scope and "media:write" not in scope.split():
+            # An unknown scope is downgraded to read-only, never refused.
+            log.warning("simkl: the sign-in is read-only (scope %r)", scope)
+        self._items = None
+        return True
+
+    def _due(self) -> bool:
+        try:
+            until = int(self.settings.value(EXPIRES_KEY, 0) or 0)
+        except (TypeError, ValueError):
+            until = 0
+        return bool(until) and time.time() > until - REFRESH_EARLY_S
+
+    def refresh(self) -> bool:
+        """A new access token from the refresh token. False when there is
+        none, or Simkl refused it - then the sign-in is gone (revoked from
+        Simkl's Connected Apps, or 180 days unused) and is forgotten here."""
+        with self._token_lock:
+            rt = str(self.settings.value(REFRESH_KEY, "") or "")
+            if not rt or not self.client_id:
+                return False
+            try:
+                r = self._http().post(f"{API}/oauth2/token", data={
+                    "grant_type": "refresh_token", "client_id": self.client_id,
+                    "refresh_token": rt}, headers=self._form_headers(), timeout=15)
+            except Exception as e:  # noqa: BLE001 - offline: try again later
+                log.info("simkl: could not renew the sign-in (%s)", type(e).__name__)
+                return False
+            if r.status_code == 200 and self._store(r.json() or {}):
+                log.info("simkl: sign-in renewed")
+                return True
+            if r.status_code in (400, 401):
+                log.warning("simkl: the sign-in was not renewed - connect again")
+                self._forget()
+            return False
+
+    def _fresh(self) -> None:
+        if self.access_token and self._due():
+            self.refresh()
 
     # -- requests -------------------------------------------------------------
 
@@ -265,6 +366,10 @@ class SimklClient:
                                "app-version": VERSION}
         out.update(extra or {})
         return out
+
+    def _form_headers(self) -> dict[str, str]:
+        return {"Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": UA}
 
     def headers(self, auth: bool = True) -> dict[str, str]:
         h = {"Content-Type": "application/json", "simkl-api-key": self.client_id,
@@ -278,12 +383,22 @@ class SimklClient:
 
     def _get(self, path: str, extra: Mapping[str, Any] | None = None,
              auth: bool = True, timeout: float = 15) -> Any:
-        return self._http().get(f"{API}{path}", params=self.params(extra),
-                                headers=self.headers(auth), timeout=timeout)
+        if auth:
+            self._fresh()
+        r = self._http().get(f"{API}{path}", params=self.params(extra),
+                             headers=self.headers(auth), timeout=timeout)
+        if auth and r.status_code == 401 and self.refresh():
+            r = self._http().get(f"{API}{path}", params=self.params(extra),
+                                 headers=self.headers(auth), timeout=timeout)
+        return r
 
     def _post(self, path: str, body: Mapping[str, Any], timeout: float = 15) -> Any:
+        self._fresh()
         r = self._http().post(f"{API}{path}", params=self.params(), json=dict(body),
                               headers=self.headers(), timeout=timeout)
+        if r.status_code == 401 and self.refresh():
+            r = self._http().post(f"{API}{path}", params=self.params(), json=dict(body),
+                                  headers=self.headers(), timeout=timeout)
         self._items = None              # what changed is read again
         return r
 
@@ -292,48 +407,62 @@ class SimklClient:
             log.warning("simkl: the sign-in is no longer accepted - connect again")
         r.raise_for_status()
 
-    # -- the PIN sign-in --------------------------------------------------------
+    # -- the PIN sign-in (AUTH V2 device flow) ---------------------------------
 
     def start_pin(self) -> dict[str, Any]:
-        """Step 1: a code for the person to type at simkl.com/pin.
-        {"user_code", "verification_url", "expires_in", "interval"}."""
-        r = self._get("/oauth/pin", auth=False, timeout=10)
+        """Step 1: a code for the person to approve at simkl.com/pin.
+        {"user_code", "verification_url", "verification_uri_complete",
+        "expires_in", "interval"} - the device code stays here."""
+        r = self._http().post(f"{API}/oauth2/device", data={
+            "client_id": self.client_id, "scope": SCOPE},
+            headers=self._form_headers(), timeout=10)
+        data = r.json() if r.content else {}
+        if r.status_code == 401:
+            # A V1 app's client id: this flow is V2's alone.
+            raise SimklAuthError(str((data or {}).get("error_description")
+                                     or "invalid_client")[:200])
         r.raise_for_status()
-        data = r.json() or {}
-        if not isinstance(data, dict) or not data.get("user_code"):
-            raise SimklAuthError("simkl_could_not_start", msg=str(data)[:120])
+        if not isinstance(data, dict) or not data.get("user_code") \
+                or not data.get("device_code"):
+            raise SimklAuthError("simkl_could_not_start", msg="no code")
+        code = str(data["user_code"])
+        self._device = {code: str(data.pop("device_code"))}
         data.setdefault("verification_url", data.get("verification_uri") or PIN_PAGE)
         return data
 
     def poll_pin(self, user_code: str) -> dict[str, Any] | None:
-        """Step 2: None while the code waits; the answer once it is approved
-        (the token is stored). SimklAuthError when it ran out or failed."""
-        r = self._get(f"/oauth/pin/{user_code}", auth=False, timeout=10)
-        if r.status_code in (404, 410):
+        """Step 2: None while the code waits (Simkl sends no "declined" -
+        the window keeps its own deadline); the answer once it is approved
+        (the tokens are stored). SimklAuthError when it ran out or failed."""
+        device = self._device.get(user_code)
+        if not device:
             raise SimklAuthError("trakt_code_expired")
-        if r.status_code == 429:
-            time.sleep(5)
-            return None
-        r.raise_for_status()
-        data = r.json() or {}
+        r = self._http().post(f"{API}/oauth2/token", data={
+            "grant_type": DEVICE_GRANT, "client_id": self.client_id,
+            "device_code": device}, headers=self._form_headers(), timeout=10)
+        try:
+            data = r.json() or {}
+        except ValueError:
+            data = {}
         if not isinstance(data, dict):
-            return None
-        token = str(data.get("access_token") or "")
-        if data.get("result") == "OK" and token:
-            self.settings.setValue(TOKEN_KEY, token)
-            self._items = None
+            data = {}
+        if r.status_code == 200 and self._store(data):
+            self._device.pop(user_code, None)
             log.info("simkl: signed in")
             return data
-        message = str(data.get("message") or "").strip()
-        low = message.lower()
-        if not message or low in _PENDING:
+        error = str(data.get("error") or "")
+        if error == "authorization_pending":
             return None
-        if "slow" in low:
+        if error == "slow_down" or r.status_code == 429:
+            # Wait before the next try: an early poll re-arms the window.
             time.sleep(5)
             return None
-        if "expire" in low:
+        if error == "expired_token":
+            self._device.pop(user_code, None)
             raise SimklAuthError("trakt_code_expired")
-        raise SimklAuthError(message[:200])
+        self._device.pop(user_code, None)
+        raise SimklAuthError(str(data.get("error_description") or error
+                                 or f"HTTP {r.status_code}")[:200])
 
     # -- scrobbling -------------------------------------------------------------
 

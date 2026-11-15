@@ -3,6 +3,7 @@ says about the app, the bodies of scrobbles, marks and the watchlist, and
 the account's lists read back - against a stand-in for Simkl's API that
 answers the way its documentation shows."""
 import json
+import time
 import logging
 
 import pytest
@@ -74,22 +75,29 @@ class FakeSimkl:
     def __init__(self):
         self.calls = []
         self.pin_answers = []
+        self.token_answers = []
 
     def get(self, url, params=None, headers=None, timeout=None):
         self.calls.append(("GET", url, dict(params or {}), dict(headers or {}), None))
         path = url.split("api.simkl.com", 1)[1]
-        if path == "/oauth/pin":
-            return Resp(200, {"result": "OK", "device_code": "DEV", "user_code": "AB12C",
-                              "verification_url": "https://simkl.com/pin/",
-                              "expires_in": 900, "interval": 5})
-        if path.startswith("/oauth/pin/"):
-            return self.pin_answers.pop(0)
         if path == "/sync/all-items/":
             return Resp(200, ALL_ITEMS)
         return Resp(404, {"error": "nope"})
 
-    def post(self, url, params=None, json=None, headers=None, timeout=None):
-        self.calls.append(("POST", url, dict(params or {}), dict(headers or {}), json))
+    def post(self, url, params=None, json=None, data=None, headers=None, timeout=None):
+        self.calls.append(("POST", url, dict(params or {}), dict(headers or {}),
+                           json if json is not None else data))
+        path = url.split("api.simkl.com", 1)[1]
+        if path == "/oauth2/device":
+            return Resp(200, {"device_code": "DEV-SECRET", "user_code": "BDWP-HQPK",
+                              "verification_uri": "https://simkl.com/pin",
+                              "verification_uri_complete":
+                                  "https://simkl.com/pin?user_code=BDWP-HQPK",
+                              "expires_in": 900, "interval": 5})
+        if path == "/oauth2/token":
+            return self.token_answers.pop(0)
+        if path == "/oauth2/revoke":
+            return Resp(200, {})
         return Resp(201, {"added": 1})
 
     def posts(self):
@@ -118,38 +126,81 @@ def test_the_client_id_comes_with_the_build(monkeypatch):
     assert not c.is_connected() and simkl.TOKEN_KEY not in c.settings.d
 
 
-def test_the_pin_sign_in(monkeypatch):
+TOKENS = {"access_token": "NEWTOKEN", "refresh_token": "simkl_rt_R", "token_type":
+          "bearer", "expires_in": 604800, "scope": "media:read media:write"}
+
+
+def test_the_pin_sign_in_is_auth_v2s_device_flow(monkeypatch):
     monkeypatch.setattr(simkl.time, "sleep", lambda _s: None)
     fake = FakeSimkl()
     c = simkl.SimklClient(FakeSettings(), session=fake, client_id="CID")
     data = c.start_pin()
-    assert data["user_code"] == "AB12C" and data["verification_url"] == "https://simkl.com/pin/"
-    _m, url, params, headers, _b = fake.calls[0]
-    assert url == "https://api.simkl.com/oauth/pin"
-    # Every request names the app the three ways Simkl asks.
-    assert params == {"client_id": "CID", "app-name": "dopeiptv",
-                      "app-version": simkl.VERSION}
-    assert headers["simkl-api-key"] == "CID" and headers["User-Agent"].startswith("dopeIPTV/")
-    assert "Authorization" not in headers
-    fake.pin_answers = [Resp(200, {"result": "KO", "message": "Authorization pending"}),
-                        Resp(200, {"result": "KO", "message": "Slow down"}),
-                        Resp(200, {"result": "OK", "access_token": "NEWTOKEN"})]
-    assert c.poll_pin("AB12C") is None
-    assert c.poll_pin("AB12C") is None
-    assert c.poll_pin("AB12C")["result"] == "OK"
+    assert data["user_code"] == "BDWP-HQPK" and data["verification_url"] == "https://simkl.com/pin"
+    assert data["verification_uri_complete"].endswith("user_code=BDWP-HQPK")
+    assert "device_code" not in data            # it is polled with, never shown
+    _m, url, _p, headers, body = fake.calls[0]
+    assert url == "https://api.simkl.com/oauth2/device"
+    assert body == {"client_id": "CID", "scope": "media:read media:write"}
+    assert headers["User-Agent"].startswith("dopeIPTV/") and "Authorization" not in headers
+    fake.token_answers = [Resp(400, {"error": "authorization_pending"}),
+                          Resp(400, {"error": "slow_down"}),
+                          Resp(200, TOKENS)]
+    assert c.poll_pin("BDWP-HQPK") is None
+    assert c.poll_pin("BDWP-HQPK") is None
+    assert c.poll_pin("BDWP-HQPK")["access_token"] == "NEWTOKEN"
     assert c.settings.value(simkl.TOKEN_KEY) == "NEWTOKEN" and c.is_connected()
-    assert fake.calls[-1][1] == "https://api.simkl.com/oauth/pin/AB12C"
-    for answer, key in ((Resp(404), "trakt_code_expired"),
-                        (Resp(200, {"result": "KO", "message": "Code expired"}),
-                         "trakt_code_expired")):
-        fake.pin_answers = [answer]
-        with pytest.raises(simkl.SimklAuthError) as e:
-            c.poll_pin("AB12C")
-        assert e.value.key == key
-    fake.pin_answers = [Resp(200, {"result": "KO", "message": "Wrong client"})]
+    assert c.settings.value(simkl.REFRESH_KEY) == "simkl_rt_R"
+    assert int(c.settings.value(simkl.EXPIRES_KEY)) > time.time() + 6 * 86400
+    _m, url, _p, _h, body = fake.calls[-1]
+    assert url == "https://api.simkl.com/oauth2/token"
+    assert body == {"grant_type": simkl.DEVICE_GRANT, "client_id": "CID",
+                    "device_code": "DEV-SECRET"}
+    # Ran out, a code it never handed out, a V1 client id.
+    c.start_pin()
+    fake.token_answers = [Resp(400, {"error": "expired_token"})]
     with pytest.raises(simkl.SimklAuthError) as e:
-        c.poll_pin("AB12C")
-    assert str(e.value) == "Wrong client"
+        c.poll_pin("BDWP-HQPK")
+    assert e.value.key == "trakt_code_expired"
+    with pytest.raises(simkl.SimklAuthError):
+        c.poll_pin("NOPE-NOPE")
+    c.start_pin()
+    fake.token_answers = [Resp(401, {"error": "invalid_client", "error_description":
+                                     "This client_id is not enabled for OAuth 2.0"})]
+    with pytest.raises(simkl.SimklAuthError) as e:
+        c.poll_pin("BDWP-HQPK")
+    assert "not enabled for OAuth 2.0" in str(e.value)
+
+
+def test_the_access_token_is_renewed_before_it_runs_out_and_on_a_401(client):
+    c, fake = client
+    c.settings.setValue(simkl.REFRESH_KEY, "simkl_rt_R")
+    c.settings.setValue(simkl.EXPIRES_KEY, int(time.time()) + 60)   # nearly out
+    fake.token_answers = [Resp(200, dict(TOKENS, access_token="FRESH"))]
+    c.watched_movies()
+    refresh = [x for x in fake.calls if x[1].endswith("/oauth2/token")]
+    assert refresh and refresh[0][4] == {"grant_type": "refresh_token", "client_id": "CID",
+                                         "refresh_token": "simkl_rt_R"}
+    assert c.settings.value(simkl.TOKEN_KEY) == "FRESH"
+    gets = [x for x in fake.calls if x[0] == "GET"]
+    assert gets[-1][3]["Authorization"] == "Bearer FRESH"
+    # Refused (revoked from Simkl, or 180 days unused): forgotten, connect again.
+    c.settings.setValue(simkl.EXPIRES_KEY, int(time.time()) + 60)
+    fake.token_answers = [Resp(400, {"error": "invalid_grant"})]
+    assert c.refresh() is False and not c.is_connected()
+    assert c.settings.value(simkl.REFRESH_KEY) is None
+
+
+def test_signing_out_revokes_the_grant(client):
+    c, fake = client
+    c.settings.setValue(simkl.REFRESH_KEY, "simkl_rt_R")
+    c.disconnect()
+    assert not c.is_connected() and c.settings.value(simkl.REFRESH_KEY) is None
+    for _ in range(50):
+        if any(x[1].endswith("/oauth2/revoke") for x in fake.calls):
+            break
+        time.sleep(0.02)
+    revoke = [x for x in fake.calls if x[1].endswith("/oauth2/revoke")]
+    assert revoke and revoke[0][4] == {"client_id": "CID", "token": "simkl_rt_R"}
 
 
 def test_scrobbles_and_marks_say_what_simkl_finds_them_by(client):
@@ -232,11 +283,14 @@ def test_the_token_is_never_logged(client):
     log.setLevel(logging.DEBUG)
     log.addHandler(h)
     try:
-        fake.pin_answers = [Resp(200, {"result": "OK", "access_token": "SECRET-T"})]
-        c.poll_pin("AB12C")
+        c.start_pin()
+        fake.token_answers = [Resp(200, dict(TOKENS, access_token="SECRET-T",
+                                             refresh_token="SECRET-R"))]
+        c.poll_pin("BDWP-HQPK")
         c.scrobble_start(simkl.scrobble_movie(1, "x"), 0)
         c.watched_movies()
     finally:
         log.removeHandler(h)
         log.setLevel(was)
-    assert lines and not any("SECRET-T" in x or "TOKEN-123" in x for x in lines)
+    assert lines and not any(s in x for x in lines
+                             for s in ("SECRET-T", "SECRET-R", "DEV-SECRET", "TOKEN-123"))
