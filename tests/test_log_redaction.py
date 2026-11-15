@@ -124,6 +124,40 @@ def test_the_filter_masks_records_the_call_site_forgot():
     assert "at 50%" in msg
 
 
+def test_an_exception_logged_as_it_is_loses_the_account_too():
+    """log.info("...: %s", e) and exc_info=True are how most failures reach
+    the log, and a requests error quotes the whole URL it failed on - the
+    account in it. Only text arguments were masked, so these went out as
+    they were (DOPEIPTV_LOG=debug, the log file, Recent lines)."""
+    import io
+    logmod.register_secrets("hunter2pass", "PLEXTOKEN99")
+    buf = io.StringIO()
+    h = logging.StreamHandler(buf)
+    h.setFormatter(logging.Formatter("%(message)s"))
+    lg = logging.getLogger("dopeiptv.test_redaction")
+    lg.propagate = False
+    lg.setLevel(logging.DEBUG)
+    lg.addHandler(h)
+    f = _RedactFilter()
+    lg.addFilter(f)
+    try:
+        err = ConnectionError("Max retries exceeded with url: /live/joe/hunter2pass/1.ts")
+        lg.warning("stream failed: %s (%r) after %d tries", err, err, 3)
+        try:
+            raise ConnectionError("url: /:/timeline?X-Plex-Token=PLEXTOKEN99")
+        except ConnectionError:
+            lg.debug("media server: progress", exc_info=True)
+        lg.warning(ConnectionError("hunter2pass as the message"))
+        lg.info("left alone: %s %r", ValueError("nothing here"), {"n": 1})
+    finally:
+        lg.removeHandler(h)
+        lg.removeFilter(f)
+    out = buf.getvalue()
+    assert "hunter2pass" not in out and "PLEXTOKEN99" not in out
+    assert "after 3 tries" in out and "Traceback" in out and "X-Plex-Token=***" in out
+    assert "left alone: nothing here {'n': 1}" in out
+
+
 def test_the_filter_leaves_a_record_alone_when_it_cannot_help():
     """It runs on every log call in the app; it must never be the reason a
     line is lost."""

@@ -121,23 +121,47 @@ def redact_url(url: object) -> str:
         return redact(text)
 
 
+def _redact_arg(value: object) -> object:
+    """One argument of a record, masked. A number stays what it is (%d and
+    friends need it); anything else that is not text - an exception, above
+    all, whose message quotes the URL it failed on - becomes its masked
+    text when it holds a registered value, and is left alone otherwise."""
+    if isinstance(value, str):
+        return redact(value)
+    if value is None or isinstance(value, (int, float)):
+        return value
+    try:
+        text = str(value)
+    except Exception:
+        return value
+    clean = redact(text)
+    return value if clean == text else clean
+
+
 class _RedactFilter(logging.Filter):
     """The safety net: mask registered values in every record, whether or
-    not the call site remembered to. Failure here must lose nothing, so any
-    error leaves the record exactly as it was."""
+    not the call site remembered to - its message, its arguments and the
+    traceback a record carries (exc_info). Failure here must lose nothing,
+    so any error leaves the record as it was."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         if not _secrets:
             return True
         try:
-            if isinstance(record.msg, str):
-                record.msg = redact(record.msg)
+            record.msg = _redact_arg(record.msg)
             if isinstance(record.args, tuple):
-                # Only str arguments are touched, so %d and friends keep the
-                # types their format specifiers need.
-                record.args = tuple(
-                    redact(a) if isinstance(a, str) else a
-                    for a in record.args)
+                record.args = tuple(_redact_arg(a) for a in record.args)
+        except Exception:
+            pass
+        try:
+            # Formatted here, once, masked: every handler's formatter uses
+            # exc_text when it is there instead of formatting it again.
+            if record.exc_info and not record.exc_text:
+                record.exc_text = logging.Formatter().formatException(record.exc_info)
+            if record.exc_text:
+                record.exc_text = redact(record.exc_text)
+            if record.stack_info:
+                record.stack_info = redact(record.stack_info)
         except Exception:
             pass
         return True
