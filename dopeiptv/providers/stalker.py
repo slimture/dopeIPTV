@@ -31,11 +31,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import quote, urlsplit
 
+from ..core import mirrors
 from ..core._lazy_requests import requests
 from ..core.log import log, register_secrets
 from ..core.privacy import for_log
 from ..i18n import LocalizedError, tr
-from .client import ListCache, json_object
+from .client import ListCache, Mirrored, json_object
 
 # What the portal sees is a MAG250 set-top box: portals serve nothing to a
 # player they do not know, and some check the firmware get_profile reports.
@@ -353,9 +354,12 @@ def pick_programme(rows: list[dict], start: float,
     return next((r for r in rows if r["start"] <= start < r["stop"]), None)
 
 
-class StalkerClient(ListCache):
+class StalkerClient(Mirrored, ListCache):
     """A Stalker / Ministra middleware portal, addressed by the portal URL
-    and the box's MAC address, behind XtreamClient's interface."""
+    and the box's MAC address, behind XtreamClient's interface. Nerd's
+    backup addresses (core/mirrors.py) are other addresses of the portal:
+    the handshake walks them while the one in use cannot be reached, and a
+    call that finds it gone logs in again through them."""
 
     LOG_NAME = "stalker"
     # See XtreamClient.NET_COOLDOWN_SECS.
@@ -436,6 +440,29 @@ class StalkerClient(ListCache):
         # and archive_table read the same days.
         self._days: dict[tuple[str, str], tuple[float, list[dict]]] = {}
 
+    def use_mirrors(self, picker: mirrors.Picker | None) -> None:
+        super().use_mirrors(picker)
+        self._endpoints = portal_endpoints(self.server)
+
+    def _landed(self, base: str) -> None:
+        m = self.picker
+        if m is not None and m.worked(base):
+            self.server = base
+            self._endpoints = portal_endpoints(base)
+
+    def _endpoint_groups(self) -> list[tuple[str, list[str]]]:
+        """(portal address, its API endpoints to try) in the order a
+        handshake asks them: the address in use first, the endpoint found
+        before first within it."""
+        out = []
+        for base in self._bases():
+            cands = portal_endpoints(base) if base != self.server else list(self._endpoints)
+            if self._endpoint in cands:
+                cands.remove(self._endpoint)
+                cands.insert(0, self._endpoint)
+            out.append((base, cands))
+        return out
+
     # -- requests -------------------------------------------------------------
 
     def _headers(self, endpoint: str, token: str | None) -> dict[str, str]:
@@ -486,6 +513,10 @@ class StalkerClient(ListCache):
                         "(failing fast for the next %d s)", what, self.server,
                         type(e).__name__, self._redact(str(e)),
                         self.NET_COOLDOWN_SECS)
+            if len(self._bases()) > 1 and mirrors.fails_over_error(e):
+                # Logged in through an address that is gone: the next
+                # call logs in again, through the backup addresses.
+                self._auth = None
             raise
         except requests.RequestException as e:
             log.warning("stalker %s @ %s: request failed - %s: %s", what,
@@ -575,29 +606,49 @@ class StalkerClient(ListCache):
 
     def _handshake(self, deadline: float | None) -> tuple[str, str, str]:
         """(endpoint, token, random) from the endpoint found before, else
-        from the first candidate that answers a handshake."""
-        cands = list(self._endpoints)
-        if self._endpoint in cands:
-            cands.remove(self._endpoint)
-            cands.insert(0, self._endpoint)
+        from the first candidate that answers a handshake. With backup
+        addresses, the next one's when this one's host cannot be reached
+        or answers 5xx - a refusal or a path that is not there ends it."""
         params = {"type": "stb", "action": "handshake", "token": ""}
         refused = False
-        for ep in cands:
-            try:
-                data, no = self._request(ep, params, None,
-                                         self._timeout(15.0, deadline))
-            except (requests.Timeout, requests.ConnectionError):
-                raise           # the host itself is down: so is every path
-            except (requests.RequestException, ValueError):
-                continue        # no portal API at this path
-            refused = refused or no
-            js = data.get("js") if isinstance(data, dict) else None
-            token = str(js.get("token") or "") if isinstance(js, dict) else ""
-            if token and isinstance(js, dict):
-                if ep != self._endpoint:
-                    log.info("stalker @ %s: the portal API is %s",
-                             self.server, urlsplit(ep).path)
-                return ep, token, str(js.get("random") or "")
+        cands: list[str] = []
+        groups = self._endpoint_groups()
+        for gi, (base, cands) in enumerate(groups):
+            after = groups[gi + 1][0] if gi + 1 < len(groups) else None
+            down = ""
+            for ep in cands:
+                cooling = time.monotonic() < self._net_down_until
+                try:
+                    data, no = self._request(ep, params, None,
+                                             self._timeout(15.0, deadline))
+                except (requests.Timeout, requests.ConnectionError) as e:
+                    # The host itself is down: so is every path.
+                    if after is None or cooling or not mirrors.fails_over_error(e):
+                        raise
+                    down = type(e).__name__
+                    break
+                except requests.HTTPError as e:
+                    code = getattr(e.response, "status_code", None)
+                    if after is not None and mirrors.fails_over_status(code):
+                        down = f"HTTP {code}"
+                        break
+                    continue    # no portal API at this path
+                except (requests.RequestException, ValueError):
+                    continue        # no portal API at this path
+                refused = refused or no
+                js = data.get("js") if isinstance(data, dict) else None
+                token = str(js.get("token") or "") if isinstance(js, dict) else ""
+                if token and isinstance(js, dict):
+                    if len(groups) > 1:
+                        self._landed(base)
+                    if ep != self._endpoint:
+                        log.info("stalker @ %s: the portal API is %s",
+                                 self.server, urlsplit(ep).path)
+                    return ep, token, str(js.get("random") or "")
+            if not down or refused or after is None:
+                break
+            self._net_down_until = 0.0      # this host's, not the next one's
+            self._next_address("handshake", base, after, down)
         if refused:
             log.warning("stalker handshake @ %s: refused", self.server)
             raise LocalizedError("err_wrong_login")

@@ -66,6 +66,9 @@ map and the one-way import rule.
 | `core/wakelock.py` | Screensaver inhibitor |
 | `core/gcguard.py` | Cyclic garbage collection on the GUI thread only |
 | `core/contest.py` | `ContestWatch`: tells another device taking the account's connection from repeated drops |
+| `core/connections.py` | Connections to the account (for everyone): what user_info says (`numbers`), which streams count (`is_network`), the app's own (`Use`) against the limit, another device's from the provider's last answer while fresh (`Ledger`), the `Verdict` when one more would go over; it only counts |
+| `core/mirrors.py` | Nerd: a source's backup addresses (`backup_servers` in its options, one per line; bad lines refused with their reason), when to try the next (unreachable, TLS, 5xx/52x - never 401/403/404), the one in use per source (`nerd_mirror_<source id>`), `Picker`; its line and Test |
+| `core/conn_test.py` | Nerd: Test connection - DNS, TCP, TLS, login (Xtream's account end and connections), a live channel's first byte and speed against SD/HD/Full HD/4K, step by step with times, on a thread of its own, cancelable; `copy_text` scrubbed by `core/report.py` |
 | `core/health.py` | Nerd's stream health per channel (source + stream id): starts, failures, time to picture, drops, last error (scrubbed), last played; one settings value, 500 channels at most; it only watches |
 | `core/desktop_entry.py` | The user's .desktop entry and icons (Wayland takes the window icon from there) |
 | `core/xdg.py` | Launch system programs from a frozen bundle without our bundled libraries |
@@ -128,12 +131,15 @@ map and the one-way import rule.
 | `ui/rewrite_rules.py` | The rewrite rules' rows in a source's Nerd options (find, replace, regex switch, up, remove) |
 | `ui/shortcuts.py` | The Keyboard shortcuts card (Settings > Advanced, for everyone): each key a button that records the next combination, ✕ / ↺ / reset all, who lost a key and why one is refused said plainly |
 | `ui/nerd_check_line.py` | The ✓ / ! / ✗ line under a Nerd setting, its Test button and Details (the app's problem window) |
+| `ui/conn_test_dialog.py` | Test connection's window: each step's mark, result and time as it goes (polled, never waited on), SD/HD/Full HD/4K lit by the speed, Copy (scrubbed), Stop, Test again |
 | `ui/source_presets.py` | Presets in the source dialog (Fritz!Box, Channels DVR, Threadfin, xTeVe, Dispatcharr, ErsatzTV) |
 | `ui/mw_box.py` | The box from the app: zap, wake, standby, record on the box from the guide; Nerd's copy address and guide channel |
 | `ui/mw_commands.py` | Commands from outside carried out: play an address or file, a channel by name, come forward |
 | `ui/mw_privacy.py` | Private viewing and Clear recent history in the window: app-menu entries and shortcuts, the sidebar marker |
 | `ui/mw_series.py` | Series recordings in the window: "Record series…", the rules' look through the guide on the pool when it loads and with its 20-minute check, the jobs added |
 | `ui/mw_failover.py` | Failover in the window: once per channel, the other source's options while it plays, a note |
+| `ui/mw_connections.py` | Connections to the account in the window: the app's own counted (player, rewind buffers, recordings over their own connection, multiview cells), the warning before a multiview cell, a recording while watching or the buffer next to a recording would go over the limit, with go ahead anyway |
+| `ui/mw_mirrors.py` | Nerd's backup addresses in the window: a live stream whose server is down asked of the next address (off the window's thread), the channel started again from it |
 | `ui/mw_chanprefs.py` | A channel's own settings in the window: the player told which channel it plays (`set_channel`), the channel menu's "Channel settings…" (a dot when it has its own), its dialog |
 | `ui/mw_health.py` | Stream health in the window: the playback path's hooks (start, picture, drop, fail), the channel menu's "Stream health…", the list's dot |
 | `ui/mw_portal_archive.py` | A Stalker portal's archive in the window: its link asked for off the window's thread (`StalkerClient.archive_link`), played from the moment asked, a go-back carried on to the next programme |
@@ -178,7 +184,9 @@ health per channel), `mw_chanprefs` (a channel's own settings),
 `mw_events` (events pushed out: webhooks and MQTT), `mw_privacy` (private
 viewing, clear recent history), `mw_report` (feedback, error reports and
 the answers to them), `mw_sync` (settings sync between a supporter's
-computers) and `mw_popout` (detached-window player). What stays in `main_window.py` is
+computers), `mw_connections` (connections to the account, the warning
+before one more), `mw_mirrors` (a source's backup addresses for a stream
+whose server is down) and `mw_popout` (detached-window player). What stays in `main_window.py` is
 the `__init__`/`_build_ui` composition and the playback path (start/stop,
 seek, fullscreen, reconnect) - keep playback code there.
 When making changes:
@@ -254,7 +262,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
   epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log,
-  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, health, nerd, nerd_lists, channel_numbers, shortcut_keys, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, catchup, url_rewrite, hls_cap, remote_api, events, mqtt, report, supporter, sync, chacha20poly1305, backup) and `services/` (failover, share, resume,
+  player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, connections, mirrors, conn_test, health, nerd, nerd_lists, channel_numbers, shortcut_keys, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, catchup, url_rewrite, hls_cap, remote_api, events, mqtt, report, supporter, sync, chacha20poly1305, backup) and `services/` (failover, share, resume,
   coverart, reminders, mpris, media_session, media_macos, media_windows, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list

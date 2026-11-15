@@ -81,6 +81,9 @@ class PlaylistDialog(QDialog):
         super().__init__(parent)
         editing = bool(playlist)
         playlist = playlist or prefill or {}
+        # The stored source's id: its history and the backup address in use
+        # (what a Nerd test asks of it).
+        self._pid = str(playlist.get("id") or "") if editing else ""
         self.setWindowTitle(tr("playlist_edit_title") if editing
                             else tr("playlist_add_title"))
         self.setMinimumWidth(520)
@@ -176,10 +179,14 @@ class PlaylistDialog(QDialog):
 
     def _source_now(self) -> dict:
         """The source as the form has it now, without its Nerd options (what
-        the catch-up Test asks)."""
-        return {"kind": self.kind.currentData(), "server": self.server.text().strip(),
-                "username": self.user.text().strip(), "password": self.pw.text().strip(),
-                "mac": self.normal_mac(self.mac.text()) or ""}
+        the Nerd tests ask)."""
+        out = {"kind": self.kind.currentData(), "server": self.server.text().strip(),
+               "username": self.user.text().strip(), "password": self.pw.text().strip(),
+               "mac": self.normal_mac(self.mac.text()) or "",
+               "name": self.name.text().strip()}
+        if self._pid:
+            out["id"] = self._pid
+        return out
 
     def _fit(self) -> None:
         """Grow or shrink with the form (rows shown for the kind, the Nerd
@@ -276,6 +283,13 @@ class PlaylistDialog(QDialog):
             self.nerd_panel.toggle.setChecked(True)
             self.nerd_panel.rw_line.show_preview()
             QMessageBox.warning(self, tr("nerd_ck_title_rewrite"), tr(bad.key, **bad.params))
+            return
+        # ... and so is a backup address that is no address.
+        bad = self.nerd_panel.mirrors_ok() if self.nerd_panel is not None else None
+        if bad is not None:
+            self.nerd_panel.toggle.setChecked(True)
+            self.nerd_panel.mr_line.show_preview()
+            QMessageBox.warning(self, tr("nerd_ck_title_mirrors"), tr(bad.key, **bad.params))
             return
         if self.kind.currentData() == "stalker":
             if not (self.server.text().strip()
@@ -1777,7 +1791,8 @@ class RestoreBackupDialog(QDialog):
                      "headers": ("nerd_headers",),
                      "rewrite": ("nerd_src_rewrite",),
                      "udpxy": ("nerd_card_udpxy",),
-                     "catchup_template": ("nerd_src_catchup",)}
+                     "catchup_template": ("nerd_src_catchup",),
+                     "backup_servers": ("nerd_src_mirrors",)}
 
     @classmethod
     def _label(cls, key: str) -> str:

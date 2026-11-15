@@ -144,6 +144,9 @@ class _MultiviewCell(QWidget):
         self.number = number
         self.url: str | None = None
         self.title: str = ""
+        # The source (id) the stream is from: whose account's connection
+        # it takes (core/connections.py).
+        self.source_id = ""
         self._focused = False
         self._muted = True
         self._drag_from = None
@@ -800,6 +803,7 @@ class _MultiviewCell(QWidget):
         self.video.set_blank(True)
         self.url = None
         self.title = ""
+        self.source_id = ""
         self._muted = True
         self._live_start = None
         self._live_edge = 0.0
@@ -1036,13 +1040,14 @@ class _MultiviewWindow(QWidget):
 
     def add_stream(self, url: str, title: str, cell: int | None = None,
                    item: dict | None = None, client=None, guide=None,
-                   playlist: str = "", start: float = 0.0) -> None:
+                   playlist: str = "", start: float = 0.0, source: str = "") -> None:
         if cell is not None and 0 <= cell < len(self.cells):
             target = self.cells[cell]
         else:
             target = next((c for c in self.cells if c.url is None),
                           self._focused or self.cells[0])
         target.play(url, title, item, client, guide, playlist, start)
+        target.source_id = source
         # Settings: a newly added channel can either take audio focus (the
         # default) or start muted, leaving the current audio alone.
         unmute = (self._owner.settings.value("mv_new_unmuted", "true")
@@ -1068,8 +1073,11 @@ class _MultiviewWindow(QWidget):
               a.playlist_name, a.resume_pos())
         sb = (b._live_url, b.title, b._item, b._client, b._guide,
               b.playlist_name, b.resume_pos())
+        src_a, src_b = a.source_id, b.source_id
         a.play(*sb) if sb[0] else a.clear()
         b.play(*sa) if sa[0] else b.clear()
+        a.source_id = src_b if sb[0] else ""
+        b.source_id = src_a if sa[0] else ""
         self._focus_cell(self._focused if self._focused in self.cells else a)
 
     def _cell_context_menu(self, cell: "_MultiviewCell", pos) -> None:
@@ -1257,7 +1265,7 @@ class _MultiviewMixin:
         self.add_to_multiview(
             url, it.get("name") or it.get("title") or "", cell,
             item=it, client=self.client, guide=getattr(self, "xmltv", None),
-            playlist=self._active_playlist_name())
+            playlist=self._active_playlist_name(), source=self._mv_source())
 
     def _multiview_available(self) -> bool:
         """Multiview is made of OpenGL video surfaces, and on a display with
@@ -1282,6 +1290,12 @@ class _MultiviewMixin:
         except (TypeError, ValueError):
             count = 4
         return count if count in (2, 4, 6, 9) else 4
+
+    def _mv_source(self, docked: bool = False) -> str:
+        """The source (id) a cell's stream is from: the active one's, or -
+        *docked* - the one the docked player plays from."""
+        find = getattr(self, "_conn_player_source" if docked else "_conn_source", None)
+        return find() if find is not None else ""
 
     def _active_playlist_name(self) -> str:
         store = getattr(self, "playlist_store", None)
@@ -1389,13 +1403,18 @@ class _MultiviewMixin:
                               client=getattr(self, "client", None),
                               guide=getattr(self, "xmltv", None),
                               playlist=self._active_playlist_name(),
-                              start=start)
+                              start=start, source=self._mv_source(docked=True))
 
     def add_to_multiview(self, url: str, title: str,
                          cell: int | None = None, item: dict | None = None,
                          client=None, guide=None, playlist: str = "",
-                         start: float = 0.0) -> None:
+                         start: float = 0.0, source: str = "") -> None:
         if not url or not self._multiview_available():
+            return
+        # One more connection to the account: said first when the account
+        # does not allow it (core/connections.py), and only then.
+        ok = getattr(self, "_conn_ok_multiview", None)
+        if ok is not None and not ok(cell, url):
             return
         # Free the docked player's connection: otherwise a single-connection
         # account refuses the multiview cell (the same channel then only plays
@@ -1406,7 +1425,7 @@ class _MultiviewMixin:
             self._stop_docked_for_multiview()
         self._ensure_multiview_window().add_stream(
             url, title, cell, item=item, client=client, guide=guide,
-            playlist=playlist, start=start)
+            playlist=playlist, start=start, source=source)
         # Watching only multiview is watching video too: without this the
         # screensaver came on mid-match (the docked player had let go).
         self.wake.acquire(f"Multiview: {title}")

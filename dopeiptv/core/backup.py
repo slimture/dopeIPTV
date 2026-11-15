@@ -89,8 +89,10 @@ _LEFT_OUT = frozenset({
     "cast_devices", "subtitle_files", "nerd_health_data",
 })
 # update_*: the update channel and what its check last found; ts_*: what a
-# source's timeshift probe learned; "_": the files' own markers.
-_LEFT_OUT_PREFIXES = ("update_", "home_pcache_", "ts_broken/", "ts_depth/", "_")
+# source's timeshift probe learned; "_": the files' own markers;
+# nerd_mirror_*: the backup address that answered last on this computer.
+_LEFT_OUT_PREFIXES = ("update_", "home_pcache_", "ts_broken/", "ts_depth/", "_",
+                      "nerd_mirror_")
 _TMDB_CACHE = re.compile(r"tmdb_.*(cache|matcher)")
 
 #: Settings naming a folder ("dir"), a JSON list of folders ("dirs") or files
@@ -108,7 +110,7 @@ RISKY = ("nerd_rec_post", "nerd_mpv_options", "nerd_mpv_config_dir", "nerd_proxy
 #: Switches that let others in or send out what is played: shown when on.
 RISKY_ON = ("nerd_remote", "nerd_share")
 #: A playlist's own options that do the same for its connections.
-RISKY_SOURCE = ("proxy", "headers", "rewrite", "udpxy", "catchup_template")
+RISKY_SOURCE = ("proxy", "headers", "rewrite", "udpxy", "catchup_template", "backup_servers")
 _HEADERS = frozenset({"nerd_headers", "nerd_hooks_header", "headers"})
 _HEADER_NAME = re.compile(r"^\s*([A-Za-z0-9!#$%&'*+.^_`|~-]+)\s*[:=]")
 #: The kinds a summary counts, by the file that holds them.

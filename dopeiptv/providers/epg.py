@@ -541,11 +541,17 @@ class XmltvGuide:
             # xmltv.php endpoint to fall back to, so report "no EPG" cleanly.
             raise RuntimeError("no EPG source for this playlist")
         else:
-            r = self.client.session.get(
-                f"{self.client.server}/xmltv.php",
-                params={"username": self.client.username,
-                        "password": self.client.password},
-                stream=True, timeout=(20, 300))
+            params = {"username": self.client.username,
+                      "password": self.client.password}
+            mirrored = getattr(self.client, "get_from_server", None)
+            if callable(mirrored):
+                # Nerd's backup addresses: the guide from the next one when
+                # the server in use is down (core/mirrors.py).
+                r = mirrored("/xmltv.php", params, (20, 300), "xmltv", stream=True)
+            else:
+                r = self.client.session.get(
+                    f"{self.client.server}/xmltv.php",
+                    params=params, stream=True, timeout=(20, 300))
         r.raise_for_status()
         total = int(r.headers.get("content-length") or 0)
         chunks: list[bytes] = []

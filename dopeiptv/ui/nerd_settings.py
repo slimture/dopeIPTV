@@ -808,6 +808,21 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
                       diagnostics(settings), state="info").exec()
     info_btn.clicked.connect(show_diag)
     c.row(tr("nerd_diag_row"), info_btn, tr("nerd_diag_hint"), search="diagnostics bug report copy")
+    # The active source's connection, step by step (core/conn_test.py).
+    conn_btn = QPushButton(tr("ct_button"))
+
+    def test_connection() -> None:
+        s = src()
+        if not s:
+            from .dialogs import ProblemDialog
+            ProblemDialog(parent, tr("ct_title"), tr("nerd_ck_no_source"), "-", state="info").exec()
+            return
+        from ..providers.client import make_client
+        from .conn_test_dialog import ConnTestDialog
+        ConnTestDialog(parent, dict(s), settings, make_client).exec()
+    conn_btn.clicked.connect(test_connection)
+    c.row(tr("ct_row"), conn_btn, tr("ct_row_hint"),
+          search="connection test DNS TLS speed Mbit throughput ping")
 
     def values() -> dict[str, str]:
         out: dict[str, str] = {}

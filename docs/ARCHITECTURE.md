@@ -52,6 +52,12 @@ dopeiptv/
     wakelock.py        Screensaver/suspend inhibitor (DBus + caffeinate)
     gcguard.py         Cyclic garbage collection on the GUI thread only
     contest.py         ContestWatch: another device taking the account's connection
+    connections.py     Connections to the account: the app's own counted, the
+                       limit, a warning before one more would go over it
+    mirrors.py         Nerd: a source's backup addresses - the next when the
+                       one in use is down (never on a refused login)
+    conn_test.py       Nerd: test the connection to a source step by step
+                       (DNS, TCP, TLS, login, first byte, speed)
     health.py          Nerd's stream health per channel (it only watches)
     channel_prefs.py   Nerd: a channel's own audio/subtitle language,
                        deinterlace, aspect, audio delay (what each sets in mpv)
@@ -126,6 +132,9 @@ dopeiptv/
     mw_cast.py         Casting: the cast dialog, the strip, archive hand-over
     mw_popout.py       Detached-window ("pop out") player mixin
     mw_multiview.py    Multiview: 2/4/6/9 live streams (own mpv per cell)
+    mw_connections.py  Connections to the account: counted, warned about
+    mw_mirrors.py      Nerd: a stream whose server is down, on the next address
+    conn_test_dialog.py Nerd: Test connection's window
     mw_busy.py         Loading indicator + spinner overlay
     mw_updates.py      Update-check badge/status wiring, "Update now"
     mw_reminders.py    Programme-reminder UI (set / list / fire)

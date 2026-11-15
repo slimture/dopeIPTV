@@ -70,6 +70,8 @@ from .mw_busy import _BusyMixin
 from .mw_cast import _CastMixin
 from .mw_chanprefs import _ChannelPrefsMixin
 from .mw_failover import _FailoverMixin
+from .mw_connections import _ConnectionsMixin
+from .mw_mirrors import _MirrorsMixin
 from .mw_portal_archive import _PortalArchiveMixin
 from .mw_health import _HealthMixin
 from .mw_remote import _RemoteMixin
@@ -131,6 +133,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
                  _HealthMixin, _ChannelPrefsMixin, _RemoteMixin, _EventsMixin, _ReportMixin,
                  _PortalArchiveMixin, _SeriesMixin, _SyncMixin,
+                 _ConnectionsMixin, _MirrorsMixin,
                  QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
@@ -5220,6 +5223,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         hkey = self.health.current
 
         def done(code, gen=gen, item=item):
+            # Nerd's backup addresses: a server that is down, asked again.
+            self._mirror_probe_said(url, code)
             if (gen != getattr(self, "_diag_gen", -1)
                     or getattr(self, "_diag_shown", False)
                     or (self.player and self.player.current_url)

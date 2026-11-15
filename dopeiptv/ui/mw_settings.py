@@ -60,6 +60,7 @@ from ..providers.metadata import CacheFiles, TmdbClient, bundled_tmdb_key
 from ..providers.opensubtitles import OpenSubtitles
 from ..providers.opensubtitles import bundled_key as bundled_os_key
 from ..providers.client import make_client
+from ..core import connections
 from ..core.local_buffer import MEMORY_MAX_MINUTES
 from ..core.log import log
 from ..core.xdg import open_url
@@ -603,12 +604,18 @@ class _SettingsMixin:
                             if days >= 0 else f" ({tr('account_expired')})")
             except (TypeError, ValueError, OSError):
                 exp_txt = str(exp)
-        active = ui.get("active_cons", "?")
-        maxc = ui.get("max_connections", "?")
+        limit, active = connections.numbers(ui)
+        if limit is not None and active is not None:
+            conns = tr("conn_in_use", n=active, max=limit)
+        elif active is not None:
+            conns = tr("conn_in_use_only", n=active)
+        else:
+            conns = (f"{tr('account_connections')}: {ui.get('active_cons', '?')}"
+                     f" / {ui.get('max_connections', '?')}")
         return "     ·     ".join([
             f"{tr('account_status')}: {status or '—'}",
             f"{tr('account_expiry')}: {exp_txt}",
-            f"{tr('account_connections')}: {active} / {maxc}",
+            conns,
         ])
 
     def _nerd_to_player(self) -> None:
@@ -2048,6 +2055,11 @@ class _SettingsMixin:
                 account_lbl.setText(tr("account_unavailable"))
                 return
             account_lbl.setText(tr("account_loading"))
+            # The app's own connections to it as it is asked: what the
+            # provider counts besides them is another device's.
+            seen = getattr(self, "_conn_seen", None)
+            own = (connections.own_count(self._conn_uses(), str(pid))
+                   if seen is not None else 0)
 
             def fetch(pl=pl):
                 try:
@@ -2056,6 +2068,8 @@ class _SettingsMixin:
                     return {}
 
             def done(info, pid=pid):
+                if seen is not None and info:
+                    seen(str(pid), info, own)
                 # Ignore a stale answer if the selection moved on meanwhile.
                 if selected_pid() == pid:
                     account_lbl.setText(self._format_account(info))
