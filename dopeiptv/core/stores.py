@@ -307,8 +307,10 @@ class HistoryStore:
 
     def add(self, url: str, title: str, icon_url: str | None,
             key: str, kind: str, extra: dict | None = None) -> None:
-        if not url or privacy.private():
-            return       # private viewing: nothing played is kept
+        # Private viewing: nothing played is kept - nor the private playback
+        # going on after it ends (a live channel's reconnect starts it again).
+        if not url or privacy.playback_private(kind, key):
+            return
         # str() both sides: providers mix int and str ids, and a key that
         # round-tripped through JSON elsewhere may come back the other type -
         # a raw == then missed and the same title stacked up as duplicates.

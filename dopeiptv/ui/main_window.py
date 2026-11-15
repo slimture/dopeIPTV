@@ -4676,11 +4676,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                                             "local")):
             return
         lp = self._last_playback or {}
-        self.resume.record(self._playing_group, self._playing_key,
-                           self.player.playback_position(),
-                           self.player.playback_duration(),
-                           item=lp.get("item"),
-                           series_ctx=lp.get("series_ctx"))
+        # A title watched privately keeps no resume point to the end of that
+        # playback, though private viewing ended before it did.
+        if not privacy.playback_private(lp.get("kind") or "", self._playing_key):
+            self.resume.record(self._playing_group, self._playing_key,
+                               self.player.playback_position(),
+                               self.player.playback_duration(),
+                               item=lp.get("item"),
+                               series_ctx=lp.get("series_ctx"))
         self._playback_max_pct = max(self._playback_max_pct,
                                      self.player.progress_percent())
 
@@ -4840,6 +4843,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return                     # private viewing marks nothing
         last = getattr(self, "_last_playback", None)
         if not last or last.get("kind") not in ("movie", "episode"):
+            return
+        if privacy.playback_private(last.get("kind") or "", last.get("key")):
+            # Watched privately and private viewing ended before it did: the
+            # mark would reach the media server and Trakt / Simkl.
             return
         if last.get("_auto_marked"):
             return                     # once per playback session

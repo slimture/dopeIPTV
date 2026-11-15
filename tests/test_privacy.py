@@ -26,8 +26,11 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 @pytest.fixture
 def settings(tmp_path):
     s = QSettings(str(tmp_path / "s.ini"), QSettings.Format.IniFormat)
+    privacy.set_private(False)
+    privacy.playback_stopped()
     yield s
     privacy.set_private(False)
+    privacy.playback_stopped()
 
 
 def _ago(**kw) -> str:
@@ -118,6 +121,62 @@ def test_private_viewing_keeps_nothing(settings):
     r.record("vod", 8, 1200, 5400, item={"name": "Synlig"})
     assert [e["name"] for e in h.items()] == ["SVT1 HD"]
     assert set(json.loads(settings.value("resume_positions_a"))) == {"vod:7", "vod:8"}
+
+
+def test_a_private_playback_going_on_after_private_viewing_ends_keeps_nothing(settings):
+    """A live channel that drops reconnects through the same path that
+    starts it, History's entry with it: that playback was private, and
+    stays so to its end, though private viewing ended meanwhile."""
+    h = HistoryStore(settings, "history_a")
+    privacy.set_private(True)
+    privacy.playback_started("live", 1)
+    privacy.set_private(False)
+    h.add("http://h/1.ts", "SVT1 HD", None, 1, "live")        # the reconnect
+    assert h.items() == []
+    h.add("http://h/2.ts", "TV4", None, 2, "live")            # another channel
+    assert [e["name"] for e in h.items()] == ["TV4"]
+    privacy.playback_stopped()                                 # Stop: a new playback
+    h.add("http://h/1.ts", "SVT1 HD", None, 1, "live")
+    assert [e["name"] for e in h.items()] == ["SVT1 HD", "TV4"]
+
+
+def test_a_private_film_keeps_no_resume_point_or_watched_mark_after_private_ends():
+    """The film played privately; private viewing went off before it ended:
+    where it stopped is not kept, and no watched mark goes to the media
+    server or Trakt / Simkl."""
+    from types import SimpleNamespace
+
+    pytest.importorskip("PyQt6.QtWidgets")
+    from dopeiptv.ui.main_window import MainWindow
+    recorded, marked = [], []
+    player = SimpleNamespace(current_url="http://h/movie/7.mkv",
+                             playback_position=lambda: 5200.0,
+                             playback_duration=lambda: 5400.0,
+                             progress_percent=lambda: 96.0)
+    w = SimpleNamespace(
+        player=player, _playing_key=7, _playing_group="vod", _playback_max_pct=0.0,
+        _last_playback={"kind": "movie", "key": 7, "item": {"name": "Hemlig"}},
+        _AUTO_WATCHED_PCT=MainWindow._AUTO_WATCHED_PCT,
+        resume=SimpleNamespace(record=lambda *a, **k: recorded.append(a)),
+        _mark_movie_watched=lambda item, push_to_trakt: marked.append(item["name"]))
+    try:
+        privacy.playback_stopped()
+        privacy.set_private(True)
+        privacy.playback_started("movie", 7)
+        privacy.set_private(False)
+        MainWindow._save_resume_position(w)
+        MainWindow._maybe_auto_mark_watched(w)
+        assert recorded == [] and marked == []
+        # Another film, not private: kept and marked as always.
+        privacy.playback_started("movie", 8)
+        w._playing_key = 8
+        w._last_playback = {"kind": "movie", "key": 8, "item": {"name": "Synlig"}}
+        MainWindow._save_resume_position(w)
+        MainWindow._maybe_auto_mark_watched(w)
+        assert len(recorded) == 1 and marked == ["Synlig"]
+    finally:
+        privacy.set_private(False)
+        privacy.playback_stopped()
 
 
 def test_the_clear_window(settings):
