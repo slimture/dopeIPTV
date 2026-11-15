@@ -2,7 +2,8 @@
 serves them, services/share.py builds the lists): started and stopped as
 Nerd > Remote and sharing says, and each request's work done on the
 window's own thread - the same controls as the media keys (mw_mpris), the
-same commands as a dopeiptv:// link (mw_commands)."""
+same commands as a dopeiptv:// link (mw_commands), TV mode's switch and keys
+through mw_tv's tv_command as the phone's and Home Assistant's."""
 
 from __future__ import annotations
 
@@ -194,6 +195,10 @@ class _RemoteMixin:
                     self._remote_media(name, secs)
                     return {"ok": True}
             raise ValueError('give "by" (seconds, + or -) or "to" (seconds from the start)')
+        if action == "tv":
+            return self.tv_command("tv", params.get("mode", "toggle"))
+        if action == "tv_key":
+            return self.tv_command("tv_key", params.get("action"))
         names = {"pause": "pause", "resume": "play", "playpause": "playpause", "stop": "stop",
                  "next": "next", "previous": "previous", "raise": "raise"}
         if action in names:
@@ -215,7 +220,8 @@ class _RemoteMixin:
         store = getattr(self, "playlist_store", None)
         active = store.active() if store is not None else None
         out: dict[str, Any] = {"state": state, "volume": int(round(float(snap.get("volume") or 0) * 100)),
-                               "source": (active or {}).get("name")}
+                               "source": (active or {}).get("name"),
+                               "tv_mode": bool(getattr(self, "_tv_on", False))}
         if state != "stopped":
             kind = last.get("kind") or ""
             out.update(kind=kind, title=snap.get("title") or "",

@@ -110,7 +110,10 @@ def test_the_controls_home_assistant_finds():
     for c in found.values():
         assert c["availability_topic"] == f"{P}/availability" and c["device"] is device
         assert c["unique_id"].startswith("n1_")
-    assert len({c["unique_id"] for c in found.values()}) == 7
+    sw = found["homeassistant/switch/n1/tv_mode/config"]
+    assert sw["command_topic"] == f"{P}/command/tv" and sw["state_topic"] == f"{P}/state"
+    assert (sw["payload_on"], sw["payload_off"]) == ("ON", "OFF") and "value_json.tv_mode" in sw["value_template"]
+    assert len({c["unique_id"] for c in found.values()}) == 8
     # No favourites: no list; commands off: every control taken away.
     assert dict(mqtt_control.discovery("n1", P, device, []))["homeassistant/select/n1/favorite/config"] is None
     assert all(c is None for _t, c in mqtt_control.discovery("n1", P, device, None))
@@ -355,6 +358,24 @@ if w.player is not None:
 # A new favourite: Home Assistant's list follows.
 w.favs.add("all", {"name": "TV4 HD", "stream_id": 401, "category_id": "1"})
 assert until(lambda: select_options() == ["Kanal 5", "TV4 HD"]), select_options()
+
+# TV mode: Home Assistant's switch, and its keys - the window's one way in.
+heard = []
+real_tv = w.tv_command
+w.tv_command = lambda what, value=None: (heard.append((what, value)), real_tv(what, value))[1]
+w._tv_input = lambda a: heard.append(("key", a))
+def switch():
+    found = [json.loads(p) for t, p, _r, _n in broker.publishes if t == "homeassistant/switch/tvpc/tv_mode/config" and p]
+    return found[-1] if found else None
+assert switch() and switch()["command_topic"] == "home/tv/command/tv"
+cmd("tv", b"ON")
+assert until(lambda: w._tv_on and broker.topics("home/tv/state")[-1].get("tv_mode") is True), broker.topics("home/tv/state")[-1]
+cmd("tv_key", b"down")
+assert until(lambda: ("key", "down") in heard), heard
+cmd("tv", b"OFF")
+assert until(lambda: not w._tv_on and broker.topics("home/tv/state")[-1].get("tv_mode") is False)
+assert heard == [("tv", "on"), ("tv_key", "down"), ("key", "down"), ("tv", "off")], heard
+del w.tv_command, w._tv_input
 
 # Private viewing: commands still work, the state still says nothing of what.
 privacy.set_private(True)

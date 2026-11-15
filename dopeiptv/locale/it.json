@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "Anche il televideo: viene scelta la pagina dei sottotitoli in questa lingua (777…).",
   "rec_mp4_keep_subs": "Conserva televideo e sottotitoli",
   "rec_mp4_keep_subs_hint": "Una registrazione con televideo o sottotitoli DVB resta un .ts: un MP4 non può contenerli.",
-  "rec_mp4_kept_subs": "conservata come .ts per il televideo e i sottotitoli"
+  "rec_mp4_kept_subs": "conservata come .ts per il televideo e i sottotitoli",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "Su",
+  "phone_tv_down": "Giù",
+  "phone_tv_left": "Sinistra",
+  "phone_tv_right": "Destra",
+  "phone_tv_vol_up": "Alza il volume",
+  "phone_tv_vol_down": "Abbassa il volume",
+  "phone_tv_digits": "Tasti numerici",
+  "phone_tv_touchpad": "Touchpad",
+  "phone_tv_touch_hint": "Scorri per spostarti · tocca per OK · tieni premuto per Indietro"
 }

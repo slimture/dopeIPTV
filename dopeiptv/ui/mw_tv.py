@@ -18,11 +18,16 @@ remote the system turns into keys), mapped to the actions of
 core/tv_input.py; a game controller and LIRC send the same actions from
 their threads. A dialog or menu that opens keeps its keys: the actions of
 a pad or LIRC become keys for it.
+
+The phone remote, the remote API and Home Assistant turn it on and off and
+press its keys through one method, tv_command - the pad's way in; while TV
+mode is off only the player's own controls among those keys do anything.
 """
 
 from __future__ import annotations
 
 import time
+from typing import Any
 
 from PyQt6 import sip
 from PyQt6.QtCore import QEvent, QObject, Qt, QTimer, pyqtSignal
@@ -195,6 +200,7 @@ class _TvMixin:
         page.show_screen("home")
         if self._tv_has_picture():
             self._tv_picture()
+        self._events_tv_mode()
 
     def exit_tv_mode(self) -> None:
         if not self._tv_on:
@@ -226,6 +232,7 @@ class _TvMixin:
                 if geo is not None:
                     self.setGeometry(geo)
         QTimer.singleShot(0, self._update_mid_compact)
+        self._events_tv_mode()
 
     def _tv_wire(self) -> None:
         if self._tv_wired:
@@ -282,6 +289,54 @@ class _TvMixin:
                     QApplication.postEvent(target, QKeyEvent(t, key, Qt.KeyboardModifier.NoModifier))
             return
         self._tv_action(action)
+
+    # -- the phone remote, the remote API, Home Assistant ----------------------------------
+
+    def tv_command(self, what: str, value: Any = None) -> dict[str, Any]:
+        """TV mode asked from elsewhere - the phone remote, the remote API,
+        Home Assistant: one way in for all of them. *what* "tv": on, off or
+        toggle; "tv_key": one of TV mode's actions, as a pad's or LIRC's
+        (_tv_input). ValueError for what it cannot take."""
+        if what == "tv":
+            mode = tv_input.switch_mode(value)
+            if mode is None:
+                raise ValueError('"mode" is on, off or toggle')
+            on = not self._tv_on if mode == "toggle" else mode == "on"
+            if on and not self._tv_on:
+                self._come_forward()
+                self.enter_tv_mode()
+            elif not on and self._tv_on:
+                self.exit_tv_mode()
+            return {"ok": True, "tv_mode": self._tv_on}
+        if what != "tv_key":
+            raise ValueError(f"unknown action: {what}")
+        action = tv_input.remote_action(value)
+        if action is None:
+            raise ValueError('"action" is one of TV mode\'s keys: up, down, left, right, ok, '
+                             'back, menu, red, green, yellow, blue, digit_0 to digit_9, ...')
+        if self._tv_on:
+            self._tv_input(action)
+            return {"ok": True, "tv_mode": True}
+        return {"ok": self._tv_off_key(action), "tv_mode": False}
+
+    def _tv_off_key(self, action: str) -> bool:
+        """A TV key while TV mode is off: the player's own control where
+        there is one (the media keys', channel up and down, the volume);
+        the arrows, OK, the colours and the rest are ignored."""
+        media = {"play_pause": "playpause", "play": "play", "pause": "pause", "stop": "stop"}
+        if action in media:
+            self._remote_media(media[action])
+            return True
+        if action in ("ch_up", "ch_down"):
+            return bool(self._play_channel_step(1 if action == "ch_up" else -1))
+        p = self.player
+        if action not in ("vol_up", "vol_down", "mute") or p is None:
+            return False
+        if action == "mute":
+            p.toggle_mute()
+        else:
+            p._nudge_volume(5 if action == "vol_up" else -5)
+        return True
 
     def _tv_takes(self, obj) -> bool:
         """Whether a key sent to *obj* is TV mode's: one for this window,

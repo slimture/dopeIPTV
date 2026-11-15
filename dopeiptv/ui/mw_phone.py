@@ -2,7 +2,9 @@
 core/phone_page.py is its page, ui/phone_remote.py its dialog): turned on
 and off from "Phone remote…", on again at the next start once it is on,
 and each request's work done on the window's own thread - the same
-controls as the media keys (mw_mpris) and the remote API (mw_remote).
+controls as the media keys (mw_mpris) and the remote API (mw_remote), TV
+mode on and off and its keys through mw_tv's tv_command (the page turns
+into a remote while TV mode is on).
 
 Only what the lists show can be listed or played from the phone: no channel
 from a hidden or locked category, no favourite from a locked folder."""
@@ -42,16 +44,32 @@ def page_words() -> dict[str, str]:
             "play_pause": tr("phone_page_play_pause"), "stop": tr("btn_stop"),
             "ch_up": tr("phone_page_ch_up"), "ch_down": tr("phone_page_ch_down"),
             "mute": tr("tooltip_mute_unmute"), "volume": tr("tooltip_volume"),
-            "loading": tr("common_loading")}
+            "loading": tr("common_loading"), **tv_words()}
+
+
+def tv_words() -> dict[str, str]:
+    """The remote's words while TV mode is on: its keys, and what each
+    colour key does there (TV mode's own legend)."""
+    from .tv_mode import TvPage
+    colours = TvPage.legend_labels()
+    return {"tv_mode": tr("tv_mode"), "tv_switch": tr("sc_tv_mode"), "ok": tr("phone_tv_ok"),
+            "up": tr("phone_tv_up"), "down": tr("phone_tv_down"), "left": tr("phone_tv_left"),
+            "right": tr("phone_tv_right"), "back": tr("btn_back"), "options": tr("tv_options"),
+            "vol_up": tr("phone_tv_vol_up"), "vol_down": tr("phone_tv_vol_down"),
+            "digits": tr("phone_tv_digits"), "touchpad": tr("phone_tv_touchpad"),
+            "touch_hint": tr("phone_tv_touch_hint"),
+            **{f"key_{c}": colours.get(c, "") for c in ("red", "green", "yellow", "blue")}}
 
 
 def page_palettes(light_now: bool) -> tuple[dict[str, str], dict[str, str]]:
     """The app's colours for the page, (dark, light): the theme in use for
     its own kind, the default theme of the other kind beside it, the
-    accent in both."""
+    accent and the remote's colour keys (TV mode's) in both."""
     from .theme import THEMES, P, on_accent
+    from .tv_widgets import COLOUR_KEYS
     own = dict(P)
     accent = {"accent": P.get("accent", ""), "on_accent": P.get("on_accent") or on_accent(P.get("accent", ""))}
+    accent.update({f"key_{name}": value for name, value in COLOUR_KEYS})
     other = {k: v for k, v in THEMES["graphite" if light_now else "light"].items() if isinstance(v, str)}
     dark, light = (other, own) if light_now else (own, other)
     return dict(dark, **accent), dict(light, **accent)
@@ -198,6 +216,10 @@ class _PhoneMixin:
             return self._phone_state()
         if action == "calendar":
             return self._calendar_text()
+        if action == "tv":
+            return self.tv_command("tv", params.get("mode", "toggle"))
+        if action == "tv_key":
+            return self.tv_command("tv_key", params.get("action"))
         if action in ("toggle", "stop"):
             self._remote_media("playpause" if action == "toggle" else "stop")
             return {"ok": True}
@@ -275,7 +297,8 @@ class _PhoneMixin:
             volume = int(getattr(p, "_vol_before_mute", volume) or 0)
         now = time.time()
         out: dict[str, Any] = {"state": st["state"], "time": now, "volume": volume, "muted": muted,
-                               "source": st.get("source") or "", "stamp": self._phone_stamp()}
+                               "source": st.get("source") or "", "stamp": self._phone_stamp(),
+                               "tv_mode": bool(st.get("tv_mode"))}
         note = self._phone_note_now()
         if note:
             out["note"] = note

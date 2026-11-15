@@ -11,6 +11,10 @@ a channel's name or number in.
     <prefix>/command/volume         0 to 100
     <prefix>/command/favorite       a favourite channel, as the list names it
     <prefix>/command/play           a channel's name, or its number
+    <prefix>/command/tv             ON, OFF or TOGGLE: TV mode (the switch)
+    <prefix>/command/tv_key         one of TV mode's keys (core/tv_input.py):
+                                    up, down, left, right, ok, back, menu, red,
+                                    green, yellow, blue, digit_0 ... digit_9, ...
 
 A retained message is never a command (one left on the broker would run
 again at every connect), nor is anything else this does not know: it is
@@ -23,6 +27,7 @@ from __future__ import annotations
 import re
 from typing import Any, Iterable
 
+from . import tv_input
 from .log import log
 
 HA_PREFIX = "homeassistant"
@@ -32,7 +37,7 @@ BUTTONS: tuple[tuple[str, str, str], ...] = (
     ("channel_up", "Channel up", "mdi:chevron-up"),
     ("channel_down", "Channel down", "mdi:chevron-down"),
 )
-COMMANDS = frozenset([b[0] for b in BUTTONS] + ["volume", "favorite", "play"])
+COMMANDS = frozenset([b[0] for b in BUTTONS] + ["volume", "favorite", "play", "tv", "tv_key"])
 MAX_TEXT = 100
 MAX_OPTIONS = 100
 MAX_OPTION_LEN = 80
@@ -80,6 +85,12 @@ def parse(prefix: str, topic: str, payload: bytes, retained: bool = False) -> tu
         if value != value:          # NaN
             return None
         return name, int(round(max(0.0, min(100.0, value))))
+    if name in ("tv", "tv_key"):
+        asked = tv_input.switch_mode(text) if name == "tv" else tv_input.remote_action(text)
+        if asked is None:
+            log.debug("mqtt: %s without a value it can take - ignored", name)
+            return None
+        return name, asked
     return name, text
 
 
@@ -106,7 +117,7 @@ def config_topics(node: str) -> list[str]:
     """Every control's discovery topic (to remove them)."""
     return ([f"{HA_PREFIX}/button/{node}/{name}/config" for name, _n, _i in BUTTONS]
             + [f"{HA_PREFIX}/number/{node}/volume/config", f"{HA_PREFIX}/select/{node}/favorite/config",
-               f"{HA_PREFIX}/text/{node}/play/config"])
+               f"{HA_PREFIX}/text/{node}/play/config", f"{HA_PREFIX}/switch/{node}/tv_mode/config"])
 
 
 def discovery(node: str, prefix: str, device: dict[str, Any],
@@ -139,4 +150,9 @@ def discovery(node: str, prefix: str, device: dict[str, Any],
     out.append((topics[6], dict(common, name="Play channel", unique_id=f"{node}_play",
                                 icon="mdi:television-classic", command_topic=command_topic(prefix, "play"),
                                 min=1, max=MAX_TEXT, mode="text")))
+    out.append((topics[7], dict(common, name="TV mode", unique_id=f"{node}_tv_mode",
+                                icon="mdi:television-play", command_topic=command_topic(prefix, "tv"),
+                                state_topic=state, payload_on="ON", payload_off="OFF",
+                                state_on="ON", state_off="OFF",
+                                value_template="{{ 'ON' if value_json.tv_mode | default(false) else 'OFF' }}")))
     return out

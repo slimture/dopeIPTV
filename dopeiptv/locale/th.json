@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "รวมเทเลเท็กซ์ด้วย: จะเลือกหน้าคำบรรยายในภาษานี้ (888…)",
   "rec_mp4_keep_subs": "เก็บเทเลเท็กซ์และคำบรรยาย",
   "rec_mp4_keep_subs_hint": "การบันทึกที่มีเทเลเท็กซ์หรือคำบรรยาย DVB จะคงเป็น .ts เพราะ MP4 เก็บสิ่งเหล่านี้ไม่ได้",
-  "rec_mp4_kept_subs": "เก็บไว้เป็น .ts เพื่อเทเลเท็กซ์และคำบรรยาย"
+  "rec_mp4_kept_subs": "เก็บไว้เป็น .ts เพื่อเทเลเท็กซ์และคำบรรยาย",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "ขึ้น",
+  "phone_tv_down": "ลง",
+  "phone_tv_left": "ซ้าย",
+  "phone_tv_right": "ขวา",
+  "phone_tv_vol_up": "เพิ่มเสียง",
+  "phone_tv_vol_down": "ลดเสียง",
+  "phone_tv_digits": "ปุ่มตัวเลข",
+  "phone_tv_touchpad": "ทัชแพด",
+  "phone_tv_touch_hint": "ปัดเพื่อเลื่อน · แตะเพื่อ OK · กดค้างเพื่อย้อนกลับ"
 }

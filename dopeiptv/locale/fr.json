@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "Le télétexte aussi : la page de sous-titres dans cette langue est choisie (888…).",
   "rec_mp4_keep_subs": "Garder le télétexte et les sous-titres",
   "rec_mp4_keep_subs_hint": "Un enregistrement avec du télétexte ou des sous-titres DVB reste en .ts – un MP4 ne peut pas les contenir.",
-  "rec_mp4_kept_subs": "conservé en .ts pour son télétexte et ses sous-titres"
+  "rec_mp4_kept_subs": "conservé en .ts pour son télétexte et ses sous-titres",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "Haut",
+  "phone_tv_down": "Bas",
+  "phone_tv_left": "Gauche",
+  "phone_tv_right": "Droite",
+  "phone_tv_vol_up": "Monter le volume",
+  "phone_tv_vol_down": "Baisser le volume",
+  "phone_tv_digits": "Touches numériques",
+  "phone_tv_touchpad": "Pavé tactile",
+  "phone_tv_touch_hint": "Glissez pour vous déplacer · touchez pour OK · maintenez pour Retour"
 }

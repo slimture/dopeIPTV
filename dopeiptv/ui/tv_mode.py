@@ -625,7 +625,9 @@ class TvPage(QWidget):
 
     # -- layout ------------------------------------------------------------------------
 
-    def legend_labels(self) -> dict[str, str]:
+    @staticmethod
+    def legend_labels() -> dict[str, str]:
+        """What each colour key does (the phone remote's page says it too)."""
         return {"red": tr("tv_key_fav"), "green": tr("nav_guide"),
                 "yellow": tr("tv_search"), "blue": tr("tv_options")}
 

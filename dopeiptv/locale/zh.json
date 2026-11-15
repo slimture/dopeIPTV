@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "也包括图文电视：会选择该语言的字幕页面（888…）。",
   "rec_mp4_keep_subs": "保留图文电视和字幕",
   "rec_mp4_keep_subs_hint": "带图文电视或 DVB 字幕的录制会保留为 .ts——MP4 无法容纳它们。",
-  "rec_mp4_kept_subs": "因图文电视和字幕保留为 .ts"
+  "rec_mp4_kept_subs": "因图文电视和字幕保留为 .ts",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "上",
+  "phone_tv_down": "下",
+  "phone_tv_left": "左",
+  "phone_tv_right": "右",
+  "phone_tv_vol_up": "调高音量",
+  "phone_tv_vol_down": "调低音量",
+  "phone_tv_digits": "数字键",
+  "phone_tv_touchpad": "触控板",
+  "phone_tv_touch_hint": "滑动以移动 · 轻点为 OK · 长按为返回"
 }

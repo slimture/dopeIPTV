@@ -14,6 +14,9 @@ TV mode (ui/mw_tv.py) is run by actions - "up", "ok", "back", "ch_up",
 - LIRC, through lircd's socket (/run/lirc/lircd), its key names
   (KEY_UP, KEY_OK, KEY_BACK, ...) mapped as the kernel's.
 
+The same actions come from the phone remote, the remote API and Home
+Assistant (``switch_mode``, ``remote_action`` read what they ask).
+
 Each source is optional and says nothing when it is not there. A reader
 runs on a thread of its own and hands each action to a callback, from
 that thread: the window takes it over to its own (a queued signal).
@@ -55,6 +58,31 @@ def digit(action: str) -> int | None:
     if action.startswith("digit_") and action[6:].isdecimal():
         return int(action[6:])
     return None
+
+
+# -- asked from elsewhere: the phone remote, the remote API, Home Assistant -------
+
+_SWITCH = {"on": "on", "true": "on", "1": "on", "off": "off", "false": "off", "0": "off",
+           "toggle": "toggle"}
+
+
+def switch_mode(value: Any) -> str | None:
+    """"on", "off" or "toggle" of a request to turn TV mode on or off
+    (Home Assistant's ON/OFF, true/false, 1/0), else None."""
+    if isinstance(value, bool):
+        return "on" if value else "off"
+    if not isinstance(value, str):
+        return None
+    return _SWITCH.get(value.strip().lower())
+
+
+def remote_action(value: Any) -> str | None:
+    """A key asked from elsewhere as one of TV mode's actions ("up",
+    "digit_5"), else None."""
+    if not isinstance(value, str):
+        return None
+    action = value.strip().lower()
+    return action if action in ALL else None
 
 
 # -- LIRC ---------------------------------------------------------------------

@@ -1,7 +1,8 @@
 """A small HTTP server in the app (Nerd > Remote and sharing): the remote
-API - what is playing, play, pause, volume, the next channel - and, when
-sharing is on, the user's channels as one playlist and one guide for other
-players on the network.
+API - what is playing, play, pause, volume, the next channel, TV mode on
+or off and its keys (``/api/tv`` {"mode": "on"}, ``/api/tv_key``
+{"action": "up"}) - and, when sharing is on, the user's channels as one
+playlist and one guide for other players on the network.
 
 Off unless the user turns it on. It listens on this computer only unless
 they choose the home network, and every request carries the token
@@ -45,7 +46,7 @@ READ = {"/api/status": "status", "/api/channels": "channels", "/api/sources": "s
 WRITE = {"/api/play": "play", "/api/pause": "pause", "/api/resume": "resume",
          "/api/toggle": "playpause", "/api/stop": "stop", "/api/next": "next",
          "/api/previous": "previous", "/api/volume": "volume", "/api/seek": "seek",
-         "/api/raise": "raise"}
+         "/api/raise": "raise", "/api/tv": "tv", "/api/tv_key": "tv_key"}
 SHARE = ("/playlist.m3u", "/guide.xml", "/guide.xml.gz")
 CALENDAR = "/calendar.ics"
 
@@ -365,6 +366,10 @@ def check_server(host: str, port: int, token: str, remote: bool, sharing: bool,
                      f"{addresses[-1]}/api/play")
         lines.append(f'  curl -X POST -H "Authorization: Bearer <token>" -d \'{{"number": 12}}\' '
                      f"{addresses[-1]}/api/play")
+        lines.append(f'  curl -X POST -H "Authorization: Bearer <token>" -d \'{{"mode": "toggle"}}\' '
+                     f"{addresses[-1]}/api/tv")
+        lines.append(f'  curl -X POST -H "Authorization: Bearer <token>" -d \'{{"action": "down"}}\' '
+                     f"{addresses[-1]}/api/tv_key")
         lines.append("")
         lines.append("Reminders and scheduled recordings, for a calendar to subscribe to:")
         lines.append(f"  {addresses[-1]}{CALENDAR}?token=<token>")

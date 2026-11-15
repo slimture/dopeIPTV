@@ -87,10 +87,11 @@ dopeiptv/
                        a thread per receiver; it only watches)
     mqtt.py            A small MQTT 3.1.1 client (standard library only)
     mqtt_control.py    Nerd: Home Assistant's commands over MQTT (topics,
-                       parsing, the controls' discovery)
+                       parsing, the controls' discovery, TV mode's switch)
     phone_remote.py    The phone remote's server (home network, token in the
                        address, rate limit and lock-out, nothing else)
-    phone_page.py      The phone remote's page (HTML/CSS/JS, nothing fetched)
+    phone_page.py      The phone remote's page (HTML/CSS/JS, nothing fetched;
+                       a remote with a touchpad while TV mode is on)
     qr.py              QR code encoder (byte mode, level M, versions 1-40)
     ical.py            Reminders and recordings as iCalendar (RFC 5545)
     shortcut_keys.py   Keyboard shortcuts: the actions, the app's keys, the
@@ -184,6 +185,8 @@ dopeiptv/
     mw_reminders.py    Programme-reminder UI (set / list / fire)
     mw_calendar.py     Reminders and recordings as a calendar (file, served)
     mw_phone.py        The phone remote: on/off, its requests on the window's thread
+                       (TV mode's through mw_tv.tv_command, as the remote API's
+                       and Home Assistant's)
     mw_series.py       Series recordings: "Record series…", the rules' check
     mw_mpris.py        The system's media controls (media_session host) +
                        media keys

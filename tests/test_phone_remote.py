@@ -287,9 +287,10 @@ def test_the_page_is_whole_in_itself_and_its_policy_allows_only_it():
 
 def test_the_page_asks_only_its_own_server():
     script = phone_page._JS
-    asked = set(re.findall(r'"(api/[a-z]+|logo/)"', script))
+    asked = set(re.findall(r'"(api/[a-z_]+|logo/)"', script))
     assert asked == {"api/state", "api/channels", "api/play", "api/toggle", "api/stop", "api/next",
-                     "api/previous", "api/mute", "api/volume", "logo/"}
+                     "api/previous", "api/mute", "api/volume", "api/tv", "api/tv_key", "api/touch",
+                     "logo/"}
     assert {a[4:] for a in asked if a.startswith("api/")} <= phone_remote.READ | phone_remote.WRITE
 
 
@@ -422,6 +423,25 @@ if w.player is not None:
     code, st = ask(port, "GET", base + "/api/state")
     assert st["muted"] is True
     ask(port, "POST", base + "/api/mute")
+
+# TV mode from the phone: the state says it; its keys go TV mode's own way in.
+keys = []
+w._tv_input = keys.append
+assert ask(port, "GET", base + "/api/state")[1]["tv_mode"] is False
+n_played, n_media = len(played), len(media)
+for a in ("up", "ok", "left", "red", "digit_5", "back", "menu"):        # off: playback left alone
+    assert ask(port, "POST", base + "/api/tv_key", {"action": a}) == (200, {"ok": False, "tv_mode": False}), a
+assert (len(played), len(media), keys) == (n_played, n_media, [])
+code, out = ask(port, "POST", base + "/api/tv", {"mode": "on"})
+assert out == {"ok": True, "tv_mode": True} and w._tv_on, out
+assert ask(port, "GET", base + "/api/state")[1]["tv_mode"] is True
+ask(port, "POST", base + "/api/tv_key", {"action": "down"})
+ask(port, "POST", base + "/api/touch", {"dx": 0, "dy": 0, "ms": 60})
+assert keys == ["down", "ok"], keys
+assert ask(port, "POST", base + "/api/tv_key", {"action": "reboot"})[0] == 400
+code, out = ask(port, "POST", base + "/api/tv", {"mode": "toggle"})
+assert out["tv_mode"] is False and not w._tv_on
+del w._tv_input
 
 # The calendar, for a calendar app on the network.
 w.rec.add_job("http://127.0.0.1:9/x.ts", "Film", time.time() + 3600, time.time() + 7200, channel="SVT2")

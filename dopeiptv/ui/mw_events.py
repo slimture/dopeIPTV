@@ -8,8 +8,10 @@ on the window's thread than put a small message on a queue.
 With MQTT's "Take commands" on, it also carries out what Home Assistant
 asks (core/mqtt_control.py): the broker's thread hands each command over a
 queued signal, and it is done here, on the window's thread - the same
-controls as the media keys and the remote API. What goes back is the
-state as ever: while viewing privately, what happened, not what."""
+controls as the media keys and the remote API, TV mode's switch and keys
+through mw_tv's tv_command as the phone's. What goes back is the state as
+ever (TV mode on or off in it): while viewing privately, what happened, not
+what."""
 
 from __future__ import annotations
 
@@ -56,6 +58,7 @@ class _EventsMixin:
             bridge = self._events_cmd
             d.on_command = bridge.got.emit
             self._events_volume_now(publish=False)
+            d.tv_mode = bool(getattr(self, "_tv_on", False))
             self._events_favorites()
             d.configure(cfg)
             if self._events_rec is None:
@@ -92,8 +95,19 @@ class _EventsMixin:
             elif name == "play":
                 text = str(value).strip()
                 self.handle_command({"number": int(text)} if text.isdigit() else {"channel": text})
+            elif name in ("tv", "tv_key"):
+                self.tv_command(name, value)
         except Exception:
             log.debug("events: a command", exc_info=True)
+
+    def _events_tv_mode(self) -> None:
+        """TV mode on or off (mw_tv): Home Assistant's switch follows."""
+        d = self._events
+        if d is not None:
+            try:
+                d.set_tv_mode(bool(getattr(self, "_tv_on", False)))
+            except Exception:
+                log.debug("events: tv mode", exc_info=True)
 
     def _events_favorites(self) -> None:
         """The favourite channels Home Assistant's list offers, again."""

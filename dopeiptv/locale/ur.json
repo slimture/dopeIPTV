@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "ٹیلی ٹیکسٹ بھی: اس زبان کا سب ٹائٹل صفحہ چنا جاتا ہے (888…)۔",
   "rec_mp4_keep_subs": "ٹیلی ٹیکسٹ اور سب ٹائٹلز رکھیں",
   "rec_mp4_keep_subs_hint": "ٹیلی ٹیکسٹ یا DVB سب ٹائٹلز والی ریکارڈنگ ‎.ts ہی رہتی ہے – MP4 انہیں نہیں رکھ سکتا۔",
-  "rec_mp4_kept_subs": "ٹیلی ٹیکسٹ اور سب ٹائٹلز کی وجہ سے ‎.ts کے طور پر رکھی گئی"
+  "rec_mp4_kept_subs": "ٹیلی ٹیکسٹ اور سب ٹائٹلز کی وجہ سے ‎.ts کے طور پر رکھی گئی",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "اوپر",
+  "phone_tv_down": "نیچے",
+  "phone_tv_left": "بائیں",
+  "phone_tv_right": "دائیں",
+  "phone_tv_vol_up": "آواز بڑھائیں",
+  "phone_tv_vol_down": "آواز کم کریں",
+  "phone_tv_digits": "نمبر کیز",
+  "phone_tv_touchpad": "ٹچ پیڈ",
+  "phone_tv_touch_hint": "حرکت کے لیے سوائپ کریں · OK کے لیے ٹیپ کریں · واپس کے لیے دبائے رکھیں"
 }

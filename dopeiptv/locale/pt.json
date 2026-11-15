@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "Teletexto também: a página de legendas neste idioma é escolhida (888…).",
   "rec_mp4_keep_subs": "Manter teletexto e legendas",
   "rec_mp4_keep_subs_hint": "Uma gravação com teletexto ou legendas DVB continua em .ts – um MP4 não consegue levá-los.",
-  "rec_mp4_kept_subs": "mantida como .ts por causa do teletexto e das legendas"
+  "rec_mp4_kept_subs": "mantida como .ts por causa do teletexto e das legendas",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "Para cima",
+  "phone_tv_down": "Para baixo",
+  "phone_tv_left": "Para a esquerda",
+  "phone_tv_right": "Para a direita",
+  "phone_tv_vol_up": "Aumentar volume",
+  "phone_tv_vol_down": "Diminuir volume",
+  "phone_tv_digits": "Teclado numérico",
+  "phone_tv_touchpad": "Touchpad",
+  "phone_tv_touch_hint": "Deslize para mover · toque para OK · segure para Voltar"
 }

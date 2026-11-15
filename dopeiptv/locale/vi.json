@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "Cả teletext: trang phụ đề bằng ngôn ngữ này sẽ được chọn (888…).",
   "rec_mp4_keep_subs": "Giữ teletext và phụ đề",
   "rec_mp4_keep_subs_hint": "Bản ghi có teletext hoặc phụ đề DVB sẽ giữ dạng .ts – MP4 không chứa được chúng.",
-  "rec_mp4_kept_subs": "giữ dạng .ts vì có teletext và phụ đề"
+  "rec_mp4_kept_subs": "giữ dạng .ts vì có teletext và phụ đề",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "Lên",
+  "phone_tv_down": "Xuống",
+  "phone_tv_left": "Trái",
+  "phone_tv_right": "Phải",
+  "phone_tv_vol_up": "Tăng âm lượng",
+  "phone_tv_vol_down": "Giảm âm lượng",
+  "phone_tv_digits": "Phím số",
+  "phone_tv_touchpad": "Bàn cảm ứng",
+  "phone_tv_touch_hint": "Vuốt để di chuyển · chạm để OK · giữ để Quay lại"
 }

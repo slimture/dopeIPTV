@@ -34,11 +34,12 @@ away. With Home Assistant discovery on, two sensors appear by themselves.
 
 With "Take commands" on, the app also listens on ``<prefix>/command/+``
 (core/mqtt_control.py): play/pause, stop, channel up and down, volume, a
-favourite channel, a channel by name or number - and with discovery, Home
-Assistant shows them as buttons, a slider, a list and a text box. While
-the connection is idle the broker's thread waits on its socket as well as
-its queue, so a command is heard at once; the window carries it out on its
-own thread (Dispatcher.on_command hands it over).
+favourite channel, a channel by name or number, TV mode on or off and its
+keys - and with discovery, Home Assistant shows them as buttons, a slider,
+a list, a text box and a switch. While the connection is idle the broker's
+thread waits on its socket as well as its queue, so a command is heard at
+once; the window carries it out on its own thread (Dispatcher.on_command
+hands it over).
 
 The connection to the broker is kept open: the last will needs one, so a
 crash or a power cut does not leave "playing" behind for ever; no handshake
@@ -763,6 +764,7 @@ class Dispatcher:
         self.on_command: Callable[[str, Any], None] | None = None
         self.options: tuple[str, ...] = ()
         self.volume: int | None = None
+        self.tv_mode: bool | None = None
         self._last: tuple[str, dict[str, Any] | None, bool] = ("idle", None, False)
 
     @property
@@ -819,6 +821,8 @@ class Dispatcher:
         self.state = state_payload(state, fields, private, now)
         if self.volume is not None and state != "off":
             self.state["volume"] = self.volume
+        if self.tv_mode is not None and state != "off":
+            self.state["tv_mode"] = self.tv_mode
         for s in self.sinks:
             if isinstance(s, MqttSink):
                 s.put("state", self.state)
@@ -830,6 +834,16 @@ class Dispatcher:
         if volume == self.volume:
             return
         self.volume = volume
+        if self.active:
+            self.set_state(*self._last)
+
+    def set_tv_mode(self, on: bool) -> None:
+        """TV mode on or off, in the state from now on (Home Assistant's
+        switch) - sent again at once when it changed."""
+        on = bool(on)
+        if on == self.tv_mode:
+            return
+        self.tv_mode = on
         if self.active:
             self.set_state(*self._last)
 
@@ -994,7 +1008,8 @@ def check_mqtt(cfg: Config, wait_s: float = 3.0) -> Check:
         if cfg.commands:
             topics += [f"  {cfg.prefix}/command/<command>  what the app is asked (not retained):",
                        "      playpause, stop, channel_up, channel_down (any payload),",
-                       "      volume (0-100), favorite (a favourite's name), play (a channel's name or number)"]
+                       "      volume (0-100), favorite (a favourite's name), play (a channel's name or number),",
+                       "      tv (ON, OFF or TOGGLE: TV mode), tv_key (one of TV mode's keys: up, ok, back, red, digit_5, ...)"]
         if cfg.ha:
             topics += [f"  {t}" for t, _c in ha_discovery(cfg)]
             if cfg.commands:

@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "Teletekst de: bu dildeki altyazı sayfası seçilir (888…).",
   "rec_mp4_keep_subs": "Teletekst ve altyazıları koru",
   "rec_mp4_keep_subs_hint": "Teletekst ya da DVB altyazısı olan bir kayıt .ts olarak kalır – MP4 bunları taşıyamaz.",
-  "rec_mp4_kept_subs": "teletekst ve altyazıları için .ts olarak tutuldu"
+  "rec_mp4_kept_subs": "teletekst ve altyazıları için .ts olarak tutuldu",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "Yukarı",
+  "phone_tv_down": "Aşağı",
+  "phone_tv_left": "Sol",
+  "phone_tv_right": "Sağ",
+  "phone_tv_vol_up": "Sesi aç",
+  "phone_tv_vol_down": "Sesi kıs",
+  "phone_tv_digits": "Rakam tuşları",
+  "phone_tv_touchpad": "Dokunmatik yüzey",
+  "phone_tv_touch_hint": "Hareket için kaydır · OK için dokun · Geri için basılı tut"
 }

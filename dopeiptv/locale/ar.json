@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "والنص المتلفز أيضًا: تُختار صفحة الترجمة بهذه اللغة (888…).",
   "rec_mp4_keep_subs": "الاحتفاظ بالنص المتلفز والترجمات",
   "rec_mp4_keep_subs_hint": "التسجيل الذي فيه نص متلفز أو ترجمات DVB يبقى بصيغة ‎.ts – لا يستطيع MP4 حملها.",
-  "rec_mp4_kept_subs": "بقي بصيغة ‎.ts من أجل النص المتلفز والترجمات"
+  "rec_mp4_kept_subs": "بقي بصيغة ‎.ts من أجل النص المتلفز والترجمات",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "أعلى",
+  "phone_tv_down": "أسفل",
+  "phone_tv_left": "يسار",
+  "phone_tv_right": "يمين",
+  "phone_tv_vol_up": "رفع الصوت",
+  "phone_tv_vol_down": "خفض الصوت",
+  "phone_tv_digits": "أزرار الأرقام",
+  "phone_tv_touchpad": "لوحة اللمس",
+  "phone_tv_touch_hint": "اسحب للتنقل · انقر لـ OK · اضغط مطولًا للرجوع"
 }

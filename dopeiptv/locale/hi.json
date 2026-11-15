@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "टेलीटेक्स्ट भी: इस भाषा का उपशीर्षक पेज चुना जाता है (888…)।",
   "rec_mp4_keep_subs": "टेलीटेक्स्ट और उपशीर्षक रखें",
   "rec_mp4_keep_subs_hint": "टेलीटेक्स्ट या DVB उपशीर्षक वाली रिकॉर्डिंग .ts ही रहती है – MP4 इन्हें नहीं रख सकता।",
-  "rec_mp4_kept_subs": "टेलीटेक्स्ट और उपशीर्षक के कारण .ts के रूप में रखी गई"
+  "rec_mp4_kept_subs": "टेलीटेक्स्ट और उपशीर्षक के कारण .ts के रूप में रखी गई",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "ऊपर",
+  "phone_tv_down": "नीचे",
+  "phone_tv_left": "बाएँ",
+  "phone_tv_right": "दाएँ",
+  "phone_tv_vol_up": "आवाज़ बढ़ाएँ",
+  "phone_tv_vol_down": "आवाज़ घटाएँ",
+  "phone_tv_digits": "नंबर कुंजियाँ",
+  "phone_tv_touchpad": "टचपैड",
+  "phone_tv_touch_hint": "हिलाने के लिए स्वाइप करें · OK के लिए टैप करें · वापस के लिए दबाकर रखें"
 }

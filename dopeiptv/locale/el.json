@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "Και το teletext: επιλέγεται η σελίδα υποτίτλων σε αυτή τη γλώσσα (777…).",
   "rec_mp4_keep_subs": "Διατήρηση teletext και υποτίτλων",
   "rec_mp4_keep_subs_hint": "Μια εγγραφή με teletext ή υπότιτλους DVB μένει .ts – ένα MP4 δεν μπορεί να τα περιέχει.",
-  "rec_mp4_kept_subs": "κρατήθηκε ως .ts για το teletext και τους υπότιτλους"
+  "rec_mp4_kept_subs": "κρατήθηκε ως .ts για το teletext και τους υπότιτλους",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "Πάνω",
+  "phone_tv_down": "Κάτω",
+  "phone_tv_left": "Αριστερά",
+  "phone_tv_right": "Δεξιά",
+  "phone_tv_vol_up": "Αύξηση έντασης",
+  "phone_tv_vol_down": "Μείωση έντασης",
+  "phone_tv_digits": "Αριθμητικά πλήκτρα",
+  "phone_tv_touchpad": "Επιφάνεια αφής",
+  "phone_tv_touch_hint": "Σύρε για μετακίνηση · πάτα για OK · κράτα για Πίσω"
 }

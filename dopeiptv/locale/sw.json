@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "Teletext pia: ukurasa wa manukuu katika lugha hii huchaguliwa (888…).",
   "rec_mp4_keep_subs": "Hifadhi teletext na manukuu",
   "rec_mp4_keep_subs_hint": "Rekodi yenye teletext au manukuu ya DVB hubaki kama .ts – MP4 haiwezi kuyabeba.",
-  "rec_mp4_kept_subs": "imebaki kama .ts kwa ajili ya teletext na manukuu yake"
+  "rec_mp4_kept_subs": "imebaki kama .ts kwa ajili ya teletext na manukuu yake",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "Juu",
+  "phone_tv_down": "Chini",
+  "phone_tv_left": "Kushoto",
+  "phone_tv_right": "Kulia",
+  "phone_tv_vol_up": "Ongeza sauti",
+  "phone_tv_vol_down": "Punguza sauti",
+  "phone_tv_digits": "Vitufe vya namba",
+  "phone_tv_touchpad": "Kibao cha kugusa",
+  "phone_tv_touch_hint": "Telezesha ili kusogea · gusa kwa OK · shikilia kwa Rudi"
 }

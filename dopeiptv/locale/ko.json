@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "텔레텍스트도 포함: 이 언어의 자막 페이지가 선택됩니다(888…).",
   "rec_mp4_keep_subs": "텔레텍스트와 자막 유지",
   "rec_mp4_keep_subs_hint": "텔레텍스트나 DVB 자막이 있는 녹화는 .ts로 남습니다. MP4에는 담을 수 없습니다.",
-  "rec_mp4_kept_subs": "텔레텍스트와 자막 때문에 .ts로 유지됨"
+  "rec_mp4_kept_subs": "텔레텍스트와 자막 때문에 .ts로 유지됨",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "위",
+  "phone_tv_down": "아래",
+  "phone_tv_left": "왼쪽",
+  "phone_tv_right": "오른쪽",
+  "phone_tv_vol_up": "볼륨 높이기",
+  "phone_tv_vol_down": "볼륨 낮추기",
+  "phone_tv_digits": "숫자 키",
+  "phone_tv_touchpad": "터치패드",
+  "phone_tv_touch_hint": "스와이프로 이동 · 탭하면 OK · 길게 누르면 뒤로"
 }

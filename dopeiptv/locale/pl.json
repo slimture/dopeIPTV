@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "Telegazeta też: wybierana jest strona z napisami w tym języku (777…).",
   "rec_mp4_keep_subs": "Zachowaj telegazetę i napisy",
   "rec_mp4_keep_subs_hint": "Nagranie z telegazetą lub napisami DVB zostaje plikiem .ts – MP4 nie może ich zawierać.",
-  "rec_mp4_kept_subs": "zachowano jako .ts ze względu na telegazetę i napisy"
+  "rec_mp4_kept_subs": "zachowano jako .ts ze względu na telegazetę i napisy",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "W górę",
+  "phone_tv_down": "W dół",
+  "phone_tv_left": "W lewo",
+  "phone_tv_right": "W prawo",
+  "phone_tv_vol_up": "Głośniej",
+  "phone_tv_vol_down": "Ciszej",
+  "phone_tv_digits": "Klawisze numeryczne",
+  "phone_tv_touchpad": "Touchpad",
+  "phone_tv_touch_hint": "Przesuń palcem: ruch · stuknij: OK · przytrzymaj: Wstecz"
 }

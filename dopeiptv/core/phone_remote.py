@@ -1,7 +1,9 @@
 """The phone as a remote control: a small HTTP server on the home network
 that serves one page - the remote (core/phone_page.py) - and the little it
-asks for: what plays, the channels, the commands, a channel's logo from the
-app's own cache and the calendar (core/ical.py).
+asks for: what plays, the channels, the commands, TV mode on or off and its
+keys, a channel's logo from the app's own cache and the calendar
+(core/ical.py). The touchpad's gestures are read here (``gesture``): a
+swipe is an arrow, a tap OK, a long press Back.
 
 Off until the person turns it on ("Phone remote…"). Every address starts
 with a long random token, /<token>/, which is what the code on the screen
@@ -37,7 +39,15 @@ REQUEST_TIMEOUT = 15
 LOGO_MAX = 512 * 1024
 
 READ = frozenset({"state", "channels"})
-WRITE = frozenset({"play", "toggle", "stop", "next", "previous", "volume", "mute"})
+WRITE = frozenset({"play", "toggle", "stop", "next", "previous", "volume", "mute",
+                   "tv", "tv_key", "touch"})
+
+#: The touchpad, in CSS pixels and milliseconds: a swipe moves this far at
+#: least (the larger axis gives its direction), a tap no more than
+#: TAP_SLOP, and a press held HOLD_MS is Back.
+SWIPE_MIN = 40
+TAP_SLOP = 12
+HOLD_MS = 550
 
 #: What every answer says: never cached, never framed, never sniffed, and
 #: no address of ours handed on as a referrer.
@@ -66,6 +76,21 @@ def image_type(data: bytes) -> str | None:
             return ctype
     if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
         return "image/webp"
+    return None
+
+
+def gesture(dx: float, dy: float, ms: float) -> str | None:
+    """The TV key of one touch on the touchpad - from where the finger went
+    down to where it came up (*dx*, *dy*) in *ms*: an arrow, OK, Back, or
+    None for one that is neither a swipe nor a tap."""
+    ax, ay = abs(dx), abs(dy)
+    far = max(ax, ay)
+    if far >= SWIPE_MIN:
+        if ax > ay:
+            return "right" if dx > 0 else "left"
+        return "down" if dy > 0 else "up"
+    if far <= TAP_SLOP:
+        return "back" if ms >= HOLD_MS else "ok"
     return None
 
 
@@ -276,6 +301,17 @@ def _make_handler(server: PhoneServer) -> type[BaseHTTPRequestHandler]:
             if params is None:
                 self._json(400, {"error": "the body is not a JSON object"})
                 return
+            if action == "touch":
+                try:
+                    key = gesture(float(params.get("dx", 0)), float(params.get("dy", 0)),
+                                  float(params.get("ms", 0)))
+                except (TypeError, ValueError):
+                    self._json(400, {"error": '"dx", "dy" and "ms" are numbers'})
+                    return
+                if key is None:
+                    self._json(200, {"ok": False})
+                    return
+                action, params = "tv_key", {"action": key}
             result = server.call(action, params)
             self._json(200, result if isinstance(result, dict) else {"ok": True})
 

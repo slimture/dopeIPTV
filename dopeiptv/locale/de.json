@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "Auch Videotext: Die Untertitelseite in dieser Sprache wird gewählt (150, 777…).",
   "rec_mp4_keep_subs": "Videotext und Untertitel behalten",
   "rec_mp4_keep_subs_hint": "Eine Aufnahme mit Videotext oder DVB-Untertiteln bleibt eine .ts – eine MP4 kann sie nicht aufnehmen.",
-  "rec_mp4_kept_subs": "als .ts behalten wegen Videotext und Untertiteln"
+  "rec_mp4_kept_subs": "als .ts behalten wegen Videotext und Untertiteln",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "Nach oben",
+  "phone_tv_down": "Nach unten",
+  "phone_tv_left": "Nach links",
+  "phone_tv_right": "Nach rechts",
+  "phone_tv_vol_up": "Lauter",
+  "phone_tv_vol_down": "Leiser",
+  "phone_tv_digits": "Zifferntasten",
+  "phone_tv_touchpad": "Touchpad",
+  "phone_tv_touch_hint": "Wischen zum Bewegen · Tippen für OK · Halten für Zurück"
 }

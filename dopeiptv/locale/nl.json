@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "Ook teletekst: de ondertitelpagina in deze taal wordt gekozen (888…).",
   "rec_mp4_keep_subs": "Teletekst en ondertitels bewaren",
   "rec_mp4_keep_subs_hint": "Een opname met teletekst of DVB-ondertitels blijft een .ts – een MP4 kan ze niet bevatten.",
-  "rec_mp4_kept_subs": "bewaard als .ts vanwege teletekst en ondertitels"
+  "rec_mp4_kept_subs": "bewaard als .ts vanwege teletekst en ondertitels",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "Omhoog",
+  "phone_tv_down": "Omlaag",
+  "phone_tv_left": "Links",
+  "phone_tv_right": "Rechts",
+  "phone_tv_vol_up": "Harder",
+  "phone_tv_vol_down": "Zachter",
+  "phone_tv_digits": "Cijfertoetsen",
+  "phone_tv_touchpad": "Touchpad",
+  "phone_tv_touch_hint": "Veeg om te bewegen · tik voor OK · houd vast voor Terug"
 }

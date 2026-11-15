@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "Teleteks juga: halaman subtitle dalam bahasa ini dipilih (888…).",
   "rec_mp4_keep_subs": "Simpan teleteks dan subtitle",
   "rec_mp4_keep_subs_hint": "Rekaman dengan teleteks atau subtitle DVB tetap berupa .ts – MP4 tidak bisa memuatnya.",
-  "rec_mp4_kept_subs": "tetap sebagai .ts karena teleteks dan subtitlenya"
+  "rec_mp4_kept_subs": "tetap sebagai .ts karena teleteks dan subtitlenya",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "Atas",
+  "phone_tv_down": "Bawah",
+  "phone_tv_left": "Kiri",
+  "phone_tv_right": "Kanan",
+  "phone_tv_vol_up": "Keraskan volume",
+  "phone_tv_vol_down": "Kecilkan volume",
+  "phone_tv_digits": "Tombol angka",
+  "phone_tv_touchpad": "Touchpad",
+  "phone_tv_touch_hint": "Geser untuk berpindah · ketuk untuk OK · tahan untuk Kembali"
 }

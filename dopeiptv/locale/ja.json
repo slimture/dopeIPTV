@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "文字放送も対象：この言語の字幕ページが選ばれます（199、333…）。",
   "rec_mp4_keep_subs": "文字放送と字幕を残す",
   "rec_mp4_keep_subs_hint": "文字放送や DVB 字幕のある録画は .ts のままにします。MP4 には入れられません。",
-  "rec_mp4_kept_subs": "文字放送と字幕のため .ts のまま保存"
+  "rec_mp4_kept_subs": "文字放送と字幕のため .ts のまま保存",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "上",
+  "phone_tv_down": "下",
+  "phone_tv_left": "左",
+  "phone_tv_right": "右",
+  "phone_tv_vol_up": "音量を上げる",
+  "phone_tv_vol_down": "音量を下げる",
+  "phone_tv_digits": "数字キー",
+  "phone_tv_touchpad": "タッチパッド",
+  "phone_tv_touch_hint": "スワイプで移動 · タップで OK · 長押しで戻る"
 }

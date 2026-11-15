@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "גם טלטקסט: נבחר עמוד הכתוביות בשפה הזו (888…).",
   "rec_mp4_keep_subs": "שמירת טלטקסט וכתוביות",
   "rec_mp4_keep_subs_hint": "הקלטה עם טלטקסט או כתוביות DVB נשארת ‎.ts – קובץ MP4 לא יכול להכיל אותם.",
-  "rec_mp4_kept_subs": "נשמר כ-‎.ts בגלל הטלטקסט והכתוביות"
+  "rec_mp4_kept_subs": "נשמר כ-‎.ts בגלל הטלטקסט והכתוביות",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "למעלה",
+  "phone_tv_down": "למטה",
+  "phone_tv_left": "שמאלה",
+  "phone_tv_right": "ימינה",
+  "phone_tv_vol_up": "הגברת עוצמה",
+  "phone_tv_vol_down": "הנמכת עוצמה",
+  "phone_tv_digits": "מקשי מספרים",
+  "phone_tv_touchpad": "משטח מגע",
+  "phone_tv_touch_hint": "החלק כדי לזוז · הקש ל-OK · החזק לחזרה"
 }

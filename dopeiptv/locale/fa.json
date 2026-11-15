@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "تله‌تکست هم: صفحهٔ زیرنویس به این زبان انتخاب می‌شود (888…).",
   "rec_mp4_keep_subs": "نگه‌داشتن تله‌تکست و زیرنویس",
   "rec_mp4_keep_subs_hint": "ضبطی که تله‌تکست یا زیرنویس DVB دارد ‎.ts می‌ماند – MP4 نمی‌تواند آن‌ها را نگه دارد.",
-  "rec_mp4_kept_subs": "به خاطر تله‌تکست و زیرنویس به صورت ‎.ts نگه داشته شد"
+  "rec_mp4_kept_subs": "به خاطر تله‌تکست و زیرنویس به صورت ‎.ts نگه داشته شد",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "بالا",
+  "phone_tv_down": "پایین",
+  "phone_tv_left": "چپ",
+  "phone_tv_right": "راست",
+  "phone_tv_vol_up": "افزایش صدا",
+  "phone_tv_vol_down": "کاهش صدا",
+  "phone_tv_digits": "کلیدهای عددی",
+  "phone_tv_touchpad": "صفحهٔ لمسی",
+  "phone_tv_touch_hint": "برای جابه‌جایی بکشید · برای OK ضربه بزنید · برای بازگشت نگه دارید"
 }

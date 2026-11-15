@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "Text-TV också: undertextsidan på det här språket väljs (199, 333…).",
   "rec_mp4_keep_subs": "Behåll text-TV och undertexter",
   "rec_mp4_keep_subs_hint": "En inspelning med text-TV eller DVB-undertexter förblir en .ts – en MP4 kan inte bära dem.",
-  "rec_mp4_kept_subs": "behölls som .ts för sin text-TV och sina undertexter"
+  "rec_mp4_kept_subs": "behölls som .ts för sin text-TV och sina undertexter",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "Upp",
+  "phone_tv_down": "Ner",
+  "phone_tv_left": "Vänster",
+  "phone_tv_right": "Höger",
+  "phone_tv_vol_up": "Höj volymen",
+  "phone_tv_vol_down": "Sänk volymen",
+  "phone_tv_digits": "Sifferknappar",
+  "phone_tv_touchpad": "Pekyta",
+  "phone_tv_touch_hint": "Svep för att flytta · tryck för OK · håll inne för Tillbaka"
 }

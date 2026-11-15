@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "I teletekst: bira se strana sa titlovima na ovom jeziku (777…).",
   "rec_mp4_keep_subs": "Zadrži teletekst i titlove",
   "rec_mp4_keep_subs_hint": "Snimak sa teletekstom ili DVB titlovima ostaje .ts – MP4 ne može da ih nosi.",
-  "rec_mp4_kept_subs": "zadržano kao .ts zbog teleteksta i titlova"
+  "rec_mp4_kept_subs": "zadržano kao .ts zbog teleteksta i titlova",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "Gore",
+  "phone_tv_down": "Dole",
+  "phone_tv_left": "Levo",
+  "phone_tv_right": "Desno",
+  "phone_tv_vol_up": "Pojačaj",
+  "phone_tv_vol_down": "Utišaj",
+  "phone_tv_digits": "Numerički tasteri",
+  "phone_tv_touchpad": "Tačped",
+  "phone_tv_touch_hint": "Prevuci za pomeranje · dodirni za OK · drži za Nazad"
 }

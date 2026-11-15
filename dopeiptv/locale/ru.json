@@ -2556,5 +2556,15 @@
   "setting_sub_lang_ttx_hint": "И телетекст: выбирается страница субтитров на этом языке (888…).",
   "rec_mp4_keep_subs": "Сохранять телетекст и субтитры",
   "rec_mp4_keep_subs_hint": "Запись с телетекстом или субтитрами DVB остаётся в .ts — MP4 не может их хранить.",
-  "rec_mp4_kept_subs": "оставлено в .ts ради телетекста и субтитров"
+  "rec_mp4_kept_subs": "оставлено в .ts ради телетекста и субтитров",
+  "phone_tv_ok": "OK",
+  "phone_tv_up": "Вверх",
+  "phone_tv_down": "Вниз",
+  "phone_tv_left": "Влево",
+  "phone_tv_right": "Вправо",
+  "phone_tv_vol_up": "Громче",
+  "phone_tv_vol_down": "Тише",
+  "phone_tv_digits": "Цифровые кнопки",
+  "phone_tv_touchpad": "Сенсорная панель",
+  "phone_tv_touch_hint": "Проведите — перемещение · коснитесь — OK · удерживайте — Назад"
 }

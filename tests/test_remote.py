@@ -518,7 +518,8 @@ def wait(cond, n=500):
     return False
 
 code, status = ask("GET", "/api/status")
-assert code == 200 and status == {"state": "stopped", "volume": status["volume"], "source": "Main"}, status
+assert code == 200 and status == {"state": "stopped", "volume": status["volume"], "source": "Main",
+                                  "tv_mode": False}, status
 assert ask("GET", "/api/status", tok="nope")[0] == 401
 
 code, out = ask("GET", "/api/channels?q=tv4")
@@ -552,6 +553,21 @@ for path, name in (("/api/toggle", "playpause"), ("/api/pause", "pause"), ("/api
 # Twice in a row is two presses for a script (the media keys' guard is not in the way).
 n = len(media); ask("POST", "/api/toggle"); ask("POST", "/api/toggle")
 assert len(media) == n + 2
+
+# TV mode: on, a key, off - the window's one way in, as the phone's.
+keys = []
+w._tv_input = keys.append
+w._come_forward = lambda: None
+code, out = ask("POST", "/api/tv", {"mode": "on"})
+assert code == 200 and out == {"ok": True, "tv_mode": True} and w._tv_on, out
+assert ask("GET", "/api/status")[1]["tv_mode"] is True
+assert ask("POST", "/api/tv_key", {"action": "left"})[0] == 200 and keys == ["left"], keys
+assert ask("POST", "/api/tv_key", {"action": "reboot"})[0] == 400
+code, out = ask("POST", "/api/tv")
+assert out["tv_mode"] is False and not w._tv_on
+n = len(media)
+assert ask("POST", "/api/tv_key", {"action": "ok"})[1] == {"ok": False, "tv_mode": False}
+assert len(media) == n and keys == ["left"]
 
 code, raw = ask("GET", "/playlist.m3u")
 text = raw.decode()

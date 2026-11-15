@@ -295,6 +295,16 @@ assert until(lambda: len(played) > n and w._tv_watching)
 w._tv_input("back")
 assert until(lambda: not w._tv_watching)
 
+# The phone, the remote API and Home Assistant: the same way in (tv_command).
+page.show_screen("channels")
+page.set_focus(ch.chans)
+ch.chans.set_row(0)
+assert w.tv_command("tv_key", "down") == {"ok": True, "tv_mode": True}
+assert ch.chans.row() == 1
+assert w._phone_do("tv_key", {"action": "down"})["ok"] and ch.chans.row() == 2
+assert w._remote_do("tv_key", {"action": "up"})["ok"] and ch.chans.row() == 1
+assert w._phone_state()["tv_mode"] is True
+
 # A film from Movies plays; the red key makes a channel a favorite.
 page.show_screen("vod")
 page.set_focus(vod.grid)
@@ -330,6 +340,14 @@ assert w._center_stack.currentIndex() == 0
 ov = QKeyEvent(QEvent.Type.ShortcutOverride, Qt.Key.Key_Up, Qt.KeyboardModifier.NoModifier)
 QApplication.sendEvent(w, ov)
 assert not ov.isAccepted()
+# Off, TV mode's keys from the phone leave playback alone.
+n = len(played)
+for a in ("ok", "up", "left", "red", "digit_3", "back", "menu"):
+    assert w.tv_command("tv_key", a) == {"ok": False, "tv_mode": False}, a
+assert len(played) == n and not w._tv_on and w._phone_state()["tv_mode"] is False
+# On and off again from the phone.
+assert w.tv_command("tv", "toggle")["tv_mode"] and w._tv_on and w.isFullScreen()
+assert not w.tv_command("tv", "off")["tv_mode"] and not w._tv_on and w.menuBar().isVisible()
 print("TV_OK")
 os._exit(0)
 """
