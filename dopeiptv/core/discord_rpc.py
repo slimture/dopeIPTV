@@ -31,7 +31,7 @@ from .log import log
 
 #: dopeIPTV's application on discord.com/developers. Public, not a secret:
 #: it names the app whose status this is. While empty the switch is hidden.
-DISCORD_APP_ID = ""
+DISCORD_APP_ID = "1571563561124368434"
 #: The name of the picture uploaded under the application's Rich Presence
 #: art assets; Discord shows none when there is no asset by that name.
 LARGE_IMAGE = "dopeiptv"
