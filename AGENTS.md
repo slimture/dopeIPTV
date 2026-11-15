@@ -278,6 +278,27 @@ surface with hairlines between rows, and controls are filled, not
 outlined - don't add borders back, and don't drop the surface either: with
 neither, the rows ran together.
 
+**Where a setting goes - decide it before you write it.** Settings are
+grouped by what a person is doing: WATCH (Playback, Picture and sound,
+Guide, Multiview, Recording, Casting), CONTENT (Sources, Home, Local
+files, Posters and info), ACCOUNTS AND INTEGRATIONS (watch history -
+Trakt, Simkl -, Sync, Integrations), SYSTEM (General, Appearance, Parental
+lock, Advanced) and NERD (Status, Network, Boxes and lists, Player, Remote
+and automation, Diagnostics).
+
+- Put it where someone would look for it, not where the code that reads
+  it lives.
+- One setting, one place: another page that needs it links to it, never a
+  second copy.
+- A feature with a few settings gets a section on the page it belongs to,
+  not a page of its own; a new page only for a service of its own.
+- A source's own option goes in that source's page, marked as its own,
+  with the shared one shown as shared.
+- A Nerd-only option goes under NERD, and the everyday page it belongs
+  beside gets one link row to it ("4 Nerd settings for ... -> Nerd >
+  Player").
+- If no page fits, stop and ask rather than add a page or a stray row.
+
 **Add a theme**: a palette in `THEMES` (`ui/theme.py`) with every key the
 others have, `"light": True` for a light one and `"accent"` for its own
 accent colour, plus `theme_<key>` in `i18n.py` and every `locale/*.json`.
