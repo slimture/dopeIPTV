@@ -51,6 +51,9 @@ HOLD_MS = 550
 
 #: What every answer says: never cached, never framed, never sniffed, and
 #: no address of ours handed on as a referrer.
+#: What a phone's home screen asks for beside the page (core/phone_page.py).
+ASSETS = frozenset({"manifest.webmanifest", "icon-180.png", "icon-192.png",
+                    "icon-512.png", "icon-maskable-512.png"})
 SAFE_HEADERS = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
                 "Referrer-Policy": "no-referrer", "X-Frame-Options": "DENY",
                 "Cross-Origin-Resource-Policy": "same-origin"}
@@ -156,13 +159,16 @@ class RateLimiter:
 
 class PhoneServer:
     """The phone remote's server. *page* gives the page as (HTML bytes, its
-    Content-Security-Policy)."""
+    Content-Security-Policy); *asset(name)* the home-screen manifest and
+    icons as (bytes, content type), or None."""
 
     def __init__(self, port: int, token: str, call: Callable[[str, dict], Any],
                  page: Callable[[], tuple[bytes, str]], host: str = "0.0.0.0",
-                 limiter: RateLimiter | None = None) -> None:
+                 limiter: RateLimiter | None = None,
+                 asset: Callable[[str], tuple[bytes, str] | None] | None = None) -> None:
         self.host, self.port, self.token = host, int(port), token
         self.call, self.page = call, page
+        self.asset = asset
         self.limiter = limiter or RateLimiter()
         self._httpd: _Server | None = None
         self._thread: threading.Thread | None = None
@@ -268,6 +274,13 @@ def _make_handler(server: PhoneServer) -> type[BaseHTTPRequestHandler]:
                     self._api(rest[4:], method)
                 elif rest.startswith("logo/") and reading:
                     self._logo(unquote(rest[5:]))
+                elif rest in ASSETS and reading:
+                    got = server.asset(rest) if server.asset is not None else None
+                    if not got:
+                        self._json(404, {"error": "not found"})
+                    else:
+                        self._send(200, got[0], got[1],
+                                   {"Cache-Control": "private, max-age=86400"})
                 elif rest == "calendar.ics" and reading:
                     text = server.call("calendar", {})
                     self._send(200, str(text).encode("utf-8"), "text/calendar; charset=utf-8",

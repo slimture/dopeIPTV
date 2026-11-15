@@ -84,12 +84,39 @@ def render(dark: dict[str, Any], light: dict[str, Any], words: dict[str, str],
     bg_light = str(light.get("bg") or "") if _HEX.fullmatch(str(light.get("bg") or "")) else ""
     html = (_HTML.replace("@@LANG@@", lang).replace("@@DIR@@", "rtl" if rtl else "ltr")
             .replace("@@BG_DARK@@", bg_dark).replace("@@BG_LIGHT@@", bg_light)
+            .replace("@@APP_NAME@@", APP_NAME)
             .replace("@@STYLE@@", style).replace("@@SCRIPT@@", script))
     csp = ("default-src 'none'; "
            f"script-src {_sha(script)}; style-src {_sha(style)}; "
-           "img-src 'self' data:; connect-src 'self'; base-uri 'none'; "
+           "img-src 'self' data:; connect-src 'self'; manifest-src 'self'; base-uri 'none'; "
            "form-action 'none'; frame-ancestors 'none'")
     return html.encode("utf-8"), csp
+
+
+#: The name under the icon on a phone's home screen, and its window's.
+APP_NAME = "dopeIPTV Remote"
+#: The home-screen icons the server hands out (see manifest), name -> size.
+ICONS = {"icon-180.png": 180, "icon-192.png": 192, "icon-512.png": 512,
+         "icon-maskable-512.png": 512}
+
+
+def manifest(bg: str = "") -> bytes:
+    """The web app manifest: "Add to Home screen" on Android (and Chrome
+    elsewhere) gets the name, the icons and a window of its own - no
+    address bar. Every address is relative, so it stays under the token."""
+    colour = bg if _HEX.fullmatch(bg or "") else "#111111"
+    data = {
+        "name": APP_NAME, "short_name": "dopeIPTV", "start_url": "./", "scope": "./",
+        "display": "standalone", "orientation": "portrait",
+        "background_color": colour, "theme_color": colour,
+        "icons": [{"src": "icon-192.png", "sizes": "192x192", "type": "image/png",
+                   "purpose": "any"},
+                  {"src": "icon-512.png", "sizes": "512x512", "type": "image/png",
+                   "purpose": "any"},
+                  {"src": "icon-maskable-512.png", "sizes": "512x512",
+                   "type": "image/png", "purpose": "maskable"}],
+    }
+    return json.dumps(data, separators=(",", ":")).encode("utf-8")
 
 
 _HTML = """<!doctype html>
@@ -102,6 +129,12 @@ _HTML = """<!doctype html>
 <meta name="theme-color" content="@@BG_LIGHT@@" media="(prefers-color-scheme: light)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="@@APP_NAME@@">
+<meta name="application-name" content="@@APP_NAME@@">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <meta name="referrer" content="no-referrer">
 <link rel="icon" href="data:,">
 <title>dopeIPTV</title>

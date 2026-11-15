@@ -24,6 +24,50 @@ from .mw_remote import _Bridge
 
 ON_KEY = "phone_remote"
 TOKEN_KEY = "phone_remote_token"
+
+
+def _home_icon(size: int, maskable: bool = False) -> bytes:
+    """The app's tile, square and edge to edge, as a phone's home screen
+    wants it: iOS rounds its corners itself (a transparent corner turns
+    black there), and a maskable icon keeps its picture inside the middle
+    80 % that every launcher's shape leaves."""
+    from PyQt6.QtCore import QBuffer, QRectF
+    from PyQt6.QtGui import QImage, QPainter
+
+    from .app_icon import make_app_icon
+    tile = make_app_icon(sizes=(size,)).pixmap(size, size).toImage()
+    if tile.isNull():
+        return b""
+    img = QImage(size, size, QImage.Format.Format_ARGB32)
+    img.fill(tile.pixelColor(size // 2, max(1, size // 12)))   # the tile's own colour
+    pr = QPainter(img)
+    pr.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+    inner = size * (0.8 if maskable else 1.0)
+    off = (size - inner) / 2
+    pr.drawImage(QRectF(off, off, inner, inner), tile)
+    pr.end()
+    buf = QBuffer()
+    buf.open(QBuffer.OpenModeFlag.WriteOnly)
+    ok = img.save(buf, "PNG")
+    buf.close()
+    return bytes(buf.data()) if ok else b""
+
+
+def _home_screen_assets() -> dict[str, tuple[bytes, str]]:
+    """What "Add to Home screen" asks for: the manifest (Android, Chrome)
+    and the icons (apple-touch-icon on iOS), so the remote sits on a phone
+    as "dopeIPTV Remote" with the app's icon and opens without an address
+    bar."""
+    from ..core import phone_page
+    from .theme import THEMES
+    dark = next((t for t in THEMES.values() if not t.get("light")), {})
+    out = {"manifest.webmanifest": (phone_page.manifest(str(dark.get("bg") or "")),
+                                    "application/manifest+json")}
+    for name, size in phone_page.ICONS.items():
+        png = _home_icon(size, maskable=name.startswith("icon-maskable"))
+        if png:
+            out[name] = (png, "image/png")
+    return out
 PORT_KEY = "phone_remote_port"
 #: How long after the phone asked for a channel what stops it is the phone's
 #: to hear, and how long its page then says it.
@@ -105,9 +149,16 @@ class _PhoneMixin:
         except (TypeError, ValueError):
             last = DEFAULT_PORT
         ports = ([last] if 1024 <= last <= 65535 else []) + [p for p in _PORTS if p != last]
+        # Drawn here, on the window's thread; the server only reads them.
+        try:
+            assets = _home_screen_assets()
+        except Exception as e:
+            log.debug("phone remote: no home-screen icons (%s)", e)
+            assets = {}
         error = ""
         for port in ports:
-            srv = PhoneServer(port, token, self._phone_call, self._phone_page)
+            srv = PhoneServer(port, token, self._phone_call, self._phone_page,
+                              asset=assets.get)
             try:
                 srv.start()
             except OSError as e:
