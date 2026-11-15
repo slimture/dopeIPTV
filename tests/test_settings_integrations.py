@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import tempfile
 import sys
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -73,14 +74,21 @@ os._exit(0)
 
 
 def _settings(app_id: str, simkl_id: str) -> str:
-    env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+    # A config directory of its own, and a second try, as test_settings_window
+    # has: on the CI runner the whole window has been seen to die once
+    # without a word from Python.
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen",
+               XDG_CONFIG_HOME=tempfile.mkdtemp())
     env.pop("DOPEIPTV_SIMKL_CLIENT_ID", None)
     if simkl_id:
         env["DOPEIPTV_SIMKL_CLIENT_ID"] = simkl_id
-    out = subprocess.run([sys.executable, "-c", _CHILD, app_id], cwd=_REPO_ROOT,
-                         env=env, capture_output=True, text=True, timeout=120)
-    assert "PAGES" in out.stdout, out.stdout + out.stderr
-    return out.stdout
+    for _attempt in (1, 2):
+        out = subprocess.run([sys.executable, "-c", _CHILD, app_id], cwd=_REPO_ROOT,
+                             env=env, capture_output=True, text=True, timeout=120)
+        if "PAGES" in out.stdout:
+            return out.stdout
+    raise AssertionError(f"exit {out.returncode}\nstdout={out.stdout!r}\n"
+                         f"stderr={out.stderr[-3000:]!r}")
 
 
 def _line(out: str, head: str) -> list[str]:
