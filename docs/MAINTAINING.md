@@ -340,7 +340,68 @@ builds on that count instead of a second one:
   recordings, multiview and stream health; failover may then try another
   source.
 
+Then the rest of what an Enigma2 box can do from a computer:
+
+- **Bouquet editor** (as Dreamboxedit does): bouquets and their channels
+  reordered, renamed, added and removed, markers, written back to the box
+  and the box told to reload them.
+- **AutoTimer**: the box's own rules read, made and changed (OpenWebif's
+  AutoTimer plugin), beside dopeIPTV's series rules - and said plainly
+  which of the two records what.
+- **The box's recordings managed**: delete, move to another folder, rename.
+- **A screenshot from the box** (`/web/grab`): what the TV shows, picture,
+  OSD or both.
+- **The box's remote control in the app** (`/web/remotecontrol`), the
+  whole remote including the colour keys and the menus.
+
 Check every endpoint against OpenWebif's source, and test on a real box.
+
+### Ideas to talk through before anything is built
+
+Not decided: each needs a word with the maintainer first.
+
+**Reception and the stream itself**
+
+- **SAT>IP client**: minisatip, Digital Devices, Telestar, and Enigma2 or
+  Tvheadend serving SAT>IP. RTSP with the tuning in the address, the
+  server's channel list where it has one (an M3U), else a scan.
+- **Teletext and DVB subtitles** through ffmpeg/libzvbi: teletext pages
+  (page 199 and the like in the Nordics) as subtitles, and a teletext
+  viewer. Recordings keep them only as .ts (MP4 cannot carry them).
+- **TS analysis in Nerd**: PIDs and the PMT, bitrate per PID, continuity
+  errors, PCR jitter - a simple TR 101 290 for the stream that plays.
+- **Recordings compared between sources**: the same programme on two
+  sources side by side (picture size, bitrate, drops), and the better one
+  chosen - built on failover's matching.
+
+**More home backends** (Enigma2, Tvheadend, HDHomeRun, Jellyfin, Emby and
+Plex are in)
+
+- **VDR** through streamdev or the restfulapi plugin.
+- **DVBViewer Media Server** (big on Windows, above all in Germany).
+- **NextPVR** and **MythTV**.
+
+**Other kinds of streams**
+
+- **Live streams through yt-dlp** (YouTube Live, Twitch and more): mpv's
+  ytdl hook already plays them; what is missing is a way to add and
+  bundle yt-dlp (it changes often, so it must update without a release).
+- **Internet radio from radio-browser.info**: stations with logos and
+  genres, beside the music library.
+
+**On the TV, from the sofa**
+
+- **A 10-foot mode**: a large interface run entirely with a remote. The
+  app has nothing for HDMI-CEC, a gamepad or LIRC today; a CEC remote works
+  only where the system turns it into keys. TV mode on the list from
+  "build everything" is the same thing.
+- **dopeIPTV as an HDHomeRun tuner** (`discover.json`, `lineup.json`), so
+  Plex, Jellyfin and Emby on the network see it as one - beside the M3U
+  and XMLTV it already shares.
+- **Android TV and Fire TV**: PyQt6 does not get there in practice; an
+  app of its own would be a separate project. Until then the shared
+  playlist and guide, the remote API and the HDHomeRun emulation let apps
+  on the TV use dopeIPTV as their source.
 
 ### Every feature works with the others
 
