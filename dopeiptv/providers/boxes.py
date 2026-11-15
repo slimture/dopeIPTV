@@ -326,7 +326,9 @@ class BoxClient(OfflineClient):
             if code in (404, 405, 501):
                 raise LocalizedError("err_box_not_found", kind=self.KIND) from None
             raise
-        except ValueError:
+        except (ValueError, ET.ParseError):
+            # ParseError is no ValueError: a router's own page (HTML, not
+            # XML) said "mismatched tag: line 1" instead.
             raise LocalizedError("err_box_not_found", kind=self.KIND) from None
         channels, recordings = self._load()
         if not channels:

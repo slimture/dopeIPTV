@@ -617,6 +617,27 @@ def test_plex_live_tv_with_a_dvr(fake):
     assert s.hits("POST", "/livetv/dvrs/7/channels/5.1/tune")
 
 
+def test_plex_live_tv_plays_through_the_windows_address(fake):
+    """The window asks a box that transcodes for its address by play_url
+    (ui/mw_box.py): Plex has no such thing, and its own film helper of that
+    name took a channel's id for a film's metadata - AttributeError, and
+    no Plex channel played, in the player, multiview or a cast."""
+    from dopeiptv.ui.mw_box import _BoxMixin
+
+    class Host(_BoxMixin):
+        pass
+    s, c = _plex(fake, plex_routes(dvr=True))
+    c.authenticate()
+    ch, = c.live_streams(None)
+    h = Host()
+    h.client = c
+    for purpose in ("play", "multiview", "cast"):
+        url = h._live_play_url(ch["stream_id"], "ts", purpose)
+        assert "/livetv/sessions/abc" in parse_qs(url.split("?", 1)[1])["path"][0]
+    vod = c.vod_url(c.vod_streams("1")[0]["stream_id"])
+    assert vod == f"{s.base}/library/parts/9/1/file.mkv?X-Plex-Token=den-tok"
+
+
 # -- finding them on the network ---------------------------------------------------
 
 def test_jellyfin_discovery_answer():

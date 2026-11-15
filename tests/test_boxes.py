@@ -383,6 +383,14 @@ def test_not_an_enigma2_box(fake):
     with pytest.raises(LocalizedError) as e:
         Enigma2Client(box2.base).authenticate()
     assert e.value.key == "err_box_not_found"
+    # A router's real page is HTML, not XML: its parse error is "not found"
+    # too, never "mismatched tag: line 1, column 50".
+    page = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Router</title></head></html>'
+    for body in (page, "", "{}"):
+        box3 = fake({"/web/about": body})
+        with pytest.raises(LocalizedError) as e:
+            Enigma2Client(box3.base).authenticate()
+        assert e.value.key == "err_box_not_found"
 
 
 def test_service_reference_helpers():

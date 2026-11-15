@@ -333,8 +333,10 @@ class PlexClient(MediaServerClient):
             params["live"] = "1"
         return self.url("/video/:/transcode/universal/start.m3u8") + "?" + urlencode(params)
 
-    def play_url(self, rk: str, m: dict) -> tuple[str, str]:
-        """(address, container) of a film or an episode."""
+    def item_url(self, rk: str, m: dict) -> tuple[str, str]:
+        """(address, container) of a film or an episode. Not "play_url":
+        the window asks a box that transcodes by that name (ui/mw_box.py),
+        and a Plex channel then never played."""
         media = next((x for x in m.get("Media") or [] if isinstance(x, dict)), {})
         part = next((x for x in media.get("Part") or [] if isinstance(x, dict)), {})
         ext = str(part.get("container") or media.get("container") or "mkv")
@@ -365,7 +367,7 @@ class PlexClient(MediaServerClient):
 
     def _film(self, m: dict, library: str) -> dict:
         rk = str(m.get("ratingKey") or "")
-        url, ext = self.play_url(rk, m)
+        url, ext = self.item_url(rk, m)
         art = self.image(m.get("art"), 1280, 720)
         return {"key": rk, "title": m.get("title"), "category": library, "url": url,
                 "icon": self.image(m.get("thumb")), "backdrop": [art] if art else [],
@@ -389,7 +391,7 @@ class PlexClient(MediaServerClient):
 
     def _episode(self, m: dict) -> dict:
         rk = str(m.get("ratingKey") or "")
-        url, ext = self.play_url(rk, m)
+        url, ext = self.item_url(rk, m)
         return {"key": rk, "title": m.get("title"), "season": m.get("parentIndex") or 0,
                 "episode": m.get("index") or 0, "url": url, "ext": ext,
                 "icon": self.image(m.get("thumb"), 480, 270) or self.image(m.get("grandparentThumb")),
