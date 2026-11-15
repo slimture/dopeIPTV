@@ -587,6 +587,14 @@ class TvPage(QWidget):
             tab.clicked.connect(self._tab_clicked)
             head.addWidget(tab)
             self.tabs.append(tab)
+        # What plays behind the page, always in sight: OK on it is the
+        # picture again (so is Play, and Back at the top of a screen).
+        self.now = TvTile("", w=430, h=64, kind="tab")
+        self.now.payload = ("now",)
+        self.now.clicked.connect(self._now_clicked)
+        self.now.hide()
+        head.addSpacing(px(18))
+        head.addWidget(self.now)
         head.addStretch(1)
         self.clock = QLabel("")
         self.clock.setFont(font(34, bold=True))
@@ -643,6 +651,27 @@ class TvPage(QWidget):
 
     def _tick(self) -> None:
         self.clock.setText(time.strftime("%H:%M"))
+        self.refresh_now()
+
+    def refresh_now(self) -> None:
+        """The Now playing tab: shown, with what plays, while a stream goes
+        on behind the page; the hint at the foot says how to get back."""
+        w = self.window
+        title = w._tv_now_title() if w._tv_has_picture() else ""
+        playing = bool(title)
+        if playing:
+            self.now.set_text(f"\u25b6  {title}")
+            if self.now not in self.tabs:
+                self.tabs.append(self.now)
+        elif self.now in self.tabs:
+            if self.focus_widget() is self.now:
+                self.set_focus(self.tab(self.current or "home"))
+            self.tabs.remove(self.now)
+        self.now.setVisible(playing)
+        self.hint.setText(tr("tv_hint_playing") if playing else tr("tv_hint"))
+
+    def _now_clicked(self) -> None:
+        self.window._tv_picture()
 
     def flash(self, text: str, ms: int = 2000) -> None:
         """A word over the page's corner: a number typed, a favorite added."""
@@ -746,9 +775,13 @@ class TvPage(QWidget):
             self.focus_into()
             return
         scr = self.screens.get(self.current)
+        if cur is self.now and direction == "down":
+            self.focus_into()
+            return
         if cur in self.tabs:
             if direction == "down":
-                key = str(cur.payload[1]) if isinstance(cur.payload, tuple) else self.current
+                key = str(cur.payload[1]) if isinstance(cur.payload, tuple) \
+                    and len(cur.payload) > 1 else self.current
                 if key != self.current:
                     self.show_screen(key)
                 else:

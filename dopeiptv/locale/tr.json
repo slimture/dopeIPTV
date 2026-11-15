@@ -2567,5 +2567,6 @@
   "phone_tv_digits": "Rakam tuşları",
   "phone_tv_touchpad": "Dokunmatik yüzey",
   "phone_tv_touch_hint": "Hareket için kaydır · OK için dokun · Geri için basılı tut",
-  "tv_play_refused": "Oynatıcı burada başlatılamadı. TV modundan çıkıp tekrar deneyin."
+  "tv_play_refused": "Oynatıcı burada başlatılamadı. TV modundan çıkıp tekrar deneyin.",
+  "tv_hint_playing": "OK açar · Oynat veya Geri: görüntüye dön"
 }

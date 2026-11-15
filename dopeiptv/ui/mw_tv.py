@@ -488,6 +488,22 @@ class _TvMixin:
         p = self.player
         return p is not None and p.current_url is not None
 
+    def _tv_now_title(self) -> str:
+        """What plays, for the Now playing tab: the channel and what is on
+        it, or the title."""
+        lp = getattr(self, "_last_playback", None) or {}
+        p = self.player
+        name = str(lp.get("title") or (p.title_lbl.text() if p is not None else "")
+                   or "").strip()
+        if lp.get("kind") == "live" and lp.get("item"):
+            try:
+                prog = self.xmltv.current_programme(lp["item"])
+            except Exception:
+                prog = None
+            if prog and prog.get("title"):
+                return f"{name} \u00b7 {prog['title']}" if name else str(prog["title"])
+        return name
+
     def _tv_before_play(self) -> None:
         """TV mode, before a stream opens: the player's page shown first.
         Its video surface makes the mpv core when it is first shown - behind
@@ -543,6 +559,7 @@ class _TvMixin:
             page.show_screen(screen)
         else:
             page.show_screen(page.current or "home")
+        page.refresh_now()
 
     def _tv_stop(self) -> None:
         """Back from the picture: the stream stops, the page comes back."""

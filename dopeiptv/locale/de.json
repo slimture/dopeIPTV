@@ -2567,5 +2567,6 @@
   "phone_tv_digits": "Zifferntasten",
   "phone_tv_touchpad": "Touchpad",
   "phone_tv_touch_hint": "Wischen zum Bewegen · Tippen für OK · Halten für Zurück",
-  "tv_play_refused": "Der Player konnte hier nicht starten. Verlasse den TV-Modus und versuche es erneut."
+  "tv_play_refused": "Der Player konnte hier nicht starten. Verlasse den TV-Modus und versuche es erneut.",
+  "tv_hint_playing": "OK öffnet · Play oder Zurück: zurück zum Bild"
 }

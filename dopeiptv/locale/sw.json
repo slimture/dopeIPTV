@@ -2567,5 +2567,6 @@
   "phone_tv_digits": "Vitufe vya namba",
   "phone_tv_touchpad": "Kibao cha kugusa",
   "phone_tv_touch_hint": "Telezesha ili kusogea · gusa kwa OK · shikilia kwa Rudi",
-  "tv_play_refused": "Kicheza hakikuweza kuanza hapa. Toka kwenye hali ya TV na ujaribu tena."
+  "tv_play_refused": "Kicheza hakikuweza kuanza hapa. Toka kwenye hali ya TV na ujaribu tena.",
+  "tv_hint_playing": "OK hufungua · Cheza au Rudi: rudi kwenye picha"
 }

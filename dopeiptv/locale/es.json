@@ -2567,5 +2567,6 @@
   "phone_tv_digits": "Teclas numéricas",
   "phone_tv_touchpad": "Panel táctil",
   "phone_tv_touch_hint": "Desliza para moverte · toca para OK · mantén pulsado para Atrás",
-  "tv_play_refused": "El reproductor no pudo iniciarse aquí. Sal del modo TV e inténtalo de nuevo."
+  "tv_play_refused": "El reproductor no pudo iniciarse aquí. Sal del modo TV e inténtalo de nuevo.",
+  "tv_hint_playing": "OK abre · Reproducir o Atrás: volver a la imagen"
 }

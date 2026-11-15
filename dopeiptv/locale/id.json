@@ -2567,5 +2567,6 @@
   "phone_tv_digits": "Tombol angka",
   "phone_tv_touchpad": "Touchpad",
   "phone_tv_touch_hint": "Geser untuk berpindah · ketuk untuk OK · tahan untuk Kembali",
-  "tv_play_refused": "Pemutar tidak dapat dimulai di sini. Keluar dari mode TV dan coba lagi."
+  "tv_play_refused": "Pemutar tidak dapat dimulai di sini. Keluar dari mode TV dan coba lagi.",
+  "tv_hint_playing": "OK membuka · Putar atau Kembali: kembali ke gambar"
 }

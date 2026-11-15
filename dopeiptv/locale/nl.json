@@ -2567,5 +2567,6 @@
   "phone_tv_digits": "Cijfertoetsen",
   "phone_tv_touchpad": "Touchpad",
   "phone_tv_touch_hint": "Veeg om te bewegen · tik voor OK · houd vast voor Terug",
-  "tv_play_refused": "De speler kon hier niet starten. Verlaat de tv-modus en probeer het opnieuw."
+  "tv_play_refused": "De speler kon hier niet starten. Verlaat de tv-modus en probeer het opnieuw.",
+  "tv_hint_playing": "OK opent · Afspelen of Terug: terug naar het beeld"
 }

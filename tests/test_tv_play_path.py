@@ -10,6 +10,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from dopeiptv.ui.mw_tv import _TvMixin  # noqa: E402
 
+_APP = None
 _SRC = (Path(__file__).resolve().parent.parent / "dopeiptv/ui/main_window.py"
         ).read_text(encoding="utf-8")
 
@@ -71,3 +72,37 @@ def test_the_playback_path_asks_before_play_and_never_opens_mpv_in_tv_mode():
     external = _SRC.index('launch_player("mpv", url, title, self)', plays)
     assert tv < external
     assert 'tr("tv_play_refused")' in _SRC[tv:external]
+
+
+def test_the_page_shows_what_plays_and_ok_on_it_is_the_picture():
+    from PyQt6.QtWidgets import QApplication
+
+    from dopeiptv.i18n import tr
+    from dopeiptv.ui.tv_mode import TvPage
+    global _APP
+    _APP = QApplication.instance() or QApplication([])   # kept alive
+
+    class Win:
+        playing = True
+        pictures = 0
+
+        def _tv_has_picture(self):
+            return self.playing
+
+        def _tv_now_title(self):
+            return "SVT1 HD · Rapport"
+
+        def _tv_picture(self):
+            self.pictures += 1
+
+    win = Win()
+    page = TvPage(win)
+    page.refresh_now()
+    assert page.now in page.tabs and not page.now.isHidden()
+    assert "SVT1 HD" in page.now.title and page.hint.text() == tr("tv_hint_playing")
+    page.now.click()
+    assert win.pictures == 1
+    win.playing = False
+    page.refresh_now()
+    assert page.now not in page.tabs and page.now.isHidden()
+    assert page.hint.text() == tr("tv_hint")

@@ -2567,5 +2567,6 @@
   "phone_tv_digits": "数字键",
   "phone_tv_touchpad": "触控板",
   "phone_tv_touch_hint": "滑动以移动 · 轻点为 OK · 长按为返回",
-  "tv_play_refused": "播放器无法在此启动。请退出电视模式后重试。"
+  "tv_play_refused": "播放器无法在此启动。请退出电视模式后重试。",
+  "tv_hint_playing": "OK 打开 · 播放或返回:回到画面"
 }

@@ -2567,5 +2567,6 @@
   "phone_tv_digits": "Touches numériques",
   "phone_tv_touchpad": "Pavé tactile",
   "phone_tv_touch_hint": "Glissez pour vous déplacer · touchez pour OK · maintenez pour Retour",
-  "tv_play_refused": "Le lecteur n'a pas pu démarrer ici. Quittez le mode TV et réessayez."
+  "tv_play_refused": "Le lecteur n'a pas pu démarrer ici. Quittez le mode TV et réessayez.",
+  "tv_hint_playing": "OK ouvre · Lecture ou Retour : revenir à l'image"
 }

@@ -2567,5 +2567,6 @@
   "phone_tv_digits": "Numerički tasteri",
   "phone_tv_touchpad": "Tačped",
   "phone_tv_touch_hint": "Prevuci za pomeranje · dodirni za OK · drži za Nazad",
-  "tv_play_refused": "Plejer nije mogao da se pokrene ovde. Izađite iz TV režima i pokušajte ponovo."
+  "tv_play_refused": "Plejer nije mogao da se pokrene ovde. Izađite iz TV režima i pokušajte ponovo.",
+  "tv_hint_playing": "OK otvara · Reprodukcija ili Nazad: nazad na sliku"
 }

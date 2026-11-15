@@ -2567,5 +2567,6 @@
   "phone_tv_digits": "Tasti numerici",
   "phone_tv_touchpad": "Touchpad",
   "phone_tv_touch_hint": "Scorri per spostarti · tocca per OK · tieni premuto per Indietro",
-  "tv_play_refused": "Il lettore non è riuscito ad avviarsi qui. Esci dalla modalità TV e riprova."
+  "tv_play_refused": "Il lettore non è riuscito ad avviarsi qui. Esci dalla modalità TV e riprova.",
+  "tv_hint_playing": "OK apre · Play o Indietro: torna all'immagine"
 }

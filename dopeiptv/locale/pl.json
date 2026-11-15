@@ -2567,5 +2567,6 @@
   "phone_tv_digits": "Klawisze numeryczne",
   "phone_tv_touchpad": "Touchpad",
   "phone_tv_touch_hint": "Przesuń palcem: ruch · stuknij: OK · przytrzymaj: Wstecz",
-  "tv_play_refused": "Odtwarzacz nie mógł się tu uruchomić. Wyjdź z trybu TV i spróbuj ponownie."
+  "tv_play_refused": "Odtwarzacz nie mógł się tu uruchomić. Wyjdź z trybu TV i spróbuj ponownie.",
+  "tv_hint_playing": "OK otwiera · Odtwórz lub Wstecz: powrót do obrazu"
 }

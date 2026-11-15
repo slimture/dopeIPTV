@@ -2567,5 +2567,6 @@
   "phone_tv_digits": "Phím số",
   "phone_tv_touchpad": "Bàn cảm ứng",
   "phone_tv_touch_hint": "Vuốt để di chuyển · chạm để OK · giữ để Quay lại",
-  "tv_play_refused": "Trình phát không thể khởi động ở đây. Hãy thoát chế độ TV và thử lại."
+  "tv_play_refused": "Trình phát không thể khởi động ở đây. Hãy thoát chế độ TV và thử lại.",
+  "tv_hint_playing": "OK để mở · Phát hoặc Quay lại: trở về hình ảnh"
 }

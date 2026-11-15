@@ -2567,5 +2567,6 @@
   "phone_tv_digits": "Sifferknappar",
   "phone_tv_touchpad": "Pekyta",
   "phone_tv_touch_hint": "Svep för att flytta · tryck för OK · håll inne för Tillbaka",
-  "tv_play_refused": "Spelaren kunde inte starta här. Lämna TV-läget och försök igen."
+  "tv_play_refused": "Spelaren kunde inte starta här. Lämna TV-läget och försök igen.",
+  "tv_hint_playing": "OK öppnar · Play eller Tillbaka: tillbaka till bilden"
 }

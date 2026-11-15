@@ -2567,5 +2567,6 @@
   "phone_tv_digits": "Teclado numérico",
   "phone_tv_touchpad": "Touchpad",
   "phone_tv_touch_hint": "Deslize para mover · toque para OK · segure para Voltar",
-  "tv_play_refused": "O player não conseguiu iniciar aqui. Saia do modo TV e tente de novo."
+  "tv_play_refused": "O player não conseguiu iniciar aqui. Saia do modo TV e tente de novo.",
+  "tv_hint_playing": "OK abre · Play ou Voltar: volta para a imagem"
 }
