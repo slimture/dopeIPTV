@@ -13,6 +13,7 @@
         "playlist",
         "m3u",
         "stalker",
+        "pvr",
         "demo",
         "update"
     ],
@@ -24,7 +25,11 @@
         "popout",
         "tracks",
         "keys",
-        "resume"
+        "resume",
+        "tvmode",
+        "tvremote",
+        "phone",
+        "phonehome"
     ],
     "tv": [
         "epg",
@@ -46,8 +51,11 @@
         "mvcost",
         "cast",
         "castfix",
+        "castback",
+        "appletv",
         "subs",
-        "trakt"
+        "trakt",
+        "simkl"
     ],
     "local": [
         "add",
@@ -60,6 +68,7 @@
         "language",
         "playback",
         "parental",
+        "profiles",
         "hide",
         "playlists",
         "home",
@@ -79,6 +88,7 @@
         "expired",
         "vpn",
         "notstarted",
+        "vlan",
         "icon",
         "external"
     ],
