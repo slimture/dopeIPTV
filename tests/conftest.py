@@ -20,6 +20,11 @@ _state = {"last_full": time.monotonic()}
 os.environ["XDG_CACHE_HOME"] = tempfile.mkdtemp(prefix="dopeiptv-test-cache-")
 # Log files and the crash file (core/report.py) too: never the real ones.
 os.environ["XDG_STATE_HOME"] = tempfile.mkdtemp(prefix="dopeiptv-test-state-")
+# A real-window test runs its window in a child process that prints what it
+# saw and ends with os._exit(0), which skips flushing stdout. Into a pipe that
+# output is buffered, so it was lost - "exit 0, stdout=''" on the CI runner,
+# while a shell that sets PYTHONUNBUFFERED passed. Children inherit this.
+os.environ["PYTHONUNBUFFERED"] = "1"
 
 
 @pytest.fixture(autouse=True, scope="session")
