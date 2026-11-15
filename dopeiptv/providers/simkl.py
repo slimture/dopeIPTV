@@ -70,7 +70,7 @@ _baked: str | None = None
 #: dopeIPTV's own AUTH V2 app ("TV, devices & command line"). Simkl: "Client
 #: IDs are public and safe on GitHub for every type" - no secret goes with
 #: it. Empty: a release build's baked id, else Simkl is not offered.
-PUBLIC_CLIENT_ID = ""
+PUBLIC_CLIENT_ID = "ec150d64a2e6f124e2408ac81e9a6aa120c3cc15a3830c44bf300b092982e3e1"
 
 
 def bundled_client_id() -> str:
