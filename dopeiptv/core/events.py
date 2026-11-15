@@ -28,9 +28,17 @@ does not end up in the home system's history either.
 A webhook gets each event as a POST (application/json, the page's header
 for a token); a few tries, 3 s each. MQTT gets each on ``<prefix>/event``
 and what plays now, retained, on ``<prefix>/state`` ({"state": "playing" |
-"paused" | "idle" | "off", ...}); ``<prefix>/availability`` says online,
-and the broker says offline (the last will) when the app goes away. With
-Home Assistant discovery on, two sensors appear by themselves.
+"paused" | "idle" | "off", "volume": 0-100, ...}); ``<prefix>/availability``
+says online, and the broker says offline (the last will) when the app goes
+away. With Home Assistant discovery on, two sensors appear by themselves.
+
+With "Take commands" on, the app also listens on ``<prefix>/command/+``
+(core/mqtt_control.py): play/pause, stop, channel up and down, volume, a
+favourite channel, a channel by name or number - and with discovery, Home
+Assistant shows them as buttons, a slider, a list and a text box. While
+the connection is idle the broker's thread waits on its socket as well as
+its queue, so a command is heard at once; the window carries it out on its
+own thread (Dispatcher.on_command hands it over).
 
 The connection to the broker is kept open: the last will needs one, so a
 crash or a power cut does not leave "playing" behind for ever; no handshake
@@ -49,6 +57,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import select
 import socket
 import ssl
 import threading
@@ -58,10 +67,10 @@ import urllib.request
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 from urllib.parse import urlsplit
 
-from . import mqtt, nerd
+from . import mqtt, mqtt_control, nerd
 from .log import log
 from .nerd_check import FAIL, MASK, OK, WARN, Check
 
@@ -76,7 +85,8 @@ DEFAULT_PREFIX = "dopeiptv"
 HA_PREFIX = "homeassistant"
 
 #: What an event may say about what plays: none of it while viewing privately.
-WHAT = frozenset({"title", "channel", "programme", "series", "source", "previous", "file", "error"})
+WHAT = frozenset({"title", "channel", "programme", "series", "source", "previous", "file", "error",
+                  "favorite"})
 
 
 # -- the settings ----------------------------------------------------------------
@@ -93,6 +103,7 @@ class Config:
     client_id: str = ""
     prefix: str = DEFAULT_PREFIX
     ha: bool = False
+    commands: bool = False
 
     @property
     def mqtt(self) -> bool:
@@ -162,7 +173,8 @@ def config(settings: Any) -> Config:
                   mqtt_tls=n.flag("nerd_mqtt_tls"), mqtt_user=n.get("nerd_mqtt_user").strip(),
                   mqtt_pass=n.get("nerd_mqtt_pass"),
                   client_id=n.get("nerd_mqtt_client").strip() or default_client_id(),
-                  prefix=clean_prefix(n.get("nerd_mqtt_prefix")), ha=n.flag("nerd_mqtt_ha"))
+                  prefix=clean_prefix(n.get("nerd_mqtt_prefix")), ha=n.flag("nerd_mqtt_ha"),
+                  commands=n.flag("nerd_mqtt_commands"))
 
 
 # -- the messages ------------------------------------------------------------------
@@ -249,9 +261,9 @@ class _Sink:
         with self._cv:
             if self._closing:
                 return
-            if kind == "state":
-                # Only the latest state is worth sending.
-                kept = [it for it in self._q if it[0] != "state"]
+            if kind in ("state", "controls"):
+                # Only the latest state (and list of controls) is worth sending.
+                kept = [it for it in self._q if it[0] != kind]
                 if len(kept) != len(self._q):
                     self._q = deque(kept)
             if len(self._q) >= self.limit:
@@ -299,7 +311,7 @@ class _Sink:
                 item = None
                 with self._cv:
                     if not self._q and not self._closing:
-                        self._cv.wait(self._idle_wait())
+                        self._wait(self._idle_wait())
                     if self._closing and (not self._q or self._left() <= 0):
                         break
                     if self._q:
@@ -318,6 +330,10 @@ class _Sink:
                 log.debug("events: %s at the end: %s", self.name, e)
 
     # -- what each kind does --------------------------------------------------------
+
+    def _wait(self, timeout: float) -> None:
+        """Nothing to send: wait (the lock held) for a message or *timeout*."""
+        self._cv.wait(timeout)
 
     def _idle_wait(self) -> float:
         return 3600.0
@@ -441,7 +457,9 @@ class MqttSink(_Sink):
 
     name = "mqtt"
 
-    def __init__(self, cfg: Config, limit: int = QUEUE_MAX, after: Iterable[_Sink] = ()) -> None:
+    def __init__(self, cfg: Config, limit: int = QUEUE_MAX, after: Iterable[_Sink] = (),
+                 on_command: Callable[[str, Any], None] | None = None,
+                 options: Iterable[str] = (), forget: bool = False) -> None:
         self.cfg = cfg
         self.prefix = cfg.prefix
         self.client: mqtt.Client | None = None
@@ -452,7 +470,93 @@ class MqttSink(_Sink):
         # The connection before this one (Settings changed): gone first, so
         # its "offline" never lands after this one's "online".
         self._after = list(after)
+        # Commands (cfg.commands): who hears them, the favourites the list
+        # offers, and - turned off since the last connection - the controls
+        # to take off Home Assistant's device.
+        self.on_command = on_command
+        self.options: tuple[str, ...] = tuple(options)
+        self._forget = forget and not cfg.commands
+        self.commands_heard = 0
+        self._readable = False
+        self._wake_r, self._wake_w = socket.socketpair()
+        for s in (self._wake_r, self._wake_w):
+            s.setblocking(False)
         super().__init__(limit)
+
+    # -- waiting on the broker as well as the queue (commands) --------------------------
+
+    def put(self, kind: str, message: dict[str, Any]) -> None:
+        super().put(kind, message)
+        self._wake()
+
+    def close(self, drain_s: float = 1.0) -> None:
+        super().close(drain_s)
+        self._wake()
+
+    def _wake(self) -> None:
+        try:
+            self._wake_w.send(b"\0")
+        except OSError:
+            pass                  # full (it is awake already) or closed
+
+    def _wait(self, timeout: float) -> None:
+        cl = self.client
+        sock = cl.raw_socket() if cl is not None and self.cfg.commands else None
+        if sock is None:
+            self._cv.wait(timeout)
+            return
+        if cl is not None and (cl.pending() or cl.inbox):
+            self._readable = True
+            return
+        self._cv.release()
+        try:
+            ready, _w, _x = select.select([sock, self._wake_r], [], [], max(0.0, timeout))
+        except (OSError, ValueError):
+            ready = [sock]        # read it: what went wrong shows there
+        finally:
+            self._cv.acquire()
+        if self._wake_r in ready:
+            try:
+                while self._wake_r.recv(4096):
+                    pass
+            except OSError:
+                pass
+        self._readable = self._readable or sock in ready
+
+    def _hear(self) -> None:
+        """The commands that came in, handed to on_command."""
+        cl = self.client
+        if cl is None or not self.cfg.commands:
+            return
+        self._readable = False
+        try:
+            got = cl.take()
+        except (OSError, mqtt.MqttError) as e:
+            log.info("events: the broker went away (%s) - connecting again", self.quiet(e))
+            cl.close(clean=False)
+            self.client = None
+            self._next_try = 0.0
+            return
+        for topic, payload, retained in got:
+            cmd = mqtt_control.parse(self.prefix, topic, payload, retained)
+            if cmd is None or self.on_command is None:
+                continue
+            self.commands_heard += 1
+            try:
+                self.on_command(*cmd)
+            except Exception as e:
+                log.info("events: a command was not taken: %s", e)
+
+    def _controls(self, cl: mqtt.Client) -> None:
+        """Home Assistant's controls for the commands, or none."""
+        if not (self.cfg.ha and self.cfg.commands) and not self._forget:
+            return
+        node, device = ha_node(self.cfg), ha_device(self.cfg)
+        for topic, conf in mqtt_control.discovery(node, self.prefix, device,
+                                                  self.options if self.cfg.commands else None):
+            cl.publish(topic, json.dumps(conf, ensure_ascii=False) if conf is not None else b"",
+                       retain=True)
+        self._forget = False
 
     def topic(self, leaf: str) -> str:
         return f"{self.prefix}/{leaf}"
@@ -503,8 +607,13 @@ class MqttSink(_Sink):
             if self.cfg.ha:
                 for topic, conf in ha_discovery(self.cfg):
                     cl.publish(topic, json.dumps(conf), retain=True)
+            self._controls(cl)
             if self.state is not None:
                 cl.publish(self.topic("state"), json.dumps(self.state, ensure_ascii=False), retain=True)
+            if self.cfg.commands:
+                granted = cl.subscribe(mqtt_control.command_filter(self.prefix))
+                if granted & 0x80:
+                    log.info("events: the broker would not give the app its commands (SUBACK refused)")
         except (OSError, mqtt.MqttError) as e:
             cl.close(clean=False)
             wait = BACKOFF[min(self._fails + 1, len(BACKOFF) - 1)]
@@ -523,6 +632,26 @@ class MqttSink(_Sink):
         return cl
 
     def _send(self, kind: str, message: dict[str, Any]) -> None:
+        try:
+            self._publish(kind, message)
+        finally:
+            if self.client is not None and (self._readable or self.client.inbox):
+                self._hear()
+
+    def _publish(self, kind: str, message: dict[str, Any]) -> None:
+        if kind == "controls":
+            # The favourites changed: the list again, on the connection there is.
+            self.options = tuple(message.get("options") or ())
+            cl = self.client
+            if cl is not None and cl.connected and self.cfg.ha and self.cfg.commands:
+                try:
+                    self._controls(cl)
+                except OSError as e:
+                    log.info("events: publishing failed (%s) - connecting again", e)
+                    cl.close(clean=False)
+                    self.client = None
+                    self._next_try = 0.0
+            return
         if kind == "state":
             self.state = message
         topic = self.topic("state" if kind == "state" else "event")
@@ -556,6 +685,9 @@ class MqttSink(_Sink):
 
     def _idle(self) -> None:
         cl = self.client
+        if cl is not None and cl.connected and (self._readable or cl.inbox or cl.pending()):
+            self._hear()
+            cl = self.client
         if cl is not None and cl.connected:
             if time.monotonic() - cl.last_io >= MQTT_KEEPALIVE / 2:
                 try:
@@ -571,6 +703,11 @@ class MqttSink(_Sink):
 
     def _finish(self) -> None:
         cl, self.client = self.client, None
+        for s in (self._wake_r, self._wake_w):
+            try:
+                s.close()
+            except OSError:
+                pass
         if cl is None or not cl.connected:
             return
         try:
@@ -580,13 +717,24 @@ class MqttSink(_Sink):
         cl.close(clean=True)
 
 
+def ha_node(cfg: Config) -> str:
+    """The app's device id in Home Assistant's topics."""
+    return re.sub(r"[^A-Za-z0-9_-]", "_", cfg.client_id or default_client_id())
+
+
+def ha_device(cfg: Config) -> dict[str, Any]:
+    node = ha_node(cfg)
+    return {"identifiers": [node], "name": "dopeIPTV", "manufacturer": "dopeIPTV",
+            "model": "dopeIPTV", "sw_version": _version()}
+
+
 def ha_discovery(cfg: Config) -> list[tuple[str, dict[str, Any]]]:
     """Home Assistant MQTT discovery: a device with two sensors - how
-    playback stands (what plays as its attributes) and the title."""
-    node = re.sub(r"[^A-Za-z0-9_-]", "_", cfg.client_id or default_client_id())
+    playback stands (what plays as its attributes) and the title. Its
+    controls, with commands on: mqtt_control.discovery."""
+    node = ha_node(cfg)
     state, avail = f"{cfg.prefix}/state", f"{cfg.prefix}/availability"
-    device = {"identifiers": [node], "name": "dopeIPTV", "manufacturer": "dopeIPTV",
-              "model": "dopeIPTV", "sw_version": _version()}
+    device = ha_device(cfg)
     common = {"state_topic": state, "availability_topic": avail, "payload_available": "online",
               "payload_not_available": "offline", "device": device}
     return [
@@ -610,10 +758,21 @@ class Dispatcher:
         self._old: list[_Sink] = []
         self.state = state_payload("idle")
         self.quitting = False
+        # Commands from the broker (Config.commands): called on the broker's
+        # thread with (command, value) - the window hands them to its own.
+        self.on_command: Callable[[str, Any], None] | None = None
+        self.options: tuple[str, ...] = ()
+        self.volume: int | None = None
+        self._last: tuple[str, dict[str, Any] | None, bool] = ("idle", None, False)
 
     @property
     def active(self) -> bool:
         return bool(self.sinks) and not self.quitting
+
+    def _command(self, name: str, value: Any) -> None:
+        handler = self.on_command
+        if handler is not None and not self.quitting:
+            handler(name, value)
 
     def configure(self, cfg: Config) -> bool:
         """The receivers *cfg* names, started; the ones before told to finish
@@ -623,10 +782,13 @@ class Dispatcher:
         for s in self.sinks:
             s.close(1.0)
         self._old = [s for s in self._old + self.sinks if s.alive]
+        had_controls = self.cfg.mqtt and self.cfg.commands
         self.cfg = cfg
         made: list[_Sink] = [WebhookSink(u, cfg.header) for u in cfg.hooks]
         if cfg.mqtt:
-            made.append(MqttSink(cfg, after=[s for s in self._old if isinstance(s, MqttSink)]))
+            made.append(MqttSink(cfg, after=[s for s in self._old if isinstance(s, MqttSink)],
+                                 on_command=self._command, options=self.options,
+                                 forget=had_controls and not cfg.commands))
         for s in made:
             if isinstance(s, MqttSink):
                 s.put("state", self.state)
@@ -653,10 +815,35 @@ class Dispatcher:
 
     def set_state(self, state: str, fields: dict[str, Any] | None = None, private: bool = False,
                   now: float | None = None) -> None:
+        self._last = (state, fields, private)
         self.state = state_payload(state, fields, private, now)
+        if self.volume is not None and state != "off":
+            self.state["volume"] = self.volume
         for s in self.sinks:
             if isinstance(s, MqttSink):
                 s.put("state", self.state)
+
+    def set_volume(self, volume: int) -> None:
+        """The player's volume (0-100), in the state from now on - sent
+        again at once when it changed."""
+        volume = max(0, min(100, int(volume)))
+        if volume == self.volume:
+            return
+        self.volume = volume
+        if self.active:
+            self.set_state(*self._last)
+
+    def set_favorites(self, options: Iterable[str]) -> None:
+        """The favourite channels Home Assistant's list offers (commands on)."""
+        opts = tuple(options)
+        if opts == self.options:
+            return
+        self.options = opts
+        if self.quitting:
+            return
+        for s in self.sinks:
+            if isinstance(s, MqttSink):
+                s.put("controls", {"options": list(opts)})
 
     def quit(self, drain_s: float = 1.0) -> None:
         """app_quitting and the state "off" sent, every receiver told to end."""
@@ -804,8 +991,14 @@ def check_mqtt(cfg: Config, wait_s: float = 3.0) -> Check:
         topics = ["", "Topics:", f"  {cfg.prefix}/event         each event",
                   f"  {cfg.prefix}/state         what plays now (retained)",
                   f"  {cfg.prefix}/availability  online / offline (retained, the last will)"]
+        if cfg.commands:
+            topics += [f"  {cfg.prefix}/command/<command>  what the app is asked (not retained):",
+                       "      playpause, stop, channel_up, channel_down (any payload),",
+                       "      volume (0-100), favorite (a favourite's name), play (a channel's name or number)"]
         if cfg.ha:
             topics += [f"  {t}" for t, _c in ha_discovery(cfg)]
+            if cfg.commands:
+                topics += [f"  {t}" for t in mqtt_control.config_topics(ha_node(cfg))]
         return Check(state, key, params or {}, "\n".join(lines + topics + _about()))
     try:
         secs = cl.connect()

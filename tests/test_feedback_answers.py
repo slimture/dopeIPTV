@@ -96,8 +96,8 @@ def _menu_actions():
     from PyQt6.QtGui import QAction
     from PyQt6.QtWidgets import QMenuBar
     bar = QMenuBar()
-    names = ("about", "settings", "open_video", "refresh", "reminders", "multiview", "cast", "private",
-             "clear", "feedback", "answers", "website", "supporter", "donate", "quit")
+    names = ("about", "settings", "open_video", "refresh", "reminders", "calendar", "multiview", "cast",
+             "phone", "private", "clear", "feedback", "answers", "website", "supporter", "donate", "quit")
     acts = {n: QAction(n, bar) for n in names}
     return bar, acts
 
@@ -119,8 +119,8 @@ def test_on_a_mac_a_real_menu_bar_and_no_second_app_menu():
     def names(menu):
         return [a.text() for a in menu.actions() if not a.isSeparator()]
     assert names(menus["app"]) == ["about", "settings", "supporter", "donate", "quit"]
-    assert names(menus["file"]) == ["open_video", "refresh", "reminders"]
-    assert names(menus["view"]) == ["multiview", "cast"]
+    assert names(menus["file"]) == ["open_video", "refresh", "reminders", "calendar"]
+    assert names(menus["view"]) == ["multiview", "cast", "phone"]
     assert names(menus["history"]) == ["private", "clear"]
     assert names(menus["help"]) == ["feedback", "answers", "website"]
     role = QAction.MenuRole
@@ -146,12 +146,12 @@ def test_on_linux_and_windows_one_menu_in_groups():
     menus = app_menu.lay_out(bar, acts, mac=False)
     assert len(bar.actions()) == 1 and all(m is menus["app"] for m in menus.values())
     seq = ["|" if a.isSeparator() else a.text() for a in menus["app"].actions()]
-    assert seq == ["about", "|", "settings", "|", "open_video", "refresh", "reminders", "|",
-                   "multiview", "cast", "|", "private", "clear", "|", "feedback", "answers", "website",
+    assert seq == ["about", "|", "settings", "|", "open_video", "refresh", "reminders", "calendar", "|",
+                   "multiview", "cast", "phone", "|", "private", "clear", "|", "feedback", "answers", "website",
                    "|", "supporter", "donate", "|", "quit"]
     # An action that is not there leaves no empty group behind.
     bar2, acts2 = _menu_actions()
-    del acts2["multiview"], acts2["cast"]
+    del acts2["multiview"], acts2["cast"], acts2["phone"]
     seq2 = ["|" if a.isSeparator() else a.text() for a in app_menu.lay_out(bar2, acts2, mac=False)["app"].actions()]
     assert "| |" not in " ".join(seq2) and seq2[0] != "|" and seq2.count("|") == 6, seq2
 

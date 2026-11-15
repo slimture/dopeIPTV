@@ -75,6 +75,13 @@ dopeiptv/
     events.py          Nerd: events pushed out - webhooks and MQTT (queue +
                        a thread per receiver; it only watches)
     mqtt.py            A small MQTT 3.1.1 client (standard library only)
+    mqtt_control.py    Nerd: Home Assistant's commands over MQTT (topics,
+                       parsing, the controls' discovery)
+    phone_remote.py    The phone remote's server (home network, token in the
+                       address, rate limit and lock-out, nothing else)
+    phone_page.py      The phone remote's page (HTML/CSS/JS, nothing fetched)
+    qr.py              QR code encoder (byte mode, level M, versions 1-40)
+    ical.py            Reminders and recordings as iCalendar (RFC 5545)
     shortcut_keys.py   Keyboard shortcuts: the actions, the app's keys, the
                        user's over them, never two on one key
     log.py             Central logging (configure_logging, DOPEIPTV_LOG)
@@ -150,6 +157,8 @@ dopeiptv/
     mw_busy.py         Loading indicator + spinner overlay
     mw_updates.py      Update-check badge/status wiring, "Update now"
     mw_reminders.py    Programme-reminder UI (set / list / fire)
+    mw_calendar.py     Reminders and recordings as a calendar (file, served)
+    mw_phone.py        The phone remote: on/off, its requests on the window's thread
     mw_series.py       Series recordings: "Record series…", the rules' check
     mw_mpris.py        The system's media controls (media_session host) +
                        media keys
@@ -176,6 +185,8 @@ dopeiptv/
                        on the Guide page or in its window (EpgGridDialog)
     epg_search.py      Programme search across the whole guide
     reminders.py       Reminders manager dialog
+    calendar_export.py Export to calendar… (an .ics, the subscription addresses)
+    phone_remote.py    Phone remote… dialog: the code (QrView), the address
     shortcuts.py       Keyboard-shortcuts card (Settings > Advanced)
     tmdb_match.py      Manual TMDB match dialog
     subtitle_search.py OpenSubtitles search dialog

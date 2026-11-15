@@ -3,16 +3,29 @@ playback path and the recordings tell it - a start, a pause, a stop, a
 channel changed, a recording started or ended - handed to the dispatcher
 as Nerd > Remote and sharing says. It only watches: each hook returns at
 once while nothing is configured, swallows its own errors, and does no more
-on the window's thread than put a small message on a queue."""
+on the window's thread than put a small message on a queue.
+
+With MQTT's "Take commands" on, it also carries out what Home Assistant
+asks (core/mqtt_control.py): the broker's thread hands each command over a
+queued signal, and it is done here, on the window's thread - the same
+controls as the media keys and the remote API. What goes back is the
+state as ever: while viewing privately, what happened, not what."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from PyQt6.QtCore import QTimer
+from PyQt6 import sip
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
-from ..core import events, privacy
+from ..core import events, mqtt_control, privacy
 from ..core.log import log
+
+
+class _CommandBridge(QObject):
+    """A command from the broker's thread onto the window's."""
+
+    got = pyqtSignal(str, object)
 
 
 class _EventsMixin:
@@ -20,6 +33,10 @@ class _EventsMixin:
     _events_now: dict | None = None        # what plays: key, kind and what the events say of it
     _events_state = "idle"                  # idle, playing, paused
     _events_rec: events.RecordingWatch | None = None
+    _events_cmd: _CommandBridge | None = None
+    _events_favs: dict | None = None        # Home Assistant's list: option -> the favourite
+    _events_vol_timer: QTimer | None = None
+    _events_fav_timer: QTimer | None = None
 
     # -- the dispatcher -------------------------------------------------------------
 
@@ -33,6 +50,13 @@ class _EventsMixin:
                     return
                 self._events = events.Dispatcher()
             d = self._events
+            if self._events_cmd is None:
+                self._events_cmd = _CommandBridge(self)
+                self._events_cmd.got.connect(self._events_command)
+            bridge = self._events_cmd
+            d.on_command = bridge.got.emit
+            self._events_volume_now(publish=False)
+            self._events_favorites()
             d.configure(cfg)
             if self._events_rec is None:
                 self._events_rec = events.RecordingWatch(list(self.rec.jobs))
@@ -43,6 +67,90 @@ class _EventsMixin:
         except Exception:
             log.warning("events: could not apply the settings", exc_info=True)
 
+    # -- Home Assistant's commands (the window's thread) ------------------------------
+
+    def _events_command(self, name: str, value: Any) -> None:
+        """A command from the broker: done as the media keys and the remote
+        API do it. Never what it said in the log - a channel's name is
+        what is watched."""
+        try:
+            if sip.isdeleted(self) or self._events_live() is None or not self._events.cfg.commands:
+                return
+            log.info("events: %s, asked over MQTT", name)
+            if name in ("playpause", "stop"):
+                self._remote_media(name)
+            elif name in ("channel_up", "channel_down"):
+                self._play_channel_step(1 if name == "channel_up" else -1)
+            elif name == "volume":
+                self._remote_media("volume", max(0, min(100, int(value))) / 100.0)
+            elif name == "favorite":
+                row = (self._events_favs or {}).get(str(value))
+                if row is not None and self._chno_rows([row]):
+                    self.play_live_channel(row)
+                else:
+                    log.debug("events: no such favourite - ignored")
+            elif name == "play":
+                text = str(value).strip()
+                self.handle_command({"number": int(text)} if text.isdigit() else {"channel": text})
+        except Exception:
+            log.debug("events: a command", exc_info=True)
+
+    def _events_favorites(self) -> None:
+        """The favourite channels Home Assistant's list offers, again."""
+        try:
+            pairs = mqtt_control.favorite_options(self._favorite_channels())
+            self._events_favs = dict(pairs)
+            if self._events is not None:
+                self._events.set_favorites(name for name, _r in pairs)
+        except Exception:
+            log.debug("events: favourites", exc_info=True)
+
+    def _favorites_changed(self) -> None:
+        """FavoriteStore.on_change: told once the changes settle."""
+        t = self._events_fav_timer
+        if t is None:
+            t = self._events_fav_timer = QTimer(self)
+            t.setSingleShot(True)
+            t.setInterval(300)
+            t.timeout.connect(self._events_favorites)
+        t.start()
+
+    def _watch_favorites(self) -> None:
+        """The source's favourites (made anew with each source) report
+        their changes."""
+        favs = getattr(self, "favs", None)
+        if favs is not None:
+            favs.on_change = self._favorites_changed
+        if self._events is not None:
+            self._favorites_changed()
+
+    def _events_volume(self, *_a) -> None:
+        """The player's volume moved: told once it rests."""
+        if self._events_live() is None:
+            return
+        t = self._events_vol_timer
+        if t is None:
+            t = self._events_vol_timer = QTimer(self)
+            t.setSingleShot(True)
+            t.setInterval(300)
+            t.timeout.connect(self._events_volume_now)
+        t.start()
+
+    def _events_volume_now(self, publish: bool = True) -> None:
+        d = self._events
+        p = getattr(self, "player", None)
+        if d is None or p is None:
+            return
+        try:
+            muted = bool(getattr(p, "_muted", False))
+            value = int(getattr(p, "_vol_before_mute", p.vol.value()) if muted else p.vol.value())
+        except Exception:
+            return
+        if publish:
+            d.set_volume(value)
+        else:
+            d.volume = max(0, min(100, value))
+
     def _events_live(self) -> events.Dispatcher | None:
         d = self._events
         return d if d is not None and d.active else None
@@ -50,16 +158,29 @@ class _EventsMixin:
     def _events_publish_state(self) -> None:
         d = self._events_live()
         if d is not None:
-            now = self._events_now or {}
-            d.set_state(self._events_state, now.get("fields"), privacy.private())
+            d.set_state(self._events_state, self._events_state_fields(), privacy.private())
+
+    def _events_state_fields(self) -> dict | None:
+        """What the state says plays: the events' fields, and - for Home
+        Assistant's list - the favourite it is (left out while private)."""
+        now = self._events_now
+        if now is None:
+            return None
+        fields = dict(now.get("fields") or {})
+        key = now["id"][1] if now["id"][0] == "live" else None
+        if key is not None and self._events_favs:
+            name = next((n for n, row in self._events_favs.items()
+                         if str(row.get("stream_id")) == str(key)), None)
+            if name:
+                fields["favorite"] = name
+        return fields
 
     def _events_send(self, event: str, fields: dict | None, state: str | None = None) -> None:
         d = self._events_live()
         if d is None:
             return
-        now = self._events_now or {}
         d.emit(event, fields, privacy.private(),
-               state=(state, now.get("fields")) if state is not None else None)
+               state=(state, self._events_state_fields()) if state is not None else None)
 
     def _events_quit(self) -> None:
         """closeEvent: app_quitting and "off" on their way; never waited for here."""

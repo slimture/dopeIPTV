@@ -1786,6 +1786,7 @@ class RestoreBackupDialog(QDialog):
                      "nerd_mqtt_host": ("nerd_card_mqtt", "nerd_mqtt_host"),
                      "nerd_remote": ("nerd_remote",),
                      "nerd_share": ("nerd_share",),
+                     "nerd_mqtt_commands": ("nerd_card_mqtt", "nerd_mqtt_commands"),
                      # A playlist's own options.
                      "proxy": ("nerd_proxy",),
                      "headers": ("nerd_headers",),
@@ -1808,7 +1809,7 @@ class RestoreBackupDialog(QDialog):
         that lets others in with who, a playlist with its options."""
         lines = []
         for key, value in risky:
-            if key in ("nerd_remote", "nerd_share"):
+            if key in ("nerd_remote", "nerd_share", "nerd_mqtt_commands"):
                 lines.append(cls._label(key) + (" · " + tr("nerd_remote_home")
                                                 if value else ""))
             else:

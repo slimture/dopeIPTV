@@ -66,8 +66,17 @@ class FavoriteStore:
             str(g): [x for x in items if isinstance(x, dict)]
             for g, items in raw.items() if isinstance(items, list)}
 
+    #: Told after every change (the window passes the list on to Home
+    #: Assistant); never allowed to break the save.
+    on_change: Any = None
+
     def _save(self) -> None:
         self.settings.setValue(self.key, json.dumps(self.groups))
+        if self.on_change is not None:
+            try:
+                self.on_change()
+            except Exception:
+                pass
 
     def group_names(self) -> list[str]:
         return sorted(self.groups, key=str.lower)
@@ -196,6 +205,11 @@ class FavoriteStore:
         (current.add if locked else current.discard)(group)
         self.settings.setValue(f"{self.key}_locked",
                                json.dumps(sorted(current)))
+        if self.on_change is not None:
+            try:
+                self.on_change()
+            except Exception:
+                pass
 
     def is_locked(self, group: str) -> bool:
         return group in self.locked_groups()

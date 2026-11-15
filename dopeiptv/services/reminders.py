@@ -38,7 +38,8 @@ class ReminderStore:
             stop=None) -> None:
         """A reminder for *title* on *ch* at *start*; one already there for
         that channel and start is replaced. *rule*: the series rule that set
-        it, *stop* its programme's end."""
+        it, *stop* its programme's end, where the guide says (the calendar
+        shows it as long as it is)."""
         sid = ch.get("stream_id")
         start = int(start)
         self._items = [r for r in self._items
@@ -52,8 +53,12 @@ class ReminderStore:
         }
         if rule:
             item["rule"] = str(rule)
-            if stop is not None:
-                item["stop"] = int(stop)
+        try:
+            end = int(stop) if stop is not None else 0
+        except (TypeError, ValueError):
+            end = 0
+        if end > start:
+            item["stop"] = end
         self._items.append(item)
         self._save()
 

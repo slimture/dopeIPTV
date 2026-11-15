@@ -80,6 +80,17 @@ def parse_connect(body: bytes) -> dict:
     return out
 
 
+def topic_matches(filt: str, topic: str) -> bool:
+    """A topic filter as a broker reads it: + one level, # the rest."""
+    f, t = filt.split("/"), topic.split("/")
+    for i, part in enumerate(f):
+        if part == "#":
+            return True
+        if i >= len(t) or (part != "+" and part != t[i]):
+            return False
+    return len(f) == len(t)
+
+
 class FakeBroker:
     """Reads the packets the app sends, answers as a broker does; *connack*
     and *suback* are what it answers a login and a subscription with."""
@@ -147,8 +158,13 @@ class FakeBroker:
             assert (flags >> 1) & 3 == 0, "QoS 0 only"
             self.publishes.append((topic.decode(), body[i:], bool(flags & 1), n))
             for other, subs in list(self._subs.items()):
-                if topic.decode() in subs:
-                    self.conns[other].sendall(bytes([0x30]) + mqtt.encode_length(len(body)) + body)
+                if any(topic_matches(f, topic.decode()) for f in subs):
+                    # As a broker passes it on: not retained (3.3.1.3). A
+                    # subscriber that went away holds up no other.
+                    try:
+                        self.conns[other].sendall(bytes([0x30]) + mqtt.encode_length(len(body)) + body)
+                    except OSError:
+                        self._subs.pop(other, None)
         elif ptype == 8:
             assert flags == 2
             pid = body[:2]

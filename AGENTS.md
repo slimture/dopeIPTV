@@ -107,9 +107,14 @@ map and the one-way import rule.
 | `core/series_rules.py` | Series recordings: rules (exact title or a word, one channel or any; record or remind), the guide looked through for their airings, the plan (padding, nothing twice, one copy of a programme on two channels, a cancelled one not again), the reminders' plan (at the programme's start, none twice, a removed one not again, moved with its programme), their store; recording padding |
 | `core/url_rewrite.py` | Nerd: a source's rewrite rules for its stream addresses (find -> replace, plain or regex, in order; bad ones refused, skipped in playback), applied by `make_client` to every address it hands out; the preview line and its Test |
 | `core/hls_cap.py` | Nerd: the highest quality adaptive (HLS) streams play at - `hls-bitrate`, and the variant (picture and sound together) the player switches to at file-loaded for a size cap |
-| `core/remote_api.py` | The remote API and shared lists' small HTTP server (token on every request, this computer only unless chosen) |
+| `core/remote_api.py` | The remote API and shared lists' small HTTP server (token on every request, this computer only unless chosen; the calendar at `/calendar.ics` with remote control on) |
 | `core/events.py` | Nerd: events pushed out - webhooks (POST JSON, token header, retries) and MQTT (event, retained state, last will, Home Assistant discovery); a queue and a thread per receiver; private viewing sends what happened, not what; the recordings' statuses as events; its checks |
-| `core/mqtt.py` | A small MQTT 3.1.1 client in the standard library (CONNECT with login and will, PUBLISH QoS 0, SUBSCRIBE, PINGREQ, TLS) |
+| `core/mqtt.py` | A small MQTT 3.1.1 client in the standard library (CONNECT with login and will, PUBLISH QoS 0, SUBSCRIBE, PINGREQ, TLS; `take()` reads what the broker sent without waiting) |
+| `core/mqtt_control.py` | Nerd: Home Assistant's commands over MQTT - the topics (`<prefix>/command/+`), what a message asks (a retained or unknown one ignored, logged at debug), the controls' discovery (buttons, volume, favourites list, text) and taking them away |
+| `core/phone_remote.py` | The phone remote's server: the home network, the token as the first part of every address, a token bucket and a lock-out per client, only the page and what it asks (state, channels, commands, a cached raster logo, the calendar) |
+| `core/phone_page.py` | The phone remote's page: HTML/CSS/JS in one, nothing from elsewhere, the app's dark and light palettes (#rrggbb only), its words, a CSP of its own script and style hashes |
+| `core/qr.py` | A QR code encoder in plain Python: byte mode, levels L/M/Q/H (M by default), versions 1-40, the best mask by penalty |
+| `core/ical.py` | Reminders and scheduled recordings as iCalendar (RFC 5545): stable UIDs, DTSTAMP, UTC times, escaping, folding at 75 octets, CRLF |
 | `core/supporter.py` | The supporter key: signed by dopeiptv.org, checked offline, nothing about the person in it |
 | `core/backup.py` | Full backup and restore: every setting a person would miss in one JSON file (logins included, caches, window layout and machine state left out); a restore over everything waits for the next start (`stage` / `apply_pending`) |
 | `core/sync.py` | Settings sync for supporters: the sync code, slot and key (HKDF), what syncs (explicit allow/deny lists), stamping, merging (last writer per entry, tombstones), the round trip to dopeiptv.org, applying what came back |
@@ -152,7 +157,7 @@ map and the one-way import rule.
 | `ui/conn_test_dialog.py` | Test connection's window: each step's mark, result and time as it goes (polled, never waited on), SD/HD/Full HD/4K lit by the speed, Copy (scrubbed), Stop, Test again |
 | `ui/source_presets.py` | Presets in the source dialog (Fritz!Box, Channels DVR, Threadfin, xTeVe, Dispatcharr, ErsatzTV) |
 | `ui/mw_box.py` | The box from the app: zap, wake, standby, record on the box from the guide; Nerd's copy address and guide channel |
-| `ui/mw_commands.py` | Commands from outside carried out: play an address or file, a channel by name, come forward |
+| `ui/mw_commands.py` | Commands from outside carried out: play an address or file, a channel by name, come forward, the next or previous channel from the one playing |
 | `ui/mw_privacy.py` | Private viewing and Clear recent history in the window: app-menu entries and shortcuts, the sidebar marker |
 | `ui/mw_series.py` | Series recordings in the window: "Record series…" (Record or Remind me), the rules' look through the guide on the pool when it loads and with its 20-minute check, the jobs added, a reminder rule's reminders set |
 | `ui/mw_stats.py` | Your statistics in the window: the time the docked player plays counted into the log (hooks beside health/events; not while paused, capped per tick), saved every few minutes and on close; "Your statistics…" in the History menu |
@@ -164,7 +169,11 @@ map and the one-way import rule.
 | `ui/mw_health.py` | Stream health in the window: the playback path's hooks (start, picture, drop, fail), the channel menu's "Stream health…", the list's dot |
 | `ui/mw_portal_archive.py` | A Stalker portal's archive in the window: its link asked for off the window's thread (`StalkerClient.archive_link`), played from the moment asked, a go-back carried on to the next programme |
 | `ui/mw_remote.py` | The remote API and sharing in the window: the server as Nerd says, each request's work on the window's thread |
-| `ui/mw_events.py` | Events pushed out in the window: the playback path's and the recordings' hooks (start, pause, stop, channel changed, recording started/ended), handed to `core/events.py`; it only watches |
+| `ui/mw_events.py` | Events pushed out in the window: the playback path's and the recordings' hooks (start, pause, stop, channel changed, recording started/ended), handed to `core/events.py`; it only watches - and, with MQTT's commands on, carries out what Home Assistant asks on the window's thread (the volume and the favourites list kept up to date) |
+| `ui/mw_phone.py` | The phone remote in the window: on and off (kept on for the next start), a new address, each request's work on the window's thread, only the channels the lists show |
+| `ui/phone_remote.py` | The Phone remote… dialog (View): turn on, the code (`QrView`, whole device pixels on a white plate) and the address, New address, Stop |
+| `ui/mw_calendar.py` | The calendar in the window: every source's reminders and the recordings to come as events, the addresses the remote API and the phone remote serve it at |
+| `ui/calendar_export.py` | Export to calendar… (File, and the Reminders window): save an .ics, the subscription addresses with Copy |
 | `ui/mw_report.py` | Send feedback, and the offer of a report after an error or a crash (queued; while a video plays it waits in the menu); answers to feedback (their window, the menu entry's count, when they are asked) |
 | `ui/mw_together.py` | Watch together in the window: start, join and leave (never while private viewing is on), the playback path's hooks (start, pause, stop), what the room plays found here and started where the room is (no resume question), kept in step once a second through the player's play, pause and seek; a live channel only tuned |
 | `ui/together_ui.py` | Watch together's dialog (start a room or join one by its code, the code to share, who is in) and the calm strip under the video |
@@ -206,7 +215,7 @@ sidebar heart, About's link, Home's card), `mw_failover` (failover to another
 source), `mw_series` (series recording rules), `mw_health` (stream
 health per channel), `mw_chanprefs` (a channel's own settings),
 `mw_portal_archive` (a Stalker portal's archive, by programme),
-`mw_events` (events pushed out: webhooks and MQTT), `mw_privacy` (private
+`mw_events` (events pushed out: webhooks and MQTT, Home Assistant's commands), `mw_phone` (the phone remote), `mw_calendar` (reminders and recordings as a calendar), `mw_privacy` (private
 viewing, clear recent history), `mw_report` (feedback, error reports and
 the answers to them), `mw_sync` (settings sync between a supporter's
 computers), `mw_connections` (connections to the account, the warning
@@ -289,7 +298,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   `DOPEIPTV_LOG=debug` shows debug traces; `DOPEIPTV_LOG_FILE=/path` tees
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
-  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan, kodi, mdns, simkl), lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log, player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, connections, mirrors, conn_test, health, nerd, nerd_lists, channel_numbers, shortcut_keys, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, night_mode, rec_mp4, viewing_stats, catchup, url_rewrite, hls_cap, remote_api, events, mqtt, report, supporter, sync, chacha20poly1305, discord_rpc, together, backup, doh, cert_pin, net_route, net_adapter, net_bridge, live_latency) and `services/` (failover, share, resume,
+  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan, kodi, mdns, simkl), lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log, player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, connections, mirrors, conn_test, health, nerd, nerd_lists, channel_numbers, shortcut_keys, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, night_mode, rec_mp4, viewing_stats, catchup, url_rewrite, hls_cap, remote_api, events, mqtt, mqtt_control, phone_remote, phone_page, qr, ical, report, supporter, sync, chacha20poly1305, discord_rpc, together, backup, doh, cert_pin, net_route, net_adapter, net_bridge, live_latency) and `services/` (failover, share, resume,
   coverart, reminders, mpris, media_session, media_macos, media_windows, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list

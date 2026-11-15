@@ -80,7 +80,7 @@ PART_KEYS = {
     "rec": ("nerd_rec_template", "nerd_rec_post"),
     "serve": ("nerd_remote", "nerd_share", "nerd_remote_lan", "nerd_remote_port", "nerd_hooks",
               "nerd_hooks_urls", "nerd_mqtt", "nerd_mqtt_host", "nerd_mqtt_port", "nerd_mqtt_tls",
-              "nerd_mqtt_client", "nerd_mqtt_prefix", "nerd_mqtt_ha"),
+              "nerd_mqtt_client", "nerd_mqtt_prefix", "nerd_mqtt_ha", "nerd_mqtt_commands"),
 }
 
 
@@ -1042,12 +1042,15 @@ def _events_cards(page: SettingsPage, n: nerd.Nerd, lines: list[CheckLine]) -> C
     prefix.setAccessibleName(tr("nerd_mqtt_prefix"))
     ha = ToggleSwitch(n.flag("nerd_mqtt_ha"))
     ha.setAccessibleName(tr("nerd_mqtt_ha"))
+    commands = ToggleSwitch(n.flag("nerd_mqtt_commands"))
+    commands.setAccessibleName(tr("nerd_mqtt_commands"))
 
     def mqtt_now() -> events.Config:
         return events.Config(mqtt_host=host.text().strip(), mqtt_port=port.value(), mqtt_tls=tls.isChecked(),
                              mqtt_user=user.text().strip(), mqtt_pass=password.text(),
                              client_id=client.text().strip() or events.default_client_id(),
-                             prefix=events.clean_prefix(prefix.text()), ha=ha.isChecked())
+                             prefix=events.clean_prefix(prefix.text()), ha=ha.isChecked(),
+                             commands=commands.isChecked())
 
     def mqtt_preview() -> Check | None:
         if not mqtt_on.isChecked():
@@ -1068,13 +1071,15 @@ def _events_cards(page: SettingsPage, n: nerd.Nerd, lines: list[CheckLine]) -> C
                    search="MQTT user name password login"),
              c.row(tr("nerd_mqtt_client"), client, search="MQTT client id"),
              c.row(tr("nerd_mqtt_prefix"), prefix, tr("nerd_mqtt_prefix_hint"), search="MQTT topic prefix"),
+             c.row(tr("nerd_mqtt_commands"), commands, tr("nerd_mqtt_commands_hint"),
+                   search="MQTT commands control Home Assistant button volume favorite channel play pause"),
              c.row(tr("nerd_mqtt_ha"), ha, tr("nerd_mqtt_ha_hint"),
                    search="Home Assistant discovery sensor device", below=mqtt_line)]
     for r in shown:
         c.shown_if(r, mqtt_on.isChecked)
     mqtt_on.toggled.connect(lambda _on, c=c: c.refresh())
     for sig in (mqtt_on.toggled, host.textChanged, port.valueChanged, tls.toggled, user.textChanged,
-                password.textChanged, client.textChanged, prefix.textChanged, ha.toggled):
+                password.textChanged, client.textChanged, prefix.textChanged, ha.toggled, commands.toggled):
         sig.connect(mqtt_line.changed)
     c.note(tr("nerd_applies_hooks"))
 
@@ -1084,7 +1089,8 @@ def _events_cards(page: SettingsPage, n: nerd.Nerd, lines: list[CheckLine]) -> C
                 "nerd_mqtt_host": host.text().strip(), "nerd_mqtt_port": str(port.value()),
                 "nerd_mqtt_tls": flag(tls), "nerd_mqtt_user": user.text().strip(),
                 "nerd_mqtt_pass": password.text(), "nerd_mqtt_client": client.text().strip(),
-                "nerd_mqtt_prefix": prefix.text().strip(), "nerd_mqtt_ha": flag(ha)}
+                "nerd_mqtt_prefix": prefix.text().strip(), "nerd_mqtt_ha": flag(ha),
+                "nerd_mqtt_commands": flag(commands)}
     return values
 
 
@@ -1264,7 +1270,7 @@ def diagnostics(settings: Any) -> str:
             "nerd_vpn_lan", "nerd_proxy_player", "nerd_failover", "nerd_health", "nerd_remote", "nerd_share",
             "nerd_remote_lan", "nerd_remote_port", "nerd_hls_quality", "nerd_hls_max_kbps",
             "nerd_hooks", "nerd_mqtt", "nerd_mqtt_port", "nerd_mqtt_tls", "nerd_mqtt_ha",
-            "nerd_dns", "nerd_dns_fallback", "nerd_low_latency"}
+            "nerd_dns", "nerd_dns_fallback", "nerd_low_latency", "nerd_mqtt_commands"}
     for key in sorted(safe):
         v = n.get(key)
         if v:

@@ -46,6 +46,7 @@ WRITE = {"/api/play": "play", "/api/pause": "pause", "/api/resume": "resume",
          "/api/previous": "previous", "/api/volume": "volume", "/api/seek": "seek",
          "/api/raise": "raise"}
 SHARE = ("/playlist.m3u", "/guide.xml", "/guide.xml.gz")
+CALENDAR = "/calendar.ics"
 
 
 def new_token() -> str:
@@ -94,9 +95,12 @@ class RemoteServer:
 
     def __init__(self, host: str, port: int, token: str,
                  call: Callable[[str, dict], Any], share: Any = None,
-                 remote: bool = True) -> None:
+                 remote: bool = True, calendar: Callable[[], str] | None = None) -> None:
         self.host, self.port, self.token = host, int(port), token
         self.call, self.share, self.remote = call, share, remote
+        # The reminders and recordings as iCalendar (core/ical.py), with
+        # remote control on: GET /calendar.ics?token=...
+        self.calendar = calendar
         self._httpd: _Server | None = None
         self._thread: threading.Thread | None = None
 
@@ -227,6 +231,20 @@ def _make_handler(server: RemoteServer) -> type[BaseHTTPRequestHandler]:
                 self._json(200, {"app": "dopeIPTV", "api": API_VERSION,
                                  "remote": server.remote, "sharing": server.share is not None})
                 return
+            if path == CALENDAR and method in ("GET", "HEAD") and server.remote \
+                    and server.calendar is not None:
+                try:
+                    text = server.calendar()
+                except TimeoutError:
+                    self._json(503, {"error": "the app is busy - try again"})
+                    return
+                except Exception as e:
+                    log.warning("remote: the calendar failed: %s", e)
+                    self._json(500, {"error": type(e).__name__})
+                    return
+                self._send(200, text.encode("utf-8"), "text/calendar; charset=utf-8",
+                           {"Content-Disposition": 'inline; filename="dopeIPTV.ics"'})
+                return
             if not server.remote or not (path in READ or path in WRITE):
                 self._json(404, {"error": "not found"})
                 return
@@ -346,6 +364,9 @@ def check_server(host: str, port: int, token: str, remote: bool, sharing: bool,
                      f"{addresses[-1]}/api/play")
         lines.append(f'  curl -X POST -H "Authorization: Bearer <token>" -d \'{{"number": 12}}\' '
                      f"{addresses[-1]}/api/play")
+        lines.append("")
+        lines.append("Reminders and scheduled recordings, for a calendar to subscribe to:")
+        lines.append(f"  {addresses[-1]}{CALENDAR}?token=<token>")
     if sharing:
         lines.append("")
         lines.append("For another player:")

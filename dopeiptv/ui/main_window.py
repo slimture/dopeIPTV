@@ -77,6 +77,8 @@ from .mw_mirrors import _MirrorsMixin
 from .mw_portal_archive import _PortalArchiveMixin
 from .mw_health import _HealthMixin
 from .mw_remote import _RemoteMixin
+from .mw_phone import _PhoneMixin
+from .mw_calendar import _CalendarMixin
 from .mw_events import _EventsMixin
 from .mw_report import _ReportMixin
 from .mw_sync import _SyncMixin
@@ -137,7 +139,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _MprisMixin,
                  _FollowMixin, _SubtitlesMixin, _CastMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
-                 _HealthMixin, _ChannelPrefsMixin, _RemoteMixin, _EventsMixin, _ReportMixin,
+                 _HealthMixin, _ChannelPrefsMixin, _RemoteMixin, _PhoneMixin, _CalendarMixin,
+                 _EventsMixin, _ReportMixin,
                  _PortalArchiveMixin, _SeriesMixin, _SyncMixin,
                  _ConnectionsMixin, _MirrorsMixin, _TogetherMixin, _StatsMixin,
                  _SimklMixin, _DiscordMixin, QMainWindow):
@@ -224,6 +227,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.xmltv.delay_minutes = self._epg_delay_minutes()
         self.favs = FavoriteStore(
             settings, f"favorites_{pid}" if pid else "favorites")
+        self.favs.on_change = self._favorites_changed
         # Flat, single-group favourites for movies and series - the
         # split Favorites column shows these under 'Movies' and 'Series'
         # alongside the grouped channel favourites.
@@ -470,6 +474,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         multiview_action = action(tr("menu_multiview"), self._show_multiview)
         cast_action = action(tr("ctx_cast_to_chromecast"), self.cast_playing)
         together_action = action(tr("together_title") + "…", self.open_together)
+        phone_action = action(tr("phone_menu"), self.open_phone_remote)
+        calendar_action = action(tr("cal_menu"), self.open_calendar_export)
         private_action, clear_action = self._build_privacy_actions()
         self._donate_action = action(tr("donate_support") + "…", lambda: self.open_donate("app-menu"))
         # Where a supporter key goes, in plain sight (the site's thank-you
@@ -486,8 +492,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         menus = lay_out(self.menuBar(), {
             "about": about_action, "settings": settings_action,
             "open_video": open_video_action, "refresh": refresh_action,
-            "reminders": reminders_action, "multiview": multiview_action,
-            "cast": cast_action, "together": together_action,
+            "reminders": reminders_action, "calendar": calendar_action,
+            "multiview": multiview_action, "cast": cast_action,
+            "together": together_action, "phone": phone_action,
             "private": private_action, "clear": clear_action,
             "stats": stats_action,
             **report_actions, "website": website_action,
@@ -507,6 +514,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             multiview_action: lambda: tr("menu_multiview"),
             cast_action: lambda: tr("ctx_cast_to_chromecast"),
             together_action: lambda: tr("together_title") + "…",
+            phone_action: lambda: tr("phone_menu"),
+            calendar_action: lambda: tr("cal_menu"),
             about_action: lambda: tr("menu_about"),
             quit_action: lambda: tr("menu_quit"),
             self._donate_action: lambda: tr("donate_support") + "…",
@@ -1318,6 +1327,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.paused_changed.connect(self._events_paused)
             self.player.paused_changed.connect(self._discord_paused)
             self.player.paused_changed.connect(self._simkl_paused)
+            self.player.vol.valueChanged.connect(self._events_volume)
             self.player.stopped.connect(self._apply_play_icon)
             self.player.finished.connect(self._apply_play_icon)
             self.player.timeshift_seek.connect(self._on_timeshift_seek)
@@ -2272,6 +2282,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # Another provider's category ids say nothing about this one's.
             self._last_cat = {}
             self.favs = FavoriteStore(self.settings, f"favorites_{pid}")
+            self._watch_favorites()
             self.movie_favs = FavoriteStore(
                 self.settings, f"movie_favorites_{pid}", id_key="stream_id")
             self.series_favs = FavoriteStore(
@@ -5833,6 +5844,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._events_quit()
         self._discord_quit()
         self._remote_stop()
+        self.phone_remote_stop(keep=True)
         self.cover.flush()
         if self._trakt_active:
             active = self._trakt_active

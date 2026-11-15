@@ -294,6 +294,34 @@ def test_the_remote_controls_token_is_never_taken_from_a_backup(tmp_path):
     assert "nerd_remote_token" not in _on_disk(fresh)["main"]    # made anew when it starts
 
 
+def test_the_phone_remote_stays_with_this_computer_and_mqtt_commands_are_named(tmp_path):
+    """The phone remote's address (its token), port and switch belong to
+    this computer's home network: never in a backup, never taken from one.
+    MQTT's commands let the broker's clients in: shown before a restore."""
+    src = _stores(tmp_path, "src")
+    for key, value in (("phone_remote", "true"), ("phone_remote_token", "phone-secret"),
+                       ("phone_remote_port", "3674"), ("nerd_mqtt_commands", "true"),
+                       ("nerd_remote_lan", "true")):
+        src["main"].setValue(key, value)
+    doc = backup.collect(src, "1.5.0")
+    main = doc["stores"]["main"]
+    assert not {"phone_remote", "phone_remote_token", "phone_remote_port"} & set(main)
+    assert "phone-secret" not in json.dumps(doc)
+    b = backup.parse(doc)
+    assert dict(backup.risky(b))["nerd_mqtt_commands"] == ""     # not the remote API's home network
+    assert not backup.new_token_here(b)
+    from dopeiptv.i18n import tr
+    from dopeiptv.ui.dialogs import RestoreBackupDialog
+    assert RestoreBackupDialog.risky_lines([("nerd_mqtt_commands", "")], []) == [
+        tr("nerd_card_mqtt") + " · " + tr("nerd_mqtt_commands")]
+    hand = backup.parse({backup.MAGIC: 1, "app_version": "1.5.0", "created": "",
+                         "stores": {"main": {"theme": "nord", "phone_remote": "true",
+                                             "phone_remote_token": "known"}}})
+    dst = _stores(tmp_path, "dst")
+    backup.restore(hand, dst)
+    assert not {"phone_remote", "phone_remote_token"} & set(_on_disk(dst)["main"])
+
+
 # -- a backup that would only empty what is here --------------------------------
 
 @pytest.mark.parametrize("stores", [

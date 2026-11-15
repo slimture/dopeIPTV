@@ -96,6 +96,35 @@ class _CommandsMixin:
         run_async(self.pool, lambda: client.live_streams(None), done,
                   lambda _e=None: done([]))
 
+    def _play_channel_step(self, direction: int) -> bool:
+        """The next (1) or previous (-1) channel from the one playing, as
+        a remote's channel up and down: in the list on screen when it
+        holds it (the list follows), else in the whole source. False when
+        no channel plays."""
+        last = getattr(self, "_last_playback", None) or {}
+        cur = (last.get("item") or {}).get("stream_id")
+        if last.get("kind") != "live" or cur is None or self.player is None \
+                or not self._media_active():
+            return False
+        if self.mode in ("live", "fav") and not self.series_ctx:
+            for i in range(self.list_model.rowCount()):
+                it = self.list_model.item_at(i)
+                if it and not it.get("_header") and str(it.get("stream_id")) == str(cur):
+                    self.listw.setCurrentIndex(self.list_model.index(i))
+                    self._zap(direction)
+                    return True
+        client = self.client
+
+        def done(rows: Any) -> None:
+            if client is not self.client:
+                return
+            shown = self._chno_rows(list(rows or []))
+            at = next((i for i, r in enumerate(shown) if str(r.get("stream_id")) == str(cur)), None)
+            if at is not None and len(shown) > 1:
+                self.play_live_channel(shown[(at + direction) % len(shown)])
+        run_async(self.pool, lambda: client.live_streams(None), done, lambda _e=None: None)
+        return True
+
     def _play_channel_number(self, number: int) -> None:
         """The channel with *number* in the whole source - the user's own
         number (Nerd) first, else the source's - typed or asked for. Only
