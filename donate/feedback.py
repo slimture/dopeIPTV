@@ -260,6 +260,16 @@ def _sig_key(sig: str) -> str:
     return hashlib.sha1(sig.encode("utf-8")).hexdigest()[:16]
 
 
+def _item_state(state: dict, r: dict) -> str:
+    """A report's own state, else its problem's (a crash marked seen or fixed
+    in Problems is no longer unread), else new."""
+    own = state.get(r["id"])
+    if own:
+        return own
+    sig = r.get("sig") or ""
+    return (state.get(_sig_key(sig)) if sig else None) or "new"
+
+
 # -- answers -------------------------------------------------------------------------
 
 def _replies_path(stats_dir: str) -> str:
@@ -396,7 +406,7 @@ def summary(stats_dir: str, days: int) -> dict:
         if r["kind"] == "feedback":
             topics[r.get("topic") or ""] = topics.get(r.get("topic") or "", 0) + 1
     items = [{"id": r["id"], "t": r["t"], "kind": r["kind"], "version": r["version"], "os": r["os"],
-              "sig": r.get("sig") or "", "preview": _preview(r), "state": state.get(r["id"], "new"),
+              "sig": r.get("sig") or "", "preview": _preview(r), "state": _item_state(state, r),
               "answerable": bool(r.get("reply")), "replies": len(answered["report"].get(r["id"], [])),
               **{k: r[k] for k in (*CHOICES, "from", "sup") if r.get(k)}}
              for r in sorted(rows, key=lambda r: -r["t"]) if r.get("text")][:300]
