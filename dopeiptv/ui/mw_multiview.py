@@ -1406,7 +1406,9 @@ class _MultiviewMixin:
         paused = getattr(p, "_paused", False)
         menu.addAction(tr("btn_play") if paused else tr("btn_pause"),
                        p.toggle_pause)
-        menu.addAction(tr("btn_stop"), p.stop)
+        # The Stop button: it also ends the recording, the scrobbles and the
+        # wake lock (player.stop() alone left the screen kept awake).
+        menu.addAction(tr("btn_stop"), p.stop_btn.click)
         # In fullscreen the same toggle leaves it, so label it accordingly.
         menu.addAction(
             tr("tooltip_exit_fullscreen") if getattr(p, "_fs_ui", False)

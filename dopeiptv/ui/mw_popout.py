@@ -770,7 +770,9 @@ class _PopoutMixin:
             paused = getattr(p, "_paused", False)
             m.addAction(tr("btn_play") if paused else tr("btn_pause"),
                         p.toggle_pause)
-            m.addAction(tr("btn_stop"), p.stop)
+            # The Stop button, as the pop-out's own bar has it: it also ends
+            # the recording, the scrobbles and the wake lock.
+            m.addAction(tr("btn_stop"), p.stop_btn.click)
             opts = m.addMenu(tr("tooltip_audio_subs_aspect"))
             # The window's own entries (casting, Watch together) at this
             # menu's top level, not a second time in the submenu.

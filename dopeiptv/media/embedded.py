@@ -3552,7 +3552,10 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
         self._sleep_badge_timer.stop()
         self.sleep_badge.hide()
         self.set_overlay_info(tr("sleep_stopping"))
-        self.stop()
+        # The Stop button, not stop() alone: the window also ends the
+        # recording, the scrobbles and the wake lock on it - so the screen
+        # can sleep once the timer has stopped what played.
+        self.stop_btn.click()
 
     def _show_stats(self) -> None:
         if self._stats_overlay.isVisible():
