@@ -136,6 +136,7 @@ def same(a: str, b: str) -> bool:
 #: The app menu's own keys (main_window.py, mw_privacy.py) and the entry
 #: each opens.
 APP_KEYS: dict[str, str] = {"Ctrl+O": "menu_open_video",
+                            "Ctrl+L": "menu_open_address",
                             "Ctrl+Shift+N": "private_menu",
                             "Ctrl+Shift+Del": "clear_menu"}
 

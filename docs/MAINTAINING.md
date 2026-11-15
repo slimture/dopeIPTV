@@ -429,13 +429,13 @@ Plex are in)
 - **DVBViewer Media Server** (big on Windows, above all in Germany).
 - **NextPVR** and **MythTV**.
 
-**Other kinds of streams**
+**Other kinds of streams** (yt-dlp's sites and radio-browser.info are in:
+`core/ytdlp.py`, `ui/mw_webstreams.py`, `providers/radio_browser.py`,
+`ui/mw_radio.py`)
 
-- **Live streams through yt-dlp** (YouTube Live, Twitch and more): mpv's
-  ytdl hook already plays them; what is missing is a way to add and
-  bundle yt-dlp (it changes often, so it must update without a release).
-- **Internet radio from radio-browser.info**: stations with logos and
-  genres, beside the music library.
+- **yt-dlp's subtitles and chapters** where the app resolves the address
+  itself (a libmpv without the ytdl hook - the Flatpak's): today one
+  stream with picture and sound, no separate audio, no subtitles.
 
 **On the TV, from the sofa**
 

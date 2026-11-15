@@ -1036,6 +1036,10 @@ class HomePage(QWidget):
         if not url:
             return
         kind = it.get("_kind") or "live"
+        if kind == "radio":
+            # A station: as Radio plays it (its now-playing title, the click).
+            w._radio_play(it)
+            return
         ctx = it.get("_series_ctx") or {}
         if kind == "episode" and ctx.get("series_id") is None:
             # An old entry recorded before the series snapshot existed: no

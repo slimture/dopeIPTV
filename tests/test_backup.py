@@ -28,6 +28,14 @@ from dopeiptv.core.stores import PlaylistStore
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+def test_radio_stations_and_web_streams_are_favorites_the_yt_dlp_check_is_not_kept():
+    assert backup._kind_of("radio_favorites") == "favorites"
+    assert backup._kind_of("web_favorites") == "favorites"
+    assert backup._kind_of("web_favorites_colors") == ""
+    assert backup.covered("main", "radio_favorites") and backup.covered("main", "ytdlp_managed")
+    assert backup.left_out("ytdlp_checked")
+
+
 SOURCES = [
     {"id": "a", "name": "A", "kind": "xtream", "server": "http://a.invalid",
      "username": "user", "password": "secret", "epg_url": "", "refresh": "never"},

@@ -460,7 +460,7 @@ class _SettingsMixin:
             "home": "nav_home", "live": "nav_tv", "guide": "nav_guide",
             "vod": "nav_movies", "series": "nav_series",
             "rec": "nav_recordings", "local": "nav_local",
-            "fav": "nav_favorites", "watchlist": "nav_watchlist",
+            "radio": "nav_radio", "fav": "nav_favorites", "watchlist": "nav_watchlist",
             "history": "nav_history",
         }
         rail = getattr(self, "_sidebar_collapsed", False)
@@ -1123,6 +1123,8 @@ class _SettingsMixin:
         nerd_link(c, "set_link_stream",
                   [tr("nerd_probe"), tr("nerd_cache"), tr("nerd_card_hls"),
                    tr("nerd_card_latency")], "player")
+        # YouTube, Twitch and the like: which yt-dlp opens them (mw_webstreams).
+        self._build_ytdlp_card(play, d)
         # Rewinding live TV has a card of its own: its five settings sat in
         # "Stream" between the stream format and the network buffer.
         c = rw = play.card(tr("set_card_rewind"))
@@ -1346,6 +1348,8 @@ class _SettingsMixin:
         # carries the Discord application's id.
         if hasattr(self, "_build_discord_card"):
             self._build_discord_card(integrations, d)
+        # The radio directory: whether a station played is told (mw_radio).
+        self._build_radio_card(integrations)
 
         # -- Programme guide --------------------------------------------------
         epg_count_box = Stepper(lo=self.EPG_UPCOMING_MIN,

@@ -70,17 +70,22 @@ class _CommandsMixin:
             return {"ok": True}
         return {"ok": bool(cmd.get("open"))}
 
-    def _play_address(self, url: str) -> None:
+    def _play_address(self, url: str, title: str | None = None) -> None:
         """A file plays as one opened from Local files (resume, its name);
-        an address as a stream, kept out of Recently viewed - it is no
-        channel or title of a source."""
+        a page of YouTube, Twitch and the like through yt-dlp
+        (mw_webstreams); any other address as a stream. Kept out of
+        Recently viewed - it is no channel or title of a source."""
         if url.startswith("file://"):
             from urllib.parse import unquote, urlsplit
             url = unquote(urlsplit(url).path)
         if url.startswith("/") or os.path.isfile(url):
             self._play_local_path(url)
             return
-        title = os.path.basename(url.split("?")[0].rstrip("/")) or url
+        from ..core.ytdlp import is_web_stream
+        if is_web_stream(url):
+            self._play_web(url, title)
+            return
+        title = title or os.path.basename(url.split("?")[0].rstrip("/")) or url
         self._start_playback(url, title, None, url, "live", record=False)
 
     def _play_channel_named(self, name: str) -> None:

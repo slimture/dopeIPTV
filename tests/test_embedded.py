@@ -312,6 +312,26 @@ def test_video_playback_is_never_touched_by_the_music_features():
     w._apply_audio_visuals("http://host/live/2.m3u8")
     assert touched == []
 
+    # A radio station (an address with no audio extension) is music too,
+    # and the channel after it gets its picture back.
+    w._apply_audio_visuals("http://radio.example/stream", audio=True)
+    assert touched == ["vis", "eq"]
+    touched.clear()
+    w._apply_audio_visuals("http://host/live/3.ts")
+    assert touched == ["vis"]
+
+
+def test_the_preview_takes_a_visualiser_down_before_it_plays():
+    """A channel previewed after music or a radio station played with the
+    visualiser in place of its picture: the preview never went through
+    _start_playback, where it is taken down."""
+    import inspect
+
+    from dopeiptv.ui.main_window import MainWindow
+
+    src = inspect.getsource(MainWindow._play_preview)
+    assert src.index("self._apply_audio_visuals(url)") < src.index("self.player.play(")
+
 
 def test_the_embedded_branch_reaches_player_play():
     """The music bookkeeping once sat at top level inside _start_playback,

@@ -101,7 +101,7 @@ def test_what_the_build_carries_is_what_settings_offers():
     # history they fill together - no page of Simkl's own.
     assert _line(with_both, "HISTORY") == ["Trakt", "Simkl", "Watched_history"]
     assert "simkl" not in _line(with_both, "PAGES")
-    assert _line(with_both, "INTEGRATIONS") == ["OpenSubtitles.com", "Discord"]
+    assert _line(with_both, "INTEGRATIONS") == ["OpenSubtitles.com", "Discord", "radio-browser.info"]
     assert "DISCORD True true" in with_both and "SIMKL True" in with_both
 
 
@@ -110,5 +110,5 @@ def test_without_the_ids_neither_is_offered():
     if "SIMKL True" in out:
         return              # a checkout with a _simkl_key.py of its own
     assert _line(out, "HISTORY") == ["Trakt", "Watched_history"]
-    assert _line(out, "INTEGRATIONS") == ["OpenSubtitles.com"]
+    assert _line(out, "INTEGRATIONS") == ["OpenSubtitles.com", "radio-browser.info"]
     assert "DISCORD False" in out

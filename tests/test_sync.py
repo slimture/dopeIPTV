@@ -466,6 +466,33 @@ def test_the_same_playlist_under_another_id_is_one_playlist(tmp_path, site):
     assert "cccc3333" in [p["id"] for p in a.playlists.items]
 
 
+def test_radio_stations_and_web_streams_sync_whatever_the_source(tmp_path, site):
+    """Favourites of no source (mw_radio, mw_webstreams): one list each, on
+    every computer, without a playlist in common - added and removed alike."""
+    slot, key = sync.derive(os.urandom(32))
+    remote = sync.Remote(slot, site.url, timeout=5)
+    a, b = Computer(tmp_path, "a", slot), Computer(tmp_path, "b", slot)
+    FavoriteStore(a.settings, "radio_favorites", "stationuuid").add(
+        "all", {"stationuuid": "u-jazz", "name": "Jazz", "url": "http://x/jazz"})
+    FavoriteStore(a.settings, "web_favorites", "url").add(
+        "Games", {"url": "https://www.twitch.tv/x", "name": "X", "_live": True})
+    snap = sync.collect(a.ctx, ["favorites"])
+    assert any(k.startswith('["*", "radio", "i"') for k in snap.values["favorites"])
+    a.round(remote, key, now=100)
+    b.state.fresh = b.state.joining = True
+    _result, applied = b.round(remote, key, now=200)
+    assert sync.GLOBAL_FP in applied.favorites
+    radio = FavoriteStore(b.settings, "radio_favorites", "stationuuid")
+    assert [x["name"] for x in radio.items()] == ["Jazz"]
+    web = FavoriteStore(b.settings, "web_favorites", "url")
+    assert web.groups == {"Games": [{"url": "https://www.twitch.tv/x", "name": "X", "_live": True}]}
+    radio.remove("u-jazz")
+    b.round(remote, key, now=300)
+    a.round(remote, key, now=400)
+    assert FavoriteStore(a.settings, "radio_favorites", "stationuuid").items() == []
+    assert FavoriteStore(a.settings, "web_favorites", "url").is_favorite("https://www.twitch.tv/x")
+
+
 def test_the_playlist_in_use_is_never_removed_by_a_sync(tmp_path, site):
     slot, key = sync.derive(os.urandom(32))
     remote = sync.Remote(slot, site.url, timeout=5)

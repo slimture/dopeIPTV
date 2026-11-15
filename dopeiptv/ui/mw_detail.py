@@ -54,9 +54,10 @@ class _DetailMixin:
             # make what you are listening to disappear.
             lp = getattr(self, "_last_playback", None) or {}
             playing = lp.get("item")
-            if (playing and lp.get("kind") == "local"
+            if playing and (lp.get("kind") == "radio" or (
+                    lp.get("kind") == "local"
                     and str(lp.get("url") or "").lower().endswith(
-                        getattr(self, "AUDIO_EXTS", ()))):
+                        getattr(self, "AUDIO_EXTS", ())))):
                 self._show_detail(playing)
                 return
             # Nothing selected: leave the pane clean - no empty poster box and
@@ -125,6 +126,12 @@ class _DetailMixin:
         self.d_logo.setStyleSheet(self.PLACEHOLDER_LOGO_STYLE)
         self.d_logo.setText(name.strip()[:1].upper())
         self._load_detail_poster(it, is_media, media_kind)
+
+        if it.get("_kind") in ("radio", "radiogroup", "web"):
+            # A station (what is on, where from, what it plays), a country
+            # or a genre, a web stream: no guide, no TMDB (mw_radio).
+            self._radio_show_detail(it)
+            return
 
         if it.get("_kind") == "local" and str(
                 it.get("_path") or "").lower().endswith(

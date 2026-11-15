@@ -221,7 +221,7 @@ SETTINGS_ALLOW = frozenset({
     "mv_frameless", "mv_on_top", "mv_remember_geo", "mv_stop_docked",
     "mv_new_unmuted", "mv_conflict_mode", "mv_autohide_secs", "mv_seek_step_min",
     "mv_cells",
-    "metadata_source", "music_art_online", "check_updates",
+    "metadata_source", "music_art_online", "check_updates", "radio_report_clicks",
 })
 #: Families of settings that sync: Home's shelves, the sidebar's colours,
 #: keyboard shortcuts (stored per operating system, so they never cross).
@@ -278,6 +278,12 @@ def _scalar(value: Any) -> str | None:
 _FAV_KINDS = (("chan", "favorites", "stream_id"),
               ("movie", "movie_favorites", "stream_id"),
               ("series", "series_favorites", "series_id"))
+#: Favourites of no source - radio stations, web streams (YouTube, Twitch):
+#: under GLOBAL_FP instead of a source's fingerprint, the key without a
+#: source's id.
+GLOBAL_FP = "*"
+_GLOBAL_FAV_KINDS = (("radio", "radio_favorites", "stationuuid"),
+                     ("web", "web_favorites", "url"))
 #: History of these kinds stays here: a file or a recording of this computer.
 _LOCAL_KINDS = ("local", "recording")
 _RESUME_GROUPS = ("vod:", "episode:")
@@ -352,26 +358,33 @@ def _collect_settings(settings: Any) -> dict[str, Any]:
     return out
 
 
+def _collect_store(out: dict[str, Any], settings: Any, fp: str, kind: str,
+                   key: str, id_key: str) -> None:
+    store = FavoriteStore(settings, key, id_key)
+    for group, items in store.groups.items():
+        out[_eid(fp, kind, "g", group)] = 1
+        order = []
+        for item in items:
+            ident = item.get(id_key)
+            if ident is None or ident == "":
+                continue
+            out[_eid(fp, kind, "i", group, ident)] = item
+            order.append(str(ident))
+        if len(order) > 1:
+            out[_eid(fp, kind, "o", group)] = order
+    colours = _json(settings.value(f"{key}_colors"), {})
+    for group, colour in colours.items():
+        if isinstance(colour, dict) and any(colour.values()):
+            out[_eid(fp, kind, "c", group)] = colour
+
+
 def _collect_favorites(settings: Any, fps: dict[str, str]) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for fp, pid in fps.items():
         for kind, prefix, id_key in _FAV_KINDS:
-            store = FavoriteStore(settings, f"{prefix}_{pid}", id_key)
-            for group, items in store.groups.items():
-                out[_eid(fp, kind, "g", group)] = 1
-                order = []
-                for item in items:
-                    ident = item.get(id_key)
-                    if ident is None or ident == "":
-                        continue
-                    out[_eid(fp, kind, "i", group, ident)] = item
-                    order.append(str(ident))
-                if len(order) > 1:
-                    out[_eid(fp, kind, "o", group)] = order
-            colours = _json(settings.value(f"{prefix}_{pid}_colors"), {})
-            for group, colour in colours.items():
-                if isinstance(colour, dict) and any(colour.values()):
-                    out[_eid(fp, kind, "c", group)] = colour
+            _collect_store(out, settings, fp, kind, f"{prefix}_{pid}", id_key)
+    for kind, key, id_key in _GLOBAL_FAV_KINDS:
+        _collect_store(out, settings, GLOBAL_FP, kind, key, id_key)
     return out
 
 
@@ -434,6 +447,10 @@ def digest(ctx: Context, cats: tuple[str, ...] | list[str]) -> str:
     pids = [str(p["id"]) for p in ctx.sources()]
     if "sources" in cats:
         take(st, "playlists")
+    if "favorites" in cats:
+        for _kind, key, _id in _GLOBAL_FAV_KINDS:
+            take(st, key)
+            take(st, f"{key}_colors")
     for pid in pids:
         if "favorites" in cats:
             for _kind, prefix, _id in _FAV_KINDS:
@@ -473,6 +490,8 @@ def _in_domain(cat: str, ident: str, entry: dict, snap: Snapshot) -> bool:
     if cat == "settings":
         return syncable(ident)
     parts = _parts(ident)
+    if cat == "favorites" and parts[:1] == [GLOBAL_FP]:
+        return True
     if cat in ("favorites", "history"):
         return bool(parts) and parts[0] in snap.fps
     if cat == "sources":
@@ -719,7 +738,7 @@ def round_trip(remote: Remote, key: bytes, doc: dict[str, Any], snap: Snapshot,
 class Applied:
     """What a round changed on this computer."""
     settings: set[str] = field(default_factory=set)
-    favorites: set[str] = field(default_factory=set)     # playlist ids
+    favorites: set[str] = field(default_factory=set)     # playlist ids, GLOBAL_FP
     history: set[str] = field(default_factory=set)       # playlist ids
     sources: bool = False
     skipped: set[str] = field(default_factory=set)       # changed meanwhile
@@ -762,15 +781,21 @@ def _apply_favorites(ctx: Context, entries: dict[str, dict], new: dict[str, Any]
                      old: dict[str, Any], fps: dict[str, str], out: Applied) -> None:
     new_b, old_b = _by_bucket(new, 2), _by_bucket(old, 2)
     kinds = {k: (prefix, id_key) for k, prefix, id_key in _FAV_KINDS}
+    global_kinds = {k: key for k, key, _id in _GLOBAL_FAV_KINDS}
     for bucket in set(new_b) | set(old_b):
         fp, kind = bucket
-        pid = fps.get(fp)
-        if pid is None or kind not in kinds:
-            continue
+        if fp == GLOBAL_FP:
+            if kind not in global_kinds:
+                continue
+            pid, key = GLOBAL_FP, global_kinds[kind]
+        else:
+            found = fps.get(fp)
+            if found is None or kind not in kinds:
+                continue
+            pid, key = found, f"{kinds[kind][0]}_{found}"
         mine = new_b.get(bucket, {})
         if _canon(mine) == _canon(old_b.get(bucket, {})):
             continue
-        prefix, _id_key = kinds[kind]
         items: dict[str, list[tuple[int, str, dict]]] = {}
         orders: dict[str, list[str]] = {}
         colours: dict[str, dict] = {}
@@ -793,11 +818,11 @@ def _apply_favorites(ctx: Context, entries: dict[str, dict], new: dict[str, Any]
             place = {ident: i for i, ident in enumerate(orders.get(group, []))}
             rows.sort(key=functools.partial(_row_key, place))
             groups[group] = [r[2] for r in rows]
-        ctx.settings.setValue(f"{prefix}_{pid}", json.dumps(groups))
+        ctx.settings.setValue(key, json.dumps(groups))
         if colours:
-            ctx.settings.setValue(f"{prefix}_{pid}_colors", json.dumps(colours))
+            ctx.settings.setValue(f"{key}_colors", json.dumps(colours))
         else:
-            ctx.settings.remove(f"{prefix}_{pid}_colors")
+            ctx.settings.remove(f"{key}_colors")
         out.favorites.add(pid)
 
 

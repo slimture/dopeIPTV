@@ -280,6 +280,18 @@ class _SyncMixin:
         pid = str(getattr(store, "active_id", "") or "")
         if pid and (pid in applied.favorites or pid in applied.history):
             self._sync_reload_stores(pid, pid in applied.favorites, pid in applied.history)
+        if sync.GLOBAL_FP in applied.favorites:
+            # Radio stations and web streams, which are no source's.
+            from ..core.stores import FavoriteStore
+            self.radio_favs = FavoriteStore(self.settings, "radio_favorites",
+                                            id_key="stationuuid")
+            self.web_favs = FavoriteStore(self.settings, "web_favorites", id_key="url")
+            playing = getattr(getattr(self, "player", None), "current_url", None)
+            if getattr(self, "mode", "") == "fav" and not playing \
+                    and hasattr(self, "_load_categories"):
+                self._load_categories()
+            elif getattr(self, "list_model", None) is not None:
+                self.list_model.refresh_all()
         if applied.sources and hasattr(self, "_update_playlist_btn"):
             self._update_playlist_btn()
         if applied.settings & _LIVE_KEYS and hasattr(self, "_apply_theme_now"):

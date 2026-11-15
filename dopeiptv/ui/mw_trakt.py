@@ -506,6 +506,10 @@ class _TraktMixin:
             return self.movie_favs.is_favorite(item.get("stream_id"))
         if kind == "series":
             return self.series_favs.is_favorite(item.get("series_id"))
+        if kind == "radio":
+            return self.radio_favs.is_favorite(item.get("stationuuid"))
+        if kind == "web":
+            return self.web_favs.is_favorite(item.get("url"))
         return False
 
     def is_item_on_watchlist(self, item: dict, kind: str) -> bool:

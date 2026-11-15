@@ -23,6 +23,8 @@ A source's own options are not here: they are in its Add/Edit dialog
   `auto_reconnect_live`, `hide_upcoming_prompt` (inverted), `night_mode`
 - Stream and buffer: `stream_format`, `cache_secs`; link → Nerd › Player
   (channel start, buffer memory, HLS, low latency)
+- YouTube, Twitch and similar sites: `ytdlp_managed`; which yt-dlp is used,
+  Download / Update now (`ytdlp_checked`: the last look for a newer one)
 - Rewind live TV: `live_rewind_minutes`, `live_rewind_disk`,
   `live_rewind_kept`, `live_rewind_space_gb`; where the buffer is (Open folder)
 - (only without the embedded player) why playback opens in mpv
@@ -96,6 +98,7 @@ and Chromecast, DLNA and Kodi rows belong here
 - OpenSubtitles.com: `os_api_key` (Test), `os_username` + `os_password`
 - Discord (only in a build with its application id): `discord_presence`,
   `discord_presence_detail`
+- radio-browser.info: `radio_report_clicks`
 
 ## SYSTEM
 

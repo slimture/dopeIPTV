@@ -46,6 +46,8 @@ dopeiptv/
     airplay_bridge.py  AirPlay: what goes to an Apple TV as it is, the rest
                        as HLS by ffmpeg on the LAN (token, cleanup)
     opensubtitles.py   OpenSubtitles.com REST client (search, download, hash)
+    radio_browser.py   Internet radio from radio-browser.info: servers from
+                       its DNS round robin, falling back between them
 
   core/                Storage, background work, OS integration
     stores.py          JSON data stores (playlists, favorites, history, ...)
@@ -101,6 +103,9 @@ dopeiptv/
                        window icon from there, not from the app)
     xdg.py             Launch system programs from a frozen bundle without
                        our bundled libraries leaking into them
+    ytdlp.py           yt-dlp for YouTube, Twitch and the like: the system's
+                       or the app's own copy (release binary, SHA2-256SUMS
+                       checked, updated at most once a day while used)
     audiotags.py       Artist/album/title and cover art from music files
                        (header-only, no dependency)
     _alloc.py          Optional allocator preload for long sessions
@@ -188,6 +193,9 @@ dopeiptv/
     mw_guide.py        The Guide page in the middle pane, and its pop-out
     home_widgets.py    Home's featured strip, shelves and cards
     mw_local.py        Local files: folders, library view, music queue
+    mw_radio.py        Radio: radio-browser.info's stations, played as music
+    mw_webstreams.py   Open address, YouTube/Twitch through yt-dlp, saved
+                       addresses
     mw_onboarding.py   First-run setup wizard
     mw_sort.py         List sort order
     widgets.py         Small standalone widgets

@@ -96,6 +96,9 @@ _LEFT_OUT = frozenset({
     "channel_stream_info",
     # Recordings of this computer still to be saved as MP4 (its own paths).
     "rec_mp4_pending",
+    # When this computer's own copy of yt-dlp was last compared with the
+    # newest release.
+    "ytdlp_checked",
 })
 # update_*: the update channel and what its check last found; ts_*: what a
 # source's timeshift probe learned; "_": the files' own markers;
@@ -133,7 +136,7 @@ _KINDS_OF = {"main": ("sources", "favorites", "history", "reminders", "recording
 
 _SOURCE_KEYS = frozenset({"playlists", "active_playlist", "playlist_name",
                           "server", "username", "password"})
-_FAVORITES = re.compile(r"(?:movie_|series_)?favorites(?:_.*)?")
+_FAVORITES = re.compile(r"(?:movie_|series_|radio_|web_)?favorites(?:_.*)?")
 _HISTORY = re.compile(r"history(?:_.*)?")
 _REMINDERS = re.compile(r"epg_reminders(?:_.*)?")
 _OVERRIDES = re.compile(r"(?:category|channel)_overrides(?:_.*)?")

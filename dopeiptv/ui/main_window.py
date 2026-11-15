@@ -114,6 +114,8 @@ from .mw_sidebar import _SidebarMixin
 from .mw_sort import _SortMixin
 from .mw_subtitles import _SubtitlesMixin
 from .mw_updates import _UpdatesMixin
+from .mw_radio import _RadioMixin
+from .mw_webstreams import _WebStreamsMixin
 from ..core.workers import (
     LogoLoader, default_image_cache_dir, run_async)
 
@@ -130,6 +132,7 @@ _COUNT_KEYS = {
     "fav": "count_favorites", "history": "count_history",
     "rec": "rec_n_recordings", "watchlist": "count_watchlist",
     "watched": "count_watched", "local": "count_files",
+    "radio": "count_stations",
 }
 
 
@@ -138,7 +141,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _ContextMenuMixin, _FavoritesMixin, _DetailMixin, _RemindersMixin,
                  _BusyMixin, _UpdatesMixin, _SearchMixin, _SidebarMixin,
                  _NavMixin, _ShortcutsMixin, _OnboardingMixin, _SortMixin,
-                 _LocalFilesMixin,
+                 _LocalFilesMixin, _RadioMixin, _WebStreamsMixin,
                  _PopoutMixin, _MultiviewMixin, _HomeMixin, _GuideMixin,
                  _MprisMixin,
                  _FollowMixin, _SubtitlesMixin, _CastMixin, _AirPlayMixin, _DonateMixin,
@@ -245,6 +248,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.series_favs = FavoriteStore(
             settings, f"series_favorites_{pid}" if pid else "series_favorites",
             id_key="series_id")
+        # Radio stations and web streams belong to no source: one list each,
+        # whatever source is in use (mw_radio, mw_webstreams).
+        self.radio_favs = FavoriteStore(settings, "radio_favorites",
+                                        id_key="stationuuid")
+        self.web_favs = FavoriteStore(settings, "web_favorites", id_key="url")
         self.history = HistoryStore(
             settings, f"history_{pid}" if pid else "history")
         self._resume_settings = self._open_resume_settings(settings)
@@ -481,6 +489,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         refresh_action = action(tr("menu_refresh_playlist"), self.refresh_playlist)
         open_video_action = action(tr("menu_open_video"), self.open_local_video)
         open_video_action.setShortcut("Ctrl+O")
+        open_address_action = action(tr("menu_open_address"), self.open_address)
+        open_address_action.setShortcut("Ctrl+L")
         reminders_action = action(tr("reminders_menu"), self._open_reminders)
         stats_action = action(tr("stats_menu") + "…", self.open_stats)
         multiview_action = action(tr("menu_multiview"), self._show_multiview)
@@ -503,8 +513,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Help - with no second "dopeIPTV" menu; elsewhere the one menu.
         menus = lay_out(self.menuBar(), {
             "about": about_action, "settings": settings_action,
-            "open_video": open_video_action, "refresh": refresh_action,
-            "reminders": reminders_action, "calendar": calendar_action,
+            "open_video": open_video_action, "open_address": open_address_action,
+            "refresh": refresh_action, "reminders": reminders_action, "calendar": calendar_action,
             "multiview": multiview_action, "cast": cast_action,
             "together": together_action, "phone": phone_action,
             "private": private_action, "clear": clear_action,
@@ -522,6 +532,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             settings_action: lambda: tr("btn_settings") + "…",
             refresh_action: lambda: tr("menu_refresh_playlist"),
             open_video_action: lambda: tr("menu_open_video"),
+            open_address_action: lambda: tr("menu_open_address"),
             reminders_action: lambda: tr("reminders_menu"),
             multiview_action: lambda: tr("menu_multiview"),
             cast_action: lambda: tr("ctx_cast_to_chromecast"),
@@ -620,7 +631,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._rail_glyphs = {
             "home": "home", "live": "tv", "guide": "guide", "vod": "movie",
             "series": "series", "rec": "rec", "local": "folder_o",
-            "fav": "star", "watchlist": "bookmark", "history": "clock",
+            "radio": "radio", "fav": "star", "watchlist": "bookmark", "history": "clock",
         }
         self._nav_texts: dict[str, str] = {}
         self.nav_btns: dict[str, NavButton] = {}
@@ -662,7 +673,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                           ("vod", tr("nav_movies")),
                           ("series", tr("nav_series")),
                           ("rec", tr("nav_recordings")),
-                          ("local", tr("nav_local"))):
+                          ("local", tr("nav_local")),
+                          ("radio", tr("nav_radio"))):
             _make_nav(key, text, sl, primary=True)
         self.nav_btns["home"].setVisible(self._home_enabled())
 
@@ -2504,6 +2516,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self.mode == "local":
             self._load_local_categories()
             return
+        if self.mode == "radio":
+            self._load_radio_categories()
+            return
         if self.mode == "rec":
             self.cat_list.blockSignals(True)
             for label, data in [(tr("rec_all_recordings"), None),
@@ -2525,7 +2540,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                                 (tr("fav_channels"), "live"),
                                 (tr("nav_movies"), "movie"),
                                 (tr("nav_series"), "series"),
-                                (tr("nav_local"), "local")]:
+                                (tr("nav_local"), "local"),
+                                (tr("nav_radio"), "radio")]:
                 it = QListWidgetItem(label)
                 it.setData(Qt.ItemDataRole.UserRole, data)
                 self.cat_list.addItem(it)
@@ -2563,6 +2579,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             add_fav_section("chan", tr("fav_channels"), self.favs)
             add_fav_section("movie", tr("fav_movies"), self.movie_favs)
             add_fav_section("series", tr("fav_series"), self.series_favs)
+            # Stations and web streams only once there are some.
+            if self.radio_favs.items():
+                add_fav_section("radio", tr("fav_radio"), self.radio_favs)
+            if self.web_favs.items():
+                add_fav_section("web", tr("fav_web"), self.web_favs)
             if self.trakt.is_connected():
                 trakt_row = QListWidgetItem(tr("watched_trakt"))
                 trakt_row.setData(Qt.ItemDataRole.UserRole, ("trakt", None))
@@ -2796,6 +2817,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._current_cat = category_id
         self._sync_sort_box()            # show THIS category's sort order
         self._apply_list_layout(False)   # honour the user's grid/list choice
+        if self.mode == "radio":
+            self._load_radio_items(category_id)
+            return
         if self.mode == "local":
             # Coming back from another section lands where the user left
             # off - the folder they were browsing, or the series they had
@@ -2833,7 +2857,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # A folder's colour cascades to all its favourites: resolve it once
             # here (all items in a selected folder share it) for item_tint.
             fstore = {"chan": self.favs, "movie": self.movie_favs,
-                      "series": self.series_favs}.get(section)
+                      "series": self.series_favs, "radio": self.radio_favs,
+                      "web": self.web_favs}.get(section)
             gc = fstore.group_color(group) if (fstore and group) else {}
             self._fav_view_tint = (gc.get("color", "") or "",
                                    gc.get("bgcolor", "") or "")
@@ -2842,6 +2867,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 return
             if section == "movie":
                 self.all_items = self.movie_favs.items(group)
+            elif section == "radio":
+                self.all_items = self._radio_fav_rows(group)
+            elif section == "web":
+                self.all_items = self._web_fav_rows(group)
             elif section == "series":
                 self.all_items = self.series_favs.items(group)
             elif section == "trakt":
@@ -2879,7 +2908,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     ("fav_channels", "fav", sect("live")),
                     ("fav_movies", "vod", sect("movie")),
                     ("fav_series", "series", sect("series")),
-                    ("nav_local", "vod", sect("local"))):
+                    ("nav_local", "vod", sect("local")),
+                    ("nav_radio", "radio", sect("radio"))):
                 if rows:
                     grouped.append({"_header": tr(hk)})
                     grouped += [{**r, "_ekind": ek} for r in rows]
@@ -3132,10 +3162,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.favs.items(None, exclude_groups=exclude))
         movies = self._search_filter(self.movie_favs.items())
         series = self._search_filter(self.series_favs.items())
+        radio = self._search_filter(self._radio_fav_rows())
+        web = self._search_filter(self._web_fav_rows())
         self._show_grouped(
             [("fav_channels", "fav", "live", chans),
              ("fav_movies", "vod", "vod", movies),
-             ("fav_series", "series", "series", series)],
+             ("fav_series", "series", "series", series),
+             ("fav_radio", "radio", "radio", radio),
+             ("fav_web", "web", "web", web)],
             "fav", tr("fav_empty_all"))
 
     def _apply_list_layout(self, _force_list: bool = False) -> None:
@@ -3239,6 +3273,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         "movie": {"movie", "vod"},
         "series": {"series", "episode"},
         "local": {"local"},
+        "radio": {"radio"},
     }
 
     def _display_name_fn(self):
@@ -3357,7 +3392,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._pending_jump_cat = playing.get("category_id")
         QTimer.singleShot(8000, self._clear_pending_jump)   # safety net
         target = {"live": "live", "vod": "vod", "episode": "series",
-                  "rec": "rec"}.get(self._playing_group, self.mode)
+                  "rec": "rec", "radio": "radio"}.get(self._playing_group,
+                                                      self.mode)
         if self.mode != target:
             self.switch_mode(target)     # done() honours _pending_jump_cat
         elif self.cat_list.count():
@@ -3479,8 +3515,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self.series_ctx:
             return "episode"
         if self.mode == "fav":
-            return {"movie": "vod", "series": "series"}.get(
-                self._fav_section, "fav")
+            return {"movie": "vod", "series": "series", "radio": "radio",
+                    "web": "web"}.get(self._fav_section, "fav")
         return self.mode
 
     def _on_list_populated(self) -> None:
@@ -3496,6 +3532,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._hide_busy()
 
     def _apply_filter(self) -> None:
+        # Radio's Search row asks the whole directory instead (mw_radio).
+        if self.mode == "radio" and self._radio_search_hook():
+            return
         text = self.search.text().lower().strip()
         kind = self._content_kind()
         if self.channel_ov.anything_hidden():
@@ -3635,6 +3674,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # one directory instead of leaving a series.
         if self.mode == "local":
             self._local_up()
+            return
+        if self.mode == "radio":
+            self._radio_up()
             return
         ctx = self.series_ctx or {}
         log.info("_leave_series: back to the series list (series_id=%r)",
@@ -3777,6 +3819,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # context (it isn't reachable through the normal series drill-down).
         if it.get("_kind") == "episode" and it.get("_series_ctx") is not None:
             self._play_continue_episode(it, player, external)
+            return
+        # A radio station or a web stream (YouTube, Twitch), wherever its row
+        # is: Radio, Favourites, History.
+        row_kind = it.get("_kind") or it.get("_ekind")
+        if self.mode == "radio" or row_kind in ("radio", "radiogroup"):
+            self._radio_activate(it, player, external)
+            return
+        if row_kind == "web":
+            self._web_activate(it, player, external)
             return
         # A SERIES row is never playable, whatever the drill state believes.
         # series_ctx alone used to decide that a row was an episode, so if
@@ -4194,7 +4245,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         gains = (gains + [0.0] * 10)[:10]
         return gains, self.settings.value("eq_on", "false") == "true"
 
-    def _apply_audio_visuals(self, url: str) -> None:
+    def _apply_audio_visuals(self, url: str, audio: bool = False) -> None:
         """Music gets a visualiser in place of the black video pane, and
         whatever equaliser the user set.
 
@@ -4208,7 +4259,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         pl = getattr(self, "player", None)
         if pl is None:
             return
-        if not str(url or "").lower().endswith(self.AUDIO_EXTS):
+        if not audio and not str(url or "").lower().endswith(self.AUDIO_EXTS):
             # Video. The ONLY thing allowed here is taking down a
             # visualiser we ourselves put up for a previous track - and
             # only when there is one. An ordinary channel play must reach
@@ -4235,8 +4286,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.settings.setValue("vis_on", "true" if on else "false")
         self.settings.setValue("vis_style", style)
         pl = getattr(self, "player", None)
-        url = (getattr(self, "_last_playback", None) or {}).get("url", "")
-        if pl is not None and str(url).lower().endswith(self.AUDIO_EXTS):
+        lp = getattr(self, "_last_playback", None) or {}
+        url = lp.get("url", "")
+        if pl is not None and (str(url).lower().endswith(self.AUDIO_EXTS)
+                               or lp.get("kind") == "radio"):
             pl.set_visualiser(on, style)
 
     def open_equaliser(self) -> None:
@@ -4451,6 +4504,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Nerd: the channel it is, for the settings of its own.
         self._chanprefs_arm(self._item_key(it), it, "live")
         self._ms_leave()
+        # Music or a radio station before it put the visualiser up: taken
+        # down, as _start_playback does - and only then (_vis_active), so an
+        # ordinary preview still reaches mpv untouched.
+        self._apply_audio_visuals(url)
         if self.player.play(url, title, local_buffer=True,
                             buffer_key=f"live:{self._item_key(it)}"):
             self.wake.acquire(tr("wake_playing", title=title))
@@ -4991,7 +5048,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._playing_group = {"live": "live", "movie": "vod",
                                "episode": "episode",
                                "recording": "rec",
-                               "local": "local"}.get(kind)
+                               "local": "local", "radio": "radio",
+                               "web": "web"}.get(kind)
         self.listw.viewport().update()
         self.setWindowTitle(title or self._base_title)
         self._set_status(tr("status_playing", title=title))
@@ -5001,7 +5059,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.rec.finish_all_inplayer("channel changed")
             self.player.show()
             self.player.set_overlay_info(title)
-            self._apply_audio_visuals(url)
+            # A radio station is music too: the visualiser and equaliser.
+            self._apply_audio_visuals(url, audio=kind == "radio")
             # Music bookkeeping - the detail panel and the play queue. This
             # MUST stay inside the embedded branch: written as a top-level
             # "if kind == local" it closed this block, so everything below
@@ -5288,6 +5347,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._stream_retries = 0
         if self.player:
             self.player.current_url = None
+        # A station or a web page is no source's: nothing to diagnose or
+        # fail over to, just why it did not play.
+        if (lp or {}).get("kind") in ("radio", "web"):
+            self._events_failed()
+            self._discord_stopped()
+            self._show_stream_error(tr("radio_play_failed")
+                                    if lp.get("kind") == "radio"
+                                    else tr("web_play_failed"))
+            return
         # The reconnects are spent: for stream health, it did not play.
         self._health_failed(msg)
         self._events_failed()

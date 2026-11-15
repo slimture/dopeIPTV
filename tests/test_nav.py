@@ -158,7 +158,7 @@ w._set_sidebar_collapsed(False)
 pump(10)
 
 # -- the order: places, MINE, the foot ----------------------------------------
-places = ["home", "live", "guide", "vod", "series", "rec", "local"]
+places = ["home", "live", "guide", "vod", "series", "rec", "local", "radio"]
 mine = ["fav", "watchlist", "history"]
 assert list(w.nav_btns) == places + mine, list(w.nav_btns)
 assert "watched" not in w.nav_btns
@@ -289,7 +289,7 @@ assert w._settings_btn.text() == ""
 assert w._settings_btn.toolTip() == tr("btn_settings")
 assert w._lib_header.isHidden() and not w._rail_rule_mine.isHidden()
 assert w._rail_rule_mine.isVisible() and w._bottom_rule.isVisible() and w._bottom_rule.is_rail()
-assert y(w.nav_btns["local"]) < y(w._rail_rule_mine) < y(w.nav_btns["fav"])
+assert y(w.nav_btns["radio"]) < y(w._rail_rule_mine) < y(w.nav_btns["fav"])
 assert y(w.nav_btns["history"]) < y(w._bottom_rule) < y(w._settings_btn)
 assert rec.badge() == ("dot", 1)
 w.rec.finish_inplayer(job["id"], "stopped")

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import (
     QAbstractListModel, QItemSelectionModel, QLocale, QMimeData, QModelIndex,
-    QRect, QRectF, QSize, Qt, QTimer,
+    QPointF, QRect, QRectF, QSize, Qt, QTimer,
 )
 from PyQt6.QtGui import (
     QColor, QDrag, QFont, QFontMetrics, QPainter, QPainterPath, QPen, QPixmap,
@@ -675,6 +675,38 @@ class ChannelDelegate(QStyledItemDelegate):
         painter.drawEllipse(anchor.left() + pad, anchor.top() + pad, d, d)
         painter.restore()
 
+    @staticmethod
+    def _country_row(it: dict) -> str:
+        """A radio country row's ISO code (lower-case, as the flags are
+        named), or ""."""
+        grp = it.get("_group") if it.get("_kind") == "radiogroup" else None
+        if isinstance(grp, list) and len(grp) == 2 and grp[0] == "country":
+            code = str(grp[1]).lower()
+            return code if len(code) == 2 and code.isalpha() else ""
+        return ""
+
+    def _paint_live_pill(self, painter, rect: QRect, right_used: int) -> int:
+        """A small LIVE pill at the row's right, left of what is already
+        there (*right_used* px). Returns the width it takes."""
+        painter.save()
+        f = QFont()
+        f.setPointSize(max(7, self.sub_pt - 1))
+        f.setBold(True)
+        painter.setFont(f)
+        fm = painter.fontMetrics()
+        label = tr("mv_live")
+        w, h = fm.horizontalAdvance(label) + 12, fm.height() + 2
+        x = rect.right() - 12 - right_used - w
+        y = rect.top() + (rect.height() - h) // 2
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(P["rec"]))
+        painter.drawRoundedRect(QRectF(x, y, w, h), h / 2, h / 2)
+        painter.setPen(QColor(255, 255, 255))
+        painter.drawText(QRect(x, y, w, h), Qt.AlignmentFlag.AlignCenter, label)
+        painter.restore()
+        return w + 8
+
     def _paint_fav_star(self, painter, anchor: QRect, size: int) -> None:
         """Gold star in the bottom-right corner of *anchor* - the same
         favourite marker channels use, now on movie/series posters too.
@@ -701,13 +733,14 @@ class ChannelDelegate(QStyledItemDelegate):
         """Is *it* the row that *key*/*in_group* refers to?"""
         group = {"live": "live", "fav": "live", "vod": "vod",
                  "episode": "episode", "history": "history",
-                 "rec": "rec"}.get(kind)
+                 "rec": "rec", "radio": "radio", "web": "web"}.get(kind)
         if key is None:
             return False
         if kind == "history":
             return (it.get("_key") == key
                     and {"live": "live", "movie": "vod",
-                         "episode": "episode"}.get(it.get("_kind"))
+                         "episode": "episode", "radio": "radio",
+                         "web": "web"}.get(it.get("_kind"))
                     == in_group)
         return group == in_group and self.window._item_key(it) == key
 
@@ -880,6 +913,18 @@ class ChannelDelegate(QStyledItemDelegate):
             y = logo_rect.y() + (logo_sz - scaled.height()) // 2
             painter.drawPixmap(x, y, scaled)
             painter.setClipping(False)
+        elif self._country_row(it):
+            # Radio's countries: the country's flag on the tile.
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(P["sel"]))
+            painter.drawRoundedRect(logo_rect, radius, radius)
+            fw = int(logo_sz * 0.7)
+            fh = int(fw * 0.75)
+            flag = flag_icon(self._country_row(it)).pixmap(QSize(fw, fh))
+            dpr = flag.devicePixelRatio() or 1.0
+            painter.drawPixmap(QPointF(
+                logo_rect.x() + (logo_sz - flag.width() / dpr) / 2,
+                logo_rect.y() + (logo_sz - flag.height() / dpr) / 2), flag)
         else:
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(QColor(P["sel"]))
@@ -974,14 +1019,22 @@ class ChannelDelegate(QStyledItemDelegate):
                 Qt.AlignmentFlag.AlignVCenter
                 | Qt.AlignmentFlag.AlignRight, "★")
 
+        # A web stream that is live (YouTube Live, Twitch): a LIVE pill
+        # where a channel has its number.
+        if it.get("_live") and (kind == "web" or it.get("_kind") == "web"):
+            num_w += self._paint_live_pill(painter, rect, num_w)
+
         text_x = logo_rect.right() + 12
         text_w = max(0, rect.right() - 12 - num_w - text_x)
         now = (self.window.xmltv.now_for(it)
                if kind in ("live", "fav") else None)
+        # A line of its own under the name where a row brings one (a
+        # station's country, genres and bitrate; how many stations).
+        sub_text = "" if now else str(it.get("_sub") or "")
 
         resume_pct = it.get("_progress_pct")
         name_h = self.name_pt + 8
-        sub_h = (self.sub_pt + 6) if now else 0
+        sub_h = (self.sub_pt + 6) if (now or sub_text) else 0
         bar_h = 6 if (now or resume_pct is not None) else 0
         info_get = getattr(self.window, "channel_stream_info", None)
         info = info_get(it, kind) if info_get else ""
@@ -1039,6 +1092,16 @@ class ChannelDelegate(QStyledItemDelegate):
                 painter.drawRoundedRect(
                     QRect(bar_rect.x(), bar_rect.y(),
                           fill_w, bar_rect.height()), 2, 2)
+        elif sub_text:
+            painter.setPen(QColor(P["muted"]))
+            fsub = QFont()
+            fsub.setPointSize(self.sub_pt)
+            painter.setFont(fsub)
+            fm2 = painter.fontMetrics()
+            painter.drawText(
+                QRect(text_x, y + name_h, text_w, sub_h),
+                Qt.AlignmentFlag.AlignVCenter,
+                fm2.elidedText(sub_text, Qt.TextElideMode.ElideRight, text_w))
         elif resume_pct is not None:
             # Continue-watching resume progress (movies have no EPG 'now').
             bar_rect = QRect(text_x, y + name_h, text_w, 4)

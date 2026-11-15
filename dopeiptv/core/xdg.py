@@ -28,6 +28,8 @@ _BUNDLE_VARS = (
     "GDK_PIXBUF_MODULE_FILE", "FONTCONFIG_FILE", "FONTCONFIG_PATH",
     "PYTHONHOME", "PYTHONPATH",
 )
+#: The same, for a module that writes them out for a child (core/ytdlp.py).
+BUNDLE_VARS = _BUNDLE_VARS
 
 
 def system_env() -> dict:

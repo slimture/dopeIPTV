@@ -14,9 +14,13 @@ from ..core.stores import FAV_DEFAULT_GROUP
 from ..i18n import tr
 
 # The context-menu kind of a row -> the favorites section that stores it.
-_SECTION = {"live": "chan", "fav": "chan", "vod": "movie", "series": "series"}
+_SECTION = {"live": "chan", "fav": "chan", "vod": "movie", "series": "series",
+            "radio": "radio", "web": "web"}
 _SECTION_LABEL = {"chan": "fav_channels", "movie": "fav_movies",
-                  "series": "fav_series"}
+                  "series": "fav_series", "radio": "fav_radio", "web": "fav_web"}
+#: Sections kept as they are (no Trakt mirror, no TMDB id): channels, radio
+#: stations, web streams.
+_PLAIN = ("chan", "radio", "web")
 
 
 class _FavoritesMixin:
@@ -26,7 +30,8 @@ class _FavoritesMixin:
 
     def _fav_store(self, section: str | None):
         return {"chan": self.favs, "movie": self.movie_favs,
-                "series": self.series_favs}.get(section)
+                "series": self.series_favs, "radio": self.radio_favs,
+                "web": self.web_favs}.get(section)
 
     def _favorite_channels(self) -> list[dict]:
         """The source's favourite channels, each once, in their folders'
@@ -62,6 +67,8 @@ class _FavoritesMixin:
                 content_kind = "vod"
             elif rk == "series":
                 content_kind = "series"
+            elif rk in ("radio", "web"):
+                content_kind = rk
         elif content_kind in ("history", "watchlist", "watched"):
             rk = it.get("_kind") or it.get("_ekind")
             if rk in ("vod", "movie"):
@@ -146,9 +153,10 @@ class _FavoritesMixin:
             group = self._ask_folder_name()
             if group is None:
                 return
-        if section == "chan":
+        if section in _PLAIN:
+            store = self._fav_store(section)
             for it in items:
-                self.favs.add(group, it)
+                store.add(group, it)
         else:
             for it in items:
                 self._toggle_media_fav(it, section, True, group=group)
@@ -158,15 +166,16 @@ class _FavoritesMixin:
             self.list_model.refresh_all()
 
     def _fav_remove_many(self, section: str, items: list[dict]) -> None:
-        if section != "chan":
+        if section not in _PLAIN:
             for it in items:
                 self._toggle_media_fav(it, section, False)
             return
         # In Favorites a channel leaves only the folder on screen; elsewhere
         # it stops being a favorite altogether.
-        group = self._fav_view_group("chan") if self.mode == "fav" else None
+        store = self._fav_store(section)
+        group = self._fav_view_group(section) if self.mode == "fav" else None
         for it in items:
-            self.favs.remove(it.get("stream_id"), group)
+            store.remove(it.get(store.id_key), group)
         if self.mode == "fav":
             self._load_categories()
         else:

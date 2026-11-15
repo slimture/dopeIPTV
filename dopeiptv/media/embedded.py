@@ -2518,6 +2518,62 @@ class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
         if self.vis_choose:
             self.vis_choose(style is not None, style or self._vis_style_get())
 
+    # -- web pages through yt-dlp (YouTube, Twitch: ui/mw_webstreams.py) ------
+
+    def _core(self):
+        """The mpv core, made now if the surface has not made it yet (as
+        play() does)."""
+        if self.video.mpv is None:
+            self.video.show()
+            QApplication.instance().processEvents()
+        return self.video.mpv
+
+    def has_ytdl_hook(self) -> bool:
+        """Whether this libmpv runs yt-dlp by itself for a web page - its
+        ytdl hook, a Lua script: a build without Lua (the Flatpak's) has
+        none, and the window then asks yt-dlp itself (core/ytdlp.resolve)."""
+        if getattr(self, "_ytdl_hook", False):
+            return True
+        m = self._core()
+        if m is None:
+            return False
+        try:
+            m.command("script-message-to", "ytdl_hook", "dopeiptv-probe")
+        except Exception:
+            return False
+        self._ytdl_hook = True
+        return True
+
+    def set_ytdl_path(self, path: str) -> None:
+        """The yt-dlp the hook runs (the app's own copy, or the system's).
+        mpv looks for it again when this changes, so a copy downloaded
+        while the app runs is used by the next page opened."""
+        m = self.video.mpv
+        if m is None or not path or getattr(self, "_ytdl_path", None) == path:
+            return
+        try:
+            m.command("change-list", "script-opts", "append",
+                      f"ytdl_hook-ytdl_path={path}")
+            self._ytdl_path = path
+        except Exception as e:
+            log.debug("ytdl_path not set: %s", e)
+
+    def icy_title(self) -> str:
+        """What an internet radio station says is on now (its ICY title),
+        or ""."""
+        m = self.video.mpv
+        if m is None:
+            return ""
+        try:
+            # A property, not an option: m["..."] reads options/<name>.
+            meta = m.metadata or {}
+        except Exception:
+            return ""
+        if not isinstance(meta, dict):
+            return ""
+        title = meta.get("icy-title") or meta.get("title") or ""
+        return " ".join(str(title).split())[:200]
+
     def set_visualiser(self, on: bool, style: str = "bars") -> None:
         """Show/hide the audio visualiser. A file with real video never gets
         one; mpv builds the graph from the audio track itself.

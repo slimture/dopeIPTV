@@ -38,6 +38,7 @@ map and the one-way import rule.
 | `providers/enigma2.py` | Enigma2 receivers (VU+, Dreambox, Zgemma...) over the classic `/web/` API of OpenWebif and the Dreambox WebInterface; the box itself: tuner signal (`signal`), screenshot (`/grab`), remote keys (`KEYS`, `remote`), its recordings renamed/moved/deleted, transcoding on port 8002 brought to what `/transcoding` accepts (`play_url`), a channel it cannot decrypt (`scrambled`) |
 | `providers/tvheadend.py` | Tvheadend servers (channel tags, stream profiles, XMLTV, DVR recordings, digest login) |
 | `providers/hdhomerun.py` | HDHomeRun tuners and their emulators (discover/lineup, SiliconDust guide, UDP discovery) |
+| `providers/radio_browser.py` | Internet radio from radio-browser.info: its servers from the DNS round robin (`all.api.radio-browser.info`), the next one when one does not answer, stations, countries, languages, genres, search, a click (only when the person turned it on); only `dopeIPTV/<version>` in the user agent |
 | `providers/lan_scan.py` | "Find on my network": the HDHomeRun, Jellyfin/Emby (UDP 7359) and Plex (GDM) broadcasts plus a probe of the local /24 |
 | `providers/mediaserver.py` | `MediaServerClient`, what Jellyfin, Emby and Plex share on `BoxClient`: a token (never a password), one device id per install (`device_id`, never in a backup), films/series/episodes/channels as the app's rows with the server's artwork, resume points and watched marks (`_server_pos`, `_played`), the server's Continue watching (`resume_items`), reports and marks back on a thread of its own (`report`, `mark`) |
 | `providers/jellyfin.py` | Jellyfin and Emby (one client; Emby's `/emby` prefix and `X-Emby-*` headers): AuthenticateByName, Quick Connect, libraries, Live TV opened by `PlaybackInfo`, its guide as XMLTV, direct file or HLS (`master.m3u8`), `/Sessions/Playing` reports, UDP 7359 discovery |
@@ -81,6 +82,7 @@ map and the one-way import rule.
 | `core/health.py` | Nerd's stream health per channel (source + stream id): starts, failures, time to picture, drops, last error (scrubbed), last played; one settings value, 500 channels at most; it only watches |
 | `core/desktop_entry.py` | The user's .desktop entry and icons (Wayland takes the window icon from there) |
 | `core/xdg.py` | Launch system programs from a frozen bundle without our bundled libraries |
+| `core/ytdlp.py` | yt-dlp for YouTube, Twitch and the like: which addresses go through it, the system's or the app's own copy (`ytdlp_managed`, the user's data folder), the official release binary downloaded and checked against SHA2-256SUMS, tried, updated at most once a day while used; `resolve` for a libmpv without the ytdl hook; the wrapper a frozen build runs it through. Never in our packages |
 | `core/audiotags.py` | Artist/album/title and cover art from music files, header-only |
 | `services/mpris.py` | MPRIS media session on the session bus (Linux) |
 | `services/media_session.py` | The system's media controls on every desktop: the window's one host (`mpris_snapshot` / `mpris_command`), the session for this system (`create_session`: MPRIS on Linux, Now Playing on macOS, the SMTC on Windows), the poll and the system's commands queued onto the GUI thread (`PolledSession`); a missing bridge logs once at debug; the self-check's `bundle_problem` |
@@ -195,6 +197,8 @@ map and the one-way import rule.
 | `ui/mw_sync.py` | Settings sync in the window: when a round runs (start, after a change, every half hour, Sync now; never in a stream's first seconds), what came back put in place, its page in Settings (Sync between computers) |
 | `ui/mw_home.py` | The Home page: which shelves, what goes in them (drawn by `home_widgets.py`) |
 | `ui/mw_local.py` | Local files: folders, library view, music queue |
+| `ui/mw_radio.py` | Radio, the place under Local files: radio-browser.info's lists (my stations, most voted/listened, search, countries, languages, genres), a station played as music (visualiser, its ICY title), favourite stations (`radio_favorites`, no source's), the click setting's card on Integrations |
+| `ui/mw_webstreams.py` | YouTube, Twitch and the like through yt-dlp: Open address… (Ctrl+L), mpv's ytdl hook or the address resolved by the app, the offer to download yt-dlp, its card on Playback, saved addresses (`web_favorites`, LIVE badge) |
 | `ui/mw_multiview.py` | Multiview: 2/4/6/9 live streams, an mpv per cell |
 | `ui/mw_donate.py` | Donating from the app: the sidebar heart, About's link, Home's one card after real use |
 | `ui/epg_grid.py` | The guide (`EpgGrid`): timeline grid, filter, its bar; the same widget on the Guide page or in its window (`EpgGridDialog`); timers only while on screen; its zoom (the time scale fitted to the room in steady steps, or a span picked with − / +, remembered for the page and the window apart) |
@@ -213,7 +217,8 @@ in the `mw_*` mixins beside it, each mixed into `MainWindow`:
 `mw_settings`, `mw_trakt` (Trakt, and the watched sync over every account),
 `mw_simkl` (Simkl), `mw_discord` (Discord status), `mw_recording`, `mw_context`, `mw_favorites`
 (several favorites at once, move between folders, drag-and-drop), `mw_home`
-(Home), `mw_local` (local files), `mw_multiview` (multiview), `mw_detail`,
+(Home), `mw_local` (local files), `mw_radio` (internet radio),
+`mw_webstreams` (YouTube, Twitch through yt-dlp), `mw_multiview` (multiview), `mw_detail`,
 `mw_search` (sidebar search), `mw_sidebar` (panel collapse / icon rail),
 `mw_nav` (focus mode, nav colours/icons, the MINE group, History's
 Watched filter, the nav's status), `mw_shortcuts`
@@ -341,7 +346,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   `DOPEIPTV_LOG=debug` shows debug traces; `DOPEIPTV_LOG_FILE=/path` tees
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
-  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan, airplay_bridge), mediaserver, jellyfin, plex), kodi, mdns, simkl), lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log, player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, connections, mirrors, conn_test, health, nerd, nerd_lists, channel_numbers, shortcut_keys, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, night_mode, rec_mp4, viewing_stats, catchup, url_rewrite, hls_cap, ts_scramble, remote_api, events, mqtt, mqtt_control, phone_remote, phone_page, qr, ical, report, supporter, sync, chacha20poly1305, discord_rpc, together, backup, doh, cert_pin, net_route, net_adapter, net_bridge, live_latency) and `services/` (failover, share, resume,
+  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan, radio_browser, airplay_bridge), mediaserver, jellyfin, plex), kodi, mdns, simkl), lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log, player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, connections, mirrors, conn_test, health, nerd, nerd_lists, channel_numbers, shortcut_keys, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, night_mode, rec_mp4, viewing_stats, catchup, url_rewrite, hls_cap, ts_scramble, remote_api, events, mqtt, mqtt_control, phone_remote, phone_page, qr, ical, report, supporter, sync, chacha20poly1305, discord_rpc, together, backup, doh, cert_pin, net_route, net_adapter, net_bridge, live_latency, ytdlp) and `services/` (failover, share, resume,
   coverart, reminders, mpris, media_session, media_macos, media_windows, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list

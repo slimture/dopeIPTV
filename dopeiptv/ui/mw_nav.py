@@ -460,6 +460,16 @@ class _NavMixin:
             path.lineTo(s * 0.88, s * 0.78)
             path.closeSubpath()
             pr.drawPath(path)
+        elif kind == "radio":
+            # A radio set: its body, the speaker, the dial, one aerial -
+            # apart from the TV's screen with two aerials and a stand.
+            stroke()
+            pr.drawRoundedRect(QRectF(s * 0.12, s * 0.36, s * 0.76, s * 0.48),
+                               s * 0.08, s * 0.08)
+            pr.drawLine(QPointF(s * 0.30, s * 0.36), QPointF(s * 0.72, s * 0.12))
+            pr.drawEllipse(QPointF(s * 0.36, s * 0.60), s * 0.12, s * 0.12)
+            pr.drawLine(QPointF(s * 0.60, s * 0.52), QPointF(s * 0.76, s * 0.52))
+            pr.drawLine(QPointF(s * 0.60, s * 0.68), QPointF(s * 0.76, s * 0.68))
         elif kind == "gear":
             # A cog's outline round a hub: eight teeth with sloped flanks.
             stroke()

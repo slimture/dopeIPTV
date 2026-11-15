@@ -43,6 +43,11 @@ class _ContextMenuMixin:
         if self.mode == "local":
             self._local_context_menu(pos, it)
             return
+        # A station or a web stream, in Radio, Favourites or History.
+        if (self.mode == "radio"
+                or (it.get("_kind") or it.get("_ekind")) in ("radio", "web")):
+            self._radio_context_menu(pos, it)
+            return
         m = QMenu(self)
         m.addAction(tr("ctx_play_in_mpv"), lambda: self.play_item(it, "mpv"))
         # Continue-watching rows carry a resume point; offer to forget it.
