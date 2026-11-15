@@ -115,7 +115,7 @@ def system_entry_exists() -> bool:
     """Whether a package (.deb, .rpm) already installed an entry
     system-wide. Then there is nothing missing and nothing to offer."""
     dirs = (os.environ.get("XDG_DATA_DIRS")
-            or "/usr/local/share:/usr/share").split(":")
+            or os.pathsep.join(("/usr/local/share", "/usr/share"))).split(os.pathsep)
     return any((Path(d) / "applications" / ENTRY_NAME).exists()
                for d in dirs if d)
 

@@ -268,9 +268,13 @@ def test_window_reports_what_is_playing():
     assert w.mpris_snapshot()["status"] == "Stopped"
 
 
-def test_window_does_what_the_desktop_asks():
+def test_window_does_what_the_desktop_asks(monkeypatch):
     import time
 
+    # MPRIS is Linux's; off Linux play, pause and play/pause are one
+    # press by design (_media_press_key), so the play below would be
+    # the pause's repeat.
+    monkeypatch.setattr(sys, "platform", "linux")
     w, calls = _window("movie")
     w.mpris_command("pause")
     w.mpris_command("pause")             # a repeat within the debounce

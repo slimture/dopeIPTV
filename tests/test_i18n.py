@@ -12,7 +12,7 @@ def test_every_tr_key_used_in_code_is_defined():
     pkg = pathlib.Path(i18n.__file__).parent
     used = set()
     for path in pkg.glob("*.py"):
-        for m in re.finditer(r'tr\(\s*"([a-z0-9_]+)"', path.read_text()):
+        for m in re.finditer(r'tr\(\s*"([a-z0-9_]+)"', path.read_text(encoding="utf-8")):
             used.add(m.group(1))
     # Illustrative keys in the module docstring, not real usage.
     used -= {"your_key", "some_key"}

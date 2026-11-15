@@ -192,7 +192,7 @@ def _make_cert(tmp: Path, name: str, tag: str) -> tuple[str, str]:
 
 
 def _fp(cert: tuple[str, str]) -> str:
-    return cert_pin.fingerprint(ssl.PEM_cert_to_DER_cert(Path(cert[0]).read_text()))
+    return cert_pin.fingerprint(ssl.PEM_cert_to_DER_cert(Path(cert[0]).read_text(encoding="utf-8")))
 
 
 # -- DNS over HTTPS -------------------------------------------------------------------
@@ -455,7 +455,7 @@ def test_the_rewind_buffers_connection_takes_the_route(monkeypatch):
 
 def test_reading_a_certificate(tmp_path):
     cert, _key = _make_cert(tmp_path, "nas.example", "r")
-    info = cert_pin.parse(ssl.PEM_cert_to_DER_cert(Path(cert).read_text()))
+    info = cert_pin.parse(ssl.PEM_cert_to_DER_cert(Path(cert).read_text(encoding="utf-8")))
     assert info.subject == {"CN": "nas.example", "O": "Home server r"} and info.self_signed
     assert info.names == ["nas.example", "127.0.0.1"]
     assert info.not_before is not None and info.not_after is not None

@@ -148,7 +148,7 @@ def test_the_command_runs_for_a_finished_recording(tmp_path):
     rec.write_bytes(b"\x47" * 188)
     proc = rec_extras.run_post(_marker_cmd(), str(rec), "Nyheterna", "SVT1 HD")
     assert proc is not None and proc.wait(20) == 0
-    assert (tmp_path / "Nyheterna.ts.done").read_text() == "Nyheterna|SVT1 HD"
+    assert (tmp_path / "Nyheterna.ts.done").read_text(encoding="utf-8") == "Nyheterna|SVT1 HD"
     assert rec_extras.run_post("", str(rec), "t") is None
     assert rec_extras.run_post("/no/such/program {path}", str(rec), "t") is None
 

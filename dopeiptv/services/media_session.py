@@ -123,7 +123,7 @@ def local_art(art: str) -> str | None:
     if not art:
         return None
     if art.startswith("file:"):
-        path = QUrl(art).toLocalFile()
+        path = os.path.normpath(QUrl(art).toLocalFile())
     elif os.path.isabs(art):
         path = art
     else:

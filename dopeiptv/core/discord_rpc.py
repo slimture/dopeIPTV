@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+import posixpath
 import socket
 import struct
 import sys
@@ -97,8 +98,8 @@ def socket_paths(env: Mapping[str, str] | None = None,
     dirs: list[str] = []
     for base in bases:
         dirs.append(base)
-        dirs += [os.path.join(base, sub) for sub in _FLATPAK_DIRS]
-    return [os.path.join(d, f"discord-ipc-{i}") for i in range(10) for d in dirs]
+        dirs += [posixpath.join(base, sub) for sub in _FLATPAK_DIRS]
+    return [posixpath.join(d, f"discord-ipc-{i}") for i in range(10) for d in dirs]
 
 
 def _text(value: Any) -> str:

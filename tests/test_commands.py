@@ -138,6 +138,8 @@ def test_nothing_running_means_no_hand_over(app, socket_name):
     assert send_to_running({"open": True}, timeout_ms=200) is False
 
 
+@pytest.mark.skipif(not hasattr(__import__("socket"), "AF_UNIX"),
+                    reason="the crashed copy's socket is a Unix socket")
 def test_a_socket_left_by_a_crash_is_taken_over(app, socket_name):
     """A copy that crashed leaves its socket file behind; the next one
     listens anyway rather than never answering."""

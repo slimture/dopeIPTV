@@ -126,6 +126,7 @@ def test_without_a_desktop_session_qt_is_not_asked(monkeypatch):
 def _menu_case(monkeypatch, focus):
     """A link chosen from a menu: *focus* says, check by check, whether a
     real window (not the menu's popup) has the focus yet."""
+    monkeypatch.setattr(sys, "platform", "linux")     # Wayland is Linux's
     monkeypatch.setattr(xdg, "_qt_platform", lambda: "wayland")
     monkeypatch.setattr(xdg, "_focus_settled", lambda: next(focus))
     timers = []

@@ -62,7 +62,7 @@ def _relative_import_targets():
         # package itself for an __init__, else the module's parent package.
         anchor = modname if is_pkg else (
             modname.rsplit(".", 1)[0] if "." in modname else modname)
-        tree = ast.parse(py.read_text(), filename=str(py))
+        tree = ast.parse(py.read_text(encoding="utf-8"), filename=str(py))
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.level:
                 name = "." * node.level + (node.module or "")

@@ -8,8 +8,8 @@ from pathlib import Path
 from dopeiptv.core.updates import NIGHTLY_PREFIX
 
 ROOT = Path(__file__).resolve().parent.parent
-RELEASE = (ROOT / ".github/workflows/release.yml").read_text()
-NIGHTLY = (ROOT / ".github/workflows/nightly.yml").read_text()
+RELEASE = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+NIGHTLY = (ROOT / ".github/workflows/nightly.yml").read_text(encoding="utf-8")
 
 
 def test_the_release_workflow_can_be_called_with_a_nightly_version():

@@ -951,7 +951,7 @@ def _requirements(lines):
 
 def test_the_bridges_are_installed_and_bundled_on_their_own_system_only():
     import tomllib
-    req = _requirements((_REPO / "requirements.txt").read_text().splitlines())
+    req = _requirements((_REPO / "requirements.txt").read_text(encoding="utf-8").splitlines())
     with open(_REPO / "pyproject.toml", "rb") as fh:
         deps = _requirements(tomllib.load(fh)["project"]["dependencies"])
     bridges = {n: m for n, m in req.items()
@@ -963,11 +963,11 @@ def test_the_bridges_are_installed_and_bundled_on_their_own_system_only():
         # Linux - CI, the AppImage, the Flatpak - never installs them.
         assert marker == f'sys_platform == "{system}"', name
         assert deps.get(name) == marker, name     # the wheel says the same
-    mac_spec = (_REPO / "dopeiptv-mac.spec").read_text()
-    win_spec = (_REPO / "dopeiptv-win.spec").read_text()
+    mac_spec = (_REPO / "dopeiptv-mac.spec").read_text(encoding="utf-8")
+    win_spec = (_REPO / "dopeiptv-win.spec").read_text(encoding="utf-8")
     from dopeiptv.services.media_session import _NEEDS
     for module in _NEEDS["darwin"]:
         assert f'"{module}"' in mac_spec, module
     for module in _NEEDS["win32"]:
         assert f'"{module}"' in win_spec, module
-    assert "winrt" not in (_REPO / "dopeiptv.spec").read_text()
+    assert "winrt" not in (_REPO / "dopeiptv.spec").read_text(encoding="utf-8")
