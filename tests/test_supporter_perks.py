@@ -176,7 +176,15 @@ from dopeiptv.i18n import tr
 from dopeiptv.providers.client import DemoClient
 from dopeiptv.ui import app_icon, theme
 from dopeiptv.ui.main_window import MainWindow
-from dopeiptv.ui.settings_ui import ThemeTile, ToggleSwitch
+from dopeiptv.ui.settings_ui import SettingsPage, ThemeTile, ToggleSwitch
+
+
+def page_of(widget):
+    # Its page, not the dialog: Settings opens on the first page, and the
+    # pages not on show are hidden.
+    while not isinstance(widget, SettingsPage):
+        widget = widget.parentWidget()
+    return widget
 
 s = QSettings(os.path.join(tempfile.mkdtemp(), "s.ini"), QSettings.Format.IniFormat)
 # Chosen while a supporter, the key since gone: the start shows the default.
@@ -214,7 +222,7 @@ def locked(d):
     assert tiles["graphite"].isChecked()
     icon_sw = [sw for sw in d.findChildren(ToggleSwitch)
                if sw.accessibleName() == tr("set_supporter_icon")][0]
-    assert not icon_sw.parentWidget().isVisibleTo(d)   # a supporter's switch
+    assert not icon_sw.parentWidget().isVisibleTo(page_of(icon_sw))   # a supporter's switch
     from PyQt6.QtWidgets import QComboBox
     lights = [b for b in d.findChildren(QComboBox) if b.findData("light") >= 0]
     assert lights and all(b.findData("dawn") < 0 for b in lights)
@@ -234,7 +242,7 @@ def unlocks(d):
     assert theme.P["name"] == theme.THEMES["aurora"]["name"]
     icon_sw = [sw for sw in d.findChildren(ToggleSwitch)
                if sw.accessibleName() == tr("set_supporter_icon")][0]
-    assert icon_sw.parentWidget().isVisibleTo(d) and icon_sw.isChecked()
+    assert icon_sw.parentWidget().isVisibleTo(page_of(icon_sw)) and icon_sw.isChecked()
 in_settings(unlocks)
 assert app_icon._shown is True                   # the key brought the icon
 

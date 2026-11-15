@@ -115,11 +115,11 @@ def search_and_cancel(self):
     visible = lambda: [nav.item(i).data(0x0100) for i in range(nav.count())
                        if not nav.item(i).isHidden()
                        and nav.item(i).data(0x0100)]
-    # Every page, Nerd too (its switch is on it); Nerd's four pages are
-    # left out while it is off.
-    shown = len(shell.pages) - 6
-    assert shell._off == {"nerd_net", "nerd_boxes", "nerd_lists", "nerd_player", "nerd_rec", "nerd_serve"}, shell._off
-    assert len(visible()) == shown >= 14, (visible(), shown)
+    # Every page, Nerd's Status too (its switch is on it); Nerd's five other
+    # pages are left out while it is off.
+    shown = len(shell.pages) - 5
+    assert shell._off == {"nerd_net", "nerd_boxes", "nerd_player", "nerd_serve", "nerd_diag"}, shell._off
+    assert len(visible()) == shown >= 18, (visible(), shown)
     shell.search.setText(tr("setting_sub_lang_fallback")[:-2])
     assert visible() == ["audio"], visible()
     # What a search finds is shown from every page at once, in one view.
@@ -127,8 +127,8 @@ def search_and_cancel(self):
     assert shell.search_hits() == ["audio"]
     shell.search.setText(tr("set_next_stream_note"))  # on two pages
     assert shell.search_hits() == ["playback", "audio"], shell.search_hits()
-    shell.search.setText("trakt")                    # a page title
-    assert "trakt" in visible() and "trakt" in shell.search_hits()
+    shell.search.setText("trakt")                    # a section's heading
+    assert "history" in visible() and "history" in shell.search_hits()
     shell.search.setText("zzzz-nothing")
     assert visible() == []
     assert shell.stack.currentWidget() is shell._none
@@ -220,9 +220,10 @@ from dopeiptv.ui.theme import P
 assert s.value("theme") == "latte" and s.value("accent") == "mint"
 assert P["bg"] == "#EFF1F5" and P["accent"] == "#34CFA0", P
 
-# 9. The sidebar reads in sections, Playlists right after General; a heading
-# cannot be selected and goes with its pages in a search. The rewind
-# settings, Chromecast and every cache sit where people look for them.
+# 9. The sidebar reads in groups - Watch, Content, Accounts and integrations,
+# System, Nerd; a heading cannot be selected and goes with its pages in a
+# search. The rewind settings, casting and every cache sit where people look
+# for them; Nerd's pages come out under NERD, in its colour, while it is on.
 def layout(self):
     from PyQt6.QtCore import Qt
     shell = self.findChild(SettingsShell)
@@ -230,92 +231,82 @@ def layout(self):
     rows = [(nav.item(i).data(0x0100), nav.item(i).flags())
             for i in range(nav.count())]
     keys = [k for k, _f in rows if k]
-    assert keys[:4] == ["general", "playlists", "appearance", "home"], keys
-    # Nerd last under System, after Advanced; its pages fold out right under
-    # it (no heading of their own), left out while it is off.
-    nerd_pages = ["nerd_net", "nerd_boxes", "nerd_lists", "nerd_player", "nerd_rec", "nerd_serve"]
-    assert keys[-9:] == ["parental", "advanced", "nerd"] + nerd_pages, keys
+    assert keys[:6] == ["playback", "audio", "guide", "multiview", "recording", "casting"], keys
+    assert keys[6:10] == ["playlists", "home", "local", "metadata"], keys
+    nerd_pages = ["nerd_net", "nerd_boxes", "nerd_player", "nerd_serve", "nerd_diag"]
+    assert keys[-6:] == ["nerd"] + nerd_pages, keys
     at = {k: i for i, (k, _f) in enumerate(rows) if k}
     assert not nav.item(at["nerd"]).isHidden()
     assert all(nav.item(at[k]).isHidden() for k in nerd_pages)
     heads = [i for i, (k, f) in enumerate(rows) if not k]
     assert len(heads) == 5 and heads[0] == 0, heads
-    assert at["nerd_net"] == at["nerd"] + 1
-    from dopeiptv.ui.settings_ui import CHILD_ROLE, PARENT_ROLE
-    # Turned on: they fold out under Nerd, one after another; off again: gone.
+    # NERD heads Status, and Nerd's pages carry its colour.
+    from dopeiptv.ui.settings_ui import GROUP_ROLE
+    from dopeiptv.ui.theme import P as _P
+    assert heads[-1] == at["nerd"] - 1 and nav.item(heads[-1]).text() == tr("nerd_page").upper()
+    tint = _P.get("nerd", _P["accent"])
+    assert {nav.item(at[k]).data(GROUP_ROLE) for k in ["nerd"] + nerd_pages} == {tint}
+    assert nav.item(heads[-1]).data(GROUP_ROLE) == tint
+    assert nav.item(at["playback"]).data(GROUP_ROLE) is None
+    page = {p.key: p for p in shell.pages}
+    # Turned on: they come out under it, one after another; off again: gone.
     nerd_switch = [x for x in self.findChildren(ToggleSwitch)
                    if x.accessibleName() == tr("nerd_switch")][0]
+    link = next(b for b in page["playback"].findChildren(QPushButton)
+                if b.objectName() == "SettingsLink")
+    assert not link.isVisibleTo(page["playback"])     # Nerd off: no link row
     import time as _t
     nerd_switch.setChecked(True)
     end = _t.monotonic() + 3
     while any(nav.item(at[k]).isHidden() for k in nerd_pages) and _t.monotonic() < end:
         app.processEvents()
     assert all(not nav.item(at[k]).isHidden() for k in nerd_pages)
-    assert [nav.item(at[k]).data(CHILD_ROLE) for k in nerd_pages] == [1, 1, 1, 1, 1, 2]
-    assert nav.item(at["nerd"]).data(PARENT_ROLE) == 2
-    shell.show_page("nerd_player")
-    assert shell.current_key() == "nerd_player"
-    # Each says where it belongs, and the way back is a click.
-    player = next(p for p in shell.pages if p.key == "nerd_player")
+    assert link.isVisibleTo(page["playback"])
+    # The link row leads to the page its settings are on.
+    shell.show_page("playback")
+    link.click()
+    assert shell.current_key() == "nerd_player", shell.current_key()
+    # Each of Nerd's pages says where it belongs, and the way back is a click.
+    player = page["nerd_player"]
     assert player.crumb is not None and player.crumb.text().startswith(tr("nerd_page"))
     player.crumb.click()
     assert shell.current_key() == "nerd"
-    # Folded in with Nerd still on: the pages go, the page shown becomes
-    # Nerd's own, the chevron turns; a search still finds them; out again.
     shell.show_page("nerd_net")
-    shell.set_folded("nerd", True)
-    assert all(nav.item(at[k]).isHidden() for k in nerd_pages)
-    assert nav.item(at["nerd"]).data(PARENT_ROLE) == 1 and shell.current_key() == "nerd"
-    assert s.value("nerd_folded") == "true"
-    shell.search.setText("proxy")
-    assert not nav.item(at["nerd_net"]).isHidden()
-    shell.search.setText("")
-    assert nav.item(at["nerd_net"]).isHidden()
-    # A click on the chevron (the far end of Nerd's row) unfolds them.
-    from PyQt6.QtCore import QPoint
-    from PyQt6.QtTest import QTest
-    rect = nav.visualItemRect(nav.item(at["nerd"]))
-    QTest.mouseClick(nav.viewport(), Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier,
-                     QPoint(rect.right() - 10, rect.center().y()))
-    end = _t.monotonic() + 3
-    while any(nav.item(at[k]).isHidden() for k in nerd_pages) and _t.monotonic() < end:
-        app.processEvents()
-    assert all(not nav.item(at[k]).isHidden() for k in nerd_pages)
-    assert nav.item(at["nerd"]).data(PARENT_ROLE) == 2 and s.value("nerd_folded") == "false"
-    # The keyboard: Left folds, Right unfolds (on Nerd's row).
-    shell.show_page("nerd")
-    QTest.keyClick(nav, Qt.Key.Key_Left)
-    assert nav.item(at["nerd"]).data(PARENT_ROLE) == 1
-    QTest.keyClick(nav, Qt.Key.Key_Right)
-    end = _t.monotonic() + 3
-    while nav.item(at["nerd"]).data(PARENT_ROLE) != 2 and _t.monotonic() < end:
-        app.processEvents()
-    assert nav.item(at["nerd"]).data(PARENT_ROLE) == 2
     nerd_switch.setChecked(False)
     assert all(nav.item(at[k]).isHidden() for k in nerd_pages)
-    assert nav.item(at["nerd"]).data(PARENT_ROLE) == 0
+    assert not link.isVisibleTo(page["playback"])
+    assert shell.current_key() != "nerd_net"
     assert all(not (rows[i][1] & Qt.ItemFlag.ItemIsSelectable) for i in heads)
     shell.show_page("playlists")
     assert shell.current_key() == "playlists"
     assert shell.stack.currentWidget().key == "playlists"
+    assert page["playlists"].title == tr("set_page_sources")
     shell.search.setText("trakt")
     shown_heads = [nav.item(i).text() for i in heads
                    if not nav.item(i).isHidden()]
-    # Trakt's page, and General's privacy row (private viewing tells
-    # Trakt nothing) - no other section.
-    assert shown_heads == [tr("set_sec_basics").upper(), tr("set_sec_services").upper()], shown_heads
+    # Watch history's Trakt card, and General's privacy row (private
+    # viewing tells Trakt nothing) - no other group.
+    assert shown_heads == [tr("set_grp_accounts").upper(), tr("set_sec_system").upper()], shown_heads
+    # Found, each page says where it is.
+    hist = page["history"]
+    assert hist.path is not None and hist.path.isVisibleTo(shell.results)
+    assert hist.path.text().startswith(tr("set_grp_accounts"))
     shell.search.setText("")
-    page = {p.key: p for p in shell.pages}
+    assert not hist.path.isVisibleTo(hist)
     from PyQt6.QtWidgets import QLabel
     def card_titles(key):
         return [l.text() for l in page[key].findChildren(QLabel)
                 if l.objectName() == "SettingsCardTitle"]
     assert tr("set_card_rewind") in card_titles("playback")
-    assert tr("set_card_cast") in card_titles("playback")
-    assert tr("set_card_cast") not in card_titles("recording")
+    assert tr("set_card_cast") in card_titles("casting")
+    assert tr("set_card_cast") not in card_titles("playback") + card_titles("recording")
     assert tr("set_card_caches") in card_titles("advanced")
     assert tr("set_card_caches") not in card_titles("local")
+    assert "OpenSubtitles.com" in card_titles("integrations")
+    assert "OpenSubtitles.com" not in card_titles("audio")
+    assert tr("tab_trakt") in card_titles("history")
     assert page["metadata"].title == tr("set_page_posters")
+    assert page["sync"].title == tr("sync_title")
     return 0
 QDialog.exec = layout
 w.open_settings()

@@ -353,8 +353,8 @@ def test_the_nerd_page_lists_its_parts_and_what_is_changed(app, settings):
     page = SettingsPage("nerd", "Nerd", "")
     blank = lambda k, sz, c: QPixmap(sz, sz)  # noqa: E731
     pages = {}
-    for key, kind in (("net", "network"), ("boxes", "box"), ("lists", "channels"),
-                      ("player", "knobs"), ("rec", "rec"), ("serve", "remote")):
+    for key, kind in (("net", "network"), ("boxes", "box"), ("player", "knobs"),
+                      ("serve", "remote"), ("diag", "pulse")):
         sp = SettingsPage(f"nerd_{key}", key.title(), f"About {key}")
         sp.icon_kind, sp.icon_base = kind, blank
         pages[key] = sp
@@ -362,11 +362,22 @@ def test_the_nerd_page_lists_its_parts_and_what_is_changed(app, settings):
     nerd_settings.build(page, settings, QDialog(), boxes=[{"id": "b", "name": "Vu+", "kind": "enigma2"}],
                         pages=pages, open_page=opened.append)
     rows = page.findChildren(nerd_settings._PartRow)
-    assert [r.accessibleName() for r in rows] == ["Net", "Boxes", "Lists", "Player", "Rec", "Serve"]
+    assert [r.accessibleName() for r in rows] == ["Net", "Boxes", "Player", "Serve", "Diag"]
     summary = {r.accessibleName(): r.summary.text() for r in rows}
-    assert summary["Rec"] == tr("nerd_part_changed", n=1)           # the template, stored
+    assert summary["Serve"] == tr("nerd_part_changed", n=1)         # the template, stored
     assert summary["Net"] == tr("nerd_part_untouched")
     assert summary["Boxes"] == tr("nerd_part_boxes", n=1)
+    # Parts that share a page are on it: the channel lists with the boxes,
+    # what follows a recording with the automation, stream health with the
+    # diagnostics.
+    from PyQt6.QtWidgets import QLabel
+    def titles(key):
+        return [lb.text() for lb in pages[key].findChildren(QLabel) if lb.objectName() == "SettingsCardTitle"]
+    assert tr("nerd_card_picons") in titles("boxes") and tr("nerd_card_chno") in titles("boxes")
+    assert tr("nerd_card_rec_after") in titles("serve")
+    assert tr("nerd_card_health") in titles("diag") and tr("nerd_card_view") in titles("diag")
+    assert not [c for c in page.cards if c.property("_title") is not None
+                and c.property("_title").text() in (tr("nerd_card_view"), tr("nerd_card_diag"))]
     # A change on a page shows the next time the list is looked at.
     proxy = next(e for e in pages["net"].findChildren(QLineEdit)
                  if e.placeholderText().startswith("http://192.168.1.1"))
@@ -381,7 +392,7 @@ def test_the_nerd_page_lists_its_parts_and_what_is_changed(app, settings):
     app.processEvents()
     assert next(r for r in rows if r.accessibleName() == "Serve").summary.text() == tr("nerd_part_on", port=3673)
     # A click, or Enter, opens the page; its crumb leads back.
-    row = rows[3]
+    row = rows[2]
     pos = QPointF(row.rect().center())
     for kind in (QMouseEvent.Type.MouseButtonPress, QMouseEvent.Type.MouseButtonRelease):
         row.event(QMouseEvent(kind, pos, pos, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
@@ -389,7 +400,7 @@ def test_the_nerd_page_lists_its_parts_and_what_is_changed(app, settings):
     assert opened == ["nerd_player"]
     from PyQt6.QtTest import QTest
     QTest.keyClick(rows[4], Qt.Key.Key_Return)
-    assert opened == ["nerd_player", "nerd_rec"]
+    assert opened == ["nerd_player", "nerd_diag"]
     pages["player"].crumb.click()
     assert opened[-1] == "nerd"
     # Off: the list goes with the rest of what Nerd holds.

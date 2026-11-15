@@ -1,14 +1,13 @@
-"""Nerd turned on in Settings: its pages fold out and the sidebar scrolls
-down to them.
+"""Nerd turned on in Settings: its pages come out under NERD and the sidebar
+scrolls down to them.
 
 The report: "when Nerd mode is activated, the settings should unfold and
-the left menu scroll down so you see all choices". Nerd is the last entry
+the left menu scroll down so you see all choices". NERD is the last group
 of a long sidebar, so its pages came out below the edge of a window of
-ordinary height - and if they had been folded in once, they did not come
-out at all. Turned on, the group is unfolded (and kept so) and scrolled
-into sight: Nerd and all its pages when they fit, its last page when they
-do not. Turned off, the pages go, as before. Opening Settings with Nerd on
-leaves the group as the person left it.
+ordinary height. Turned on, the group is scrolled into sight: its heading
+and all its pages when they fit, its last page when they do not. Turned
+off, the pages go, Status (with the switch) stays. Opening Settings with
+Nerd on shows them all.
 
 The real Settings window in a child process (offscreen), as in
 test_settings_window.
@@ -60,34 +59,35 @@ def opened(height, check):
         shell = self.findChild(SettingsShell)
         shell.show_page("nerd")
         wait(lambda: False, 0.05)
-        head = shell._items["nerd"]
-        kids = [shell._items[k] for k in shell._children["nerd"]]
+        head = shell._section_of("nerd")[0]
+        status = shell._items["nerd"]
+        kids = [shell._items[k] for k in shell._gated["nerd"]]
         switch = next(x for x in self.findChildren(ToggleSwitch)
                       if x.accessibleName() == tr("nerd_switch"))
-        check(shell, shell.nav, head, kids, switch)
+        check(shell, shell.nav, head, status, kids, switch)
         self.hide()
         return 0
     QDialog.exec = run
     w.open_settings()
 
 
-def unfolds_into_view(shell, nav, head, kids, switch):
-    # Folded in once, Nerd off since: nothing of its pages shows.
-    assert "nerd" in shell.folded and all(k.isHidden() for k in kids)
+def comes_out_into_view(shell, nav, head, status, kids, switch):
+    # Off: NERD and its Status (the switch), nothing else of it.
     assert not switch.isChecked()
+    assert not head.isHidden() and not status.isHidden() and all(k.isHidden() for k in kids)
+    nav.verticalScrollBar().setValue(0)
     switch.setChecked(True)
     assert wait(lambda: all(not k.isHidden() for k in kids) and shell._into_view is None)
-    assert "nerd" not in shell.folded and s.value("nerd_folded") == "false"
-    # It had to scroll, and Nerd with every page of it is in sight.
+    # It had to scroll, and NERD with every page of it is in sight.
     assert nav.verticalScrollBar().value() > 0
     assert in_view(nav, head) and all(in_view(nav, k) for k in kids), (
         [nav.visualItemRect(x) for x in [head] + kids], nav.viewport().rect())
-    # Off: its pages go, as before.
+    # Off: its pages go, Status stays.
     switch.setChecked(False)
-    assert all(k.isHidden() for k in kids) and "nerd" not in shell.folded
+    assert all(k.isHidden() for k in kids) and not status.isHidden()
 
 
-def too_short_for_all(shell, nav, head, kids, switch):
+def too_short_for_all(shell, nav, head, status, kids, switch):
     # Not all of the group fits: its last page, at least, is in sight.
     switch.setChecked(True)
     assert wait(lambda: all(not k.isHidden() for k in kids) and shell._into_view is None)
@@ -96,26 +96,23 @@ def too_short_for_all(shell, nav, head, kids, switch):
     assert in_view(nav, kids[-1])
 
 
-def left_as_folded(shell, nav, head, kids, switch):
-    # Nerd on at opening, its pages folded in by the person: kept so.
-    assert switch.isChecked() and "nerd" in shell.folded
-    wait(lambda: False, 0.4)
-    assert all(k.isHidden() for k in kids) and s.value("nerd_folded") == "true"
+def opened_with_nerd_on(shell, nav, head, status, kids, switch):
+    # Nerd on at opening: all its pages are there from the start.
+    assert switch.isChecked()
+    assert all(not k.isHidden() for k in kids)
 
 
-s.setValue("nerd_folded", "true")
-opened(600, unfolds_into_view)          # the shortest Settings opens at
+opened(600, comes_out_into_view)        # the shortest Settings opens at
 s.setValue("nerd_enabled", "false")
 opened(250, too_short_for_all)
 s.setValue("nerd_enabled", "true")
-s.setValue("nerd_folded", "true")
-opened(600, left_as_folded)
+opened(600, opened_with_nerd_on)
 print("NERD_UNFOLD_OK", flush=True)
 os._exit(0)
 """
 
 
-def test_nerd_turned_on_unfolds_and_scrolls_into_view():
+def test_nerd_turned_on_comes_out_and_scrolls_into_view():
     env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
     out = subprocess.run([sys.executable, "-c", _CHILD], cwd=_REPO_ROOT, env=env,
                          capture_output=True, text=True, timeout=180)

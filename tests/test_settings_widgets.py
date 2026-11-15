@@ -168,10 +168,10 @@ def test_the_slider_writes_its_value_beside_it():
     assert sl.value() == 0.0 and sl.label.text() == "Off"
 
 
-def test_settings_closed_while_its_pages_fold_out_is_no_error(monkeypatch):
-    """The pages under a parent fold out one after another on timers; the
-    window closed in between left them touching rows already deleted - an
-    error from a timer, offered as a report."""
+def test_settings_closed_while_its_pages_come_out_is_no_error(monkeypatch):
+    """A group's pages come out one after another on timers when it is
+    turned on; the window closed in between left them touching rows already
+    deleted - an error from a timer, offered as a report."""
     import sys
     import time
 
@@ -181,17 +181,14 @@ def test_settings_closed_while_its_pages_fold_out_is_no_error(monkeypatch):
     from dopeiptv.ui.settings_ui import SettingsShell
     errors: list = []
     monkeypatch.setattr(sys, "excepthook", lambda *a: errors.append(a))
-    for how in ("enable", "unfold"):
+    for _round in range(2):
         shell = SettingsShell("Search", "Nothing")
-        for key in ("nerd", "net", "boxes", "lists"):
+        for key in ("nerd", "net", "boxes", "player"):
             shell.add_page(SettingsPage(key, key.title()), QIcon())
-        shell.set_children("nerd", ["net", "boxes", "lists"], "#888888")
-        if how == "enable":
-            shell.set_group_enabled("nerd", False)
-            shell.set_group_enabled("nerd", True)
-        else:
-            shell.set_folded("nerd", True)
-            shell.set_folded("nerd", False)
+        shell.set_gated("nerd", ["net", "boxes", "player"])
+        shell.arrange([("Nerd", ["nerd", "net", "boxes", "player"], "#888888")])
+        shell.set_group_enabled("nerd", False)
+        shell.set_group_enabled("nerd", True)
         sip.delete(shell)
         end = time.monotonic() + 0.4
         while time.monotonic() < end:

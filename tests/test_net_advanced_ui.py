@@ -38,7 +38,7 @@ def _pages(settings):
     blank = lambda k, sz, c: QPixmap(sz, sz)  # noqa: E731
     page = SettingsPage("nerd", "Nerd", "")
     pages = {}
-    for key in ("net", "boxes", "lists", "player", "rec", "serve"):
+    for key in nerd_settings.PARTS:
         sp = SettingsPage(f"nerd_{key}", key.title(), "")
         sp.icon_kind, sp.icon_base = "nerd", blank
         pages[key] = sp

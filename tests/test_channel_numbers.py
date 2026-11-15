@@ -186,7 +186,7 @@ def test_the_shared_playlist_carries_the_users_number():
         xt.close()
 
 
-# -- Settings > Nerd > Channels and guide ------------------------------------------------------
+# -- Settings > Nerd > Boxes and lists --------------------------------------------------------
 
 def test_the_settings_card_says_how_many_and_numbers_all(tmp_path):
     pytest.importorskip("PyQt6.QtWidgets")

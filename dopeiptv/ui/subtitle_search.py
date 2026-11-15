@@ -164,7 +164,7 @@ class SubtitleSearchDialog(QDialog):
 
     def _open_settings(self) -> None:
         # Straight to the page with the key on it.
-        self.window_._settings_page = "audio"
+        self.window_._settings_page = "integrations"
         self.window_.open_settings()
         self._sync()
         if self.window_._subtitle_client() is not None:

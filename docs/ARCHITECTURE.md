@@ -137,14 +137,16 @@ dopeiptv/
   ui/                  Everything the user sees
     __init__.py        Lazy MainWindow export (PEP 562)
     main_window.py     MainWindow composition root (QMainWindow + mixins)
-    mw_settings.py     Settings dialog mixin (the pages and what they store)
-    settings_ui.py     Settings building blocks: sidebar shell, pages,
-                       cards, rows, switches, the playlist delegate
+    mw_settings.py     Settings dialog mixin (the pages and what they store;
+                       which row is where: docs/SETTINGS_MAP.md)
+    settings_ui.py     Settings building blocks: sidebar shell (groups, a
+                       group's pages shown only while it is on), pages,
+                       cards, rows, link rows, switches, the playlist delegate
     qt_i18n.py         Qt's own strings (standard buttons, calendars) and
                        QLocale-formatted dates in the app's language
     mw_trakt.py        Trakt / watched / watchlist mixin (the sync reads
                        every account signed in: Trakt, Simkl or both)
-    mw_simkl.py        Simkl: scrobbles, its Settings page, PIN sign-in
+    mw_simkl.py        Simkl: scrobbles, its Settings card, PIN sign-in
     mw_discord.py      Discord status ("Watching ...") from the player
     mw_recording.py    Recording / timeshift mixin
     mw_portal_archive.py A Stalker portal's archive: by programme, its link

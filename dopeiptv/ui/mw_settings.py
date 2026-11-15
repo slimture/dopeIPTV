@@ -711,10 +711,79 @@ class _SettingsMixin:
         def is_on(key: str, default: str) -> bool:
             return self.settings.value(key, default) == on
 
-        # -- General ----------------------------------------------------------
-        from ..i18n import LANGUAGES, current_language
+        # -- the pages, in the order the sidebar shows them ---------------------
+        # Made first and filled below in whatever order their code needs; each
+        # setting has one page, the one a person looks on (docs/SETTINGS_MAP.md).
+        nerd_tint = P.get("nerd", P["accent"])
+        play = page("playback", tr("tab_playback"),
+                    tr("set_page_playback_sub"), "play")
+        # Sound, subtitles and picture on one page: they were two pages of
+        # four and five rows, both about how a stream plays.
+        audio = page("audio", tr("set_page_av"), tr("set_page_av_sub"),
+                     "picture")
+        guide = page("guide", tr("sec_guide"), tr("set_page_guide_sub"),
+                     "guide")
+        mv = page("multiview", tr("tab_multiview"),
+                  tr("set_page_multiview_sub"), "grid")
+        rec = page("recording", tr("tab_recording"),
+                   tr("set_page_recording_sub"), "rec")
+        casting = page("casting", tr("set_page_casting"),
+                       tr("set_page_casting_sub"), "cast")
+        playlists = page("playlists", tr("set_page_sources"),
+                         tr("set_page_playlists_sub"), "stack")
+        home = page("home", tr("nav_home"), tr("set_page_home_sub"), "home")
+        loc = page("local", tr("nav_local"), tr("local_settings_hint"),
+                   "folder")
+        meta = page("metadata", tr("set_page_posters"),
+                    tr("set_page_metadata_sub"), "image")
+        simkl = getattr(self, "simkl", None)
+        simkl_offered = simkl is not None and simkl.available()
+        history = page("history", tr("set_page_history"),
+                       tr("set_page_history_sub" if simkl_offered
+                          else "set_page_trakt_sub"), "trakt")
+        sync_page = page("sync", tr("sync_title"), tr("set_page_sync_sub"),
+                         "sync")
+        integrations = page("integrations", tr("set_page_integrations"),
+                            tr("set_page_integrations_sub"), "plug")
         general = page("general", tr("set_page_general"),
                        tr("set_page_general_sub"), "gear")
+        look = page("appearance", tr("set_page_appearance"),
+                    tr("set_page_appearance_sub"), "palette")
+        par = page("parental", tr("set_page_parental"),
+                   tr("set_page_parental_sub"), "lock")
+        adv = page("advanced", tr("set_page_advanced"),
+                   tr("set_page_advanced_sub"), "wrench")
+        # Nerd's pages, in its own colour; all but Status only while it is on.
+        nerd_page = page("nerd", tr("nerd_pg_status"), tr("nerd_page_sub"),
+                         "nerd", nerd_tint)
+        nerd_pages = {
+            "net": page("nerd_net", tr("nerd_pg_net"), tr("nerd_pg_net_sub"), "network", nerd_tint),
+            "boxes": page("nerd_boxes", tr("nerd_pg_boxlists"), tr("nerd_pg_boxlists_sub"), "box", nerd_tint),
+            "player": page("nerd_player", tr("nerd_pg_player"), tr("nerd_pg_player_sub"), "knobs", nerd_tint),
+            "serve": page("nerd_serve", tr("nerd_pg_remote"), tr("nerd_pg_remote_sub"), "remote", nerd_tint),
+            "diag": page("nerd_diag", tr("nerd_pg_diag"), tr("nerd_pg_diag_sub"), "pulse", nerd_tint),
+        }
+        # A Nerd setting has its place under NERD; the everyday page beside
+        # it says so in one row that leads there, while Nerd is on.
+        nerd_switch: dict = {"box": None}
+        link_cards: list = []
+
+        def nerd_on() -> bool:
+            box = nerd_switch["box"]
+            return box is not None and box.isChecked()
+
+        rtl = QLocale().textDirection() == Qt.LayoutDirection.RightToLeft
+
+        def nerd_link(card, text_key: str, names: list[str], part: str) -> None:
+            target = nerd_pages[part]
+            row = card.link(tr(text_key, n=len(names)), " · ".join(names),
+                            f"{tr('nerd_page')} {'‹' if rtl else '›'} {target.title}",
+                            lambda: shell.show_page(target.key))
+            card.shown_if(row, nerd_on)
+            link_cards.append(card)
+
+        # -- General ----------------------------------------------------------
+        from ..i18n import LANGUAGES, current_language
         # A normal dropdown: click to open, scroll inside the popup. _combo()
         # caps the popup at 14 rows, scrolls per pixel and keeps the
         # scrollbar visible for the 27 languages.
@@ -736,10 +805,6 @@ class _SettingsMixin:
         clear_btn.clicked.connect(lambda: self.open_clear_history())
         c.row(tr("clear_menu"), clear_btn, tr("clear_hint"),
               search="history incognito private recently viewed")
-        # What plays, as a Discord status (mw_discord): only in a build that
-        # carries the Discord application's id.
-        if hasattr(self, "_build_discord_card"):
-            self._build_discord_card(general, d)
         c = general.card(tr("set_card_updates"))
         updates_box = c.toggle(tr("setting_check_updates"),
                                is_on("check_updates", "true"))
@@ -829,11 +894,9 @@ class _SettingsMixin:
                              tr("set_donate_heart_hint"))
         # Sync between computers: a supporter's thank-you (mw_sync).
         if hasattr(self, "_build_sync_card"):
-            self._build_sync_card(general, d)
+            self._build_sync_card(sync_page, d)
 
         # -- Appearance -------------------------------------------------------
-        look = page("appearance", tr("set_page_appearance"),
-                    tr("set_page_appearance_sub"), "palette")
         themes = ChoicePicker(
             [ThemeTile(key, tr(f"theme_{key}")) for key in THEME_ORDER],
             self.settings.value("theme", "graphite"),
@@ -1008,8 +1071,6 @@ class _SettingsMixin:
         c.row(tr("setting_sort_by"), sort_box)
 
         # -- Playback ---------------------------------------------------------
-        play = page("playback", tr("tab_playback"),
-                    tr("set_page_playback_sub"), "play")
         # How early the "Next episode" card appears. A number the user picks
         # rather than one guessed here: where the credits start varies from
         # show to show.
@@ -1045,16 +1106,19 @@ class _SettingsMixin:
         upcoming_box = c.toggle(
             tr("set_upcoming_prompt"),
             self.settings.value("hide_upcoming_prompt", "false") != on)
-        # Night mode: the player's menu and its key turn it on too, live.
-        c = play.card(tr("set_card_sound"))
+        # Night mode: the player's menu and its key turn it on too, live. A
+        # card of its own held this one row.
         night_box = c.toggle(tr("night_mode"), night_mode.enabled(self.settings),
                              tr("night_mode_hint"))
-        c = play.card(tr("set_card_stream"))
+        c = play.card(tr("set_card_stream_buffer"))
         c.row(tr("setting_stream_format"), fmt_box)
         c.row(tr("setting_network_buffer"), buf_box)
         # Settings apply as they change; these two only reach the player
         # with the next stream, so they say so.
         c.note(tr("set_next_stream_note"))
+        nerd_link(c, "set_link_stream",
+                  [tr("nerd_probe"), tr("nerd_cache"), tr("nerd_card_hls"),
+                   tr("nerd_card_latency")], "player")
         # Rewinding live TV has a card of its own: its five settings sat in
         # "Stream" between the stream format and the network buffer.
         c = rw = play.card(tr("set_card_rewind"))
@@ -1126,7 +1190,8 @@ class _SettingsMixin:
                              cast_grid[0], max(cast_grid[-1], cast_pause_mb))
         cast_spin.setValue(max(cast_grid[0], cast_pause_mb))
         cast_pause_box = Stepper(cast_spin, width=cast_spin.widest() + 80)
-        c = play.card(tr("set_card_cast"))
+        # -- Casting: its own page, beside Playback (it was a card there) -----
+        c = casting.card(tr("set_card_cast"))
         c.row(tr("cast_pause_label"), cast_pause_box, tr("cast_pause_hint"))
         if not self.player:
             c = play.card()
@@ -1135,10 +1200,6 @@ class _SettingsMixin:
                       or tr("set_reason_unknown")))
 
         # -- Audio & subtitles ------------------------------------------------
-        # Sound, subtitles and picture on one page: they were two pages of
-        # four and five rows, both about how a stream plays.
-        audio = page("audio", tr("set_page_av"), tr("set_page_av_sub"),
-                     "picture")
         LANGS = [
             ("", tr("option_lang_auto")), ("swe", tr("lang_swe")),
             ("eng", tr("lang_eng")), ("nor", tr("lang_nor")),
@@ -1214,10 +1275,15 @@ class _SettingsMixin:
         c = audio.card(tr("set_card_decoding"))
         c.row(tr("setting_hwdec"), hwdec_box, tr("setting_hwdec_hint"))
         c.note(tr("set_next_stream_note"))
+        nerd_link(c, "set_link_picture",
+                  [tr("nerd_spdif"), tr("nerd_sync"), tr("nerd_interpolation"),
+                   tr("nerd_adelay"), tr("nerd_card_mpv")], "player")
 
-
+        # -- Integrations -----------------------------------------------------
         # OpenSubtitles: a key (built in, or the user's own) and an optional
         # account, which only raises how many subtitles a day can be fetched.
+        # A service's account, so beside the other services rather than
+        # among the subtitle settings it serves.
         os_bundled = bool(bundled_os_key())
         os_key_edit = QLineEdit(self.settings.value("os_api_key", "") or "")
         os_test_btn = QPushButton(tr("btn_test"))
@@ -1226,7 +1292,7 @@ class _SettingsMixin:
         os_pass_edit.setEchoMode(QLineEdit.EchoMode.Password)
         os_user_edit.setPlaceholderText(tr("login_username"))
         os_pass_edit.setPlaceholderText(tr("login_password"))
-        c = os_card = audio.card("OpenSubtitles.com")
+        c = os_card = integrations.card("OpenSubtitles.com")
         c.row(tr("setting_api_key"), hbox(os_key_edit, os_test_btn,
                                           stretch=False),
               tr("os_key_builtin_hint") if os_bundled else tr("os_key_hint"),
@@ -1272,10 +1338,12 @@ class _SettingsMixin:
             run_async(self.pool, check, ok, fail)
 
         os_test_btn.clicked.connect(test_os_key)
+        # What plays, as a Discord status (mw_discord): only in a build that
+        # carries the Discord application's id.
+        if hasattr(self, "_build_discord_card"):
+            self._build_discord_card(integrations, d)
 
         # -- Programme guide --------------------------------------------------
-        guide = page("guide", tr("sec_guide"), tr("set_page_guide_sub"),
-                     "guide")
         epg_count_box = Stepper(lo=self.EPG_UPCOMING_MIN,
                                 hi=self.EPG_UPCOMING_MAX,
                                 value=self._epg_upcoming_count())
@@ -1312,9 +1380,7 @@ class _SettingsMixin:
         c.layout_row(hbox(refresh_epg_btn, clear_epg_btn),
                      tr("setting_epg_cache"))
 
-        # -- Playlists --------------------------------------------------------
-        playlists = page("playlists", tr("tab_playlists"),
-                         tr("set_page_playlists_sub"), "stack")
+        # -- Sources (the playlists) ------------------------------------------
         store = self.playlist_store
         pl_list = ReorderList()
         pl_list.setObjectName("PlaylistList")
@@ -1351,9 +1417,19 @@ class _SettingsMixin:
         c = playlists.card(tr("set_card_selected_playlist"))
         account_lbl = c.row(tr("set_account"), refresh_pl_btn,
                             tr("account_loading")).hint_label
+        # How the app reaches every source, and the boxes and channel lists:
+        # Nerd's, a row each here, where the sources are.
+        c = playlists.card()
+        nerd_link(c, "set_link_net",
+                  [tr("nerd_card_identity"), tr("nerd_card_proxy"),
+                   tr("nerd_card_conn"), tr("nerd_card_dns"),
+                   tr("nerd_card_vpn")], "net")
+        nerd_link(c, "set_link_lists",
+                  [tr("nerd_card_boxes"), tr("nerd_card_picons"),
+                   tr("nerd_card_udpxy"), tr("nerd_card_failover"),
+                   tr("nerd_card_chno")], "boxes")
 
         # -- Home -------------------------------------------------------------
-        home = page("home", tr("nav_home"), tr("set_page_home_sub"), "home")
         c = home.card()
         home_show_box = c.toggle(tr("set_home_show"),
                                  is_on("home_enabled", "true"))
@@ -1435,8 +1511,6 @@ class _SettingsMixin:
         fol_stop.clicked.connect(fol_unfollow)
 
         # -- Multiview --------------------------------------------------------
-        mv = page("multiview", tr("tab_multiview"),
-                  tr("set_page_multiview_sub"), "grid")
         c = mv.card(tr("mv_sec_window"))
         mv_titlebar_box = c.toggle(tr("mv_set_titlebar"),
                                    not is_on("mv_frameless", "true"))
@@ -1484,8 +1558,6 @@ class _SettingsMixin:
         c.layout_row(hbox(mv_info_btn))
 
         # -- Recording --------------------------------------------------------
-        rec = page("recording", tr("tab_recording"),
-                   tr("set_page_recording_sub"), "rec")
         rec_dir_btn = QPushButton(tr("btn_choose_folder"))
         c = rec.card(tr("set_card_folder"))
         rec_dir_row = c.row(tr("rec_saved_in"), rec_dir_btn,
@@ -1533,6 +1605,9 @@ class _SettingsMixin:
         # Saved as MP4 once a recording ended well (core/rec_mp4.py).
         mp4_box = c.toggle(tr("rec_mp4_setting"), rec_mp4.enabled(self.settings),
                            tr("rec_mp4_hint"))
+        nerd_link(c, "set_link_rec",
+                  [tr("nerd_card_rec_files"), tr("nerd_card_rec_after")],
+                  "serve")
         c = rec.card(tr("set_card_limits"))
         c.row(tr("rec_max_label"), rec_max_box)
         c.row(tr("rec_total_label"), rec_total_box)
@@ -1623,8 +1698,6 @@ class _SettingsMixin:
         c.note(tr("rec_howto_hint"))
 
         # -- Local files ------------------------------------------------------
-        loc = page("local", tr("nav_local"), tr("local_settings_hint"),
-                   "folder")
         loc_list = QListWidget(objectName="FolderList")
         folder_icon = page_icon("folder", self._action_pixmap, 16)
 
@@ -1715,8 +1788,6 @@ class _SettingsMixin:
             lambda: (self._local_clear_thumbs(), loc_cleared()))
 
         # -- Metadata (TMDB artwork) ------------------------------------------
-        meta = page("metadata", tr("set_page_posters"),
-                    tr("set_page_metadata_sub"), "image")
         _bundled = bool(bundled_tmdb_key())
         # Source options: the built-in key (only offered when one ships),
         # the user's own key, or the provider's own artwork. The key field
@@ -1787,24 +1858,28 @@ class _SettingsMixin:
             lambda _i: meta_card.refresh())
         tmdb_test_btn.clicked.connect(test_tmdb_key)
 
-        # -- Trakt ------------------------------------------------------------
-        trakt = page("trakt", tr("tab_trakt"), tr("set_page_trakt_sub"),
-                     "trakt")
+        # -- Watch history: Trakt, Simkl and what they keep -------------------
+        # Trakt and Simkl were a page each, with a sync row each for the one
+        # store they fill together: a card each, and that store's own below.
         trakt_browser_btn = QPushButton(tr("trakt_connect_browser"),
                                         objectName="Primary")
         trakt_disconnect_btn = QPushButton(tr("trakt_disconnect"))
         trakt_watchlist_btn = QPushButton(tr("trakt_watchlist_btn"))
-        c = trakt.card(tr("set_card_account"))
+        c = history.card(tr("tab_trakt"))
         trakt_row = c.row(tr("trakt_not_connected"),
                           hbox(trakt_browser_btn, trakt_disconnect_btn,
                                stretch=False),
-                          tr("trakt_connect_browser_hint"))
+                          tr("trakt_connect_browser_hint"),
+                          search="trakt account sign in")
         c.row(tr("set_trakt_lists"), trakt_watchlist_btn,
-              tr("trakt_scrobble_hint"))
+              tr("trakt_scrobble_hint"), search="trakt")
+        # Simkl's card (mw_simkl): only in a build with its client id.
+        simkl_card = (self._build_simkl_card(history, d)
+                      if hasattr(self, "_build_simkl_card") else None)
         sync_now_btn = QPushButton(tr("trakt_sync_now"))
-        c = trakt.card(tr("set_card_watched_history"))
+        c = history.card(tr("set_card_watched_history"))
         sync_row = c.row(tr("trakt_sync_never"), sync_now_btn,
-                         tr("trakt_sync_hint"))
+                         tr("trakt_sync_hint"), search="trakt simkl sync")
 
         def refresh_sync_status():
             n_m, n_e = (len(self.watched.movies),
@@ -1865,14 +1940,11 @@ class _SettingsMixin:
         trakt_watchlist_btn.clicked.connect(
             lambda: self._open_trakt_dialog(d))
         refresh_trakt_status()
-
-        # -- Simkl (mw_simkl): only in a build with its client id ------------
-        if hasattr(self, "_build_simkl_page"):
-            self._build_simkl_page(page, d)
+        if simkl_card is not None:
+            # Signed in or out there: the history card says so here.
+            simkl_card.on_change = refresh_sync_status
 
         # -- Parental controls ------------------------------------------------
-        par = page("parental", tr("tab_parental"),
-                   tr("set_page_parental_sub"), "lock")
         set_pin_btn = QPushButton(tr("pin_set_change"))
         remove_pin_btn = QPushButton(tr("pin_remove"))
         lock_now_btn = QPushButton(tr("pin_lock_now"))
@@ -1922,8 +1994,6 @@ class _SettingsMixin:
         refresh_pin_status()
 
         # -- Advanced ---------------------------------------------------------
-        adv = page("advanced", tr("set_page_advanced"),
-                   tr("set_page_advanced_sub"), "wrench")
         # Every rebindable action and its key, where the old editor's row
         # was: recorded on a click, applied as it changes.
         from ..core import shortcut_keys
@@ -1993,6 +2063,9 @@ class _SettingsMixin:
 
             win_sc_btn.clicked.connect(_make_win_shortcut)
             c.row(tr("win_shortcut_hint"), win_sc_btn)
+        nerd_link(maint, "set_link_diag",
+                  [tr("nerd_log_level"), tr("nerd_log_file"),
+                   tr("nerd_card_view"), tr("nerd_card_health")], "diag")
         refresh_cache_label()
         x11_box = None
         if sys.platform.startswith("linux"):
@@ -2007,23 +2080,8 @@ class _SettingsMixin:
 
         # -- Nerd -------------------------------------------------------------
         from . import nerd_settings
-        nerd_tint = P.get("nerd", P["accent"])
-        nerd_page = page("nerd", tr("nerd_page"), tr("nerd_page_sub"), "nerd", nerd_tint)
-        nerd_pages = {
-            "net": page("nerd_net", tr("nerd_pg_net"), tr("nerd_pg_net_sub"), "network", nerd_tint),
-            "boxes": page("nerd_boxes", tr("nerd_pg_boxes"), tr("nerd_pg_boxes_sub"), "box", nerd_tint),
-            "lists": page("nerd_lists", tr("nerd_pg_lists"), tr("nerd_pg_lists_sub"), "channels", nerd_tint),
-            "player": page("nerd_player", tr("nerd_pg_player"), tr("nerd_pg_player_sub"), "knobs", nerd_tint),
-            "rec": page("nerd_rec", tr("nerd_pg_rec"), tr("nerd_pg_rec_sub"), "rec", nerd_tint),
-            "serve": page("nerd_serve", tr("nerd_pg_serve"), tr("nerd_pg_serve_sub"), "remote", nerd_tint),
-        }
-        # Nerd's pages fold out under Nerd itself, in its own colour - not a
-        # section with a heading of its own.
-        shell.set_children("nerd", [p.key for p in nerd_pages.values()], nerd_tint)
-        # Folded in by the person: kept that way the next time.
-        if self.settings.value("nerd_folded", "false") == "true":
-            shell.folded.add("nerd")
-        shell.on_fold = lambda _p, folded: self.settings.setValue("nerd_folded", "true" if folded else "false")
+        # Status, with the switch, is always there; the rest while it is on.
+        shell.set_gated("nerd", [p.key for p in nerd_pages.values()])
 
         def show_nerd_pages(on: bool) -> None:
             shell.set_group_enabled("nerd", on)
@@ -2044,6 +2102,11 @@ class _SettingsMixin:
             open_page=shell.show_page,
             health_store=lambda: self.health,
             numbers=self._chno_settings)
+        # The link rows to Nerd's pages follow its switch (a turn of it runs
+        # every page's filter again); shown now if it is on.
+        nerd_switch["box"] = getattr(nerd_commit, "switch", None)
+        for card in link_cards:
+            card.refresh()
 
         # -- the playlist page's behaviour -------------------------------------
         def reload_pl_list():
@@ -2223,18 +2286,19 @@ class _SettingsMixin:
         fl.addWidget(close_btn)
         outer.addWidget(footer)
 
-        # The order a person looks for things in, under headings - the pages
-        # are built above in the order their code needs. Playlists, the first
-        # thing a new user has to find, sat seventh.
+        # Grouped by what a person is doing (AGENTS.md, "Where a setting
+        # goes"): watching, what there is to watch, the accounts and services
+        # around it, the app itself - and Nerd, in its own colour.
         shell.arrange([
-            (tr("set_sec_basics"), ["general", "playlists", "appearance",
-                                    "home"]),
-            (tr("set_sec_watching"), ["playback", "audio", "guide",
-                                      "multiview"]),
-            (tr("set_sec_library"), ["recording", "local"]),
-            (tr("set_sec_services"), ["metadata", "trakt", "simkl"]),
-            # Nerd's own pages fold out under it while it is on.
-            (tr("set_sec_system"), ["parental", "advanced", "nerd"]),
+            (tr("set_grp_watch"), ["playback", "audio", "guide", "multiview",
+                                   "recording", "casting"]),
+            (tr("set_grp_content"), ["playlists", "home", "local",
+                                     "metadata"]),
+            (tr("set_grp_accounts"), ["history", "sync", "integrations"]),
+            (tr("set_sec_system"), ["general", "appearance", "parental",
+                                    "advanced"]),
+            (tr("nerd_page"), ["nerd", *(p.key for p in nerd_pages.values())],
+             nerd_tint),
         ])
         # Back on the page that was open last time this session.
         shell.show_page(getattr(self, "_settings_page", None))

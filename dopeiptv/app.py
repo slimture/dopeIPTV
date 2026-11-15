@@ -559,7 +559,7 @@ def main() -> int:
             # recover by themselves (cooldown + caches).
             if isinstance(e, RuntimeError) and "username or password" in str(e):
                 from .i18n import tr
-                where = f"{tr('settings_title')} → {tr('tab_playlists')}"
+                where = f"{tr('settings_title')} → {tr('set_page_sources')}"
                 QMessageBox.warning(
                     w, tr("msg_connection_failed"),
                     f"{pl['name']}: {e}\n\n"

@@ -264,7 +264,7 @@ def test_the_settings_card_lists_the_worst_stores_the_switch_and_clears(app, tmp
     shown = page.findChildren(nerd_settings.HealthList)[0]
     assert [name for name, _n in shown.rows] == ["TV4 HD", "SVT1"]
     assert shown.rows[0][1] == tr("nerd_health_line", fails=1, starts=1, avg="–", drops=0)
-    assert "nerd_health" in nerd_settings.PART_KEYS["lists"]
+    assert "nerd_health" in nerd_settings.PART_KEYS["diag"]
     switch = next(sw for sw in page.findChildren(ToggleSwitch) if sw.accessibleName() == tr("nerd_health"))
     assert not switch.isChecked()                 # off by default
     stored: dict = {}

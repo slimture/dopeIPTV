@@ -1,6 +1,7 @@
-"""Settings with and without what a build carries: the Simkl page only with
-a Simkl client id, the Discord card only with Discord's application id, and
-the Discord switch applied as it is turned.
+"""Settings with and without what a build carries: Simkl's card on the Watch
+history page only with a Simkl client id, the Discord card on Integrations
+only with Discord's application id, and the Discord switch applied as it is
+turned.
 
 The real Settings window in a child process (offscreen), as in
 test_settings_window.
@@ -34,13 +35,24 @@ w = MainWindow(DemoClient(), s, PlaylistStore(s))
 seen = {}
 
 
+def titles(page):
+    return [c.property("_title").text().replace(" ", "_") for c in page.cards
+            if c.property("_title") is not None]
+
+
 def run(self):
     self.show()
     shell = self.findChild(SettingsShell)
     seen["pages"] = [p.key for p in shell.pages]
+    pages = {p.key: p for p in shell.pages}
+    seen["history"] = titles(pages["history"])
+    seen["integrations"] = titles(pages["integrations"])
     switch = next((x for x in self.findChildren(ToggleSwitch)
                    if x.accessibleName() == tr("discord_show")), None)
     seen["discord"] = switch is not None
+    # Where it is: on Integrations, beside OpenSubtitles.
+    if switch is not None:
+        assert pages["integrations"].isAncestorOf(switch)
     if switch is not None:
         assert not switch.isChecked()
         switch.setChecked(True)
@@ -52,6 +64,8 @@ def run(self):
 QDialog.exec = run
 w.open_settings()
 print("PAGES", " ".join(seen["pages"]))
+print("HISTORY", " ".join(seen["history"]))
+print("INTEGRATIONS", " ".join(seen["integrations"]))
 print("DISCORD", seen["discord"], seen.get("on"))
 print("SIMKL", w.simkl.available())
 os._exit(0)
@@ -69,9 +83,17 @@ def _settings(app_id: str, simkl_id: str) -> str:
     return out.stdout
 
 
+def _line(out: str, head: str) -> list[str]:
+    return out.split(head + " ", 1)[1].split("\n", 1)[0].split()
+
+
 def test_what_the_build_carries_is_what_settings_offers():
     with_both = _settings("1234567890", "client-id")
-    assert "simkl" in with_both.split("PAGES", 1)[1].split("\n", 1)[0].split()
+    # One page for the watch history: Trakt's card, Simkl's, and the one
+    # history they fill together - no page of Simkl's own.
+    assert _line(with_both, "HISTORY") == ["Trakt", "Simkl", "Watched_history"]
+    assert "simkl" not in _line(with_both, "PAGES")
+    assert _line(with_both, "INTEGRATIONS") == ["OpenSubtitles.com", "Discord"]
     assert "DISCORD True true" in with_both and "SIMKL True" in with_both
 
 
@@ -79,5 +101,6 @@ def test_without_the_ids_neither_is_offered():
     out = _settings("", "")
     if "SIMKL True" in out:
         return              # a checkout with a _simkl_key.py of its own
-    assert "simkl" not in out.split("PAGES", 1)[1].split("\n", 1)[0].split()
+    assert _line(out, "HISTORY") == ["Trakt", "Watched_history"]
+    assert _line(out, "INTEGRATIONS") == ["OpenSubtitles.com"]
     assert "DISCORD False" in out

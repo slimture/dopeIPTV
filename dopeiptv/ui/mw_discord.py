@@ -1,6 +1,6 @@
 """Discord status in the window: what the player plays, shown in Discord as
 "Watching <channel>" (or the film, or the series and its episode) with the
-time since it started - or only "Watching TV" - while Settings > General
+time since it started - or only "Watching TV" - while Settings > Integrations
 says so (core/discord_rpc.py talks to Discord, on a thread of its own).
 
 It only watches: each hook returns at once while the switch is off, does no
@@ -146,17 +146,17 @@ class _DiscordMixin:
             except Exception:
                 pass
 
-    # -- Settings > General ---------------------------------------------------------
+    # -- Settings > Integrations -----------------------------------------------------
 
     def _build_discord_card(self, page, dlg) -> None:
-        """The Discord card on the General page - only in a build with an
+        """The Discord card on the Integrations page - only in a build with an
         application id."""
         if discord_offered():
             _DiscordCard(self, page.card(tr("discord_card")), dlg)
 
 
 class _DiscordCard(QObject):
-    """Settings, General: the switch, and what the status says. Lives as
+    """Settings, Integrations: the switch, and what the status says. Lives as
     long as the dialog; applied as it is changed."""
 
     def __init__(self, win, card, dlg) -> None:

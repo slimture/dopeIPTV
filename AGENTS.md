@@ -144,7 +144,7 @@ map and the one-way import rule.
 | `ui/app_menu.py` | The app's menus per platform: macOS's menu bar (app menu by roles, File, View, History, Help), elsewhere the one menu in the same groups |
 | `ui/channel_list.py` | List model, view, delegate painting |
 | `ui/dialogs.py` | Dialog windows |
-| `ui/settings_ui.py` | Settings building blocks: sidebar shell, search view, pages, sections (`card`), rows, switches, steppers, chips |
+| `ui/settings_ui.py` | Settings building blocks: sidebar shell (group headings, a group's pages shown only while it is on), search view (each page's group over it), pages, sections (`card`), rows, link rows to a page elsewhere, switches, steppers, chips |
 | `ui/qt_i18n.py` | Qt's own strings and QLocale dates in the app's language |
 | `ui/home_widgets.py` | Home's featured strip, shelves and cards (pure presentation) |
 | `ui/tmdb_match.py` | Manual TMDB match dialog |
@@ -154,7 +154,7 @@ map and the one-way import rule.
 | `ui/box_finder.py` | Box and media-server kinds in the add-a-source forms and the "Find on my network" button (the form's own kinds first) |
 | `ui/media_signin.py` | Signing in to a media server in the source dialog and the welcome: Jellyfin/Emby name and password (sent once, never kept) or Quick Connect, Plex's PIN in the browser and the server picked; the network off the window's thread |
 | `ui/mw_media.py` | Media servers in the window: what plays reported (start, every 10 s, pause, stop), the newer of the server's and this computer's resume points, the server's titles under Continue watching (`_continue_rows`), a watched mark sent back, why there is no live TV; it only watches, nothing in private viewing |
-| `ui/nerd_settings.py` | Nerd in Settings: its own page (switch, how it works, diagnostics) and the five pages under NERD while it is on |
+| `ui/nerd_settings.py` | Nerd in Settings: Status (switch, what is in Nerd, how it works) and, while it is on, the five pages beside it under NERD - Network, Boxes and lists, Player, Remote and automation, Diagnostics |
 | `ui/source_nerd.py` | A source's own Nerd options in the Add/Edit source dialog |
 | `ui/net_advanced.py` | Nerd's Own DNS card (Network page) and Low latency card (Player page), each with its check line |
 | `ui/source_net.py` | A source's own DNS, IP version and trusted certificate in its Nerd options, each with a Test |
@@ -185,9 +185,9 @@ map and the one-way import rule.
 | `ui/mw_report.py` | Send feedback, and the offer of a report after an error or a crash (queued; while a video plays it waits in the menu); answers to feedback (their window, the menu entry's count, when they are asked) |
 | `ui/mw_together.py` | Watch together in the window: start, join and leave (never while private viewing is on), the playback path's hooks (start, pause, stop), what the room plays found here and started where the room is (no resume question), kept in step once a second through the player's play, pause and seek; a live channel only tuned |
 | `ui/together_ui.py` | Watch together's dialog (start a room or join one by its code, the code to share, who is in) and the calm strip under the video |
-| `ui/mw_simkl.py` | Simkl in the window: scrobbles of what plays, its Settings page (only with a client id), the PIN sign-in, its watchlist and history window; marks and the watched sync go to every account through `mw_trakt`'s `_watch_accounts` |
-| `ui/mw_discord.py` | Discord status in the window: the player's hooks (start, pause, stop), nothing in private viewing, names or only "Watching TV", the card in Settings, General (only with an application id); it only watches |
-| `ui/mw_sync.py` | Settings sync in the window: when a round runs (start, after a change, every half hour, Sync now; never in a stream's first seconds), what came back put in place, its card in Settings, General |
+| `ui/mw_simkl.py` | Simkl in the window: scrobbles of what plays, its card on Settings > Watch history (only with a client id), the PIN sign-in, its watchlist and history window; marks and the watched sync go to every account through `mw_trakt`'s `_watch_accounts` |
+| `ui/mw_discord.py` | Discord status in the window: the player's hooks (start, pause, stop), nothing in private viewing, names or only "Watching TV", the card in Settings, Integrations (only with an application id); it only watches |
+| `ui/mw_sync.py` | Settings sync in the window: when a round runs (start, after a change, every half hour, Sync now; never in a stream's first seconds), what came back put in place, its page in Settings (Sync between computers) |
 | `ui/mw_home.py` | The Home page: which shelves, what goes in them (drawn by `home_widgets.py`) |
 | `ui/mw_local.py` | Local files: folders, library view, music queue |
 | `ui/mw_multiview.py` | Multiview: 2/4/6/9 live streams, an mpv per cell |
@@ -288,7 +288,11 @@ Guide, Multiview, Recording, Casting), CONTENT (Sources, Home, Local
 files, Posters and info), ACCOUNTS AND INTEGRATIONS (watch history -
 Trakt, Simkl -, Sync, Integrations), SYSTEM (General, Appearance, Parental
 lock, Advanced) and NERD (Status, Network, Boxes and lists, Player, Remote
-and automation, Diagnostics).
+and automation, Diagnostics). Every row there is today, page by page and
+section by section with the key it stores, is in
+[`docs/SETTINGS_MAP.md`](docs/SETTINGS_MAP.md) - look there first, and add
+the new row to it (`tests/test_settings_map.py` checks every page is in one
+group, every row on one page, and that the map names every page).
 
 - Put it where someone would look for it, not where the code that reads
   it lives.
@@ -300,7 +304,7 @@ and automation, Diagnostics).
   with the shared one shown as shared.
 - A Nerd-only option goes under NERD, and the everyday page it belongs
   beside gets one link row to it ("4 Nerd settings for ... -> Nerd >
-  Player").
+  Player"): `nerd_link()` in `open_settings`, shown only while Nerd is on.
 - If no page fits, stop and ask rather than add a page or a stray row.
 
 **Add a theme**: a palette in `THEMES` (`ui/theme.py`) with every key the

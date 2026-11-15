@@ -1,7 +1,7 @@
-"""Nerd in Settings: its own page (the switch, how it works, stats,
-diagnostics) and, while it is on, four more under NERD - the network, boxes
-and servers, channels and guide, the player. Each setting that can be tried
-has a line under it saying whether it works (ui/nerd_check_line.py,
+"""Nerd in Settings: its own page, Status (the switch, what is in Nerd, how
+it works), and while it is on five more under NERD - Network, Boxes and
+lists, Player, Remote and automation, Diagnostics. Each setting that can be
+tried has a line under it saying whether it works (ui/nerd_check_line.py,
 core/nerd_check.py); each card says when its settings take effect.
 core/nerd.py turns what is stored here into what the player and the network
 do.
@@ -67,21 +67,24 @@ BOX_NAMES = {"enigma2": "Enigma2", "tvheadend": "Tvheadend", "hdhomerun": "HDHom
 
 #: Nerd's pages in the order its list shows them, and the settings on each
 #: (what "2 changed" counts; boxes are counted as boxes).
-PARTS = ("net", "boxes", "lists", "player", "rec", "serve")
+PARTS = ("net", "boxes", "player", "serve", "diag")
 PART_KEYS = {
     "net": ("nerd_user_agent", "nerd_referer", "nerd_headers", "nerd_proxy", "nerd_proxy_player",
             "nerd_ip_family", "nerd_net_timeout", "nerd_reconnect_max", "nerd_vpn_guard",
             "nerd_vpn_iface", "nerd_vpn_lan", "nerd_dns", "nerd_dns_url", "nerd_dns_fallback"),
-    "lists": ("nerd_picon_dir", "nerd_picon_override", "nerd_udpxy", "nerd_failover", "nerd_health",
-              "nerd_numbers_keep"),
+    "boxes": ("nerd_picon_dir", "nerd_picon_override", "nerd_udpxy", "nerd_failover", "nerd_numbers_keep"),
     "player": ("nerd_spdif", "nerd_video_sync", "nerd_interpolation", "nerd_probe", "nerd_demux_max_mb",
                "nerd_mpv_config_dir", "nerd_shaders", "nerd_mpv_options", "nerd_adelay_per_channel",
                "nerd_hls_quality", "nerd_hls_max_kbps", "nerd_low_latency"),
-    "rec": ("nerd_rec_template", "nerd_rec_post"),
     "serve": ("nerd_remote", "nerd_share", "nerd_remote_lan", "nerd_remote_port", "nerd_hooks",
               "nerd_hooks_urls", "nerd_mqtt", "nerd_mqtt_host", "nerd_mqtt_port", "nerd_mqtt_tls",
-              "nerd_mqtt_client", "nerd_mqtt_prefix", "nerd_mqtt_ha", "nerd_mqtt_commands"),
+              "nerd_mqtt_client", "nerd_mqtt_prefix", "nerd_mqtt_ha", "nerd_mqtt_commands",
+              "nerd_rec_template", "nerd_rec_post"),
+    "diag": ("nerd_log_level", "nerd_log_file", "nerd_overlay_more", "nerd_health"),
 }
+#: Parts that share a page: the channel lists with the boxes, what follows a
+#: recording with the rest of the automation.
+PART_HOME = {"lists": "boxes", "rec": "serve"}
 
 
 class _Defaults(nerd.Nerd):
@@ -175,9 +178,10 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
           health_store: Callable[[], Any] | None = None,
           numbers: Callable[[str, bool, Callable[[int], None]], None] | None = None,
           ) -> Callable[[Callable[[str, Any], None]], None]:
-    """*page* is Nerd's own: the switch, how it works, stats, diagnostics.
-    *pages* ("net", "boxes", "lists", "player", "rec") take the rest, shown by
-    *show_pages* while Nerd is on; without them it all goes on *page*.
+    """*page* is Nerd's own, Status: the switch, what is in Nerd, how it
+    works. *pages* ("net", "boxes", "player", "serve", "diag") take the
+    rest, shown by *show_pages* while Nerd is on; a part without a page of
+    its own goes on the page it shares (PART_HOME), else on *page*.
     *boxes*: the box sources, each a click (*edit*, by id) from its options.
     *source*: the active source, which the network checks ask; *channels*:
     fetches its channel list, off the window's thread (the picon check
@@ -194,7 +198,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     sub = pages or {}
 
     def at(key: str) -> SettingsPage:
-        return sub.get(key, page)
+        return sub.get(key) or sub.get(PART_HOME.get(key, "")) or page
 
     def val(key: str, default: str = "") -> str:
         return n.get(key, default)
@@ -238,10 +242,6 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     if pages:
         how.append(("nerd_how_pages_t", "nerd_how_pages"))
     c.widget(_how_block(how), " ".join(tr(t) + " " + tr(b) for t, b in how))
-
-    c = page.card(tr("nerd_card_view"))
-    overlay = c.toggle(tr("nerd_overlay"), n.flag("nerd_overlay_more", True), tr("nerd_overlay_hint"))
-    c.note(tr("nerd_intro"))
 
     # -- network: who the app says it is -------------------------------------------
     c = at("net").card(tr("nerd_card_identity"))
@@ -435,35 +435,6 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     c.row(tr("nerd_failover"), fail_on, tr("nerd_failover_hint"),
           search="failover backup another source fallback", below=fo_line)
     c.note(tr("nerd_applies_stream"))
-
-    # -- channels: stream health -----------------------------------------------------------
-    from ..core import health
-    own_store = health.StreamHealth(settings) if health_store is None else None
-
-    def store_now() -> Any:
-        return health_store() if health_store is not None else own_store
-    c = at("lists").card(tr("nerd_card_health"))
-    health_on = ToggleSwitch(n.flag(health.SWITCH))
-    health_on.setAccessibleName(tr("nerd_health"))
-    c.row(tr("nerd_health"), health_on, tr("nerd_health_hint"),
-          search="stream health statistics start time failures drops reconnects")
-    worst = HealthList()
-    c.widget(worst, "worst channels slowest start failures")
-    clear_health = QPushButton(tr("nerd_health_clear"))
-
-    def show_worst() -> None:
-        rows = store_now().worst(10)
-        worst.fill(rows)
-        clear_health.setEnabled(bool(rows))
-
-    def forget_health() -> None:
-        store_now().clear()
-        show_worst()
-    clear_health.clicked.connect(lambda _c=False: forget_health())
-    c.layout_row(_hbox(clear_health), "clear stream health")
-    c.note(tr("nerd_applies_stream"))
-    show_worst()
-    at("lists").installEventFilter(_OnShow(at("lists"), show_worst))
 
     # -- channels: guide -------------------------------------------------------------------
     c = at("lists").card(tr("nerd_card_guide"))
@@ -659,43 +630,6 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
           search="mpv.conf options", below=raw_line)
     c.note(tr("nerd_applies_mpv"))
 
-    # -- recordings: names, the folder, what follows ------------------------------------------
-    from ..core import rec_extras
-    c = at("rec").card(tr("nerd_card_rec_names"))
-    template = QLineEdit(val("nerd_rec_template"))
-    template.setPlaceholderText(rec_extras.DEFAULT_TEMPLATE)
-
-    def template_job() -> Any:
-        text = template.text()
-        return lambda: rec_extras.check_template(text)
-    tpl_line = check(template_job, tr("nerd_ck_title_tpl"))
-    template.textChanged.connect(tpl_line.changed)
-    c.row(tr("nerd_rec_template"), template, tr("nerd_rec_template_hint"), stretch_control=True,
-          search="file name template folder recording", below=tpl_line)
-    c.note(tr("nerd_rec_fields"))
-
-    c = at("rec").card(tr("nerd_card_rec_folder"))
-
-    def folder_job() -> Any:
-        folder = rec_dir() if rec_dir is not None else ""
-        return lambda: rec_extras.check_folder(folder)
-    folder_line = check(folder_job, tr("nerd_ck_title_recdir"))
-    c.widget(folder_line, "recording folder network share NAS free space")
-    c.note(tr("nerd_rec_folder_note"))
-
-    c = at("rec").card(tr("nerd_card_rec_after"))
-    post = QLineEdit(val("nerd_rec_post"))
-    post.setPlaceholderText('comskip "{path}"')
-
-    def post_job() -> Any:
-        cmd = post.text().strip()
-        return (lambda: rec_extras.check_post(cmd)) if cmd else None
-    post_line = check(post_job, tr("nerd_ck_title_post"), test=True,
-                      test_text=tr("nerd_ck_test_post"))
-    c.row(tr("nerd_rec_post"), post, tr("nerd_rec_post_hint"), stretch_control=True,
-          search="command script comskip post-processing after recording", below=post_line)
-    c.note(tr("nerd_applies_rec"))
-
     # -- remote control and sharing --------------------------------------------------------
     from ..core import remote_api
     c = at("serve").card(tr("nerd_card_remote"))
@@ -791,8 +725,46 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     # -- events pushed out: webhooks and MQTT ------------------------------------------------
     hooks = _events_cards(at("serve"), n, lines)
 
-    # -- diagnostics (Nerd's own page) --------------------------------------------------------
-    c = page.card(tr("nerd_card_diag"))
+    # -- recordings: names, the folder, what follows ------------------------------------------
+    from ..core import rec_extras
+    c = at("rec").card(tr("nerd_card_rec_files"))
+    template = QLineEdit(val("nerd_rec_template"))
+    template.setPlaceholderText(rec_extras.DEFAULT_TEMPLATE)
+
+    def template_job() -> Any:
+        text = template.text()
+        return lambda: rec_extras.check_template(text)
+    tpl_line = check(template_job, tr("nerd_ck_title_tpl"))
+    template.textChanged.connect(tpl_line.changed)
+    c.row(tr("nerd_rec_template"), template, tr("nerd_rec_template_hint"), stretch_control=True,
+          search="file name template folder recording", below=tpl_line)
+    c.note(tr("nerd_rec_fields"))
+
+    c = at("rec").card(tr("nerd_card_rec_folder"))
+
+    def folder_job() -> Any:
+        folder = rec_dir() if rec_dir is not None else ""
+        return lambda: rec_extras.check_folder(folder)
+    folder_line = check(folder_job, tr("nerd_ck_title_recdir"))
+    c.widget(folder_line, "recording folder network share NAS free space")
+    c.note(tr("nerd_rec_folder_note"))
+
+    c = at("rec").card(tr("nerd_card_rec_after"))
+    post = QLineEdit(val("nerd_rec_post"))
+    post.setPlaceholderText('comskip "{path}"')
+
+    def post_job() -> Any:
+        cmd = post.text().strip()
+        return (lambda: rec_extras.check_post(cmd)) if cmd else None
+    post_line = check(post_job, tr("nerd_ck_title_post"), test=True,
+                      test_text=tr("nerd_ck_test_post"))
+    c.row(tr("nerd_rec_post"), post, tr("nerd_rec_post_hint"), stretch_control=True,
+          search="command script comskip post-processing after recording", below=post_line)
+    c.note(tr("nerd_applies_rec"))
+
+    # -- diagnostics: the logs, the app's own report, the connection ------------------------
+    # On a page of its own the page's title says it already.
+    c = at("diag").card("" if "diag" in sub else tr("nerd_card_diag"))
     level = combo([("info", "nerd_log_info"), ("debug", "nerd_log_debug")], val("nerd_log_level", "info"))
     c.row(tr("nerd_log_level"), level, tr("nerd_log_level_hint"), search="log debug")
     log_file = c.toggle(tr("nerd_log_file"), n.flag("nerd_log_file"), tr("nerd_log_file_hint"))
@@ -830,6 +802,41 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     conn_btn.clicked.connect(test_connection)
     c.row(tr("ct_row"), conn_btn, tr("ct_row_hint"),
           search="connection test DNS TLS speed Mbit throughput ping")
+
+    # -- diagnostics: stats over the video --------------------------------------------------
+    c = at("diag").card(tr("nerd_card_view"))
+    overlay = c.toggle(tr("nerd_overlay"), n.flag("nerd_overlay_more", True), tr("nerd_overlay_hint"))
+    c.note(tr("nerd_intro"))
+
+    # -- diagnostics: stream health -------------------------------------------------------
+    from ..core import health
+    own_store = health.StreamHealth(settings) if health_store is None else None
+
+    def store_now() -> Any:
+        return health_store() if health_store is not None else own_store
+    c = at("diag").card(tr("nerd_card_health"))
+    health_on = ToggleSwitch(n.flag(health.SWITCH))
+    health_on.setAccessibleName(tr("nerd_health"))
+    c.row(tr("nerd_health"), health_on, tr("nerd_health_hint"),
+          search="stream health statistics start time failures drops reconnects")
+    worst = HealthList()
+    c.widget(worst, "worst channels slowest start failures")
+    clear_health = QPushButton(tr("nerd_health_clear"))
+
+    def show_worst() -> None:
+        rows = store_now().worst(10)
+        worst.fill(rows)
+        clear_health.setEnabled(bool(rows))
+
+    def forget_health() -> None:
+        store_now().clear()
+        show_worst()
+    clear_health.clicked.connect(lambda _c=False: forget_health())
+    c.layout_row(_hbox(clear_health), "clear stream health")
+    c.note(tr("nerd_applies_stream"))
+    show_worst()
+    at("diag").installEventFilter(_OnShow(at("diag"), show_worst))
+
 
     def values() -> dict[str, str]:
         out: dict[str, str] = {}
@@ -896,13 +903,15 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
                 line.start()
 
     def part_summary(key: str) -> tuple[str, bool]:
-        if key == "boxes":
-            return (tr("nerd_part_boxes", n=len(boxes)), True) if boxes else (tr("nerd_part_no_boxes"), False)
+        if key == "boxes" and boxes:
+            return tr("nerd_part_boxes", n=len(boxes)), True
         if key == "serve" and (remote_on.isChecked() or share_on.isChecked()):
             return tr("nerd_part_on", port=port.value()), True
         now = values()
         changed = sum(1 for k in PART_KEYS.get(key, ()) if now.get(k, "") != n.defaults.get(k, ""))
-        return (tr("nerd_part_changed", n=changed), True) if changed else (tr("nerd_part_untouched"), False)
+        if changed:
+            return tr("nerd_part_changed", n=changed), True
+        return tr("nerd_part_no_boxes" if key == "boxes" else "nerd_part_untouched"), False
 
     def refresh_parts() -> None:
         for key, row in part_rows:
@@ -951,6 +960,8 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
             put(key, value)
 
     commit.lines = lines  # type: ignore[attr-defined]
+    #: The switch: the link rows on other pages show only while it is on.
+    commit.switch = switch  # type: ignore[attr-defined]
     return commit
 
 

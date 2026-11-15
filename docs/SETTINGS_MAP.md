@@ -1,0 +1,174 @@
+# Settings map
+
+Where every row of the Settings window is: group → page (`page key`) →
+section → the QSettings key it stores. One setting, one place; a page that
+needs a setting kept elsewhere has a link row to it ("→ Nerd › Player").
+The rules for placing a new one are in [`AGENTS.md`](../AGENTS.md), "Where
+a setting goes"; `tests/test_settings_map.py` checks that every page is in
+one group, every row on one page, that the search finds them, and that
+this file names every page.
+
+The pages are built in `ui/mw_settings.py` (`open_settings`), Nerd's in
+`ui/nerd_settings.py` (with `ui/net_advanced.py`), the shortcuts in
+`ui/shortcuts.py`, Simkl in `ui/mw_simkl.py`, sync in `ui/mw_sync.py`,
+Discord in `ui/mw_discord.py`. A row without a key is an action or a
+status. "(inverted)" is stored the other way round from what the row says.
+A source's own options are not here: they are in its Add/Edit dialog
+(`ui/dialogs.py`, its Nerd part in `ui/source_nerd.py`, `ui/source_net.py`).
+
+## WATCH
+
+**Playback** (`playback`)
+- Behaviour: `autoplay_preview`, `autoplay_next_episode`, `nextup_lead_secs`,
+  `auto_reconnect_live`, `hide_upcoming_prompt` (inverted), `night_mode`
+- Stream and buffer: `stream_format`, `cache_secs`; link → Nerd › Player
+  (channel start, buffer memory, HLS, low latency)
+- Rewind live TV: `live_rewind_minutes`, `live_rewind_disk`,
+  `live_rewind_kept`, `live_rewind_space_gb`; where the buffer is (Open folder)
+- (only without the embedded player) why playback opens in mpv
+
+**Picture & sound** (`audio`)
+- Audio & subtitles: `audio_lang`, `sub_mode`, `sub_lang`, `sub_lang2`
+- How subtitles look: `sub_scale`, `sub_color`, `sub_background`
+- Video: `aspect_mode`, `video_deinterlace`, `video_sharpen`, `video_tonemapping`
+- Decoding: `hwdec_mode`; link → Nerd › Player (passthrough, video sync,
+  interpolation, audio delay per channel, mpv)
+
+**Guide** (`guide`)
+- (untitled): `epg_upcoming_count`
+- Time offsets: `replay_delay_min`, `epg_delay_min`
+- Guide data: Refresh guide, Clear guide cache
+
+**Multiview** (`multiview`)
+- Window: `mv_frameless` (inverted), `mv_on_top`, `mv_remember_geo`, `mv_cells`
+- Behavior: `mv_stop_docked`, `mv_new_unmuted`, `mv_conflict_mode`
+- Controls: `mv_autohide_secs`, `mv_seek_step_min`, show the tips again (`mv_info_seen`)
+
+**Recording** (`recording`)
+- Folder: `recordings_dir`, `rec_save_mp4`; link → Nerd › Remote and
+  automation (file names, what runs after)
+- Limits: `rec_max_value` + `rec_max_unit`, `rec_total_value` + `rec_total_unit`
+- Padding: `rec_pad_before_min`, `rec_pad_after_min`
+- Series recordings: the rules (`series_rules_<source id>`), add a word, delete
+- (untitled): which recorder is used, how to record
+
+**Casting** (`casting`) - a page of one row for now; AirPlay's rows join it,
+and Chromecast, DLNA and Kodi rows belong here
+- Chromecast: `cast_pause_gb`
+
+## CONTENT
+
+**Sources** (`playlists`)
+- (untitled): the sources (`playlists`, `active_playlist`): add, edit, remove,
+  use, drag to reorder
+- Selected playlist: its account (expiry, connections), Refresh
+- (untitled): link → Nerd › Network (identity, proxy, connection, own DNS,
+  VPN guard); link → Nerd › Boxes and lists (boxes, picons, udpxy, failover,
+  channel numbers)
+
+**Home** (`home`)
+- (untitled): `home_enabled`, `home_start`
+- Sections on Home: `home_sh_resume`, `home_sh_new_eps`, `home_sh_fav`,
+  `home_sh_history`, `home_sh_watchlist`, `home_sh_hero`, `home_sh_pop_movies`,
+  `home_sh_pop_series`, `home_sh_movies`, `home_sh_series`, `home_sh_channels`
+- Followed series: `follow_notify`; the followed series, stop following
+
+**Local files** (`local`)
+- Folders: `local_dirs`
+- Music: `music_art_online`
+
+**Posters & info** (`metadata`)
+- (untitled): `metadata_source`, `tmdb_api_key` (Test)
+
+## ACCOUNTS AND INTEGRATIONS
+
+**Watch history** (`history`)
+- Trakt: account (connect in the browser, disconnect), watchlist and history
+- Simkl (only in a build with its client id): account (PIN sign-in), lists
+- Watched history: last sync, Sync now - one store, Trakt's and Simkl's
+
+**Sync between computers** (`sync`)
+- (untitled): a supporter's key first; then start or join, what syncs
+  (`sync_cats`), the code, Sync now, stop
+
+**Integrations** (`integrations`)
+- OpenSubtitles.com: `os_api_key` (Test), `os_username` + `os_password`
+- Discord (only in a build with its application id): `discord_presence`,
+  `discord_presence_detail`
+
+## SYSTEM
+
+**General** (`general`)
+- Language: `language`
+- Privacy: private viewing (until the app closes, not stored), clear recent history
+- Updates: `check_updates`, `update_channel`
+- Backup: back up, restore
+- System: `desktop_entry` (Linux), `mpris` (the system's media controls)
+- Support dopeIPTV: feedback and its answers, `supporter_key` (its window),
+  `supporter_icon`, the sidebar heart (`donate_heart_until`)
+
+**Appearance** (`appearance`)
+- Theme: `theme`, `accent` (+ `accent_custom`), `theme_follow_system`,
+  `theme_light`, `corner_style`, `ui_scale`
+- Lists: `view_density`, `sort_order`
+
+**Parental lock** (`parental`)
+- PIN: `parental_pin_hash` + `parental_salt` (set, remove), lock now
+
+**Advanced** (`advanced`)
+- Keyboard shortcuts: `keyboard_shortcuts`
+- Maintenance: reset broken .ts streams, Start-menu shortcut (Windows);
+  link → Nerd › Diagnostics (log detail, log file, stats for nerds, stream health)
+- Caches: the image cache, the local files' caches
+- System (Linux): `force_x11`
+- Reset: reset all settings
+
+## NERD
+
+Status is always there (it holds the switch); the other five pages only
+while Nerd is on, and so are the link rows that lead to them.
+
+**Status** (`nerd`)
+- (untitled): `nerd_enabled`
+- What's in Nerd: its pages, what is changed on each
+- How Nerd works
+
+**Network** (`nerd_net`)
+- Who the app says it is: `nerd_user_agent`, `nerd_referer`, `nerd_headers`
+- Proxy: `nerd_proxy`, `nerd_proxy_player`
+- Connection: `nerd_ip_family`, `nerd_net_timeout`, `nerd_reconnect_max`
+- Own DNS: `nerd_dns`, `nerd_dns_url`, `nerd_dns_fallback`
+- VPN guard: `nerd_vpn_guard`, `nerd_vpn_iface`, `nerd_vpn_lan`
+
+**Boxes and lists** (`nerd_boxes`)
+- Boxes and servers: each box source's options (its dialog), add a box
+- Channel logos (picons): `nerd_picon_dir`, `nerd_picon_override`
+- Multicast (udpxy): `nerd_udpxy`
+- Failover: `nerd_failover`
+- Guide: how to give a source several guides, a channel its guide by hand
+- Channel numbers: `nerd_numbers_keep`; number all, clear (`nerd_chno_<source id>`)
+
+**Player** (`nerd_player`)
+- Picture and sound: `nerd_spdif`, `nerd_video_sync`, `nerd_interpolation`
+- Channel start and buffer: `nerd_probe`, `nerd_demux_max_mb`, `nerd_adelay_per_channel`
+- Low latency: `nerd_low_latency`
+- Adaptive streams (HLS): `nerd_hls_quality`, `nerd_hls_max_kbps`
+- mpv: `nerd_mpv_config_dir`, `nerd_shaders`, `nerd_mpv_options`
+
+**Remote and automation** (`nerd_serve`)
+- Remote control: `nerd_remote`
+- Share with other players: `nerd_share`; copy the playlist and guide addresses
+- Who can reach it: `nerd_remote_lan`, `nerd_remote_port`, `nerd_remote_token`
+- Webhooks: `nerd_hooks`, `nerd_hooks_urls`, `nerd_hooks_header`
+- MQTT: `nerd_mqtt`, `nerd_mqtt_host`, `nerd_mqtt_port`, `nerd_mqtt_tls`,
+  `nerd_mqtt_user` + `nerd_mqtt_pass`, `nerd_mqtt_client`, `nerd_mqtt_prefix`,
+  `nerd_mqtt_commands`, `nerd_mqtt_ha`
+- Recording file names: `nerd_rec_template`
+- Recording folder: a check of the folder set under Recording
+- When a recording is done: `nerd_rec_post`
+
+**Diagnostics** (`nerd_diag`)
+- (untitled): `nerd_log_level`, `nerd_log_file`, the log folder, the
+  diagnostics to copy, Test connection
+- Stats for nerds: `nerd_overlay_more`
+- Stream health: `nerd_health`; the worst channels, clear

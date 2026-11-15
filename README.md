@@ -198,7 +198,7 @@ server (e.g. `http://server:8080`) with username and password, an M3U
 playlist URL, or a Stalker / Ministra portal address with a MAC address.
 No account yet? Pick the **demo channels** — free public test streams — to
 look around first. More providers can be added later under
-**Settings → Playlists**.
+**Settings → Sources**.
 
 ## Add to the application menu (optional)
 
@@ -251,7 +251,7 @@ hand costs nothing either.
 | Watch a programme from the start | Right-click a ⏪ channel → Timeshift |
 | Browse the full guide | The **EPG Guide** button in the sidebar (↻ in the guide refreshes it) |
 | Search | Type in the search field at the top |
-| Switch playlist / provider | The playlist menu at the top of the sidebar, or Settings → Playlists |
+| Switch playlist / provider | The playlist menu at the top of the sidebar, or Settings → Sources |
 
 ## Keyboard shortcuts
 

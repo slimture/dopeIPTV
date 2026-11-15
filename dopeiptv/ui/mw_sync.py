@@ -1,5 +1,6 @@
 """Settings sync in the window (core/sync.py does the work): when it runs,
-what comes back put in place, and its card in Settings, General.
+what comes back put in place, and its card in Settings, Sync between
+computers.
 
 A round runs shortly after the start, half a minute after something that
 syncs has changed and stayed so, every half hour, and on Sync now - on a
@@ -446,12 +447,13 @@ class _SyncMixin:
     # -- in Settings ---------------------------------------------------------------
 
     def _build_sync_card(self, page, dlg) -> None:
-        _SyncCard(self, page.card(tr("sync_title")), dlg)
+        # On a page of its own, titled as the card was: no heading twice.
+        _SyncCard(self, page.card(), dlg)
 
 
 class _SyncCard(QObject):
-    """Settings, General: the sync card, in its three states - not a
-    supporter, off, on. Lives as long as the dialog."""
+    """Settings, Sync between computers: the sync card, in its three states
+    - not a supporter, off, on. Lives as long as the dialog."""
 
     def __init__(self, win, card, dlg) -> None:
         super().__init__(dlg)

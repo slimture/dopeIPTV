@@ -1,5 +1,5 @@
 """Simkl in the window (providers/simkl.py talks to Simkl): the sign-in with
-a code, the scrobbles of what plays, the Settings page, and the watchlist
+a code, the scrobbles of what plays, its card in Settings, and the watchlist
 and history window. Marking a title watched or for later, and the watched
 sync, go to every account signed in - Trakt, Simkl or both - through
 mw_trakt's _watch_accounts.
@@ -110,16 +110,16 @@ class _SimklMixin:
         self._simkl_send("scrobble_pause" if paused else "scrobble_start",
                          active["payload"], self._simkl_progress())
 
-    # -- Settings: the Simkl page ------------------------------------------------------
+    # -- Settings: Simkl's card on the Watch history page ---------------------------------
 
-    def _build_simkl_page(self, page, dlg) -> None:
-        """Simkl's page under Services, beside Trakt's - only in a build with
-        the client id."""
+    def _build_simkl_card(self, pg, dlg):
+        """Simkl's card on Settings > Watch history, beside Trakt's - only
+        in a build with the client id. Returns it (its on_change is told
+        when the account changes), or None."""
         simkl = getattr(self, "simkl", None)
         if simkl is None or not simkl.available():
-            return
-        pg = page("simkl", tr("tab_simkl"), tr("set_page_simkl_sub"), "trakt")
-        _SimklPage(self, pg, dlg)
+            return None
+        return _SimklCard(self, pg, dlg)
 
     # -- sign-in -------------------------------------------------------------------
 
@@ -138,18 +138,21 @@ class _SimklMixin:
         _SimklListsDialog(parent, self).exec()
 
 
-class _SimklPage(QObject):
-    """Settings > Simkl: the account and the watched history. Lives as long
-    as the dialog."""
+class _SimklCard(QObject):
+    """Settings > Watch history, Simkl's card: the account and its lists.
+    The watched history they fill with Trakt's has one card of its own on
+    the page; *on_change* is told when the account changes, to bring it up
+    to date. Lives as long as the dialog."""
 
     def __init__(self, win, pg, dlg) -> None:
         super().__init__(dlg)
         from .settings_ui import hbox
         self.win, self.dlg = win, dlg
+        self.on_change = None
         self.connect_btn = QPushButton(tr("simkl_connect"), objectName="Primary")
         self.disconnect_btn = QPushButton(tr("trakt_disconnect"))
         self.lists_btn = QPushButton(tr("trakt_watchlist_btn"))
-        c = pg.card(tr("set_card_account"))
+        c = pg.card(tr("tab_simkl"))
         self.account_row = c.row(tr("trakt_not_connected"),
                                  hbox(self.connect_btn, self.disconnect_btn,
                                       stretch=False),
@@ -157,17 +160,12 @@ class _SimklPage(QObject):
                                  search="simkl account sign in pin code")
         c.row(tr("set_trakt_lists"), self.lists_btn, tr("simkl_scrobble_hint"),
               search="simkl scrobble watchlist history")
-        self.sync_btn = QPushButton(tr("trakt_sync_now"))
-        c = pg.card(tr("set_card_watched_history"))
-        self.sync_row = c.row(tr("trakt_sync_never"), self.sync_btn,
-                              tr("simkl_sync_hint"), search="simkl sync watched")
         self.poll = QTimer(self)
         self.poll.setInterval(400)
         self.poll.timeout.connect(self.tick)
         self.connect_btn.clicked.connect(self.sign_in)
         self.disconnect_btn.clicked.connect(self.sign_out)
         self.lists_btn.clicked.connect(self.lists)
-        self.sync_btn.clicked.connect(self.sync_now)
         self.refresh()
 
     def _alive(self) -> bool:
@@ -183,16 +181,8 @@ class _SimklPage(QObject):
         self.disconnect_btn.setVisible(connected)
         self.account_row.hint_label.setVisible(not connected)
         self.lists_btn.setEnabled(connected)
-        w = self.win.watched
-        if w.last_sync_at:
-            from datetime import datetime
-            when = datetime.fromtimestamp(w.last_sync_at).strftime("%Y-%m-%d %H:%M")
-            self.sync_row.label.setText(tr(
-                "trakt_sync_status", when=when, movies=len(w.movies),
-                episodes=sum(len(v) for v in w.episodes.values())))
-        else:
-            self.sync_row.label.setText(tr("trakt_sync_never"))
-        self.sync_btn.setEnabled(connected and not self.win._watched_sync_running)
+        if self.on_change is not None:
+            self.on_change()
 
     def sign_in(self, _checked: bool = False) -> None:
         if self.win._simkl_connect_dialog(self.dlg):
@@ -207,12 +197,6 @@ class _SimklPage(QObject):
 
     def lists(self, _checked: bool = False) -> None:
         self.win._open_simkl_dialog(self.dlg)
-
-    def sync_now(self, _checked: bool = False) -> None:
-        self.sync_btn.setEnabled(False)
-        self.sync_row.label.setText(tr("trakt_syncing"))
-        self.win._maybe_sync_watched(force=True)
-        self.poll.start()
 
     def tick(self) -> None:
         if not self.win._watched_sync_running:

@@ -34,7 +34,7 @@ from PyQt6.QtWidgets import (
     QAbstractButton, QAbstractSpinBox, QButtonGroup, QCheckBox, QFrame,
     QHBoxLayout, QLabel, QLayout, QLineEdit, QListWidget, QListWidgetItem,
     QPushButton, QScrollArea, QSizePolicy, QSlider, QSpinBox, QStackedWidget,
-    QStyle,
+    QStyle, QStyleOptionViewItem,
     QStyledItemDelegate, QToolButton, QVBoxLayout, QWidget,
 )
 
@@ -221,6 +221,22 @@ class SettingsCard(QFrame):
         self._add(holder, text)
         return lbl
 
+    def link(self, label: str, hint: str, target: str,
+             on_click: Callable[[], None]) -> QWidget:
+        """A row that leads to settings kept on another page ("4 Nerd
+        settings for stream and buffer", what they are, "Nerd › Player →"):
+        one setting has one place, and the page beside it says where."""
+        rtl = QLocale().textDirection() == Qt.LayoutDirection.RightToLeft
+        btn = QPushButton(f"{target}  {'←' if rtl else '→'}")
+        btn.setObjectName("SettingsLink")
+        btn.setFlat(True)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.clicked.connect(lambda _c=False: on_click())
+        w = self.row(label, btn, hint, search=target)
+        w.label.setObjectName("SettingsLinkLabel")
+        w.link = btn
+        return w
+
     def shown_if(self, row: QWidget, predicate) -> None:
         """Show *row* only while *predicate()* holds (re-checked by
         refresh() and by every search)."""
@@ -267,6 +283,10 @@ class SettingsPage(QScrollArea):
         self.icon_kind = ""
         self.icon_base = None
         self.crumb: QPushButton | None = None
+        #: The group the page is in, over its title while a search shows it
+        #: among the other pages' rows (set by SettingsShell.arrange).
+        self.group = ""
+        self.path: QLabel | None = None
         self.setWidgetResizable(True)
         self.setFrameShape(QFrame.Shape.NoFrame)
         body = QWidget()
@@ -316,6 +336,24 @@ class SettingsPage(QScrollArea):
         self.crumb = btn
         return btn
 
+    def set_path(self, group: str, colour: str | None = None) -> None:
+        """The group over the title ("Watch ›"), shown while a search lists
+        this page's rows with every other page's - where each was found."""
+        self.group = group
+        rtl = QLocale().textDirection() == Qt.LayoutDirection.RightToLeft
+        if self.path is None:
+            self.path = QLabel()
+            self.path.setObjectName("SettingsPath")
+            self.path.hide()
+            self._col.insertWidget(0, self.path)
+        self.path.setText(f"{group}  {'‹' if rtl else '›'}")
+        self.path.setStyleSheet(f"color:{colour};" if colour else "")
+
+    def show_path(self, on: bool) -> None:
+        # A page with a crumb (Nerd's) says where it is already.
+        if self.path is not None:
+            self.path.setVisible(on and self.crumb is None)
+
     def card(self, title: str = "") -> SettingsCard:
         at = self._col.indexOf(self._tail)
         c = SettingsCard(self)
@@ -338,94 +376,79 @@ class SettingsPage(QScrollArea):
         whole = bool(needle) and needle in self.title.casefold()
         shown = False
         for c in self.cards:
-            if c.apply_filter(needle, whole):
+            # A section's heading found shows the section ("trakt": its
+            # card on the Watch history page).
+            head = c.property("_title")
+            all_of = whole or (bool(needle) and head is not None
+                               and needle in head.text().casefold())
+            if c.apply_filter(needle, all_of):
                 shown = True
         if self._subtitle is not None:
             self._subtitle.setVisible(not needle)
         return shown or not needle
 
 
-#: On a sidebar entry: 1 a page folded out under another, 2 the last of them.
-CHILD_ROLE = Qt.ItemDataRole.UserRole + 1
-#: On the entry they fold out under: 0 with none to show (Nerd off), 1
-#: folded in, 2 unfolded.
-PARENT_ROLE = Qt.ItemDataRole.UserRole + 2
-#: How wide the chevron's target is at the far end of a parent's row.
-CHEVRON_HIT = 30
+#: On a sidebar entry: the colour of the group it is in, for a group with a
+#: colour of its own (Nerd's).
+GROUP_ROLE = Qt.ItemDataRole.UserRole + 1
 
 
 class _NavDelegate(QStyledItemDelegate):
-    """Pages folded out under another (Nerd's under Nerd): indented, joined
-    by a rail that comes down from the parent's icon, in the group's own
-    colour - one group to the eye, not a section of its own."""
-
-    RAIL_X = 19.0          # the parent's icon centre: padding 10 + icon 18 / 2
-    INDENT = 30
-
-    def __init__(self, nav: QListWidget) -> None:
-        super().__init__(nav)
-        self.colour = ""
+    """The page picked in a group of its own colour (Nerd's) is tinted in
+    that colour rather than the accent: one group to the eye, under its
+    heading in the same colour."""
 
     def paint(self, painter, option, index) -> None:
-        child = index.data(CHILD_ROLE)
-        parent = index.data(PARENT_ROLE)
-        selected = bool(option.state & QStyle.StateFlag.State_Selected)
-        if not self.colour or not (child or (parent and selected)):
-            super().paint(painter, option, index)
+        colour = index.data(GROUP_ROLE)
+        if colour and index.data(Qt.ItemDataRole.UserRole) is None:
+            self._heading(painter, option, index, str(colour))
+        elif colour and option.state & QStyle.StateFlag.State_Selected:
+            self._tinted(painter, option, index, str(colour))
         else:
-            self._tinted(painter, option, index, bool(child), selected)
-        if parent in (1, 2) and self.colour:
-            self._chevron(painter, option, open_=parent == 2)
+            super().paint(painter, option, index)
 
-    def _tinted(self, painter, option, index, child: bool, selected: bool) -> None:
-        """A page of the group in the group's colour: a child indented on
-        the rail; the parent itself, when it is the page shown."""
+    def _heading(self, painter, option, index, colour: str) -> None:
+        """The group's heading in its colour: the style sheet gives every
+        heading (an item that cannot be picked) the muted colour, over the
+        item's own."""
+        opt = QStyleOptionViewItem(option)
+        self.initStyleOption(opt, index)
+        painter.save()
+        painter.setFont(opt.font)
+        painter.setPen(QColor(colour))
+        align = QStyle.visualAlignment(opt.direction, Qt.AlignmentFlag.AlignLeft
+                                       | Qt.AlignmentFlag.AlignBottom)
+        # Where the style puts the others: its padding and its text margin.
+        painter.drawText(opt.rect.adjusted(13, 0, -13, -4), int(align), opt.text)
+        painter.restore()
+
+    def _tinted(self, painter, option, index, colour: str) -> None:
         r = option.rect
         rtl = option.direction == Qt.LayoutDirection.RightToLeft
 
         def x(v: float) -> float:          # from the leading edge, either way round
             return r.right() + 1 - v if rtl else r.left() + v
-        col = QColor(self.colour)
+        col = QColor(colour)
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        mid = r.center().y() + 0.5
-        indent = self.INDENT if child else 0
-        if child:
-            rail = QColor(col)
-            rail.setAlphaF(0.5)
-            pen = QPen(rail, 2)
-            pen.setCapStyle(Qt.PenCapStyle.FlatCap)
-            painter.setPen(pen)
-            last = index.data(CHILD_ROLE) == 2
-            painter.drawLine(QPointF(x(self.RAIL_X), r.top()),
-                             QPointF(x(self.RAIL_X), mid if last else r.bottom() + 1))
-        hover = bool(option.state & QStyle.StateFlag.State_MouseOver)
-        left, right = x(indent), x(r.width())
+        left, right = x(0), x(r.width())
         pill = QRectF(min(left, right), r.top() + 1, abs(right - left), r.height() - 2)
         painter.setPen(Qt.PenStyle.NoPen)
-        if selected:
-            fill = QColor(col)
-            fill.setAlphaF(0.2)
-            painter.setBrush(fill)
-            painter.drawRoundedRect(pill, 8, 8)
-            if child:
-                painter.setBrush(col)
-                painter.drawEllipse(QPointF(x(self.RAIL_X), mid), 3.5, 3.5)
-        elif hover:
-            painter.setBrush(QColor(P["hover"]))
-            painter.drawRoundedRect(pill, 8, 8)
+        fill = QColor(col)
+        fill.setAlphaF(0.2)
+        painter.setBrush(fill)
+        painter.drawRoundedRect(pill, 8, 8)
         icon = index.data(Qt.ItemDataRole.DecorationRole)
-        size = 16 if child else 18
-        lead = indent + 10
+        size = 18
+        lead = 12                          # in line with the untinted rows
         ix = x(lead + (size if rtl else 0))
         if isinstance(icon, QIcon):
             icon.paint(painter, QRect(int(ix), int(r.center().y() - size / 2 + 1), size, size))
         font = QFont(option.font)
-        if selected:
-            font.setWeight(QFont.Weight.DemiBold)
+        font.setWeight(QFont.Weight.DemiBold)
         painter.setFont(font)
-        painter.setPen(col if selected else QColor(P["text2"]))
-        t0, t1 = x(lead + size + (10 if child else 8)), x(r.width() - (28 if index.data(PARENT_ROLE) else 8))
+        painter.setPen(col)
+        t0, t1 = x(lead + size + 7), x(r.width() - 8)
         text_rect = QRectF(min(t0, t1), r.top(), abs(t1 - t0), r.height())
         text = QFontMetrics(font).elidedText(str(index.data(Qt.ItemDataRole.DisplayRole) or ""),
                                              Qt.TextElideMode.ElideRight, int(text_rect.width()))
@@ -434,64 +457,12 @@ class _NavDelegate(QStyledItemDelegate):
         painter.drawText(text_rect, int(align), text)
         painter.restore()
 
-    def _chevron(self, painter, option, open_: bool = True) -> None:
-        """At the far end of the parent: pointing down while its pages are
-        out, towards the text's direction while they are folded in - and a
-        click there folds them (SettingsNav)."""
-        r = option.rect
-        rtl = option.direction == Qt.LayoutDirection.RightToLeft
-        cx = r.left() + 16 if rtl else r.right() - 15
-        cy = r.center().y() + 1
-        painter.save()
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        pen = QPen(QColor(self.colour), 1.6)
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        painter.setPen(pen)
-        path = QPainterPath()
-        if open_:
-            path.moveTo(cx - 4, cy - 2)
-            path.lineTo(cx, cy + 2)
-            path.lineTo(cx + 4, cy - 2)
-        else:
-            d = -1 if rtl else 1
-            path.moveTo(cx - 2 * d, cy - 4)
-            path.lineTo(cx + 2 * d, cy)
-            path.lineTo(cx - 2 * d, cy + 4)
-        painter.drawPath(path)
-        painter.restore()
-
 
 class SettingsNav(QListWidget):
-    """The sidebar: one entry per page, with its icon."""
+    """The sidebar: the pages under their groups' headings, each with its
+    icon. A heading cannot be picked; the arrow keys step over it."""
 
     page_chosen = pyqtSignal(int)
-    #: A parent's pages folded in or out: (its row).
-    fold_clicked = pyqtSignal(int)
-
-    def mousePressEvent(self, event) -> None:      # noqa: N802 - Qt hook
-        item = self.itemAt(event.position().toPoint())
-        if item is not None and item.data(PARENT_ROLE) in (1, 2):
-            x = event.position().x()
-            rtl = self.layoutDirection() == Qt.LayoutDirection.RightToLeft
-            r = self.visualItemRect(item)
-            on_chevron = x <= r.left() + CHEVRON_HIT if rtl else x >= r.right() - CHEVRON_HIT
-            # The chevron, or the parent again while its page is the one shown.
-            if on_chevron or item is self.currentItem():
-                self.fold_clicked.emit(self.row(item))
-                event.accept()
-                return
-        super().mousePressEvent(event)
-
-    def keyPressEvent(self, event) -> None:        # noqa: N802
-        item = self.currentItem()
-        state = item.data(PARENT_ROLE) if item is not None else None
-        rtl = self.layoutDirection() == Qt.LayoutDirection.RightToLeft
-        fold, unfold = ((Qt.Key.Key_Right, Qt.Key.Key_Left) if rtl
-                        else (Qt.Key.Key_Left, Qt.Key.Key_Right))
-        if (state == 2 and event.key() == fold) or (state == 1 and event.key() == unfold):
-            self.fold_clicked.emit(self.row(item))
-            return
-        super().keyPressEvent(event)
 
     def __init__(self) -> None:
         super().__init__()
@@ -549,22 +520,17 @@ class SettingsShell(QWidget):
         self.results.setWidget(rbody)
         self.stack.addWidget(self.results)
         self._searching = False
-        # Pages that are not shown at all (Nerd until it is turned on):
+        # Pages that are not shown at all (Nerd's, until it is turned on):
         # left out of the sidebar and of every search.
         self._off: set[str] = set()
         self.pages: list[SettingsPage] = []
         self._items: dict[str, QListWidgetItem] = {}
         self._sections: list[tuple[QListWidgetItem, list[QListWidgetItem]]] = []
-        #: Pages folded out under another: parent key -> its pages, in order.
-        self._children: dict[str, list[str]] = {}
+        #: Pages shown only while their group is on: group -> its pages.
+        self._gated: dict[str, list[str]] = {}
         #: Fold out with a short stagger (off in tests that count at once).
         self.animate = True
-        #: Parents whose pages are folded in by the person (Nerd on, but
-        #: its list put away): a search still finds them.
-        self.folded: set[str] = set()
-        #: Told (parent, folded) when the person folds a group: to keep it.
-        self.on_fold: Callable[[str, bool], None] | None = None
-        #: The group just turned on, scrolled into sight as it folds out.
+        #: The group just turned on, scrolled into sight as it comes out.
         self._into_view: str | None = None
         self._into_view_steps = 0
         self._into_view_timer = QTimer(self)
@@ -572,7 +538,6 @@ class SettingsShell(QWidget):
         self._into_view_timer.timeout.connect(self._bring_into_view)
         self._aligned = False
         self.nav.page_chosen.connect(self._show)
-        self.nav.fold_clicked.connect(self._fold_row)
         self.search.textChanged.connect(self._filter)
 
     def showEvent(self, event) -> None:
@@ -604,30 +569,24 @@ class SettingsShell(QWidget):
         self.stack.addWidget(page)
         item = QListWidgetItem(icon, page.title)
         item.setData(Qt.ItemDataRole.UserRole, page.key)
-        # 32 px, not 36: with the section headings, fifteen pages at 36 no
-        # longer fitted the sidebar of a window of the default height.
+        # 32 px, not 36: with the group headings, the pages at 36 no longer
+        # fitted the sidebar of a window of the default height.
         item.setSizeHint(QSize(0, 32))
         self.nav.addItem(item)
         self._items[page.key] = item
         return page
 
-    def set_children(self, parent: str, keys: list[str], colour: str) -> None:
-        """*keys* fold out under *parent* in the sidebar - indented, joined
-        by a rail in *colour* - wherever *parent* is placed."""
-        self._children[parent] = [k for k in keys if k in self._items]
-        self.nav.delegate.colour = colour
-        for k in self._children[parent]:
-            self._items[k].setSizeHint(QSize(0, 30))
-        if parent in self._items:
-            self._items[parent].setData(PARENT_ROLE, 0)
+    def set_gated(self, group: str, keys: list[str]) -> None:
+        """*keys* are shown only while *group* is on (set_group_enabled):
+        Nerd's pages, while Nerd is."""
+        self._gated[group] = [k for k in keys if k in self._items]
 
-    def set_group_enabled(self, parent: str, on: bool) -> None:
-        """Show or leave out every page under *parent* at once. Turned on,
-        they fold out one after another - unfolded even if the person had
-        folded them in before - and the sidebar scrolls them into sight:
-        at the foot of a long sidebar they came out below its edge, and
-        nothing showed that anything had happened."""
-        keys = self._children.get(parent, [])
+    def set_group_enabled(self, group: str, on: bool) -> None:
+        """Show or leave out every gated page of *group* at once. Turned on,
+        they come out one after another and the sidebar scrolls them into
+        sight: at the foot of a long sidebar they came out below its edge,
+        and nothing showed that anything had happened."""
+        keys = self._gated.get(group, [])
         was = [k for k in keys if k not in self._off]
         for k in keys:
             if on:
@@ -635,17 +594,13 @@ class SettingsShell(QWidget):
             else:
                 self._off.add(k)
         turned_on = bool(on and keys and not was)
-        if turned_on and parent in self.folded:
-            self.folded.discard(parent)
-            if self.on_fold is not None:
-                self.on_fold(parent, False)
-        if not on and self._into_view == parent:
+        if not on and self._into_view == group:
             self._into_view_timer.stop()
             self._into_view = None
         self._filter(self.search.text())
         if not turned_on or self._searching:
             return
-        self._into_view = parent
+        self._into_view = group
         self._into_view_steps = 0
         if not self.animate:
             self._into_view_timer.start(0)
@@ -663,29 +618,35 @@ class SettingsShell(QWidget):
                 key = it.data(Qt.ItemDataRole.UserRole)
                 if key not in self._off and not self._searching:
                     it.setHidden(False)
-            self._mark_children()
         for i in range(len(shown)):
             QTimer.singleShot(35 * (i + 1), lambda i=i: reveal(i))
-        # Each page as it comes out, so the list follows the fold.
+        # Each page as it comes out, so the list follows it.
         self._into_view_steps = len(shown)
         self._into_view_timer.start(35)
 
+    def _section_of(self, key: str) -> tuple[QListWidgetItem, list[QListWidgetItem]] | None:
+        item = self._items.get(key)
+        return next((s for s in self._sections if item in s[1]), None)
+
     def _bring_into_view(self) -> None:
-        """Scroll the sidebar so the group being folded out is in sight:
-        its last page showing at least, and the parent too when the whole
-        group fits. Steps along with the fold-out (one page every 35 ms),
-        then once more after its last page."""
-        parent = self._into_view
+        """Scroll the sidebar so the group being turned on is in sight: its
+        last page showing at least, and its heading too when the whole group
+        fits. Steps along with the pages coming out (one every 35 ms), then
+        once more after the last."""
+        group = self._into_view
         if self._into_view_steps > 0:
             self._into_view_steps -= 1
             self._into_view_timer.start(35)
         else:
             self._into_view = None
-        item = self._items.get(parent or "")
-        if parent is None or item is None or item.isHidden() or self._searching:
+        keys = self._gated.get(group or "", [])
+        section = self._section_of(keys[0]) if keys else None
+        if group is None or section is None or self._searching:
             return
-        rows = [item] + [self._items[k] for k in self._children.get(parent, [])
-                         if not self._items[k].isHidden()]
+        head, items = section
+        rows = [it for it in [head, *items] if not it.isHidden()]
+        if len(rows) < 2:
+            return
         nav = self.nav
         top = nav.visualItemRect(rows[0]).top()
         bottom = nav.visualItemRect(rows[-1]).bottom()
@@ -700,80 +661,25 @@ class SettingsShell(QWidget):
             bar = nav.verticalScrollBar()
             bar.setValue(bar.value() + delta)
 
-    def _fold_row(self, row: int) -> None:
-        item = self.nav.item(row)
-        key = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
-        if key in self._children:
-            self.set_folded(key, key not in self.folded)
-
-    def set_folded(self, parent: str, folded: bool) -> None:
-        """Fold *parent*'s pages in (or out again) in the sidebar."""
-        was = parent in self.folded
-        if folded:
-            self.folded.add(parent)
-        else:
-            self.folded.discard(parent)
-        if self.on_fold is not None and was != folded:
-            self.on_fold(parent, folded)
-        cur = self.current_key()
-        self._filter(self.search.text())
-        # The page shown was one of those folded in: its parent instead.
-        if folded and cur in self._children.get(parent, []):
-            self.show_page(parent)
-        if not folded and was and self.animate and not self._searching:
-            shown = [self._items[k] for k in self._children.get(parent, [])
-                     if not self._items[k].isHidden()]
-            for it in shown:
-                it.setHidden(True)
-
-            def reveal(i: int) -> None:
-                if self._gone():
-                    return
-                for it in shown[:i + 1]:
-                    if sip.isdeleted(it):
-                        continue
-                    key = it.data(Qt.ItemDataRole.UserRole)
-                    if key not in self._off and parent not in self.folded and not self._searching:
-                        it.setHidden(False)
-                self._mark_children()
-            for i in range(len(shown)):
-                QTimer.singleShot(25 * (i + 1), lambda i=i: reveal(i))
-
     def _gone(self) -> bool:
-        """Settings closed while its pages were still folding out: the
+        """Settings closed while its pages were still coming out: the
         staggered steps still to come find the sidebar and its rows gone."""
         return sip.isdeleted(self) or sip.isdeleted(self.nav)
 
-    def _mark_children(self) -> None:
-        """The last page showing under each parent ends the rail; a parent
-        with pages showing is unfolded."""
-        for parent, keys in self._children.items():
-            showing = [self._items[k] for k in keys if not self._items[k].isHidden()]
-            for k in keys:
-                self._items[k].setData(CHILD_ROLE, 1)
-            if showing:
-                showing[-1].setData(CHILD_ROLE, 2)
-            available = any(k not in self._off for k in keys)
-            if parent in self._items:
-                state = 0 if not available else (2 if showing else 1)
-                self._items[parent].setData(PARENT_ROLE, state)
-        self.nav.viewport().update()
-
-    def arrange(self, sections: list[tuple[str, list[str]]]) -> None:
+    def arrange(self, sections: list[tuple]) -> None:
         """Put the sidebar in this order, under these headings: (heading,
-        [page keys]). The pages are built in whatever order their code needs;
-        this is the order a person reads them in. A page left out keeps its
-        place at the end, so a new page can never go missing."""
+        [page keys]) - or (heading, [page keys], colour) for a group in a
+        colour of its own. The pages are built in whatever order their code
+        needs; this is the order a person reads them in. A page left out
+        keeps its place at the end, so a new page can never go missing."""
         self.nav.blockSignals(True)
         while self.nav.count():
             self.nav.takeItem(0)
         self._sections = []
         placed: set[str] = set()
-        under = {k for keys in self._children.values() for k in keys}
-        for heading, keys in sections:
-            # A parent's pages come right after it, wherever it is.
-            keys = [k for k in keys if k not in under]
-            keys = [x for k in keys for x in [k, *self._children.get(k, [])]]
+        pages = {p.key: p for p in self.pages}
+        for heading, keys, *rest in sections:
+            colour = rest[0] if rest else None
             items = [self._items[k] for k in keys if k in self._items]
             if not items:
                 continue
@@ -784,12 +690,17 @@ class SettingsShell(QWidget):
             f.setPointSizeF(max(7.0, f.pointSizeF() * 0.8))
             f.setBold(True)
             head.setFont(f)
-            head.setForeground(QColor(P["muted"]))
+            head.setForeground(QColor(colour or P["muted"]))
+            head.setData(GROUP_ROLE, colour)
             head.setTextAlignment(Qt.AlignmentFlag.AlignLeft
                                   | Qt.AlignmentFlag.AlignBottom)
             self.nav.addItem(head)
             for it in items:
+                it.setData(GROUP_ROLE, colour)
                 self.nav.addItem(it)
+            for k in keys:
+                if k in pages:
+                    pages[k].set_path(heading, colour)
             self._sections.append((head, items))
             placed.update(keys)
         for p in self.pages:
@@ -828,6 +739,7 @@ class SettingsShell(QWidget):
         for page in self._ordered_pages():
             body = page.takeWidget()
             self._results_col.insertWidget(at, body)
+            page.show_path(True)
             at += 1
 
     def _leave_search(self) -> None:
@@ -838,9 +750,10 @@ class SettingsShell(QWidget):
             self._results_col.removeWidget(page.body)
             page.setWidget(page.body)
             page.body.show()
+            page.show_path(False)
 
     def set_page_enabled(self, key: str, on: bool) -> None:
-        """Show or leave out a whole page (Nerd, until it is turned on)."""
+        """Show or leave out a whole page."""
         if on:
             self._off.discard(key)
         else:
@@ -864,14 +777,13 @@ class SettingsShell(QWidget):
     def _filter(self, text: str) -> None:
         needle = " ".join(text.split()).casefold()
         first = None
-        folded_in = {k for p in self.folded for k in self._children.get(p, [])} if not needle else set()
         for page in self.pages:
             hit = page.key not in self._off and page.apply_filter(needle)
-            self._items[page.key].setHidden(not hit or page.key in folded_in)
+            self._items[page.key].setHidden(not hit)
         # A heading goes with the last of its pages.
         for head, items in self._sections:
             head.setHidden(all(it.isHidden() for it in items))
-        self._mark_children()
+        self.nav.viewport().update()
         for i in range(self.nav.count()):
             if self._page_at(i) is not None and not self.nav.item(i).isHidden():
                 first = i
@@ -955,6 +867,18 @@ QPushButton#SettingsCrumb {{
     text-align: left;
 }}
 QPushButton#SettingsCrumb:hover {{ text-decoration: underline; }}
+QLabel#SettingsPath {{
+    color: {p['muted']}; font-size: 12px; font-weight: 700; margin: 0 0 2px 0;
+}}
+QLabel#SettingsLinkLabel {{ font-size: 13px; color: {p.get('nerd', p['accent'])}; }}
+#SettingsPageBody QPushButton#SettingsLink {{
+    background: transparent; border: none; padding: 4px 2px;
+    color: {p.get('nerd', p['accent'])}; font-weight: 600;
+}}
+#SettingsPageBody QPushButton#SettingsLink:hover,
+#SettingsPageBody QPushButton#SettingsLink:focus {{
+    background: transparent; text-decoration: underline;
+}}
 QFrame#NerdPart {{ background: transparent; border: none; border-radius: 10px; }}
 QFrame#NerdPart:hover, QFrame#NerdPart:focus {{ background: {p['hover']}; }}
 QLabel#NerdPartTitle {{ color: {p['text']}; font-weight: 600; }}
@@ -1191,7 +1115,8 @@ def page_icon(kind: str, base, size: int = 18, tint: str | None = None) -> QIcon
 def _own_icon(kind: str, s: int, colour: str) -> QPixmap | None:
     if kind not in ("palette", "play", "subtitles", "picture", "lock",
                     "wrench", "image", "trakt", "nerd", "network", "box",
-                    "knobs", "channels", "remote"):
+                    "knobs", "channels", "remote", "cast", "sync", "plug",
+                    "pulse"):
         return None
     scale = 3
     pm = QPixmap(s * scale, s * scale)
@@ -1304,6 +1229,54 @@ def _own_icon(kind: str, s: int, colour: str) -> QPixmap | None:
             pr.drawRoundedRect(QRectF(f * 0.1, f * (y - 0.08), f * 0.16, f * 0.16),
                                f * 0.03, f * 0.03)
             pr.drawLine(QPointF(f * 0.36, f * y), QPointF(f * 0.9, f * y))
+    elif kind == "cast":                    # a screen with waves from its corner
+        frame = QPainterPath()
+        frame.moveTo(f * 0.1, f * 0.38)
+        frame.lineTo(f * 0.1, f * 0.24)
+        frame.quadTo(f * 0.1, f * 0.16, f * 0.18, f * 0.16)
+        frame.lineTo(f * 0.82, f * 0.16)
+        frame.quadTo(f * 0.9, f * 0.16, f * 0.9, f * 0.24)
+        frame.lineTo(f * 0.9, f * 0.76)
+        frame.quadTo(f * 0.9, f * 0.84, f * 0.82, f * 0.84)
+        frame.lineTo(f * 0.6, f * 0.84)
+        pr.drawPath(frame)
+        for r in (0.22, 0.4):
+            pr.drawArc(QRectF(f * (0.1 - r), f * (0.84 - r), f * r * 2, f * r * 2), 0, 90 * 16)
+        pr.setPen(Qt.PenStyle.NoPen)
+        pr.setBrush(col)
+        pr.drawEllipse(QPointF(f * 0.12, f * 0.82), f * 0.05, f * 0.05)
+    elif kind == "sync":                    # two arrows round a circle
+        rect = QRectF(f * 0.16, f * 0.16, f * 0.68, f * 0.68)
+        pr.drawArc(rect, 30 * 16, 150 * 16)
+        pr.drawArc(rect, 210 * 16, 150 * 16)
+        pr.setPen(Qt.PenStyle.NoPen)
+        pr.setBrush(col)
+        for cx, cy, d in ((0.79, 0.33, 1.0), (0.21, 0.67, -1.0)):
+            head = QPainterPath()
+            head.moveTo(f * (cx - 0.12 * d), f * (cy - 0.02 * d))
+            head.lineTo(f * (cx + 0.1 * d), f * (cy - 0.06 * d))
+            head.lineTo(f * (cx + 0.03 * d), f * (cy + 0.14 * d))
+            head.closeSubpath()
+            pr.drawPath(head)
+    elif kind == "plug":                    # a plug and its cord
+        pr.drawRoundedRect(QRectF(f * 0.28, f * 0.3, f * 0.44, f * 0.3), f * 0.08, f * 0.08)
+        pr.drawLine(QPointF(f * 0.4, f * 0.3), QPointF(f * 0.4, f * 0.12))
+        pr.drawLine(QPointF(f * 0.6, f * 0.3), QPointF(f * 0.6, f * 0.12))
+        cord = QPainterPath()
+        cord.moveTo(f * 0.5, f * 0.6)
+        cord.lineTo(f * 0.5, f * 0.72)
+        cord.quadTo(f * 0.5, f * 0.88, f * 0.66, f * 0.88)
+        pr.drawPath(cord)
+    elif kind == "pulse":                   # a heartbeat on a line
+        beat = QPainterPath()
+        beat.moveTo(f * 0.08, f * 0.54)
+        beat.lineTo(f * 0.3, f * 0.54)
+        beat.lineTo(f * 0.4, f * 0.26)
+        beat.lineTo(f * 0.54, f * 0.78)
+        beat.lineTo(f * 0.64, f * 0.46)
+        beat.lineTo(f * 0.7, f * 0.54)
+        beat.lineTo(f * 0.92, f * 0.54)
+        pr.drawPath(beat)
     elif kind == "trakt":
         pr.drawEllipse(QRectF(f * 0.1, f * 0.1, f * 0.8, f * 0.8))
         tick = QPainterPath()

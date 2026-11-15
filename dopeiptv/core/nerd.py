@@ -1,7 +1,7 @@
 """Nerd settings: what they ask of the player and the network.
 
-Everything here is off until the user turns Nerd on (Settings > General >
-Show Nerd settings, or seven taps on the version in About), and a setting
+Everything here is off until the user turns Nerd on (Settings > Nerd >
+Status, or seven taps on the version in About), and a setting
 left empty changes nothing: with Nerd off the app plays exactly as it does
 without this module. The window installs a profile (``install``) at start
 and after each Settings change; the player, the provider clients and the
