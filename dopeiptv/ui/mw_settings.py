@@ -764,6 +764,10 @@ class _SettingsMixin:
                        tr("set_page_general_sub"), "gear")
         look = page("appearance", tr("set_page_appearance"),
                     tr("set_page_appearance_sub"), "palette")
+        # A whole feature of its own (every action's key), for everyone: it
+        # was lost at the top of Advanced.
+        keys_page = page("shortcuts", tr("sc_title"),
+                         tr("set_page_shortcuts_sub"), "keyboard")
         par = page("parental", tr("set_page_parental"),
                    tr("set_page_parental_sub"), "lock")
         adv = page("advanced", tr("set_page_advanced"),
@@ -2028,13 +2032,15 @@ class _SettingsMixin:
         lock_now_btn.clicked.connect(lock_now)
         refresh_pin_status()
 
-        # -- Advanced ---------------------------------------------------------
-        # Every rebindable action and its key, where the old editor's row
-        # was: recorded on a click, applied as it changes.
+        # -- Keyboard shortcuts ---------------------------------------------
+        # Every rebindable action and its key: recorded on a click, applied
+        # as it changes.
         from ..core import shortcut_keys
         from .shortcuts import ShortcutEditor
         keys_shown = self.settings.value(shortcut_keys.SETTING, "") or ""
-        key_editor = ShortcutEditor(adv.card(tr("sc_title")), keys_shown, d)
+        key_editor = ShortcutEditor(keys_page.card(tr("sc_title")), keys_shown, d)
+
+        # -- Advanced ---------------------------------------------------------
         # Disk-cache controls: covers/logos accumulate under
         # QStandardPaths.CacheLocation and don't clean themselves. The live
         # cache is the shared "images" dir; the two legacy dirs predate the
@@ -2368,8 +2374,8 @@ class _SettingsMixin:
             (tr("set_grp_content"), ["playlists", "home", "local",
                                      "metadata"]),
             (tr("set_grp_accounts"), ["history", "sync", "integrations"]),
-            (tr("set_sec_system"), ["general", "appearance", "parental",
-                                    "advanced"]),
+            (tr("set_sec_system"), ["general", "appearance", "shortcuts",
+                                    "parental", "advanced"]),
             (tr("nerd_page"), ["nerd", *(p.key for p in nerd_pages.values())],
              nerd_tint),
         ])

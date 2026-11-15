@@ -1001,7 +1001,7 @@
   "set_card_pin": "PIN",
   "parental_hint": "Blocca una cartella dei preferiti (clic destro su di essa in Preferiti) o un'intera categoria (clic destro su di essa in TV, Film o Serie). I contenuti bloccati restano nascosti, anche in «Tutti», finché non si inserisce il PIN.",
   "set_page_advanced": "Avanzate",
-  "set_page_advanced_sub": "Scorciatoie, cache e ripartire da zero.",
+  "set_page_advanced_sub": "Cache e ripartire da zero.",
   "set_card_reset": "Ripristino",
   "set_reset_label": "Ripristina tutte le impostazioni",
   "set_reset_btn": "Ripristina…",
@@ -2405,5 +2405,6 @@
   "tv_fav_removed": "{name} rimosso dai preferiti",
   "tv_volume": "Volume {n}%",
   "tv_muted": "Audio disattivato",
-  "tv_paused": "In pausa"
+  "tv_paused": "In pausa",
+  "set_page_shortcuts_sub": "Ogni tasto a cui l'app risponde: fai clic su uno per cambiarlo."
 }

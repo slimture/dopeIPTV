@@ -1281,7 +1281,7 @@ def _own_icon(kind: str, s: int, colour: str) -> QPixmap | None:
     if kind not in ("palette", "play", "subtitles", "picture", "lock",
                     "wrench", "image", "trakt", "nerd", "network", "box",
                     "knobs", "channels", "remote", "cast", "sync", "plug",
-                    "pulse"):
+                    "pulse", "keyboard"):
         return None
     scale = 3
     pm = QPixmap(s * scale, s * scale)
@@ -1432,6 +1432,18 @@ def _own_icon(kind: str, s: int, colour: str) -> QPixmap | None:
         cord.lineTo(f * 0.5, f * 0.72)
         cord.quadTo(f * 0.5, f * 0.88, f * 0.66, f * 0.88)
         pr.drawPath(cord)
+    elif kind == "keyboard":                # a keyboard: keys and a space bar
+        pr.drawRoundedRect(QRectF(f * 0.08, f * 0.24, f * 0.84, f * 0.52),
+                           f * 0.08, f * 0.08)
+        pr.setPen(Qt.PenStyle.NoPen)
+        pr.setBrush(col)
+        k = f * 0.075
+        for row, y in ((5, 0.36), (4, 0.5)):
+            span = 0.64 / row
+            for i in range(row):
+                x = 0.18 + span * i + (span - 0.075) / 2 + (0.04 if row == 4 else 0)
+                pr.drawRoundedRect(QRectF(f * x, f * y, k, k), k * 0.3, k * 0.3)
+        pr.drawRoundedRect(QRectF(f * 0.3, f * 0.62, f * 0.4, k), k * 0.3, k * 0.3)
     elif kind == "pulse":                   # a heartbeat on a line
         beat = QPainterPath()
         beat.moveTo(f * 0.08, f * 0.54)

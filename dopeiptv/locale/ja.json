@@ -1001,7 +1001,7 @@
   "set_card_pin": "PIN",
   "parental_hint": "お気に入りフォルダー（お気に入りで右クリック）やカテゴリー全体（テレビ、映画、シリーズで右クリック）をロックできます。ロックした内容はPINを入力するまで、「すべて」も含めて非表示になります。",
   "set_page_advanced": "詳細",
-  "set_page_advanced_sub": "ショートカット、キャッシュ、最初からやり直す。",
+  "set_page_advanced_sub": "キャッシュ、最初からやり直す。",
   "set_card_reset": "リセット",
   "set_reset_label": "すべての設定をリセット",
   "set_reset_btn": "リセット…",
@@ -2405,5 +2405,6 @@
   "tv_fav_removed": "{name} をお気に入りから外しました",
   "tv_volume": "音量 {n}%",
   "tv_muted": "消音",
-  "tv_paused": "一時停止中"
+  "tv_paused": "一時停止中",
+  "set_page_shortcuts_sub": "アプリが反応するすべてのキー - クリックして変更できます。"
 }

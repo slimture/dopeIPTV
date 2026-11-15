@@ -1001,7 +1001,7 @@
   "set_card_pin": "PIN",
   "parental_hint": "Sperre einen Favoritenordner (Rechtsklick darauf unter Favoriten) oder eine ganze Kategorie (Rechtsklick darauf in TV, Filme oder Serien). Gesperrte Inhalte bleiben verborgen – auch unter „Alle“ –, bis die PIN eingegeben wird.",
   "set_page_advanced": "Erweitert",
-  "set_page_advanced_sub": "Tastenkürzel, Zwischenspeicher und Neuanfang.",
+  "set_page_advanced_sub": "Zwischenspeicher und Neuanfang.",
   "set_card_reset": "Zurücksetzen",
   "set_reset_label": "Alle Einstellungen zurücksetzen",
   "set_reset_btn": "Zurücksetzen…",
@@ -2405,5 +2405,6 @@
   "tv_fav_removed": "{name} aus den Favoriten entfernt",
   "tv_volume": "Lautstärke {n} %",
   "tv_muted": "Ton aus",
-  "tv_paused": "Pausiert"
+  "tv_paused": "Pausiert",
+  "set_page_shortcuts_sub": "Jede Taste, auf die die App reagiert - zum Ändern anklicken."
 }

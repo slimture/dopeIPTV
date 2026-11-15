@@ -1001,7 +1001,7 @@
   "set_card_pin": "PIN",
   "parental_hint": "Zablokuj folder ulubionych (kliknij go prawym przyciskiem w Ulubionych) lub całą kategorię (kliknij ją prawym przyciskiem w TV, Filmach lub Serialach). Zablokowane treści są ukryte — także w „Wszystkie” — dopóki nie zostanie wpisany PIN.",
   "set_page_advanced": "Zaawansowane",
-  "set_page_advanced_sub": "Skróty, pamięć podręczna i zaczynanie od nowa.",
+  "set_page_advanced_sub": "Pamięć podręczna i zaczynanie od nowa.",
   "set_card_reset": "Reset",
   "set_reset_label": "Resetuj wszystkie ustawienia",
   "set_reset_btn": "Resetuj…",
@@ -2405,5 +2405,6 @@
   "tv_fav_removed": "Usunięto {name} z ulubionych",
   "tv_volume": "Głośność {n}%",
   "tv_muted": "Dźwięk wyłączony",
-  "tv_paused": "Wstrzymano"
+  "tv_paused": "Wstrzymano",
+  "set_page_shortcuts_sub": "Każdy klawisz, na który reaguje aplikacja - kliknij, aby go zmienić."
 }

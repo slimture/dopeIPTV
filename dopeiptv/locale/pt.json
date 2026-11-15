@@ -1001,7 +1001,7 @@
   "set_card_pin": "PIN",
   "parental_hint": "Bloqueie uma pasta de favoritos (clique com o botão direito nela em Favoritos) ou uma categoria inteira (clique com o botão direito nela em TV, Filmes ou Séries). O conteúdo bloqueado fica oculto – inclusive em “Tudo” – até o PIN ser digitado.",
   "set_page_advanced": "Avançado",
-  "set_page_advanced_sub": "Atalhos, caches e começar do zero.",
+  "set_page_advanced_sub": "Caches e começar do zero.",
   "set_card_reset": "Redefinição",
   "set_reset_label": "Redefinir todas as configurações",
   "set_reset_btn": "Redefinir…",
@@ -2405,5 +2405,6 @@
   "tv_fav_removed": "{name} removido dos favoritos",
   "tv_volume": "Volume {n}%",
   "tv_muted": "Sem som",
-  "tv_paused": "Pausado"
+  "tv_paused": "Pausado",
+  "set_page_shortcuts_sub": "Todas as teclas a que o app responde - clique em uma para mudá-la."
 }

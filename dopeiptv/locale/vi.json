@@ -1001,7 +1001,7 @@
   "set_card_pin": "PIN",
   "parental_hint": "Khóa một thư mục yêu thích (nhấp chuột phải vào nó trong Yêu thích) hoặc cả một danh mục (nhấp chuột phải vào nó trong TV, Phim hoặc Loạt phim). Nội dung bị khóa sẽ bị ẩn — kể cả trong 'Tất cả' — cho đến khi nhập PIN.",
   "set_page_advanced": "Nâng cao",
-  "set_page_advanced_sub": "Phím tắt, bộ nhớ đệm và bắt đầu lại từ đầu.",
+  "set_page_advanced_sub": "Bộ nhớ đệm và bắt đầu lại từ đầu.",
   "set_card_reset": "Đặt lại",
   "set_reset_label": "Đặt lại tất cả cài đặt",
   "set_reset_btn": "Đặt lại…",
@@ -2405,5 +2405,6 @@
   "tv_fav_removed": "Đã bỏ {name} khỏi yêu thích",
   "tv_volume": "Âm lượng {n}%",
   "tv_muted": "Tắt tiếng",
-  "tv_paused": "Đã tạm dừng"
+  "tv_paused": "Đã tạm dừng",
+  "set_page_shortcuts_sub": "Mọi phím mà ứng dụng phản hồi - nhấp vào một phím để thay đổi."
 }

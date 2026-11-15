@@ -1001,7 +1001,7 @@
   "set_card_pin": "PIN",
   "parental_hint": "Zaključaj mapu favorita (desni klik na nju pod Favoriti) ili cijelu kategoriju (desni klik na nju u TV-u, Filmovima ili Serijama). Zaključani sadržaj je skriven — i u „Sve” — dok se ne unese PIN.",
   "set_page_advanced": "Napredno",
-  "set_page_advanced_sub": "Prečaci, predmemorija i početak ispočetka.",
+  "set_page_advanced_sub": "Predmemorija i početak ispočetka.",
   "set_card_reset": "Poništavanje",
   "set_reset_label": "Poništi sve postavke",
   "set_reset_btn": "Poništi…",
@@ -2405,5 +2405,6 @@
   "tv_fav_removed": "{name} uklonjen iz favorita",
   "tv_volume": "Glasnoća {n} %",
   "tv_muted": "Zvuk isključen",
-  "tv_paused": "Pauzirano"
+  "tv_paused": "Pauzirano",
+  "set_page_shortcuts_sub": "Svaka tipka na koju aplikacija reagira - kliknite jednu da je promijenite."
 }

@@ -1001,7 +1001,7 @@
   "set_card_pin": "PIN",
   "parental_hint": "Bir favori klasörünü (Favoriler altında ona sağ tıklayın) veya bütün bir kategoriyi (TV, Filmler ya da Diziler'de ona sağ tıklayın) kilitleyin. Kilitli içerik, PIN girilene kadar — 'Tümü' dahil — gizlenir.",
   "set_page_advanced": "Gelişmiş",
-  "set_page_advanced_sub": "Kısayollar, önbellekler ve baştan başlamak.",
+  "set_page_advanced_sub": "Önbellekler ve baştan başlamak.",
   "set_card_reset": "Sıfırla",
   "set_reset_label": "Tüm ayarları sıfırla",
   "set_reset_btn": "Sıfırla…",
@@ -2405,5 +2405,6 @@
   "tv_fav_removed": "{name} favorilerden çıkarıldı",
   "tv_volume": "Ses %{n}",
   "tv_muted": "Ses kapalı",
-  "tv_paused": "Duraklatıldı"
+  "tv_paused": "Duraklatıldı",
+  "set_page_shortcuts_sub": "Uygulamanın yanıt verdiği her tuş - değiştirmek için birine tıklayın."
 }

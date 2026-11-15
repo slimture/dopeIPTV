@@ -44,7 +44,7 @@ GROUPS = [
     ("set_grp_watch", ["playback", "audio", "guide", "multiview", "recording", "casting"]),
     ("set_grp_content", ["playlists", "home", "local", "metadata"]),
     ("set_grp_accounts", ["history", "sync", "integrations"]),
-    ("set_sec_system", ["general", "appearance", "parental", "advanced"]),
+    ("set_sec_system", ["general", "appearance", "shortcuts", "parental", "advanced"]),
     ("nerd_page", ["nerd", "nerd_net", "nerd_boxes", "nerd_player", "nerd_serve", "nerd_diag"]),
 ]
 NERD_ONLY = GROUPS[-1][1][1:]

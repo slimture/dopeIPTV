@@ -1001,7 +1001,7 @@
   "set_card_pin": "Code PIN",
   "parental_hint": "Verrouillez un dossier de favoris (clic droit dessus sous Favoris) ou toute une catégorie (clic droit dessus dans TV, Films ou Séries). Le contenu verrouillé reste masqué – même dans « Tout » – jusqu'à la saisie du code PIN.",
   "set_page_advanced": "Avancé",
-  "set_page_advanced_sub": "Raccourcis, caches et repartir de zéro.",
+  "set_page_advanced_sub": "Caches et repartir de zéro.",
   "set_card_reset": "Réinitialisation",
   "set_reset_label": "Réinitialiser tous les paramètres",
   "set_reset_btn": "Réinitialiser…",
@@ -2405,5 +2405,6 @@
   "tv_fav_removed": "{name} retiré des favoris",
   "tv_volume": "Volume {n} %",
   "tv_muted": "Son coupé",
-  "tv_paused": "En pause"
+  "tv_paused": "En pause",
+  "set_page_shortcuts_sub": "Toutes les touches auxquelles l'app répond - cliquez sur l'une pour la changer."
 }

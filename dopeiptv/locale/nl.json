@@ -1001,7 +1001,7 @@
   "set_card_pin": "Pincode",
   "parental_hint": "Vergrendel een favorietenmap (klik er met rechts op onder Favorieten) of een hele categorie (klik er met rechts op in TV, Films of Series). Vergrendelde inhoud blijft verborgen – ook onder ‘Alle’ – tot de pincode is ingevoerd.",
   "set_page_advanced": "Geavanceerd",
-  "set_page_advanced_sub": "Sneltoetsen, caches en opnieuw beginnen.",
+  "set_page_advanced_sub": "Caches en opnieuw beginnen.",
   "set_card_reset": "Herstellen",
   "set_reset_label": "Alle instellingen herstellen",
   "set_reset_btn": "Herstellen…",
@@ -2405,5 +2405,6 @@
   "tv_fav_removed": "{name} verwijderd uit favorieten",
   "tv_volume": "Volume {n}%",
   "tv_muted": "Geluid uit",
-  "tv_paused": "Gepauzeerd"
+  "tv_paused": "Gepauzeerd",
+  "set_page_shortcuts_sub": "Elke toets waarop de app reageert - klik erop om hem te wijzigen."
 }

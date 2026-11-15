@@ -170,7 +170,7 @@ map and the one-way import rule.
 | `ui/source_net.py` | A source's own DNS, IP version and trusted certificate in its Nerd options, each with a Test |
 | `ui/cert_trust.py` | The window that shows a certificate before it is trusted, and the offer to review a pinned source's changed one (`offer_review`) |
 | `ui/rewrite_rules.py` | The rewrite rules' rows in a source's Nerd options (find, replace, regex switch, up, remove) |
-| `ui/shortcuts.py` | The Keyboard shortcuts card (Settings > Advanced, for everyone): each key a button that records the next combination, ✕ / ↺ / reset all, who lost a key and why one is refused said plainly |
+| `ui/shortcuts.py` | The Keyboard shortcuts card (its own page under SYSTEM, for everyone): each key a button that records the next combination, ✕ / ↺ / reset all, who lost a key and why one is refused said plainly |
 | `ui/nerd_check_line.py` | The ✓ / ! / ✗ line under a Nerd setting, its Test button and Details (the app's problem window) |
 | `ui/command_palette.py` | The command palette's overlay (Ctrl+K / ⌘K): the field, the three groups, a row's chip, text and keys, Up/Down/Enter/Tab/Esc |
 | `ui/mw_palette.py` | The command palette in the window: the menu's and the rebindable actions, every Settings row (`SettingsShell.index`, Nerd's while it is on), the active source's channels and the guide's programmes (folded on a worker), what a row does |
@@ -310,8 +310,8 @@ neither, the rows ran together.
 grouped by what a person is doing: WATCH (Playback, Picture and sound,
 Guide, Multiview, Recording, Casting), CONTENT (Sources, Home, Local
 files, Posters and info), ACCOUNTS AND INTEGRATIONS (watch history -
-Trakt, Simkl -, Sync, Integrations), SYSTEM (General, Appearance, Parental
-lock, Advanced) and NERD (Status, Network, Boxes and lists, Player, Remote
+Trakt, Simkl -, Sync, Integrations), SYSTEM (General, Appearance, Keyboard
+shortcuts, Parental lock, Advanced) and NERD (Status, Network, Boxes and lists, Player, Remote
 and automation, Diagnostics). Every row there is today, page by page and
 section by section with the key it stores, is in
 [`docs/SETTINGS_MAP.md`](docs/SETTINGS_MAP.md) - look there first, and add

@@ -1001,7 +1001,7 @@
   "set_card_pin": "PIN-kod",
   "parental_hint": "Lås en favoritmapp (högerklicka på den under Favoriter) eller en hel kategori (högerklicka på den i TV, Filmer eller Serier). Låst innehåll döljs – även från ”Alla” – tills PIN-koden har angetts.",
   "set_page_advanced": "Avancerat",
-  "set_page_advanced_sub": "Kortkommandon, cacheminnen och att börja om.",
+  "set_page_advanced_sub": "Cacheminnen och att börja om.",
   "set_card_reset": "Återställning",
   "set_reset_label": "Återställ alla inställningar",
   "set_reset_btn": "Återställ…",
@@ -2405,5 +2405,6 @@
   "tv_fav_removed": "{name} har tagits bort från favoriterna",
   "tv_volume": "Volym {n} %",
   "tv_muted": "Ljud av",
-  "tv_paused": "Pausad"
+  "tv_paused": "Pausad",
+  "set_page_shortcuts_sub": "Alla tangenter appen svarar på - klicka på en för att ändra den."
 }

@@ -150,11 +150,13 @@ or "Shared" and where the shared one lives. Nerd's rows only while it is on.
   `theme_light`, `corner_style`, `ui_scale`
 - Lists: `view_density`, `sort_order`
 
+**Keyboard shortcuts** (`shortcuts`)
+- Keyboard shortcuts: `keyboard_shortcuts` (every rebindable action's key)
+
 **Parental lock** (`parental`)
 - PIN: `parental_pin_hash` + `parental_salt` (set, remove), lock now
 
 **Advanced** (`advanced`)
-- Keyboard shortcuts: `keyboard_shortcuts`
 - Maintenance: reset broken .ts streams, Start-menu shortcut (Windows);
   link → Nerd › Diagnostics (log detail, log file, stats for nerds, stream health)
 - Caches: the image cache, the local files' caches

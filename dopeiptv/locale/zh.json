@@ -1001,7 +1001,7 @@
   "set_card_pin": "PIN",
   "parental_hint": "锁定一个收藏文件夹（在“收藏”下右键点击它）或整个分类（在“电视”“电影”或“剧集”中右键点击它）。锁定的内容会被隐藏（包括在“全部”中），直到输入 PIN。",
   "set_page_advanced": "高级",
-  "set_page_advanced_sub": "快捷键、缓存和从头开始。",
+  "set_page_advanced_sub": "缓存和从头开始。",
   "set_card_reset": "重置",
   "set_reset_label": "重置所有设置",
   "set_reset_btn": "重置…",
@@ -2405,5 +2405,6 @@
   "tv_fav_removed": "已将 {name} 移出收藏",
   "tv_volume": "音量 {n}%",
   "tv_muted": "已静音",
-  "tv_paused": "已暂停"
+  "tv_paused": "已暂停",
+  "set_page_shortcuts_sub": "应用响应的每个按键——点击即可更改。"
 }

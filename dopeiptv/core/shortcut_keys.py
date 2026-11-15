@@ -1,7 +1,7 @@
 """Keyboard shortcuts: the app's own keys and the user's over them.
 
 The app's rebindable actions and their keys are listed here (``ACTIONS``).
-The user's keys (Settings > Advanced > Keyboard shortcuts) win over these,
+The user's keys (Settings > Keyboard shortcuts) win over these,
 always: only what differs from the app's own is stored, as JSON (action ->
 key in Qt's portable text, "Ctrl+Shift+M"; "" for an action given no key)
 under ``keyboard_shortcuts``. The old editor's keys (one setting per action

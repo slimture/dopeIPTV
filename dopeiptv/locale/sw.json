@@ -1001,7 +1001,7 @@
   "set_card_pin": "PIN",
   "parental_hint": "Funga folda ya vipendwa (ibofye kulia chini ya Vipendwa) au aina nzima (ibofye kulia katika TV, Filamu au Misururu). Maudhui yaliyofungwa yamefichwa — hata kwenye 'Zote' — hadi PIN iingizwe.",
   "set_page_advanced": "Mahiri",
-  "set_page_advanced_sub": "Njia za mkato, kache na kuanza upya.",
+  "set_page_advanced_sub": "Kache na kuanza upya.",
   "set_card_reset": "Weka upya",
   "set_reset_label": "Weka upya mipangilio yote",
   "set_reset_btn": "Weka upya…",
@@ -2405,5 +2405,6 @@
   "tv_fav_removed": "{name} imeondolewa kwenye vipendwa",
   "tv_volume": "Sauti {n}%",
   "tv_muted": "Sauti imezimwa",
-  "tv_paused": "Imesitishwa"
+  "tv_paused": "Imesitishwa",
+  "set_page_shortcuts_sub": "Kila kitufe ambacho programu inakijibu - bofya kimoja ili kukibadilisha."
 }

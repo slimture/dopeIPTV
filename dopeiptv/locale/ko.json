@@ -1001,7 +1001,7 @@
   "set_card_pin": "PIN",
   "parental_hint": "즐겨찾기 폴더(즐겨찾기에서 마우스 오른쪽 버튼 클릭) 또는 카테고리 전체(TV, 영화, 시리즈에서 마우스 오른쪽 버튼 클릭)를 잠글 수 있습니다. 잠긴 콘텐츠는 PIN을 입력할 때까지 '전체'에서도 숨겨집니다.",
   "set_page_advanced": "고급",
-  "set_page_advanced_sub": "단축키, 캐시 및 처음부터 다시 시작.",
+  "set_page_advanced_sub": "캐시 및 처음부터 다시 시작.",
   "set_card_reset": "재설정",
   "set_reset_label": "모든 설정 재설정",
   "set_reset_btn": "재설정…",
@@ -2405,5 +2405,6 @@
   "tv_fav_removed": "{name}을(를) 즐겨찾기에서 뺐습니다",
   "tv_volume": "볼륨 {n}%",
   "tv_muted": "음소거",
-  "tv_paused": "일시 정지됨"
+  "tv_paused": "일시 정지됨",
+  "set_page_shortcuts_sub": "앱이 반응하는 모든 키 - 하나를 클릭해 바꿀 수 있습니다."
 }

@@ -1001,7 +1001,7 @@
   "set_card_pin": "PIN",
   "parental_hint": "Kunci folder favorit (klik kanan folder itu di Favorit) atau seluruh kategori (klik kanan kategori itu di TV, Film, atau Serial). Konten yang dikunci disembunyikan — juga dari 'Semua' — sampai PIN dimasukkan.",
   "set_page_advanced": "Lanjutan",
-  "set_page_advanced_sub": "Pintasan, cache, dan memulai dari awal.",
+  "set_page_advanced_sub": "Cache dan memulai dari awal.",
   "set_card_reset": "Setel ulang",
   "set_reset_label": "Setel ulang semua pengaturan",
   "set_reset_btn": "Setel ulang…",
@@ -2405,5 +2405,6 @@
   "tv_fav_removed": "{name} dihapus dari favorit",
   "tv_volume": "Volume {n}%",
   "tv_muted": "Suara mati",
-  "tv_paused": "Dijeda"
+  "tv_paused": "Dijeda",
+  "set_page_shortcuts_sub": "Setiap tombol yang ditanggapi aplikasi - klik salah satu untuk mengubahnya."
 }

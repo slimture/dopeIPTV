@@ -401,8 +401,8 @@ def page_of(widget):
 
 def in_settings(self):
     btn = next(b for b in self.findChildren(KeyButton) if b.sid == "sidebar")
-    assert page_of(btn).key == "advanced", page_of(btn).key
-    assert {page_of(b).key for b in self.findChildren(KeyButton)} == {"advanced"}
+    assert page_of(btn).key == "shortcuts", page_of(btn).key
+    assert {page_of(b).key for b in self.findChildren(KeyButton)} == {"shortcuts"}
     assert btn.sequence() == "F9"
     btn.click()
     QTest.keyClick(btn, Qt.Key.Key_F8)
