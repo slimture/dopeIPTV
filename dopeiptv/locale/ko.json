@@ -1,6 +1,4 @@
 {
-  "setting_stream_info": "스트림 정보 표시",
-  "setting_stream_info_hint": "채널 변경 시 해상도, 원본 FPS와 코덱을 잠시 표시하고 프로그램 진행 표시줄 아래에도 표시합니다. 목록은 재생 중 마지막으로 확인한 값을 사용하며 추가 스트림을 열지 않습니다.",
   "nav_home": "홈",
   "home_resume": "계속 시청하기",
   "home_fav_now": "현재 즐겨찾기",
@@ -56,6 +54,8 @@
   "tab_recording": "녹화",
   "tab_trakt": "Trakt",
   "setting_autoplay_preview": "선택 시 미리보기 자동 재생",
+  "setting_stream_info": "스트림 정보 표시",
+  "setting_stream_info_hint": "채널 변경 시 해상도, 원본 FPS와 코덱을 잠시 표시하고 프로그램 진행 표시줄 아래에도 표시합니다. 목록은 재생 중 마지막으로 확인한 값을 사용하며 추가 스트림을 열지 않습니다.",
   "setting_autoplay_next": "다음 에피소드 자동 재생",
   "setting_auto_reconnect": "라이브 스트림 자동 재연결",
   "setting_stream_format": "라이브 스트림 형식",

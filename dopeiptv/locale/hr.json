@@ -1,6 +1,4 @@
 {
-  "setting_stream_info": "Prikaži podatke o streamu",
-  "setting_stream_info_hint": "Kratko prikaži razlučivost, izvorni FPS i kodek pri promjeni kanala te ispod trake napretka programa. Popis koristi posljednje vrijednosti zabilježene tijekom reprodukcije, bez otvaranja dodatnih streamova.",
   "nav_home": "Početna",
   "home_resume": "Nastavi gledati",
   "home_fav_now": "Sada na tvojim favoritima",
@@ -56,6 +54,8 @@
   "tab_recording": "Snimanje",
   "tab_trakt": "Trakt",
   "setting_autoplay_preview": "Automatski reproduciraj pretpregled pri odabiru",
+  "setting_stream_info": "Prikaži podatke o streamu",
+  "setting_stream_info_hint": "Kratko prikaži razlučivost, izvorni FPS i kodek pri promjeni kanala te ispod trake napretka programa. Popis koristi posljednje vrijednosti zabilježene tijekom reprodukcije, bez otvaranja dodatnih streamova.",
   "setting_autoplay_next": "Automatski reproduciraj sljedeću epizodu",
   "setting_auto_reconnect": "Automatski ponovno poveži prijenose uživo",
   "setting_stream_format": "Format prijenosa uživo",

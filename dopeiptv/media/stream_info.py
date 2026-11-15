@@ -1,4 +1,9 @@
-"""A short channel-change banner, fed only by the current mpv core."""
+"""A short channel-change banner, fed only by the current mpv core.
+
+The selected video track is read once when mpv reports the requested file
+loaded, then again only when mpv says the video format changed
+(``video-params``). Both arrive on mpv's event thread and reach the GUI
+thread through signals; nothing polls."""
 from __future__ import annotations
 
 import weakref
@@ -7,6 +12,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QLabel
 
 from ..core import stream_info
+from ..core.log import log
 
 
 class StreamInfoMixin:
@@ -16,9 +22,6 @@ class StreamInfoMixin:
         self.stream_info_badge.setTextFormat(Qt.TextFormat.PlainText)
         self.stream_info_badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.stream_info_badge.hide()
-        self._info_timer = QTimer(self)
-        self._info_timer.setInterval(1000)
-        self._info_timer.timeout.connect(self._poll_stream_info)
         self._info_hide = QTimer(self)
         self._info_hide.setSingleShot(True)
         self._info_hide.setInterval(4000)
@@ -28,9 +31,9 @@ class StreamInfoMixin:
         self._info_shown = False
         self._info_last = {}
         self._info_loaded.connect(self._stream_info_loaded)
+        self._info_reconfig.connect(self._stream_info_reconfig)
 
     def _reset_stream_info(self) -> None:
-        self._info_timer.stop()
         self._info_hide.stop()
         self.stream_info_badge.hide()
         self._info_path = None
@@ -39,6 +42,8 @@ class StreamInfoMixin:
         self._info_last = {}
 
     def _arm_stream_info(self, core, path: str) -> None:
+        """Expect *path* on *core*. Hooks each core once: its file-loaded
+        event and its video-params observer, both handed to the GUI thread."""
         if not self._chan_key:
             return
         self._info_path = path
@@ -46,7 +51,7 @@ class StreamInfoMixin:
             return
         me, ref = weakref.ref(self), weakref.ref(core)
 
-        def loaded(_event) -> None:
+        def loaded(_event) -> None:        # mpv's event thread
             player, mpv = me(), ref()
             if player is not None and mpv is not None:
                 try:
@@ -54,18 +59,35 @@ class StreamInfoMixin:
                 except (RuntimeError, AttributeError):
                     pass
 
+        def reconfigured(_name, _value) -> None:   # mpv's event thread
+            player = me()
+            if player is not None:
+                try:
+                    player._info_reconfig.emit()
+                except (RuntimeError, AttributeError):
+                    pass
+
         core.event_callback("file-loaded")(loaded)
+        try:
+            core.observe_property("video-params", reconfigured)
+        except Exception as e:
+            log.debug("Stream info: format changes not followed: %s", e)
         self._info_core = ref
 
     def _stream_info_loaded(self, path: str) -> None:
         if not self._info_path or path != self._info_path:
             return
         self._info_ready = True
-        self._info_timer.start()
-        self._poll_stream_info()
+        self._read_stream_info()
 
-    def _poll_stream_info(self) -> None:
+    def _stream_info_reconfig(self) -> None:
+        if self._info_ready:
+            self._read_stream_info()
+
+    def _read_stream_info(self) -> None:
+        """Read the selected video track once and show or update the banner."""
         if not stream_info.enabled(self._settings):
+            self._info_hide.stop()
             self.stream_info_badge.hide()
             return
         core = self.video.mpv

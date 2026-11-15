@@ -96,19 +96,25 @@ Two recording modes:
 
 ## Channel stream information
 
-Playback's "Show stream information" switch controls a four-second banner
-after a live channel loads and the technical line below its EPG progress
-bar in list view. `media/stream_info.py` reads the selected video track
-from the existing mpv core after `file-loaded`, checks the loaded path and
-keeps sampling for adaptive format changes. FPS is the source's
-`demux-fps`, not the display or deinterlacer's output rate. Missing fields
-stay absent; nothing is inferred from a channel's name.
+Playback's "Show stream information" switch (off by default) controls a
+four-second banner after a live channel loads and the technical line below
+its EPG progress bar in list view. `media/stream_info.py` reads the
+selected video track from the existing mpv core once at `file-loaded`,
+checks the loaded path, and reads it again only when mpv reports a format
+change through an observer on `video-params`. Both arrive on mpv's event
+thread and reach the GUI thread through signals; nothing polls. FPS is the
+source's `demux-fps`, not the display or deinterlacer's output rate.
+Missing fields stay absent; nothing is inferred from a channel's name.
 
 `core/stream_info.py` validates the metadata and keeps at most 500 channel
-entries in QSettings, keyed by source and channel. Non-playing rows show
-the last observed values, not a fresh measurement. No probe or extra
-provider connection is opened. Private viewing neither reads nor updates
-the persistent cache. Disabling the switch immediately hides both views.
+entries in QSettings, keyed by source and channel; `ui/mw_stream_info.py`
+is the window's side. Non-playing rows show the last observed values, not
+a fresh measurement. No probe or extra provider connection is opened.
+The cache lists the channels someone watched, so private viewing neither
+reads nor updates it, Clear recent history drops it whenever channels are
+cleared (it keeps no times, so any range takes all of it), backups leave
+it out and sync never carried it. Disabling the switch immediately hides
+both views.
 
 ## Rewind and dopeIPTV's own buffer (DVR)
 

@@ -44,6 +44,7 @@ KEPT_OUT = {
     "music_art_v1": "{}", "home_pcache_a": "{}", "ts_broken/a": "1", "ts_depth/a": "60",
     "nerd_health_data": "{}", "hwdec_mode": "auto-safe", "force_x11": "true",
     "cast_devices": "TV", "subtitle_files": "{}", "tmdb_poster_cache_v3": "{}",
+    "channel_stream_info": "{}",
 }
 
 

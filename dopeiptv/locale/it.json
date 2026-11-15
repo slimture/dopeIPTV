@@ -1,6 +1,4 @@
 {
-  "setting_stream_info": "Mostra informazioni sul flusso",
-  "setting_stream_info_hint": "Mostra brevemente risoluzione, FPS della sorgente e codec al cambio canale e sotto la barra di avanzamento del programma. La lista usa gli ultimi valori rilevati durante la riproduzione, senza aprire altri flussi.",
   "nav_home": "Home",
   "home_resume": "Continua a guardare",
   "home_fav_now": "Ora sui tuoi preferiti",
@@ -56,6 +54,8 @@
   "tab_recording": "Registrazione",
   "tab_trakt": "Trakt",
   "setting_autoplay_preview": "Riproduci anteprima alla selezione",
+  "setting_stream_info": "Mostra informazioni sul flusso",
+  "setting_stream_info_hint": "Mostra brevemente risoluzione, FPS della sorgente e codec al cambio canale e sotto la barra di avanzamento del programma. La lista usa gli ultimi valori rilevati durante la riproduzione, senza aprire altri flussi.",
   "setting_autoplay_next": "Riproduci automaticamente l'episodio successivo",
   "setting_auto_reconnect": "Riconnetti automaticamente le dirette",
   "setting_stream_format": "Formato della diretta",

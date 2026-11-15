@@ -1,6 +1,4 @@
 {
-  "setting_stream_info": "Hiển thị thông tin luồng",
-  "setting_stream_info_hint": "Hiển thị nhanh độ phân giải, FPS nguồn và codec khi chuyển kênh và dưới thanh tiến trình chương trình. Danh sách dùng các giá trị quan sát gần nhất khi phát, không mở thêm luồng.",
   "nav_home": "Trang chủ",
   "home_resume": "Tiếp tục xem",
   "home_fav_now": "Mục yêu thích của bạn hiện tại",
@@ -56,6 +54,8 @@
   "tab_recording": "Ghi hình",
   "tab_trakt": "Trakt",
   "setting_autoplay_preview": "Tự động phát xem trước khi chọn",
+  "setting_stream_info": "Hiển thị thông tin luồng",
+  "setting_stream_info_hint": "Hiển thị nhanh độ phân giải, FPS nguồn và codec khi chuyển kênh và dưới thanh tiến trình chương trình. Danh sách dùng các giá trị quan sát gần nhất khi phát, không mở thêm luồng.",
   "setting_autoplay_next": "Tự động phát tập tiếp theo",
   "setting_auto_reconnect": "Tự động kết nối lại luồng trực tiếp",
   "setting_stream_format": "Định dạng luồng trực tiếp",

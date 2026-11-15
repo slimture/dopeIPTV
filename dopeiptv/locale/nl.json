@@ -1,6 +1,4 @@
 {
-  "setting_stream_info": "Streaminformatie tonen",
-  "setting_stream_info_hint": "Toon resolutie, bron-FPS en codec kort bij het wisselen van zender en onder de voortgangsbalk van het programma. De lijst gebruikt de laatst tijdens het afspelen gemeten waarden, zonder extra streams te openen.",
   "nav_home": "Home",
   "home_resume": "Verder kijken",
   "home_fav_now": "Nu op je favorieten",
@@ -56,6 +54,8 @@
   "tab_recording": "Opname",
   "tab_trakt": "Trakt",
   "setting_autoplay_preview": "Voorbeeld automatisch afspelen bij selectie",
+  "setting_stream_info": "Streaminformatie tonen",
+  "setting_stream_info_hint": "Toon resolutie, bron-FPS en codec kort bij het wisselen van zender en onder de voortgangsbalk van het programma. De lijst gebruikt de laatst tijdens het afspelen gemeten waarden, zonder extra streams te openen.",
   "setting_autoplay_next": "Volgende aflevering automatisch afspelen",
   "setting_auto_reconnect": "Live-streams automatisch opnieuw verbinden",
   "setting_stream_format": "Formaat live-stream",

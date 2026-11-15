@@ -34,6 +34,7 @@ s = QSettings("dopeiptv-test", "settings-window")
 s.clear()
 PRESET = {
     "autoplay_preview": "false", "autoplay_next_episode": "false",
+    "show_stream_info": "true",
     "nextup_lead_secs": "300", "auto_reconnect_live": "false",
     "hide_upcoming_prompt": "true", "stream_format": "m3u8",
     "audio_lang": "swe", "sub_mode": "lang", "sub_lang": "eng",

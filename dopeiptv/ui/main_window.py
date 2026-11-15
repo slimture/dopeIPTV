@@ -77,6 +77,7 @@ from .mw_connections import _ConnectionsMixin
 from .mw_mirrors import _MirrorsMixin
 from .mw_portal_archive import _PortalArchiveMixin
 from .mw_health import _HealthMixin
+from .mw_stream_info import _StreamInfoMixin
 from .mw_remote import _RemoteMixin
 from .mw_phone import _PhoneMixin
 from .mw_calendar import _CalendarMixin
@@ -141,7 +142,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _MprisMixin,
                  _FollowMixin, _SubtitlesMixin, _CastMixin, _AirPlayMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
-                 _HealthMixin, _ChannelPrefsMixin, _RemoteMixin, _PhoneMixin, _CalendarMixin,
+                 _HealthMixin, _StreamInfoMixin, _ChannelPrefsMixin, _RemoteMixin, _PhoneMixin, _CalendarMixin,
                  _EventsMixin, _ReportMixin,
                  _PortalArchiveMixin, _SeriesMixin, _SyncMixin,
                  _ConnectionsMixin, _MirrorsMixin, _TogetherMixin, _StatsMixin,
@@ -421,28 +422,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._maybe_open_home_at_start()
 
     # -- UI construction -------------------------------------------------------
-
-    def _stream_info_store(self):
-        from ..core.stream_info import StreamInfoCache
-        if getattr(self, "_stream_info_cache", None) is None:
-            self._stream_info_cache = StreamInfoCache(self.settings)
-        return self._stream_info_cache
-
-    def _remember_stream_info(self, key: str, info: dict) -> None:
-        from ..core import privacy, stream_info
-        if privacy.private() or not stream_info.enabled(self.settings):
-            return
-        if self._stream_info_store().put(key, info):
-            self.listw.viewport().update()
-
-    def channel_stream_info(self, item: dict, kind: str) -> str:
-        from ..core import privacy, stream_info
-        if privacy.private() or not stream_info.enabled(self.settings):
-            return ""
-        if kind not in ("live", "fav") and not (
-                kind == "history" and item.get("_kind") == "live"):
-            return ""
-        return self._stream_info_store().get(self._health_key(self._item_key(item), item))
 
     def _fill_playlist_menu(self, menu: QMenu) -> None:
         """Fill *menu* with a checkable entry per playlist, the active one

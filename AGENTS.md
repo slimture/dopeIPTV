@@ -177,6 +177,7 @@ map and the one-way import rule.
 | `ui/mw_mirrors.py` | Nerd's backup addresses in the window: a live stream whose server is down asked of the next address (off the window's thread), the channel started again from it |
 | `ui/mw_chanprefs.py` | A channel's own settings in the window: the player told which channel it plays (`set_channel`), the channel menu's "Channel settings…" (a dot when it has its own), its dialog |
 | `ui/mw_health.py` | Stream health in the window: the playback path's hooks (start, picture, drop, fail), the channel menu's "Stream health…", the list's dot |
+| `ui/mw_stream_info.py` | Stream information in the window: what the player observed remembered per source and channel, the list's technical line (off by default, never in private viewing) |
 | `ui/mw_portal_archive.py` | A Stalker portal's archive in the window: its link asked for off the window's thread (`StalkerClient.archive_link`), played from the moment asked, a go-back carried on to the next programme |
 | `ui/mw_remote.py` | The remote API and sharing in the window: the server as Nerd says, each request's work on the window's thread |
 | `ui/mw_events.py` | Events pushed out in the window: the playback path's and the recordings' hooks (start, pause, stop, channel changed, recording started/ended), handed to `core/events.py`; it only watches - and, with MQTT's commands on, carries out what Home Assistant asks on the window's thread (the volume and the favourites list kept up to date) |
@@ -224,7 +225,7 @@ dialog, the strip, handing over from the archive), `mw_airplay` (AirPlay
 to an Apple TV on macOS: the receiver added, its own endings), `mw_donate` (the
 sidebar heart, About's link, Home's card), `mw_failover` (failover to another
 source), `mw_series` (series recording rules), `mw_health` (stream
-health per channel), `mw_chanprefs` (a channel's own settings),
+health per channel), `mw_stream_info` (stream details per channel), `mw_chanprefs` (a channel's own settings),
 `mw_portal_archive` (a Stalker portal's archive, by programme),
 `mw_events` (events pushed out: webhooks and MQTT, Home Assistant's commands), `mw_phone` (the phone remote), `mw_calendar` (reminders and recordings as a calendar), `mw_privacy` (private
 `mw_events` (events pushed out: webhooks and MQTT), `mw_media` (media

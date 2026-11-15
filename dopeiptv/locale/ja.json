@@ -1,6 +1,4 @@
 {
-  "setting_stream_info": "ストリーム情報を表示",
-  "setting_stream_info_hint": "チャンネル切り替え時に解像度、ソースのFPS、コーデックを短時間表示し、番組の進行バーの下にも表示します。一覧には再生中に最後に取得した値を使い、追加のストリームは開きません。",
   "nav_home": "ホーム",
   "home_resume": "続きを視聴",
   "home_fav_now": "現在のお気に入り",
@@ -56,6 +54,8 @@
   "tab_recording": "録画",
   "tab_trakt": "Trakt",
   "setting_autoplay_preview": "選択時にプレビューを自動再生",
+  "setting_stream_info": "ストリーム情報を表示",
+  "setting_stream_info_hint": "チャンネル切り替え時に解像度、ソースのFPS、コーデックを短時間表示し、番組の進行バーの下にも表示します。一覧には再生中に最後に取得した値を使い、追加のストリームは開きません。",
   "setting_autoplay_next": "次のエピソードを自動再生",
   "setting_auto_reconnect": "ライブ配信を自動的に再接続",
   "setting_stream_format": "ライブ配信の形式",

@@ -159,5 +159,12 @@ def clear_recent(settings: Any, resume_settings: Any, history: Any, seconds: int
         vlog = viewing if viewing is not None else viewing_stats.ViewingLog(settings)
         if vlog.clear(since, kinds):
             vlog.save()
+    if channels:
+        # The channels' last observed stream details say which were watched.
+        # They carry no time, so any clear of channels takes all of them: a
+        # cache that fills again as channels play.
+        from . import stream_info
+        if settings.value(stream_info.KEY) is not None:
+            settings.setValue(stream_info.KEY, "{}")
     log.info("cleared recent history (%s): %s", seconds or "all", out)
     return out

@@ -1,6 +1,4 @@
 {
-  "setting_stream_info": "Tampilkan informasi siaran",
-  "setting_stream_info_hint": "Tampilkan resolusi, FPS sumber dan codec sebentar saat berganti saluran dan di bawah bilah kemajuan acara. Daftar memakai nilai terakhir yang diamati saat pemutaran, tanpa membuka siaran tambahan.",
   "nav_home": "Beranda",
   "home_resume": "Lanjutkan menonton",
   "home_fav_now": "Favorit Anda saat ini",
@@ -56,6 +54,8 @@
   "tab_recording": "Perekaman",
   "tab_trakt": "Trakt",
   "setting_autoplay_preview": "Putar pratinjau otomatis saat dipilih",
+  "setting_stream_info": "Tampilkan informasi siaran",
+  "setting_stream_info_hint": "Tampilkan resolusi, FPS sumber dan codec sebentar saat berganti saluran dan di bawah bilah kemajuan acara. Daftar memakai nilai terakhir yang diamati saat pemutaran, tanpa membuka siaran tambahan.",
   "setting_autoplay_next": "Putar episode berikutnya secara otomatis",
   "setting_auto_reconnect": "Sambungkan ulang siaran langsung secara otomatis",
   "setting_stream_format": "Format siaran langsung",

@@ -10,7 +10,7 @@ CAP = 500
 
 
 def enabled(settings: Any) -> bool:
-    return settings is not None and settings.value("show_stream_info", "true") == "true"
+    return settings is not None and settings.value("show_stream_info", "false") == "true"
 
 
 def clean(value: Any) -> dict:

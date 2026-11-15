@@ -505,6 +505,7 @@ class EmbeddedPlayer(StreamInfoMixin, RewindBarMixin, DvrPlayerMixin, QWidget):
     """Video pane with libmpv OpenGL rendering, control bar, and fullscreen overlay."""
 
     _info_loaded = pyqtSignal(str)
+    _info_reconfig = pyqtSignal()
     stream_info_changed = pyqtSignal(str, object)
     double_clicked = pyqtSignal()
     playback_error = pyqtSignal(str)
