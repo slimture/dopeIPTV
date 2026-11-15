@@ -439,10 +439,13 @@ Plex are in)
 
 **On the TV, from the sofa**
 
-- **A 10-foot mode**: a large interface run entirely with a remote. The
-  app has nothing for HDMI-CEC, a gamepad or LIRC today; a CEC remote works
-  only where the system turns it into keys. TV mode on the list from
-  "build everything" is the same thing.
+- **A 10-foot mode**: in - TV mode (`ui/mw_tv.py`, `ui/tv_mode.py`), run
+  with keys (a remote that acts as a keyboard), a game controller (SDL2
+  through pysdl2 when it is installed - an optional `pip install pysdl2
+  pysdl2-dll`, never in requirements.txt - else evdev) and LIRC (lircd's
+  socket). Still open: native HDMI-CEC (libcec's cec-client, or a kernel
+  CEC adapter's keymap, turns the TV remote into keys today), a channel
+  list over the picture, the on-screen keyboard beyond Latin letters.
 - **dopeIPTV as an HDHomeRun tuner**: part of server mode (above).
 - **Android TV and Fire TV**: PyQt6 does not get there in practice; an
   app of its own would be a separate project. Until then the shared

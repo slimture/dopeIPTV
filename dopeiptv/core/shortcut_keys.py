@@ -44,6 +44,7 @@ ACTIONS: tuple[tuple[str, str, str], ...] = (
     ("focus_mode", "Ctrl+Shift+M", "sc_focus_mode"),
     # Cmd+K on macOS: Qt's "Ctrl" is the Command key there.
     ("palette", "Ctrl+K", "sc_palette"),
+    ("tv_mode", "Ctrl+Shift+T", "sc_tv_mode"),
 )
 DEFAULTS: dict[str, str] = {sid: key for sid, key, _label in ACTIONS}
 LABELS: dict[str, str] = {sid: label for sid, _key, label in ACTIONS}

@@ -9,9 +9,11 @@ dopeiptv:// link, another program (the remote API asks the same way).
     dopeiptv dopeiptv://open             bring the window forward
     dopeiptv dopeiptv://supporter?key=DS1-...   a supporter key from the
                                          site's thank-you, shown to be kept
+    dopeiptv --tv                    TV mode (with any of the above too)
 
 A command is a small dict - {"play": url}, {"channel": name},
-{"open": True}, {"supporter": key} - or None when there is nothing to do.
+{"open": True}, {"supporter": key}, {"tv": True} - or None when there
+is nothing to do.
 """
 
 from __future__ import annotations
@@ -63,8 +65,17 @@ def stream_url_ok(url: str) -> bool:
 
 def parse_command(argv: list[str]) -> dict | None:
     """The command in a command line (argv without the program), or None.
-    Unknown options are left to whoever reads them (--self-check, ...)."""
-    args = list(argv)
+    Unknown options are left to whoever reads them (--self-check, ...).
+    ``--tv`` asks for TV mode, alone or with any other command."""
+    args = [a for a in argv if a != "--tv"]
+    cmd = _parse_command(args)
+    if len(args) != len(argv):
+        cmd = dict(cmd or {})
+        cmd["tv"] = True
+    return cmd
+
+
+def _parse_command(args: list[str]) -> dict | None:
     for i, a in enumerate(args):
         if a in ("--play", "--channel") and i + 1 < len(args):
             value = args[i + 1].strip()

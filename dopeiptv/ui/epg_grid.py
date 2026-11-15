@@ -124,6 +124,10 @@ class EpgGrid(QWidget):
     # row on screen - for a span a minute or two different.
     REFIT_TOLERANCE = 0.03
     LABEL_DY = 21            # vertical inset of a card's title text
+    # The channel names' size, and the titles' and times' (0: the app's
+    # own font) - TV mode's guide (ui/tv_mode.py) draws them larger.
+    NAME_PT = 11
+    LABEL_PX = 0
     FUTURE_HOURS = 12       # how far ahead the board reaches
     MAX_PAST_HOURS = 48     # cap on how far back timeshift opens the board
     # A board kept to be shown again (the Guide page) is drawn afresh once
@@ -1220,7 +1224,7 @@ class EpgGrid(QWidget):
         # shows an hour of it or so, often no hour mark at all. Zoomed out
         # until a half hour is narrower than its label, the hours alone.
         marks = self._half_hours()
-        label_w = QFontMetricsF(QFont()).horizontalAdvance("00:00")
+        label_w = QFontMetricsF(self._label_font()).horizontalAdvance("00:00")
         if 30 * self._ppm < label_w + 14 and len(marks) > 1:
             first = 1 if (not self._on_hour(marks[0])
                           and self._on_hour(marks[1])) else 0
@@ -1228,6 +1232,7 @@ class EpgGrid(QWidget):
         for t in marks:
             lbl = QGraphicsSimpleTextItem(
                 datetime.fromtimestamp(t).strftime("%H:%M"))
+            lbl.setFont(self._label_font())
             lbl.setBrush(QColor(P["text"] if self._on_hour(t)
                                 else P["muted"]))
             lbl.setPos(self._x(t) + 4, 7)
@@ -1354,7 +1359,7 @@ class EpgGrid(QWidget):
         name = QGraphicsSimpleTextItem(label_text)
         f = QFont()
         f.setBold(True)
-        f.setPointSize(11)
+        f.setPointSize(self.NAME_PT)
         name.setFont(f)
         # The theme's text, not white: on a light theme's pale column white
         # names were all but invisible (the accent cell takes its own ink).
@@ -1526,6 +1531,7 @@ class EpgGrid(QWidget):
         letters rather than the card. Only the card is clickable; the title is
         just paint on top of it."""
         label = QGraphicsSimpleTextItem(text)
+        label.setFont(self._label_font())
         self._elide(label, x2 - x1 - 14)
         if self._cut_to_nothing(label.text(), text):
             return None
@@ -1535,6 +1541,12 @@ class EpgGrid(QWidget):
         label.setPos(x1 + 8, y + self.LABEL_DY)
         self.scene.addItem(label)
         return label
+
+    def _label_font(self) -> QFont:
+        f = QFont()
+        if self.LABEL_PX:
+            f.setPixelSize(self.LABEL_PX)
+        return f
 
     def _rec_spans(self, ch: dict) -> list[tuple[float, float]]:
         """The scheduled or running recordings of this channel (matched on

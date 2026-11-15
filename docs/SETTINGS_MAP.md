@@ -140,6 +140,8 @@ or "Shared" and where the shared one lives. Nerd's rows only while it is on.
 - Updates: `check_updates`, `update_channel`
 - Backup: back up, restore
 - System: `desktop_entry` (Linux), `mpris` (the system's media controls)
+- TV mode: Open TV mode, `tv_mode_start`, `tv_inputs` (game controllers and
+  LIRC), the remotes and controllers found
 - Support dopeIPTV: feedback and its answers, `supporter_key` (its window),
   `supporter_icon`, the sidebar heart (`donate_heart_until`)
 

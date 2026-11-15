@@ -286,6 +286,8 @@ class _SettingsMixin:
                 and self._home_showing()):
             self._home_page.refresh()
         self._guide_restyle()        # the Guide page's board, in the new colours
+        if getattr(self, "_tv_page", None) is not None:
+            self._tv_page.restyle()  # TV mode's page (its tiles paint from P)
 
     def _reset_all_settings(self, parent_dialog) -> None:
         """Wipe every stored preference (theme, layout, playlists, favorites,
@@ -862,6 +864,20 @@ class _SettingsMixin:
                     tr("setting_media_controls_hint_mac"
                        if sys.platform == "darwin"
                        else "setting_media_controls_hint_win"))
+        # TV mode (mw_tv): the window as a 10-foot interface, from a remote.
+        c = general.card(tr("tv_mode"))
+        tv_open_btn = QPushButton(tr("tv_open"))
+        tv_open_btn.clicked.connect(lambda _c=False: (d.accept(), QTimer.singleShot(0, self.enter_tv_mode)))
+        c.row(tr("tv_mode"), tv_open_btn, tr("tv_mode_hint"),
+              search="tv 10-foot sofa couch remote htpc fullscreen kodi")
+        tv_start_box = c.toggle(tr("tv_start_in"), is_on("tv_mode_start", "false"),
+                                tr("tv_start_hint"))
+        tv_inputs_box = c.toggle(tr("tv_inputs"), is_on("tv_inputs", "true"),
+                                 tr("tv_inputs_hint"))
+        tv_found = QLabel(self.tv_inputs_text())
+        tv_found.setWordWrap(True)
+        c.row(tr("tv_inputs_found"), tv_found, tr("tv_inputs_found_hint"),
+              search="lirc gamepad controller joystick cec remote evdev sdl")
         # The sidebar's heart, last and quiet: off hides it for three months.
         c = support_card = general.card(tr("donate_support"))
         # What the supporter key opens: read once here, again only after the
@@ -2445,6 +2461,11 @@ class _SettingsMixin:
                 QTimer.singleShot(0, self._maybe_check_updates)
             if x11_box is not None:
                 put("force_x11", flag(x11_box))
+            # Written once switched: an untouched window stores nothing.
+            for tv_key, tv_box, tv_default in (("tv_mode_start", tv_start_box, "false"),
+                                               ("tv_inputs", tv_inputs_box, "true")):
+                if tv_box.isChecked() != is_on(tv_key, tv_default):
+                    put(tv_key, flag(tv_box))
             if mpris_box is not None:
                 put("mpris", flag(mpris_box))
                 if "mpris" in changed:

@@ -117,6 +117,7 @@ from .mw_subtitles import _SubtitlesMixin
 from .mw_updates import _UpdatesMixin
 from .mw_radio import _RadioMixin
 from .mw_webstreams import _WebStreamsMixin
+from .mw_tv import _TvMixin
 from ..core.workers import (
     LogoLoader, default_image_cache_dir, run_async)
 
@@ -151,7 +152,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _EventsMixin, _ReportMixin,
                  _PortalArchiveMixin, _SeriesMixin, _SyncMixin,
                  _ConnectionsMixin, _MirrorsMixin, _TogetherMixin, _StatsMixin,
-                 _SimklMixin, _DiscordMixin, _MediaServerMixin,
+                 _SimklMixin, _DiscordMixin, _MediaServerMixin, _TvMixin,
                  QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
@@ -432,6 +433,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Land on the Home page (if enabled) - the classic view keeps loading
         # underneath, so leaving Home is instant.
         self._maybe_open_home_at_start()
+        # "Start in TV mode" (mw_tv), once the window is up.
+        QTimer.singleShot(300, self._maybe_start_tv_mode)
 
     # -- UI construction -------------------------------------------------------
 
@@ -502,6 +505,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         cast_action = action(tr("ctx_cast_to_chromecast"), self.cast_playing)
         together_action = action(tr("together_title") + "…", self.open_together)
         phone_action = action(tr("phone_menu"), self.open_phone_remote)
+        tv_action = action(tr("tv_mode"), self.toggle_tv_mode)
         calendar_action = action(tr("cal_menu"), self.open_calendar_export)
         private_action, clear_action = self._build_privacy_actions()
         self._donate_action = action(tr("donate_support") + "…", lambda: self.open_donate("app-menu"))
@@ -523,7 +527,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             "refresh": refresh_action, "reminders": reminders_action, "calendar": calendar_action,
             "multiview": multiview_action, "cast": cast_action,
             "together": together_action, "phone": phone_action,
-            "private": private_action, "clear": clear_action,
+            "tv_mode": tv_action, "private": private_action, "clear": clear_action,
             "stats": stats_action,
             **report_actions, "website": website_action,
             "supporter": self._supporter_action, "donate": self._donate_action,
@@ -545,6 +549,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             cast_action: lambda: tr("ctx_cast_to_chromecast"),
             together_action: lambda: tr("together_title") + "…",
             phone_action: lambda: tr("phone_menu"),
+            tv_action: lambda: tr("tv_mode"),
             calendar_action: lambda: tr("cal_menu"),
             about_action: lambda: tr("menu_about"),
             quit_action: lambda: tr("menu_quit"),
@@ -2046,6 +2051,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._popout_macos()
             self._toggle_popout_fullscreen()
             return
+        self._enter_docked_fullscreen()
+
+    def _enter_docked_fullscreen(self) -> None:
+        """The docked player fills the window, the window the screen. TV
+        mode (mw_tv) comes here straight: its window already fills the
+        screen, so macOS needs no pop-out for it."""
         self._player_fs = True
         self._fs_return_index = self.listw.currentIndex()
         self._fs_return_scroll = self.listw.verticalScrollBar().value()
@@ -3629,6 +3640,31 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     # -- series -> episodes --------------------------------------------------------
 
+    @staticmethod
+    def _episode_rows(info: dict, series: dict) -> list:
+        """A series_info answer's episodes as list rows, season by season
+        (the list here and TV mode's)."""
+        # Fall back to the show's own poster so an episode row isn't a
+        # bare initial: prefer the episode still, then the series art.
+        series_cover = (series.get("cover") or series.get("cover_big")
+                        or series.get("stream_icon") or "")
+        series_title = series.get("name") or series.get("title") or ""
+        episodes = []
+        for season, eps in ((info or {}).get("episodes") or {}).items():
+            for ep in eps:
+                ep["season"] = season
+                ep["name"] = (
+                    f"S{season} * E{ep.get('episode_num', '?')} - "
+                    f"{ep.get('title') or tr('misc_episode')}")
+                still = (ep.get("info") or {}).get("movie_image") or ""
+                ep["stream_icon"] = (ep.get("stream_icon") or still
+                                     or series_cover)
+                # Let the cover pipeline resolve the show's TMDB poster for
+                # each episode (its own name never matches TMDB).
+                ep["_series_title"] = series_title
+                episodes.append(ep)
+        return episodes
+
     def _enter_series(self, series) -> None:
         sid = series.get("series_id")
         if sid is None:
@@ -3637,25 +3673,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
         def done(info):
             self._hide_busy()
-            # Fall back to the show's own poster so an episode row isn't a
-            # bare initial: prefer the episode still, then the series art.
-            series_cover = (series.get("cover") or series.get("cover_big")
-                            or series.get("stream_icon") or "")
-            series_title = series.get("name") or series.get("title") or ""
-            episodes = []
-            for season, eps in (info.get("episodes") or {}).items():
-                for ep in eps:
-                    ep["season"] = season
-                    ep["name"] = (
-                        f"S{season} * E{ep.get('episode_num', '?')} - "
-                        f"{ep.get('title') or tr('misc_episode')}")
-                    still = (ep.get("info") or {}).get("movie_image") or ""
-                    ep["stream_icon"] = (ep.get("stream_icon") or still
-                                         or series_cover)
-                    # Let the cover pipeline resolve the show's TMDB poster for
-                    # each episode (its own name never matches TMDB).
-                    ep["_series_title"] = series_title
-                    episodes.append(ep)
+            episodes = self._episode_rows(info, series)
             # A series entered from a slim snapshot (resume ctx) doesn't know
             # its category; series_info usually does. Backfill it so backing
             # out of the episodes can land in the series' own category.
@@ -5126,6 +5144,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self._discord_started(key, title, item, kind, catchup)
                 if not catchup:
                     self._ms_started(url, key, kind, item, resume_at)
+                # TV mode: the picture fills the screen, whoever asked.
+                self._tv_started(kind)
             else:
                 log.warning("embedded play() refused %s - falling back to an "
                             "external mpv window", redact_url(url))

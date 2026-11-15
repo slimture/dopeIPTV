@@ -103,6 +103,9 @@ dopeiptv/
                        window icon from there, not from the app)
     xdg.py             Launch system programs from a frozen bundle without
                        our bundled libraries leaking into them
+    tv_input.py        TV mode's input as actions: LIRC (lircd's socket), a
+                       game controller (SDL2 if pysdl2 is there, else evdev)
+    tv_nav.py          TV mode's focus moves (nearest element, grid step)
     ytdlp.py           yt-dlp for YouTube, Twitch and the like: the system's
                        or the app's own copy (release binary, SHA2-256SUMS
                        checked, updated at most once a day while used)
@@ -196,6 +199,11 @@ dopeiptv/
     mw_radio.py        Radio: radio-browser.info's stations, played as music
     mw_webstreams.py   Open address, YouTube/Twitch through yt-dlp, saved
                        addresses
+    mw_tv.py           TV mode: on/off, its keys and inputs, the picture with
+                       the info bar, zapping (plays through the window's path)
+    tv_mode.py         TV mode's page and screens (Home, Channels, Options)
+    tv_screens.py      TV mode's guide, Movies/Series and Search screens
+    tv_widgets.py      TV mode's tiles, lists, keyboard and info bar
     mw_onboarding.py   First-run setup wizard
     mw_sort.py         List sort order
     widgets.py         Small standalone widgets

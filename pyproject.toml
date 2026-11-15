@@ -87,6 +87,8 @@ files = [
     "dopeiptv/providers/lan_scan.py",
     "dopeiptv/providers/radio_browser.py",
     "dopeiptv/core/ytdlp.py",
+    "dopeiptv/core/tv_input.py",
+    "dopeiptv/core/tv_nav.py",
     "dopeiptv/providers/kodi.py",
     "dopeiptv/providers/mdns.py",
     "dopeiptv/providers/simkl.py",

@@ -41,13 +41,17 @@ class _CommandsMixin:
 
     def handle_command(self, cmd: dict) -> dict[str, Any]:
         """Do what *cmd* asks: {"play": address}, {"channel": name},
-        {"number": channel number}, {"open": True}. Returns at once; a
-        channel is looked up off the window's thread."""
+        {"number": channel number}, {"open": True}, {"tv": True} (TV mode,
+        before whatever else it asks). Returns at once; a channel is looked
+        up off the window's thread."""
         if not isinstance(cmd, dict):
             return {"ok": False}
         log.info("command: %s", ", ".join(sorted(cmd)))
-        if cmd.get("open") or cmd.get("play") or cmd.get("channel") or cmd.get("supporter") or cmd.get("number"):
+        if (cmd.get("open") or cmd.get("play") or cmd.get("channel") or cmd.get("supporter")
+                or cmd.get("number") or cmd.get("tv")):
             self._come_forward()
+        if cmd.get("tv") is True and hasattr(self, "enter_tv_mode"):
+            self.enter_tv_mode()
         key = str(cmd.get("supporter") or "").strip()
         if key and hasattr(self, "open_supporter"):
             # Shown in the supporter window (checked there, offline), never
@@ -68,7 +72,7 @@ class _CommandsMixin:
         if number is not None:
             self._play_channel_number(number)
             return {"ok": True}
-        return {"ok": bool(cmd.get("open"))}
+        return {"ok": bool(cmd.get("open") or cmd.get("tv"))}
 
     def _play_address(self, url: str, title: str | None = None) -> None:
         """A file plays as one opened from Local files (resume, its name);

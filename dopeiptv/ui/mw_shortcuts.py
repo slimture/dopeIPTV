@@ -191,6 +191,7 @@ class _ShortcutsMixin:
             "sidebar": self._shortcut_sidebar,
             "focus_mode": self._shortcut_focus_mode,
             "palette": self._open_palette,
+            "tv_mode": self.toggle_tv_mode,
         }
 
     def shortcut_keys(self) -> dict[str, str]:
