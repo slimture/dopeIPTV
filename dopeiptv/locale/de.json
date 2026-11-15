@@ -2694,5 +2694,8 @@
   "set_cast_keep_buffer_hint": "Damit kannst du auf dem Fernseher in dem zurückgehen, was der Rückspulpuffer enthält. Das braucht eine weitere Verbindung zu deinem Anbieter, und die meisten Konten erlauben nur eine - schalte es nur ein, wenn deines mehr erlaubt.",
   "cast_buffer_without": "Ohne ihn streamen",
   "conn_what_cast_buffer": "Wenn der Rückspulpuffer beim Streamen weiter aufnimmt, braucht er eine weitere Verbindung zu deinem Anbieter, zusätzlich zu der des Streams.",
-  "conn_limit_unknown": "Dein Anbieter sagt nicht, wie viele Verbindungen dein Konto erlaubt. Die meisten erlauben nur eine, und dann kann der Anbieter den Stream ablehnen oder unterbrechen."
+  "conn_limit_unknown": "Dein Anbieter sagt nicht, wie viele Verbindungen dein Konto erlaubt. Die meisten erlauben nur eine, und dann kann der Anbieter den Stream ablehnen oder unterbrechen.",
+  "conn_what_test": "Dieser Test liest ein paar Sekunden lang einen Live-Kanal und öffnet dafür eine weitere Verbindung zu deinem Anbieter.",
+  "conn_test_unknown": "Von diesem Konto läuft gerade schon etwas, und dein Anbieter sagt nicht, wie viele Verbindungen es erlaubt. Die meisten erlauben nur eine, und dann kann der Anbieter das unterbrechen, was gerade läuft.",
+  "ct_skip_conn": "Nicht versucht – es würde eine weitere Verbindung zu deinem Anbieter öffnen"
 }

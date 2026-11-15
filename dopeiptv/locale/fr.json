@@ -2694,5 +2694,8 @@
   "set_cast_keep_buffer_hint": "Te permet de revenir en arrière sur la TV dans ce que garde la mémoire tampon de retour en arrière. Cela utilise une connexion de plus chez ton fournisseur, et la plupart des comptes n'en autorisent qu'une - ne l'active que si le tien en autorise davantage.",
   "cast_buffer_without": "Diffuser sans elle",
   "conn_what_cast_buffer": "Garder la mémoire tampon de retour en arrière en enregistrement pendant que tu diffuses utilise une connexion de plus chez ton fournisseur, en plus de celle de la diffusion.",
-  "conn_limit_unknown": "Ton fournisseur n'indique pas combien de connexions ton compte autorise. La plupart n'en autorisent qu'une, et le fournisseur peut alors refuser la diffusion ou la couper."
+  "conn_limit_unknown": "Ton fournisseur n'indique pas combien de connexions ton compte autorise. La plupart n'en autorisent qu'une, et le fournisseur peut alors refuser la diffusion ou la couper.",
+  "conn_what_test": "Ce test lit une chaîne en direct pendant quelques secondes, ce qui ouvre une connexion de plus chez ton fournisseur.",
+  "conn_test_unknown": "Quelque chose de ce compte est déjà en lecture, et ton fournisseur n'indique pas combien de connexions il autorise. La plupart n'en autorisent qu'une, et le fournisseur peut alors couper ce qui est en lecture.",
+  "ct_skip_conn": "Pas essayé – cela ouvrirait une connexion de plus chez ton fournisseur"
 }

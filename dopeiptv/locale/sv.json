@@ -2694,5 +2694,8 @@
   "set_cast_keep_buffer_hint": "Låter dig gå tillbaka på tv:n i det bakåtspolningsbufferten håller. Det använder ytterligare en anslutning till din leverantör, och de flesta konton tillåter bara en - slå bara på det om ditt tillåter fler.",
   "cast_buffer_without": "Casta utan den",
   "conn_what_cast_buffer": "Att låta bakåtspolningsbufferten spela in medan du castar använder ytterligare en anslutning till din leverantör, utöver castens egen.",
-  "conn_limit_unknown": "Din leverantör säger inte hur många anslutningar ditt konto tillåter. De flesta tillåter bara en, och då kan leverantören neka casten eller bryta den."
+  "conn_limit_unknown": "Din leverantör säger inte hur många anslutningar ditt konto tillåter. De flesta tillåter bara en, och då kan leverantören neka casten eller bryta den.",
+  "conn_what_test": "Det här testet läser en livekanal i några sekunder, och det öppnar ytterligare en anslutning till din leverantör.",
+  "conn_test_unknown": "Något från det här kontot spelas redan, och din leverantör säger inte hur många anslutningar det tillåter. De flesta tillåter bara en, och då kan leverantören bryta det som spelas.",
+  "ct_skip_conn": "Inte provat – det skulle öppna ytterligare en anslutning till din leverantör"
 }

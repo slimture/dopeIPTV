@@ -2694,5 +2694,8 @@
   "set_cast_keep_buffer_hint": "Omogućuje ti da se na televizoru vratiš unatrag u onome što međuspremnik za premotavanje drži. Koristi još jednu vezu prema tvom davatelju, a većina računa dopušta samo jednu - uključi ga samo ako tvoj dopušta više.",
   "cast_buffer_without": "Emitiraj bez njega",
   "conn_what_cast_buffer": "Ako međuspremnik za premotavanje nastavi snimati dok emitiraš, koristi još jednu vezu prema tvom davatelju, uz onu samog emitiranja.",
-  "conn_limit_unknown": "Tvoj davatelj ne kaže koliko veza tvoj račun dopušta. Većina dopušta samo jednu, a tada davatelj može odbiti emitiranje ili ga prekinuti."
+  "conn_limit_unknown": "Tvoj davatelj ne kaže koliko veza tvoj račun dopušta. Većina dopušta samo jednu, a tada davatelj može odbiti emitiranje ili ga prekinuti.",
+  "conn_what_test": "Ovaj test nekoliko sekundi čita kanal uživo, a to otvara još jednu vezu prema tvom davatelju.",
+  "conn_test_unknown": "S ovog računa već se nešto reproducira, a tvoj davatelj ne kaže koliko veza dopušta. Većina dopušta samo jednu, a tada davatelj može prekinuti ono što se reproducira.",
+  "ct_skip_conn": "Nije pokušano – otvorilo bi još jednu vezu prema tvom davatelju"
 }

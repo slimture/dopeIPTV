@@ -2251,6 +2251,9 @@ _STRINGS: dict[str, dict[str, str]] = {
     "conn_what_cast": {"en": "Casting this opens another connection to your provider."},
     "conn_what_cast_buffer": {"en": "Keeping the rewind buffer recording while you cast uses one more connection to your provider, next to the cast's own."},
     "conn_limit_unknown": {"en": "Your provider does not say how many connections your account allows. Most allow only one, and then the provider may refuse the cast or cut it."},
+    "conn_what_test": {"en": "This test reads a live channel for a few seconds, which opens one more connection to your provider."},
+    "conn_test_unknown": {"en": "Something is already playing from this account, and your provider does not say how many connections it allows. Most allow only one, and then the provider may cut what is playing."},
+    "ct_skip_conn": {"en": "Not tried - it would open another connection to your provider"},
     # -- an Enigma2 box's tuners (the transponder check) and In use now --
     "tuner_title": {"en": "The box's tuners"},
     "tuner_what": {"en": "This channel is not on a transponder the box tunes now, so it needs a tuner of its own."},

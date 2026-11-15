@@ -2694,5 +2694,8 @@
   "set_cast_keep_buffer_hint": "Permite voltar na TV dentro do que o buffer de retrocesso guarda. Usa mais uma conexão com o seu provedor, e a maioria das contas permite só uma - ative só se a sua permitir mais.",
   "cast_buffer_without": "Transmitir sem ele",
   "conn_what_cast_buffer": "Manter o buffer de retrocesso gravando durante a transmissão usa mais uma conexão com o seu provedor, além da conexão da própria transmissão.",
-  "conn_limit_unknown": "O seu provedor não informa quantas conexões a sua conta permite. A maioria permite só uma, e então o provedor pode recusar a transmissão ou cortá-la."
+  "conn_limit_unknown": "O seu provedor não informa quantas conexões a sua conta permite. A maioria permite só uma, e então o provedor pode recusar a transmissão ou cortá-la.",
+  "conn_what_test": "Este teste lê um canal ao vivo por alguns segundos, o que abre mais uma conexão com o seu provedor.",
+  "conn_test_unknown": "Algo desta conta já está tocando, e o seu provedor não informa quantas conexões permite. A maioria permite só uma, e então o provedor pode cortar o que está tocando.",
+  "ct_skip_conn": "Não tentado – abriria mais uma conexão com o seu provedor"
 }

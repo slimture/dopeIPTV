@@ -2694,5 +2694,8 @@
   "set_cast_keep_buffer_hint": "Te permite retroceder en la TV en lo que guarda el búfer para retroceder. Usa una conexión más con tu proveedor, y la mayoría de las cuentas solo permiten una: actívalo solo si la tuya permite más.",
   "cast_buffer_without": "Enviar sin él",
   "conn_what_cast_buffer": "Mantener el búfer para retroceder grabando mientras envías usa una conexión más con tu proveedor, además de la del propio envío.",
-  "conn_limit_unknown": "Tu proveedor no dice cuántas conexiones permite tu cuenta. La mayoría solo permite una, y entonces el proveedor puede rechazar el envío o cortarlo."
+  "conn_limit_unknown": "Tu proveedor no dice cuántas conexiones permite tu cuenta. La mayoría solo permite una, y entonces el proveedor puede rechazar el envío o cortarlo.",
+  "conn_what_test": "Esta prueba lee un canal en directo durante unos segundos, y eso abre otra conexión con tu proveedor.",
+  "conn_test_unknown": "Ya se está reproduciendo algo de esta cuenta, y tu proveedor no dice cuántas conexiones permite. La mayoría solo permite una, y entonces el proveedor puede cortar lo que se está reproduciendo.",
+  "ct_skip_conn": "No se probó: abriría otra conexión con tu proveedor"
 }

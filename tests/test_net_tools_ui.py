@@ -278,6 +278,108 @@ def test_the_recording_questions_carry_the_warning_when_over():
     assert roomy._one_more_over() is None and roomy._with_conn_warning("B", None) == "B"
 
 
+def test_a_tests_stream_beside_what_plays_is_asked_about_first():
+    # Test connection's speed, a catch-up or rewrite Test: one more
+    # connection to the account. Nothing of the app's on it: no question.
+    idle = _window()
+    assert idle._conn_ok_test("pl1") and not idle.asked
+    # Something plays from it and the limit is not known (most accounts
+    # allow one): asked, and Cancel leaves the stream unread.
+    playing = _window(player=_Player("http://h.example.com/live/u/p/1.ts"))
+    playing.answer = 1
+    assert not playing._conn_ok_test("pl1")
+    assert len(playing.asked) == 1 and tr("conn_what_test") in playing.asked[0]
+    assert tr("conn_test_unknown") in playing.asked[0]
+    playing.answer = 0
+    assert playing._conn_ok_test("")              # the active source's, read anyway
+    # A known limit with room: on with it; a full one: asked, with who uses it.
+    roomy = _window(limit=2, player=_Player("http://h.example.com/live/u/p/1.ts"))
+    assert roomy._conn_ok_test("pl1") and not roomy.asked
+    full = _window(limit=1, player=_Player("http://h.example.com/live/u/p/1.ts"))
+    full.answer = 1
+    assert not full._conn_ok_test("pl1")
+    assert tr("conn_over", max=1, n=1) in full.asked[0] and tr("conn_k_player") in full.asked[0]
+    # What plays is another source's: this account has nothing of the app's.
+    other = _window(player=_Player("http://h.example.com/live/u/p/1.ts"))
+    assert other._conn_ok_test("pl2") and not other.asked
+
+
+def test_the_window_above_a_test_is_the_one_asked(app):
+    from PyQt6.QtWidgets import QWidget
+
+    from dopeiptv.ui.mw_connections import may_read_stream
+
+    class Top(QWidget):
+        def __init__(self, answer):
+            super().__init__()
+            self.answer, self.asked = answer, []
+
+        def _conn_ok_test(self, source_id):
+            self.asked.append(source_id)
+            return self.answer
+
+    top = Top(False)
+    inner = QWidget(QWidget(top))
+    assert may_read_stream(inner, "pl1") is False and top.asked == ["pl1"]
+    assert may_read_stream(QWidget(), "pl1") is True     # no window: a test alone
+
+
+def test_a_sources_catchup_and_rewrite_tests_ask_before_their_stream(nerd_on):
+    from PyQt6.QtWidgets import QWidget
+
+    from dopeiptv.core.nerd_check import INFO
+    from dopeiptv.core.url_rewrite import Rule, dump
+    from dopeiptv.ui.source_nerd import SourceNerdPanel
+
+    class Top(QWidget):
+        def __init__(self, answer):
+            super().__init__()
+            self.answer, self.asked = answer, []
+
+        def _conn_ok_test(self, source_id):
+            self.asked.append(source_id)
+            return self.answer
+
+    src = {"id": "pl1", "kind": "m3u", "server": "http://h.example.com/list.m3u"}
+    opts = {"rewrite": dump([Rule("/live/", "/live2/")]), "catchup_template": "?utc={utc}"}
+    no = Top(False)
+    p = SourceNerdPanel("m3u", opts, no, source=lambda: dict(src))
+    for job in (p._cu_job, p._rw_job):
+        got = job()()
+        assert (got.state, got.key) == (INFO, "ct_skip_conn")
+    assert no.asked == ["pl1", "pl1"]
+    yes = Top(True)
+    p2 = SourceNerdPanel("m3u", opts, yes, source=lambda: dict(src))
+    assert p2._cu_job().__name__ == "run" and p2._rw_job().__name__ == "run"
+
+
+def test_the_test_window_leaves_the_stream_out_when_not_wanted(nerd_on):
+    from PyQt6.QtWidgets import QWidget
+
+    from dopeiptv.providers.client import make_client
+    from dopeiptv.ui import conn_test_dialog as ctd
+    from tests.test_conn_test import Xtream
+
+    class Top(QWidget):
+        def _conn_ok_test(self, source_id):
+            return False
+
+    srv = Xtream()
+    top = Top()
+    try:
+        src = {"id": "pl1", "kind": "xtream", "server": srv.url, "username": "a", "password": "b"}
+        d = ctd.ConnTestDialog(top, src, None, make_client, speed_secs=0.3, autostart=False)
+        d.start()
+        assert _wait(lambda: d.test is not None and d.test.finished and not d._timer.isActive())
+        assert d.test.stream is False
+        assert d.rows["stream"].result.text() == tr("ct_skip_conn")
+        assert d.rows["login"].mark.text() == "✓"
+        assert not [p for p in srv.asked if p.startswith("/live/")]
+        d.done(0)
+    finally:
+        srv.close()
+
+
 def test_account_details_say_how_many_are_in_use():
     from dopeiptv.ui.mw_settings import _SettingsMixin
     text = _SettingsMixin._format_account(None, {"user_info": {

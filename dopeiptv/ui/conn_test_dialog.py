@@ -212,8 +212,14 @@ class ConnTestDialog(QDialog):
         if self.test is not None and not self.test.finished:
             return
         self.copied.hide()
+        # The stream steps take one of the account's connections: beside
+        # what plays from it, the window asks first (ui/mw_connections.py).
+        from .mw_connections import may_read_stream
+        stream = may_read_stream(self, str(self._source.get("id") or ""))
+        if sip.isdeleted(self):
+            return
         self.test = ct.ConnTest(self._source, self._make_client, self._settings,
-                                speed_secs=self._speed_secs)
+                                speed_secs=self._speed_secs, stream=stream)
         for name, row in self.rows.items():
             row.show_step(ct.Step(name))
         self._show_needs(None)

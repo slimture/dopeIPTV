@@ -195,6 +195,19 @@ def test_a_stream_that_is_refused(xtream):
     assert st["speed"].state == ct.SKIP
 
 
+def test_told_not_to_it_never_opens_the_stream(xtream):
+    # One more connection beside what plays was not wanted (the window
+    # asked): the network and the login are tested, no stream is opened.
+    srv = xtream()
+    t = ct.ConnTest(source(srv.url), make_client, None, speed_secs=0.3, stream=False)
+    t.run()
+    st = {s.name: s for s in t.snapshot()}
+    assert st["login"].state == ct.OK
+    assert (st["stream"].state, st["stream"].key) == (ct.SKIP, "ct_skip_conn")
+    assert (st["speed"].state, st["speed"].key) == (ct.SKIP, "ct_skip_conn")
+    assert not [p for p in srv.asked if p.startswith("/live/")] and t.mbps is None
+
+
 def test_nothing_listens(xtream):
     s = socket.socket()
     s.bind(("127.0.0.1", 0))

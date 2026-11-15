@@ -2694,5 +2694,8 @@
   "set_cast_keep_buffer_hint": "Pozwala cofać się na telewizorze w tym, co przechowuje bufor przewijania. Używa kolejnego połączenia z twoim dostawcą, a większość kont pozwala tylko na jedno - włącz to tylko wtedy, gdy twoje pozwala na więcej.",
   "cast_buffer_without": "Przesyłaj bez niego",
   "conn_what_cast_buffer": "Dalsze nagrywanie bufora przewijania podczas przesyłania używa kolejnego połączenia z twoim dostawcą, obok połączenia samego przesyłania.",
-  "conn_limit_unknown": "Twój dostawca nie podaje, ile połączeń dopuszcza twoje konto. Większość pozwala tylko na jedno, a wtedy dostawca może odrzucić przesyłanie albo je przerwać."
+  "conn_limit_unknown": "Twój dostawca nie podaje, ile połączeń dopuszcza twoje konto. Większość pozwala tylko na jedno, a wtedy dostawca może odrzucić przesyłanie albo je przerwać.",
+  "conn_what_test": "Ten test przez kilka sekund odczytuje kanał na żywo, co otwiera kolejne połączenie z twoim dostawcą.",
+  "conn_test_unknown": "Z tego konta już coś jest odtwarzane, a twój dostawca nie podaje, ile połączeń dopuszcza. Większość pozwala tylko na jedno, a wtedy dostawca może przerwać to, co jest odtwarzane.",
+  "ct_skip_conn": "Nie próbowano – otworzyłoby to kolejne połączenie z twoim dostawcą"
 }

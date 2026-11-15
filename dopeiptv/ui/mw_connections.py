@@ -38,6 +38,22 @@ KIND_WORDS = {"player": "conn_k_player", "buffer": "conn_k_buffer",
 TUNER_TICK_MS = 20000
 
 
+def may_read_stream(widget: Any, source_id: str = "") -> bool:
+    """From a dialog or a Settings page: may a test read a stream of
+    *source_id* (Test connection's stream and speed, a Test of a source's
+    catch-up or rewritten addresses)? The window above *widget* asks first
+    when that would be one connection too many (``_conn_ok_test``); True
+    where there is no such window."""
+    w = widget
+    while w is not None:
+        ask = getattr(w, "_conn_ok_test", None)
+        if callable(ask):
+            return bool(ask(source_id))
+        parent = getattr(w, "parentWidget", None)
+        w = parent() if callable(parent) else None
+    return True
+
+
 def _tuner_fetch(pid: str, client: Any) -> tuple[str, Any, Any]:
     """(off the window's thread) (source id, the box's state or None, why
     not) - never raises."""
@@ -291,6 +307,38 @@ class _ConnectionsMixin:
         log.info("connections: the rewind buffer beside the cast (%s) - %s",
                  f"{v.in_use} of {v.limit} in use" if v is not None else "limit unknown",
                  "kept anyway" if go else "not kept")
+        return go
+
+    def _conn_ok_test(self, source_id: str = "") -> bool:
+        """A test about to read a stream of *source_id* (the active source
+        when not given) for a moment: one more connection to the account.
+        Nothing of the app's on it and no limit known to be full: it goes
+        ahead. Else asked first - over a known limit, or with none known
+        while something plays from it (most accounts allow one, and the
+        provider may cut what plays) - never opened silently. True to read."""
+        active = self._conn_source()
+        src = str(source_id or active)
+        own, cap, v = 1, None, None
+        try:
+            self._conn_seen()
+            uses = self._conn_uses()
+            own = connections.own_count(uses, src)
+            cap = (self._conn_limit() if src == active else None) or self._conn_ledger().limit(src)
+            v = self._conn_ledger().check(src, uses, 1, limit=cap) if cap else None
+        except Exception as e:
+            log.debug("connections: the test not counted: %s", e)
+            own, cap, v = 1, None, None
+        if v is None and (cap or not own):
+            return True
+        parts = [tr("conn_what_test"),
+                 self._conn_warning(v) if v is not None else tr("conn_test_unknown")]
+        idx = self._choice_dialog(
+            tr("conn_title"), "\n\n".join(parts),
+            [(tr("conn_anyway"), "normal"), (tr("common_cancel"), "primary")])
+        go = idx == 0
+        log.info("connections: a test's stream (%s) - %s",
+                 f"{v.in_use} of {v.limit} in use" if v is not None else "limit unknown",
+                 "read anyway" if go else "not read")
         return go
 
     # -- a box's tuners (core/tuners.py) -------------------------------------------------

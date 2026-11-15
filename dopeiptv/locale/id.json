@@ -2694,5 +2694,8 @@
   "set_cast_keep_buffer_hint": "Memungkinkanmu mundur di TV dalam apa yang disimpan buffer putar mundur. Ini memakai satu koneksi lagi ke penyediamu, dan sebagian besar akun hanya mengizinkan satu - nyalakan hanya jika akunmu mengizinkan lebih.",
   "cast_buffer_without": "Kirim tanpa itu",
   "conn_what_cast_buffer": "Membiarkan buffer putar mundur terus merekam saat kamu mengirim memakai satu koneksi lagi ke penyediamu, di samping koneksi pengiriman itu sendiri.",
-  "conn_limit_unknown": "Penyediamu tidak menyebutkan berapa koneksi yang diizinkan akunmu. Sebagian besar hanya mengizinkan satu, dan penyedia lalu bisa menolak pengiriman atau memutusnya."
+  "conn_limit_unknown": "Penyediamu tidak menyebutkan berapa koneksi yang diizinkan akunmu. Sebagian besar hanya mengizinkan satu, dan penyedia lalu bisa menolak pengiriman atau memutusnya.",
+  "conn_what_test": "Tes ini membaca saluran langsung selama beberapa detik, dan itu membuka satu koneksi lagi ke penyediamu.",
+  "conn_test_unknown": "Sesuatu dari akun ini sedang diputar, dan penyediamu tidak menyebutkan berapa koneksi yang diizinkan. Sebagian besar hanya mengizinkan satu, dan penyedia lalu bisa memutus yang sedang diputar.",
+  "ct_skip_conn": "Tidak dicoba – itu akan membuka satu koneksi lagi ke penyediamu"
 }

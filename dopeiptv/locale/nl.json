@@ -2694,5 +2694,8 @@
   "set_cast_keep_buffer_hint": "Hiermee kun je op de tv teruggaan in wat de terugspoelbuffer bewaart. Dit gebruikt nog een verbinding met je provider, en de meeste accounts staan er maar één toe - zet het alleen aan als het jouwe er meer toestaat.",
   "cast_buffer_without": "Casten zonder buffer",
   "conn_what_cast_buffer": "Als de terugspoelbuffer blijft opnemen terwijl je cast, gebruikt dat nog een verbinding met je provider, naast die van het casten zelf.",
-  "conn_limit_unknown": "Je provider zegt niet hoeveel verbindingen je account toestaat. De meeste staan er maar één toe, en dan kan de provider het casten weigeren of afbreken."
+  "conn_limit_unknown": "Je provider zegt niet hoeveel verbindingen je account toestaat. De meeste staan er maar één toe, en dan kan de provider het casten weigeren of afbreken.",
+  "conn_what_test": "Deze test leest een paar seconden een live zender, en dat opent nog een verbinding met je provider.",
+  "conn_test_unknown": "Er speelt al iets van dit account, en je provider zegt niet hoeveel verbindingen het toestaat. De meeste staan er maar één toe, en dan kan de provider afbreken wat er speelt.",
+  "ct_skip_conn": "Niet geprobeerd – het zou nog een verbinding met je provider openen"
 }

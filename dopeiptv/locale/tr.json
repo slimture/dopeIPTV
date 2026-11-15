@@ -2694,5 +2694,8 @@
   "set_cast_keep_buffer_hint": "Geri sarma arabelleğinde tutulan kısım içinde TV'de geri gitmeni sağlar. Sağlayıcına bir bağlantı daha kullanır ve çoğu hesap yalnızca bir bağlantıya izin verir - yalnızca seninki daha fazlasına izin veriyorsa aç.",
   "cast_buffer_without": "Onsuz yayınla",
   "conn_what_cast_buffer": "Yayın yaparken geri sarma arabelleğinin kayda devam etmesi, yayının kendi bağlantısının yanında sağlayıcına bir bağlantı daha kullanır.",
-  "conn_limit_unknown": "Sağlayıcın hesabının kaç bağlantıya izin verdiğini söylemiyor. Çoğu yalnızca bire izin verir; o zaman sağlayıcı yayını reddedebilir veya kesebilir."
+  "conn_limit_unknown": "Sağlayıcın hesabının kaç bağlantıya izin verdiğini söylemiyor. Çoğu yalnızca bire izin verir; o zaman sağlayıcı yayını reddedebilir veya kesebilir.",
+  "conn_what_test": "Bu test birkaç saniye boyunca canlı bir kanalı okur; bu da sağlayıcına bir bağlantı daha açar.",
+  "conn_test_unknown": "Bu hesaptan zaten bir şey oynatılıyor ve sağlayıcın kaç bağlantıya izin verdiğini söylemiyor. Çoğu yalnızca bire izin verir; o zaman sağlayıcı oynatılanı kesebilir.",
+  "ct_skip_conn": "Denenmedi – sağlayıcına bir bağlantı daha açardı"
 }

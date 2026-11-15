@@ -459,7 +459,13 @@ class SourceNerdPanel(QWidget):
                                               now=now)
             return catchup.check_archive(url, ua, hdrs, n.proxy(opts, url), secrets=secrets,
                                          channel=str(ch.get("name") or ""))
-        return run
+        return run if self._may_read(src) else _not_read
+
+    def _may_read(self, src: dict) -> bool:
+        """A Test that reads a stream of *src*: asked first by the window
+        when that is one connection too many (ui/mw_connections.py)."""
+        from .mw_connections import may_read_stream
+        return may_read_stream(self, str(src.get("id") or ""))
 
     # -- address rewrite ----------------------------------------------------------
 
@@ -555,7 +561,12 @@ class SourceNerdPanel(QWidget):
                 return url_rewrite.check(rules, ch["live_url"], channel=name, secrets=secrets)
             return url_rewrite.check_address(after, ch["live_url"], ua, hdrs, n.proxy(opts, after),
                                              secrets=secrets, channel=name)
-        return run
+        return run if self._may_read(src) else _not_read
+
+
+def _not_read() -> nerd_check.Check:
+    """A Test's stream not read: one more connection was not wanted."""
+    return nerd_check.Check(nerd_check.INFO, "ct_skip_conn")
 
 
 def sample_channel(source: dict, fmt: str = "ts") -> dict | None:

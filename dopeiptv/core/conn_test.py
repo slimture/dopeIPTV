@@ -113,8 +113,11 @@ class ConnTest:
 
     def __init__(self, source: dict, make_client: Callable[[dict], Any] | None = None,
                  settings: Any = None, speed_secs: float = SPEED_SECS,
-                 profile: nerd.Nerd | None = None) -> None:
+                 profile: nerd.Nerd | None = None, stream: bool = True) -> None:
         self.source = dict(source or {})
+        # The stream and speed steps open a connection to the account: False
+        # when the window was told not to (one more beside what plays).
+        self.stream = stream
         self.kind = str(self.source.get("kind") or "xtream")
         self.opts = dict(self.source.get("options") or {}, _kind=self.kind)
         self.settings = settings
@@ -229,6 +232,10 @@ class ConnTest:
         try:
             self._login(client, url)
             self._check()
+            if not self.stream:
+                for name in ("stream", "speed"):
+                    self._set(name, SKIP, "ct_skip_conn")
+                return
             self._stream(client)
         except _Stop:
             return

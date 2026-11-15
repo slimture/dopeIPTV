@@ -2694,5 +2694,8 @@
   "set_cast_keep_buffer_hint": "Ti permette di tornare indietro sulla TV in ciò che il buffer per tornare indietro conserva. Usa un'altra connessione con il tuo provider, e la maggior parte degli account ne consente una sola: attivalo solo se il tuo ne consente di più.",
   "cast_buffer_without": "Trasmetti senza",
   "conn_what_cast_buffer": "Lasciare che il buffer per tornare indietro continui a registrare mentre trasmetti usa un'altra connessione con il tuo provider, oltre a quella della trasmissione.",
-  "conn_limit_unknown": "Il tuo provider non dice quante connessioni consente il tuo account. La maggior parte ne consente una sola, e allora il provider può rifiutare la trasmissione o interromperla."
+  "conn_limit_unknown": "Il tuo provider non dice quante connessioni consente il tuo account. La maggior parte ne consente una sola, e allora il provider può rifiutare la trasmissione o interromperla.",
+  "conn_what_test": "Questo test legge un canale in diretta per qualche secondo, e così apre un'altra connessione con il tuo provider.",
+  "conn_test_unknown": "Da questo account sta già andando qualcosa, e il tuo provider non dice quante connessioni consente. La maggior parte ne consente una sola, e allora il provider può interrompere ciò che è in riproduzione.",
+  "ct_skip_conn": "Non provato – aprirebbe un'altra connessione con il tuo provider"
 }
