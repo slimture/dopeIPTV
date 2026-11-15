@@ -6,6 +6,8 @@ readers are stand-ins (Python scripts); the command lines themselves were
 checked against a real ffmpeg with generated transport streams."""
 from __future__ import annotations
 
+import shutil
+import subprocess
 import sys
 import time
 import urllib.request
@@ -53,7 +55,7 @@ write(end=True)
 def readers(monkeypatch):
     calls = []
 
-    def args(exe, url, start=0.0, ts_offset=0.0, net=None):
+    def args(exe, url, start=0.0, ts_offset=0.0, net=None, audio=0):
         calls.append({"url": url, "start": start, "ts_offset": ts_offset,
                       "net": net})
         return [sys.executable, "-c", _READER, url, "30"]
@@ -111,6 +113,39 @@ def test_every_piece_starts_at_a_keyframe_and_carries_the_clock_on():
     assert cast_feed.progress_seconds("out_time_us=16692000") == 16.692
     assert cast_feed.progress_seconds("out_time=00:01:02.500000") == 62.5
     assert cast_feed.progress_seconds("progress=end") is None
+
+
+def test_a_piece_carries_only_the_sound_track_the_cast_plays(tmp_path):
+    """A second sound track with no packets in the probe (a silent audio
+    description) has no sample rate, and the TS muxer then writes nothing:
+    "sample rate not set", the Apple TV got no timeshift at all. The
+    readers pass on the one track chosen; the converters read it as 0."""
+    args = cast_feed.reader_args("ffmpeg", "http://p/1.ts", audio=1)
+    maps = [args[i + 1] for i, a in enumerate(args) if a == "-map"]
+    assert maps == ["0:v:0?", "0:a:1?"]
+    a = ab.ffmpeg_args("ffmpeg", ab.Plan(False, cast_feed.INPUT, live=True,
+                                         audio_track=1), feed=True)
+    assert [a[i + 1] for i, x in enumerate(a) if x == "-map"] == ["0:v:0?", "0:a:0?"]
+    c = cb.feed_args("ffmpeg", True, "/tmp/x", audio=1)
+    assert [c[i + 1] for i, x in enumerate(c) if x == "-map"] == ["0:v:0", "0:a:0"]
+    exe = shutil.which("ffmpeg")
+    if not exe:
+        return
+    src = tmp_path / "two.ts"
+    subprocess.run([exe, "-loglevel", "error", "-y",
+                    "-f", "lavfi", "-i", "testsrc=size=160x120:rate=25",
+                    "-f", "lavfi", "-i", "sine=f=440", "-f", "lavfi", "-i", "sine=f=880",
+                    "-t", "3", "-map", "0", "-map", "1", "-map", "2",
+                    "-c:v", "mpeg2video", "-c:a", "aac", str(src)],
+                   check=True, timeout=60)
+    out = subprocess.run(cast_feed.reader_args(exe, str(src), audio=1),
+                         capture_output=True, timeout=60)
+    assert out.returncode == 0 and out.stdout, out.stderr[-500:]
+    piece = tmp_path / "piece.ts"
+    piece.write_bytes(out.stdout)
+    probe = subprocess.run([exe, "-hide_banner", "-i", str(piece)],
+                           capture_output=True, text=True, timeout=60).stderr
+    assert probe.count("Audio:") == 1 and "Video:" in probe, probe
 
 
 def test_the_converter_reads_the_pieces_from_its_stdin():
@@ -223,7 +258,7 @@ def test_a_piece_that_gives_nothing_is_asked_again(monkeypatch):
     is a retry from the same moment, not the end of the cast."""
     calls = []
 
-    def args(exe, url, start=0.0, ts_offset=0.0, net=None):
+    def args(exe, url, start=0.0, ts_offset=0.0, net=None, audio=0):
         calls.append(url)
         secs = "0" if len(calls) == 1 else "30"
         return [sys.executable, "-c", _READER, url, secs]

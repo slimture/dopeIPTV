@@ -1268,7 +1268,7 @@ def test_a_cast_from_the_rewind_buffer_gives_the_apple_tv_the_bridge(
     seen = fake_ffmpeg(4, "live")
     attached = []
     monkeypatch.setattr(cast_feed.Feed, "attach",
-                        lambda self, sink, exe, net_for=None: attached.append(
+                        lambda self, sink, exe, net_for=None, audio=0: attached.append(
                             (self, net_for)))
     loop = "http://127.0.0.1:4321/tok/s/7.ts"
     feed = cast_feed.Feed(lambda m: (loop, 0.0, m - 2.0), 1000.0,

@@ -71,9 +71,14 @@ def is_loopback(url: str) -> bool:
 
 
 def reader_args(exe: str, url: str, start: float = 0.0, ts_offset: float = 0.0,
-                net: list[str] | None = None) -> list[str]:
+                net: list[str] | None = None, audio: int = 0) -> list[str]:
     """The command that copies one piece to stdout as MPEG-TS, reporting
-    how far it got on stderr (-progress: out_time_us=...)."""
+    how far it got on stderr (-progress: out_time_us=...).
+
+    Only the picture and the one sound track the cast plays (*audio*, what
+    -map 0:a:N counts): a second track with no packets in the probe (an
+    audio description that is silent for now) has no sample rate, and the
+    TS muxer then refuses to write anything at all."""
     return [
         exe, "-hide_banner", "-loglevel", "error", "-nostdin", "-nostats",
         "-progress", "pipe:2",
@@ -81,7 +86,7 @@ def reader_args(exe: str, url: str, start: float = 0.0, ts_offset: float = 0.0,
         *(net or []),
         *(["-ss", f"{start:.3f}"] if start > 0 else []),
         *KEYFRAME_INPUT, "-i", url,
-        "-map", "0:v:0?", "-map", "0:a?", "-sn", "-dn",
+        "-map", "0:v:0?", "-map", f"0:a:{max(0, int(audio))}?", "-sn", "-dn",
         "-c", "copy", *KEYFRAME_OUTPUT,
         *(["-output_ts_offset", f"{ts_offset:.3f}"] if ts_offset > 0 else []),
         "-f", "mpegts", "pipe:1",
@@ -130,6 +135,7 @@ class Feed:
         #: How far the pieces read so far reach, wall clock.
         self.reached = self.first_wall
         self.pieces = 0
+        self.audio = 0
         self.closed = False
         #: What the pieces come from, for whoever asks again from another
         #: moment (the rewind buffer's session).
@@ -144,10 +150,12 @@ class Feed:
         return self.first[0] if self.first else ""
 
     def attach(self, sink: IO[bytes], exe: str,
-               net_for: NetFor | None = None) -> None:
+               net_for: NetFor | None = None, audio: int = 0) -> None:
         """Begin writing the pieces into *sink* (a converter's stdin), on a
-        thread of its own; *sink* is closed when they run out."""
+        thread of its own; *sink* is closed when they run out. *audio*: the
+        one sound track the pieces carry (the converter reads it as 0:a:0)."""
         self.detach()
+        self.audio = audio
         if self.closed:
             raise RuntimeError("the feed was closed")
         stop = threading.Event()
@@ -258,7 +266,7 @@ class Feed:
               stop: threading.Event) -> float | None:
         """Copy one piece into *sink*: how many seconds it gave, or None
         when *sink* is gone."""
-        args = reader_args(exe, url, at, ts_offset, net)
+        args = reader_args(exe, url, at, ts_offset, net, self.audio)
         try:
             proc = subprocess.Popen(args, stdin=subprocess.DEVNULL,
                                     stdout=subprocess.PIPE,

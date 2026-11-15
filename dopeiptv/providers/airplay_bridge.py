@@ -333,7 +333,8 @@ def ffmpeg_args(exe: str, p: Plan, start: float = 0.0,
         exe, "-hide_banner", "-loglevel", "error",
         *([] if feed else ["-nostdin"]), *opts,
         "-fflags", "+genpts", "-i", src,
-        "-map", "0:v:0?", "-map", f"0:a:{p.audio_track}?", "-sn", "-dn",
+        # A feed carries only the chosen track (cast_feed.reader_args).
+        "-map", "0:v:0?", "-map", f"0:a:{0 if feed else p.audio_track}?", "-sn", "-dn",
         *video, *audio, "-max_muxing_queue_size", "1024",
         "-f", "hls", "-hls_time", str(SEGMENT_S),
         "-hls_segment_type", "fmp4", "-hls_fmp4_init_filename", "init.mp4",
@@ -557,7 +558,7 @@ class AirPlayBridge:
             raise RuntimeError(f"ffmpeg did not start ({e})") from e
         if feed is not None and self._proc.stdin is not None:
             self.feed = feed
-            feed.attach(self._proc.stdin, exe, net_for)
+            feed.attach(self._proc.stdin, exe, net_for, audio=p.audio_track)
         # Its pid beside its files: a run that crashes leaves ffmpeg pulling
         # the channel - one of the account's connections - and the next
         # start ends it (sweep_leftovers).

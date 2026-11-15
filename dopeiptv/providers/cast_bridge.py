@@ -566,7 +566,9 @@ def feed_args(exe: str, copy_video: bool, folder: str, audio: int = 0,
               quality: str = "original") -> list[str]:
     """The command for a broadcast in pieces (cast_feed.Feed on stdin):
     one HLS playlist that keeps every segment (EVENT), so the receiver
-    plays from one piece into the next and can go back within it."""
+    plays from one piece into the next and can go back within it. *audio*
+    is chosen by the feed's readers (Feed.attach), which pass on that
+    track alone - here it is always the first."""
     height, fps = QUALITY.get(quality, (0, 0))
     if height or fps:
         copy_video = False
@@ -578,7 +580,8 @@ def feed_args(exe: str, copy_video: bool, folder: str, audio: int = 0,
     return [
         exe, "-hide_banner", "-loglevel", "error",
         *cast_feed.INPUT_OPTIONS, "-fflags", "+genpts", "-i", cast_feed.INPUT,
-        "-map", "0:v:0", "-map", f"0:a:{audio}",
+        # The feed carries only the chosen track (cast_feed.reader_args).
+        "-map", "0:v:0", "-map", "0:a:0",
         *(["-vf", ",".join(chain)] if chain else []),
         *(["-r", str(fps)] if fps else []),
         "-c:v", "copy" if copy_video else video_encoder(),
@@ -1513,7 +1516,7 @@ class CastBridge:
             log.info("cast bridge: could not start ffmpeg (%s)", e)
             return None
         if feed is not None and proc.stdin is not None:
-            feed.attach(proc.stdin, exe, _input_options)
+            feed.attach(proc.stdin, exe, _input_options, audio=self.audio)
         # ffmpeg says why it failed on stderr and nowhere else. Throwing that
         # away would leave exactly the kind of silent failure this whole
         # feature exists to end, so it goes into the log (loglevel is 'error',
