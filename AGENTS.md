@@ -268,6 +268,12 @@ pop-out window), `mw_cast` (Chromecast, DLNA and Kodi: the cast
 dialog, the strip, handing over from the archive, zapping while casting -
 a live channel picked then goes to the same receiver; "Add a device by
 address…" and Settings > Casting's devices added by address), `mw_airplay` (AirPlay
+dialog, the strip, handing over from the archive, going back during a live
+cast in the rewind buffer while it holds the moment (kept recording beside
+the cast only with Settings > Casting's `cast_keep_buffer` on - a second
+connection, asked first over a full or unknown limit; never to a DLNA TV or
+a Kodi), else in the archive, zapping while casting -
+a live channel picked then goes to the same receiver), `mw_airplay` (AirPlay
 to an Apple TV on macOS: the receiver added, its own endings, its window
 from the strip), `mw_donate` (the
 sidebar heart, About's link, Home's card), `mw_failover` (failover to another

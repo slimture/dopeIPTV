@@ -62,6 +62,9 @@ has two profiles or more.
 **Casting** (`casting`) - AirPlay's rows join it, and Chromecast, DLNA and
 Kodi rows belong here
 - Chromecast: `cast_pause_gb`
+- (untitled): keep the rewind buffer while casting (`cast_keep_buffer`, off
+  by default - one more connection to the provider; asked first over a full
+  or unknown limit)
 - Devices added by address: the Chromecasts and TVs added in the cast
   window ("Add a device by address…", `cast_added_devices`) and the Kodis
   added by hand (`kodi_devices`), each with Remove (adding is in the cast

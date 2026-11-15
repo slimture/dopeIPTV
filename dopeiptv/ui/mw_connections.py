@@ -263,6 +263,36 @@ class _ConnectionsMixin:
             return True
         return self._conn_ask(v, "conn_what_cast" if v is not None else "tuner_what", t)
 
+    def _conn_ok_cast_buffer(self, url: str = "") -> bool:
+        """The rewind buffer kept recording beside a cast of *url* (Settings >
+        Casting's switch asks for it): one more connection to the provider
+        next to the cast's. Within a known limit with room for both it goes
+        ahead; over a known limit, or with none known - most accounts allow
+        one - it is asked first, never opened silently. True to keep it."""
+        src, cap, v = self._conn_source(), None, None
+        try:
+            self._conn_seen()
+            cap = self._conn_limit() or self._conn_ledger().limit(src)
+            if cap:
+                uses = [u for u in self._conn_uses(free_player=True) if u.kind != "cast"]
+                uses.append(Use("cast", src, url))
+                v = self._conn_ledger().check(src, uses, 1, limit=cap)
+        except Exception as e:
+            log.debug("connections: the buffer beside the cast not counted: %s", e)
+            cap, v = None, None
+        if cap and v is None:
+            return True
+        parts = [tr("conn_what_cast_buffer"),
+                 self._conn_warning(v) if v is not None else tr("conn_limit_unknown")]
+        idx = self._choice_dialog(
+            tr("conn_title"), "\n\n".join(parts),
+            [(tr("conn_anyway"), "normal"), (tr("cast_buffer_without"), "primary")])
+        go = idx == 0
+        log.info("connections: the rewind buffer beside the cast (%s) - %s",
+                 f"{v.in_use} of {v.limit} in use" if v is not None else "limit unknown",
+                 "kept anyway" if go else "not kept")
+        return go
+
     # -- a box's tuners (core/tuners.py) -------------------------------------------------
 
     def _tuner_cache(self) -> tuners.StateCache:

@@ -2689,5 +2689,10 @@
   "nerd_src_streamdev_hint": "Lango la HTTP la streamdev-server kwenye VDR: chaneli na rekodi zinacheza kutoka hapo.",
   "nerd_src_dvb_port_hint": "Lango la utiririshaji la seva ya midia (HTTP/UPnP), 7522 isipobadilishwa.",
   "nerd_src_fav_groups": "Vipendwa vyake kama vikundi",
-  "nerd_src_radio_channels": "Chaneli za redio"
+  "nerd_src_radio_channels": "Chaneli za redio",
+  "set_cast_keep_buffer": "Hifadhi bafa ya kurudisha nyuma wakati wa kutuma",
+  "set_cast_keep_buffer_hint": "Inakuruhusu kurudi nyuma kwenye TV ndani ya kile bafa ya kurudisha nyuma inachohifadhi. Inatumia muunganisho mmoja zaidi kwa mtoa huduma wako, na akaunti nyingi huruhusu mmoja tu - iwashe tu ikiwa yako inaruhusu zaidi.",
+  "cast_buffer_without": "Tuma bila hiyo",
+  "conn_what_cast_buffer": "Kuacha bafa ya kurudisha nyuma ikiendelea kurekodi wakati unatuma kunatumia muunganisho mmoja zaidi kwa mtoa huduma wako, kando na ule wa kutuma wenyewe.",
+  "conn_limit_unknown": "Mtoa huduma wako hasemi akaunti yako inaruhusu miunganisho mingapi. Nyingi huruhusu mmoja tu, na hapo mtoa huduma anaweza kukataa utumaji au kuukata."
 }

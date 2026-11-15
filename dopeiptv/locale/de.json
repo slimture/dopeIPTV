@@ -2689,5 +2689,10 @@
   "nerd_src_streamdev_hint": "HTTP-Port von streamdev-server auf dem VDR: Von dort laufen Sender und Aufnahmen.",
   "nerd_src_dvb_port_hint": "Der Streaming-Port des Media Servers (HTTP/UPnP), 7522, sofern nicht geändert.",
   "nerd_src_fav_groups": "Seine Favoriten als Gruppen",
-  "nerd_src_radio_channels": "Radiosender"
+  "nerd_src_radio_channels": "Radiosender",
+  "set_cast_keep_buffer": "Rückspulpuffer beim Streamen behalten",
+  "set_cast_keep_buffer_hint": "Damit kannst du auf dem Fernseher in dem zurückgehen, was der Rückspulpuffer enthält. Das braucht eine weitere Verbindung zu deinem Anbieter, und die meisten Konten erlauben nur eine - schalte es nur ein, wenn deines mehr erlaubt.",
+  "cast_buffer_without": "Ohne ihn streamen",
+  "conn_what_cast_buffer": "Wenn der Rückspulpuffer beim Streamen weiter aufnimmt, braucht er eine weitere Verbindung zu deinem Anbieter, zusätzlich zu der des Streams.",
+  "conn_limit_unknown": "Dein Anbieter sagt nicht, wie viele Verbindungen dein Konto erlaubt. Die meisten erlauben nur eine, und dann kann der Anbieter den Stream ablehnen oder unterbrechen."
 }

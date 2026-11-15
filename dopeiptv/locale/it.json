@@ -2689,5 +2689,10 @@
   "nerd_src_streamdev_hint": "La porta HTTP di streamdev-server sul VDR: canali e registrazioni partono da lì.",
   "nerd_src_dvb_port_hint": "La porta di streaming del media server (HTTP/UPnP), 7522 se non è stata cambiata.",
   "nerd_src_fav_groups": "I suoi preferiti come gruppi",
-  "nerd_src_radio_channels": "Canali radio"
+  "nerd_src_radio_channels": "Canali radio",
+  "set_cast_keep_buffer": "Mantieni il buffer per tornare indietro durante la trasmissione",
+  "set_cast_keep_buffer_hint": "Ti permette di tornare indietro sulla TV in ciò che il buffer per tornare indietro conserva. Usa un'altra connessione con il tuo provider, e la maggior parte degli account ne consente una sola: attivalo solo se il tuo ne consente di più.",
+  "cast_buffer_without": "Trasmetti senza",
+  "conn_what_cast_buffer": "Lasciare che il buffer per tornare indietro continui a registrare mentre trasmetti usa un'altra connessione con il tuo provider, oltre a quella della trasmissione.",
+  "conn_limit_unknown": "Il tuo provider non dice quante connessioni consente il tuo account. La maggior parte ne consente una sola, e allora il provider può rifiutare la trasmissione o interromperla."
 }

@@ -2689,5 +2689,10 @@
   "nerd_src_streamdev_hint": "Port HTTP streamdev-server di VDR: saluran dan rekaman diputar dari sana.",
   "nerd_src_dvb_port_hint": "Port streaming server media (HTTP/UPnP), 7522 kecuali diubah.",
   "nerd_src_fav_groups": "Favoritnya sebagai grup",
-  "nerd_src_radio_channels": "Saluran radio"
+  "nerd_src_radio_channels": "Saluran radio",
+  "set_cast_keep_buffer": "Pertahankan buffer putar mundur saat mengirim",
+  "set_cast_keep_buffer_hint": "Memungkinkanmu mundur di TV dalam apa yang disimpan buffer putar mundur. Ini memakai satu koneksi lagi ke penyediamu, dan sebagian besar akun hanya mengizinkan satu - nyalakan hanya jika akunmu mengizinkan lebih.",
+  "cast_buffer_without": "Kirim tanpa itu",
+  "conn_what_cast_buffer": "Membiarkan buffer putar mundur terus merekam saat kamu mengirim memakai satu koneksi lagi ke penyediamu, di samping koneksi pengiriman itu sendiri.",
+  "conn_limit_unknown": "Penyediamu tidak menyebutkan berapa koneksi yang diizinkan akunmu. Sebagian besar hanya mengizinkan satu, dan penyedia lalu bisa menolak pengiriman atau memutusnya."
 }

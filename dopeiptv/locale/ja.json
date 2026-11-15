@@ -2689,5 +2689,10 @@
   "nerd_src_streamdev_hint": "VDR 上の streamdev-server の HTTP ポート。チャンネルと録画はここから再生されます。",
   "nerd_src_dvb_port_hint": "メディアサーバーのストリーミングポート（HTTP/UPnP）。変更していなければ 7522。",
   "nerd_src_fav_groups": "お気に入りをグループとして",
-  "nerd_src_radio_channels": "ラジオチャンネル"
+  "nerd_src_radio_channels": "ラジオチャンネル",
+  "set_cast_keep_buffer": "キャスト中も巻き戻しバッファーを保持",
+  "set_cast_keep_buffer_hint": "巻き戻しバッファーにある範囲で、テレビ側でも巻き戻せます。プロバイダーへの接続をもう 1 つ使います。ほとんどのアカウントは 1 つしか許可していないので、複数許可されている場合だけオンにしてください。",
+  "cast_buffer_without": "保持せずにキャスト",
+  "conn_what_cast_buffer": "キャスト中も巻き戻しバッファーの記録を続けると、キャスト自体の接続に加えて、プロバイダーへの接続をもう 1 つ使います。",
+  "conn_limit_unknown": "プロバイダーは、このアカウントでいくつの接続が許可されているかを示していません。ほとんどは 1 つだけで、その場合プロバイダーがキャストを拒否したり切断したりすることがあります。"
 }

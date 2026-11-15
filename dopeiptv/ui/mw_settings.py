@@ -1268,6 +1268,12 @@ class _SettingsMixin:
         # -- Casting: its own page, beside Playback (it was a card there) -----
         c = casting.card(tr("set_card_cast"))
         c.row(tr("cast_pause_label"), cast_pause_box, tr("cast_pause_hint"))
+        # Off unless asked for: it is a second connection to the provider,
+        # and nearly every account allows one.
+        c = casting.card()
+        cast_buffer_box = c.toggle(
+            tr("set_cast_keep_buffer"), is_on("cast_keep_buffer", "false"),
+            tr("set_cast_keep_buffer_hint"))
         self._cast_added_card(casting.card(tr("set_card_cast_added")), nerd_link)
         if not self.player:
             c = play.card()
@@ -2638,6 +2644,7 @@ class _SettingsMixin:
                     put(skey, box.value())
             if cast_pause_box.value() != cast_pause_mb:
                 put("cast_pause_gb", f"{cast_pause_box.value() / 1000:g}")
+            put("cast_keep_buffer", flag(cast_buffer_box))
             put("metadata_source", meta_source_box.currentData())
             put("tmdb_api_key", tmdb_key_edit.text().strip())
             put("mv_frameless",

@@ -53,8 +53,8 @@ class DvrSession:
         self._lock = threading.Lock()
         self.connections = 0
         # Who else reads it while it is not watched here: a cast fed from
-        # the buffer (providers/cast_feed.py) keeps it streaming, as a
-        # recording does.
+        # the buffer (providers/cast_feed.py), or a live cast that may go
+        # back in it, keeps it streaming, as a recording does.
         self._holds: set[str] = set()
         self.ingest.start()
 

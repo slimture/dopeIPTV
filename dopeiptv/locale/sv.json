@@ -2689,5 +2689,10 @@
   "nerd_src_streamdev_hint": "streamdev-servers HTTP-port på VDR:en: kanalerna och inspelningarna spelas därifrån.",
   "nerd_src_dvb_port_hint": "Mediaserverns streamingport (HTTP/UPnP), 7522 om den inte ändrats.",
   "nerd_src_fav_groups": "Dess favoriter som grupper",
-  "nerd_src_radio_channels": "Radiokanaler"
+  "nerd_src_radio_channels": "Radiokanaler",
+  "set_cast_keep_buffer": "Behåll bakåtspolningsbufferten när du castar",
+  "set_cast_keep_buffer_hint": "Låter dig gå tillbaka på tv:n i det bakåtspolningsbufferten håller. Det använder ytterligare en anslutning till din leverantör, och de flesta konton tillåter bara en - slå bara på det om ditt tillåter fler.",
+  "cast_buffer_without": "Casta utan den",
+  "conn_what_cast_buffer": "Att låta bakåtspolningsbufferten spela in medan du castar använder ytterligare en anslutning till din leverantör, utöver castens egen.",
+  "conn_limit_unknown": "Din leverantör säger inte hur många anslutningar ditt konto tillåter. De flesta tillåter bara en, och då kan leverantören neka casten eller bryta den."
 }

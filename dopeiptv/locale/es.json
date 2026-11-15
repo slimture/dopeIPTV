@@ -2689,5 +2689,10 @@
   "nerd_src_streamdev_hint": "El puerto HTTP de streamdev-server en el VDR: desde ahí se reproducen los canales y las grabaciones.",
   "nerd_src_dvb_port_hint": "El puerto de streaming del servidor multimedia (HTTP/UPnP), 7522 si no se ha cambiado.",
   "nerd_src_fav_groups": "Sus favoritos como grupos",
-  "nerd_src_radio_channels": "Canales de radio"
+  "nerd_src_radio_channels": "Canales de radio",
+  "set_cast_keep_buffer": "Mantener el búfer para retroceder al enviar",
+  "set_cast_keep_buffer_hint": "Te permite retroceder en la TV en lo que guarda el búfer para retroceder. Usa una conexión más con tu proveedor, y la mayoría de las cuentas solo permiten una: actívalo solo si la tuya permite más.",
+  "cast_buffer_without": "Enviar sin él",
+  "conn_what_cast_buffer": "Mantener el búfer para retroceder grabando mientras envías usa una conexión más con tu proveedor, además de la del propio envío.",
+  "conn_limit_unknown": "Tu proveedor no dice cuántas conexiones permite tu cuenta. La mayoría solo permite una, y entonces el proveedor puede rechazar el envío o cortarlo."
 }

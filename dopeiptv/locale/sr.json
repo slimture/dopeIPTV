@@ -2689,5 +2689,10 @@
   "nerd_src_streamdev_hint": "HTTP port streamdev-servera na VDR-u: odatle se puštaju kanali i snimci.",
   "nerd_src_dvb_port_hint": "Port za striming medijskog servera (HTTP/UPnP), 7522 ako nije promenjen.",
   "nerd_src_fav_groups": "Njegovi omiljeni kao grupe",
-  "nerd_src_radio_channels": "Radio kanali"
+  "nerd_src_radio_channels": "Radio kanali",
+  "set_cast_keep_buffer": "Zadrži bafer za premotavanje tokom prebacivanja",
+  "set_cast_keep_buffer_hint": "Omogućava ti da se na televizoru vratiš unazad u okviru onoga što bafer za premotavanje čuva. Koristi još jednu vezu ka tvom provajderu, a većina naloga dozvoljava samo jednu - uključi ga samo ako tvoj dozvoljava više.",
+  "cast_buffer_without": "Prebaci bez njega",
+  "conn_what_cast_buffer": "Ako bafer za premotavanje nastavi da snima dok prebacuješ, koristi još jednu vezu ka tvom provajderu, pored one samog prebacivanja.",
+  "conn_limit_unknown": "Tvoj provajder ne kaže koliko veza tvoj nalog dozvoljava. Većina dozvoljava samo jednu, a tada provajder može da odbije prebacivanje ili da ga prekine."
 }

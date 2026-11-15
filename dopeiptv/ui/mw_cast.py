@@ -24,6 +24,16 @@ reads them here into one converter run, so the TV plays one growing
 playlist (_cast_from_moment) and a move within what is written is a seek
 there, not a new stream. The buffer's loopback address never leaves this
 computer.
+
+Going back during a live cast (the strip's timeshift menu, its timeline):
+a moment the rewind buffer still holds comes out of it, earlier ones out of
+the provider's archive where the channel has one. By default the buffer is
+kept only while a feed reads it (a cast started behind live) - it is then
+the cast's one connection. Kept recording beside a live cast is a second
+connection, so only with Settings > Casting's "Keep the rewind buffer while
+casting" on, and asked first over a full or unknown limit. Only a receiver
+fed through a converter here can take the buffer - a DLNA TV or a Kodi gets
+the archive alone.
 """
 from __future__ import annotations
 
@@ -144,7 +154,14 @@ class _CastMixin:
         # the cast reads it) - the player stops before the cast starts.
         if not getattr(self, "_cast_device", None):
             self._cast_drop_feed()
+        self._cast_release_buffer()
         feed = self._cast_buffer_feed(it) if live else None
+        # Asked for in Settings > Casting: the buffer goes on recording while
+        # the TV plays live, so the strip can go back in it - held before the
+        # player stops (which would freeze it). A second connection, so
+        # never by itself.
+        buffer, hold = (self._cast_keep_buffer(it, feed, source) if live
+                        else (None, None))
         self._cast_ctx = {
             "sid": it.get("stream_id") if live else None,
             # Not a portal's: it is asked for by programme, which only the
@@ -166,30 +183,45 @@ class _CastMixin:
             "feed": feed,
             "archive_from": (datetime.fromtimestamp(feed.first_wall)
                              if feed is not None else None),
+            "buffer": buffer,
+            "buffer_hold": hold,
         }
         CastDialog(self, url, title, self._local_codecs(),
                    self._local_audio_index(), start,
                    self._local_tracks(it),
                    probe=not self._busy_elsewhere(it), source=source,
                    live=self._play_kind_for(it) == "live").exec()
-        if feed is not None and not getattr(self, "_cast_device", None):
-            self._cast_drop_feed(ending=True)   # nothing was cast from it
+        if not getattr(self, "_cast_device", None):
+            if feed is not None:
+                self._cast_drop_feed(ending=True)   # nothing was cast from it
+            self._cast_release_buffer()
 
     # How far behind live the player has to be for a cast to come from the
-    # rewind buffer rather than from the provider's own stream.
+    # rewind buffer rather than from the provider's own stream - and how
+    # close to live a moment picked on the strip is live.
     CAST_BUFFER_BEHIND_S = 10.0
+    # The strip's steps back that are shorter than the archive's
+    # (TIMESHIFT_STEPS), in seconds: what a rewind buffer of minutes holds.
+    CAST_BUFFER_STEPS = (10, 30, 60, 300, 900)
+
+    def _playing_buffer(self, it):
+        """The player's rewind buffer when *it* is the channel it plays from
+        it, streaming; else None."""
+        p = getattr(self, "player", None)
+        session = getattr(p, "_dvr", None)
+        if (session is None or not getattr(session, "streaming", False)
+                or self._playing_key is None
+                or self._item_key(it) != self._playing_key):
+            return None
+        return session
 
     def _cast_buffer_feed(self, it) -> "cast_feed.Feed | None":
         """The rewind buffer from where the player is, as a cast's pieces -
         when *it* is the channel playing from the buffer, behind live. The
         session is held streaming until the feed is closed."""
-        p = getattr(self, "player", None)
-        session = getattr(p, "_dvr", None)
-        wall_now = getattr(p, "_dvr_wall_now", None)
-        if (session is None or not callable(wall_now)
-                or not getattr(session, "streaming", False)
-                or self._playing_key is None
-                or self._item_key(it) != self._playing_key):
+        session = self._playing_buffer(it)
+        wall_now = getattr(getattr(self, "player", None), "_dvr_wall_now", None)
+        if session is None or not callable(wall_now):
             return None
         try:
             wall = wall_now()
@@ -199,8 +231,114 @@ class _CastMixin:
             return None
         return self._buffer_feed(session, wall)
 
+    def _cast_hold_name(self, what: str, session) -> str:
+        """A name of its own for each hold on a buffer: two with one name
+        would be let go together."""
+        n = self._cast_hold_n = getattr(self, "_cast_hold_n", 0) + 1
+        return f"{what}:{id(session)}:{n}"
+
+    def _cast_keeps_buffer(self) -> bool:
+        """Settings > Casting: keep the rewind buffer while casting - off
+        unless asked for, as it is a second connection to the provider."""
+        settings = getattr(self, "settings", None)
+        try:
+            return settings is not None and str(
+                settings.value("cast_keep_buffer", "false")) == "true"
+        except Exception:
+            return False
+
+    def _cast_keep_buffer(self, it, feed=None, url: str = "") -> tuple:
+        """(session, hold): the rewind buffer of *it* - the channel the player
+        plays from its buffer, or the one *feed* reads - held streaming for
+        a live cast of *url*, so the strip can go back in it while the TV
+        plays live. Only with Settings > Casting's switch on: it is one more
+        connection to the provider next to the cast's, and over a full or
+        unknown limit the person is asked first. (None, None) when not kept -
+        it freezes as the player stops (a feed holds it only while it reads
+        it), so no second connection is ever opened by itself."""
+        session = feed.source if feed is not None else self._playing_buffer(it)
+        if (session is None or not getattr(session, "streaming", False)
+                or not self._cast_keeps_buffer()):
+            return None, None
+        ask = getattr(self, "_conn_ok_cast_buffer", None)
+        if not callable(ask) or not ask(url):
+            log.info("cast: the rewind buffer is not kept beside the cast")
+            return None, None
+        who = self._cast_hold_name("cast-live", session)
+        try:
+            session.hold(who)
+        except Exception as e:
+            log.debug("cast: the rewind buffer could not be held: %s", e)
+            return None, None
+        log.info("cast: the rewind buffer goes on recording beside the cast")
+        return session, who
+
+    def _cast_release_buffer(self, ctx: dict | None = None) -> None:
+        """The rewind buffer kept for a live cast let go: it freezes, unless
+        the player, a recording or a feed still reads it."""
+        if ctx is None:
+            ctx = getattr(self, "_cast_ctx", None) or {}
+        session, who = ctx.pop("buffer", None), ctx.pop("buffer_hold", None)
+        if session is None or not who:
+            return
+        log.info("cast: the rewind buffer kept for the cast is let go")
+        try:
+            session.let_go(who)
+        except Exception as e:
+            log.debug("cast: letting the rewind buffer go: %s", e)
+
+    def _cast_buffer(self):
+        """The rewind buffer of the channel on the TV, while it streams and
+        the receiver is fed through a converter here: the session a running
+        feed reads, else the one kept for the cast. None for a DLNA TV or a
+        Kodi - its address is this computer's loopback."""
+        device = getattr(self, "_cast_device", None)
+        if (not device or not self._cast_takes_feed(device)
+                or not self._cast_converts()):
+            return None
+        feed = self._cast_feed()
+        session = getattr(feed, "source", None) if feed is not None else None
+        if session is None:
+            session = (getattr(self, "_cast_ctx", None) or {}).get("buffer")
+        if (session is None or getattr(session, "closed", True)
+                or not getattr(session, "streaming", False)):
+            return None
+        return session
+
+    def _cast_converts(self) -> bool:
+        """The running cast's receiver has a converter here (ffmpeg found),
+        the only way the rewind buffer's pieces reach a TV."""
+        bridge = getattr(getattr(self, "cast", None), "bridge", None)
+        available = getattr(bridge, "available", None)
+        try:
+            return not callable(available) or bool(available())
+        except Exception:
+            return False
+
+    def _cast_buffer_span(self) -> tuple[float, float] | None:
+        """What the cast's rewind buffer holds, (oldest, newest) wall-clock
+        seconds - or None when there is none to go back in."""
+        session = self._cast_buffer()
+        if session is None:
+            return None
+        try:
+            span = session.span()
+        except Exception:
+            return None
+        if not span or span[1] - span[0] < 1.0:
+            return None
+        return float(span[0]), float(span[1])
+
+    def _cast_can_go_back(self) -> bool:
+        """The live channel on the TV can be wound back: it has an archive,
+        or its rewind buffer holds some of it."""
+        ctx = getattr(self, "_cast_ctx", None) or {}
+        if ctx.get("archive"):
+            return True
+        return ctx.get("sid") is not None and self._cast_buffer_span() is not None
+
     def _buffer_feed(self, session, wall: float) -> "cast_feed.Feed | None":
-        who = f"cast:{id(session)}:{wall:.0f}"
+        who = self._cast_hold_name("cast", session)
         last: list[int | None] = [None]
 
         def url_at(moment: float):
@@ -571,6 +709,7 @@ class _CastMixin:
         if old.get("sid") is not None and old.get("item"):
             self._prev_live_item = old["item"]
         self._cast_drop_feed()
+        self._cast_release_buffer()         # the last channel's buffer
         self._cast_ctx = {
             "sid": sid,
             "archive": bool(item.get("tv_archive")
@@ -617,6 +756,7 @@ class _CastMixin:
         if old.get("sid") is not None and old.get("item"):
             self._prev_live_item = old["item"]
         self._cast_drop_feed()
+        self._cast_release_buffer()
         rkind = self._CAST_RESUME_KIND.get(kind)
         start = self._resume_offset(key, kind, item)
         audio, subs = self._cast_title_tracks(kind, key, device)
@@ -809,10 +949,17 @@ class _CastMixin:
             self._cast_zap_gen += 1
             self._cast_hooks_end()
             self._cast_drop_feed(ending=True)
-        elif ctx.get("feed") is not None and not self._cast_takes_feed(device):
-            # A TV or a Kodi took the address as it is: no pieces read here.
-            self._cast_drop_feed(ending=True)
-            ctx["archive_from"] = None
+            self._cast_release_buffer()
+        elif not self._cast_takes_feed(device):
+            # A TV or a Kodi took the address as it is: no pieces read here,
+            # and the rewind buffer (this computer's loopback) is no use to it.
+            if ctx.get("feed") is not None:
+                self._cast_drop_feed(ending=True)
+                ctx["archive_from"] = None
+            self._cast_release_buffer(ctx)
+        elif ctx.get("buffer") is not None and not self._cast_converts():
+            # No ffmpeg here: the buffer kept beside the cast cannot reach it.
+            self._cast_release_buffer(ctx)
         self._cast_key = ctx.get("key") if device else None
         self._cast_group = ctx.get("group") if device else None
         if self._cast_group is None and device:
@@ -836,7 +983,7 @@ class _CastMixin:
         # worse than no button.
         self.cast_bar_pause.setVisible(
             bool(device) and (not ctx.get("sid") or self.cast.bridged()))
-        self.cast_bar_ts.setVisible(bool(device) and bool(ctx.get("archive")))
+        self.cast_bar_ts.setVisible(bool(device) and self._cast_can_go_back())
         airplay_btn = getattr(self, "cast_bar_airplay", None)
         if airplay_btn is not None:
             airplay_btn.setVisible(bool(device) and self._cast_on_airplay())
@@ -972,10 +1119,17 @@ class _CastMixin:
             # one that would cast an empty address.
             log.info("cast: no address recorded for the running cast")
             return
-        CastDialog(self, ctx.get("url") or "", ctx.get("title") or "",
+        url, source = ctx.get("url") or "", ctx.get("source")
+        if cast_feed.is_loopback(url) or cast_feed.is_loopback(source or ""):
+            # A cast out of the rewind buffer: its pieces are the feed's, and
+            # another device picked here is given the channel's own address,
+            # never this computer's loopback one.
+            url = ctx.get("row_url") or url
+            source = ctx.get("row_source") or url
+        CastDialog(self, url, ctx.get("title") or "",
                    self._local_codecs(), 0, self.cast.position(),
                    ctx.get("tracks") or {}, probe=False,
-                   source=ctx.get("source"), managing=True,
+                   source=source, managing=True,
                    chosen=(ctx.get("audio"), ctx.get("subs")),
                    live=ctx.get("kind") == "live").exec()
 
@@ -1145,45 +1299,90 @@ class _CastMixin:
             self.cast_bar_tracks.rect().bottomLeft()))
 
     def _cast_timeshift_menu(self) -> None:
-        """The archive, for what is playing on the TV.
+        """The archive and the rewind buffer, for what is playing on the TV.
 
         The player's own timeshift menu, pointed at the receiver instead of at
         mpv: go back to live, start the programme that is on from its
         beginning, browse what has been, or simply wind back a while. The
-        archive does not care who is watching it.
+        archive does not care who is watching it, and the buffer is read
+        here and fed to the TV.
         """
-        ctx = self._cast_ctx or {}
-        it = ctx.get("item")
-        if not ctx.get("archive") or not it:
+        entries = self._cast_timeshift_entries()
+        if not entries:
             return
         m = QMenu(self)
-        m.addAction(tr("ts_go_live"), self._cast_go_live)
-        m.addSeparator()
+        for entry in entries:
+            if entry is None:
+                m.addSeparator()
+                continue
+            text, act = entry
+            if act is None:
+                m.addAction(text).setEnabled(False)
+            else:
+                m.addAction(text, act)
+        m.exec(self.cast_bar_ts.mapToGlobal(
+            self.cast_bar_ts.rect().bottomLeft()))
+
+    def _cast_timeshift_entries(self) -> list:
+        """The timeshift menu's entries: (text, what it does) - None for a
+        separator, and no action for a line that only says something.
+
+        Go back to live; with an archive, the programme on from its start
+        and the past programmes; then the steps back from where the picture
+        is, as far as the buffer or the archive reaches."""
+        ctx = self._cast_ctx or {}
+        it = ctx.get("item")
+        if not it or not self._cast_can_go_back():
+            return []
+        archive = bool(ctx.get("archive"))
+        out: list = [(tr("ts_go_live"), self._cast_go_live), None]
         # Where the picture is now, so a step back is a step back from THERE
         # and not from live - winding back twice has to go twice as far.
         at = self._cast_moment()
-        prog = self.xmltv.current_programme(it)
-        if prog:
-            m.addAction(
-                tr("ts_watch_from_start_named", title=prog["title"]),
-                lambda: self._cast_to_moment(
-                    datetime.fromtimestamp(prog["start_timestamp"])))
-        m.addAction(tr("ts_browse_past"),
-                    lambda: self._open_catchup_dialog(
-                        it, on_pick=lambda p: self._cast_to_moment(
-                            datetime.fromtimestamp(p["start_timestamp"]))))
-        m.addSeparator()
-        eff_min = self._effective_ts_minutes(it)
-        for mins, dur_key in self.TIMESHIFT_STEPS:
-            if mins > eff_min:
-                break
-            m.addAction(tr("ts_go_back", t=tr(dur_key)),
-                        lambda mins=mins: self._cast_to_moment(
-                            at - timedelta(minutes=mins)))
-        note = m.addAction(tr("ts_archive_depth", n=self._timeshift_days(it)))
-        note.setEnabled(False)
-        m.exec(self.cast_bar_ts.mapToGlobal(
-            self.cast_bar_ts.rect().bottomLeft()))
+        if archive:
+            prog = self.xmltv.current_programme(it)
+            if prog:
+                out.append((
+                    tr("ts_watch_from_start_named", title=prog["title"]),
+                    lambda: self._cast_to_moment(
+                        datetime.fromtimestamp(prog["start_timestamp"]))))
+            out.append((tr("ts_browse_past"),
+                        lambda: self._open_catchup_dialog(
+                            it, on_pick=lambda p: self._cast_to_moment(
+                                datetime.fromtimestamp(p["start_timestamp"])))))
+            out.append(None)
+        for secs, label in self._cast_back_steps(at):
+            out.append((tr("ts_go_back", t=label),
+                        lambda secs=secs: self._cast_to_moment(
+                            at - timedelta(seconds=secs))))
+        if archive:
+            out.append((tr("ts_archive_depth", n=self._timeshift_days(it)),
+                        None))
+        return out
+
+    def _cast_back_steps(self, at: datetime) -> list[tuple[int, str]]:
+        """The steps back from *at* the cast can go, (seconds, how long it
+        says): the buffer's short ones and the archive's, each only where the
+        moment it lands on is held - in the rewind buffer, or in the archive
+        (its depth, and never the minutes it is still writing)."""
+        ctx = self._cast_ctx or {}
+        span = self._cast_buffer_span()
+        archive = bool(ctx.get("archive"))
+        eff_min = (self._effective_ts_minutes(ctx.get("item") or {})
+                   if archive else 0)
+        newest = datetime.now() - self.ARCHIVE_LAG
+        steps = [(s, tr("health_secs", s=s) if s < 60
+                  else tr("opt_minutes", n=s // 60))
+                 for s in self.CAST_BUFFER_STEPS]
+        steps += [(mins * 60, tr(key)) for mins, key in self.TIMESHIFT_STEPS]
+        out = []
+        for secs, label in steps:
+            to = at - timedelta(seconds=secs)
+            in_buffer = span is not None and to.timestamp() >= span[0]
+            in_archive = archive and secs <= eff_min * 60 and to <= newest
+            if in_buffer or in_archive:
+                out.append((secs, label))
+        return out
 
     def _cast_moment(self):
         """The broadcast moment the TV is showing.
@@ -1203,14 +1402,27 @@ class _CastMixin:
         return datetime.now() - timedelta(seconds=behind)
 
     def _cast_to_moment(self, when) -> None:
-        """Point the cast at *when*, within what the archive actually holds."""
+        """Point the cast at *when*: out of the rewind buffer while it holds
+        that moment, else within what the archive actually holds."""
         ctx = self._cast_ctx or {}
         it = ctx.get("item") or {}
         now = datetime.now()
-        floor = now - timedelta(minutes=self._effective_ts_minutes(it))
-        # A minute inside the live edge: the archive is written as it goes and
-        # the newest minute is not there yet.
-        when = max(floor, min(when, now - timedelta(minutes=1)))
+        span = self._cast_buffer_span()
+        if span is not None and when.timestamp() >= span[0]:
+            if (now - when).total_seconds() < self.CAST_BUFFER_BEHIND_S:
+                # Next to the live edge is live.
+                if ctx.get("archive_from") is not None:
+                    self._cast_go_live()
+                return
+        elif ctx.get("archive"):
+            floor = now - timedelta(minutes=self._effective_ts_minutes(it))
+            # A minute inside the live edge: the archive is written as it
+            # goes and the newest minute is not there yet.
+            when = max(floor, min(when, now - timedelta(minutes=1)))
+        elif span is not None:
+            when = datetime.fromtimestamp(span[0])  # as far as the buffer goes
+        else:
+            return
         self._cast_paused_at = None
         self.cast_bar_pause.setIcon(cast_strip_icon("pause", P["text"]))
         feed = self._cast_feed()
@@ -1232,6 +1444,12 @@ class _CastMixin:
         if not device or not url:
             return
         log.info("cast: back to the live edge")
+        # The rewind buffer was all the cast had of the provider (not kept
+        # beside it): its feed ends first, and the provider is given a
+        # moment, before the TV asks for the channel - never two at once.
+        feed = self._cast_feed()
+        settle = bool(feed is not None and feed.source is not None
+                      and ctx.get("buffer") is None and self.cast.bridged())
         self._cast_drop_feed()
         ctx.update(url=url, source=ctx.get("row_source") or url,
                    archive_from=None)
@@ -1242,6 +1460,7 @@ class _CastMixin:
         run_async(
             self.pool,
             lambda: self.cast.cast(device, url, title, self._local_codecs(),
+                                   settle=settle,
                                    source=ctx.get("row_source") or url,
                                    quality=self._cast_quality(),
                                    height=ctx.get("height") or 0,
@@ -1353,6 +1572,11 @@ class _CastMixin:
             return
         if self._cast_ended_there():
             return
+        ts = getattr(self, "cast_bar_ts", None)
+        if ts is not None:
+            # The rewind buffer can come and go while the cast runs (the
+            # pool lets one go for space), and the menu goes with it.
+            ts.setVisible(bool(self._cast_device) and self._cast_can_go_back())
         span = self._cast_timeline()
         dur = float(getattr(self.cast, "duration", 0.0) or 0.0)
         # A broadcast the converter is recording can be held even with no
@@ -1407,19 +1631,29 @@ class _CastMixin:
 
     def _cast_timeline(self) -> tuple[float, float] | None:
         """The stretch of broadcast the bar spans, as (start, span) seconds -
-        or None when what is playing is not a broadcast."""
+        or None when what is playing is not a broadcast: the archive's depth
+        and what the rewind buffer holds, whichever reaches further back."""
         ctx = self._cast_ctx or {}
-        if not ctx.get("archive") or not self._cast_device:
-            return None
-        try:
-            depth = self._effective_ts_minutes(ctx.get("item") or {}) or 0
-        except Exception:
-            return None
-        depth = min(depth, self.CAST_TIMELINE_MIN)
-        if depth <= 0:
+        if not getattr(self, "_cast_device", None):
             return None
         now = time.time()
-        return now - depth * 60, depth * 60.0
+        widths = []
+        if ctx.get("archive"):
+            try:
+                depth = self._effective_ts_minutes(ctx.get("item") or {}) or 0
+            except Exception:
+                depth = 0
+            depth = min(depth, self.CAST_TIMELINE_MIN)
+            if depth > 0:
+                widths.append(depth * 60.0)
+        held = (self._cast_buffer_span() if ctx.get("sid") is not None
+                else None)
+        if held is not None:
+            widths.append(min(now - held[0], self.CAST_TIMELINE_MIN * 60.0))
+        width = max(widths, default=0.0)
+        if width < 1.0:
+            return None
+        return now - width, width
 
     def _cast_time_at(self, frac: float) -> str:
         """What is at *frac* of the way along the bar.
@@ -1641,14 +1875,12 @@ class _CastMixin:
         threading.Thread(target=self.cast.pause, daemon=True).start()
 
     def _cast_from_moment(self, when) -> None:
-        """Cast this channel from *when*: out of the rewind buffer while
-        the cast reads it and it still holds that moment, else out of the
-        provider's archive."""
+        """Cast this channel from *when*: out of the rewind buffer - the one
+        a feed reads, or the one kept for the cast - while it still holds
+        that moment, else out of the provider's archive."""
         ctx, device = self._cast_ctx or {}, self._cast_device
-        feed = self._cast_feed()
-        session = feed.source if feed is not None else None
-        span = session.span() if session is not None and \
-            getattr(session, "streaming", False) else None
+        session = self._cast_buffer()
+        span = self._cast_buffer_span() if session is not None else None
         if span is not None and device and span[0] <= when.timestamp():
             new = self._buffer_feed(session, when.timestamp())
             if new is not None:
@@ -1656,10 +1888,19 @@ class _CastMixin:
                 return
         if ctx.get("archive"):
             self._cast_from_archive(when)
+        else:
+            log.info("cast: nothing holds %s - neither the rewind buffer nor "
+                     "an archive", when.strftime("%H:%M:%S"))
 
     def _cast_send_feed(self, feed) -> None:
         """Cast the running channel from *feed*'s pieces, as one stream."""
         ctx, device = self._cast_ctx or {}, self._cast_device
+        if not device or not self._cast_takes_feed(device):
+            # A TV or a Kodi plays an address as it is: the first piece's
+            # (the rewind buffer's loopback one) is never handed to it.
+            log.info("cast: %s cannot be fed in pieces", device)
+            threading.Thread(target=feed.close, daemon=True).start()
+            return
         # The one on the TV now plays on until this one replaces it - the
         # bridge closes it then.
         ctx.update(url=feed.first_url or ctx.get("url"),

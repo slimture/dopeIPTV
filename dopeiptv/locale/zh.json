@@ -2689,5 +2689,10 @@
   "nerd_src_streamdev_hint": "VDR 上 streamdev-server 的 HTTP 端口：频道和录像从这里播放。",
   "nerd_src_dvb_port_hint": "媒体服务器的串流端口（HTTP/UPnP），未更改则为 7522。",
   "nerd_src_fav_groups": "将其收藏作为分组",
-  "nerd_src_radio_channels": "广播频道"
+  "nerd_src_radio_channels": "广播频道",
+  "set_cast_keep_buffer": "投放时保留回退缓冲",
+  "set_cast_keep_buffer_hint": "让你在电视上回退到回退缓冲保存的内容。这会多占用一个到服务商的连接，而大多数账户只允许一个 - 只有在你的账户允许更多时才开启。",
+  "cast_buffer_without": "不保留，直接投放",
+  "conn_what_cast_buffer": "投放时让回退缓冲继续录制，会在投放本身的连接之外，再占用一个到服务商的连接。",
+  "conn_limit_unknown": "你的服务商没有说明账户允许多少个连接。大多数只允许一个，此时服务商可能拒绝或中断投放。"
 }

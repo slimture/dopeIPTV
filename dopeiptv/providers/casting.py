@@ -23,6 +23,7 @@ from ..core import home_net
 from ..core.log import log
 from ..i18n import LocalizedError
 from . import cast_devices
+from .cast_feed import is_loopback
 from .chromecast import ChromecastManager, _host_of
 from .dlna import DlnaManager
 from .kodi import KodiDevice, KodiManager
@@ -311,8 +312,19 @@ class CastHub:
         self._current = mgr
         if not getattr(mgr, "TAKES_FEED", False):
             # A TV or a Kodi plays an address as it is: the pieces of an
-            # archive or the rewind buffer are a converter's to read.
-            kwargs.pop("feed", None)
+            # archive or the rewind buffer are a converter's to read - and
+            # the buffer's own address is this computer's, which no TV
+            # reaches.
+            feed = kwargs.pop("feed", None)
+            # source: a keyword, or the seventh after the title (the
+            # managers' order: codecs, audio, subs, start, duration,
+            # settle, source, ...).
+            source = kwargs.get("source", args[6] if len(args) > 6 else None)
+            if feed is not None and (
+                    is_loopback(url) or is_loopback(str(source or ""))):
+                log.info("cast: %s cannot be fed the rewind buffer - its "
+                         "address is this computer's", device_name)
+                raise LocalizedError("cast_err_no_address")
         return mgr.cast(device_name, url, title, *args, **kwargs)
 
     def waiting_for_route(self) -> bool:

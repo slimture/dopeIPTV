@@ -2689,5 +2689,10 @@
   "nerd_src_streamdev_hint": "VDR에 있는 streamdev-server의 HTTP 포트입니다. 채널과 녹화물이 여기서 재생됩니다.",
   "nerd_src_dvb_port_hint": "미디어 서버의 스트리밍 포트(HTTP/UPnP)입니다. 바꾸지 않았다면 7522입니다.",
   "nerd_src_fav_groups": "즐겨찾기를 그룹으로",
-  "nerd_src_radio_channels": "라디오 채널"
+  "nerd_src_radio_channels": "라디오 채널",
+  "set_cast_keep_buffer": "전송 중에도 되감기 버퍼 유지",
+  "set_cast_keep_buffer_hint": "되감기 버퍼에 담긴 만큼 TV에서도 되돌아갈 수 있습니다. 제공자와의 연결을 하나 더 사용하며, 대부분의 계정은 하나만 허용합니다. 계정이 더 많이 허용하는 경우에만 켜세요.",
+  "cast_buffer_without": "버퍼 없이 전송",
+  "conn_what_cast_buffer": "전송하는 동안 되감기 버퍼가 계속 기록하면, 전송 자체의 연결 외에 제공자와의 연결을 하나 더 사용합니다.",
+  "conn_limit_unknown": "제공자가 계정에서 허용하는 연결 수를 알려 주지 않습니다. 대부분은 하나만 허용하며, 그 경우 제공자가 전송을 거부하거나 끊을 수 있습니다."
 }

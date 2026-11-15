@@ -2689,5 +2689,10 @@
   "nerd_src_streamdev_hint": "VDR üzerindeki streamdev-server'ın HTTP portu: kanallar ve kayıtlar oradan oynatılır.",
   "nerd_src_dvb_port_hint": "Medya sunucusunun yayın portu (HTTP/UPnP), değiştirilmediyse 7522.",
   "nerd_src_fav_groups": "Favorileri grup olarak",
-  "nerd_src_radio_channels": "Radyo kanalları"
+  "nerd_src_radio_channels": "Radyo kanalları",
+  "set_cast_keep_buffer": "Yayın sırasında geri sarma arabelleğini tut",
+  "set_cast_keep_buffer_hint": "Geri sarma arabelleğinde tutulan kısım içinde TV'de geri gitmeni sağlar. Sağlayıcına bir bağlantı daha kullanır ve çoğu hesap yalnızca bir bağlantıya izin verir - yalnızca seninki daha fazlasına izin veriyorsa aç.",
+  "cast_buffer_without": "Onsuz yayınla",
+  "conn_what_cast_buffer": "Yayın yaparken geri sarma arabelleğinin kayda devam etmesi, yayının kendi bağlantısının yanında sağlayıcına bir bağlantı daha kullanır.",
+  "conn_limit_unknown": "Sağlayıcın hesabının kaç bağlantıya izin verdiğini söylemiyor. Çoğu yalnızca bire izin verir; o zaman sağlayıcı yayını reddedebilir veya kesebilir."
 }

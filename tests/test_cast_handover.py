@@ -50,7 +50,12 @@ _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_cast_hooks_end", "_cast_on_airplay", "_show_cast_label",
             "_cast_drop_feed", "_cast_takes_feed", "_cast_title_ended",
             "_cast_feed", "_cast_written", "_cast_from_moment",
-            "_cast_send_feed", "_archive_feed", "_buffer_feed")
+            "_cast_send_feed", "_archive_feed", "_buffer_feed",
+            "_cast_buffer", "_cast_buffer_span", "_cast_can_go_back",
+            "_cast_release_buffer", "_cast_keep_buffer", "_playing_buffer",
+            "_cast_hold_name", "_cast_buffer_feed", "_cast_back_steps",
+            "_cast_timeshift_entries", "_open_cast_dialog", "_cast_converts",
+            "_cast_keeps_buffer")
 
 
 class _Resume0:
@@ -86,6 +91,7 @@ def _window():
     ns.update({name: getattr(MainWindow, name)
                for name in ("ARCHIVE_LAG", "TIMESHIFT_STEPS",
                             "CAST_TIMELINE_MIN", "_cast_zap_gen",
+                            "CAST_BUFFER_BEHIND_S", "CAST_BUFFER_STEPS",
                             "_cast_hooked",
                             "_CAST_RESUME_KIND", "_RESUME_GROUP")})
     cls = type("_StubWindow", (), ns)
@@ -2477,3 +2483,394 @@ def test_moving_within_what_the_playlist_holds_is_a_seek_on_the_tv(monkeypatch):
     w._cast_from_moment = lambda when: called.append(when)
     w._cast_to_moment(began + timedelta(minutes=40))
     assert called and len(w.cast.seeks) == 1
+
+
+# -- going back in the rewind buffer during a live cast ---------------------------
+
+
+class _Seg:
+    def __init__(self, seq, t0):
+        self.seq, self.t0 = seq, t0
+
+
+class _BufferSession:
+    """A DvrSession stand-in: a segment every two seconds over the last
+    *held* seconds, its holds and its loopback server's addresses."""
+
+    def __init__(self, held):
+        now = time.time()
+        self.t0, self.t1 = now - held, now
+        self.holds, self.let_gone = set(), []
+        self.closed, self.streaming = False, True
+
+    def span(self):
+        return (self.t0, self.t1) if self.t1 > self.t0 else None
+
+    def segment_at(self, t):
+        n = int((max(self.t0, min(t, self.t1)) - self.t0) // 2)
+        return _Seg(n, self.t0 + 2 * n)
+
+    def next_run_after(self, t, seq=None):
+        return None
+
+    def url_for(self, seg):
+        return f"http://127.0.0.1:4321/tok/s/{seg.seq}.ts"
+
+    def hold(self, who):
+        self.holds.add(who)
+
+    def let_go(self, who):
+        self.holds.discard(who)
+        self.let_gone.append(who)
+
+    @property
+    def held(self):
+        return bool(self.holds)
+
+
+class _Hub(_FeedCast):
+    """The cast as the window sees it: a Chromecast fed through the
+    converter here (*feeds*), or a DLNA TV that is not."""
+
+    def __init__(self, feeds=True, written=0.0):
+        super().__init__(0.0, written)
+        self.feeds, self.sent = feeds, []
+
+    def takes_feed(self, _name):
+        return self.feeds
+
+    def plays_as_is(self, _name):
+        return not self.feeds
+
+    def cast(self, device, url, title, *a, **kw):
+        self.sent.append((url, kw))
+        return device
+
+
+class _Guide(_Xmltv):
+    def current_programme(self, _it):
+        return None
+
+
+def _buffer_cast(monkeypatch, held=120.0, archive=False, feeds=True, kept=True):
+    import dopeiptv.ui.mw_cast as mwmod
+    w = _with_strip()
+    w.pool, w.player = None, None
+    w.settings = _Settings()
+    w.xmltv = _Guide()
+    w._local_codecs = lambda: []
+    w._effective_ts_minutes = lambda it: 2880 if archive else 0
+    w._timeshift_days = lambda it: 2
+    w._open_catchup_dialog = lambda it, on_pick=None: None
+    w._cast_device = "Alva TV"
+    w.cast = _Hub(feeds=feeds)
+    session = _BufferSession(held)
+    w._cast_ctx = {"sid": 7, "archive": archive, "title": "SVT1",
+                   "item": {"stream_id": 7}, "key": 7, "kind": "live",
+                   "row_url": "http://p/live/u/pw/7.m3u8",
+                   "row_source": "http://p/live/u/pw/7.ts",
+                   "url": "http://p/live/u/pw/7.m3u8",
+                   "source": "http://p/live/u/pw/7.ts"}
+    if kept:
+        session.hold("cast-live:1")
+        w._cast_ctx.update(buffer=session, buffer_hold="cast-live:1")
+    monkeypatch.setattr(mwmod, "run_async",
+                        lambda pool, work, ok, err: work())
+    return w, session
+
+
+def _entry(w, text):
+    return next(act for t, act in (e for e in w._cast_timeshift_entries() if e)
+                if t == text)
+
+
+def _back(n=None, s=None):
+    from dopeiptv.i18n import tr
+    return tr("ts_go_back", t=tr("health_secs", s=s) if s is not None
+              else tr("opt_minutes", n=n))
+
+
+def _wait_until(cond, timeout=5.0):
+    end = time.monotonic() + timeout
+    while not cond() and time.monotonic() < end:
+        time.sleep(0.02)
+    return cond()
+
+
+def test_a_cast_channel_without_an_archive_goes_back_in_the_rewind_buffer(monkeypatch):
+    """No archive, but the buffer of the channel the player was watching
+    goes on recording beside the cast: the strip's menu and its timeline
+    offer what it holds, and no further."""
+    from dopeiptv.i18n import tr
+    w, session = _buffer_cast(monkeypatch, held=120.0)
+    assert w._cast_can_go_back()
+    texts = [e[0] for e in w._cast_timeshift_entries() if e is not None]
+    assert texts == [tr("ts_go_live"), _back(s=10), _back(s=30), _back(n=1)]
+    # Nothing of the archive's: no programme list, no depth.
+    assert tr("ts_browse_past") not in texts
+    # A buffer of twenty minutes: its short steps, not the archive's 30 min.
+    session.t0 = time.time() - 20 * 60
+    assert [s for s, _ in w._cast_back_steps(w._cast_moment())] == [
+        10, 30, 60, 300, 900]
+    # The strip: the menu's button, and a timeline as long as the buffer.
+    w._show_cast_progress()
+    assert w.cast_bar_ts.visible and w.cast_bar_seek.shown is True
+    start, width = w._cast_timeline()
+    assert abs(start - session.t0) < 2 and abs(width - 20 * 60) < 2
+    # No ffmpeg here: no converter to feed the TV the buffer's pieces.
+    w.cast.bridge.available = lambda: False
+    assert not w._cast_can_go_back() and w._cast_timeline() is None
+    del w.cast.bridge.available
+    # A DLNA TV plays an address as it is - the buffer's is this
+    # computer's loopback one: nothing of the buffer is offered.
+    w.cast = _Hub(feeds=False)
+    assert w._cast_timeshift_entries() == [] and not w._cast_can_go_back()
+    w._show_cast_progress()
+    assert not w.cast_bar_ts.visible
+
+
+def test_a_step_the_buffer_holds_feeds_the_tv_from_it(monkeypatch):
+    from datetime import datetime
+    w, session = _buffer_cast(monkeypatch, held=120.0)
+    before = time.time()
+    _entry(w, _back(s=30))()
+    feed = w._cast_ctx["feed"]
+    try:
+        assert feed.kind == "rewind buffer" and feed.source is session
+        # From the segment holding that moment (a segment every 2 s).
+        assert before - 33 <= feed.first_wall <= before - 29
+        assert w._cast_ctx["archive_from"] == datetime.fromtimestamp(
+            feed.first_wall)
+        # The converter reads the pieces; the TV gets its playlist.
+        url, kw = w.cast.sent[-1]
+        assert kw["feed"] is feed and kw["dvr"] is True
+        # Held while the feed reads it, beside the cast's own hold.
+        assert len(session.holds) == 2 and "cast-live:1" in session.holds
+    finally:
+        feed.close()
+    assert session.holds == {"cast-live:1"}, "the feed's hold went with it"
+
+
+def test_a_step_beyond_the_buffer_goes_to_the_archive(monkeypatch):
+    """With an archive too: what the buffer holds comes out of it, what is
+    earlier out of the archive - and the archive alone never offers the
+    minutes it is still writing."""
+    from dopeiptv.i18n import tr
+    w, session = _buffer_cast(monkeypatch, held=120.0, archive=True)
+    archived = []
+    w._cast_from_archive = lambda at: archived.append(at)
+    steps = [s for s, _ in w._cast_back_steps(w._cast_moment())]
+    assert steps[:6] == [10, 30, 60, 300, 900, 1800] and 2880 * 60 in steps
+    texts = [e[0] for e in w._cast_timeshift_entries() if e is not None]
+    assert tr("ts_browse_past") in texts
+    assert tr("ts_archive_depth", n=2) in texts
+    _entry(w, _back(n=5))()
+    assert len(archived) == 1 and not w._cast_ctx.get("feed")
+    assert abs(archived[0].timestamp() - (time.time() - 300)) < 5
+    _entry(w, _back(s=30))()
+    feed = w._cast_ctx["feed"]
+    assert feed.kind == "rewind buffer" and len(archived) == 1
+    feed.close()
+    # The archive alone, at live: from five minutes back, never the newest
+    # minute - and a minute back from 30 s behind is 90 s, which it holds.
+    w._cast_ctx.pop("buffer")
+    w._cast_ctx.update(feed=None, archive_from=None)
+    assert [s for s, _ in w._cast_back_steps(w._cast_moment())][:2] == [300, 900]
+    w._cast_behind = 30.0
+    assert [s for s, _ in w._cast_back_steps(w._cast_moment())][:2] == [60, 300]
+
+
+def test_the_timeline_seeks_within_the_buffer_feed_and_back_to_live_ends_it(
+        monkeypatch):
+    from datetime import datetime, timedelta
+    w, session = _buffer_cast(monkeypatch, held=300.0)
+    w._cast_to_moment(datetime.now() - timedelta(seconds=120))
+    feed = w._cast_ctx["feed"]
+    sent = len(w.cast.sent)
+    # Within what the converter has written: the TV moves there itself.
+    w.cast.bridge.written = lambda: 60.0
+    w._cast_to_moment(datetime.fromtimestamp(feed.first_wall + 20))
+    assert _wait_until(lambda: w.cast.seeks)
+    assert w.cast.seeks == [pytest.approx(20.0, abs=1)]
+    assert len(w.cast.sent) == sent and w._cast_ctx["feed"] is feed
+    # Dragged to the live end: that is live - the feed ends, and the TV is
+    # given the channel's own address again.
+    w._cast_to_moment(datetime.now() - timedelta(seconds=2))
+    url, kw = w.cast.sent[-1]
+    assert url == "http://p/live/u/pw/7.m3u8" and "feed" not in kw
+    assert kw["source"] == "http://p/live/u/pw/7.ts"
+    assert kw["settle"] is False, "the buffer kept beside it goes on"
+    assert w._cast_ctx["archive_from"] is None and "feed" not in w._cast_ctx
+    assert _wait_until(lambda: feed.closed)
+    assert session.holds == {"cast-live:1"}
+    assert w._cast_can_go_back(), "still recording, still offered"
+
+
+def test_back_to_live_lets_a_buffer_with_no_room_beside_the_cast_go_first(
+        monkeypatch):
+    """No room for the buffer beside the cast (it was the cast's only
+    connection to the provider): its feed ends before the TV asks for the
+    channel, and the provider is given a moment."""
+    from datetime import datetime, timedelta
+    w, session = _buffer_cast(monkeypatch, held=300.0, kept=False)
+    assert not w._cast_can_go_back()        # nothing reads it: not offered
+    feed = w._buffer_feed(session, time.time() - 60)
+    w._cast_send_feed(feed)
+    assert w._cast_can_go_back() and session.held
+    w._cast_to_moment(datetime.now() - timedelta(seconds=90))
+    assert w._cast_ctx["feed"] is not feed
+    assert w._cast_ctx["feed"].source is session
+    feed.close()
+    w._cast_go_live()
+    assert w.cast.sent[-1][1]["settle"] is True
+    assert _wait_until(lambda: not session.holds), "let go once the feed ends"
+
+
+def test_the_rewind_buffer_is_kept_for_a_live_cast_only_when_asked_for(monkeypatch):
+    """Kept recording beside a live cast is a second connection to the
+    provider, and nearly every account allows one: by default the buffer
+    is never held for it (it freezes as the player stops). With Settings >
+    Casting's switch on it is held before the cast dialog stops the player
+    - once the connections check says yes (asked over a full or unknown
+    limit, a No kept to) - and let go when the cast ends, goes to a DLNA TV,
+    or never starts."""
+    import dopeiptv.ui.mw_cast as mwmod
+    w = _with_strip()
+    w.settings = _Settings()
+    session = _BufferSession(60.0)
+    w.player = types.SimpleNamespace(_dvr=session, _dvr_wall_now=time.time,
+                                     current_url="http://p/live/u/pw/7.ts",
+                                     isVisible=lambda: False)
+    w._playing_key = 7
+    w._item_key = lambda it: it.get("stream_id")
+    w._stream_for = lambda it: ("http://p/live/u/pw/7.ts", "SVT1")
+    w.client = types.SimpleNamespace(
+        live_url=lambda sid, fmt: f"http://p/live/u/pw/{sid}.{fmt}")
+    w._vpn_guard_blocks = lambda url: False
+    w._cast_pin_ok = lambda *u: True
+    w._conn_ok_cast = lambda url: True
+    w._play_kind_for = lambda it: "live"
+    w._local_codecs = lambda: []
+    w._local_audio_index = lambda: 0
+    w._local_tracks = lambda it: {}
+    w._busy_elsewhere = lambda it: False
+    w._record_cast_history = lambda: None
+    w._show_cast_volume = lambda: None
+    w._show_cast_progress = lambda: None
+    w._cast_began = lambda ctx: None
+    w._cast_device = None
+    room, seen, device = [True], {}, [None]
+
+    class Dialog:
+        def __init__(self, win, url, title, *a, **k):
+            seen.update(url=url, source=k.get("source"))
+
+        def exec(self):
+            seen["held"] = set(session.holds)
+            if device[0]:
+                w.show_cast_strip(device[0], "SVT1")
+
+    monkeypatch.setattr(mwmod, "CastDialog", Dialog)
+    checked = []
+    w._conn_ok_cast_buffer = lambda url: (checked.append(url), room[0])[1]
+    channel = {"stream_id": 7, "name": "SVT1", "_kind": "live"}
+
+    # Off, as it is unless asked for: never held beside the cast, nothing
+    # even asked - not for the dialog, not for a cast to a Chromecast.
+    w.cast = _Hub(feeds=True)
+    w.cast.active = None
+    device[0] = "Alva TV"
+    w._open_cast_dialog(channel)
+    assert seen["held"] == set() and not session.holds and not checked
+    assert w._cast_ctx["buffer"] is None and not session.let_gone
+    assert not w._cast_can_go_back(), "a frozen buffer is not offered"
+    w.show_cast_strip(None)
+    w.cast = _Cast(active=False)
+    device[0] = None
+
+    w.settings.setValue("cast_keep_buffer", "true")
+    # Closed without a cast: held for the dialog, let go after it.
+    w._open_cast_dialog(channel)
+    assert checked == ["http://p/live/u/pw/7.ts"]
+    assert len(seen["held"]) == 1 and not session.holds
+    assert len(seen["held"]) == 1 and not session.holds
+    assert not seen["url"].startswith("http://127.")
+    # Cast to a Chromecast: held for as long as the cast runs.
+    w.cast = _Hub(feeds=True)
+    w.cast.active = None                    # nothing on it yet
+    device[0] = "Alva TV"
+    w._open_cast_dialog(channel)
+    assert len(session.holds) == 1 and w._cast_ctx["buffer"] is session
+    w.show_cast_strip(None)
+    assert not session.holds and "buffer" not in w._cast_ctx
+    # A DLNA TV: nothing here reads the buffer for it.
+    w.cast = _Hub(feeds=False)
+    w.cast.active = None
+    w._cast_device = None
+    device[0] = "Den (DLNA)"
+    w._open_cast_dialog(channel)
+    assert len(seen["held"]) == 1 and not session.holds
+    # Asked (a full or unknown limit) and told No: not kept at all.
+    w.show_cast_strip(None)
+    gone = len(session.let_gone)
+    room[0] = False
+    device[0] = None
+    w._open_cast_dialog(channel)
+    assert seen["held"] == set() and len(session.let_gone) == gone
+    assert len(checked) == 4
+
+
+def test_no_receiver_is_handed_the_rewind_buffer_s_loopback_address(monkeypatch):
+    from dopeiptv.i18n import LocalizedError
+    from dopeiptv.providers.casting import CastHub
+
+    class Mgr:
+        TAKES_FEED = False
+        active = None
+
+        def __init__(self, names):
+            self.names, self.calls = names, []
+
+        def knows(self, name):
+            return name in self.names
+
+        def cast(self, *a, **kw):
+            self.calls.append((a, kw))
+            return a[0]
+
+    class Fed(Mgr):
+        TAKES_FEED = True
+
+    cc, dlna, kodi = Fed(set()), Mgr({"Den (DLNA)"}), Mgr({"Hall (Kodi)"})
+    hub = CastHub(chromecast=cc, dlna=dlna, kodi=kodi)
+    feed = types.SimpleNamespace(kind="rewind buffer")
+    loop = "http://127.0.0.1:4321/tok/s/7.ts"
+    for name, mgr in (("Den (DLNA)", dlna), ("Hall (Kodi)", kodi)):
+        with pytest.raises(LocalizedError):
+            hub.cast(name, loop, "SVT1", source=loop, feed=feed)
+        with pytest.raises(LocalizedError):
+            hub.cast(name, "http://p/live/u/pw/7.m3u8", "SVT1", [], None,
+                     None, 0.0, 0.0, False, loop, feed=feed)
+        assert mgr.calls == []
+    # The channel's own address goes to a TV, without the pieces.
+    hub.cast("Den (DLNA)", "http://p/live/u/pw/7.m3u8", "SVT1",
+             source="http://p/live/u/pw/7.ts", feed=feed)
+    assert "feed" not in dlna.calls[-1][1]
+    # A Chromecast's converter here reads the pieces.
+    hub.cast("Alva TV", loop, "SVT1", feed=feed)
+    assert cc.calls[-1][1]["feed"] is feed
+    # The window never feeds a TV, and its panel never offers it the
+    # buffer's address for another device.
+    w, session = _buffer_cast(monkeypatch, feeds=False)
+    piece = w._buffer_feed(session, time.time() - 30)
+    w._cast_send_feed(piece)
+    assert w.cast.sent == [] and _wait_until(lambda: piece.closed)
+    import dopeiptv.ui.mw_cast as mwmod
+    shown = {}
+    monkeypatch.setattr(mwmod, "CastDialog", lambda win, url, *a, **k: (
+        shown.update(url=url, source=k.get("source")),
+        types.SimpleNamespace(exec=lambda: None))[1])
+    w._cast_ctx.update(url=loop, source=loop)
+    w.manage_cast()
+    assert shown == {"url": "http://p/live/u/pw/7.m3u8",
+                     "source": "http://p/live/u/pw/7.ts"}

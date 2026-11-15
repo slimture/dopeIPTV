@@ -1050,6 +1050,13 @@ _STRINGS: dict[str, dict[str, str]] = {
               "have already watched is deleted as it goes, so an evening in "
               "front of the TV costs nothing; only the pause itself takes "
               "room, and all of it is gone when the cast ends."},
+    "set_cast_keep_buffer": {"en": "Keep the rewind buffer while casting"},
+    "set_cast_keep_buffer_hint": {
+        "en": "Lets you go back on the TV in what the rewind buffer holds. "
+              "It uses one more connection to your provider, and most "
+              "accounts allow only one - turn it on only if yours allows "
+              "more."},
+    "cast_buffer_without": {"en": "Cast without it"},
     "cast_track_note": {
         "en": "Choosing a track converts the stream on this computer."},
 
@@ -2242,6 +2249,8 @@ _STRINGS: dict[str, dict[str, str]] = {
     "conn_what_multiview": {"en": "Playing this in multiview opens another connection to your provider."},
     "conn_k_cast": {"en": "cast to a TV"},
     "conn_what_cast": {"en": "Casting this opens another connection to your provider."},
+    "conn_what_cast_buffer": {"en": "Keeping the rewind buffer recording while you cast uses one more connection to your provider, next to the cast's own."},
+    "conn_limit_unknown": {"en": "Your provider does not say how many connections your account allows. Most allow only one, and then the provider may refuse the cast or cut it."},
     # -- an Enigma2 box's tuners (the transponder check) and In use now --
     "tuner_title": {"en": "The box's tuners"},
     "tuner_what": {"en": "This channel is not on a transponder the box tunes now, so it needs a tuner of its own."},

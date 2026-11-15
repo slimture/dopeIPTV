@@ -119,6 +119,33 @@ def test_a_cast_over_the_limit_is_asked_about_and_said_by_whom():
     assert tr("conn_k_cast") in w2.asked[-1]
 
 
+def test_the_rewind_buffer_beside_a_cast_is_asked_about_unless_there_is_room():
+    # The buffer kept recording beside a live cast (Settings > Casting) is a
+    # connection of its own next to the TV's: within a known limit with room
+    # it goes ahead; over one, or with none known, it is asked first and a
+    # No is kept to - never opened silently.
+    cast = "http://h.example.com/live/u/p/1.ts"
+    w = _counting(player=_Player(cast, _Dvr()))
+    assert not w._conn_ok_cast_buffer(cast)              # unknown: asked, No
+    assert tr("conn_what_cast_buffer") in w.asked[-1]
+    assert tr("conn_limit_unknown") in w.asked[-1]
+    w.answer = 0                                          # Go ahead anyway
+    assert w._conn_ok_cast_buffer(cast)
+    w.asked.clear()
+    w.answer = 1
+    w.client.max_connections = 1                          # the TV takes the one
+    assert not w._conn_ok_cast_buffer(cast)
+    assert tr("conn_over", max=1, n=1) in w.asked[-1]
+    assert tr("conn_k_cast") in w.asked[-1]
+    w.asked.clear()
+    w.client.max_connections = 2            # the player's own one handed over
+    assert w._conn_ok_cast_buffer(cast) and not w.asked
+    w.rec.jobs.append({"status": "recording", "source": "pl1",
+                       "url": "http://h.example.com/live/u/p/9.ts"})
+    assert not w._conn_ok_cast_buffer(cast) and len(w.asked) == 1
+    assert tr("conn_k_recording") in w.asked[-1]
+
+
 # -- Watch together through a failover -----------------------------------------------
 
 def test_watch_together_stays_on_the_channel_through_a_failover():

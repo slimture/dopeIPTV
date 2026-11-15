@@ -2689,5 +2689,10 @@
   "nerd_src_streamdev_hint": "De HTTP-poort van streamdev-server op de VDR: daarvandaan spelen zenders en opnames.",
   "nerd_src_dvb_port_hint": "De streamingpoort van de mediaserver (HTTP/UPnP), 7522 tenzij gewijzigd.",
   "nerd_src_fav_groups": "Zijn favorieten als groepen",
-  "nerd_src_radio_channels": "Radiozenders"
+  "nerd_src_radio_channels": "Radiozenders",
+  "set_cast_keep_buffer": "Terugspoelbuffer bewaren tijdens het casten",
+  "set_cast_keep_buffer_hint": "Hiermee kun je op de tv teruggaan in wat de terugspoelbuffer bewaart. Dit gebruikt nog een verbinding met je provider, en de meeste accounts staan er maar één toe - zet het alleen aan als het jouwe er meer toestaat.",
+  "cast_buffer_without": "Casten zonder buffer",
+  "conn_what_cast_buffer": "Als de terugspoelbuffer blijft opnemen terwijl je cast, gebruikt dat nog een verbinding met je provider, naast die van het casten zelf.",
+  "conn_limit_unknown": "Je provider zegt niet hoeveel verbindingen je account toestaat. De meeste staan er maar één toe, en dan kan de provider het casten weigeren of afbreken."
 }

@@ -2689,5 +2689,10 @@
   "nerd_src_streamdev_hint": "Cổng HTTP của streamdev-server trên VDR: kênh và bản ghi phát từ đó.",
   "nerd_src_dvb_port_hint": "Cổng phát luồng của máy chủ đa phương tiện (HTTP/UPnP), 7522 nếu chưa đổi.",
   "nerd_src_fav_groups": "Mục yêu thích của nó thành nhóm",
-  "nerd_src_radio_channels": "Kênh radio"
+  "nerd_src_radio_channels": "Kênh radio",
+  "set_cast_keep_buffer": "Giữ bộ đệm tua lại khi truyền",
+  "set_cast_keep_buffer_hint": "Cho phép bạn lùi lại trên TV trong phạm vi bộ đệm tua lại đang giữ. Việc này dùng thêm một kết nối tới nhà cung cấp, và hầu hết tài khoản chỉ cho phép một - chỉ bật khi tài khoản của bạn cho phép nhiều hơn.",
+  "cast_buffer_without": "Truyền mà không giữ",
+  "conn_what_cast_buffer": "Để bộ đệm tua lại tiếp tục ghi trong khi truyền sẽ dùng thêm một kết nối tới nhà cung cấp, bên cạnh kết nối của chính việc truyền.",
+  "conn_limit_unknown": "Nhà cung cấp không cho biết tài khoản của bạn được phép bao nhiêu kết nối. Hầu hết chỉ cho phép một, và khi đó nhà cung cấp có thể từ chối hoặc cắt việc truyền."
 }

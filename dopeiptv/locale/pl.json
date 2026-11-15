@@ -2689,5 +2689,10 @@
   "nerd_src_streamdev_hint": "Port HTTP streamdev-server na VDR: stamtąd odtwarzane są kanały i nagrania.",
   "nerd_src_dvb_port_hint": "Port strumieniowania serwera multimediów (HTTP/UPnP), 7522, jeśli nie był zmieniany.",
   "nerd_src_fav_groups": "Jego ulubione jako grupy",
-  "nerd_src_radio_channels": "Kanały radiowe"
+  "nerd_src_radio_channels": "Kanały radiowe",
+  "set_cast_keep_buffer": "Zachowuj bufor przewijania podczas przesyłania",
+  "set_cast_keep_buffer_hint": "Pozwala cofać się na telewizorze w tym, co przechowuje bufor przewijania. Używa kolejnego połączenia z twoim dostawcą, a większość kont pozwala tylko na jedno - włącz to tylko wtedy, gdy twoje pozwala na więcej.",
+  "cast_buffer_without": "Przesyłaj bez niego",
+  "conn_what_cast_buffer": "Dalsze nagrywanie bufora przewijania podczas przesyłania używa kolejnego połączenia z twoim dostawcą, obok połączenia samego przesyłania.",
+  "conn_limit_unknown": "Twój dostawca nie podaje, ile połączeń dopuszcza twoje konto. Większość pozwala tylko na jedno, a wtedy dostawca może odrzucić przesyłanie albo je przerwać."
 }

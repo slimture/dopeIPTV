@@ -2689,5 +2689,10 @@
   "nerd_src_streamdev_hint": "Le port HTTP de streamdev-server sur le VDR : les chaînes et les enregistrements se lisent depuis là.",
   "nerd_src_dvb_port_hint": "Le port de streaming du serveur multimédia (HTTP/UPnP), 7522 sauf modification.",
   "nerd_src_fav_groups": "Ses favoris en groupes",
-  "nerd_src_radio_channels": "Chaînes de radio"
+  "nerd_src_radio_channels": "Chaînes de radio",
+  "set_cast_keep_buffer": "Garder la mémoire tampon de retour en arrière pendant la diffusion",
+  "set_cast_keep_buffer_hint": "Te permet de revenir en arrière sur la TV dans ce que garde la mémoire tampon de retour en arrière. Cela utilise une connexion de plus chez ton fournisseur, et la plupart des comptes n'en autorisent qu'une - ne l'active que si le tien en autorise davantage.",
+  "cast_buffer_without": "Diffuser sans elle",
+  "conn_what_cast_buffer": "Garder la mémoire tampon de retour en arrière en enregistrement pendant que tu diffuses utilise une connexion de plus chez ton fournisseur, en plus de celle de la diffusion.",
+  "conn_limit_unknown": "Ton fournisseur n'indique pas combien de connexions ton compte autorise. La plupart n'en autorisent qu'une, et le fournisseur peut alors refuser la diffusion ou la couper."
 }
