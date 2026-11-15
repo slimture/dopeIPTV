@@ -355,7 +355,9 @@ class _BoxMixin:
         if getattr(self, "_playing_key", None) != getattr(self, "_box_scrambled_key", None):
             return
         if self.player is not None and self.player.current_url:
-            self.player.stop()
+            # The Stop button, not stop() alone: the window also ends the
+            # recording, the scrobbles and the wake lock on it.
+            self.player.stop_btn.click()
         self._show_stream_error(tr("diag_scrambled"))
 
     def _box_rec_stopped(self, title: str, reason: str) -> None:

@@ -125,3 +125,15 @@ def test_the_popout_right_click_stop_is_the_stop_button(monkeypatch):
     _trigger(shown[0], tr("btn_stop"))
     assert win.player.stop_btn.clicks == 1
     assert win.player.stopped_directly == 0
+
+
+def test_a_channel_the_box_cannot_decrypt_stops_through_the_stop_button():
+    from dopeiptv.ui.mw_box import _BoxMixin
+
+    errors = []
+    win = SimpleNamespace(_playing_key=("live", 7), _box_scrambled_key=("live", 7),
+                          player=_Player(), _show_stream_error=errors.append)
+    _BoxMixin._box_scrambled_end(win)
+    assert win.player.stop_btn.clicks == 1
+    assert win.player.stopped_directly == 0
+    assert errors == [tr("diag_scrambled")]
