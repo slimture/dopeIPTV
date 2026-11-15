@@ -500,7 +500,7 @@ def test_the_play_queue_steps_and_wraps_an_album(tmp_path):
     assert w._queue_step(-1) is False           # nothing before the first
     w._play_queued(2)
     assert w._queue_autoplay() is False         # end of the album
-    assert [p.split("/")[-1] for p in w.played] == ["01.flac", "02.flac",
+    assert [os.path.basename(p) for p in w.played] == ["01.flac", "02.flac",
                                                     "01.flac", "03.flac"]
 
 

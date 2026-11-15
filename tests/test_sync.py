@@ -774,7 +774,7 @@ def test_two_windows_start_join_and_sync_both_ways(tmp_path, site, qapp):
     code = a._sync_start_here()
     assert code and a._sync_on() and _settle(a)
     assert a._sync_status[0] == "ok" and len(site.slots) == 1
-    assert json.loads(a._sync_state_file.read_text())["version"] == 1
+    assert json.loads(a._sync_state_file.read_text(encoding="utf-8"))["version"] == 1
 
     assert not b._sync_join("not a code")
     assert b._sync_join(code.lower()) and _settle(b)
@@ -831,7 +831,7 @@ def test_closing_keeps_when_a_change_was_made(tmp_path, site, qapp):
     w.settings.setValue("theme", "dawn")
     before = int(time.time())
     w._sync_on_close()
-    data = json.loads(w._sync_state_file.read_text())
+    data = json.loads(w._sync_state_file.read_text(encoding="utf-8"))
     entry = data["doc"]["c"]["settings"]["theme"]
     assert entry["v"] == "dawn" and entry["t"] >= before
     calls = len(site.calls)

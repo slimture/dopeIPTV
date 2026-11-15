@@ -23,6 +23,8 @@ def home(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_DATA_DIRS", str(tmp_path / "nowhere"))
     return tmp_path
 
+@pytest.mark.skipif(not sys.platform.startswith("linux"),
+                    reason=".desktop entries and their Exec quoting are Linux's")
 def test_the_entry_points_at_the_appimage_not_the_mount(home, monkeypatch):
     """$APPIMAGE is the .AppImage file itself. The temporary mount it runs
     from is gone the moment the app exits, so an entry written against
@@ -43,6 +45,8 @@ def test_the_entry_points_at_the_appimage_not_the_mount(home, monkeypatch):
     assert desktop_entry.is_installed()
 
 
+@pytest.mark.skipif(not sys.platform.startswith("linux"),
+                    reason=".desktop entries and their Exec quoting are Linux's")
 def test_a_path_with_a_space_is_quoted(home, monkeypatch):
     appimage = home / "My Apps" / "dopeIPTV.AppImage"
     appimage.parent.mkdir()
@@ -120,6 +124,8 @@ def test_the_written_entry_is_a_valid_desktop_file(home, monkeypatch):
     assert r.returncode == 0, r.stdout + r.stderr
 
 
+@pytest.mark.skipif(not sys.platform.startswith("linux"),
+                    reason=".desktop entries and their Exec quoting are Linux's")
 def test_describe_names_the_cause_whichever_it_is(home, monkeypatch):
     """"No icon" has four causes that look identical from outside. This
     line is what stops the next one being a guessing game."""
@@ -307,7 +313,7 @@ def test_our_entries_name_the_window_class(home, monkeypatch):
     appimage.write_text("")
     monkeypatch.setenv("APPIMAGE", str(appimage))
     assert desktop_entry.install()
-    assert "\nStartupWMClass=dopeiptv\n" in desktop_entry.entry_path().read_text()
+    assert "\nStartupWMClass=dopeiptv\n" in desktop_entry.entry_path().read_text(encoding="utf-8")
 
 
 def test_an_entry_from_before_links_takes_them_once(home, monkeypatch):

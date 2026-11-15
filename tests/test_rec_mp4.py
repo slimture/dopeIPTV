@@ -128,7 +128,7 @@ def test_a_good_remux_replaces_the_ts_and_takes_its_info_along(tmp_path):
     res = rec_mp4.remux(src, "ffmpeg", run, free=_room)
     assert res == rec_mp4.Result(True, str(tmp_path / "Show.mp4"))
     assert sorted(os.listdir(tmp_path)) == ["Show.mp4", "Show.mp4.info.json"]
-    assert json.loads((tmp_path / "Show.mp4.info.json").read_text())["title"] == "Show"
+    assert json.loads((tmp_path / "Show.mp4.info.json").read_text(encoding="utf-8"))["title"] == "Show"
     assert [c[-1] for c in run.calls] == [src, src[:-3] + ".mp4.part", src[:-3] + ".mp4.part"]
 
 
@@ -212,7 +212,7 @@ def test_the_fake_program_runs_through_the_real_runner(tmp_path, fake_ffmpeg, mo
     src = _ts(rec)
     res = rec_mp4.remux(src, fake_ffmpeg)
     assert res.ok and sorted(os.listdir(rec)) == ["Show.mp4", "Show.mp4.info.json"]
-    log = (tmp_path / "ffmpeg.log").read_text().splitlines()
+    log = (tmp_path / "ffmpeg.log").read_text(encoding="utf-8").splitlines()
     assert len(log) == 3 and "-c copy" in log[1] and "+faststart" in log[1]
     monkeypatch.setenv("FAKE_FFMPEG", "fail")
     src = _ts(rec, "Other.ts")
@@ -310,7 +310,7 @@ def test_on_the_recording_ends_as_an_mp4_and_the_command_gets_that(tmp_path, man
     rm._after(j)                                 # once
     time.sleep(0.2)
     app.processEvents()
-    assert len((tmp_path / "ffmpeg.log").read_text().splitlines()) == 3
+    assert len((tmp_path / "ffmpeg.log").read_text(encoding="utf-8").splitlines()) == 3
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="a script as a program")

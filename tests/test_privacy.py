@@ -190,7 +190,8 @@ app = QApplication.instance() or QApplication([])
 QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, tempfile.mkdtemp())
 s = QSettings(os.path.join(tempfile.mkdtemp(), "s.ini"), QSettings.Format.IniFormat)
 w = MainWindow(DemoClient(), s, PlaylistStore(s))
-assert w._resume_settings.fileName().startswith(tempfile.gettempdir()), w._resume_settings.fileName()
+assert os.path.normcase(os.path.normpath(w._resume_settings.fileName())).startswith(
+    os.path.normcase(tempfile.gettempdir())), w._resume_settings.fileName()
 w.show()
 toasts = []
 w._show_toast = lambda text, ms=0: toasts.append(text)

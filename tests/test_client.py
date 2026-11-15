@@ -1,5 +1,9 @@
 """Unit tests for dopeiptv.providers.client utilities."""
 
+import time
+
+import pytest
+
 from dopeiptv.providers.client import (
     b64, detect_provider_link, parse_xtream_url,
 )
@@ -196,6 +200,8 @@ def test_epg_listings_survive_a_list_answer():
         assert c.epg_table(1) == want
 
 
+@pytest.mark.skipif(not hasattr(time, "tzset"),
+                    reason="TZ is applied with time.tzset(), POSIX only")
 def test_timeshift_urls_carry_a_local_and_a_utc_stamp():
     import os
     import time as _time

@@ -1082,7 +1082,7 @@ def test_errors_and_error_log_entries_are_logged_without_logins(qapp, macos, cap
 
 
 def test_no_private_tricks_and_no_view_inside_a_qt_widget():
-    src = (_REPO / "dopeiptv" / "services" / "airplay_macos.py").read_text()
+    src = (_REPO / "dopeiptv" / "services" / "airplay_macos.py").read_text(encoding="utf-8")
     for trick in ("performClick", "subviews()", "winId", "objc_object"):
         assert trick not in src, trick
 
@@ -1224,16 +1224,16 @@ def test_linux_and_windows_add_no_airplay(monkeypatch):
 
 
 def test_the_mac_build_bundles_and_checks_airplay():
-    req = (_REPO / "requirements.txt").read_text()
+    req = (_REPO / "requirements.txt").read_text(encoding="utf-8")
     for name in ("pyobjc-framework-AVFoundation", "pyobjc-framework-AVKit"):
         line = next(x for x in req.splitlines() if x.startswith(name))
         assert line.endswith('sys_platform == "darwin"'), line
-    spec = (_REPO / "dopeiptv-mac.spec").read_text()
+    spec = (_REPO / "dopeiptv-mac.spec").read_text(encoding="utf-8")
     for module in ("AVFoundation", "AVKit", "Quartz"):
         assert f'"{module}"' in spec, module
     for module in ("AVFoundation", "AVKit"):
-        assert module not in (_REPO / "dopeiptv.spec").read_text()
-    app = (_REPO / "dopeiptv" / "app.py").read_text()
+        assert module not in (_REPO / "dopeiptv.spec").read_text(encoding="utf-8")
+    app = (_REPO / "dopeiptv" / "app.py").read_text(encoding="utf-8")
     assert "airplay_macos import bundle_problem" in app
 
 

@@ -108,7 +108,7 @@ def test_installs_beside_the_old_one_and_moves_the_menu_entry(env):
     assert current.exists(), "the old file goes only once the new one ran"
     assert _leftovers(current.parent) == [current.name, new.name]
     # Repointed, it still opens dopeiptv:// links.
-    assert f"Exec={new} %u\n" in desktop_entry.entry_path().read_text()
+    assert f"Exec={new} %u\n" in desktop_entry.entry_path().read_text(encoding="utf-8")
 
     # The new version, started, removes the old one.
     assert selfupdate.take_pending_cleanup(str(current), new)
@@ -126,11 +126,11 @@ def test_a_corrupt_download_changes_nothing(env):
 def test_a_new_version_that_does_not_start_changes_nothing(env):
     current, served = env
     assert desktop_entry.install()
-    before = desktop_entry.entry_path().read_text()
+    before = desktop_entry.entry_path().read_text(encoding="utf-8")
     with pytest.raises(UpdateError, match="start-up check"):
         selfupdate.install(_release(served, BROKEN), "1.2.14")
     assert _leftovers(current.parent) == [current.name]
-    assert desktop_entry.entry_path().read_text() == before
+    assert desktop_entry.entry_path().read_text(encoding="utf-8") == before
 
 
 def test_a_renamed_appimage_is_replaced_under_its_own_name(env, monkeypatch):
@@ -169,7 +169,7 @@ def test_menu_entry_follows_a_replaced_appimage_only(env, tmp_path):
     gone = tmp_path / "Downloads" / "dopeIPTV-1.2.11-x86_64.AppImage"
     _entry(f"[Desktop Entry]\nExec={gone}\nX-dopeIPTV-Generated=true\n")
     assert selfupdate.repoint_desktop_entry(current)
-    assert f"Exec={current}\n" in desktop_entry.entry_path().read_text()
+    assert f"Exec={current}\n" in desktop_entry.entry_path().read_text(encoding="utf-8")
 
     # Pointing at another file that still exists is the user's choice.
     other = tmp_path / "Downloads" / "dopeIPTV-old.AppImage"
@@ -190,7 +190,7 @@ def test_menu_entry_quotes_a_path_with_spaces(env, tmp_path, monkeypatch):
     _entry("[Desktop Entry]\nExec=/gone/dopeIPTV.AppImage\n"
            "X-dopeIPTV-Generated=true\n")
     assert selfupdate.repoint_desktop_entry(spaced)
-    assert f'Exec="{spaced}"\n' in desktop_entry.entry_path().read_text()
+    assert f'Exec="{spaced}"\n' in desktop_entry.entry_path().read_text(encoding="utf-8")
 
 
 def test_cleanup_only_removes_an_old_appimage(tmp_path):
