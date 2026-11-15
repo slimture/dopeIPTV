@@ -83,16 +83,17 @@ class DvrPool:
             s.last_used = self._clock()
             if s.closed:
                 return
-            if s.recording:
-                log.info("DVR pool: a recording keeps the channel left "
-                         "streaming")
+            if s.recording or s.held:
+                log.info("DVR pool: %s keeps the channel left streaming",
+                         "a recording" if s.recording else "a cast")
             else:
                 s.freeze()
             self._enforce()
 
     def _recording_done(self, s: DvrSession) -> None:
         with self._lock:
-            if s is not self.active and not s.recording and s.streaming:
+            if s is not self.active and not s.recording and not s.held \
+                    and s.streaming:
                 s.freeze()
             self._enforce()
 

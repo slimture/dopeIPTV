@@ -18,6 +18,7 @@ from .cast_bridge import (
     QUALITY, SAFE_AUDIO, SAFE_VIDEO, CastBridge,
     normalise_quality, probe_tracks,
 )
+from .cast_feed import is_loopback as _is_loopback
 
 # pychromecast drags in zeroconf + ifaddr (~130 ms of the app's startup),
 # and this module sits on the main window's import chain - so the import is
@@ -498,7 +499,10 @@ class ChromecastManager:
              start: float = 0.0, duration: float = 0.0,
              settle: bool = False, source: str | None = None,
              quality: str = "original", height: int = 0,
-             fps: float = 0.0, dvr: bool = False) -> str:
+             fps: float = 0.0, dvr: bool = False, feed=None) -> str:
+        """*feed*: the archive or the rewind buffer in pieces
+        (cast_feed.Feed): converted here into one playlist, so the receiver
+        never sees a piece end - nor the buffer's loopback address."""
         with self._lock:
             cc = self._device(device_name)
             if cc is None:
@@ -563,16 +567,33 @@ class ChromecastManager:
         # the receiver plays whatever the stream hands it and renders no
         # subtitle carried inside one. Leaving both on their default is what
         # keeps a cast native, which is why the default is a default.
+        if feed is not None:
+            log.info("cast: converting - the %s comes in pieces, the "
+                     "receiver gets them as one playlist", feed.kind)
+            if self._bridge_cast(mc, device_name, source or url, codecs,
+                                 title, audio, None, 0.0, quality, feed=feed):
+                return device_name
+            raise LocalizedError("cast_err_need_ffmpeg_any"
+                                 if not CastBridge.available()
+                                 else "cast_err_refused")
+        # This computer's own address (the rewind buffer's server, a local
+        # proxy): no receiver reaches it - only the converter here can.
+        local = _is_loopback(source or url) or _is_loopback(url)
         if audio is not None or subs is not None or quality != "original" \
-                or dvr:
+                or dvr or local:
             log.info("cast: converting - %s",
                      "a track was chosen" if audio is not None
                      or subs is not None else
                      f"this device is set to {quality}" if quality != "original"
+                     else "the stream is on this computer" if local
                      else "so the picture can be held here")
             if self._bridge_cast(mc, device_name, source or url, codecs,
                                  title, audio, subs, start, quality):
                 return device_name
+            if local:
+                raise LocalizedError("cast_err_need_ffmpeg_any"
+                                     if not CastBridge.available()
+                                     else "cast_err_refused")
             if audio is not None or subs is not None or quality != "original":
                 raise LocalizedError("cast_err_track")
             # Only the pause was riding on the converter. Casting the channel
@@ -672,6 +693,9 @@ class ChromecastManager:
                 return device_name
         raise self._no_decoder(codecs)
 
+    #: CastHub hands this manager the pieces of an archive or a buffer.
+    TAKES_FEED = True
+
     @staticmethod
     def _needed_quality(want: str, height: int, fps: float) -> str:
         """What this particular picture actually needs.
@@ -733,7 +757,8 @@ class ChromecastManager:
     def _bridge_cast(self, mc, device_name: str, url: str,
                      codecs: list[str], title: str,
                      audio: dict | None = None, subs: dict | None = None,
-                     start: float = 0.0, quality: str = "original") -> bool:
+                     start: float = 0.0, quality: str = "original",
+                     feed=None) -> bool:
         """Convert the stream here and cast that instead.
 
         ffmpeg copies the video through untouched and re-encodes only what the
@@ -767,7 +792,8 @@ class ChromecastManager:
             audio=(audio or {}).get("index", 0),
             subs=None if subs is None else subs.get("index"),
             sub_codec=(subs or {}).get("codec", ""), start_at=start,
-            quality=quality, sub_lang=(subs or {}).get("lang", ""))
+            quality=quality, sub_lang=(subs or {}).get("lang", ""),
+            feed=feed)
         # ffmpeg does the seeking, so the converted stream starts at zero and
         # the offset is added back when the position is read.
         self.position_offset = start
@@ -1558,6 +1584,10 @@ class CastDialog(QDialog):
         # Leave everything the strip needs to offer another track later
         # without asking the provider again.
         ctx = getattr(self.window, "_cast_ctx", None)
+        # A channel watched from the rewind buffer: its pieces, for a
+        # receiver fed through a converter here (never its loopback address).
+        feed = ctx.get("feed") if isinstance(ctx, dict) else None
+        more = {"feed": feed} if feed is not None else {}
         if isinstance(ctx, dict):
             ctx.update(url=self.url, source=self.source, codecs=self.codecs,
                        height=self.height, fps=self.fps,
@@ -1575,7 +1605,7 @@ class CastDialog(QDialog):
                                                      self._is_airplay(name))
                                                  else self.quality(),
                                                  self.height,
-                                                 self.fps, dvr),
+                                                 self.fps, dvr, **more),
                   done, failed)
 
     def _add_kodi(self) -> None:

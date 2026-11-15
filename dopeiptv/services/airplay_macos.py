@@ -3,8 +3,12 @@ way Apple documents them.
 
 The cast plays in an AVPlayer that allows external playback. Apple's own
 AirPlay button - AVKit's AVRoutePickerView with that player set - sits in a
-small native panel of its own (an NSPanel), above an AVPlayerLayer, the
-player's video output. The user clicks the button and picks the Apple TV;
+small dark native panel of its own (an NSPanel in Apple's HUD style),
+under a small AVPlayerLayer, the player's video output - which has to stay
+on a real layer, or AirPlay sends sound only. Nothing else is in it: what
+the cast is doing is said in the cast strip, as for any receiver. Once the
+Apple TV has held the stream for PANEL_HIDE_S, the panel steps aside
+(orderOut); the cast strip's AirPlay button brings it back. The user clicks the button and picks the Apple TV;
 the Apple TV then fetches the stream itself: HLS or MP4 as it is, or what
 providers/airplay_bridge.py makes of anything else.
 
@@ -79,6 +83,7 @@ OPEN_WAIT_S = 10.0      # the GUI thread making the player
 SETTLE_S = 2.0          # a provider still counting the player's connection
 DETECT_SETTLE_S = 3.0   # AVRouteDetector's first answer once it is on
 MENU_HINT_S = 8.0       # Apple's menu closed this long, and still no route
+PANEL_HIDE_S = 4.0      # on the Apple TV this long: the panel steps aside
 ERROR_LOG_MAX = 20      # AVFoundation error-log entries logged per cast
 
 _NEEDS = ("objc", "Foundation", "AppKit", "AVFoundation", "AVKit")
@@ -129,7 +134,7 @@ def check() -> None:
             (f.kit, ("AVRoutePickerView",)),
             (f.fd, ("NSObject", "NSURL", "NSNotificationCenter",
                     "NSOperationQueue")),
-            (f.ak, ("NSPanel", "NSView", "NSTextField", "NSColor"))):
+            (f.ak, ("NSPanel", "NSView", "NSColor"))):
         for name in names:
             getattr(module, name)
     _observer_class()
@@ -307,10 +312,12 @@ def _beside_front_window(width: float) -> tuple[float, float] | None:
 
 
 class _Panel:
-    """Apple's AirPlay button and the player's video output, in a small
-    native panel of their own (the module's docstring says why)."""
+    """Apple's AirPlay button and a small video output, in a dark HUD panel
+    of their own (the module's docstring says why)."""
 
-    W, H, VIDEO_H, PAD = 320.0, 244.0, 166.0, 12.0
+    VIDEO_W, VIDEO_H, BUTTON, PAD = 160.0, 90.0, 32.0, 10.0
+    W = VIDEO_W + 2 * PAD
+    H = PAD + VIDEO_H + 6.0 + BUTTON + PAD
 
     def __init__(self, player: Any, delegate: Any,
                  top_left: tuple[float, float] | None) -> None:
@@ -318,64 +325,72 @@ class _Panel:
         ak, av, kit = f.ak, f.av, f.kit
         style = (getattr(ak, "NSWindowStyleMaskTitled", 1)
                  | getattr(ak, "NSWindowStyleMaskClosable", 2)
-                 | getattr(ak, "NSWindowStyleMaskUtilityWindow", 16))
+                 | getattr(ak, "NSWindowStyleMaskUtilityWindow", 1 << 4)
+                 | getattr(ak, "NSWindowStyleMaskHUDWindow", 1 << 13))
         panel = ak.NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
             ((0.0, 0.0), (self.W, self.H)), style,
             getattr(ak, "NSBackingStoreBuffered", 2), False)
         panel.setReleasedWhenClosed_(False)
         panel.setTitle_(tr("airplay_window_title"))
+        try:
+            dark = ak.NSAppearance.appearanceNamed_(getattr(
+                ak, "NSAppearanceNameVibrantDark", "NSAppearanceNameVibrantDark"))
+            if dark is not None:
+                panel.setAppearance_(dark)
+        except Exception as e:
+            log.debug("airplay: the panel's dark appearance: %s", e)
         # Above the cast dialog, and clickable while it is open: Qt runs a
         # modal dialog as an AppKit modal session, which passes clicks only
         # to the modal window and to panels that work when modal.
         panel.setFloatingPanel_(True)
         panel.setWorksWhenModal_(True)
         panel.setBecomesKeyOnlyIfNeeded_(True)
+        panel.setHidesOnDeactivate_(False)
         panel.setCollectionBehavior_(getattr(
             ak, "NSWindowCollectionBehaviorFullScreenAuxiliary", 1 << 8))
         content = panel.contentView()
         pad = self.PAD
         video = ak.NSView.alloc().initWithFrame_(
-            ((pad, self.H - pad - self.VIDEO_H),
-             (self.W - 2 * pad, self.VIDEO_H)))
+            ((pad, self.H - pad - self.VIDEO_H), (self.VIDEO_W, self.VIDEO_H)))
         # The player's video output: AirPlay sends a player's picture while
         # a layer shows it; a player without one goes over as sound only.
         # Paused until the Apple TV has it, it shows a still at most here.
         layer = av.AVPlayerLayer.playerLayerWithPlayer_(player)
         try:
             layer.setBackgroundColor_(ak.NSColor.blackColor().CGColor())
+            layer.setCornerRadius_(4.0)
+            layer.setMasksToBounds_(True)
         except Exception:
             pass
         video.setLayer_(layer)          # a layer-hosting view: the layer
         video.setWantsLayer_(True)      # first, then wantsLayer
         content.addSubview_(video)
+        side = self.BUTTON
         picker = kit.AVRoutePickerView.alloc().initWithFrame_(
-            ((pad, pad), (44.0, 44.0)))
+            (((self.W - side) / 2, pad), (side, side)))
         picker.setPlayer_(player)
         if delegate is not None:
             picker.setDelegate_(delegate)
-        for setter, value in (("setRoutePickerButtonBordered_", True),
+        for setter, value in (("setRoutePickerButtonBordered_", False),
                               ("setToolTip_", tr("airplay_button"))):
             try:
                 getattr(picker, setter)(value)
             except Exception:
                 pass
         content.addSubview_(picker)
-        label = ak.NSTextField.wrappingLabelWithString_("")
-        label.setFrame_(((pad + 52.0, pad - 4.0),
-                         (self.W - 2 * pad - 52.0, 52.0)))
-        content.addSubview_(label)
         if top_left is not None:
             panel.setFrameTopLeftPoint_(top_left)
         else:
             panel.center()
-        self.panel, self.layer, self.picker, self.label = (
-            panel, layer, picker, label)
+        self.panel, self.layer, self.picker = panel, layer, picker
 
     def show(self) -> None:
         self.panel.orderFront_(None)
 
-    def say(self, text: str) -> None:
-        self.label.setStringValue_(text)
+    def hide(self) -> None:
+        """Out of the way, not closed: the player keeps its layer, so the
+        Apple TV keeps the picture."""
+        self.panel.orderOut_(None)
 
     def close(self) -> None:
         for step in (lambda: self.picker.setDelegate_(None),
@@ -393,6 +408,8 @@ class AirPlayReceiver(QObject):
     """AirPlay as CastHub sees a receiver: one entry, one cast at a time."""
 
     KIND = "airplay"
+    #: CastHub hands this receiver the pieces of an archive or a buffer.
+    TAKES_FEED = True
     #: The cast ended by itself; a string key says why (tr), "" for none.
     ended = pyqtSignal(str)
     #: Something the user should know while it plays (a string key).
@@ -420,7 +437,6 @@ class AirPlayReceiver(QObject):
         self._volume, self._muted = 1.0, False
         self._player: Any = None
         self._panel: _Panel | None = None
-        self._panel_said = ""
         self._obs: Any = None
         self._obs_failed = False
         self._kvo_player: list[tuple[Any, str]] = []
@@ -469,6 +485,8 @@ class AirPlayReceiver(QObject):
                                           self._menu_hint)
         self._detect_timer = self._one_shot(int(DETECT_SETTLE_S * 1000),
                                             self._detect_settled)
+        self._hide_timer = self._one_shot(int(PANEL_HIDE_S * 1000),
+                                          self._hide_panel)
         cast(Any, self._call).connect(self._carry_out,
                                      Qt.ConnectionType.QueuedConnection)
         cast(Any, self._kick).connect(self._on_kick,
@@ -550,27 +568,36 @@ class AirPlayReceiver(QObject):
 
     def show_window(self, *_args: Any) -> None:
         """Bring the AirPlay window to the front (the cast dialog's
-        button)."""
+        button, the cast strip's AirPlay button). Shown again on a route
+        that holds, it stays until it is closed."""
         self._gui("show")
+
+    def waiting_for_route(self) -> bool:
+        """Apple's button not clicked yet, or the Apple TV has not taken
+        the stream: what the cast strip says while it is so."""
+        return self.active is not None and not self._external
 
     def cast(self, device_name: str, url: str, title: str,
              codecs: list[str] | None = None, audio: Any = None,
              subs: Any = None, start: float = 0.0, duration: float = 0.0,
              settle: bool = False, source: str | None = None,
              quality: str = "original", height: int = 0, fps: float = 0.0,
-             dvr: bool = False) -> str:
+             dvr: bool = False, feed: Any = None) -> str:
         """Ready *url* for the Apple TV and open the AirPlay window; returns
         *device_name*. Runs on a worker thread: the probe and the bridge's
         first segments take seconds. Subtitles and the picture tiers are
-        Chromecast's; a chosen sound track goes through the bridge."""
+        Chromecast's; a chosen sound track goes through the bridge. *feed*:
+        the archive or the rewind buffer in pieces (cast_feed.Feed), read
+        by the bridge into one playlist - never handed to the TV."""
         if not supported():
             raise LocalizedError("airplay_unavailable")
         src = source or url
         ctx = self.context() if callable(self.context) else {}
         kind = (ctx or {}).get("kind")
-        live = (kind == "live" if kind else
-                bool(dvr) or ab.endless(src) or
-                (duration <= 0 and not nerd.is_own_file(src)))
+        live = feed is not None or (
+            kind == "live" if kind else
+            bool(dvr) or ab.endless(src) or
+            (duration <= 0 and not nerd.is_own_file(src)))
         track = 0
         if isinstance(audio, dict):
             try:
@@ -584,7 +611,7 @@ class AirPlayReceiver(QObject):
         self._prepare({"url": url, "source": src, "codecs": list(codecs or []),
                        "track": track, "live": live, "start": float(start or 0),
                        "duration": float(duration or 0), "settle": settle,
-                       "generation": gen})
+                       "generation": gen, "feed": feed})
         if self._generation != gen:
             raise LocalizedError("cast_stopped")
         self.active = device_name
@@ -612,10 +639,14 @@ class AirPlayReceiver(QObject):
                 self._busy -= 1
 
     def _ready(self, req: dict[str, Any], force_bridge: bool) -> None:
-        url, src = req["url"], req["source"]
+        url, src, feed = req["url"], req["source"], req.get("feed")
+        if feed is not None:
+            # The pieces are read here and the TV gets the playlist; what is
+            # probed (when nothing is known) is the first piece.
+            src = feed.first_url or src
         net, own = self._network(src)
         p = ab.plan(url, src, req["codecs"], req["live"], req["track"],
-                    own or force_bridge)
+                    own or force_bridge or feed is not None)
         duration = req["duration"]
         if p.direct:
             self.bridge.stop()
@@ -641,7 +672,9 @@ class AirPlayReceiver(QObject):
                         and req["live"] is not True:
                     duration = found["duration"]
             gen = req["generation"]
-            target = self.bridge.start(p, req["start"], net)
+            target = self.bridge.start(
+                p, req["start"], net, feed=feed,
+                net_for=lambda u: self._network(u)[0])
             if not self.bridge.wait_ready(
                     stopping=lambda: self._generation != gen):
                 why = self.bridge.error
@@ -708,6 +741,7 @@ class AirPlayReceiver(QObject):
                 return
             if name == "show":
                 if self._panel is not None:
+                    self._hide_timer.stop()
                     self._panel.show()
                     log.debug("airplay: the AirPlay window is shown again")
                 return
@@ -784,7 +818,6 @@ class AirPlayReceiver(QObject):
         self.state = "BUFFERING/NONE" if self._external else "WAITING/ROUTE"
         self._timer.start()
         self._show_row()
-        self._panel_text()
 
     def _make_panel(self, player: Any) -> None:
         """The AirPlay window, once per cast: Apple's button for this
@@ -796,7 +829,7 @@ class AirPlayReceiver(QObject):
             log.info("airplay: the AirPlay window could not be made (%s: %s)",
                      type(e).__name__, e)
             raise
-        self._panel, self._panel_said = panel, ""
+        self._panel = panel
         try:
             f = _frameworks()
             name = getattr(f.ak, "NSWindowWillCloseNotification",
@@ -949,6 +982,20 @@ class AirPlayReceiver(QObject):
                  "on an AirPlay route - no Apple TV picked, or it did not take "
                  "the stream", MENU_HINT_S)
 
+    def _hide_panel(self) -> None:
+        """The Apple TV has held the stream for PANEL_HIDE_S: the panel
+        steps aside - only while the route still holds; one that went
+        meanwhile leaves Apple's button where the user can reach it."""
+        panel = self._panel
+        if panel is None or not (self._external and self._raw_ext):
+            return
+        try:
+            panel.hide()
+            log.info("airplay: on the Apple TV - the AirPlay window steps "
+                     "aside (the cast strip's AirPlay button brings it back)")
+        except Exception as e:
+            log.debug("airplay: hiding the AirPlay window: %s", e)
+
     def _window_closed(self) -> None:
         if self._closing or self._player is None:
             return
@@ -1046,6 +1093,7 @@ class AirPlayReceiver(QObject):
         self._timer.stop()
         self._settle.stop()
         self._menu_timer.stop()
+        self._hide_timer.stop()
         self._closing = True
         try:
             # Observers first, while what they watch is still there.
@@ -1068,7 +1116,6 @@ class AirPlayReceiver(QObject):
             self._closing = False
         self._raw_ext = self._external = self._ever_external = False
         self._swapped_at = 0.0
-        self._panel_said = ""
         self.state = "IDLE/NONE"
         self._show_row()
 
@@ -1133,7 +1180,6 @@ class AirPlayReceiver(QObject):
             log.info("airplay: the Apple TV has not reached the bridge")
             self.problem.emit("airplay_unreachable")
         self._show_row()
-        self._panel_text()
 
     def _route(self, p: Any, now: float) -> bool:
         """The route, debounced: externalPlaybackActive moves the player
@@ -1152,6 +1198,7 @@ class AirPlayReceiver(QObject):
                 self._ever_external, self._lost_at = True, 0.0
                 self._external_since = now
                 self._apply_mute(p)
+                self._hide_timer.start()
                 if not self._user_paused and self._note != "end":
                     p.play()
                 log.info("airplay: on the Apple TV - %s", "paused as asked"
@@ -1286,14 +1333,3 @@ class AirPlayReceiver(QObject):
         want = self._panel is not None
         if button.isHidden() == want:
             button.setVisible(want)
-
-    def _panel_text(self) -> None:
-        if self._panel is None:
-            return
-        text = tr("airplay_on_tv") if self._external else tr("airplay_pick")
-        if text != self._panel_said:
-            self._panel_said = text
-            try:
-                self._panel.say(text)
-            except Exception as e:
-                log.debug("airplay: the window's text: %s", e)

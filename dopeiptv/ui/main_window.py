@@ -1250,6 +1250,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cast_bar_tracks = strip_button(
             "tracks", tr("cast_audio") + " / " + tr("cast_subtitles"),
             self._cast_tracks_menu)
+        # AirPlay's own way in: the AirPlay window (Apple's button, the
+        # video output) back while an Apple TV is cast to (mw_cast).
+        self.cast_bar_airplay = strip_button(
+            "airplay", tr("airplay_show_window"), self._cast_airplay_window)
+        self.cast_bar_airplay.hide()
         # Pause is only shown where pausing means something. A Chromecast
         # cannot pause live television - there is nothing buffered ahead to
         # come back to - and the app answers that from the provider's archive.
@@ -4846,7 +4851,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         queue forward so it keeps advancing. Returns False if there's no next
         episode or we're not on the embedded player."""
         nxt = self._next_episode_item()
-        if not nxt or self.playback_mode() != "embedded":
+        # On a running cast the next one goes to the TV (mw_cast), whatever
+        # this computer plays with.
+        casting = getattr(self, "_cast_runs", None)
+        if not nxt or (self.playback_mode() != "embedded"
+                       and not (callable(casting) and casting())):
             return False
         item, queue, index, ctx = nxt
         saved = self.series_ctx

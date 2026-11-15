@@ -746,6 +746,31 @@ def cast_strip_icon(kind: str, colour: str) -> QIcon:
                 pr.drawArc(QRectF(s * (0.56 - r), s * (0.5 - r),
                                   s * r * 2, s * r * 2),
                            -60 * 16, 120 * 16)
+    elif kind == "airplay":                 # a screen, a triangle under it
+        pen.setWidthF(s * 0.10)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        pr.setPen(pen)
+        pr.setBrush(Qt.BrushStyle.NoBrush)
+        frame = QPainterPath()              # open at the bottom, mid-way
+        frame.moveTo(s * 0.32, s * 0.70)
+        frame.lineTo(s * 0.14, s * 0.70)
+        frame.quadTo(s * 0.08, s * 0.70, s * 0.08, s * 0.64)
+        frame.lineTo(s * 0.08, s * 0.20)
+        frame.quadTo(s * 0.08, s * 0.14, s * 0.14, s * 0.14)
+        frame.lineTo(s * 0.86, s * 0.14)
+        frame.quadTo(s * 0.92, s * 0.14, s * 0.92, s * 0.20)
+        frame.lineTo(s * 0.92, s * 0.64)
+        frame.quadTo(s * 0.92, s * 0.70, s * 0.86, s * 0.70)
+        frame.lineTo(s * 0.68, s * 0.70)
+        pr.drawPath(frame)
+        pr.setPen(Qt.PenStyle.NoPen)
+        pr.setBrush(col)
+        tri = QPainterPath()
+        tri.moveTo(s * 0.50, s * 0.52)
+        tri.lineTo(s * 0.76, s * 0.90)
+        tri.lineTo(s * 0.24, s * 0.90)
+        tri.closeSubpath()
+        pr.drawPath(tri)
     elif kind == "rewind":                  # a clock wound back
         pen.setWidthF(s * 0.10)
         pr.setPen(pen)

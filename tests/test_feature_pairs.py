@@ -770,6 +770,11 @@ acts = strip_menu()
 assert tr("airplay_show_window") in acts and tr("airplay_menu_note") in acts, acts
 acts[tr("airplay_show_window")]()
 assert getattr(ap, "shown", 0) == 1
+# ...and so is the strip's own AirPlay button, shown for AirPlay alone.
+assert not w.cast_bar_airplay.isHidden()
+assert w.cast_bar_airplay.toolTip() == tr("airplay_show_window")
+w.cast_bar_airplay.click()
+assert ap.shown == 2
 
 # Stop casting is the one way off the cast: told once, and the next
 # channel plays here again.
@@ -786,6 +791,7 @@ assert not w.cast_bar_vol.isHidden() and not w.cast_bar_mute.isHidden()
 w._cast_volume(0.3)
 assert spin(lambda: cc.volumes), "a Chromecast's volume is still set"
 assert tr("airplay_show_window") not in strip_menu()
+assert w.cast_bar_airplay.isHidden()
 print("CAST_ZAP_OK")
 """
 
@@ -801,6 +807,108 @@ def test_zapping_while_casting_stays_on_the_same_receiver():
         env=env, cwd=_REPO_ROOT, timeout=180)
     assert "CAST_ZAP_OK" in proc.stdout, (
         f"zapping during a cast\nstdout={proc.stdout!r}\n"
+        f"stderr={proc.stderr[-4000:]!r}")
+
+
+# -- a film or an episode picked while casting: the same receiver -------------------------
+
+_TITLE_CHILD = _ZAP_CHILD.split("rows = w.client.live_streams(None)")[0] + r"""
+import json
+from dopeiptv.providers import cast_bridge
+
+looked = []
+cast_bridge.probe_tracks = lambda src, exe=None: (looked.append(src), {
+    "duration": 5400.0, "audio": [{"index": 0}, {"index": 1}],
+    "subtitle": [{"index": 0, "codec": "subrip", "lang": "swe"}]})[1]
+casts = []
+plain = Rx.cast
+
+
+def cast(self, name, url, title, *a, **k):
+    casts.append((name, url, title, a))
+    return plain(self, name, url, title, *a, **k)
+
+
+Rx.cast = cast
+w.client.vod_url = lambda sid, ext=None: "http://p/movie/u/pw/%s.mkv" % sid
+w.client.episode_url = lambda eid, ext=None: "http://p/series/u/pw/%s.mkv" % eid
+hooks = []
+w._trakt_start_for_item = lambda kind, item: hooks.append(("trakt", kind, item.get("name")))
+w._simkl_start_for_item = lambda kind, item: hooks.append(("simkl", kind))
+w._ms_started = lambda url, key, kind, item, at=0.0: hooks.append(("ms", kind, at))
+saved = {"movie:901": 1830.0}
+w.resume.saved_position = lambda key, kind: saved.get("%s:%s" % (kind, key), 0.0)
+w._ms_resume_at = lambda key, kind, item, pos: pos
+w._choice_dialog = lambda title, message, options, dont_ask_setting=None: (asked.append(message), 0)[1]
+
+a = w.client.live_streams(None)[0]
+w._open_cast_dialog(dict(a, _kind="live"))
+assert w._cast_device == "Kitchen" and not playing()
+
+# A film: to the Chromecast, from where it was left (the resume question
+# asked as here), its length told, its scrobble and report begun.
+film = {"stream_id": 901, "name": "Film", "container_extension": "mkv", "_kind": "movie"}
+w._start_playback(w.client.vod_url(901), "Film", None, 901, "movie", item=film)
+assert spin(lambda: len(casts) >= 2), casts
+name, url, title, args = casts[-1]
+assert (name, url, title) == ("Kitchen", "http://p/movie/u/pw/901.mkv", "Film"), casts[-1]
+assert args[3] == 1830.0 and args[4] == 5400.0, args
+assert any("30:30" in m for m in asked), asked
+assert w._cast_device == "Kitchen" and not playing() and cc.stops == 0
+assert w._cast_ctx["kind"] == "movie" and w._last_playback["kind"] == "movie"
+assert ("trakt", "movie", "Film") in hooks and ("ms", "movie", 1830.0) in hooks, hooks
+assert spin(lambda: w.cast_bar_title.text() == "Film")
+
+# An episode with its remembered sound track and subtitle: through the
+# converter, the subtitle's kind looked up.
+w.series_ctx = {"series_id": 77, "name": "Show"}
+e1 = {"id": 5001, "name": "S01 E01", "container_extension": "mkv"}
+e2 = {"id": 5002, "name": "S01 E02", "container_extension": "mkv"}
+w.all_items = [e1, e2]
+w.settings.setValue("track_prefs", json.dumps({"episode:5001": {"aid": 2, "sid": 1}}))
+w._start_playback(w.client.episode_url(5001), "S01 E01", None, 5001, "episode", item=e1)
+assert spin(lambda: len(casts) >= 3), casts
+name, url, title, args = casts[-1]
+assert url == "http://p/series/u/pw/5001.mkv" and args[3] == 0.0, casts[-1]
+assert args[1] == {"index": 1}, args
+assert args[2] == {"index": 0, "codec": "subrip", "lang": "swe"}, args
+assert w._last_playback["ep_queue"] == [e1, e2] and w._last_playback["ep_index"] == 0
+assert ("trakt", "episode", "S01 E01") in hooks
+
+# Its end on the TV: the next episode follows there, not here.
+w.series_ctx = None
+cc.state = "IDLE/FINISHED"
+w._show_cast_progress()
+assert spin(lambda: len(casts) >= 4), casts
+assert casts[-1][1] == "http://p/series/u/pw/5002.mkv" and casts[-1][2] == "S01 E02"
+cc.state = "PLAYING/NONE"
+assert w._cast_device == "Kitchen" and not playing()
+assert w._last_playback["ep_index"] == 1
+
+# On an Apple TV, a title goes as it is (the sound track through the
+# bridge), and the receiver is not looked into here.
+picked[0] = "AirPlay (Apple TV)"
+w._open_cast_dialog(dict(a, _kind="live"))
+n = len(looked)
+w._start_playback(w.client.vod_url(902), "Film 2", None, 902,
+                  "movie", item={"stream_id": 902, "name": "Film 2", "_kind": "movie"})
+assert spin(lambda: ap.casts and ap.casts[-1][2] == "Film 2"), ap.casts
+assert len(looked) == n and casts[-1][3][2] is None
+print("CAST_TITLE_OK")
+"""
+
+
+def test_a_film_or_an_episode_picked_while_casting_goes_to_the_receiver():
+    try:
+        import PyQt6  # noqa: F401
+    except Exception:
+        pytest.skip("PyQt6 not available")
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+    proc = subprocess.run(
+        [sys.executable, "-c", _TITLE_CHILD], capture_output=True, text=True,
+        env=env, cwd=_REPO_ROOT, timeout=180)
+    assert "CAST_TITLE_OK" in proc.stdout, (
+        f"titles during a cast\nstdout={proc.stdout!r}\n"
         f"stderr={proc.stderr[-4000:]!r}")
 
 

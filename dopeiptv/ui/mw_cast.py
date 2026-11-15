@@ -13,7 +13,17 @@ list, the guide, a number, channel up/down, the phone, Home Assistant, the
 media keys - goes to the same receiver, not to the player (_cast_zap,
 asked by the playback path after its checks). One at a time: a channel
 picked while the last is still on its way waits, and only the newest goes.
-Only Stop casting ends the cast. A film or an episode still plays here.
+A film or an episode picked while a cast runs goes there too
+(_cast_title): with its resume point, its remembered sound track (and
+subtitle, where the converter carries one), its scrobbles and reports; at
+an episode's end the next one follows on the TV. Only Stop casting ends the
+cast.
+
+The archive and the rewind buffer reach a TV in pieces: a cast_feed.Feed
+reads them here into one converter run, so the TV plays one growing
+playlist (_cast_from_moment) and a move within what is written is a seek
+there, not a new stream. The buffer's loopback address never leaves this
+computer.
 """
 from __future__ import annotations
 
@@ -32,6 +42,7 @@ from ..core.log import log
 from ..core.privacy import for_log
 from ..core.workers import run_async
 from ..i18n import LocalizedError, tr
+from ..providers import cast_feed
 from ..providers.chromecast import CastDialog
 from ..providers.kodi import DEFAULT_PORT, parse_address
 from .theme import P
@@ -128,6 +139,12 @@ class _CastMixin:
             here = self._playing_position(it)
             start = (self._ask_resume(here) if here > 60
                      else self._resume_offset(key, rkind))
+        # A channel watched from the rewind buffer, behind live: the TV
+        # carries on from there, out of the buffer (held streaming while
+        # the cast reads it) - the player stops before the cast starts.
+        if not getattr(self, "_cast_device", None):
+            self._cast_drop_feed()
+        feed = self._cast_buffer_feed(it) if live else None
         self._cast_ctx = {
             "sid": it.get("stream_id") if live else None,
             # Not a portal's: it is asked for by programme, which only the
@@ -146,12 +163,129 @@ class _CastMixin:
             "kind": self._play_kind_for(it),
             "row_url": url,
             "row_source": source,
+            "feed": feed,
+            "archive_from": (datetime.fromtimestamp(feed.first_wall)
+                             if feed is not None else None),
         }
         CastDialog(self, url, title, self._local_codecs(),
                    self._local_audio_index(), start,
                    self._local_tracks(it),
                    probe=not self._busy_elsewhere(it), source=source,
                    live=self._play_kind_for(it) == "live").exec()
+        if feed is not None and not getattr(self, "_cast_device", None):
+            self._cast_drop_feed(ending=True)   # nothing was cast from it
+
+    # How far behind live the player has to be for a cast to come from the
+    # rewind buffer rather than from the provider's own stream.
+    CAST_BUFFER_BEHIND_S = 10.0
+
+    def _cast_buffer_feed(self, it) -> "cast_feed.Feed | None":
+        """The rewind buffer from where the player is, as a cast's pieces -
+        when *it* is the channel playing from the buffer, behind live. The
+        session is held streaming until the feed is closed."""
+        p = getattr(self, "player", None)
+        session = getattr(p, "_dvr", None)
+        wall_now = getattr(p, "_dvr_wall_now", None)
+        if (session is None or not callable(wall_now)
+                or not getattr(session, "streaming", False)
+                or self._playing_key is None
+                or self._item_key(it) != self._playing_key):
+            return None
+        try:
+            wall = wall_now()
+        except Exception:
+            wall = None
+        if wall is None or time.time() - wall < self.CAST_BUFFER_BEHIND_S:
+            return None
+        return self._buffer_feed(session, wall)
+
+    def _buffer_feed(self, session, wall: float) -> "cast_feed.Feed | None":
+        who = f"cast:{id(session)}:{wall:.0f}"
+        last: list[int | None] = [None]
+
+        def url_at(moment: float):
+            if session.closed or not session.streaming:
+                raise EOFError("the rewind buffer was let go")
+            # After a piece, the next RUN - the segment holding *moment*
+            # is the one just read (a run ends at a reconnect).
+            seg = (session.segment_at(moment) if last[0] is None
+                   else session.next_run_after(moment, last[0]))
+            if seg is None:
+                return None
+            last[0] = seg.seq
+            return session.url_for(seg), 0.0, float(seg.t0)
+
+        session.hold(who)
+        try:
+            feed = cast_feed.Feed(url_at, wall, lag=0.0, kind="rewind buffer",
+                                  on_close=lambda: session.let_go(who))
+        except Exception as e:
+            log.info("cast: the rewind buffer cannot feed the cast (%s)", e)
+            session.let_go(who)
+            return None
+        if feed.first is None:
+            feed.close()
+            return None
+        feed.source = session
+        log.info("cast: from the rewind buffer, %.0f s behind live",
+                 time.time() - feed.first_wall)
+        return feed
+
+    def _archive_feed(self, sid, when: datetime) -> "cast_feed.Feed | None":
+        """The provider's archive from *when* on, as a cast's pieces: each
+        stretch ends where the panel had written to, the next is asked
+        from there (ARCHIVE_LAG behind now at the least)."""
+        lag = self.ARCHIVE_LAG
+
+        def url_at(moment: float):
+            at = min(datetime.fromtimestamp(moment), datetime.now() - lag)
+            minute = at.replace(second=0, microsecond=0)
+            behind = max(1, int((datetime.now() - minute).total_seconds()
+                                // 60))
+            cands = self.client.timeshift_urls(sid, minute, behind + 240) or []
+            # The transport stream, not the panel's HLS wrapper of the same
+            # archive (see _cast_from_archive).
+            url = next((c for c in cands if ".ts" in c), "") or \
+                next(iter(cands), "")
+            if not url:
+                return None
+            return url, (at - minute).total_seconds(), at.timestamp()
+
+        try:
+            feed = cast_feed.Feed(url_at, when.timestamp(),
+                                  lag=lag.total_seconds(), kind="archive")
+        except Exception as e:
+            log.info("cast: no archive address (%s)", e)
+            return None
+        return feed if feed.first is not None else None
+
+    def _cast_drop_feed(self, ending: bool = False) -> None:
+        """The cast's context is done with its pieces. One a converter
+        reads is the bridge's to close when the next stream replaces it
+        (the TV plays on meanwhile); one never read, or a cast that is over
+        (*ending*), is closed here - the reader stops, the rewind buffer is
+        let go."""
+        ctx = getattr(self, "_cast_ctx", None) or {}
+        feed = ctx.pop("feed", None)
+        if feed is not None and (ending or not feed.running()):
+            threading.Thread(target=feed.close, daemon=True).start()
+
+    def _cast_takes_feed(self, device) -> bool:
+        takes = getattr(self.cast, "takes_feed", None)
+        return bool(callable(takes) and takes(device))
+
+    def _cast_feed(self):
+        feed = (getattr(self, "_cast_ctx", None) or {}).get("feed")
+        return feed if feed is not None and not feed.closed else None
+
+    def _cast_written(self) -> float:
+        """Seconds of the running feed's playlist - how far the TV can be
+        moved within it without a new stream."""
+        fn = getattr(getattr(self.cast, "bridge", None), "written", None)
+        try:
+            return float(fn()) if callable(fn) else 0.0
+        except Exception:
+            return 0.0
 
     def _cast_pin_ok(self, *urls: str) -> bool:
         """Nerd: the source trusts one certificate for its server. A TV,
@@ -402,6 +536,9 @@ class _CastMixin:
         Asked by the playback path after its own checks (a recording, the
         VPN guard); a cast's own come here: the source's trusted
         certificate and the account's connections."""
+        if kind in ("movie", "episode") and not catchup and item \
+                and self._cast_runs():
+            return self._cast_title(url, title, icon_url, key, kind, item)
         if (kind != "live" or catchup or not item
                 or item.get("stream_id") is None or not self._cast_runs()):
             return False
@@ -433,6 +570,7 @@ class _CastMixin:
         self._ms_leave()
         if old.get("sid") is not None and old.get("item"):
             self._prev_live_item = old["item"]
+        self._cast_drop_feed()
         self._cast_ctx = {
             "sid": sid,
             "archive": bool(item.get("tv_archive")
@@ -455,6 +593,89 @@ class _CastMixin:
         self.show_cast_strip(device, title)
         self._cast_zap_send()
         return True
+
+    def _cast_title(self, url: str, title: str, icon_url, key, kind: str,
+                    item) -> bool:
+        """A film or an episode picked while a cast runs: to the same
+        receiver, from its resume point, as a local start would - the
+        scrobbles, a media server's report, History, the episode queue."""
+        timer = getattr(self, "_preview_timer", None)
+        if timer is not None:
+            timer.stop()
+        device = self._cast_device
+        if not self._cast_pin_ok(url) or not self._conn_ok_cast(url):
+            return True
+        old = self._cast_ctx or {}
+        if old.get("key") == key and old.get("kind") == kind:
+            log.info("cast: that title is on %s already", device)
+            return True
+        self._save_cast_position()
+        self._failover_leave(url, key)
+        self._trakt_stop_current()
+        self._simkl_stop_current()
+        self._ms_leave()
+        if old.get("sid") is not None and old.get("item"):
+            self._prev_live_item = old["item"]
+        self._cast_drop_feed()
+        rkind = self._CAST_RESUME_KIND.get(kind)
+        start = self._resume_offset(key, kind, item)
+        audio, subs = self._cast_title_tracks(kind, key, device)
+        self._cast_ctx = {
+            "sid": None, "archive": False, "title": title,
+            "group": self._RESUME_GROUP.get(rkind or ""), "key": key,
+            "item": item, "kind": kind, "row_url": url, "row_source": url,
+            "url": url, "source": url, "codecs": [], "height": 0, "fps": 0.0,
+            "audio": audio, "subs": subs, "duration": 0.0, "tracks": {},
+            "start": float(start or 0.0),
+            "_zap_pending": True,
+        }
+        self._last_playback = {"url": url, "title": title,
+                               "icon_url": icon_url, "key": key,
+                               "kind": kind, "item": item,
+                               "series_ctx": (self.series_ctx
+                                              if kind == "episode" else None)}
+        if kind == "episode":
+            # The queue the next episode comes from, as a local start keeps.
+            queue = getattr(self, "_ep_queue_override", None)
+            idx = getattr(self, "_ep_index_override", -1)
+            self._ep_queue_override, self._ep_index_override = None, -1
+            if queue is None and self.series_ctx:
+                queue = [e for e in (self.all_items or [])
+                         if not e.get("_header")]
+                idx = next((i for i, e in enumerate(queue)
+                            if e is item or self._item_key(e) == key), -1)
+            self._last_playback["ep_queue"] = queue or []
+            self._last_playback["ep_index"] = idx
+        self._trakt_start_for_item(kind, item)
+        self._simkl_start_for_item(kind, item)
+        self._ms_started(url, key, kind, item, float(start or 0.0))
+        log.info("cast: %s to %s, from %d s", for_log(title), device,
+                 int(start or 0))
+        self._set_status(tr("cast_starting", name=device))
+        self.show_cast_strip(device, title)
+        self._cast_zap_send()
+        return True
+
+    def _cast_title_tracks(self, kind: str, key, device) -> tuple:
+        """The sound track (and subtitle) remembered for this title, as
+        the cast takes them: a Chromecast through the converter, AirPlay
+        the sound track, a TV or a Kodi neither (it plays the stream as
+        it is). The default sound track is no choice - it keeps a cast
+        native."""
+        if self._cast_plays_as_is(device):
+            return None, None
+        prefs = self._track_prefs()
+        pref = prefs.get(f"{kind}:{key}")
+        if not isinstance(pref, dict):
+            pref = next((prefs[k] for k in self._series_pref_keys(kind)
+                         if isinstance(prefs.get(k), dict)), None) or {}
+        aid, sid = pref.get("aid"), pref.get("sid")
+        audio = ({"index": int(aid) - 1}
+                 if isinstance(aid, int) and int(aid) > 1 else None)
+        subs = ({"index": int(sid) - 1}
+                if isinstance(sid, int) and int(sid) > 0
+                and not self._cast_on_airplay() else None)
+        return audio, subs
 
     def _cast_zap_send(self) -> None:
         """Send the channel the cast should show, unless one is on its way:
@@ -480,8 +701,38 @@ class _CastMixin:
         device it is on (AirPlay swaps the item in the player it has)."""
         if gen != self._cast_zap_gen:
             raise LocalizedError("cast_stopped")
+        audio, subs = ctx.get("audio"), ctx.get("subs")
+        duration = float(ctx.get("duration") or 0.0)
+        if ctx.get("kind") in ("movie", "episode") \
+                and not self._cast_on_airplay() \
+                and not self._cast_plays_as_is(device):
+            # A Chromecast is told the film's length (it is what lets the
+            # strip move within it), and a remembered subtitle needs its
+            # kind - from one look into the stream, once the converter of
+            # the last one has let go of the account's connection.
+            if settle:
+                self.cast.bridge.stop()
+                time.sleep(1.5)
+                settle = False
+            from ..providers.cast_bridge import probe_tracks
+            try:
+                found = probe_tracks(ctx.get("source") or ctx["url"]) or {}
+            except Exception as e:
+                log.info("cast: could not look into the title (%s)", e)
+                found = {}
+            duration = float(found.get("duration") or duration or 0.0)
+            ctx["duration"] = duration
+            ctx["tracks"] = {"audio": found.get("audio") or [],
+                             "subtitle": found.get("subtitle") or []}
+            if subs is not None:
+                hit = next((t for t in found.get("subtitle") or []
+                            if t.get("index") == subs.get("index")), None)
+                subs = dict(subs, codec=hit.get("codec") or "",
+                            lang=hit.get("lang") or "") if hit else None
+                ctx["subs"] = subs
         self.cast.cast(device, ctx["url"], ctx.get("title") or "dopeIPTV",
-                       [], None, None, 0.0, 0.0, settle, ctx.get("source"),
+                       [], audio, subs, float(ctx.get("start") or 0.0),
+                       duration, settle, ctx.get("source"),
                        quality, 0, 0.0, dvr=bool(ctx.get("archive")))
         return gen
 
@@ -557,6 +808,11 @@ class _CastMixin:
             # whoever heard of it hears it stopped.
             self._cast_zap_gen += 1
             self._cast_hooks_end()
+            self._cast_drop_feed(ending=True)
+        elif ctx.get("feed") is not None and not self._cast_takes_feed(device):
+            # A TV or a Kodi took the address as it is: no pieces read here.
+            self._cast_drop_feed(ending=True)
+            ctx["archive_from"] = None
         self._cast_key = ctx.get("key") if device else None
         self._cast_group = ctx.get("group") if device else None
         if self._cast_group is None and device:
@@ -581,6 +837,9 @@ class _CastMixin:
         self.cast_bar_pause.setVisible(
             bool(device) and (not ctx.get("sid") or self.cast.bridged()))
         self.cast_bar_ts.setVisible(bool(device) and bool(ctx.get("archive")))
+        airplay_btn = getattr(self, "cast_bar_airplay", None)
+        if airplay_btn is not None:
+            airplay_btn.setVisible(bool(device) and self._cast_on_airplay())
         if not device:
             self._cast_tick.stop()
             bar.hide()
@@ -612,11 +871,29 @@ class _CastMixin:
             pl.hide()
         self._record_cast_history()
         self._show_cast_progress()
-        self.cast_bar_lbl.setText(tr("cast_casting_to", name=device))
+        self._show_cast_label()
         self.cast_bar_title.setText(title or "")
         self.cast_bar_title.setVisible(bool(title))
         self._show_cast_volume()
         bar.show()
+
+    def _show_cast_label(self) -> None:
+        """What the cast is doing, on the strip: "Casting to X" - and for
+        AirPlay, until the Apple TV has the stream, what to click."""
+        device = self._cast_device
+        if not device:
+            return
+        waiting = getattr(self.cast, "waiting_for_route", None)
+        text = (tr("airplay_pick_window")
+                if self._cast_on_airplay() and callable(waiting) and waiting()
+                else tr("cast_casting_to", name=device))
+        self.cast_bar_lbl.setText(text)
+
+    def _cast_airplay_window(self) -> None:
+        """The strip's AirPlay button: the AirPlay window back."""
+        show = getattr(self, "_airplay_show_window", None)
+        if callable(show):
+            show()
 
     def _history_extra(self, kind: str, item, title: str) -> dict | None:
         """What a History row needs beyond its address, for this kind.
@@ -936,7 +1213,17 @@ class _CastMixin:
         when = max(floor, min(when, now - timedelta(minutes=1)))
         self._cast_paused_at = None
         self.cast_bar_pause.setIcon(cast_strip_icon("pause", P["text"]))
-        self._cast_from_archive(when)
+        feed = self._cast_feed()
+        if feed is not None and self.cast.bridged():
+            # Within what the playlist holds: the TV moves there itself.
+            at = when.timestamp() - feed.first_wall
+            if 0 <= at <= self._cast_written() - 3:
+                log.info("cast: moving within the playlist to %s",
+                         when.strftime("%H:%M:%S"))
+                threading.Thread(target=self.cast.seek, args=(at,),
+                                 daemon=True).start()
+                return
+        self._cast_from_moment(when)
 
     def _cast_go_live(self) -> None:
         """Back to the live edge, off the archive."""
@@ -945,6 +1232,7 @@ class _CastMixin:
         if not device or not url:
             return
         log.info("cast: back to the live edge")
+        self._cast_drop_feed()
         ctx.update(url=url, source=ctx.get("row_source") or url,
                    archive_from=None)
         self._cast_paused_at = None
@@ -1004,7 +1292,33 @@ class _CastMixin:
         at = self._cast_moment()
         log.info("cast: the archive ran out at %s - asking for the next of it",
                  at.strftime("%H:%M:%S"))
+        feed = ctx.get("feed")
+        if feed is not None and feed.source is not None:
+            self._cast_from_moment(at)      # the rewind buffer's pieces
+            return
         self._cast_from_archive(at)
+
+    def _cast_title_ended(self) -> bool:
+        """An episode the receiver played to its end: its point and its
+        scrobble end as at the player's end, and the next episode follows
+        on the TV. True when that is under way."""
+        ctx = self._cast_ctx or {}
+        if (ctx.get("kind") != "episode" or ctx.get("_ended")
+                or not self._cast_device
+                or not str(getattr(self.cast, "state", "")
+                           ).startswith("IDLE/FINISHED")
+                or getattr(self, "_cast_zap_busy", False)):
+            return False
+        ctx["_ended"] = True
+        log.info("cast: the episode played to its end on %s",
+                 self._cast_device)
+        self._save_cast_position()
+        self._trakt_stop_current()
+        self._simkl_stop_current()
+        self._ms_leave(ended=True)
+        if not (self._autoplay_next_episode() and self._has_next_episode()):
+            return False
+        return bool(self._advance_to_next_episode())
 
     def _cast_plays_as_is(self, name: str | None) -> bool:
         """A DLNA TV or a Kodi: it plays the stream as it is."""
@@ -1058,6 +1372,9 @@ class _CastMixin:
             return
         if not self._cast_tick.isActive():
             self._cast_tick.start()
+        self._show_cast_label()
+        if self._cast_title_ended():
+            return
         self._cast_continue_archive()
         if span is not None:
             self._show_cast_timeline(*span)
@@ -1262,6 +1579,10 @@ class _CastMixin:
             return
         at = self.cast.position() if start is None else start
         ctx.update(audio=audio, subs=subs)
+        if self._cast_feed() is not None:
+            # The pieces again, from the moment on the TV, with the track.
+            self._cast_from_moment(self._cast_moment())
+            return
         log.info("cast: switching tracks and picking up at %d s", at)
         title = ctx.get("title") or "dopeIPTV"
         run_async(
@@ -1319,6 +1640,48 @@ class _CastMixin:
         self.cast.bridge.cap = int(max(0.1, gb) * 10**9)
         threading.Thread(target=self.cast.pause, daemon=True).start()
 
+    def _cast_from_moment(self, when) -> None:
+        """Cast this channel from *when*: out of the rewind buffer while
+        the cast reads it and it still holds that moment, else out of the
+        provider's archive."""
+        ctx, device = self._cast_ctx or {}, self._cast_device
+        feed = self._cast_feed()
+        session = feed.source if feed is not None else None
+        span = session.span() if session is not None and \
+            getattr(session, "streaming", False) else None
+        if span is not None and device and span[0] <= when.timestamp():
+            new = self._buffer_feed(session, when.timestamp())
+            if new is not None:
+                self._cast_send_feed(new)
+                return
+        if ctx.get("archive"):
+            self._cast_from_archive(when)
+
+    def _cast_send_feed(self, feed) -> None:
+        """Cast the running channel from *feed*'s pieces, as one stream."""
+        ctx, device = self._cast_ctx or {}, self._cast_device
+        # The one on the TV now plays on until this one replaces it - the
+        # bridge closes it then.
+        ctx.update(url=feed.first_url or ctx.get("url"),
+                   source=feed.first_url or ctx.get("source"),
+                   archive_from=datetime.fromtimestamp(feed.first_wall),
+                   feed=feed)
+        title = ctx.get("title") or "dopeIPTV"
+        log.info("cast: %s from %s, in pieces as one playlist",
+                 for_log(title),
+                 datetime.fromtimestamp(feed.first_wall).strftime("%H:%M:%S"))
+        run_async(
+            self.pool,
+            lambda: self.cast.cast(device, ctx.get("url") or "", title,
+                                   self._local_codecs(), ctx.get("audio"),
+                                   None, start=0.0, source=ctx.get("source"),
+                                   quality=self._cast_quality(),
+                                   height=ctx.get("height") or 0,
+                                   fps=ctx.get("fps") or 0.0, dvr=True,
+                                   feed=feed),
+            lambda _n: self.show_cast_strip(device, title),
+            lambda msg: self._error(tr("cast_failed", msg=msg)))
+
     def _cast_from_archive(self, paused_at) -> None:
         """Cast this channel from a moment in the provider's catch-up.
 
@@ -1351,6 +1714,18 @@ class _CastMixin:
         # that ignore Range, replaying television at random - are off for
         # timeshift input.
         paused_at = min(paused_at, datetime.now() - self.ARCHIVE_LAG)
+        if self._cast_takes_feed(device):
+            # A converter here: the archive in pieces, one playlist on the
+            # TV - no new stream where a stretch ends.
+            feed = self._archive_feed(sid, paused_at)
+            if feed is not None:
+                log.info("cast: resuming %s from %s (%d min behind live)",
+                         for_log(ctx.get("title") or ""),
+                         paused_at.strftime("%H:%M:%S"),
+                         max(1, int((datetime.now() - paused_at
+                                     ).total_seconds() // 60)))
+                self._cast_send_feed(feed)
+                return
         # Addressed by the minute; the seconds ride along as ffmpeg's own
         # starting offset, so nothing already watched is replayed.
         minute = paused_at.replace(second=0, microsecond=0)

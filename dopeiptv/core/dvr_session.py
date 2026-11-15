@@ -52,6 +52,10 @@ class DvrSession:
         self._freezing: threading.Thread | None = None
         self._lock = threading.Lock()
         self.connections = 0
+        # Who else reads it while it is not watched here: a cast fed from
+        # the buffer (providers/cast_feed.py) keeps it streaming, as a
+        # recording does.
+        self._holds: set[str] = set()
         self.ingest.start()
 
     # -- where to play from --------------------------------------------------
@@ -147,6 +151,26 @@ class DvrSession:
     def recording(self) -> bool:
         with self._lock:
             return any(r.alive and not r.stopping for r in self.recorders)
+
+    def hold(self, who: str) -> None:
+        """*who* reads the buffer from elsewhere (a cast): left by the
+        player, it goes on streaming until let go."""
+        with self._lock:
+            self._holds.add(who)
+
+    def let_go(self, who: str) -> None:
+        with self._lock:
+            if who not in self._holds:
+                return
+            self._holds.discard(who)
+        cb = self.on_recording_done
+        if cb is not None:
+            cb(self)
+
+    @property
+    def held(self) -> bool:
+        with self._lock:
+            return bool(self._holds)
 
     def _recording_ended(self, rec: BufferRecorder) -> None:
         with self._lock:

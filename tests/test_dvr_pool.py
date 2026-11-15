@@ -196,3 +196,19 @@ def test_close_all_ends_recordings_and_wipes_the_buffers(tmp_path):
     assert not rec.alive and out.stat().st_size == 3 * len(PKT)
     assert wait_until(lambda: not root.exists(), 5)
     assert pool.sessions == []
+
+
+def test_a_cast_reading_the_buffer_keeps_the_channel_streaming(tmp_path):
+    """A cast fed from the buffer (providers/cast_feed.py) holds it as a
+    recording does: the player leaving it does not freeze it, and it goes
+    frozen once the cast lets go."""
+    pool = _pool(tmp_path)
+    s = pool.open("http://p/live/1.ts", key="live:1")
+    _feed(s, 3)
+    s.hold("cast")
+    pool.release(s)
+    assert s.streaming and not s.frozen and s.held
+    s.let_go("cast")
+    s.let_go("cast")                        # twice changes nothing more
+    assert s.frozen and not s.held
+    pool.close_all()

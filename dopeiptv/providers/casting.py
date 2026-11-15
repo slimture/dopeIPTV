@@ -177,4 +177,20 @@ class CastHub:
             except Exception as e:
                 log.info("cast: stopping the old cast failed (%s)", e)
         self._current = mgr
+        if not getattr(mgr, "TAKES_FEED", False):
+            # A TV or a Kodi plays an address as it is: the pieces of an
+            # archive or the rewind buffer are a converter's to read.
+            kwargs.pop("feed", None)
         return mgr.cast(device_name, url, title, *args, **kwargs)
+
+    def waiting_for_route(self) -> bool:
+        """AirPlay: the Apple TV not picked yet, or not playing the stream
+        yet (what the cast strip says meanwhile)."""
+        fn = getattr(self._current, "waiting_for_route", None)
+        return bool(callable(fn) and fn())
+
+    def takes_feed(self, name: str | None) -> bool:
+        """Whether *name*'s kind of receiver reads a cast_feed.Feed (the
+        converter here does), rather than an address as it is."""
+        return bool(name) and bool(getattr(self._for(name), "TAKES_FEED",
+                                           False))

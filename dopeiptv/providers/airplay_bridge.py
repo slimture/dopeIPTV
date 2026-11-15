@@ -20,6 +20,12 @@ keeps a rolling live playlist (LIVE_WINDOW_S of it, so a pause holds); a
 film keeps every segment and its playlist ends as a VOD one, so the TV's
 own remote can scrub it.
 
+The archive and the rewind buffer come in pieces (providers/cast_feed.py):
+then ffmpeg reads them one after the other from its stdin, and the playlist
+is one EVENT playlist that grows for as long as the cast runs - the Apple
+TV plays on from one piece into the next, and can go back within what is
+written.
+
 Platform-neutral on purpose: the AVKit side is services/airplay_macos.py,
 and everything here is tested on Linux with a stand-in for ffmpeg.
 """
@@ -37,11 +43,11 @@ import time
 from dataclasses import dataclass, replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable
-from urllib.parse import urlsplit
 
 from ..core.log import log
 from ..core.player_exec import NO_WINDOW
 from ..core.exclusive_bind import ExclusiveBindMixin
+from . import cast_feed
 from .cast_bridge import (_endless, _hls_file, _hls_name_ok, _timeshift,
                           cast_cache_dir, ffmpeg_path, lan_address,
                           video_encoder)
@@ -103,11 +109,7 @@ def split_codecs(codecs: list[str] | tuple[str, ...]) -> tuple[list[str], list[s
 def is_loopback(url: str) -> bool:
     """An address on this computer: the rewind buffer's own server, a
     local proxy. An Apple TV can never reach one."""
-    try:
-        host = (urlsplit(url).hostname or "").lower()
-    except ValueError:
-        return False
-    return host in ("localhost", "::1", "0.0.0.0") or host.startswith("127.")
+    return cast_feed.is_loopback(url)
 
 
 def direct_ok(url: str) -> bool:
@@ -284,15 +286,23 @@ def probe(source: str, net: list[str] | None = None, exe: str | None = None,
 
 
 def ffmpeg_args(exe: str, p: Plan, start: float = 0.0,
-                net: list[str] | None = None) -> list[str]:
+                net: list[str] | None = None, feed: bool = False) -> list[str]:
     """The command that writes *p* as HLS into the folder it runs in.
 
     Every name is relative and ffmpeg runs with the folder as its working
     directory, so the playlist, the init segment and the segments land side
     by side whatever this ffmpeg's idea of where an init file goes. The
     segments are fragmented MP4: what HEVC needs on an Apple TV, and what
-    carries AC-3 and E-AC-3 there."""
-    src = p.url if "://" in p.url else os.path.abspath(p.url)
+    carries AC-3 and E-AC-3 there.
+
+    *feed*: the pieces of a broadcast on stdin (cast_feed.Feed), written
+    as one EVENT playlist that keeps every segment."""
+    if feed:
+        src, opts = cast_feed.INPUT, list(cast_feed.INPUT_OPTIONS)
+    else:
+        src = p.url if "://" in p.url else os.path.abspath(p.url)
+        opts = [*_probe_limits(src), *(net or []),
+                *(["-ss", f"{start:.3f}"] if start > 0 else [])]
     if p.video == "copy":
         video = ["-c:v", "copy", *(["-tag:v", "hvc1"] if p.hevc else [])]
     else:
@@ -313,15 +323,15 @@ def ffmpeg_args(exe: str, p: Plan, start: float = 0.0,
              if p.audio == "copy" else
              ["-c:a", "aac", "-ac", "2", "-b:a", "192k"])
     keep = (["-hls_list_size", str(LIVE_WINDOW_S // SEGMENT_S),
-             "-hls_flags", "delete_segments+temp_file"] if p.live else
+             "-hls_flags", "delete_segments+temp_file"] if p.live and not feed
+            else
             # A film keeps every segment; ENDLIST at its end makes the
             # playlist a whole one (served as VOD, see serve_playlist).
             ["-hls_list_size", "0", "-hls_playlist_type", "event",
              "-hls_flags", "temp_file"])
     return [
-        exe, "-hide_banner", "-loglevel", "error", "-nostdin",
-        *_probe_limits(src), *(net or []),
-        *(["-ss", f"{start:.3f}"] if start > 0 else []),
+        exe, "-hide_banner", "-loglevel", "error",
+        *([] if feed else ["-nostdin"]), *opts,
         "-fflags", "+genpts", "-i", src,
         "-map", "0:v:0?", "-map", f"0:a:{p.audio_track}?", "-sn", "-dn",
         *video, *audio, "-max_muxing_queue_size", "1024",
@@ -331,9 +341,12 @@ def ffmpeg_args(exe: str, p: Plan, start: float = 0.0,
     ]
 
 
-def serve_playlist(body: bytes) -> bytes:
+def serve_playlist(body: bytes, from_start: bool = False) -> bytes:
     """A playlist as it goes out: a film's, once ffmpeg has finished it,
-    as the VOD playlist it now is."""
+    as the VOD playlist it now is; a broadcast's pieces (*from_start*)
+    played from their first segment, not from the newest."""
+    if from_start:
+        body = cast_feed.start_at_beginning(body)
     if b"#EXT-X-ENDLIST" in body:
         return body.replace(b"#EXT-X-PLAYLIST-TYPE:EVENT",
                             b"#EXT-X-PLAYLIST-TYPE:VOD")
@@ -452,7 +465,7 @@ class _Handler(BaseHTTPRequestHandler):
             return
         ext = os.path.splitext(name)[1]
         if ext == ".m3u8":
-            data = serve_playlist(data)
+            data = serve_playlist(data, bridge.feed is not None)
         self.send_response(200)
         self.send_header("Content-Type",
                          _TYPES.get(ext, "application/octet-stream"))
@@ -483,6 +496,8 @@ class AirPlayBridge:
         # How much room a pause may take - set by the cast strip; the live
         # window (LIVE_WINDOW_S) is what bounds it here.
         self.cap = 0
+        #: The pieces ffmpeg reads (the archive, the rewind buffer), if any.
+        self.feed: cast_feed.Feed | None = None
         self._own: set[str] = set()
         self._server: _Server | None = None
         self._proc: subprocess.Popen[bytes] | None = None
@@ -504,11 +519,16 @@ class AirPlayBridge:
         return p is not None and p.poll() is None
 
     def start(self, p: Plan, start: float = 0.0,
-              net: list[str] | None = None) -> str:
+              net: list[str] | None = None,
+              feed: cast_feed.Feed | None = None,
+              net_for: cast_feed.NetFor | None = None) -> str:
         """Begin converting *p* and serving it; returns the playlist's
         address on the LAN. ffmpeg starts at once: by the time someone has
-        picked their Apple TV, the first segments are there."""
-        self.stop()
+        picked their Apple TV, the first segments are there. With *feed*,
+        ffmpeg reads its pieces (each read with *net_for*'s options); the
+        bridge owns it from now and closes it when another stream replaces
+        it or the bridge stops."""
+        self._stop(keep=feed)
         exe = self.exe or ffmpeg_path()
         if not exe:
             raise RuntimeError("no ffmpeg")
@@ -525,15 +545,19 @@ class AirPlayBridge:
         self._own = {"127.0.0.1", "::1", "::ffff:127.0.0.1", host,
                      f"::ffff:{host}"}
         self.url = f"http://{host}:{server.server_address[1]}{self.prefix}{PLAYLIST}"
-        args = ffmpeg_args(exe, p, start, net)
+        args = ffmpeg_args(exe, p, start, net, feed=feed is not None)
         try:
             self._proc = subprocess.Popen(
-                args, cwd=self.folder, stdin=subprocess.DEVNULL,
+                args, cwd=self.folder,
+                stdin=subprocess.PIPE if feed is not None else subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
                 creationflags=NO_WINDOW)
         except OSError as e:
             self.stop()
             raise RuntimeError(f"ffmpeg did not start ({e})") from e
+        if feed is not None and self._proc.stdin is not None:
+            self.feed = feed
+            feed.attach(self._proc.stdin, exe, net_for)
         # Its pid beside its files: a run that crashes leaves ffmpeg pulling
         # the channel - one of the account's connections - and the next
         # start ends it (sweep_leftovers).
@@ -546,7 +570,9 @@ class AirPlayBridge:
                          daemon=True).start()
         log.info("airplay bridge: serving on port %d (%s; picture %s, sound "
                  "%s, %s)", server.server_address[1], p.why,
-                 p.video, p.audio, "live" if p.live else "film")
+                 p.video, p.audio,
+                 f"the {feed.kind} in pieces, one playlist" if feed is not None
+                 else "live" if p.live else "film")
         if p.costs_cpu:
             log.info("airplay bridge: the picture is converted to H.264 "
                      "here (%s) - this costs the processor", video_encoder())
@@ -577,6 +603,10 @@ class AirPlayBridge:
                 return f.read()
         except OSError:
             return b""
+
+    def written(self) -> float:
+        """Seconds the playlist holds - how far the TV can move in it."""
+        return cast_feed.written(self._playlist())
 
     def ready(self) -> bool:
         """The playlist has enough to start: LEAD segments of a channel (an
@@ -616,10 +646,17 @@ class AirPlayBridge:
             log.info("airplay bridge: the receiver is reading the stream")
 
     def stop(self) -> None:
+        self._stop()
+
+    def _stop(self, keep: cast_feed.Feed | None = None) -> None:
         with self._lock:
             proc, self._proc = self._proc, None
             server, self._server = self._server, None
             folder, self.folder = self.folder, None
+            feed, self.feed = self.feed, None
+        if feed is not None:
+            # Done with, unless it is the one being started again.
+            feed.detach() if feed is keep else feed.close()
         if proc is not None:
             for step, grace in ((proc.terminate, 1.0), (proc.kill, 0.5)):
                 try:

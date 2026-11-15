@@ -173,6 +173,7 @@ files = [
     "dopeiptv/services/media_windows.py",
     "dopeiptv/services/airplay_macos.py",
     "dopeiptv/providers/airplay_bridge.py",
+    "dopeiptv/providers/cast_feed.py",
     "dopeiptv/services/notify.py",
     "dopeiptv/services/popular.py",
     "dopeiptv/media/subtitle_text.py",

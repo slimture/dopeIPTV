@@ -19,6 +19,12 @@ says so in the log.
 The bridge is started only after a direct cast has already been refused, it
 serves exactly one stream at a time, and stopping the cast stops both the
 server and ffmpeg.
+
+The archive and the rewind buffer come in pieces (providers/cast_feed.py):
+then ffmpeg reads them one after the other from its stdin and writes one
+growing HLS playlist - the receiver plays on from one piece into the next
+and can go back within what is written, and a pause still costs the
+provider nothing (the segments go on being written).
 """
 
 from __future__ import annotations
@@ -39,6 +45,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from ..core.log import log
 from ..core.player_exec import NO_WINDOW
 from ..core.exclusive_bind import ExclusiveBindMixin
+from . import cast_feed
 
 # What a Cast receiver decodes. Anything outside these has to be re-encoded;
 # anything inside is copied through untouched.
@@ -555,6 +562,43 @@ def hls_args(exe: str, source: str, copy_video: bool, folder: str,
     ]
 
 
+def feed_args(exe: str, copy_video: bool, folder: str, audio: int = 0,
+              quality: str = "original") -> list[str]:
+    """The command for a broadcast in pieces (cast_feed.Feed on stdin):
+    one HLS playlist that keeps every segment (EVENT), so the receiver
+    plays from one piece into the next and can go back within it."""
+    height, fps = QUALITY.get(quality, (0, 0))
+    if height or fps:
+        copy_video = False
+    chain: list[str] = []
+    if not copy_video:
+        chain.append("yadif=deint=1")
+    if height:
+        chain.append(f"scale=-2:{height}")
+    return [
+        exe, "-hide_banner", "-loglevel", "error",
+        *cast_feed.INPUT_OPTIONS, "-fflags", "+genpts", "-i", cast_feed.INPUT,
+        "-map", "0:v:0", "-map", f"0:a:{audio}",
+        *(["-vf", ",".join(chain)] if chain else []),
+        *(["-r", str(fps)] if fps else []),
+        "-c:v", "copy" if copy_video else video_encoder(),
+        *([] if copy_video else
+          (["-b:v", "4M"] if video_encoder() != "libx264" else
+           ["-preset", "veryfast", "-crf", "23",
+            "-maxrate", "6M", "-bufsize", "12M"])),
+        "-c:a", "aac", "-ac", "2", "-b:a", "192k",
+        "-max_muxing_queue_size", "1024",
+        "-f", "hls", "-hls_time", str(HLS_SEGMENT),
+        "-hls_list_size", "0", "-hls_playlist_type", "event",
+        "-hls_flags", "temp_file",
+        "-hls_segment_filename", os.path.join(folder, "v%05d.ts"),
+        os.path.join(folder, FEED_PLAYLIST),
+    ]
+
+
+FEED_PLAYLIST = "index.m3u8"
+
+
 class _Spool:
     """The recording behind a cast, in pieces, so what has been watched can
     be thrown away while the rest keeps arriving.
@@ -920,6 +964,8 @@ class _Handler(BaseHTTPRequestHandler):
             return
         if name == "master.m3u8":
             body = _autoselect_subtitles(body, bridge.sub_lang)
+        elif bridge.feed is not None and name == FEED_PLAYLIST:
+            body = cast_feed.start_at_beginning(body)
         elif name.endswith(".vtt"):
             body = _timestamp_map(body)
         # Once, and then quiet. Whether the receiver fetches the subtitles
@@ -1004,6 +1050,8 @@ class CastBridge:
         # rendition rather than being drawn into it.
         self.hls = False
         self.hls_dir: str | None = None
+        #: The pieces ffmpeg reads (the archive, the rewind buffer), if any.
+        self.feed: cast_feed.Feed | None = None
         self.said_subs = False
         # Whether the receiver has been handed the opening playlist yet.
         # Only that first one waits for a head start.
@@ -1073,13 +1121,19 @@ class CastBridge:
     def start(self, source: str, codecs: list[str] | None = None,
               audio: int = 0, subs: int | None = None,
               sub_codec: str = "", start_at: float = 0.0,
-              quality: str = "original", sub_lang: str = "") -> str:
+              quality: str = "original", sub_lang: str = "",
+              feed: cast_feed.Feed | None = None) -> str:
         """Begin serving *source* re-muxed for the receiver; returns the URL.
 
         ffmpeg is not started here - it starts when the Chromecast actually
         asks for the stream, so a receiver that never connects costs nothing.
+        With *feed*, ffmpeg reads the broadcast's pieces from it instead of
+        *source* (which is then only what the logs name), and the receiver
+        gets one HLS playlist. No subtitle rides along a feed. The bridge
+        owns *feed* from now: it is closed when another stream replaces it
+        or the bridge stops.
         """
-        self.stop()
+        self._stop(keep=feed)
         self.fatal = ""          # a new run gets to fail on its own terms
         self.generation += 1
         source = self._safe_source(source)
@@ -1111,11 +1165,15 @@ class CastBridge:
         # A text subtitle goes beside the picture as a WebVTT rendition,
         # which means HLS: a set of files rather than one long response.
         self.hls = subs is not None and sub_codec not in BITMAP_SUBS
+        self.feed = feed
+        if feed is not None:
+            self.subs, self.hls, self.start_at = None, True, 0.0
         self.prefix = f"/{secrets.token_urlsafe(12)}/"
         if self.hls:
             self.hls_dir = os.path.join(self._tmpdir(), "hls")
             os.makedirs(self.hls_dir, exist_ok=True)
-            self.path = self.prefix + "master.m3u8"
+            self.path = self.prefix + (FEED_PLAYLIST if feed is not None
+                                       else "master.m3u8")
         else:
             self.path = self.prefix + "stream.mp4"
         self._server = _Server(("0.0.0.0", 0), _Handler)
@@ -1145,7 +1203,9 @@ class CastBridge:
         log.info("cast bridge: serving %s (video %s, audio track %d -> aac%s)",
                  url, "copied" if self.copy_video else "re-encoded",
                  self.audio,
-                 (f", subtitle track {subs} as webvtt beside it" if self.hls
+                 (f", the {feed.kind} in pieces as one playlist"
+                  if feed is not None else
+                  f", subtitle track {subs} as webvtt beside it" if self.hls
                   else f", subtitle track {subs} drawn in"
                   if subs is not None else "")
                  + ("" if quality == "original" else f", {quality}"))
@@ -1279,6 +1339,17 @@ class CastBridge:
         return (f"{ahead / 1e6:.0f} MB ahead"
                 + (" - SPOOL FULL, ffmpeg is blocked" if spool.full else ""))
 
+    def written(self) -> float:
+        """Seconds a feed's playlist holds - how far the receiver can
+        move in it; 0 for anything else."""
+        if self.feed is None or not self.hls_dir:
+            return 0.0
+        try:
+            with open(os.path.join(self.hls_dir, FEED_PLAYLIST), "rb") as f:
+                return cast_feed.written(f.read())
+        except OSError:
+            return 0.0
+
     def filling(self, proc: subprocess.Popen) -> bool:
         """Whether more is still on its way into the spool."""
         th = self._spools.get(proc)
@@ -1408,7 +1479,10 @@ class CastBridge:
         if self.fatal:
             log.info("cast bridge: not trying again - %s", self.fatal)
             return None
-        if self.hls:
+        if self.feed is not None:
+            args = feed_args(exe, self.copy_video, self.hls_dir or "",
+                             self.audio, self.quality)
+        elif self.hls:
             args = hls_args(exe, self.source, self.copy_video,
                             self.hls_dir or "", self.audio, self.subs,
                             self.start_at, self.quality,
@@ -1429,13 +1503,17 @@ class CastBridge:
                      "connection (%.1f s)", wait)
             time.sleep(wait)
         log.info("cast bridge: starting ffmpeg")
+        feed = self.feed
         try:
             proc = subprocess.Popen(
                 args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                stdin=subprocess.PIPE if feed is not None else None,
                 creationflags=NO_WINDOW)
         except Exception as e:
             log.info("cast bridge: could not start ffmpeg (%s)", e)
             return None
+        if feed is not None and proc.stdin is not None:
+            feed.attach(proc.stdin, exe, _input_options)
         # ffmpeg says why it failed on stderr and nowhere else. Throwing that
         # away would leave exactly the kind of silent failure this whole
         # feature exists to end, so it goes into the log (loglevel is 'error',
@@ -1529,8 +1607,15 @@ class CastBridge:
                 continue
 
     def stop(self) -> None:
+        self._stop()
+
+    def _stop(self, keep: cast_feed.Feed | None = None) -> None:
         with self._lock:
             procs, self._procs = list(self._procs), []
+            feed, self.feed = self.feed, None
+        if feed is not None:
+            # Done with, unless it is the one being started again.
+            feed.detach() if feed is keep else feed.close()
         for p in procs:
             self.kill(p)
         ran = self._server is not None

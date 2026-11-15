@@ -19,6 +19,8 @@ surface and a provider, and none of this touches either.
 import inspect
 import os
 import threading
+import time
+import types
 
 import pytest
 
@@ -45,7 +47,10 @@ _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_set_cast_quality", "_toggle_cast_mute", "_show_cast_volume",
             "_cast_tracks_menu", "manage_cast", "_cast_ended_there",
             "_cast_plays_as_is", "_cast_is_kodi", "_cast_began",
-            "_cast_hooks_end", "_cast_on_airplay")
+            "_cast_hooks_end", "_cast_on_airplay", "_show_cast_label",
+            "_cast_drop_feed", "_cast_takes_feed", "_cast_title_ended",
+            "_cast_feed", "_cast_written", "_cast_from_moment",
+            "_cast_send_feed", "_archive_feed", "_buffer_feed")
 
 
 class _Resume0:
@@ -2402,3 +2407,73 @@ def test_a_kodi_stopped_by_its_own_remote_takes_the_strip_down():
     assert not w.cast.stopped.is_set()
 
 
+
+
+def test_the_buffer_s_loopback_address_never_reaches_a_chromecast(monkeypatch):
+    """The rewind buffer's server is on this computer: a Chromecast is
+    handed the converter's address for it, never the loopback one - and
+    the pieces of a feed go to the converter as they are."""
+    import types
+    from dopeiptv.providers import chromecast as cm
+    m = _manager(monkeypatch)
+    monkeypatch.setattr(cm.CastBridge, "available", staticmethod(lambda: True))
+    asked = []
+    monkeypatch.setattr(m.bridge, "start", lambda *a, **k: (
+        asked.append((a, k)), "http://192.168.1.5:5000/t/stream.mp4")[1])
+    m.scan()
+    m.cast("Alva TV", "http://127.0.0.1:4321/tok/s/7.ts", "SVT1")
+    assert asked and asked[-1][0][0] == "http://127.0.0.1:4321/tok/s/7.ts"
+    feed = types.SimpleNamespace(kind="rewind buffer")
+    m.cast("Alva TV", "http://p/live/u/pw/1.m3u8", "SVT1", feed=feed)
+    assert asked[-1][1]["feed"] is feed and asked[-1][1]["start_at"] == 0.0
+    plays = [u for u, _c in m.devices[0].plays]
+    assert plays == ["http://192.168.1.5:5000/t/stream.mp4"] * 2, plays
+    assert m.duration == 0.0
+
+
+class _FeedCast(_CastAt):
+    """A cast reading a feed: the converter's playlist holds *written* s."""
+
+    def __init__(self, at, written):
+        super().__init__(at, 0.0)
+        self.seeks = []
+        self.bridge = types.SimpleNamespace(cap=0, hls=True,
+                                            written=lambda: written)
+
+    def bridged(self):
+        return True
+
+    def seek(self, to):
+        self.seeks.append(to)
+
+
+def test_moving_within_what_the_playlist_holds_is_a_seek_on_the_tv(monkeypatch):
+    """The archive in pieces is one playlist on the TV: going back within
+    what is written moves the TV there, no new stream - and the strip's
+    moment follows the TV's position in that playlist."""
+    import dopeiptv.ui.mw_cast as mwmod
+    from datetime import datetime, timedelta
+    w = _with_strip()
+    w._cast_device = "Alva TV"
+    w.cast = _FeedCast(600.0, 1200.0)
+    began = datetime.now() - timedelta(minutes=60)
+    feed = types.SimpleNamespace(first_wall=began.timestamp(), closed=False,
+                                 kind="archive", source=None,
+                                 running=lambda: True)
+    w._cast_ctx = {"archive": True, "sid": 7, "item": {"tv_archive_duration": 3},
+                   "archive_from": began, "feed": feed}
+    w._effective_ts_minutes = lambda it: 180
+    sent = []
+    monkeypatch.setattr(mwmod, "run_async", lambda *a, **k: sent.append(a))
+    assert abs((w._cast_moment() - (began + timedelta(seconds=600))
+                ).total_seconds()) < 1
+    w._cast_to_moment(began + timedelta(minutes=5))
+    end = time.monotonic() + 5
+    while not w.cast.seeks and time.monotonic() < end:
+        time.sleep(0.02)
+    assert w.cast.seeks == [pytest.approx(300.0, abs=1)] and not sent
+    # Beyond what is written: a new stream from there.
+    called = []
+    w._cast_from_moment = lambda when: called.append(when)
+    w._cast_to_moment(began + timedelta(minutes=40))
+    assert called and len(w.cast.seeks) == 1

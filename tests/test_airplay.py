@@ -203,8 +203,8 @@ def fake_ffmpeg(monkeypatch):
     seen = {}
 
     def use(segments=4, how="live"):
-        def args(exe, p, start=0.0, net=None):
-            seen.update(plan=p, start=start, net=net)
+        def args(exe, p, start=0.0, net=None, feed=False):
+            seen.update(plan=p, start=start, net=net, feed=feed)
             return [sys.executable, "-c", _FAKE, str(segments), how]
         monkeypatch.setattr(ab, "ffmpeg_args", args)
         return seen
@@ -927,7 +927,14 @@ def test_apple_s_button_is_in_a_window_of_its_own(qapp, macos):
     assert panel.visible and panel.settings["setWorksWhenModal_"] is True
     assert panel.settings["setFloatingPanel_"] is True
     assert panel.settings["setReleasedWhenClosed_"] is False
-    assert panel.label().text == am.tr("airplay_pick")
+    # Apple's HUD style, small, and nothing but the button and the video
+    # output: what the cast does is said in the cast strip.
+    assert panel.style & am_hud(am)
+    (_x, _y), (w, h) = panel.rect
+    assert w <= 200 and h <= 160, panel.rect
+    assert (video.frame[1][0], video.frame[1][1]) == (160.0, 90.0)
+    assert [type(v) for v in panel.content.subviews] == [_View, _Picker]
+    assert rx.waiting_for_route()
     assert not button.isHidden() and label.text() == am.tr("airplay_pick_window")
     # The dialog's list refreshed, the row redrawn, another stream: the same
     # window and button, never made again.
@@ -943,7 +950,7 @@ def test_apple_s_button_is_in_a_window_of_its_own(qapp, macos):
     _pump(qapp)
     _settle(am, rx)
     assert label.text() == am.tr("airplay_on_tv_window")
-    assert panel.label().text == am.tr("airplay_on_tv")
+    assert not rx.waiting_for_route()
     # Closed once on the TV: the cast goes on, and the dialog brings it back.
     center.post(_CLOSE)
     panel.visible = False
@@ -957,6 +964,41 @@ def test_apple_s_button_is_in_a_window_of_its_own(qapp, macos):
     assert button.isHidden() and label.text() == am.tr("airplay_note")
     dialog.deleteLater()
     _pump(qapp)
+
+
+def am_hud(am):
+    return 1 << 13          # NSWindowStyleMaskHUDWindow
+
+
+def test_the_window_steps_aside_once_the_apple_tv_holds_the_stream(qapp, macos):
+    """A few seconds on the Apple TV and the AirPlay window is ordered out -
+    not closed: the player keeps its layer, so the TV keeps the picture.
+    The strip's AirPlay button brings it back; a route that went before the
+    time was up leaves it where Apple's button can be reached."""
+    am, center = macos
+    rx = am.AirPlayReceiver()
+    rx.cast(am.NAME, "http://p/live/u/pw/1.m3u8", "SVT1", ["h264", "aac"])
+    p, panel = _Player.made[-1], _NSPanel.made[-1]
+    video = panel.video()
+    assert panel.visible and not rx._hide_timer.isActive()
+    p.route(True)
+    _pump(qapp)
+    _settle(am, rx)
+    assert rx._hide_timer.isActive() and panel.visible
+    assert rx._hide_timer.interval() == int(am.PANEL_HIDE_S * 1000)
+    rx._hide_timer.stop()
+    rx._hide_panel()
+    assert not panel.visible and not panel.closed
+    assert video.layer.player is p and rx.active == am.NAME
+    rx.show_window()
+    assert panel.visible and not rx._hide_timer.isActive()
+    # The route gone before the time is up: it stays.
+    p.route(False)
+    _pump(qapp)
+    _settle(am, rx)
+    rx._hide_panel()
+    assert panel.visible
+    rx.stop()
 
 
 def test_closing_the_window_before_a_tv_is_picked_ends_the_cast(qapp, macos):
@@ -1214,3 +1256,37 @@ def test_the_mac_app_declares_airplay_s_bonjour_services():
     assert "'_airplay._tcp'" in line and "'_raop._tcp'" in line
     for key in ("NSAllowsLocalNetworking", "NSLocalNetworkUsageDescription"):
         assert key in spec
+
+
+def test_a_cast_from_the_rewind_buffer_gives_the_apple_tv_the_bridge(
+        qapp, macos, fake_ffmpeg, monkeypatch):
+    """The buffer's pieces come from its loopback server: ffmpeg reads them
+    here, and the Apple TV is handed the bridge's playlist on the LAN -
+    never the loopback address, whatever the plan would say of it."""
+    from dopeiptv.providers import cast_feed
+    am, _center = macos
+    seen = fake_ffmpeg(4, "live")
+    attached = []
+    monkeypatch.setattr(cast_feed.Feed, "attach",
+                        lambda self, sink, exe, net_for=None: attached.append(
+                            (self, net_for)))
+    loop = "http://127.0.0.1:4321/tok/s/7.ts"
+    feed = cast_feed.Feed(lambda m: (loop, 0.0, m - 2.0), 1000.0,
+                          kind="rewind buffer")
+    rx = am.AirPlayReceiver()
+    rx.bridge.exe = sys.executable
+    rx.context = lambda: {"kind": "live"}
+    rx.cast(am.NAME, "http://p/live/u/pw/1.m3u8", "SVT1", ["h264", "aac"],
+            feed=feed)
+    p = _Player.made[-1]
+    try:
+        assert seen["feed"] is True and attached and attached[0][0] is feed
+        assert rx.bridged() and rx.bridge.feed is feed
+        assert p.item.url == rx.bridge.url and not ab.is_loopback(p.item.url)
+        assert rx.position() == 0.0 and rx.duration == 0.0
+        # Each piece read with the source's own network options.
+        assert callable(attached[0][1])
+    finally:
+        rx.stop()
+    assert feed.closed
+    _pump(qapp)
