@@ -46,7 +46,7 @@ from typing import Any, Callable
 
 from ..core.log import log
 from ..core.player_exec import NO_WINDOW
-from ..core.exclusive_bind import ExclusiveBindMixin
+from ..core.exclusive_bind import ExclusiveBindMixin, IdleTimeoutMixin
 from . import cast_feed
 from .cast_bridge import (_endless, _hls_file, _hls_name_ok, _timeshift,
                           cast_cache_dir, ffmpeg_path, lan_address,
@@ -425,7 +425,7 @@ class _Server(ExclusiveBindMixin, ThreadingHTTPServer):
         log.info("airplay bridge: a request failed (%s)", exc)
 
 
-class _Handler(BaseHTTPRequestHandler):
+class _Handler(IdleTimeoutMixin, BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     server: _Server
 

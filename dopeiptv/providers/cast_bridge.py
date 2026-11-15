@@ -44,7 +44,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from ..core.log import log
 from ..core.player_exec import NO_WINDOW
-from ..core.exclusive_bind import ExclusiveBindMixin
+from ..core.exclusive_bind import ExclusiveBindMixin, IdleTimeoutMixin
 from . import cast_feed
 
 # What a Cast receiver decodes. Anything outside these has to be re-encoded;
@@ -898,7 +898,7 @@ def _hls_file(folder: str | None, name: str) -> str | None:
     return None
 
 
-class _Handler(BaseHTTPRequestHandler):
+class _Handler(IdleTimeoutMixin, BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt, *args):        # noqa: A003 - stdlib hook

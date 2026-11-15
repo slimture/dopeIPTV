@@ -31,7 +31,7 @@ from ..core._lazy_requests import requests
 from ..core.log import log, redact_url
 from ..i18n import LocalizedError
 from .cast_bridge import lan_address
-from ..core.exclusive_bind import ExclusiveBindMixin
+from ..core.exclusive_bind import ExclusiveBindMixin, IdleTimeoutMixin
 
 SSDP_ADDR = ("239.255.255.250", 1900)
 SEARCH_TARGETS = ("urn:schemas-upnp-org:device:MediaRenderer:1",
@@ -335,7 +335,7 @@ def soap(url: str, service: str, action: str,
     return {child.tag: (child.text or "") for child in answer}
 
 
-class _FileHandler(BaseHTTPRequestHandler):
+class _FileHandler(IdleTimeoutMixin, BaseHTTPRequestHandler):
     """One file, at one unguessable address, with byte ranges - a TV seeks
     in a film by asking for the part it wants."""
 

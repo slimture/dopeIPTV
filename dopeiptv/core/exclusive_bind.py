@@ -11,6 +11,9 @@ to keep the answer as ``server_name`` - which nothing here reads (CGI did).
 For 0.0.0.0 that is a lookup of the computer's own name and then its
 address backwards, and on Windows it can take seconds: every cast, every
 server start waited for it. The name kept is the address itself.
+
+And how long a client may hold a connection without asking anything
+(``IdleTimeoutMixin``, the LAN servers a TV reads from).
 """
 
 from __future__ import annotations
@@ -43,3 +46,35 @@ class ExclusiveBindMixin:
             self.server_name, self.server_port = str(host), int(port)
             return
         super().server_bind()  # type: ignore[misc]
+
+
+#: Seconds a connection may wait for its request - before the first one, or
+#: between two on a kept-alive connection - before it is closed.
+IDLE_S = 30.0
+
+
+class IdleTimeoutMixin:
+    """Mixed in before BaseHTTPRequestHandler: a client that opens a
+    connection and asks nothing on it (or stops halfway through its
+    request) is let go after ``idle_timeout`` instead of holding a server
+    thread for as long as it likes. The answer has no limit: a TV reads a
+    stream at the pace it plays it, and a paused one reads nothing for
+    minutes - a timeout there would end the cast."""
+
+    idle_timeout: float = IDLE_S
+    connection: Any
+
+    def _idle_limit(self, secs: float | None) -> None:
+        try:
+            self.connection.settimeout(secs)
+        except OSError:
+            pass
+
+    def handle_one_request(self) -> None:
+        self._idle_limit(self.idle_timeout)        # waiting for the request
+        super().handle_one_request()  # type: ignore[misc]
+
+    def parse_request(self) -> bool:
+        ok = bool(super().parse_request())  # type: ignore[misc]
+        self._idle_limit(None)                     # the answer takes its time
+        return ok
