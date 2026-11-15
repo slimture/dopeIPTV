@@ -1845,5 +1845,8 @@
   "restore_token_note": "Tokeni ya udhibiti wa mbali haichukuliwi kamwe kutoka kwenye nakala rudufu: mpya hutengenezwa kwenye kompyuta hii udhibiti wa mbali au kushiriki kunapowashwa.",
   "epg_zoom_out": "Vuta mbali",
   "epg_zoom_in": "Vuta karibu",
-  "epg_zoom_fit": "Linganisha na dirisha"
+  "epg_zoom_fit": "Linganisha na dirisha",
+  "setting_media_controls": "Vidhibiti vya media vya mfumo",
+  "setting_media_controls_hint_mac": "Huonyesha kinachochezwa katika Kituo cha Udhibiti, kwenye skrini iliyofungwa na kwenye upau wa menyu — na huruhusu vitufe vya media vya kibodi na AirPods kusitisha, kucheza na kuruka.",
+  "setting_media_controls_hint_win": "Huonyesha kinachochezwa katika vidhibiti vya media vya Windows kando ya sauti na kwenye skrini iliyofungwa — na huruhusu vitufe vya media vya kibodi kusitisha, kucheza na kuruka."
 }

@@ -1845,5 +1845,8 @@
   "restore_token_note": "Token zdalnego sterowania nigdy nie jest brany z kopii zapasowej: nowy powstaje na tym komputerze, gdy włączysz zdalne sterowanie lub udostępnianie.",
   "epg_zoom_out": "Pomniejsz",
   "epg_zoom_in": "Powiększ",
-  "epg_zoom_fit": "Dopasuj do okna"
+  "epg_zoom_fit": "Dopasuj do okna",
+  "setting_media_controls": "Systemowe sterowanie multimediami",
+  "setting_media_controls_hint_mac": "Pokazuje, co jest odtwarzane, w centrum sterowania, na ekranie blokady i na pasku menu — oraz pozwala klawiszom multimedialnym klawiatury i AirPods wstrzymywać, odtwarzać i przeskakiwać.",
+  "setting_media_controls_hint_win": "Pokazuje, co jest odtwarzane, w sterowaniu multimediami Windows obok głośności i na ekranie blokady — oraz pozwala klawiszom multimedialnym klawiatury wstrzymywać, odtwarzać i przeskakiwać."
 }

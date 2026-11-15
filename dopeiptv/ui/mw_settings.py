@@ -743,6 +743,17 @@ class _SettingsMixin:
                                        tr("setting_desktop_entry_hint"))
             mpris_box = c.toggle(tr("setting_mpris"), is_on("mpris", "true"),
                                  tr("setting_mpris_hint"))
+        elif sys.platform in ("darwin", "win32"):
+            # The same switch for Now Playing / the System Media Transport
+            # Controls, where this build has the bridge to them.
+            from ..services import media_session as _ms
+            if _ms.supported():
+                c = general.card(tr("set_card_system"))
+                mpris_box = c.toggle(
+                    tr("setting_media_controls"), is_on("mpris", "true"),
+                    tr("setting_media_controls_hint_mac"
+                       if sys.platform == "darwin"
+                       else "setting_media_controls_hint_win"))
         # The sidebar's heart, last and quiet: off hides it for three months.
         c = support_card = general.card(tr("donate_support"))
         # What the supporter key opens: read once here, again only after the

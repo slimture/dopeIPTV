@@ -1845,5 +1845,8 @@
   "restore_token_note": "Fjärrstyrningens token tas aldrig från en säkerhetskopia: en ny skapas på den här datorn när du slår på fjärrstyrning eller delning.",
   "epg_zoom_out": "Zooma ut",
   "epg_zoom_in": "Zooma in",
-  "epg_zoom_fit": "Anpassa till fönstret"
+  "epg_zoom_fit": "Anpassa till fönstret",
+  "setting_media_controls": "Systemets mediakontroller",
+  "setting_media_controls_hint_mac": "Visar vad som spelas i Kontrollcenter, på låsskärmen och i menyraden — och låter tangentbordets medieknappar och AirPods pausa, spela och hoppa.",
+  "setting_media_controls_hint_win": "Visar vad som spelas i Windows mediakontroller vid volymen och på låsskärmen — och låter tangentbordets medieknappar pausa, spela och hoppa."
 }

@@ -1845,5 +1845,8 @@
   "restore_token_note": "Das Token der Fernsteuerung wird nie aus einer Sicherung übernommen: Auf diesem Computer wird ein neues erstellt, sobald Fernsteuerung oder Teilen eingeschaltet wird.",
   "epg_zoom_out": "Herauszoomen",
   "epg_zoom_in": "Hineinzoomen",
-  "epg_zoom_fit": "An Fenster anpassen"
+  "epg_zoom_fit": "An Fenster anpassen",
+  "setting_media_controls": "Medienbedienung des Systems",
+  "setting_media_controls_hint_mac": "Zeigt im Kontrollzentrum, auf dem Sperrbildschirm und in der Menüleiste, was läuft — und lässt die Medientasten der Tastatur und AirPods pausieren, abspielen und springen.",
+  "setting_media_controls_hint_win": "Zeigt in der Medienbedienung von Windows neben der Lautstärke und auf dem Sperrbildschirm, was läuft — und lässt die Medientasten der Tastatur pausieren, abspielen und springen."
 }

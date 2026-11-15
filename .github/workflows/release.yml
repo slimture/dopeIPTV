@@ -1133,11 +1133,12 @@ jobs:
             hdiutil detach "$MOUNT" || true; exit 1
           fi
           # And they must actually LOAD from the frozen bundle: --self-check
-          # runs GUI-less (no window server needed) and verifies both the
-          # bundled libmpv and that every shipped language registers.
-          echo "::group::--self-check (bundled libmpv + languages)"
+          # runs GUI-less (no window server needed) and verifies the bundled
+          # libmpv, that every shipped language registers and that PyObjC's
+          # MediaPlayer (Now Playing, the media keys) imports.
+          echo "::group::--self-check (bundled libmpv + languages + media controls)"
           if ! "$BIN" --self-check; then
-            echo "::error::--self-check failed on the mounted .app (libmpv or languages)"
+            echo "::error::--self-check failed on the mounted .app (libmpv, languages or media controls)"
             # Why libmpv does not load: dlopen's own message names the
             # library it could not find.
             echo "::group::libmpv: links, rpaths and dlopen"
@@ -1395,17 +1396,18 @@ jobs:
           # happens to have installed. Reading the import tables can.
           python tools/win_dll_audit.py \
             dist/dopeiptv/_internal/mpv-2.dll dist/dopeiptv/_internal/vulkan-1.dll
-      - name: Smoke test - self-check the frozen exe (libmpv + languages)
+      - name: Smoke test - self-check the frozen exe (libmpv + languages + media controls)
         shell: pwsh
         run: |
           # The exe is a windowed app, so PowerShell won't wait on its own -
           # Start-Process -Wait does. Exit code 0 = bundled libmpv loads, the
           # vulkan-1.dll it pulls in is the bundled copy (not the runner's),
-          # AND every shipped language registers from the bundle.
+          # every shipped language registers from the bundle AND PyWinRT's
+          # Windows.Media namespaces (the system's media controls) import.
           $p = Start-Process -FilePath "dist\dopeiptv\dopeiptv.exe" `
                  -ArgumentList "--self-check" -Wait -PassThru
           if ($p.ExitCode -ne 0) {
-            Write-Error "self-check failed (exit $($p.ExitCode)) - libmpv or languages missing from the bundle"
+            Write-Error "self-check failed (exit $($p.ExitCode)) - libmpv, languages or the media controls (PyWinRT) missing from the bundle"
             exit 1
           }
           Write-Output "self-check OK"

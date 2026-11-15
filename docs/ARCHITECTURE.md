@@ -92,6 +92,11 @@ dopeiptv/
     resume.py          ResumeStore - per-playlist resume positions
                        (persistence + keep/drop rule)
     mpris.py           MPRIS media session on the D-Bus session bus (Linux)
+    media_session.py   The system's media controls: one host, the session
+                       for this system (MPRIS / Now Playing / SMTC), the
+                       poll, commands queued onto the GUI thread
+    media_macos.py     macOS Now Playing (PyObjC's MediaPlayer)
+    media_windows.py   Windows' System Media Transport Controls (PyWinRT)
     notify.py          Desktop notifications (org.freedesktop.Notifications)
     popular.py         Popular right now: TMDB's chart of the week matched
                        against the provider's catalogue (Home shelves)
@@ -125,7 +130,8 @@ dopeiptv/
     mw_updates.py      Update-check badge/status wiring, "Update now"
     mw_reminders.py    Programme-reminder UI (set / list / fire)
     mw_series.py       Series recordings: "Record series…", the rules' check
-    mw_mpris.py        Desktop media controls (MPRIS host) + media keys
+    mw_mpris.py        The system's media controls (media_session host) +
+                       media keys
     mw_follow.py       Follow a series: new-episode checks and news
     mw_subtitles.py    Subtitles from OpenSubtitles; remembered per title
     mw_home.py         The Home page (shelves: resume, favourites, new)
@@ -219,6 +225,9 @@ for player-overlay colours, which is why `ui/__init__` exposes
 - python-mpv + libmpv (the embedded player - required in practice; the
   packaged builds bundle libmpv)
 - pychromecast (Chromecast; bundled in every packaged build)
+- PyObjC's MediaPlayer wrapper on macOS and PyWinRT's Windows.Media packages
+  on Windows (the system's media controls; installed and bundled only on
+  their own system - the app runs without them)
 - ffmpeg CLI (standalone recording; bundled in every packaged build)
 
 Everything else (DLNA, MPRIS over D-Bus, OpenSubtitles, TMDB, Trakt, the

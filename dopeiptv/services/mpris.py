@@ -14,11 +14,12 @@ from __future__ import annotations
 import os
 import sys
 import time
-from typing import Any, Protocol
+from typing import Any
 
 from PyQt6.QtCore import QMetaType, QObject, QTimer
 
 from ..core.log import log
+from .media_session import MediaHost, clean_snapshot
 
 BUS_NAME = "org.mpris.MediaPlayer2.dopeiptv"
 OBJECT_PATH = "/org/mpris/MediaPlayer2"
@@ -29,19 +30,9 @@ NO_TRACK = "/org/mpris/MediaPlayer2/TrackList/NoTrack"
 # once (see refresh) does not wait for this.
 POLL_MS = 1000
 
-
-class MprisHost(Protocol):
-    def mpris_snapshot(self) -> dict[str, Any]:
-        """status ("Playing"/"Paused"/"Stopped"), track (any id that changes
-        per title), title, artist, album, art (URL), length and position (s),
-        can_seek, can_next, can_prev, volume (0-1)."""
-
-    def mpris_position(self) -> float:
-        """Seconds into what is playing, read now."""
-
-    def mpris_command(self, name: str, arg: Any = None) -> None:
-        """play, pause, playpause, stop, next, previous, seek (+/- s),
-        set_position (s), volume (0-1), raise, quit."""
+# The window's side, as every system's media session has it (media_session.py).
+MprisHost = MediaHost
+_clean = clean_snapshot
 
 
 def _int64(value: int) -> Any:
@@ -56,30 +47,6 @@ def _strings(values: list[str]) -> Any:
     arg = QDBusArgument()
     arg.add(list(values), QMetaType.Type.QStringList.value)  # type: ignore[arg-type]
     return arg
-
-
-def _clean(snap: dict[str, Any]) -> dict[str, Any]:
-    """The snapshot with every field present and of the right type."""
-    def num(key: str) -> float:
-        try:
-            return max(0.0, float(snap.get(key) or 0.0))
-        except (TypeError, ValueError):
-            return 0.0
-    status = snap.get("status")
-    return {
-        "status": status if status in ("Playing", "Paused") else "Stopped",
-        "track": str(snap.get("track") or ""),
-        "title": str(snap.get("title") or ""),
-        "artist": str(snap.get("artist") or ""),
-        "album": str(snap.get("album") or ""),
-        "art": str(snap.get("art") or ""),
-        "length": num("length"),
-        "position": num("position"),
-        "can_seek": bool(snap.get("can_seek")),
-        "can_next": bool(snap.get("can_next")),
-        "can_prev": bool(snap.get("can_prev")),
-        "volume": min(1.0, num("volume")),
-    }
 
 
 def _build_adaptors(service: MprisService) -> None:

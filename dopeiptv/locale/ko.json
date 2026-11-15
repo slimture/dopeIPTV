@@ -1845,5 +1845,8 @@
   "restore_token_note": "원격 제어 토큰은 백업에서 가져오지 않습니다. 원격 제어나 공유를 켜면 이 컴퓨터에서 새 토큰이 만들어집니다.",
   "epg_zoom_out": "축소",
   "epg_zoom_in": "확대",
-  "epg_zoom_fit": "창에 맞추기"
+  "epg_zoom_fit": "창에 맞추기",
+  "setting_media_controls": "시스템 미디어 컨트롤",
+  "setting_media_controls_hint_mac": "재생 중인 내용을 제어 센터, 잠금 화면, 메뉴 막대에 표시하고, 키보드의 미디어 키와 AirPods로 일시정지, 재생, 건너뛰기를 할 수 있습니다.",
+  "setting_media_controls_hint_win": "재생 중인 내용을 볼륨 옆의 Windows 미디어 컨트롤과 잠금 화면에 표시하고, 키보드의 미디어 키로 일시정지, 재생, 건너뛰기를 할 수 있습니다."
 }

@@ -1845,5 +1845,8 @@
   "restore_token_note": "Token kendali jarak jauh tidak pernah diambil dari cadangan: token baru dibuat di komputer ini saat kendali jarak jauh atau berbagi dinyalakan.",
   "epg_zoom_out": "Perkecil",
   "epg_zoom_in": "Perbesar",
-  "epg_zoom_fit": "Sesuaikan dengan jendela"
+  "epg_zoom_fit": "Sesuaikan dengan jendela",
+  "setting_media_controls": "Kontrol media sistem",
+  "setting_media_controls_hint_mac": "Menampilkan apa yang sedang diputar di Pusat Kontrol, layar kunci, dan bar menu — serta memungkinkan tombol media keyboard dan AirPods untuk menjeda, memutar, dan melompat.",
+  "setting_media_controls_hint_win": "Menampilkan apa yang sedang diputar di kontrol media Windows di dekat volume dan di layar kunci — serta memungkinkan tombol media keyboard untuk menjeda, memutar, dan melompat."
 }

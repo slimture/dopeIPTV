@@ -1845,5 +1845,8 @@
   "restore_token_note": "Mã thông báo của điều khiển từ xa không bao giờ được lấy từ bản sao lưu: một mã mới được tạo trên máy tính này khi bật điều khiển từ xa hoặc chia sẻ.",
   "epg_zoom_out": "Thu nhỏ",
   "epg_zoom_in": "Phóng to",
-  "epg_zoom_fit": "Vừa với cửa sổ"
+  "epg_zoom_fit": "Vừa với cửa sổ",
+  "setting_media_controls": "Điều khiển đa phương tiện của hệ thống",
+  "setting_media_controls_hint_mac": "Hiển thị nội dung đang phát trong Trung tâm điều khiển, trên màn hình khóa và thanh menu — đồng thời cho phép phím đa phương tiện trên bàn phím và AirPods tạm dừng, phát và bỏ qua.",
+  "setting_media_controls_hint_win": "Hiển thị nội dung đang phát trong điều khiển đa phương tiện của Windows cạnh âm lượng và trên màn hình khóa — đồng thời cho phép phím đa phương tiện trên bàn phím tạm dừng, phát và bỏ qua."
 }

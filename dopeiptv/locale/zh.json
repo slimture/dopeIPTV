@@ -1845,5 +1845,8 @@
   "restore_token_note": "远程控制的令牌绝不会从备份中取用：开启远程控制或共享时，会在这台计算机上新建一个。",
   "epg_zoom_out": "缩小",
   "epg_zoom_in": "放大",
-  "epg_zoom_fit": "适应窗口"
+  "epg_zoom_fit": "适应窗口",
+  "setting_media_controls": "系统媒体控制",
+  "setting_media_controls_hint_mac": "在控制中心、锁定屏幕和菜单栏中显示正在播放的内容——并让键盘的媒体键和 AirPods 可以暂停、播放和跳转。",
+  "setting_media_controls_hint_win": "在 Windows 音量旁的媒体控制和锁屏界面上显示正在播放的内容——并让键盘的媒体键可以暂停、播放和跳转。"
 }

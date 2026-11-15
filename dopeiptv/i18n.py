@@ -1964,6 +1964,10 @@ _STRINGS: dict[str, dict[str, str]] = {
     # Media controls (MPRIS)
     "setting_mpris": {"en": "Desktop media controls (MPRIS)"},
     "setting_mpris_hint": {"en": "Lets the desktop's media controls, the keyboard's media keys, headphone buttons and KDE Connect pause, play and skip — and shows what is playing, with its logo."},
+    # The same on macOS (Now Playing) and Windows (System Media Transport Controls)
+    "setting_media_controls": {"en": "System media controls"},
+    "setting_media_controls_hint_mac": {"en": "Shows what is playing in Control Center, on the lock screen and in the menu bar — and lets the keyboard's media keys and AirPods pause, play and skip."},
+    "setting_media_controls_hint_win": {"en": "Shows what is playing in Windows' media controls by the volume and on the lock screen — and lets the keyboard's media keys pause, play and skip."},
     # Following a series (new episodes)
     "ctx_follow_series": {"en": "Follow series"},
     "ctx_unfollow_series": {"en": "Stop following series"},

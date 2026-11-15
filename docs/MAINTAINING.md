@@ -102,6 +102,13 @@ Platform notes that are easy to forget:
   Start menu entry and an entry under Settings -> Apps - and the portable
   zip. The release job installs it, installs it again over itself the way
   the app's update does (`/S /relaunch`), self-checks and removes it.
+- The system's media controls off Linux come through PyObjC (macOS, Now
+  Playing) and PyWinRT (Windows, the SMTC): `requirements.txt` installs
+  them with platform markers, the specs name their modules, and
+  `--self-check` fails a bundle without them. CI cannot press a media key:
+  a change in `services/media_macos.py` or `media_windows.py` is tried on
+  a real Mac or PC (Control Center, the lock screen, the volume flyout, the
+  keys) before it ships.
 
 ## Cutting a release
 

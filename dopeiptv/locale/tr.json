@@ -1845,5 +1845,8 @@
   "restore_token_note": "Uzaktan kumanda belirteci asla yedekten alınmaz: uzaktan kumanda ya da paylaşım açıldığında bu bilgisayarda yenisi oluşturulur.",
   "epg_zoom_out": "Uzaklaştır",
   "epg_zoom_in": "Yakınlaştır",
-  "epg_zoom_fit": "Pencereye sığdır"
+  "epg_zoom_fit": "Pencereye sığdır",
+  "setting_media_controls": "Sistem medya denetimleri",
+  "setting_media_controls_hint_mac": "Çalanı Denetim Merkezi'nde, kilitli ekranda ve menü çubuğunda gösterir — ve klavyenin medya tuşlarının ve AirPods'un duraklatmasına, oynatmasına ve atlamasına izin verir.",
+  "setting_media_controls_hint_win": "Çalanı Windows'un ses düzeyinin yanındaki medya denetimlerinde ve kilit ekranında gösterir — ve klavyenin medya tuşlarının duraklatmasına, oynatmasına ve atlamasına izin verir."
 }

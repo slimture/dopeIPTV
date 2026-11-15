@@ -22,6 +22,15 @@ dependencies = [
     "requests>=2.28,<3",
     "python-mpv>=1.0,<2",
     "pychromecast>=13.0,<15",
+    # The system's media controls, each only on its own system (see
+    # requirements.txt): Now Playing on macOS, the SMTC on Windows.
+    "pyobjc-framework-MediaPlayer>=10.0,<14; sys_platform == 'darwin'",
+    "pyobjc-framework-Cocoa>=10.0,<14; sys_platform == 'darwin'",
+    "winrt-runtime>=4.0,<5; sys_platform == 'win32'",
+    "winrt-Windows.Foundation>=4!10.0.28000,<5!0; sys_platform == 'win32'",
+    "winrt-Windows.Media>=4!10.0.28000,<5!0; sys_platform == 'win32'",
+    "winrt-Windows.Media.Playback>=4!10.0.28000,<5!0; sys_platform == 'win32'",
+    "winrt-Windows.Storage.Streams>=4!10.0.28000,<5!0; sys_platform == 'win32'",
 ]
 
 [project.urls]
@@ -124,6 +133,9 @@ files = [
     "dopeiptv/services/coverart.py",
     "dopeiptv/services/reminders.py",
     "dopeiptv/services/mpris.py",
+    "dopeiptv/services/media_session.py",
+    "dopeiptv/services/media_macos.py",
+    "dopeiptv/services/media_windows.py",
     "dopeiptv/services/notify.py",
     "dopeiptv/services/popular.py",
     "dopeiptv/media/subtitle_text.py",

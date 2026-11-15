@@ -71,6 +71,9 @@ map and the one-way import rule.
 | `core/xdg.py` | Launch system programs from a frozen bundle without our bundled libraries |
 | `core/audiotags.py` | Artist/album/title and cover art from music files, header-only |
 | `services/mpris.py` | MPRIS media session on the session bus (Linux) |
+| `services/media_session.py` | The system's media controls on every desktop: the window's one host (`mpris_snapshot` / `mpris_command`), the session for this system (`create_session`: MPRIS on Linux, Now Playing on macOS, the SMTC on Windows), the poll and the system's commands queued onto the GUI thread (`PolledSession`); a missing bridge logs once at debug; the self-check's `bundle_problem` |
+| `services/media_macos.py` | macOS Now Playing through PyObjC: MPNowPlayingInfoCenter (title, programme or series, artwork from the image cache, live or a title's length and position, never kept for suggestions) and MPRemoteCommandCenter (play/pause, next/previous channel or episode, skip and scrub for a title) |
+| `services/media_windows.py` | Windows' System Media Transport Controls through PyWinRT: an idle MediaPlayer's controls with its command manager off, the buttons (channel up/down for a channel), the timeline, the thumbnail written from the image cache into a stream in memory |
 | `services/notify.py` | Desktop notifications over D-Bus (Linux) |
 | `services/popular.py` | Popular right now: TMDB's weekly chart matched to the provider's catalogue |
 | `core/log.py` | Central logging (`configure_logging`, `DOPEIPTV_LOG`) |
@@ -163,7 +166,7 @@ in the `mw_*` mixins beside it, each mixed into `MainWindow`:
 Watched filter, the nav's status), `mw_shortcuts`
 (keyboard shortcuts), `mw_busy` (loading indicator), `mw_updates`
 (update badge), `mw_reminders`, `mw_sort`, `mw_onboarding`,
-`mw_mpris` (desktop media controls, media keys), `mw_follow` (followed
+`mw_mpris` (the system's media controls through `services/media_session.py` - MPRIS, Now Playing, the SMTC - and the media keys), `mw_follow` (followed
 series, new-episode news), `mw_subtitles` (OpenSubtitles, subtitles
 remembered per title), `mw_guide` (the Guide page in the middle pane, its
 pop-out window), `mw_cast` (Chromecast and DLNA: the cast
@@ -252,7 +255,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
   epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log,
   player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, health, nerd, nerd_lists, channel_numbers, shortcut_keys, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, catchup, url_rewrite, hls_cap, remote_api, events, mqtt, report, supporter, sync, chacha20poly1305, backup) and `services/` (failover, share, resume,
-  coverart, reminders, mpris, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
+  coverart, reminders, mpris, media_session, media_macos, media_windows, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list
   as more non-UI modules gain type hints.

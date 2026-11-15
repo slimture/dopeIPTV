@@ -1845,5 +1845,8 @@
   "restore_token_note": "Token daljinskog upravljanja nikad se ne uzima iz sigurnosne kopije: novi se stvara na ovom računalu kad se uključi daljinsko upravljanje ili dijeljenje.",
   "epg_zoom_out": "Umanji",
   "epg_zoom_in": "Uvećaj",
-  "epg_zoom_fit": "Prilagodi prozoru"
+  "epg_zoom_fit": "Prilagodi prozoru",
+  "setting_media_controls": "Medijske kontrole sustava",
+  "setting_media_controls_hint_mac": "Prikazuje što se reproducira u Kontrolnom centru, na zaključanom zaslonu i u traci izbornika — i omogućuje medijskim tipkama tipkovnice i AirPodsima pauziranje, reprodukciju i preskakanje.",
+  "setting_media_controls_hint_win": "Prikazuje što se reproducira u medijskim kontrolama sustava Windows uz glasnoću i na zaključanom zaslonu — i omogućuje medijskim tipkama tipkovnice pauziranje, reprodukciju i preskakanje."
 }

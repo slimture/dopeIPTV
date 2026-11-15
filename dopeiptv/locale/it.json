@@ -1845,5 +1845,8 @@
   "restore_token_note": "Il token del telecomando non viene mai preso da un backup: se ne crea uno nuovo su questo computer quando si attiva il telecomando o la condivisione.",
   "epg_zoom_out": "Riduci zoom",
   "epg_zoom_in": "Aumenta zoom",
-  "epg_zoom_fit": "Adatta alla finestra"
+  "epg_zoom_fit": "Adatta alla finestra",
+  "setting_media_controls": "Controlli multimediali di sistema",
+  "setting_media_controls_hint_mac": "Mostra cosa è in riproduzione nel Centro di Controllo, sulla schermata di blocco e nella barra dei menu — e consente ai tasti multimediali della tastiera e agli AirPods di mettere in pausa, riprodurre e saltare.",
+  "setting_media_controls_hint_win": "Mostra cosa è in riproduzione nei controlli multimediali di Windows, accanto al volume, e nella schermata di blocco — e consente ai tasti multimediali della tastiera di mettere in pausa, riprodurre e saltare."
 }

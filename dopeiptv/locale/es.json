@@ -1845,5 +1845,8 @@
   "restore_token_note": "El token del control remoto nunca se toma de una copia de seguridad: se crea uno nuevo en este ordenador cuando se activa el control remoto o compartir.",
   "epg_zoom_out": "Alejar",
   "epg_zoom_in": "Acercar",
-  "epg_zoom_fit": "Ajustar a la ventana"
+  "epg_zoom_fit": "Ajustar a la ventana",
+  "setting_media_controls": "Controles multimedia del sistema",
+  "setting_media_controls_hint_mac": "Muestra lo que se está reproduciendo en el Centro de control, en la pantalla de bloqueo y en la barra de menús — y permite que las teclas multimedia del teclado y los AirPods pausen, reproduzcan y salten.",
+  "setting_media_controls_hint_win": "Muestra lo que se está reproduciendo en los controles multimedia de Windows, junto al volumen, y en la pantalla de bloqueo — y permite que las teclas multimedia del teclado pausen, reproduzcan y salten."
 }

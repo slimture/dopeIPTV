@@ -1,13 +1,17 @@
-"""MainWindow mixin: the desktop's media controls (MPRIS) and media keys.
+"""MainWindow mixin: the system's media controls and the media keys.
 
-The window's half of services/mpris.py: what is playing, and doing what the
-desktop asks - GNOME's and KDE's media controls, headphone buttons, KDE
-Connect. The keyboard's media keys also work in the window itself on every
-system; a Linux desktop routes them through MPRIS instead, and a key that
-arrives both ways is acted on once.
+The window's half of services/media_session.py: what is playing, and doing
+what the system asks - on Linux MPRIS (GNOME's and KDE's media controls,
+headphone buttons, KDE Connect), on macOS Now Playing (Control Center, the
+lock screen, AirPods), on Windows the System Media Transport Controls (the
+media box by the volume, the lock screen). The keyboard's media keys also
+work in the window itself on every system; the system may route them
+through its media controls instead, and a key that arrives both ways is
+acted on once.
 """
 from __future__ import annotations
 
+import sys
 import time
 from typing import Any
 
@@ -18,6 +22,9 @@ from ..core.log import log
 
 # The same action from the key and from MPRIS inside this window counts once.
 _SAME_PRESS_S = 0.35
+# Off Linux, the system's session starts a moment after the window: importing
+# its bridge (PyObjC, PyWinRT) is no reason to keep the first paint waiting.
+_JOIN_LATER_MS = 1000
 _MEDIA_KEYS = (
     (Qt.Key.Key_MediaTogglePlayPause, "playpause"),
     (Qt.Key.Key_MediaPlay, "play"),
@@ -29,7 +36,7 @@ _MEDIA_KEYS = (
 
 
 class _MprisMixin:
-    """MainWindow mixin: MPRIS host and the media keys."""
+    """MainWindow mixin: the media session's host and the media keys."""
 
     def _start_media_session(self) -> None:
         for key, name in _MEDIA_KEYS:
@@ -44,17 +51,34 @@ class _MprisMixin:
                            self.player.finished):
                 signal.connect(self._mpris_refresh_soon)
         if self.settings.value("mpris", "true") == "true":
+            if sys.platform.startswith("linux"):
+                self._join_media_session()
+            else:
+                t = self._media_join_timer = QTimer(self)
+                t.setSingleShot(True)
+                t.setInterval(_JOIN_LATER_MS)
+                t.timeout.connect(self._join_media_session_later)
+                t.start()
+
+    def _join_media_session_later(self) -> None:
+        if (getattr(self, "_mpris", None) is None
+                and self.settings.value("mpris", "true") == "true"):
             self._join_media_session()
 
     def _join_media_session(self) -> None:
-        from ..services.mpris import MprisService
-        svc = MprisService(self, self)
+        from ..services.media_session import create_session
+        svc = create_session(self, self)
+        if svc is None:
+            return
         if svc.start():
             self._mpris = svc
         else:
             svc.deleteLater()
 
     def _stop_media_session(self) -> None:
+        later = getattr(self, "_media_join_timer", None)
+        if later is not None:
+            later.stop()
         svc = getattr(self, "_mpris", None)
         if svc is not None:
             svc.stop()
@@ -75,6 +99,16 @@ class _MprisMixin:
 
     def _media_key(self, name: str) -> None:
         self.mpris_command(name)
+
+    @staticmethod
+    def _media_press_key(name: str) -> str:
+        """What counts as one press. Windows turns the play/pause key into
+        Play or Pause by what its controls show, while the window hears the
+        key itself as play/pause: off Linux the three are one press."""
+        if not sys.platform.startswith("linux") and name in (
+                "play", "pause", "playpause"):
+            return "playpause"
+        return name
 
     # -- MprisHost -------------------------------------------------------------
 
@@ -114,6 +148,9 @@ class _MprisMixin:
         elif kind == "local":
             artist = item.get("_artist") or ""
             album = item.get("_album") or ""
+        audio = kind == "local" and bool(
+            artist or album or str(item.get("_path") or "").lower().endswith(
+                tuple(getattr(self, "AUDIO_EXTS", ()))))
         seekable = getattr(p, "_seek_mode", "vod") == "vod"
         length = p.playback_duration() if seekable else 0.0
         if kind == "episode":
@@ -134,6 +171,8 @@ class _MprisMixin:
             "can_next": can_next,
             "can_prev": kind in ("live", "local"),
             "volume": p.vol.value() / 100.0,
+            "live": kind == "live",
+            "audio": audio,
         }
 
     def _media_art(self, url) -> str:
@@ -147,14 +186,37 @@ class _MprisMixin:
             path = None
         if path is not None:
             return QUrl.fromLocalFile(str(path)).toString()
+        if not sys.platform.startswith("linux"):
+            self._fetch_media_art(str(url))
         return str(url)
+
+    def _fetch_media_art(self, url: str) -> None:
+        """macOS and Windows are only handed a picture on this computer:
+        one not in the image cache yet is fetched there - once - the way the
+        lists fetch theirs, and shown on the next refresh."""
+        if not url.startswith(("http://", "https://")):
+            return
+        asked = self.__dict__.setdefault("_media_art_asked", set())
+        if url in asked:
+            return
+        if len(asked) > 256:
+            asked.clear()
+        asked.add(url)
+        try:
+            self.logos.get(url, self._media_art_fetched)
+        except Exception as e:
+            log.debug("media art: %s", e)
+
+    def _media_art_fetched(self, _pixmap) -> None:
+        self._mpris_refresh_soon()
 
     def mpris_command(self, name: str, arg: Any = None) -> None:
         now = time.monotonic()
         pressed = self.__dict__.setdefault("_media_pressed", {})
-        if now - pressed.get(name, 0.0) < _SAME_PRESS_S:
+        key = self._media_press_key(name)
+        if now - pressed.get(key, 0.0) < _SAME_PRESS_S:
             return
-        pressed[name] = now
+        pressed[key] = now
         p = self.player
         log.info("media control: %s", name)
         if name == "raise":

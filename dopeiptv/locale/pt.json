@@ -1845,5 +1845,8 @@
   "restore_token_note": "O token do controle remoto nunca vem de um backup: um novo é criado neste computador quando o controle remoto ou o compartilhamento é ligado.",
   "epg_zoom_out": "Diminuir zoom",
   "epg_zoom_in": "Aumentar zoom",
-  "epg_zoom_fit": "Ajustar à janela"
+  "epg_zoom_fit": "Ajustar à janela",
+  "setting_media_controls": "Controles de mídia do sistema",
+  "setting_media_controls_hint_mac": "Mostra o que está tocando na Central de Controle, na tela bloqueada e na barra de menus — e permite que as teclas de mídia do teclado e os AirPods pausem, reproduzam e pulem.",
+  "setting_media_controls_hint_win": "Mostra o que está tocando nos controles de mídia do Windows, junto ao volume, e na tela de bloqueio — e permite que as teclas de mídia do teclado pausem, reproduzam e pulem."
 }

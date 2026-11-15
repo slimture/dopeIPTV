@@ -1845,5 +1845,8 @@
   "restore_token_note": "Token daljinskog upravljanja nikad se ne uzima iz rezervne kopije: novi se pravi na ovom računaru kada se uključi daljinsko upravljanje ili deljenje.",
   "epg_zoom_out": "Umanji",
   "epg_zoom_in": "Uvećaj",
-  "epg_zoom_fit": "Prilagodi prozoru"
+  "epg_zoom_fit": "Prilagodi prozoru",
+  "setting_media_controls": "Sistemske medijske kontrole",
+  "setting_media_controls_hint_mac": "Prikazuje šta se pušta u Kontrolnom centru, na zaključanom ekranu i na traci menija — i omogućava medijskim tasterima tastature i AirPods slušalicama pauziranje, puštanje i preskakanje.",
+  "setting_media_controls_hint_win": "Prikazuje šta se pušta u medijskim kontrolama Windowsa pored jačine zvuka i na zaključanom ekranu — i omogućava medijskim tasterima tastature pauziranje, puštanje i preskakanje."
 }

@@ -1845,5 +1845,8 @@
   "restore_token_note": "Le jeton de la télécommande n'est jamais repris d'une sauvegarde : un nouveau est créé sur cet ordinateur quand la télécommande ou le partage est activé.",
   "epg_zoom_out": "Zoom arrière",
   "epg_zoom_in": "Zoom avant",
-  "epg_zoom_fit": "Ajuster à la fenêtre"
+  "epg_zoom_fit": "Ajuster à la fenêtre",
+  "setting_media_controls": "Commandes multimédias du système",
+  "setting_media_controls_hint_mac": "Affiche ce qui est en lecture dans le Centre de contrôle, sur l'écran verrouillé et dans la barre des menus — et permet aux touches multimédias du clavier et aux AirPods de mettre en pause, lire et passer.",
+  "setting_media_controls_hint_win": "Affiche ce qui est en lecture dans les commandes multimédias de Windows, près du volume, et sur l'écran de verrouillage — et permet aux touches multimédias du clavier de mettre en pause, lire et passer."
 }

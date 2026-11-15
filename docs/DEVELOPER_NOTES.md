@@ -25,7 +25,8 @@ rule (see `ARCHITECTURE.md` for the full module map):
 - `core/`      — storage, background workers, OS integration
 - `media/`     — playback (embedded libmpv widget, external launchers)
 - `services/`  — window-agnostic application services (cover art, resume,
-  reminders, MPRIS, notifications, the popular-titles chart)
+  reminders, the system's media controls - MPRIS, Now Playing, the SMTC -,
+  notifications, the popular-titles chart)
 - `ui/`        — the main window, its mixins and all widgets/dialogs
 
 `ui` may import from any layer below it; `services` builds on

@@ -1845,5 +1845,8 @@
   "restore_token_note": "Het token voor bediening op afstand wordt nooit uit een back-up overgenomen: er wordt op deze computer een nieuw gemaakt zodra bediening op afstand of delen aan gaat.",
   "epg_zoom_out": "Uitzoomen",
   "epg_zoom_in": "Inzoomen",
-  "epg_zoom_fit": "Aanpassen aan venster"
+  "epg_zoom_fit": "Aanpassen aan venster",
+  "setting_media_controls": "Mediabediening van het systeem",
+  "setting_media_controls_hint_mac": "Toont wat er speelt in het bedieningspaneel, op het toegangsscherm en in de menubalk — en laat de mediatoetsen van het toetsenbord en AirPods pauzeren, afspelen en overslaan.",
+  "setting_media_controls_hint_win": "Toont wat er speelt in de mediabediening van Windows bij het volume en op het vergrendelingsscherm — en laat de mediatoetsen van het toetsenbord pauzeren, afspelen en overslaan."
 }

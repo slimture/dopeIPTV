@@ -201,7 +201,8 @@ class _RemoteMixin:
     def _remote_media(self, name: str, arg: Any = None) -> None:
         # The media keys' guard against one press arriving twice is no
         # business of a script asking twice in a row.
-        self.__dict__.setdefault("_media_pressed", {}).pop(name, None)
+        self.__dict__.setdefault("_media_pressed", {}).pop(
+            self._media_press_key(name), None)
         self.mpris_command(name, arg)
 
     def _remote_status(self) -> dict[str, Any]:

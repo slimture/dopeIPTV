@@ -300,6 +300,18 @@ def main() -> int:
                 len(missing), ", ".join(missing))
             return 1
         log.info("self-check: all %d languages loaded", len(LANGUAGES))
+        if sys.platform in ("darwin", "win32") and getattr(sys, "frozen", False):
+            # The system's media controls come through a bridge (PyObjC's
+            # MediaPlayer, PyWinRT) whose pieces the freezer has to be told
+            # about; a bundle without them runs - without the controls.
+            from .services.media_session import bundle_problem
+            problem = bundle_problem()
+            if problem:
+                log.error("self-check: the system's media controls are not "
+                          "in this bundle: %s", problem)
+                return 1
+            log.info("self-check: the system's media controls are in the "
+                     "bundle")
         # The programme guide is parsed by this same executable started as a
         # process of its own (providers/epg.py). A bundle that cannot do that
         # still parses in the app, slowly - the regression this catches.
