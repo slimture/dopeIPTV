@@ -59,9 +59,13 @@ has two profiles or more.
   records it
 - (untitled): which recorder is used, how to record
 
-**Casting** (`casting`) - a page of one row for now; AirPlay's rows join it,
-and Chromecast, DLNA and Kodi rows belong here
+**Casting** (`casting`) - AirPlay's rows join it, and Chromecast, DLNA and
+Kodi rows belong here
 - Chromecast: `cast_pause_gb`
+- Devices added by address: the Chromecasts and TVs added in the cast
+  window ("Add a device by address…", `cast_added_devices`) and the Kodis
+  added by hand (`kodi_devices`), each with Remove (adding is in the cast
+  window, where the device is tried); link → Nerd › Network (other networks)
 
 ## CONTENT
 
@@ -73,7 +77,7 @@ and Chromecast, DLNA and Kodi rows belong here
   host
 - Selected playlist: its account (expiry, connections), Refresh
 - (untitled): link → Nerd › Network (identity, proxy, connection, own DNS,
-  VPN guard); link → Nerd › Boxes and lists (boxes, picons, udpxy, failover,
+  VPN guard, other networks); link → Nerd › Boxes and lists (boxes, picons, udpxy, failover,
   channel numbers)
 
 **A source's own page** - not in the sidebar: opened in place of Sources
@@ -196,6 +200,9 @@ while Nerd is on, and so are the link rows that lead to them.
 - Connection: `nerd_ip_family`, `nerd_net_timeout`, `nerd_reconnect_max`
 - Own DNS: `nerd_dns`, `nerd_dns_url`, `nerd_dns_fallback`
 - VPN guard: `nerd_vpn_guard`, `nerd_vpn_iface`, `nerd_vpn_lan`
+- Other networks (VLANs): `nerd_other_networks` (the parts of a split home
+  network that "Find on my network" and the cast window ask by unicast);
+  Search now
 
 **Boxes and lists** (`nerd_boxes`)
 - Boxes and servers: each box source's options (its dialog), add a box

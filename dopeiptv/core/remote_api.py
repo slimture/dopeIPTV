@@ -5,7 +5,9 @@ or off and its keys (``/api/tv`` {"mode": "on"}, ``/api/tv_key``
 playlist and one guide for other players on the network.
 
 Off unless the user turns it on. It listens on this computer only unless
-they choose the home network, and every request carries the token
+they choose the home network - then a client at any private address is let
+in (core/home_net.py: every part of a network split in VLANs, not only the
+one this computer is on), a public one never - and every request carries the token
 (``Authorization: Bearer``, ``X-Dopeiptv-Token`` or ``?token=``), so a web
 page in a browser cannot drive the player and a stranger on the network
 gets nothing. Reading is GET; anything that changes something is POST.
@@ -30,6 +32,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable, Iterable
 from urllib.parse import parse_qs, quote, urlsplit
 
+from . import home_net
 from .log import log
 from .nerd_check import FAIL, OK, WARN, Check
 from .exclusive_bind import ExclusiveBindMixin
@@ -137,6 +140,20 @@ class RemoteServer:
         return bool(self.token) and hmac.compare_digest(given.encode("utf-8", "replace"),
                                                         self.token.encode("utf-8"))
 
+    @staticmethod
+    def client_ok(address: str, own: str = "") -> bool:
+        """This computer or the home network, whichever part of it (*own*:
+        the address the client reached us at - the same is this computer)."""
+        return home_net.is_home_client(address, own)
+
+
+def _own(handler: BaseHTTPRequestHandler) -> str:
+    """The address a client reached this computer at."""
+    try:
+        return str(handler.connection.getsockname()[0])
+    except (OSError, AttributeError, IndexError):
+        return ""
+
 
 def _make_handler(server: RemoteServer) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
@@ -208,6 +225,9 @@ def _make_handler(server: RemoteServer) -> type[BaseHTTPRequestHandler]:
             return params
 
         def _handle(self, method: str) -> None:
+            if not server.client_ok(str(self.client_address[0]), _own(self)):
+                self._json(403, {"error": "only this computer and the home network"})
+                return
             parts = urlsplit(self.path)
             path = parts.path.rstrip("/") or "/"
             query = parse_qs(parts.query, keep_blank_values=False)

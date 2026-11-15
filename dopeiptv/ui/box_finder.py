@@ -1,8 +1,13 @@
 """Boxes on the home network and media servers in the add-a-source forms:
 what each kind is called and asks for, and the "Find on my network" button
-that fills the form in from what answers (providers/lan_scan.py)."""
+that fills the form in from what answers (providers/lan_scan.py) - the
+other networks Nerd lists too (a home network split in VLANs). Pressed
+again while it searches, it stops; with nothing found, it says why a split
+network may hide a box and what helps."""
 
 from __future__ import annotations
+
+import threading
 
 from PyQt6.QtCore import Qt, QThreadPool, pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMenu, QPushButton, QWidget
@@ -44,6 +49,13 @@ def retranslate_box_kinds(combo) -> None:
             combo.setItemText(i, tr(KIND_LABELS[kind]))
 
 
+def nothing_found_text() -> str:
+    """What "Find on my network" says when nothing answered: type the
+    address, and why a home network split in parts (VLANs) may hide a box -
+    with what fixes it on the router."""
+    return tr("playlist_nothing_found") + " " + tr("vlan_nothing_found")
+
+
 class FindOnNetwork(QPushButton):
     """Looks for boxes and servers on the local network off the window's
     thread, then hands over the one picked ({"kind", "server", "name",
@@ -80,6 +92,9 @@ class FindOnNetwork(QPushButton):
         lay.addWidget(self.status, 1)
         self.clicked.connect(self._start)
         self._busy = False
+        self._cancel = threading.Event()
+        # A form closed while it searches: the search stops at its next step.
+        self.destroyed.connect(self._cancel.set)
         self.wanted: tuple[str, ...] = ()
 
     def retranslate(self) -> None:
@@ -88,22 +103,30 @@ class FindOnNetwork(QPushButton):
 
     def _start(self) -> None:
         if self._busy:
+            # Pressed again: stop (what was found so far still comes back).
+            self._cancel.set()
+            self.setText(tr("playlist_search_stopping"))
             return
         from ..providers import lan_scan
         # Not disabled while it searches: a focused button that is, hands the
         # focus to the next field (the user name), as if asked to type there.
         self._busy = True
+        self._cancel = threading.Event()
+        self.destroyed.connect(self._cancel.set)
         self.setText(tr("playlist_searching_network"))
+        self.setToolTip(tr("playlist_search_stop_tip"))
         self.status.hide()
-        run_async(QThreadPool.globalInstance(), lan_scan.scan, self._done, self._failed)
+        run_async(QThreadPool.globalInstance(), lan_scan.scan, self._done, self._failed,
+                  cancel=self._cancel)
 
     def _reset(self) -> None:
         self._busy = False
         self.setText(tr("playlist_find_on_network"))
+        self.setToolTip("")
 
     def _failed(self, _err=None) -> None:
         self._reset()
-        self._say(tr("playlist_nothing_found"))
+        self._say(nothing_found_text())
 
     def _say(self, text: str) -> None:
         self.status.setText(text)
@@ -113,7 +136,7 @@ class FindOnNetwork(QPushButton):
         self._reset()
         found = list(found or [])
         if not found:
-            self._say(tr("playlist_nothing_found"))
+            self._say(nothing_found_text())
             return
         found.sort(key=lambda d: d.get("kind") not in self.wanted)
         if len(found) == 1:

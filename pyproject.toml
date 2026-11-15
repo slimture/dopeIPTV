@@ -86,6 +86,8 @@ files = [
     "dopeiptv/providers/tvheadend.py",
     "dopeiptv/providers/hdhomerun.py",
     "dopeiptv/providers/lan_scan.py",
+    "dopeiptv/providers/cast_devices.py",
+    "dopeiptv/core/home_net.py",
     "dopeiptv/providers/radio_browser.py",
     "dopeiptv/core/ytdlp.py",
     "dopeiptv/core/tv_input.py",

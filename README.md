@@ -309,6 +309,7 @@ keys stay the app's).
 - **Live stream won't start** — try switching **Live stream format** to `m3u8` under **Settings → Playback**.
 - **No categories** — check the server URL (include the port, e.g. `:8080`).
 - **No EPG for a channel** — the provider may not have a programme guide mapped to it; dopeIPTV tries three different sources (short EPG, full EPG table, XMLTV) before giving up.
+- **A box, a Chromecast or a TV on another part of your network is not found** — a home network split into VLANs (a guest or gadget network) keeps searches on their own part unless the router passes them on: turn on its mDNS reflector (Avahi's reflector, "Multicast DNS" on UniFi), an SSDP relay or UPnP proxy for DLNA TVs, and an IGMP proxy for multicast TV. Or add the device by its address (the cast window's **Add a device by address…**, a box's address in **Add source**), or list the other networks under **Settings → Nerd → Network → Other networks**.
 - **Fullscreen video flickers around its edges (Linux)** — that is variable refresh rate (VRR); turn it off in your display settings.
 - **Anything else** — the [help page](https://dopeiptv.org/help/?ref=github) answers most questions; for a bug, open an issue with a log (`DOPEIPTV_LOG=debug DOPEIPTV_LOG_FILE=/tmp/dope.log dopeiptv`).
 

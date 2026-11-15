@@ -272,6 +272,8 @@ class KodiManager:
         self.settings = settings
         self.session = session
         self.devices: dict[str, KodiDevice] = {}
+        # Found by their address on another part of the network (set_extra).
+        self.extra: list[KodiDevice] = []
         self.active: KodiDevice | None = None
         self.bridge = _NoBridge()
         self.files = FileShare()
@@ -318,9 +320,27 @@ class KodiManager:
         one remembered at the same address keeps its login and its name."""
         mine = self.remembered()
         at = {(d.host.lower(), d.port): d for d in mine}
-        rest = sorted((d for d in found if (d.host.lower(), d.port) not in at),
-                      key=lambda d: (d.name.lower(), d.address))
-        return self._named(mine + rest)
+        rest: dict[tuple[str, int], KodiDevice] = {}
+        for d in list(found) + list(self.extra):
+            where = (d.host.lower(), d.port)
+            if where not in at:
+                rest.setdefault(where, d)
+        return self._named(mine + sorted(rest.values(),
+                                         key=lambda d: (d.name.lower(), d.address)))
+
+    def set_extra(self, devices: list[KodiDevice]) -> list[str]:
+        """Kodis found by their address on another part of the network:
+        listed with the others from now on (not remembered). Their names."""
+        with self._lock:
+            before = {(d.host.lower(), d.port) for d in self.extra}
+            self.extra = list(devices)
+            # One no longer found there goes - unless it is the one casting.
+            keep = [d for d in self.devices.values()
+                    if (d.host.lower(), d.port) not in before or d is self.active]
+            merged = self._merge(keep)
+            self.devices = merged
+            wanted = {(d.host.lower(), d.port) for d in devices}
+            return [k for k, d in merged.items() if (d.host.lower(), d.port) in wanted]
 
     def scan(self, timeout: float = 2.5) -> list[str]:
         found: list[KodiDevice] = []

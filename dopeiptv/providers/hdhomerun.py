@@ -59,6 +59,22 @@ class HDHomeRunClient(BoxClient):
             return self.url(path.path + (f"?{path.query}" if path.query else ""))
         return self.url("/lineup.json")
 
+    def _reachable(self, url: str) -> str:
+        """A stream address as this computer reaches it. An emulator that
+        knows no name of its own says 127.0.0.1 or 0.0.0.0; the address the
+        user typed is the one that answers (on another part of the network,
+        too). A real tuner names its own address, which is kept."""
+        try:
+            u = urlsplit(url)
+            host = (u.hostname or "").lower()
+            mine = urlsplit(self.server).hostname or ""
+        except ValueError:
+            return url
+        if not mine or not (host in ("localhost", "0.0.0.0", "::", "::1") or host.startswith("127.")):
+            return url
+        netloc = (f"[{mine}]" if ":" in mine else mine) + (f":{u.port}" if u.port else "")
+        return u._replace(netloc=netloc).geturl()
+
     def _load(self) -> tuple[list[dict], list[dict]]:
         js = self.get_json(self._lineup_url(), timeout=(6.0, 60.0), absolute=True)
         entries = js if isinstance(js, list) else []
@@ -73,7 +89,7 @@ class HDHomeRunClient(BoxClient):
             if _flag(e.get("DRM")) and not show_drm:
                 continue
             number = str(e.get("GuideNumber") or "")
-            url = str(e["URL"])
+            url = self._reachable(str(e["URL"]))
             if transcode:
                 url += ("&" if "?" in url else "?") + "transcode=" + transcode
             row = {"key": number or url, "name": e.get("GuideName") or number,

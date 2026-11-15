@@ -254,7 +254,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.parental = ParentalControl(settings)
         # Chromecasts, DLNA TVs and Kodis alike, behind one object
         # (casting.py); a Kodi added by hand is remembered in the settings.
-        self.cast = CastHub(kodi=KodiManager(settings))
+        self.cast = CastHub(kodi=KodiManager(settings), settings=settings)
         # AirPlay to an Apple TV joins it on macOS (mw_airplay).
         self._init_airplay()
         self.rec = RecordingManager(settings, self)

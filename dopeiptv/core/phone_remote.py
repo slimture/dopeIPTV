@@ -5,7 +5,9 @@ keys, a channel's logo from the app's own cache and the calendar
 (core/ical.py). The touchpad's gestures are read here (``gesture``): a
 swipe is an arrow, a tap OK, a long press Back.
 
-Off until the person turns it on ("Phone remote…"). Every address starts
+Off until the person turns it on ("Phone remote…"). Only a phone at a
+private address gets an answer - any part of a home network split in
+VLANs, never the internet (core/home_net.py). Every address starts
 with a long random token, /<token>/, which is what the code on the screen
 holds: a request without it gets 403 and nothing else, and an address that
 keeps guessing is shut out for a while. Each address may ask only so often
@@ -29,8 +31,9 @@ from http.server import BaseHTTPRequestHandler
 from typing import Any, Callable
 from urllib.parse import unquote, urlsplit
 
+from . import home_net
 from .log import log
-from .remote_api import _Server
+from .remote_api import _own, _Server
 
 DEFAULT_PORT = 3674           # the remote API's 3673, and one
 TOKEN_BYTES = 24              # 32 characters, 192 bits
@@ -199,6 +202,13 @@ class PhoneServer:
         return bool(self.token) and hmac.compare_digest(given.encode("utf-8", "replace"),
                                                         self.token.encode("utf-8"))
 
+    @staticmethod
+    def client_ok(address: str, own: str = "") -> bool:
+        """A phone at a private address, on whichever part of a network
+        split in VLANs; never one from the internet (*own*: the address it
+        reached us at - the same is this computer)."""
+        return home_net.is_home_client(address, own)
+
 
 def _make_handler(server: PhoneServer) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
@@ -245,6 +255,9 @@ def _make_handler(server: PhoneServer) -> type[BaseHTTPRequestHandler]:
 
         def _handle(self, method: str) -> None:
             who = self.client_address[0]
+            if not server.client_ok(str(who), _own(self)):
+                self._text(403, "forbidden")
+                return
             lim = server.limiter
             if lim.blocked(who) or not lim.allow(who):
                 self._send(429, b"too many requests", "text/plain; charset=utf-8", {"Retry-After": "10"})

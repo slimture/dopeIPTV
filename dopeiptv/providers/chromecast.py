@@ -385,6 +385,25 @@ class _CastWatch:
                  self.name, getattr(status, "status", status))
 
 
+def _host_of(cc) -> str:
+    info = getattr(cc, "cast_info", None)
+    host = getattr(info, "host", None) or getattr(cc, "host", None)
+    if not host:
+        sock = getattr(cc, "socket_client", None)
+        host = getattr(sock, "host", None)
+    return str(host or "")
+
+
+def _uuid_of(h: dict):
+    """The device's own id when its eureka_info gave one, else one made
+    from its address (pychromecast needs an id to tell devices apart)."""
+    import uuid
+    try:
+        return uuid.UUID(str(h.get("uuid") or "").replace("-", ""))
+    except ValueError:
+        return uuid.uuid5(uuid.NAMESPACE_URL, "chromecast://" + str(h.get("host")))
+
+
 class ChromecastManager:
     """Discovers Chromecast devices on the LAN and casts streams."""
 
@@ -392,6 +411,13 @@ class ChromecastManager:
         self.devices: list = []
         self.active = None
         self._browser = None
+        # Chromecasts known by their address (added by hand, or found on
+        # another part of the network, where mDNS does not reach): each a
+        # {"host", "port", "name", "uuid", "model"}, set by set_hosts and
+        # listed after every scan.
+        self.by_host: list[dict] = []
+        # The device objects made for them (_add_hosts).
+        self._hosted: list = []
         self.bridge = CastBridge()
         # Codecs a given device has been seen to refuse, so the same twenty
         # seconds of refusals are not spent on every cast. Learned from the
@@ -458,15 +484,58 @@ class ChromecastManager:
             self._tear_down()
             devices, browser = _pc().get_chromecasts(timeout=6)
             self._browser = browser
-            self.devices = devices
+            self.devices = list(devices)
+            self._hosted = []
+            self._add_hosts()
             # A running cast survives all this: the receiver plays the stream
             # by itself, so dropping the sender socket does not stop the TV.
             # Re-point 'active' at the freshly discovered object with the same
             # name, or the stop button would have nothing left to talk to.
             if was_active:
                 self.active = next(
-                    (c for c in devices if c.name == was_active), None)
-            return sorted(cc.name for cc in devices)
+                    (c for c in self.devices if c.name == was_active), None)
+            return sorted(cc.name for cc in self.devices)
+
+    def set_hosts(self, hosts: list[dict], attach: bool = True) -> list[str]:
+        """Chromecasts by their address, listed from now on beside those
+        mDNS finds (and after every scan); one no longer known leaves the
+        list, unless it is the one casting. Their names in the list.
+        *attach*: listed now (else at the next scan)."""
+        with self._lock:
+            self.by_host = [dict(h) for h in hosts if h.get("host")]
+            now = {str(h["host"]) for h in self.by_host}
+            for c in list(self._hosted):
+                if _host_of(c) not in now and c is not self.active:
+                    self._hosted.remove(c)
+                    if c in self.devices:
+                        self.devices.remove(c)
+            return self._add_hosts() if attach else []
+
+    def _add_hosts(self) -> list[str]:
+        """A device object for each one known by its address that mDNS did
+        not find (same address): made without connecting - cast() does that."""
+        pc = _pc()
+        if pc is None or not self.by_host:
+            return []
+        names: list[str] = []
+        for h in self.by_host:
+            host = str(h["host"])
+            cc = next((c for c in self.devices if _host_of(c) == host), None)
+            if cc is None:
+                name = str(h.get("name") or "").strip() or f"Chromecast ({host})"
+                if any(c.name == name for c in self.devices):
+                    name = f"{name} ({host})"
+                try:
+                    cc = pc.get_chromecast_from_host(
+                        (host, int(h.get("port") or 8009), _uuid_of(h),
+                         h.get("model") or None, name), tries=2, timeout=8)
+                except Exception as e:
+                    log.info("cast: no Chromecast object for %s (%s)", host, e)
+                    continue
+                self.devices.append(cc)
+                self._hosted.append(cc)
+            names.append(cc.name)
+        return names
 
     def _device(self, name: str):
         return next((c for c in self.devices if c.name == name), None)
@@ -1118,6 +1187,14 @@ class ChromecastManager:
             self._tear_down()  # devices before browser - see _tear_down
 
 
+def none_found_text() -> str:
+    """What the cast window says when the search found nothing: and why a
+    home network split in parts (VLANs) may hide a device, what fixes that
+    on the router, and adding it by its address."""
+    return "\n\n".join((tr("cast_none_found"), tr("vlan_nothing_found"),
+                         tr("cast_none_found_add")))
+
+
 class CastDialog(QDialog):
     """Scan for Chromecasts, DLNA TVs and Kodis and cast a stream to one."""
 
@@ -1188,8 +1265,15 @@ class CastDialog(QDialog):
         self.kodi_btn = QPushButton(tr("cast_add_kodi"))
         self.kodi_btn.clicked.connect(self._add_kodi)
         self.kodi_btn.setVisible(callable(getattr(window, "add_kodi", None)))
+        # A Chromecast or a TV the search does not reach (another part of a
+        # network split in VLANs): by its address, kept for next time.
+        # Opened on one added that way, it offers to forget it.
+        self.addr_btn = QPushButton(tr("cast_add_by_address"))
+        self.addr_btn.clicked.connect(self._add_by_address)
+        self.addr_btn.setVisible(callable(getattr(window, "add_cast_device", None)))
         kodi_row = QHBoxLayout()
         kodi_row.addWidget(self.kodi_btn)
+        kodi_row.addWidget(self.addr_btn)
         kodi_row.addStretch(1)
         lay.addLayout(kodi_row)
 
@@ -1509,7 +1593,7 @@ class CastDialog(QDialog):
                 for name in names or []:
                     self.list.addItem(name)
                 status = (tr("cast_devices_found", n=len(names)) if names
-                          else tr("cast_none_found"))
+                          else none_found_text())
                 if not names and not ChromecastManager.available():
                     # Nothing found, and Chromecasts could not even be looked
                     # for: say why, or the empty list reads as "you have none".
@@ -1608,6 +1692,19 @@ class CastDialog(QDialog):
                                                  self.fps, dvr, **more),
                   done, failed)
 
+    def _add_by_address(self) -> None:
+        """Add a Chromecast, a TV or a Kodi by its address - or forget the
+        one added that way that is chosen."""
+        item = self.list.currentItem()
+        is_added = getattr(self.window.cast, "is_added", None)
+        current = (item.text() if item is not None and callable(is_added)
+                   and is_added(item.text()) else None)
+        label = self.window.add_cast_device(self, current)
+        if label is None:
+            return
+        # Forgotten: out of the list. Another one added: beside it.
+        self._took(label, current, None if label == "" else {label, current})
+
     def _add_kodi(self) -> None:
         """Add a Kodi by its address, or give a listed one its login."""
         item = self.list.currentItem()
@@ -1615,10 +1712,17 @@ class CastDialog(QDialog):
         label = self.window.add_kodi(self, current)
         if label is None:
             return
+        self._took(label, current,
+                   getattr(getattr(self.window.cast, "kodi", None), "devices", None))
+
+    def _took(self, label: str, current: str | None, known) -> None:
+        """A device added (or changed, or forgotten: *label* "") from the
+        dialog it was opened on (*current*): the list follows, and is kept
+        for the next panel. *known*: the names still there, None when not
+        known."""
         # The one it was opened on goes when it is forgotten, or now has
-        # another name at the same address; a Kodi at a new address is one
+        # another name at the same address; a device at a new address is one
         # more, beside it.
-        known = getattr(getattr(self.window.cast, "kodi", None), "devices", None)
         if current and label != current and (known is None or current not in known):
             for i in range(self.list.count()):
                 if self.list.item(i).text() == current:

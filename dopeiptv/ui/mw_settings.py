@@ -1264,6 +1264,7 @@ class _SettingsMixin:
         # -- Casting: its own page, beside Playback (it was a card there) -----
         c = casting.card(tr("set_card_cast"))
         c.row(tr("cast_pause_label"), cast_pause_box, tr("cast_pause_hint"))
+        self._cast_added_card(casting.card(tr("set_card_cast_added")), nerd_link)
         if not self.player:
             c = play.card()
             c.note(tr("set_embedded_unavailable",
@@ -1497,7 +1498,7 @@ class _SettingsMixin:
         nerd_link(c, "set_link_net",
                   [tr("nerd_card_identity"), tr("nerd_card_proxy"),
                    tr("nerd_card_conn"), tr("nerd_card_dns"),
-                   tr("nerd_card_vpn")], "net")
+                   tr("nerd_card_vpn"), tr("nerd_card_lan")], "net")
         nerd_link(c, "set_link_lists",
                   [tr("nerd_card_boxes"), tr("nerd_card_picons"),
                    tr("nerd_card_udpxy"), tr("nerd_card_failover"),

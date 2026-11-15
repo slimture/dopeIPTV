@@ -325,6 +325,21 @@ tests check that placeholders line up and that every `tr("…")` key exists.
   still to be seen on a real Mac - `docs/DEVELOPER_NOTES.md` says how it
   works.
 - Windows code signing (see above).
+- **A home network split in VLANs** (approved, November 2026): searches
+  sent to everyone at once - mDNS, SSDP, the HDHomeRun, Jellyfin and Plex
+  broadcasts - stay on their own part unless the router passes them on, so
+  Nerd › Network › Other networks (`core/home_net.py`) lists the other
+  parts and "Find on my network" and the cast window ask each address
+  there by unicast (`providers/lan_scan.py`); the cast window adds a
+  Chromecast, a DLNA TV or a Kodi by its address
+  (`providers/cast_devices.py`, kept in `cast_added_devices`, listed on
+  Settings › Casting); the remote API and the phone remote let in every
+  private range, never a public address. Tried against fake devices on the
+  loopback only: a real network with two VLANs and a router between them
+  is still to be seen - a Chromecast (8008/8009) and a TV answering
+  unicast M-SEARCH there, a cast's converter or file share reached from
+  the other part (it is served at this computer's address on its default
+  route), and the phone remote from a phone on the guest network.
 - On the website, a few Serbian strings are in Cyrillic while the rest of
   the Serbian page is Latin.
 - **Profiles**: built - one per person in the household, as Netflix and
@@ -514,6 +529,16 @@ Plex are in)
 
 Written once, when everything in the batch is in (GitHub's CHANGELOG,
 FEATURES and README; the website's help in every language):
+
+- **Devices on another part of the network (VLANs).** A search does not
+  cross from one VLAN to another unless the router passes it on: an mDNS
+  reflector (Avahi's reflector; "Multicast DNS" on UniFi) for Chromecasts
+  and Kodi, an SSDP relay or UPnP proxy for DLNA TVs, an IGMP proxy for
+  multicast TV - and the router must let traffic through between them.
+  Without that: add the device by its address in the cast window, or a
+  box by its address in Add source, or list the other networks under Nerd
+  › Network › Other networks. The README's Troubleshooting has the short
+  version.
 
 - **An Apple TV from Linux or Windows.** AirPlay is macOS only (Apple's
   frameworks; tvOS 18 shut out other senders' video). Elsewhere: cast to a

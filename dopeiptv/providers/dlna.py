@@ -15,6 +15,7 @@ from __future__ import annotations
 import os
 import re
 import secrets
+import select
 import socket
 import threading
 import time
@@ -124,6 +125,25 @@ class Renderer:
     rc_type: str = ""
     udn: str = ""
 
+    def to_dict(self) -> dict[str, str]:
+        return {"name": self.name, "location": self.location, "av_url": self.av_url,
+                "av_type": self.av_type, "rc_url": self.rc_url, "rc_type": self.rc_type,
+                "udn": self.udn}
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Renderer | None":
+        """One kept in the settings; None when it could not be cast to."""
+        try:
+            r = cls(name=_clean_name(str(d.get("name") or "")),
+                    location=str(d.get("location") or ""), av_url=str(d.get("av_url") or ""),
+                    av_type=str(d.get("av_type") or ""), rc_url=str(d.get("rc_url") or ""),
+                    rc_type=str(d.get("rc_type") or ""), udn=str(d.get("udn") or ""))
+        except (AttributeError, TypeError):
+            return None
+        ok = (r.av_url.startswith("http://") and r.av_type.startswith(AVT_PREFIX)
+              and (not r.rc_url or r.rc_url.startswith("http://")))
+        return r if ok else None
+
 
 def ssdp_search(timeout: float = 3.0,
                 addr: tuple[str, int] = SSDP_ADDR) -> list[str]:
@@ -166,6 +186,77 @@ def ssdp_search(timeout: float = 3.0,
                     found.append(value)
     except OSError as e:
         log.info("dlna: the search could not be sent (%s)", e)
+    finally:
+        sock.close()
+    return found
+
+
+#: Where renderers keep their description when they do not answer a search
+#: (port, path): Samsung, Sony, Sonos, Philips, gmrender, Yamaha and the
+#: libupnp default. Asked only of an address given by hand or one that is
+#: known to be there.
+DESCRIPTION_PATHS = ((9197, "/dmr"), (52323, "/dmr.xml"),
+                     (1400, "/xml/device_description.xml"),
+                     (49153, "/nmrDescription.xml"), (49494, "/description.xml"),
+                     (49154, "/MediaRenderer/desc.xml"), (49152, "/description.xml"))
+
+
+def _locations(data: bytes) -> list[str]:
+    out: list[str] = []
+    for line in data.decode("utf-8", "replace").split("\r\n"):
+        key, _, value = line.partition(":")
+        value = value.strip()
+        if key.strip().lower() == "location" and value.startswith("http://") \
+                and value not in out:
+            out.append(value)
+    return out
+
+
+def ssdp_unicast(hosts: list[str], timeout: float = 2.0, port: int = 1900,
+                 cancel: Any = None) -> dict[str, list[str]]:
+    """Each of *hosts* (addresses) asked directly - UPnP 1.1's unicast
+    M-SEARCH, which reaches another part of a network split in VLANs where
+    the multicast one does not. {address: description addresses}."""
+    found: dict[str, list[str]] = {}
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+    except OSError as e:
+        log.info("dlna: no socket for the search (%s)", e)
+        return found
+    try:
+        sock.settimeout(0.05)
+        for host in hosts:
+            if cancel is not None and cancel.is_set():
+                return found
+            for st in SEARCH_TARGETS:
+                msg = ("M-SEARCH * HTTP/1.1\r\n"
+                       f"HOST: {host}:{port}\r\n"
+                       'MAN: "ssdp:discover"\r\n'
+                       f"ST: {st}\r\n"
+                       f"USER-AGENT: {UA}\r\n\r\n").encode()
+                try:
+                    sock.sendto(msg, (host, port))
+                except OSError:
+                    break               # no route there, or the buffer is full
+        sock.setblocking(False)
+        deadline = time.monotonic() + timeout
+        while True:
+            left = deadline - time.monotonic()
+            if left <= 0 or (cancel is not None and cancel.is_set()):
+                break
+            ready, _w, _x = select.select([sock], [], [], min(0.2, left))
+            if not ready:
+                continue
+            try:
+                data, addr = sock.recvfrom(65507)
+            except OSError:
+                continue
+            for loc in _locations(data):
+                got = found.setdefault(str(addr[0]), [])
+                if loc not in got:
+                    got.append(loc)
+    except (OSError, ValueError) as e:
+        log.info("dlna: the search by address stopped (%s)", e)
     finally:
         sock.close()
     return found
@@ -389,6 +480,8 @@ class DlnaManager:
     def __init__(self, session: Any = None) -> None:
         self.session = session
         self.renderers: dict[str, Renderer] = {}
+        # Known by their address rather than found (set_extra).
+        self.extra: list[Renderer] = []
         self.active: Renderer | None = None
         self.bridge = _NoBridge()
         self.files = FileShare()
@@ -409,6 +502,46 @@ class DlnaManager:
     def knows(self, name: str) -> bool:
         return name in self.renderers or name.endswith(SUFFIX)
 
+    @staticmethod
+    def _place(found: dict[str, Renderer], r: Renderer) -> str | None:
+        """Put *r* in *found* under a name of its own; None when the same TV
+        is there already (its UDN, or its description address)."""
+        if any((x.udn and x.udn == r.udn) or x.location == r.location
+               for x in found.values()):
+            return None
+        name = r.name + SUFFIX
+        n = 2
+        while name in found:
+            name = f"{r.name} #{n}{SUFFIX}"
+            n += 1
+        found[name] = r
+        return name
+
+    def set_extra(self, renderers: list[Renderer]) -> list[str]:
+        """Renderers known by their address (added by hand, or found on
+        another part of the network): listed beside those that answered the
+        search, from now on and after every scan. Returns their names."""
+        with self._lock:
+            before = {r.location for r in self.extra}
+            self.extra = list(renderers)
+            now = {r.location for r in self.extra}
+            for name, r in list(self.renderers.items()):
+                # One no longer known goes - unless it is the one casting.
+                if r.location in before - now and r is not self.active:
+                    self.renderers.pop(name, None)
+            return self._merge_extra(self.renderers)
+
+    def _merge_extra(self, found: dict[str, Renderer]) -> list[str]:
+        names: list[str] = []
+        for r in self.extra:
+            name = self._place(found, r)
+            if name is None:
+                name = next((k for k, x in found.items()
+                             if (x.udn and x.udn == r.udn) or x.location == r.location), None)
+            if name:
+                names.append(name)
+        return names
+
     def scan(self, timeout: float = 3.0) -> list[str]:
         locations = ssdp_search(timeout)
         found: dict[str, Renderer] = {}
@@ -419,14 +552,7 @@ class DlnaManager:
             if r is None:
                 return
             with lock:
-                if any(x.udn and x.udn == r.udn for x in found.values()):
-                    return              # the same TV answered twice
-                name = r.name + SUFFIX
-                n = 2
-                while name in found:
-                    name = f"{r.name} #{n}{SUFFIX}"
-                    n += 1
-                found[name] = r
+                self._place(found, r)   # the same TV answering twice is one
 
         threads = [threading.Thread(target=look, args=(loc,), daemon=True)
                    for loc in locations]
@@ -435,6 +561,7 @@ class DlnaManager:
         for t in threads:
             t.join(6)
         with self._lock:
+            self._merge_extra(found)
             self.renderers = found
             if self.active is not None:
                 # A running cast keeps its renderer under the new scan.

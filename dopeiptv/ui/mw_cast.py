@@ -33,7 +33,7 @@ from datetime import datetime, timedelta
 
 from PyQt6 import sip
 from PyQt6.QtWidgets import (
-    QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit, QMenu,
+    QComboBox, QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit, QMenu,
     QPushButton, QVBoxLayout,
 )
 
@@ -1819,6 +1819,61 @@ class _CastMixin:
             return None
         return d.result_label
 
+    def add_cast_device(self, parent, current: str | None = None) -> str | None:
+        """The cast panel's "Add a device by address…": a Chromecast, a TV
+        or a Kodi the search does not reach (another part of a network split
+        in VLANs), found out at its address before it is kept. Opened on one
+        added that way, it can forget it. The name it has in the device list,
+        "" when it was forgotten, None when nothing changed."""
+        hub = getattr(self, "cast", None)
+        if hub is None or not callable(getattr(hub, "add_by_address", None)):
+            return None
+        d = _AddressDialog(parent, hub, current, self.pool)
+        if d.exec() != QDialog.DialogCode.Accepted:
+            return None
+        return d.result_label
+
+    def _cast_added_card(self, c, nerd_link) -> None:
+        """Settings > Casting: the devices added by address - Chromecasts
+        and TVs (cast_added_devices) and Kodis (kodi_devices) - each with
+        Remove; and, while Nerd is on, the way to the other networks it
+        searches. Adding is in the cast window, where the device is tried."""
+        from ..providers import kodi as kodi_mod
+        hub = getattr(self, "cast", None)
+        kinds = {"chromecast": "Chromecast", "dlna": tr("cast_addr_kind_dlna")}
+        rows: list[tuple[str, str, str, str]] = []
+        stored = getattr(hub, "stored", None)
+        for d in (stored() if callable(stored) else []):
+            rows.append((d.name, f"{kinds.get(d.kind, d.kind)} · {d.address}", "cast", d.key))
+        for k in kodi_mod.load_devices(self.settings):
+            rows.append((k.name, f"Kodi · {k.address}", "kodi", k.address))
+        gone: set[str] = set()
+        none = c.note(tr("set_cast_added_none"))
+        none_row = c.rows[-1][0]
+        c.shown_if(none_row, lambda: len(gone) == len(rows))
+
+        def forget(kind: str, key: str) -> None:
+            if kind == "cast" and hub is not None:
+                hub.forget_added(key)
+            elif kind == "kodi":
+                mgr = getattr(hub, "kodi", None)
+                label = next((n for n, d in (getattr(mgr, "devices", None) or {}).items()
+                              if d.address == key), None)
+                if mgr is not None and label is not None:
+                    mgr.forget(label)
+                else:
+                    kodi_mod.save_devices(self.settings, [
+                        d for d in kodi_mod.load_devices(self.settings) if d.address != key])
+            gone.add(kind + ":" + key)
+            c.refresh()
+        for name, hint, kind, key in rows:
+            btn = QPushButton(tr("cast_addr_remove"))
+            btn.clicked.connect(lambda _c=False, kind=kind, key=key: forget(kind, key))
+            row = c.row(name, btn, hint, search=f"{hint} {tr('cast_add_by_address')}")
+            c.shown_if(row, lambda kind=kind, key=key: kind + ":" + key not in gone)
+        none.setWordWrap(True)
+        nerd_link(c, "set_link_cast_net", [tr("nerd_card_lan")], "net")
+
     def stop_local_playback_for_cast(self) -> bool:
         """Free the local stream when a cast starts. The Chromecast pulls the
         URL itself (one connection from the device), so on a single-connection
@@ -1919,6 +1974,104 @@ class _KodiAddDialog(QDialog):
         self._say(tr("kodi_checking", address=f"{host}:{port}"))
         run_async(self.pool, self.kodi.add, self._added, self._failed,
                   host, port, user, password)
+
+    def _alive(self) -> bool:
+        return not sip.isdeleted(self) and self.isVisible()
+
+    def _added(self, label: str) -> None:
+        if not self._alive():
+            return
+        self._checking = False
+        self.result_label = label
+        self.accept()
+
+    def _failed(self, msg: str) -> None:
+        if not self._alive():
+            return
+        self._checking = False
+        self.ok_btn.setEnabled(True)
+        self._say(msg, error=True)
+
+
+class _AddressDialog(QDialog):
+    """A device by its address: what kind it is found out (or the one
+    chosen), and it is kept only once it answers as that."""
+
+    KINDS = (("auto", "cast_addr_kind_auto"), ("chromecast", "cast_addr_kind_cc"),
+             ("dlna", "cast_addr_kind_dlna"), ("kodi", "cast_addr_kind_kodi"))
+
+    def __init__(self, parent, hub, current: str | None, pool) -> None:
+        super().__init__(parent)
+        self.hub = hub
+        self.pool = pool
+        self.current = current
+        self.result_label: str | None = None
+        self._checking = False
+        self.setWindowTitle(tr("cast_addr_title"))
+        self.setMinimumWidth(440)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(18, 18, 18, 18)
+        lay.setSpacing(10)
+        intro = QLabel(tr("cast_addr_intro"))
+        intro.setWordWrap(True)
+        intro.setObjectName("DetailMeta")
+        lay.addWidget(intro)
+        form = QFormLayout()
+        self.kind = QComboBox()
+        for key, label in self.KINDS:
+            self.kind.addItem(tr(label), key)
+        self.address = QLineEdit("")
+        self.address.setPlaceholderText(tr("cast_addr_ph"))
+        form.addRow(tr("cast_addr_kind"), self.kind)
+        form.addRow(tr("kodi_address"), self.address)
+        lay.addLayout(form)
+        self.status = QLabel("")
+        self.status.setWordWrap(True)
+        self.status.hide()
+        lay.addWidget(self.status)
+        self.buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel)
+        self.ok_btn = self.buttons.button(QDialogButtonBox.StandardButton.Ok)
+        self.ok_btn.setText(tr("cast_addr_add"))
+        self.forget_btn = None
+        if current:
+            self.forget_btn = QPushButton(tr("cast_addr_forget"))
+            self.buttons.addButton(self.forget_btn,
+                                   QDialogButtonBox.ButtonRole.DestructiveRole)
+            self.forget_btn.clicked.connect(self._forget)
+        self.buttons.accepted.connect(self._check)
+        self.buttons.rejected.connect(self.reject)
+        lay.addWidget(self.buttons)
+
+    def _say(self, text: str, error: bool = False) -> None:
+        self.status.setText(text)
+        self.status.setStyleSheet(
+            f"color:{P['error'] if error else P['muted']}; font-size:12px;")
+        if self.status.isHidden():
+            self.status.show()
+            self.adjustSize()
+
+    def _forget(self) -> None:
+        key = self.hub.added_key(self.current)
+        if key:
+            self.hub.forget_added(key)
+        self.result_label = ""
+        self.accept()
+
+    def _check(self) -> None:
+        if self._checking:
+            return
+        from ..providers.cast_devices import parse_address
+        text = self.address.text().strip()
+        if parse_address(text) is None:
+            self._say(tr("cast_addr_bad"), error=True)
+            return
+        self._checking = True
+        self.ok_btn.setEnabled(False)
+        self._say(tr("cast_addr_checking", address=text))
+        run_async(self.pool, self.hub.add_by_address, self._added, self._failed,
+                  text, self.kind.currentData() or "auto")
 
     def _alive(self) -> bool:
         return not sip.isdeleted(self) and self.isVisible()

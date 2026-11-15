@@ -71,7 +71,8 @@ PARTS = ("net", "boxes", "player", "serve", "diag")
 PART_KEYS = {
     "net": ("nerd_user_agent", "nerd_referer", "nerd_headers", "nerd_proxy", "nerd_proxy_player",
             "nerd_ip_family", "nerd_net_timeout", "nerd_reconnect_max", "nerd_vpn_guard",
-            "nerd_vpn_iface", "nerd_vpn_lan", "nerd_dns", "nerd_dns_url", "nerd_dns_fallback"),
+            "nerd_vpn_iface", "nerd_vpn_lan", "nerd_dns", "nerd_dns_url", "nerd_dns_fallback",
+            "nerd_other_networks"),
     "boxes": ("nerd_picon_dir", "nerd_picon_override", "nerd_udpxy", "nerd_failover", "nerd_numbers_keep"),
     "player": ("nerd_spdif", "nerd_video_sync", "nerd_interpolation", "nerd_probe", "nerd_demux_max_mb",
                "nerd_mpv_config_dir", "nerd_shaders", "nerd_mpv_options", "nerd_adelay_per_channel",
@@ -359,6 +360,9 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     c.widget(vpn_line, "VPN WireGuard")
     vpn_line.auto = True
     c.note(tr("nerd_applies_vpn"))
+
+    # -- network: the other networks to search (VLANs) ------------------------------------
+    lan_values = net_advanced.networks_card(at("net"), n, lines)
 
     # -- boxes and servers ---------------------------------------------------------------
     if boxes is not None:
@@ -908,6 +912,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
         put("nerd_remote_token", token.text().strip())
         out.update(hooks())
         out.update(dns_values())
+        out.update(lan_values())
         out.update(latency_values())
         return out
 
