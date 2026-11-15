@@ -29,6 +29,11 @@ device on the admin page (needs Python's cryptography package).
                           watch together (together.py): sealed messages passed
                           between the people in a room, in memory only
 
+/together/, /sync/ and /feedback/report answer an app that says it is a
+modified build (X-dopeIPTV-Build: modified) with 403 and the words it shows
+(official.py); no header, as from older official apps, is fine. Only how
+many were refused is kept, per day - the admin page shows it.
+
 A donation comes with a supporter key for the app (supporter.py): shown on
 the page when the payment goes through, and behind a link in Stripe's
 receipt (the PaymentIntent's description: ".../#key=<token>", the token
@@ -799,7 +804,7 @@ def _watch_donations() -> None:
 # One list, so a new path cannot be served by one check and refused by another.
 ADMIN_DATA = ("/admin/data", "/admin/visits", "/admin/visitor", "/admin/find", "/admin/rows", "/admin/account",
               "/admin/live", "/admin/builds")
-ADMIN_FEEDBACK = ("/admin/feedback", "/admin/feedback-item")
+ADMIN_FEEDBACK = ("/admin/feedback", "/admin/feedback-item", "/admin/feedback-copy")
 ADMIN_GET = ("/admin/admin.js", "/admin/analysis.js", "/admin/logtools.js", "/admin/account.js",
              "/admin/builds.js", "/admin/feedback.js", *ADMIN_DATA, *ADMIN_FEEDBACK)
 ADMIN_POST = ("/admin/notify-test", "/admin/push-subscribe", "/admin/push-unsubscribe", "/admin/pick",
@@ -939,6 +944,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/admin/feedback-item":
                 row = feedback.item(fb_dir, query.get("id", "")[:40])
                 return self._send(200, row) if row else self._send(404, {"error": "no such report"})
+            if path == "/admin/feedback-copy":      # "Copy all shown": many reports' plain text at once
+                ids = query.get("ids", "")[:feedback.COPY_MOST * 41].split(",")
+                return self._send(200, {"items": feedback.copies(fb_dir, ids)})
             try:
                 fb_days = int(query.get("days", "30"))
             except ValueError:
@@ -983,6 +991,11 @@ class Handler(BaseHTTPRequestHandler):
                 body["sync"] = sync.usage(stats_dir)
             except Exception as e:  # noqa: BLE001 - the page without it rather than none
                 print(f"[donate] sync space unavailable: {type(e).__name__}", file=sys.stderr, flush=True)
+            try:
+                import official
+                body["refused"] = official.REFUSED.totals(_stats_dir(), days if days in admin.RANGES else 30)
+            except Exception as e:  # noqa: BLE001 - the page without it rather than none
+                print(f"[donate] refusal counts unavailable: {type(e).__name__}", file=sys.stderr, flush=True)
             body["push"] = {"ready": push_ready(), "key": push_key() if push_ready() else "",
                             "devices": [{"label": d.get("label", ""), "added": d.get("added", 0)}
                                         for d in push_subs()]}
@@ -1209,10 +1222,28 @@ class Handler(BaseHTTPRequestHandler):
         return 200, {"key": key, "since": supporter.check(key, _public())["since"],
                      "handed_out": count + 1}
 
+    def _refused(self, service: str) -> bool:
+        """A modified build of the app (X-dopeIPTV-Build: modified) is not
+        served here: 403 and the words the app shows. Only the count is kept
+        (official.py) - nothing about the request."""
+        import official
+        if not official.refused(self.headers.get(official.HEADER)):
+            return False
+        try:
+            if official.REFUSED.add(_stats_dir(), service):
+                print(f"[donate] a modified build refused ({service}) - the first today; "
+                      "the admin page counts them", file=sys.stderr, flush=True)
+        except Exception as e:  # noqa: BLE001 - refused all the same, counted or not
+            print(f"[donate] refusal not counted: {type(e).__name__}", file=sys.stderr, flush=True)
+        self._send_quiet(403, official.REFUSAL)
+        return True
+
     def _feedback(self) -> None:
-        """A report from the app: kind, version, system and the text its user
-        read and sent. Nothing about who sent it is kept (the rate limit
-        holds the address in memory only)."""
+        """A report from the app: kind, version, system, build and the text
+        its user read and sent. Nothing about who sent it is kept (the rate
+        limit holds the address in memory only)."""
+        if self._refused("feedback"):
+            return
         if self.headers.get("X-Dopeiptv-Report") != "1":
             return self._send(400, {"error": "not from the app"})
         addr = self.headers.get("X-Real-IP") or "local"
@@ -1233,7 +1264,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, {"ok": True})
         import admin
         import feedback
-        status, body = feedback.accept(CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats")), data)
+        import official
+        status, body = feedback.accept(CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats")), data,
+                                       official.kind(self.headers.get(official.HEADER)))
         if status == 200 and not body.get("duplicate") and push_ready():
             kind = str(data.get("kind") or "feedback")
             threading.Thread(target=push, args=(
@@ -1283,6 +1316,8 @@ class Handler(BaseHTTPRequestHandler):
         key, no account (a supporter key an older app still sends is not
         read). The address is never kept, logged or tied to the slot: the
         limits hold it in memory only."""
+        if self._refused("sync"):
+            return
         import sync
         slot = self.path.split("?", 1)[0][len(SYNC):]
         if not sync.SLOT.match(slot):
@@ -1331,6 +1366,8 @@ class Handler(BaseHTTPRequestHandler):
         """Watch together's relay (together.py): a room's sealed messages,
         in memory only. Neither the room, the member nor the address is
         kept beyond memory or logged (the rate limit holds the address)."""
+        if self._refused("together"):
+            return
         import together
         path, _, query = self.path.partition("?")
         room = path[len(TOGETHER):]
@@ -1527,8 +1564,9 @@ def sync_watch(stats_dir: str) -> dict:
 def _sync_cleanup() -> None:
     """Once a day: the sync slots nobody has used for sync.KEEP_DAYS go (the
     privacy policy's 180 days), the space the rest take is looked at
-    (sync_watch), and the reports older than feedback.KEEP_DAYS go (the
-    privacy policy's 12 months)."""
+    (sync_watch), the day's refusals of modified builds are summed in the
+    log, and the reports older than feedback.KEEP_DAYS go (the privacy
+    policy's 12 months)."""
     import sync
     while True:
         try:
@@ -1547,6 +1585,16 @@ def _sync_cleanup() -> None:
                       f"{seen['rooms']} open now", file=sys.stderr, flush=True)
         except Exception as e:  # noqa: BLE001 - the cleanup keeps its schedule
             print(f"[donate] together counts: {type(e).__name__}", file=sys.stderr, flush=True)
+        try:
+            import official
+            official.REFUSED.flush()
+            seen = official.REFUSED.take()
+            if seen:
+                print(f"[donate] modified builds: {sum(seen.values())} request(s) refused in the last day ("
+                      + ", ".join(f"{s} {seen[s]}" for s in official.SERVICES if s in seen) + ")",
+                      file=sys.stderr, flush=True)
+        except Exception as e:  # noqa: BLE001 - the cleanup keeps its schedule
+            print(f"[donate] refusal counts: {type(e).__name__}", file=sys.stderr, flush=True)
         try:
             import feedback
             gone = feedback.prune(_stats_dir())

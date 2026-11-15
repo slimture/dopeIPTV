@@ -27,6 +27,13 @@ and words of their own. The app asks now and then with its codes (POST
 /feedback/replies) and is told the answers to the reports they hash to.
 Nobody is named anywhere: the code is the only link, and it never leaves
 the person's computer. Kept in feedback-replies.json.
+
+Which build sent it: the app's X-dopeIPTV-Build header (official.py) -
+"official" or "source"; "unknown" for none (apps from before it, the
+site's footer). A modified build is refused before anything is read
+(donate.py), so none is kept. Reports from before the header are unknown.
+The admin page shows "source" and filters by it, and its Copy takes a
+report as plain text (plain()).
 """
 
 from __future__ import annotations
@@ -48,6 +55,8 @@ CHOICES = {"topic": ("bug", "idea", "like", "question"),
                     "website"),
            "often": ("always", "sometimes", "once")}
 REPLY_CODES = ("thanks", "known", "fixed", "needinfo", "note")
+#: The build kinds a report is kept with (official.py says which came).
+BUILDS = ("official", "source", "unknown")
 _HASH = re.compile(r"^[0-9a-f]{64}$")
 DAY_MOST = 2000
 SAME_SIG_DAY = 50
@@ -126,10 +135,11 @@ def _memory(stats_dir: str, now: float) -> dict:
     return mem
 
 
-def accept(stats_dir: str, body: dict) -> tuple[int, dict]:
-    """One report from the app; (status, answer). A report already taken
-    answers ok with "duplicate" (the app need not try again), and is not
-    kept twice."""
+def accept(stats_dir: str, body: dict, build: str = "unknown") -> tuple[int, dict]:
+    """One report from the app; (status, answer). *build*: what its
+    X-dopeIPTV-Build header said (official.kind), never the body's word. A
+    report already taken answers ok with "duplicate" (the app need not try
+    again), and is not kept twice."""
     kind = str(body.get("kind") or "feedback")
     if kind not in KINDS:
         kind = "feedback"
@@ -142,7 +152,8 @@ def accept(stats_dir: str, body: dict) -> tuple[int, dict]:
         return 400, {"error": "empty"}
     now = time.time()
     row = {"id": uuid.uuid4().hex[:12], "t": int(now), "kind": kind,
-           "version": version, "os": system, "sig": signature(kind, text), "text": text}
+           "version": version, "os": system, "build": build if build in BUILDS else "unknown",
+           "sig": signature(kind, text), "text": text}
     if _HASH.match(str(body.get("reply") or "")):
         row["reply"] = str(body["reply"])
     if body.get("supporter") == "yes":
@@ -370,6 +381,7 @@ def summary(stats_dir: str, days: int) -> dict:
     per_day: dict[str, dict[str, int]] = {}
     by_version: dict[str, int] = {}
     by_os: dict[str, int] = {}
+    by_build: dict[str, int] = {}
     kinds = dict.fromkeys(KINDS, 0)
     groups: dict[str, dict] = {}
     for r in rows:
@@ -379,13 +391,17 @@ def summary(stats_dir: str, days: int) -> dict:
         kinds[r["kind"]] = kinds.get(r["kind"], 0) + 1
         by_version[r["version"]] = by_version.get(r["version"], 0) + 1
         by_os[r["os"]] = by_os.get(r["os"], 0) + 1
+        build = _build(r)
+        by_build[build] = by_build.get(build, 0) + 1
         if r["kind"] != "feedback":
             key = _sig_key(r.get("sig") or "")
             g = groups.setdefault(key, {"key": key, "sig": r.get("sig") or "", "kind": r["kind"], "count": 0,
                                         "first": r["t"], "last": r["t"], "versions": set(), "systems": set(),
                                         "latest": r["id"], "answerable": 0,
+                                        "builds": dict.fromkeys(BUILDS, 0),
                                         "replies": len(answered["group"].get(key, []))})
             g["count"] += 1
+            g["builds"][build] += 1
             g["answerable"] += 1 if r.get("reply") else 0
             g["first"] = min(g["first"], r["t"])
             if r["t"] >= g["last"]:
@@ -406,7 +422,7 @@ def summary(stats_dir: str, days: int) -> dict:
         if r["kind"] == "feedback":
             topics[r.get("topic") or ""] = topics.get(r.get("topic") or "", 0) + 1
     items = [{"id": r["id"], "t": r["t"], "kind": r["kind"], "version": r["version"], "os": r["os"],
-              "sig": r.get("sig") or "", "preview": _preview(r), "state": _item_state(state, r),
+              "build": _build(r), "sig": r.get("sig") or "", "preview": _preview(r), "state": _item_state(state, r),
               "answerable": bool(r.get("reply")), "replies": len(answered["report"].get(r["id"], [])),
               **{k: r[k] for k in (*CHOICES, "from", "sup") if r.get(k)}}
              for r in sorted(rows, key=lambda r: -r["t"]) if r.get("text")][:300]
@@ -416,7 +432,13 @@ def summary(stats_dir: str, days: int) -> dict:
             "per_day": [[day, v["error"], v["crash"], v["feedback"]] for day, v in sorted(per_day.items())],
             "by_version": sorted(by_version.items(), key=lambda kv: -kv[1]),
             "by_os": sorted(by_os.items(), key=lambda kv: -kv[1]),
+            "by_build": sorted(by_build.items(), key=lambda kv: -kv[1]),
             "groups": group_list[:100], "items": items}
+
+
+def _build(row: dict) -> str:
+    b = row.get("build")
+    return b if b in BUILDS else "unknown"
 
 
 def _preview(row: dict) -> str:
@@ -428,15 +450,62 @@ def _preview(row: dict) -> str:
     return re.sub(r"\s+", " ", first)[:160]
 
 
+#: What the app's short lists mean, for the plain text (feedback.js shows the same).
+_WORDS = {"topic": {"bug": "not working", "idea": "idea", "like": "likes", "question": "question"},
+          "often": {"always": "every time", "sometimes": "sometimes", "once": "once"}}
+
+
+def plain(row: dict) -> str:
+    """A report as plain text, whole, for the admin page's Copy: what it is,
+    when, the version, system and build it came from, what the person
+    picked, and the text as sent - the error and its traceback, the recent
+    log and their own words are in it, as the app wrote them."""
+    kind = row.get("kind") if row.get("kind") in KINDS else "feedback"
+    t = int(row.get("t") or 0)
+    lines = [f"dopeIPTV {kind} report {row.get('id', '')}".rstrip(),
+             "Sent: " + time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(t)),
+             f"Kind: {kind}",
+             f"Version: {row.get('version') or '?'}",
+             f"System: {row.get('os') or '?'}",
+             f"Build: {_build(row)}",
+             "From: " + ("the website" if row.get("from") == "site" else "the app")]
+    if row.get("sup"):
+        lines.append("Supporter: yes")
+    for key, label in (("topic", "Topic"), ("area", "Area"), ("often", "How often")):
+        if row.get(key):
+            lines.append(f"{label}: " + _WORDS.get(key, {}).get(row[key], str(row[key])))
+    if kind != "feedback" and row.get("sig"):
+        lines.append(f"Problem: {row['sig']}")
+    text = (row.get("text") or "").strip("\n")
+    return "\n".join(lines) + "\n\n" + (text or "(no text kept: the same problem many times that day)") + "\n"
+
+
 def item(stats_dir: str, rid: str) -> dict | None:
     for r in _rows(stats_dir):
         if r.get("id") == rid:
             out = {k: v for k, v in r.items() if k != "reply"}
+            out["build"] = _build(r)
             out["state"] = _state(stats_dir).get(rid, "new")
             out["answerable"] = bool(r.get("reply"))
             out["replies"] = _answers(r, _replies(stats_dir))
+            out["copy"] = plain(r)
             return out
     return None
+
+
+_ID = re.compile(r"^[0-9a-f]{8,40}$")
+COPY_MOST = 300
+
+
+def copies(stats_dir: str, ids: list[str]) -> list[dict]:
+    """[{"id", "copy"}] for the reports *ids* names, in that order (the
+    admin page's "Copy all shown"; one read of the file for all of them)."""
+    want = [i for i in dict.fromkeys(ids) if isinstance(i, str) and _ID.match(i)][:COPY_MOST]
+    if not want:
+        return []
+    wanted = set(want)
+    found = {r.get("id"): r for r in _rows(stats_dir) if r.get("id") in wanted}
+    return [{"id": i, "copy": plain(found[i])} for i in want if i in found]
 
 
 def export(stats_dir: str, days: int, most: int = 200) -> dict:

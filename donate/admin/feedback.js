@@ -2,11 +2,15 @@
  * app (Send feedback…, and the offer after an error or a crash), laid out
  * like the statistics - the numbers for the period, a row a day, the
  * problems grouped by what went wrong, what people wrote. Each report can
- * be read in full, marked seen or fixed, and copied as a block to paste
- * into a conversation with whoever fixes it.
- * /admin/feedback, /admin/feedback-item, /admin/feedback-mark in donate.py
- * (feedback.py). The app scrubs a report before the person sends it; the
- * service scrubs it again. An external file for the CSP.
+ * be read in full, marked seen or fixed, and copied - as plain text from
+ * its row (Copy; the service writes the text, feedback.py plain()), the
+ * whole list as shown (Copy all shown), or as a block to paste into a
+ * conversation with whoever fixes it. Which build sent a report: "source"
+ * is marked, and the lists filter by build.
+ * /admin/feedback, /admin/feedback-item, /admin/feedback-copy,
+ * /admin/feedback-mark in donate.py (feedback.py). The app scrubs a report
+ * before the person sends it; the service scrubs it again. An external file
+ * for the CSP.
  */
 (function () {
   "use strict";
@@ -21,7 +25,9 @@
                  settings: "Settings", cast: "Casting", updates: "Updates", other: "Something else",
                  website: "The website" };
   const OFTEN = { always: "every time", sometimes: "sometimes", once: "once" };
-  let topic = "";
+  // Which build sent it (X-dopeIPTV-Build; reports from before it are unknown).
+  const BUILD = { official: "Official", source: "From source", unknown: "Unknown" };
+  let topic = "", build = "";
   // Answers the app shows in its own language (feedback.py REPLY_CODES);
   // words of one's own go with any of them, or alone as a note.
   const REPLY = [["thanks", "Thanks, noted"], ["known", "Known problem, being worked on"],
@@ -45,6 +51,127 @@
   function post(url, body) {
     return fetch(url, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(body) }).then((r) => r.ok);
+  }
+
+  // -- copying, phones included -----------------------------------------------
+  // The clipboard takes text only during a tap: the Clipboard API where the
+  // page may use it, else a selected textarea and execCommand. Text still to
+  // be fetched goes in as a promise (ClipboardItem - Safari keeps the tap for
+  // it); where that is not taken, the button asks for a second tap, with the
+  // text at hand by then.
+  function copyByHand(text) {
+    const was = document.activeElement;
+    const ta = mk("textarea", "copy-buffer");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.setAttribute("aria-hidden", "true");
+    document.body.append(ta);
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, text.length);        // iOS selects nothing without it
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    ta.remove();
+    if (was && was.focus) { was.focus(); }
+    return ok;
+  }
+  function copyNow(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) {
+      return navigator.clipboard.writeText(text).then(() => true, () => copyByHand(text));
+    }
+    return Promise.resolve(copyByHand(text));
+  }
+  function copyLater(promise) {
+    let tried = Promise.resolve(false);
+    if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write && window.isSecureContext) {
+      try {
+        const item = new ClipboardItem({ "text/plain": promise.then((t) => new Blob([t], { type: "text/plain" })) });
+        tried = navigator.clipboard.write([item]).then(() => true, () => false);
+      } catch (e) { tried = Promise.resolve(false); }
+    }
+    return tried.then((ok) => ok || promise.then(copyNow));
+  }
+  // A button that copies what *text()* gives - a string, or a promise of
+  // one - and says so for a moment.
+  function copyButton(label, cls, text) {
+    const b = mk("button", cls, label);
+    b.type = "button";
+    let ready = null, timer = 0;
+    const say = (words, cls2, stay) => {
+      clearTimeout(timer);
+      b.textContent = words;
+      b.classList.remove("done", "again");
+      if (cls2) { b.classList.add(cls2); }
+      if (!stay) { timer = setTimeout(() => { b.textContent = label; b.classList.remove("done", "again"); }, 2200); }
+    };
+    const said = (ok) => say(ok ? "Copied \u2713" : "Could not copy - select the text and copy it", ok ? "done" : "");
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (ready === null) {
+        const got = text();
+        if (typeof got === "string") { ready = got; }
+        else {
+          const p = Promise.resolve(got);
+          p.then((t) => { ready = t; }, () => {});
+          copyLater(p).then((ok) => (ok ? said(true) : say("Tap again to copy", "again", true)),
+                            (err) => say("Could not load it" + (err && err.message ? ": " + err.message : "")));
+          return;
+        }
+      }
+      copyNow(ready).then(said);
+    });
+    return b;
+  }
+  // The plain text of reports (feedback.py plain()), fetched once each.
+  const copies = new Map();
+  function fetchCopies(ids) {
+    const want = ids.filter((id) => id && !copies.has(id));
+    if (!want.length) { return Promise.resolve(copies); }
+    return get("/admin/feedback-copy?ids=" + want.map(encodeURIComponent).join(",")).then((r) => {
+      (r.items || []).forEach((i) => copies.set(i.id, i.copy));
+      return copies;
+    });
+  }
+  const utc = (t) => new Date(t * 1000).toISOString().slice(0, 16).replace("T", " ") + " UTC";
+  const buildsText = (b) => Object.keys(b || {}).filter((k) => b[k]).map((k) => k + " " + b[k]).join(", ") || "unknown";
+  // A problem's line above its latest report.
+  function groupHead(g) {
+    return "Problem: " + (g.sig || "(no message)") + "\n" +
+      "Reported " + g.count + (g.count === 1 ? " time" : " times") + " in " + K.spanText() + " - versions " +
+      g.versions.join(", ") + " - " + g.systems.join(", ") + " - builds " + buildsText(g.builds) +
+      " - first " + utc(g.first) + ", last " + utc(g.last) + " - " + g.state + "\n\nThe latest report:\n";
+  }
+  function groupCopy(g) {
+    return () => fetchCopies([g.latest]).then((c) => groupHead(g) + (c.get(g.latest) || "(not found)\n"));
+  }
+  function itemCopy(it) {
+    return () => copies.get(it.id) || fetchCopies([it.id]).then((c) => c.get(it.id) || "(not found)\n");
+  }
+  const RULE = "\n" + "-".repeat(60) + "\n\n";
+  // Everything the list shows, in its order, as one text.
+  function copyAll(what, shown, ids, one) {
+    return copyButton("Copy all shown", "btn btn-small quiet fb-copy-all", () => fetchCopies(ids).then((c) =>
+      "dopeIPTV " + what + " - " + shown.length + " shown, " + K.spanText() + (build ? ", build " + BUILD[build].toLowerCase() : "") +
+      RULE + shown.map((x) => one(x, c)).join(RULE)));
+  }
+  function buildSelect() {
+    const sel = mk("select", "fb-select");
+    sel.setAttribute("aria-label", "Build");
+    [["", "Every build"], ["official", "Official"], ["source", "From source"], ["unknown", "Unknown build"]]
+      .forEach(([v, t]) => { const o = mk("option", "", t); o.value = v; o.selected = build === v; sel.append(o); });
+    sel.addEventListener("change", () => { build = sel.value; problems(); words(); });
+    return sel;
+  }
+  function sourceChip(n, total) {
+    const c = mk("span", "chip b-source", "Source");
+    c.title = n === undefined ? "Sent from an app run from source (a checkout)"
+      : num.format(n) + " of " + num.format(total) + " from an app run from source (a checkout)";
+    return c;
+  }
+  function metaLine(text, button) {
+    const meta = mk("div", "fb-meta");
+    meta.append(mk("span", "fb-meta-text", text), button);
+    return meta;
   }
 
   function show() {
@@ -82,7 +209,8 @@
     $("fb-summary").replaceChildren(head, bigs);
     chart();
     $("fb-versions").replaceChildren(K.listCard("By version", res.by_version || [], (v) => v),
-                                     K.listCard("By system", res.by_os || [], (v) => v));
+                                     K.listCard("By system", res.by_os || [], (v) => v),
+                                     K.listCard("By build", res.by_build || [], (v) => BUILD[v] || v));
     problems();
     words();
   }
@@ -124,7 +252,7 @@
     return mk("span", "chip st-" + state, state === "fixed" ? "Fixed" : state === "seen" ? "Seen" : "New");
   }
 
-  function controls() {
+  function controls(shown) {
     const bar = mk("div", "fb-controls");
     const chips = mk("div", "fb-chips");
     SORTS.forEach(([key, label]) => {
@@ -143,7 +271,11 @@
     const all = mk("option", "", "Every version"); all.value = ""; ver.append(all);
     (res.by_version || []).forEach(([v]) => { const o = mk("option", "", v); o.value = v; o.selected = version === v; ver.append(o); });
     ver.addEventListener("change", () => { version = ver.value; problems(); });
-    bar.append(chips, which, ver);
+    bar.append(chips, which, ver, buildSelect());
+    if (shown.length) {
+      bar.append(copyAll("problems", shown, shown.map((g) => g.latest),
+                         (g, c) => groupHead(g) + (c.get(g.latest) || "(not found)\n")));
+    }
     return bar;
   }
 
@@ -156,6 +288,7 @@
     if (only === "open") { groups = groups.filter((g) => g.state !== "fixed"); }
     if (only === "fixed") { groups = groups.filter((g) => g.state === "fixed"); }
     if (version) { groups = groups.filter((g) => g.versions.indexOf(version) >= 0); }
+    if (build) { groups = groups.filter((g) => (g.builds || {})[build]); }
     const by = {
       count: (a, b) => b.count - a.count || b.last - a.last,
       recent: (a, b) => b.last - a.last,
@@ -164,7 +297,7 @@
     }[sort];
     groups.sort(by);
     if (!groups.length) {
-      box.replaceChildren(controls(), mk("p", "empty", (res.groups || []).length ? "Nothing matches - try All."
+      box.replaceChildren(controls([]), mk("p", "empty", (res.groups || []).length ? "Nothing matches - try All" + (build ? " and Every build." : ".")
         : "No errors or crashes reported in this period."));
       return;
     }
@@ -176,19 +309,21 @@
       btn.append(mk("span", "chip kind-" + g.kind, KIND[g.kind]), mk("span", "sig", g.sig || "(no message)"),
                  mk("span", "count", "×" + num.format(g.count)), stateChip(g.state));
       if (g.replies) { btn.append(mk("span", "chip answered", "Answered")); }
-      const meta = mk("div", "fb-meta", "Versions " + g.versions.join(", ") + " · " + g.systems.join(", ") +
-                      " · last " + when.format(new Date(g.last * 1000)));
+      if ((g.builds || {}).source) { btn.insertBefore(sourceChip(g.builds.source, g.count), btn.children[1]); }
+      const meta = metaLine("Versions " + g.versions.join(", ") + " · " + g.systems.join(", ") +
+                            " · last " + when.format(new Date(g.last * 1000)),
+                            copyButton("Copy", "fb-copy", groupCopy(g)));
       const body = mk("div", "fb-body");
       body.hidden = true;
       btn.addEventListener("click", () => toggle(body, g.latest, g.key, g));
       li.append(btn, meta, body);
       ul.append(li);
     });
-    box.replaceChildren(controls(), ul);
+    box.replaceChildren(controls(groups), ul);
   }
 
   // What people wrote, newest first - all of it, or one topic.
-  function topicChips(all) {
+  function topicChips(all, shown) {
     const t = res.topics || {};
     const bar = mk("div", "fb-controls");
     const chips = mk("div", "fb-chips");
@@ -201,7 +336,8 @@
         b.addEventListener("click", () => { topic = key; words(); });
         chips.append(b);
       });
-    bar.append(chips);
+    bar.append(chips, buildSelect());
+    if (shown.length) { bar.append(copyAll("feedback", shown, shown.map((i) => i.id), (i, c) => c.get(i.id) || "(not found)\n")); }
     return bar;
   }
 
@@ -211,7 +347,7 @@
     if (!all.length) { box.replaceChildren(mk("p", "empty", "No feedback in this period.")); return; }
     // A supporter's feedback first while it is new; the rest newest first.
     const first = (i) => (i.sup && i.state === "new" ? 1 : 0);
-    const items = (topic ? all.filter((i) => i.topic === topic) : all.slice())
+    const items = all.filter((i) => (!topic || i.topic === topic) && (!build || i.build === build))
       .sort((a, b) => first(b) - first(a));
     const ul = mk("ul", "fb-list");
     items.forEach((it) => {
@@ -220,6 +356,7 @@
       btn.type = "button";
       if (it.topic) { btn.append(mk("span", "chip t-" + it.topic, TOPIC[it.topic] || it.topic)); }
       if (it.from === "site") { btn.append(mk("span", "chip from-site", "Website")); }
+      if (it.build === "source") { btn.append(sourceChip()); }
       if (it.sup) {
         const sup = mk("span", "chip sup", "\u2665 Supporter");
         sup.title = "Sent from an app with a supporter key - read first";
@@ -229,15 +366,16 @@
       if (it.replies) { btn.append(mk("span", "chip answered", "Answered")); }
       const where = [it.area && AREA[it.area], it.often && OFTEN[it.often]].filter(Boolean).join(", ");
       const origin = it.from === "site" ? "from the website" : it.version + " · " + it.os;
-      const meta = mk("div", "fb-meta", when.format(new Date(it.t * 1000)) + " · " + origin +
-                      (where ? " · " + where : ""));
+      const meta = metaLine(when.format(new Date(it.t * 1000)) + " · " + origin + (where ? " · " + where : ""),
+                            copyButton("Copy", "fb-copy", itemCopy(it)));
       const body = mk("div", "fb-body");
       body.hidden = true;
       btn.addEventListener("click", () => toggle(body, it.id, it.id));
       li.append(btn, meta, body);
       ul.append(li);
     });
-    box.replaceChildren(topicChips(all), items.length ? ul : mk("p", "empty", "Nothing on this topic in this period."));
+    box.replaceChildren(topicChips(all, items), items.length ? ul
+      : mk("p", "empty", build ? "Nothing from this build on this topic in this period." : "Nothing on this topic in this period."));
   }
 
   // A report in full: its text, a copy to paste where it gets fixed, and
@@ -303,15 +441,9 @@
     get("/admin/feedback-item?id=" + encodeURIComponent(id)).then((r) => {
       const pre = mk("pre", "fb-text", r.text);
       const bar = mk("div", "fb-actions");
-      const copy = mk("button", "btn", "Copy for a bug fix");
-      copy.type = "button";
-      copy.addEventListener("click", () => {
-        const block = "dopeIPTV " + KIND[r.kind].toLowerCase() + " report " + r.id + " (version " + r.version +
-          ", " + r.os + ", " + new Date(r.t * 1000).toISOString().slice(0, 16).replace("T", " ") + ")\n```\n" + r.text + "\n```\n";
-        navigator.clipboard.writeText(block).then(() => { copy.textContent = "Copied ✓"; },
-                                                  () => { copy.textContent = "Select the text and copy it"; });
-      });
-      bar.append(copy);
+      if (r.copy) { copies.set(r.id, r.copy); }
+      // The same plain text, fenced, to paste into a conversation about a fix.
+      bar.append(copyButton("Copy for a bug fix", "btn", () => "```\n" + (r.copy || r.text || "").replace(/\n+$/, "") + "\n```\n"));
       [["seen", "Mark seen"], ["fixed", "Mark fixed"], ["new", "Mark new"]].forEach(([state, label]) => {
         const b = mk("button", "btn quiet", label);
         b.type = "button";

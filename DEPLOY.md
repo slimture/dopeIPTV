@@ -810,6 +810,57 @@ first three seconds, a minute between two from one browser - and the
 service's own limits on top. Deploy: the site files and `donate/` as usual,
 `service iptv_donate restart`.
 
+## Official builds only, and Copy on the Feedback tab
+
+The app tells the site which build it is in a header: `X-dopeIPTV-Build:
+official` (a release or test build from the project's workflows), `source`
+(run from a checkout) or `modified` (built from changed code). Watch
+together (`/together/`), settings sync (`/sync/`) and feedback / error
+reports (`/feedback/report`) answer `modified` with 403 and
+`{"error": "unofficial_build", "message": "This is not an official version
+of dopeIPTV. This service is only in the official app, from dopeiptv.org."}`,
+which the app shows (donate/official.py). No header - every app from before
+it - is served as before, and so is a word the service does not know. The
+header is the app's own word, not proof.
+
+Only how many were refused is kept, per day and service, in
+`stats/refused-builds.json`: no address, room, slot or anything else about
+a request. The service's log says the first refusal of a day and the day's
+sum. The admin page shows them on Overview under Services, **Refused
+(modified builds)**, for the period chosen.
+
+A report kept from now on records its build: official or source, unknown
+without the header (older apps, the site's footer; older reports too). The
+Feedback tab marks "Source", filters both lists by build and lists "By
+build" under "Where it comes from". Every problem and feedback row has
+**Copy**: the whole report as plain text - what it is, when, version,
+system, build, what the person picked, then the text as sent (the error and
+its traceback, the recent log, their own words). Each list has **Copy all
+shown** for what its filters show (`/admin/feedback-copy`). On a phone it
+copies on the first tap where the browser allows that, else the button
+says "Tap again to copy".
+
+The privacy policy lists what a report carries (section on error reports
+and feedback): the build kind is new there - add it to `site/legal/sv/` and
+`site/legal/en/privacy.html` (the Swedish governs) with this deploy.
+
+Deploy (jail) - only `donate/` changed; both nginx layers pass the header on
+as it is, so neither nginx file changes:
+
+    cd ~/dopeiptv; git checkout website; git pull origin website
+    cp -R donate /usr/local/www/iptv/
+    service iptv_donate restart
+
+**Check** (jail): `python3 -m pytest donate` or
+`python3 donate/test_official.py` - all pass; then
+
+    curl -s -H 'X-dopeIPTV-Build: modified' -H 'X-Together-Member: 0123456789abcdef' \
+        "https://dopeiptv.org/together/$(printf 'ab%.0s' $(seq 32))?after=0&wait=0"
+
+answers the `unofficial_build` JSON, and the same without the
+`X-dopeIPTV-Build` line answers `{"seq": 0, ...}` as before. Overview's
+Refused (modified builds) then shows the one refusal the check made.
+
 ## Moving to dopeiptv.org
 
 The site's address is dopeiptv.org; iptv.dope.rs sends every request on to

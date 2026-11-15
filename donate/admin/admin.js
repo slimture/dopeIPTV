@@ -701,6 +701,18 @@
       ? "Settings sync is full (" + gb(S.bytes) + " of " + gb(S.most) + "): new copies are refused until there is room or MAX_TOTAL in donate/sync.py is raised."
       : "Settings sync has used " + pct + " % of its " + gb(S.most) + ". At 100 % new copies are refused - raise MAX_TOTAL in donate/sync.py or make room.";
   }
+  // Modified builds refused (donate/official.py): how many requests in the
+  // period, per service, and since counting began.
+  const REFUSED_BY = [["together", "Watch together"], ["sync", "Settings sync"], ["feedback", "Feedback"]];
+  function refusedBuilds() {
+    const R = data.refused, card = $("refused");
+    card.hidden = !R;
+    if (!R) { return; }
+    $("refused-count").textContent = num.format(R.total) + (R.total === 1 ? " request" : " requests") +
+      (days ? (days === 365 ? " in the last 12 months" : " in the last " + days + " days") : " in all");
+    $("refused-by").textContent = REFUSED_BY.map(([k, t]) => t + " " + num.format((R.by || {})[k] || 0)).join(" · ") +
+      " · " + num.format(R.all || 0) + " since counting began";
+  }
   // Supporter keys (donate/supporter.py): one again for a payment (the same
   // key its donor got), or one by hand; and how many have been handed out.
   let skWired = false;
@@ -1485,7 +1497,7 @@
     const S = data.series, best = S.reduce((a, d, i) => (d.downloads > (S[a] || {}).downloads ? i : a), 0);
     $("n-downloads").textContent = num.format(T.downloads) + (T.downloads === 1 ? " download" : " downloads") +
       (T.downloads && S[best] ? " · most on " + pointLabel(S[best].date, best) : "");
-    summary(); tiles(); funnel(); visitsChart(); downloadsChart(); visitsTable(); lists(); byChannel(); years(); donations(); supporterKeys(); syncSpace();
+    summary(); tiles(); funnel(); visitsChart(); downloadsChart(); visitsTable(); lists(); byChannel(); years(); donations(); supporterKeys(); syncSpace(); refusedBuilds();
     $("updated").textContent = data.updated ? "Counts updated " + stamp.format(new Date(data.updated)) + "." : "";
     $("kept").textContent = keptFor();
   }
