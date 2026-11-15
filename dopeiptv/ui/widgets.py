@@ -184,6 +184,19 @@ def solecraft_pixmap(height: int, colour: str, dpr: float = 1.0) -> QPixmap | No
     return pm
 
 
+def file_dialog_options(*extra):
+    """Options for a QFileDialog: the system's own dialog on macOS and
+    Windows, Qt's own on Linux (a bundled Qt may not reach the desktop's
+    portal or GTK dialog there, and Qt's follows the theme)."""
+    from PyQt6.QtWidgets import QFileDialog
+    opts = QFileDialog.Option(0)
+    for o in extra:
+        opts |= o
+    if sys.platform.startswith("linux"):
+        opts |= QFileDialog.Option.DontUseNativeDialog
+    return opts
+
+
 class SolecraftLink(QPushButton):
     """The Solecraft logotype as a quiet link: muted at rest, the text
     colour under the pointer. Text instead where the logotype cannot be

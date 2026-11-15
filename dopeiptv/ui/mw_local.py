@@ -23,6 +23,7 @@ from ..core.audiotags import cover_bytes, display_name, read_tags
 from ..core.log import log
 from ..core.workers import run_async
 from ..i18n import tr
+from .widgets import file_dialog_options
 
 # Everything after (and including) a year/quality/codec tag is release
 # annotation, not title: "Movie.Name.2019.1080p.BluRay.x265-GRP" -> the
@@ -164,8 +165,7 @@ class _LocalFilesMixin:
                  or os.path.expanduser("~"))
         path = QFileDialog.getExistingDirectory(
             self, tr("local_add_folder_title"), start,
-            QFileDialog.Option.DontUseNativeDialog
-            | QFileDialog.Option.ShowDirsOnly)
+            file_dialog_options(QFileDialog.Option.ShowDirsOnly))
         dirs = self._local_dirs()
         if path and path not in dirs:
             self._save_local_dirs(dirs + [path])

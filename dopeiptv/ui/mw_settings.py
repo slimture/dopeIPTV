@@ -80,7 +80,7 @@ from .settings_ui import (
     ValueSlider, size_text,
     SettingsShell, ThemeTile, fit_to_rows, hbox, page_icon, settings_style,
 )
-from .widgets import confirm
+from .widgets import confirm, file_dialog_options
 from ..core.updates import GITHUB_REPO, fetch_update, offered
 from ..core.workers import (
     clear_directory, default_image_cache_dir, dir_size_bytes, run_async)
@@ -159,8 +159,7 @@ class _SettingsMixin:
     def _choose_rec_dir(self) -> None:
         d = QFileDialog.getExistingDirectory(
             self, tr("rec_choose_folder_title"), self.rec.directory(),
-            QFileDialog.Option.DontUseNativeDialog
-            | QFileDialog.Option.ShowDirsOnly)
+            file_dialog_options(QFileDialog.Option.ShowDirsOnly))
         if d:
             self.rec.set_directory(d)
             if self.mode == "rec":
@@ -352,7 +351,7 @@ class _SettingsMixin:
             parent, tr("backup_title"),
             f"dopeIPTV-backup-{date.today().isoformat()}.json",
             tr("file_filter_json"),
-            options=QFileDialog.Option.DontUseNativeDialog)
+            options=file_dialog_options())
         if not path:
             return
         doc = backup.collect(self._backup_stores(), VERSION)
@@ -378,7 +377,7 @@ class _SettingsMixin:
         path, _f = QFileDialog.getOpenFileName(
             parent, tr("restore_title"), "",
             tr("file_filter_json") + ";;" + tr("file_filter_all"),
-            options=QFileDialog.Option.DontUseNativeDialog)
+            options=file_dialog_options())
         if not path:
             return
         try:
@@ -1495,8 +1494,7 @@ class _SettingsMixin:
         def pick_rec_dir():
             path = QFileDialog.getExistingDirectory(
                 d, tr("rec_choose_folder_title"), self.rec.directory(),
-                QFileDialog.Option.DontUseNativeDialog
-                | QFileDialog.Option.ShowDirsOnly)
+                file_dialog_options(QFileDialog.Option.ShowDirsOnly))
             if path:
                 self.rec.set_directory(path)
                 rec_dir_row.hint_label.setText(path)
@@ -1685,8 +1683,7 @@ class _SettingsMixin:
                      or os.path.expanduser("~"))
             path = QFileDialog.getExistingDirectory(
                 d, tr("local_add_folder_title"), start,
-                QFileDialog.Option.DontUseNativeDialog
-                | QFileDialog.Option.ShowDirsOnly)
+                file_dialog_options(QFileDialog.Option.ShowDirsOnly))
             dirs = self._local_dirs()
             if path and path not in dirs:
                 self._save_local_dirs(dirs + [path])

@@ -1150,6 +1150,7 @@ QFileDialog QTreeView::item:hover, QFileDialog QListView::item:hover {{
 QFileDialog QTreeView::item:selected, QFileDialog QListView::item:selected {{
     background: {ACCENT}; color: {ON};
 }}
+QHeaderView {{ background: {p['btn']}; border: none; }}
 QHeaderView::section {{
     background: {p['btn']}; color: {p['text2']}; border: none;
     padding: 4px 8px; font-size: 11px;

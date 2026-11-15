@@ -63,7 +63,7 @@ from .nav_widgets import NavButton, SideRule, SourceAvatar
 from .app_menu import MAC_MENUS, fold_into_app_menu, lay_out, open_website  # noqa: F401
 from .widgets import (
     FlowRow, HeartButton, _SidebarLogo, _Toast,
-    cast_strip_icon, confirm,
+    cast_strip_icon, confirm, file_dialog_options,
 )
 from .mw_settings import _SettingsMixin
 from .mw_trakt import _TraktMixin
@@ -3905,7 +3905,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self, tr("open_video_title"), start,
             f"{tr('open_video_filter')} ({pattern});;"
             + tr("file_filter_all"),
-            options=QFileDialog.Option.DontUseNativeDialog)
+            options=file_dialog_options(
+                QFileDialog.Option.HideNameFilterDetails))
         if not path:
             return
         self.settings.setValue("local_open_dir", os.path.dirname(path))
