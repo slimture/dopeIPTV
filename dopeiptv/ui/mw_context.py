@@ -544,6 +544,9 @@ class _ContextMenuMixin:
     # -- parental control ----------------------------------------------------------
 
     def _request_unlock(self) -> bool:
+        kids = getattr(self, "_profile_kids", None)
+        if kids is not None and kids():
+            return False        # a kids profile is never asked (mw_profiles)
         if self.parental.session_unlocked:
             return True
         if not self.parental.has_pin():

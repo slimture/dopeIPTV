@@ -327,6 +327,22 @@ tests check that placeholders line up and that every `tr("…")` key exists.
 - Windows code signing (see above).
 - On the website, a few Serbian strings are in Cyrillic while the rest of
   the Serbian page is Latin.
+- **Profiles**: built - one per person in the household, as Netflix and
+  Plex have them (`core/profiles.py`, `ui/mw_profiles.py`,
+  `ui/profiles_ui.py`; Settings > System > Profiles). What is a profile's
+  own is declared in `core/profiles.py` (favorites of every kind, history
+  and resume points, Watch later, watched marks, followed series,
+  reminders, statistics, Trakt and Simkl, Home's sections, theme and
+  accent, audio and subtitle languages, the kids level); everything else is
+  the household's. The first start copies everything into the first
+  profile (`me`) and leaves the old keys: **drop the old keys in the
+  release after the next one** (a downgrade then no longer finds them -
+  say so in the notes). A profile's PIN stays on the computer it was set
+  on: settings sync carries profiles without it, and never takes one out.
+  Not yet: a "recently searched" list of its own (no search keeps one
+  today; `recent_searches` is reserved in the split), Home Assistant's
+  profile as a list in its discovery (a `profile` command and state field
+  for now), and a cast going on through a switch (the TV keeps playing).
 
 ### Planned: Enigma2 for those with boxes at home
 

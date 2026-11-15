@@ -104,7 +104,9 @@ class TogetherDialog(QDialog):
         name_row = QHBoxLayout()
         name_lbl = QLabel(tr("together_name"))
         name_row.addWidget(name_lbl)
-        self.name = QLineEdit(self.win._together_name or "")
+        # The name typed last this session, else the profile's (mw_profiles).
+        room_name = getattr(self.win, "_profile_room_name", lambda: "")
+        self.name = QLineEdit(self.win._together_name or room_name() or "")
         self.name.setMaxLength(together.NAME_MAX)
         self.name.setPlaceholderText(tr("together_name_hint"))
         self.name.setAccessibleName(tr("together_name"))

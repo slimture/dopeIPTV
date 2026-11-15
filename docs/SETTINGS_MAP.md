@@ -14,6 +14,9 @@ The pages are built in `ui/mw_settings.py` (`open_settings`), Nerd's in
 Discord in `ui/mw_discord.py`. A row without a key is an action or a
 status. "(inverted)" is stored the other way round from what the row says.
 A source's own options are on its own page, under Sources (below).
+"(this profile's)" is a profile's own (`core/profiles.py`): kept under
+`profiles/<id>/` and marked "This profile's" on the row while the household
+has two profiles or more.
 
 ## WATCH
 
@@ -29,7 +32,7 @@ A source's own options are on its own page, under Sources (below).
 - (only without the embedded player) why playback opens in mpv
 
 **Picture & sound** (`audio`)
-- Audio & subtitles: `audio_lang`, `sub_mode`, `sub_lang`, `sub_lang2` (the language picks a teletext subtitle page too; the page chosen per channel in the player's menu is `teletext_pages`, no row)
+- Audio & subtitles: `audio_lang`, `sub_mode`, `sub_lang`, `sub_lang2` (this profile's; the language picks a teletext subtitle page too; the page chosen per channel in the player's menu is `teletext_pages`, no row)
 - How subtitles look: `sub_scale`, `sub_color`, `sub_background`
 - Video: `aspect_mode`, `video_deinterlace`, `video_sharpen`, `video_tonemapping`
 - Decoding: `hwdec_mode`; link → Nerd › Player (passthrough, video sync,
@@ -105,7 +108,7 @@ or "Shared" and where the shared one lives. Nerd's rows only while it is on.
 
 **Home** (`home`)
 - (untitled): `home_enabled`, `home_start`
-- Sections on Home: `home_sh_resume`, `home_sh_new_eps`, `home_sh_fav`,
+- Sections on Home (this profile's): `home_sh_resume`, `home_sh_new_eps`, `home_sh_fav`,
   `home_sh_history`, `home_sh_watchlist`, `home_sh_hero`, `home_sh_pop_movies`,
   `home_sh_pop_series`, `home_sh_movies`, `home_sh_series`, `home_sh_channels`
 - Followed series: `follow_notify`; the followed series, stop following
@@ -120,8 +123,10 @@ or "Shared" and where the shared one lives. Nerd's rows only while it is on.
 ## ACCOUNTS AND INTEGRATIONS
 
 **Watch history** (`history`)
-- Trakt: account (connect in the browser, disconnect), watchlist and history
-- Simkl (only in a build with its client id): account (PIN sign-in), lists
+- Trakt: account (this profile's: `trakt_access_token` and its kin; connect
+  in the browser, disconnect), watchlist and history
+- Simkl (only in a build with its client id): account (this profile's:
+  `simkl_access_token`; PIN sign-in), lists
 - Watched history: last sync, Sync now - one store, Trakt's and Simkl's
 
 **Sync between computers** (`sync`) - "Sync" in the sidebar, for everyone
@@ -150,11 +155,20 @@ or "Shared" and where the shared one lives. Nerd's rows only while it is on.
 
 **Appearance** (`appearance`)
 - Theme: `theme`, `accent` (+ `accent_custom`), `theme_follow_system`,
-  `theme_light`, `corner_style`, `ui_scale`
+  `theme_light` (these four this profile's), `corner_style`, `ui_scale`
 - Lists: `view_density`, `sort_order`
 
 **Keyboard shortcuts** (`shortcuts`)
 - Keyboard shortcuts: `keyboard_shortcuts` (every rebindable action's key)
+
+**Profiles** (`profiles`) - one per person in the household, a service of
+its own (`ui/profiles_ui.py`, `ui/mw_profiles.py`)
+- Profiles: the household's (`profiles_list`: name, avatar colour or emoji,
+  PIN, kids), each one's Edit (its window) and Remove (asked first, never
+  the one in use); add a profile (up to 8)
+- At start: `profile_ask_start` (ask who's watching; off: the profile used
+  last, `profile_active` - one with a PIN asks anyway)
+- What a profile keeps: its own and the household's, in words (no key)
 
 **Parental lock** (`parental`)
 - PIN: `parental_pin_hash` + `parental_salt` (set, remove), lock now

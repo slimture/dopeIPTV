@@ -153,11 +153,18 @@ class _SimklCard(QObject):
         self.disconnect_btn = QPushButton(tr("trakt_disconnect"))
         self.lists_btn = QPushButton(tr("trakt_watchlist_btn"))
         c = pg.card(tr("tab_simkl"))
+        badge = None
+        if getattr(win, "_profile_many", lambda: False)():
+            # The account is the profile's own (core/profiles.py).
+            from .source_page import Origin
+            badge = Origin()
+            badge.set(tr("profile_own"), True)
+            badge.setToolTip(tr("profile_own_tip"))
         self.account_row = c.row(tr("trakt_not_connected"),
                                  hbox(self.connect_btn, self.disconnect_btn,
                                       stretch=False),
                                  tr("simkl_connect_hint"),
-                                 search="simkl account sign in pin code")
+                                 search="simkl account sign in pin code", badge=badge)
         c.row(tr("set_trakt_lists"), self.lists_btn, tr("simkl_scrobble_hint"),
               search="simkl scrobble watchlist history")
         self.poll = QTimer(self)

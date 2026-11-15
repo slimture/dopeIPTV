@@ -765,6 +765,7 @@ class Dispatcher:
         self.options: tuple[str, ...] = ()
         self.volume: int | None = None
         self.tv_mode: bool | None = None
+        self.profile: str | None = None
         self._last: tuple[str, dict[str, Any] | None, bool] = ("idle", None, False)
 
     @property
@@ -823,6 +824,8 @@ class Dispatcher:
             self.state["volume"] = self.volume
         if self.tv_mode is not None and state != "off":
             self.state["tv_mode"] = self.tv_mode
+        if self.profile and state != "off":
+            self.state["profile"] = self.profile
         for s in self.sinks:
             if isinstance(s, MqttSink):
                 s.put("state", self.state)
@@ -845,6 +848,15 @@ class Dispatcher:
             return
         self.tv_mode = on
         if self.active:
+            self.set_state(*self._last)
+
+    def set_profile(self, name: str | None) -> None:
+        """The profile in use (core/profiles.py), in the state from now on
+        - sent again at once when it changed. None while there is one."""
+        if name == self.profile:
+            return
+        self.profile = name
+        if not self.quitting:
             self.set_state(*self._last)
 
     def set_favorites(self, options: Iterable[str]) -> None:

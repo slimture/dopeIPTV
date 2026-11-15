@@ -15,6 +15,7 @@ a channel's name or number in.
     <prefix>/command/tv_key         one of TV mode's keys (core/tv_input.py):
                                     up, down, left, right, ok, back, menu, red,
                                     green, yellow, blue, digit_0 ... digit_9, ...
+    <prefix>/command/profile        a profile's name (none with a PIN)
 
 A retained message is never a command (one left on the broker would run
 again at every connect), nor is anything else this does not know: it is
@@ -37,7 +38,7 @@ BUTTONS: tuple[tuple[str, str, str], ...] = (
     ("channel_up", "Channel up", "mdi:chevron-up"),
     ("channel_down", "Channel down", "mdi:chevron-down"),
 )
-COMMANDS = frozenset([b[0] for b in BUTTONS] + ["volume", "favorite", "play", "tv", "tv_key"])
+COMMANDS = frozenset([b[0] for b in BUTTONS] + ["volume", "favorite", "play", "tv", "tv_key", "profile"])
 MAX_TEXT = 100
 MAX_OPTIONS = 100
 MAX_OPTION_LEN = 80

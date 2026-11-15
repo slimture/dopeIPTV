@@ -40,7 +40,7 @@ LOGO_MAX = 512 * 1024
 
 READ = frozenset({"state", "channels"})
 WRITE = frozenset({"play", "toggle", "stop", "next", "previous", "volume", "mute",
-                   "tv", "tv_key", "touch"})
+                   "tv", "tv_key", "touch", "profile"})
 
 #: The touchpad, in CSS pixels and milliseconds: a swipe moves this far at
 #: least (the larger axis gives its direction), a tap no more than

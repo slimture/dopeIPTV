@@ -42,11 +42,13 @@ API_VERSION = 1
 REQUEST_TIMEOUT = 15
 
 # What the remote API answers: (method, path) -> the window's action.
-READ = {"/api/status": "status", "/api/channels": "channels", "/api/sources": "sources"}
+READ = {"/api/status": "status", "/api/channels": "channels", "/api/sources": "sources",
+        "/api/profiles": "profiles"}
 WRITE = {"/api/play": "play", "/api/pause": "pause", "/api/resume": "resume",
          "/api/toggle": "playpause", "/api/stop": "stop", "/api/next": "next",
          "/api/previous": "previous", "/api/volume": "volume", "/api/seek": "seek",
-         "/api/raise": "raise", "/api/tv": "tv", "/api/tv_key": "tv_key"}
+         "/api/raise": "raise", "/api/tv": "tv", "/api/tv_key": "tv_key",
+         "/api/profile": "profile"}
 SHARE = ("/playlist.m3u", "/guide.xml", "/guide.xml.gz")
 CALENDAR = "/calendar.ics"
 

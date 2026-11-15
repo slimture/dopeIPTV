@@ -481,6 +481,7 @@ class OptionsScreen(TvScreen):
         for key, label in (("audio", tr("opt_audio_track")),
                            ("subtitles", tr("opt_subtitles")),
                            ("sleep", tr("opt_sleep_timer")),
+                           ("profile", tr("profile_who")),
                            ("start", tr("tv_start_in")),
                            ("exit", tr("tv_exit"))):
             tile = TvTile(label, w=1100, h=96, kind="option")
@@ -510,6 +511,11 @@ class OptionsScreen(TvScreen):
         on = w.settings.value("tv_mode_start", "false") == "true"
         self.tiles["start"].set_text(self.tiles["start"].title,
                                      tr("option_on") if on else tr("option_off"))
+        # Who is watching: only with two profiles or more.
+        prof = w._profile() if getattr(w, "_profile_many", lambda: False)() else None
+        self.tiles["profile"].setVisible(prof is not None)
+        if prof is not None:
+            self.tiles["profile"].set_text(self.tiles["profile"].title, prof.name)
 
     def _clicked(self) -> None:
         tile = self.sender()
@@ -528,10 +534,13 @@ class OptionsScreen(TvScreen):
         elif key == "exit":
             QTimer.singleShot(0, w.exit_tv_mode)
             return
+        elif key == "profile":
+            self.page.show_screen("profiles")
+            return
         self.refresh()
 
     def focusables(self) -> list[QWidget]:
-        return [t for t in self.tiles.values() if t.isEnabled()]
+        return [t for t in self.tiles.values() if t.isEnabled() and not t.isHidden()]
 
 
 def _minutes_left(it: dict) -> int:
@@ -695,6 +704,9 @@ class TvPage(QWidget):
             from .tv_screens import GuideScreen, MediaScreen, SearchScreen
             if key in ("vod", "series"):
                 scr = MediaScreen(self, key)
+            elif key == "profiles":
+                from .profiles_ui import tv_profiles_screen
+                scr = tv_profiles_screen(self)
             else:
                 kind = {"channels": ChannelsScreen, "guide": GuideScreen,
                         "search": SearchScreen, "settings": OptionsScreen}.get(key, HomeScreen)
@@ -810,6 +822,23 @@ class TvPage(QWidget):
 
     def handle(self, action: str) -> bool:
         """An action while the page shows; False when it does nothing here."""
+        if getattr(self.window, "_profile_locked", lambda: False)():
+            # Who is watching first (a profile with a PIN at start): only
+            # the profiles' tiles, the arrows between them and OK.
+            if self.current != "profiles":
+                self.show_screen("profiles")
+            scr = self.screens.get("profiles")
+            tiles = scr.focusables() if scr is not None else []
+            cur = self.focus_widget()
+            if action in ("left", "right") and tiles:
+                i = tiles.index(cur) if cur in tiles else 0
+                i = max(0, min(len(tiles) - 1, i + (1 if action == "right" else -1)))
+                self.set_focus(tiles[i])
+            elif action == "ok" and cur in tiles:
+                cur.click()
+            elif cur not in tiles and tiles:
+                self.set_focus(tiles[0])
+            return True
         if action in tv_nav.DIRECTIONS:
             self.move(action)
             return True

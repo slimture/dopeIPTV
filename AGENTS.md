@@ -115,6 +115,7 @@ map and the one-way import rule.
 | `core/instance.py` | A second start hands its command to the copy running (local socket, the user's alone; `$XDG_RUNTIME_DIR` on Linux) |
 | `core/privacy.py` | Private viewing (nothing kept until the app closes; `for_log` keeps titles out of the log; a playback that was private stays so to its end for every reporter, `playback_private`) and Clear recent history by time range, for every source (the viewing statistics' time too) |
 | `core/night_mode.py` | Night mode for the sound: the one audio filter (`dynaudnorm`, its values explained), put on and taken off the core by its own label; the setting |
+| `core/profiles.py` | Profiles, one per person in the household: the split declared in one place (`OWN_KEYS`, `OWN_FAMILIES`, `OWN_PREFIXES`, `OWN_STORES`; the rest is shared), a profile's own keys under `profiles/<id>/` in the same four files, `ProfileSettings` (the app's settings as the profile in use sees them; `raw()` the file itself), `pinned()` (a store's view, kept to its profile past a switch), `ProfileStore` (`profiles_list`: name, colour from the theme's ACCENTS or an emoji, a 4-digit PIN hashed as the parental PIN, kids), the first start (`migrate`: everything copied into `me`, the old keys left for a downgrade), what a kids profile never sees (`adult_category`, `adult_item`) |
 | `core/viewing_stats.py` | Your statistics: the log of seconds watched per title and hour (`viewing_stats`, this computer only, never synced; private viewing adds nothing), seeded once from the resume positions; the sums (week/month/year, weekday, hour, top channels/movies/series, streaks) |
 | `core/rec_extras.py` | Nerd for recordings: file name template (folders, never outside), the command after a recording (no shell), their checks |
 | `core/catchup.py` | Nerd: a source's own catch-up address - Kodi's placeholders and the M3U modes (default, append, shift, flussonic), tried before the app's own; its checks |
@@ -188,6 +189,8 @@ map and the one-way import rule.
 | `ui/mw_privacy.py` | Private viewing and Clear recent history in the window: app-menu entries and shortcuts, the sidebar marker |
 | `ui/mw_series.py` | Series recordings in the window: "Record series…" (Record, Remind me, or on an Enigma2 box with AutoTimer the box's own rule), the rules' look through the guide on the pool when it loads and with its 20-minute check (and what the box records, asked there too), the jobs added, what the box records left to it and said once, a reminder rule's reminders set |
 | `ui/autotimer_ui.py` | A box's AutoTimer in the window: the rule editor (`AutoTimerDialog`: words and match, channels from the box's bouquets, time span, days, padding, record or zap, folder, duplicates), the preview (`AutoTimerPreview`), and the box's rules in the series card beside the app's, each row marked who records it (`BoxRules`, `marked`) |
+| `ui/mw_profiles.py` | Profiles in the window: the profile's stores built pinned to it (`_build_source_stores`, `_build_profile_accounts`), `switch_profile` (what plays stops as Stop does, everything of the profile read again, Home, lists, sidebar, guide and theme shown again - no restart), the PIN asked, "Who's watching?" at start (and always for a profile with a PIN; nothing else until it is given), a kids profile's limits (no locked or adult category or folder, never a PIN question, Settings only with a grown-up's PIN), the avatar's menu, the profile for the phone remote, the remote API and Home Assistant (`_profile_state`, `_profile_switch_remote`) |
+| `ui/profiles_ui.py` | Profiles on screen: the avatar (initials on its colour, or its emoji), the picker over the window (big tiles, arrows, Enter), TV mode's own picker screen, the profile's window (name, avatar, PIN, kids), the PIN question, Settings > Profiles (`ProfilesPage`) |
 | `ui/mw_stats.py` | Your statistics in the window: the time the docked player plays counted into the log (hooks beside health/events; not while paused, capped per tick), saved every few minutes and on close; "Your statistics…" in the History menu |
 | `ui/stats_window.py` | The statistics window: tiles, the period switch, two one-series column charts (P's accent, a hairline baseline, the peak's value, tooltips), the top lists, its empty state |
 | `ui/mw_failover.py` | Failover in the window: once per channel, the other source's options while it plays, a note |
@@ -269,7 +272,7 @@ before one more), `mw_mirrors` (a source's backup addresses for a stream
 whose server is down) and `mw_popout` (detached-window player). What stays in `main_window.py` is
 computers), `mw_together` (watch together: a room, its strip, keeping in
 step) and `mw_popout` (detached-window player). What stays in `main_window.py` is
-computers), `mw_stats` (your viewing statistics) and `mw_popout` (detached-window player). What stays in `main_window.py` is
+computers), `mw_stats` (your viewing statistics), `mw_profiles` (profiles: one per person, switching, the picker, kids) and `mw_popout` (detached-window player). What stays in `main_window.py` is
 the `__init__`/`_build_ui` composition and the playback path (start/stop,
 seek, fullscreen, reconnect) - keep playback code there.
 When making changes:
@@ -322,7 +325,7 @@ grouped by what a person is doing: WATCH (Playback, Picture and sound,
 Guide, Multiview, Recording, Casting), CONTENT (Sources, Home, Local
 files, Posters and info), ACCOUNTS AND INTEGRATIONS (watch history -
 Trakt, Simkl -, Sync, Integrations), SYSTEM (General, Appearance, Keyboard
-shortcuts, Parental lock, Advanced) and NERD (Status, Network, Boxes and lists, Player, Remote
+shortcuts, Profiles, Parental lock, Advanced) and NERD (Status, Network, Boxes and lists, Player, Remote
 and automation, Diagnostics). Every row there is today, page by page and
 section by section with the key it stores, is in
 [`docs/SETTINGS_MAP.md`](docs/SETTINGS_MAP.md) - look there first, and add
@@ -338,6 +341,10 @@ group, every row on one page, and that the map names every page).
 - A source's own option goes in that source's page (`ui/source_page.py`,
   on the tab it belongs to, with an `Origin` mark), marked as its own,
   with the shared one shown as shared.
+- A profile's own setting (`core/profiles.py` declares which) stays on the
+  page it belongs to, marked "This profile's" (`own()` in `open_settings`,
+  shown with two profiles or more); a new one is added to the declared
+  split, or it is the household's.
 - A Nerd-only option goes under NERD, and the everyday page it belongs
   beside gets one link row to it ("4 Nerd settings for ... -> Nerd >
   Player"): `nerd_link()` in `open_settings`, shown only while Nerd is on.
@@ -370,7 +377,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   `DOPEIPTV_LOG=debug` shows debug traces; `DOPEIPTV_LOG_FILE=/path` tees
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
-  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, cast_feed, stalker, boxes, enigma2, autotimer, tvheadend, hdhomerun, lan_scan, radio_browser, airplay_bridge), mediaserver, jellyfin, plex), kodi, mdns, simkl), lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log, player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, connections, tuners, mirrors, conn_test, health, nerd, nerd_lists, channel_numbers, shortcut_keys, palette_match, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, night_mode, rec_mp4, viewing_stats, catchup, url_rewrite, hls_cap, ts_scramble, teletext, teletext_subs, ts_analysis, remote_api, events, mqtt, mqtt_control, phone_remote, phone_page, qr, ical, report, supporter, sync, chacha20poly1305, discord_rpc, together, backup, doh, cert_pin, net_route, net_adapter, net_bridge, live_latency, ytdlp, tv_input, tv_nav) and `services/` (failover, share, resume,
+  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, cast_feed, stalker, boxes, enigma2, autotimer, tvheadend, hdhomerun, lan_scan, radio_browser, airplay_bridge), mediaserver, jellyfin, plex), kodi, mdns, simkl), lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log, player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, connections, tuners, mirrors, conn_test, health, nerd, nerd_lists, channel_numbers, shortcut_keys, palette_match, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, night_mode, rec_mp4, viewing_stats, profiles, catchup, url_rewrite, hls_cap, ts_scramble, teletext, teletext_subs, ts_analysis, remote_api, events, mqtt, mqtt_control, phone_remote, phone_page, qr, ical, report, supporter, sync, chacha20poly1305, discord_rpc, together, backup, doh, cert_pin, net_route, net_adapter, net_bridge, live_latency, ytdlp, tv_input, tv_nav) and `services/` (failover, share, resume,
   coverart, reminders, mpris, media_session, media_macos, media_windows, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list

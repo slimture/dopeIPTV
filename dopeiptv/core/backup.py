@@ -36,6 +36,14 @@ is refused before anything changes.
 
 An export from before this module - a list of playlists - still reads, as
 playlists only.
+
+Profiles (core/profiles.py) go in whole: the household's list and each
+profile's own keys, kept under ``profiles/<id>/`` in the same four files.
+A key is covered by what it is without that part. A backup that has them
+counts each profile's own; the copies the first start left under the old
+names (for a downgrade) go along but are not counted twice. One from before
+profiles puts the old names back, and the next start makes them the first
+profile's again.
 """
 
 from __future__ import annotations
@@ -51,6 +59,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Protocol
 
+from . import profiles as _profiles
 from .log import log
 
 FORMAT = 1
@@ -62,8 +71,9 @@ MAX_BYTES = 64 * 1024 * 1024
 PENDING_NAME = "restore-pending.json"
 
 #: What a backup counts, in the order a summary lists it.
-KINDS = ("sources", "favorites", "history", "resume", "watched", "watchlist",
-         "followed", "reminders", "recordings", "hidden", "numbers", "settings")
+KINDS = ("sources", "profiles", "favorites", "history", "resume", "watched",
+         "watchlist", "followed", "reminders", "recordings", "hidden", "numbers",
+         "settings")
 
 # The other files give only these keys (the name, or the name + "_<source>").
 _ONLY = {"resume": "resume_positions", "follow": "followed_series"}
@@ -130,8 +140,8 @@ RISKY_SOURCE = ("proxy", "headers", "rewrite", "udpxy", "catchup_template",
 _HEADERS = frozenset({"nerd_headers", "nerd_hooks_header", "headers"})
 _HEADER_NAME = re.compile(r"^\s*([A-Za-z0-9!#$%&'*+.^_`|~-]+)\s*[:=]")
 #: The kinds a summary counts, by the file that holds them.
-_KINDS_OF = {"main": ("sources", "favorites", "history", "reminders", "recordings",
-                      "hidden", "numbers", "settings"),
+_KINDS_OF = {"main": ("sources", "profiles", "favorites", "history", "reminders",
+                      "recordings", "hidden", "numbers", "settings"),
              "resume": ("resume",), "follow": ("followed",), "cache": ("watched", "watchlist")}
 
 _SOURCE_KEYS = frozenset({"playlists", "active_playlist", "playlist_name",
@@ -194,9 +204,16 @@ def left_out(key: str) -> bool:
             or _TMDB_CACHE.match(key) is not None)
 
 
+def _base(key: str) -> str:
+    """A profile's own key without its ``profiles/<id>/`` part."""
+    got = _profiles.split_key(key)
+    return got[1] if got is not None else key
+
+
 def covered(store: str, key: str) -> bool:
     """Whether *key* of the file *store* goes in a backup (and is replaced by
-    a restore)."""
+    a restore). A profile's own key is covered as the key it is."""
+    key = _base(key)
     if not key or key.startswith("_"):
         return False
     if store == "main":
@@ -391,7 +408,8 @@ def _json(value: Any) -> Any:
 
 def _kind_of(key: str) -> str:
     """The summary's kind of an app settings key ("" counts nothing)."""
-    if key in _SOURCE_KEYS:
+    if key in _SOURCE_KEYS or key in (_profiles.K_ACTIVE, _profiles.K_ASK,
+                                      _profiles.K_MIGRATED):
         return ""
     if _FAVORITES.fullmatch(key):
         return "" if key.endswith(("_locked", "_colors")) else "favorites"
@@ -429,26 +447,45 @@ def _taken(b: Backup, name: str) -> dict[str, Any]:
     return {k: v for k, v in b.stores.get(name, {}).items() if covered(name, k)}
 
 
+def _counted(b: Backup, name: str) -> list[tuple[str, Any]]:
+    """(key without its profile, value) of what a restore takes of file
+    *name*, each profile's own once: with profiles in the backup, the old
+    names' copies are not counted again."""
+    taken = _taken(b, name)
+    profiled = any(_profiles.split_key(k) is not None for k in _taken(b, "main")) \
+        or any(_profiles.split_key(k) is not None for k in taken)
+    out = []
+    for key, value in taken.items():
+        if profiled and _profiles.split_key(key) is None and _profiles.is_own(key):
+            continue
+        out.append((_base(key), value))
+    return out
+
+
 def summary(b: Backup) -> dict[str, int]:
     """How much of each of KINDS *b* holds - of what a restore takes."""
     counts = dict.fromkeys(KINDS, 0)
     counts["sources"] = len(b.sources)
-    for key, value in _taken(b, "main").items():
+    for key, value in _counted(b, "main"):
+        if key == _profiles.K_LIST:
+            got = _json(value)
+            counts["profiles"] = len(got) if isinstance(got, list) else 0
+            continue
         kind = _kind_of(key)
         if kind:
             counts[kind] += _count(kind, value)
     for name, kind in (("resume", "resume"), ("follow", "followed")):
-        for value in _taken(b, name).values():
+        for _key, value in _counted(b, name):
             data = _json(value)
             counts[kind] += len(data) if isinstance(data, dict) else 0
-    cache = _taken(b, "cache")
-    watched = _json(cache.get("trakt_watched_cache"))
-    if isinstance(watched, dict) and isinstance(watched.get("local_items"), list):
-        counts["watched"] = len(watched["local_items"])
-    later = _json(cache.get("trakt_watchlist_cache"))
-    if isinstance(later, dict):
-        counts["watchlist"] = sum(len(later[k]) for k in ("movies", "shows")
-                                  if isinstance(later.get(k), list))
+    for key, value in _counted(b, "cache"):
+        data = _json(value)
+        if key == "trakt_watched_cache" and isinstance(data, dict) \
+                and isinstance(data.get("local_items"), list):
+            counts["watched"] += len(data["local_items"])
+        elif key == "trakt_watchlist_cache" and isinstance(data, dict):
+            counts["watchlist"] += sum(len(data[k]) for k in ("movies", "shows")
+                                       if isinstance(data.get(k), list))
     return counts
 
 

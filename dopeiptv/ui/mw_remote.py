@@ -161,6 +161,12 @@ class _RemoteMixin:
                                 for p in (store.playlists() if store is not None else [])]}
         if action == "status":
             return self._remote_status()
+        if action == "profiles":
+            # The profile in use and the household's (never a PIN).
+            return self._profile_state()
+        if action == "profile":
+            # {"id"} or {"name"}, and "pin" for one that has a PIN.
+            return self._profile_switch_remote(params)
         if action == "play":
             url = str(params.get("url") or "").strip()
             channel = str(params.get("channel") or "").strip()
@@ -222,6 +228,9 @@ class _RemoteMixin:
         out: dict[str, Any] = {"state": state, "volume": int(round(float(snap.get("volume") or 0) * 100)),
                                "source": (active or {}).get("name"),
                                "tv_mode": bool(getattr(self, "_tv_on", False))}
+        prof = self._profile() if hasattr(self, "_profile") else None
+        if prof is not None:
+            out["profile"] = prof.name
         if state != "stopped":
             kind = last.get("kind") or ""
             out.update(kind=kind, title=snap.get("title") or "",

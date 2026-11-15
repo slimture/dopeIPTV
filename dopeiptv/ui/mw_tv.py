@@ -201,6 +201,11 @@ class _TvMixin:
         if self._tv_has_picture():
             self._tv_picture()
         self._events_tv_mode()
+        if getattr(self, "_profile_picker", None) is not None \
+                or getattr(self, "_profile_must_pick", False):
+            # "Who's watching?" in TV mode's own style (mw_profiles).
+            self._profile_close_picker()
+            page.show_screen("profiles")
 
     def exit_tv_mode(self) -> None:
         if not self._tv_on:

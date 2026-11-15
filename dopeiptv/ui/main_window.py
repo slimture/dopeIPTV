@@ -40,8 +40,6 @@ from ..providers.client import (
 from ..media.embedded import EmbeddedPlayer, _SeekSlider
 from ..providers.epg import XmltvGuide, epg_cache_path, prune_epg_caches
 from ..services.coverart import CoverArtService
-from ..services.resume import ResumeStore
-from ..services.reminders import ReminderStore
 from ..core.series_rules import SeriesRuleStore
 from ..media.players import embedded_playback_supported, launch_player
 from ..core.contest import ContestWatch
@@ -50,13 +48,10 @@ from ..core.privacy import for_log
 from ..core.health import StreamHealth
 from ..core.recording import RecordingManager
 from ..core.stores import (
-    CategoryOverrides, ChannelOverrides, FavoriteStore, FollowedSeriesStore,
-    HistoryStore, ParentalControl, PlaylistStore, WatchedStore, WatchlistStore,
+    CategoryOverrides, ChannelOverrides, ParentalControl, PlaylistStore,
 )
 from .theme import P, rounded
 from .player_resize import PlayerResizeHandle
-from ..providers.trakt import TraktClient
-from ..providers.simkl import SimklClient
 from ..core.wakelock import WakeLock
 from .dialogs import PlaylistDialog
 from .nav_widgets import NavButton, SideRule, SourceAvatar
@@ -91,6 +86,7 @@ from .mw_together import _TogetherMixin
 from .mw_simkl import _SimklMixin
 from .mw_discord import _DiscordMixin
 from .mw_privacy import _PrivacyMixin
+from .mw_profiles import _ProfilesMixin
 from .mw_commands import _CommandsMixin
 from .mw_box import _BoxMixin
 from .mw_donate import _DonateMixin
@@ -155,7 +151,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _PortalArchiveMixin, _SeriesMixin, _SyncMixin,
                  _ConnectionsMixin, _MirrorsMixin, _TogetherMixin, _StatsMixin,
                  _SimklMixin, _DiscordMixin, _MediaServerMixin, _TvMixin,
-                 _TeletextMixin, QMainWindow):
+                 _TeletextMixin, _ProfilesMixin, QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
     epg_progress = pyqtSignal(int)
@@ -240,31 +236,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             cache_path=epg_cache_path(pid) if pid else None,
             progress_cb=self.epg_progress.emit)
         self.xmltv.delay_minutes = self._epg_delay_minutes()
-        self.favs = FavoriteStore(
-            settings, f"favorites_{pid}" if pid else "favorites")
-        self.favs.on_change = self._favorites_changed
-        # Flat, single-group favourites for movies and series - the
-        # split Favorites column shows these under 'Movies' and 'Series'
-        # alongside the grouped channel favourites.
-        self.movie_favs = FavoriteStore(
-            settings, f"movie_favorites_{pid}" if pid else "movie_favorites",
-            id_key="stream_id")
-        self.series_favs = FavoriteStore(
-            settings, f"series_favorites_{pid}" if pid else "series_favorites",
-            id_key="series_id")
+        # The household's profiles (core/profiles.py); each store below is
+        # the profile's in use, pinned to it.
+        from ..core.profiles import ProfileStore
+        self.profiles = ProfileStore(settings)
+        self._resume_settings = self._open_resume_settings(settings)
+        self._follow_settings = self._open_follow_settings(settings)
+        self._build_source_stores(pid)
         # Radio stations and web streams belong to no source: one list each,
         # whatever source is in use (mw_radio, mw_webstreams).
-        self.radio_favs = FavoriteStore(settings, "radio_favorites",
-                                        id_key="stationuuid")
-        self.web_favs = FavoriteStore(settings, "web_favorites", id_key="url")
-        self.history = HistoryStore(
-            settings, f"history_{pid}" if pid else "history")
-        self._resume_settings = self._open_resume_settings(settings)
-        self.resume = ResumeStore(self._resume_settings, pid)
-        self.reminders = ReminderStore(settings, pid)
+        self._build_radio_web_favs()
         self.series_rules = SeriesRuleStore(settings, pid)
-        self._follow_settings = self._open_follow_settings()
-        self.followed = FollowedSeriesStore(self._follow_settings, pid)
         self.overrides = CategoryOverrides(
             settings, f"category_overrides_{pid}" if pid else "category_overrides")
         self.channel_ov = ChannelOverrides(
@@ -314,14 +296,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cover = CoverArtService(
             self._cache_settings, self.logos,
             lambda: self._poster_refresh_timer.start(150))
-        self.trakt = TraktClient(settings)
         self._trakt_active: dict | None = None
-        # Simkl beside Trakt (mw_simkl): offered only when the build carries
-        # its client id.
-        self.simkl = SimklClient(settings)
         self._simkl_active: dict | None = None
-        self.watched = WatchedStore(self._cache_settings)
-        self.watchlist = WatchlistStore(self._cache_settings)
+        # The profile's accounts (Trakt; Simkl beside it, offered only when
+        # the build carries its client id - mw_simkl), watched marks and
+        # Watch later.
+        self._build_profile_accounts()
         self._watched_sync_running = False
         self._raw_categories: list = []
         self.mode: str = "live"
@@ -437,6 +417,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._maybe_open_home_at_start()
         # "Start in TV mode" (mw_tv), once the window is up.
         QTimer.singleShot(300, self._maybe_start_tv_mode)
+        # "Who's watching?" over it all when there are several profiles
+        # (mw_profiles) - TV mode shows it as a screen of its own.
+        self._maybe_pick_profile_at_start()
 
     # -- UI construction -------------------------------------------------------
 
@@ -444,10 +427,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         """Fill *menu* with a checkable entry per playlist, the active one
         ticked. Used by the source avatar at the sidebar's foot."""
         menu.clear()
+        # The household's profiles first (two or more; mw_profiles).
+        self._fill_profile_menu(menu)
         store = self.playlist_store
         if not store or not store.playlists():
             act = menu.addAction(tr("pl_mgmt_unavailable"))
             act.setEnabled(False)
+            self._profile_manage_action(menu)
             return
         active = store.active_id
         for p in store.playlists():
@@ -461,6 +447,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             menu.addSeparator()
             act = menu.addAction(tr("src_settings_menu"))
             act.triggered.connect(lambda _c=False, pid=active: self.open_source_settings(pid))
+        self._profile_manage_action(menu)
 
     def _show_playlist_menu(self) -> None:
         """Pop the source switcher just above the avatar at the sidebar's
@@ -483,6 +470,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         store = self.playlist_store
         pl = store.get(store.active_id) if (store and store.active_id) else None
         name = ((pl or {}).get("name") or (pl or {}).get("server") or "")
+        prof = self._profile() if self._profile_many() else None
+        if prof is not None:
+            # Two people or more: the avatar is the one watching (mw_profiles).
+            from .profiles_ui import avatar_text, profile_fill
+            btn.set_profile(prof.name, profile_fill(prof), avatar_text(prof), name,
+                            tr("profile_menu_hint"))
+            btn.setVisible(True)
+            return
         btn.set_source(name, tr("menu_playlists"))
         btn.setVisible(pl is not None)
 
@@ -2350,17 +2345,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             nerd.set_source(pl)
             # Another provider's category ids say nothing about this one's.
             self._last_cat = {}
-            self.favs = FavoriteStore(self.settings, f"favorites_{pid}")
+            # The profile's own for this source: favorites, history, resume
+            # points, reminders, followed series.
+            self._build_source_stores(pid)
             self._watch_favorites()
-            self.movie_favs = FavoriteStore(
-                self.settings, f"movie_favorites_{pid}", id_key="stream_id")
-            self.series_favs = FavoriteStore(
-                self.settings, f"series_favorites_{pid}", id_key="series_id")
-            self.history = HistoryStore(self.settings, f"history_{pid}")
-            self.resume = ResumeStore(self._resume_settings, pid)
-            self.reminders = ReminderStore(self.settings, pid)
             self.series_rules = SeriesRuleStore(self.settings, pid)
-            self.followed = FollowedSeriesStore(self._follow_settings, pid)
             # Hide/rename/lock rules are per playlist too: kept, the old
             # provider's locks applied here and edits saved under its key.
             self.overrides = CategoryOverrides(
@@ -2607,12 +2596,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 for g in store.custom_groups():
                     locked = (section == "chan" and store.is_locked(g)
                               and not self.parental.session_unlocked)
+                    if locked and kids:
+                        continue        # a kids profile: not there at all
                     text = (f"    {g}  " + tr("cat_locked_suffix")
                             if locked else f"    {g}")
                     it = QListWidgetItem(text)
                     it.setData(Qt.ItemDataRole.UserRole, (section, g))
                     self.cat_list.addItem(it)
 
+            kids = self._profile_kids()
             add_fav_section("chan", tr("fav_channels"), self.favs)
             add_fav_section("movie", tr("fav_movies"), self.movie_favs)
             add_fav_section("series", tr("fav_series"), self.series_favs)
@@ -2698,14 +2690,22 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 rc = QListWidgetItem("🆕  " + tr("cat_recent"))
                 rc.setData(Qt.ItemDataRole.UserRole, "__recent__")
                 self.cat_list.addItem(rc)
+            # A kids profile sees only what the parental lock leaves open,
+            # and is never asked for the PIN of the rest (mw_profiles).
+            kids = self._profile_kids()
+            from ..core.profiles import adult_category
             for c in cats:
                 cid = c.get("category_id")
                 if self.overrides.is_hidden(self.mode, cid):
                     continue
                 name = self.overrides.display_name(
                     self.mode, cid, c.get("category_name", "?"))
+                if kids and adult_category(name):
+                    continue
                 if (self.overrides.is_locked(self.mode, cid)
                         and not self.parental.session_unlocked):
+                    if kids:
+                        continue
                     name += "  " + tr("cat_locked_suffix")
                 ovr = self.overrides.get(self.mode, cid)
                 icon = ovr.get("icon", "")
@@ -3581,6 +3581,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # Nothing hidden (most lists): asking each of 80,000 films
             # took a third of a second on the GUI thread.
             items = list(self.all_items)
+        if getattr(self, "_profile_kids", lambda: False)():
+            # A kids profile: nothing the provider marks for adults.
+            from ..core.profiles import adult_item
+            items = [it for it in items if not adult_item(it)]
         if text:
             name = self._display_name_fn()
             filtered = [it for it in items if text in name(it).lower()]
@@ -4597,8 +4601,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         the shared file tiny so those frequent writes sync in ~1ms, and the
         caches (rewritten on their own worker threads) no longer bloat it.
         Migrate any existing cache keys out of the shared file once."""
-        cs = QSettings(QSettings.Format.IniFormat, QSettings.Scope.UserScope,
-                       ORG, "cache")
+        cs = self._side_settings(shared, "cache")
         try:
             if cs.value("_migrated") != "1":
                 moved = False
@@ -4616,13 +4619,24 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         return cs
 
     @staticmethod
-    def _open_follow_settings() -> QSettings:
+    def _side_settings(shared: QSettings, name: str) -> QSettings:
+        """One of the files beside the app's settings - as the profile in
+        use sees it when the app's settings are a profile's view
+        (core/profiles.py)."""
+        from ..core.profiles import ProfileSettings
+        kind = ProfileSettings if isinstance(shared, ProfileSettings) else QSettings
+        return kind(QSettings.Format.IniFormat, QSettings.Scope.UserScope, ORG, name)
+
+    @classmethod
+    def _open_follow_settings(cls, shared: QSettings | None = None) -> QSettings:
         """Followed series in a file of their own, for the same reason as the
         resume positions: each remembers every episode id it has seen, which
         grows with every series followed - kept in the shared settings, each
         check would have rewritten all of it on the main thread."""
-        return QSettings(QSettings.Format.IniFormat, QSettings.Scope.UserScope,
-                         ORG, "follow")
+        if shared is None:
+            return QSettings(QSettings.Format.IniFormat, QSettings.Scope.UserScope,
+                             ORG, "follow")
+        return cls._side_settings(shared, "follow")
 
     def _open_resume_settings(self, shared: QSettings) -> QSettings:
         """Resume positions get their own small settings file. They are written
@@ -4634,8 +4648,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         ~1ms and never dirties the big one. Migrate any existing
         resume_positions* keys out of the shared file once, so the user's
         continue-watching survives the move."""
-        rs = QSettings(QSettings.Format.IniFormat, QSettings.Scope.UserScope,
-                       ORG, "resume")
+        rs = self._side_settings(shared, "resume")
         try:
             if rs.value("_migrated") != "1":
                 moved = False
@@ -6005,6 +6018,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._update_mid_compact()
         if self._welcome is not None and self._welcome.isVisible():
             self._welcome.cover()
+        self._profile_picker_fit()
         self._position_provider_hint()
         self._reposition_update_banner()
         if getattr(self, "_focus_mode", False):

@@ -137,9 +137,11 @@ avatar.click()
 pump()
 assert menus, "no menu"
 acts = [(a.text(), a.isChecked()) for a in menus[-1].actions()]
-# The sources, then the active one's own page in Settings.
+# The sources, then the active one's own page in Settings, then the
+# household's profiles (one profile: no list of them above).
 assert acts == [("Min IPTV", True), ("Familjen", False), ("", False),
-                (tr("src_settings_menu"), False)], acts
+                (tr("src_settings_menu"), False), ("", False),
+                (tr("profile_manage"), False)], acts
 
 # -- another source, a new name, a new theme: the avatar follows ------------------
 store.set_active(family["id"])

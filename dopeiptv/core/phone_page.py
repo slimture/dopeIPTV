@@ -2,8 +2,9 @@
 JavaScript in one answer, nothing fetched from anywhere else, so it works
 on a home network with no internet.
 
-Mobile first: what plays at the top (the channel, what is on now and
-next), the channels and favourites with a search in the middle, and the
+Mobile first: who is watching (a profile's chip, with two profiles or
+more: a tap lists the others), what plays at the top (the channel, what is
+on now and next), the channels and favourites with a search in the middle, and the
 controls - channel down and up, play/pause, stop, volume and mute - docked
 at the bottom where a thumb reaches. It asks the app what plays every 1.5 s
 while it is on screen, and not at all while it is not.
@@ -43,7 +44,8 @@ WORDS = ("channels", "favorites", "search", "nothing", "next", "paused", "offlin
          "none_found", "no_favorites", "play_pause", "stop", "ch_up", "ch_down", "mute", "volume",
          "loading", "tv_mode", "tv_switch", "ok", "up", "down", "left", "right", "back", "options",
          "vol_up", "vol_down", "digits", "touchpad", "touch_hint",
-         "key_red", "key_green", "key_yellow", "key_blue")
+         "key_red", "key_green", "key_yellow", "key_blue",
+         "profile", "profile_pin")
 _HEX = re.compile(r"#[0-9A-Fa-f]{6}")
 
 
@@ -145,11 +147,13 @@ _HTML = """<!doctype html>
   <header class="top">
     <span class="brand">dopeIPTV</span>
     <span class="source" id="source"></span>
+    <button class="pchip" id="pchip" aria-haspopup="menu" aria-expanded="false" hidden><span class="pav" id="pav"></span><span class="pname" id="pname"></span></button>
     <button class="tvBtn" id="tvBtn" aria-pressed="false">
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="12.5" rx="2"/><path d="M8.5 20.5h7M12 17v3.5"/></svg>
       <span id="tvBtnText"></span>
     </button>
   </header>
+  <div class="pmenu" id="pmenu" role="menu" hidden></div>
   <div class="banner" id="banner" role="status" hidden></div>
   <section class="now" id="now" aria-live="polite">
     <div class="logo" id="nowLogo"><span id="nowInitials"></span><img id="nowImg" alt="" hidden></div>
@@ -268,6 +272,16 @@ svg .fill{fill:currentColor;stroke:none}
   background:var(--btn);color:var(--text2);font-size:13px;font-weight:600}
 .tvBtn svg{width:18px;height:18px}
 .tvBtn[aria-pressed=true]{background:var(--accent);color:var(--on-accent)}
+.pchip{display:flex;align-items:center;gap:6px;flex:none;min-height:34px;padding:3px 10px 3px 3px;border-radius:999px;
+  background:var(--pane);color:var(--text2);font-size:13px;font-weight:600;max-width:40%}
+.pchip .pname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pav{flex:none;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:var(--pf,var(--accent));color:var(--on-accent);font-size:12px;font-weight:700}
+.pmenu{background:var(--pane);border-radius:var(--radius);padding:4px;margin:0 0 10px;display:flex;flex-direction:column}
+.pmenu button{display:flex;align-items:center;gap:10px;min-height:48px;padding:6px 10px;border-radius:9px;text-align:start}
+.pmenu button[aria-checked=true]{background:var(--sel);color:var(--text)}
+.pmenu button:active{background:var(--hover)}
+.pmenu .lock{margin-inline-start:auto;color:var(--muted);font-size:12px}
 .banner{background:var(--pane);color:var(--error);border-radius:var(--radius);padding:12px 14px;margin:0 0 10px;font-size:14px}
 .now{display:flex;gap:14px;align-items:flex-start;background:var(--pane);border-radius:var(--radius);padding:14px}
 .logo{flex:0 0 56px;height:56px;border-radius:10px;background:var(--btn);display:flex;align-items:center;
@@ -441,10 +455,52 @@ function setBar(frac) {
   if (frac !== null) $("nowBar").style.setProperty("width", (Math.max(0, Math.min(1, frac)) * 100).toFixed(1) + "%");
 }
 
+const HEX = /^#[0-9a-fA-F]{6}$/;
+let profiles = [], profileId = null;
+
+function avatar(el, p) {
+  el.textContent = p.emoji || p.initials || "";
+  if (HEX.test(p.fill || "")) el.style.setProperty("--pf", p.fill); else el.style.removeProperty("--pf");
+}
+
+function showProfile(s) {
+  const chip = $("pchip");
+  const p = s.profile || null;
+  hide(chip, !p);
+  if (!p) { hide($("pmenu"), true); return; }
+  profiles = s.profiles || [];
+  if (p.id !== profileId) { profileId = p.id; hide($("pmenu"), true); chip.setAttribute("aria-expanded", "false"); }
+  avatar($("pav"), p);
+  $("pname").textContent = p.name || "";
+  chip.setAttribute("aria-label", W.profile + ": " + (p.name || ""));
+}
+
+function profileMenu() {
+  const m = $("pmenu"), chip = $("pchip");
+  const open = m.hasAttribute("hidden");
+  m.textContent = "";
+  if (open) {
+    for (const p of profiles) {
+      const b = document.createElement("button");
+      b.setAttribute("role", "menuitemradio");
+      b.setAttribute("aria-checked", String(p.id === profileId));
+      b.dataset.id = p.id;
+      const av = document.createElement("span"); av.className = "pav"; avatar(av, p);
+      const name = document.createElement("span"); name.textContent = p.name || "";
+      b.append(av, name);
+      if (p.pin && p.id !== profileId) { const l = document.createElement("span"); l.className = "lock"; l.textContent = "PIN"; b.append(l); }
+      m.append(b);
+    }
+  }
+  hide(m, !open);
+  chip.setAttribute("aria-expanded", String(open));
+}
+
 function show(s) {
   st = s; stAt = Date.now();
   setTv(s.tv_mode);
   $("source").textContent = s.source || "";
+  showProfile(s);
   const playing = s.state === "playing", stopped = s.state === "stopped";
   hide($("icoPlay"), playing); hide($("icoPause"), !playing);
   const ch = s.channel || null;
@@ -672,6 +728,17 @@ function init() {
     if (!b) return;
     b.classList.add("pending");
     send("api/play", {id: b.dataset.id}).then(() => b.classList.remove("pending"));
+  });
+  $("pchip").addEventListener("click", profileMenu);
+  $("pmenu").addEventListener("click", async (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    const p = profiles.find((x) => x.id === b.dataset.id);
+    hide($("pmenu"), true); $("pchip").setAttribute("aria-expanded", "false");
+    if (!p || p.id === profileId) return;
+    if (p.pin) { banner(W.profile_pin); return; }
+    const r = await send("api/profile", {id: p.id});
+    if (!r) banner(W.profile_pin);
   });
   $("toggle").addEventListener("click", () => send("api/toggle"));
   $("stop").addEventListener("click", () => send("api/stop"));

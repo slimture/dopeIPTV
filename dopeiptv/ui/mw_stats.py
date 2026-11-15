@@ -40,7 +40,10 @@ class _StatsMixin:
         """The viewing log, read once; a new one takes what the resume
         positions know already (every source's)."""
         if self._stats_log is None:
-            self._stats_log = viewing_stats.ViewingLog(self.settings)
+            # The profile's own log, pinned to it (core/profiles.py).
+            own = getattr(self, "_own", None)
+            self._stats_log = viewing_stats.ViewingLog(
+                own(self.settings) if own is not None else self.settings)
             if self._stats_log.fresh:
                 try:
                     self._stats_seed(self._stats_log)

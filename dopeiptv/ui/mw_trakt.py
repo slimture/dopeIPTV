@@ -77,7 +77,10 @@ class _TraktMixin:
         threading.Thread(target=job, daemon=True).start()
     def _trakt_start_for_item(self, kind: str, item) -> None:
         from ..core import privacy
-        if not item or not self.trakt.is_connected() or privacy.private():
+        # The account of the profile watching, whatever profile is in use by
+        # the time the answer comes (core/profiles.py).
+        trakt = self.trakt
+        if not item or not trakt.is_connected() or privacy.private():
             return          # private viewing: Trakt is not told either
         if kind == "movie":
             title = item.get("name") or item.get("title") or ""
@@ -85,11 +88,11 @@ class _TraktMixin:
                 return
 
             def job(title=title):
-                movie = self.trakt.find_movie(title)
+                movie = trakt.find_movie(title)
                 if not movie:
                     return None
                 payload = {"movie": movie}
-                self.trakt.scrobble_start(payload, 0.0)
+                trakt.scrobble_start(payload, 0.0)
                 return payload
 
         elif kind == "episode":
@@ -104,18 +107,18 @@ class _TraktMixin:
                 return
 
             def job(show_title=show_title, season=season, episode=episode):
-                ep = self.trakt.find_episode(show_title, season, episode)
+                ep = trakt.find_episode(show_title, season, episode)
                 if not ep:
                     return None
                 payload = {"episode": ep}
-                self.trakt.scrobble_start(payload, 0.0)
+                trakt.scrobble_start(payload, 0.0)
                 return payload
         else:
             return
 
         def done(payload):
-            if payload:
-                self._trakt_active = {"payload": payload}
+            if payload and trakt is self.trakt:
+                self._trakt_active = {"payload": payload, "client": trakt}
 
         run_async(self.pool, job, done, lambda _e: None)
 
@@ -125,9 +128,10 @@ class _TraktMixin:
         active = self._trakt_active
         self._trakt_active = None
         progress = self.player.progress_percent() if self.player else 0.0
+        trakt = active.get("client") or self.trakt
 
         def job(active=active, progress=progress):
-            self.trakt.scrobble_stop(active["payload"], progress)
+            trakt.scrobble_stop(active["payload"], progress)
 
         run_async(self.pool, job, lambda _r: None, lambda _e: None)
 
@@ -147,6 +151,13 @@ class _TraktMixin:
             if age < self._WATCHED_SYNC_TTL:
                 return
         self._watched_sync_running = True
+        # The profile's own stores, as they are now: a switch while this runs
+        # leaves its answer with the profile it was asked for.
+        mine = {"watched": self.watched, "watchlist": self.watchlist,
+                "accounts": accounts, "trakt": getattr(self, "trakt", None),
+                "favs": (getattr(self, "movie_favs", None),
+                         getattr(self, "series_favs", None))}
+        watched, watchlist = mine["watched"], mine["watchlist"]
 
         # Runs on a daemon thread rather than the QThreadPool: the two
         # Trakt endpoints are 30-45 s worst case, and if the user closes
@@ -180,15 +191,14 @@ class _TraktMixin:
                 QTimer.singleShot(0, self._on_watched_sync_failed)
                 return
             try:
-                self.watched.replace(movies, shows, movie_titles,
-                                     show_titles)
-                self.watchlist.replace(wl_movies, wl_shows)
+                watched.replace(movies, shows, movie_titles, show_titles)
+                watchlist.replace(wl_movies, wl_shows)
                 # Cross-device: anything the user marked 'seen (local)'
                 # that has since resolved to a TMDB id but isn't on Trakt
                 # yet gets pushed up now, then promoted into the Trakt
                 # layer so it's never POSTed twice (which would add
                 # duplicate watches).
-                self._push_local_watched_to_trakt()
+                self._push_local_watched_to_trakt(mine)
             except Exception as e:
                 # Without this the running flag stayed set and no sync ran
                 # again until the app was restarted.
@@ -199,11 +209,12 @@ class _TraktMixin:
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _push_to_accounts(self, method: str, *args) -> bool:
+    def _push_to_accounts(self, method: str, *args, accounts=None) -> bool:
         """Runs on the sync worker thread: *method* on every signed-in
-        account; True when at least one took it."""
+        account (of the profile the sync is for); True when at least one
+        took it."""
         took = False
-        for acc in self._watch_accounts():
+        for acc in (self._watch_accounts() if accounts is None else accounts):
             try:
                 getattr(acc, method)(*args)
                 took = True
@@ -211,50 +222,60 @@ class _TraktMixin:
                 continue
         return took
 
-    def _push_local_watched_to_trakt(self) -> None:
+    def _push_local_watched_to_trakt(self, mine: dict | None = None) -> None:
         """Runs on the sync worker thread. Best-effort POST of local-only
         watched marks to the accounts (Trakt, Simkl); each accepted item is
         promoted to the Trakt layer so the next sync keeps it and we never
-        double-post."""
-        movies, episodes = self.watched.pending_trakt_pushes()
+        double-post. *mine*: the profile's stores and accounts the sync
+        started with."""
+        mine = mine or {"watched": self.watched, "watchlist": self.watchlist,
+                        "accounts": None, "trakt": self.trakt,
+                        "favs": (getattr(self, "movie_favs", None),
+                                 getattr(self, "series_favs", None))}
+        watched, watchlist, accounts = mine["watched"], mine["watchlist"], mine["accounts"]
+        movies, episodes = watched.pending_trakt_pushes()
         for tid in movies:
-            if self._push_to_accounts("add_movie_history", tid):
-                self.watched.mark_movie_synced(tid)
+            if self._push_to_accounts("add_movie_history", tid, accounts=accounts):
+                watched.mark_movie_synced(tid)
         for show_id, season, episode in episodes:
             if self._push_to_accounts("add_episode_history", show_id, season,
-                                      episode):
-                self.watched.mark_episode_synced(show_id, season, episode)
-        for show_id in self.watched.pending_show_pushes():
-            if self._push_to_accounts("add_show_history", show_id):
-                self.watched.mark_show_synced(show_id)
-        wl_movies, wl_shows = self.watchlist.pending_trakt_pushes()
+                                      episode, accounts=accounts):
+                watched.mark_episode_synced(show_id, season, episode)
+        for show_id in watched.pending_show_pushes():
+            if self._push_to_accounts("add_show_history", show_id, accounts=accounts):
+                watched.mark_show_synced(show_id)
+        wl_movies, wl_shows = watchlist.pending_trakt_pushes()
         for tid in wl_movies:
-            if self._push_to_accounts("add_movie_watchlist", tid):
-                self.watchlist.mark_movie_synced(tid)
+            if self._push_to_accounts("add_movie_watchlist", tid, accounts=accounts):
+                watchlist.mark_movie_synced(tid)
         for tid in wl_shows:
-            if self._push_to_accounts("add_show_watchlist", tid):
-                self.watchlist.mark_show_synced(tid)
+            if self._push_to_accounts("add_show_watchlist", tid, accounts=accounts):
+                watchlist.mark_show_synced(tid)
         # The favourites list is Trakt's own; Simkl has nothing like it.
-        if self.trakt.is_connected():
-            self._push_local_favorites_to_trakt()
+        if mine["trakt"] is not None and mine["trakt"].is_connected():
+            self._push_local_favorites_to_trakt(mine["trakt"], mine["favs"])
 
-    def _push_local_favorites_to_trakt(self) -> None:
+    def _push_local_favorites_to_trakt(self, trakt=None, stores=None) -> None:
         """Runs on the sync worker thread. Upload any movie/series
         favourite that carries a resolved tmdb id but isn't on the Trakt
         'dopeIPTV Favorites' list yet, so favourites are remembered
         across devices. Adds are idempotent, so re-runs are harmless."""
+        trakt = trakt or self.trakt
+        movie_favs, series_favs = stores or (self.movie_favs, self.series_favs)
         try:
-            on_trakt = {"vod": set(self.trakt.favorite_movies()),
-                        "series": set(self.trakt.favorite_shows())}
+            on_trakt = {"vod": set(trakt.favorite_movies()),
+                        "series": set(trakt.favorite_shows())}
         except Exception:
             return
-        for store, kind in ((self.movie_favs, "vod"),
-                            (self.series_favs, "series")):
+        for store, kind in ((movie_favs, "vod"),
+                            (series_favs, "series")):
+            if store is None:
+                continue
             for it in store.items():
                 tid = it.get("_tmdb_id")
                 if isinstance(tid, int) and tid not in on_trakt[kind]:
                     try:
-                        self.trakt.add_favorite(tid, kind)
+                        trakt.add_favorite(tid, kind)
                     except Exception:
                         pass
 

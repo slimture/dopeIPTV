@@ -107,9 +107,33 @@ class _SyncMixin:
     def _sync_on(self) -> bool:
         return sync.code_of(self.settings) is not None
 
+    def _sync_own(self, settings):
+        """*settings* pinned to the profile in use (mw_profiles), when the
+        window keeps profiles."""
+        own = getattr(self, "_own", None)
+        return own(settings) if own is not None else settings
+
     def _sync_ctx(self) -> sync.Context:
-        return sync.Context(self.settings, getattr(self, "_resume_settings", None),
-                            getattr(self, "playlist_store", None))
+        """What syncs: every profile's own (core/profiles.py) - the first
+        profile's under the names it always had, the others' under their
+        ids - and the household's settings and sources."""
+        from ..core import profiles
+        st, rs = self.settings, getattr(self, "_resume_settings", None)
+        store = getattr(self, "playlist_store", None)
+        reg = getattr(self, "profiles", None)
+        if not isinstance(st, profiles.ProfileSettings) or reg is None:
+            return sync.Context(st, rs, store)
+
+        def pin(s, pid):
+            return profiles.pinned(s, pid) if s is not None else None
+
+        def views(pid):
+            return pin(st, pid), pin(rs, pid)
+
+        ctx = sync.Context(pin(st, profiles.MAIN_ID), pin(rs, profiles.MAIN_ID), store,
+                           registry=reg, pin=views)
+        ctx.refresh_others()
+        return ctx
 
     def _sync_path(self) -> Path:
         if self._sync_state_file is not None:
@@ -281,11 +305,13 @@ class _SyncMixin:
         if pid and (pid in applied.favorites or pid in applied.history):
             self._sync_reload_stores(pid, pid in applied.favorites, pid in applied.history)
         if sync.GLOBAL_FP in applied.favorites:
-            # Radio stations and web streams, which are no source's.
+            # Radio stations and web streams, which are no source's: the
+            # profile's in use, read again.
             from ..core.stores import FavoriteStore
-            self.radio_favs = FavoriteStore(self.settings, "radio_favorites",
+            own = self._sync_own(self.settings)
+            self.radio_favs = FavoriteStore(own, "radio_favorites",
                                             id_key="stationuuid")
-            self.web_favs = FavoriteStore(self.settings, "web_favorites", id_key="url")
+            self.web_favs = FavoriteStore(own, "web_favorites", id_key="url")
             playing = getattr(getattr(self, "player", None), "current_url", None)
             if getattr(self, "mode", "") == "fav" and not playing \
                     and hasattr(self, "_load_categories"):
@@ -311,18 +337,22 @@ class _SyncMixin:
     def _sync_reload_stores(self, pid: str, favs: bool, history: bool) -> None:
         """The active playlist's stores read again (sync wrote under them)."""
         from ..core.stores import FavoriteStore, HistoryStore
+        own = self._sync_own(self.settings)
         if favs:
-            self.favs = FavoriteStore(self.settings, f"favorites_{pid}")
-            self.movie_favs = FavoriteStore(self.settings, f"movie_favorites_{pid}",
+            # The profile's in use, pinned to it (core/profiles.py).
+            self.favs = FavoriteStore(own, f"favorites_{pid}")
+            if hasattr(self, "_favorites_changed"):
+                self.favs.on_change = self._favorites_changed
+            self.movie_favs = FavoriteStore(own, f"movie_favorites_{pid}",
                                             id_key="stream_id")
-            self.series_favs = FavoriteStore(self.settings, f"series_favorites_{pid}",
+            self.series_favs = FavoriteStore(own, f"series_favorites_{pid}",
                                              id_key="series_id")
         if history:
-            self.history = HistoryStore(self.settings, f"history_{pid}")
+            self.history = HistoryStore(own, f"history_{pid}")
             resume_settings = getattr(self, "_resume_settings", None)
             if resume_settings is not None:
                 from ..services.resume import ResumeStore
-                self.resume = ResumeStore(resume_settings, pid)
+                self.resume = ResumeStore(self._sync_own(resume_settings), pid)
         playing = getattr(getattr(self, "player", None), "current_url", None)
         if favs and getattr(self, "mode", "") == "fav" and not playing \
                 and hasattr(self, "_load_categories"):

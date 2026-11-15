@@ -232,8 +232,8 @@ def test_what_a_backup_holds_is_counted(tmp_path):
     counts = backup.summary(backup.parse(backup.collect(src, "1.5.0")))
     assert list(counts) == list(backup.KINDS)
     assert {k: v for k, v in counts.items() if k != "settings"} == {
-        "sources": 2, "favorites": 4, "history": 3, "resume": 1, "watched": 1,
-        "watchlist": 2, "followed": 1, "reminders": 1, "recordings": 1,
+        "sources": 2, "profiles": 0, "favorites": 4, "history": 3, "resume": 1,
+        "watched": 1, "watchlist": 2, "followed": 1, "reminders": 1, "recordings": 1,
         "hidden": 3, "numbers": 1}
     assert counts["settings"] >= 10
 

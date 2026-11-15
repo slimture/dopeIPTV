@@ -217,6 +217,14 @@ def _put_restore_in_place() -> bool | None:
         return None
 
 
+def _profile_files() -> list:
+    """The three files beside the app's settings that hold a profile's own
+    keys too (resume positions, followed series, the watched marks' cache),
+    as the window opens them (main_window._open_*_settings)."""
+    ini, user = QSettings.Format.IniFormat, QSettings.Scope.UserScope
+    return [QSettings(ini, user, ORG, name) for name in ("resume", "follow", "cache")]
+
+
 def main() -> int:
     """Launch the application."""
     # PyInstaller's windowed (no-console) build - our Windows release - leaves
@@ -451,7 +459,11 @@ def main() -> int:
     # GNOME's margin, a retina Dock's size) and set for every window; on
     # Linux also written into the XDG icon theme, where Wayland takes it
     # from. The window keeps it in step with the key and the switch.
-    settings = QSettings(ORG, ORG)
+    # The settings as the profile in use sees them (core/profiles.py): its
+    # own favorites, history, look... under its name, the household's as
+    # they are.
+    from .core import profiles
+    settings = profiles.ProfileSettings(ORG, ORG)
     from .ui import app_icon
     try:
         supporter_icon = app_icon.wanted(settings)
@@ -459,8 +471,13 @@ def main() -> int:
         log.warning("supporter icon: %s", e)
         supporter_icon = False
     app_icon.show(supporter_icon, theme_icons=sys.platform.startswith("linux"))
-    from .i18n import is_rtl, set_language
+    from .i18n import is_rtl, set_language, tr as _tr
     set_language(settings.value("language", "en"))
+    # The first start with profiles makes everything so far the first
+    # profile's (copied - the old keys stay for a downgrade); then the one
+    # used last is the one in use, before anything reads its settings.
+    from . import __version__
+    profiles.start(settings, _profile_files(), _tr("profile_me"), __version__)
     from .ui.qt_i18n import apply_qt_language
     apply_qt_language(app)          # Qt's own buttons and dialogs too
     # Right-to-left languages (Arabic, Persian) mirror the whole UI.

@@ -88,7 +88,8 @@ def page_words() -> dict[str, str]:
             "play_pause": tr("phone_page_play_pause"), "stop": tr("btn_stop"),
             "ch_up": tr("phone_page_ch_up"), "ch_down": tr("phone_page_ch_down"),
             "mute": tr("tooltip_mute_unmute"), "volume": tr("tooltip_volume"),
-            "loading": tr("common_loading"), **tv_words()}
+            "loading": tr("common_loading"), "profile": tr("profile_who_short"),
+            "profile_pin": tr("phone_page_profile_pin"), **tv_words()}
 
 
 def tv_words() -> dict[str, str]:
@@ -285,6 +286,9 @@ class _PhoneMixin:
             # The player's own slider: raising it while muted unmutes.
             self._remote_media("volume", value / 100.0)
             return {"ok": True, "volume": int(round(value))}
+        if action == "profile":
+            # The profile chip: another profile (one with a PIN only with it).
+            return self._profile_switch_remote(params)
         if action == "mute":
             p = self.player
             if p is None:
@@ -353,6 +357,15 @@ class _PhoneMixin:
         note = self._phone_note_now()
         if note:
             out["note"] = note
+        if getattr(self, "_profile_many", lambda: False)():
+            # The chip at the top: who is watching, and the others to pick.
+            from .profiles_ui import profile_fill
+            state = self._profile_state()
+            fills = {p.id: profile_fill(p) for p in self.profiles.profiles()}
+            for row in [state["profile"], *state["profiles"]]:
+                if row is not None:
+                    row["fill"] = fills.get(row["id"], "")
+            out.update(state)
         if st["state"] == "stopped":
             return out
         last = getattr(self, "_last_playback", None) or {}

@@ -207,13 +207,28 @@ class SourceAvatar(QPushButton):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
         self._initials = "?"
+        self._fill: str | None = None
 
     def set_source(self, name: str, hint: str = "") -> None:
         """Show source *name*; *hint* (what a click does) under it in the
         tooltip."""
         self._initials = source_initials(name)
+        self._fill = None
         self.setToolTip(f"{name}\n{hint}" if name and hint else (name or hint))
         self.setAccessibleName(name or hint)
+        self.setAccessibleDescription(hint)
+        self.update()
+
+    def set_profile(self, name: str, fill: str, text: str, source: str = "",
+                    hint: str = "") -> None:
+        """Show the profile in use (two profiles or more): its initials or
+        emoji (*text*) on its colour (*fill*), the source it uses under its
+        name in the tooltip."""
+        self._initials = text
+        self._fill = fill
+        lines = [x for x in (name, source, hint) if x]
+        self.setToolTip("\n".join(lines))
+        self.setAccessibleName(name)
         self.setAccessibleDescription(hint)
         self.update()
 
@@ -222,7 +237,7 @@ class SourceAvatar(QPushButton):
 
     def colors(self) -> tuple[str, str]:
         """(fill, ink) as painted now."""
-        fill = P.get("accent", "#4C8DFF")
+        fill = self._fill or P.get("accent", "#4C8DFF")
         if self.isDown():
             fill = QColor(fill).darker(115).name()
         elif self.underMouse():

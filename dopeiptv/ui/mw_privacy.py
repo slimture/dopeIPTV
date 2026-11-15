@@ -150,7 +150,9 @@ class _PrivacyMixin:
         if c["positions"] and getattr(self, "resume", None) is not None:
             from ..services.resume import ResumeStore
             pl = self.playlist_store.active() if self.playlist_store else None
-            self.resume = ResumeStore(resume_settings, (pl or {}).get("id"))
+            own = getattr(self, "_own", None)
+            self.resume = ResumeStore(own(resume_settings) if own is not None else resume_settings,
+                                      (pl or {}).get("id"))
         # So do the channels' stream details, gone with the channels.
         if c["channels"] and hasattr(self, "_stream_info_forget"):
             self._stream_info_forget()

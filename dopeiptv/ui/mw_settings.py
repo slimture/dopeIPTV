@@ -334,10 +334,14 @@ class _SettingsMixin:
     # -- backup and restore (core/backup.py) ---------------------------------
 
     def _backup_stores(self) -> dict:
-        return {"main": self.settings,
-                "resume": getattr(self, "_resume_settings", None),
-                "follow": getattr(self, "_follow_settings", None),
-                "cache": getattr(self, "_cache_settings", None)}
+        """The four files as they are - every profile's own in them
+        (core/profiles.py), not only the profile's in use."""
+        from ..core.profiles import raw
+        out = {"main": self.settings,
+               "resume": getattr(self, "_resume_settings", None),
+               "follow": getattr(self, "_follow_settings", None),
+               "cache": getattr(self, "_cache_settings", None)}
+        return {k: (raw(v) if v is not None else None) for k, v in out.items()}
 
     @staticmethod
     def _backup_counts(counts: dict) -> str:
@@ -692,6 +696,9 @@ class _SettingsMixin:
         (card, row, name) when asked (the command palette), lit for a
         moment. *index_only* builds it for ``_settings_index`` and shows
         nothing."""
+        # A kids profile opens Settings with a grown-up's PIN (mw_profiles).
+        if not index_only and not self._kids_settings_unlock():
+            return
         d = QDialog(self)
         d.setWindowTitle(tr("settings_title"))
         d.setMinimumSize(860, 600)
@@ -768,6 +775,9 @@ class _SettingsMixin:
         # was lost at the top of Advanced.
         keys_page = page("shortcuts", tr("sc_title"),
                          tr("set_page_shortcuts_sub"), "keyboard")
+        # One per person in the household (mw_profiles): a service of its
+        # own, beside the parental lock its kids profiles follow.
+        prof_page = page("profiles", tr("profile_page"), tr("profile_page_sub"), "person")
         par = page("parental", tr("set_page_parental"),
                    tr("set_page_parental_sub"), "lock")
         adv = page("advanced", tr("set_page_advanced"),
@@ -800,6 +810,17 @@ class _SettingsMixin:
                             lambda: shell.show_page(target.key))
             card.shown_if(row, nerd_on)
             link_cards.append(card)
+
+        def own():
+            """"This profile's" before a profile's own setting, while the
+            household has two profiles or more (core/profiles.py)."""
+            if not self._profile_many():
+                return None
+            from .source_page import Origin
+            mark = Origin()
+            mark.set(tr("profile_own"), True)
+            mark.setToolTip(tr("profile_own_tip"))
+            return mark
 
         # -- General ----------------------------------------------------------
         from ..i18n import LANGUAGES, current_language
@@ -1079,15 +1100,27 @@ class _SettingsMixin:
              ("recent", tr("option_sort_recent"))],
             self.settings.value("sort_order", "default"))
         c = look.card(tr("set_card_theme"))
-        c.widget(themes, " ".join([tr("setting_theme")]
-                                  + [t.text() for t in themes.tiles]))
+        theme_mark = own()
+        if theme_mark is not None:
+            # The theme is the profile's own: said over its tiles.
+            holder = QWidget()
+            hv = QVBoxLayout(holder)
+            hv.setContentsMargins(0, 0, 0, 0)
+            hv.addWidget(theme_mark, 0, Qt.AlignmentFlag.AlignRight)
+            hv.addWidget(themes)
+            c.widget(holder, " ".join([tr("setting_theme")]
+                                      + [t.text() for t in themes.tiles]))
+        else:
+            c.widget(themes, " ".join([tr("setting_theme")]
+                                      + [t.text() for t in themes.tiles]))
         c.row(tr("setting_accent_color"), accents,
-              tr("misc_theme_applies_immediately"), stretch_control=True)
+              tr("misc_theme_applies_immediately"), stretch_control=True,
+              badge=own())
         follow_box = c.toggle(
             tr("setting_follow_system"),
             self.settings.value("theme_follow_system", "false") == "true",
-            tr("setting_follow_system_hint"))
-        light_row = c.row(tr("setting_light_theme"), light_box)
+            tr("setting_follow_system_hint"), badge=own())
+        light_row = c.row(tr("setting_light_theme"), light_box, badge=own())
         c.shown_if(light_row, follow_box.isChecked)
 
         def follow(on: bool) -> None:
@@ -1256,12 +1289,13 @@ class _SettingsMixin:
         slang_box = self._combo(LANGS, self.settings.value("sub_lang", ""))
         slang2_box = self._combo(LANGS, self.settings.value("sub_lang2", ""))
         c = subs_card = audio.card(tr("sec_audio_subs"))
-        c.row(tr("setting_audio_lang"), alang_box, tr("set_next_stream_note"))
-        c.row(tr("setting_subtitles"), sub_box)
+        c.row(tr("setting_audio_lang"), alang_box, tr("set_next_stream_note"),
+              badge=own())
+        c.row(tr("setting_subtitles"), sub_box, badge=own())
         subs_on = lambda: sub_box.currentData() != "off"  # noqa: E731
         c.shown_if(c.row(tr("setting_sub_lang"), slang_box,
-                         tr("setting_sub_lang_ttx_hint")), subs_on)
-        c.shown_if(c.row(tr("setting_sub_lang_fallback"), slang2_box),
+                         tr("setting_sub_lang_ttx_hint"), badge=own()), subs_on)
+        c.shown_if(c.row(tr("setting_sub_lang_fallback"), slang2_box, badge=own()),
                    subs_on)
         sub_box.currentIndexChanged.connect(lambda _i: subs_card.refresh())
         sub_size_box = self._combo(
@@ -1499,7 +1533,17 @@ class _SettingsMixin:
                 chips.append(Chip(tr(slabel), is_on(skey, "true")))
                 home_shelf_boxes[skey] = chips[-1]
             shelf_groups.append((heading, chips))
-        c.widget(ChipGroups(shelf_groups),
+        shelves_widget = ChipGroups(shelf_groups)
+        shelf_mark = own()
+        if shelf_mark is not None:
+            # Which shelves Home shows is the profile's own.
+            holder = QWidget()
+            hv = QVBoxLayout(holder)
+            hv.setContentsMargins(0, 0, 0, 0)
+            hv.addWidget(shelf_mark, 0, Qt.AlignmentFlag.AlignRight)
+            hv.addWidget(shelves_widget)
+            shelves_widget = holder
+        c.widget(shelves_widget,
                  " ".join(ch.text() for _h, chs in shelf_groups for ch in chs))
         c.note(tr("set_home_popular_note"))
         # Following a series: whether new episodes are announced (the shelf
@@ -1947,7 +1991,7 @@ class _SettingsMixin:
                           hbox(trakt_browser_btn, trakt_disconnect_btn,
                                stretch=False),
                           tr("trakt_connect_browser_hint"),
-                          search="trakt account sign in")
+                          search="trakt account sign in", badge=own())
         c.row(tr("set_trakt_lists"), trakt_watchlist_btn,
               tr("trakt_scrobble_hint"), search="trakt")
         # Simkl's card (mw_simkl): only in a build with its client id.
@@ -2069,6 +2113,10 @@ class _SettingsMixin:
         remove_pin_btn.clicked.connect(remove_pin)
         lock_now_btn.clicked.connect(lock_now)
         refresh_pin_status()
+
+        # -- Profiles ---------------------------------------------------------
+        from .profiles_ui import ProfilesPage
+        ProfilesPage(prof_page, self, d)
 
         # -- Keyboard shortcuts ---------------------------------------------
         # Every rebindable action and its key: recorded on a click, applied
@@ -2415,7 +2463,7 @@ class _SettingsMixin:
                                      "metadata"]),
             (tr("set_grp_accounts"), ["history", "sync", "integrations"]),
             (tr("set_sec_system"), ["general", "appearance", "shortcuts",
-                                    "parental", "advanced"]),
+                                    "profiles", "parental", "advanced"]),
             (tr("nerd_page"), ["nerd", *(p.key for p in nerd_pages.values())],
              nerd_tint),
         ])

@@ -99,7 +99,7 @@ def test_the_watched_sync_reads_every_account_signed_in(monkeypatch):
     w.watched = SimpleNamespace(
         replace=lambda m, s, mt, st: got.update(movies=sorted(set(m)), shows=s, titles=mt))
     w.watchlist = SimpleNamespace(replace=lambda m, s: got.update(wl=sorted(m)))
-    w._push_local_watched_to_trakt = lambda: got.setdefault("pushed", True)
+    w._push_local_watched_to_trakt = lambda mine=None: got.setdefault("pushed", True)
     def done():
         w._watched_sync_running = False
         got.setdefault("done", True)

@@ -18,6 +18,14 @@ computer, the supporter key, the sync code, logins of other services),
 playlists with their logins (off by default), and watch history with resume
 points (off by default).
 
+Profiles (core/profiles.py). Every profile's own syncs: the first profile's
+under the entries it always had (so a computer with an older app syncs on
+with it), each other one's under its id - a source's fingerprint as
+"<fp>@<profile>", a setting as "profiles/<profile>/<key>" - and the
+household's profiles themselves as "profile/<id>": the name, colour, emoji
+and level, never the PIN (each computer keeps its own). A profile is added
+or renamed by sync, never taken out.
+
 How it merges. Each upload is a whole snapshot. Everything in it is an entry
 with a time - a value, or a tombstone where something was removed - and two
 snapshots merge entry by entry, the later one winning (ties go the same way
@@ -51,6 +59,7 @@ from pathlib import Path
 from typing import Any
 
 from . import chacha20poly1305 as aead
+from . import profiles as _profiles
 from .log import log
 from .stores import FavoriteStore, HistoryStore
 
@@ -252,8 +261,18 @@ _DENY_PARTS = ("geometry", "splitter", "_dir", "path", "token", "password",
                "secret", "private")
 
 
+#: A household's profile in the settings category: "profile/<id>".
+PROFILE_ENTRY = "profile/"
+
+
 def syncable(key: str) -> bool:
     key = str(key)
+    if key.startswith(PROFILE_ENTRY):
+        return len(key) > len(PROFILE_ENTRY)
+    own = _profiles.split_key(key)
+    if own is not None:
+        # Another profile's own setting: as the first profile's would.
+        return _profiles.is_own(own[1]) and syncable(own[1])
     if key in SETTINGS_DENY or key.startswith(SETTINGS_DENY_PREFIX):
         return False
     if any(part in key.lower() for part in _DENY_PARTS):
@@ -289,6 +308,12 @@ _LOCAL_KINDS = ("local", "recording")
 _RESUME_GROUPS = ("vod:", "episode:")
 
 
+def tag(fp: str, profile: str = "") -> str:
+    """A source's fingerprint (or GLOBAL_FP) for *profile*: as it is for
+    the first profile, "<fp>@<profile>" for the others."""
+    return f"{fp}@{profile}" if profile else fp
+
+
 def source_fp(p: dict) -> str:
     """The same playlist on another computer, whatever its id there: its
     kind, address, user name and MAC."""
@@ -322,10 +347,47 @@ def _json(value: Any, empty: Any) -> Any:
 @dataclass
 class Context:
     """Where this computer keeps what syncs: the shared settings, the resume
-    positions' file, and the playlists (a PlaylistStore, or None)."""
+    positions' file, and the playlists (a PlaylistStore, or None). With
+    profiles, *settings* and *resume_settings* are the first profile's
+    (core/profiles.MAIN_ID); *others* the other profiles' (id, settings,
+    resume settings); *registry* the household's profiles."""
     settings: Any
     resume_settings: Any = None
     playlists: Any = None
+    others: list[tuple[str, Any, Any]] = field(default_factory=list)
+    registry: Any = None
+    #: (settings, resume settings) of a profile by its id: for one that a
+    #: round brings (its own arrive in the same round).
+    pin: Any = None
+
+    def refresh_others(self) -> None:
+        """The other profiles as the registry has them now."""
+        reg, pin = self.registry, self.pin
+        if reg is None or pin is None:
+            return
+        self.others = [(p.id, *pin(p.id)) for p in reg.profiles()
+                       if p.id != _profiles.MAIN_ID]
+
+    def views(self) -> list[tuple[str, Any, Any]]:
+        """(profile, settings, resume settings) of every profile; "" for
+        the first."""
+        return [("", self.settings, self.resume_settings)] + list(self.others)
+
+    def places(self) -> dict[str, tuple[str, Any, Any]]:
+        """Every source's fingerprint, and GLOBAL_FP, of every profile (as
+        tag() makes them) -> (playlist id or GLOBAL_FP, settings, resume
+        settings)."""
+        out: dict[str, tuple[str, Any, Any]] = {}
+        fps = self.fps()
+        for label, st, rs in self.views():
+            for fp, pid in fps.items():
+                out[tag(fp, label)] = (pid, st, rs)
+            out[tag(GLOBAL_FP, label)] = (GLOBAL_FP, st, rs)
+        return out
+
+    def profile_ids(self) -> set[str]:
+        reg = self.registry
+        return {p.id for p in reg.profiles()} if reg is not None else set()
 
     def sources(self) -> list[dict]:
         store = self.playlists
@@ -346,15 +408,28 @@ class Snapshot:
     value. *fps*: this computer's playlists by fingerprint."""
     values: dict[str, dict[str, Any]] = field(default_factory=dict)
     fps: dict[str, str] = field(default_factory=dict)
+    #: The profiles this computer has (their own settings are in domain).
+    profiles: set[str] = field(default_factory=set)
 
 
-def _collect_settings(settings: Any) -> dict[str, Any]:
+def _collect_settings(ctx: Context) -> dict[str, Any]:
     out: dict[str, Any] = {}
+    settings = ctx.settings
     for key in settings.allKeys():
         if syncable(key):
             value = _scalar(settings.value(key))
             if value is not None:
                 out[str(key)] = value
+    for label, view, _rs in ctx.others:
+        for key in view.allKeys():
+            if _profiles.is_own(key) and syncable(key):
+                value = _scalar(view.value(key))
+                if value is not None:
+                    out[f"{_profiles.ROOT}/{label}/{key}"] = value
+    reg = ctx.registry
+    for p in (reg.profiles() if reg is not None else []):
+        out[PROFILE_ENTRY + p.id] = _canon(
+            {"name": p.name, "colour": p.colour, "emoji": p.emoji, "kids": p.kids})
     return out
 
 
@@ -378,31 +453,34 @@ def _collect_store(out: dict[str, Any], settings: Any, fp: str, kind: str,
             out[_eid(fp, kind, "c", group)] = colour
 
 
-def _collect_favorites(settings: Any, fps: dict[str, str]) -> dict[str, Any]:
+def _collect_favorites(ctx: Context, fps: dict[str, str]) -> dict[str, Any]:
     out: dict[str, Any] = {}
-    for fp, pid in fps.items():
-        for kind, prefix, id_key in _FAV_KINDS:
-            _collect_store(out, settings, fp, kind, f"{prefix}_{pid}", id_key)
-    for kind, key, id_key in _GLOBAL_FAV_KINDS:
-        _collect_store(out, settings, GLOBAL_FP, kind, key, id_key)
+    for label, settings, _rs in ctx.views():
+        for fp, pid in fps.items():
+            for kind, prefix, id_key in _FAV_KINDS:
+                _collect_store(out, settings, tag(fp, label), kind, f"{prefix}_{pid}", id_key)
+        for kind, key, id_key in _GLOBAL_FAV_KINDS:
+            _collect_store(out, settings, tag(GLOBAL_FP, label), kind, key, id_key)
     return out
 
 
 def _collect_history(ctx: Context, fps: dict[str, str]) -> dict[str, Any]:
     out: dict[str, Any] = {}
-    for fp, pid in fps.items():
-        rows = _json(ctx.settings.value(f"history_{pid}"), [])
-        for e in rows:
-            if not isinstance(e, dict) or e.get("_kind") in _LOCAL_KINDS:
-                continue
-            if e.get("_key") in (None, "") or not e.get("_kind"):
-                continue
-            out[_eid(fp, "h", e["_kind"], e["_key"])] = e
-        if ctx.resume_settings is not None:
-            data = _json(ctx.resume_settings.value(f"resume_positions_{pid}"), {})
-            for rkey, v in data.items():
-                if str(rkey).startswith(_RESUME_GROUPS) and isinstance(v, dict):
-                    out[_eid(fp, "r", rkey)] = v
+    for label, settings, resume in ctx.views():
+        for fp, pid in fps.items():
+            at = tag(fp, label)
+            rows = _json(settings.value(f"history_{pid}"), [])
+            for e in rows:
+                if not isinstance(e, dict) or e.get("_kind") in _LOCAL_KINDS:
+                    continue
+                if e.get("_key") in (None, "") or not e.get("_kind"):
+                    continue
+                out[_eid(at, "h", e["_kind"], e["_key"])] = e
+            if resume is not None:
+                data = _json(resume.value(f"resume_positions_{pid}"), {})
+                for rkey, v in data.items():
+                    if str(rkey).startswith(_RESUME_GROUPS) and isinstance(v, dict):
+                        out[_eid(at, "r", rkey)] = v
     return out
 
 
@@ -418,11 +496,12 @@ def _collect_sources(ctx: Context) -> dict[str, Any]:
 def collect(ctx: Context, cats: tuple[str, ...] | list[str]) -> Snapshot:
     """What syncs of *cats*, read from the settings (the window's thread)."""
     fps = ctx.fps()
-    snap = Snapshot(fps=fps)
+    snap = Snapshot(fps={k: v[0] for k, v in ctx.places().items()},
+                    profiles=ctx.profile_ids())
     if "settings" in cats:
-        snap.values["settings"] = _collect_settings(ctx.settings)
+        snap.values["settings"] = _collect_settings(ctx)
     if "favorites" in cats:
-        snap.values["favorites"] = _collect_favorites(ctx.settings, fps)
+        snap.values["favorites"] = _collect_favorites(ctx, fps)
     if "history" in cats:
         snap.values["history"] = _collect_history(ctx, fps)
     if "sources" in cats and ctx.playlists is not None:
@@ -444,22 +523,31 @@ def digest(ctx: Context, cats: tuple[str, ...] | list[str]) -> str:
     if "settings" in cats:
         for key in sorted(k for k in st.allKeys() if syncable(k)):
             take(st, key)
+        for label, view, _rs in ctx.others:
+            h.update(label.encode("utf-8", "replace") + b"\2")
+            for key in sorted(k for k in view.allKeys()
+                              if _profiles.is_own(k) and syncable(k)):
+                take(view, key)
+        if ctx.registry is not None:
+            take(_profiles.raw(st), _profiles.K_LIST)
     pids = [str(p["id"]) for p in ctx.sources()]
     if "sources" in cats:
         take(st, "playlists")
-    if "favorites" in cats:
-        for _kind, key, _id in _GLOBAL_FAV_KINDS:
-            take(st, key)
-            take(st, f"{key}_colors")
-    for pid in pids:
+    for label, view, resume in ctx.views():
+        h.update(label.encode("utf-8", "replace") + b"\3")
         if "favorites" in cats:
-            for _kind, prefix, _id in _FAV_KINDS:
-                take(st, f"{prefix}_{pid}")
-                take(st, f"{prefix}_{pid}_colors")
-        if "history" in cats:
-            take(st, f"history_{pid}")
-            if ctx.resume_settings is not None:
-                take(ctx.resume_settings, f"resume_positions_{pid}")
+            for _kind, key, _id in _GLOBAL_FAV_KINDS:
+                take(view, key)
+                take(view, f"{key}_colors")
+        for pid in pids:
+            if "favorites" in cats:
+                for _kind, prefix, _id in _FAV_KINDS:
+                    take(view, f"{prefix}_{pid}")
+                    take(view, f"{prefix}_{pid}_colors")
+            if "history" in cats:
+                take(view, f"history_{pid}")
+                if resume is not None:
+                    take(resume, f"resume_positions_{pid}")
     return h.hexdigest()
 
 
@@ -488,6 +576,12 @@ def _in_domain(cat: str, ident: str, entry: dict, snap: Snapshot) -> bool:
     being this computer's (another one's playlist and what belongs to it, a
     setting this version does not sync)."""
     if cat == "settings":
+        if ident.startswith(PROFILE_ENTRY):
+            return False        # a profile is never taken out by sync
+        own = _profiles.split_key(ident)
+        if own is not None:
+            # Another profile's own: only one this computer has.
+            return own[0] in snap.profiles and syncable(ident)
         return syncable(ident)
     parts = _parts(ident)
     if cat == "favorites" and parts[:1] == [GLOBAL_FP]:
@@ -747,11 +841,35 @@ class Applied:
         return bool(self.settings or self.favorites or self.history or self.sources)
 
 
-def _apply_settings(settings: Any, new: dict[str, Any], old: dict[str, Any],
+def _apply_profiles(ctx: Context, new: dict[str, Any], old: dict[str, Any],
                     out: Applied) -> None:
-    for key in set(new) | set(old):
-        if not syncable(key):
+    """The household's profiles another computer has, merged in (added or
+    renamed, never taken out; the PIN stays this computer's)."""
+    reg = ctx.registry
+    if reg is None:
+        return
+    rows = []
+    for key, value in new.items():
+        if not key.startswith(PROFILE_ENTRY) or value == old.get(key):
             continue
+        got = _json(value, {})
+        if got:
+            rows.append(dict(got, id=key[len(PROFILE_ENTRY):]))
+    if rows and reg.merge_public(rows):
+        out.settings.add(_profiles.K_LIST)
+
+
+def _apply_settings(settings: Any, new: dict[str, Any], old: dict[str, Any],
+                    out: Applied, ctx: Context | None = None) -> None:
+    if ctx is not None:
+        _apply_profiles(ctx, new, old, out)
+    here = ctx.profile_ids() if ctx is not None else set()
+    for key in set(new) | set(old):
+        if not syncable(key) or key.startswith(PROFILE_ENTRY):
+            continue
+        own = _profiles.split_key(key)
+        if own is not None and own[0] not in here:
+            continue            # a profile this computer does not have
         value = new.get(key)
         if value == old.get(key):
             continue
@@ -778,19 +896,23 @@ def _row_key(place: dict[str, int], row: tuple[int, str, dict]) -> tuple[int, in
 
 
 def _apply_favorites(ctx: Context, entries: dict[str, dict], new: dict[str, Any],
-                     old: dict[str, Any], fps: dict[str, str], out: Applied) -> None:
+                     old: dict[str, Any], places: dict[str, tuple[str, Any, Any]],
+                     out: Applied) -> None:
     new_b, old_b = _by_bucket(new, 2), _by_bucket(old, 2)
     kinds = {k: (prefix, id_key) for k, prefix, id_key in _FAV_KINDS}
     global_kinds = {k: key for k, key, _id in _GLOBAL_FAV_KINDS}
     for bucket in set(new_b) | set(old_b):
         fp, kind = bucket
-        if fp == GLOBAL_FP:
+        where = places.get(fp)
+        if where is None:
+            continue            # another computer's source, or profile
+        found, settings, _rs = where
+        if found == GLOBAL_FP:
             if kind not in global_kinds:
                 continue
             pid, key = GLOBAL_FP, global_kinds[kind]
         else:
-            found = fps.get(fp)
-            if found is None or kind not in kinds:
+            if kind not in kinds:
                 continue
             pid, key = found, f"{kinds[kind][0]}_{found}"
         mine = new_b.get(bucket, {})
@@ -818,38 +940,40 @@ def _apply_favorites(ctx: Context, entries: dict[str, dict], new: dict[str, Any]
             place = {ident: i for i, ident in enumerate(orders.get(group, []))}
             rows.sort(key=functools.partial(_row_key, place))
             groups[group] = [r[2] for r in rows]
-        ctx.settings.setValue(key, json.dumps(groups))
+        settings.setValue(key, json.dumps(groups))
         if colours:
-            ctx.settings.setValue(f"{key}_colors", json.dumps(colours))
+            settings.setValue(f"{key}_colors", json.dumps(colours))
         else:
-            ctx.settings.remove(f"{key}_colors")
+            settings.remove(f"{key}_colors")
         out.favorites.add(pid)
 
 
 def _apply_history(ctx: Context, new: dict[str, Any], old: dict[str, Any],
-                   fps: dict[str, str], out: Applied) -> None:
+                   places: dict[str, tuple[str, Any, Any]], out: Applied) -> None:
     new_b, old_b = _by_bucket(new, 2), _by_bucket(old, 2)
     for bucket in set(new_b) | set(old_b):
         fp, sub = bucket
-        pid = fps.get(fp)
+        place = places.get(fp)
         mine = new_b.get(bucket, {})
-        if pid is None or _canon(mine) == _canon(old_b.get(bucket, {})):
+        if place is None or place[0] == GLOBAL_FP \
+                or _canon(mine) == _canon(old_b.get(bucket, {})):
             continue
+        pid, settings, resume = place
         if sub == "h":
-            here = [e for e in _json(ctx.settings.value(f"history_{pid}"), [])
+            here = [e for e in _json(settings.value(f"history_{pid}"), [])
                     if isinstance(e, dict) and e.get("_kind") in _LOCAL_KINDS]
             rows = here + [v for v in mine.values() if isinstance(v, dict)]
             rows.sort(key=lambda e: str(e.get("_watched_at") or ""), reverse=True)
-            ctx.settings.setValue(f"history_{pid}", json.dumps(rows[:MAX_HISTORY]))
-        elif sub == "r" and ctx.resume_settings is not None:
+            settings.setValue(f"history_{pid}", json.dumps(rows[:MAX_HISTORY]))
+        elif sub == "r" and resume is not None:
             key = f"resume_positions_{pid}"
-            data = {k: v for k, v in _json(ctx.resume_settings.value(key), {}).items()
+            data = {k: v for k, v in _json(resume.value(key), {}).items()
                     if not str(k).startswith(_RESUME_GROUPS)}
             for ident, v in mine.items():
                 parts = _parts(ident)
                 if len(parts) >= 3 and isinstance(v, dict):
                     data[parts[2]] = v
-            ctx.resume_settings.setValue(key, json.dumps(data))
+            resume.setValue(key, json.dumps(data))
         else:
             continue
         out.history.add(pid)
@@ -917,14 +1041,15 @@ def apply(ctx: Context, result: RoundResult, before: Snapshot, now_here: Snapsho
         new = live(result.merged, cat)
         old = before.values[cat]
         if cat == "settings":
-            _apply_settings(ctx.settings, new, old, out)
+            _apply_settings(ctx.settings, new, old, out, ctx)
+            ctx.refresh_others()            # a profile that came with it
         elif cat == "sources":
             _apply_sources(ctx, new, old, out)
         elif cat == "favorites":
             _apply_favorites(ctx, result.merged["c"].get(cat) or {}, new, old,
-                             ctx.fps(), out)
+                             ctx.places(), out)
         elif cat == "history":
-            _apply_history(ctx, new, old, ctx.fps(), out)
+            _apply_history(ctx, new, old, ctx.places(), out)
     return out, keep
 
 

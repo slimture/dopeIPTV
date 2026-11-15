@@ -59,6 +59,8 @@ class _EventsMixin:
             d.on_command = bridge.got.emit
             self._events_volume_now(publish=False)
             d.tv_mode = bool(getattr(self, "_tv_on", False))
+            if hasattr(self, "_events_profile"):
+                self._events_profile()
             self._events_favorites()
             d.configure(cfg)
             if self._events_rec is None:
@@ -97,6 +99,11 @@ class _EventsMixin:
                 self.handle_command({"number": int(text)} if text.isdigit() else {"channel": text})
             elif name in ("tv", "tv_key"):
                 self.tv_command(name, value)
+            elif name == "profile":
+                try:
+                    self._profile_switch_remote({"name": str(value)})
+                except ValueError:
+                    log.debug("events: no such profile, or one with a PIN - ignored")
         except Exception:
             log.debug("events: a command", exc_info=True)
 

@@ -190,10 +190,11 @@ class SettingsCard(QFrame):
                         Qt.AlignmentFlag.AlignVCenter)
         return self._add(w, f"{label} {hint} {search}")
 
-    def toggle(self, label: str, checked: bool, hint: str = "") -> ToggleSwitch:
+    def toggle(self, label: str, checked: bool, hint: str = "",
+               badge: QWidget | None = None) -> ToggleSwitch:
         sw = ToggleSwitch(checked)
         sw.setAccessibleName(label)
-        self.row(label, sw, hint)
+        self.row(label, sw, hint, badge=badge)
         return sw
 
     def widget(self, w: QWidget, search: str = "") -> QWidget:
@@ -1281,7 +1282,7 @@ def _own_icon(kind: str, s: int, colour: str) -> QPixmap | None:
     if kind not in ("palette", "play", "subtitles", "picture", "lock",
                     "wrench", "image", "trakt", "nerd", "network", "box",
                     "knobs", "channels", "remote", "cast", "sync", "plug",
-                    "pulse", "keyboard"):
+                    "pulse", "keyboard", "person"):
         return None
     scale = 3
     pm = QPixmap(s * scale, s * scale)
@@ -1341,6 +1342,12 @@ def _own_icon(kind: str, s: int, colour: str) -> QPixmap | None:
         hill.lineTo(f * 0.84, f * 0.74)
         pr.drawPath(hill)
         pr.drawEllipse(QPointF(f * 0.66, f * 0.34), f * 0.06, f * 0.06)
+    elif kind == "person":                  # a head and shoulders
+        pr.drawEllipse(QRectF(f * 0.34, f * 0.12, f * 0.32, f * 0.32))
+        body = QPainterPath()
+        body.moveTo(f * 0.16, f * 0.88)
+        body.cubicTo(f * 0.18, f * 0.58, f * 0.82, f * 0.58, f * 0.84, f * 0.88)
+        pr.drawPath(body)
     elif kind == "lock":
         pr.drawRoundedRect(QRectF(f * 0.2, f * 0.44, f * 0.6, f * 0.44),
                            f * 0.08, f * 0.08)
