@@ -95,6 +95,40 @@ def test_lirc_reader_reads_a_fake_lircd():
         srv.close()
 
 
+def test_a_halted_reader_hands_on_no_key():
+    """TV mode left and on again at once: the old reader, still in its read,
+    says nothing of a key the new one hears too (lircd sends every client
+    each key) - one press, one action."""
+    d = tempfile.mkdtemp()
+    path = os.path.join(d, "lircd")
+    srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    srv.bind(path)
+    srv.listen(1)
+    got: list[str] = []
+    conns: list[socket.socket] = []
+
+    def serve() -> None:
+        conn, _ = srv.accept()
+        conns.append(conn)
+
+    threading.Thread(target=serve, daemon=True).start()
+    reader = ti.LircReader(got.append, path)
+    reader.start()
+    try:
+        assert _until(lambda: bool(conns))
+        conns[0].sendall(b"0000000000f40bf0 00 KEY_UP devinput\n")
+        assert _until(lambda: got == ["up"]), got
+        reader.halt()
+        conns[0].sendall(b"0000000000f40bf0 00 KEY_DOWN devinput\n")
+        time.sleep(0.8)
+        assert got == ["up"]
+    finally:
+        reader.halt()
+        for c in conns:
+            c.close()
+        srv.close()
+
+
 # -- game controllers ------------------------------------------------------------------
 
 def test_evdev_buttons_hat_and_stick():

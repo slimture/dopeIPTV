@@ -335,6 +335,11 @@ class _Reader(threading.Thread):
 
     def _send(self, actions: list[str]) -> None:
         for a in actions:
+            if self._halt.is_set():
+                # Halted while still reading (up to half a second): TV mode
+                # left and on again has a new reader, and lircd and evdev
+                # hand every client the same key - it would act twice.
+                return
             try:
                 self._emit(a)
             except Exception as e:
