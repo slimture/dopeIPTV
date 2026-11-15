@@ -2195,8 +2195,6 @@
   "airplay_unreachable": "Apple TV haijafikia Mac hii. Ikiwa macOS iliuliza kama dopeIPTV inaweza kupokea miunganisho inayoingia, iruhusu (System Settings → Network → Firewall → Options), na hakikisha Apple TV iko kwenye mtandao uleule.",
   "airplay_button": "Chagua Apple TV",
   "airplay_note": "Bonyeza \"Tuma\": dirisha dogo la AirPlay litafunguka. Bofya kitufe cha AirPlay ndani yake kisha chagua Apple TV yako.",
-  "airplay_pick": "Chagua Apple TV yako kwenye menyu ya AirPlay — kitufe cha AirPlay hapa kinaifungua.",
-  "airplay_on_tv": "Inacheza kwenye Apple TV. Kitufe cha AirPlay hapa kinaihamishia nyingine.",
   "airplay_cpu": "Picha inabadilishwa kwenye Mac hii kwa ajili ya Apple TV, jambo linaloshughulisha prosesa wakati inacheza.",
   "airplay_menu_note": "Apple TV inacheza picha na sauti ya mtiririko wenyewe — inachaguliwa kwa kitufe cha AirPlay kwenye dirisha la AirPlay.",
   "conn_k_cast": "kutuma kwa TV",

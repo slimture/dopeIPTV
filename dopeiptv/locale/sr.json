@@ -2195,8 +2195,6 @@
   "airplay_unreachable": "Apple TV nije stigao do ovog Maca. Ako je macOS pitao da li dopeIPTV sme da prima dolazne veze, dozvoli to (Podešavanja sistema → Mreža → Zaštitni zid → Opcije) i proveri da li je Apple TV na istoj mreži.",
   "airplay_button": "Izaberi Apple TV",
   "airplay_note": "Pritisni „Prebaci”: otvara se mali AirPlay prozor. Klikni u njemu na AirPlay dugme i izaberi svoj Apple TV.",
-  "airplay_pick": "Izaberi svoj Apple TV u AirPlay meniju — AirPlay dugme ovde ga otvara.",
-  "airplay_on_tv": "Pušta se na Apple TV-u. AirPlay dugme ovde ga prebacuje na drugi.",
   "airplay_cpu": "Slika se na ovom Macu pretvara za Apple TV, što opterećuje procesor dok se pušta.",
   "airplay_menu_note": "Apple TV pušta sliku i zvuk samog strima — bira se AirPlay dugmetom u AirPlay prozoru.",
   "conn_k_cast": "prebacivanje na TV",

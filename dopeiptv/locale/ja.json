@@ -2195,8 +2195,6 @@
   "airplay_unreachable": "Apple TV がこの Mac に接続できていません。dopeIPTV への着信接続を許可するか macOS に尋ねられた場合は許可し（システム設定 → ネットワーク → ファイアウォール → オプション）、Apple TV が同じネットワークにあるか確認してください。",
   "airplay_button": "Apple TV を選択",
   "airplay_note": "「キャスト」を押すと小さな AirPlay ウインドウが開きます。その中の AirPlay ボタンをクリックして Apple TV を選んでください。",
-  "airplay_pick": "AirPlay メニューで Apple TV を選んでください — ここの AirPlay ボタンで開きます。",
-  "airplay_on_tv": "Apple TV で再生中です。ここの AirPlay ボタンで別の Apple TV に切り替えられます。",
   "airplay_cpu": "映像はこの Mac で Apple TV 用に変換されるため、再生中はプロセッサに負荷がかかります。",
   "airplay_menu_note": "Apple TV ではストリーム本来の映像と音声が再生されます — Apple TV は AirPlay ウインドウの AirPlay ボタンで選びます。",
   "conn_k_cast": "テレビへのキャスト",

@@ -2195,8 +2195,6 @@
   "airplay_unreachable": "Apple TV bu Mac'e ulaşamadı. macOS, dopeIPTV'nin gelen bağlantıları kabul edip edemeyeceğini sorduysa izin verin (Sistem Ayarları → Ağ → Güvenlik Duvarı → Seçenekler) ve Apple TV'nin aynı ağda olduğunu kontrol edin.",
   "airplay_button": "Apple TV seç",
   "airplay_note": "\"Yayınla\"ya basın: küçük bir AirPlay penceresi açılır. Oradaki AirPlay düğmesine tıklayın ve Apple TV'nizi seçin.",
-  "airplay_pick": "AirPlay menüsünden Apple TV'nizi seçin — buradaki AirPlay düğmesi menüyü açar.",
-  "airplay_on_tv": "Apple TV'de oynatılıyor. Buradaki AirPlay düğmesi başka birine taşır.",
   "airplay_cpu": "Görüntü Apple TV için bu Mac'te dönüştürülüyor; oynatma süresince işlemciyi meşgul eder.",
   "airplay_menu_note": "Apple TV yayının kendi görüntüsünü ve sesini oynatır — AirPlay penceresindeki AirPlay düğmesiyle seçilir.",
   "conn_k_cast": "TV'ye yayın",

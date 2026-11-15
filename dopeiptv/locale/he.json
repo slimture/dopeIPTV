@@ -2195,8 +2195,6 @@
   "airplay_unreachable": "‏ה-Apple TV לא הגיע ל-Mac הזה. אם macOS שאל אם dopeIPTV רשאי לקבל חיבורים נכנסים, אשרו זאת (הגדרות המערכת ← רשת ← חומת אש ← אפשרויות), ובדקו שה-Apple TV נמצא באותה רשת.",
   "airplay_button": "‏בחירת Apple TV",
   "airplay_note": "‏לחצו על „העבר”: ייפתח חלון AirPlay קטן. לחצו בו על כפתור ה-AirPlay ובחרו את ה-Apple TV שלכם.",
-  "airplay_pick": "‏בחרו את ה-Apple TV שלכם בתפריט AirPlay — כפתור ה-AirPlay כאן פותח אותו.",
-  "airplay_on_tv": "‏מתנגן ב-Apple TV. כפתור ה-AirPlay כאן מעביר אותו למכשיר אחר.",
   "airplay_cpu": "‏התמונה מומרת ב-Mac הזה עבור ה-Apple TV, וזה מעסיק את המעבד כל עוד היא מתנגנת.",
   "airplay_menu_note": "‏ה-Apple TV מנגן את התמונה והקול של השידור עצמו — הוא נבחר בכפתור ה-AirPlay בחלון AirPlay.",
   "conn_k_cast": "העברה לטלוויזיה",

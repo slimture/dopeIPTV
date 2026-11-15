@@ -2476,8 +2476,6 @@ _STRINGS: dict[str, dict[str, str]] = {
     "airplay_unreachable": {"en": "The Apple TV has not reached this Mac. If macOS asked whether dopeIPTV may accept incoming connections, allow it (System Settings → Network → Firewall → Options), and check that the Apple TV is on the same network."},
     "airplay_button": {"en": "Choose an Apple TV"},
     "airplay_note": {"en": "Press Cast: a small AirPlay window opens. Click the AirPlay button in it and choose your Apple TV."},
-    "airplay_pick": {"en": "Choose your Apple TV in the AirPlay menu — the AirPlay button here opens it."},
-    "airplay_on_tv": {"en": "Playing on the Apple TV. The AirPlay button here moves it to another one."},
     "airplay_cpu": {"en": "The picture is converted on this Mac for the Apple TV, which keeps the processor busy while it plays."},
     "set_grp_watch": {"en": "Watch"},
     "set_grp_content": {"en": "Content"},

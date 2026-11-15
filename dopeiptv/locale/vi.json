@@ -2195,8 +2195,6 @@
   "airplay_unreachable": "Apple TV chưa kết nối được tới máy Mac này. Nếu macOS hỏi có cho dopeIPTV nhận kết nối đến không, hãy cho phép (Cài đặt hệ thống → Mạng → Tường lửa → Tùy chọn), và kiểm tra Apple TV có cùng mạng không.",
   "airplay_button": "Chọn Apple TV",
   "airplay_note": "Nhấn “Truyền”: một cửa sổ AirPlay nhỏ sẽ mở ra. Bấm nút AirPlay trong đó rồi chọn Apple TV của bạn.",
-  "airplay_pick": "Chọn Apple TV của bạn trong menu AirPlay — nút AirPlay ở đây sẽ mở menu.",
-  "airplay_on_tv": "Đang phát trên Apple TV. Nút AirPlay ở đây chuyển sang thiết bị khác.",
   "airplay_cpu": "Hình ảnh được chuyển đổi trên máy Mac này cho Apple TV, khiến bộ xử lý bận trong suốt lúc phát.",
   "airplay_menu_note": "Apple TV phát hình ảnh và âm thanh gốc của luồng — chọn thiết bị bằng nút AirPlay trong cửa sổ AirPlay.",
   "conn_k_cast": "truyền tới TV",

@@ -2195,8 +2195,6 @@
   "airplay_unreachable": "Apple TV belum menjangkau Mac ini. Jika macOS menanyakan apakah dopeIPTV boleh menerima koneksi masuk, izinkan (Pengaturan Sistem → Jaringan → Firewall → Pilihan), dan pastikan Apple TV ada di jaringan yang sama.",
   "airplay_button": "Pilih Apple TV",
   "airplay_note": "Tekan \"Kirim\": jendela AirPlay kecil akan terbuka. Klik tombol AirPlay di dalamnya, lalu pilih Apple TV Anda.",
-  "airplay_pick": "Pilih Apple TV Anda di menu AirPlay — tombol AirPlay di sini membukanya.",
-  "airplay_on_tv": "Diputar di Apple TV. Tombol AirPlay di sini memindahkannya ke yang lain.",
   "airplay_cpu": "Gambar dikonversi di Mac ini untuk Apple TV, yang membuat prosesor sibuk selama diputar.",
   "airplay_menu_note": "Apple TV memutar gambar dan suara siaran apa adanya — dipilih dengan tombol AirPlay di jendela AirPlay.",
   "conn_k_cast": "pengiriman ke TV",
