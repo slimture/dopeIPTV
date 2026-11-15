@@ -137,7 +137,9 @@ avatar.click()
 pump()
 assert menus, "no menu"
 acts = [(a.text(), a.isChecked()) for a in menus[-1].actions()]
-assert acts == [("Min IPTV", True), ("Familjen", False)], acts
+# The sources, then the active one's own page in Settings.
+assert acts == [("Min IPTV", True), ("Familjen", False), ("", False),
+                (tr("src_settings_menu"), False)], acts
 
 # -- another source, a new name, a new theme: the avatar follows ------------------
 store.set_active(family["id"])
