@@ -49,7 +49,7 @@ PRESET = {
     "view_density": "large", "epg_upcoming_count": "7",
     "sort_order": "alpha_desc", "check_updates": "false",
     "rec_max_value": "2.5", "rec_max_unit": "TB", "rec_total_value": "100.0",
-    "rec_total_unit": "TB", "cast_pause_gb": "9.0",
+    "rec_total_unit": "TB", "cast_pause_gb": "9.0", "cast_keep_buffer": "false",
     "metadata_source": "playlist", "tmdb_api_key": "abc123",
     "mv_frameless": "false", "mv_on_top": "true", "mv_remember_geo": "false",
     "mv_stop_docked": "false", "mv_new_unmuted": "false",
