@@ -2663,5 +2663,7 @@
   "cast_addr_no_chromecast": "Ovo je Chromecast, ali za emitovanje treba paket pychromecast, koji ovde nedostaje.",
   "set_card_cast_added": "Uređaji dodati po adresi",
   "set_cast_added_none": "Još nijedan. Chromecast, televizor ili Kodi koji pretraga ne pronalazi dodaje se u prozoru za emitovanje, pomoću „Dodaj uređaj po adresi…”.",
-  "set_link_cast_net": "Jedno Nerd podešavanje za uređaje na drugim mrežama"
+  "set_link_cast_net": "Jedno Nerd podešavanje za uređaje na drugim mrežama",
+  "phone_tv_picture": "Prikaži na TV-u",
+  "phone_tv_now_playing": "Upravo se reprodukuje"
 }

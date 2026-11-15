@@ -2663,5 +2663,7 @@
   "cast_addr_no_chromecast": "Det här är en Chromecast, men för att casta till den behövs paketet pychromecast, som saknas här.",
   "set_card_cast_added": "Enheter tillagda med adress",
   "set_cast_added_none": "Inga än. En Chromecast, en tv eller en Kodi som sökningen inte hittar lägger du till i castfönstret, med ”Lägg till en enhet med adress…”.",
-  "set_link_cast_net": "En Nerd-inställning för enheter på andra nätverk"
+  "set_link_cast_net": "En Nerd-inställning för enheter på andra nätverk",
+  "phone_tv_picture": "Visa på TV:n",
+  "phone_tv_now_playing": "Spelas nu"
 }

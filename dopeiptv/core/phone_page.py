@@ -16,7 +16,9 @@ channel and volume rockers, mute and number keys that fold out - each a
 TV key (api/tv_key). Or a touchpad (the page remembers the choice): a
 swipe is an arrow, a tap OK, a long press Back - the app reads the
 gesture (core/phone_remote.gesture), the page only says where the finger
-went and for how long.
+went and for how long. While something plays there, the whole Now playing
+card is a button - a pill at its trailing edge says what it does - that
+brings the picture back on the TV (api/tv_key "picture").
 
 Styled as the app is - flat surfaces, hairlines, the accent colour - in the
 app's dark palette, or its light one when the phone asks for light. The
@@ -45,7 +47,7 @@ WORDS = ("channels", "favorites", "search", "nothing", "next", "paused", "offlin
          "loading", "tv_mode", "tv_switch", "ok", "up", "down", "left", "right", "back", "options",
          "vol_up", "vol_down", "digits", "touchpad", "touch_hint",
          "key_red", "key_green", "key_yellow", "key_blue",
-         "profile", "profile_pin")
+         "profile", "profile_pin", "tv_picture", "tv_now_playing")
 _HEX = re.compile(r"#[0-9A-Fa-f]{6}")
 
 
@@ -158,12 +160,14 @@ _HTML = """<!doctype html>
   <section class="now" id="now" aria-live="polite">
     <div class="logo" id="nowLogo"><span id="nowInitials"></span><img id="nowImg" alt="" hidden></div>
     <div class="nowText">
+      <div class="nowLabel" id="nowLabel" hidden></div>
       <div class="nowTitle" id="nowTitle"></div>
       <div class="nowProg"><span class="chip" id="nowPaused" hidden></span><span id="nowProg"></span></div>
       <div class="bar" id="nowBarWrap" hidden><i id="nowBar"></i></div>
       <div class="nowTimes" id="nowTimes"><span id="nowStart"></span><span id="nowEnd"></span></div>
       <div class="next" id="nowNext"></div>
     </div>
+    <span class="nowPill" id="nowPill" aria-hidden="true" hidden><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="12.5" rx="2"/><path d="M8.5 20.5h7"/><path class="fill" d="M10.2 8.2v4.6l4-2.3z"/></svg><span id="nowPillText"></span></span>
   </section>
   <div id="browse">
   <div class="sticky">
@@ -298,6 +302,19 @@ svg .fill{fill:currentColor;stroke:none}
 .nowTimes{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-top:4px;
   font-variant-numeric:tabular-nums}
 .next{color:var(--muted);font-size:13px;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.now.act{flex-wrap:wrap;row-gap:12px;min-height:48px;cursor:pointer;user-select:none;-webkit-user-select:none;
+  touch-action:manipulation}
+.now.act .nowText{flex:1 1 180px}
+.now.act:active{background:var(--hover)}
+.now.act:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.nowLabel{color:var(--text2);font-size:12px;font-weight:700;letter-spacing:.2px;margin-bottom:1px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nowPill{flex:none;max-width:100%;margin-inline-start:auto;align-self:center;display:flex;align-items:center;gap:7px;
+  height:40px;padding:0 16px 0 13px;border-radius:999px;background:var(--accent);color:var(--on-accent);
+  font-size:14px;font-weight:700;white-space:nowrap}
+.nowPill span{overflow:hidden;text-overflow:ellipsis}
+.nowPill svg{width:20px;height:20px;flex:none}
+.now.act:active .nowPill{filter:brightness(1.1)}
 .sticky{position:sticky;top:0;z-index:2;background:var(--bg);padding:12px 0 8px}
 .tabs{display:flex;gap:6px;background:var(--pane);border-radius:var(--radius);padding:4px}
 .tab{flex:1;min-height:40px;border-radius:9px;color:var(--muted);font-weight:600}
@@ -317,8 +334,10 @@ svg .fill{fill:currentColor;stroke:none}
 .row.pending{opacity:.6}
 .num{flex:0 0 34px;color:var(--muted);font-size:13px;text-align:end;font-variant-numeric:tabular-nums}
 .lg{flex:0 0 40px;height:40px;border-radius:8px;background:var(--btn);display:flex;align-items:center;justify-content:center;
-  overflow:hidden;color:var(--text2);font-weight:700;font-size:13px}
-.lg img{width:100%;height:100%;object-fit:contain;padding:4px}
+  overflow:hidden;color:var(--text2);font-weight:700;font-size:13px;position:relative}
+.lg img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:4px;opacity:0}
+.lg.pic img{opacity:1}
+.lg.pic span{visibility:hidden}
 .lg.long{font-size:11px;letter-spacing:-.2px}
 .logo.long{font-size:15px}
 .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -518,6 +537,7 @@ function show(s) {
   $("nowInitials").textContent = stopped ? "" : initials(title);
   $("nowLogo").classList.toggle("long", $("nowInitials").textContent.length > 3);
   hide($("nowInitials"), !img.hasAttribute("hidden"));
+  nowCard();
   tick();
   if (Date.now() > volUntil) setVol(s.volume || 0);
   hide($("icoVol"), s.muted); hide($("icoMute"), !s.muted);
@@ -601,12 +621,18 @@ function row(c) {
   b.className = "row" + (String(c.id) === playingId ? " playing" : "");
   b.dataset.id = String(c.id);
   const num = document.createElement("span"); num.className = "num"; num.textContent = c.number != null ? c.number : "";
-  const lg = document.createElement("span"); lg.textContent = initials(c.name);
-  lg.className = lg.textContent.length > 3 ? "lg long" : "lg";
+  const lg = document.createElement("span"), ini = document.createElement("span");
+  ini.textContent = initials(c.name);
+  lg.className = ini.textContent.length > 3 ? "lg long" : "lg";
+  lg.append(ini);
   if (c.logo) {
+    // In the row from the start (unseen until it loads), so the browser asks
+    // for it only as the row nears the screen; none to be had: the initials.
     const img = new Image(); img.alt = ""; img.loading = "lazy"; img.decoding = "async";
-    img.addEventListener("load", () => { lg.textContent = ""; lg.appendChild(img); });
+    img.addEventListener("load", () => lg.classList.add("pic"));
+    img.addEventListener("error", () => img.remove());
     img.src = "logo/" + encodeURIComponent(String(c.id));
+    lg.append(img);
   }
   const name = document.createElement("span"); name.className = "name"; name.textContent = c.name;
   b.append(num, lg, name);
@@ -644,6 +670,20 @@ function setTab(t) {
 
 function label(id, text) { const b = $(id); b.setAttribute("aria-label", text); b.title = text; }
 
+// TV mode on and something playing: the whole Now playing card is a button
+// that brings the picture back on the TV. Else the card as it always is.
+function nowCard() {
+  const n = $("now"), on = !!tvOn && !!st.state && st.state !== "stopped";
+  n.classList.toggle("act", on);
+  hide($("nowLabel"), !on); hide($("nowPill"), !on);
+  if (!on) { for (const a of ["role", "tabindex", "aria-label"]) n.removeAttribute(a); return; }
+  const what = [$("nowTitle").textContent, $("nowProg").textContent].filter(Boolean).join(" · ");
+  n.setAttribute("role", "button"); n.setAttribute("tabindex", "0");
+  n.setAttribute("aria-label", W.tv_picture + (what ? ": " + what : ""));
+}
+
+function nowPressed() { if ($("now").classList.contains("act")) send("api/tv_key", {action: "picture"}); }
+
 // TV mode on: the page is a remote; off: the lists and the dock again.
 function setTv(on) {
   on = !!on;
@@ -652,6 +692,7 @@ function setTv(on) {
   hide($("browse"), on); hide($("tvr"), !on); hide($("dock"), on);
   document.body.classList.toggle("tv", on);
   $("tvBtn").setAttribute("aria-pressed", String(on));
+  nowCard();
   if (on) window.scrollTo({top: 0});
 }
 
@@ -695,6 +736,11 @@ function initTv() {
   $("kOk").textContent = W.ok; $("kBackText").textContent = W.back; $("kMenuText").textContent = W.options;
   $("padModeText").textContent = W.touchpad; $("digitsText").textContent = W.digits;
   $("touchHint").textContent = W.touch_hint;
+  $("nowLabel").textContent = W.tv_now_playing; $("nowPillText").textContent = W.tv_picture;
+  $("now").addEventListener("click", nowPressed);
+  $("now").addEventListener("keydown", (e) => {
+    if ((e.key === "Enter" || e.key === " ") && $("now").classList.contains("act")) { e.preventDefault(); nowPressed(); }
+  });
   for (const c of ["red", "green", "yellow", "blue"]) $("k_" + c).lastElementChild.textContent = W["key_" + c];
   $("tvr").addEventListener("click", (e) => {
     const b = e.target.closest("[data-a]");

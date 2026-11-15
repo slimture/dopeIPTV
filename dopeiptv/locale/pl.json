@@ -2663,5 +2663,7 @@
   "cast_addr_no_chromecast": "To Chromecast, ale przesyłanie na niego wymaga pakietu pychromecast, którego tu brakuje.",
   "set_card_cast_added": "Urządzenia dodane po adresie",
   "set_cast_added_none": "Jeszcze żadnych. Chromecasta, telewizor lub Kodi, których wyszukiwanie nie znajduje, dodaje się w oknie przesyłania przez „Dodaj urządzenie po adresie…”.",
-  "set_link_cast_net": "Ustawienie Nerd dla urządzeń w innych sieciach"
+  "set_link_cast_net": "Ustawienie Nerd dla urządzeń w innych sieciach",
+  "phone_tv_picture": "Pokaż na TV",
+  "phone_tv_now_playing": "Teraz odtwarzane"
 }

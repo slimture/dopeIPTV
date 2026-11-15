@@ -2663,5 +2663,7 @@
   "cast_addr_no_chromecast": "Це Chromecast, але для трансляції потрібен пакет pychromecast, якого тут немає.",
   "set_card_cast_added": "Пристрої, додані за адресою",
   "set_cast_added_none": "Поки немає. Chromecast, телевізор або Kodi, яких пошук не знаходить, додаються у вікні трансляції: «Додати пристрій за адресою…».",
-  "set_link_cast_net": "Налаштування Nerd для пристроїв в інших мережах"
+  "set_link_cast_net": "Налаштування Nerd для пристроїв в інших мережах",
+  "phone_tv_picture": "Показати на ТБ",
+  "phone_tv_now_playing": "Зараз відтворюється"
 }

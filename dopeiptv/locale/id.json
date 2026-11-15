@@ -2663,5 +2663,7 @@
   "cast_addr_no_chromecast": "Ini Chromecast, tetapi cast ke sana perlu paket pychromecast, yang tidak ada di sini.",
   "set_card_cast_added": "Perangkat yang ditambahkan lewat alamat",
   "set_cast_added_none": "Belum ada. Chromecast, TV, atau Kodi yang tidak ditemukan pencarian ditambahkan di jendela cast, dengan “Tambahkan perangkat lewat alamat…”.",
-  "set_link_cast_net": "Satu pengaturan Nerd untuk perangkat di jaringan lain"
+  "set_link_cast_net": "Satu pengaturan Nerd untuk perangkat di jaringan lain",
+  "phone_tv_picture": "Tampilkan di TV",
+  "phone_tv_now_playing": "Sedang diputar"
 }

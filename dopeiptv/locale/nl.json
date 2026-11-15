@@ -2663,5 +2663,7 @@
   "cast_addr_no_chromecast": "Dit is een Chromecast, maar casten ernaar vraagt het pakket pychromecast, dat hier ontbreekt.",
   "set_card_cast_added": "Via adres toegevoegde apparaten",
   "set_cast_added_none": "Nog geen. Een Chromecast, tv of Kodi die het zoeken niet vindt, voeg je toe in het castvenster, met ‘Apparaat toevoegen via adres…’.",
-  "set_link_cast_net": "Een Nerd-instelling voor apparaten op andere netwerken"
+  "set_link_cast_net": "Een Nerd-instelling voor apparaten op andere netwerken",
+  "phone_tv_picture": "Toon op tv",
+  "phone_tv_now_playing": "Speelt nu"
 }

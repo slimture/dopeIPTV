@@ -9,8 +9,10 @@ VPN guard, the connection count and the rest apply as everywhere), and
 whatever starts a stream meanwhile - a screen here, the phone remote, a
 command - brings the picture up full screen (the docked player's
 fullscreen), with a big info bar on any key and channel up/down zapping.
-Back leaves the picture (the stream stops); the guide, a search or the
-options open over it without stopping it, and Back returns to it.
+Back over the picture goes back to the screen it came from (a number being
+typed and the info bar go first), and so do the guide, search and options
+keys to theirs: the stream goes on behind the page, Now playing above its
+tabs, and Back, Play or OK on Now playing return to it. Stop stops it.
 
 Keys come to one event filter while TV mode is on: every key without
 Ctrl, Alt or Meta is TV mode's (a remote that acts as a keyboard, a CEC
@@ -423,6 +425,11 @@ class _TvMixin:
         if action in ("play", "play_pause") and self._tv_has_picture():
             self._tv_picture()
             return
+        if action == "picture":
+            # The phone's Now playing: the picture again, when there is one.
+            if self._tv_has_picture():
+                self._tv_picture()
+            return
         if action == "stop" and self._tv_has_picture():
             self.player.stop_btn.click()
             return
@@ -453,7 +460,21 @@ class _TvMixin:
             if self._tv_info is not None and self._tv_info.isVisible() and action == "ok":
                 self._tv_hide_info()
                 return
-        elif action in ("back", "stop"):
+        elif action == "back":
+            # Back is back, one step at a time: a number being typed, the
+            # info bar, then the screen the picture came from - the stream
+            # goes on behind it (Stop stops it).
+            if self._chan_buffer:
+                self._chan_timer.stop()
+                self._chan_buffer = ""
+                self._chan_entry_show("", 0)
+            elif self._tv_info is not None and not sip.isdeleted(self._tv_info) \
+                    and self._tv_info.isVisible():
+                self._tv_hide_info()
+            else:
+                self._tv_browse()
+            return
+        elif action == "stop":
             self._tv_stop()
             return
         elif action in ("menu", "blue"):
@@ -567,7 +588,8 @@ class _TvMixin:
         page.refresh_now()
 
     def _tv_stop(self) -> None:
-        """Back from the picture: the stream stops, the page comes back."""
+        """Stop over the picture (or a film's end): the stream stops, the
+        page comes back."""
         p = self.player
         if p is not None and p.current_url is not None:
             # The Stop button's own way: recordings in the player, the wake

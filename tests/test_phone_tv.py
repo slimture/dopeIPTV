@@ -146,11 +146,97 @@ def test_the_page_has_a_remote_for_tv_mode_and_its_policy_still_allows_only_it()
     assert ".pad,.colours,.deck,.digits{direction:ltr}" in style
 
 
+def test_the_now_card_is_the_way_back_to_the_picture_only_in_tv_mode_while_something_plays():
+    html, _csp = _page()
+    script = re.search(r"<script>(.*)</script>", html, re.S).group(1)
+    style = re.search(r"<style>(.*)</style>", html, re.S).group(1)
+    card = re.search(r'(<section class="now" id="now"[^>]*>)(.*?)</section>', html, re.S)
+    # As it always was until TV mode is on and something plays: no button,
+    # no label, no pill.
+    assert "role=" not in card.group(1) and "tabindex" not in card.group(1)
+    assert 'id="nowLabel" hidden' in card.group(2)
+    assert 'id="nowPill" aria-hidden="true" hidden' in card.group(2)
+    # Then the whole card: a button (Enter and Space too) that asks for the picture.
+    fn = script[script.index("function nowCard()"):script.index("function nowPressed()")]
+    assert "!!tvOn" in fn and '!== "stopped"' in fn
+    assert 'setAttribute("role", "button")' in fn and 'setAttribute("tabindex", "0")' in fn
+    assert "W.tv_picture" in fn and 'removeAttribute(a)' in fn
+    assert 'send("api/tv_key", {action: "picture"})' in script
+    assert 'e.key === "Enter" || e.key === " "' in script
+    assert "nowCard();" in script[script.index("function setTv("):script.index("function setTouch(")]
+    # Filled, the page's own colours, a big enough target, pressed and focused states.
+    assert ".now.act{" in style and "min-height:48px" in style.split(".now.act{")[1].split("}")[0]
+    pill = style.split(".nowPill{")[1].split("}")[0]
+    assert "background:var(--accent)" in pill and "color:var(--on-accent)" in pill
+    assert ".now.act:active{" in style and ".now.act:focus-visible{" in style
+    assert not re.search(r"#[0-9a-fA-F]{3,6}\b", style.split(".now.act{")[1].split(".sticky{")[0])
+    # The pill wraps under the text on a narrow phone instead of squeezing it.
+    assert "flex-wrap:wrap" in style.split(".now.act{")[1].split("}")[0]
+    assert ".now.act .nowText{flex:1 1 180px}" in style
+    assert {"tv_picture", "tv_now_playing"} <= set(phone_page.WORDS)
+    assert "picture" in tv_input.ALL and tv_input.remote_action("picture") == "picture"
+
+
+def test_picture_from_the_phone_shows_what_plays_and_nothing_else():
+    pytest.importorskip("PyQt6.QtWidgets")
+    from PyQt6.QtCore import QObject
+    from PyQt6.QtWidgets import QApplication
+
+    from dopeiptv.ui.mw_phone import _PhoneMixin
+    from dopeiptv.ui.mw_tv import _TvMixin
+    QApplication.instance() or QApplication([])
+
+    class Player:
+        current_url = "http://x/1.ts"
+
+    class Page:
+        def __init__(self):
+            self.handled = []
+
+        def handle(self, action):
+            self.handled.append(action)
+
+    class W(_TvMixin, _PhoneMixin, QObject):
+        def __init__(self):
+            super().__init__()
+            self._tv_on, self.player, self._tv_page = True, Player(), Page()
+            self.pictures, self.infos = 0, 0
+
+        def _tv_picture(self):
+            self.pictures += 1
+
+        def _tv_show_info(self):
+            self.infos += 1
+
+    w = W()
+    phone = PhoneServer(0, TOKEN, w._phone_do, lambda: (b"", ""), host="127.0.0.1")
+    phone.start()
+    try:
+        assert ask(phone.port, "POST", f"/{TOKEN}/api/tv_key", {"action": "picture"}) == \
+            (200, {"ok": True, "tv_mode": True})
+        assert w.pictures == 1 and w._tv_page.handled == []
+        w.player.current_url = None                     # nothing plays: nothing happens
+        assert w.tv_command("tv_key", "picture") == {"ok": True, "tv_mode": True}
+        assert w.pictures == 1 and w._tv_page.handled == []
+        w.player.current_url = "http://x/1.ts"
+        w._tv_watching = True                           # the picture is up: only the info bar
+        w._last_playback = {"kind": "live"}
+        w.tv_command("tv_key", "picture")
+        assert w.pictures == 1 and w.infos == 1
+        w._tv_on, w._tv_watching = False, False         # TV mode off: not TV mode's
+        assert w.tv_command("tv_key", "picture") == {"ok": False, "tv_mode": False}
+        assert w.pictures == 1
+    finally:
+        phone.stop()
+
+
 def test_the_window_gives_the_page_every_word_and_colour():
     pytest.importorskip("PyQt6.QtWidgets")
     from dopeiptv.ui import mw_phone
     words = mw_phone.page_words()
     assert set(phone_page.WORDS) <= set(words) and all(words[k] for k in phone_page.WORDS)
+    from dopeiptv.i18n import tr
+    assert words["tv_picture"] == tr("phone_tv_picture") and words["tv_now_playing"] == tr("phone_tv_now_playing")
     dark, light = mw_phone.page_palettes(False)
     for pal in (dark, light):
         assert all(re.fullmatch(r"#[0-9A-Fa-f]{6}", pal[f"key_{c}"]) for c in ("red", "green", "yellow", "blue"))

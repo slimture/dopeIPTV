@@ -2477,6 +2477,8 @@ _STRINGS: dict[str, dict[str, str]] = {
     "phone_tv_digits": {"en": "Number keys"},
     "phone_tv_touchpad": {"en": "Touchpad"},
     "phone_tv_touch_hint": {"en": "Swipe to move · tap for OK · hold for Back"},
+    "phone_tv_picture": {"en": "Show on TV"},
+    "phone_tv_now_playing": {"en": "Now playing"},
     "cal_menu": {"en": "Export to calendar…"},
     "cal_title": {"en": "Export to calendar"},
     "cal_intro": {"en": "Your reminders and scheduled recordings as a calendar: each programme an event at its time, and a reminder with an alert when it starts."},

@@ -1,7 +1,8 @@
 """The phone as a remote control: a small HTTP server on the home network
 that serves one page - the remote (core/phone_page.py) - and the little it
 asks for: what plays, the channels, the commands, TV mode on or off and its
-keys, a channel's logo from the app's own cache and the calendar
+keys, a channel's logo from the app's own cache (the window fetches one
+into it, on this server's thread, when it is not there yet) and the calendar
 (core/ical.py). The touchpad's gestures are read here (``gesture``): a
 swipe is an arrow, a tap OK, a long press Back.
 
@@ -39,7 +40,8 @@ DEFAULT_PORT = 3674           # the remote API's 3673, and one
 TOKEN_BYTES = 24              # 32 characters, 192 bits
 MAX_BODY = 4096
 REQUEST_TIMEOUT = 15
-LOGO_MAX = 512 * 1024
+LOGO_MAX = 2 * 1024 * 1024    # a logo served, or fetched for the phone
+LOGO_TIMEOUT = 5.0            # a logo fetched for the phone (not on disk yet)
 
 READ = frozenset({"state", "channels"})
 WRITE = frozenset({"play", "toggle", "stop", "next", "previous", "volume", "mute",

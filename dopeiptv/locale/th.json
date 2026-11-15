@@ -2663,5 +2663,7 @@
   "cast_addr_no_chromecast": "นี่คือ Chromecast แต่การแคสต์ต้องใช้แพ็กเกจ pychromecast ซึ่งไม่มีในเครื่องนี้",
   "set_card_cast_added": "อุปกรณ์ที่เพิ่มด้วยที่อยู่",
   "set_cast_added_none": "ยังไม่มี Chromecast ทีวี หรือ Kodi ที่การค้นหาไม่พบ ให้เพิ่มในหน้าต่างแคสต์ด้วย “เพิ่มอุปกรณ์ด้วยที่อยู่…”",
-  "set_link_cast_net": "การตั้งค่า Nerd สำหรับอุปกรณ์ในเครือข่ายอื่น"
+  "set_link_cast_net": "การตั้งค่า Nerd สำหรับอุปกรณ์ในเครือข่ายอื่น",
+  "phone_tv_picture": "แสดงบนทีวี",
+  "phone_tv_now_playing": "กำลังเล่น"
 }

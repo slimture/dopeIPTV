@@ -2663,5 +2663,7 @@
   "cast_addr_no_chromecast": "Đây là Chromecast, nhưng truyền tới nó cần gói pychromecast, mà ở đây không có.",
   "set_card_cast_added": "Thiết bị thêm bằng địa chỉ",
   "set_cast_added_none": "Chưa có. Chromecast, TV hay Kodi mà lần tìm không thấy được thêm trong cửa sổ truyền, bằng “Thêm thiết bị bằng địa chỉ…”.",
-  "set_link_cast_net": "Một cài đặt Nerd cho thiết bị ở mạng khác"
+  "set_link_cast_net": "Một cài đặt Nerd cho thiết bị ở mạng khác",
+  "phone_tv_picture": "Hiện trên TV",
+  "phone_tv_now_playing": "Đang phát"
 }

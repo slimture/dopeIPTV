@@ -2663,5 +2663,7 @@
   "cast_addr_no_chromecast": "यह Chromecast है, पर इस पर कास्ट करने के लिए pychromecast पैकेज चाहिए, जो यहाँ नहीं है।",
   "set_card_cast_added": "पते से जोड़े गए डिवाइस",
   "set_cast_added_none": "अभी कोई नहीं। जिस Chromecast, टीवी या Kodi को खोज नहीं ढूँढ पाती, उसे कास्ट विंडो में “पते से डिवाइस जोड़ें…” से जोड़ा जाता है।",
-  "set_link_cast_net": "दूसरे नेटवर्क के डिवाइस के लिए एक Nerd सेटिंग"
+  "set_link_cast_net": "दूसरे नेटवर्क के डिवाइस के लिए एक Nerd सेटिंग",
+  "phone_tv_picture": "टीवी पर दिखाएँ",
+  "phone_tv_now_playing": "अभी चल रहा है"
 }

@@ -2663,5 +2663,7 @@
   "cast_addr_no_chromecast": "Bu bir Chromecast, ama ona yayın yapmak için burada eksik olan pychromecast paketi gerekiyor.",
   "set_card_cast_added": "Adresle eklenen cihazlar",
   "set_cast_added_none": "Henüz yok. Aramanın bulamadığı bir Chromecast, televizyon ya da Kodi, yayın penceresinde “Adresle cihaz ekle…” ile eklenir.",
-  "set_link_cast_net": "Diğer ağlardaki cihazlar için bir Nerd ayarı"
+  "set_link_cast_net": "Diğer ağlardaki cihazlar için bir Nerd ayarı",
+  "phone_tv_picture": "TV'de göster",
+  "phone_tv_now_playing": "Şimdi oynatılıyor"
 }

@@ -155,6 +155,7 @@ class TvTile(QAbstractButton):
         self.current = False        # a tab: the screen on show
         self._pm: QPixmap | None = None
         self._img_w, self._img_h = px(w), px(h)
+        self._elastic = False       # narrower where the room is (set_width)
         if kind == "tab":
             # As wide as its word, in any language.
             text_w = QFontMetrics(font(28, bold=True)).horizontalAdvance(title)
@@ -178,8 +179,23 @@ class TvTile(QAbstractButton):
         self._pm = pm
         self.update()
 
+    def set_width(self, width: int, shrink: bool = False) -> None:
+        """*width* pixels across, the focus ring's room included: fixed, or
+        with *shrink* at most that - narrower where its layout has less
+        room, its words then elided at their own size (a word tile)."""
+        h = self.height()
+        self._elastic = shrink
+        if shrink:
+            self.setMinimumSize(min(width, px(160)), h)
+            self.setMaximumSize(width, h)
+        else:
+            self.setFixedSize(width, h)
+        self._img_w = max(1, width - 2 * px(self.RING))
+        self.updateGeometry()
+        self.update()
+
     def sizeHint(self) -> QSize:
-        return self.size()
+        return QSize(self.maximumWidth(), self.maximumHeight())
 
     def focusInEvent(self, e) -> None:
         super().focusInEvent(e)
@@ -198,7 +214,7 @@ class TvTile(QAbstractButton):
         focus = self.hasFocus()
         enabled = self.isEnabled()
         if self.kind in ("key", "option", "tab"):
-            r = QRectF(ring, ring, self._img_w, self._img_h)
+            r = QRectF(ring, ring, max(1, self.width() - 2 * ring), self._img_h)
             radius = r.height() / 2 if self.kind == "tab" else px(14)
             if focus:
                 fill, ink = colour("accent"), colour("on_accent")
@@ -228,12 +244,20 @@ class TvTile(QAbstractButton):
                                | Qt.AlignmentFlag.AlignRight, self.sub)
             else:
                 # Smaller until it fits: a word of some languages is long.
+                # Still too long (or a tile that takes the room it gets):
+                # cut at the end.
                 size = 30 if self.kind == "key" else 28
+                room = int(r.width() - px(48 if self._elastic else 16))
                 p.setFont(font(size, bold=True))
-                while size > 16 and p.fontMetrics().horizontalAdvance(self.title) > r.width() - px(16):
+                while (not self._elastic and size > 16
+                       and p.fontMetrics().horizontalAdvance(self.title) > room):
                     size -= 2
                     p.setFont(font(size, bold=True))
-                p.drawText(r, Qt.AlignmentFlag.AlignCenter, self.title)
+                text = self.title
+                if p.fontMetrics().horizontalAdvance(text) > room:
+                    text = p.fontMetrics().elidedText(text, Qt.TextElideMode.ElideRight,
+                                                      max(1, room))
+                p.drawText(r, Qt.AlignmentFlag.AlignCenter, text)
             if self.kind == "tab" and self.current and not focus:
                 bar = QRectF(r.center().x() - px(22), r.bottom() - px(6), px(44), px(4))
                 p.setPen(Qt.PenStyle.NoPen)

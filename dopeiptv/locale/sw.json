@@ -2663,5 +2663,7 @@
   "cast_addr_no_chromecast": "Hii ni Chromecast, lakini kutuma kwake kunahitaji kifurushi cha pychromecast, ambacho hakipo hapa.",
   "set_card_cast_added": "Vifaa vilivyoongezwa kwa anwani",
   "set_cast_added_none": "Bado hakuna. Chromecast, TV au Kodi ambayo utafutaji hauipati huongezwa kwenye dirisha la kutuma, kwa “Ongeza kifaa kwa anwani…”.",
-  "set_link_cast_net": "Mpangilio mmoja wa Nerd kwa vifaa kwenye mitandao mingine"
+  "set_link_cast_net": "Mpangilio mmoja wa Nerd kwa vifaa kwenye mitandao mingine",
+  "phone_tv_picture": "Onyesha kwenye TV",
+  "phone_tv_now_playing": "Inacheza sasa"
 }

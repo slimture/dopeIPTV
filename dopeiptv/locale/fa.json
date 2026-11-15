@@ -2663,5 +2663,7 @@
   "cast_addr_no_chromecast": "این یک Chromecast است، اما پخش روی آن به بستهٔ pychromecast نیاز دارد که اینجا نیست.",
   "set_card_cast_added": "دستگاه‌های افزوده‌شده با نشانی",
   "set_cast_added_none": "هنوز هیچ. Chromecast، تلویزیون یا Kodi که جست‌وجو پیدایش نمی‌کند در پنجرهٔ پخش با «افزودن دستگاه با نشانی…» اضافه می‌شود.",
-  "set_link_cast_net": "یک تنظیم Nerd برای دستگاه‌های شبکه‌های دیگر"
+  "set_link_cast_net": "یک تنظیم Nerd برای دستگاه‌های شبکه‌های دیگر",
+  "phone_tv_picture": "نمایش روی تلویزیون",
+  "phone_tv_now_playing": "در حال پخش"
 }

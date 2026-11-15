@@ -26,6 +26,7 @@ s = QSettings(os.path.join(tmp, "s.ini"), QSettings.Format.IniFormat)
 s.setValue("tv_inputs", "false")
 from dopeiptv.core import commands, shortcut_keys
 from dopeiptv.core.stores import PlaylistStore
+from dopeiptv.i18n import tr
 from dopeiptv.providers.client import DemoClient
 from dopeiptv.ui import app_menu
 import dopeiptv.ui.main_window as mw
@@ -273,15 +274,27 @@ key(Qt.Key.Key_Return)                          # OK hides the info bar...
 assert not w._tv_info.isVisible()
 key(Qt.Key.Key_Q, "q")                          # ...and any key brings it back
 assert w._tv_info.isVisible()
-# The guide over the picture keeps it; Back returns to it; Back again stops.
+# The guide over the picture keeps it; Back returns to it. Back over the
+# picture: the info bar first, then the screen it came from with the stream
+# going on behind it (Now playing above the tabs); Stop stops it.
 key(Qt.Key.Key_Green)
 assert until(lambda: page.current == "guide" and not w._tv_watching)
 assert w._tv_has_picture()
 key(Qt.Key.Key_Escape)
 assert until(lambda: w._tv_watching)
+assert w._tv_info.isVisible()
+key(Qt.Key.Key_Escape)                          # the info bar goes first
+assert w._tv_watching and not w._tv_info.isVisible()
 key(Qt.Key.Key_Escape)
+assert until(lambda: not w._tv_watching)
+assert w._tv_has_picture() and w.player.current_url == played[-1]
+assert page.current == "guide" and w._center_stack.currentWidget() is page
+assert not page.now.isHidden() and page.hint.text() == tr("tv_hint_playing")
+key(Qt.Key.Key_Escape)                          # Back on the page: the picture again
+assert until(lambda: w._tv_watching)
+key(Qt.Key.Key_X)                               # Stop stops
 assert until(lambda: not w._tv_watching and not w._tv_has_picture())
-assert w._center_stack.currentWidget() is page
+assert w._center_stack.currentWidget() is page and page.now.isHidden()
 
 # -- a pad's and LIRC's actions: the same way in ------------------------------------------
 page.show_screen("channels")
@@ -292,8 +305,11 @@ assert ch.chans.row() == 1
 n = len(played)
 w._tv_input("ok")
 assert until(lambda: len(played) > n and w._tv_watching)
-w._tv_input("back")
-assert until(lambda: not w._tv_watching)
+w._tv_input("back")                             # the info bar
+w._tv_input("back")                             # the page, the stream behind it
+assert until(lambda: not w._tv_watching) and w._tv_has_picture()
+w._tv_input("stop")
+assert until(lambda: not w._tv_has_picture())
 
 # The phone, the remote API and Home Assistant: the same way in (tv_command).
 page.show_screen("channels")
@@ -325,7 +341,10 @@ key(Qt.Key.Key_7, "7")
 key(Qt.Key.Key_Return)
 assert until(lambda: played[-1] == "http://tv.invalid/7.ts" and w._tv_watching), played
 key(Qt.Key.Key_Escape)
-assert until(lambda: not w._tv_watching)
+key(Qt.Key.Key_Escape)
+assert until(lambda: not w._tv_watching) and w._tv_has_picture()
+key(Qt.Key.Key_X)
+assert until(lambda: not w._tv_has_picture())
 
 # -- leaving puts the window back ----------------------------------------------------------
 key(Qt.Key.Key_Blue)

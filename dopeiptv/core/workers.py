@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import threading
 import time
 from collections import OrderedDict
 from pathlib import Path
@@ -439,6 +440,81 @@ class LogoLoader(QObject):
         """The cached copy of *url* on disk, when there is one."""
         path = self._disk_path(url)
         return path if path is not None and path.is_file() else None
+
+    #: Answers fetch_file takes beside image/*: the generic types some image
+    #: hosts (S3 buckets, panels) send - kept only when the bytes are a picture.
+    _GENERIC_TYPES = ("application/octet-stream", "binary/octet-stream")
+
+    def fetch_file(self, url: str, timeout: float = 5.0,
+                   max_bytes: int = 2 * 1024 * 1024) -> Path | None:
+        """*url* fetched into the disk cache now, on the calling thread -
+        never the window's (it blocks for up to *timeout*): the file
+        ``disk_file`` reads, or None - no disk cache, not a web address, the
+        address or its host on cooldown, an answer that is not an image or
+        is larger than *max_bytes*. As the lists' own fetches: the same user
+        agent and route, the same dead-address and host cooldowns. No Qt
+        object but a QImage (thread-safe), to check the bytes decode."""
+        dp = self._disk_path(url)
+        if dp is None or not url.lower().startswith(("http://", "https://")):
+            return None
+        if dp.is_file():
+            return dp
+        if self.is_dead(url):
+            return None
+        try:
+            r = _image_get(url)(url, headers=_IMG_HEADERS, stream=True,
+                                timeout=(min(3.05, timeout), timeout))
+        except Exception as e:
+            _img_dbg(f"file FAIL {type(e).__name__} {url}")
+            self._mark_dead(url, self.dead_ttl_transient)
+            self._strike_host(url)
+            return None
+        try:
+            self._clear_host(url)
+            if r.status_code != 200:
+                permanent = r.status_code in (400, 404, 410, 451)
+                self._mark_dead(url, self.dead_ttl_permanent if permanent
+                                else self.dead_ttl_transient)
+                _img_dbg(f"file {r.status_code} {url}")
+                return None
+            ctype = str(r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            if not (ctype.startswith("image/") or ctype in self._GENERIC_TYPES):
+                _img_dbg(f"file not an image ({ctype or 'no type'}) {url}")
+                self._mark_dead(url, self.dead_ttl_permanent)
+                return None
+            try:
+                said = int(r.headers.get("Content-Length") or 0)
+            except ValueError:
+                said = 0
+            data = b""
+            if said <= max_bytes:
+                parts, size = [], 0
+                for chunk in r.iter_content(64 * 1024):
+                    parts.append(chunk)
+                    size += len(chunk)
+                    if size > max_bytes:
+                        break
+                data = b"".join(parts)
+            if said > max_bytes or len(data) > max_bytes:
+                # Too big for this reader only: the lists may still show it.
+                _img_dbg(f"file too big {url}")
+                return None
+            if not data or not QImage().loadFromData(data):
+                _img_dbg(f"file not a picture ({len(data)}B) {url}")
+                self._mark_dead(url, self.dead_ttl_permanent)
+                return None
+            dp.parent.mkdir(parents=True, exist_ok=True)
+            tmp = dp.with_name(dp.name + f".{threading.get_ident()}.part")
+            tmp.write_bytes(data)
+            tmp.replace(dp)
+            _img_dbg(f"file ok {len(data)}B {url}")
+            return dp
+        except Exception as e:
+            _img_dbg(f"file FAIL {type(e).__name__} {url}")
+            self._mark_dead(url, self.dead_ttl_transient)
+            return None
+        finally:
+            r.close()
 
     @staticmethod
     def _pm_bytes(pm: QPixmap) -> int:

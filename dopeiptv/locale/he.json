@@ -2663,5 +2663,7 @@
   "cast_addr_no_chromecast": "זה Chromecast, אבל העברה אליו דורשת את החבילה pychromecast, שחסרה כאן.",
   "set_card_cast_added": "מכשירים שנוספו לפי כתובת",
   "set_cast_added_none": "עדיין אין. Chromecast, טלוויזיה או Kodi שהחיפוש לא מוצא מוסיפים בחלון ההעברה, עם „הוספת מכשיר לפי כתובת…”.",
-  "set_link_cast_net": "הגדרת Nerd למכשירים ברשתות אחרות"
+  "set_link_cast_net": "הגדרת Nerd למכשירים ברשתות אחרות",
+  "phone_tv_picture": "הצג בטלוויזיה",
+  "phone_tv_now_playing": "מתנגן עכשיו"
 }

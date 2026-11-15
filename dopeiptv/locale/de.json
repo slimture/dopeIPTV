@@ -2663,5 +2663,7 @@
   "cast_addr_no_chromecast": "Das ist ein Chromecast, aber zum Casten braucht es das Paket pychromecast, das hier fehlt.",
   "set_card_cast_added": "Über Adresse hinzugefügte Geräte",
   "set_cast_added_none": "Noch keine. Einen Chromecast, Fernseher oder Kodi, den die Suche nicht findet, fügst du im Cast-Fenster hinzu: „Gerät über Adresse hinzufügen…“.",
-  "set_link_cast_net": "Eine Nerd-Einstellung für Geräte in anderen Netzwerken"
+  "set_link_cast_net": "Eine Nerd-Einstellung für Geräte in anderen Netzwerken",
+  "phone_tv_picture": "Am Fernseher zeigen",
+  "phone_tv_now_playing": "Läuft gerade"
 }

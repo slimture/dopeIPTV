@@ -2663,5 +2663,7 @@
   "cast_addr_no_chromecast": "これは Chromecast ですが、キャストには pychromecast パッケージが必要で、ここにはありません。",
   "set_card_cast_added": "アドレスで追加した機器",
   "set_cast_added_none": "まだありません。検索で見つからない Chromecast、テレビ、Kodi は、キャストのウィンドウの「アドレスで機器を追加…」で追加します。",
-  "set_link_cast_net": "ほかのネットワークの機器のための Nerd の設定"
+  "set_link_cast_net": "ほかのネットワークの機器のための Nerd の設定",
+  "phone_tv_picture": "テレビに表示",
+  "phone_tv_now_playing": "再生中"
 }

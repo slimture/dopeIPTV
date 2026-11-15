@@ -2663,5 +2663,7 @@
   "cast_addr_no_chromecast": "这是一台 Chromecast，但投屏需要 pychromecast 软件包，这里没有安装。",
   "set_card_cast_added": "按地址添加的设备",
   "set_cast_added_none": "还没有。搜索找不到的 Chromecast、电视或 Kodi，可以在投屏窗口里用“按地址添加设备…”添加。",
-  "set_link_cast_net": "一项用于其他网络设备的 Nerd 设置"
+  "set_link_cast_net": "一项用于其他网络设备的 Nerd 设置",
+  "phone_tv_picture": "在电视上显示",
+  "phone_tv_now_playing": "正在播放"
 }

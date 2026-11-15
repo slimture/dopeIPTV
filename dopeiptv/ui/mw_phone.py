@@ -12,12 +12,15 @@ from a hidden or locked category, no favourite from a locked folder."""
 from __future__ import annotations
 
 import hashlib
+import threading
 import time
 from typing import Any
 
 from ..core import channel_numbers
 from ..core.log import log
-from ..core.phone_remote import DEFAULT_PORT, PhoneServer, new_token, page_url
+from ..core.phone_remote import (
+    DEFAULT_PORT, LOGO_MAX, LOGO_TIMEOUT, PhoneServer, new_token, page_url,
+)
 from ..core.remote_api import lan_addresses
 from ..i18n import tr
 from .mw_remote import _Bridge
@@ -76,6 +79,20 @@ PHONE_NOTE_S = 20.0
 #: Ports tried after the one used last: the default and the next few, then
 #: any the system gives.
 _PORTS = tuple(range(DEFAULT_PORT, DEFAULT_PORT + 10)) + (0,)
+#: Logos fetched for the phone: a few at once, and the addresses that
+#: failed this session (never asked again; bounded).
+_LOGO_FETCHES = threading.BoundedSemaphore(4)
+_LOGO_LOCK = threading.Lock()
+_LOGO_FAILED_MAX = 4096
+
+
+def _picon_files() -> frozenset[str]:
+    """The picons in Nerd's folder while Nerd is on: the only files on this
+    computer a logo for the phone may be."""
+    from ..core import nerd, nerd_lists
+    n = nerd.current()
+    folder = n.get("nerd_picon_dir").strip() if n.on else ""
+    return frozenset(nerd_lists.picon_index(folder).values()) if folder else frozenset()
 
 
 def page_words() -> dict[str, str]:
@@ -102,7 +119,8 @@ def tv_words() -> dict[str, str]:
             "right": tr("phone_tv_right"), "back": tr("btn_back"), "options": tr("tv_options"),
             "vol_up": tr("phone_tv_vol_up"), "vol_down": tr("phone_tv_vol_down"),
             "digits": tr("phone_tv_digits"), "touchpad": tr("phone_tv_touchpad"),
-            "touch_hint": tr("phone_tv_touch_hint"),
+            "touch_hint": tr("phone_tv_touch_hint"), "tv_picture": tr("phone_tv_picture"),
+            "tv_now_playing": tr("phone_tv_now_playing"),
             **{f"key_{c}": colours.get(c, "") for c in ("red", "green", "yellow", "blue")}}
 
 
@@ -221,10 +239,8 @@ class _PhoneMixin:
         if action == "channels":
             listed = bridge.call("_channels", {"rows": self._phone_rows(bridge)})
             icons: dict[str, str] = listed.pop("_icons")
-            logos = getattr(self, "logos", None)
             for c in listed["channels"]:
-                icon = icons.get(str(c["id"]))
-                c["logo"] = bool(icon and logos is not None and logos.disk_file(icon))
+                c["logo"] = bool(icons.get(str(c["id"])))
             self._phone_icons = icons
             return listed
         if action == "play":
@@ -236,10 +252,49 @@ class _PhoneMixin:
         if action == "logo":
             ident = str(params.get("id") or "")
             icon = (self._phone_icons or {}).get(ident) or bridge.call("_now_icon", {"id": ident})
-            logos = getattr(self, "logos", None)
-            path = logos.disk_file(icon) if icon and logos is not None else None
-            return str(path) if path is not None else None
+            return self._phone_logo_file(str(icon or ""))
         return bridge.call(action, params)
+
+    def _phone_logo_file(self, icon: str) -> str | None:
+        """The file to serve for a logo address the window passed (a web
+        address, or a picon from Nerd's folder): the image cache's copy -
+        fetched into it once, here on the server's thread, when it is not
+        there yet. A fetch that failed is not tried again this session."""
+        logos = getattr(self, "logos", None)
+        if not icon or logos is None:
+            return None
+        if not icon.lower().startswith(("http://", "https://")):
+            return icon.removeprefix("file://")
+        path = logos.disk_file(icon)
+        if path is not None:
+            return str(path)
+        with _LOGO_LOCK:
+            failed = self.__dict__.setdefault("_phone_logo_failed", set())
+            if icon in failed:
+                return None
+        with _LOGO_FETCHES:
+            path = logos.disk_file(icon) or logos.fetch_file(
+                icon, timeout=LOGO_TIMEOUT, max_bytes=LOGO_MAX)
+        if path is None:
+            with _LOGO_LOCK:
+                if len(failed) >= _LOGO_FAILED_MAX:
+                    failed.clear()
+                failed.add(icon)
+            return None
+        return str(path)
+
+    def _phone_logo_address(self, icon: Any, picons: frozenset[str] | None = None) -> str:
+        """*icon* when the phone may be shown it (the window's thread): a
+        web address, or a picon from Nerd's folder - no other file on this
+        computer; else ""."""
+        icon = str(icon or "").strip()
+        if icon.lower().startswith(("http://", "https://")):
+            return icon
+        if not icon:
+            return ""
+        if picons is None:
+            picons = _picon_files()
+        return icon if icon.removeprefix("file://") in picons else ""
 
     # -- the work (the window's thread) -----------------------------------------------
     def _phone_do(self, action: str, params: dict) -> Any:
@@ -263,7 +318,9 @@ class _PhoneMixin:
             return {"ok": True}
         if action == "_now_icon":
             item = (getattr(self, "_last_playback", None) or {}).get("item") or {}
-            return item.get("stream_icon") if str(item.get("stream_id")) == params.get("id") else None
+            if str(item.get("stream_id")) != params.get("id"):
+                return None
+            return self._phone_logo_address(item.get("stream_icon")) or None
         if action == "state":
             return self._phone_state()
         if action == "calendar":
@@ -300,7 +357,9 @@ class _PhoneMixin:
     def _phone_channels(self, rows: list[dict]) -> dict[str, Any]:
         shown = self._chno_rows(rows)
         numbers = channel_numbers.active(self._chno_pid())
-        icons = {str(r.get("stream_id")): str(r.get("stream_icon") or "") for r in shown if r.get("stream_icon")}
+        picons = _picon_files()
+        icons = {str(r.get("stream_id")): icon for r in shown
+                 if (icon := self._phone_logo_address(r.get("stream_icon"), picons))}
         listed = [{"id": r.get("stream_id"), "name": str(r.get("name") or ""),
                    "number": channel_numbers.shown(r, numbers)} for r in shown]
         here = {str(r.get("stream_id")) for r in shown}
@@ -374,11 +433,9 @@ class _PhoneMixin:
                    duration=st.get("duration") or 0)
         item = last.get("item") or {}
         if kind == "live" and item.get("stream_id") is not None:
-            icon = str(item.get("stream_icon") or "")
-            logos = getattr(self, "logos", None)
             out["channel"] = {"id": item.get("stream_id"), "name": item.get("name") or st.get("title") or "",
                               "number": channel_numbers.shown(item, channel_numbers.active(self._chno_pid())),
-                              "logo": bool(icon and logos is not None and logos.disk_file(icon))}
+                              "logo": bool(self._phone_logo_address(item.get("stream_icon")))}
             try:
                 listings = self.xmltv.listings_for(item, 3)
             except Exception:

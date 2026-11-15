@@ -2663,5 +2663,7 @@
   "cast_addr_no_chromecast": "هذا جهاز Chromecast، لكن البث إليه يحتاج إلى حزمة pychromecast، وهي غير موجودة هنا.",
   "set_card_cast_added": "أجهزة أُضيفت بعناوينها",
   "set_cast_added_none": "لا شيء بعد. يُضاف جهاز Chromecast أو تلفزيون أو Kodi لا يجده البحث من نافذة البث، عبر «إضافة جهاز بعنوانه…».",
-  "set_link_cast_net": "إعداد Nerd للأجهزة على شبكات أخرى"
+  "set_link_cast_net": "إعداد Nerd للأجهزة على شبكات أخرى",
+  "phone_tv_picture": "اعرض على التلفاز",
+  "phone_tv_now_playing": "قيد التشغيل الآن"
 }

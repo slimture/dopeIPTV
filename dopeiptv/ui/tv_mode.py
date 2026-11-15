@@ -5,8 +5,10 @@ Options - and under them the screen: Home's shelves (continue watching,
 favorites, live now), categories and then their channels with what is on,
 the guide (the app's own, larger), the films and series in posters, a
 search with a keyboard on screen, and the few options that matter on a
-TV. Inside safe margins (a TV's overscan cuts the edges off), in the
-theme's colours with the accent as the focus ring.
+TV. While a stream goes on behind the page, what plays is in a row of its
+own above the tabs (Up from a tab; OK there is the picture). Inside safe
+margins (a TV's overscan cuts the edges off), in the theme's colours with
+the accent as the focus ring.
 
 Everything is reached with the arrows (core/tv_nav.py: a list moves its
 own rows, else the nearest element that way; up from a screen's top is
@@ -23,6 +25,7 @@ import time
 
 from PyQt6 import sip
 from PyQt6.QtCore import QPoint, QRect, Qt, QTimer
+from PyQt6.QtGui import QFontMetrics
 from PyQt6.QtWidgets import (
     QApplication, QFrame, QHBoxLayout, QLabel, QScrollArea, QStackedWidget,
     QVBoxLayout, QWidget,
@@ -586,6 +589,15 @@ class TvPage(QWidget):
         outer = QVBoxLayout(self)
         outer.setSpacing(px(22))
         self._outer = outer
+        # What plays behind the page, in a row of its own above the tabs
+        # (beside them it pushed the row off a 1080p screen): OK on it is
+        # the picture again, so are Play and Back. As wide as its words up
+        # to the page's, then cut at the end; hidden, it takes no room.
+        self.now = TvTile("", w=150, h=64, kind="tab")
+        self.now.payload = ("now",)
+        self.now.clicked.connect(self._now_clicked)
+        self.now.hide()
+        outer.addWidget(self.now, 0, Qt.AlignmentFlag.AlignLeft)
         head = QHBoxLayout()
         head.setSpacing(px(6))
         self.tabs: list[TvTile] = []
@@ -596,14 +608,6 @@ class TvPage(QWidget):
             tab.clicked.connect(self._tab_clicked)
             head.addWidget(tab)
             self.tabs.append(tab)
-        # What plays behind the page, always in sight: OK on it is the
-        # picture again (so is Play, and Back at the top of a screen).
-        self.now = TvTile("", w=430, h=64, kind="tab")
-        self.now.payload = ("now",)
-        self.now.clicked.connect(self._now_clicked)
-        self.now.hide()
-        head.addSpacing(px(18))
-        head.addWidget(self.now)
         head.addStretch(1)
         self.clock = QLabel("")
         self.clock.setFont(font(34, bold=True))
@@ -663,21 +667,33 @@ class TvPage(QWidget):
         self.refresh_now()
 
     def refresh_now(self) -> None:
-        """The Now playing tab: shown, with what plays, while a stream goes
+        """The Now playing row: shown, with what plays, while a stream goes
         on behind the page; the hint at the foot says how to get back."""
         w = self.window
         title = w._tv_now_title() if w._tv_has_picture() else ""
         playing = bool(title)
         if playing:
-            self.now.set_text(f"\u25b6  {title}")
-            if self.now not in self.tabs:
-                self.tabs.append(self.now)
-        elif self.now in self.tabs:
-            if self.focus_widget() is self.now:
-                self.set_focus(self.tab(self.current or "home"))
-            self.tabs.remove(self.now)
+            text = f"\u25b6  {title}"
+            if text != self.now.title:
+                self.now.set_text(text)
+                ring = px(TvTile.RING)
+                words = QFontMetrics(font(28, bold=True)).horizontalAdvance(text)
+                self.now.set_width(words + px(56) + 2 * ring, shrink=True)
+        elif self.focus_widget() is self.now:
+            self._to_current_tab()
         self.now.setVisible(playing)
         self.hint.setText(tr("tv_hint_playing") if playing else tr("tv_hint"))
+        self._place_flash()
+
+    def now_shown(self) -> bool:
+        return not self.now.isHidden()
+
+    def _to_current_tab(self) -> None:
+        tab = self.tab(self.current)
+        if tab is not None:
+            self.set_focus(tab)
+        else:
+            self.focus_into()
 
     def _now_clicked(self) -> None:
         self.window._tv_picture()
@@ -694,7 +710,10 @@ class TvPage(QWidget):
     def _place_flash(self) -> None:
         lbl = self.flash_lbl
         mx, my = int(self.width() * self.SAFE), int(self.height() * self.SAFE)
-        lbl.move(self.width() - mx - lbl.width(), my + px(84))
+        top = my + px(84)               # under the tabs
+        if self.now_shown():
+            top += self.now.height() + self._outer.spacing()
+        lbl.move(self.width() - mx - lbl.width(), top)
 
     # -- screens -----------------------------------------------------------------------
 
@@ -753,7 +772,7 @@ class TvPage(QWidget):
             return
         self._focus = w
         w.setFocus(Qt.FocusReason.OtherFocusReason)
-        if w not in self.tabs and self.current:
+        if w not in self.tabs and w is not self.now and self.current:
             self._last[self.current] = w
         w.update()
 
@@ -775,7 +794,8 @@ class TvPage(QWidget):
         scr = self.screens.get(self.current)
         inside = [w for w in (scr.focusables() if scr else [])
                   if not sip.isdeleted(w) and w.isVisibleTo(self) and w.isEnabled()]
-        return list(self.tabs) + inside
+        head: list[QWidget] = [self.now] if self.now_shown() else []
+        return head + list(self.tabs) + inside
 
     def _rect(self, w: QWidget) -> tv_nav.Rect:
         r = QRect(w.mapTo(self, QPoint(0, 0)), w.size())
@@ -787,8 +807,10 @@ class TvPage(QWidget):
             self.focus_into()
             return
         scr = self.screens.get(self.current)
-        if cur is self.now and direction == "down":
-            self.focus_into()
+        if cur is self.now:
+            # Alone in its row: Down to the screen's tab, nothing else.
+            if direction == "down":
+                self._to_current_tab()
             return
         if cur in self.tabs:
             if direction == "down":
@@ -800,12 +822,14 @@ class TvPage(QWidget):
                     self.focus_into()
                 return
             if direction == "up":
+                if self.now_shown():
+                    self.set_focus(self.now)
                 return
             cands: list[QWidget] = list(self.tabs)
         else:
             if scr is not None and scr.move(cur, direction):
                 return
-            cands = self.focusables()
+            cands = [c for c in self.focusables() if c is not self.now]
             if direction != "up":
                 # Only Up leaves a screen for its tabs.
                 cands = [c for c in cands if c not in self.tabs]
@@ -883,7 +907,8 @@ class TvPage(QWidget):
         when one plays behind, else Home, and on Home to its tab."""
         cur = self.focus_widget()
         scr = self.screens.get(self.current)
-        if scr is not None and cur is not None and cur not in self.tabs and scr.back(cur):
+        if scr is not None and cur is not None and cur not in self.tabs \
+                and cur is not self.now and scr.back(cur):
             return
         if self.window._tv_has_picture():
             self.window._tv_picture()

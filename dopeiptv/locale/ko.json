@@ -2663,5 +2663,7 @@
   "cast_addr_no_chromecast": "Chromecast이지만, 캐스트하려면 pychromecast 패키지가 필요한데 여기에는 없습니다.",
   "set_card_cast_added": "주소로 추가한 기기",
   "set_cast_added_none": "아직 없습니다. 검색으로 찾지 못하는 Chromecast, TV, Kodi는 캐스트 창에서 “주소로 기기 추가…”로 추가합니다.",
-  "set_link_cast_net": "다른 네트워크의 기기를 위한 Nerd 설정"
+  "set_link_cast_net": "다른 네트워크의 기기를 위한 Nerd 설정",
+  "phone_tv_picture": "TV에 표시",
+  "phone_tv_now_playing": "재생 중"
 }

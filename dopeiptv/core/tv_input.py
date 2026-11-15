@@ -37,12 +37,14 @@ from typing import Any
 
 from .log import log
 
-#: Every action TV mode knows, besides the digits.
+#: Every action TV mode knows, besides the digits ("picture": what plays
+#: behind the page, full screen again - the phone remote's Now playing).
 ACTIONS: tuple[str, ...] = (
     "up", "down", "left", "right", "ok", "back", "menu", "info", "guide",
     "home", "search", "play_pause", "play", "pause", "stop", "ch_up",
     "ch_down", "vol_up", "vol_down", "mute", "red", "green", "yellow",
-    "blue", "fav", "subtitles", "audio", "fast_forward", "rewind", "last")
+    "blue", "fav", "subtitles", "audio", "fast_forward", "rewind", "last",
+    "picture")
 DIGITS: tuple[str, ...] = tuple(f"digit_{n}" for n in range(10))
 ALL: frozenset[str] = frozenset(ACTIONS + DIGITS)
 #: Actions a held button repeats; the rest act once per press.
