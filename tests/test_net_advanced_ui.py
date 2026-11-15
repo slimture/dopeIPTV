@@ -168,6 +168,65 @@ def test_the_trust_window_shows_the_certificate(app):
     assert tr("cert_changed_head") in texts and cert_trust.two_lines("00" * 32) in texts
 
 
+def test_a_certificate_read_earlier_is_never_shown_as_the_newer_addresss(app, monkeypatch):
+    """Trust, another address typed, Trust again: the first answer coming
+    back first is not shown under the second address."""
+    import threading
+    import time
+
+    from PyQt6.QtCore import QObject, QThreadPool
+
+    from dopeiptv.ui import cert_trust
+    release = threading.Event()
+
+    def fetch(host, port, timeout=8.0, route=None):
+        if host == "old.example":
+            release.wait(5)
+            return cert_pin.CertInfo(der=b"o", sha256="11" * 32)
+        if host == "bad.example":
+            raise OSError("refused")
+        return cert_pin.CertInfo(der=b"n", sha256="22" * 32)
+
+    monkeypatch.setattr(cert_trust.cert_pin, "fetch", fetch)
+    owner = QObject()
+    shown, failed = [], []
+    f = cert_trust.CertFetch(owner, lambda h, p, info: shown.append((h, p, info.sha256)), failed.append)
+
+    def settle():
+        end = time.monotonic() + 5
+        while QThreadPool.globalInstance().activeThreadCount() and time.monotonic() < end:
+            app.processEvents()
+            time.sleep(0.01)
+        for _ in range(20):
+            app.processEvents()
+
+    f.start("old.example", 443, None)
+    f.start("new.example", 8443, None)
+    end = time.monotonic() + 5
+    while not shown and time.monotonic() < end:
+        app.processEvents()
+        time.sleep(0.01)
+    release.set()
+    settle()
+    assert shown == [("new.example", 8443, "22" * 32)] and failed == []
+    # And the other way round: the earlier answer late is dropped too.
+    shown.clear()
+    release.clear()
+    f.start("new.example", 8443, None)
+    f.start("old.example", 443, None)
+    end = time.monotonic() + 0.5
+    while time.monotonic() < end:                # the first ask's answer comes in
+        app.processEvents()
+        time.sleep(0.01)
+    assert shown == []
+    release.set()
+    settle()
+    assert shown == [("old.example", 443, "11" * 32)]
+    f.start("bad.example", 443, None)
+    settle()
+    assert failed == ["refused"]
+
+
 def test_a_changed_certificate_is_offered_for_review_only_when_met(app, monkeypatch):
     from dopeiptv.ui import cert_trust
     asked = []

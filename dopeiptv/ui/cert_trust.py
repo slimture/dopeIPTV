@@ -123,15 +123,31 @@ class CertFetch(QObject):
 
     def start(self, host: str, port: int, route: net_route.Route | None) -> None:
         self._gen += 1
-        self._want = (host, port, self._gen)
-        run_async(QThreadPool.globalInstance(), cert_pin.fetch, self._came, self._error,
-                  host, port, 8.0, route)
+        gen = self._gen
+        self._want = (host, port, gen)
 
-    def _came(self, info: Any) -> None:
+        def work() -> tuple[int, Any, str]:
+            # The answer says whose it is: one asked for earlier (another
+            # address typed meanwhile) is never shown as the newer one's.
+            try:
+                return gen, cert_pin.fetch(host, port, 8.0, route), ""
+            except Exception as e:
+                localized = getattr(e, "localized", None)     # as run_async says it
+                return gen, None, localized() if callable(localized) else str(e)
+
+        run_async(QThreadPool.globalInstance(), work, self._came, self._error)
+
+    def _came(self, got: Any) -> None:
         if sip.isdeleted(self) or self._want is None:
             return
-        host, port, _gen = self._want
+        gen, info, error = got
+        host, port, want = self._want
+        if gen != want:
+            return              # an earlier ask's; the newer one is on its way
         self._want = None
+        if info is None:
+            self._failed(error)
+            return
         self._done(host, port, info)
 
     def _error(self, message: str) -> None:
