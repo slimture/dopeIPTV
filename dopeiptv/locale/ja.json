@@ -2566,5 +2566,6 @@
   "phone_tv_vol_down": "音量を下げる",
   "phone_tv_digits": "数字キー",
   "phone_tv_touchpad": "タッチパッド",
-  "phone_tv_touch_hint": "スワイプで移動 · タップで OK · 長押しで戻る"
+  "phone_tv_touch_hint": "スワイプで移動 · タップで OK · 長押しで戻る",
+  "tv_play_refused": "ここではプレーヤーを開始できませんでした。TVモードを終了してもう一度お試しください。"
 }

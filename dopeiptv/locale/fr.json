@@ -2566,5 +2566,6 @@
   "phone_tv_vol_down": "Baisser le volume",
   "phone_tv_digits": "Touches numériques",
   "phone_tv_touchpad": "Pavé tactile",
-  "phone_tv_touch_hint": "Glissez pour vous déplacer · touchez pour OK · maintenez pour Retour"
+  "phone_tv_touch_hint": "Glissez pour vous déplacer · touchez pour OK · maintenez pour Retour",
+  "tv_play_refused": "Le lecteur n'a pas pu démarrer ici. Quittez le mode TV et réessayez."
 }

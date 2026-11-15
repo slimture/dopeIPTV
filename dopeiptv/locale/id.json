@@ -2566,5 +2566,6 @@
   "phone_tv_vol_down": "Kecilkan volume",
   "phone_tv_digits": "Tombol angka",
   "phone_tv_touchpad": "Touchpad",
-  "phone_tv_touch_hint": "Geser untuk berpindah · ketuk untuk OK · tahan untuk Kembali"
+  "phone_tv_touch_hint": "Geser untuk berpindah · ketuk untuk OK · tahan untuk Kembali",
+  "tv_play_refused": "Pemutar tidak dapat dimulai di sini. Keluar dari mode TV dan coba lagi."
 }

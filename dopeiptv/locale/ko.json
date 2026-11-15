@@ -2566,5 +2566,6 @@
   "phone_tv_vol_down": "볼륨 낮추기",
   "phone_tv_digits": "숫자 키",
   "phone_tv_touchpad": "터치패드",
-  "phone_tv_touch_hint": "스와이프로 이동 · 탭하면 OK · 길게 누르면 뒤로"
+  "phone_tv_touch_hint": "스와이프로 이동 · 탭하면 OK · 길게 누르면 뒤로",
+  "tv_play_refused": "여기서는 플레이어를 시작할 수 없습니다. TV 모드를 나간 뒤 다시 시도하세요."
 }

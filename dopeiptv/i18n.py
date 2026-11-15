@@ -2643,6 +2643,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "tv_volume": {"en": "Volume {n}%"},
     "tv_muted": {"en": "Sound off"},
     "tv_paused": {"en": "Paused"},
+    "tv_play_refused": {"en": "The player could not start here. Leave TV mode and try again."},
     "at_search_start": {"en": "Titles starting with this"},
     "at_search_description": {"en": "Descriptions containing this"},
     "at_search_other": {"en": "As the box has it ({kind})"},

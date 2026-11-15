@@ -2566,5 +2566,6 @@
   "phone_tv_vol_down": "Abbassa il volume",
   "phone_tv_digits": "Tasti numerici",
   "phone_tv_touchpad": "Touchpad",
-  "phone_tv_touch_hint": "Scorri per spostarti · tocca per OK · tieni premuto per Indietro"
+  "phone_tv_touch_hint": "Scorri per spostarti · tocca per OK · tieni premuto per Indietro",
+  "tv_play_refused": "Il lettore non è riuscito ad avviarsi qui. Esci dalla modalità TV e riprova."
 }

@@ -2566,5 +2566,6 @@
   "phone_tv_vol_down": "הנמכת עוצמה",
   "phone_tv_digits": "מקשי מספרים",
   "phone_tv_touchpad": "משטח מגע",
-  "phone_tv_touch_hint": "החלק כדי לזוז · הקש ל-OK · החזק לחזרה"
+  "phone_tv_touch_hint": "החלק כדי לזוז · הקש ל-OK · החזק לחזרה",
+  "tv_play_refused": "הנגן לא הצליח להתחיל כאן. צאו ממצב טלוויזיה ונסו שוב."
 }

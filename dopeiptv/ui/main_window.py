@@ -5146,6 +5146,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # Nerd: a live channel (its catch-up too) plays with the
             # settings of its own; anything else with the app's.
             self._chanprefs_arm(key, item, kind)
+            before = getattr(self, "_tv_before_play", None)
+            if before is not None:
+                before()
             if self.player.play(url, title, start=resume_at,
                                 local_buffer=kind == "live" and not catchup,
                                 buffer_key=f"{kind}:{key}" if key else None,
@@ -5160,6 +5163,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     self._ms_started(url, key, kind, item, resume_at)
                 # TV mode: the picture fills the screen, whoever asked.
                 self._tv_started(kind)
+            elif getattr(self, "_tv_on", False):
+                # TV mode fills the screen: another window would open
+                # behind it, out of reach of the remote.
+                log.warning("embedded play() refused %s in TV mode",
+                            redact_url(url))
+                self._show_stream_error(tr("tv_play_refused"))
             else:
                 log.warning("embedded play() refused %s - falling back to an "
                             "external mpv window", redact_url(url))

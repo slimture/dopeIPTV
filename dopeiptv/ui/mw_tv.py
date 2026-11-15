@@ -488,6 +488,22 @@ class _TvMixin:
         p = self.player
         return p is not None and p.current_url is not None
 
+    def _tv_before_play(self) -> None:
+        """TV mode, before a stream opens: the player's page shown first.
+        Its video surface makes the mpv core when it is first shown - behind
+        TV mode's page it never was, play() was refused and the first stream
+        from TV mode fell back to an external mpv window behind the app."""
+        if not self._tv_on:
+            return
+        p = self.player
+        if p is None or getattr(p.video, "mpv", None) is not None:
+            return
+        if self._center_stack.currentIndex() != 0:
+            self._center_stack.setCurrentIndex(0)
+        p.show()
+        p.video.show()
+        QApplication.processEvents()
+
     def _tv_started(self, kind: str) -> None:
         """A stream started (_start_playback): in TV mode, the picture."""
         self._tv_gen += 1

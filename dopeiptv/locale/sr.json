@@ -2566,5 +2566,6 @@
   "phone_tv_vol_down": "Utišaj",
   "phone_tv_digits": "Numerički tasteri",
   "phone_tv_touchpad": "Tačped",
-  "phone_tv_touch_hint": "Prevuci za pomeranje · dodirni za OK · drži za Nazad"
+  "phone_tv_touch_hint": "Prevuci za pomeranje · dodirni za OK · drži za Nazad",
+  "tv_play_refused": "Plejer nije mogao da se pokrene ovde. Izađite iz TV režima i pokušajte ponovo."
 }

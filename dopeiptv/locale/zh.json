@@ -2566,5 +2566,6 @@
   "phone_tv_vol_down": "调低音量",
   "phone_tv_digits": "数字键",
   "phone_tv_touchpad": "触控板",
-  "phone_tv_touch_hint": "滑动以移动 · 轻点为 OK · 长按为返回"
+  "phone_tv_touch_hint": "滑动以移动 · 轻点为 OK · 长按为返回",
+  "tv_play_refused": "播放器无法在此启动。请退出电视模式后重试。"
 }

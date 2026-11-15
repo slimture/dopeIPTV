@@ -2566,5 +2566,6 @@
   "phone_tv_vol_down": "Sänk volymen",
   "phone_tv_digits": "Sifferknappar",
   "phone_tv_touchpad": "Pekyta",
-  "phone_tv_touch_hint": "Svep för att flytta · tryck för OK · håll inne för Tillbaka"
+  "phone_tv_touch_hint": "Svep för att flytta · tryck för OK · håll inne för Tillbaka",
+  "tv_play_refused": "Spelaren kunde inte starta här. Lämna TV-läget och försök igen."
 }

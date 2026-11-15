@@ -2566,5 +2566,6 @@
   "phone_tv_vol_down": "Ciszej",
   "phone_tv_digits": "Klawisze numeryczne",
   "phone_tv_touchpad": "Touchpad",
-  "phone_tv_touch_hint": "Przesuń palcem: ruch · stuknij: OK · przytrzymaj: Wstecz"
+  "phone_tv_touch_hint": "Przesuń palcem: ruch · stuknij: OK · przytrzymaj: Wstecz",
+  "tv_play_refused": "Odtwarzacz nie mógł się tu uruchomić. Wyjdź z trybu TV i spróbuj ponownie."
 }

@@ -2566,5 +2566,6 @@
   "phone_tv_vol_down": "Utišaj",
   "phone_tv_digits": "Brojčane tipke",
   "phone_tv_touchpad": "Dodirna površina",
-  "phone_tv_touch_hint": "Povuci za pomicanje · dodirni za OK · drži za Natrag"
+  "phone_tv_touch_hint": "Povuci za pomicanje · dodirni za OK · drži za Natrag",
+  "tv_play_refused": "Player se ovdje nije mogao pokrenuti. Izađite iz TV načina i pokušajte ponovno."
 }
