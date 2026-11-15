@@ -7,12 +7,13 @@ dopeIPTV based on what I think is a good IPTV-player. I think you will like it.
 
 It's primarily for Linux — and runs on **macOS** and **Windows** too — with a
 modern interface, supporting the **Xtream Codes API**, **M3U playlists** and
-**Stalker / Ministra portals**, a full **EPG**, rewinding live TV, and an
+**Stalker / Ministra portals** as well as the receivers, TV servers and media
+servers at home, a full **EPG**, rewinding live TV, and an
 **embedded mpv** video player (with optional external mpv/VLC playback).
 
 > **dopeIPTV is a player, not a content source.** You connect it to a service
 > you already subscribe to (an Xtream Codes account, an M3U playlist or a
-> Stalker portal) — it
+> Stalker portal) or to your own receiver or media server — it
 > doesn't provide any channels itself. The built-in **demo channels** are free,
 > public test streams so you can try the app with nothing to configure.
 
@@ -28,24 +29,30 @@ modern interface, supporting the **Xtream Codes API**, **M3U playlists** and
 ## Features
 
 - **Embedded video** via libmpv's OpenGL render API — plays right inside the app on any compositor (GNOME, KDE, Hyprland, ...), with fullscreen, a pop-out window (detach to a second screen, optionally always-on-top), a hover scrubber and arrow-key seeking
+- **Your provider, and the boxes and servers at home** — Xtream Codes logins, M3U playlists and Stalker / Ministra portals (portal address + MAC; *experimental*); Enigma2 receivers (VU+, Dreambox, Zgemma, ...), Tvheadend, HDHomeRun, VDR, DVBViewer, NextPVR and MythTV with their channels, guide and recordings; and Jellyfin, Emby and Plex with your own films and series, their resume points and watched marks. **Find on my network** looks for them, and each source has a page of its own in Settings
+- **TV, Movies & Series** with seasons/episodes, favorites, history, resume where you stopped, and instant search across thousands of channels — and `Ctrl`+`K` (`⌘`+`K` on a Mac) finds an action, a setting, a channel or a programme from one field
+- **Profiles** — one per person in the household, each with its own favorites, history, Continue watching, watched marks and theme; "Who's watching?" at start, a PIN if you like, and kids profiles that never see a locked or adult category
+- **TV mode and a phone remote** — a full-screen layout for the sofa (`Ctrl`+`Shift`+`T`), run from a remote, a game controller or LIRC: Home, channels with what is on, the guide, movies and series in posters, search with an on-screen keyboard. And your phone as a remote over the home network: scan a code, and it plays channels and favorites, shows what is on now and next, and in TV mode turns into a d-pad or a touchpad — on its home screen as *dopeIPTV Remote*, with nothing to install
 - **Multiview** — watch 2/4/6/9 live channels at once in a separate grid, each an independent stream (even from different playlists), with per-window audio/subtitles, click-to-focus audio and a real timeshift timeline on catch-up channels
-- **TV, Movies & Series** with seasons/episodes, favorites, history, and instant search across thousands of channels
-- **Three kinds of provider** — Xtream Codes logins, M3U playlists, and Stalker / Ministra portals (portal address + MAC; *experimental*, catch-up from a portal is not there yet)
 - **Rewind live TV** — pause and go back in the channel you are watching, even without your provider's catch-up: a few minutes in memory, up to 6 hours on disk, or (*experimental*) **dopeIPTV's own buffer**, which goes on downloading while you pause, comes back to live without reconnecting, keeps each channel's history for when you return and records from the buffer
-- **Home** — a featured strip of this week's most popular films and series that your provider has, continue watching with the time left, your favourite channels with what is on now, new episodes of followed series and the popular charts — each section can be switched off
+- **Home** — a featured strip of this week's most popular films and series that your provider has, continue watching with the time left, your favourite channels with what is on now, new episodes of the series you follow (with a notification) and the popular charts — each section can be switched off
+- **Watch together** — start a room, share its code, and friends watch the same film, episode or channel in step, each from their own source; the messages are encrypted with a key made from the code, so dopeiptv.org only passes them on
 - **27 languages** — from English, Svenska and Español to 中文, 日本語, हिन्दी and العربية, with full right-to-left support (Arabic, Persian, Hebrew, Urdu) — switchable live in Settings
 - **Local files** — point it at a folder (or a mounted network share) and browse your own videos beside the provider's: a folder view and a library view that builds series with seasons out of the file names, TMDB posters, resume, History, Trakt, casting and multiview. Music gets album art and a play queue that advances on its own
-- **Resume playback** — movies/series/recordings remember where you stopped and offer to continue
+- **Internet radio and web streams** — stations from radio-browser.info by country, language and genre, kept among your favorites; and YouTube Live, Twitch and similar sites through yt-dlp (**Open address…**, `Ctrl`+`L`), which the app can download for you
 - **Full EPG** with now/next progress bars, a searchable guide, and a persistent disk cache that shows instantly on startup
 - **TMDB metadata** — posters, ratings (linked to IMDb), and a clickable cast list that finds an actor's other titles in your playlist
-- **Recording & Timeshift** — record on a timer/schedule (single-connection friendly) and watch catch-up archives from the EPG; the guide refreshes itself when it gets old
-- **Cast to a Chromecast or a smart TV** — Samsung, LG, Sony and other DLNA/UPnP TVs show up beside the Chromecasts; pause, seek and volume from the app
-- **Subtitles from OpenSubtitles** — find subtitles for the film or episode you are watching right from the player, remembered for next time, or load a subtitle file
+- **Recording & Timeshift** — record on a timer/schedule (single-connection friendly) or a whole series by its title or a word (or a reminder for each airing instead), and watch catch-up archives from the EPG; recordings can be saved as MP4, and reminders and recordings to come export to your calendar
+- **Subtitles and teletext** — find subtitles on OpenSubtitles for the film or episode you are watching, remembered for next time, or load a file; a channel's DVB subtitles and teletext subtitle pages in the subtitle menu by language; and, with dopeIPTV's own rewind buffer on, a teletext viewer (`T`) with the colour keys, subpages, hold and reveal
+- **Cast to a Chromecast, a smart TV or Kodi** — Samsung, LG, Sony and other DLNA/UPnP TVs and Kodi show up beside the Chromecasts, and on macOS an Apple TV through AirPlay; pause, seek and volume from the app, a channel picked while casting goes to the same TV, and a device on another part of the network can be added by its address
+- **Enigma2 from the app** — the box's signal, a screenshot of its TV, its remote control and its recordings; its AutoTimer rules beside the app's series rules; and it asks first when a stream would cut off a recording or what the box's TV shows
 - **System media controls** — the keyboard's media keys and the system's own controls pause, play and skip, and show what is playing: GNOME/KDE media controls, headphone buttons and KDE Connect on Linux (MPRIS), Control Center, the lock screen and AirPods on macOS (Now Playing), the media box by the volume and the lock screen on Windows
-- **Follow a series** — new episodes land on Home with a notification
-- **Trakt** scrobbling, **multiple playlists** (drag to reorder, export/import, or drop an M3U file or link on the window), parental control, content manager and editable channel lists
+- **Trakt and Simkl** scrobbling, **Discord status** if you want it, **multiple playlists** (drag to reorder, export/import, or drop an M3U file or link on the window), parental control, content manager and editable channel lists
+- **Night mode, statistics and private viewing** — night mode (`N`) brings loud adverts down and quiet dialogue up; **Your statistics** shows what you watch, counted on this computer only; private viewing keeps nothing until the app closes
+- **Sync and backup** — favorites and settings, and if you like playlists and watch history, the same on all your computers, encrypted on your computer with a code only your computers know; or everything in one backup file
 - **Themes** — 25 themes picked from previews — dark and light, and some with a colour of their own (sea, forest, wine, neon, an amber terminal, coffee, sand, sky) — 10 accent colours or any colour you like, follow the desktop's light/dark mode, corner style and interface size — all applied live
-- **Updates itself** — the AppImage downloads, verifies and swaps in a new release from the update banner; **Settings → General → Update channel → Test builds** offers the next version's test builds early
+- **Nerd** — off until you turn it on, for those who like to tinker: Test connection, backup addresses, own DNS over HTTPS, a trusted certificate per source, low latency for live, stream analysis (a simple TR 101 290), failover to another source, stream health, picons, udpxy, a remote API, webhooks and MQTT for Home Assistant, and searching the other parts of a home network split in VLANs
+- **Updates itself** — the AppImage, the installed Windows app and the Mac app download, verify and swap in a new release from the update banner; official builds carry a signed list of their own files, so a changed copy is told apart; **Settings → General → Update channel → Test builds** offers the next version's test builds early
 
 See [FEATURES.md](docs/FEATURES.md) for the full feature list.
 
@@ -63,10 +70,14 @@ optional:
 | `ffmpeg` | recording backend | ✅ |
 | `pychromecast` | Chromecast casting | ✅ (pip) |
 | `vlc` | optional *external* player only | ⬜ |
+| `yt-dlp` | YouTube, Twitch and similar sites (the app can download the official build into your data folder) | ⬜ |
+| `pysdl2` | game controllers in TV mode (on Linux, pads are also read without it) | ⬜ |
 
 The Python packages (`PyQt6`, `requests`, `python-mpv`, `pychromecast`) are
-installed automatically by pip/pipx from `requirements.txt`. The system
-packages (`mpv`, `ffmpeg`, and optionally `vlc`) come from your distro.
+installed automatically by pip/pipx from `requirements.txt` — on macOS and
+Windows with the bridges to the system's media controls (and AirPlay on
+macOS). The system packages (`mpv`, `ffmpeg`, and optionally `vlc`) come
+from your distro.
 
 ## Installation
 
@@ -195,10 +206,11 @@ dopeiptv
 
 The first time, a short setup asks for your provider: an Xtream Codes
 server (e.g. `http://server:8080`) with username and password, an M3U
-playlist URL, or a Stalker / Ministra portal address with a MAC address.
-No account yet? Pick the **demo channels** — free public test streams — to
-look around first. More providers can be added later under
-**Settings → Sources**.
+playlist URL, a Stalker / Ministra portal address with a MAC address, or
+a Jellyfin, Emby or Plex server to sign in to. No account yet? Pick the
+**demo channels** — free public test streams — to look around first. More
+sources — the receivers and TV servers at home among them, which **Find on
+my network** looks for — can be added later under **Settings → Sources**.
 
 ## Add to the application menu (optional)
 
@@ -249,8 +261,12 @@ hand costs nothing either.
 | Pause / rewind a live channel | Hover the video for the rewind bar, or pause; **LIVE** brings you back (how far back: Settings → Playback) |
 | Switch between rewind and catch-up | **DVR \| TIMESHIFT** at the left of the bar, on a channel with the provider's catch-up |
 | Watch a programme from the start | Right-click a ⏪ channel → Timeshift |
-| Browse the full guide | The **EPG Guide** button in the sidebar (↻ in the guide refreshes it) |
+| Browse the full guide | **Guide** in the sidebar (↻ in the guide refreshes it, **Pop out** gives it a window of its own) |
 | Search | Type in the search field at the top |
+| Find an action, a setting, a channel or a programme | `Ctrl`+`K` (`⌘`+`K` on a Mac) |
+| Cast to a TV | Right-click → Cast to TV… (or the player's ⚙ menu) |
+| Use your phone as a remote | Menu → Phone remote… and scan the code |
+| TV mode for the sofa | Menu → TV mode, or `Ctrl`+`Shift`+`T` |
 | Switch playlist / provider | The playlist menu at the top of the sidebar, or Settings → Sources |
 
 ## Keyboard shortcuts
@@ -268,18 +284,26 @@ hand costs nothing either.
 | `Ctrl`+`G` | Open the EPG guide |
 | `Ctrl`+`Shift`+`F` | Search the guide |
 | `Ctrl`+`Shift`+`R` | Reminders |
+| `Ctrl`+`K` | Command palette: find an action, a setting, a channel or a programme |
+| `Ctrl`+`Shift`+`T` | TV mode |
 | `Ctrl`+`O` | Open a video file |
+| `Ctrl`+`L` | Open an address (a stream, or a page on YouTube, Twitch and the like) |
+| `Ctrl`+`Shift`+`N` | Private viewing |
+| `Ctrl`+`Shift`+`Del` | Clear recent history |
 | `M` | Mute |
+| `N` | Night mode for the sound |
 | `P` | Pop the player out to its own window |
 | `R` | Record |
 | `I` | Stats for nerds |
+| `T` | Teletext (while a live channel plays) |
 | `Delete` | Remove the selected item (recordings / history) |
 | `Esc` | Leave fullscreen / close a dialog |
 
-Single-letter keys (`M`, `P`, `R`, `I`) act on the player and are ignored
-while you're typing in the search box. Every one of these but `Ctrl`+`O`,
-`Delete` and `Esc` can be changed under **Settings → Advanced → Keyboard
-shortcuts** (a key does one thing: given to another action, the one that
+Single-letter keys (`M`, `N`, `P`, `R`, `I`, `T`) act on the player and are ignored
+while you're typing in the search box. On a Mac, `Ctrl` is `⌘`. Every one of
+these but `Ctrl`+`O`, `Ctrl`+`L`, `Ctrl`+`Shift`+`N`, `Ctrl`+`Shift`+`Del`,
+`Delete` and `Esc` can be changed under **Settings → Keyboard shortcuts**
+(a key does one thing: given to another action, the one that
 had it is left without; digits, `Enter`, the arrows, `Tab` and the media
 keys stay the app's).
 
