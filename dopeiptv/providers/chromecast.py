@@ -5,6 +5,7 @@ from __future__ import annotations
 import threading
 import time
 
+from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import (
     QComboBox, QDialog, QHBoxLayout, QLabel, QListWidget,
     QPushButton, QVBoxLayout, QWidget,
@@ -1518,6 +1519,12 @@ class CastDialog(QDialog):
             self._set_status(tr("airplay_pick_window") if self._is_airplay(n)
                              else tr("cast_casting_to", name=n))
             self._banner(n, self.stream_title)
+            if self._is_airplay(n):
+                # This dialog is modal: while it is open, macOS hands no
+                # click to Apple's AirPlay menu and shows that menu behind
+                # it. The AirPlay window carries on alone; the cast strip
+                # controls the cast from here.
+                QTimer.singleShot(0, self.accept)
 
         def failed(msg):
             self._set_status(tr("cast_failed", msg=msg))
