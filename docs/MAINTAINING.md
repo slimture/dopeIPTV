@@ -361,6 +361,31 @@ Then the rest of what an Enigma2 box can do from a computer:
 
 Check every endpoint against OpenWebif's source, and test on a real box.
 
+### Planned: server mode, after the Enigma2 work
+
+dopeIPTV as the home's server as well as its player - what Threadfin,
+xTeVe and Dispatcharr are for, in the same program. Four parts, built
+together:
+
+- **Without a window.** A headless start (`--server`) for a NAS, a
+  Raspberry Pi, Docker or a systemd service: starts with the computer,
+  runs series rules, reminders' recordings and the guide's refresh day
+  and night. Linux first (AppImage, .deb, a container image); the same
+  code on macOS and Windows.
+- **Streams through dopeIPTV.** Today sharing sends a player on to the
+  source's own address. Restreaming instead fetches it here, so a
+  source's user agent, headers, own DNS, trusted certificate, proxy,
+  rewrite rules, backup addresses and failover apply to every device on
+  the network, and viewers of the same channel share one connection to
+  the account (counted in `core/connections.py`). Redirect stays as an
+  option.
+- **An HDHomeRun tuner** (`discover.json`, `lineup.json`, `lineup_status.json`,
+  SSDP/UDP discovery), so Plex, Jellyfin, Emby and Channels DVR find
+  dopeIPTV by themselves; as many tuners as the account's connections.
+- **Settings in a browser**: sources, status (connections, tuners,
+  recordings, stream health), recordings and series rules - behind a
+  token like the remote API, this computer only unless chosen.
+
 ### Ideas to talk through before anything is built
 
 Not decided: each needs a word with the maintainer first.
@@ -400,9 +425,7 @@ Plex are in)
   app has nothing for HDMI-CEC, a gamepad or LIRC today; a CEC remote works
   only where the system turns it into keys. TV mode on the list from
   "build everything" is the same thing.
-- **dopeIPTV as an HDHomeRun tuner** (`discover.json`, `lineup.json`), so
-  Plex, Jellyfin and Emby on the network see it as one - beside the M3U
-  and XMLTV it already shares.
+- **dopeIPTV as an HDHomeRun tuner**: part of server mode (above).
 - **Android TV and Fire TV**: PyQt6 does not get there in practice; an
   app of its own would be a separate project. Until then the shared
   playlist and guide, the remote API and the HDHomeRun emulation let apps
