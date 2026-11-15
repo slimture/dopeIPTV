@@ -58,12 +58,11 @@ map and the one-way import rule.
 | `providers/trakt.py` | Trakt.tv sync |
 | `providers/chromecast.py` | Chromecast support; Chromecasts known by their address (`set_hosts`, pychromecast's `get_chromecast_from_host`, listed after every scan, one mDNS finds at the same address not twice); the cast dialog (its "Add a device by address…", the nothing-found line `none_found_text`) |
 | `providers/dlna.py` | DLNA / UPnP TVs (discovery, control, local file share); UPnP 1.1's unicast M-SEARCH to given addresses (`ssdp_unicast`), where renderers keep their description (`DESCRIPTION_PATHS`), renderers known by their address listed after every scan (`set_extra`), a renderer kept in the settings (`Renderer.to_dict`/`from_dict`) |
-| `providers/casting.py` | `CastHub`: Chromecast, DLNA and Kodi behind one object (`plays_as_is`, `ended_elsewhere`); the devices added by address and (Nerd) what answers on the other networks, handed to their managers (`add_by_address`, `forget_added`, `is_added`, `stored`), the other networks asked beside the searches |
+| `providers/casting.py` | `CastHub`: Chromecast, DLNA and Kodi behind one object (`plays_as_is`, `ended_elsewhere`), and receivers the window adds (`add_receiver`: AirPlay on macOS); the devices added by address and (Nerd) what answers on the other networks, handed to their managers (`add_by_address`, `forget_added`, `is_added`, `stored`), the other networks asked beside the searches |
 | `providers/cast_devices.py` | Devices to cast to added by their address (another part of a network split in VLANs): what was typed (`parse_address`: an address, a port, a DLNA description URL), what is there (`detect`: Chromecast, Kodi, DLNA, or the kind chosen), the Chromecasts and TVs kept (`cast_added_devices`, a JSON list; a Kodi goes to `kodi_devices`) |
 | `providers/kodi.py` | Kodi as a cast target over JSON-RPC (HTTP): Player.Open with the source's user agent/headers as Kodi's `\|` options (never a loopback address), pause, seek, volume, state polling, a cast ended on Kodi itself; Kodis added by hand with their login (`kodi_devices`, never logged) |
 | `providers/mdns.py` | mDNS service discovery in plain Python: one legacy-unicast PTR question, PTR/SRV/A/TXT read back (how Kodi's `_xbmc-jsonrpc-h._tcp` is found) |
 | `providers/simkl.py` | Simkl client: AUTH V2's device sign-in (`/oauth2/device`, then `/oauth2/token` polled; a 7-day access token renewed shortly before it runs out or once on a 401 with the sliding 180-day refresh token; sign-out revokes), scrobble start/pause/stop, watched marks, Plan to watch, the account's lists read back (one all-items answer); client id public (`PUBLIC_CLIENT_ID`) or baked at build time (`bundled_client_id`, `_simkl_key.py`), tokens `simkl_access_token`, `simkl_refresh_token`, `simkl_token_expires` |
-| `providers/casting.py` | `CastHub`: Chromecast and DLNA behind one object, and receivers the window adds (`add_receiver`: AirPlay on macOS) |
 | `providers/airplay_bridge.py` | AirPlay's plan and bridge, platform-neutral: what goes to an Apple TV as it is (HLS/MP4 it decodes), the rest repackaged by ffmpeg as HLS (fMP4, copy H.264/HEVC and AAC/AC-3/E-AC-3, other sound to AAC, MPEG-2 and other pictures to H.264), served on the LAN under a token; the source's user agent/headers/proxy; the macOS firewall's answer |
 | `providers/cast_bridge.py` | Re-encodes audio a Chromecast refuses (E-AC-3) so the stream still casts |
 | `providers/cast_feed.py` | A cast's archive or rewind buffer in pieces, read here into one converter run (`Feed`): one growing playlist on the TV, keyframe starts, the buffer's loopback address never handed out |
@@ -249,50 +248,63 @@ map and the one-way import rule.
 ## Working with individual modules
 
 `ui/main_window.py` is a thin composition root: the real behaviour lives
-in the `mw_*` mixins beside it, each mixed into `MainWindow`:
-`mw_settings`, `mw_trakt` (Trakt, and the watched sync over every account),
-`mw_simkl` (Simkl), `mw_discord` (Discord status), `mw_recording`, `mw_context`, `mw_favorites`
-(several favorites at once, move between folders, drag-and-drop), `mw_home`
-(Home), `mw_local` (local files), `mw_radio` (internet radio),
-`mw_webstreams` (YouTube, Twitch through yt-dlp), `mw_teletext` (the teletext viewer), `mw_tv` (TV mode, the 10-foot
-layout run from a remote), `mw_multiview` (multiview), `mw_detail`,
-`mw_search` (sidebar search), `mw_sidebar` (panel collapse / icon rail),
-`mw_nav` (focus mode, nav colours/icons, the MINE group, History's
-Watched filter, the nav's status), `mw_shortcuts`
-(keyboard shortcuts), `mw_palette` (the command palette), `mw_busy` (loading indicator), `mw_updates`
-(update badge), `mw_reminders`, `mw_sort`, `mw_onboarding`,
-`mw_mpris` (the system's media controls through `services/media_session.py` - MPRIS, Now Playing, the SMTC - and the media keys), `mw_follow` (followed
-series, new-episode news), `mw_subtitles` (OpenSubtitles, subtitles
-remembered per title), `mw_guide` (the Guide page in the middle pane, its
-pop-out window), `mw_cast` (Chromecast, DLNA and Kodi: the cast
-dialog, the strip, handing over from the archive, zapping while casting -
-a live channel picked then goes to the same receiver; "Add a device by
-address…" and Settings > Casting's devices added by address), `mw_airplay` (AirPlay
-dialog, the strip, handing over from the archive, going back during a live
-cast in the rewind buffer while it holds the moment (kept recording beside
-the cast only with Settings > Casting's `cast_keep_buffer` on - a second
-connection, asked first over a full or unknown limit; never to a DLNA TV or
-a Kodi), else in the archive, zapping while casting -
-a live channel picked then goes to the same receiver), `mw_airplay` (AirPlay
-to an Apple TV on macOS: the receiver added, its own endings, its window
-from the strip), `mw_donate` (the
-sidebar heart, About's link, Home's card), `mw_failover` (failover to another
-source), `mw_series` (series recording rules), `mw_health` (stream
-health per channel), `mw_ts_analysis` (Nerd's stream analysis, TR 101 290), `mw_stream_info` (stream details per channel), `mw_chanprefs` (a channel's own settings),
-`mw_portal_archive` (a Stalker portal's archive, by programme),
-`mw_events` (events pushed out: webhooks and MQTT, Home Assistant's commands), `mw_phone` (the phone remote), `mw_calendar` (reminders and recordings as a calendar), `mw_privacy` (private
-`mw_events` (events pushed out: webhooks and MQTT), `mw_media` (media
-servers: playback reported, their resume points and watched marks), `mw_privacy` (private
-viewing, clear recent history), `mw_report` (feedback, error reports and
-the answers to them), `mw_sync` (settings sync between a person's
-computers, for everyone), `mw_connections` (connections to the account, the warning
-before one more), `mw_mirrors` (a source's backup addresses for a stream
-whose server is down) and `mw_popout` (detached-window player). What stays in `main_window.py` is
-computers), `mw_together` (watch together: a room, its strip, keeping in
-step) and `mw_popout` (detached-window player). What stays in `main_window.py` is
-computers), `mw_stats` (your viewing statistics), `mw_profiles` (profiles: one per person, switching, the picker, kids) and `mw_popout` (detached-window player). What stays in `main_window.py` is
-the `__init__`/`_build_ui` composition and the playback path (start/stop,
-seek, fullscreen, reconnect) - keep playback code there.
+in the `mw_*` mixins beside it, each mixed into `MainWindow`. Each has its
+row in the table above; in short:
+
+- Settings and accounts: `mw_settings`, `mw_trakt` (Trakt, and the watched
+  sync over every account), `mw_simkl` (Simkl), `mw_discord` (Discord
+  status), `mw_sync` (settings sync between a person's computers),
+  `mw_profiles` (profiles: one per person, switching, the picker, kids).
+- Places and lists: `mw_home` (Home), `mw_local` (local files), `mw_radio`
+  (internet radio), `mw_webstreams` (YouTube, Twitch through yt-dlp),
+  `mw_guide` (the Guide page and its pop-out window), `mw_detail`,
+  `mw_search` (sidebar search), `mw_sidebar` (panel collapse / icon rail),
+  `mw_nav` (focus mode, nav colours/icons, the MINE group, History's
+  Watched filter, the nav's status), `mw_favorites` (several favorites at
+  once, move between folders, drag-and-drop), `mw_context`, `mw_sort`,
+  `mw_follow` (followed series, new-episode news), `mw_reminders`,
+  `mw_calendar` (reminders and recordings as a calendar), `mw_stats`
+  (your viewing statistics), `mw_donate` (the sidebar heart, About's
+  link, Home's card), `mw_onboarding`, `mw_busy` (loading indicator),
+  `mw_updates` (update badge), `mw_report` (feedback, error reports and
+  the answers to them).
+- Watching: `mw_recording`, `mw_series` (series recording rules),
+  `mw_multiview` (multiview), `mw_popout` (detached-window player),
+  `mw_subtitles` (OpenSubtitles, subtitles remembered per title),
+  `mw_teletext` (the teletext viewer), `mw_tv` (TV mode, the 10-foot
+  layout run from a remote), `mw_together` (watch together: a room, its
+  strip, keeping in step), `mw_media` (media servers: playback reported,
+  their resume points and watched marks), `mw_privacy` (private viewing,
+  clear recent history), `mw_mpris` (the system's media controls through
+  `services/media_session.py` - MPRIS, Now Playing, the SMTC - and the
+  media keys).
+- Casting: `mw_cast` (Chromecast, DLNA and Kodi: the cast dialog, the
+  strip, handing over from the archive, going back during a live cast in
+  the rewind buffer while it holds the moment - kept recording beside the
+  cast only with Settings > Casting's `cast_keep_buffer` on, a second
+  connection, asked first over a full or unknown limit; never to a DLNA TV
+  or a Kodi - else in the archive, zapping while casting on the same
+  receiver, "Add a device by address…"), `mw_airplay` (AirPlay to an Apple
+  TV on macOS: the receiver added, its own endings, its window from the
+  strip).
+- Sources, boxes and the network: `mw_box` (the box from the app),
+  `mw_portal_archive` (a Stalker portal's archive, by programme),
+  `mw_failover` (failover to another source), `mw_connections`
+  (connections to the account, the warning before one more, a box's
+  tuners), `mw_mirrors` (a source's backup addresses for a stream whose
+  server is down), `mw_health` (stream health per channel),
+  `mw_ts_analysis` (Nerd's stream analysis, TR 101 290), `mw_stream_info`
+  (stream details per channel), `mw_chanprefs` (a channel's own settings).
+- Remote control and automation: `mw_shortcuts` (keyboard shortcuts),
+  `mw_palette` (the command palette), `mw_commands` (commands from
+  outside), `mw_remote` (the remote API and sharing), `mw_phone` (the
+  phone remote), `mw_events` (events pushed out: webhooks and MQTT, Home
+  Assistant's commands).
+
+What stays in `main_window.py` is the `__init__`/`_build_ui` composition
+and the playback path (start/stop, seek, fullscreen, reconnect) - keep
+playback code there.
+
 When making changes:
 
 - **UI changes**: find the method by name across `ui/main_window.py` and
