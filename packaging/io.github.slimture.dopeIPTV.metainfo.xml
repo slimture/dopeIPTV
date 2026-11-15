@@ -69,6 +69,26 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.6.0" date="2026-11-16">
+      <description>
+        <p>Profiles for everyone in the household, a TV mode for the sofa with the phone as its remote, and Jellyfin, Emby and Plex as sources.</p>
+        <ul>
+          <li>Profiles with their own favorites, history, watched marks and theme, a PIN if wanted, and kids profiles</li>
+          <li>TV mode: a full-screen layout run from a remote, a game controller, LIRC or the phone</li>
+          <li>The phone as a remote over the home network, also from its home screen, with nothing to install</li>
+          <li>Jellyfin, Emby and Plex as sources, and VDR, DVBViewer, NextPVR and MythTV beside Enigma2, Tvheadend and HDHomeRun</li>
+          <li>Enigma2: the box's signal, screenshot, remote control and recordings, its AutoTimer rules, and a question before a stream would cut off a recording</li>
+          <li>Casting to Kodi, and to an Apple TV through AirPlay on macOS; a channel picked while casting goes to the same TV</li>
+          <li>DVB subtitles and teletext subtitles in the subtitle menu, and a teletext viewer</li>
+          <li>A command palette (Ctrl+K), internet radio, and YouTube Live, Twitch and similar sites through yt-dlp</li>
+          <li>Watch together with friends, each from their own source, and settings sync for everyone</li>
+          <li>Night mode for the sound, recordings saved as MP4, series reminders, viewing statistics and an export to calendar</li>
+          <li>Simkl beside Trakt, Discord status, and the system's media controls on macOS and Windows</li>
+          <li>Settings grouped by what you are doing, with a page for each source</li>
+          <li>For tinkerers: Test connection, backup addresses, own DNS, trusted certificates, stream analysis and Home Assistant commands</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.5.0" date="2026-11-14">
       <description>
         <p>Boxes on the home network as sources: Enigma2 receivers, Tvheadend servers and HDHomeRun tuners, found on the network by themselves. Series recording with padding, a backup of everything in one file, keyboard shortcuts of your own, catch-up on Stalker portals, and for supporters end-to-end encrypted sync between computers. Nerd, a Settings page for tinkerers, off until chosen: the box from the app, picons, udpxy, guides from several places, network and player options that each say whether they work, failover to another source, stream health, channel numbers of your own, catch-up addresses, recording names, a remote API and every source shared as one playlist and guide. Private viewing and Clear recent history. Feedback from the app with only the part of the log that matters, and answers to it in the app - nothing that identifies anyone. A supporter key for those who donate, with a logo, an icon and two themes of their own.</p>
