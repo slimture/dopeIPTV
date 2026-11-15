@@ -367,8 +367,10 @@ tests check that placeholders line up and that every `tr("…")` key exists.
 
 ## Open work and known limits
 
-- **Stalker / Ministra portals are experimental**: no catch-up from a
-  portal yet (it needs a portal with archive to test against).
+- **Stalker / Ministra portals are experimental**: the portal's archive
+  plays by programme (`archive_link`, `archive_table`,
+  `ui/mw_portal_archive.py`), checked against a fake portal only - it needs
+  a real portal with archive to confirm.
 - **dopeIPTV's own rewind buffer is experimental** (Settings → Playback).
   When it has had a release or two without trouble, drop the label.
 - **Flatpak** is built but not on Flathub (`packaging/flatpak/FLATHUB.md`
