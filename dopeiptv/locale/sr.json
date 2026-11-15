@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "Kod za Quick Connect je istekao. Počnite ponovo.",
   "err_ms_pin_expired": "Prijava na Plex je trajala predugo. Pokušajte ponovo.",
   "err_ms_plex_unreachable": "Plex nije dostupan. Proverite vezu i pokušajte ponovo.",
-  "err_ms_no_stream": "Server nije dao strim za ovaj kanal."
+  "err_ms_no_stream": "Server nije dao strim za ovaj kanal.",
+  "airplay_unavailable": "AirPlay traži Appleove AVFoundation i AVKit, kojih nema u ovoj kopiji dopeIPTV-a.",
+  "airplay_needs_ffmpeg": "Ovaj strim mora da se pretvori za Apple TV, a ffmpeg nije pronađen.",
+  "airplay_firewall": "Zaštitni zid macOS-a blokira dolazne veze ka dopeIPTV-u, pa Apple TV ne može da preuzme strim. Dozvoli dopeIPTV u Podešavanjima sistema → Mreža → Zaštitni zid → Opcije.",
+  "airplay_bridge_failed": "Strim nije mogao da se pripremi za Apple TV: {msg}",
+  "airplay_failed": "AirPlay se nije pokrenuo: {msg}",
+  "airplay_failed_play": "Apple TV nije mogao da pusti ovaj strim.",
+  "airplay_route_lost": "AirPlay je završen — Apple TV više nije povezan.",
+  "airplay_no_route": "Nijedan Apple TV nije izabran, pa je AirPlay zaustavljen.",
+  "airplay_unreachable": "Apple TV nije stigao do ovog Maca. Ako je macOS pitao da li dopeIPTV sme da prima dolazne veze, dozvoli to (Podešavanja sistema → Mreža → Zaštitni zid → Opcije) i proveri da li je Apple TV na istoj mreži.",
+  "airplay_button": "Izaberi Apple TV",
+  "airplay_note": "Pritisni „Prebaci”, pa izaberi svoj Apple TV u Appleovom AirPlay meniju.",
+  "airplay_pick": "Izaberi svoj Apple TV u AirPlay meniju — AirPlay dugme ovde ga otvara.",
+  "airplay_on_tv": "Pušta se na Apple TV-u. AirPlay dugme ovde ga prebacuje na drugi.",
+  "airplay_cpu": "Slika se na ovom Macu pretvara za Apple TV, što opterećuje procesor dok se pušta.",
+  "airplay_menu_note": "Apple TV pušta sliku i zvuk samog strima — bira se u AirPlay meniju na panelu za prebacivanje."
 }

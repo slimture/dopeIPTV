@@ -207,21 +207,44 @@ today (`[tool.mypy] files` in `pyproject.toml`); grow that list as modules
 gain type hints. A release build also runs a GUI-less `--self-check` that
 loads the bundled libmpv.
 
-## Parked: AirPlay to Apple TV
+## AirPlay to Apple TV (macOS)
 
-Proven not viable on 2026-07-18 with real hardware: pyatv 0.18.0 pairs and
-connects to an Apple TV 4K fine, but `play_url` fails (HTTP 500 on
-`/playback-info`, nothing renders on the TV) — even with Apple's own public
-HLS demo stream, so it is not a provider-format problem. Known upstream
-issue ([pyatv #2512](https://github.com/postlund/pyatv/issues/2512), closed
-unresolved): tvOS 18 effectively broke the legacy AirPlay video API for
-third-party senders.
+AirPlay goes through Apple's own frameworks, so it is a macOS feature:
+`services/airplay_macos.py` makes an `AVPlayer` with
+`allowsExternalPlayback` and puts AVKit's `AVRoutePickerView`, with that
+player set, in the cast dialog's "AirPlay (Apple TV)" row (a native child
+of the dialog, never of the main window, where the video surface is). The
+user picks the Apple TV in Apple's own menu - the app opens it after Cast,
+and the button reopens it - and the Apple TV fetches the stream itself.
+The player never plays on the Mac: it starts when `externalPlaybackActive`
+turns on and pauses the moment it goes off (the cast ends after a few
+seconds without it, or two minutes with nothing picked). Everything on
+AVFoundation runs on the GUI thread: the cast's worker threads queue onto
+it, a 0.5 s poll reads time, status and the route, and the end and failure
+notifications run on the main queue. The receiver joins `CastHub` through
+`add_receiver` (`ui/mw_airplay.py`), so the strip drives it like any cast.
 
-To re-evaluate after a pyatv release that mentions AirPlay-video/`play_url`
-fixes, run `python3 tools/airplay_probe.py --demo` against an Apple TV
-(2 minutes; pairing credentials are cached). If the demo stream plays, the
-planned design is: an `AppleTVManager` mirroring `ChromecastManager` (lazy
-import, its own asyncio loop in a worker thread), Apple TVs listed in the
-shared cast dialog, a PIN pairing flow, `.m3u8` forced for live, and the
-option hidden for `.mkv` VOD (AirPlay cannot play Matroska). macOS users
-always have the OS-level fallback: Control Center screen mirroring.
+An Apple TV plays HLS and MP4, not a running MPEG-TS, Matroska or MP2
+sound. `providers/airplay_bridge.py` decides (`plan`): what is already
+HLS or MP4 with codecs it takes goes as it is (an Xtream channel's .m3u8,
+an MP4 film), and falls back to the bridge once if the TV refuses it;
+anything else - or a source that sends its own user agent, headers or
+proxy (Nerd), which the TV would not - is repackaged by the bundled ffmpeg
+as HLS with fragmented-MP4 segments (2 s; a channel's playlist rolls over
+five minutes, a film keeps every segment and is served as VOD once ffmpeg
+ends it), on a small HTTP server on the LAN address under a random token,
+removed when the cast stops. H.264/HEVC (tagged `hvc1`) and AAC/AC-3/E-AC-3
+are copied; other sound becomes AAC, MPEG-2 and other pictures H.264 (the
+panel says that costs the processor). The codecs come from mpv when the
+title is playing, else from `ffmpeg -i` (the Mac bundles no ffprobe). The
+loopback rewind-buffer address never goes to the TV. A firewall that
+blocks the app (`socketfilterfw`) refuses the cast with the way to allow
+it; a TV that never reaches the bridge after 20 s is told the same.
+
+Why not elsewhere: pyatv was tried on real hardware in July 2026 (an Apple
+TV 4K pairs and connects, `play_url` fails with HTTP 500 on
+`/playback-info` even for Apple's own demo stream; tvOS 18 broke the legacy
+AirPlay video API for third-party senders, [pyatv
+#2512](https://github.com/postlund/pyatv/issues/2512)). Only Apple's own
+stack still sends video, so Linux and Windows have no AirPlay entry.
+

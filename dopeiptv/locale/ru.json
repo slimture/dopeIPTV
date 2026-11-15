@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "Код Quick Connect истёк. Начните заново.",
   "err_ms_pin_expired": "Вход в Plex занял слишком много времени. Попробуйте ещё раз.",
   "err_ms_plex_unreachable": "Не удалось связаться с Plex. Проверьте подключение и попробуйте ещё раз.",
-  "err_ms_no_stream": "Сервер не выдал поток для этого канала."
+  "err_ms_no_stream": "Сервер не выдал поток для этого канала.",
+  "airplay_unavailable": "Для AirPlay нужны AVFoundation и AVKit от Apple, а в этой копии dopeIPTV их нет.",
+  "airplay_needs_ffmpeg": "Этот поток нужно преобразовать для Apple TV, но ffmpeg не найден.",
+  "airplay_firewall": "Брандмауэр macOS блокирует входящие подключения к dopeIPTV, поэтому Apple TV не может получить поток. Разрешите dopeIPTV в Системных настройках → Сеть → Брандмауэр → Параметры.",
+  "airplay_bridge_failed": "Не удалось подготовить поток для Apple TV: {msg}",
+  "airplay_failed": "AirPlay не запустился: {msg}",
+  "airplay_failed_play": "Apple TV не смогла воспроизвести этот поток.",
+  "airplay_route_lost": "AirPlay завершён — Apple TV больше не подключена.",
+  "airplay_no_route": "Apple TV не выбрана, поэтому AirPlay остановлен.",
+  "airplay_unreachable": "Apple TV не смогла связаться с этим Mac. Если macOS спрашивала, может ли dopeIPTV принимать входящие подключения, разрешите это (Системные настройки → Сеть → Брандмауэр → Параметры) и проверьте, что Apple TV в той же сети.",
+  "airplay_button": "Выбрать Apple TV",
+  "airplay_note": "Нажмите «Транслировать», затем выберите свою Apple TV в меню AirPlay от Apple.",
+  "airplay_pick": "Выберите свою Apple TV в меню AirPlay — его открывает кнопка AirPlay здесь.",
+  "airplay_on_tv": "Воспроизводится на Apple TV. Кнопка AirPlay здесь переносит его на другую.",
+  "airplay_cpu": "Изображение преобразуется на этом Mac для Apple TV, и всё время воспроизведения это нагружает процессор.",
+  "airplay_menu_note": "Apple TV воспроизводит изображение и звук самого потока — её выбирают в меню AirPlay на панели трансляции."
 }

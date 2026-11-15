@@ -69,6 +69,7 @@ from .mw_settings import _SettingsMixin
 from .mw_trakt import _TraktMixin
 from .mw_recording import _RecordingMixin
 from .mw_busy import _BusyMixin
+from .mw_airplay import _AirPlayMixin
 from .mw_cast import _CastMixin
 from .mw_chanprefs import _ChannelPrefsMixin
 from .mw_failover import _FailoverMixin
@@ -138,7 +139,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _LocalFilesMixin,
                  _PopoutMixin, _MultiviewMixin, _HomeMixin, _GuideMixin,
                  _MprisMixin,
-                 _FollowMixin, _SubtitlesMixin, _CastMixin, _DonateMixin,
+                 _FollowMixin, _SubtitlesMixin, _CastMixin, _AirPlayMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
                  _HealthMixin, _ChannelPrefsMixin, _RemoteMixin, _PhoneMixin, _CalendarMixin,
                  _EventsMixin, _ReportMixin,
@@ -258,6 +259,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Chromecasts, DLNA TVs and Kodis alike, behind one object
         # (casting.py); a Kodi added by hand is remembered in the settings.
         self.cast = CastHub(kodi=KodiManager(settings))
+        # AirPlay to an Apple TV joins it on macOS (mw_airplay).
+        self._init_airplay()
         self.rec = RecordingManager(settings, self)
         # A portal's recording asks for its address as it starts.
         self.rec.address_for = self._rec_address_for

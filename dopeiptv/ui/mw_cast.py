@@ -548,12 +548,20 @@ class _CastMixin:
         self._last_menu_subs = len(subs)
         menu = QMenu(self)
         menu.addAction(tr("cast_title"), self.manage_cast)
-        if self._cast_plays_as_is(self._cast_device):
+        is_airplay = getattr(self.cast, "is_airplay", None)
+        airplay = bool(callable(is_airplay) and is_airplay(self._cast_device))
+        if airplay or self._cast_plays_as_is(self._cast_device):
             # A TV or a Kodi plays the stream as it is. Tracks and the
             # picture setting are the converter's, and only a Chromecast is
-            # fed through it.
-            note = menu.addAction(tr("cast_kodi_note") if self._cast_is_kodi(
-                self._cast_device) else tr("cast_dlna_note"))
+            # fed through it. AirPlay's own choices are in Apple's menu, in
+            # the panel.
+            if airplay:
+                text = tr("airplay_menu_note")
+            elif self._cast_is_kodi(self._cast_device):
+                text = tr("cast_kodi_note")
+            else:
+                text = tr("cast_dlna_note")
+            note = menu.addAction(text)
             note.setEnabled(False)
             menu.exec(self.cast_bar_tracks.mapToGlobal(
                 self.cast_bar_tracks.rect().bottomLeft()))

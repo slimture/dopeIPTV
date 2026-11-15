@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "Ο κωδικός Quick Connect έληξε. Ξεκινήστε ξανά.",
   "err_ms_pin_expired": "Η σύνδεση στο Plex άργησε πολύ. Δοκιμάστε ξανά.",
   "err_ms_plex_unreachable": "Δεν ήταν δυνατή η σύνδεση με το Plex. Ελέγξτε τη σύνδεση και δοκιμάστε ξανά.",
-  "err_ms_no_stream": "Ο διακομιστής δεν έδωσε ροή για αυτό το κανάλι."
+  "err_ms_no_stream": "Ο διακομιστής δεν έδωσε ροή για αυτό το κανάλι.",
+  "airplay_unavailable": "Το AirPlay χρειάζεται τα AVFoundation και AVKit της Apple, που λείπουν από αυτό το αντίγραφο του dopeIPTV.",
+  "airplay_needs_ffmpeg": "Αυτή η ροή πρέπει να μετατραπεί για το Apple TV και δεν βρέθηκε το ffmpeg.",
+  "airplay_firewall": "Το τείχος προστασίας του macOS μπλοκάρει τις εισερχόμενες συνδέσεις προς το dopeIPTV, οπότε το Apple TV δεν μπορεί να λάβει τη ροή. Επιτρέψτε το dopeIPTV στις Ρυθμίσεις συστήματος → Δίκτυο → Τείχος προστασίας → Επιλογές.",
+  "airplay_bridge_failed": "Η ροή δεν μπόρεσε να προετοιμαστεί για το Apple TV: {msg}",
+  "airplay_failed": "Το AirPlay δεν ξεκίνησε: {msg}",
+  "airplay_failed_play": "Το Apple TV δεν μπόρεσε να αναπαράγει αυτή τη ροή.",
+  "airplay_route_lost": "Το AirPlay τερματίστηκε — το Apple TV δεν είναι πια συνδεδεμένο.",
+  "airplay_no_route": "Δεν επιλέχθηκε Apple TV, οπότε το AirPlay σταμάτησε.",
+  "airplay_unreachable": "Το Apple TV δεν έφτασε σε αυτό το Mac. Αν το macOS ρώτησε αν το dopeIPTV μπορεί να δέχεται εισερχόμενες συνδέσεις, επιτρέψτε το (Ρυθμίσεις συστήματος → Δίκτυο → Τείχος προστασίας → Επιλογές) και ελέγξτε ότι το Apple TV είναι στο ίδιο δίκτυο.",
+  "airplay_button": "Επιλογή Apple TV",
+  "airplay_note": "Πατήστε «Μετάδοση» και μετά επιλέξτε το Apple TV σας στο μενού AirPlay της Apple.",
+  "airplay_pick": "Επιλέξτε το Apple TV σας στο μενού AirPlay — το κουμπί AirPlay εδώ το ανοίγει.",
+  "airplay_on_tv": "Παίζει στο Apple TV. Το κουμπί AirPlay εδώ το μεταφέρει σε άλλο.",
+  "airplay_cpu": "Η εικόνα μετατρέπεται σε αυτό το Mac για το Apple TV, κάτι που απασχολεί τον επεξεργαστή όσο παίζει.",
+  "airplay_menu_note": "Το Apple TV παίζει την εικόνα και τον ήχο της ίδιας της ροής — επιλέγεται στο μενού AirPlay στο πάνελ μετάδοσης."
 }

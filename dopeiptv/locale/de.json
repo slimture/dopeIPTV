@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "Der Quick-Connect-Code ist abgelaufen. Fang noch einmal an.",
   "err_ms_pin_expired": "Die Anmeldung bei Plex hat zu lange gedauert. Versuch es noch einmal.",
   "err_ms_plex_unreachable": "Plex war nicht erreichbar. Prüf die Verbindung und versuch es noch einmal.",
-  "err_ms_no_stream": "Der Server hat für diesen Sender keinen Stream geliefert."
+  "err_ms_no_stream": "Der Server hat für diesen Sender keinen Stream geliefert.",
+  "airplay_unavailable": "AirPlay braucht Apples AVFoundation und AVKit, die dieser dopeIPTV-Kopie fehlen.",
+  "airplay_needs_ffmpeg": "Dieser Stream muss für das Apple TV umgewandelt werden, und ffmpeg wurde nicht gefunden.",
+  "airplay_firewall": "Die macOS-Firewall blockiert eingehende Verbindungen zu dopeIPTV, daher kann das Apple TV den Stream nicht abrufen. Erlaube dopeIPTV unter Systemeinstellungen → Netzwerk → Firewall → Optionen.",
+  "airplay_bridge_failed": "Der Stream konnte nicht für das Apple TV vorbereitet werden: {msg}",
+  "airplay_failed": "AirPlay ist nicht gestartet: {msg}",
+  "airplay_failed_play": "Das Apple TV konnte diesen Stream nicht abspielen.",
+  "airplay_route_lost": "AirPlay beendet — das Apple TV ist nicht mehr verbunden.",
+  "airplay_no_route": "Es wurde kein Apple TV ausgewählt, daher wurde AirPlay beendet.",
+  "airplay_unreachable": "Das Apple TV hat diesen Mac nicht erreicht. Falls macOS gefragt hat, ob dopeIPTV eingehende Verbindungen annehmen darf, erlaube es (Systemeinstellungen → Netzwerk → Firewall → Optionen), und prüfe, ob das Apple TV im selben Netzwerk ist.",
+  "airplay_button": "Apple TV auswählen",
+  "airplay_note": "Tippe auf „Streamen“ und wähle dann dein Apple TV in Apples AirPlay-Menü.",
+  "airplay_pick": "Wähle dein Apple TV im AirPlay-Menü — die AirPlay-Taste hier öffnet es.",
+  "airplay_on_tv": "Läuft auf dem Apple TV. Mit der AirPlay-Taste hier wechselst du zu einem anderen.",
+  "airplay_cpu": "Das Bild wird auf diesem Mac für das Apple TV umgewandelt, was den Prozessor beschäftigt, solange es läuft.",
+  "airplay_menu_note": "Das Apple TV zeigt Bild und Ton des Streams selbst — ausgewählt wird es im AirPlay-Menü im Streaming-Fenster."
 }

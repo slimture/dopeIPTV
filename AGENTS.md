@@ -52,6 +52,8 @@ map and the one-way import rule.
 | `providers/kodi.py` | Kodi as a cast target over JSON-RPC (HTTP): Player.Open with the source's user agent/headers as Kodi's `\|` options (never a loopback address), pause, seek, volume, state polling, a cast ended on Kodi itself; Kodis added by hand with their login (`kodi_devices`, never logged) |
 | `providers/mdns.py` | mDNS service discovery in plain Python: one legacy-unicast PTR question, PTR/SRV/A/TXT read back (how Kodi's `_xbmc-jsonrpc-h._tcp` is found) |
 | `providers/simkl.py` | Simkl client: PIN sign-in, scrobble start/pause/stop, watched marks, Plan to watch, the account's lists read back (one all-items answer); client id baked at build time (`bundled_client_id`, `_simkl_key.py`), token `simkl_access_token` |
+| `providers/casting.py` | `CastHub`: Chromecast and DLNA behind one object, and receivers the window adds (`add_receiver`: AirPlay on macOS) |
+| `providers/airplay_bridge.py` | AirPlay's plan and bridge, platform-neutral: what goes to an Apple TV as it is (HLS/MP4 it decodes), the rest repackaged by ffmpeg as HLS (fMP4, copy H.264/HEVC and AAC/AC-3/E-AC-3, other sound to AAC, MPEG-2 and other pictures to H.264), served on the LAN under a token; the source's user agent/headers/proxy; the macOS firewall's answer |
 | `providers/cast_bridge.py` | Re-encodes audio a Chromecast refuses (E-AC-3) so the stream still casts |
 | `providers/opensubtitles.py` | OpenSubtitles.com client (search, download, file hash) |
 | `core/stores.py` | Data persistence layer |
@@ -84,6 +86,7 @@ map and the one-way import rule.
 | `services/media_session.py` | The system's media controls on every desktop: the window's one host (`mpris_snapshot` / `mpris_command`), the session for this system (`create_session`: MPRIS on Linux, Now Playing on macOS, the SMTC on Windows), the poll and the system's commands queued onto the GUI thread (`PolledSession`); a missing bridge logs once at debug; the self-check's `bundle_problem` |
 | `services/media_macos.py` | macOS Now Playing through PyObjC: MPNowPlayingInfoCenter (title, programme or series, artwork from the image cache, live or a title's length and position, never kept for suggestions) and MPRemoteCommandCenter (play/pause, next/previous channel or episode, skip and scrub for a title) |
 | `services/media_windows.py` | Windows' System Media Transport Controls through PyWinRT: an idle MediaPlayer's controls with its command manager off, the buttons (channel up/down for a channel), the timeline, the thumbnail written from the image cache into a stream in memory |
+| `services/airplay_macos.py` | AirPlay to an Apple TV on macOS: an AVPlayer with external playback and AVKit's route picker in the cast dialog, driven on the GUI thread (poll, end notifications), never playing on the Mac; the CastHub receiver the strip drives; the self-check's `bundle_problem` |
 | `services/notify.py` | Desktop notifications over D-Bus (Linux) |
 | `services/popular.py` | Popular right now: TMDB's weekly chart matched to the provider's catalogue |
 | `core/log.py` | Central logging (`configure_logging`, `DOPEIPTV_LOG`) |
@@ -215,7 +218,8 @@ Watched filter, the nav's status), `mw_shortcuts`
 series, new-episode news), `mw_subtitles` (OpenSubtitles, subtitles
 remembered per title), `mw_guide` (the Guide page in the middle pane, its
 pop-out window), `mw_cast` (Chromecast and DLNA: the cast
-dialog, the strip, handing over from the archive), `mw_donate` (the
+dialog, the strip, handing over from the archive), `mw_airplay` (AirPlay
+to an Apple TV on macOS: the receiver added, its own endings), `mw_donate` (the
 sidebar heart, About's link, Home's card), `mw_failover` (failover to another
 source), `mw_series` (series recording rules), `mw_health` (stream
 health per channel), `mw_chanprefs` (a channel's own settings),
@@ -326,7 +330,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   `DOPEIPTV_LOG=debug` shows debug traces; `DOPEIPTV_LOG_FILE=/path` tees
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
-  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan, mediaserver, jellyfin, plex), kodi, mdns, simkl), lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log, player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, connections, mirrors, conn_test, health, nerd, nerd_lists, channel_numbers, shortcut_keys, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, night_mode, rec_mp4, viewing_stats, catchup, url_rewrite, hls_cap, remote_api, events, mqtt, mqtt_control, phone_remote, phone_page, qr, ical, report, supporter, sync, chacha20poly1305, discord_rpc, together, backup, doh, cert_pin, net_route, net_adapter, net_bridge, live_latency) and `services/` (failover, share, resume,
+  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker, boxes, enigma2, tvheadend, hdhomerun, lan_scan, airplay_bridge), mediaserver, jellyfin, plex), kodi, mdns, simkl), lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log, player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, gcguard, contest, connections, mirrors, conn_test, health, nerd, nerd_lists, channel_numbers, shortcut_keys, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, night_mode, rec_mp4, viewing_stats, catchup, url_rewrite, hls_cap, remote_api, events, mqtt, mqtt_control, phone_remote, phone_page, qr, ical, report, supporter, sync, chacha20poly1305, discord_rpc, together, backup, doh, cert_pin, net_route, net_adapter, net_bridge, live_latency) and `services/` (failover, share, resume,
   coverart, reminders, mpris, media_session, media_macos, media_windows, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list

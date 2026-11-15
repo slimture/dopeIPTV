@@ -26,6 +26,9 @@ dependencies = [
     # requirements.txt): Now Playing on macOS, the SMTC on Windows.
     "pyobjc-framework-MediaPlayer>=10.0,<14; sys_platform == 'darwin'",
     "pyobjc-framework-Cocoa>=10.0,<14; sys_platform == 'darwin'",
+    # AirPlay to an Apple TV, macOS only (see requirements.txt).
+    "pyobjc-framework-AVFoundation>=10.0,<14; sys_platform == 'darwin'",
+    "pyobjc-framework-AVKit>=10.0,<14; sys_platform == 'darwin'",
     "winrt-runtime>=4.0,<5; sys_platform == 'win32'",
     "winrt-Windows.Foundation>=4!10.0.28000,<5!0; sys_platform == 'win32'",
     "winrt-Windows.Media>=4!10.0.28000,<5!0; sys_platform == 'win32'",
@@ -162,6 +165,8 @@ files = [
     "dopeiptv/services/media_session.py",
     "dopeiptv/services/media_macos.py",
     "dopeiptv/services/media_windows.py",
+    "dopeiptv/services/airplay_macos.py",
+    "dopeiptv/providers/airplay_bridge.py",
     "dopeiptv/services/notify.py",
     "dopeiptv/services/popular.py",
     "dopeiptv/media/subtitle_text.py",

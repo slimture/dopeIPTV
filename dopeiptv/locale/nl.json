@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "De Quick Connect-code is verlopen. Begin opnieuw.",
   "err_ms_pin_expired": "Inloggen bij Plex duurde te lang. Probeer het opnieuw.",
   "err_ms_plex_unreachable": "Plex was niet bereikbaar. Controleer de verbinding en probeer het opnieuw.",
-  "err_ms_no_stream": "De server gaf geen stream voor deze zender."
+  "err_ms_no_stream": "De server gaf geen stream voor deze zender.",
+  "airplay_unavailable": "AirPlay heeft AVFoundation en AVKit van Apple nodig, en die ontbreken in deze kopie van dopeIPTV.",
+  "airplay_needs_ffmpeg": "Deze stream moet voor de Apple TV worden omgezet, en ffmpeg is niet gevonden.",
+  "airplay_firewall": "De firewall van macOS blokkeert inkomende verbindingen met dopeIPTV, dus de Apple TV kan de stream niet ophalen. Sta dopeIPTV toe in Systeeminstellingen → Netwerk → Firewall → Opties.",
+  "airplay_bridge_failed": "De stream kon niet voor de Apple TV worden klaargemaakt: {msg}",
+  "airplay_failed": "AirPlay is niet gestart: {msg}",
+  "airplay_failed_play": "De Apple TV kon deze stream niet afspelen.",
+  "airplay_route_lost": "AirPlay gestopt — de Apple TV is niet meer verbonden.",
+  "airplay_no_route": "Er is geen Apple TV gekozen, dus AirPlay is gestopt.",
+  "airplay_unreachable": "De Apple TV heeft deze Mac niet bereikt. Vroeg macOS of dopeIPTV inkomende verbindingen mag accepteren, sta het dan toe (Systeeminstellingen → Netwerk → Firewall → Opties) en controleer of de Apple TV op hetzelfde netwerk zit.",
+  "airplay_button": "Kies een Apple TV",
+  "airplay_note": "Druk op ‘Casten’ en kies dan je Apple TV in het AirPlay-menu van Apple.",
+  "airplay_pick": "Kies je Apple TV in het AirPlay-menu — de AirPlay-knop hier opent het.",
+  "airplay_on_tv": "Speelt af op de Apple TV. Met de AirPlay-knop hier zet je het op een andere.",
+  "airplay_cpu": "Het beeld wordt op deze Mac voor de Apple TV omgezet, wat de processor bezighoudt zolang het speelt.",
+  "airplay_menu_note": "De Apple TV speelt het beeld en geluid van de stream zelf — je kiest hem in het AirPlay-menu in het cast-paneel."
 }

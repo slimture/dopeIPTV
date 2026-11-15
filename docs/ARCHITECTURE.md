@@ -43,6 +43,8 @@ dopeiptv/
     simkl.py           Simkl sync (scrobbles, watched, Plan to watch)
     cast_bridge.py     Local bridge that re-encodes the audio a Chromecast
                        refuses (E-AC-3) so the stream still casts
+    airplay_bridge.py  AirPlay: what goes to an Apple TV as it is, the rest
+                       as HLS by ffmpeg on the LAN (token, cleanup)
     opensubtitles.py   OpenSubtitles.com REST client (search, download, hash)
 
   core/                Storage, background work, OS integration
@@ -126,6 +128,8 @@ dopeiptv/
                        poll, commands queued onto the GUI thread
     media_macos.py     macOS Now Playing (PyObjC's MediaPlayer)
     media_windows.py   Windows' System Media Transport Controls (PyWinRT)
+    airplay_macos.py   AirPlay on macOS: AVPlayer + AVKit's route picker,
+                       a CastHub receiver (PyObjC's AVFoundation, AVKit)
     notify.py          Desktop notifications (org.freedesktop.Notifications)
     popular.py         Popular right now: TMDB's chart of the week matched
                        against the provider's catalogue (Home shelves)
@@ -158,6 +162,7 @@ dopeiptv/
                        History's Watched filter, the nav's status)
     mw_shortcuts.py    Keyboard shortcuts + registry
     mw_cast.py         Casting: the cast dialog, the strip, archive hand-over
+    mw_airplay.py      AirPlay (macOS): the receiver added, its own endings
     mw_popout.py       Detached-window ("pop out") player mixin
     mw_multiview.py    Multiview: 2/4/6/9 live streams (own mpv per cell)
     mw_connections.py  Connections to the account: counted, warned about
@@ -273,8 +278,10 @@ for player-overlay colours, which is why `ui/__init__` exposes
 - pychromecast (Chromecast; bundled in every packaged build)
 - PyObjC's MediaPlayer wrapper on macOS and PyWinRT's Windows.Media packages
   on Windows (the system's media controls; installed and bundled only on
-  their own system - the app runs without them)
-- ffmpeg CLI (standalone recording; bundled in every packaged build)
+  their own system - the app runs without them); PyObjC's AVFoundation and
+  AVKit on macOS for AirPlay, the same way
+- ffmpeg CLI (standalone recording, the cast and AirPlay bridges; bundled in
+  every packaged build)
 
 Everything else (DLNA, Kodi and mDNS, MPRIS over D-Bus, Discord's IPC,
 OpenSubtitles, TMDB, Trakt, Simkl, the Stalker portal protocol, music tags) is written against the standard

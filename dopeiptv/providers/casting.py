@@ -1,10 +1,11 @@
-"""One front for every kind of receiver: Chromecast, DLNA and Kodi.
+"""One front for every kind of receiver: Chromecast, DLNA and Kodi, and
+those the window adds (AirPlay on macOS, services/airplay_macos.py).
 
 The window casts through a single object. Each call goes to the manager the
 chosen device belongs to - a DLNA renderer carries the " (DLNA)" suffix in
-its name, a Kodi " (Kodi)" - and everything the window asks about the
-running cast (where it has got to, its state, its volume) is answered by the
-one running it.
+its name, a Kodi " (Kodi)", an added receiver knows its own entries - and
+everything the window asks about the running cast (where it has got to, its
+state, its volume) is answered by the one running it.
 """
 from __future__ import annotations
 
@@ -24,16 +25,26 @@ class CastHub:
             else ChromecastManager()
         self.dlna = dlna if dlna is not None else DlnaManager()
         self.kodi = kodi if kodi is not None else KodiManager()
+        # Receivers added from above (add_receiver): each answers knows(),
+        # entries() and what every manager answers.
+        self.added: list[Any] = []
         self._current: Any = self.chromecast
 
+    def add_receiver(self, mgr: Any) -> None:
+        self.added.append(mgr)
+
     def _managers(self) -> tuple[Any, ...]:
-        return (self.chromecast, self.dlna, self.kodi)
+        return (self.chromecast, self.dlna, self.kodi, *self.added)
 
     def is_dlna(self, name: str | None) -> bool:
         return bool(name) and self.dlna.knows(name)
 
     def is_kodi(self, name: str | None) -> bool:
         return bool(name) and self.kodi.knows(name)
+
+    def is_airplay(self, name: str | None) -> bool:
+        return bool(name) and any(getattr(m, "KIND", "") == "airplay"
+                                  and m.knows(name) for m in self.added)
 
     def plays_as_is(self, name: str | None) -> bool:
         """A device that fetches the stream itself and plays it as it is -
@@ -46,6 +57,9 @@ class CastHub:
         return bool(getattr(self._current, "gone", False))
 
     def _for(self, name: str) -> Any:
+        for mgr in self.added:
+            if mgr.knows(name):
+                return mgr
         if self.is_kodi(name):
             return self.kodi
         return self.dlna if self.is_dlna(name) else self.chromecast
@@ -145,7 +159,8 @@ class CastHub:
             t.start()
         for t in threads:
             t.join(20)
-        return found["cc"] + found["dlna"] + found["kodi"]
+        added = [n for m in self.added for n in m.entries()]
+        return added + found["cc"] + found["dlna"] + found["kodi"]
 
     def cast(self, device_name: str, url: str, title: str,
              *args: Any, **kwargs: Any) -> str:

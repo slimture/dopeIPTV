@@ -109,6 +109,10 @@ Platform notes that are easy to forget:
   a change in `services/media_macos.py` or `media_windows.py` is tried on
   a real Mac or PC (Control Center, the lock screen, the volume flyout, the
   keys) before it ships.
+- AirPlay (macOS) comes through PyObjC's AVFoundation and AVKit in the same
+  way, and `--self-check` fails a Mac bundle without them. A change in
+  `services/airplay_macos.py` is tried with a real Apple TV: Apple's menu,
+  a channel and a film, pause, seek, the firewall's question.
 
 ## Cutting a release
 
@@ -311,8 +315,9 @@ tests check that placeholders line up and that every `tr("…")` key exists.
   When it has had a release or two without trouble, drop the label.
 - **Flatpak** is built but not on Flathub (`packaging/flatpak/FLATHUB.md`
   has what a submission needs); its build leg is experimental.
-- **AirPlay** was tried and parked (tvOS broke the API third-party senders
-  use) - `docs/DEVELOPER_NOTES.md` says how to re-check.
+- **AirPlay** is macOS only (AVFoundation and AVKit; tvOS broke the API
+  other senders use) and has not been tried on a real Mac and Apple TV
+  yet - `docs/DEVELOPER_NOTES.md` says how it works.
 - Windows code signing (see above).
 - On the website, a few Serbian strings are in Cyrillic while the rest of
   the Serbian page is Latin.

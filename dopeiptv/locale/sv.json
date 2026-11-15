@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "Quick Connect-koden har gått ut. Börja om.",
   "err_ms_pin_expired": "Inloggningen hos Plex tog för lång tid. Försök igen.",
   "err_ms_plex_unreachable": "Det gick inte att nå Plex. Kontrollera anslutningen och försök igen.",
-  "err_ms_no_stream": "Servern lämnade ingen ström för den här kanalen."
+  "err_ms_no_stream": "Servern lämnade ingen ström för den här kanalen.",
+  "airplay_unavailable": "AirPlay behöver Apples AVFoundation och AVKit, som saknas i den här kopian av dopeIPTV.",
+  "airplay_needs_ffmpeg": "Strömmen måste konverteras för Apple TV, och ffmpeg hittades inte.",
+  "airplay_firewall": "Brandväggen i macOS blockerar inkommande anslutningar till dopeIPTV, så din Apple TV kan inte hämta strömmen. Tillåt dopeIPTV i Systeminställningar → Nätverk → Brandvägg → Alternativ.",
+  "airplay_bridge_failed": "Strömmen kunde inte göras redo för Apple TV: {msg}",
+  "airplay_failed": "AirPlay startade inte: {msg}",
+  "airplay_failed_play": "Din Apple TV kunde inte spela den här strömmen.",
+  "airplay_route_lost": "AirPlay avslutades — din Apple TV är inte längre ansluten.",
+  "airplay_no_route": "Ingen Apple TV valdes, så AirPlay stoppades.",
+  "airplay_unreachable": "Din Apple TV har inte nått den här Macen. Om macOS frågade om dopeIPTV får ta emot inkommande anslutningar, tillåt det (Systeminställningar → Nätverk → Brandvägg → Alternativ), och kolla att din Apple TV är på samma nätverk.",
+  "airplay_button": "Välj en Apple TV",
+  "airplay_note": "Tryck på ”Casta” och välj sedan din Apple TV i Apples AirPlay-meny.",
+  "airplay_pick": "Välj din Apple TV i AirPlay-menyn — AirPlay-knappen här öppnar den.",
+  "airplay_on_tv": "Spelas på din Apple TV. AirPlay-knappen här flyttar den till en annan.",
+  "airplay_cpu": "Bilden konverteras på den här Macen för din Apple TV, vilket håller processorn sysselsatt medan den spelas.",
+  "airplay_menu_note": "Din Apple TV spelar strömmens egen bild och ljud — den väljs i AirPlay-menyn i cast-panelen."
 }

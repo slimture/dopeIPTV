@@ -1,0 +1,735 @@
+"""AirPlay to an Apple TV: the plan and the HLS bridge (providers/
+airplay_bridge.py), run here with a stand-in for ffmpeg and a real HTTP
+server, and the macOS side (services/airplay_macos.py) driven through
+stand-ins for PyObjC's AVFoundation and AVKit, which the suite never has.
+"""
+import importlib.machinery
+import os
+import sys
+import threading
+import time
+import types
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+import pytest
+
+from dopeiptv.providers import airplay_bridge as ab
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+_REPO = Path(__file__).resolve().parent.parent
+
+
+@pytest.fixture(scope="module")
+def qapp():
+    from PyQt6.QtWidgets import QApplication
+    return QApplication.instance() or QApplication([])
+
+
+def _pump(qapp, seconds=0.05):
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        qapp.processEvents()
+        time.sleep(0.005)
+
+
+# -- the plan -----------------------------------------------------------------
+
+def test_hls_and_mp4_the_apple_tv_decodes_go_as_they_are():
+    p = ab.plan("http://p/live/u/pw/1.m3u8", "http://p/live/u/pw/1.ts",
+                ["h264", "aac"], live=True)
+    assert p.direct and p.url.endswith("1.m3u8") and p.live
+    assert ab.plan("http://p/movie/u/pw/7.mp4", "", []).direct  # unknown: try
+    # A running transport stream or Matroska needs the bridge.
+    for url in ("http://p/live/u/pw/1.ts", "http://p/movie/u/pw/7.mkv",
+                "/home/me/Recordings/news.ts"):
+        p = ab.plan(url, url, ["h264", "aac"])
+        assert not p.direct and p.video == "copy" and p.audio == "copy"
+
+
+def test_what_the_apple_tv_refuses_is_converted_and_only_that():
+    p = ab.plan("http://p/1.m3u8", "http://p/1.ts", ["h264", "mp2"])
+    assert not p.direct and p.url == "http://p/1.ts"
+    assert (p.video, p.audio) == ("copy", "aac") and not p.costs_cpu
+    p = ab.plan("http://p/1.m3u8", "http://p/1.ts", ["mpeg2video", "ac3"])
+    assert (p.video, p.audio) == ("h264", "copy") and p.costs_cpu
+    p = ab.plan("", "http://p/1.ts", ["hevc", "eac3"])
+    assert p.hevc and p.video == "copy"
+    # mpv's names and aliases; a name that is neither is assumed fine.
+    assert ab.split_codecs(["H264", "ac-3", "e-ac-3", "something"]) == (
+        ["h264"], ["ac3", "eac3"])
+
+
+def test_a_sound_track_or_the_source_s_own_network_needs_the_bridge():
+    url = "http://p/live/u/pw/1.m3u8"
+    assert not ab.plan(url, url, ["h264", "aac"], audio_track=1).direct
+    p = ab.plan(url, url, ["h264", "aac"], own_network=True)
+    assert not p.direct and "user agent" in p.why
+
+
+def test_the_rewind_buffer_s_address_never_goes_to_the_tv():
+    for url in ("http://127.0.0.1:41234/tok/live.m3u8",
+                "http://localhost:8080/x.mp4", "http://[::1]:9/x.m3u8"):
+        assert ab.is_loopback(url) and not ab.direct_ok(url)
+        assert not ab.plan(url, url, ["h264", "aac"]).direct
+
+
+def test_what_ffmpeg_finds_refines_the_plan():
+    found = ab.parse_probe(
+        "Input #0, mpegts, from 'http://p/1.ts':\n"
+        "  Duration: N/A, start: 1.400000, bitrate: N/A\n"
+        "  Stream #0:0[0x100]: Video: mpeg2video (Main), yuv420p, 720x576\n"
+        "  Stream #0:1[0x101](swe): Audio: mp2, 48000 Hz, stereo, 192 kb/s\n"
+        "  Stream #0:2[0x102](eng): Audio: ac3, 48000 Hz, 5.1(side)\n"
+        "Input #1, x: Stream #1:0: Video: h264\n")
+    assert found == {"video": "mpeg2video", "audio": ["mp2", "ac3"],
+                     "duration": 0.0}
+    p = ab.plan("", "http://p/1.ts", [])
+    assert (p.video, p.audio) == ("copy", "copy")
+    p = ab.refine(p, found)
+    assert (p.video, p.audio) == ("h264", "aac")
+    p = ab.refine(ab.plan("", "http://p/1.ts", [], audio_track=1), found)
+    assert p.audio == "copy"                     # the second track is AC-3
+    film = ab.parse_probe("  Duration: 01:30:00.50, start: 0\n"
+                          "  Stream #0:0: Video: hevc (Main 10)\n"
+                          "  Stream #0:1: Video: mjpeg, (attached pic)\n")
+    assert film["duration"] == 5400.5 and film["video"] == "hevc"
+
+
+# -- ffmpeg's command line -----------------------------------------------------
+
+def test_ffmpeg_copies_into_fmp4_hls_relative_to_its_folder():
+    p = ab.plan("", "http://p/live/u/pw/1.ts", ["h264", "aac"], live=True)
+    args = ab.ffmpeg_args("ffmpeg", p, net=["-user_agent", "X"])
+    assert args[args.index("-c:v") + 1] == "copy"
+    assert args[args.index("-c:a") + 1] == "copy"
+    assert args[args.index("-hls_segment_type") + 1] == "fmp4"
+    assert args[args.index("-hls_time") + 1] == str(ab.SEGMENT_S)
+    assert args[args.index("-hls_list_size") + 1] == str(
+        ab.LIVE_WINDOW_S // ab.SEGMENT_S)
+    assert "delete_segments" in args[args.index("-hls_flags") + 1]
+    assert args[-1] == ab.PLAYLIST and not os.path.isabs(args[-1])
+    assert "-sn" in args and "-tag:v" not in args
+    assert args.index("-user_agent") < args.index("-i")
+
+
+def test_a_film_keeps_every_segment_and_starts_where_asked():
+    p = ab.plan("", "/films/Ocean's Eleven.mkv", ["hevc", "dts"])
+    args = ab.ffmpeg_args("ffmpeg", p, start=1830.5)
+    assert args[args.index("-hls_list_size") + 1] == "0"
+    assert args[args.index("-hls_playlist_type") + 1] == "event"
+    assert args[args.index("-tag:v") + 1] == "hvc1"
+    assert args[args.index("-c:a") + 1] == "aac"
+    assert args[args.index("-ss") + 1] == "1830.500"
+    assert args.index("-ss") < args.index("-i")
+    assert os.path.isabs(args[args.index("-i") + 1])
+
+
+def test_a_converted_picture_is_deinterlaced_with_a_keyframe_per_segment(
+        monkeypatch):
+    monkeypatch.setattr(ab, "video_encoder", lambda: "libx264")
+    p = ab.plan("", "http://p/1.ts", ["mpeg2video", "mp2"], live=True)
+    args = ab.ffmpeg_args("ffmpeg", p)
+    assert args[args.index("-c:v") + 1] == "libx264"
+    assert args[args.index("-vf") + 1] == "yadif=deint=1"
+    assert "-force_key_frames" in args and "yuv420p" in args
+
+
+def test_ffmpeg_reads_the_provider_as_the_source_plays():
+    opts = ab.input_options("http://p/live/1.ts", "TiviMate/5",
+                            {"Referer": "http://p/", "X-Bad": "a\r\nb"},
+                            "http://proxy:3128")
+    assert opts[opts.index("-user_agent") + 1] == "TiviMate/5"
+    assert opts[opts.index("-headers") + 1] == "Referer: http://p/\r\n"
+    assert opts[opts.index("-http_proxy") + 1] == "http://proxy:3128"
+    assert "-reconnect" in opts
+    # No reconnect for an archive window; nothing at all for a file or UDP.
+    assert "-reconnect" not in ab.input_options(
+        "http://p/timeshift/u/pw/60/2026-11-15:20-00/1.ts", "X")
+    assert ab.input_options("/home/me/x.ts", "X") == []
+    assert ab.input_options("udp://@239.0.0.1:1234", "X") == []
+
+
+def test_a_finished_film_is_served_as_a_vod_playlist():
+    growing = b"#EXTM3U\n#EXT-X-PLAYLIST-TYPE:EVENT\n#EXTINF:2,\ns00000.m4s\n"
+    assert ab.serve_playlist(growing) == growing
+    done = growing + b"#EXT-X-ENDLIST\n"
+    assert b"PLAYLIST-TYPE:VOD" in ab.serve_playlist(done)
+    assert ab.segments_in(done) == 1
+
+
+def test_the_firewall_s_answers():
+    on, off = "Firewall is enabled. (State = 1)", "Firewall is disabled. (State = 0)"
+    allowed = "The application /Applications/dopeIPTV.app is permitted"
+    blocked = "The application /Applications/dopeIPTV.app is blocked"
+    assert not ab.parse_firewall(off, "", blocked)
+    assert not ab.parse_firewall(on, "Firewall has block all state set to disabled.",
+                                 allowed)
+    assert ab.parse_firewall(on, "Firewall has block all state set to enabled.",
+                             allowed)
+    assert ab.parse_firewall(on, "", blocked)
+    assert ab.parse_firewall("Firewall is enabled. (State = 2)", "", allowed)
+    assert not ab.parse_firewall(on, "", "")        # not asked yet: macOS asks
+    assert not ab.parse_firewall("", "", blocked)   # no answer: not refused
+    assert not ab.firewall_blocks() or sys.platform == "darwin"
+
+
+# -- the bridge, for real ----------------------------------------------------------
+
+_FAKE = r"""
+import os, sys, time
+open("init.mp4", "wb").write(b"INIT")
+n = int(sys.argv[1])
+end = sys.argv[2] == "end"
+for i in range(n):
+    open("s%05d.m4s" % i, "wb").write(b"SEG%d" % i)
+    body = "#EXTM3U\n#EXT-X-PLAYLIST-TYPE:EVENT\n#EXT-X-MAP:URI=\"init.mp4\"\n"
+    body += "".join("#EXTINF:2,\ns%05d.m4s\n" % j for j in range(i + 1))
+    if end and i == n - 1:
+        body += "#EXT-X-ENDLIST\n"
+    open("index.m3u8.tmp", "w").write(body)
+    os.replace("index.m3u8.tmp", "index.m3u8")
+if sys.argv[2] == "fail":
+    sys.stderr.write("Unknown encoder 'h264_videotoolbox'\n")
+    sys.exit(1)
+if not end:
+    time.sleep(60)
+"""
+
+
+@pytest.fixture
+def fake_ffmpeg(monkeypatch):
+    seen = {}
+
+    def use(segments=4, how="live"):
+        def args(exe, p, start=0.0, net=None):
+            seen.update(plan=p, start=start, net=net)
+            return [sys.executable, "-c", _FAKE, str(segments), how]
+        monkeypatch.setattr(ab, "ffmpeg_args", args)
+        return seen
+    return use
+
+
+def _get(url, method="GET"):
+    req = urllib.request.Request(url, method=method)
+    with urllib.request.urlopen(req, timeout=10) as r:
+        return r.status, r.headers, r.read()
+
+
+def test_the_bridge_serves_the_playlist_under_its_token(fake_ffmpeg):
+    seen = fake_ffmpeg(4, "live")
+    b = ab.AirPlayBridge()
+    b.exe = sys.executable
+    p = ab.plan("", "http://p/live/u/pw/1.ts", ["h264", "mp2"], live=True)
+    url = b.start(p, net=["-user_agent", "X"])
+    folder = b.folder
+    try:
+        assert seen["net"] == ["-user_agent", "X"]
+        assert url.startswith("http://") and url.endswith("/index.m3u8")
+        assert len(b.prefix) > 20                     # unguessable
+        assert b.wait_ready(10) and b.hls
+        code, headers, body = _get(url)
+        assert code == 200 and body.startswith(b"#EXTM3U")
+        assert headers["Content-Type"] == "application/vnd.apple.mpegurl"
+        assert headers["Cache-Control"] == "no-cache"
+        base = url.rsplit("/", 1)[0]
+        code, headers, body = _get(base + "/s00001.m4s")
+        assert body == b"SEG1" and headers["Content-Type"] == "video/iso.segment"
+        assert _get(base + "/init.mp4", "HEAD")[0] == 200
+        # Only this computer asked: not the Apple TV, not yet.
+        assert not b.remote_seen
+        root = url.split(b.prefix)[0]
+        for bad in ("/index.m3u8", "/wrongtoken/index.m3u8",
+                    b.prefix + "../index.m3u8", b.prefix + "..%2Fx",
+                    b.prefix + ".hidden", b.prefix + "nothere.m4s"):
+            with pytest.raises(urllib.error.HTTPError) as e:
+                _get(root + bad)
+            assert e.value.code == 404, bad
+        b.saw("192.168.1.50")
+        assert b.remote_seen
+    finally:
+        b.stop()
+    assert not os.path.exists(folder) and not b.hls and b.url == ""
+    with pytest.raises(urllib.error.URLError):
+        _get(url)
+    b.stop()                                          # twice is fine
+
+
+def test_a_live_playlist_waits_for_three_segments(fake_ffmpeg):
+    fake_ffmpeg(2, "live")
+    b = ab.AirPlayBridge()
+    b.exe = sys.executable
+    b.start(ab.plan("", "http://p/live/1.ts", [], live=True))
+    try:
+        assert not b.wait_ready(1.5)
+        assert "no stream" in b.error
+    finally:
+        b.stop()
+    fake_ffmpeg(1, "end")                             # a short film
+    b.start(ab.plan("", "/films/short.mkv", []))
+    try:
+        assert b.wait_ready(10)
+        assert b"PLAYLIST-TYPE:VOD" in _get(b.url)[2]
+    finally:
+        b.stop()
+
+
+def test_ffmpeg_s_own_words_say_why_it_failed(fake_ffmpeg):
+    fake_ffmpeg(0, "fail")
+    b = ab.AirPlayBridge()
+    b.exe = sys.executable
+    b.start(ab.plan("", "http://p/1.ts", ["mpeg2video"], live=True))
+    try:
+        assert not b.wait_ready(10)
+        assert "Unknown encoder" in b.error
+    finally:
+        b.stop()
+
+
+def test_a_stopping_cast_does_not_wait_for_the_bridge(fake_ffmpeg):
+    fake_ffmpeg(0, "live")
+    b = ab.AirPlayBridge()
+    b.exe = sys.executable
+    b.start(ab.plan("", "http://p/1.ts", [], live=True))
+    began = time.monotonic()
+    try:
+        assert not b.wait_ready(20, stopping=lambda: True)
+        assert time.monotonic() - began < 2
+    finally:
+        b.stop()
+
+
+# -- the macOS side, with stand-ins for PyObjC ----------------------------------------
+
+def _module(name, **attrs):
+    mod = types.ModuleType(name)
+    mod.__spec__ = importlib.machinery.ModuleSpec(name, None)
+    for k, v in attrs.items():
+        setattr(mod, k, v)
+    return mod
+
+
+class _Time:
+    def __init__(self, s):
+        self.value, self.timescale, self.flags = int(s * 600), 600, 1
+
+
+class _Item:
+    def __init__(self, url):
+        self.url, self._status, self._dur = url, 1, _Time(0)
+        self._dur.flags = 17                       # indefinite: live
+
+    def status(self):
+        return self._status
+
+    def duration(self):
+        return self._dur
+
+    def error(self):
+        return None
+
+
+class _Player:
+    made = []
+
+    def __init__(self, item):
+        self.item, self.calls = item, []
+        self.external, self._rate, self.t, self.allows = False, 0.0, 0.0, None
+        _Player.made.append(self)
+
+    @classmethod
+    def playerWithPlayerItem_(cls, item):
+        return cls(item)
+
+    def setAllowsExternalPlayback_(self, on):
+        self.allows = on
+
+    def isExternalPlaybackActive(self):
+        return self.external
+
+    def play(self):
+        self.calls.append(("play", threading.get_ident()))
+        self._rate = 1.0
+
+    def pause(self):
+        self.calls.append(("pause", threading.get_ident()))
+        self._rate = 0.0
+
+    def rate(self):
+        return self._rate
+
+    def timeControlStatus(self):
+        return 2 if self._rate else 0
+
+    def currentTime(self):
+        return _Time(self.t)
+
+    def currentItem(self):
+        return self.item
+
+    def replaceCurrentItemWithPlayerItem_(self, item):
+        self.item = item
+
+    def seekToTime_(self, t):
+        self.calls.append(("seek", t))
+
+    def setVolume_(self, v):
+        self.calls.append(("volume", v, threading.get_ident()))
+
+    def setMuted_(self, m):
+        self.muted = m
+
+
+class _Picker:
+    def __init__(self):
+        self.player, self.super_, self.button = None, None, _Button()
+
+    @classmethod
+    def alloc(cls):
+        return cls()
+
+    def initWithFrame_(self, frame):
+        self.frame = frame
+        return self
+
+    def superview(self):
+        return self.super_
+
+    def removeFromSuperview(self):
+        self.super_ = None
+
+    def setFrame_(self, f):
+        self.frame = f
+
+    def setAutoresizingMask_(self, m):
+        self.mask = m
+
+    def setPlayer_(self, p):
+        self.player = p
+
+    def subviews(self):
+        return [types.SimpleNamespace(isKindOfClass_=lambda _c: False),
+                self.button]
+
+
+class _Button:
+    clicks = 0
+
+    def isKindOfClass_(self, cls):
+        return cls is _Button
+
+    def performClick_(self, _sender):
+        _Button.clicks += 1
+
+
+class _View:
+    def bounds(self):
+        return ((0, 0), (36, 28))
+
+    def addSubview_(self, v):
+        v.super_ = self
+
+
+class _Center:
+    def __init__(self):
+        self.blocks = {}
+
+    def addObserverForName_object_queue_usingBlock_(self, name, item, q, block):
+        self.blocks[name] = block
+        return name
+
+    def removeObserver_(self, token):
+        self.blocks.pop(token, None)
+
+
+@pytest.fixture
+def macos(monkeypatch):
+    from dopeiptv.services import airplay_macos as am
+    center = _Center()
+    av = _module("AVFoundation", AVPlayer=_Player, AVPlayerItem=types.SimpleNamespace(
+        playerItemWithURL_=_Item))
+    kit = _module("AVKit", AVRoutePickerView=_Picker)
+    fd = _module("Foundation",
+                 NSURL=types.SimpleNamespace(URLWithString_=lambda u: u or None),
+                 NSNotificationCenter=types.SimpleNamespace(defaultCenter=lambda: center),
+                 NSOperationQueue=types.SimpleNamespace(mainQueue=lambda: "main"))
+    ak = _module("AppKit", NSButton=_Button)
+    objc = _module("objc", objc_object=lambda c_void_p=None: _View())
+    for mod in (av, kit, fd, ak, objc):
+        monkeypatch.setitem(sys.modules, mod.__name__, mod)
+    monkeypatch.setitem(sys.modules, "CoreMedia", None)
+    monkeypatch.setattr(am, "supported", lambda: True)
+    monkeypatch.setattr(am.ab, "firewall_blocks", lambda: False)
+    from dopeiptv.services import media_session
+    monkeypatch.setattr(media_session, "_said", set())
+    _Player.made.clear()
+    return am, center
+
+
+def test_nothing_plays_on_the_mac_until_the_apple_tv_has_it(qapp, macos):
+    am, center = macos
+    rx = am.AirPlayReceiver()
+    rx.context = lambda: {"kind": "live"}
+    ended = []
+    rx.ended.connect(ended.append)
+    assert rx.entries() == [am.NAME] and rx.knows(am.NAME)
+    assert am.bundle_problem() is None
+    url = "http://p/live/u/pw/1.m3u8"
+    assert rx.cast(am.NAME, url, "SVT1", ["h264", "aac"]) == am.NAME
+    p = _Player.made[-1]
+    assert p.item.url == url and p.allows is True
+    assert rx.active == am.NAME and not rx.bridged() and rx.duration == 0.0
+    assert [c[0] for c in p.calls if c[0] in ("play", "pause")] == ["pause"]
+    rx._poll()
+    assert rx.state == "WAITING/ROUTE" and p.rate() == 0.0
+    p.external = True                       # picked in Apple's menu
+    rx._poll()
+    assert p.rate() == 1.0 and rx.state == "PLAYING/NONE"
+    p.t = 12.5
+    rx._poll()
+    assert rx.position() == 12.5
+    rx.pause()
+    rx._poll()
+    assert p.rate() == 0.0 and rx.state == "PAUSED/NONE"   # held, not resumed
+    rx.resume()
+    assert p.rate() == 1.0
+    # The Apple TV goes away: paused at once, over after the grace.
+    p.external = False
+    rx._poll()
+    assert p.rate() == 0.0 and rx.active == am.NAME and not ended
+    rx._lost_at -= am.ROUTE_GRACE_S + 1
+    rx._poll()
+    assert ended == ["airplay_route_lost"] and rx.active is None
+    assert p.item is None and not center.blocks
+
+
+def test_nothing_picked_ends_the_cast_and_an_ending_is_noticed(qapp, macos):
+    am, center = macos
+    rx = am.AirPlayReceiver()
+    rx.context = lambda: {"kind": "movie"}
+    ended = []
+    rx.ended.connect(ended.append)
+    rx.cast(am.NAME, "http://p/movie/u/pw/7.mp4", "Film", [], start=600.0,
+            duration=5400.0)
+    p = _Player.made[-1]
+    assert ("seek", (360000, 600, 1, 0)) in p.calls      # resumed there
+    assert rx.duration == 5400.0
+    p.external = True
+    rx._poll()
+    center.blocks["AVPlayerItemDidPlayToEndTimeNotification"](None)
+    rx._poll()
+    assert rx.state == "IDLE/FINISHED"
+    rx.stop()
+    assert rx.active is None and p.item is None
+    rx.cast(am.NAME, "http://p/movie/u/pw/7.mp4", "Film", [])
+    rx._opened_at -= am.ROUTE_WAIT_S + 1
+    rx._poll()
+    assert ended == ["airplay_no_route"]
+
+
+def test_the_strip_s_calls_from_other_threads_run_on_the_gui_thread(qapp, macos):
+    am, _ = macos
+    rx = am.AirPlayReceiver()
+    rx.cast(am.NAME, "http://p/live/u/pw/1.m3u8", "SVT1", ["h264", "aac"])
+    p = _Player.made[-1]
+    t = threading.Thread(target=rx.set_volume, args=(0.4,))
+    t.start()
+    t.join()
+    assert not any(c[0] == "volume" and c[1] == 0.4 for c in p.calls)
+    _pump(qapp)
+    vol = [c for c in p.calls if c[0] == "volume" and c[1] == 0.4]
+    assert vol and vol[0][2] == threading.get_ident()
+    assert rx.volume() == (0.4, False)
+    rx.stop()
+
+
+def test_a_transport_stream_goes_through_the_bridge(qapp, macos, fake_ffmpeg,
+                                                    monkeypatch):
+    am, _ = macos
+    fake_ffmpeg(4, "live")
+    monkeypatch.setattr(am.ab, "probe", lambda *a, **k: {
+        "video": "mpeg2video", "audio": ["mp2"], "duration": 0.0})
+    rx = am.AirPlayReceiver()
+    rx.bridge.exe = sys.executable
+    rx.context = lambda: {"kind": "live"}
+    out = {}
+
+    def cast():
+        try:
+            out["name"] = rx.cast(am.NAME, "http://p/live/u/pw/1.ts", "SVT1")
+        except Exception as e:                     # pragma: no cover
+            out["error"] = e
+
+    t = threading.Thread(target=cast)
+    t.start()
+    while t.is_alive():
+        _pump(qapp, 0.02)
+    assert out.get("name") == am.NAME, out
+    assert rx.bridged() and rx.plan.video == "h264" and rx.plan.audio == "aac"
+    p = _Player.made[-1]
+    assert p.item.url == rx.bridge.url and rx.bridge.prefix in p.item.url
+    assert "127.0.0.1" not in p.item.url or ab.lan_address() == "127.0.0.1"
+    folder = rx.bridge.folder
+    rx.stop()
+    assert not rx.bridge.hls and not os.path.exists(folder)
+
+
+def test_a_direct_stream_the_tv_refuses_is_tried_once_through_the_bridge(
+        qapp, macos, fake_ffmpeg, monkeypatch):
+    am, _ = macos
+    fake_ffmpeg(4, "live")
+    monkeypatch.setattr(am.ab, "probe", lambda *a, **k: {
+        "video": "h264", "audio": ["aac"], "duration": 0.0})
+    rx = am.AirPlayReceiver()
+    rx.bridge.exe = sys.executable
+    rx.context = lambda: {"kind": "live"}
+    rx.cast(am.NAME, "http://p/live/u/pw/1.m3u8", "SVT1", ["h264", "aac"])
+    p = _Player.made[-1]
+    p.external = True
+    p.item._status = 2                               # the TV said no
+    rx._poll()
+    end = time.monotonic() + 10
+    while time.monotonic() < end and p.item.url != rx.bridge.url:
+        _pump(qapp, 0.05)
+    assert rx.bridged() and p.item.url == rx.bridge.url
+    rx.stop()
+
+
+def test_apple_s_button_is_in_the_cast_panel_row(qapp, macos):
+    am, _ = macos
+    from PyQt6.QtWidgets import QWidget
+    parent = QWidget()
+    rx = am.AirPlayReceiver()
+    row = rx.dialog_row(parent)
+    host, label = rx._row
+    assert label.text() == am.tr("airplay_note") and host.isHidden()
+    _Button.clicks = 0
+    rx.cast(am.NAME, "http://p/live/u/pw/1.m3u8", "SVT1", ["h264", "aac"])
+    assert not host.isHidden() and label.text() == am.tr("airplay_pick")
+    assert rx._picker.player is _Player.made[-1]
+    _pump(qapp, 0.4)
+    assert _Button.clicks == 1                       # Apple's menu opened
+    _Player.made[-1].external = True
+    rx._poll()
+    assert label.text() == am.tr("airplay_on_tv")
+    rx.stop()
+    assert row is not None and rx._picker.player is None
+    parent.deleteLater()
+    _pump(qapp)
+
+
+def test_without_pyobjc_there_is_no_airplay(monkeypatch):
+    from dopeiptv.services import airplay_macos as am
+    monkeypatch.setitem(sys.modules, "AVKit", None)
+    assert am.bundle_problem()                  # says what is missing
+    if sys.platform != "darwin":
+        assert not am.supported()
+
+
+# -- the hub, the panel, the window ---------------------------------------------------
+
+class _Mgr:
+    def __init__(self, names, kind=""):
+        self.names, self.active, self.calls, self.KIND = names, None, [], kind
+
+    def knows(self, name):
+        return name in self.names
+
+    def entries(self):
+        return list(self.names)
+
+    def scan(self):
+        return list(self.names)
+
+    def cast(self, name, *a, **k):
+        self.active = name
+        return name
+
+    def stop(self):
+        self.calls.append("stop")
+        self.active = None
+
+    def shutdown(self):
+        self.calls.append("shutdown")
+
+
+def test_the_hub_routes_an_added_receiver_and_keeps_one_cast(monkeypatch):
+    from dopeiptv.providers import casting
+    monkeypatch.setattr(casting.ChromecastManager, "available",
+                        staticmethod(lambda: True))
+    cc, tv = _Mgr(["Kitchen"]), _Mgr(["TV (DLNA)"])
+    tv.knows = lambda n: n.endswith("(DLNA)")
+    hub = casting.CastHub(cc, tv)
+    assert not hub.is_airplay("AirPlay (Apple TV)")
+    ap = _Mgr(["AirPlay (Apple TV)"], "airplay")
+    hub.add_receiver(ap)
+    assert hub.scan() == ["AirPlay (Apple TV)", "Kitchen", "TV (DLNA)"]
+    assert hub.is_airplay("AirPlay (Apple TV)") and not hub.is_airplay("Kitchen")
+    hub.cast("Kitchen", "http://a", "A")
+    hub.cast("AirPlay (Apple TV)", "http://a", "A")
+    assert "stop" in cc.calls and hub.active == "AirPlay (Apple TV)"
+    hub.cast("TV (DLNA)", "http://a", "A")
+    assert "stop" in ap.calls
+    hub.shutdown()
+    assert "shutdown" in ap.calls
+
+
+def test_the_cast_panel_shows_the_airplay_row(qapp, macos, tmp_path):
+    am, _ = macos
+    from PyQt6.QtCore import QSettings, QThreadPool
+    from PyQt6.QtWidgets import QWidget
+
+    from dopeiptv.providers import casting, chromecast
+    hub = casting.CastHub(_Mgr(["Living room"]), _Mgr([]))
+    rx = am.AirPlayReceiver()
+    hub.add_receiver(rx)
+    win = QWidget()
+    win.settings = QSettings(str(tmp_path / "s.ini"), QSettings.Format.IniFormat)
+    win.cast, win.pool, win._cast_device = hub, QThreadPool(), None
+    tracks = {"audio": [{"index": 0, "codec": "aac"},
+                        {"index": 1, "codec": "ac3", "lang": "swe"}],
+              "subtitle": [{"index": 0, "codec": "subrip", "lang": "swe"}]}
+    d = chromecast.CastDialog(win, "http://p/live/u/pw/1.m3u8", "SVT1",
+                              tracks=tracks, probe=False)
+    win.pool.waitForDone(3000)
+    _pump(qapp)
+    names = [d.list.item(i).text() for i in range(d.list.count())]
+    assert names == [am.NAME, "Living room"]
+    d.list.setCurrentRow(0)
+    assert not d.airplay_row.isHidden()
+    assert all(r.isHidden() for r in d.track_rows) and d.kind_box.isHidden()
+    shot = os.environ.get("DOPEIPTV_SHOT")
+    if shot:
+        d.resize(460, 380)
+        d.show()
+        _pump(qapp, 0.2)
+        d.grab().save(shot)
+    d.list.setCurrentRow(1)
+    assert d.airplay_row.isHidden() and not d.track_rows[0].isHidden()
+    d.close()
+    win.deleteLater()
+    _pump(qapp)
+
+
+def test_linux_and_windows_add_no_airplay(monkeypatch):
+    from dopeiptv.ui.mw_airplay import _AirPlayMixin
+    for system in ("linux", "win32"):
+        monkeypatch.setattr(sys, "platform", system)
+        w = types.SimpleNamespace(cast=types.SimpleNamespace(
+            add_receiver=lambda _m: pytest.fail("added")))
+        _AirPlayMixin._init_airplay(w)
+
+
+def test_the_mac_build_bundles_and_checks_airplay():
+    req = (_REPO / "requirements.txt").read_text()
+    for name in ("pyobjc-framework-AVFoundation", "pyobjc-framework-AVKit"):
+        line = next(x for x in req.splitlines() if x.startswith(name))
+        assert line.endswith('sys_platform == "darwin"'), line
+    spec = (_REPO / "dopeiptv-mac.spec").read_text()
+    for module in ("AVFoundation", "AVKit", "Quartz"):
+        assert f'"{module}"' in spec, module
+    for module in ("AVFoundation", "AVKit"):
+        assert module not in (_REPO / "dopeiptv.spec").read_text()
+    app = (_REPO / "dopeiptv" / "app.py").read_text()
+    assert "airplay_macos import bundle_problem" in app

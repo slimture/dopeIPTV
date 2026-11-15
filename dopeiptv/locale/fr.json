@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "Le code Quick Connect a expiré. Recommencez.",
   "err_ms_pin_expired": "La connexion à Plex a pris trop de temps. Réessayez.",
   "err_ms_plex_unreachable": "Impossible de joindre Plex. Vérifiez la connexion et réessayez.",
-  "err_ms_no_stream": "Le serveur n'a fourni aucun flux pour cette chaîne."
+  "err_ms_no_stream": "Le serveur n'a fourni aucun flux pour cette chaîne.",
+  "airplay_unavailable": "AirPlay a besoin d'AVFoundation et d'AVKit d'Apple, absents de cette copie de dopeIPTV.",
+  "airplay_needs_ffmpeg": "Ce flux doit être converti pour l'Apple TV, et ffmpeg est introuvable.",
+  "airplay_firewall": "Le coupe-feu de macOS bloque les connexions entrantes vers dopeIPTV, l'Apple TV ne peut donc pas récupérer le flux. Autorisez dopeIPTV dans Réglages Système → Réseau → Coupe-feu → Options.",
+  "airplay_bridge_failed": "Impossible de préparer le flux pour l'Apple TV : {msg}",
+  "airplay_failed": "AirPlay n'a pas démarré : {msg}",
+  "airplay_failed_play": "L'Apple TV n'a pas pu lire ce flux.",
+  "airplay_route_lost": "AirPlay terminé — l'Apple TV n'est plus connectée.",
+  "airplay_no_route": "Aucune Apple TV n'a été choisie, AirPlay s'est donc arrêté.",
+  "airplay_unreachable": "L'Apple TV n'a pas joint ce Mac. Si macOS a demandé si dopeIPTV peut accepter les connexions entrantes, autorisez-le (Réglages Système → Réseau → Coupe-feu → Options) et vérifiez que l'Apple TV est sur le même réseau.",
+  "airplay_button": "Choisir une Apple TV",
+  "airplay_note": "Appuyez sur « Diffuser », puis choisissez votre Apple TV dans le menu AirPlay d'Apple.",
+  "airplay_pick": "Choisissez votre Apple TV dans le menu AirPlay — le bouton AirPlay ici l'ouvre.",
+  "airplay_on_tv": "Lecture sur l'Apple TV. Le bouton AirPlay ici la déplace vers une autre.",
+  "airplay_cpu": "L'image est convertie sur ce Mac pour l'Apple TV, ce qui occupe le processeur pendant la lecture.",
+  "airplay_menu_note": "L'Apple TV lit l'image et le son du flux tels quels — elle se choisit dans le menu AirPlay du panneau de diffusion."
 }

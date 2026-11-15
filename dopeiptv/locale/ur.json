@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "Quick Connect کوڈ کی میعاد ختم ہو گئی۔ دوبارہ شروع کریں۔",
   "err_ms_pin_expired": "Plex میں سائن ان ہونے میں بہت دیر لگی۔ دوبارہ کوشش کریں۔",
   "err_ms_plex_unreachable": "Plex تک رسائی نہیں ہو سکی۔ کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
-  "err_ms_no_stream": "سرور نے اس چینل کے لیے کوئی اسٹریم نہیں دی۔"
+  "err_ms_no_stream": "سرور نے اس چینل کے لیے کوئی اسٹریم نہیں دی۔",
+  "airplay_unavailable": "AirPlay کو Apple کے AVFoundation اور AVKit درکار ہیں، جو dopeIPTV کی اس کاپی میں نہیں ہیں۔",
+  "airplay_needs_ffmpeg": "اس اسٹریم کو Apple TV کے لیے بدلنا ضروری ہے، اور ffmpeg نہیں ملا۔",
+  "airplay_firewall": "macOS فائر وال dopeIPTV کی طرف آنے والے کنکشن روک رہی ہے، اس لیے Apple TV اسٹریم حاصل نہیں کر سکتا۔ System Settings → Network → Firewall → Options میں dopeIPTV کو اجازت دیں۔",
+  "airplay_bridge_failed": "اسٹریم کو Apple TV کے لیے تیار نہیں کیا جا سکا: {msg}",
+  "airplay_failed": "AirPlay شروع نہیں ہوا: {msg}",
+  "airplay_failed_play": "Apple TV یہ اسٹریم نہیں چلا سکا۔",
+  "airplay_route_lost": "AirPlay ختم ہو گیا — Apple TV اب جڑا ہوا نہیں ہے۔",
+  "airplay_no_route": "کوئی Apple TV منتخب نہیں کیا گیا، اس لیے AirPlay رک گیا۔",
+  "airplay_unreachable": "Apple TV اس Mac تک نہیں پہنچا۔ اگر macOS نے پوچھا تھا کہ کیا dopeIPTV آنے والے کنکشن قبول کر سکتا ہے، تو اجازت دیں (System Settings → Network → Firewall → Options)، اور دیکھیں کہ Apple TV اسی نیٹ ورک پر ہے۔",
+  "airplay_button": "Apple TV منتخب کریں",
+  "airplay_note": "“کاسٹ کریں” دبائیں، پھر Apple کے AirPlay مینو میں اپنا Apple TV منتخب کریں۔",
+  "airplay_pick": "AirPlay مینو میں اپنا Apple TV منتخب کریں — یہاں کا AirPlay بٹن اسے کھولتا ہے۔",
+  "airplay_on_tv": "Apple TV پر چل رہا ہے۔ یہاں کا AirPlay بٹن اسے کسی دوسرے پر لے جاتا ہے۔",
+  "airplay_cpu": "تصویر Apple TV کے لیے اسی Mac پر بدلی جاتی ہے، جس سے چلنے کے دوران پروسیسر مصروف رہتا ہے۔",
+  "airplay_menu_note": "Apple TV اسٹریم کی اپنی تصویر اور آواز چلاتا ہے — اسے کاسٹ پینل کے AirPlay مینو میں منتخب کیا جاتا ہے۔"
 }

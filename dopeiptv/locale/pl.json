@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "Kod Quick Connect wygasł. Zacznij od nowa.",
   "err_ms_pin_expired": "Logowanie do Plex trwało zbyt długo. Spróbuj ponownie.",
   "err_ms_plex_unreachable": "Nie udało się połączyć z Plex. Sprawdź połączenie i spróbuj ponownie.",
-  "err_ms_no_stream": "Serwer nie przekazał strumienia dla tego kanału."
+  "err_ms_no_stream": "Serwer nie przekazał strumienia dla tego kanału.",
+  "airplay_unavailable": "AirPlay wymaga AVFoundation i AVKit od Apple, których brakuje w tej kopii dopeIPTV.",
+  "airplay_needs_ffmpeg": "Ten strumień trzeba przekonwertować dla Apple TV, a nie znaleziono ffmpeg.",
+  "airplay_firewall": "Zapora macOS blokuje połączenia przychodzące do dopeIPTV, więc Apple TV nie może pobrać strumienia. Zezwól na dopeIPTV w Ustawieniach systemowych → Sieć → Zapora sieciowa → Opcje.",
+  "airplay_bridge_failed": "Nie udało się przygotować strumienia dla Apple TV: {msg}",
+  "airplay_failed": "AirPlay się nie uruchomił: {msg}",
+  "airplay_failed_play": "Apple TV nie mógł odtworzyć tego strumienia.",
+  "airplay_route_lost": "AirPlay zakończony — Apple TV nie jest już połączony.",
+  "airplay_no_route": "Nie wybrano żadnego Apple TV, więc AirPlay się zatrzymał.",
+  "airplay_unreachable": "Apple TV nie dotarł do tego Maca. Jeśli macOS zapytał, czy dopeIPTV może przyjmować połączenia przychodzące, zezwól na to (Ustawienia systemowe → Sieć → Zapora sieciowa → Opcje) i sprawdź, czy Apple TV jest w tej samej sieci.",
+  "airplay_button": "Wybierz Apple TV",
+  "airplay_note": "Naciśnij „Prześlij”, a potem wybierz swój Apple TV w menu AirPlay od Apple.",
+  "airplay_pick": "Wybierz swój Apple TV w menu AirPlay — otwiera je przycisk AirPlay tutaj.",
+  "airplay_on_tv": "Odtwarzanie na Apple TV. Przycisk AirPlay tutaj przenosi je na inny.",
+  "airplay_cpu": "Obraz jest konwertowany na tym Macu dla Apple TV, co obciąża procesor podczas odtwarzania.",
+  "airplay_menu_note": "Apple TV odtwarza obraz i dźwięk samego strumienia — wybiera się go w menu AirPlay w panelu przesyłania."
 }

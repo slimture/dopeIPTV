@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "انتهت صلاحية رمز Quick Connect. ابدأ من جديد.",
   "err_ms_pin_expired": "استغرق تسجيل الدخول إلى Plex وقتاً طويلاً. حاول مرة أخرى.",
   "err_ms_plex_unreachable": "تعذّر الوصول إلى Plex. تحقّق من الاتصال وحاول مرة أخرى.",
-  "err_ms_no_stream": "لم يقدّم الخادم بثاً لهذه القناة."
+  "err_ms_no_stream": "لم يقدّم الخادم بثاً لهذه القناة.",
+  "airplay_unavailable": "يحتاج AirPlay إلى AVFoundation وAVKit من Apple، وهما غير موجودتين في هذه النسخة من dopeIPTV.",
+  "airplay_needs_ffmpeg": "يجب تحويل هذا البث من أجل Apple TV، ولم يُعثر على ffmpeg.",
+  "airplay_firewall": "يحظر جدار حماية macOS الاتصالات الواردة إلى dopeIPTV، لذا لا يستطيع Apple TV جلب البث. اسمح لـ dopeIPTV في إعدادات النظام ← الشبكة ← جدار الحماية ← الخيارات.",
+  "airplay_bridge_failed": "تعذّر تجهيز البث لـ Apple TV: {msg}",
+  "airplay_failed": "لم يبدأ AirPlay: {msg}",
+  "airplay_failed_play": "لم يتمكن Apple TV من تشغيل هذا البث.",
+  "airplay_route_lost": "انتهى AirPlay — لم يعد Apple TV متصلًا.",
+  "airplay_no_route": "لم يُختر أي Apple TV، لذا توقف AirPlay.",
+  "airplay_unreachable": "لم يصل Apple TV إلى هذا الـ Mac. إذا سأل macOS هل يُسمح لـ dopeIPTV بقبول الاتصالات الواردة، فاسمح بذلك (إعدادات النظام ← الشبكة ← جدار الحماية ← الخيارات)، وتأكد من أن Apple TV على الشبكة نفسها.",
+  "airplay_button": "اختر Apple TV",
+  "airplay_note": "اضغط «إرسال»، ثم اختر جهاز Apple TV من قائمة AirPlay الخاصة بـ Apple.",
+  "airplay_pick": "اختر جهاز Apple TV من قائمة AirPlay — يفتحها زر AirPlay هنا.",
+  "airplay_on_tv": "يُعرض على Apple TV. ينقله زر AirPlay هنا إلى جهاز آخر.",
+  "airplay_cpu": "تُحوَّل الصورة على هذا الـ Mac من أجل Apple TV، ما يُشغل المعالج طوال التشغيل.",
+  "airplay_menu_note": "يعرض Apple TV صورة البث وصوته كما هما — ويُختار من قائمة AirPlay في لوحة الإرسال."
 }

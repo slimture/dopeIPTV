@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "O código do Quick Connect expirou. Comece de novo.",
   "err_ms_pin_expired": "A entrada no Plex demorou demais. Tente de novo.",
   "err_ms_plex_unreachable": "Não foi possível acessar o Plex. Verifique a conexão e tente de novo.",
-  "err_ms_no_stream": "O servidor não entregou nenhum stream para este canal."
+  "err_ms_no_stream": "O servidor não entregou nenhum stream para este canal.",
+  "airplay_unavailable": "O AirPlay precisa do AVFoundation e do AVKit da Apple, que esta cópia do dopeIPTV não tem.",
+  "airplay_needs_ffmpeg": "Esta transmissão precisa ser convertida para a Apple TV, e o ffmpeg não foi encontrado.",
+  "airplay_firewall": "O firewall do macOS bloqueia conexões de entrada para o dopeIPTV, então a Apple TV não consegue buscar a transmissão. Permita o dopeIPTV em Ajustes do Sistema → Rede → Firewall → Opções.",
+  "airplay_bridge_failed": "Não foi possível preparar a transmissão para a Apple TV: {msg}",
+  "airplay_failed": "O AirPlay não começou: {msg}",
+  "airplay_failed_play": "A Apple TV não conseguiu reproduzir esta transmissão.",
+  "airplay_route_lost": "O AirPlay terminou — a Apple TV não está mais conectada.",
+  "airplay_no_route": "Nenhuma Apple TV foi escolhida, então o AirPlay parou.",
+  "airplay_unreachable": "A Apple TV não alcançou este Mac. Se o macOS perguntou se o dopeIPTV pode aceitar conexões de entrada, permita (Ajustes do Sistema → Rede → Firewall → Opções) e confira se a Apple TV está na mesma rede.",
+  "airplay_button": "Escolher uma Apple TV",
+  "airplay_note": "Toque em “Transmitir” e escolha sua Apple TV no menu AirPlay da Apple.",
+  "airplay_pick": "Escolha sua Apple TV no menu AirPlay — o botão AirPlay aqui o abre.",
+  "airplay_on_tv": "Reproduzindo na Apple TV. O botão AirPlay aqui passa para outra.",
+  "airplay_cpu": "A imagem é convertida neste Mac para a Apple TV, o que mantém o processador ocupado durante a reprodução.",
+  "airplay_menu_note": "A Apple TV reproduz a imagem e o som da própria transmissão — ela é escolhida no menu AirPlay do painel de transmissão."
 }

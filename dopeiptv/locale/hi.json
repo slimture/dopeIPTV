@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "Quick Connect कोड की अवधि समाप्त हो गई। फिर से शुरू करें।",
   "err_ms_pin_expired": "Plex में साइन इन करने में बहुत देर लगी। फिर से कोशिश करें।",
   "err_ms_plex_unreachable": "Plex तक नहीं पहुँचा जा सका। कनेक्शन जाँचें और फिर से कोशिश करें।",
-  "err_ms_no_stream": "सर्वर ने इस चैनल के लिए कोई स्ट्रीम नहीं दी।"
+  "err_ms_no_stream": "सर्वर ने इस चैनल के लिए कोई स्ट्रीम नहीं दी।",
+  "airplay_unavailable": "AirPlay को Apple के AVFoundation और AVKit चाहिए, जो dopeIPTV की इस कॉपी में नहीं हैं।",
+  "airplay_needs_ffmpeg": "इस स्ट्रीम को Apple TV के लिए बदलना ज़रूरी है, और ffmpeg नहीं मिला।",
+  "airplay_firewall": "macOS फ़ायरवॉल dopeIPTV पर आने वाले कनेक्शन रोक रहा है, इसलिए Apple TV स्ट्रीम नहीं ले पा रहा। System Settings → Network → Firewall → Options में dopeIPTV को अनुमति दें।",
+  "airplay_bridge_failed": "स्ट्रीम Apple TV के लिए तैयार नहीं हो सकी: {msg}",
+  "airplay_failed": "AirPlay शुरू नहीं हुआ: {msg}",
+  "airplay_failed_play": "Apple TV यह स्ट्रीम नहीं चला सका।",
+  "airplay_route_lost": "AirPlay बंद हो गया — Apple TV अब कनेक्ट नहीं है।",
+  "airplay_no_route": "कोई Apple TV नहीं चुना गया, इसलिए AirPlay रुक गया।",
+  "airplay_unreachable": "Apple TV इस Mac तक नहीं पहुँचा। अगर macOS ने पूछा था कि dopeIPTV आने वाले कनेक्शन स्वीकार कर सकता है या नहीं, तो अनुमति दें (System Settings → Network → Firewall → Options), और जाँचें कि Apple TV उसी नेटवर्क पर है।",
+  "airplay_button": "Apple TV चुनें",
+  "airplay_note": "“कास्ट करें” दबाएँ, फिर Apple के AirPlay मेनू में अपना Apple TV चुनें।",
+  "airplay_pick": "AirPlay मेनू में अपना Apple TV चुनें — यहाँ का AirPlay बटन उसे खोलता है।",
+  "airplay_on_tv": "Apple TV पर चल रहा है। यहाँ का AirPlay बटन इसे दूसरे पर ले जाता है।",
+  "airplay_cpu": "तस्वीर इस Mac पर Apple TV के लिए बदली जाती है, जिससे चलने तक प्रोसेसर व्यस्त रहता है।",
+  "airplay_menu_note": "Apple TV स्ट्रीम की अपनी तस्वीर और आवाज़ चलाता है — उसे कास्ट पैनल के AirPlay मेनू में चुना जाता है।"
 }

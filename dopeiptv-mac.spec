@@ -109,12 +109,15 @@ hiddenimports += [
     "PyQt6.QtNetwork",
 ]
 
-# Now Playing and the media keys (services/media_macos.py) go through PyObjC,
-# whose framework wrappers import one another inside functions: every module
-# of each is named here. Without them the app still builds and runs, only
-# without the system's media controls - which --self-check refuses.
+# Now Playing and the media keys (services/media_macos.py) and AirPlay
+# (services/airplay_macos.py: AVFoundation's player, AVKit's route picker) go
+# through PyObjC, whose framework wrappers import one another inside
+# functions: every module of each is named here. Without them the app still
+# builds and runs, only without the system's media controls or AirPlay -
+# which --self-check refuses.
 for pkg in ("objc", "CoreFoundation", "Foundation", "AppKit", "CoreAudio",
-            "CoreMedia", "AVFAudio", "AVFoundation", "MediaPlayer"):
+            "CoreMedia", "AVFAudio", "AVFoundation", "MediaPlayer", "Quartz",
+            "AVKit"):
     try:
         hiddenimports += collect_submodules(pkg)
     except Exception as e:

@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "Quick Connect kodunun süresi doldu. Yeniden başlayın.",
   "err_ms_pin_expired": "Plex oturumu açmak çok uzun sürdü. Yeniden deneyin.",
   "err_ms_plex_unreachable": "Plex'e ulaşılamadı. Bağlantıyı denetleyip yeniden deneyin.",
-  "err_ms_no_stream": "Sunucu bu kanal için yayın akışı vermedi."
+  "err_ms_no_stream": "Sunucu bu kanal için yayın akışı vermedi.",
+  "airplay_unavailable": "AirPlay, Apple'ın AVFoundation ve AVKit'ine ihtiyaç duyar; bu dopeIPTV kopyasında bunlar yok.",
+  "airplay_needs_ffmpeg": "Bu yayının Apple TV için dönüştürülmesi gerekiyor ve ffmpeg bulunamadı.",
+  "airplay_firewall": "macOS güvenlik duvarı dopeIPTV'ye gelen bağlantıları engelliyor, bu yüzden Apple TV yayını alamıyor. Sistem Ayarları → Ağ → Güvenlik Duvarı → Seçenekler'de dopeIPTV'ye izin verin.",
+  "airplay_bridge_failed": "Yayın Apple TV için hazırlanamadı: {msg}",
+  "airplay_failed": "AirPlay başlamadı: {msg}",
+  "airplay_failed_play": "Apple TV bu yayını oynatamadı.",
+  "airplay_route_lost": "AirPlay sona erdi — Apple TV artık bağlı değil.",
+  "airplay_no_route": "Hiçbir Apple TV seçilmediği için AirPlay durdu.",
+  "airplay_unreachable": "Apple TV bu Mac'e ulaşamadı. macOS, dopeIPTV'nin gelen bağlantıları kabul edip edemeyeceğini sorduysa izin verin (Sistem Ayarları → Ağ → Güvenlik Duvarı → Seçenekler) ve Apple TV'nin aynı ağda olduğunu kontrol edin.",
+  "airplay_button": "Apple TV seç",
+  "airplay_note": "\"Yayınla\"ya basın, ardından Apple'ın AirPlay menüsünden Apple TV'nizi seçin.",
+  "airplay_pick": "AirPlay menüsünden Apple TV'nizi seçin — buradaki AirPlay düğmesi menüyü açar.",
+  "airplay_on_tv": "Apple TV'de oynatılıyor. Buradaki AirPlay düğmesi başka birine taşır.",
+  "airplay_cpu": "Görüntü Apple TV için bu Mac'te dönüştürülüyor; oynatma süresince işlemciyi meşgul eder.",
+  "airplay_menu_note": "Apple TV yayının kendi görüntüsünü ve sesini oynatır — yayın panelindeki AirPlay menüsünden seçilir."
 }

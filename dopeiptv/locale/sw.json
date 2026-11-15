@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "Msimbo wa Quick Connect umeisha muda. Anza upya.",
   "err_ms_pin_expired": "Kuingia kwenye Plex kumechukua muda mrefu mno. Jaribu tena.",
   "err_ms_plex_unreachable": "Plex haikuweza kufikiwa. Angalia muunganisho kisha ujaribu tena.",
-  "err_ms_no_stream": "Seva haikutoa mtiririko wa chaneli hii."
+  "err_ms_no_stream": "Seva haikutoa mtiririko wa chaneli hii.",
+  "airplay_unavailable": "AirPlay inahitaji AVFoundation na AVKit za Apple, ambazo nakala hii ya dopeIPTV haina.",
+  "airplay_needs_ffmpeg": "Mtiririko huu unahitaji kubadilishwa kwa ajili ya Apple TV, na ffmpeg haikupatikana.",
+  "airplay_firewall": "Ngome ya macOS inazuia miunganisho inayoingia kwa dopeIPTV, kwa hiyo Apple TV haiwezi kupata mtiririko. Ruhusu dopeIPTV katika System Settings → Network → Firewall → Options.",
+  "airplay_bridge_failed": "Mtiririko haukuweza kuandaliwa kwa ajili ya Apple TV: {msg}",
+  "airplay_failed": "AirPlay haikuanza: {msg}",
+  "airplay_failed_play": "Apple TV haikuweza kucheza mtiririko huu.",
+  "airplay_route_lost": "AirPlay imeisha — Apple TV haijaunganishwa tena.",
+  "airplay_no_route": "Hakuna Apple TV iliyochaguliwa, kwa hiyo AirPlay imesimama.",
+  "airplay_unreachable": "Apple TV haijafikia Mac hii. Ikiwa macOS iliuliza kama dopeIPTV inaweza kupokea miunganisho inayoingia, iruhusu (System Settings → Network → Firewall → Options), na hakikisha Apple TV iko kwenye mtandao uleule.",
+  "airplay_button": "Chagua Apple TV",
+  "airplay_note": "Bonyeza \"Tuma\", kisha chagua Apple TV yako kwenye menyu ya AirPlay ya Apple.",
+  "airplay_pick": "Chagua Apple TV yako kwenye menyu ya AirPlay — kitufe cha AirPlay hapa kinaifungua.",
+  "airplay_on_tv": "Inacheza kwenye Apple TV. Kitufe cha AirPlay hapa kinaihamishia nyingine.",
+  "airplay_cpu": "Picha inabadilishwa kwenye Mac hii kwa ajili ya Apple TV, jambo linaloshughulisha prosesa wakati inacheza.",
+  "airplay_menu_note": "Apple TV inacheza picha na sauti ya mtiririko wenyewe — inachaguliwa kwenye menyu ya AirPlay katika paneli ya kutuma."
 }

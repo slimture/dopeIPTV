@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "Kode Quick Connect sudah kedaluwarsa. Mulai lagi.",
   "err_ms_pin_expired": "Masuk ke Plex terlalu lama. Coba lagi.",
   "err_ms_plex_unreachable": "Plex tidak dapat dijangkau. Periksa koneksi lalu coba lagi.",
-  "err_ms_no_stream": "Server tidak memberikan siaran untuk saluran ini."
+  "err_ms_no_stream": "Server tidak memberikan siaran untuk saluran ini.",
+  "airplay_unavailable": "AirPlay memerlukan AVFoundation dan AVKit dari Apple, yang tidak ada di salinan dopeIPTV ini.",
+  "airplay_needs_ffmpeg": "Siaran ini harus dikonversi untuk Apple TV, dan ffmpeg tidak ditemukan.",
+  "airplay_firewall": "Firewall macOS memblokir koneksi masuk ke dopeIPTV, jadi Apple TV tidak bisa mengambil siaran. Izinkan dopeIPTV di Pengaturan Sistem → Jaringan → Firewall → Pilihan.",
+  "airplay_bridge_failed": "Siaran tidak dapat disiapkan untuk Apple TV: {msg}",
+  "airplay_failed": "AirPlay tidak dimulai: {msg}",
+  "airplay_failed_play": "Apple TV tidak dapat memutar siaran ini.",
+  "airplay_route_lost": "AirPlay berakhir — Apple TV tidak lagi terhubung.",
+  "airplay_no_route": "Tidak ada Apple TV yang dipilih, jadi AirPlay berhenti.",
+  "airplay_unreachable": "Apple TV belum menjangkau Mac ini. Jika macOS menanyakan apakah dopeIPTV boleh menerima koneksi masuk, izinkan (Pengaturan Sistem → Jaringan → Firewall → Pilihan), dan pastikan Apple TV ada di jaringan yang sama.",
+  "airplay_button": "Pilih Apple TV",
+  "airplay_note": "Tekan \"Kirim\", lalu pilih Apple TV Anda di menu AirPlay Apple.",
+  "airplay_pick": "Pilih Apple TV Anda di menu AirPlay — tombol AirPlay di sini membukanya.",
+  "airplay_on_tv": "Diputar di Apple TV. Tombol AirPlay di sini memindahkannya ke yang lain.",
+  "airplay_cpu": "Gambar dikonversi di Mac ini untuk Apple TV, yang membuat prosesor sibuk selama diputar.",
+  "airplay_menu_note": "Apple TV memutar gambar dan suara siaran apa adanya — dipilih di menu AirPlay pada panel kirim."
 }

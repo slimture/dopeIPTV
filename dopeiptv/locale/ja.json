@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "Quick Connect のコードの有効期限が切れました。最初からやり直してください。",
   "err_ms_pin_expired": "Plex へのサインインに時間がかかりすぎました。もう一度お試しください。",
   "err_ms_plex_unreachable": "Plex に接続できませんでした。接続を確認してもう一度お試しください。",
-  "err_ms_no_stream": "サーバーはこのチャンネルのストリームを渡しませんでした。"
+  "err_ms_no_stream": "サーバーはこのチャンネルのストリームを渡しませんでした。",
+  "airplay_unavailable": "AirPlay には Apple の AVFoundation と AVKit が必要ですが、この dopeIPTV には含まれていません。",
+  "airplay_needs_ffmpeg": "このストリームは Apple TV 用に変換する必要がありますが、ffmpeg が見つかりません。",
+  "airplay_firewall": "macOS のファイアウォールが dopeIPTV への着信接続をブロックしているため、Apple TV がストリームを取得できません。システム設定 → ネットワーク → ファイアウォール → オプション で dopeIPTV を許可してください。",
+  "airplay_bridge_failed": "Apple TV 用にストリームを準備できませんでした: {msg}",
+  "airplay_failed": "AirPlay を開始できませんでした: {msg}",
+  "airplay_failed_play": "Apple TV はこのストリームを再生できませんでした。",
+  "airplay_route_lost": "AirPlay が終了しました — Apple TV との接続が切れました。",
+  "airplay_no_route": "Apple TV が選択されなかったため、AirPlay を停止しました。",
+  "airplay_unreachable": "Apple TV がこの Mac に接続できていません。dopeIPTV への着信接続を許可するか macOS に尋ねられた場合は許可し（システム設定 → ネットワーク → ファイアウォール → オプション）、Apple TV が同じネットワークにあるか確認してください。",
+  "airplay_button": "Apple TV を選択",
+  "airplay_note": "「キャスト」を押してから、Apple の AirPlay メニューで Apple TV を選んでください。",
+  "airplay_pick": "AirPlay メニューで Apple TV を選んでください — ここの AirPlay ボタンで開きます。",
+  "airplay_on_tv": "Apple TV で再生中です。ここの AirPlay ボタンで別の Apple TV に切り替えられます。",
+  "airplay_cpu": "映像はこの Mac で Apple TV 用に変換されるため、再生中はプロセッサに負荷がかかります。",
+  "airplay_menu_note": "Apple TV ではストリーム本来の映像と音声が再生されます — Apple TV はキャストパネルの AirPlay メニューで選びます。"
 }

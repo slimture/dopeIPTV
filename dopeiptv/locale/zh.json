@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "Quick Connect 代码已过期。请重新开始。",
   "err_ms_pin_expired": "登录 Plex 用时过长。请重试。",
   "err_ms_plex_unreachable": "无法连接 Plex。请检查网络连接后重试。",
-  "err_ms_no_stream": "服务器没有为此频道提供直播流。"
+  "err_ms_no_stream": "服务器没有为此频道提供直播流。",
+  "airplay_unavailable": "AirPlay 需要 Apple 的 AVFoundation 和 AVKit，而此 dopeIPTV 中没有。",
+  "airplay_needs_ffmpeg": "此流需要为 Apple TV 转换，但未找到 ffmpeg。",
+  "airplay_firewall": "macOS 防火墙阻止了到 dopeIPTV 的传入连接，因此 Apple TV 无法获取流。请在 系统设置 → 网络 → 防火墙 → 选项 中允许 dopeIPTV。",
+  "airplay_bridge_failed": "无法为 Apple TV 准备此流：{msg}",
+  "airplay_failed": "AirPlay 未能启动：{msg}",
+  "airplay_failed_play": "Apple TV 无法播放此流。",
+  "airplay_route_lost": "AirPlay 已结束 — Apple TV 已断开连接。",
+  "airplay_no_route": "未选择 Apple TV，AirPlay 已停止。",
+  "airplay_unreachable": "Apple TV 未能连接到这台 Mac。如果 macOS 询问是否允许 dopeIPTV 接受传入连接，请允许（系统设置 → 网络 → 防火墙 → 选项），并确认 Apple TV 在同一网络中。",
+  "airplay_button": "选择 Apple TV",
+  "airplay_note": "点按“投放”，然后在 Apple 的 AirPlay 菜单中选择你的 Apple TV。",
+  "airplay_pick": "在 AirPlay 菜单中选择你的 Apple TV — 这里的 AirPlay 按钮可以打开它。",
+  "airplay_on_tv": "正在 Apple TV 上播放。这里的 AirPlay 按钮可切换到另一台。",
+  "airplay_cpu": "画面会在这台 Mac 上为 Apple TV 转换，播放期间会占用处理器。",
+  "airplay_menu_note": "Apple TV 播放流本身的画面和声音 — 在投放面板的 AirPlay 菜单中选择设备。"
 }

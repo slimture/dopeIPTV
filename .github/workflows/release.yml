@@ -1164,11 +1164,12 @@ jobs:
           fi
           # And they must actually LOAD from the frozen bundle: --self-check
           # runs GUI-less (no window server needed) and verifies the bundled
-          # libmpv, that every shipped language registers and that PyObjC's
-          # MediaPlayer (Now Playing, the media keys) imports.
-          echo "::group::--self-check (bundled libmpv + languages + media controls)"
+          # libmpv, that every shipped language registers, that PyObjC's
+          # MediaPlayer (Now Playing, the media keys) imports and that
+          # AVFoundation and AVKit (AirPlay) do.
+          echo "::group::--self-check (bundled libmpv + languages + media controls + AirPlay)"
           if ! "$BIN" --self-check; then
-            echo "::error::--self-check failed on the mounted .app (libmpv, languages or media controls)"
+            echo "::error::--self-check failed on the mounted .app (libmpv, languages, media controls or AirPlay)"
             # Why libmpv does not load: dlopen's own message names the
             # library it could not find.
             echo "::group::libmpv: links, rpaths and dlopen"

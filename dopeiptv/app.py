@@ -312,6 +312,16 @@ def main() -> int:
                 return 1
             log.info("self-check: the system's media controls are in the "
                      "bundle")
+        if sys.platform == "darwin" and getattr(sys, "frozen", False):
+            # AirPlay goes through PyObjC's AVFoundation and AVKit, which
+            # the freezer has to be told about just the same.
+            from .services.airplay_macos import bundle_problem as airplay_problem
+            problem = airplay_problem()
+            if problem:
+                log.error("self-check: AirPlay (AVFoundation, AVKit) is not "
+                          "in this bundle: %s", problem)
+                return 1
+            log.info("self-check: AirPlay is in the bundle")
         # The programme guide is parsed by this same executable started as a
         # process of its own (providers/epg.py). A bundle that cannot do that
         # still parses in the app, slowly - the regression this catches.

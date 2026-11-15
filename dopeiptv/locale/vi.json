@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "Mã Quick Connect đã hết hạn. Hãy bắt đầu lại.",
   "err_ms_pin_expired": "Đăng nhập Plex mất quá lâu. Hãy thử lại.",
   "err_ms_plex_unreachable": "Không thể kết nối tới Plex. Hãy kiểm tra kết nối rồi thử lại.",
-  "err_ms_no_stream": "Máy chủ không cung cấp luồng phát cho kênh này."
+  "err_ms_no_stream": "Máy chủ không cung cấp luồng phát cho kênh này.",
+  "airplay_unavailable": "AirPlay cần AVFoundation và AVKit của Apple, nhưng bản dopeIPTV này không có.",
+  "airplay_needs_ffmpeg": "Luồng này cần được chuyển đổi cho Apple TV, nhưng không tìm thấy ffmpeg.",
+  "airplay_firewall": "Tường lửa macOS chặn các kết nối đến dopeIPTV, nên Apple TV không lấy được luồng. Hãy cho phép dopeIPTV trong Cài đặt hệ thống → Mạng → Tường lửa → Tùy chọn.",
+  "airplay_bridge_failed": "Không thể chuẩn bị luồng cho Apple TV: {msg}",
+  "airplay_failed": "AirPlay không khởi động được: {msg}",
+  "airplay_failed_play": "Apple TV không phát được luồng này.",
+  "airplay_route_lost": "AirPlay đã dừng — Apple TV không còn kết nối.",
+  "airplay_no_route": "Chưa chọn Apple TV nào nên AirPlay đã dừng.",
+  "airplay_unreachable": "Apple TV chưa kết nối được tới máy Mac này. Nếu macOS hỏi có cho dopeIPTV nhận kết nối đến không, hãy cho phép (Cài đặt hệ thống → Mạng → Tường lửa → Tùy chọn), và kiểm tra Apple TV có cùng mạng không.",
+  "airplay_button": "Chọn Apple TV",
+  "airplay_note": "Nhấn “Truyền”, rồi chọn Apple TV của bạn trong menu AirPlay của Apple.",
+  "airplay_pick": "Chọn Apple TV của bạn trong menu AirPlay — nút AirPlay ở đây sẽ mở menu.",
+  "airplay_on_tv": "Đang phát trên Apple TV. Nút AirPlay ở đây chuyển sang thiết bị khác.",
+  "airplay_cpu": "Hình ảnh được chuyển đổi trên máy Mac này cho Apple TV, khiến bộ xử lý bận trong suốt lúc phát.",
+  "airplay_menu_note": "Apple TV phát hình ảnh và âm thanh gốc của luồng — chọn thiết bị trong menu AirPlay ở bảng truyền."
 }

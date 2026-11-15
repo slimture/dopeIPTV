@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "Il codice Quick Connect è scaduto. Ricomincia.",
   "err_ms_pin_expired": "L'accesso a Plex ha richiesto troppo tempo. Riprova.",
   "err_ms_plex_unreachable": "Impossibile raggiungere Plex. Controlla la connessione e riprova.",
-  "err_ms_no_stream": "Il server non ha fornito alcun flusso per questo canale."
+  "err_ms_no_stream": "Il server non ha fornito alcun flusso per questo canale.",
+  "airplay_unavailable": "AirPlay richiede AVFoundation e AVKit di Apple, che questa copia di dopeIPTV non ha.",
+  "airplay_needs_ffmpeg": "Questo flusso va convertito per l'Apple TV e ffmpeg non è stato trovato.",
+  "airplay_firewall": "Il firewall di macOS blocca le connessioni in entrata verso dopeIPTV, quindi l'Apple TV non può ricevere il flusso. Consenti dopeIPTV in Impostazioni di Sistema → Rete → Firewall → Opzioni.",
+  "airplay_bridge_failed": "Non è stato possibile preparare il flusso per l'Apple TV: {msg}",
+  "airplay_failed": "AirPlay non è partito: {msg}",
+  "airplay_failed_play": "L'Apple TV non è riuscita a riprodurre questo flusso.",
+  "airplay_route_lost": "AirPlay terminato: l'Apple TV non è più collegata.",
+  "airplay_no_route": "Non è stata scelta nessuna Apple TV, quindi AirPlay si è fermato.",
+  "airplay_unreachable": "L'Apple TV non ha raggiunto questo Mac. Se macOS ha chiesto se dopeIPTV può accettare connessioni in entrata, consentilo (Impostazioni di Sistema → Rete → Firewall → Opzioni) e controlla che l'Apple TV sia sulla stessa rete.",
+  "airplay_button": "Scegli un'Apple TV",
+  "airplay_note": "Premi «Trasmetti», poi scegli la tua Apple TV nel menu AirPlay di Apple.",
+  "airplay_pick": "Scegli la tua Apple TV nel menu AirPlay: il pulsante AirPlay qui lo apre.",
+  "airplay_on_tv": "In riproduzione sull'Apple TV. Il pulsante AirPlay qui la sposta su un'altra.",
+  "airplay_cpu": "L'immagine viene convertita su questo Mac per l'Apple TV, il che tiene occupato il processore durante la riproduzione.",
+  "airplay_menu_note": "L'Apple TV riproduce immagine e audio del flusso così come sono: si sceglie nel menu AirPlay del pannello di trasmissione."
 }

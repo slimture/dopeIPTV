@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "El código de Quick Connect ha caducado. Empieza de nuevo.",
   "err_ms_pin_expired": "El inicio de sesión en Plex tardó demasiado. Inténtalo de nuevo.",
   "err_ms_plex_unreachable": "No se pudo contactar con Plex. Comprueba la conexión e inténtalo de nuevo.",
-  "err_ms_no_stream": "El servidor no entregó ninguna emisión para este canal."
+  "err_ms_no_stream": "El servidor no entregó ninguna emisión para este canal.",
+  "airplay_unavailable": "AirPlay necesita AVFoundation y AVKit de Apple, que esta copia de dopeIPTV no tiene.",
+  "airplay_needs_ffmpeg": "Esta emisión debe convertirse para el Apple TV y no se encontró ffmpeg.",
+  "airplay_firewall": "El firewall de macOS bloquea las conexiones entrantes a dopeIPTV, así que el Apple TV no puede obtener la emisión. Permite dopeIPTV en Ajustes del Sistema → Red → Firewall → Opciones.",
+  "airplay_bridge_failed": "No se pudo preparar la emisión para el Apple TV: {msg}",
+  "airplay_failed": "AirPlay no se inició: {msg}",
+  "airplay_failed_play": "El Apple TV no pudo reproducir esta emisión.",
+  "airplay_route_lost": "AirPlay terminó: el Apple TV ya no está conectado.",
+  "airplay_no_route": "No se eligió ningún Apple TV, así que AirPlay se detuvo.",
+  "airplay_unreachable": "El Apple TV no ha llegado a este Mac. Si macOS preguntó si dopeIPTV puede aceptar conexiones entrantes, permítelo (Ajustes del Sistema → Red → Firewall → Opciones) y comprueba que el Apple TV esté en la misma red.",
+  "airplay_button": "Elegir un Apple TV",
+  "airplay_note": "Pulsa «Enviar» y luego elige tu Apple TV en el menú AirPlay de Apple.",
+  "airplay_pick": "Elige tu Apple TV en el menú AirPlay; el botón AirPlay de aquí lo abre.",
+  "airplay_on_tv": "Se reproduce en el Apple TV. El botón AirPlay de aquí lo pasa a otro.",
+  "airplay_cpu": "La imagen se convierte en este Mac para el Apple TV, lo que mantiene ocupado el procesador mientras se reproduce.",
+  "airplay_menu_note": "El Apple TV reproduce la imagen y el sonido propios de la emisión; se elige en el menú AirPlay del panel de envío."
 }

@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "کد Quick Connect منقضی شد. دوباره شروع کنید.",
   "err_ms_pin_expired": "ورود به Plex بیش از حد طول کشید. دوباره امتحان کنید.",
   "err_ms_plex_unreachable": "دسترسی به Plex ممکن نشد. اتصال را بررسی کنید و دوباره امتحان کنید.",
-  "err_ms_no_stream": "سرور جریانی برای این شبکه نداد."
+  "err_ms_no_stream": "سرور جریانی برای این شبکه نداد.",
+  "airplay_unavailable": "AirPlay به AVFoundation و AVKit اپل نیاز دارد که این نسخه از dopeIPTV آن‌ها را ندارد.",
+  "airplay_needs_ffmpeg": "این پخش باید برای Apple TV تبدیل شود و ffmpeg پیدا نشد.",
+  "airplay_firewall": "دیوار آتش macOS اتصال‌های ورودی به dopeIPTV را مسدود می‌کند، پس Apple TV نمی‌تواند پخش را دریافت کند. dopeIPTV را در تنظیمات سیستم ← شبکه ← دیوار آتش ← گزینه‌ها مجاز کنید.",
+  "airplay_bridge_failed": "پخش برای Apple TV آماده نشد: {msg}",
+  "airplay_failed": "AirPlay شروع نشد: {msg}",
+  "airplay_failed_play": "Apple TV نتوانست این پخش را اجرا کند.",
+  "airplay_route_lost": "AirPlay پایان یافت — Apple TV دیگر وصل نیست.",
+  "airplay_no_route": "هیچ Apple TV انتخاب نشد، پس AirPlay متوقف شد.",
+  "airplay_unreachable": "Apple TV به این Mac نرسیده است. اگر macOS پرسید که آیا dopeIPTV می‌تواند اتصال‌های ورودی را بپذیرد، اجازه دهید (تنظیمات سیستم ← شبکه ← دیوار آتش ← گزینه‌ها) و مطمئن شوید Apple TV در همان شبکه است.",
+  "airplay_button": "انتخاب Apple TV",
+  "airplay_note": "«ارسال» را بزنید، سپس Apple TV خود را در منوی AirPlay اپل انتخاب کنید.",
+  "airplay_pick": "Apple TV خود را در منوی AirPlay انتخاب کنید — دکمهٔ AirPlay همین‌جا آن را باز می‌کند.",
+  "airplay_on_tv": "روی Apple TV پخش می‌شود. دکمهٔ AirPlay همین‌جا آن را به دستگاه دیگری می‌برد.",
+  "airplay_cpu": "تصویر روی این Mac برای Apple TV تبدیل می‌شود و تا وقتی پخش می‌شود پردازنده را مشغول نگه می‌دارد.",
+  "airplay_menu_note": "Apple TV تصویر و صدای خود پخش را اجرا می‌کند — و در منوی AirPlay در پنل ارسال انتخاب می‌شود."
 }

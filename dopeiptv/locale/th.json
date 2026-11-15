@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "รหัส Quick Connect หมดอายุแล้ว เริ่มใหม่อีกครั้ง",
   "err_ms_pin_expired": "การลงชื่อเข้าใช้ Plex ใช้เวลานานเกินไป ลองอีกครั้ง",
   "err_ms_plex_unreachable": "ไม่สามารถเชื่อมต่อ Plex ได้ ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
-  "err_ms_no_stream": "เซิร์ฟเวอร์ไม่ได้ส่งสตรีมของช่องนี้มา"
+  "err_ms_no_stream": "เซิร์ฟเวอร์ไม่ได้ส่งสตรีมของช่องนี้มา",
+  "airplay_unavailable": "AirPlay ต้องใช้ AVFoundation และ AVKit ของ Apple ซึ่ง dopeIPTV ชุดนี้ไม่มี",
+  "airplay_needs_ffmpeg": "สตรีมนี้ต้องแปลงสำหรับ Apple TV แต่ไม่พบ ffmpeg",
+  "airplay_firewall": "ไฟร์วอลล์ของ macOS บล็อกการเชื่อมต่อขาเข้าสู่ dopeIPTV ทำให้ Apple TV ดึงสตรีมไม่ได้ อนุญาต dopeIPTV ได้ที่ การตั้งค่าระบบ → เครือข่าย → ไฟร์วอลล์ → ตัวเลือก",
+  "airplay_bridge_failed": "ไม่สามารถเตรียมสตรีมสำหรับ Apple TV ได้: {msg}",
+  "airplay_failed": "AirPlay ไม่เริ่มทำงาน: {msg}",
+  "airplay_failed_play": "Apple TV เล่นสตรีมนี้ไม่ได้",
+  "airplay_route_lost": "AirPlay สิ้นสุดแล้ว — Apple TV ไม่ได้เชื่อมต่ออยู่",
+  "airplay_no_route": "ไม่ได้เลือก Apple TV จึงหยุด AirPlay",
+  "airplay_unreachable": "Apple TV ยังเชื่อมต่อมาที่ Mac เครื่องนี้ไม่ได้ ถ้า macOS ถามว่าให้ dopeIPTV รับการเชื่อมต่อขาเข้าได้หรือไม่ ให้อนุญาต (การตั้งค่าระบบ → เครือข่าย → ไฟร์วอลล์ → ตัวเลือก) และตรวจสอบว่า Apple TV อยู่ในเครือข่ายเดียวกัน",
+  "airplay_button": "เลือก Apple TV",
+  "airplay_note": "กด “แคสต์” แล้วเลือก Apple TV ของคุณในเมนู AirPlay ของ Apple",
+  "airplay_pick": "เลือก Apple TV ของคุณในเมนู AirPlay — ปุ่ม AirPlay ตรงนี้ใช้เปิดเมนู",
+  "airplay_on_tv": "กำลังเล่นบน Apple TV ปุ่ม AirPlay ตรงนี้ใช้ย้ายไปเครื่องอื่น",
+  "airplay_cpu": "ภาพจะถูกแปลงบน Mac เครื่องนี้สำหรับ Apple TV ซึ่งทำให้โปรเซสเซอร์ทำงานตลอดการเล่น",
+  "airplay_menu_note": "Apple TV เล่นภาพและเสียงของสตรีมตามต้นฉบับ — เลือกเครื่องได้ในเมนู AirPlay ในแผงแคสต์"
 }

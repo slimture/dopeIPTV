@@ -2201,5 +2201,20 @@
   "err_ms_qc_expired": "Quick Connect 코드가 만료되었습니다. 다시 시작하세요.",
   "err_ms_pin_expired": "Plex 로그인이 너무 오래 걸렸습니다. 다시 시도하세요.",
   "err_ms_plex_unreachable": "Plex에 연결할 수 없습니다. 연결을 확인하고 다시 시도하세요.",
-  "err_ms_no_stream": "서버가 이 채널의 스트림을 넘겨주지 않았습니다."
+  "err_ms_no_stream": "서버가 이 채널의 스트림을 넘겨주지 않았습니다.",
+  "airplay_unavailable": "AirPlay에는 Apple의 AVFoundation과 AVKit이 필요하지만 이 dopeIPTV에는 없습니다.",
+  "airplay_needs_ffmpeg": "이 스트림은 Apple TV용으로 변환해야 하는데 ffmpeg를 찾을 수 없습니다.",
+  "airplay_firewall": "macOS 방화벽이 dopeIPTV로 들어오는 연결을 막고 있어 Apple TV가 스트림을 가져올 수 없습니다. 시스템 설정 → 네트워크 → 방화벽 → 옵션에서 dopeIPTV를 허용하세요.",
+  "airplay_bridge_failed": "Apple TV용으로 스트림을 준비하지 못했습니다: {msg}",
+  "airplay_failed": "AirPlay를 시작하지 못했습니다: {msg}",
+  "airplay_failed_play": "Apple TV가 이 스트림을 재생하지 못했습니다.",
+  "airplay_route_lost": "AirPlay가 끝났습니다 — Apple TV가 더 이상 연결되어 있지 않습니다.",
+  "airplay_no_route": "Apple TV를 선택하지 않아 AirPlay가 중지되었습니다.",
+  "airplay_unreachable": "Apple TV가 이 Mac에 연결되지 않았습니다. macOS가 dopeIPTV의 수신 연결 허용 여부를 물었다면 허용하고(시스템 설정 → 네트워크 → 방화벽 → 옵션), Apple TV가 같은 네트워크에 있는지 확인하세요.",
+  "airplay_button": "Apple TV 선택",
+  "airplay_note": "'전송'을 누른 다음 Apple의 AirPlay 메뉴에서 Apple TV를 선택하세요.",
+  "airplay_pick": "AirPlay 메뉴에서 Apple TV를 선택하세요 — 여기 있는 AirPlay 버튼으로 열 수 있습니다.",
+  "airplay_on_tv": "Apple TV에서 재생 중입니다. 여기 있는 AirPlay 버튼으로 다른 기기로 옮길 수 있습니다.",
+  "airplay_cpu": "화면을 이 Mac에서 Apple TV용으로 변환하므로 재생하는 동안 프로세서를 사용합니다.",
+  "airplay_menu_note": "Apple TV는 스트림의 원래 화면과 소리를 재생합니다 — 전송 패널의 AirPlay 메뉴에서 선택합니다."
 }

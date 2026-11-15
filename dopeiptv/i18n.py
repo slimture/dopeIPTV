@@ -2409,6 +2409,21 @@ _STRINGS: dict[str, dict[str, str]] = {
     "cal_recording_note": {"en": "Recording in dopeIPTV"},
     "nerd_mqtt_commands": {"en": "Take commands"},
     "nerd_mqtt_commands_hint": {"en": "Home Assistant, or anything else that can publish to the broker, can control the player on dopeiptv/command/…: play/pause, stop, channel up and down, volume, a favorite channel, a channel by name or number. With Home Assistant discovery on, they show up as buttons, a volume slider, a list of favorites and a box to type a channel in."},
+    "airplay_unavailable": {"en": "AirPlay needs Apple's AVFoundation and AVKit, which this copy of dopeIPTV does not have."},
+    "airplay_needs_ffmpeg": {"en": "This stream has to be converted for the Apple TV, and ffmpeg was not found."},
+    "airplay_firewall": {"en": "The macOS firewall blocks incoming connections to dopeIPTV, so the Apple TV cannot fetch the stream. Allow dopeIPTV in System Settings → Network → Firewall → Options."},
+    "airplay_bridge_failed": {"en": "The stream could not be made ready for the Apple TV: {msg}"},
+    "airplay_failed": {"en": "AirPlay did not start: {msg}"},
+    "airplay_failed_play": {"en": "The Apple TV could not play this stream."},
+    "airplay_route_lost": {"en": "AirPlay ended — the Apple TV is no longer connected."},
+    "airplay_no_route": {"en": "No Apple TV was chosen, so AirPlay stopped."},
+    "airplay_unreachable": {"en": "The Apple TV has not reached this Mac. If macOS asked whether dopeIPTV may accept incoming connections, allow it (System Settings → Network → Firewall → Options), and check that the Apple TV is on the same network."},
+    "airplay_button": {"en": "Choose an Apple TV"},
+    "airplay_note": {"en": "Press Cast, then choose your Apple TV in Apple's AirPlay menu."},
+    "airplay_pick": {"en": "Choose your Apple TV in the AirPlay menu — the AirPlay button here opens it."},
+    "airplay_on_tv": {"en": "Playing on the Apple TV. The AirPlay button here moves it to another one."},
+    "airplay_cpu": {"en": "The picture is converted on this Mac for the Apple TV, which keeps the processor busy while it plays."},
+    "airplay_menu_note": {"en": "The Apple TV plays the stream's own picture and sound — it is chosen in the AirPlay menu in the cast panel."},
 }
 
 
