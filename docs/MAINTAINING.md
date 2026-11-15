@@ -321,9 +321,11 @@ builds on that count instead of a second one:
 
 - **Transponder check.** Channels on the same transponder share the
   TSID/ONID/namespace of their service reference. With the box's tuner
-  count (`/web/about`) and what it records (`/web/timerlist`), warn before
-  a zap or a stream that would cut off a recording or someone watching,
-  and mark the channels that can be seen without one.
+  count (`/web/about`), what it records (`/web/timerlist` - recordings
+  only) and what the box itself shows on the TV right now
+  (`/web/getcurrent`, the service being watched), warn before a zap or a
+  stream that would cut off a recording or someone watching, and mark the
+  channels that can be seen without one.
 - **Signal values.** SNR, AGC and BER of the tuner in use (`/web/signal`),
   live in the stream stats (`I`) and the box's info.
 - **Transcoding via port 8002**, per box, for boxes with a hardware
