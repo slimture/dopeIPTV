@@ -1271,6 +1271,7 @@ class EpgGrid(QWidget):
         # when the load-poll rebuilt a scrolled board). Blocking the scroll
         # signals across the clear closes the window entirely.
         self._header_group = None
+        self._time_labels = []
         self._chan_group = None
         self._corner = None
         hbar = self.view.horizontalScrollBar()
@@ -1474,6 +1475,7 @@ class EpgGrid(QWidget):
             marks = marks[first::2]
         ly = (self.HEADER_H
               - QFontMetricsF(self._label_font()).height()) / 2
+        self._time_labels = []
         for t in marks:
             lbl = QGraphicsSimpleTextItem(
                 datetime.fromtimestamp(t).strftime("%H:%M"))
@@ -1482,6 +1484,7 @@ class EpgGrid(QWidget):
                                 else P["muted"]))
             lbl.setPos(self._x(t) + 4, ly)
             self._header_group.addToGroup(lbl)
+            self._time_labels.append(lbl)
 
     def _now_pen(self) -> QPen:
         pen = QPen(QColor(P["accent"]), max(2, round(self.ROW_H / 30)))
@@ -2128,7 +2131,18 @@ class EpgGrid(QWidget):
         self._chan_group.setX(tl.x())
         self._corner.setPos(tl.x(), tl.y())
         self._reflow_labels(tl.x() + self.CH_COL_W)
+        self._hide_cut_times(tl.x() + self.CH_COL_W)
         self._update_note(tl)
+
+    def _hide_cut_times(self, edge: float) -> None:
+        """A time whose label starts under the pinned channel column showed
+        only its last digit ("0" of 21:00) beside the column: hidden until
+        the board scrolls it clear."""
+        for lbl in getattr(self, "_time_labels", ()) or ():
+            try:
+                lbl.setVisible(lbl.x() >= edge)
+            except RuntimeError:
+                pass
 
     def _update_note(self, tl: QPointF) -> None:
         """No row drawn has a guide (it is still loading, or there is none

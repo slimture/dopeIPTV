@@ -545,3 +545,23 @@ def test_the_now_line_shows_only_when_turned_on():
     s.setValue(EpgGrid.NOW_LINE_KEY, "true")
     assert grid._now_shown()
     s.clear()
+
+
+def test_a_time_cut_by_the_channel_column_is_hidden():
+    """A half hour's label starting under the pinned channel column showed
+    only its last digit ("0" of 21:00) beside it."""
+    from PyQt6.QtWidgets import QApplication, QGraphicsSimpleTextItem
+
+    from dopeiptv.ui.epg_grid import EpgGrid
+
+    app = QApplication.instance() or QApplication([])   # kept: the items need it
+    grid = EpgGrid.__new__(EpgGrid)
+    cut, clear = QGraphicsSimpleTextItem("21:00"), QGraphicsSimpleTextItem("21:30")
+    cut.setPos(150, 0)
+    clear.setPos(210, 0)
+    grid._time_labels = [cut, clear]
+    grid._hide_cut_times(160)
+    assert not cut.isVisible() and clear.isVisible()
+    grid._hide_cut_times(100)                  # scrolled clear of the column
+    assert cut.isVisible()
+    del app
