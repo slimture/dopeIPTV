@@ -532,6 +532,36 @@ def load_with_options(m, url: str, options: dict[str, str]) -> bool:
     return False
 
 
+#: How long play() waits for a web page's file to be gone (some milliseconds).
+FILE_END_WAIT = 2.0
+
+
+def end_file_options(m, wait: float = FILE_END_WAIT) -> bool:
+    """End the file load_with_options loaded, and wait until its options
+    are back, before the next stream's are set. mpv puts back what such a
+    file replaced when it ends - with loadfile replace that is after the
+    next stream had written its own, which were lost: the first stream
+    after a web page played without Nerd's low latency, or with the buffer
+    from before a change. A stop alone is not enough either: a write right
+    after it can still come before the core ends the file. The file's path
+    is gone once the options are back. Whether that was within *wait*
+    seconds (if not, the next stream plays as it did before this)."""
+    deadline = time.monotonic() + wait
+    try:
+        if m.path is None:
+            return True
+        m.command("stop")
+        while m.path is not None:
+            if time.monotonic() > deadline:
+                log.info("web page: its file was not ended within %.1f s", wait)
+                return False
+            time.sleep(0.005)
+    except Exception as e:
+        log.debug("web page: its file not ended first: %s", e)
+        return False
+    return True
+
+
 class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
                      DvrPlayerMixin, QWidget):
     """Video pane with libmpv OpenGL rendering, control bar, and fullscreen overlay."""
@@ -642,6 +672,9 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
         self._delay_chan: str | None = None
         self._delay_key: str | None = None
         self._delay_set = False
+        # The file on the core was loaded with options of its own (a web
+        # page): play() ends it before it sets the next stream's.
+        self._own_file_options = False
         # Night mode for the sound (core/night_mode.py): whether it is
         # wanted, and what the core was last given (its weakref, on/off) -
         # so a play() that changes nothing writes nothing to mpv, and a core
@@ -2848,6 +2881,11 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
             if self.video.mpv is None:
                 raise RuntimeError("OpenGL context not ready")
             m = self.video.mpv
+            # A web page's file had options of its own: it ends first, so
+            # that mpv does not put them back over what is set below.
+            if self._own_file_options:
+                self._own_file_options = False
+                end_file_options(m)
             # Re-enable mpv's video output in case a previous stop() set it
             # to "no" - without this the stream would play with audio only.
             # Also reset the audio track to auto: picking a specific track
@@ -3006,7 +3044,7 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
             except Exception as e:
                 log.debug("Stream info unavailable: %s", e)
             if web:
-                load_with_options(m, url, WEB_FILE_OPTIONS)
+                self._own_file_options = load_with_options(m, url, WEB_FILE_OPTIONS)
             else:
                 m.play(source or url)
             self.current_url = url
