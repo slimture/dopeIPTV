@@ -912,8 +912,24 @@ jobs:
           brew install create-dmg
       - name: Python build deps
         run: |
+          if [ "${{ matrix.deps }}" = conda ]; then
+            # PyObjC 13.0's CoreMedia for Intel binds a C function to macOS
+            # 26's libswiftCoreMedia and does not load on macOS 15 - AirPlay
+            # and the media controls with it (--self-check). The Intel build
+            # stays on 12.2.2; Apple Silicon's 13.0 loads.
+            C="$RUNNER_TEMP/pyobjc-intel.txt"
+            for p in pyobjc-core pyobjc-framework-Cocoa pyobjc-framework-MediaPlayer \
+                     pyobjc-framework-AVFoundation pyobjc-framework-AVKit \
+                     pyobjc-framework-CoreMedia pyobjc-framework-CoreAudio \
+                     pyobjc-framework-Quartz; do
+              echo "$p==12.2.2"
+            done > "$C"
+            export PIP_CONSTRAINT="$C"
+            cat "$C"
+          fi
           python -m pip install --upgrade pip pyinstaller pyobjc-core
           python -m pip install -r requirements.txt
+          python -m pip list 2>/dev/null | grep -i '^pyobjc' || true
       - name: Version
         id: v
         run: echo "version=$(python -c 'import dopeiptv,sys;print(dopeiptv.VERSION)')" >> "$GITHUB_OUTPUT"
