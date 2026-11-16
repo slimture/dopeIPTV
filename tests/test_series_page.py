@@ -568,3 +568,138 @@ def test_the_series_page_in_the_window(tmp_path):
                           env=env, cwd=_REPO_ROOT, timeout=240)
     assert "SERIES_PAGE_OK" in proc.stdout, (
         f"stdout={proc.stdout[-3000:]!r}\nstderr={proc.stderr[-4000:]!r}")
+
+
+# -- regressions found in review ------------------------------------------------------
+
+_CHILD_REVIEW = r"""
+import os, tempfile, threading, time
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from PyQt6.QtCore import QSettings
+from PyQt6.QtWidgets import QApplication
+
+_tmp = tempfile.mkdtemp()
+QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, _tmp)
+
+from dopeiptv.providers.client import DemoClient
+from dopeiptv.ui import main_window as mw_mod, mw_series_page
+from dopeiptv.ui.main_window import MainWindow
+
+app = QApplication.instance() or QApplication([])
+settings = QSettings(os.path.join(_tmp, "s.ini"), QSettings.Format.IniFormat)
+settings.setValue("home_enabled", "false")
+launched = []
+mw_mod.launch_player = lambda *a, **k: launched.append(a)
+mw_series_page.launch_player = lambda *a, **k: launched.append(a)
+w = MainWindow(DemoClient(), settings)
+w.cover.resolver = None
+asked = []
+w._choice_dialog = lambda *a, **k: asked.append(a) or 0
+
+def settle(cond, secs=10):
+    end = time.time() + secs
+    while not cond() and time.time() < end:
+        app.processEvents()
+        time.sleep(0.01)
+    app.processEvents()
+    assert cond(), "timed out"
+
+def season(n, count):
+    return [{"id": str(n * 1000 + e), "episode_num": e, "title": f"Ep {e}",
+             "container_extension": "mkv",
+             "info": {"plot": "A plot.", "duration_secs": 2700}} for e in range(1, count + 1)]
+
+info = {"info": {"name": "Show 30"}, "episodes": {"1": season(1, 3), "2": season(2, 2)}}
+w.client.series_info = lambda sid: info
+w.client.episode_url = lambda i, ext=None: f"http://x/series/u/p/{i}.mkv"
+w.resize(1440, 900)
+w.show()
+settle(lambda: w.list_model.rowCount() > 0)
+series = {"series_id": 130, "name": "Show 30", "category_id": "6"}
+
+def episode(eid):
+    return next(e for s in w._sp_seasons for e in s.episodes if e["id"] == eid)
+
+# -- a followed series' new episodes are new once: opened again within the
+#    ten minutes its episodes are kept, none of them is still "new" -----------
+w.followed.follow(series)
+w.followed.update(130, {"episodes": {"1": season(1, 2)}})
+w.followed.update(130, {"episodes": {"1": season(1, 3), "2": season(2, 2)}})
+assert set(w.followed.new_ids(130)) == {"1003", "2001", "2002"}
+w._open_series_page(series)
+settle(lambda: bool(w._sp_seasons))
+page = w._series_page
+assert page.states["1003"].new and page.states["2002"].new
+w._leave_series_page()
+w._open_series_page(series)
+settle(lambda: bool(w._sp_seasons))
+stale = [k for k, s in w._series_page.states.items() if s.new]
+assert stale == [], f"seen episodes still marked new: {stale}"
+
+# -- a live channel whose id is an episode's (ids are unique only within a
+#    type) does not stop that episode from playing ---------------------------
+w._start_playback("http://x/live/u/p/2002.ts", "Channel", None, 2002, "live")
+if not getattr(w.player, "current_url", None):
+    w.player.current_url = "http://x/live/u/p/2002.ts"
+assert w._playing_group == "live" and str(w._playing_key) == "2002"
+w._sp_play(episode("2002"))
+assert w._last_playback["kind"] == "episode" and str(w._last_playback["key"]) == "2002", \
+    w._last_playback
+
+# -- an episode the recordings' question turned back leaves no autoplay
+#    queue behind for the next episode played from elsewhere ---------------------
+guard = w._guard_stream_switch
+w._guard_stream_switch = lambda url, title: False
+w._sp_play(episode("1001"))
+w._guard_stream_switch = guard
+assert str(w._last_playback["key"]) == "2002"
+assert w._ep_queue_override is None, w._ep_queue_override
+
+# -- a portal (its addresses slow to get): Open externally asks for the
+#    address off the window's thread, and Continue still starts where it got
+#    to without the question --------------------------------------------------
+ready, blocked = set(), []
+def slow_url(i, ext=None):
+    on_main = threading.current_thread() is threading.main_thread()
+    if on_main and str(i) not in ready:
+        blocked.append(str(i))
+    if not on_main:
+        time.sleep(0.05)
+        ready.add(str(i))
+    return f"http://x/series/u/p/{i}.mkv"
+w.client.episode_url = slow_url
+w.client.slow_links = True
+w.client.link_ready = lambda name, ident: str(ident) in ready
+w._choice_dialog = lambda *a, **k: asked.append(a) or 1      # open anyway
+launched.clear()
+w._sp_play_external(episode("1002"), "mpv")
+settle(lambda: launched)
+assert blocked == [], f"the address was asked for on the window's thread: {blocked}"
+assert launched[-1][1].endswith("/1002.mkv"), launched
+
+w._sp_play(episode("1001"))
+settle(lambda: str(w._last_playback["key"]) == "1001")
+w.resume.record("episode", "2001", 1350, 2700, item={"id": "2001"},
+                series_ctx={"series_id": 130, "name": "Show 30"})
+w._sp_refresh()
+nxt = w._sp_next
+assert nxt.episode["id"] == "2001" and nxt.resume, (nxt.episode, nxt.resume)
+asked.clear()
+w._choice_dialog = lambda *a, **k: asked.append(a) or 0
+w._sp_primary()
+settle(lambda: str(w._last_playback["key"]) == "2001")
+assert asked == [], f"Continue asked whether to resume: {asked}"
+assert blocked == [], blocked
+print("SERIES_REVIEW_OK", flush=True)
+os._exit(0)
+"""
+
+
+def test_series_page_review_regressions_in_the_window(tmp_path):
+    pytest.importorskip("PyQt6")
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen", XDG_CONFIG_HOME=str(tmp_path))
+    proc = subprocess.run([sys.executable, "-c", _CHILD_REVIEW], capture_output=True,
+                          text=True, env=env, cwd=_REPO_ROOT, timeout=240)
+    assert "SERIES_REVIEW_OK" in proc.stdout, (
+        f"stdout={proc.stdout[-3000:]!r}\nstderr={proc.stderr[-4000:]!r}")
+
