@@ -38,6 +38,13 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   ellipsis); the pop-out's own play/pause disc no longer sits under it
   taking clicks.
 
+- A cast of what plays from another source than the one in use (started
+  before a switch, by failover or from the Search page) checked the
+  trusted certificate of the source in use, and a Kodi or an Apple TV got
+  that source's user agent, headers and proxy. It now asks about the pin
+  of the source the stream comes from, and the receiver gets that
+  source's own options.
+
 ## [1.6.1]
 
 A calmer guide, a night mode that tames loud adverts and bangs without

@@ -55,7 +55,8 @@ _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_cast_release_buffer", "_cast_keep_buffer", "_playing_buffer",
             "_cast_hold_name", "_cast_buffer_feed", "_cast_back_steps",
             "_cast_timeshift_entries", "_open_cast_dialog", "_cast_converts",
-            "_cast_keeps_buffer", "_cast_source_of")
+            "_cast_keeps_buffer", "_cast_source_of", "_cast_route_from",
+            "_cast_playlist")
 
 
 class _Resume0:
@@ -2818,7 +2819,7 @@ def test_the_rewind_buffer_is_kept_for_a_live_cast_only_when_asked_for(monkeypat
     w.client = types.SimpleNamespace(
         live_url=lambda sid, fmt: f"http://p/live/u/pw/{sid}.{fmt}")
     w._vpn_guard_blocks = lambda url: False
-    w._cast_pin_ok = lambda *u: True
+    w._cast_pin_ok = lambda *u, **_k: True
     w._conn_ok_cast = lambda url, **_k: True
     w._play_kind_for = lambda it: "live"
     w._local_codecs = lambda: []

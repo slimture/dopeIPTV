@@ -55,3 +55,12 @@ def _build_from_source():
     build_check.set_verdict(build_check.Verdict(build_check.SOURCE))
     yield
     build_check.set_verdict(None)
+
+
+@pytest.fixture(autouse=True)
+def _no_cast_source_left():
+    """A cast's source (core/nerd.set_cast_source) is set as a cast starts:
+    one a test started must not stand for the next test's Kodi or AirPlay."""
+    yield
+    from dopeiptv.core import nerd
+    nerd.set_cast_source(None)

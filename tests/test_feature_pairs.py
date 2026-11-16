@@ -1070,6 +1070,162 @@ def test_a_cast_of_a_pinned_source_is_asked_about_once_per_source_this_session(a
     assert not hasattr(_CastMixin, "_cast_pin_allowed")          # the window's, never stored
 
 
+def _two_source_caster(monkeypatch, pin_a: bool, pin_b: bool):
+    """A window that casts, with sources Alpha (a) and Beta (b), either's
+    server pinned; what the cast dialog was opened with is in *opened*:
+    (address, the user agent a Kodi would send)."""
+    from dopeiptv.core import cert_pin, nerd
+    from dopeiptv.providers.kodi import KodiManager
+    from dopeiptv.ui import mw_cast
+    from dopeiptv.ui.mw_cast import _CastMixin
+    from dopeiptv.ui.mw_connections import _ConnectionsMixin
+    from dopeiptv.ui.mw_source_label import _SourceLabelMixin
+
+    opened: list[tuple[str, str]] = []
+
+    class Dialog:
+        def __init__(self, win, address, title, *a, **k):
+            opened.append((address, KodiManager._stream_options(None)[0]))
+
+        def exec(self):
+            return 0
+
+    monkeypatch.setattr(mw_cast, "CastDialog", Dialog)
+
+    def options(host, pinned, ua):
+        base = cert_pin.pin_options(host, 443, "ab" * 32) if pinned else {}
+        return dict(base, user_agent=ua)
+
+    class Store:
+        def __init__(self):
+            self.active_id = "a"
+            self.items = {
+                "a": {"id": "a", "name": "Alpha", "kind": "xtream",
+                      "options": options("a.example.com", pin_a, "AlphaUA")},
+                "b": {"id": "b", "name": "Beta", "kind": "xtream",
+                      "options": options("b.example.com", pin_b, "BetaUA")}}
+
+        def get(self, pid):
+            return self.items.get(pid)
+
+        def active(self):
+            return self.items.get(self.active_id)
+
+        def playlists(self):
+            return list(self.items.values())
+
+    class W(_CastMixin, _ConnectionsMixin, _SourceLabelMixin):
+        mode, _fav_section, series_ctx = "live", None, None
+
+        def __init__(self):
+            self.client = SimpleNamespace(
+                max_connections=None,
+                live_url=lambda sid, fmt="ts": f"https://b.example.com/live/u/p/{sid}.{fmt}")
+            self.player = SimpleNamespace(current_url=None, _dvr=None, _dvr_pool=None)
+            self.rec = SimpleNamespace(jobs=[])
+            self._multiview_win = None
+            self.playlist_store = Store()
+            self._failover_source = self._failover_key = None
+            self._last_playback = None
+            self.cast = SimpleNamespace(active=None)
+            self._cast_ctx = self._cast_device = None
+            self._playing_key = self._playing_item = None
+            self.settings = _S()
+            self.asked: list[str] = []
+            self.answer = 1
+
+        def _item_key(self, it):
+            return (it or {}).get("stream_id") or (it or {}).get("_key")
+
+        def _content_kind(self):
+            return "live"
+
+        def _stream_for(self, it):
+            sid = it.get("stream_id")
+            return (self.client.live_url(sid) if sid is not None else None), it.get("name")
+
+        def _play_kind_for(self, it):
+            return "live" if it.get("_kind") == "live" else "other"
+
+        def _vpn_guard_blocks(self, _url):
+            return False
+
+        def _local_codecs(self):
+            return []
+
+        def _local_audio_index(self):
+            return 0
+
+        def _local_tracks(self, _it):
+            return {}
+
+        def _choice_dialog(self, title, message, options, dont_ask_setting=None):
+            self.asked.append(message)
+            return self.answer
+
+        def plays_alpha(self, url):
+            """Alpha's channel plays; the person switched to Beta since."""
+            row = {"stream_id": 7, "name": "News", "_kind": "live"}
+            self.player.current_url = url
+            self._note_playing_source(url, 7, "live")
+            self._last_playback = {"url": url, "title": "News", "kind": "live", "item": row}
+            self._playing_key, self._playing_item = 7, row
+            self.playlist_store.active_id = "b"
+            nerd.set_source(self.playlist_store.active())        # as switch_playlist does
+
+    return W(), opened
+
+
+def test_a_cast_checks_the_trusted_certificate_of_the_source_its_stream_is_from(app, monkeypatch):
+    """Alpha's server is pinned, Beta's is not. Alpha's channel plays and the
+    person switches to Beta: casting what plays asks about Alpha's pin - the
+    TV fetches Alpha's stream - and a Kodi or an Apple TV is handed Alpha's
+    user agent; a row of Beta's list casts with Beta's, no question. The
+    other way round, Beta pinned: what plays from Alpha casts without a
+    word, Beta's row is asked about. Failover's stream is its source's."""
+    from dopeiptv.core import nerd
+
+    a_url = "https://a.example.com/live/u/p/7.m3u8"
+    nerd.install(_S(nerd_enabled="true"))
+    try:
+        w, opened = _two_source_caster(monkeypatch, pin_a=True, pin_b=False)
+        w.plays_alpha(a_url)
+        w.cast_playing()                                    # Cancel
+        assert w.asked == [tr("cast_pin_body", name="Alpha", server="a.example.com:443")]
+        assert not opened
+        w.answer = 0                                        # Cast anyway
+        w.cast_playing()
+        assert opened == [(a_url, "AlphaUA")], "Alpha's stream, with Alpha's own options"
+        assert w._cast_ctx["source_id"] == "a" and len(w.asked) == 2
+        w.player.current_url = None
+        w._open_cast_dialog({"stream_id": 3, "name": "Sport", "_kind": "live"})
+        assert opened[-1] == ("https://b.example.com/live/u/p/3.m3u8", "BetaUA")
+        assert len(w.asked) == 2, "Beta pins nothing: no question"
+
+        w, opened = _two_source_caster(monkeypatch, pin_a=False, pin_b=True)
+        w.plays_alpha(a_url)
+        w.cast_playing()
+        assert opened == [(a_url, "AlphaUA")] and not w.asked, "Alpha pins nothing"
+        w.player.current_url = None
+        w._open_cast_dialog({"stream_id": 3, "name": "Sport", "_kind": "live"})
+        assert w.asked == [tr("cast_pin_body", name="Beta", server="b.example.com:443")]
+        assert len(opened) == 1
+
+        # Failover's stream from Alpha while Beta is in use: Alpha's pin.
+        w, opened = _two_source_caster(monkeypatch, pin_a=True, pin_b=False)
+        w.playlist_store.active_id = "b"
+        w._failover_source = w.playlist_store.get("a")
+        w._failover_key = "failover:a:7"
+        w.player.current_url = a_url
+        w._note_playing_source(a_url, w._failover_key, "live")
+        w._last_playback = {"url": a_url, "kind": "live", "key": w._failover_key}
+        w.cast_playing()
+        assert w.asked == [tr("cast_pin_body", name="Alpha", server="a.example.com:443")]
+    finally:
+        nerd.set_source(None)
+        nerd.install(None)
+
+
 # -- the phone's page hears what stopped its play ------------------------------------------
 
 def test_the_phone_note_is_the_phones_only_for_a_while_and_until_something_plays(monkeypatch):
@@ -1657,3 +1813,4 @@ def test_a_recording_continued_over_a_new_connection_keeps_its_source():
     assert w._guard_rec_switch("http://b.invalid/live/u/p/3.ts", "Sport")
     assert made and (made[-1].get("source"), made[-1].get("source_kind")) == ("a", "xtream"), made
     assert made[-1]["url"] == url
+

@@ -435,7 +435,7 @@ class KodiManager:
     def _stream_options(self) -> tuple[str, dict[str, str]]:
         from ..core import nerd
         n = nerd.current()
-        src = nerd.source()
+        src = nerd.cast_source()
         return n.user_agent(src), n.headers(src)
 
     def cast(self, device_name: str, url: str, title: str,

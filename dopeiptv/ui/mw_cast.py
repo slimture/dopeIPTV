@@ -153,9 +153,10 @@ class _CastMixin:
             return
         # The way in every stream takes: Nerd's VPN guard, and the account's
         # connections - the TV, Kodi or the converter here holds one.
-        if (self._vpn_guard_blocks(source) or not self._cast_pin_ok(url, source)
+        if (self._vpn_guard_blocks(source) or not self._cast_pin_ok(url, source, source_id=src)
                 or not self._conn_ok_cast(source, source_id=src)):
             return
+        self._cast_route_from(src)
         # Remember what is being cast, not just where to. Pausing a live
         # channel is answered from the provider's archive, and that needs the
         # channel's own id long after this dialog is gone.
@@ -468,16 +469,43 @@ class _CastMixin:
         except Exception:
             return 0.0
 
-    def _cast_pin_ok(self, *urls: str) -> bool:
+    def _cast_playlist(self, source_id: str = "") -> dict | None:
+        """The source (its entry) a cast's stream is from: *source_id*'s -
+        what plays from another source than the one in use (started before
+        a switch, by failover or from the Search page) - else the one in
+        use."""
+        store = getattr(self, "playlist_store", None)
+        if store is None:
+            return None
+        get = getattr(store, "get", None)
+        if source_id and callable(get):
+            try:
+                pl = get(source_id)
+            except Exception:
+                pl = None
+            if pl:
+                return pl
+        active = getattr(store, "active", None)
+        return active() if callable(active) else None
+
+    def _cast_route_from(self, source_id: str = "") -> None:
+        """A cast starts from *source_id* (the one in use when ""): Kodi and
+        an Apple TV take that source's user agent, headers and proxy (core/
+        nerd.py), not the one in use's."""
+        from ..core import nerd
+        nerd.set_cast_source(self._cast_playlist(source_id))
+
+    def _cast_pin_ok(self, *urls: str, source_id: str = "") -> bool:
         """Nerd: the source trusts one certificate for its server. A TV,
         Kodi or an Apple TV fetches the stream itself, so the pin cannot
         protect a cast: asked first, and "Cast anyway" holds for that source
-        until the app closes (never stored)."""
+        until the app closes (never stored). The pin of the source the
+        stream is from (*source_id*, else the one in use) - not the one in
+        use after a switch."""
         from ..core import cert_pin, nerd
         if not nerd.current().on:
             return True             # the pin is in force only with Nerd on
-        store = getattr(self, "playlist_store", None)
-        pl = (store.active() if store is not None else None) or {}
+        pl = self._cast_playlist(source_id) or {}
         hit = cert_pin.covers(pl.get("options"), *urls)
         if hit is None:
             return True
@@ -759,8 +787,10 @@ class _CastMixin:
         # A row of the lists: the source in use's (another source's channel
         # has no row here, and plays in the player).
         src = self._cast_source_of()
-        if not self._cast_pin_ok(hls, url) or not self._conn_ok_cast(url, source_id=src):
+        if (not self._cast_pin_ok(hls, url, source_id=src)
+                or not self._conn_ok_cast(url, source_id=src)):
             return True
+        self._cast_route_from(src)
         # The one on the TV ends as it would here: a film keeps its point,
         # its scrobbles end, failover may try again.
         self._save_cast_position()
@@ -807,12 +837,13 @@ class _CastMixin:
             timer.stop()
         device = self._cast_device
         src = self._cast_source_of()
-        if not self._cast_pin_ok(url) or not self._conn_ok_cast(url, source_id=src):
+        if not self._cast_pin_ok(url, source_id=src) or not self._conn_ok_cast(url, source_id=src):
             return True
         old = self._cast_ctx or {}
         if old.get("key") == key and old.get("kind") == kind:
             log.info("cast: that title is on %s already", device)
             return True
+        self._cast_route_from(src)
         self._save_cast_position()
         self._failover_leave(url, key)
         self._trakt_stop_current()

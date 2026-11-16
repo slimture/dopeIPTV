@@ -482,18 +482,37 @@ class Nerd:
 
 _current = Nerd(None)
 _source: dict | None = None
+_cast_source: dict | None = None
 _ip_original: Any = None
+
+
+def _options_of(playlist: dict | None) -> dict | None:
+    return (dict(playlist.get("options") or {}, _kind=playlist.get("kind") or "xtream")
+            if playlist else None)
 
 
 def set_source(playlist: dict | None) -> None:
     """The source playing from now on: its own options and its kind."""
     global _source
-    _source = (dict(playlist.get("options") or {}, _kind=playlist.get("kind") or "xtream")
-               if playlist else None)
+    _source = _options_of(playlist)
 
 
 def source() -> dict | None:
     return _source
+
+
+def set_cast_source(playlist: dict | None) -> None:
+    """The source a cast starting now is from (what plays from another
+    source than the one in use - started before a switch, by failover or
+    from the Search page - keeps its own); None: the source playing."""
+    global _cast_source
+    _cast_source = _options_of(playlist)
+
+
+def cast_source() -> dict | None:
+    """The source of the stream on a TV, Kodi or an Apple TV, in source()'s
+    form: whose user agent, headers and proxy its receiver takes."""
+    return _cast_source if _cast_source is not None else _source
 
 
 def install(settings: Settings | None) -> Nerd:

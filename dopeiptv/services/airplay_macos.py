@@ -621,8 +621,9 @@ class AirPlayReceiver(QObject):
 
     def _network(self, url: str) -> tuple[list[str], bool]:
         """ffmpeg's input options as the source plays (Nerd), and whether
-        the source sends anything of its own the Apple TV would not."""
-        n, src = nerd.current(), nerd.source()
+        the source sends anything of its own the Apple TV would not - the
+        source the cast is from (nerd.cast_source)."""
+        n, src = nerd.current(), nerd.cast_source()
         ua = n.user_agent(src)
         headers = n.headers(src)
         proxy = n.proxy(src, url)
