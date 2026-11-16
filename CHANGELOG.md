@@ -9,8 +9,8 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [1.6.1]
 
-A calmer guide, night mode you can hear, the visualiser for channels
-that are sound alone, settings brought over to a new computer from the
+A calmer guide, a night mode that tames loud adverts and bangs without
+raising anything, the visualiser for channels that are sound alone, settings brought over to a new computer from the
 welcome, the same menu bar on every system, and fixes - above all to
 how connections to the account are counted.
 

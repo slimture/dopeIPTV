@@ -1,11 +1,11 @@
 ## dopeIPTV 1.6.1
 
-**A calmer guide, night mode you can hear, the visualizer for music channels, and your settings on a new computer in one step.**
+**A calmer guide, a night mode that tames loud adverts and bangs, the visualizer for music channels, and your settings on a new computer in one step.**
 
 ### New and better
 
 - **A calmer, denser guide.** Lower rows, so more channels fit; a narrower channel column that shows only the logos when the guide is narrow (drag its edge to set the width); flat cards with a thin progress bar on what is on now; a line at the time now; separators like "-= Sweden =-" as headings; and rows without guide data left empty instead of repeating the same sentence. The now line runs behind the programmes - **Settings → Guide** puts it in front.
-- **Night mode you can hear.** Quiet speech comes up clearly and loud adverts and bangs come down - press `N`. It says so however you switch it, and tells you when it could not be turned on for a stream.
+- **Night mode that works.** Loud adverts, explosions and bangs come down while ordinary speech stays exactly as it is - it never makes anything louder - press `N`. It says so however you switch it, and tells you when it could not be turned on for a stream.
 - **The visualizer for music and radio channels.** A channel in your playlist with sound but no picture now shows the visualizer instead of a black screen. Two new styles, Vectorscope and Frequencies, make five - in the player's options menu.
 - **New computer? Bring your settings from the welcome.** Type the sync code from your other computer, or restore a backup: your profiles and settings come over, and your sources too when the other computer syncs them. Encrypted on your computer before it is sent - dopeiptv.org keeps only bytes it cannot read.
 - **The same menu bar everywhere.** File, View, History and Help on Windows, Linux and macOS - About is under Help (on a Mac in the dopeIPTV menu, as before). **Settings → General** now ends with About and the version too.

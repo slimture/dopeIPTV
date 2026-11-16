@@ -71,10 +71,10 @@
   <releases>
     <release version="1.6.1" date="2026-11-16">
       <description>
-        <p>A calmer guide, night mode you can hear, and the visualiser for channels that are sound alone.</p>
+        <p>A calmer guide, a night mode that tames loud adverts and bangs, and the visualiser for channels that are sound alone.</p>
         <ul>
           <li>The guide: lower rows, a narrower channel column with logos only when it is narrow, flat cards, a line at the time now, separators as headings</li>
-          <li>Night mode lifts quiet speech and lowers loud adverts clearly, and says when it could not be turned on</li>
+          <li>Night mode brings loud adverts, explosions and bangs down, leaves ordinary speech as it is, and says when it could not be turned on</li>
           <li>A channel with sound but no picture shows the visualiser, now in five styles</li>
           <li>Settings and profiles brought over to a new computer from the welcome, by sync code or backup</li>
           <li>The same menu bar on Windows, Linux and macOS, and About with the version in Settings</li>
