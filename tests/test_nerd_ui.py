@@ -183,8 +183,11 @@ def test_welcome_offers_nerd_quietly_and_boxes_only_then(app, settings):
 
 def test_welcome_is_no_taller_with_nerd_on(app, settings):
     """The welcome card with Nerd on holds the box kinds and Find on my
-    network, nothing more: never taller than the plain Xtream form (the
-    source's own Nerd options live in the source dialog only)."""
+    network, nothing more: never taller than the forms everyone has - a
+    media server's, with Find on my network and its sign-in, the tallest
+    (the source's own Nerd options live in the source dialog only). The
+    plain Xtream form once measured as tall only because it showed the
+    MAC address and the sign-in too."""
     def height(kind):
         ov, got = _welcome(settings)
         got["_win"].resize(1100, 640)
@@ -199,7 +202,7 @@ def test_welcome_is_no_taller_with_nerd_on(app, settings):
         return h
     # The tallest the plain form measures (a first window can measure a few
     # pixels apart from a later one - CI saw 504 then 486).
-    plain = max(height("xtream"), height("xtream"))
+    plain = max(height("xtream"), height("xtream"), height("jellyfin"))
     settings.setValue("nerd_enabled", "true")
     nerd.install(settings)
     for kind in ("xtream", "enigma2", "tvheadend", "hdhomerun"):

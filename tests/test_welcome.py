@@ -201,3 +201,20 @@ def test_the_connect_step_fits_a_low_window_the_first_time():
     assert ov._stack.height() > ov._scroll.height()          # it scrolls
     assert page.width() <= ov._scroll.viewport().width()     # nothing cut on the right
     win.close()
+
+
+def test_the_xtream_form_shows_only_its_own_rows_from_the_start():
+    """Before a kind or a language was picked, the connect step showed the
+    MAC address, the media server sign-in and Find on my network for
+    Xtream too."""
+    try:
+        import PyQt6  # noqa: F401
+    except Exception:
+        pytest.skip("PyQt6 not available")
+    _app, _win, ov, _ = _overlay()
+    page = ov._stack.widget(1)
+    assert ov._conn_kind.currentData() == "xtream"
+    for w in (ov._server, ov._user, ov._pw):
+        assert w.isVisibleTo(page)
+    for w in (ov._mac, ov._signin, ov._finder.row):
+        assert not w.isVisibleTo(page)

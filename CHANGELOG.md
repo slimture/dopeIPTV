@@ -110,6 +110,7 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   A "channel" that is only a heading in the provider's list ("-= Sweden
   =-", "#### SE ####") is drawn as a heading over the channels below it,
   with nothing to click.
+- The welcome's connect step showed the MAC address, the media server sign-in and Find on my network for Xtream until another kind or a language was picked.
 
 ## [1.6.0]
 

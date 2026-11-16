@@ -134,6 +134,10 @@ class WelcomeOverlay(QWidget):
         card_l.addWidget(self._scroll)
         outer.addWidget(self._card, 0, Qt.AlignmentFlag.AlignHCenter)
         outer.addStretch(1)
+        # The connect form's rows as its first kind wants them: until a kind
+        # or a language was picked, Xtream showed the MAC address, the media
+        # sign-in and the box finder too.
+        self._update_conn_kind()
         # A QStackedWidget otherwise reserves the height of its tallest page,
         # so the short welcome page would look as tall as the connect form.
         # Let the card hug whichever page is showing.
