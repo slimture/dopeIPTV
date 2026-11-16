@@ -12,7 +12,8 @@ from PyQt6.QtCore import (
     QStandardPaths, Qt, QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QColor, QCursor, QIcon, QPainter, QPen, QPixmap, QPolygonF,
+    QColor, QCursor, QIcon, QKeyEvent, QMouseEvent, QPainter, QPen, QPixmap,
+    QPolygonF,
 )
 from PyQt6.QtOpenGL import QOpenGLFramebufferObject
 from PyQt6.QtWidgets import (
@@ -399,7 +400,10 @@ class _MacInputFilter(QObject):
     # Application-level filter = called for EVERY event in the app, so the
     # dispatch must be as close to free as possible. Module-level frozensets
     # beat rebuilding enum tuples per call (profiled: the enum lookups alone
-    # showed up in the fullscreen-toggle trace).
+    # showed up in the fullscreen-toggle trace). PyQt hands a key or mouse
+    # event over as its own class, so an isinstance test lets every other
+    # event through before event.type() builds its enum: building the
+    # Settings window alone sends some forty thousand events through here.
     _MOUSE_EVS = frozenset({
         QEvent.Type.MouseMove, QEvent.Type.MouseButtonPress,
         QEvent.Type.MouseButtonRelease,
@@ -408,11 +412,13 @@ class _MacInputFilter(QObject):
     _IS_MAC = sys.platform == "darwin"
 
     def eventFilter(self, obj, event):
-        et = event.type()
-        if et in self._KEY_EVS:
-            if self._handle_seek_key(event, et == QEvent.Type.KeyPress):
+        if isinstance(event, QKeyEvent):
+            et = event.type()
+            if et in self._KEY_EVS and self._handle_seek_key(
+                    event, et == QEvent.Type.KeyPress):
                 return True
-        elif self._IS_MAC and et in self._MOUSE_EVS:
+        elif (self._IS_MAC and isinstance(event, QMouseEvent)
+              and event.type() in self._MOUSE_EVS):
             # Any mouse activity un-hides - including the click that opens
             # a context menu, so the menu never comes up with an invisible
             # pointer. Only idle time over the bare video re-hides.

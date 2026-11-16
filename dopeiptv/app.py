@@ -187,14 +187,19 @@ def _install_crash_hooks() -> None:
 
 def _watch_link_events(app, window) -> None:
     """macOS hands a dopeiptv:// link to a running app as an event, not on
-    the command line."""
-    from PyQt6.QtCore import QEvent, QObject
+    the command line. Elsewhere no such event ever comes, and a filter on
+    the whole application is a call into Python for every event the app
+    has: none there."""
+    if sys.platform != "darwin":
+        return
+    from PyQt6.QtCore import QObject
+    from PyQt6.QtGui import QFileOpenEvent
 
     from .core.commands import parse_link
 
     class _Links(QObject):
         def eventFilter(self, obj, event):  # noqa: N802 - Qt's name
-            if event.type() == QEvent.Type.FileOpen:
+            if isinstance(event, QFileOpenEvent):
                 url = event.url().toString() if event.url().isValid() else event.file()
                 cmd = parse_link(url) if url.lower().startswith("dopeiptv://") else None
                 if cmd is not None:
