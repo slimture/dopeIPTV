@@ -873,6 +873,41 @@ assert w._series_page.retry.isVisibleTo(w._series_page), "no way to try again"
 w._episode_rows = rows
 w._leave_series_page()
 
+# -- a title TMDB matched before backdrops were kept: its details asked for
+#    again by its id, once, and the backdrop shown ---------------------------------
+asked = []
+
+class Resolver:
+    client = SimpleNamespace(season_episodes=lambda tid, n: {})
+
+    def __getattr__(self, name):            # the list's covers: none here
+        return lambda *a, **k: None
+
+    def is_resolved(self, title, kind):
+        return True
+
+    def get_full(self, title, kind, callback):
+        return {"tmdb_id": 55, "poster_url": None}
+
+    def tmdb_id_for(self, title, kind):
+        return 55
+
+    def fill_backdrop(self, title, kind, callback):
+        asked.append(title)
+        callback({"tmdb_id": 55, "poster_url": None,
+                  "backdrop_url": "https://img.invalid/w780/b.jpg"})
+        return True
+
+w.cover.resolver = Resolver()
+w.client.series_info = lambda sid: info
+w._open_series_page({"series_id": 160, "name": "Show 60"})
+settle(lambda: bool(w._sp_seasons))
+assert asked == ["Show 60"], asked
+assert w._sp_head["backdrop"] == "https://img.invalid/w780/b.jpg", w._sp_head
+w._sp_refresh()
+w._sp_fill_header(None)
+assert asked == ["Show 60"], asked
+w.cover.resolver = None
 print("SERIES_REVIEW2_OK", flush=True)
 os._exit(0)
 """
@@ -930,3 +965,39 @@ def test_episode_rows_take_a_dict_a_flat_list_or_a_list_of_lists(app):
     for info in ({}, {"episodes": None}, {"episodes": []}, {"episodes": {"1": None}}, None, []):
         assert MainWindow._episode_rows(info, series) == []
 
+
+def test_a_backdrop_for_a_title_matched_before_backdrops_were_kept(app, tmp_path):
+    """A TMDB entry cached before 1.6.0 has no backdrop_url: its details are
+    asked for again by its id, once, on the pool - the backdrop (or None)
+    kept beside what was there; the cache version stays."""
+    from unittest.mock import MagicMock
+
+    from PyQt6.QtCore import QSettings, QThreadPool
+    from dopeiptv.providers.metadata import PosterResolver
+    settings = QSettings(str(tmp_path / "s.ini"), QSettings.Format.IniFormat)
+    client = MagicMock()
+    client.fetch_details_by_id.return_value = {
+        "tmdb_id": 7, "poster_url": "https://tmdb/other.jpg",
+        "backdrop_url": "https://tmdb/w780/b.jpg"}
+    pool = QThreadPool()
+    pool.setMaxThreadCount(1)
+    r = PosterResolver(pool, settings, client)
+    key = r._key("Show", "series")
+    r._cache[key] = {"tmdb_id": 7, "poster_url": "https://tmdb/p.jpg", "manual": True}
+    got = []
+    assert r.fill_backdrop("Show", "series", got.append) is True
+    end = time.time() + 5
+    while not got and time.time() < end:
+        pool.waitForDone(50)
+        app.processEvents()
+    assert got and got[0]["backdrop_url"] == "https://tmdb/w780/b.jpg", got
+    entry = r.get_full("Show", "series", lambda d: None)
+    assert entry["backdrop_url"] == "https://tmdb/w780/b.jpg"
+    assert entry["poster_url"] == "https://tmdb/p.jpg" and entry["manual"]   # kept
+    # Asked for once: never again, not for an entry that has its backdrop.
+    assert r.fill_backdrop("Show", "series", got.append) is False
+    r._cache[r._key("Other", "series")] = {"tmdb_id": 8, "backdrop_url": None}
+    assert r.fill_backdrop("Other", "series", got.append) is False
+    assert r.fill_backdrop("Unknown", "series", got.append) is False
+    assert client.fetch_details_by_id.call_count == 1
+    assert client.fetch_details_by_id.call_args[0] == (7, "series")

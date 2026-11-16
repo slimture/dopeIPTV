@@ -379,6 +379,7 @@ class _SeriesPageMixin:
                                     "backdrop": "", "asked": False}
         if extra is not None:
             head["info"] = dict(extra)
+            head["source_in"] = True
         info, td = head["info"], head["tmdb"]
         ctx = self._sp_ctx or {}
         title = self._sp_title()
@@ -425,6 +426,14 @@ class _SeriesPageMixin:
             head["backdrop"] = backdrop
             if backdrop:
                 self._sp_art().get(backdrop, partial(self._sp_backdrop_in, gen, backdrop))
+        # A title TMDB matched before backdrops were kept (no "backdrop_url"
+        # in its entry), the source giving none either: asked for again by
+        # its id, once, off the window's thread (_sp_tmdb_in draws it).
+        fill = getattr(self.tmdb, "fill_backdrop", None)
+        if (callable(fill) and td and "backdrop_url" not in td and not backdrop
+                and head.get("source_in") and not head.get("backdrop_asked")):
+            head["backdrop_asked"] = True
+            fill(title, "series", partial(self._sp_tmdb_in, gen))
 
     def _sp_tmdb_in(self, gen: int, details) -> None:
         page = self._series_page
