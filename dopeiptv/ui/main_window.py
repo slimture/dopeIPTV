@@ -5255,13 +5255,20 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         opens: the channel's logo or the title's poster when the window
         holds it in memory already - never a download for it, the name
         alone otherwise - and whether it opens again what dropped."""
+        # Right before player.play(): nothing here may keep a stream from
+        # playing - an icon that is no address (a provider's odd JSON) is
+        # the name alone.
         pm = None
-        if icon_url:
-            for loader in (getattr(self, "logos", None), getattr(self, "poster_art", None)):
-                hit = getattr(loader, "cache", {}).get(icon_url)
-                if hit is not None and not hit.isNull():
-                    pm = hit
-                    break
+        if icon_url and isinstance(icon_url, str):
+            try:
+                for loader in (getattr(self, "logos", None), getattr(self, "poster_art", None)):
+                    hit = getattr(loader, "cache", {}).get(icon_url)
+                    if hit is not None and not hit.isNull():
+                        pm = hit
+                        break
+            except Exception as e:
+                log.debug("loading indicator: no picture: %s", e)
+                pm = None
         try:
             self.player.set_loading_art(pm, reconnect=reconnect)
         except Exception as e:

@@ -745,6 +745,14 @@ def test_the_window_hands_over_only_an_image_it_holds(app):
     MainWindow._arm_loading(h, "http://img/elsewhere.png")
     MainWindow._arm_loading(h, None)
     assert armed == [(poster, True), (None, False), (None, False)]
+    # A provider's odd JSON for its icon (a list, a dict) never keeps the
+    # stream from playing: it is called right before player.play().
+    armed.clear()
+    MainWindow._arm_loading(h, ["http://img/poster.jpg"])
+    MainWindow._arm_loading(h, {"url": "http://img/poster.jpg"}, True)
+    h.logos = Loader(None)
+    MainWindow._arm_loading(h, "http://img/elsewhere.png")
+    assert armed == [(None, False), (None, True), (None, False)]
     # A player without it (an external one) is no reason to fail.
     h.player = SimpleNamespace()
     MainWindow._arm_loading(h, "http://img/poster.jpg")
