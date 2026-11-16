@@ -2775,5 +2775,8 @@
   "satip_tuners_auto": "Sesuai kata server",
   "satip_tuners_hint": "Berapa stream dari server ini yang boleh diputar sekaligus - pemutar, multiview, rekaman, cast. Lebih sedikit dari yang dimilikinya bila TV lain di rumah juga memakainya.",
   "ct_stream_rtsp": "{channel}: server menjawab RTSP – stream dibaca sendiri oleh pemutar",
-  "ct_skip_rtsp": "Tidak diukur – stream RTSP dibaca sendiri oleh pemutar"
+  "ct_skip_rtsp": "Tidak diukur – stream RTSP dibaca sendiri oleh pemutar",
+  "ct_server_ok": "Server menjawab",
+  "ct_stream_no_live": "Sumber ini tidak punya saluran langsung – tidak ada yang bisa dicoba",
+  "ct_speed_no_live": "Tidak dicoba – tidak ada saluran langsung untuk diukur"
 }

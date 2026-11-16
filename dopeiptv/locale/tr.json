@@ -2775,5 +2775,8 @@
   "satip_tuners_auto": "Sunucunun söylediği kadar",
   "satip_tuners_hint": "Bu sunucudan aynı anda kaç yayın oynayabilir - oynatıcı, çoklu görünüm, kayıtlar, yansıtma. Evdeki başka TV'ler de kullanıyorsa sahip olduğundan az.",
   "ct_stream_rtsp": "{channel}: sunucu RTSP'ye yanıt veriyor – yayını oynatıcı kendisi okur",
-  "ct_skip_rtsp": "Ölçülmedi – RTSP yayınını oynatıcı kendisi okur"
+  "ct_skip_rtsp": "Ölçülmedi – RTSP yayınını oynatıcı kendisi okur",
+  "ct_server_ok": "Sunucu yanıt veriyor",
+  "ct_stream_no_live": "Bu kaynakta canlı kanal yok – denenecek bir şey yok",
+  "ct_speed_no_live": "Denenmedi – ölçülecek canlı kanal yok"
 }

@@ -2775,5 +2775,8 @@
   "satip_tuners_auto": "Tak, jak podaje serwer",
   "satip_tuners_hint": "Ile strumieni z tego serwera może grać naraz - odtwarzacz, multiview, nagrania, przesyłanie. Mniej, niż ma, jeśli korzystają z niego też inne telewizory w domu.",
   "ct_stream_rtsp": "{channel}: serwer odpowiada przez RTSP – strumień odczytuje sam odtwarzacz",
-  "ct_skip_rtsp": "Nie zmierzono – strumień RTSP odczytuje sam odtwarzacz"
+  "ct_skip_rtsp": "Nie zmierzono – strumień RTSP odczytuje sam odtwarzacz",
+  "ct_server_ok": "Serwer odpowiada",
+  "ct_stream_no_live": "To źródło nie ma kanałów na żywo – nie ma czego sprawdzić",
+  "ct_speed_no_live": "Nie próbowano – nie ma kanału na żywo do zmierzenia"
 }

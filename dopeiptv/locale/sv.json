@@ -2775,5 +2775,8 @@
   "satip_tuners_auto": "Som servern säger",
   "satip_tuners_hint": "Hur många strömmar från den här servern som får spelas samtidigt - spelaren, multiview, inspelningar, en cast. Färre än den har om andra tv-apparater hemma också använder den.",
   "ct_stream_rtsp": "{channel}: servern svarar på RTSP – spelaren läser strömmen själv",
-  "ct_skip_rtsp": "Inte mätt – en RTSP-ström läses av spelaren själv"
+  "ct_skip_rtsp": "Inte mätt – en RTSP-ström läses av spelaren själv",
+  "ct_server_ok": "Servern svarar",
+  "ct_stream_no_live": "Den här källan har inga livekanaler – inget att prova",
+  "ct_speed_no_live": "Inte provat – det finns ingen livekanal att mäta"
 }

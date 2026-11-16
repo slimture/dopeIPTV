@@ -2775,5 +2775,8 @@
   "satip_tuners_auto": "Kako kaže server",
   "satip_tuners_hint": "Koliko strimova sa ovog servera sme da ide odjednom - plejer, višestruki prikaz, snimci, kastovanje. Manje nego što ima ako ga koriste i drugi televizori u kući.",
   "ct_stream_rtsp": "{channel}: server odgovara na RTSP – strim čita sam plejer",
-  "ct_skip_rtsp": "Nije izmereno – RTSP strim čita sam plejer"
+  "ct_skip_rtsp": "Nije izmereno – RTSP strim čita sam plejer",
+  "ct_server_ok": "Server odgovara",
+  "ct_stream_no_live": "Ovaj izvor nema kanala uživo – nema šta da se proba",
+  "ct_speed_no_live": "Nije pokušano – nema kanala uživo za merenje"
 }

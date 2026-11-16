@@ -9,7 +9,9 @@
             when the account ends and how many of its connections are in
             use; a playlist downloaded; a portal's or a box's login
     stream  the first byte of a live channel: the one last played on the
-            source, else the first in its list
+            source, else the first in its list; a source with no live
+            channel (a media server without Live TV) has none to try, which
+            is no failure - this step and the next are not applicable
     speed   that stream read for about SPEED_SECS, in Mbit/s, set against
             what SD, HD, Full HD and 4K need (NEEDS)
 
@@ -425,6 +427,8 @@ class ConnTest:
             self._set("login", OK, "ct_playlist_ok", {"n": n}, ms, f"{n} channels")
         elif self.kind == "stalker":
             self._set("login", OK, "ct_portal_ok", {}, ms, "handshake and profile: ok")
+        elif self.kind in nerd.MEDIA_KINDS:
+            self._set("login", OK, "ct_server_ok", {}, ms, "the server answered")
         else:
             self._set("login", OK, "ct_box_ok", {}, ms, "the box answered")
 
@@ -468,7 +472,10 @@ class ConnTest:
     # -- the stream ------------------------------------------------------------------
 
     def _channel(self, client: Any) -> tuple[str, str] | None:
-        """(address, name) of the channel to try."""
+        """(address, name) of the channel to try - the address empty when
+        the source gave none for it; None when it has no live channel to
+        play at all (a media server without Live TV, MythTV's channels
+        listed for the guide only, a list of films)."""
         fmt = "ts"
         if self.settings is not None:
             try:
@@ -483,12 +490,12 @@ class ConnTest:
                 url = ""
             if url:
                 return url, last[1]
-        rows = [r for r in (client.live_streams(None) or []) if r.get("stream_id") is not None]
+        rows = [r for r in (client.live_streams(None) or [])
+                if r.get("stream_id") is not None and not r.get("_no_live")]
         if not rows:
             return None
         row = rows[0]
-        url = client.live_url(row["stream_id"], fmt) or ""
-        return (url, str(row.get("name") or "")) if url else None
+        return client.live_url(row["stream_id"], fmt) or "", str(row.get("name") or "")
 
     def _stream_session(self, url: str) -> Any:
         import requests
@@ -512,10 +519,16 @@ class ConnTest:
             self._set("stream", FAIL, "ct_stream_list", {"error": _err(e)}, _ms(t0), _err(e))
             raise _Stop() from e
         self._check()
-        if not found:
+        if found is None:
+            # Nothing failed: there is no live channel to try (nor a speed
+            # to read), as a media server without Live TV has none.
+            self._set("stream", SKIP, "ct_stream_no_live")
+            self._set("speed", SKIP, "ct_speed_no_live")
+            return
+        url, name = found
+        if not url:
             self._set("stream", FAIL, "ct_stream_none")
             raise _Stop()
-        url, name = found
         name = name or "?"
         if rtsp.is_rtsp(url):
             # An RTSP stream (a SAT>IP server's): the server asked whether

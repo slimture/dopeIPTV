@@ -2775,5 +2775,8 @@
   "satip_tuners_auto": "Kama seva inavyosema",
   "satip_tuners_hint": "Mitiririko mingapi kutoka seva hii inaweza kucheza kwa wakati mmoja - kicheza, multiview, rekodi, kutuma kwenye TV. Pungufu ya ilivyo navyo ikiwa TV nyingine nyumbani zinaitumia pia.",
   "ct_stream_rtsp": "{channel}: seva inajibu kwa RTSP – kicheza husoma mtiririko chenyewe",
-  "ct_skip_rtsp": "Haikupimwa – mtiririko wa RTSP husomwa na kicheza chenyewe"
+  "ct_skip_rtsp": "Haikupimwa – mtiririko wa RTSP husomwa na kicheza chenyewe",
+  "ct_server_ok": "Seva inajibu",
+  "ct_stream_no_live": "Chanzo hiki hakina chaneli za moja kwa moja – hakuna cha kujaribu",
+  "ct_speed_no_live": "Haikujaribiwa – hakuna chaneli ya moja kwa moja ya kupima"
 }

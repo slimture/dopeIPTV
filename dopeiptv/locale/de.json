@@ -2775,5 +2775,8 @@
   "satip_tuners_auto": "Wie der Server sagt",
   "satip_tuners_hint": "Wie viele Streams von diesem Server gleichzeitig laufen dürfen – Player, Multiview, Aufnahmen, Casten. Weniger, als er hat, wenn ihn auch andere Fernseher zu Hause nutzen.",
   "ct_stream_rtsp": "{channel}: Der Server antwortet über RTSP – den Stream liest der Player selbst",
-  "ct_skip_rtsp": "Nicht gemessen – einen RTSP-Stream liest der Player selbst"
+  "ct_skip_rtsp": "Nicht gemessen – einen RTSP-Stream liest der Player selbst",
+  "ct_server_ok": "Der Server antwortet",
+  "ct_stream_no_live": "Diese Quelle hat keine Live-Sender – nichts zum Ausprobieren",
+  "ct_speed_no_live": "Nicht versucht – es gibt keinen Live-Sender zum Messen"
 }

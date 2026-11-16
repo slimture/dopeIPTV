@@ -2775,5 +2775,8 @@
   "satip_tuners_auto": "Zoals de server zegt",
   "satip_tuners_hint": "Hoeveel streams van deze server tegelijk mogen spelen - de speler, multiview, opnames, casten. Minder dan hij heeft als andere tv's in huis hem ook gebruiken.",
   "ct_stream_rtsp": "{channel}: de server antwoordt via RTSP – de speler leest de stream zelf",
-  "ct_skip_rtsp": "Niet gemeten – een RTSP-stream leest de speler zelf"
+  "ct_skip_rtsp": "Niet gemeten – een RTSP-stream leest de speler zelf",
+  "ct_server_ok": "De server antwoordt",
+  "ct_stream_no_live": "Deze bron heeft geen livezenders – niets om te proberen",
+  "ct_speed_no_live": "Niet geprobeerd – er is geen livezender om te meten"
 }

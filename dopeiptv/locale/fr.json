@@ -2775,5 +2775,8 @@
   "satip_tuners_auto": "Selon le serveur",
   "satip_tuners_hint": "Combien de flux de ce serveur peuvent être lus à la fois - le lecteur, le multivue, les enregistrements, un cast. Moins qu'il n'en a si d'autres télés de la maison l'utilisent aussi.",
   "ct_stream_rtsp": "{channel} : le serveur répond en RTSP – le lecteur lit le flux lui-même",
-  "ct_skip_rtsp": "Pas mesuré – un flux RTSP est lu par le lecteur lui-même"
+  "ct_skip_rtsp": "Pas mesuré – un flux RTSP est lu par le lecteur lui-même",
+  "ct_server_ok": "Le serveur répond",
+  "ct_stream_no_live": "Cette source n'a pas de chaînes en direct – rien à essayer",
+  "ct_speed_no_live": "Pas essayé – il n'y a pas de chaîne en direct à mesurer"
 }

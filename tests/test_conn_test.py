@@ -269,6 +269,70 @@ def test_a_file_has_no_network_steps(tmp_path):
     assert st["stream"].state == ct.FAIL
 
 
+class _NoLive:
+    """A source that answers and has no live channel to play: a media
+    server without Live TV, MythTV (channels for the guide only), films."""
+
+    def __init__(self, url: str, rows=(), address: str = "") -> None:
+        self.server, self.rows, self.address = url, list(rows), address
+
+    def authenticate(self) -> dict:
+        return {}
+
+    def live_streams(self, _category=None) -> list[dict]:
+        return list(self.rows)
+
+    def live_url(self, _sid, _fmt="ts") -> str:
+        return self.address
+
+
+def _no_live_run(srv, kind: str, rows=(), address: str = "") -> ct.ConnTest:
+    t = ct.ConnTest({"id": "ms", "kind": kind, "server": srv.url},
+                    lambda s: _NoLive(s["server"], rows, address), None, speed_secs=0.3)
+    t.run()
+    assert t.finished
+    return t
+
+
+def test_a_source_without_live_channels_has_nothing_to_try(xtream):
+    # Jellyfin's demo server has no Live TV: the stream and its speed are not
+    # applicable - the neutral mark, not a red failure, and nothing after a
+    # failed step.
+    srv = xtream()
+    for kind, rows, login in (
+            ("jellyfin", [], "ct_server_ok"), ("plex", [], "ct_server_ok"),
+            ("mythtv", [{"stream_id": 5, "name": "BBC One", "_no_live": True}], "ct_box_ok")):
+        st = {s.name: s for s in _no_live_run(srv, kind, rows).snapshot()}
+        assert (st["login"].state, st["login"].key) == (ct.OK, login), kind
+        assert (st["stream"].state, st["stream"].key) == (ct.SKIP, "ct_stream_no_live"), kind
+        assert (st["speed"].state, st["speed"].key) == (ct.SKIP, "ct_speed_no_live"), kind
+        assert not [s for s in st.values() if s.state == ct.FAIL], kind
+    assert not [p for p in srv.asked if p.startswith("/live/")]
+
+
+def test_a_channel_without_an_address_still_fails(xtream):
+    srv = xtream()
+    st = {s.name: s for s in _no_live_run(
+        srv, "tvheadend", [{"stream_id": 1, "name": "One"}]).snapshot()}
+    assert (st["stream"].state, st["stream"].key) == (ct.FAIL, "ct_stream_none")
+    assert (st["speed"].state, st["speed"].key) == (ct.SKIP, "ct_skip")
+
+
+def test_the_window_shows_no_live_channel_as_not_applicable():
+    pytest.importorskip("PyQt6.QtWidgets")
+    from PyQt6.QtWidgets import QApplication
+
+    from dopeiptv.i18n import tr
+    from dopeiptv.ui import conn_test_dialog as dlg
+    from dopeiptv.ui.theme import P
+    QApplication.instance() or QApplication([])
+    row = dlg.StepRow("stream")
+    row.show_step(ct.Step("stream", ct.SKIP, None, "ct_stream_no_live"))
+    assert row.mark.text() == dlg.MARKS[ct.SKIP] == "–"
+    assert P["error"] not in row.result.styleSheet()
+    assert row.result.text() == tr("ct_stream_no_live")
+
+
 def test_speed_words():
     assert ct.speed_key(2.0) == "ct_speed_low"
     assert ct.speed_key(3.0) == "ct_speed_sd"

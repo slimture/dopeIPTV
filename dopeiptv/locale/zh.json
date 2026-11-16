@@ -2775,5 +2775,8 @@
   "satip_tuners_auto": "按服务器所报",
   "satip_tuners_hint": "此服务器可同时播放多少路流——播放器、多画面、录制、投屏。如果家里其他电视也在用它，请设得比实际数量少。",
   "ct_stream_rtsp": "{channel}：服务器响应 RTSP——流由播放器自己读取",
-  "ct_skip_rtsp": "未测量——RTSP 流由播放器自己读取"
+  "ct_skip_rtsp": "未测量——RTSP 流由播放器自己读取",
+  "ct_server_ok": "服务器有响应",
+  "ct_stream_no_live": "此来源没有直播频道——无可测试",
+  "ct_speed_no_live": "未尝试——没有可测速的直播频道"
 }

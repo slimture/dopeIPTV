@@ -2775,5 +2775,8 @@
   "satip_tuners_auto": "Theo máy chủ",
   "satip_tuners_hint": "Bao nhiêu luồng từ máy chủ này được phát cùng lúc - trình phát, xem đa kênh, bản ghi, truyền lên TV. Ít hơn số nó có nếu các TV khác trong nhà cũng dùng nó.",
   "ct_stream_rtsp": "{channel}: máy chủ trả lời RTSP – trình phát tự đọc luồng",
-  "ct_skip_rtsp": "Chưa đo – luồng RTSP do trình phát tự đọc"
+  "ct_skip_rtsp": "Chưa đo – luồng RTSP do trình phát tự đọc",
+  "ct_server_ok": "Máy chủ trả lời",
+  "ct_stream_no_live": "Nguồn này không có kênh trực tiếp – không có gì để thử",
+  "ct_speed_no_live": "Chưa thử – không có kênh trực tiếp để đo"
 }

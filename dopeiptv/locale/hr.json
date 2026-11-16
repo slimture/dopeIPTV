@@ -2775,5 +2775,8 @@
   "satip_tuners_auto": "Kako kaže poslužitelj",
   "satip_tuners_hint": "Koliko streamova s ovog poslužitelja smije ići odjednom - player, multiview, snimke, cast. Manje nego što ima ako ga koriste i drugi televizori u kući.",
   "ct_stream_rtsp": "{channel}: poslužitelj odgovara na RTSP – stream čita sam player",
-  "ct_skip_rtsp": "Nije izmjereno – RTSP stream čita sam player"
+  "ct_skip_rtsp": "Nije izmjereno – RTSP stream čita sam player",
+  "ct_server_ok": "Poslužitelj odgovara",
+  "ct_stream_no_live": "Ovaj izvor nema kanala uživo – nema se što probati",
+  "ct_speed_no_live": "Nije pokušano – nema kanala uživo za mjerenje"
 }
