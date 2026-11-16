@@ -34,7 +34,7 @@ import hashlib
 import json
 import re
 import uuid
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -648,6 +648,26 @@ def left_behind(settings: Any) -> Any | None:
     else:
         return None
     return PinnedSettings(settings, "") if pid == MAIN_ID else None
+
+
+def drop_left_behind(settings: Any, key: str, keep: Callable[[Any], Any]) -> None:
+    """One thing a person takes out of the first profile's own - a row of
+    Recently viewed, a resume point, a followed series - taken out of the
+    copy under *key*'s old name too (left_behind): *keep* is given that
+    copy's JSON and returns what stays of it. Nothing for another profile,
+    with no profiles in play, or where there is no such copy."""
+    old = left_behind(settings)
+    if old is None or not old.contains(key):
+        return
+    try:
+        data = json.loads(old.value(key, "") or "null")
+    except (TypeError, ValueError):
+        return
+    if data is None:
+        return
+    kept = keep(data)
+    if kept != data:
+        old.setValue(key, json.dumps(kept))
 
 
 def start(main: Any, others: Iterable[Any] = (), name: str = "Me",

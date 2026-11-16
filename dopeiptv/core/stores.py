@@ -11,7 +11,7 @@ import json
 import threading
 import time
 import uuid
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime
 from typing import Any
 
@@ -502,21 +502,37 @@ class HistoryStore:
 
     def remove(self, key: str, kind: str) -> None:
         # str() both sides, as add() does: an int key missed a str one.
-        self.entries = [e for e in self.entries
-                        if not (str(e.get("_key")) == str(key)
-                                and e.get("_kind") == kind)]
+        def stays(e: Any) -> bool:
+            return not (isinstance(e, dict) and str(e.get("_key")) == str(key)
+                        and e.get("_kind") == kind)
+        self.entries = [e for e in self.entries if stays(e)]
         self._save()
+        self._drop_left_behind(stays)
 
     def clear(self) -> None:
         self.entries = []
         self._save()
+        self._drop_left_behind(lambda _e: False)
 
     def clear_kind(self, kinds) -> None:
         """Remove only entries whose _kind is in *kinds* (e.g. just channels,
         leaving movies and series). Used by the per-category history delete."""
         ks = set(kinds)
-        self.entries = [e for e in self.entries if e.get("_kind") not in ks]
+
+        def stays(e: Any) -> bool:
+            return not isinstance(e, dict) or e.get("_kind") not in ks
+        self.entries = [e for e in self.entries if stays(e)]
         self._save()
+        self._drop_left_behind(stays)
+
+    def _drop_left_behind(self, stays: Callable[[Any], bool]) -> None:
+        """What was taken out, out of the first profile's copy under the old
+        name too (core/profiles.left_behind): not kept there for a
+        downgrade, nor in every backup made after."""
+        from .profiles import drop_left_behind
+        drop_left_behind(self.settings, self.key,
+                         lambda rows: [e for e in rows if stays(e)]
+                         if isinstance(rows, list) else rows)
 
     def items(self) -> list[dict]:
         return list(self.entries)
@@ -1467,8 +1483,15 @@ class FollowedSeriesStore:
         self._save()
 
     def unfollow(self, series_id: Any) -> None:
-        if self.series.pop(str(series_id), None) is not None:
+        sid = str(series_id)
+        if self.series.pop(sid, None) is not None:
             self._save()
+        # Nor kept in the first profile's copy under the old name
+        # (core/profiles.left_behind).
+        from .profiles import drop_left_behind
+        drop_left_behind(self.settings, self._key,
+                         lambda d: {k: v for k, v in d.items() if k != sid}
+                         if isinstance(d, dict) else d)
 
     def update(self, series_id: Any, info: Any,
                now: float | None = None) -> list[dict]:

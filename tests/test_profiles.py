@@ -816,3 +816,46 @@ def test_what_is_cleared_or_signed_out_is_not_left_under_the_old_names(tmp_path)
     # What was not taken out is there as it was, for a downgrade.
     assert raw_main.value("favorites_a") == OLD_MAIN["favorites_a"]
     assert raw_main.value("theme") == "nord"
+
+
+def test_one_thing_taken_out_is_not_left_under_the_old_names(tmp_path):
+    """The same for one thing at a time: a row removed from Recently
+    viewed, a resume point removed from Continue watching, a series no
+    longer followed - gone from the first profile's copy under the old
+    name too; another profile's removals leave it alone."""
+    from dopeiptv.core.stores import FollowedSeriesStore
+    from dopeiptv.services.resume import ResumeStore
+    views, store, kid = _two(tmp_path)
+    raw = {name: profiles.raw(views[name]) for name in ("main", "resume", "follow")}
+
+    def stores(pid):
+        return (HistoryStore(profiles.pinned(views["main"], pid), "history_a"),
+                ResumeStore(profiles.pinned(views["resume"], pid), "a"),
+                FollowedSeriesStore(profiles.pinned(views["follow"], pid), "a"))
+
+    def remove_all(pid):
+        history, resume, followed = stores(pid)
+        history.remove("1", "live")             # an int key in the file, a str one asked
+        resume.clear("vod", 30)
+        followed.unfollow(40)
+
+    remove_all(kid.id)
+    assert raw["main"].value("history_a") == OLD_MAIN["history_a"]
+    assert raw["resume"].value("resume_positions_a") == OLD_RESUME["resume_positions_a"]
+    assert raw["follow"].value("followed_series_a") == OLD_FOLLOW["followed_series_a"]
+    # Something the old copy does not have: the copy is not even rewritten.
+    HistoryStore(profiles.pinned(views["main"], MAIN_ID), "history_a").remove("9", "live")
+    assert raw["main"].value("history_a") == OLD_MAIN["history_a"]
+
+    remove_all(MAIN_ID)
+    history, resume, followed = stores(MAIN_ID)
+    assert history.items() == [] and resume.saved_position(30, "movie") == 0
+    assert not followed.is_followed(40)
+    assert json.loads(raw["main"].value("history_a")) == []
+    assert json.loads(raw["resume"].value("resume_positions_a")) == {}
+    assert json.loads(raw["follow"].value("followed_series_a")) == {}
+    made = json.dumps(backup.collect({k: raw[k] for k in ("main", "resume")}, "1.6.1"))
+    assert "http://x/1" not in made and '\\"pos\\": 600' not in made
+    # What was not taken out is there as it was, for a downgrade.
+    assert raw["main"].value("favorites_a") == OLD_MAIN["favorites_a"]
+    assert raw["main"].value("epg_reminders_a") == OLD_MAIN["epg_reminders_a"]

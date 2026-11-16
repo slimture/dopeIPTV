@@ -146,8 +146,15 @@ class ResumeStore:
 
     def clear(self, group: str, key) -> None:
         """Drop a single resume point (e.g. 'Remove from Continue watching')."""
-        if self._data.pop(f"{group}:{key}", None) is not None:
+        rkey = f"{group}:{key}"
+        if self._data.pop(rkey, None) is not None:
             self._settings.setValue(self._key, json.dumps(self._data))
+        # Nor kept in the first profile's copy under the old name
+        # (core/profiles.left_behind).
+        from ..core.profiles import drop_left_behind
+        drop_left_behind(self._settings, self._key,
+                         lambda d: {k: v for k, v in d.items() if k != rkey}
+                         if isinstance(d, dict) else d)
 
     def saved_position(self, key, kind: str) -> float:
         """The saved start offset in seconds for a title, or 0.0 when there

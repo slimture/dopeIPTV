@@ -22,6 +22,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 - On macOS the command palette names About, Settings, Quit, the
   supporter key and Donate by the application menu they are in
   ("dopeIPTV"), not Help or File.
+- After an upgrade from 1.5, a row removed from Recently viewed, a title
+  removed from Continue watching or a series no longer followed in the
+  first profile is gone from the copy the first start left for a
+  downgrade too - before, it stayed there, and in every backup made
+  after.
 
 ## [1.6.1]
 
