@@ -325,7 +325,10 @@ def test_the_window_shows_no_live_channel_as_not_applicable():
     from dopeiptv.i18n import tr
     from dopeiptv.ui import conn_test_dialog as dlg
     from dopeiptv.ui.theme import P
-    QApplication.instance() or QApplication([])
+    # Kept: a QApplication made here and dropped at once is gone before the
+    # widget (alone, the file aborted).
+    app = QApplication.instance() or QApplication([])
+    assert app is not None
     row = dlg.StepRow("stream")
     row.show_step(ct.Step("stream", ct.SKIP, None, "ct_stream_no_live"))
     assert row.mark.text() == dlg.MARKS[ct.SKIP] == "–"
