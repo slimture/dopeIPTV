@@ -268,6 +268,120 @@ def test_its_keys_are_shown_as_the_system_writes_them(app):
     assert key_parts("") == []
 
 
+
+def _catalogue_host(client, source="p1"):
+    """A window stand-in with the palette's catalogue code and nothing else."""
+    from types import SimpleNamespace
+
+    from PyQt6.QtCore import QThreadPool
+    from PyQt6.QtWidgets import QWidget
+
+    from dopeiptv.ui import mw_palette
+
+    class Host(QWidget, mw_palette._PaletteMixin):
+        pass
+
+    host = Host()
+    host.client = client
+    host.xmltv = None
+    host.pool = QThreadPool()
+    host.pool.setMaxThreadCount(4)
+    host.parental = SimpleNamespace(session_unlocked=False)
+    host._catalog_filter = lambda mode: (lambda it: True)
+    host.playlist_store = SimpleNamespace(active_id=source, get=lambda i: {"name": "Demo"})
+    host._palette = None
+    host._chno_pid = lambda: source
+    return host
+
+
+def _until(app, cond, secs=5.0):
+    end = time.monotonic() + secs
+    while not cond() and time.monotonic() < end:
+        app.processEvents()
+        time.sleep(0.01)
+    app.processEvents()
+    return cond()
+
+
+def test_the_series_never_hold_up_the_channels_and_are_asked_for_once(app):
+    """The palette finds series too. Their list - a provider's whole
+    catalogue, a portal's two hundred pages - is asked for in a job of its
+    own after the channels, at most once per source in a session, and never
+    of a portal (slow_links): there only what the client holds already."""
+    import threading
+
+    gate = threading.Event()
+    asked = []
+
+    class Client:
+        def live_streams(self, cat=None):
+            return [{"name": "Sintel", "stream_id": 1, "category_id": "1"}]
+
+        def live_categories(self):
+            return [{"category_id": "1", "category_name": "Films"}]
+
+        def series_list(self, cat=None):
+            asked.append(cat)
+            gate.wait(5)
+            return [{"series_id": 7, "name": "Show Seven", "category_id": "2"}]
+
+        def series_categories(self):
+            return [{"category_id": "2", "category_name": "Drama"}]
+
+    host = _catalogue_host(Client())
+    try:
+        host._palette_load_catalogue()
+        # The channels are in while the series list is still on its way.
+        assert _until(app, lambda: getattr(host, "_pal_catalogue", None) is not None, 2.0), \
+            "the channels waited for the series"
+        assert [c["name"] for c in host._pal_catalogue.chans] == ["Sintel"]
+        gate.set()
+        assert _until(app, lambda: [s["name"] for s in host._pal_catalogue.series] == ["Show Seven"])
+        assert host._pal_catalogue.series_cats == {"2": "Drama"}
+        assert [c["name"] for c in host._pal_catalogue.chans] == ["Sintel"]
+        # Opened again (and again): never asked for again this session.
+        for _ in range(3):
+            host._palette_load_catalogue()
+            assert _until(app, lambda: host._pal_catalogue is not None
+                          and [s["name"] for s in host._pal_catalogue.series] == ["Show Seven"])
+        host.pool.waitForDone(3000)
+        app.processEvents()
+        assert asked == [None], asked
+    finally:
+        gate.set()
+        host.pool.waitForDone(3000)
+        host.close()
+
+    # A portal: its series list is never asked for by the palette - only
+    # what it holds already is looked through.
+    held: list = []
+
+    class Portal(Client):
+        slow_links = True
+
+        def held_series(self):
+            return (list(held[0]), [{"category_id": "2", "category_name": "Drama"}]) if held else None
+
+    asked.clear()
+    gate.set()
+    host = _catalogue_host(Portal(), source="p2")
+    try:
+        host._palette_load_catalogue()
+        assert _until(app, lambda: getattr(host, "_pal_catalogue", None) is not None)
+        host.pool.waitForDone(3000)
+        app.processEvents()
+        assert host._pal_catalogue.series == [] and asked == [], asked
+        # Its list loaded meanwhile (the Series section): found from then on.
+        held.append([{"series_id": 9, "name": "Show Nine", "category_id": "2"}])
+        host._palette_load_catalogue()
+        assert _until(app, lambda: host._pal_catalogue is not None
+                      and [s["name"] for s in host._pal_catalogue.series] == ["Show Nine"])
+        host.pool.waitForDone(3000)
+        assert asked == [], asked
+    finally:
+        host.pool.waitForDone(3000)
+        host.close()
+
 # -- the window: the real menu, Settings, channels; stand-ins where it would play --
 
 _WINDOW = r"""

@@ -450,6 +450,14 @@ class BoxClient(OfflineClient):
     # (MainWindow._links_later), as for a portal's links.
     slow_links = True
 
+    def held_series(self) -> tuple[list[dict], list[dict]] | None:
+        """The series and their categories as loaded already, or None while
+        the catalogue is not in (or due again) - never a request (the
+        command palette)."""
+        if not self._loaded or self._stale:
+            return None
+        return self.series_list(None), self.series_categories()
+
     def link_ready(self, method: str, ident: int | str) -> bool:
         """Whether a play address answers at once: the channels are in, or
         the last try to load them failed a moment ago (no new try yet)."""

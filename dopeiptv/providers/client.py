@@ -237,6 +237,16 @@ class ListCache:
         self._save_list(key, now, self._reply_body(data, got))
         return data
 
+    def held(self, key: tuple) -> Any:
+        """*key*'s list as this client holds it - in memory, else its disk
+        copy, whatever its age - or None: never a request (a worker reads
+        the disk)."""
+        with self._list_lock:
+            hit = self._list_cache.get(key)
+        if hit is None:
+            hit = self._disk_hit(key)
+        return hit[1] if hit is not None else None
+
     def clear_list_cache(self) -> None:
         """Make the next call of every list re-fetch it (Refresh). The lists
         in memory stay as the last resort for a provider that doesn't
@@ -536,6 +546,15 @@ class XtreamClient(Mirrored, ListCache):
             p["category_id"] = category_id
         return self._cached_list(("get_series", category_id),
                                  lambda: self._api(**p))
+
+    def held_series(self) -> tuple[list[dict], list[dict]] | None:
+        """Every series and their categories as held already (memory or the
+        disk copy), or None - never a request (the command palette)."""
+        rows = self.held(("get_series", None))
+        if not isinstance(rows, list):
+            return None
+        cats = self.held(("get_series_categories",))
+        return rows, cats if isinstance(cats, list) else []
 
     def series_info(self, series_id: int | str) -> dict:
         return self._api(action="get_series_info", series_id=series_id) or {}

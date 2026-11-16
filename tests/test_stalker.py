@@ -858,3 +858,21 @@ def test_a_reconnect_asks_the_portal_for_a_new_link():
     assert c._cached_link("l7")
     c.forget_link(7)
     assert c._cached_link("l7") == ""
+
+
+def test_the_series_as_held_never_ask_the_portal():
+    """held_series (the command palette's): the series only when the whole
+    list was read already - its up to MAX_PAGES pages are never asked for."""
+    from dopeiptv.providers.stalker import StalkerClient
+    c = StalkerClient("http://portal.invalid/c/", "00:1A:79:12:34:56")
+    calls = []
+    c._call = lambda *a, **k: calls.append(a) or {}
+    assert c.held_series() is None
+    now = time.time()
+    c._list_cache[("series_module",)] = (now, ["vod"])
+    assert c.held_series() is None                    # the list itself not read
+    rows = [{"series_id": 3, "name": "Show"}, {"stream_id": 4, "name": "Film"}]
+    c._list_cache[("vod", "list", "*")] = (now, rows)
+    c._list_cache[("vod_categories",)] = (now, [{"category_id": "1", "category_name": "Drama"}])
+    assert c.held_series() == ([rows[0]], [{"category_id": "1", "category_name": "Drama"}])
+    assert calls == []

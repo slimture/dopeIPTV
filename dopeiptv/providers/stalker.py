@@ -927,6 +927,21 @@ class StalkerClient(Mirrored, ListCache):
         return [r for r in self._titles(self._series_module(), category_id)
                 if "series_id" in r]
 
+    def held_series(self) -> tuple[list[dict], list[dict]] | None:
+        """Every series and their categories when the whole list was read
+        already (memory or the disk copy), else None - never a request: the
+        list is up to MAX_PAGES pages (the command palette)."""
+        got = self.held(("series_module",))
+        if not isinstance(got, list) or not got:
+            return None
+        module = "series" if got[0] == "series" else "vod"
+        rows = self.held((module, "list", "*"))
+        if not isinstance(rows, list):
+            return None
+        cats = self.held(("series_categories",) if module == "series" else ("vod_categories",))
+        return ([r for r in rows if isinstance(r, dict) and "series_id" in r],
+                cats if isinstance(cats, list) else [])
+
     def _series_module(self) -> str:
         """Where the portal keeps series: a module of their own
         (type=series), or among the films with is_series=1 (type=vod)."""

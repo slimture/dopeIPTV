@@ -188,3 +188,21 @@ def test_lists_of_a_removed_playlist_are_pruned(tmp_path, monkeypatch):
     assert epg.prune_epg_caches(["keep"]) == 2
     assert sorted(p.name for p in tmp_path.iterdir()) == [
         "lists_keep.d", "lists_keep.json"]
+
+
+def test_the_series_as_held_never_ask_the_provider(tmp_path):
+    """held_series (the command palette's): the series list and its
+    categories from memory or the disk copy, whatever its age - else None,
+    and never a request."""
+    shows = [{"series_id": i, "name": f"Show {i}", "category_id": "2"} for i in range(5)]
+    c, calls = _client(tmp_path)
+    assert c.held_series() is None and calls == []
+    c, calls = _client(tmp_path, json.dumps(shows).encode())
+    assert c.series_list() == shows and calls == ["get_series"]
+    assert c.held_series() == (shows, []) and calls == ["get_series"]
+    # A new start, the copy on disk days old: held, still no request.
+    path = c._list_file(("get_series", None))
+    old = time.time() - 3 * 86400
+    os.utime(path, (old, old))
+    again, calls2 = _client(tmp_path)
+    assert again.held_series() == (shows, []) and calls2 == []

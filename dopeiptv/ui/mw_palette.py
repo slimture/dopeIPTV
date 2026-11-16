@@ -15,7 +15,9 @@ window. It finds, as it is typed in:
   the guide does.
 
 The channels and the guide are folded once per opening on a worker
-(core/palette_match.py). A query over a few thousand of them is a pass of
+(core/palette_match.py); the series follow in a job of their own, never
+holding the channels up - their list is asked for at most once per source
+in a session, and never of a portal (slow_links): only what it holds. A query over a few thousand of them is a pass of
 substring tests on the window's thread; over more (tens of thousands of
 channels, hundreds of thousands of programmes: a few tenths of a second, a
 stutter in the video) it runs on a worker of its own, the actions and
@@ -28,6 +30,7 @@ there during private viewing.
 
 from __future__ import annotations
 
+import copy
 import time
 from functools import partial
 
@@ -90,6 +93,38 @@ class PaletteCatalogue:
     def size(self) -> int:
         """How much a query goes through (on a worker past MATCH_HERE)."""
         return len(self.names) + len(self.titles) + len(self.series_names)
+
+    def with_series(self, series: list[dict], cats: dict[str, str],
+                    names: Index | None = None) -> PaletteCatalogue:
+        """This catalogue with *series* in it (folded here unless *names*
+        has them already): the channels' own folding is kept."""
+        out = copy.copy(self)
+        out.series = list(series)
+        out.series_cats = dict(cats)
+        out.series_names = names if names is not None else Index(
+            str(s.get("name") or s.get("title") or "") for s in out.series)
+        return out
+
+
+def _series_rows(client, may_fetch: bool) -> tuple[list[dict], dict[str, str]] | None:
+    """On a worker: the source's series and their categories' names - as
+    the client holds them, else (*may_fetch*) asked for; None when it holds
+    none and may not ask."""
+    held = getattr(client, "held_series", None)
+    got = held() if callable(held) else None
+    if got is None:
+        if not may_fetch:
+            return None
+        rows = client.series_list(None) or []
+        try:
+            cat_rows = client.series_categories() or []
+        except Exception:
+            cat_rows = []
+    else:
+        rows, cat_rows = got
+    cats = {str(c.get("category_id")): str(c.get("category_name") or "")
+            for c in cat_rows if isinstance(c, dict)}
+    return [s for s in rows if isinstance(s, dict) and s.get("series_id") is not None], cats
 
 
 def _number(value) -> str:
@@ -250,7 +285,8 @@ class _PaletteMixin:
 
     def _palette_load_catalogue(self) -> None:
         """The channels and the guide, folded on a worker. The last ones
-        answer meanwhile, while they are the same source's."""
+        answer meanwhile, while they are the same source's. The series come
+        after, in a job of their own (_palette_load_series)."""
         client = self.client
         xmltv = getattr(self, "xmltv", None)
         # Whose catalogue: another profile (a kids one sees less), or the
@@ -261,7 +297,6 @@ class _PaletteMixin:
         if have is not None and have.key != key:
             self._pal_catalogue = None
         keep = self._catalog_filter("live")
-        keep_series = self._catalog_filter("series")
         numbers = channel_numbers.active(self._chno_pid())
         now = time.time()
 
@@ -276,26 +311,68 @@ class _PaletteMixin:
             nums = [_number(channel_numbers.shown(c, numbers)) for c in chans]
             airings = (xmltv.airings(chans, now, now + GUIDE_HOURS * 3600)
                        if xmltv is not None and hasattr(xmltv, "airings") else [])
-            # The series too: chosen, one opens its page.
-            series: list[dict] = []
-            series_cats: dict[str, str] = {}
-            try:
-                series = [s for s in (client.series_list(None) or [])
-                          if s.get("series_id") is not None and keep_series(s)]
-                for c in client.series_categories() or []:
-                    series_cats[str(c.get("category_id"))] = str(c.get("category_name") or "")
-            except Exception:
-                series = series or []
-            return PaletteCatalogue(key, chans, cats, nums, airings, series, series_cats)
+            return PaletteCatalogue(key, chans, cats, nums, airings)
 
         run_async(self.pool, work, self._palette_catalogue_ready,
                   self._palette_catalogue_failed)
 
     def _palette_catalogue_ready(self, cat: PaletteCatalogue) -> None:
+        old = getattr(self, "_pal_catalogue", None)
+        if old is not None and old.key == cat.key and old.series:
+            # The same source and profile: its series as they were.
+            cat = cat.with_series(old.series, old.series_cats, old.series_names)
         self._pal_catalogue = cat
+        if not cat.series:
+            self._palette_load_series(cat)
         pal = self._palette_open()
         if pal is not None and pal.query().strip():
             pal.refresh()
+
+    def _palette_series_source(self) -> str:
+        store = getattr(self, "playlist_store", None)
+        return str(getattr(store, "active_id", None) or id(self.client))
+
+    def _palette_load_series(self, cat: PaletteCatalogue) -> None:
+        """The source's series into *cat*, on a worker, once the channels
+        are in: their list is a provider's whole catalogue (a portal's up to
+        two hundred pages), so it is asked for at most once per source in a
+        session, and never of a portal (slow_links) - there only what the
+        client holds already is looked through."""
+        client = self.client
+        if cat.key[0] != id(client):
+            return
+        source = self._palette_series_source()
+        had = self.__dict__.setdefault("_pal_series", {}).get(source)
+        asked = self.__dict__.setdefault("_pal_series_asked", set())
+        may_fetch = source not in asked and not getattr(client, "slow_links", False)
+        if had is None and may_fetch:
+            asked.add(source)
+        keep = self._catalog_filter("series")
+
+        def work() -> tuple:
+            got = had if had is not None else _series_rows(client, may_fetch)
+            if got is None:
+                return None, None
+            rows, cats = got
+            return got, cat.with_series([s for s in rows if keep(s)], cats)
+
+        run_async(self.pool, work, partial(self._palette_series_ready, cat, source, client),
+                  self._palette_series_failed)
+
+    def _palette_series_ready(self, cat: PaletteCatalogue, source: str, client,
+                              done: tuple) -> None:
+        got, with_series = done
+        if got is not None and client is self.client:
+            self._pal_series[source] = got
+        if with_series is None or getattr(self, "_pal_catalogue", None) is not cat:
+            return
+        self._pal_catalogue = with_series
+        pal = self._palette_open()
+        if pal is not None and pal.query().strip():
+            pal.refresh()
+
+    def _palette_series_failed(self, err) -> None:
+        log.debug("palette: no series to look through: %s", err)
 
     def _palette_catalogue_failed(self, err) -> None:
         log.debug("palette: no channels to look through: %s", err)
