@@ -63,6 +63,7 @@ def test_a_digest_channel_plays_through_the_rewind_buffer(server, tmp_path):
     from dopeiptv.core.dvr_session import DvrSession
     m = _libmpv()
     srv = server(auth=("digest", "kodi", "s3cret"))
+    srv.repeat = 8      # over the buffer's 256 KB a connection must bring
     url = with_login(f"http://127.0.0.1:{srv.port}/stream/channel/c1", "kodi", "s3cret")
     s = DvrSession(url, tmp_path, keep_seconds=120, max_bytes=64 * 1024 * 1024)
     try:

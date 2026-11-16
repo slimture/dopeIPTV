@@ -274,6 +274,9 @@ class Recorder:
     def __init__(self, auth=None):
         self.requests: list[dict] = []
         self.auth = auth
+        # The clip this many times over per request: the rewind buffer
+        # counts a connection that brings under 256 KB as a failed try.
+        self.repeat = 1
         rec = self
 
         class H(BaseHTTPRequestHandler):
@@ -295,10 +298,11 @@ class Recorder:
                     return
                 self.send_response(200)
                 self.send_header("Content-Type", "video/mp2t")
-                self.send_header("Content-Length", str(len(TS)))
+                body = TS * rec.repeat
+                self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 try:
-                    self.wfile.write(TS)
+                    self.wfile.write(body)
                 except OSError:
                     pass
 
