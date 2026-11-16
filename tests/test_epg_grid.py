@@ -326,10 +326,12 @@ def calm_progs(ch, a, b):
     if ch.get("stream_id") not in (1, 5):
         return []
     return [
+        # From the board's start (a), so it is never clipped to a sliver
+        # whatever the minute: at least 20 minutes wide, room for its title.
         {"title": "Aired", "description": "",
-         "start_timestamp": now - 2400, "stop_timestamp": now - 1200},
+         "start_timestamp": a, "stop_timestamp": now - 600},
         {"title": "On Air", "description": "",
-         "start_timestamp": now - 1200, "stop_timestamp": now + 1800},
+         "start_timestamp": now - 600, "stop_timestamp": now + 1800},
         {"title": "Nyheter", "description": "",            # five minutes
          "start_timestamp": now + 1800, "stop_timestamp": now + 2100},
         {"title": "Later", "description": "",
