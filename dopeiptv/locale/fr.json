@@ -2892,5 +2892,6 @@
   "onb_sync_no_sources": "Tes paramètres et tes profils sont là. Tes sources n'ont pas suivi – active « {what} » dans {where} sur les deux ordinateurs, ou ajoutes-en une ici.",
   "onb_sync_err_net": "Impossible de joindre dopeiptv.org. Vérifie ta connexion et réessaie.",
   "onb_sync_err_none": "Rien n'est synchronisé sous ce code. Vérifie-le sur ton autre ordinateur et réessaie.",
-  "onb_sync_err_other": "Ça n'a pas marché cette fois. Réessaie dans un instant."
+  "onb_sync_err_other": "Ça n'a pas marché cette fois. Réessaie dans un instant.",
+  "onb_bring_private": "Chiffré sur cet ordinateur avant tout envoi - dopeiptv.org ne garde que des données qu'il ne peut pas lire. Ni compte, ni e-mail."
 }

@@ -2892,5 +2892,6 @@
   "onb_sync_no_sources": "Pengaturan dan profil Anda sudah di sini. Sumber Anda tidak ikut – aktifkan “{what}” di {where} pada kedua komputer, atau tambahkan satu di sini.",
   "onb_sync_err_net": "Tidak dapat menghubungi dopeiptv.org. Periksa koneksi Anda lalu coba lagi.",
   "onb_sync_err_none": "Tidak ada yang disinkronkan dengan kode itu. Periksa di komputer Anda yang lain lalu coba lagi.",
-  "onb_sync_err_other": "Itu belum berhasil. Coba lagi sebentar lagi."
+  "onb_sync_err_other": "Itu belum berhasil. Coba lagi sebentar lagi.",
+  "onb_bring_private": "Dienkripsi di komputer ini sebelum dikirim - dopeiptv.org hanya menyimpan data yang tidak bisa dibacanya. Tanpa akun, tanpa email."
 }

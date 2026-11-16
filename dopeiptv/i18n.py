@@ -3109,6 +3109,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "onb_bring_go": {"en": "Bring them over"},
     "onb_bring_fetching": {"en": "Fetching your settings…"},
     "onb_or": {"en": "or"},
+    "onb_bring_private": {"en": "Encrypted on this computer before it is sent - dopeiptv.org only keeps bytes it cannot read. No account, no email."},
     "onb_restore_backup": {"en": "Restore a backup…"},
     "onb_restore_ready": {"en": "Your backup is ready. dopeIPTV puts it in place the next time it starts."},
     "onb_restore_quit": {"en": "Quit now"},

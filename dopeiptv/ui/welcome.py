@@ -503,7 +503,7 @@ class WelcomeOverlay(QWidget):
         self._b_err.setWordWrap(True)
         self._b_err.setVisible(False)
         # What dopeiptv.org gets, in Settings > Sync's words: a caption.
-        self._b_private = QLabel(tr("sync_privacy_title"), objectName="OnbOr")
+        self._b_private = QLabel(tr("onb_bring_private"), objectName="OnbOr")
         self._b_private.setWordWrap(True)
         self._b_private.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -903,7 +903,7 @@ class WelcomeOverlay(QWidget):
         self._b_code.setPlaceholderText(tr("sync_code"))
         self._b_go.setText(tr("onb_bring_go"))
         self._b_wait.setText(tr("onb_bring_fetching"))
-        self._b_private.setText(tr("sync_privacy_title"))
+        self._b_private.setText(tr("onb_bring_private"))
         self._b_or.setText(tr("onb_or"))
         self._b_restore.setText(tr("onb_restore_backup"))
         self._b_ready.setText(tr("onb_restore_ready"))

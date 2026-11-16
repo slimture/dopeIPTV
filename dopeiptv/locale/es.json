@@ -2892,5 +2892,6 @@
   "onb_sync_no_sources": "Tus ajustes y perfiles ya están aquí. Tus fuentes no han venido: activa «{what}» en {where} en ambos ordenadores, o añade una aquí.",
   "onb_sync_err_net": "No se pudo conectar con dopeiptv.org. Comprueba tu conexión e inténtalo de nuevo.",
   "onb_sync_err_none": "No hay nada sincronizado con ese código. Compruébalo en tu otro ordenador e inténtalo de nuevo.",
-  "onb_sync_err_other": "No ha funcionado esta vez. Inténtalo de nuevo en un momento."
+  "onb_sync_err_other": "No ha funcionado esta vez. Inténtalo de nuevo en un momento.",
+  "onb_bring_private": "Se cifra en este ordenador antes de enviarse: dopeiptv.org solo guarda datos que no puede leer. Sin cuenta ni correo."
 }

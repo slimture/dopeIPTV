@@ -2892,5 +2892,6 @@
   "onb_sync_no_sources": "Ayarların ve profillerin burada. Kaynakların gelmedi – iki bilgisayarda da {where} altında “{what}” seçeneğini aç ya da buradan bir kaynak ekle.",
   "onb_sync_err_net": "dopeiptv.org'a ulaşılamadı. Bağlantını kontrol et ve yeniden dene.",
   "onb_sync_err_none": "Bu kodla eşitlenmiş bir şey yok. Diğer bilgisayarında kontrol et ve yeniden dene.",
-  "onb_sync_err_other": "Bu sefer olmadı. Birazdan yeniden dene."
+  "onb_sync_err_other": "Bu sefer olmadı. Birazdan yeniden dene.",
+  "onb_bring_private": "Gönderilmeden önce bu bilgisayarda şifrelenir - dopeiptv.org yalnızca okuyamadığı verileri saklar. Hesap yok, e-posta yok."
 }

@@ -2892,5 +2892,6 @@
   "onb_sync_no_sources": "Twoje ustawienia i profile są tutaj. Źródła nie zostały przeniesione – włącz „{what}” w sekcji {where} na obu komputerach albo dodaj źródło tutaj.",
   "onb_sync_err_net": "Brak połączenia z dopeiptv.org. Sprawdź połączenie i spróbuj ponownie.",
   "onb_sync_err_none": "Pod tym kodem nic nie jest zsynchronizowane. Sprawdź go na drugim komputerze i spróbuj ponownie.",
-  "onb_sync_err_other": "Tym razem się nie udało. Spróbuj ponownie za chwilę."
+  "onb_sync_err_other": "Tym razem się nie udało. Spróbuj ponownie za chwilę.",
+  "onb_bring_private": "Szyfrowane na tym komputerze przed wysłaniem - dopeiptv.org przechowuje tylko dane, których nie może odczytać. Bez konta i bez e-maila."
 }

@@ -2892,5 +2892,6 @@
   "onb_sync_no_sources": "Le tue impostazioni e i tuoi profili sono qui. Le tue fonti non sono arrivate: attiva «{what}» in {where} su entrambi i computer, oppure aggiungine una qui.",
   "onb_sync_err_net": "Impossibile raggiungere dopeiptv.org. Controlla la connessione e riprova.",
   "onb_sync_err_none": "Sotto questo codice non c'è nulla di sincronizzato. Controllalo sull'altro computer e riprova.",
-  "onb_sync_err_other": "Non ha funzionato. Riprova tra un momento."
+  "onb_sync_err_other": "Non ha funzionato. Riprova tra un momento.",
+  "onb_bring_private": "Cifrato su questo computer prima dell'invio: dopeiptv.org conserva solo dati che non può leggere. Nessun account, nessuna email."
 }

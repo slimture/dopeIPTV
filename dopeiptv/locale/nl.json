@@ -2892,5 +2892,6 @@
   "onb_sync_no_sources": "Je instellingen en profielen zijn er. Je bronnen zijn niet meegekomen – zet ‘{what}’ aan onder {where} op beide computers, of voeg er hier een toe.",
   "onb_sync_err_net": "dopeiptv.org is niet bereikbaar. Controleer je verbinding en probeer het opnieuw.",
   "onb_sync_err_none": "Onder die code is niets gesynchroniseerd. Controleer hem op je andere computer en probeer het opnieuw.",
-  "onb_sync_err_other": "Dat lukte nu niet. Probeer het zo opnieuw."
+  "onb_sync_err_other": "Dat lukte nu niet. Probeer het zo opnieuw.",
+  "onb_bring_private": "Versleuteld op deze computer voordat er iets wordt verstuurd - dopeiptv.org bewaart alleen gegevens die het niet kan lezen. Geen account, geen e-mail."
 }

@@ -2892,5 +2892,6 @@
   "onb_sync_no_sources": "Dina inställningar och profiler är här. Dina källor följde inte med – slå på ”{what}” under {where} på båda datorerna, eller lägg till en här.",
   "onb_sync_err_net": "Kom inte fram till dopeiptv.org. Kontrollera anslutningen och försök igen.",
   "onb_sync_err_none": "Inget är synkat under den koden. Kontrollera den på din andra dator och försök igen.",
-  "onb_sync_err_other": "Det gick inte just nu. Försök igen om en stund."
+  "onb_sync_err_other": "Det gick inte just nu. Försök igen om en stund.",
+  "onb_bring_private": "Krypteras på den här datorn innan något skickas - dopeiptv.org sparar bara data som den inte kan läsa. Inget konto, ingen e-post."
 }
