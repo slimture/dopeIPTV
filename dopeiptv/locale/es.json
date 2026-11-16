@@ -283,7 +283,7 @@
   "rec_record_now_duration": "Grabar ahora - {duration}",
   "rec_schedule_recording": "Programar grabación…",
   "rec_open_recordings": "Abrir grabaciones",
-  "about_desc": "Un elegante cliente IPTV para Xtream Codes y listas M3U, con EPG, reproducción integrada mpv, favoritos, grabaciones y sincronización con Trakt.",
+  "about_desc": "La IPTV y la televisión de casa en un solo reproductor: Xtream Codes, listas M3U, portales Stalker, Enigma2 y otros decodificadores, Jellyfin, Emby y Plex. Con guía, grabaciones, modo TV y transmisión a otros dispositivos.",
   "about_website": "Sitio web",
   "about_github": "GitHub",
   "about_all_releases": "Versiones",

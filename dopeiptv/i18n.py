@@ -452,7 +452,7 @@ _STRINGS: dict[str, dict[str, str]] = {
 
     # ── About / menu ──────────────────────────────────────────────────────
 
-    "about_desc": {"en": "An elegant IPTV client for Xtream Codes and M3U playlists - with EPG, embedded mpv playback, favorites, recordings and Trakt sync."},
+    "about_desc": {"en": "IPTV and the TV at home in one player: Xtream Codes, M3U playlists, Stalker portals, Enigma2 and other boxes, Jellyfin, Emby and Plex. With a guide, recordings, TV mode and casting."},
     "about_website": {"en": "Website"},
     "about_github": {"en": "GitHub"},
     "about_all_releases": {"en": "All releases"},

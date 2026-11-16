@@ -283,7 +283,7 @@
   "rec_record_now_duration": "سجّل الآن — {duration}",
   "rec_schedule_recording": "جدولة تسجيل…",
   "rec_open_recordings": "فتح التسجيلات",
-  "about_desc": "عميل IPTV أنيق لقوائم تشغيل Xtream Codes و M3U — مع EPG وتشغيل mpv مدمج والمفضلة والتسجيلات ومزامنة Trakt.",
+  "about_desc": "IPTV وتلفاز البيت في مشغّل واحد: Xtream Codes وقوائم تشغيل M3U وبوابات Stalker وأجهزة Enigma2 وغيرها، وJellyfin وEmby وPlex. مع دليل البرامج والتسجيلات ووضع التلفاز والإرسال إلى الأجهزة الأخرى.",
   "about_website": "الموقع الإلكتروني",
   "about_github": "GitHub",
   "about_all_releases": "كل الإصدارات",

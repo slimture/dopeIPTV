@@ -283,7 +283,7 @@
   "rec_record_now_duration": "Rekodi sasa — {duration}",
   "rec_schedule_recording": "Ratibu kurekodi…",
   "rec_open_recordings": "Fungua Rekodi",
-  "about_desc": "Kiteja kizuri cha IPTV kwa orodha za kucheza za Xtream Codes na M3U — chenye EPG, uchezaji uliojengwa wa mpv, vipendwa, rekodi na ulandanishaji wa Trakt.",
+  "about_desc": "IPTV na TV ya nyumbani katika kicheza kimoja: Xtream Codes, orodha za kucheza za M3U, malango ya Stalker, Enigma2 na visanduku vingine, Jellyfin, Emby na Plex. Pamoja na mwongozo, rekodi, hali ya TV na kutuma kwenye vifaa vingine.",
   "about_website": "Tovuti",
   "about_github": "GitHub",
   "about_all_releases": "Matoleo yote",

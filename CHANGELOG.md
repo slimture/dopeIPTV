@@ -7,6 +7,13 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Changed
+
+- About says what the app is today - IPTV and the TV at home: Xtream
+  Codes, M3U, Stalker portals, Enigma2 and other boxes, Jellyfin, Emby
+  and Plex, with a guide, recordings, TV mode and casting - not only
+  "Xtream Codes and M3U playlists", in every language.
+
 ### Fixed
 
 - "Night mode could not be turned on for this stream" - and why a typed

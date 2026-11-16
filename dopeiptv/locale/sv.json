@@ -283,7 +283,7 @@
   "rec_record_now_duration": "Spela in nu - {duration}",
   "rec_schedule_recording": "Schemalägg inspelning…",
   "rec_open_recordings": "Öppna inspelningar",
-  "about_desc": "En elegant IPTV-klient för Xtream Codes och M3U-spellistor - med EPG, inbäddad mpv-uppspelning, favoriter, inspelningar och Trakt-synk.",
+  "about_desc": "IPTV och tv:n hemma i en och samma spelare: Xtream Codes, M3U-spellistor, Stalker-portaler, Enigma2 och andra boxar, Jellyfin, Emby och Plex. Med programguide, inspelningar, TV-läge och casting.",
   "about_website": "Webbplats",
   "about_github": "GitHub",
   "about_all_releases": "Alla versioner",

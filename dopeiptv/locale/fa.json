@@ -283,7 +283,7 @@
   "rec_record_now_duration": "اکنون ضبط کن — {duration}",
   "rec_schedule_recording": "زمان‌بندی ضبط…",
   "rec_open_recordings": "باز کردن ضبط‌ها",
-  "about_desc": "یک کلاینت IPTV زیبا برای فهرست‌های پخش Xtream Codes و M3U — با EPG، پخش داخلی mpv، علاقه‌مندی‌ها، ضبط‌ها و همگام‌سازی Trakt.",
+  "about_desc": "IPTV و تلویزیون خانه در یک پخش‌کننده: Xtream Codes، فهرست‌های پخش M3U، پورتال‌های Stalker، Enigma2 و گیرنده‌های دیگر، Jellyfin، Emby و Plex. با راهنمای برنامه‌ها، ضبط، حالت تلویزیون و ارسال به دستگاه‌های دیگر.",
   "about_website": "وب‌سایت",
   "about_github": "GitHub",
   "about_all_releases": "همه نسخه‌ها",
