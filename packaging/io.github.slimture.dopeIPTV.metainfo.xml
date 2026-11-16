@@ -7,15 +7,26 @@
   <summary>Modern IPTV player for Xtream Codes with EPG</summary>
   <description>
     <p>
-      dopeIPTV is a clean, modern player for your own Xtream Codes, M3U or
-      Stalker portal subscription. It offers an embedded mpv player, an
-      electronic programme guide with a timeline grid, rewinding live TV,
-      movies and series with TMDB metadata, a Home page with what is popular
-      right now, recording and timeshift catch-up, multiview for up to nine
-      channels, your own local video and music files, optional Trakt sync,
-      casting to Chromecast and DLNA smart TVs, subtitles from OpenSubtitles,
-      desktop media controls, multiple playlists, themes and 27 languages.
+      dopeIPTV plays live TV, films and series from what you already have:
+      an IPTV subscription (Xtream Codes, an M3U playlist or a Stalker /
+      Ministra portal), the receivers and TV servers on your home network,
+      your media servers and your own files. Video plays inside the app,
+      with mpv.
     </p>
+    <ul>
+      <li>A programme guide: now and next in the channel list, a timeline grid and a search of the whole guide</li>
+      <li>Pause and rewind live TV, and the provider's catch-up archive where it keeps one</li>
+      <li>Films and series with posters and details from TMDB, resume where you stopped, and a Home page with what to watch next</li>
+      <li>Recording now, on a timer or every airing of a series, optionally saved as MP4</li>
+      <li>Multiview: up to nine live channels at once</li>
+      <li>Home network sources: Enigma2 receivers, Tvheadend, HDHomeRun, VDR, DVBViewer, NextPVR and MythTV, and Jellyfin, Emby and Plex servers</li>
+      <li>Your own video and music files, internet radio, and YouTube or Twitch through yt-dlp</li>
+      <li>Casting to Chromecast, DLNA smart TVs and Kodi</li>
+      <li>TV mode, a full-screen layout for the sofa run with a remote or a game controller, and your phone as a remote</li>
+      <li>A profile for each person in the household, kids profiles and a parental lock</li>
+      <li>Optional Trakt and Simkl sync, subtitles from OpenSubtitles, and encrypted settings sync between your computers</li>
+      <li>The desktop's media controls, 25 themes and 27 languages, right-to-left ones included</li>
+    </ul>
     <p>
       dopeIPTV is a player only: it does not provide any channels or content -
       you connect it to a service you already subscribe to.
