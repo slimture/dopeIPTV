@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import threading
 import time
 
 import re
@@ -97,6 +98,34 @@ def _dir_row(p: str) -> dict:
     if y or _TAG.search(n):
         row.update({"_clean_title": t, "_year": y})
     return row
+
+
+def _merged(old: list, new: list, key) -> list:
+    """*old* in its order with each item *new* has again (by *key*) in its
+    place, then *new*'s own: a library walked again shown as it was, the
+    walk's finds in it."""
+    if not old:
+        return list(new)
+    got = {key(x): x for x in new}
+    had = {key(x) for x in old}
+    return [got.get(key(x), x) for x in old] + \
+        [x for x in new if key(x) not in had]
+
+
+def _top_folder(path: str, base: str) -> str | None:
+    """The first folder of *path* under *base* (normalised; "" for *base*
+    itself), None for a path outside it: what os.path.relpath's first part
+    says, without its abspath and common prefix per row - a library's
+    thousands of rows at every render."""
+    if not base or not path:
+        return None
+    p = os.path.normpath(path)
+    if p == base:
+        return ""
+    head = base if base.endswith(os.sep) else base + os.sep
+    if not p.startswith(head):
+        return None
+    return p[len(head):].split(os.sep, 1)[0]
 
 
 def _pretty_gvfs(name: str) -> str:
@@ -246,6 +275,9 @@ class _LocalFilesMixin:
     def _local_clear_library_cache(self) -> None:
         """Forget every scanned library (the walk starts fresh next visit).
         Nothing on disk beyond our own cache file is touched."""
+        # A copy still on its way to the file does not bring it back.
+        self._local_cache_floor = getattr(self, "_local_cache_seq", 0)
+        self._local_lib_mem = None
         try:
             os.unlink(self._library_cache_path())
         except OSError:
@@ -254,13 +286,16 @@ class _LocalFilesMixin:
         self._local_series_index = {}
         self._local_collection_index = {}
         self._local_movies_rows = []
+        self._local_shelf_art = {}
 
     def _local_clear_poster_cache(self) -> None:
         self.settings.remove("local_tmdb_posters_v2")
         self.settings.remove("music_art_v1")
+        self._local_art_found = {}
 
     def _local_clear_thumbs(self) -> None:
         from ..core.workers import clear_directory, default_image_cache_dir
+        self._local_tile = None          # the folder glyph is drawn again
         try:
             clear_directory(default_image_cache_dir("thumbs"))
         except OSError as e:
@@ -269,8 +304,9 @@ class _LocalFilesMixin:
     # -- the middle list (directory browsing) --------------------------------
 
     def _load_local_items(self, root) -> None:
-        # Whatever was searched before is not what is wanted now.
+        # Whatever was searched or listed before is not what is wanted now.
         self._local_cancel_walk()
+        self._local_cancel_listing()
         if self._local_view() == "series" and isinstance(root, str) \
                 and not getattr(self, "_local_ctx", None):
             self._sync_search_hint()
@@ -288,7 +324,7 @@ class _LocalFilesMixin:
         # reading a tag header per track - both a network round trip each
         # over SMB. Doing that on the UI thread is what made every click on
         # macOS spin the beachball, so the whole listing happens on the
-        # worker pool and the rows arrive when they are ready.
+        # worker pool and the rows arrive as they are read.
         self._local_list_token = getattr(self, "_local_list_token", 0) + 1
         token = self._local_list_token
         q = self._local_search_text()
@@ -298,45 +334,145 @@ class _LocalFilesMixin:
             # it (#33), on the pool too.
             self._local_search_walk(base, q)
             return
-        exts, aexts = self.MEDIA_EXTS, self.AUDIO_EXTS
+        self._local_list_folder(base, token)
+
+    # -- a folder's listing, in slices -----------------------------------------
+
+    # The first slice is short: what is read by then shows at once, and a
+    # folder on the local disk is whole in it - one render, no flicker.
+    _LIST_FIRST = 0.08
+
+    def _local_cancel_listing(self) -> None:
+        listing = getattr(self, "_local_listing", None)
+        if listing is None:
+            return
+        self._local_listing = None
+        listing.cancel()
+        self._hide_busy()
+
+    def _local_list_folder(self, base: str, token: int) -> None:
+        """The folder's rows, read on the search's own threads in slices
+        (core/local_listing.py): the folders, then the files in order, each
+        slice's rows added below the ones there - the list on screen until
+        the first ones come, and nothing on the window's thread but making
+        the model longer. On a share each entry is a round trip or two, and
+        a folder of thousands stood the window still (or, read in one job,
+        showed nothing for a minute)."""
+        from ..core.local_listing import FolderListing
+        listing = FolderListing(base, self.MEDIA_EXTS)
+        self._local_listing = listing
+        self._local_list_names = None
+        self._local_want_key = None
+        state: dict = {"shown": None, "fresh": [], "painted": None,
+                       "named": False, "dirs": [], "files": []}
+        self._local_list_step(listing, token, state, self._LIST_FIRST)
+
+    def _local_list_step(self, listing, token: int, state: dict,
+                         budget: float) -> None:
+        aexts = self.AUDIO_EXTS
 
         def job():
-            if not os.path.isdir(base):
-                return []
-            try:
-                names = sorted(os.listdir(base), key=str.lower)
-            except OSError as e:
-                log.warning("local browse failed for %s: %s", base, e)
-                return []
-            dirs: list[dict] = []
-            files: list[dict] = []
-            for n in names:
-                if n.startswith("."):
-                    continue
-                p = os.path.join(base, n)
-                if os.path.isdir(p):
-                    dirs.append(_dir_row(p))
-                elif n.lower().endswith(exts):
-                    try:
-                        st = os.stat(p)
-                    except OSError:
-                        continue
-                    # A track's tags name it properly; that read happens
-                    # in the enrich pass so the list can appear first.
-                    files.append(_file_row(p, aexts, st.st_size,
-                                           int(st.st_mtime)))
-            return dirs + files
+            finished = listing.step(budget)
+            # The rows are made here too: a name cleaned per file is
+            # thousands of regular expressions in a big folder.
+            rows = [_dir_row(i.path) if i.is_dir
+                    else _file_row(i.path, aexts, i.size, i.mtime)
+                    for i in listing.take()]
+            names = None if state["named"] else listing.media_names()
+            return finished, rows, names, listing.told
 
-        def done(rows):
-            if token != getattr(self, "_local_list_token", 0):
+        def done(result):
+            if token != getattr(self, "_local_list_token", 0) \
+                    or listing is not getattr(self, "_local_listing", None):
                 return                      # a newer click won
-            rows = [r for r in rows if self._search_filter([r])]
-            self._render_rows(rows, "rec", tr("local_empty"))
-            self._local_enrich(rows)
-            self._local_fetch_album_art(rows)
+            if self.mode != "local":
+                self._local_cancel_listing()
+                return
+            finished, rows, names, told = result
+            if names is not None:
+                self._local_list_names = (os.path.normpath(listing.base),
+                                          names)
+                state["named"] = told
+            state["fresh"].extend(r for r in rows if self._search_filter([r]))
+            now = time.monotonic()
+            if finished or (state["fresh"] and (
+                    state["painted"] is None
+                    or now - state["painted"] >= self._SEARCH_PAINT)):
+                state["painted"] = now
+                self._local_list_paint(state)
+            if finished:
+                self._local_listing = None
+                self._local_list_names = None
+                self._local_want_key = None
+                self._hide_busy()
+                return
+            self._show_busy()
+            self._local_list_step(listing, token, state, self._SEARCH_SLICE)
 
-        run_async(getattr(self, "pool", None), job, done,
-                  lambda _e: done([]))
+        def fail(e):
+            if listing is getattr(self, "_local_listing", None):
+                log.warning("local browse failed for %s: %r", listing.base, e)
+                listing.done = True
+                done((True, [], None, True))
+
+        run_async(self._local_walk_pool(), job, done, fail)
+
+    def _local_list_paint(self, state: dict) -> None:
+        """The rows read since the last paint put in their places - the new
+        folders after the folders there, the new files after the files -
+        without laying the list out again (the selection and the scroll
+        position stay), and their tags and art asked for, on the pool."""
+        fresh, state["fresh"] = state["fresh"], []
+        new_dirs = [r for r in fresh if r.get("_kind") == "localdir"]
+        new_files = [r for r in fresh if r.get("_kind") != "localdir"]
+        shown = state["shown"]
+        model = getattr(self, "list_model", None)
+        if (shown is not None and model is not None
+                and self.all_items is shown
+                and model.rowCount() == len(shown)):
+            model.insert_items(len(state["dirs"]), new_dirs)
+            model.append_items(new_files)
+            self._set_list_status(self._count_text("rec", len(shown)))
+        else:
+            self._render_rows(state["dirs"] + new_dirs
+                              + state["files"] + new_files,
+                              "rec", tr("local_empty"))
+            state["shown"] = self.all_items
+        state["dirs"] += new_dirs
+        state["files"] += new_files
+        want = getattr(self, "_local_want_key", None)
+        if want and self._local_select_key(want):
+            self._local_want_key = None
+        if fresh:
+            self._local_enrich(fresh)
+            self._local_fetch_album_art(fresh)
+
+    def _local_listing_rows(self, url: str, item) -> list[dict] | None:
+        """What a file plays on into while its folder is still being read
+        (main_window._place_in_queue): every media file of the folder in
+        the listing's order - the rows not shown yet made from their names,
+        their tags read on the pool - not only those read so far. None
+        once the listing is whole: the list on screen is the folder."""
+        if getattr(self, "_local_listing", None) is None:
+            return None
+        got = getattr(self, "_local_list_names", None)
+        folder = os.path.normpath(os.path.dirname(url))
+        if not got or got[0] != folder \
+                or os.path.basename(url) not in got[1]:
+            return None
+        have = {r.get("_path"): r for r in (self.all_items or [])
+                if r.get("_kind") == "local"}
+        rows: list[dict] = []
+        at = 0
+        for n in got[1]:
+            p = os.path.join(os.path.dirname(url), n)
+            if p == url:
+                at = len(rows)
+                rows.append(item)
+            else:
+                rows.append(have.get(p) or _file_row(p, self.AUDIO_EXTS))
+        self._local_tag_rows(rows, at)
+        return rows
 
     # A tag read is a network round trip over SMB, so they go in batches -
     # chained, or a folder of thousands stopped dead after the first 300.
@@ -360,6 +496,9 @@ class _LocalFilesMixin:
 
         def job():
             out = {}
+            # An album's tracks share their folder's cover: looked for once,
+            # not once per track (a folder listed each time, on a share).
+            covers: dict[str, str] = {}
             for key, path, needs_tags, kind in paths:
                 info = {}
                 if needs_tags:
@@ -369,8 +508,10 @@ class _LocalFilesMixin:
                                        or tags.get("albumartist", ""))
                     info["_album"] = tags.get("album", "")
                     info["_year"] = tags.get("date", "")[:4]
-                    info["stream_icon"] = self._cover_in(
-                        os.path.dirname(path))
+                    d = os.path.dirname(path)
+                    if d not in covers:
+                        covers[d] = self._cover_in(d)
+                    info["stream_icon"] = covers[d]
                 elif kind == "localdir":
                     info["stream_icon"] = self._cover_in(path, depth=1)
                 if info:
@@ -424,10 +565,13 @@ class _LocalFilesMixin:
     # -- the search: a folder and its subfolders (#33) ------------------------
 
     # A slice of the walk per pool job: a slow share never holds a thread
-    # for long, and the matches show as they are found - at most this often,
-    # so the list is not reset under the user at every slice.
-    _SEARCH_SLICE = 0.5
-    _SEARCH_PAINT = 1.5
+    # for long, and the matches show as they are found. In the walk's own
+    # order they are added below the rows there (nothing moves under the
+    # user) at most every _SEARCH_PAINT; a list sorted otherwise is laid out
+    # again, so less often.
+    _SEARCH_SLICE = 0.25
+    _SEARCH_PAINT = 0.4
+    _SEARCH_RESORT = 1.5
 
     def _local_walk_mode(self) -> bool:
         """Is the list a folder's listing - folder view, or a folder opened
@@ -475,6 +619,20 @@ class _LocalFilesMixin:
         walk.cancel()
         self._hide_busy()
 
+    def _local_walk_pool(self):
+        """The search's own threads. On the shared pool a slice waited
+        behind the tag reads, art lookups and ffmpeg thumbnails the matches
+        themselves set off - each a network round trip on a share, a
+        thumbnail up to a minute - and the search stood still meanwhile.
+        Two: a cancelled walk ends its folder while the next one starts."""
+        pool = getattr(self, "_local_walk_threads", None)
+        if pool is None:
+            from PyQt6.QtCore import QThreadPool
+            pool = QThreadPool()
+            pool.setMaxThreadCount(2)
+            self._local_walk_threads = pool
+        return pool
+
     def _local_search_walk(self, base: str, q: str) -> None:
         from ..core.local_search import TreeSearch
         search = TreeSearch(base, q, self.MEDIA_EXTS, skip=self._SCAN_JUNK)
@@ -483,6 +641,12 @@ class _LocalFilesMixin:
         self._local_search_said = ""
         self._show_busy(tr("local_searching"))
         self._local_search_step(search, {}, {"painted": None, "n": -1})
+
+    def _local_walk_order(self) -> bool:
+        """Is the list in the order the walk finds things (no sort of its
+        own)? _sorted hands that order back as the very list it was given."""
+        probe: list = []
+        return self._sorted(probe) is probe
 
     def _local_search_step(self, search, rows: dict, state: dict) -> None:
         def job():
@@ -495,11 +659,13 @@ class _LocalFilesMixin:
                 self._local_cancel_walk()
                 return
             now = time.monotonic()
+            every = self._SEARCH_PAINT if self._local_walk_order() \
+                else self._SEARCH_RESORT
             if finished or state["painted"] is None or (
                     len(search.hits) != state["n"]
-                    and now - state["painted"] >= self._SEARCH_PAINT):
+                    and now - state["painted"] >= every):
                 state["painted"], state["n"] = now, len(search.hits)
-                self._local_search_paint(search, rows)
+                self._local_search_paint(search, rows, state)
             if not finished:
                 # The rows put in place took the strip down; the walk goes on.
                 self._show_busy(tr("local_searching"))
@@ -518,11 +684,16 @@ class _LocalFilesMixin:
                 search.done = True
                 done(True)
 
-        run_async(getattr(self, "pool", None), job, done, fail)
+        run_async(self._local_walk_pool(), job, done, fail)
 
-    def _local_search_paint(self, search, rows: dict) -> None:
+    def _local_search_paint(self, search, rows: dict,
+                            state: dict | None = None) -> None:
         """The matches found so far. A row made once keeps what the enrich
-        pass gave it (a track's tags, art), so only new ones are enriched."""
+        pass gave it (a track's tags, art), so only new ones are enriched.
+        In the walk's order the new ones go below the rows already there,
+        the selection and the scroll position untouched; nothing here reads
+        the disk - the walk read what a row shows, and what costs a file
+        read more (tags, art) is fetched on the pool."""
         new = []
         for h in search.hits:
             if h.path not in rows:
@@ -532,10 +703,22 @@ class _LocalFilesMixin:
         shown = [rows[h.path] for h in search.hits]
         said = self._local_search_note(search, len(shown))
         self._local_search_said = said
-        key = self._local_current_key()
-        self._render_rows(self._sorted(shown), "rec", said)
-        self._local_select_key(key)
-        self._set_list_status(said)
+        ordered = self._sorted(shown)
+        model = getattr(self, "list_model", None)
+        last = state.get("shown") if state is not None else None
+        if (last is not None and ordered is shown and model is not None
+                and self.all_items is last and len(last) <= len(shown)
+                and model.rowCount() == len(last)
+                and all(a is b for a, b in zip(last, shown, strict=False))):
+            model.append_items(shown[len(last):])
+            self._set_list_status(said)
+        else:
+            key = self._local_current_key()
+            self._render_rows(ordered, "rec", said)
+            self._local_select_key(key)
+            self._set_list_status(said)
+            if state is not None:
+                state["shown"] = self.all_items
         if new:
             self._local_enrich(new)
             self._local_fetch_album_art(new)
@@ -709,10 +892,16 @@ class _LocalFilesMixin:
             sb.clear()
             sb.blockSignals(False)
 
-    def _local_select_key(self, key) -> None:
+    def _local_select_key(self, key) -> bool:
+        """Select the row of *key*. While a folder is still being read its
+        row may not be there yet, and the rows there are the old list's:
+        it is selected again as the folder's rows come in (_local_list_paint)
+        - backing out of a folder, a file revealed."""
+        if key and getattr(self, "_local_listing", None) is not None:
+            self._local_want_key = key
         model = getattr(self, "list_model", None)
         if not key or model is None:
-            return
+            return False
         try:
             for row in range(model.rowCount()):
                 it = model.item_at(row)
@@ -720,9 +909,10 @@ class _LocalFilesMixin:
                     ix = model.index(row)
                     self.listw.setCurrentIndex(ix)
                     self.listw.scrollTo(ix)
-                    return
+                    return True
         except Exception:
             pass
+        return False
 
     # -- the library view (Infuse-style series grouping) ----------------------
 
@@ -792,6 +982,11 @@ class _LocalFilesMixin:
                                        or cached.get("collections")
                                        or cached.get("albums")):
             cached = None
+        if cached is not None:
+            # Rows of its own: what is shown gets posters and art written
+            # into it, and the cache kept in memory must stay as walked.
+            cached = dict(cached)
+            cached["movies"] = [dict(r) for r in cached.get("movies") or []]
         if cached is not None:
             self._local_album_index = cached.get("albums") or {}
             self._local_cover_index = cached.get("covers") or {}
@@ -880,19 +1075,33 @@ class _LocalFilesMixin:
                 # and files deleted on disk are dropped only when the walk
                 # completes. Never re-render under a drilled-in user.
                 if cached is not None:
+                    # Each in the cached order, what the walk found in its
+                    # place and the new after: a library that has not
+                    # changed renders as it is shown - _apply_library then
+                    # leaves it be - not reshuffled, nor its counts dropping
+                    # and climbing back, at each slice.
                     ms = dict(cached.get("series") or {})
-                    ms.update(series)
+                    for name, eps in series.items():
+                        ms[name] = _merged(ms.get(name) or [], eps,
+                                           lambda e: e[2])
                     mc = dict(cached.get("collections") or {})
-                    mc.update(collections)
-                    seen = {r.get("_key") for r in movies}
-                    mm = movies + [r for r in (cached.get("movies") or [])
-                                   if r.get("_key") not in seen]
+                    for name, paths in collections.items():
+                        mc[name] = _merged(mc.get(name) or [], paths,
+                                           lambda p: p)
+                    mm = _merged(cached.get("movies") or [], movies,
+                                 lambda r: r.get("_key"))
+                    ma = dict(cached.get("albums") or {})
+                    ma.update(state.get("albums", {}))
+                    # The folders' covers are worked out as the walk ends:
+                    # the cached ones meanwhile, not the folder glyph.
+                    self._local_cover_index = dict(cached.get("covers") or {})
                 else:
                     ms, mc, mm = series, collections, movies
+                    ma = state.get("albums", {})
                 self._local_series_index = ms
                 self._local_collection_index = mc
                 self._local_movies_rows = mm
-                self._local_album_index = state.get("albums", {})
+                self._local_album_index = ma
                 self._local_scan_state = state
                 if not getattr(self, "_local_series", None) \
                         and not getattr(self, "_local_ctx", None):
@@ -916,6 +1125,9 @@ class _LocalFilesMixin:
             self._local_scan_active = False
             self._local_scan_state = None
             self._hide_busy()
+            # The shelves' covers are looked for once more, in the whole
+            # library this time.
+            self._local_shelf_art = {}
             done_at = dict(getattr(self, "_local_scan_done", {}))
             done_at[root] = time.monotonic()
             self._local_scan_done = done_at
@@ -987,30 +1199,19 @@ class _LocalFilesMixin:
         if not albums:
             return []
         root = self._current_cat if isinstance(self._current_cat, str) else ""
+        base = os.path.normpath(root) if root else ""
         shelves: dict[str, int] = {}
         for d, info in albums.items():
             n = info.get("n", 0) if isinstance(info, dict) else int(info or 0)
-            try:
-                rel = os.path.relpath(os.path.normpath(d),
-                                      os.path.normpath(root))
-            except ValueError:
-                continue
-            top = rel.split(os.sep)[0]
-            if top in (".", ".."):
-                top = ""
-            shelves[top] = shelves.get(top, 0) + n
+            top = _top_folder(d, base)
+            if top is not None:
+                shelves[top] = shelves.get(top, 0) + n
         # How much VIDEO each top-level folder holds, so a folder that is
         # mostly films with a stray track in it is not called music.
         vids: dict[str, int] = {}
         for r in (getattr(self, "_local_movies_rows", []) or []):
-            p = r.get("_path") or ""
-            try:
-                rel = os.path.relpath(os.path.normpath(p),
-                                      os.path.normpath(root))
-            except ValueError:
-                continue
-            top = rel.split(os.sep)[0]
-            if top not in (".", ".."):
+            top = _top_folder(r.get("_path") or "", base)
+            if top:
                 vids[top] = vids.get(top, 0) + 1
         for name, paths in (getattr(self, "_local_collection_index", {})
                             or {}).items():
@@ -1018,6 +1219,14 @@ class _LocalFilesMixin:
 
         rows: list[dict] = []
         music_tops = []
+        tile = self._folder_tile()
+        known = self._local_shelf_memo()
+        # A shelf looked for again (after a walk) keeps the cover
+        # it shows until the new answer: no flash of the folder glyph.
+        showing = {r.get("_path"): r.get("stream_icon")
+                   for r in (getattr(self, "all_items", None) or [])
+                   if r.get("_kind") == "localalbum"}
+        pending: list[str] = []
         for top in sorted(shelves, key=str.lower):
             if not top:
                 continue        # loose tracks in the root: not a shelf
@@ -1025,24 +1234,93 @@ class _LocalFilesMixin:
             if vids.get(top, 0) > tracks:
                 continue        # mostly video: it is not a music shelf
             music_tops.append(top)
-            rows.append({"name": top, "_kind": "localalbum",
-                         "_path": os.path.join(root, top),
-                         "_key": f"localmusic::{top}",
-                         "stream_icon": self._music_shelf_cover(
-                             os.path.join(root, top)) or self._folder_tile(),
-                         "_desc": tr("local_tracks", n=tracks)})
+            path = os.path.join(root, top)
+            icon = known.get(path) if path in known else showing.get(path)
+            row = {"name": top, "_kind": "localalbum", "_path": path,
+                   "_key": f"localmusic::{top}",
+                   "stream_icon": icon or tile,
+                   "_desc": tr("local_tracks", n=tracks)}
+            if path not in known:
+                # Its cover is still being looked for: not one to ask
+                # iTunes about meanwhile (_local_fetch_album_art).
+                row["_shelf_pending"] = True
+                pending.append(path)
+            rows.append(row)
         self._local_music_tops = set(music_tops)
+        if pending:
+            self._local_find_shelf_art(pending)
         return [{"_header": tr("local_music")}] + rows if rows else []
 
-    def _music_shelf_cover(self, top_path: str) -> str:
+    def _local_shelf_memo(self) -> dict[str, str]:
+        """Each music shelf's cover as found ("" for none), for this walk:
+        forgotten when a walk ends and with the library cache."""
+        memo = getattr(self, "_local_shelf_art", None)
+        if memo is None:
+            memo = self._local_shelf_art = {}
+        return memo
+
+    def _local_find_shelf_art(self, paths: list[str]) -> None:
+        """The music shelves' covers looked for on the pool - a folder
+        listed per album, a track's embedded art read, each a round trip on
+        a share: on the window's thread a big shelf with no art froze it for
+        seconds at every slice of the library's walk. A shelf found with
+        none is left to the online lookup, as before."""
+        busy = getattr(self, "_local_shelf_busy", None)
+        if busy is None:
+            busy = self._local_shelf_busy = set()
+        todo = [p for p in paths if p not in busy]
+        if not todo or getattr(self, "pool", None) is None:
+            return
+        busy.update(todo)
+        # Copies: the walk's next slice goes on adding to the index.
+        albums = list(getattr(self, "_local_album_index", {}) or {})
+        dircover = dict(getattr(self, "_local_dircover", {}) or {})
+
+        def job():
+            return {p: self._music_shelf_cover(p, albums, dircover)
+                    for p in todo}
+
+        def done(found):
+            busy.difference_update(todo)
+            found = found or {}
+            self._local_shelf_memo().update(found)
+            tile = self._folder_tile()
+            hit = False
+            none = []
+            for r in self.all_items or []:
+                p = r.get("_path")
+                if r.get("_kind") != "localalbum" or p not in found \
+                        or not r.pop("_shelf_pending", False):
+                    continue
+                if found[p] or r.get("stream_icon") != tile:
+                    r["stream_icon"] = found[p] or tile
+                    hit = True
+                if not found[p]:
+                    none.append(r)
+            if hit:
+                self.list_model.refresh_all()
+            if none:
+                self._local_fetch_album_art(none)
+
+        def fail(e):
+            busy.difference_update(todo)
+            log.debug("music shelf art failed: %r", e)
+
+        run_async(self.pool, job, done, fail)
+
+    def _music_shelf_cover(self, top_path: str, albums=None,
+                           dircover: dict | None = None) -> str:
         """Borrow an album cover from inside the shelf, so "Musik" shows
-        real artwork instead of a blank folder."""
-        albums = getattr(self, "_local_album_index", {})
+        real artwork instead of a blank folder. Reads the disk: on the pool
+        (_local_find_shelf_art), with copies of the walk's index."""
+        if albums is None:
+            albums = list(getattr(self, "_local_album_index", {}) or {})
+        if dircover is None:
+            dircover = getattr(self, "_local_dircover", {}) or {}
         for d in sorted(albums, key=str.lower):
             if not os.path.normpath(d).startswith(os.path.normpath(top_path)):
                 continue
-            cov = (getattr(self, "_local_dircover", {}).get(d)
-                   or self._cover_in(d))
+            cov = dircover.get(d) or self._cover_in(d)
             if cov:
                 return cov
         # Nothing indexed yet (a first visit renders before the walk has
@@ -1139,11 +1417,17 @@ class _LocalFilesMixin:
             from ..core.workers import default_image_cache_dir
             from .theme import P
             color = P["text2"].lstrip("#")
+            # Kept once made: asked per row (is this art or the glyph?), a
+            # stat each, and a library has thousands of rows.
+            memo = getattr(self, "_local_tile", None)
+            if memo and memo[0] == color:
+                return memo[1]
             path = default_image_cache_dir("thumbs") / f"folder-{color}.png"
             if not path.exists():
                 os.makedirs(path.parent, exist_ok=True)
                 self._action_pixmap("folder", 128, P["text2"]).save(
                     str(path), "PNG")
+            self._local_tile = (color, str(path))
             return str(path)
         except Exception:
             return ""
@@ -1227,7 +1511,23 @@ class _LocalFilesMixin:
         else:
             rows = [r for r in rows if r.get("_header")
                     or self._search_filter([r])]
+        # The same rows as on screen (a slice of a walk that found nothing
+        # new): left as they are. A list with section headers is
+        # laid out row by row - a library of 19,000 films took the window
+        # 0.45 s each time, at every slice of a walk.
+        sig = (self._grid_on() if hasattr(self, "_grid_on") else None,
+               [(r.get("_key"), r.get("name"), r.get("_desc"),
+                 r.get("_header")) for r in rows])
+        model = getattr(self, "list_model", None)
+        shown = getattr(self, "_local_lib_shown", None)
+        if (model is not None and shown is not None
+                and self.all_items is shown[0] and sig == shown[1]
+                and model.rowCount() == len(self.all_items)):
+            if getattr(self, "_local_scan_active", False):
+                self._set_status(self._local_scan_note())
+            return
         self._render_rows(rows, "rec", tr("local_empty"))
+        self._local_lib_shown = (self.all_items, sig)
         if getattr(self, "_local_scan_active", False):
             self._set_status(self._local_scan_note())
         self._local_resolve_posters(
@@ -1291,36 +1591,79 @@ class _LocalFilesMixin:
     _LIB_CACHE_VER = 3
 
     def _library_cache(self) -> dict:
+        """The cached libraries by folder. Read from the file once a
+        session and kept as last written: a big library is megabytes of
+        JSON, and parsing it holds the interpreter (whichever thread does
+        it) for tens of ms - at every visit to the library, before. A copy
+        of the roots: a writer adds its own to it."""
+        mem = getattr(self, "_local_lib_mem", None)
+        if mem is not None:
+            return dict(mem)
+        roots: dict = {}
         try:
             with open(self._library_cache_path(), encoding="utf-8") as fh:
                 v = json.load(fh)
-            if not isinstance(v, dict) \
-                    or v.get("_v") != self._LIB_CACHE_VER:
-                return {}
-            roots = v.get("roots")
-            return roots if isinstance(roots, dict) else {}
+            if isinstance(v, dict) and v.get("_v") == self._LIB_CACHE_VER \
+                    and isinstance(v.get("roots"), dict):
+                roots = v["roots"]
         except (OSError, ValueError):
-            return {}
+            pass
+        self._local_lib_mem = roots
+        return dict(roots)
+
+    _LIB_CACHE_LOCK = threading.Lock()
 
     def _save_library_cache(self, root: str, series: dict,
                             movies: list[dict],
                             collections: dict | None = None) -> None:
-        try:
-            cache = self._library_cache()
-            cache[root] = {"series": series, "movies": movies,
-                           "collections": collections or {},
-                           "albums": getattr(self, "_local_album_index", {}),
-                           "covers": getattr(self, "_local_cover_index", {})}
-            # Only the latest handful of roots - this is a warm-start, not
-            # a database.
-            for k in list(cache)[:-8]:
-                cache.pop(k, None)
-            path = self._library_cache_path()
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "w", encoding="utf-8") as fh:
-                json.dump({"_v": self._LIB_CACHE_VER, "roots": cache}, fh)
-        except OSError as e:
-            log.warning("library cache save failed: %s", e)
+        """The library as walked, kept for the next visit. Copied here -
+        the walk's next slice goes on adding to the same lists - and written
+        on the pool: read back, merged and dumped, a library of 20,000 files
+        is megabytes of JSON, tens of ms on the window's thread every 15 s
+        of a walk. Written in the order asked, an older copy never over a
+        newer one."""
+        entry = {"series": {k: list(v) for k, v in (series or {}).items()},
+                 "movies": list(movies or []),
+                 "collections": {k: list(v)
+                                 for k, v in (collections or {}).items()},
+                 "albums": {k: dict(v) if isinstance(v, dict) else v
+                            for k, v in (getattr(self, "_local_album_index",
+                                                 {}) or {}).items()},
+                 "covers": dict(getattr(self, "_local_cover_index", {})
+                                or {})}
+        seq = self._local_cache_seq = getattr(self, "_local_cache_seq", 0) + 1
+        pool = getattr(self, "pool", None)
+        if pool is None:
+            self._write_library_cache(root, entry, seq)
+            return
+        run_async(pool, lambda: self._write_library_cache(root, entry, seq),
+                  lambda _r: None,
+                  lambda e: log.warning("library cache save failed: %r", e))
+
+    def _write_library_cache(self, root: str, entry: dict, seq: int) -> None:
+        with self._LIB_CACHE_LOCK:
+            if seq < getattr(self, "_local_cache_written", 0) \
+                    or seq <= getattr(self, "_local_cache_floor", 0):
+                return          # a newer copy is there, or it was cleared
+            try:
+                cache = self._library_cache()
+                cache[root] = entry
+                # Only the latest handful of roots - this is a warm-start,
+                # not a database.
+                for k in list(cache)[:-8]:
+                    cache.pop(k, None)
+                path = self._library_cache_path()
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                # Beside it, then over it: the window reads the file while
+                # this writes.
+                part = f"{path}.{threading.get_ident()}.part"
+                with open(part, "w", encoding="utf-8") as fh:
+                    json.dump({"_v": self._LIB_CACHE_VER, "roots": cache}, fh)
+                os.replace(part, path)
+                self._local_cache_written = seq
+                self._local_lib_mem = cache
+            except OSError as e:
+                log.warning("library cache save failed: %s", e)
 
     def _local_open_series(self, title: str, row: dict | None = None) -> None:
         if not title:
@@ -1532,14 +1875,20 @@ class _LocalFilesMixin:
         bad = getattr(self, "_local_thumb_fail", None)
         if bad is None:
             bad = self._local_thumb_fail = set()
+        # Files a job is grabbing now: a list read in slices asks for its
+        # rows' thumbnails at each, and one ffmpeg per file is enough.
+        busy = getattr(self, "_local_thumb_busy", None)
+        if busy is None:
+            busy = self._local_thumb_busy = set()
         cand = [(r["_key"], r["_path"]) for r in rows
                 if r.get("_path") and not r.get("stream_icon")
                 and r["_path"].lower().endswith(self.VIDEO_EXTS)
-                and r["_path"] not in bad]
+                and r["_path"] not in bad and r["_path"] not in busy]
         todo = cand[:self._THUMB_BATCH]
         more = len(cand) > len(todo)
         if not ff or not todo:
             return
+        busy.update(p for _k, p in todo)
         from ..core.workers import default_image_cache_dir
         tdir = str(default_image_cache_dir("thumbs"))
         gen = self._load_gen
@@ -1572,6 +1921,7 @@ class _LocalFilesMixin:
             return out
 
         def done(out):
+            busy.difference_update(p for _k, p in todo)
             if gen != self._load_gen \
                     or token != getattr(self, "_local_list_token", 0):
                 return
@@ -1591,7 +1941,8 @@ class _LocalFilesMixin:
             if more and _round + 1 < self._THUMB_ROUNDS:
                 self._local_make_thumbs(rows, _round + 1)
 
-        run_async(self.pool, job, done, lambda _e: None)
+        run_async(self.pool, job, done,
+                  lambda _e: busy.difference_update(p for _k, p in todo))
 
     # -- album art from the internet -----------------------------------------
 
@@ -1624,57 +1975,89 @@ class _LocalFilesMixin:
         return (artist, album) if album else ("", base)
 
     _ART_BATCH = 40
+    # Folders a job reads for their album's name at most - a known miss
+    # costs that read too, and on a share each is a round trip.
+    _ART_LOOK = 200
     _ART_ROUNDS = 40
 
-    def _local_fetch_album_art(self, rows: list[dict],
-                               _round: int = 0) -> None:
+    def _local_fetch_album_art(self, rows: list[dict], _round: int = 0,
+                               _dirs: list[str] | None = None) -> None:
         """Cover art for albums that carry none of their own, looked up by
         artist and album on the iTunes search service - no API key, one
         request per album, and the answer (misses included) is remembered
         so the same album is never asked about twice. Batched and chained,
-        so a big music shelf is not "the first forty albums only"."""
+        so a big music shelf is not "the first forty albums only".
+
+        Here only the folders are gathered: naming an album lists its folder
+        and reads a track's tags, a network round trip each on a share, and
+        on the window's thread a search's hundreds of matches froze it for
+        seconds. The job reads them, a known miss passed over there (it
+        never takes a lookup's place in the batch), and the next round goes
+        on from the folder the last one stopped at. What a folder came to
+        is kept for the session (_local_art_memo): a row made again - the
+        library's at every slice of its walk, a folder's rows read in slices
+        - takes its art from there, and a folder is never read twice for it
+        while a job for it is under way."""
         if self.settings.value("music_art_online", "true") != "true":
             return
-        cache = self._music_art_cache()
-        todo = []
-        for r in rows:
-            if r.get("_kind") not in ("localalbum", "localdir", "local"):
-                continue
-            icon = r.get("stream_icon") or ""
-            if icon and "/folder-" not in icon:
-                continue          # already has real art
-            d = (r.get("_path") if r.get("_kind") != "local"
-                 else os.path.dirname(r.get("_path") or ""))
-            if not d or any(x.get("_d") == d for x in todo):
-                continue
-            artist, album = self._album_id(d)
-            if cache.get(f"{artist}|{album}".lower()) == "":
-                # A known miss keeps its folder icon forever, so leaving
-                # it in would make every round pick the same forty and
-                # never reach the rest of the shelf.
-                continue
-            todo.append({"_key": r.get("_key"), "_d": d})
-        if not todo or getattr(self, "pool", None) is None:
+        memo = self._local_art_memo()
+        busy = getattr(self, "_local_art_busy", None)
+        if busy is None:
+            busy = self._local_art_busy = set()
+        if _dirs is None:
+            _dirs = []
+            seen: set[str] = set()
+            known = False
+            for r in rows:
+                if r.get("_kind") not in ("localalbum", "localdir", "local") \
+                        or r.get("_shelf_pending"):
+                    continue
+                icon = r.get("stream_icon") or ""
+                if icon and "/folder-" not in icon:
+                    continue          # already has real art
+                d = (r.get("_path") if r.get("_kind") != "local"
+                     else os.path.dirname(r.get("_path") or ""))
+                if not d:
+                    continue
+                if d in memo:
+                    if memo[d]:
+                        r["stream_icon"] = memo[d]
+                        known = True
+                    continue          # found before, or a known miss
+                if d not in seen and d not in busy:
+                    seen.add(d)
+                    _dirs.append(d)
+            if known and getattr(self, "list_model", None) is not None:
+                self.list_model.refresh_all()
+            busy.update(_dirs)
+        if not _dirs or getattr(self, "pool", None) is None:
+            busy.difference_update(_dirs)
             return
-        more = len(todo) > self._ART_BATCH
-        todo = todo[:self._ART_BATCH]
+        dirs = _dirs
+        cache = self._music_art_cache()
         gen = getattr(self, "_load_gen", 0)
         token = getattr(self, "_local_list_token", 0)
-        state: dict[str, bool] = {}
+        state: dict = {}
 
         def job():
             import urllib.parse
 
             from ..core._lazy_requests import requests
-            out, changed = {}, False
-            for t in todo:
-                artist, album = self._album_id(t["_d"])
+            out, came, changed = {}, {}, False
+            asked = failed = looked = 0
+            for d in dirs:
+                if asked >= self._ART_BATCH or looked >= self._ART_LOOK:
+                    break
+                looked += 1
+                artist, album = self._album_id(d)
                 if not (artist or album):
+                    came[d] = ""
                     continue
                 ck = f"{artist}|{album}".lower()
                 if ck in cache:
                     url = cache[ck]
                 else:
+                    asked += 1
                     q = urllib.parse.urlencode(
                         {"term": f"{artist} {album}".strip(),
                          "entity": "album", "limit": 1})
@@ -1688,24 +2071,36 @@ class _LocalFilesMixin:
                             "100x100bb", "600x600bb")
                     except Exception as e:
                         log.debug("album art lookup failed (%s): %s", ck, e)
+                        failed += 1
                         continue          # not cached: asked again later
                     cache[ck] = url
                     changed = True
+                came[d] = url
                 if url:
-                    out[t["_d"]] = url
+                    out[d] = url
             if changed:
                 self.settings.setValue("music_art_v1", json.dumps(cache))
-            state["progressed"] = bool(changed or out)
-            log.info("album art: %d/%d resolved online", len(out), len(todo))
-            return out
+            state["next"] = looked
+            # Every lookup failed (no network, the service down): no next
+            # round, or a dead connection is asked about the whole shelf.
+            state["stuck"] = asked > 0 and failed == asked
+            log.info("album art: %d resolved online (%d folders, %d asked)",
+                     len(out), looked, asked)
+            return out, came
 
-        def done(out):
-            if gen != self._load_gen \
-                    or token != getattr(self, "_local_list_token", 0):
+        def done(result):
+            out, came = result or ({}, {})
+            memo.update(came)
+            at = state.get("next", len(dirs))
+            busy.difference_update(dirs[:at])
+            rest = dirs[at:]
+            if gen != getattr(self, "_load_gen", 0):
+                busy.difference_update(rest)
                 return
-            out = out or {}
             hit = False
-            for r in self.all_items:
+            # By folder, so the rows on screen now get it - whichever list
+            # asked.
+            for r in self.all_items if out else ():
                 d = (r.get("_path") if r.get("_kind") != "local"
                      else os.path.dirname(r.get("_path") or ""))
                 url = out.get(d)
@@ -1715,13 +2110,23 @@ class _LocalFilesMixin:
                     hit = True
             if hit:
                 self.list_model.refresh_all()
-            # The albums this round could not fill now carry a cached
-            # miss, so the next round starts on the ones after them.
-            if more and state.get("progressed") \
+            if rest and not state.get("stuck") \
+                    and token == getattr(self, "_local_list_token", 0) \
                     and _round + 1 < self._ART_ROUNDS:
-                self._local_fetch_album_art(rows, _round + 1)
+                self._local_fetch_album_art(rows, _round + 1, rest)
+            else:
+                busy.difference_update(rest)
 
-        run_async(getattr(self, "pool", None), job, done, lambda _e: None)
+        run_async(getattr(self, "pool", None), job, done,
+                  lambda _e: busy.difference_update(dirs))
+
+    def _local_art_memo(self) -> dict[str, str]:
+        """Each folder's album art as the online lookup came to it ("" for
+        none), for the session: forgotten with the poster cache."""
+        memo = getattr(self, "_local_art_found", None)
+        if memo is None:
+            memo = self._local_art_found = {}
+        return memo
 
     # -- multiview -----------------------------------------------------------
 

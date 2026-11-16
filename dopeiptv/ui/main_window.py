@@ -4364,10 +4364,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # film must not roll from the last track into the film.
             same = self._is_audio if self._is_audio(url) else self._is_video
             # A search match plays on through its own folder, as it would
-            # from there - not through the other matches (mw_local).
-            listing = (self._local_hit_folder(url, item)
-                       if isinstance(item, dict) and item.get("_hit")
-                       else None)
+            # from there - not through the other matches (mw_local); a file
+            # of a folder still being read, through all of it.
+            if isinstance(item, dict) and item.get("_hit"):
+                listing = self._local_hit_folder(url, item)
+            elif isinstance(item, dict) and item.get("_kind") == "local":
+                listing = self._local_listing_rows(url, item)
+            else:
+                listing = None
             q = [r for r in (listing or self.all_items or [])
                  if not r.get("_header") and same(r.get("_path") or "")]
             here = next((n for n, t in enumerate(q)
@@ -6471,7 +6475,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Wayland handles and file descriptors have a chance to
         # release cleanly - a hard exit while any of those are mid-
         # teardown leaves stale state that can crash the NEXT startup.
-        for pool in (self.pool, self._logo_pool, self._art_pool):
+        # A Local files search ends its folder and stops (mw_local).
+        walk = getattr(self, "_local_walk", None)
+        if walk is not None:
+            walk.cancel()
+        for pool in (self.pool, self._logo_pool, self._art_pool,
+                     getattr(self, "_local_walk_threads", None)):
+            if pool is None:
+                continue
             try:
                 pool.clear()
                 pool.waitForDone(1500)
@@ -6495,7 +6506,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         active_workers = any(
             p is not None and p.activeThreadCount() > 0
             for p in (self.pool, self._logo_pool, self._art_pool,
-                      getattr(self, "_sync_pool", None)))
+                      getattr(self, "_sync_pool", None),
+                      getattr(self, "_local_walk_threads", None)))
         # macOS: QApplication.quit() enters AppKit's terminate cascade, whose
         # exit() finalizers run while Qt timers are still live - a timer then
         # fires into the half-destroyed QGuiApplication and segfaults (seen

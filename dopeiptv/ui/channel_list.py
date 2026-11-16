@@ -487,6 +487,28 @@ class ChannelListModel(QAbstractListModel):
         self.uniform = not any(it.get("_header") for it in items)
         self.endResetModel()
 
+    def append_items(self, items: list) -> None:
+        """*items* added after the last row (insert_items)."""
+        self.insert_items(len(self._items), items)
+
+    def insert_items(self, at: int, items: list) -> None:
+        """*items* put in before row *at*, without a reset: the selection,
+        the current row and the scroll position stay as they are (Local
+        files adds a folder's rows and a search's matches this way as they
+        are read). Into the list the model holds - the window's all_items
+        is the same list. A section header among them resets instead:
+        uniform rows are laid out from the first one's size."""
+        if not items:
+            return
+        at = max(0, min(at, len(self._items)))
+        if self.uniform and any(it.get("_header") for it in items):
+            self.set_items(self._items[:at] + list(items) + self._items[at:],
+                           self.kind)
+            return
+        self.beginInsertRows(QModelIndex(), at, at + len(items) - 1)
+        self._items[at:at] = items
+        self.endInsertRows()
+
     def item_at(self, row: int):
         if 0 <= row < len(self._items):
             return self._items[row]

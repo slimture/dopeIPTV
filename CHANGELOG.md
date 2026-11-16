@@ -80,6 +80,22 @@ how connections to the account are counted.
 
 ### Fixed
 
+- Local files no longer freezes the window on a big folder or a network
+  share. A search in a folder held it while each match's folder was read
+  for its album's name (1.5 s at a time on a share with 15 ms a round
+  trip); "View: folders" held it while every subfolder was (5 s for 1,350
+  folders, 3 ms each); the library held it for seconds at every slice of
+  its walk while each music shelf's albums were listed for a cover (21 s
+  for a thousand albums). All of that is read on the pool now, nothing on
+  the window's thread over a few ms. A folder's rows come in as they are
+  read - the first within a tenth of a second instead of after the whole
+  folder (34 s for 5,300 entries) - the folders first and the files in
+  order as before, and a file played meanwhile still plays on through
+  the whole folder. A search's matches are added below the ones found
+  (the selection and scroll stay) and no longer wait behind thumbnails
+  and art lookups; the library's cache is read from disk once a session,
+  written off the window's thread, and a walk that finds nothing new
+  leaves the list as it is.
 - Night mode brings loud parts down and nothing up. In 1.6.0 its leveller
   (`dynaudnorm`) did little to a bang and lifted quiet passages, making
   plain speech louder and its level ride with every pause - "louder, and
