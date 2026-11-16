@@ -2816,5 +2816,9 @@
   "srv_start_hint": "要让它昼夜运行，请随电脑启动这个命令 - Linux 上用 systemd 用户服务，macOS 上用登录项，Windows 上用任务计划程序。只运行这个或应用窗口中的服务器，不要两个都运行。",
   "srv_offline": "服务器没有响应。",
   "srv_no_sources": "还没有源 - 请在 dopeIPTV 中添加一个。",
-  "srv_minutes": "{n} 分钟"
+  "srv_minutes": "{n} 分钟",
+  "status_playing_from": "正在播放：{title}（来自 {source}）",
+  "status_list_source": "{source} · {text}",
+  "source_label_name": "来源：{name}",
+  "source_label_hint": "列表显示的是此来源——点击可切换到其他来源或打开它的设置"
 }

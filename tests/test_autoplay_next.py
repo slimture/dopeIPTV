@@ -448,6 +448,7 @@ def test_toggling_grid_inside_a_series_keeps_the_episodes():
     f._sorted = lambda x: x
     f._hide_busy = lambda: None
     f._set_status = lambda *a, **k: None
+    f._set_list_status = lambda *a, **k: None
     f._pending_jump_key = None
     for n in ("_apply_view_settings", "_apply_filter", "_content_kind",
               "_count_text",

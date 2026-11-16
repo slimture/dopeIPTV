@@ -2816,5 +2816,9 @@
   "srv_start_hint": "昼も夜も動かしておくには、このコマンドをコンピューターの起動時に実行してください。Linux では systemd のユーザーサービス、macOS ではログイン項目、Windows ではタスク スケジューラを使います。これとアプリのウィンドウのサーバーは、どちらか一方だけを動かしてください。",
   "srv_offline": "サーバーが応答しません。",
   "srv_no_sources": "ソースがまだありません。dopeIPTV で追加してください。",
-  "srv_minutes": "{n} 分"
+  "srv_minutes": "{n} 分",
+  "status_playing_from": "再生中：{title}（{source} から）",
+  "status_list_source": "{source} · {text}",
+  "source_label_name": "ソース：{name}",
+  "source_label_hint": "リストにはこのソースが表示されています。クリックすると別のソースに切り替えたり、設定を開いたりできます"
 }

@@ -2816,5 +2816,9 @@
   "srv_start_hint": "Per tenerlo acceso giorno e notte, avvia questo comando con il computer – un servizio utente systemd su Linux, un elemento di login su macOS, l'Utilità di pianificazione su Windows. Esegui questo oppure il server nella finestra dell'app, non entrambi.",
   "srv_offline": "Il server non risponde.",
   "srv_no_sources": "Ancora nessuna sorgente – aggiungine una in dopeIPTV.",
-  "srv_minutes": "{n} min"
+  "srv_minutes": "{n} min",
+  "status_playing_from": "In riproduzione: {title} - da {source}",
+  "status_list_source": "{source} · {text}",
+  "source_label_name": "Sorgente: {name}",
+  "source_label_hint": "Gli elenchi mostrano questa sorgente: fai clic per passare a un'altra o aprirne le impostazioni"
 }

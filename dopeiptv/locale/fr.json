@@ -2816,5 +2816,9 @@
   "srv_start_hint": "Pour qu'il tourne jour et nuit, lance cette commande au démarrage de l'ordinateur – un service utilisateur systemd sous Linux, un élément d'ouverture sous macOS, le Planificateur de tâches sous Windows. Lance soit ceci, soit le serveur dans la fenêtre de l'appli, pas les deux.",
   "srv_offline": "Le serveur ne répond pas.",
   "srv_no_sources": "Pas encore de source – ajoutes-en une dans dopeIPTV.",
-  "srv_minutes": "{n} min"
+  "srv_minutes": "{n} min",
+  "status_playing_from": "Lecture : {title} – depuis {source}",
+  "status_list_source": "{source} · {text}",
+  "source_label_name": "Source : {name}",
+  "source_label_hint": "Les listes affichent cette source – cliquez pour passer à une autre ou ouvrir ses réglages"
 }

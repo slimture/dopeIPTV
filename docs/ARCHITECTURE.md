@@ -175,6 +175,8 @@ dopeiptv/
     mw_shortcuts.py    Keyboard shortcuts: dispatch, the keys in force, live rebind
     mw_nav.py          Nav chrome (focus mode, nav colours/icons, MINE,
                        History's Watched filter, the nav's status)
+    mw_source_label.py The active source in plain sight: over the
+                       categories, in the status line, TV mode's header
     mw_shortcuts.py    Keyboard shortcuts + registry
     mw_cast.py         Casting: the cast dialog, the strip, archive hand-over
     mw_airplay.py      AirPlay (macOS): the receiver added, its own endings
@@ -214,7 +216,8 @@ dopeiptv/
     mw_sort.py         List sort order
     widgets.py         Small standalone widgets
     nav_widgets.py     A nav entry (selected bar, status), the rail's hairline,
-                       the source's avatar at the foot
+                       the source's avatar at the foot, its name over the
+                       categories
     category_flags.py  Bundled SVG flags for category names (flag-icons, MIT)
     player_resize.py   Height handle under the docked video
     welcome.py         First-run welcome overlay (connect / explore)

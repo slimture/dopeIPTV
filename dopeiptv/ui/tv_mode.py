@@ -636,6 +636,14 @@ class TvPage(QWidget):
             head.addWidget(tab)
             self.tabs.append(tab)
         head.addStretch(1)
+        # The source the screens show, muted beside the clock - a household
+        # with several sources sees which one it is on (cut when long).
+        self.source_lbl = QLabel("")
+        self.source_lbl.setFont(font(24))
+        self.source_lbl.setStyleSheet(f"color:{P['muted']};")
+        self.source_lbl.hide()
+        head.addWidget(self.source_lbl, 0, Qt.AlignmentFlag.AlignVCenter)
+        head.addSpacing(px(20))
         self.clock = QLabel("")
         self.clock.setFont(font(34, bold=True))
         self.clock.setStyleSheet(f"color:{P['text2']};")
@@ -669,6 +677,7 @@ class TvPage(QWidget):
         self._focus: QWidget | None = None
         self._last: dict[str, QWidget] = {}
         self._tick()
+        self.refresh_source()
         self._place_margins()
 
     # -- layout ------------------------------------------------------------------------
@@ -714,6 +723,21 @@ class TvPage(QWidget):
 
     def now_shown(self) -> bool:
         return not self.now.isHidden()
+
+    #: The widest the source's name grows beside the clock.
+    SOURCE_W = 420
+
+    def refresh_source(self) -> None:
+        """The source's name beside the clock, as it is now ("" hides it)."""
+        get = getattr(self.window, "_tv_source_name", None)
+        name = get() if callable(get) else ""
+        lbl = self.source_lbl
+        text = QFontMetrics(lbl.font()).elidedText(
+            name, Qt.TextElideMode.ElideRight, px(self.SOURCE_W))
+        lbl.setText(text)
+        lbl.setToolTip(name if text != name else "")
+        lbl.setAccessibleName(name)
+        lbl.setVisible(bool(name))
 
     def _to_current_tab(self) -> None:
         tab = self.tab(self.current)
@@ -976,5 +1000,6 @@ class TvPage(QWidget):
     def restyle(self) -> None:
         self.setStyleSheet(f"#TvPage {{ background: {P['bg']}; }}")
         self.clock.setStyleSheet(f"color:{P['text2']};")
+        self.source_lbl.setStyleSheet(f"color:{P['muted']};")
         self.hint.setStyleSheet(f"color:{P['muted']};")
         self.update()

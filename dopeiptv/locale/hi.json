@@ -2816,5 +2816,9 @@
   "srv_start_hint": "इसे दिन-रात चलाए रखने के लिए यह कमांड कंप्यूटर के साथ शुरू करें – Linux पर systemd यूज़र सर्विस, macOS पर लॉगिन आइटम, Windows पर टास्क शेड्यूलर। या तो यह चलाएँ या ऐप की विंडो वाला सर्वर, दोनों नहीं।",
   "srv_offline": "सर्वर जवाब नहीं दे रहा।",
   "srv_no_sources": "अभी कोई सोर्स नहीं – dopeIPTV में एक जोड़ें।",
-  "srv_minutes": "{n} मिनट"
+  "srv_minutes": "{n} मिनट",
+  "status_playing_from": "चल रहा है: {title} - {source} से",
+  "status_list_source": "{source} · {text}",
+  "source_label_name": "स्रोत: {name}",
+  "source_label_hint": "सूचियाँ यह स्रोत दिखा रही हैं - दूसरे स्रोत पर जाने या इसकी सेटिंग खोलने के लिए क्लिक करें"
 }

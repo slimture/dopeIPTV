@@ -2816,5 +2816,9 @@
   "srv_start_hint": "برای اینکه شبانه‌روز اجرا شود، این فرمان را همراه با رایانه اجرا کنید – یک سرویس کاربر systemd در Linux، یک مورد ورود در macOS، Task Scheduler در Windows. یا این را اجرا کنید یا سرور درون پنجرهٔ برنامه را، نه هر دو.",
   "srv_offline": "سرور پاسخ نمی‌دهد.",
   "srv_no_sources": "هنوز منبعی نیست – یکی در dopeIPTV اضافه کنید.",
-  "srv_minutes": "{n} دقیقه"
+  "srv_minutes": "{n} دقیقه",
+  "status_playing_from": "در حال پخش: {title} - از {source}",
+  "status_list_source": "‏{source} · {text}",
+  "source_label_name": "منبع: {name}",
+  "source_label_hint": "فهرست‌ها این منبع را نشان می‌دهند - برای رفتن به منبعی دیگر یا باز کردن تنظیماتش کلیک کنید"
 }

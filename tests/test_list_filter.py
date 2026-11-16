@@ -25,7 +25,8 @@ def win():
         list_model=SimpleNamespace(
             set_items=lambda items, kind: shown.append(list(items))),
         _sorted=lambda x: x, _hide_busy=lambda: None,
-        _set_status=lambda *a: None, _count_text=lambda k, n: "",
+        _set_status=lambda *a: None, _set_list_status=lambda *a: None,
+        _count_text=lambda k, n: "",
         shown=shown)
     for n in ("_apply_filter", "_content_kind", "_channel_hidden",
               "channel_display_name", "_display_name_fn", "_search_filter"):

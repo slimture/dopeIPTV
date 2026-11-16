@@ -2816,5 +2816,9 @@
   "srv_start_hint": "Ili iendelee usiku na mchana, anzisha amri hii pamoja na kompyuta – huduma ya mtumiaji ya systemd kwenye Linux, kipengee cha kuingia kwenye macOS, Task Scheduler kwenye Windows. Endesha hii au seva iliyo kwenye dirisha la programu, si zote mbili.",
   "srv_offline": "Seva haijibu.",
   "srv_no_sources": "Bado hakuna vyanzo – ongeza kimoja kwenye dopeIPTV.",
-  "srv_minutes": "Dakika {n}"
+  "srv_minutes": "Dakika {n}",
+  "status_playing_from": "Kinachezwa: {title} - kutoka {source}",
+  "status_list_source": "{source} · {text}",
+  "source_label_name": "Chanzo: {name}",
+  "source_label_hint": "Orodha zinaonyesha chanzo hiki - bofya kubadili hadi kingine au kufungua mipangilio yake"
 }

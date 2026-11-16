@@ -2816,5 +2816,9 @@
   "srv_start_hint": "ليعمل ليلًا ونهارًا، شغّل هذا الأمر مع بدء الحاسوب – خدمة مستخدم systemd على Linux، أو عنصر تسجيل دخول على macOS، أو جدولة المهام على Windows. شغّل هذا أو الخادم في نافذة التطبيق، لا كليهما.",
   "srv_offline": "الخادم لا يستجيب.",
   "srv_no_sources": "لا توجد مصادر بعد – أضف واحدًا في dopeIPTV.",
-  "srv_minutes": "{n} د"
+  "srv_minutes": "{n} د",
+  "status_playing_from": "قيد التشغيل: {title} - من {source}",
+  "status_list_source": "‏{source} · {text}",
+  "source_label_name": "المصدر: {name}",
+  "source_label_hint": "القوائم تعرض هذا المصدر - انقر للتبديل إلى مصدر آخر أو لفتح إعداداته"
 }

@@ -2816,5 +2816,9 @@
   "srv_start_hint": "Om hem dag en nacht te laten draaien, start je deze opdracht met de computer – een systemd-gebruikersdienst op Linux, een inlogonderdeel op macOS, Taakplanner op Windows. Draai dit óf de server in het venster van de app, niet allebei.",
   "srv_offline": "De server antwoordt niet.",
   "srv_no_sources": "Nog geen bronnen – voeg er een toe in dopeIPTV.",
-  "srv_minutes": "{n} min"
+  "srv_minutes": "{n} min",
+  "status_playing_from": "Speelt: {title} – uit {source}",
+  "status_list_source": "{source} · {text}",
+  "source_label_name": "Bron: {name}",
+  "source_label_hint": "De lijsten tonen deze bron – klik om naar een andere te wisselen of de instellingen te openen"
 }

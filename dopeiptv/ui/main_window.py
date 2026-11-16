@@ -54,7 +54,7 @@ from .theme import P, rounded
 from .player_resize import PlayerResizeHandle
 from ..core.wakelock import WakeLock
 from .dialogs import PlaylistDialog
-from .nav_widgets import NavButton, SideRule, SourceAvatar
+from .nav_widgets import NavButton, SideRule, SourceAvatar, SourceLabel
 # fold_into_app_menu: imported from here as well (tests, older callers).
 from .app_menu import MAC_MENUS, fold_into_app_menu, lay_out, open_website  # noqa: F401
 from .widgets import (
@@ -96,6 +96,7 @@ from .mw_favorites import _FavoritesMixin
 from .mw_follow import _FollowMixin
 from .mw_detail import _DetailMixin
 from .mw_nav import _NavMixin
+from .mw_source_label import _SourceLabelMixin
 from .mw_mpris import _MprisMixin
 from .mw_multiview import _MultiviewMixin
 from .mw_guide import _GuideMixin
@@ -141,7 +142,7 @@ _COUNT_KEYS = {
 class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _ContextMenuMixin, _FavoritesMixin, _DetailMixin, _RemindersMixin,
                  _BusyMixin, _UpdatesMixin, _SearchMixin, _SidebarMixin,
-                 _NavMixin, _ShortcutsMixin, _PaletteMixin, _OnboardingMixin, _SortMixin,
+                 _NavMixin, _SourceLabelMixin, _ShortcutsMixin, _PaletteMixin, _OnboardingMixin, _SortMixin,
                  _LocalFilesMixin, _RadioMixin, _WebStreamsMixin,
                  _PopoutMixin, _MultiviewMixin, _HomeMixin, _GuideMixin,
                  _MprisMixin,
@@ -468,6 +469,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         btn = getattr(self, "_playlist_btn", None)
         if btn is None:
             return
+        # Its name over the categories, TV mode's header and the status
+        # line follow every change the avatar does (mw_source_label).
+        self._update_source_label()
         store = self.playlist_store
         pl = store.get(store.active_id) if (store and store.active_id) else None
         name = ((pl or {}).get("name") or (pl or {}).get("server") or "")
@@ -760,6 +764,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._lib_toggle.setChecked(
                 self.settings.value("library_collapsed", False, type=bool))
 
+        # The source the lists show, over its categories: its name, its kind
+        # in a chip with two sources or more, the source menu on a click
+        # (mw_source_label). Hidden on the rail, where the avatar says it.
+        sl.addSpacing(8)
+        self._source_label = SourceLabel()
+        self._source_label.clicked.connect(self._show_source_menu)
+        self._source_label.hide()
+        sl.addWidget(self._source_label)
         # "Categories" header with a small "solo" toggle on the right that
         # collapses the list to just the active category. Kept in a zero-margin
         # row so it takes exactly the label's height - the nav-button spacing
@@ -3127,8 +3139,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             rows = [r for r in rows if not r.get("_header")]
         self.all_items = rows
         self.list_model.set_items(rows, model_kind)
-        self._set_status(self._count_text(model_kind, n) if n
-                         else (empty_msg or self._count_text(model_kind, 0)))
+        self._set_list_status(self._count_text(model_kind, n) if n
+                              else (empty_msg or self._count_text(model_kind, 0)))
         # On the very first populated list, select the first playable row (not a
         # section header) so the detail pane shows something straight away -
         # selecting only, never auto-playing.
@@ -3611,13 +3623,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # gen-discarded async load (e.g. rapid Home<->TV toggling) could leave
         # the "Loading channels…" overlay stuck on until the next selection.
         self._hide_busy()
-        self._set_status(self._count_text(kind, len(filtered)))
         if self.mode == "fav" and not self.series_ctx and not self.all_items:
-            self._set_status(tr({"movie": "fav_empty_movies",
-                                 "series": "fav_empty_series"}.get(
-                                     self._fav_section, "fav_empty_channels")))
+            self._set_list_status(tr({"movie": "fav_empty_movies",
+                                      "series": "fav_empty_series"}.get(
+                                          self._fav_section, "fav_empty_channels")))
         elif kind == "history" and not self.all_items:
-            self._set_status(tr("history_empty"))
+            self._set_list_status(tr("history_empty"))
+        else:
+            self._set_list_status(self._count_text(kind, len(filtered)))
 
     # -- item identity -------------------------------------------------------------
 
@@ -4553,6 +4566,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # back instead of resuming nothing. Without this the Play button
         # after Stop prints '_resume_last: no _last_playback stored' because
         # auto-preview never went through _start_playback.
+        self._note_playing_source(url, self._item_key(it), "live")
         self._last_playback = {"url": url, "title": title,
                                "icon_url": it.get("stream_icon"),
                                "key": self._item_key(it),
@@ -4561,7 +4575,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._sync_player_buttons()
         self.listw.viewport().update()
         self.setWindowTitle(title or self._base_title)
-        self._set_status(tr("status_playing", title=title))
+        self._set_status(self._status_playing(title))
         self.rec.finish_all_inplayer("channel changed")
         self.player.show()
         self.player.set_overlay_info(title)
@@ -4914,6 +4928,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._apply_play_icon()
         self.listw.viewport().update()
         self.setWindowTitle(self._base_title)
+        self._source_status_stopped()     # the list's line again, its source with it
 
     def _autoplay_next_episode(self) -> bool:
         return self.settings.value("autoplay_next_episode", "true") == "true"
@@ -5115,6 +5130,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Remember the full context so a Stop -> Play round-trip can replay
         # exactly this title (and resume where it left off) instead of falling
         # back to the first channel in the list.
+        self._note_playing_source(url, key, kind)
         self._last_playback = {"url": url, "title": title, "icon_url": icon_url,
                                "key": key, "kind": kind, "item": item,
                                "series_ctx": (self.series_ctx
@@ -5156,7 +5172,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                                "web": "web"}.get(kind)
         self.listw.viewport().update()
         self.setWindowTitle(title or self._base_title)
-        self._set_status(tr("status_playing", title=title))
+        self._set_status(self._status_playing(title))
         log.info("play: embedded path kind=%s player=%s %s",
                  kind, "yes" if self.player else "NO", for_log(title))
         if self.player:

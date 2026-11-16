@@ -2816,5 +2816,9 @@
   "srv_start_hint": "Para que funcione día y noche, inicia este comando con el ordenador: un servicio de usuario de systemd en Linux, un elemento de inicio de sesión en macOS, el Programador de tareas en Windows. Ejecuta esto o el servidor en la ventana de la app, no ambos.",
   "srv_offline": "El servidor no responde.",
   "srv_no_sources": "Aún no hay fuentes: añade una en dopeIPTV.",
-  "srv_minutes": "{n} min"
+  "srv_minutes": "{n} min",
+  "status_playing_from": "Reproduciendo: {title} - desde {source}",
+  "status_list_source": "{source} · {text}",
+  "source_label_name": "Fuente: {name}",
+  "source_label_hint": "Las listas muestran esta fuente: haz clic para cambiar a otra o abrir sus ajustes"
 }

@@ -2816,5 +2816,9 @@
   "srv_start_hint": "Damit er Tag und Nacht läuft, starte diesen Befehl mit dem Computer – als systemd-Benutzerdienst unter Linux, als Anmeldeobjekt unter macOS, mit der Aufgabenplanung unter Windows. Führe entweder diesen oder den Server im Fenster der App aus, nicht beides.",
   "srv_offline": "Der Server antwortet nicht.",
   "srv_no_sources": "Noch keine Quellen – füge eine in dopeIPTV hinzu.",
-  "srv_minutes": "{n} Min."
+  "srv_minutes": "{n} Min.",
+  "status_playing_from": "Wiedergabe: {title} – aus {source}",
+  "status_list_source": "{source} · {text}",
+  "source_label_name": "Quelle: {name}",
+  "source_label_hint": "Die Listen zeigen diese Quelle – klicken, um zu einer anderen zu wechseln oder ihre Einstellungen zu öffnen"
 }

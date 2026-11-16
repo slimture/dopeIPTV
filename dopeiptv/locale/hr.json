@@ -2816,5 +2816,9 @@
   "srv_start_hint": "Da radi danju i noću, pokreni ovu naredbu s računalom – kao korisničku uslugu systemd na Linuxu, stavku za prijavu na macOS-u, Planer zadataka na Windowsima. Pokreni ili ovo ili poslužitelj u prozoru aplikacije, ne oboje.",
   "srv_offline": "Poslužitelj ne odgovara.",
   "srv_no_sources": "Još nema izvora – dodaj jedan u dopeIPTV-u.",
-  "srv_minutes": "{n} min"
+  "srv_minutes": "{n} min",
+  "status_playing_from": "Reproducira se: {title} – iz izvora {source}",
+  "status_list_source": "{source} · {text}",
+  "source_label_name": "Izvor: {name}",
+  "source_label_hint": "Popisi prikazuju ovaj izvor – kliknite za prelazak na drugi ili za otvaranje njegovih postavki"
 }

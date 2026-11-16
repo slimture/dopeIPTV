@@ -1,16 +1,18 @@
 """The sidebar's own widgets: a nav entry with its selected bar and quiet
-status, the hairline between the sidebar's groups, and the active source's
-avatar at its foot."""
+status, the hairline between the sidebar's groups, the active source's
+avatar at its foot and its name over the categories."""
 
 from __future__ import annotations
 
 import re
 
-from PyQt6.QtCore import QPoint, QRectF, Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QFontMetricsF, QPainter, QPaintEvent, QPen
+from PyQt6.QtCore import QPoint, QPointF, QRectF, Qt, pyqtSignal
+from PyQt6.QtGui import (
+    QColor, QFont, QFontMetricsF, QPainter, QPainterPath, QPaintEvent, QPen,
+)
 from PyQt6.QtWidgets import QPushButton, QSizePolicy, QWidget
 
-from .theme import P, ink_on
+from .theme import P, corner_radius, ink_on, tinted
 
 #: Status kinds a nav entry can show.
 DOT, PILL, COUNT = "dot", "pill", "count"
@@ -264,4 +266,148 @@ class SourceAvatar(QPushButton):
         pr.setFont(f)
         pr.setPen(QColor(ink))
         pr.drawText(box, int(Qt.AlignmentFlag.AlignCenter), self._initials)
+        pr.end()
+
+
+class SourceLabel(QPushButton):
+    """The active source over the categories: its name, and with more than
+    one source its kind as a small muted chip after it, a chevron at the
+    trailing end - a click opens the source menu. Painted, so a long name
+    is cut with an ellipsis, the chip goes before the name is cut short, and
+    a right-to-left language mirrors the row."""
+
+    HEIGHT = 30
+    PAD = 13.0
+    GAP = 6.0
+    CHEVRON = 8.0
+    #: The name keeps at least this much room before the chip goes.
+    MIN_NAME = 48.0
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.setObjectName("SourceLabel")
+        self.setFlat(True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        # A click must not leave a focus ring behind; Tab still reaches it.
+        self.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+        # Asks for no width, as the nav entries: the sidebar stays free to
+        # be dragged narrow and to collapse to the rail.
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        self.setMinimumWidth(0)
+        self.setFixedHeight(self.HEIGHT)
+        self._name = ""
+        self._kind = ""
+
+    def set_source(self, name: str, kind: str = "", tip: str = "",
+                   accessible: str = "", hint: str = "") -> None:
+        """Show source *name*, with *kind* in a chip ("" for none); *tip*
+        for the pointer, *accessible* and *hint* for a screen reader."""
+        if (name, kind) != (self._name, self._kind):
+            self._name, self._kind = name, kind
+            self.update()
+        self.setToolTip(tip)
+        self.setAccessibleName(accessible or name)
+        self.setAccessibleDescription(hint)
+
+    def name(self) -> str:
+        return self._name
+
+    def kind(self) -> str:
+        return self._kind
+
+    # -- geometry -----------------------------------------------------------
+
+    def _fonts(self) -> tuple[QFont, QFont]:
+        name = QFont(self.font())
+        name.setPixelSize(13)
+        name.setWeight(QFont.Weight.DemiBold)
+        chip = QFont(self.font())
+        chip.setPixelSize(10)
+        chip.setWeight(QFont.Weight.DemiBold)
+        return name, chip
+
+    def boxes(self) -> tuple[QRectF, QRectF | None, QRectF, str]:
+        """(the name's box, the chip's box or None, the chevron's box, the
+        name as it is drawn) at the present width - mirrored in a
+        right-to-left language."""
+        w, h = float(self.width()), float(self.height())
+        name_font, chip_font = self._fonts()
+        fm = QFontMetricsF(name_font)
+        end = w - self.PAD - self.CHEVRON
+        room = max(0.0, end - self.GAP - self.PAD)
+        chip_w = (QFontMetricsF(chip_font).horizontalAdvance(self._kind) + 12.0
+                  if self._kind else 0.0)
+        name_w = fm.horizontalAdvance(self._name)
+        if chip_w and room - self.GAP - chip_w < min(name_w, self.MIN_NAME):
+            chip_w = 0.0                     # too narrow for both: the name only
+        name_room = max(0.0, room - (self.GAP + chip_w if chip_w else 0.0))
+        text = fm.elidedText(self._name, Qt.TextElideMode.ElideRight, name_room)
+        shown_w = min(fm.horizontalAdvance(text), name_room)
+        name_box = QRectF(self.PAD, 0.0, shown_w, h)
+        chip_box = None
+        if chip_w:
+            ch = 16.0
+            chip_box = QRectF(self.PAD + shown_w + self.GAP, (h - ch) / 2, chip_w, ch)
+        chevron = QRectF(end, (h - 5.0) / 2, self.CHEVRON, 5.0)
+        if self.isRightToLeft():
+            name_box = self._mirror(name_box, w)
+            chip_box = self._mirror(chip_box, w) if chip_box is not None else None
+            chevron = self._mirror(chevron, w)
+        return name_box, chip_box, chevron, text
+
+    @staticmethod
+    def _mirror(box: QRectF, w: float) -> QRectF:
+        return QRectF(w - box.x() - box.width(), box.y(), box.width(), box.height())
+
+    @staticmethod
+    def chip_colors() -> tuple[str, str]:
+        """(fill, ink) of the kind's chip: a quiet wash of the muted tone
+        over the sidebar, its words readable at 4.5:1 on every theme."""
+        side = P.get("side", "#101014")
+        return tinted(P.get("muted", "#8B8B96"), side, 0.18,
+                      P.get("text", "#ECECF1"))
+
+    # -- painting -----------------------------------------------------------
+
+    def paintEvent(self, _event: QPaintEvent) -> None:
+        pr = QPainter(self)
+        pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        pr.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
+        whole = QRectF(0.0, 0.0, float(self.width()), float(self.height()))
+        radius = corner_radius(8.0)
+        if self.isDown() or self.underMouse():
+            pr.setPen(Qt.PenStyle.NoPen)
+            pr.setBrush(QColor(P.get("sel" if self.isDown() else "hover", "#1D1D24")))
+            pr.drawRoundedRect(whole, radius, radius)
+        if self.hasFocus():
+            pr.setPen(QPen(QColor(P.get("accent", "#4C8DFF")), 1.5))
+            pr.setBrush(Qt.BrushStyle.NoBrush)
+            pr.drawRoundedRect(whole.adjusted(1, 1, -1, -1), radius, radius)
+        name_box, chip_box, chevron, text = self.boxes()
+        name_font, chip_font = self._fonts()
+        rtl = self.isRightToLeft()
+        lead = Qt.AlignmentFlag.AlignRight if rtl else Qt.AlignmentFlag.AlignLeft
+        pr.setFont(name_font)
+        pr.setPen(QColor(P.get("text", "#ECECF1")))
+        pr.drawText(name_box, int(lead | Qt.AlignmentFlag.AlignVCenter), text)
+        if chip_box is not None:
+            fill, ink = self.chip_colors()
+            pr.setPen(Qt.PenStyle.NoPen)
+            pr.setBrush(QColor(fill))
+            r = corner_radius(4.0)
+            pr.drawRoundedRect(chip_box, r, r)
+            pr.setFont(chip_font)
+            pr.setPen(QColor(ink))
+            pr.drawText(chip_box, int(Qt.AlignmentFlag.AlignCenter), self._kind)
+        ink = P.get("text2" if self.underMouse() else "muted2", "#6E6E79")
+        pen = QPen(QColor(ink), 1.6)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        pr.setPen(pen)
+        pr.setBrush(Qt.BrushStyle.NoBrush)
+        path = QPainterPath(QPointF(chevron.left(), chevron.top()))
+        path.lineTo(QPointF(chevron.center().x(), chevron.bottom()))
+        path.lineTo(QPointF(chevron.right(), chevron.top()))
+        pr.drawPath(path)
         pr.end()

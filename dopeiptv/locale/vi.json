@@ -2816,5 +2816,9 @@
   "srv_start_hint": "Để chạy ngày đêm, hãy khởi chạy lệnh này cùng máy tính – một dịch vụ người dùng systemd trên Linux, một mục đăng nhập trên macOS, Task Scheduler trên Windows. Chỉ chạy lệnh này hoặc máy chủ trong cửa sổ ứng dụng, không chạy cả hai.",
   "srv_offline": "Máy chủ không phản hồi.",
   "srv_no_sources": "Chưa có nguồn nào – hãy thêm một nguồn trong dopeIPTV.",
-  "srv_minutes": "{n} phút"
+  "srv_minutes": "{n} phút",
+  "status_playing_from": "Đang phát: {title} - từ {source}",
+  "status_list_source": "{source} · {text}",
+  "source_label_name": "Nguồn: {name}",
+  "source_label_hint": "Danh sách đang hiển thị nguồn này - bấm để chuyển sang nguồn khác hoặc mở cài đặt của nguồn"
 }

@@ -2816,5 +2816,9 @@
   "srv_start_hint": "Agar berjalan siang dan malam, jalankan perintah ini saat komputer menyala – layanan pengguna systemd di Linux, item login di macOS, Task Scheduler di Windows. Jalankan ini atau server di jendela aplikasi, jangan keduanya.",
   "srv_offline": "Server tidak menjawab.",
   "srv_no_sources": "Belum ada sumber – tambahkan satu di dopeIPTV.",
-  "srv_minutes": "{n} mnt"
+  "srv_minutes": "{n} mnt",
+  "status_playing_from": "Memutar: {title} - dari {source}",
+  "status_list_source": "{source} · {text}",
+  "source_label_name": "Sumber: {name}",
+  "source_label_hint": "Daftar menampilkan sumber ini - klik untuk beralih ke sumber lain atau membuka setelannya"
 }

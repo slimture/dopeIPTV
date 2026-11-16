@@ -2816,5 +2816,9 @@
   "srv_start_hint": "اسے دن رات چلتا رکھنے کے لیے یہ کمانڈ کمپیوٹر کے ساتھ شروع کریں – Linux پر systemd یوزر سروس، macOS پر لاگ اِن آئٹم، Windows پر ٹاسک شیڈولر۔ یا تو یہ چلائیں یا ایپ کی ونڈو والا سرور، دونوں نہیں۔",
   "srv_offline": "سرور جواب نہیں دے رہا۔",
   "srv_no_sources": "ابھی کوئی ذریعہ نہیں – dopeIPTV میں ایک شامل کریں۔",
-  "srv_minutes": "{n} منٹ"
+  "srv_minutes": "{n} منٹ",
+  "status_playing_from": "چل رہا ہے: {title} - {source} سے",
+  "status_list_source": "‏{source} · {text}",
+  "source_label_name": "ماخذ: {name}",
+  "source_label_hint": "فہرستیں یہ ماخذ دکھا رہی ہیں - کسی دوسرے ماخذ پر جانے یا اس کی ترتیبات کھولنے کے لیے کلک کریں"
 }

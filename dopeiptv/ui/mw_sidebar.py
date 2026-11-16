@@ -31,6 +31,8 @@ class _SidebarMixin:
         it touches no width constraints and never calls setSizes()."""
         if not hasattr(self, "nav_btns"):
             return
+        # The source's name over the categories reads it (mw_source_label).
+        self._chrome_rail = collapsed
         for key, b in self.nav_btns.items():
             # Rail: icon only (centred); expanded: icon + label. The icon
             # itself is always set (see _apply_nav_icons).

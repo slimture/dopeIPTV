@@ -2816,5 +2816,9 @@
   "srv_start_hint": "כדי שירוץ יומם ולילה, יש להפעיל את הפקודה הזו עם המחשב – שירות משתמש של systemd ב-Linux, פריט התחברות ב-macOS, מתזמן המשימות ב-Windows. יש להריץ את זה או את השרת שבחלון האפליקציה, לא את שניהם.",
   "srv_offline": "השרת לא עונה.",
   "srv_no_sources": "אין עדיין מקורות – אפשר להוסיף אחד ב-dopeIPTV.",
-  "srv_minutes": "{n} דק׳"
+  "srv_minutes": "{n} דק׳",
+  "status_playing_from": "מתנגן: {title} - מ-{source}",
+  "status_list_source": "‏{source} · {text}",
+  "source_label_name": "מקור: {name}",
+  "source_label_hint": "הרשימות מציגות את המקור הזה - לחצו כדי לעבור למקור אחר או לפתוח את ההגדרות שלו"
 }

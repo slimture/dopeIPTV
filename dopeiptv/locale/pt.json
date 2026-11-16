@@ -2816,5 +2816,9 @@
   "srv_start_hint": "Para deixá-lo rodando dia e noite, inicie este comando com o computador – um serviço de usuário do systemd no Linux, um item de login no macOS, o Agendador de Tarefas no Windows. Rode este ou o servidor na janela do app, não os dois.",
   "srv_offline": "O servidor não responde.",
   "srv_no_sources": "Ainda sem fontes – adicione uma no dopeIPTV.",
-  "srv_minutes": "{n} min"
+  "srv_minutes": "{n} min",
+  "status_playing_from": "Reproduzindo: {title} - de {source}",
+  "status_list_source": "{source} · {text}",
+  "source_label_name": "Fonte: {name}",
+  "source_label_hint": "As listas mostram esta fonte - clique para trocar para outra ou abrir as configurações dela"
 }

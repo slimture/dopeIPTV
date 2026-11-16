@@ -2816,5 +2816,9 @@
   "srv_start_hint": "Da bi radio danju i noću, pokreći ovu komandu sa računarom – kao korisnički servis systemd na Linuxu, stavku za prijavu na macOS-u, Planer zadataka na Windowsu. Pokreni ili ovo ili server u prozoru aplikacije, ne oboje.",
   "srv_offline": "Server ne odgovara.",
   "srv_no_sources": "Još nema izvora – dodaj jedan u dopeIPTV-u.",
-  "srv_minutes": "{n} min"
+  "srv_minutes": "{n} min",
+  "status_playing_from": "Reprodukuje se: {title} – iz izvora {source}",
+  "status_list_source": "{source} · {text}",
+  "source_label_name": "Izvor: {name}",
+  "source_label_hint": "Liste prikazuju ovaj izvor – kliknite da pređete na drugi ili otvorite njegova podešavanja"
 }

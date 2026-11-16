@@ -2816,5 +2816,9 @@
   "srv_start_hint": "Aby działał dzień i noc, uruchamiaj to polecenie razem z komputerem – jako usługę użytkownika systemd w Linuksie, element logowania w macOS, Harmonogram zadań w Windows. Uruchom albo to, albo serwer w oknie aplikacji, nie oba naraz.",
   "srv_offline": "Serwer nie odpowiada.",
   "srv_no_sources": "Nie ma jeszcze źródeł – dodaj jakieś w dopeIPTV.",
-  "srv_minutes": "{n} min"
+  "srv_minutes": "{n} min",
+  "status_playing_from": "Odtwarzanie: {title} – ze źródła {source}",
+  "status_list_source": "{source} · {text}",
+  "source_label_name": "Źródło: {name}",
+  "source_label_hint": "Listy pokazują to źródło – kliknij, aby przełączyć na inne lub otworzyć jego ustawienia"
 }

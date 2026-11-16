@@ -2816,5 +2816,9 @@
   "srv_start_hint": "För att ha den igång dygnet runt, starta det här kommandot med datorn – en systemd-användartjänst på Linux, ett inloggningsobjekt på macOS, Schemaläggaren i Windows. Kör antingen det här eller servern i appens fönster, inte båda.",
   "srv_offline": "Servern svarar inte.",
   "srv_no_sources": "Inga källor än – lägg till en i dopeIPTV.",
-  "srv_minutes": "{n} min"
+  "srv_minutes": "{n} min",
+  "status_playing_from": "Spelar: {title} – från {source}",
+  "status_list_source": "{source} · {text}",
+  "source_label_name": "Källa: {name}",
+  "source_label_hint": "Listorna visar den här källan – klicka för att byta till en annan eller öppna dess inställningar"
 }

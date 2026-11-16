@@ -2816,5 +2816,9 @@
   "srv_start_hint": "Gece gündüz çalışması için bu komutu bilgisayarla birlikte başlat – Linux'ta bir systemd kullanıcı hizmeti, macOS'ta bir oturum açma öğesi, Windows'ta Görev Zamanlayıcı. Ya bunu ya da uygulamanın penceresindeki sunucuyu çalıştır, ikisini birden değil.",
   "srv_offline": "Sunucu yanıt vermiyor.",
   "srv_no_sources": "Henüz kaynak yok – dopeIPTV'de bir tane ekle.",
-  "srv_minutes": "{n} dk"
+  "srv_minutes": "{n} dk",
+  "status_playing_from": "Oynatılıyor: {title} - {source} kaynağından",
+  "status_list_source": "{source} · {text}",
+  "source_label_name": "Kaynak: {name}",
+  "source_label_hint": "Listeler bu kaynağı gösteriyor - başka bir kaynağa geçmek ya da ayarlarını açmak için tıklayın"
 }
