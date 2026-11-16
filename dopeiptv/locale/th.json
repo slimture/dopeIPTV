@@ -2840,5 +2840,9 @@
   "sp_playing": "กำลังเล่น",
   "sp_new": "ใหม่",
   "sp_retry": "ลองอีกครั้ง",
-  "sp_no_episodes": "ยังไม่มีตอน"
+  "sp_no_episodes": "ยังไม่มีตอน",
+  "player_loading_connecting": "กำลังเชื่อมต่อ…",
+  "player_loading_slow": "ยังโหลดอยู่ - บางช่องต้องใช้เวลาสักครู่กว่าจะเริ่ม",
+  "player_loading_buffering": "กำลังบัฟเฟอร์…",
+  "player_loading_buffering_pct": "กำลังบัฟเฟอร์… {n}%"
 }

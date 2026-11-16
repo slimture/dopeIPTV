@@ -2840,5 +2840,9 @@
   "sp_playing": "در حال پخش",
   "sp_new": "جدید",
   "sp_retry": "تلاش دوباره",
-  "sp_no_episodes": "هنوز قسمتی نیست"
+  "sp_no_episodes": "هنوز قسمتی نیست",
+  "player_loading_connecting": "در حال اتصال…",
+  "player_loading_slow": "هنوز در حال بارگذاری - شروع بعضی کانال‌ها کمی طول می‌کشد",
+  "player_loading_buffering": "در حال بافر کردن…",
+  "player_loading_buffering_pct": "در حال بافر کردن… {n}٪"
 }

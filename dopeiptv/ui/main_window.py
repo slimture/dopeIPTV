@@ -4576,6 +4576,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # down, as _start_playback does - and only then (_vis_active), so an
         # ordinary preview still reaches mpv untouched.
         self._apply_audio_visuals(url)
+        self._arm_loading(it.get("stream_icon"))
         if self.player.play(url, title, local_buffer=True,
                             buffer_key=f"live:{self._item_key(it)}"):
             self.wake.acquire(tr("wake_playing", title=title))
@@ -5029,6 +5030,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # to_cast: a live channel may go to a running cast (False: here).
         # own_buffer False: an address opened by hand - mpv opens it, never
         # dopeIPTV's own rewind buffer (it need not be a stream at all).
+        # The app's reconnect (_retry_last_stream) of this very stream says
+        # "Reconnecting…" over the picture while it opens; anything else is
+        # a fresh start.
+        reconnect = key is not None and getattr(self, "_reconnect_key", None) == key
+        self._reconnect_key = None
         if not self._guard_stream_switch(url, title):
             return
         # The guard is about streams: the user's own files always play.
@@ -5202,6 +5208,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             before = getattr(self, "_tv_before_play", None)
             if before is not None:
                 before()
+            self._arm_loading(icon_url, reconnect)
             if self.player.play(url, title, start=resume_at,
                                 local_buffer=kind == "live" and not catchup,
                                 buffer_key=f"{kind}:{key}" if key else None,
@@ -5242,6 +5249,23 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             token = getattr(self, "_catchup_verify_token", 0) + 1
             self._catchup_verify_token = token
             QTimer.singleShot(5000, lambda t=token: self._verify_catchup(t))
+
+    def _arm_loading(self, icon_url, reconnect: bool = False) -> None:
+        """What the player's loading indicator shows while the next stream
+        opens: the channel's logo or the title's poster when the window
+        holds it in memory already - never a download for it, the name
+        alone otherwise - and whether it opens again what dropped."""
+        pm = None
+        if icon_url:
+            for loader in (getattr(self, "logos", None), getattr(self, "poster_art", None)):
+                hit = getattr(loader, "cache", {}).get(icon_url)
+                if hit is not None and not hit.isNull():
+                    pm = hit
+                    break
+        try:
+            self.player.set_loading_art(pm, reconnect=reconnect)
+        except Exception as e:
+            log.debug("loading indicator not armed: %s", e)
 
     def _apply_seek_mode(self, item, kind: str) -> None:
         """Pick one seek UI per stream so there's never a second, useless bar:
@@ -5500,6 +5524,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.stream_error.show()
         if self.player:
             self.player.title_lbl.setText("")
+            self.player.hide_loading()
 
     def _upcoming_prompt_plausible(self, item) -> bool:
         """Whether a 407 really means 'this broadcast hasn't started yet'.
@@ -5669,6 +5694,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             msg = tr("status_stream_dropped")
             self._set_status(msg, emphasis=True)
             self.player.set_overlay_info(msg)
+            self.player.hide_loading()
             return
         if reason == "eof":
             # The provider ended a stream that was playing. Drops like that,
@@ -5818,6 +5844,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             log.info("retry skipped: last playback is %r, not live",
                      (lp or {}).get("kind"))
             return
+        # Its start says "Reconnecting…" - also when a portal's new link
+        # comes later (_links_later); _start_playback takes it.
+        self._reconnect_key = lp.get("key")
         self._health_retry()
         # A catch-up/archive segment must be replayed by its own archive URL.
         # Re-deriving a live URL (below) would silently yank the user to the

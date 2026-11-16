@@ -2840,5 +2840,9 @@
   "sp_playing": "Spelas nu",
   "sp_new": "Nytt",
   "sp_retry": "Försök igen",
-  "sp_no_episodes": "Inga avsnitt än"
+  "sp_no_episodes": "Inga avsnitt än",
+  "player_loading_connecting": "Ansluter…",
+  "player_loading_slow": "Laddar fortfarande - vissa kanaler tar en stund att starta",
+  "player_loading_buffering": "Buffrar…",
+  "player_loading_buffering_pct": "Buffrar… {n} %"
 }

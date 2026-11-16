@@ -2840,5 +2840,9 @@
   "sp_playing": "Đang phát",
   "sp_new": "Mới",
   "sp_retry": "Thử lại",
-  "sp_no_episodes": "Chưa có tập nào"
+  "sp_no_episodes": "Chưa có tập nào",
+  "player_loading_connecting": "Đang kết nối…",
+  "player_loading_slow": "Vẫn đang tải - một số kênh cần chút thời gian để bắt đầu",
+  "player_loading_buffering": "Đang tải bộ đệm…",
+  "player_loading_buffering_pct": "Đang tải bộ đệm… {n}%"
 }

@@ -2840,5 +2840,9 @@
   "sp_playing": "Відтворюється",
   "sp_new": "Нова",
   "sp_retry": "Спробувати ще",
-  "sp_no_episodes": "Епізодів поки немає"
+  "sp_no_episodes": "Епізодів поки немає",
+  "player_loading_connecting": "Під'єднання…",
+  "player_loading_slow": "Ще завантажується - деяким каналам потрібен час, щоб запуститися",
+  "player_loading_buffering": "Буферизація…",
+  "player_loading_buffering_pct": "Буферизація… {n}%"
 }

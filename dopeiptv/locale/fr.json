@@ -2840,5 +2840,9 @@
   "sp_playing": "En cours",
   "sp_new": "Nouveau",
   "sp_retry": "Réessayer",
-  "sp_no_episodes": "Pas encore d'épisodes"
+  "sp_no_episodes": "Pas encore d'épisodes",
+  "player_loading_connecting": "Connexion…",
+  "player_loading_slow": "Toujours en chargement - certaines chaînes mettent un moment à démarrer",
+  "player_loading_buffering": "Mise en mémoire tampon…",
+  "player_loading_buffering_pct": "Mise en mémoire tampon… {n} %"
 }

@@ -2840,5 +2840,9 @@
   "sp_playing": "재생 중",
   "sp_new": "신규",
   "sp_retry": "다시 시도",
-  "sp_no_episodes": "아직 에피소드가 없습니다"
+  "sp_no_episodes": "아직 에피소드가 없습니다",
+  "player_loading_connecting": "연결 중…",
+  "player_loading_slow": "아직 불러오는 중 - 일부 채널은 시작하는 데 시간이 걸립니다",
+  "player_loading_buffering": "버퍼링 중…",
+  "player_loading_buffering_pct": "버퍼링 중… {n}%"
 }

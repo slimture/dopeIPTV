@@ -2840,5 +2840,9 @@
   "sp_playing": "正在播放",
   "sp_new": "新",
   "sp_retry": "重试",
-  "sp_no_episodes": "暂无剧集"
+  "sp_no_episodes": "暂无剧集",
+  "player_loading_connecting": "正在连接…",
+  "player_loading_slow": "仍在加载 - 有些频道需要一点时间才能开始播放",
+  "player_loading_buffering": "正在缓冲…",
+  "player_loading_buffering_pct": "正在缓冲… {n}%"
 }

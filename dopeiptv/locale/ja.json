@@ -2840,5 +2840,9 @@
   "sp_playing": "再生中",
   "sp_new": "新着",
   "sp_retry": "再試行",
-  "sp_no_episodes": "まだエピソードがありません"
+  "sp_no_episodes": "まだエピソードがありません",
+  "player_loading_connecting": "接続中…",
+  "player_loading_slow": "まだ読み込み中です - チャンネルによっては始まるまで少し時間がかかります",
+  "player_loading_buffering": "バッファリング中…",
+  "player_loading_buffering_pct": "バッファリング中… {n}%"
 }

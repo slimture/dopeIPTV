@@ -2840,5 +2840,9 @@
   "sp_playing": "In riproduzione",
   "sp_new": "Nuovo",
   "sp_retry": "Riprova",
-  "sp_no_episodes": "Ancora nessun episodio"
+  "sp_no_episodes": "Ancora nessun episodio",
+  "player_loading_connecting": "Connessione…",
+  "player_loading_slow": "Ancora in caricamento - alcuni canali impiegano un po' a partire",
+  "player_loading_buffering": "Buffering in corso…",
+  "player_loading_buffering_pct": "Buffering in corso… {n}%"
 }

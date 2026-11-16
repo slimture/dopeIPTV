@@ -2840,5 +2840,9 @@
   "sp_playing": "מתנגן",
   "sp_new": "חדש",
   "sp_retry": "נסה שוב",
-  "sp_no_episodes": "אין עדיין פרקים"
+  "sp_no_episodes": "אין עדיין פרקים",
+  "player_loading_connecting": "מתחבר…",
+  "player_loading_slow": "עדיין טוען - לחלק מהערוצים לוקח זמן להתחיל",
+  "player_loading_buffering": "אוגר נתונים…",
+  "player_loading_buffering_pct": "אוגר נתונים… {n}%"
 }

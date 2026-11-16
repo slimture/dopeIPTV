@@ -2840,5 +2840,9 @@
   "sp_playing": "Oynatılıyor",
   "sp_new": "Yeni",
   "sp_retry": "Tekrar dene",
-  "sp_no_episodes": "Henüz bölüm yok"
+  "sp_no_episodes": "Henüz bölüm yok",
+  "player_loading_connecting": "Bağlanıyor…",
+  "player_loading_slow": "Hâlâ yükleniyor - bazı kanalların başlaması biraz zaman alır",
+  "player_loading_buffering": "Arabelleğe alınıyor…",
+  "player_loading_buffering_pct": "Arabelleğe alınıyor… %{n}"
 }

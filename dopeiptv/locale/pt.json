@@ -2840,5 +2840,9 @@
   "sp_playing": "Reproduzindo",
   "sp_new": "Novo",
   "sp_retry": "Tentar de novo",
-  "sp_no_episodes": "Ainda não há episódios"
+  "sp_no_episodes": "Ainda não há episódios",
+  "player_loading_connecting": "Conectando…",
+  "player_loading_slow": "Ainda carregando - alguns canais demoram um pouco para começar",
+  "player_loading_buffering": "Armazenando em buffer…",
+  "player_loading_buffering_pct": "Armazenando em buffer… {n}%"
 }

@@ -2840,5 +2840,9 @@
   "sp_playing": "Sedang diputar",
   "sp_new": "Baru",
   "sp_retry": "Coba lagi",
-  "sp_no_episodes": "Belum ada episode"
+  "sp_no_episodes": "Belum ada episode",
+  "player_loading_connecting": "Menyambung…",
+  "player_loading_slow": "Masih memuat - beberapa saluran butuh waktu untuk mulai",
+  "player_loading_buffering": "Menyangga…",
+  "player_loading_buffering_pct": "Menyangga… {n}%"
 }

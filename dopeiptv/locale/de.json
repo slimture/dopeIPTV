@@ -2840,5 +2840,9 @@
   "sp_playing": "Läuft",
   "sp_new": "Neu",
   "sp_retry": "Erneut versuchen",
-  "sp_no_episodes": "Noch keine Folgen"
+  "sp_no_episodes": "Noch keine Folgen",
+  "player_loading_connecting": "Verbinden…",
+  "player_loading_slow": "Lädt noch - manche Sender brauchen eine Weile zum Starten",
+  "player_loading_buffering": "Puffern…",
+  "player_loading_buffering_pct": "Puffern… {n} %"
 }

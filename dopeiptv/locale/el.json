@@ -2840,5 +2840,9 @@
   "sp_playing": "Αναπαράγεται",
   "sp_new": "Νέο",
   "sp_retry": "Δοκιμάστε ξανά",
-  "sp_no_episodes": "Δεν υπάρχουν ακόμη επεισόδια"
+  "sp_no_episodes": "Δεν υπάρχουν ακόμη επεισόδια",
+  "player_loading_connecting": "Σύνδεση…",
+  "player_loading_slow": "Φορτώνει ακόμα - ορισμένα κανάλια αργούν λίγο να ξεκινήσουν",
+  "player_loading_buffering": "Προσωρινή αποθήκευση…",
+  "player_loading_buffering_pct": "Προσωρινή αποθήκευση… {n}%"
 }

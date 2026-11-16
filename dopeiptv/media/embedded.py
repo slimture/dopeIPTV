@@ -26,6 +26,7 @@ from ..core.log import log, redact_url
 from ..core.local_buffer import rewind_bytes
 from ..i18n import current_language, tr
 from .dvr_player import DvrPlayerMixin
+from .loading_overlay import LoadingMixin
 from .rewind_bar import RewindBarMixin
 from .seek_slider import _SeekSlider, _format_time
 from .subtitle_text import fixed_bytes
@@ -582,14 +583,17 @@ def end_file_options(m, wait: float = FILE_END_WAIT) -> bool:
     return True
 
 
-class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
-                     DvrPlayerMixin, QWidget):
+class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
+                     RewindBarMixin, DvrPlayerMixin, QWidget):
     """Video pane with libmpv OpenGL rendering, control bar, and fullscreen overlay."""
 
     _info_loaded = pyqtSignal(str)
     _info_reconfig = pyqtSignal()
     # (a thread) the PMT's teletext pages of stream number n: teletext_subs.
     _ttx_streams_ready = pyqtSignal(int, object)
+    # (mpv's event thread) what the loading indicator follows, and its value:
+    # media/loading_overlay.py.
+    _ld_event = pyqtSignal(str, object)
     stream_info_changed = pyqtSignal(str, object)
     double_clicked = pyqtSignal()
     playback_error = pyqtSignal(str)
@@ -1123,6 +1127,9 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
         self._stats_timer.setInterval(1000)
         self._stats_timer.timeout.connect(self._update_stats_text)
         self._init_stream_info(P)
+        # The loading indicator over the picture (media/loading_overlay.py):
+        # a sibling of the video like the overlays above, never its child.
+        self._init_loading()
 
         # Top-left "am I live?" badge: red LIVE at the live edge, a neutral
         # TIMESHIFT pill when watching the catch-up archive. A sibling of the
@@ -1214,6 +1221,7 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
         self.local_buffer_seek.setToolTip(tr("tooltip_timeshift"))
         self._dvr_switch.retranslate()
         self._ts_switch.retranslate()
+        self._ld_refresh()
 
     # -- event filter (fullscreen overlay reveal on hover) --------------------
 
@@ -1304,6 +1312,8 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
             self.center_btn.hide()
             return
         paused = bool(getattr(self, "_paused", False))
+        if not paused and self.loading_shown():
+            return      # the loading indicator has the centre
         if paused is not getattr(self, "_center_icon_paused", None):
             self._update_center_icon()
         if not self.center_btn.isVisible():
@@ -1326,6 +1336,8 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
         # play() has cleared the flag is a real one and gets forwarded.
         if self._stopping:
             return
+        # The window says what went wrong; nothing is loading any more.
+        self._ld_clear()
         self.playback_error.emit(msg)
 
     def _on_video_press(self, event) -> None:
@@ -1564,7 +1576,8 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
         self._ov_surface = m
         m.installEventFilter(self)      # its resizes re-place the bars
         for ov in (self.seek_overlay, self.ts_timeline, self._stats_overlay,
-                   self.nextup_btn, self.local_buffer_bar, self.stream_info_badge):
+                   self.nextup_btn, self.local_buffer_bar, self.stream_info_badge,
+                   self._ld_overlay):
             if ov is not None:
                 ov.setParent(parent)
                 ov.hide()
@@ -1585,6 +1598,9 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
         # settled window (the caller adds the mirror and the bar after this).
         self._keep_stats_up()
         QTimer.singleShot(0, self._keep_stats_up)
+        # A stream still on its way says so over the mirror too.
+        self._ld_refresh()
+        QTimer.singleShot(0, self._ld_refresh)
         # Every fullscreen toggle tears this down and builds it again - a new
         # GL context and a fresh mpv render binding each time. Timed so a
         # stall at the transition can be attributed to the rebuild rather
@@ -1758,7 +1774,8 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
         # Overlays back onto the docked player.
         self._ov_surface = self.video
         for ov in (self.seek_overlay, self.ts_timeline, self._stats_overlay,
-                   self.nextup_btn, self.local_buffer_bar, self.stream_info_badge):
+                   self.nextup_btn, self.local_buffer_bar, self.stream_info_badge,
+                   self._ld_overlay):
             if ov is not None:
                 ov.setParent(self)
                 ov.hide()
@@ -1776,6 +1793,8 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
         self._reveal_sleep_badge()
         self._keep_stats_up()
         QTimer.singleShot(0, self._keep_stats_up)
+        self._ld_refresh()
+        QTimer.singleShot(0, self._ld_refresh)
         log.info("VID mirror stop took %.0fms",
                  (time.monotonic() - _t_stop) * 1000)
 
@@ -2309,6 +2328,8 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
         The timeline first: the DVR row goes above it when both show."""
         if self.stream_info_badge.isVisible():
             self._place_stream_info()
+        if self._ld_overlay is not None and self._ld_overlay.isVisible():
+            self._place_loading()
         if self.seek_overlay is not None and self.seek_overlay.isVisible():
             self._place_seek_overlay()
         if self.ts_timeline.isVisible():
@@ -2863,6 +2884,8 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
         # Nerd: the channel this is (set_channel, one-shot) and the settings
         # of its own it plays with - none for anything else.
         chan, self._chan_armed = self._chan_armed, None
+        # The loading indicator's logo or poster, for this stream alone.
+        loading_art = self._ld_take_armed()
         self._reset_stream_info()
         self._chan_key = chan
         self._ttx_reset(live)
@@ -3078,6 +3101,10 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
                 self._arm_stream_info(m, source or url)
             except Exception as e:
                 log.debug("Stream info unavailable: %s", e)
+            # The loading indicator: from this load's start-file to its
+            # playback-restart (media/loading_overlay.py). Never raises.
+            self._ld_hook(m)
+            self._ld_begin(title, loading_art)
             rtsp_opts = {} if web or source else rtsp_file_options(url)
             if web:
                 self._own_file_options = load_with_options(m, url, WEB_FILE_OPTIONS)
@@ -3114,6 +3141,7 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
             log.error("Embedded playback failed: %s: %s", type(e).__name__, e)
             self.current_url = None
             self._reset_stream_info()
+            self._ld_clear()
             self._end_dvr()
             return False
 
@@ -3294,6 +3322,9 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
         icon = _control_icon(name, self._icon_color, self.ICON_PX)
         self.pause_btn.setIcon(icon)
         self.fs_pause_btn.setIcon(icon)
+        # Paused, the loading indicator gives way to the play button; going
+        # on, it comes back while the stream is still on its way.
+        self._ld_refresh()
         # The big centre button stays up while paused and fades once playing.
         self._reveal_center()
         self.paused_changed.emit(paused)
@@ -3958,6 +3989,10 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
             idle = bool(m.core_idle) and self.current_url is not None
         except Exception:
             idle = False
+        # Playing: whatever mpv event did not come, nothing is loading.
+        if self._ld_phase is not None or self._ld_buffering:
+            self._ld_poll(played is not None and self.current_url is not None
+                          and not paused and not idle)
         if paused or not idle:
             self._stall_since = 0.0
         else:
@@ -4115,6 +4150,8 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
         # Reassert the pause/mute icons to match current state.
         self._sync_pause_label(bool(getattr(self, "_paused", False)))
         self._apply_mute_icon()
+        if self._ld_overlay is not None:
+            self._ld_overlay.update()  # it reads the palette as it draws
 
     def _apply_mute_icon(self) -> None:
         icon = _control_icon(
@@ -4182,6 +4219,8 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
 
     def stop(self) -> None:
         self._reset_stream_info()
+        self._ld_clear()
+        self._ld_armed = (None, False)
         self._ttx_reset()
         self._ttx_pending = False
         self._end_dvr()
@@ -4254,6 +4293,7 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
         self._blackout.raise_()
 
     def shutdown(self) -> None:
+        self._ld_clear()
         self.stop_stream_record()
         self.dvr_shutdown()
         self._pos_timer.stop()

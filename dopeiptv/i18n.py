@@ -3060,6 +3060,12 @@ _STRINGS: dict[str, dict[str, str]] = {
     "build_report_copied": {"en": "The report is on the clipboard."},
     "about_build_modified": {"en": "Not an official build - online services are off. Get the official app at dopeiptv.org."},
     "about_build_source": {"en": "Running from source"},
+    # -- the loading indicator over the video (media/loading_overlay.py);
+    #    a reconnect says status_reconnecting --
+    "player_loading_connecting": {"en": "Connecting…"},
+    "player_loading_slow": {"en": "Still loading - some channels take a while to start"},
+    "player_loading_buffering": {"en": "Buffering…"},
+    "player_loading_buffering_pct": {"en": "Buffering… {n}%"},
 }
 
 

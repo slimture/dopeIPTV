@@ -373,6 +373,9 @@ class _PopoutMixin:
         if btn is None or win is None:
             return
         paused = bool(getattr(self.player, "_paused", False))
+        loading = getattr(self.player, "loading_shown", None)
+        if not paused and callable(loading) and loading():
+            return      # the player's loading indicator has the centre
         if paused is not getattr(self, "_popout_center_paused", None):
             self._popout_center_paused = paused
             btn.setIcon(self._popout_center_icon(paused))

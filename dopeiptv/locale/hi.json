@@ -2840,5 +2840,9 @@
   "sp_playing": "चल रहा है",
   "sp_new": "नया",
   "sp_retry": "फिर से कोशिश करें",
-  "sp_no_episodes": "अभी कोई एपिसोड नहीं"
+  "sp_no_episodes": "अभी कोई एपिसोड नहीं",
+  "player_loading_connecting": "कनेक्ट हो रहा है…",
+  "player_loading_slow": "अभी भी लोड हो रहा है - कुछ चैनल शुरू होने में थोड़ा समय लेते हैं",
+  "player_loading_buffering": "बफ़र हो रहा है…",
+  "player_loading_buffering_pct": "बफ़र हो रहा है… {n}%"
 }

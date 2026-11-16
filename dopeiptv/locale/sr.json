@@ -2840,5 +2840,9 @@
   "sp_playing": "Reprodukuje se",
   "sp_new": "Novo",
   "sp_retry": "Pokušaj ponovo",
-  "sp_no_episodes": "Još nema epizoda"
+  "sp_no_episodes": "Još nema epizoda",
+  "player_loading_connecting": "Povezivanje…",
+  "player_loading_slow": "Još se učitava - nekim kanalima treba malo vremena da krenu",
+  "player_loading_buffering": "Baferovanje…",
+  "player_loading_buffering_pct": "Baferovanje… {n}%"
 }

@@ -2840,5 +2840,9 @@
   "sp_playing": "Kinachezwa",
   "sp_new": "Mpya",
   "sp_retry": "Jaribu tena",
-  "sp_no_episodes": "Bado hakuna vipindi"
+  "sp_no_episodes": "Bado hakuna vipindi",
+  "player_loading_connecting": "Inaunganisha…",
+  "player_loading_slow": "Bado inapakia - baadhi ya vituo huchukua muda kuanza",
+  "player_loading_buffering": "Inaakibisha…",
+  "player_loading_buffering_pct": "Inaakibisha… {n}%"
 }

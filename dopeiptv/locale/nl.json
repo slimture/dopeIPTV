@@ -2840,5 +2840,9 @@
   "sp_playing": "Speelt",
   "sp_new": "Nieuw",
   "sp_retry": "Opnieuw proberen",
-  "sp_no_episodes": "Nog geen afleveringen"
+  "sp_no_episodes": "Nog geen afleveringen",
+  "player_loading_connecting": "Verbinden…",
+  "player_loading_slow": "Nog aan het laden - sommige zenders hebben even nodig om te starten",
+  "player_loading_buffering": "Bufferen…",
+  "player_loading_buffering_pct": "Bufferen… {n}%"
 }
