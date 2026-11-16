@@ -2921,5 +2921,9 @@
   "sa_placeholder_all": "Alles zoeken in al je bronnen (bijv. Star Trek)",
   "phone_page_ep_prev": "Vorige aflevering",
   "phone_page_seek": "Afspeelpositie",
-  "phone_tv_type": "Typ om op de tv te zoeken"
+  "phone_tv_type": "Typ om op de tv te zoeken",
+  "player_track_forced": "geforceerd",
+  "player_track_external": "extern",
+  "phone_page_tracks": "Ondertitels en geluid",
+  "phone_page_sleep_left": "Stopt over {n} min"
 }

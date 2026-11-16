@@ -3029,6 +3029,10 @@ _STRINGS: dict[str, dict[str, str]] = {
     "phone_page_ep_prev": {"en": "Previous episode"},
     "phone_page_seek": {"en": "Playback position"},
     "phone_tv_type": {"en": "Type to search on the TV"},
+    "player_track_forced": {"en": "forced"},
+    "player_track_external": {"en": "external"},
+    "phone_page_tracks": {"en": "Subtitles and sound"},
+    "phone_page_sleep_left": {"en": "Stops in {n} min"},
     "backup_kind_profiles": {"en": "Profiles"},
     # -- a home network split in VLANs (core/home_net.py, providers/lan_scan.py,
     #    providers/cast_devices.py) --

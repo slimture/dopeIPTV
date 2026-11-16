@@ -2921,5 +2921,9 @@
   "sa_placeholder_all": "Sök i allt, i alla dina källor (t.ex. Star Trek)",
   "phone_page_ep_prev": "Föregående avsnitt",
   "phone_page_seek": "Uppspelningsposition",
-  "phone_tv_type": "Skriv för att söka på tv:n"
+  "phone_tv_type": "Skriv för att söka på tv:n",
+  "player_track_forced": "tvingade",
+  "player_track_external": "extern",
+  "phone_page_tracks": "Undertexter och ljud",
+  "phone_page_sleep_left": "Stannar om {n} min"
 }

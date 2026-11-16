@@ -2921,5 +2921,9 @@
   "sa_placeholder_all": "Alles in all deinen Quellen suchen (z. B. Star Trek)",
   "phone_page_ep_prev": "Vorherige Folge",
   "phone_page_seek": "Wiedergabeposition",
-  "phone_tv_type": "Tippen, um auf dem Fernseher zu suchen"
+  "phone_tv_type": "Tippen, um auf dem Fernseher zu suchen",
+  "player_track_forced": "erzwungen",
+  "player_track_external": "extern",
+  "phone_page_tracks": "Untertitel und Ton",
+  "phone_page_sleep_left": "Stoppt in {n} Min."
 }

@@ -2921,5 +2921,9 @@
   "sa_placeholder_all": "Αναζήτηση σε όλα, σε όλες τις πηγές σας (π.χ. Star Trek)",
   "phone_page_ep_prev": "Προηγούμενο επεισόδιο",
   "phone_page_seek": "Θέση αναπαραγωγής",
-  "phone_tv_type": "Πληκτρολογήστε για αναζήτηση στην τηλεόραση"
+  "phone_tv_type": "Πληκτρολογήστε για αναζήτηση στην τηλεόραση",
+  "player_track_forced": "υποχρεωτικοί",
+  "player_track_external": "εξωτερικοί",
+  "phone_page_tracks": "Υπότιτλοι και ήχος",
+  "phone_page_sleep_left": "Σταματά σε {n} λεπτά"
 }

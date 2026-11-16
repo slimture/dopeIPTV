@@ -2921,5 +2921,9 @@
   "sa_placeholder_all": "Cari semuanya di semua sumber (mis. Star Trek)",
   "phone_page_ep_prev": "Episode sebelumnya",
   "phone_page_seek": "Posisi pemutaran",
-  "phone_tv_type": "Ketik untuk mencari di TV"
+  "phone_tv_type": "Ketik untuk mencari di TV",
+  "player_track_forced": "paksa",
+  "player_track_external": "eksternal",
+  "phone_page_tracks": "Subtitel dan suara",
+  "phone_page_sleep_left": "Berhenti dalam {n} mnt"
 }

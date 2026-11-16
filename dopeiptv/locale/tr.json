@@ -2921,5 +2921,9 @@
   "sa_placeholder_all": "Tüm kaynaklarınızda her şeyi ara (ör. Star Trek)",
   "phone_page_ep_prev": "Önceki bölüm",
   "phone_page_seek": "Oynatma konumu",
-  "phone_tv_type": "TV'de aramak için yazın"
+  "phone_tv_type": "TV'de aramak için yazın",
+  "player_track_forced": "zorunlu",
+  "player_track_external": "harici",
+  "phone_page_tracks": "Altyazı ve ses",
+  "phone_page_sleep_left": "{n} dk sonra durur"
 }

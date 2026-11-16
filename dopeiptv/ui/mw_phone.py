@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+import secrets
 import threading
 import time
 from typing import Any
@@ -177,6 +178,10 @@ def page_words() -> dict[str, str]:
             "nothing_here": tr("tv_nothing_here"), "find": tr("nav_search"),
             "skip_back": tr("tooltip_back_10s"), "skip_fwd": tr("tooltip_forward_30s"),
             "seek": tr("phone_page_seek"), "tv_type": tr("phone_tv_type"),
+            "tracks": tr("phone_page_tracks"), "audio": tr("opt_audio_track"),
+            "subtitles": tr("opt_subtitles"), "no_audio": tr("opt_no_audio_tracks"),
+            "sleep": tr("opt_sleep_timer"), "off": tr("opt_off"), "minutes": tr("opt_minutes"),
+            "sleep_left": tr("phone_page_sleep_left"), "close": tr("common_close"),
             **tv_words()}
 
 
@@ -405,8 +410,10 @@ class _PhoneMixin(_PhoneBrowseMixin):
             from .theme import effective_theme, is_light
             dark, light = page_palettes(is_light(effective_theme(self.settings)))
             from ..media.embedded import EmbeddedPlayer
+            from .mw_tv import _SLEEP_STEPS
             return phone_page.render(dark, light, page_words(), current_language(), is_rtl(),
-                                     skips=(EmbeddedPlayer.SEEK_BACK, EmbeddedPlayer.SEEK_FWD))
+                                     skips=(EmbeddedPlayer.SEEK_BACK, EmbeddedPlayer.SEEK_FWD),
+                                     sleep_steps=tuple(m for m in _SLEEP_STEPS if m))
         if action in ("_play", "toggle", "next", "previous", "calendar") \
                 and getattr(self, "_profile_locked", lambda: False)():
             # "Who's watching?" waits for the PIN at start: nothing of the
@@ -453,6 +460,12 @@ class _PhoneMixin(_PhoneBrowseMixin):
             return {"ok": self._play_channel_step(step)}
         if action == "seek":
             return self._phone_seek(params)
+        if action == "tracks":
+            return self._phone_tracks()
+        if action == "track":
+            return self._phone_pick_track(params)
+        if action == "sleep":
+            return self._phone_sleep(params)
         if action == "volume":
             try:
                 value = max(0.0, min(100.0, float(params.get("value"))))
@@ -617,6 +630,13 @@ class _PhoneMixin(_PhoneBrowseMixin):
         # A title with a length can be sought in (the media keys' own test: a
         # film, an episode, a file, a recording - never a live channel).
         out["seek"] = bool(out["duration"])
+        # Small and steady: the sheet of tracks is read only when it is
+        # asked for (this says when to read it again), the sleep timer as
+        # the moment it stops what plays.
+        out["tracks"] = f"{id(getattr(p, 'current_url', None)) % 99991}.{self.__dict__.get('_track_ver', 0)}"
+        left = p.sleep_left() if p is not None and hasattr(p, "sleep_left") else 0.0
+        if left > 0:
+            out["sleep_at"] = int(round(time.time() - time.monotonic() + p._sleep_deadline))
         item = last.get("item") or {}
         if kind == "live" and item.get("stream_id") is not None:
             out["channel"] = self._phone_channel(item, st.get("title") or "")
@@ -647,6 +667,68 @@ class _PhoneMixin(_PhoneBrowseMixin):
         target = max(0.0, min(length, target))
         self._remote_media("set_position", target)
         return {"ok": True, "position": round(target, 1)}
+
+    def _phone_tracks(self) -> dict[str, Any]:
+        """The sheet of tracks: what plays' audio tracks and subtitles as the
+        player's own menu lists them (built into menus that are never shown,
+        kept until the next sheet), the one on marked - read only now, never
+        in a poll. *stamp* names this sheet: a pick is of its entries."""
+        from PyQt6.QtWidgets import QMenu
+        p = self.player
+        if p is None or not getattr(p, "current_url", None) or not hasattr(p, "fill_sub_tracks"):
+            return {"stamp": "", "audio": [], "subs": []}
+        audio, subs = QMenu(), QMenu()
+        p.fill_audio_tracks(audio)
+        p.fill_sub_tracks(subs)
+        old = self.__dict__.get("_phone_sheet")
+        stamp = secrets.token_hex(4)
+        self._phone_sheet = (stamp, audio, subs)
+        if old is not None:
+            for menu in old[1:]:
+                menu.deleteLater()
+
+        def entries(menu) -> list[dict]:
+            return [{"label": a.text().split("\t")[0], "on": a.isChecked(), "ok": a.isEnabled()}
+                    for a in self._phone_sheet_actions(menu)]
+        return {"stamp": stamp, "audio": entries(audio), "subs": entries(subs)}
+
+    @staticmethod
+    def _phone_sheet_actions(menu) -> list:
+        return [a for a in menu.actions() if not a.isSeparator() and a.text()]
+
+    def _phone_pick_track(self, params: dict) -> dict[str, Any]:
+        """One entry of the sheet picked: its action triggered - the
+        player's own path, so a title's remembered tracks and a channel's
+        teletext page are kept as when it is picked on the computer."""
+        sheet = self.__dict__.get("_phone_sheet")
+        kind = params.get("kind")
+        try:
+            index = int(params.get("i"))
+        except (TypeError, ValueError):
+            raise ValueError('"i" is the entry\'s number') from None
+        if sheet is None or params.get("stamp") != sheet[0] or kind not in ("audio", "subs"):
+            return {"ok": False, "stale": True}
+        actions = self._phone_sheet_actions(sheet[1] if kind == "audio" else sheet[2])
+        if not 0 <= index < len(actions) or not actions[index].isEnabled():
+            raise ValueError("no such entry")
+        actions[index].trigger()
+        return {"ok": True}
+
+    def _phone_sleep(self, params: dict) -> dict[str, Any]:
+        """The sleep timer TV mode's Options sets (the player's own): one of
+        its steps, 0 to cancel it."""
+        from .mw_tv import _SLEEP_STEPS
+        try:
+            minutes = int(params.get("minutes"))
+        except (TypeError, ValueError):
+            raise ValueError('"minutes" is one of the sleep timer\'s steps') from None
+        if minutes not in _SLEEP_STEPS:
+            raise ValueError('"minutes" is one of the sleep timer\'s steps')
+        p = self.player
+        if p is None or (minutes and not getattr(p, "current_url", None)):
+            return {"ok": False}
+        self._tv_set_sleep(minutes)
+        return {"ok": True}
 
     def _phone_sections(self) -> list[str]:
         """The page's sections: Movies and Series only where the source has

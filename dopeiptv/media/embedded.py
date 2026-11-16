@@ -3542,26 +3542,8 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         own entries (casting, Watch together) at the end - left out by a menu
         that puts them at its own top level."""
         m = self.video.mpv
-
-        def tracks(kind):
-            try:
-                return [t for t in (m.track_list or [])
-                        if t.get("type") == kind]
-            except Exception:
-                return []
-
-        def track_label(t):
-            parts = [t.get("lang") or "", t.get("title") or ""]
-            label = " ".join(p for p in parts if p).strip()
-            return label or tr("player_track_n", n=t.get("id"))
-
         audio = menu.addMenu(tr("opt_audio_track"))
-        for t in (tracks("audio") if m else []):
-            act = audio.addAction(track_label(t))
-            act.setCheckable(True)
-            act.setChecked(bool(t.get("selected")))
-            act.triggered.connect(
-                lambda _c, tid=t.get("id"): self._pick_track("aid", tid))
+        self.fill_audio_tracks(audio)
         if audio.isEmpty():
             audio.addAction(tr("opt_no_audio_tracks")).setEnabled(False)
         # Night mode next to the tracks: loud and quiet evened out, on the
@@ -3578,28 +3560,7 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
             ttx_act.triggered.connect(self.open_teletext)
 
         subs = menu.addMenu(tr("opt_subtitles"))
-        off = subs.addAction(tr("opt_off"))
-        off.setCheckable(True)
-        sub_tracks = tracks("sub") if m else []
-        # A track chosen hidden (_sub_defaults) is off, as far as anyone
-        # watching can tell.
-        try:
-            shown = bool(m["sub-visibility"]) if m else False
-        except Exception:
-            shown = True
-        off.setChecked(not (shown and any(t.get("selected")
-                                          for t in sub_tracks)))
-        off.triggered.connect(lambda _c: self._pick_track("sid", "no"))
-        for t in sub_tracks:
-            if self._ttx_is_track(t):
-                # Teletext and DVB subtitles: language and page.
-                self._ttx_add_entries(subs, t, shown)
-                continue
-            act = subs.addAction(track_label(t))
-            act.setCheckable(True)
-            act.setChecked(bool(t.get("selected")) and shown)
-            act.triggered.connect(
-                lambda _c, tid=t.get("id"): self._pick_track("sid", tid))
+        sub_tracks = self.fill_sub_tracks(subs)
         if m and sub_tracks:
             self._ttx_menu_tail(subs)
         if m and self.current_url:
@@ -4047,6 +4008,70 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         else:
             self._stats_overlay.adjustSize()
         self._stats_overlay.move(g.x() + 8, g.y() + 8)
+
+    def _tracks_of(self, kind: str) -> list[dict]:
+        m = self.video.mpv
+        if m is None:
+            return []
+        try:
+            return [t for t in (m.track_list or []) if t.get("type") == kind]
+        except Exception:
+            return []
+
+    @staticmethod
+    def track_label(t: dict) -> str:
+        """A track as the menus name it: its language and title, and whether
+        it is forced or a file of its own."""
+        parts = [t.get("lang") or "", t.get("title") or ""]
+        label = " ".join(p for p in parts if p).strip() or tr("player_track_n", n=t.get("id"))
+        marks = [tr(key) for flag, key in (("forced", "player_track_forced"),
+                                          ("external", "player_track_external")) if t.get(flag)]
+        return f"{label} ({', '.join(marks)})" if marks else label
+
+    def fill_audio_tracks(self, menu) -> None:
+        """The audio tracks as the options menu lists them, the one playing
+        checked; each picked through _pick_track (the phone remote's sheet
+        is made of the same entries)."""
+        for t in self._tracks_of("audio"):
+            act = menu.addAction(self.track_label(t))
+            act.setCheckable(True)
+            act.setChecked(bool(t.get("selected")))
+            act.triggered.connect(
+                lambda _c=False, tid=t.get("id"): self._pick_track("aid", tid))
+
+    def fill_sub_tracks(self, menu) -> list[dict]:
+        """Off and the subtitle tracks as the options menu lists them -
+        teletext and DVB subtitles by language and page - the one shown
+        checked; returns the tracks."""
+        m = self.video.mpv
+        off = menu.addAction(tr("opt_off"))
+        off.setCheckable(True)
+        sub_tracks = self._tracks_of("sub")
+        # A track chosen hidden (_sub_defaults) is off, as far as anyone
+        # watching can tell.
+        try:
+            shown = bool(m["sub-visibility"]) if m else False
+        except Exception:
+            shown = True
+        off.setChecked(not (shown and any(t.get("selected") for t in sub_tracks)))
+        off.triggered.connect(lambda _c=False: self._pick_track("sid", "no"))
+        for t in sub_tracks:
+            if self._ttx_is_track(t):
+                # Teletext and DVB subtitles: language and page.
+                self._ttx_add_entries(menu, t, shown)
+                continue
+            act = menu.addAction(self.track_label(t))
+            act.setCheckable(True)
+            act.setChecked(bool(t.get("selected")) and shown)
+            act.triggered.connect(
+                lambda _c=False, tid=t.get("id"): self._pick_track("sid", tid))
+        return sub_tracks
+
+    def sleep_left(self) -> float:
+        """Seconds until the sleep timer stops what plays; 0 when it is off."""
+        if not self._sleep_timer.isActive():
+            return 0.0
+        return max(0.0, self._sleep_deadline - time.monotonic())
 
     def _pick_track(self, prop: str, tid) -> None:
         """User picked an audio/subtitle track from the options menu: apply

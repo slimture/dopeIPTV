@@ -4923,6 +4923,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         """A track was picked in the player's options menu: file it under the
         currently playing resumable title (live channels are skipped - their
         track layout varies per programme and aid=auto handles them)."""
+        # Something else picked: the phone remote's sheet is read again.
+        self._track_ver = getattr(self, "_track_ver", 0) + 1
         lp = getattr(self, "_last_playback", None) or {}
         kind, key = lp.get("kind"), lp.get("key")
         if kind not in self._RESUMABLE or key is None:

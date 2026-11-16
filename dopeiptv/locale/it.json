@@ -2921,5 +2921,9 @@
   "sa_placeholder_all": "Cerca tutto in tutte le tue fonti (es. Star Trek)",
   "phone_page_ep_prev": "Episodio precedente",
   "phone_page_seek": "Posizione di riproduzione",
-  "phone_tv_type": "Scrivi per cercare sulla TV"
+  "phone_tv_type": "Scrivi per cercare sulla TV",
+  "player_track_forced": "forzati",
+  "player_track_external": "esterni",
+  "phone_page_tracks": "Sottotitoli e audio",
+  "phone_page_sleep_left": "Si ferma tra {n} min"
 }

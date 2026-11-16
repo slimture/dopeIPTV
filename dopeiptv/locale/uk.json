@@ -2921,5 +2921,9 @@
   "sa_placeholder_all": "Шукати все в усіх ваших джерелах (напр. Star Trek)",
   "phone_page_ep_prev": "Попередня серія",
   "phone_page_seek": "Позиція відтворення",
-  "phone_tv_type": "Введіть текст для пошуку на телевізорі"
+  "phone_tv_type": "Введіть текст для пошуку на телевізорі",
+  "player_track_forced": "примусові",
+  "player_track_external": "зовнішні",
+  "phone_page_tracks": "Субтитри та звук",
+  "phone_page_sleep_left": "Зупиниться через {n} хв"
 }

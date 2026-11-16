@@ -2921,5 +2921,9 @@
   "sa_placeholder_all": "Busque tudo em todas as suas fontes (ex.: Star Trek)",
   "phone_page_ep_prev": "Episódio anterior",
   "phone_page_seek": "Posição da reprodução",
-  "phone_tv_type": "Digite para buscar na TV"
+  "phone_tv_type": "Digite para buscar na TV",
+  "player_track_forced": "forçadas",
+  "player_track_external": "externas",
+  "phone_page_tracks": "Legendas e som",
+  "phone_page_sleep_left": "Para em {n} min"
 }

@@ -2921,5 +2921,9 @@
   "sa_placeholder_all": "すべてのソースからすべてを検索 (例: Star Trek)",
   "phone_page_ep_prev": "前のエピソード",
   "phone_page_seek": "再生位置",
-  "phone_tv_type": "テレビで検索する文字を入力"
+  "phone_tv_type": "テレビで検索する文字を入力",
+  "player_track_forced": "強制",
+  "player_track_external": "外部",
+  "phone_page_tracks": "字幕と音声",
+  "phone_page_sleep_left": "{n} 分後に停止"
 }

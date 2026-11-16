@@ -2921,5 +2921,9 @@
   "sa_placeholder_all": "Tafuta kila kitu katika vyanzo vyako vyote (k.m. Star Trek)",
   "phone_page_ep_prev": "Kipindi kilichotangulia",
   "phone_page_seek": "Mahali pa uchezaji",
-  "phone_tv_type": "Andika ili kutafuta kwenye TV"
+  "phone_tv_type": "Andika ili kutafuta kwenye TV",
+  "player_track_forced": "lazima",
+  "player_track_external": "ya nje",
+  "phone_page_tracks": "Manukuu na sauti",
+  "phone_page_sleep_left": "Itasimama baada ya dakika {n}"
 }

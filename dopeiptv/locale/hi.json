@@ -2921,5 +2921,9 @@
   "sa_placeholder_all": "अपने सभी स्रोतों में सब कुछ खोजें (जैसे Star Trek)",
   "phone_page_ep_prev": "पिछला एपिसोड",
   "phone_page_seek": "प्लेबैक की स्थिति",
-  "phone_tv_type": "टीवी पर खोजने के लिए टाइप करें"
+  "phone_tv_type": "टीवी पर खोजने के लिए टाइप करें",
+  "player_track_forced": "अनिवार्य",
+  "player_track_external": "बाहरी",
+  "phone_page_tracks": "उपशीर्षक और ध्वनि",
+  "phone_page_sleep_left": "{n} मिनट में रुकेगा"
 }

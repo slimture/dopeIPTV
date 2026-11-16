@@ -2921,5 +2921,9 @@
   "sa_placeholder_all": "모든 소스에서 모두 검색 (예: Star Trek)",
   "phone_page_ep_prev": "이전 에피소드",
   "phone_page_seek": "재생 위치",
-  "phone_tv_type": "TV에서 검색할 내용을 입력하세요"
+  "phone_tv_type": "TV에서 검색할 내용을 입력하세요",
+  "player_track_forced": "강제",
+  "player_track_external": "외부",
+  "phone_page_tracks": "자막 및 음성",
+  "phone_page_sleep_left": "{n}분 후 정지"
 }

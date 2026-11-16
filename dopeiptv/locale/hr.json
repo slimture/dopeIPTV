@@ -2921,5 +2921,9 @@
   "sa_placeholder_all": "Traži sve u svim svojim izvorima (npr. Star Trek)",
   "phone_page_ep_prev": "Prethodna epizoda",
   "phone_page_seek": "Položaj reprodukcije",
-  "phone_tv_type": "Upišite za pretraživanje na televizoru"
+  "phone_tv_type": "Upišite za pretraživanje na televizoru",
+  "player_track_forced": "prisilni",
+  "player_track_external": "vanjski",
+  "phone_page_tracks": "Titlovi i zvuk",
+  "phone_page_sleep_left": "Zaustavlja se za {n} min"
 }

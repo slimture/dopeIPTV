@@ -2921,5 +2921,9 @@
   "sa_placeholder_all": "在所有来源中搜索一切（例如 Star Trek）",
   "phone_page_ep_prev": "上一集",
   "phone_page_seek": "播放位置",
-  "phone_tv_type": "输入以在电视上搜索"
+  "phone_tv_type": "输入以在电视上搜索",
+  "player_track_forced": "强制",
+  "player_track_external": "外部",
+  "phone_page_tracks": "字幕和声音",
+  "phone_page_sleep_left": "{n} 分钟后停止"
 }

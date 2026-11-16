@@ -54,10 +54,10 @@ REQUEST_TIMEOUT = 15
 LOGO_MAX = 2 * 1024 * 1024    # a logo served, or fetched for the phone
 LOGO_TIMEOUT = 5.0            # a logo fetched for the phone (not on disk yet)
 
-READ = frozenset({"state", "channels", "browse", "episodes"})
+READ = frozenset({"state", "channels", "browse", "episodes", "tracks"})
 WRITE = frozenset({"play", "toggle", "stop", "next", "previous", "volume", "mute",
                    "tv", "tv_key", "touch", "profile", "play_ref", "seek",
-                   "tv_text"})
+                   "tv_text", "track", "sleep"})
 #: What a reading request may say in its query string (core/phone_browse.py
 #: checks each further), and how long each may be.
 QUERY_KEYS = frozenset({"p", "o", "q", "sid", "v", "ref"})

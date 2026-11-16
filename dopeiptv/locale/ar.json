@@ -2921,5 +2921,9 @@
   "sa_placeholder_all": "ابحث في كل شيء في جميع مصادرك (مثلًا Star Trek)",
   "phone_page_ep_prev": "الحلقة السابقة",
   "phone_page_seek": "موضع التشغيل",
-  "phone_tv_type": "اكتب للبحث على التلفاز"
+  "phone_tv_type": "اكتب للبحث على التلفاز",
+  "player_track_forced": "إجباري",
+  "player_track_external": "خارجي",
+  "phone_page_tracks": "الترجمة والصوت",
+  "phone_page_sleep_left": "يتوقف بعد {n} دقيقة"
 }

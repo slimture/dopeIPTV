@@ -2921,5 +2921,9 @@
   "sa_placeholder_all": "Tìm mọi thứ trong tất cả các nguồn của bạn (vd. Star Trek)",
   "phone_page_ep_prev": "Tập trước",
   "phone_page_seek": "Vị trí phát",
-  "phone_tv_type": "Gõ để tìm trên TV"
+  "phone_tv_type": "Gõ để tìm trên TV",
+  "player_track_forced": "bắt buộc",
+  "player_track_external": "bên ngoài",
+  "phone_page_tracks": "Phụ đề và âm thanh",
+  "phone_page_sleep_left": "Dừng sau {n} phút"
 }

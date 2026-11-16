@@ -2921,5 +2921,9 @@
   "sa_placeholder_all": "اپنے تمام ذرائع میں سب کچھ تلاش کریں (مثلاً Star Trek)",
   "phone_page_ep_prev": "پچھلی قسط",
   "phone_page_seek": "پلے بیک کی جگہ",
-  "phone_tv_type": "ٹی وی پر تلاش کے لیے ٹائپ کریں"
+  "phone_tv_type": "ٹی وی پر تلاش کے لیے ٹائپ کریں",
+  "player_track_forced": "لازمی",
+  "player_track_external": "بیرونی",
+  "phone_page_tracks": "سب ٹائٹل اور آواز",
+  "phone_page_sleep_left": "{n} منٹ میں رک جائے گا"
 }

@@ -89,7 +89,9 @@ WORDS = ("channels", "favorites", "search", "nothing", "next", "paused", "offlin
          "profile", "profile_pin", "tv_picture", "tv_now_playing", "show_in_list",
          "ep_prev", "ep_next", "episodes", "movies", "series", "recent", "local", "radio",
          "recordings", "back_to", "min", "watched", "playing", "search_radio", "search_here",
-         "nothing_here", "find", "skip_back", "skip_fwd", "seek", "tv_type")
+         "nothing_here", "find", "skip_back", "skip_fwd", "seek", "tv_type",
+         "tracks", "audio", "subtitles", "no_audio", "sleep", "off", "minutes", "sleep_left",
+         "close")
 _HEX = re.compile(r"#[0-9A-Fa-f]{6}")
 
 
@@ -120,7 +122,8 @@ def _sha(text: str) -> str:
 
 def render(dark: dict[str, Any], light: dict[str, Any], words: dict[str, str],
            lang: str = "en", rtl: bool = False,
-           skips: tuple[int, int] = (10, 30)) -> tuple[bytes, str]:
+           skips: tuple[int, int] = (10, 30),
+           sleep_steps: tuple[int, ...] = (15, 30, 45, 60, 90, 120)) -> tuple[bytes, str]:
     """The page as UTF-8 and its Content-Security-Policy. *skips*: the
     player's own skip back and forward, in seconds."""
     style = (_CSS.replace("@@DARK@@", css_vars(dark)).replace("@@LIGHT@@", css_vars(light)))
@@ -128,7 +131,8 @@ def render(dark: dict[str, Any], light: dict[str, Any], words: dict[str, str],
     script = (_JS.replace("@@WORDS@@", _js_literal(texts))
               .replace("@@TOUCH@@", _js_literal({"hold": HOLD_MS, "slop": TAP_SLOP}))
               .replace("@@SKIP@@", _js_literal({"back": abs(int(skips[0])), "fwd": abs(int(skips[1])),
-                                               "text_max": TEXT_MAX})))
+                                               "text_max": TEXT_MAX,
+                                               "sleep": [int(m) for m in sleep_steps if int(m) > 0]})))
     lang = lang if re.fullmatch(r"[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})?", lang or "") else "en"
     bg_dark = str(dark.get("bg") or "") if _HEX.fullmatch(str(dark.get("bg") or "")) else ""
     bg_light = str(light.get("bg") or "") if _HEX.fullmatch(str(light.get("bg") or "")) else ""
@@ -212,8 +216,12 @@ _HTML = """<!doctype html>
       <div class="seekbar" id="nowBarWrap" hidden><div class="bar"><i id="nowBar"></i></div><span class="knob" id="nowKnob"></span><span class="seekTip" id="seekTip" hidden></span></div>
       <div class="nowTimes" id="nowTimes"><span id="nowStart"></span><span class="skips" id="skips" hidden><button class="skip" id="skipBack"><svg class="flip" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.6 8.6A7.6 7.6 0 1 1 4.4 12.5"/><path d="M5.3 3.9v4.9h4.9"/></svg><b></b></button><button class="skip" id="skipFwd"><svg class="flip" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.4 8.6A7.6 7.6 0 1 0 19.6 12.5"/><path d="M18.7 3.9v4.9h-4.9"/></svg><b></b></button></span><span id="nowEnd"></span></div>
       <div class="next" id="nowNext"></div>
+      <div class="nowActs" id="nowActs">
       <button class="showIn" id="showIn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M4 12h7M4 18h10"/><circle cx="17.5" cy="12" r="3"/></svg><span id="showInText"></span></button>
       <button class="showIn" id="epsBtn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M7.5 9h9M7.5 12.5h9M7.5 16h5"/></svg><span id="epsBtnText"></span></button>
+      <button class="showIn" id="tracksBtn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M10.5 10.3a2.2 2.2 0 1 0 0 3.4M17 10.3a2.2 2.2 0 1 0 0 3.4"/></svg><span id="tracksText"></span></button>
+      <button class="showIn" id="sleepBtn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 14.5A7.5 7.5 0 0 1 9.5 4.5a7.5 7.5 0 1 0 10 10z"/></svg><span id="sleepText"></span></button>
+      </div>
     </div>
     <span class="nowPill" id="nowPill" aria-hidden="true" hidden><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="12.5" rx="2"/><path d="M8.5 20.5h7"/><path class="fill" d="M10.2 8.2v4.6l4-2.3z"/></svg><span id="nowPillText"></span></span>
   </section>
@@ -274,6 +282,10 @@ _HTML = """<!doctype html>
       <button class="pill" id="padMode" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle class="fill" cx="12" cy="15" r="2.6"/><path d="M7 15a5 5 0 0 1 10 0M3.8 15a8.2 8.2 0 0 1 16.4 0"/></svg><span id="padModeText"></span></button>
       <button class="pill" id="kMenu" data-a="menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span id="kMenuText"></span></button>
     </div>
+    <div class="pair" id="tvActs" hidden>
+      <button class="pill" id="tvTracks"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M10.5 10.3a2.2 2.2 0 1 0 0 3.4M17 10.3a2.2 2.2 0 1 0 0 3.4"/></svg><span id="tvTracksText"></span></button>
+      <button class="pill" id="tvSleep"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 14.5A7.5 7.5 0 0 1 9.5 4.5a7.5 7.5 0 1 0 10 10z"/></svg><span id="tvSleepText"></span></button>
+    </div>
     <div class="colours">
       <button class="ck" id="k_red" data-a="red"><i class="r"></i><span dir="auto"></span></button>
       <button class="ck" id="k_green" data-a="green"><i class="g"></i><span dir="auto"></span></button>
@@ -306,6 +318,13 @@ _HTML = """<!doctype html>
     </div>
   </section>
 </main>
+<div class="scrim" id="scrim" hidden></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
+  <div class="sheetIn">
+    <div class="sheetHead"><span id="sheetTitle" dir="auto"></span><button class="back" id="sheetClose"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div id="sheetBody"></div>
+  </div>
+</div>
 <footer class="dock" id="dock">
   <div class="dockIn">
   <div class="mini" id="mini" hidden></div>
@@ -418,6 +437,33 @@ svg .fill{fill:currentColor;stroke:none}
   border-radius:999px;background:var(--btn);color:var(--text);font-size:14px;font-weight:600}
 .showIn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .showIn svg{width:18px;height:18px;flex:none;color:var(--accent)}
+.nowActs{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.nowActs .showIn{margin-top:0}
+.showIn.on{background:var(--sel)}
+.pill.on{background:var(--sel);color:var(--accent)}
+body.tv .nowActs{display:none}
+.scrim{position:fixed;inset:0;z-index:5;background:var(--bg);opacity:.62}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:6;max-height:calc(var(--vh)*82);overflow:auto;
+  overscroll-behavior:contain;background:var(--pane);border-radius:16px 16px 0 0;box-shadow:0 -1px 0 var(--border);
+  padding:6px var(--gut-r) calc(14px + var(--safe-b)) var(--gut-l)}
+.sheetIn{max-width:528px;margin:0 auto}
+.sheetHead{display:flex;align-items:center;gap:8px;min-height:52px;position:sticky;top:-6px;background:var(--pane);z-index:1}
+.sheetHead span{flex:1;min-width:0;font-weight:700;font-size:17px;overflow-wrap:anywhere}
+.sheet .grp{color:var(--muted);font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:12px 4px 6px}
+.opt{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:6px 12px;border-radius:10px;text-align:start}
+.opt span{min-width:0;overflow-wrap:anywhere}
+.opt:active{background:var(--hover)}
+.opt[aria-checked=true]{background:var(--sel);font-weight:600}
+.opt .tick{margin-inline-start:auto;flex:none;color:var(--accent)}
+.opt .tick svg{width:20px;height:20px}
+.opt[disabled]{opacity:.5}
+.sheetText{color:var(--text2);padding:2px 4px 10px;overflow-wrap:anywhere}
+.chk{display:flex;align-items:center;gap:10px;min-height:44px;padding:2px 4px;color:var(--text2)}
+.chk input{width:22px;height:22px;margin:0;accent-color:var(--accent);flex:none}
+.sheetBtns{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.sheetBtns button{flex:1 1 120px;min-height:48px;padding:0 14px;border-radius:var(--radius);background:var(--btn);font-weight:700}
+.sheetBtns .primary{background:var(--accent);color:var(--on-accent)}
+.sheetBtns .danger{background:var(--error);color:var(--on-accent)}
 .showIn:active{background:var(--btn-hover)}
 .now.act{flex-wrap:wrap;row-gap:12px;min-height:48px;cursor:pointer;user-select:none;-webkit-user-select:none;
   touch-action:manipulation}
@@ -862,6 +908,7 @@ function show(s) {
   $("chUp").disabled = !(live || (ep && ep.next));
   label("chDown", ep ? W.ep_prev : W.ch_down); label("chUp", ep ? W.ep_next : W.ch_up);
   epsOffer(ep);
+  actsOffer(s);
 }
 
 function tick() {
@@ -884,6 +931,7 @@ function tick() {
     }
   } else { setBar(null); $("nowStart").textContent = $("nowEnd").textContent = ""; }
   epsTick();
+  sleepTick();
 }
 
 function setVol(v) {
@@ -1350,9 +1398,125 @@ function epsPressed(e) {
   send("api/play_ref", {ref: b.dataset.ref}).then(() => b.classList.remove("pending"));
 }
 
-// Back - the page's arrows and the phone's own gesture: the Episodes view
-// first, then a section's place before.
+// -- Sheets over the page: subtitles and sound, the sleep timer -----------------------------
+// A sheet is a list to pick from or a question; Back (its ✕, the phone's own
+// gesture) closes it first.
+let sheet = null, skipPop = false;
+
+function openSheet(kind, title) {
+  if (!sheet) { try { history.pushState({sheet: 1}, ""); } catch (e) { /* no history */ } }
+  sheet = {kind};
+  $("sheetTitle").textContent = title;
+  $("sheetBody").textContent = "";
+  hide($("sheet"), false); hide($("scrim"), false);
+  return $("sheetBody");
+}
+
+function closeSheet(fromHistory) {
+  if (!sheet) return;
+  const was = sheet;
+  sheet = null;
+  hide($("sheet"), true); hide($("scrim"), true);
+  if (was.onClose) was.onClose();
+  if (!fromHistory) { skipPop = true; try { history.back(); } catch (e) { skipPop = false; } }
+}
+
+function sheetOptions(body, groups, pick) {
+  groups.forEach((g, gi) => {
+    if (g.head) { const h = document.createElement("div"); h.className = "grp"; h.textContent = g.head; body.append(h); }
+    g.items.forEach((it, ii) => {
+      const b = document.createElement("button");
+      b.className = "opt"; b.setAttribute("role", "menuitemradio");
+      b.setAttribute("aria-checked", String(!!it.on));
+      b.disabled = it.ok === false;
+      const t = document.createElement("span"); t.dir = "auto"; t.textContent = it.label;
+      b.append(t);
+      if (it.on) b.append(mark(CHECK, "tick"));
+      b.addEventListener("click", () => pick(gi, ii, it));
+      body.append(b);
+    });
+  });
+}
+
+// What plays' audio tracks and subtitles, as the player's own menu lists
+// them - read when the sheet opens, and again when the state says they changed.
+async function loadTracks() {
+  let d;
+  try { d = await api("api/tracks"); } catch (e) { return; }
+  if (!sheet || sheet.kind !== "tracks") return;
+  sheet.stamp = d.stamp; sheet.seen = st.tracks;
+  const body = $("sheetBody");
+  body.textContent = "";
+  const audio = (d.audio || []).length ? d.audio : [{label: W.no_audio, ok: false}];
+  sheetOptions(body, [{head: W.audio, items: audio}, {head: W.subtitles, items: d.subs || []}], async (gi, ii) => {
+    const stamp = sheet && sheet.stamp;
+    await send("api/track", {stamp, kind: gi ? "subs" : "audio", i: ii});
+    if (sheet && sheet.kind === "tracks") loadTracks();
+  });
+}
+
+function openTracks() {
+  if (!st.state || st.state === "stopped") return;
+  openSheet("tracks", W.tracks).textContent = W.loading;
+  loadTracks();
+}
+
+// The player's own sleep timer, as TV mode's Options sets it.
+function sleepLeft() {
+  if (!st.sleep_at || st.state === "stopped") return 0;
+  const now = (st.time || Date.now() / 1000) + (Date.now() - stAt) / 1000;
+  return Math.max(0, st.sleep_at - now);
+}
+
+function sleepText() {
+  const left = sleepLeft();
+  return left > 0 ? W.sleep_left.replace("{n}", String(Math.max(1, Math.ceil(left / 60)))) : W.sleep;
+}
+
+function openSleep() {
+  if (!st.state || st.state === "stopped") return;
+  const on = sleepLeft() > 0;
+  const body = openSheet("sleep", on ? W.sleep + " · " + sleepText() : W.sleep);
+  const items = [{label: W.off, on: !on, m: 0}].concat(SKIP.sleep.map((m) => ({label: W.minutes.replace("{n}", m), m})));
+  sheetOptions(body, [{items}], (gi, ii, it) => {
+    send("api/sleep", {minutes: it.m});
+    closeSheet();
+  });
+}
+
+function sleepTick() {
+  const text = sleepText(), on = sleepLeft() > 0;
+  for (const id of ["sleepText", "tvSleepText"]) if ($(id).textContent !== text) $(id).textContent = text;
+  for (const id of ["sleepBtn", "tvSleep"]) $(id).classList.toggle("on", on);
+}
+
+// Now playing's secondary row (and TV mode's remote): what plays' tracks and
+// the sleep timer while something plays.
+function actsOffer(s) {
+  const playing = !!s.state && s.state !== "stopped";
+  hide($("tracksBtn"), !playing); hide($("sleepBtn"), !playing); hide($("tvActs"), !playing);
+  const row = $("nowActs");
+  hide(row, ![...row.children].some((b) => !b.hasAttribute("hidden")));
+  if (sheet && sheet.kind === "tracks" && s.tracks !== sheet.seen) loadTracks();
+  if (sheet && !playing && (sheet.kind === "tracks" || sheet.kind === "sleep")) closeSheet();
+  sleepTick();
+}
+
+function initSheets() {
+  $("tracksText").textContent = W.tracks; $("tvTracksText").textContent = W.tracks;
+  label("sheetClose", W.close);
+  $("sheetClose").addEventListener("click", () => closeSheet());
+  $("scrim").addEventListener("click", () => closeSheet());
+  for (const id of ["tracksBtn", "tvTracks"]) $(id).addEventListener("click", openTracks);
+  for (const id of ["sleepBtn", "tvSleep"]) $(id).addEventListener("click", openSleep);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sheet) closeSheet(); });
+}
+
+// Back - the page's arrows and the phone's own gesture: a sheet first, then
+// the Episodes view, then a section's place before.
 function goneBack() {
+  if (skipPop) { skipPop = false; return; }
+  if (sheet) { closeSheet(true); return; }
   if (eps.open) { closeEps(); return; }
   libPop();
 }
@@ -1525,6 +1689,7 @@ function init() {
   seekBar();
   label("crumbBack", W.back_to); label("epsBack", W.back_to);
   $("epsBtnText").textContent = W.episodes;
+  initSheets();
   label("toggle", W.play_pause); label("stop", W.stop); label("chUp", W.ch_up); label("chDown", W.ch_down);
   label("mute", W.mute); $("vol").setAttribute("aria-label", W.volume);
   $("nowTitle").textContent = W.loading;

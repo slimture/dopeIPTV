@@ -2921,5 +2921,9 @@
   "sa_placeholder_all": "ค้นหาทุกอย่างในทุกแหล่งของคุณ (เช่น Star Trek)",
   "phone_page_ep_prev": "ตอนก่อนหน้า",
   "phone_page_seek": "ตำแหน่งการเล่น",
-  "phone_tv_type": "พิมพ์เพื่อค้นหาบนทีวี"
+  "phone_tv_type": "พิมพ์เพื่อค้นหาบนทีวี",
+  "player_track_forced": "บังคับ",
+  "player_track_external": "ภายนอก",
+  "phone_page_tracks": "คำบรรยายและเสียง",
+  "phone_page_sleep_left": "หยุดในอีก {n} นาที"
 }
