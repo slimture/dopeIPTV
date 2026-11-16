@@ -19,6 +19,8 @@
 - Keyboard shortcuts sync between your computers again - between computers of the same system, since `⌘` is not `Ctrl`.
 - A series' page played an episode on one click. Now one click picks it and a double click or `Enter` plays it, as in the lists - unless **Auto-play preview on selection** is on.
 - Connections to your account are counted right: a cast on the source it comes from, a stream the player gave up on no longer, a rewind buffer kept by a recording or a cast only on its own source, and YouTube, Twitch and radio not at all. A cast or a recording after you switched source no longer picks the new source's channel with the same number.
+- Searching in a Local files folder finds files in its subfolders too.
+- The search boxes say what they search: the list, the categories, or everything.
 - TV mode: Stop while a dropped channel waited to reconnect now stops it.
 - A scheduled recording that comes due while you watch no longer opens a second connection by itself: it records from what plays when it is the same channel, and otherwise waits for a free connection or your OK.
 - The same provider account added twice is counted as one account.

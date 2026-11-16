@@ -67,6 +67,11 @@ how connections to the account are counted.
   Codes, M3U, Stalker portals, Enigma2 and other boxes, Jellyfin, Emby
   and Plex, with a guide, recordings, TV mode and casting - not only
   "Xtream Codes and M3U playlists", in every language.
+- The three search boxes say what they do (#32): the one over the list
+  "Filter this list…" (in a folder of Local files "Search this folder
+  and its subfolders…"), the one by Categories "Find categories by name
+  or channel…" (or movie, or series), and the Search page "Search
+  everything in all your sources".
 
 ### Fixed
 
@@ -194,6 +199,19 @@ how connections to the account are counted.
   loaders' threads and without holding up the window, already at their
   size; the window only puts them up (each was decoded a second time there,
   about 5 ms for an episode's still). Nothing looks different.
+- Local files: a search in a folder looks through all its subfolders
+  too, not only the files in the folder itself (#33). Each match says
+  which subfolder it is in, the nearest come first, and a match plays as
+  it does from its own folder - an album plays on through that album,
+  an episode on into the next. The walk runs in the background and
+  starts over as you type or open another folder, so a slow network
+  share never holds the window up; it stops at 500 matches or 30,000
+  files and folders and says so. Hidden folders and links that loop
+  back are left out; an emptied search shows the folder as before.
+- The 🔍 by Categories in Local files filters the list shown, as it does
+  in Favorites and History - it did nothing there. The box over the list
+  no longer keeps saying "Search radio-browser.info…" after leaving
+  Radio's Search.
 
 ## [1.6.0]
 
