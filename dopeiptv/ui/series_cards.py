@@ -369,16 +369,21 @@ class EpisodeDelegate(QStyledItemDelegate):
         """A small pill at the end of the title line; its width."""
         f = _px_font(10, bold=True)
         fm = QFontMetrics(f)
-        w, h = fm.horizontalAdvance(text) + 14, fm.height() + 2
+        # Sized from the glyphs' own ascent and descent, with room around
+        # them: a font's line height alone left the text touching the pill's
+        # edges on Linux, where the system fonts sit taller.
+        ink_h = fm.ascent() + fm.descent()
+        w, h = fm.horizontalAdvance(text) + 18, ink_h + 6
         x = r.left() if rtl else r.right() - w
-        y = r.top() + max(0, (r.height() - h) // 2)
+        y = r.top() + (r.height() - h) // 2
         wash, ink = tinted(P["accent"], P["bg"], 0.22, P["text"])
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(_c("accent") if strong else QColor(wash))
         p.drawRoundedRect(QRectF(x, y, w, h), h / 2, h / 2)
         p.setFont(f)
         p.setPen(_c("on_accent") if strong else QColor(ink))
-        p.drawText(QRect(x, y, w, h), Qt.AlignmentFlag.AlignCenter, text)
+        base = y + (h - ink_h) // 2 + fm.ascent()
+        p.drawText(x + (w - fm.horizontalAdvance(text)) // 2, base, text)
         return w + 8
 
     def _paint_text(self, p: QPainter, ep: dict, r: QRect, state: EpisodeState,
