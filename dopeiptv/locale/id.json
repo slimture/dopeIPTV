@@ -2925,5 +2925,7 @@
   "player_track_forced": "paksa",
   "player_track_external": "eksternal",
   "phone_page_tracks": "Subtitel dan suara",
-  "phone_page_sleep_left": "Berhenti dalam {n} mnt"
+  "phone_page_sleep_left": "Berhenti dalam {n} mnt",
+  "phone_rec_ask": "Rekam {title}?",
+  "phone_rec_stop_ask": "Hentikan perekaman {title}?"
 }

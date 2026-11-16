@@ -78,7 +78,7 @@ from .tv_input import TEXT_MAX
 
 #: The palette keys the page uses, as ui/theme.py names them.
 COLOURS = ("bg", "pane", "side", "hover", "sel", "input", "btn", "btn_hover", "border",
-           "text", "text2", "muted", "muted2", "ok", "error", "accent", "on_accent",
+           "text", "text2", "muted", "muted2", "ok", "error", "rec", "accent", "on_accent",
            "key_red", "key_green", "key_yellow", "key_blue")
 #: The words the page shows, as the window passes them (i18n keys' values).
 WORDS = ("channels", "favorites", "search", "nothing", "next", "paused", "offline", "expired",
@@ -91,7 +91,8 @@ WORDS = ("channels", "favorites", "search", "nothing", "next", "paused", "offlin
          "recordings", "back_to", "min", "watched", "playing", "search_radio", "search_here",
          "nothing_here", "find", "skip_back", "skip_fwd", "seek", "tv_type",
          "tracks", "audio", "subtitles", "no_audio", "sleep", "off", "minutes", "sleep_left",
-         "close")
+         "close", "rec", "rec_stop", "rec_this", "remind", "dont_ask", "cancel", "rec_anyway",
+         "rec_cancel", "rec_ask", "rec_stop_ask")
 _HEX = re.compile(r"#[0-9A-Fa-f]{6}")
 
 
@@ -222,6 +223,10 @@ _HTML = """<!doctype html>
       <button class="showIn" id="tracksBtn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M10.5 10.3a2.2 2.2 0 1 0 0 3.4M17 10.3a2.2 2.2 0 1 0 0 3.4"/></svg><span id="tracksText"></span></button>
       <button class="showIn" id="sleepBtn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 14.5A7.5 7.5 0 0 1 9.5 4.5a7.5 7.5 0 1 0 10 10z"/></svg><span id="sleepText"></span></button>
       </div>
+      <div class="nowRec" id="nowRec" hidden>
+      <button class="showIn rec" id="recBtn" hidden><span class="recIcon" id="recIcon"></span><span id="recText"></span></button>
+      <button class="showIn" id="nextBtn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/></svg><span id="nextText"></span></button>
+      </div>
     </div>
     <span class="nowPill" id="nowPill" aria-hidden="true" hidden><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="12.5" rx="2"/><path d="M8.5 20.5h7"/><path class="fill" d="M10.2 8.2v4.6l4-2.3z"/></svg><span id="nowPillText"></span></span>
   </section>
@@ -318,6 +323,7 @@ _HTML = """<!doctype html>
     </div>
   </section>
 </main>
+<div class="toast" id="toast" role="status" hidden></div>
 <div class="scrim" id="scrim" hidden></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
   <div class="sheetIn">
@@ -353,13 +359,13 @@ _HTML = """<!doctype html>
 """
 
 _CSS = """
-:root{@@DARK@@;color-scheme:dark;--radius:12px;--dock:172px;--vh:1vh;
+:root{@@DARK@@;color-scheme:dark;--on-error:var(--bg);--radius:12px;--dock:172px;--vh:1vh;
   --safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);
   --gut-l:max(clamp(12px,4vw,16px),env(safe-area-inset-left,0px));
   --gut-r:max(clamp(12px,4vw,16px),env(safe-area-inset-right,0px));
   --key-h:clamp(46px,calc(var(--vh)*8.5),54px)}
 @supports (height:1dvh){:root{--vh:1dvh}}
-@media (prefers-color-scheme: light){:root{@@LIGHT@@;color-scheme:light}}
+@media (prefers-color-scheme: light){:root{@@LIGHT@@;color-scheme:light;--on-error:var(--on-accent)}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--text);
   font:15px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans",Ubuntu,Cantarell,"Helvetica Neue",Arial,sans-serif;
@@ -440,6 +446,15 @@ svg .fill{fill:currentColor;stroke:none}
 .nowActs{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .nowActs .showIn{margin-top:0}
 .showIn.on{background:var(--sel)}
+.nowRec{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:12px;box-shadow:inset 0 1px 0 var(--border)}
+body.tv .nowRec{display:none}
+.recIcon{display:flex;color:var(--rec)}
+.recIcon svg,.showIn .recIcon svg{width:18px;height:18px;color:var(--rec)}
+.showIn.rec.on{background:var(--sel);color:var(--rec)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--dock) + 8px);z-index:4;max-width:min(92vw,520px);
+  padding:10px 16px;border-radius:12px;background:var(--text);color:var(--bg);font-size:14px;font-weight:600;
+  text-align:center;overflow-wrap:anywhere}
+body.tv .toast{bottom:calc(16px + var(--safe-b))}
 .pill.on{background:var(--sel);color:var(--accent)}
 body.tv .nowActs{display:none}
 .scrim{position:fixed;inset:0;z-index:5;background:var(--bg);opacity:.62}
@@ -457,13 +472,13 @@ body.tv .nowActs{display:none}
 .opt .tick{margin-inline-start:auto;flex:none;color:var(--accent)}
 .opt .tick svg{width:20px;height:20px}
 .opt[disabled]{opacity:.5}
-.sheetText{color:var(--text2);padding:2px 4px 10px;overflow-wrap:anywhere}
+.sheetText{color:var(--text2);padding:2px 4px 10px;overflow-wrap:anywhere;white-space:pre-line}
 .chk{display:flex;align-items:center;gap:10px;min-height:44px;padding:2px 4px;color:var(--text2)}
 .chk input{width:22px;height:22px;margin:0;accent-color:var(--accent);flex:none}
 .sheetBtns{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
 .sheetBtns button{flex:1 1 120px;min-height:48px;padding:0 14px;border-radius:var(--radius);background:var(--btn);font-weight:700}
 .sheetBtns .primary{background:var(--accent);color:var(--on-accent)}
-.sheetBtns .danger{background:var(--error);color:var(--on-accent)}
+.sheetBtns .danger{background:var(--error);color:var(--on-error)}
 .showIn:active{background:var(--btn-hover)}
 .now.act{flex-wrap:wrap;row-gap:12px;min-height:48px;cursor:pointer;user-select:none;-webkit-user-select:none;
   touch-action:manipulation}
@@ -909,6 +924,7 @@ function show(s) {
   label("chDown", ep ? W.ep_prev : W.ch_down); label("chUp", ep ? W.ep_next : W.ch_up);
   epsOffer(ep);
   actsOffer(s);
+  recOffer(s);
 }
 
 function tick() {
@@ -932,6 +948,7 @@ function tick() {
   } else { setBar(null); $("nowStart").textContent = $("nowEnd").textContent = ""; }
   epsTick();
   sleepTick();
+  recTick();
 }
 
 function setVol(v) {
@@ -1220,9 +1237,10 @@ function libRow(it) {
   b.className = "row";
   b.dataset.k = it.k || "";
   b.dataset.name = it.name || "";
-  for (const f of ["p", "ref", "sid"]) if (it[f]) b.dataset[f] = it[f];
+  for (const f of ["p", "ref", "sid", "id", "state"]) if (it[f]) b.dataset[f] = it[f];
   const lg = document.createElement("span");
   if (it.k === "dir") { lg.className = "lg dir"; lg.innerHTML = FOLDER; }
+  else if (it.k === "job") { lg.className = "lg dir" + (it.state === "rec" ? " recIcon" : ""); lg.innerHTML = it.state === "rec" ? RECDOT : CLOCK; }
   else {
     const ini = document.createElement("span"); ini.textContent = initials(it.name);
     lg.className = "lg" + (it.img && tab !== "radio" ? " poster" : "") + (ini.textContent.length > 3 ? " long" : "");
@@ -1265,6 +1283,7 @@ function libPressed(e) {
   const k = b.dataset.k;
   if (k === "dir") libPush(b.dataset.p, b.dataset.name);
   else if (k === "series") openEps(b.dataset.sid, b.dataset.ref || "", b.dataset.name);
+  else if (k === "job") jobSheet(b.dataset.id, b.dataset.state, b.dataset.name);
   else if (k === "play" && b.dataset.ref) {
     b.classList.add("pending");
     send("api/play_ref", {ref: b.dataset.ref}).then(() => b.classList.remove("pending"));
@@ -1406,6 +1425,7 @@ let sheet = null, skipPop = false;
 function openSheet(kind, title) {
   if (!sheet) { try { history.pushState({sheet: 1}, ""); } catch (e) { /* no history */ } }
   sheet = {kind};
+  hide($("toast"), true);
   $("sheetTitle").textContent = title;
   $("sheetBody").textContent = "";
   hide($("sheet"), false); hide($("scrim"), false);
@@ -1512,6 +1532,150 @@ function initSheets() {
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sheet) closeSheet(); });
 }
 
+// -- Recording ----------------------------------------------------------------------------------
+// Record what plays (from the stream that plays - no connection of its own),
+// asked first unless that was turned off for every phone (state.rec_ask); a
+// long press asks again whatever was chosen. Stopping always asks. The
+// channel's next programme recorded or reminded. A question the app asks in
+// any of it - one connection too many, a box's tuners - comes here and is
+// answered here; nothing it asks about starts without that answer.
+const RECDOT = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle class="fill" cx="12" cy="12" r="6"/></svg>';
+const STOPSQ = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect class="fill" x="6.5" y="6.5" width="11" height="11" rx="1.5"/></svg>';
+const CLOCK = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/></svg>';
+let lastAsking = null, askShown = "", toastTimer = 0;
+
+function toast(text) {
+  const t = $("toast");
+  t.textContent = text || "";
+  hide(t, !text);
+  clearTimeout(toastTimer);
+  if (text) toastTimer = setTimeout(() => hide(t, true), 6000);
+}
+
+function sheetText(body, text) {
+  const p = document.createElement("div"); p.className = "sheetText"; p.dir = "auto"; p.textContent = text;
+  body.append(p);
+}
+
+function sheetButtons(body, buttons) {
+  const row = document.createElement("div"); row.className = "sheetBtns";
+  for (const [label, kind, act] of buttons) {
+    const b = document.createElement("button");
+    b.className = kind || ""; b.textContent = label;
+    b.addEventListener("click", act);
+    row.append(b);
+  }
+  body.append(row);
+}
+
+function sheetCheck(body, label, on) {
+  const l = document.createElement("label"); l.className = "chk";
+  const c = document.createElement("input"); c.type = "checkbox"; c.checked = !!on;
+  const t = document.createElement("span"); t.textContent = label;
+  l.append(c, t); body.append(l);
+  return c;
+}
+
+// The app's own question, in its words with its choices; a choice sends the
+// request again with the answer - only then does it go ahead.
+function askSheet(ask, path, body) {
+  if (!ask || !ask.q) return;
+  askShown = ask.q;
+  const b = openSheet("ask", ask.title || "");
+  sheetText(b, ask.text || "");
+  const dont = ask.dont ? sheetCheck(b, W.dont_ask, false) : null;
+  sheetButtons(b, (ask.choices || []).map((c, i) => [c.label, c.kind === "primary" ? "primary" : c.kind === "danger" ? "danger" : "", () => {
+    closeSheet();
+    const answers = (ask.answers || []).concat([{q: ask.q, i, dont: !!(dont && dont.checked)}]);
+    send(path, Object.assign({}, body || {}, {answers}));
+  }]));
+}
+
+function playingName() { return (st.channel && st.channel.name) || st.title || ""; }
+
+function recNow(dont) { send("api/rec", dont ? {dont: true} : {}); }
+
+function recAsk() {
+  const b = openSheet("rec", W.rec_ask.replace("{title}", playingName()));
+  const dont = sheetCheck(b, W.dont_ask, !st.rec_ask);
+  sheetButtons(b, [[W.rec, "primary", () => {
+    closeSheet();
+    if (!dont.checked && !st.rec_ask) send("api/rec_ask", {ask: true});
+    recNow(dont.checked);
+  }], [W.cancel, "", () => {
+    closeSheet();
+    if (!dont.checked && !st.rec_ask) send("api/rec_ask", {ask: true});      // asked again from now on
+  }]]);
+}
+
+function stopAsk(id, title) {
+  const b = openSheet("rec", W.rec_stop_ask.replace("{title}", title || ""));
+  sheetButtons(b, [[W.rec_stop, "danger", () => { closeSheet(); send("api/rec_stop", {id}); }],
+                   [W.cancel, "", () => closeSheet()]]);
+}
+
+function recPressed() {
+  if (st.rec && st.rec.id) { stopAsk(st.rec.id, st.rec.title); return; }
+  if (st.rec_ask) recAsk(); else recNow(false);
+}
+
+function nextSheet() {
+  const n = st.next;
+  if (!n) return;
+  const b = openSheet("next", n.title || W.next);
+  sheetText(b, at(n.start) + "–" + at(n.stop) + (playingName() ? " · " + playingName() : ""));
+  sheetButtons(b, [[W.rec_this, "primary", () => { closeSheet(); send("api/rec_next", {start: n.start, what: "record"}); }],
+                   [W.remind, "", () => { closeSheet(); send("api/rec_next", {start: n.start, what: "remind"}); }]]);
+}
+
+function jobSheet(id, state, title) {
+  if (state === "rec") { stopAsk(id, title); return; }
+  const b = openSheet("job", title || "");
+  const buttons = [];
+  if (state === "held") buttons.push([W.rec_anyway, "primary", () => { closeSheet(); send("api/rec_go", {id}); }]);
+  buttons.push([W.rec_cancel, "danger", () => { closeSheet(); send("api/rec_stop", {id}); }]);
+  buttons.push([W.close, "", () => closeSheet()]);
+  sheetButtons(b, buttons);
+}
+
+// Now playing's own row for it, apart from the others: Record or Stop with
+// its time, and the next programme.
+function recOffer(s) {
+  const live = s.kind === "live" && s.state !== "stopped" && !!s.channel;
+  const running = !!(s.rec && s.rec.id);
+  hide($("recBtn"), !(live && s.can_rec) && !running);
+  hide($("nextBtn"), !live || !s.next);
+  $("recBtn").classList.toggle("on", running);
+  $("recIcon").innerHTML = running ? STOPSQ : RECDOT;
+  hide($("nowRec"), $("recBtn").hasAttribute("hidden") && $("nextBtn").hasAttribute("hidden"));
+  $("nextText").textContent = s.next ? W.next + " · " + (s.next.title || "") : "";
+  recTick();
+  if (s.ask && s.ask.q !== askShown && lastAsking && Date.now() - lastAsking.at < 60000) askSheet(s.ask, lastAsking.path, lastAsking.body);
+}
+
+function recTick() {
+  const r = st.rec;
+  let text = W.rec;
+  if (r && r.id) {
+    const now = (st.time || Date.now() / 1000) + (Date.now() - stAt) / 1000;
+    text = W.rec_stop + " · " + hms(Math.max(0, now - (r.start || now)));
+  }
+  if ($("recText").textContent !== text) $("recText").textContent = text;
+}
+
+function initRec() {
+  const b = $("recBtn");
+  let held = 0, long = false;
+  b.addEventListener("pointerdown", () => {
+    long = false; clearTimeout(held);
+    held = setTimeout(() => { long = true; if (!(st.rec && st.rec.id)) recAsk(); }, T.hold);
+  });
+  for (const t of ["pointerup", "pointercancel", "pointerleave"]) b.addEventListener(t, () => clearTimeout(held));
+  b.addEventListener("click", () => { if (long) { long = false; return; } recPressed(); });
+  b.addEventListener("contextmenu", (e) => e.preventDefault());
+  $("nextBtn").addEventListener("click", nextSheet);
+}
+
 // Back - the page's arrows and the phone's own gesture: a sheet first, then
 // the Episodes view, then a section's place before.
 function goneBack() {
@@ -1523,10 +1687,21 @@ function goneBack() {
 
 function soon() { clearTimeout(pollTimer); pollTimer = setTimeout(poll, 350); }
 
+// What may start a stream or a recording: the app's question in it comes back here.
+const ASKING = ["api/play", "api/play_ref", "api/next", "api/previous", "api/toggle", "api/rec", "api/rec_next",
+                "api/rec_go"];
+
 async function send(path, body) {
   if (navigator.vibrate) navigator.vibrate(8);
   quickUntil = Date.now() + 10000;
-  try { const r = await api(path, body || {}); soon(); return r; } catch (e) { soon(); return null; }
+  if (ASKING.includes(path)) lastAsking = {path, body: body || {}, at: Date.now()};
+  try {
+    const r = await api(path, body || {});
+    soon();
+    if (r && r.ask) askSheet(r.ask, path, body);
+    if (r && r.note) toast(r.note);
+    return r;
+  } catch (e) { soon(); return null; }
 }
 
 function setTab(t) {
@@ -1690,6 +1865,7 @@ function init() {
   label("crumbBack", W.back_to); label("epsBack", W.back_to);
   $("epsBtnText").textContent = W.episodes;
   initSheets();
+  initRec();
   label("toggle", W.play_pause); label("stop", W.stop); label("chUp", W.ch_up); label("chDown", W.ch_down);
   label("mute", W.mute); $("vol").setAttribute("aria-label", W.volume);
   $("nowTitle").textContent = W.loading;

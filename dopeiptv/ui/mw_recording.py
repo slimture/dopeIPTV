@@ -153,7 +153,14 @@ class _RecordingMixin:
         *dont_ask_setting* is given, a "Don't show this again" checkbox is
         added; ticking it and choosing an option stores "true" under that key
         (so a caller can suppress the prompt next time; it's resettable in
-        Settings)."""
+        Settings).
+
+        While the phone remote does something (mw_phone), the question is
+        the phone's: asked there in the same words with the same choices,
+        never left waiting on this screen with nobody at it."""
+        ask = getattr(self, "_phone_ask_hook", None)
+        if ask is not None:
+            return ask(title, message, options, dont_ask_setting)
         from PyQt6.QtWidgets import QCheckBox
         d = QDialog(self)
         d.setWindowTitle(title)
@@ -338,12 +345,19 @@ class _RecordingMixin:
         self._build_record_menu(m, it)
         m.exec(anchor.mapToGlobal(anchor.rect().bottomLeft()))
 
+    def _rec_warn(self, title: str, text: str) -> None:
+        """A recording that cannot start, said - on the phone remote when it
+        asked (mw_phone), never a box left on this screen for nobody."""
+        ask = getattr(self, "_phone_ask_hook", None)
+        if ask is not None:
+            ask.note(text)
+            return
+        QMessageBox.warning(self, title, text)
+
     def _recorder_ready(self) -> bool:
         if self.rec.recorder()[1]:
             return True
-        QMessageBox.warning(
-            self, tr("rec_status_recording"),
-            tr("msg_rec_needs_ffmpeg"))
+        self._rec_warn(tr("rec_status_recording"), tr("msg_rec_needs_ffmpeg"))
         return False
 
     @staticmethod
@@ -355,11 +369,10 @@ class _RecordingMixin:
         total size limit, so no new recording is started."""
         if not self.rec.total_cap_exceeded():
             return True
-        QMessageBox.warning(
-            self, tr("rec_cap_title"),
-            tr("rec_cap_reached",
-               used=self._fmt_gb(self.rec.folder_used_bytes()),
-               cap=self._fmt_gb(self.rec.total_cap_bytes())))
+        self._rec_warn(tr("rec_cap_title"),
+                       tr("rec_cap_reached",
+                          used=self._fmt_gb(self.rec.folder_used_bytes()),
+                          cap=self._fmt_gb(self.rec.total_cap_bytes())))
         return False
 
     def _warn_pause_while_recording(self) -> None:
@@ -767,7 +780,7 @@ class _RecordingMixin:
             try:
                 path = self.rec.build_path(title, channel=self.channel_display_name(it))
             except OSError as e:
-                QMessageBox.warning(self, tr("rec_status_recording"), str(e))
+                self._rec_warn(tr("rec_status_recording"), str(e))
                 return
             if self.player.start_stream_record(path):
                 self.rec.add_inplayer_job(

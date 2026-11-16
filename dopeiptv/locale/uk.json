@@ -2925,5 +2925,7 @@
   "player_track_forced": "примусові",
   "player_track_external": "зовнішні",
   "phone_page_tracks": "Субтитри та звук",
-  "phone_page_sleep_left": "Зупиниться через {n} хв"
+  "phone_page_sleep_left": "Зупиниться через {n} хв",
+  "phone_rec_ask": "Записати {title}?",
+  "phone_rec_stop_ask": "Зупинити запис {title}?"
 }

@@ -372,7 +372,25 @@ class _PhoneBrowseMixin:
                             "sub": time.strftime("%Y-%m-%d %H:%M", time.localtime(mtime))})
             return out
         rows, _b = lists.get(("rec", root), _bucket(REC_SECS), build)
-        return rows
+        jobs = snap.get("jobs") or []
+        if not jobs:
+            return rows
+        # What records now and what is to come, over the files: a tap stops
+        # one or cancels it (always asked on the page), a held one goes ahead.
+        out: list[dict] = []
+        for status, head in (("recording", snap["now_title"]), ("scheduled", snap["later_title"])):
+            these = [j for j in jobs if j["status"] == status]
+            if these:
+                out.append({"k": "head", "name": head})
+            for j in sorted(these, key=lambda j: j["start"]):
+                when = time.strftime("%H:%M", time.localtime(j["start"])) if status == "recording" \
+                    else time.strftime("%Y-%m-%d %H:%M", time.localtime(j["start"]))
+                sub = " · ".join(t for t in (j["channel"], when, snap["waiting"] if j["held"] else "") if t)
+                out.append({"k": "job", "id": j["id"], "name": j["title"], "sub": sub,
+                            "state": "rec" if status == "recording" else "held" if j["held"] else "sched"})
+        if rows:
+            out.append({"k": "head", "name": snap["files_title"]})
+        return out + rows
 
     def _phone_episodes(self, bridge: Any, params: dict) -> dict[str, Any]:
         """A series' Episodes view: its seasons and their episodes, which
@@ -440,7 +458,7 @@ class _PhoneBrowseMixin:
         got = self._pb()[1].get(ref) if ref else None
         if got is None or got[0] not in _PLAYS:
             raise ValueError("no such title")
-        return bridge.call("_pb_play", {"kind": got[0], "value": got[1]})
+        return bridge.call("_pb_play", {"kind": got[0], "value": got[1], "answers": params.get("answers")})
 
     def _phone_thumb(self, params: dict) -> bytes | None:
         """A row's picture made small, kept for the session (the image
@@ -523,7 +541,10 @@ class _PhoneBrowseMixin:
                         section=tr("nav_radio"))
         elif mode == "rec":
             snap.update(dir=self.rec.directory(), rec_exts=tuple(self.rec.VIDEO_EXTS),
-                        read_info=self.rec.read_info, section=tr("nav_recordings"))
+                        read_info=self.rec.read_info, section=tr("nav_recordings"),
+                        jobs=self._phone_rec_jobs(), now_title=tr("rec_status_recording"),
+                        later_title=tr("rec_upcoming"), files_title=tr("nav_recordings"),
+                        waiting=tr("rec_waiting_room"))
         return snap
 
     def _pb_history_shown(self, rows: list[dict]) -> list[dict]:

@@ -2925,5 +2925,7 @@
   "player_track_forced": "lazima",
   "player_track_external": "ya nje",
   "phone_page_tracks": "Manukuu na sauti",
-  "phone_page_sleep_left": "Itasimama baada ya dakika {n}"
+  "phone_page_sleep_left": "Itasimama baada ya dakika {n}",
+  "phone_rec_ask": "Rekodi {title}?",
+  "phone_rec_stop_ask": "Simamisha kurekodi {title}?"
 }

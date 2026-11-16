@@ -2925,5 +2925,7 @@
   "player_track_forced": "prisilni",
   "player_track_external": "vanjski",
   "phone_page_tracks": "Titlovi i zvuk",
-  "phone_page_sleep_left": "Zaustavlja se za {n} min"
+  "phone_page_sleep_left": "Zaustavlja se za {n} min",
+  "phone_rec_ask": "Snimiti {title}?",
+  "phone_rec_stop_ask": "Zaustaviti snimanje {title}?"
 }

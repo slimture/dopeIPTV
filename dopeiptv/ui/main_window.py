@@ -3862,6 +3862,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         keep = getattr(self, "_keep_origin", None)
         if keep is not None:
             again = keep(again)
+        # ...and a phone remote's request stays the phone's: its questions
+        # are asked there, never left on this screen (mw_phone_rec).
+        keep = getattr(self, "_phone_keep_asking", None)
+        if keep is not None:
+            again = keep(again)
         gens = getattr(self, "_link_gens", None)
         if gens is None:
             gens = self._link_gens = {}

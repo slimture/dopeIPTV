@@ -2925,5 +2925,7 @@
   "player_track_forced": "forçadas",
   "player_track_external": "externas",
   "phone_page_tracks": "Legendas e som",
-  "phone_page_sleep_left": "Para em {n} min"
+  "phone_page_sleep_left": "Para em {n} min",
+  "phone_rec_ask": "Gravar {title}?",
+  "phone_rec_stop_ask": "Parar a gravação de {title}?"
 }

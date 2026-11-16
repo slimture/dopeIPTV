@@ -2925,5 +2925,7 @@
   "player_track_forced": "لازمی",
   "player_track_external": "بیرونی",
   "phone_page_tracks": "سب ٹائٹل اور آواز",
-  "phone_page_sleep_left": "{n} منٹ میں رک جائے گا"
+  "phone_page_sleep_left": "{n} منٹ میں رک جائے گا",
+  "phone_rec_ask": "{title} ریکارڈ کریں؟",
+  "phone_rec_stop_ask": "{title} کی ریکارڈنگ روکیں؟"
 }

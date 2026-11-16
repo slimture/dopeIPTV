@@ -488,10 +488,20 @@ job = {"id": 999, "status": "recording", "url": "https://rec.example.com/live/9.
        "title": "Rec", "stop": None}
 w.rec.jobs.append(job)
 over = tr("conn_over", max=1, n=1)
-w._phone_do("_play", {"row": row})
-assert asked and over in asked[-1] and not playing(), ("phone limit", asked)
+# The phone's own request: the window's question is the phone's - the same
+# words and choices there, nothing left on this screen, nothing played
+# until it is answered there (Cancel: nothing).
+ask_here = w._choice_dialog
+del w._choice_dialog
+r = w._phone_do("_play", {"row": row})
+assert not asked and not playing() and r.get("ask") and over in r["ask"]["text"], ("phone limit", r, asked)
+assert r["ask"]["choices"][-1]["label"] == tr("common_cancel"), r
+cancel = len(r["ask"]["choices"]) - 1
+r = w._phone_do("_play", {"row": row, "answers": [{"q": r["ask"]["q"], "i": cancel}]})
+assert not r.get("ask") and not asked and not playing(), ("phone cancel", r)
 note = w._phone_do("state", {}).get("note") or ""
-assert over in note and tr("phone_answer_there") in note, note
+assert tr("phone_answer_there") not in note, note
+w._choice_dialog = ask_here
 asked.clear()
 w._events_command("favorite", row["name"])
 assert asked and over in asked[-1] and not playing(), ("mqtt limit", asked)
@@ -1321,10 +1331,14 @@ def playing():
 
 
 cut = tr("tuner_cuts", what=tr("tuner_w_tv", name="SVT1 HD"))
-w._phone_do("_play", {"row": row})
-assert asked and cut in asked[-1] and not playing(), ("phone", asked)
-note = w._phone_do("state", {}).get("note") or ""
-assert cut in note and tr("phone_answer_there") in note, note
+# Asked on the phone, in the window's words: nothing here, nothing played.
+ask_here = w._choice_dialog
+del w._choice_dialog
+r = w._phone_do("_play", {"row": row})
+assert not asked and not playing() and r.get("ask") and cut in r["ask"]["text"], ("phone", r, asked)
+r = w._phone_do("_play", {"row": row, "answers": [{"q": r["ask"]["q"], "i": len(r["ask"]["choices"]) - 1}]})
+assert not r.get("ask") and not asked and not playing(), ("phone cancel", r)
+w._choice_dialog = ask_here
 asked.clear()
 w._events_command("favorite", row["name"])
 assert asked and cut in asked[-1] and not playing(), ("mqtt favorite", asked)

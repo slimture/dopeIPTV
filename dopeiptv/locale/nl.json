@@ -2925,5 +2925,7 @@
   "player_track_forced": "geforceerd",
   "player_track_external": "extern",
   "phone_page_tracks": "Ondertitels en geluid",
-  "phone_page_sleep_left": "Stopt over {n} min"
+  "phone_page_sleep_left": "Stopt over {n} min",
+  "phone_rec_ask": "{title} opnemen?",
+  "phone_rec_stop_ask": "Opname van {title} stoppen?"
 }

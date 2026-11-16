@@ -2925,5 +2925,7 @@
   "player_track_forced": "bắt buộc",
   "player_track_external": "bên ngoài",
   "phone_page_tracks": "Phụ đề và âm thanh",
-  "phone_page_sleep_left": "Dừng sau {n} phút"
+  "phone_page_sleep_left": "Dừng sau {n} phút",
+  "phone_rec_ask": "Ghi hình {title}?",
+  "phone_rec_stop_ask": "Dừng ghi hình {title}?"
 }

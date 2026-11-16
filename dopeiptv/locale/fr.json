@@ -2925,5 +2925,7 @@
   "player_track_forced": "forcés",
   "player_track_external": "externes",
   "phone_page_tracks": "Sous-titres et son",
-  "phone_page_sleep_left": "S'arrête dans {n} min"
+  "phone_page_sleep_left": "S'arrête dans {n} min",
+  "phone_rec_ask": "Enregistrer {title} ?",
+  "phone_rec_stop_ask": "Arrêter l'enregistrement de {title} ?"
 }

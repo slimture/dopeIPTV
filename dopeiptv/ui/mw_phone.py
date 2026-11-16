@@ -40,6 +40,7 @@ from ..core.phone_remote import (
 from ..core.remote_api import lan_addresses
 from ..i18n import tr
 from .mw_phone_browse import _PhoneBrowseMixin
+from .mw_phone_rec import _PhoneRecMixin
 from .mw_remote import _Bridge
 
 ON_KEY = "phone_remote"
@@ -97,6 +98,9 @@ PHONE_NOTE_S = 20.0
 #: The Episodes view of what plays is asked for again at least this often
 #: (a watched mark made on the computer meanwhile).
 EPISODES_FRESH_S = 300
+#: What the phone asks that may start a stream or a recording: the app's
+#: questions while it runs are the phone's (mw_phone_rec).
+_ASKING = frozenset({"_play", "_pb_play", "next", "previous", "toggle", "rec", "_rec_next", "rec_go"})
 #: Ports tried after the one used last: the default and the next few, then
 #: any the system gives.
 _PORTS = tuple(range(DEFAULT_PORT, DEFAULT_PORT + 10)) + (0,)
@@ -182,6 +186,11 @@ def page_words() -> dict[str, str]:
             "subtitles": tr("opt_subtitles"), "no_audio": tr("opt_no_audio_tracks"),
             "sleep": tr("opt_sleep_timer"), "off": tr("opt_off"), "minutes": tr("opt_minutes"),
             "sleep_left": tr("phone_page_sleep_left"), "close": tr("common_close"),
+            "rec": tr("rec_record"), "rec_stop": tr("rec_stop_recording"),
+            "rec_this": tr("rec_record_programme"), "remind": tr("reminder_add"),
+            "dont_ask": tr("dont_show_again"), "cancel": tr("common_cancel"),
+            "rec_anyway": tr("rec_record_anyway"), "rec_cancel": tr("rec_cancel_scheduled"),
+            "rec_ask": tr("phone_rec_ask"), "rec_stop_ask": tr("phone_rec_stop_ask"),
             **tv_words()}
 
 
@@ -214,7 +223,7 @@ def page_palettes(light_now: bool) -> tuple[dict[str, str], dict[str, str]]:
     return dict(dark, **accent), dict(light, **accent)
 
 
-class _PhoneMixin(_PhoneBrowseMixin):
+class _PhoneMixin(_PhoneBrowseMixin, _PhoneRecMixin):
     _phone: PhoneServer | None = None
     _phone_error: str = ""
     _phone_bridge: _Bridge | None = None
@@ -335,7 +344,20 @@ class _PhoneMixin(_PhoneBrowseMixin):
             row = next((r for r in self._phone_rows(bridge) if str(r.get("stream_id")) == want), None)
             if row is None:
                 raise ValueError("no such channel")
-            return bridge.call("_play", {"row": row})
+            return bridge.call("_play", {"row": row, "answers": params.get("answers")})
+        if action == "rec_next":
+            # The channel's next programme as the poll finds it, here in a
+            # guide already in memory - the one the page saw, or nothing.
+            _state, target = bridge.call("_state", {})
+            nxt = _now_next(target[0], target[1], time.time()).get("next") if target else None
+            try:
+                same = nxt is not None and int(nxt.get("start") or 0) == int(params.get("start"))
+            except (TypeError, ValueError):
+                same = False
+            if not same:
+                return {"ok": False}
+            return bridge.call("_rec_next", {"item": target[1], "prog": nxt, "what": params.get("what"),
+                                             "answers": params.get("answers")})
         if action == "channels":
             got = bridge.call("_channels", {"rows": self._phone_rows(bridge)})
             listed, icons = _listed(got["rows"], got["numbers"], got["picons"])
@@ -398,6 +420,15 @@ class _PhoneMixin(_PhoneBrowseMixin):
 
     # -- the work (the window's thread) -----------------------------------------------
     def _phone_do(self, action: str, params: dict) -> Any:
+        if action in _ASKING and self.__dict__.get("_phone_ask_hook") is None:
+            # The app's questions in it are the phone's: nothing it would
+            # ask about starts without the person's answer there.
+            with self._phone_asking(params.get("answers")) as q:
+                result = self._phone_do_now(action, params)
+            return self._phone_answered(q, result)
+        return self._phone_do_now(action, params)
+
+    def _phone_do_now(self, action: str, params: dict) -> Any:
         if action.startswith("_pb_"):
             return self._pb_do(action, params)
         if action == "_client":
@@ -414,7 +445,8 @@ class _PhoneMixin(_PhoneBrowseMixin):
             return phone_page.render(dark, light, page_words(), current_language(), is_rtl(),
                                      skips=(EmbeddedPlayer.SEEK_BACK, EmbeddedPlayer.SEEK_FWD),
                                      sleep_steps=tuple(m for m in _SLEEP_STEPS if m))
-        if action in ("_play", "toggle", "next", "previous", "calendar") \
+        if action in ("_play", "toggle", "next", "previous", "calendar", "rec", "rec_stop",
+                      "rec_go", "_rec_next") \
                 and getattr(self, "_profile_locked", lambda: False)():
             # "Who's watching?" waits for the PIN at start: nothing of the
             # profile's is played before it is given (the page says why).
@@ -444,6 +476,18 @@ class _PhoneMixin(_PhoneBrowseMixin):
             return self.tv_command("tv", params.get("mode", "toggle"))
         if action == "tv_key":
             return self.tv_command("tv_key", params.get("action"))
+        if action == "rec":
+            return self._phone_rec(params)
+        if action == "rec_stop":
+            return self._phone_rec_stop(params)
+        if action == "rec_go":
+            return self._phone_rec_go(params)
+        if action == "_rec_next":
+            return self._phone_rec_next(params)
+        if action == "rec_ask":
+            from .mw_phone_rec import REC_ASK_KEY
+            self.settings.setValue(REC_ASK_KEY, "true" if params.get("ask") is not False else "false")
+            return {"ok": True, "rec_ask": self._phone_rec_asks()}
         if action == "tv_text":
             # The phone's own keyboard into TV mode's search (mw_tv).
             return self.tv_command("text", params.get("text"))
@@ -621,6 +665,15 @@ class _PhoneMixin(_PhoneBrowseMixin):
                 if row is not None:
                     row["fill"] = fills.get(row["id"], "")
             out.update(state)
+        # Recording: whether the page asks first (one key for every phone),
+        # what records now, a question asked later in a request of the phone's.
+        out["rec_ask"] = self._phone_rec_asks()
+        rec = self._phone_rec_state()
+        if rec is not None:
+            out["rec"] = rec
+        late = self._phone_late_ask()
+        if late is not None:
+            out["ask"] = late
         if st["state"] == "stopped" or locked:
             return out, None
         last = getattr(self, "_last_playback", None) or {}
@@ -640,6 +693,8 @@ class _PhoneMixin(_PhoneBrowseMixin):
         item = last.get("item") or {}
         if kind == "live" and item.get("stream_id") is not None:
             out["channel"] = self._phone_channel(item, st.get("title") or "")
+            if self._phone_rec_item() is not None:
+                out["can_rec"] = True       # what airs now, recorded from what plays
             return out, (getattr(self, "xmltv", None), item)
         if kind == "episode":
             out["episode"] = self._phone_episode(last)

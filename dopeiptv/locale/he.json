@@ -2925,5 +2925,7 @@
   "player_track_forced": "מאולץ",
   "player_track_external": "חיצוני",
   "phone_page_tracks": "כתוביות וקול",
-  "phone_page_sleep_left": "נעצר בעוד {n} דק׳"
+  "phone_page_sleep_left": "נעצר בעוד {n} דק׳",
+  "phone_rec_ask": "להקליט את {title}?",
+  "phone_rec_stop_ask": "לעצור את ההקלטה של {title}?"
 }

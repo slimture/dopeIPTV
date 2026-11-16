@@ -2925,5 +2925,7 @@
   "player_track_forced": "강제",
   "player_track_external": "외부",
   "phone_page_tracks": "자막 및 음성",
-  "phone_page_sleep_left": "{n}분 후 정지"
+  "phone_page_sleep_left": "{n}분 후 정지",
+  "phone_rec_ask": "{title}을(를) 녹화하시겠습니까?",
+  "phone_rec_stop_ask": "{title} 녹화를 정지하시겠습니까?"
 }

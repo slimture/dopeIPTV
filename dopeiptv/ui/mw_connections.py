@@ -337,6 +337,8 @@ class _ConnectionsMixin:
                          tuner: tuners.Verdict | None = None) -> None:
         """A play the phone remote asked for waits on this question: its
         page says it too (mw_phone), and where to answer."""
+        if getattr(self, "_phone_ask_hook", None) is not None:
+            return                      # the question itself is the phone's (mw_phone_rec)
         note = getattr(self, "_phone_note", None)
         said = " ".join(x for x in (self._conn_warning(v) if v is not None else "",
                                     self._tuner_warning(tuner) if tuner is not None else "") if x)

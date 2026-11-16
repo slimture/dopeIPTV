@@ -290,7 +290,9 @@ def test_the_page_asks_only_its_own_server():
     asked = set(re.findall(r'"(api/[a-z_]+|logo/|thumb/)[?"]', script))
     assert asked == {"api/state", "api/channels", "api/play", "api/toggle", "api/stop", "api/next",
                      "api/previous", "api/mute", "api/volume", "api/tv", "api/tv_key", "api/touch", "api/profile",
-                     "api/play_ref", "api/browse", "api/episodes", "api/seek", "api/tv_text", "api/tracks", "api/track", "api/sleep", "logo/", "thumb/"}
+                     "api/play_ref", "api/browse", "api/episodes", "api/seek", "api/tv_text", "api/tracks",
+                     "api/track", "api/sleep", "api/rec", "api/rec_stop", "api/rec_next", "api/rec_go",
+                     "api/rec_ask", "logo/", "thumb/"}
     assert {a[4:] for a in asked if a.startswith("api/")} <= phone_remote.READ | phone_remote.WRITE
 
 
