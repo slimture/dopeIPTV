@@ -2879,5 +2879,18 @@
   "set_about_version": "Sürüm {version}",
   "epg_no_guide_any": "Bu kanallar için program kılavuzu yok.",
   "set_guide_now_front": "Şimdi çizgisi programların üstünde",
-  "set_guide_now_front_hint": "Kapalıyken şu anki saati gösteren çizgi programların arkasından geçer ve aralarında görünür. Açıkken üzerlerinden geçer."
+  "set_guide_now_front_hint": "Kapalıyken şu anki saati gösteren çizgi programların arkasından geçer ve aralarında görünür. Açıkken üzerlerinden geçer.",
+  "onb_bring_offer": "dopeIPTV'yi zaten başka bir bilgisayarda mı kullanıyorsun? Ayarlarını getir",
+  "onb_bring_title": "Ayarlarını getir",
+  "onb_bring_sub": "Diğer bilgisayarındaki eşitleme kodunu yaz. Orada Ayarlar → {page} altında bulursun.",
+  "onb_bring_go": "Getir",
+  "onb_bring_fetching": "Ayarların getiriliyor…",
+  "onb_or": "veya",
+  "onb_restore_backup": "Yedeği geri yükle…",
+  "onb_restore_ready": "Yedeğin hazır. dopeIPTV bir sonraki açılışta onu yerine koyacak.",
+  "onb_restore_quit": "Şimdi çık",
+  "onb_sync_no_sources": "Ayarların ve profillerin burada. Kaynakların gelmedi – iki bilgisayarda da {where} altında “{what}” seçeneğini aç ya da buradan bir kaynak ekle.",
+  "onb_sync_err_net": "dopeiptv.org'a ulaşılamadı. Bağlantını kontrol et ve yeniden dene.",
+  "onb_sync_err_none": "Bu kodla eşitlenmiş bir şey yok. Diğer bilgisayarında kontrol et ve yeniden dene.",
+  "onb_sync_err_other": "Bu sefer olmadı. Birazdan yeniden dene."
 }

@@ -2879,5 +2879,18 @@
   "set_about_version": "Verzija {version}",
   "epg_no_guide_any": "Nema programskog vodiča za ove kanale.",
   "set_guide_now_front": "Linija „sada” preko emisija",
-  "set_guide_now_front_hint": "Isključeno: linija koja označava trenutno vreme prolazi iza emisija i vidi se između njih. Uključeno: prelazi preko njih."
+  "set_guide_now_front_hint": "Isključeno: linija koja označava trenutno vreme prolazi iza emisija i vidi se između njih. Uključeno: prelazi preko njih.",
+  "onb_bring_offer": "Već koristiš dopeIPTV na drugom računaru? Prenesi svoja podešavanja",
+  "onb_bring_title": "Prenesi svoja podešavanja",
+  "onb_bring_sub": "Upiši kôd za sinhronizaciju sa drugog računara. Naći ćeš ga tamo pod Podešavanja → {page}.",
+  "onb_bring_go": "Prenesi",
+  "onb_bring_fetching": "Preuzimam tvoja podešavanja…",
+  "onb_or": "ili",
+  "onb_restore_backup": "Vrati rezervnu kopiju…",
+  "onb_restore_ready": "Tvoja rezervna kopija je spremna. dopeIPTV će je primeniti pri sledećem pokretanju.",
+  "onb_restore_quit": "Izađi sada",
+  "onb_sync_no_sources": "Tvoja podešavanja i profili su ovde. Tvoji izvori nisu stigli – uključi „{what}” pod {where} na oba računara ili ovde dodaj jedan.",
+  "onb_sync_err_net": "dopeiptv.org nije dostupan. Proveri vezu i pokušaj ponovo.",
+  "onb_sync_err_none": "Pod tim kodom ništa nije sinhronizovano. Proveri ga na drugom računaru i pokušaj ponovo.",
+  "onb_sync_err_other": "To sada nije uspelo. Pokušaj ponovo za trenutak."
 }

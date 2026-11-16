@@ -2879,5 +2879,18 @@
   "set_about_version": "Version {version}",
   "epg_no_guide_any": "Kein Programmführer für diese Kanäle.",
   "set_guide_now_front": "Jetzt-Linie über den Sendungen",
-  "set_guide_now_front_hint": "Aus läuft die Linie, die die aktuelle Zeit markiert, hinter den Sendungen und ist zwischen ihnen zu sehen. An läuft sie über sie hinweg."
+  "set_guide_now_front_hint": "Aus läuft die Linie, die die aktuelle Zeit markiert, hinter den Sendungen und ist zwischen ihnen zu sehen. An läuft sie über sie hinweg.",
+  "onb_bring_offer": "Nutzt du dopeIPTV schon auf einem anderen Computer? Einstellungen mitnehmen",
+  "onb_bring_title": "Deine Einstellungen mitnehmen",
+  "onb_bring_sub": "Gib den Sync-Code von deinem anderen Computer ein. Du findest ihn dort unter Einstellungen → {page}.",
+  "onb_bring_go": "Übernehmen",
+  "onb_bring_fetching": "Deine Einstellungen werden geholt…",
+  "onb_or": "oder",
+  "onb_restore_backup": "Sicherung wiederherstellen…",
+  "onb_restore_ready": "Deine Sicherung ist bereit. dopeIPTV übernimmt sie beim nächsten Start.",
+  "onb_restore_quit": "Jetzt beenden",
+  "onb_sync_no_sources": "Deine Einstellungen und Profile sind da. Deine Quellen sind nicht mitgekommen – schalte „{what}“ unter {where} auf beiden Computern ein, oder füge hier eine hinzu.",
+  "onb_sync_err_net": "dopeiptv.org nicht erreichbar. Prüfe deine Verbindung und versuche es noch einmal.",
+  "onb_sync_err_none": "Unter diesem Code ist nichts synchronisiert. Prüfe ihn auf deinem anderen Computer und versuche es noch einmal.",
+  "onb_sync_err_other": "Das hat gerade nicht geklappt. Versuche es gleich noch einmal."
 }

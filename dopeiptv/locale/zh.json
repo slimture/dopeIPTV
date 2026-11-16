@@ -2879,5 +2879,18 @@
   "set_about_version": "版本 {version}",
   "epg_no_guide_any": "这些频道暂无节目指南。",
   "set_guide_now_front": "当前时间线显示在节目上方",
-  "set_guide_now_front_hint": "关闭时，标示当前时间的线从节目后面经过，只在节目之间露出。开启时，它从节目上方穿过。"
+  "set_guide_now_front_hint": "关闭时，标示当前时间的线从节目后面经过，只在节目之间露出。开启时，它从节目上方穿过。",
+  "onb_bring_offer": "已经在另一台电脑上使用 dopeIPTV？把设置带过来",
+  "onb_bring_title": "把你的设置带过来",
+  "onb_bring_sub": "输入另一台电脑上的同步代码。可以在那台电脑的 设置 → {page} 中找到。",
+  "onb_bring_go": "带过来",
+  "onb_bring_fetching": "正在获取你的设置…",
+  "onb_or": "或",
+  "onb_restore_backup": "恢复备份…",
+  "onb_restore_ready": "备份已准备好。dopeIPTV 下次启动时会应用它。",
+  "onb_restore_quit": "立即退出",
+  "onb_sync_no_sources": "你的设置和个人资料已经到了。你的来源没有一起过来——请在两台电脑的 {where} 中打开“{what}”，或在这里添加一个。",
+  "onb_sync_err_net": "无法连接 dopeiptv.org。请检查网络连接后重试。",
+  "onb_sync_err_none": "此代码下没有同步内容。请在另一台电脑上核对后重试。",
+  "onb_sync_err_other": "这次没有成功。请稍后再试。"
 }

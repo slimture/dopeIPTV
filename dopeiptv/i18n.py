@@ -3103,6 +3103,19 @@ _STRINGS: dict[str, dict[str, str]] = {
     "sa_open_series": {"en": "Open series"},
     "sa_from_source": {"en": "From {source}"},
     "set_about_version": {"en": "Version {version}"},
+    "onb_bring_offer": {"en": "Already use dopeIPTV on another computer? Bring your settings"},
+    "onb_bring_title": {"en": "Bring your settings over"},
+    "onb_bring_sub": {"en": "Type the sync code from your other computer. You find it there under Settings → {page}."},
+    "onb_bring_go": {"en": "Bring them over"},
+    "onb_bring_fetching": {"en": "Fetching your settings…"},
+    "onb_or": {"en": "or"},
+    "onb_restore_backup": {"en": "Restore a backup…"},
+    "onb_restore_ready": {"en": "Your backup is ready. dopeIPTV puts it in place the next time it starts."},
+    "onb_restore_quit": {"en": "Quit now"},
+    "onb_sync_no_sources": {"en": "Your settings and profiles are here. Your sources didn't come along - turn on “{what}” under {where} on both computers, or add one here."},
+    "onb_sync_err_net": {"en": "Couldn't reach dopeiptv.org. Check your connection and try again."},
+    "onb_sync_err_none": {"en": "Nothing is synced under that code. Check it on your other computer and try again."},
+    "onb_sync_err_other": {"en": "That didn't work just now. Try again in a moment."},
 }
 
 

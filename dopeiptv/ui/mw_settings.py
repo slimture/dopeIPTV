@@ -377,22 +377,11 @@ class _SettingsMixin:
         """Settings > General > Backup: a backup back - over everything, as
         the app next starts, or its playlists beside the ones here now."""
         from ..core import backup
-        from .dialogs import RestoreBackupDialog
-        path, _f = QFileDialog.getOpenFileName(
-            parent, tr("restore_title"), "",
-            tr("file_filter_json") + ";;" + tr("file_filter_all"),
-            options=file_dialog_options())
-        if not path:
-            return
-        try:
-            b = backup.read(path)
-        except backup.BackupError as exc:
-            log.warning("restore: %s", exc)
-            text = (tr("pl_import_unreadable", error=exc.detail)
-                    if exc.reason == "unreadable"
-                    else tr("restore_newer", version=exc.detail or "?")
-                    if exc.reason == "newer" else tr("restore_invalid"))
-            QMessageBox.warning(parent, tr("restore_title"), text)
+        from .dialogs import RestoreBackupDialog, pick_backup, stage_backup
+        b, why = pick_backup(parent)
+        if b is None:
+            if why:
+                QMessageBox.warning(parent, tr("restore_title"), why)
             return
         store = getattr(self, "playlist_store", None)
         dlg = RestoreBackupDialog(parent, b, backup.summary(b),
@@ -418,12 +407,9 @@ class _SettingsMixin:
         if not confirm(parent, tr("restore_title"), tr("restore_confirm"),
                        default_yes=False):
             return
-        try:
-            backup.stage(b)
-        except (OSError, ValueError) as exc:
-            log.warning("restore: not staged: %s", exc)
-            QMessageBox.warning(parent, tr("restore_title"),
-                                tr("pl_export_failed", error=exc))
+        why = stage_backup(b)
+        if why:
+            QMessageBox.warning(parent, tr("restore_title"), why)
             return
         # As after Reset all: nothing written on the way out, and the app
         # closes - the backup is put in place as it next starts, where no

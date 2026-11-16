@@ -2879,5 +2879,18 @@
   "set_about_version": "バージョン {version}",
   "epg_no_guide_any": "これらのチャンネルには番組表がありません。",
   "set_guide_now_front": "現在時刻の線を番組の上に表示",
-  "set_guide_now_front_hint": "オフでは現在時刻を示す線は番組の後ろを通り、番組の間に見えます。オンでは番組の上を横切ります。"
+  "set_guide_now_front_hint": "オフでは現在時刻を示す線は番組の後ろを通り、番組の間に見えます。オンでは番組の上を横切ります。",
+  "onb_bring_offer": "ほかのパソコンでも dopeIPTV を使っていますか？ 設定を引き継ぐ",
+  "onb_bring_title": "設定を引き継ぐ",
+  "onb_bring_sub": "ほかのパソコンの同期コードを入力してください。そのパソコンの 設定 → {page} にあります。",
+  "onb_bring_go": "引き継ぐ",
+  "onb_bring_fetching": "設定を取得しています…",
+  "onb_or": "または",
+  "onb_restore_backup": "バックアップを復元…",
+  "onb_restore_ready": "バックアップの準備ができました。次に dopeIPTV を起動したときに反映されます。",
+  "onb_restore_quit": "今すぐ終了",
+  "onb_sync_no_sources": "設定とプロフィールを引き継ぎました。ソースは引き継がれていません。両方のパソコンで {where} の「{what}」をオンにするか、ここでソースを追加してください。",
+  "onb_sync_err_net": "dopeiptv.org に接続できません。接続を確認して、もう一度お試しください。",
+  "onb_sync_err_none": "このコードで同期されたものはありません。ほかのパソコンで確認して、もう一度お試しください。",
+  "onb_sync_err_other": "うまくいきませんでした。少ししてからもう一度お試しください。"
 }

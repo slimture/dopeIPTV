@@ -263,7 +263,7 @@ map and the one-way import rule.
 | `ui/mw_series_page.py` | The series page in the window: opened from a series anywhere (its list, Favorites, Watch later, Home's shelves, Continue watching, New episodes, the command palette, an actor's titles, the logo on a playing episode) and a local library's series, over the list left untouched - Back, Esc, the mouse's back button: that list exactly as it was, or Home; the episodes from the source's own series_info off the window's thread (kept 10 minutes), a calm word while they load; an episode played through `_start_playback` with the series as context for the moment (resume, marks, Trakt/Simkl, History, autoplay's queue), Continue without the resume question (`_sp_take_start`), the page following what plays (`_sp_playback_started`); the episode menu the list had; the season picked kept per series (`series_seasons`, the profile's own, never while private); a kids profile and locked categories as the lists; TMDB's backdrop and stills where the source has none |
 | `ui/search_page.py` | The Search page, pure presentation: one field (debounced), chips (All / Channels / Programmes / Movies / Series), the results in four groups under headings with counts, a few rows each and "Show all (N)", a painted row per hit (logo or poster through the loaders, only on screen; the title; a muted line naming its source; Live and a progress bar for a programme on the air), Up/Down across groups, Tab between the field and the results, Enter, a row's menu; mirrored right to left |
 | `ui/mw_search_all.py` | The Search page in the window (a place in the nav, Ctrl+Shift+F, the guide's Search button, the palette's "Search everywhere for …"): each source's lists and guide week read off the window's thread once (`services/search_sources.py`), a query matched on a worker of its own, the newest winning; a channel or a programme on now played with the page kept - another source's without switching (`mw_failover._play_other_source`, its address asked for only then), a programme later reminded in its own source's reminders (they fire whichever source is in use, `mw_reminders`) or recorded asking its source for the address at the start, a film or a series of another source once that source is switched to (`switch_playlist`'s *then*), the series page's Back to the results as they were; Esc empties the field, then goes back; nothing kept past leaving it while viewing privately |
-| `ui/welcome.py` | First-run welcome overlay |
+| `ui/welcome.py` | First-run welcome overlay; its Bring step (a quiet link on the first page, `_Link`): another computer's sync code or a backup asked of the window (`sync_asked`, `restore_asked`), its answers shown (`sync_failed`, `sync_no_sources` - the connect step with a note -, `finish`, `restore_staged` with Quit) |
 | `ui/category_flags.py` | Bundled SVG flags for category names (flag emoji, "SE \| …" prefixes) |
 | `ui/player_resize.py` | The handle under the docked video that sets its height |
 | `ui/theme.py` | Theming engine; `SUPPORTER_THEMES`, the two a supporter key opens |
@@ -293,9 +293,11 @@ row in the table above; in short:
   `mw_follow` (followed series, new-episode news), `mw_reminders`,
   `mw_calendar` (reminders and recordings as a calendar), `mw_stats`
   (your viewing statistics), `mw_donate` (the heart and Home's card one
-  week a month, About's link), `mw_onboarding`, `mw_busy` (loading indicator),
-  `mw_updates` (update badge), `mw_report` (feedback, error reports and
-  the answers to them).
+  week a month, About's link), `mw_onboarding` (the welcome; its Bring step
+  with Settings' own sync join and restore: the other computer's sources and
+  history followed where it syncs them, a miss leaves sync off), `mw_busy`
+  (loading indicator), `mw_updates` (update badge), `mw_report` (feedback,
+  error reports and the answers to them).
 - Watching: `mw_recording`, `mw_series` (series recording rules),
   `mw_multiview` (multiview), `mw_popout` (detached-window player),
   `mw_subtitles` (OpenSubtitles, subtitles remembered per title),

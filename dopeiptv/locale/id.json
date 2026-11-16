@@ -2879,5 +2879,18 @@
   "set_about_version": "Versi {version}",
   "epg_no_guide_any": "Tidak ada panduan program untuk saluran-saluran ini.",
   "set_guide_now_front": "Garis sekarang di atas acara",
-  "set_guide_now_front_hint": "Mati: garis penanda waktu sekarang lewat di belakang acara dan terlihat di antaranya. Nyala: garis melintasi acara."
+  "set_guide_now_front_hint": "Mati: garis penanda waktu sekarang lewat di belakang acara dan terlihat di antaranya. Nyala: garis melintasi acara.",
+  "onb_bring_offer": "Sudah memakai dopeIPTV di komputer lain? Bawa pengaturan Anda",
+  "onb_bring_title": "Bawa pengaturan Anda",
+  "onb_bring_sub": "Ketik kode sinkron dari komputer Anda yang lain. Anda menemukannya di sana pada Pengaturan → {page}.",
+  "onb_bring_go": "Bawa ke sini",
+  "onb_bring_fetching": "Mengambil pengaturan Anda…",
+  "onb_or": "atau",
+  "onb_restore_backup": "Pulihkan cadangan…",
+  "onb_restore_ready": "Cadangan Anda siap. dopeIPTV akan memasangnya saat dijalankan berikutnya.",
+  "onb_restore_quit": "Keluar sekarang",
+  "onb_sync_no_sources": "Pengaturan dan profil Anda sudah di sini. Sumber Anda tidak ikut – aktifkan “{what}” di {where} pada kedua komputer, atau tambahkan satu di sini.",
+  "onb_sync_err_net": "Tidak dapat menghubungi dopeiptv.org. Periksa koneksi Anda lalu coba lagi.",
+  "onb_sync_err_none": "Tidak ada yang disinkronkan dengan kode itu. Periksa di komputer Anda yang lain lalu coba lagi.",
+  "onb_sync_err_other": "Itu belum berhasil. Coba lagi sebentar lagi."
 }

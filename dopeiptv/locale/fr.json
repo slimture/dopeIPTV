@@ -2879,5 +2879,18 @@
   "set_about_version": "Version {version}",
   "epg_no_guide_any": "Pas de guide des programmes pour ces chaînes.",
   "set_guide_now_front": "Ligne de l'heure par-dessus les programmes",
-  "set_guide_now_front_hint": "Désactivée, la ligne qui marque l'heure actuelle passe derrière les programmes et se voit entre eux. Activée, elle les traverse."
+  "set_guide_now_front_hint": "Désactivée, la ligne qui marque l'heure actuelle passe derrière les programmes et se voit entre eux. Activée, elle les traverse.",
+  "onb_bring_offer": "Tu utilises déjà dopeIPTV sur un autre ordinateur ? Récupère tes paramètres",
+  "onb_bring_title": "Récupère tes paramètres",
+  "onb_bring_sub": "Saisis le code de synchronisation de ton autre ordinateur. Tu le trouveras là-bas dans Paramètres → {page}.",
+  "onb_bring_go": "Les récupérer",
+  "onb_bring_fetching": "Récupération de tes paramètres…",
+  "onb_or": "ou",
+  "onb_restore_backup": "Restaurer une sauvegarde…",
+  "onb_restore_ready": "Ta sauvegarde est prête. dopeIPTV la mettra en place au prochain démarrage.",
+  "onb_restore_quit": "Quitter maintenant",
+  "onb_sync_no_sources": "Tes paramètres et tes profils sont là. Tes sources n'ont pas suivi – active « {what} » dans {where} sur les deux ordinateurs, ou ajoutes-en une ici.",
+  "onb_sync_err_net": "Impossible de joindre dopeiptv.org. Vérifie ta connexion et réessaie.",
+  "onb_sync_err_none": "Rien n'est synchronisé sous ce code. Vérifie-le sur ton autre ordinateur et réessaie.",
+  "onb_sync_err_other": "Ça n'a pas marché cette fois. Réessaie dans un instant."
 }

@@ -2879,5 +2879,18 @@
   "set_about_version": "Versie {version}",
   "epg_no_guide_any": "Geen programmagids voor deze kanalen.",
   "set_guide_now_front": "Nu-lijn over de programma's",
-  "set_guide_now_front_hint": "Uit loopt de lijn die de huidige tijd aangeeft achter de programma's en is tussen ze te zien. Aan loopt hij eroverheen."
+  "set_guide_now_front_hint": "Uit loopt de lijn die de huidige tijd aangeeft achter de programma's en is tussen ze te zien. Aan loopt hij eroverheen.",
+  "onb_bring_offer": "Gebruik je dopeIPTV al op een andere computer? Neem je instellingen mee",
+  "onb_bring_title": "Neem je instellingen mee",
+  "onb_bring_sub": "Typ de synchronisatiecode van je andere computer. Je vindt hem daar onder Instellingen → {page}.",
+  "onb_bring_go": "Meenemen",
+  "onb_bring_fetching": "Je instellingen worden opgehaald…",
+  "onb_or": "of",
+  "onb_restore_backup": "Back-up terugzetten…",
+  "onb_restore_ready": "Je back-up staat klaar. dopeIPTV zet hem terug zodra het weer start.",
+  "onb_restore_quit": "Nu afsluiten",
+  "onb_sync_no_sources": "Je instellingen en profielen zijn er. Je bronnen zijn niet meegekomen – zet ‘{what}’ aan onder {where} op beide computers, of voeg er hier een toe.",
+  "onb_sync_err_net": "dopeiptv.org is niet bereikbaar. Controleer je verbinding en probeer het opnieuw.",
+  "onb_sync_err_none": "Onder die code is niets gesynchroniseerd. Controleer hem op je andere computer en probeer het opnieuw.",
+  "onb_sync_err_other": "Dat lukte nu niet. Probeer het zo opnieuw."
 }

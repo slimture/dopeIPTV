@@ -2879,5 +2879,18 @@
   "set_about_version": "Toleo {version}",
   "epg_no_guide_any": "Hakuna mwongozo wa vipindi kwa vituo hivi.",
   "set_guide_now_front": "Mstari wa sasa juu ya vipindi",
-  "set_guide_now_front_hint": "Ukizimwa, mstari unaoonyesha saa ya sasa hupita nyuma ya vipindi na huonekana kati yake. Ukiwashwa, hupita juu yake."
+  "set_guide_now_front_hint": "Ukizimwa, mstari unaoonyesha saa ya sasa hupita nyuma ya vipindi na huonekana kati yake. Ukiwashwa, hupita juu yake.",
+  "onb_bring_offer": "Tayari unatumia dopeIPTV kwenye kompyuta nyingine? Leta mipangilio yako",
+  "onb_bring_title": "Leta mipangilio yako",
+  "onb_bring_sub": "Andika msimbo wa kusawazisha kutoka kompyuta yako nyingine. Utaupata huko kwenye Mipangilio → {page}.",
+  "onb_bring_go": "Ilete",
+  "onb_bring_fetching": "Inaleta mipangilio yako…",
+  "onb_or": "au",
+  "onb_restore_backup": "Rejesha nakala rudufu…",
+  "onb_restore_ready": "Nakala yako rudufu iko tayari. dopeIPTV itaiweka mahali pake itakapoanza tena.",
+  "onb_restore_quit": "Ondoka sasa",
+  "onb_sync_no_sources": "Mipangilio na wasifu wako viko hapa. Vyanzo vyako havikuja – washa “{what}” chini ya {where} kwenye kompyuta zote mbili, au ongeza kimoja hapa.",
+  "onb_sync_err_net": "Haikuweza kufikia dopeiptv.org. Kagua muunganisho wako kisha ujaribu tena.",
+  "onb_sync_err_none": "Hakuna kilichosawazishwa chini ya msimbo huo. Ukague kwenye kompyuta yako nyingine kisha ujaribu tena.",
+  "onb_sync_err_other": "Hilo halikufaulu sasa hivi. Jaribu tena baada ya muda mfupi."
 }

@@ -9,6 +9,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [1.6.1]
 
+### Added
+
+- The welcome brings your settings over from another computer: "Already use dopeIPTV on another computer? Bring your settings" on its first page takes the sync code from there (joined as Settings > Sync joins it, fetched off the window's thread) or restores a backup. Profiles, settings and favorites come along; sources and watch history too where the other computer syncs them, and then this one syncs them as well. With sources the welcome closes and loads them (and asks "Who's watching?" with two profiles or more); without, the connect step says why. A wrong code, nothing under it or no network is said plainly and leaves sync off; a modified build is refused as in Settings. A restored backup is staged for the next start, with Quit to get there.
+
 ### Fixed
 
 - Night mode can be heard. The leveller alone, with slow settings, did

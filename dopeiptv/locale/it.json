@@ -2879,5 +2879,18 @@
   "set_about_version": "Versione {version}",
   "epg_no_guide_any": "Nessuna guida ai programmi per questi canali.",
   "set_guide_now_front": "Linea dell'ora sopra i programmi",
-  "set_guide_now_front_hint": "Disattivata, la linea che segna l'ora attuale passa dietro i programmi e si vede tra l'uno e l'altro. Attivata, li attraversa."
+  "set_guide_now_front_hint": "Disattivata, la linea che segna l'ora attuale passa dietro i programmi e si vede tra l'uno e l'altro. Attivata, li attraversa.",
+  "onb_bring_offer": "Usi già dopeIPTV su un altro computer? Porta qui le tue impostazioni",
+  "onb_bring_title": "Porta qui le tue impostazioni",
+  "onb_bring_sub": "Scrivi il codice di sincronizzazione dell'altro computer. Lo trovi lì in Impostazioni → {page}.",
+  "onb_bring_go": "Portale qui",
+  "onb_bring_fetching": "Recupero delle impostazioni…",
+  "onb_or": "oppure",
+  "onb_restore_backup": "Ripristina un backup…",
+  "onb_restore_ready": "Il tuo backup è pronto. dopeIPTV lo applicherà al prossimo avvio.",
+  "onb_restore_quit": "Esci ora",
+  "onb_sync_no_sources": "Le tue impostazioni e i tuoi profili sono qui. Le tue fonti non sono arrivate: attiva «{what}» in {where} su entrambi i computer, oppure aggiungine una qui.",
+  "onb_sync_err_net": "Impossibile raggiungere dopeiptv.org. Controlla la connessione e riprova.",
+  "onb_sync_err_none": "Sotto questo codice non c'è nulla di sincronizzato. Controllalo sull'altro computer e riprova.",
+  "onb_sync_err_other": "Non ha funzionato. Riprova tra un momento."
 }

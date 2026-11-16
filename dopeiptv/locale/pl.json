@@ -2879,5 +2879,18 @@
   "set_about_version": "Wersja {version}",
   "epg_no_guide_any": "Brak przewodnika po programach dla tych kanałów.",
   "set_guide_now_front": "Linia „teraz” nad programami",
-  "set_guide_now_front_hint": "Wyłączona: linia oznaczająca bieżący czas biegnie za programami i widać ją między nimi. Włączona: przechodzi przez nie."
+  "set_guide_now_front_hint": "Wyłączona: linia oznaczająca bieżący czas biegnie za programami i widać ją między nimi. Włączona: przechodzi przez nie.",
+  "onb_bring_offer": "Używasz już dopeIPTV na innym komputerze? Przenieś swoje ustawienia",
+  "onb_bring_title": "Przenieś swoje ustawienia",
+  "onb_bring_sub": "Wpisz kod synchronizacji z drugiego komputera. Znajdziesz go tam w Ustawienia → {page}.",
+  "onb_bring_go": "Przenieś",
+  "onb_bring_fetching": "Pobieram twoje ustawienia…",
+  "onb_or": "lub",
+  "onb_restore_backup": "Przywróć kopię zapasową…",
+  "onb_restore_ready": "Kopia zapasowa jest gotowa. dopeIPTV wczyta ją przy następnym uruchomieniu.",
+  "onb_restore_quit": "Zakończ teraz",
+  "onb_sync_no_sources": "Twoje ustawienia i profile są tutaj. Źródła nie zostały przeniesione – włącz „{what}” w sekcji {where} na obu komputerach albo dodaj źródło tutaj.",
+  "onb_sync_err_net": "Brak połączenia z dopeiptv.org. Sprawdź połączenie i spróbuj ponownie.",
+  "onb_sync_err_none": "Pod tym kodem nic nie jest zsynchronizowane. Sprawdź go na drugim komputerze i spróbuj ponownie.",
+  "onb_sync_err_other": "Tym razem się nie udało. Spróbuj ponownie za chwilę."
 }

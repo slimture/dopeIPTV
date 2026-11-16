@@ -11,6 +11,11 @@ child widget, not a modal dialog, so it feels part of the app):
                Xtream link pasted into the server field auto-fills the three
                credential fields.
   3. Trakt   - optional Trakt.tv sync.
+  4. Bring   - for someone who uses dopeIPTV on another computer already
+               (a quiet link on the first page): the sync code from there,
+               or a backup file. The window does the work
+               (ui/mw_onboarding.py, with Settings' own sync and restore)
+               and says how it went.
 
 At any point the user can "Skip for now" and explore the empty app; a
 pulsing "+ Add provider" button in the middle pane brings the wizard back
@@ -19,9 +24,10 @@ until a provider is configured.
 
 from __future__ import annotations
 
+from html import escape
 from typing import Callable
 
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QComboBox, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QScrollArea, QSizePolicy, QStackedWidget, QVBoxLayout, QWidget,
@@ -36,9 +42,85 @@ from .dialogs import PlaylistDialog, stalker_available
 from .media_signin import MediaSignIn
 from .theme import P
 
+#: The pages, in the stack's order.
+PAGE_WELCOME, PAGE_CONNECT, PAGE_TRAKT, PAGE_BRING = range(4)
+
+
+class _Link(QLabel):
+    """A quiet link that wraps: a long translation goes on a second line
+    instead of being cut at the card's edge, as a button's text would.
+    Clicked, or Enter / Space with the focus on it."""
+
+    clicked = pyqtSignal()
+
+    def __init__(self, text: str = "", parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("OnbLink")
+        self.setWordWrap(True)
+        self.setTextFormat(Qt.TextFormat.RichText)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self._plain = ""
+        self._hot = False
+        self.set_plain(text)
+
+    def plain(self) -> str:
+        return self._plain
+
+    def set_plain(self, text: str) -> None:
+        self._plain = text
+        self.setAccessibleName(text)
+        self._paint()
+
+    def _paint(self) -> None:
+        hot = self._hot or self.hasFocus()
+        colour = P["text"] if hot else P["muted2"]
+        body = escape(self._plain)
+        self.setText(f"<span style='color:{colour}'>"
+                     + (f"<u>{body}</u>" if hot else body) + "</span>")
+
+    def enterEvent(self, event) -> None:
+        self._hot = True
+        self._paint()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        self._hot = False
+        self._paint()
+        super().leaveEvent(event)
+
+    def focusInEvent(self, event) -> None:
+        super().focusInEvent(event)
+        self._paint()
+
+    def focusOutEvent(self, event) -> None:
+        super().focusOutEvent(event)
+        self._paint()
+
+    def mouseReleaseEvent(self, event) -> None:
+        super().mouseReleaseEvent(event)
+        if event.button() == Qt.MouseButton.LeftButton and self.rect().contains(
+                event.position().toPoint()):
+            self.clicked.emit()
+
+    def keyPressEvent(self, event) -> None:
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
+            self.clicked.emit()
+            return
+        super().keyPressEvent(event)
+
 
 class WelcomeOverlay(QWidget):
     """First-run onboarding overlay: a multi-step welcome/connect/Trakt wizard drawn over the main content."""
+
+    #: The Bring step asks the window (ui/mw_onboarding.py): sync with this
+    #: code; stop the sync it started; pick a backup to restore; quit, so a
+    #: staged backup is put in place as the app starts again.
+    sync_asked = pyqtSignal(str)
+    sync_cancelled = pyqtSignal()
+    restore_asked = pyqtSignal()
+    quit_asked = pyqtSignal()
     # Decorative greetings that flash on the first page - one per shipped
     # language, so the rotation mirrors how many languages the app speaks.
     _GREETINGS = (
@@ -94,7 +176,14 @@ class WelcomeOverlay(QWidget):
             # read on the connect step, clearly set apart from the fields.
             f"#OnbTip {{ font-size: 12px; color: {P['text']};"
             f" background: {P['input']}; border: 1px solid {P['border']};"
-            f" border-radius: 8px; padding: 8px 10px; }}")
+            f" border-radius: 8px; padding: 8px 10px; }}"
+            # What came over from the other computer, and what did not: over
+            # the connect step, set apart from the tip by the accent's edge.
+            f"#OnbNote {{ font-size: 12px; color: {P['text']};"
+            f" background: {P['input']}; border: 1px solid {P['accent']};"
+            f" border-radius: 8px; padding: 8px 10px; }}"
+            f"#OnbLink {{ font-size: 11px; padding: 4px 0; }}"
+            f"#OnbOr {{ font-size: 11px; color: {P['muted2']}; }}")
 
         # Stretches above and below keep the card at its natural (content)
         # height, centred - without them the card stretches to fill the whole
@@ -113,6 +202,7 @@ class WelcomeOverlay(QWidget):
         self._stack.addWidget(self._build_welcome_page())   # 0
         self._stack.addWidget(self._build_connect_page())   # 1
         self._stack.addWidget(self._build_trakt_page())     # 2
+        self._stack.addWidget(self._build_bring_page())     # 3
         # The pages scroll inside the card when the window is too low for
         # the whole page (a small screen, a long language, the box finder's
         # note): the card never grows past the window and cuts them off.
@@ -193,6 +283,12 @@ class WelcomeOverlay(QWidget):
         lay.addWidget(self._w_next)
         lay.addWidget(self._w_demo)
         lay.addWidget(self._w_skip)
+        lay.addSpacing(2)
+        # For someone who has dopeIPTV on another computer: their settings
+        # brought over (the Bring step) instead of starting from nothing.
+        self._w_bring = _Link(tr("onb_bring_offer"))
+        self._w_bring.clicked.connect(self._open_bring)
+        lay.addWidget(self._w_bring)
         # Nerd, offered quietly: a small link under it all. On, the next
         # step offers boxes on the home network too; off, nothing changes.
         self._w_nerd = QPushButton(objectName="OnbNerd")
@@ -244,6 +340,10 @@ class WelcomeOverlay(QWidget):
         # provider link, or fill the fields in by hand. Shown in both modes.
         self._c_hint = QLabel(tr("onb_xtream_link_hint"), objectName="OnbTip")
         self._c_hint.setWordWrap(True)
+        # After a sync that brought settings but no source (sync_no_sources).
+        self._c_note = QLabel("", objectName="OnbNote")
+        self._c_note.setWordWrap(True)
+        self._c_note.setVisible(False)
 
         form = QFormLayout()
         s = self._settings
@@ -321,6 +421,7 @@ class WelcomeOverlay(QWidget):
                                  "onb_feat_3", "onb_feat_4")]
 
         lay.addWidget(self._c_title)
+        lay.addWidget(self._c_note)
         lay.addWidget(self._c_hint)
         lay.addLayout(form)
         # Connect sits directly under the Password field; the error line
@@ -378,6 +479,76 @@ class WelcomeOverlay(QWidget):
         lay.addWidget(self._t_finish)
         return page
 
+    def _build_bring_page(self) -> QWidget:
+        page = QWidget()
+        lay = QVBoxLayout(page)
+        lay.setSpacing(7)
+        self._b_title = QLabel(tr("onb_bring_title"), objectName="OnbTitle")
+        self._b_title.setWordWrap(True)
+        self._b_sub = QLabel(tr("onb_bring_sub", page=tr("sync_title")), objectName="OnbSub")
+        self._b_sub.setWordWrap(True)
+        # Typed or pasted the way Settings > Sync takes it (any case, any
+        # separators); checked by the window with core/sync.parse_code.
+        self._b_code = QLineEdit()
+        self._b_code.setPlaceholderText(tr("sync_code"))
+        self._b_code.returnPressed.connect(self._ask_sync)
+        self._b_code.textEdited.connect(self._bring_edited)
+        self._b_go = QPushButton(tr("onb_bring_go"), objectName="Primary")
+        self._b_go.setMinimumHeight(34)
+        self._b_go.clicked.connect(self._ask_sync)
+        self._b_wait = QLabel(tr("onb_bring_fetching"), objectName="OnbSub")
+        self._b_wait.setWordWrap(True)
+        self._b_wait.setVisible(False)
+        self._b_err = QLabel("", objectName="OnbErr")
+        self._b_err.setWordWrap(True)
+        self._b_err.setVisible(False)
+        # What dopeiptv.org gets, in Settings > Sync's words: a caption.
+        self._b_private = QLabel(tr("sync_privacy_title"), objectName="OnbOr")
+        self._b_private.setWordWrap(True)
+        self._b_private.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self._b_or = QLabel(tr("onb_or"), objectName="OnbOr")
+        self._b_or.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._b_restore = QPushButton(tr("onb_restore_backup"))
+        self._b_restore.clicked.connect(self._ask_restore)
+        self._b_rerr = QLabel("", objectName="OnbErr")
+        self._b_rerr.setWordWrap(True)
+        self._b_rerr.setVisible(False)
+        # A backup staged: put in place as the app next starts.
+        self._b_ready = QLabel("", objectName="OnbOk")
+        self._b_ready.setWordWrap(True)
+        self._b_ready.setVisible(False)
+        self._b_quit = QPushButton(tr("onb_restore_quit"), objectName="Primary")
+        self._b_quit.setMinimumHeight(34)
+        self._b_quit.setVisible(False)
+        self._b_quit.clicked.connect(self._ask_quit)
+
+        lay.addWidget(self._b_title)
+        lay.addWidget(self._b_sub)
+        lay.addSpacing(2)
+        lay.addWidget(self._b_code)
+        lay.addWidget(self._b_go)
+        lay.addWidget(self._b_wait)
+        lay.addWidget(self._b_err)
+        lay.addWidget(self._b_private)
+        lay.addSpacing(4)
+        lay.addWidget(self._b_or)
+        lay.addWidget(self._b_restore)
+        lay.addWidget(self._b_rerr)
+        lay.addWidget(self._b_ready)
+        lay.addWidget(self._b_quit)
+        lay.addSpacing(2)
+        row = QHBoxLayout()
+        self._b_back = QPushButton(tr("onb_back"))
+        self._b_back.clicked.connect(self._bring_back)
+        row.addWidget(self._b_back)
+        row.addStretch(1)
+        lay.addLayout(row)
+        self._b_busy = False
+        self._b_allowed = True
+        self._b_staged = False
+        return page
+
     def set_trakt_connected(self, connected: bool) -> None:
         """Reflect a successful Trakt link: swap the connect button for a green
         confirmation and nudge the finish button so the step reads as done."""
@@ -388,6 +559,117 @@ class WelcomeOverlay(QWidget):
         self._t_ok.setVisible(True)
         self._t_connect.setText(tr("onb_trakt_reconnect"))
         self._t_finish.setText(tr("onb_finish_done"))
+        self._fit_card(self._stack.currentIndex())
+
+    # -- the Bring step: what the window says back ----------------------------
+
+    def sync_failed(self, text: str) -> None:
+        """The sync did not bring anything: why, and the code to try again."""
+        self._set_busy(False)
+        self._b_err.setText(text)
+        self._b_err.setVisible(True)
+        self._fit_card(self._stack.currentIndex())
+
+    def sync_no_sources(self) -> None:
+        """Settings and profiles came, no source: the connect step, with a
+        word on why and what to do."""
+        self._set_busy(False)
+        self._b_code.clear()
+        self._b_err.setVisible(False)
+        self._c_note.setText(self._no_sources_text())
+        self._c_note.setVisible(True)
+        self._stack.setCurrentIndex(PAGE_CONNECT)
+        self._fit_card(PAGE_CONNECT)
+
+    @staticmethod
+    def _no_sources_text() -> str:
+        # The switch named as Settings > Sync names it.
+        return tr("onb_sync_no_sources", what=tr("tab_playlists"), where=tr("sync_nav"))
+
+    def finish(self) -> None:
+        """Sources came along: the wizard goes, the window loads them."""
+        self._set_busy(False)
+        self._b_code.clear()
+        self._finish()
+
+    def restore_failed(self, text: str) -> None:
+        self._b_rerr.setText(text)
+        self._b_rerr.setVisible(bool(text))
+        self._fit_card(self._stack.currentIndex())
+
+    def restore_staged(self) -> None:
+        """A backup waits for the next start: said, with Quit to get there."""
+        self._b_rerr.setVisible(False)
+        self._b_ready.setText(tr("onb_restore_ready"))
+        self._b_ready.setVisible(True)
+        self._b_quit.setVisible(True)
+        # The backup replaces everything as the app starts: a sync now
+        # would be gone with it.
+        self._b_staged = True
+        self._set_busy(False)
+
+    # -- the Bring step: what it asks -----------------------------------------
+
+    def _open_bring(self) -> None:
+        # A modified build may not use dopeiptv.org's sync: said as Settings
+        # says it, the code's field off; a backup is this computer's alone.
+        from ..core import build_check
+        verdict = build_check.settled()
+        self._b_allowed = verdict is None or build_check.allowed()
+        if not self._b_allowed:
+            self._b_err.setText(build_check.notice("sync"))
+            self._b_err.setVisible(True)
+        elif not self._b_busy:
+            self._b_err.setVisible(False)
+        self._set_busy(self._b_busy)
+        self._stack.setCurrentIndex(PAGE_BRING)
+        if self._b_allowed:
+            self._b_code.setFocus()
+
+    def _ask_sync(self) -> None:
+        if self._b_busy or not self._b_allowed or self._b_staged:
+            return
+        text = self._b_code.text().strip()
+        if not text:
+            self._b_code.setFocus()
+            return
+        self._b_err.setVisible(False)
+        self._set_busy(True)
+        self.sync_asked.emit(text)
+
+    def _bring_edited(self, _text: str = "") -> None:
+        if self._b_err.isVisible() and self._b_allowed:
+            self._b_err.setVisible(False)
+            self._fit_card(self._stack.currentIndex())
+
+    def _ask_restore(self) -> None:
+        if self._b_busy:
+            return
+        self._b_rerr.setVisible(False)
+        self.restore_asked.emit()
+
+    def _ask_quit(self) -> None:
+        self.quit_asked.emit()
+
+    def _bring_back(self) -> None:
+        """Back to the first page; a sync still fetching is stopped."""
+        self._cancel_sync()
+        self._stack.setCurrentIndex(PAGE_WELCOME)
+
+    def _cancel_sync(self) -> None:
+        if self._b_busy:
+            self._set_busy(False)
+            self.sync_cancelled.emit()
+
+    def _set_busy(self, on: bool) -> None:
+        self._b_busy = on
+        ready = not on and self._b_allowed and not self._b_staged
+        self._b_code.setEnabled(ready)
+        self._b_go.setEnabled(ready)
+        self._b_restore.setEnabled(not on)
+        self._b_wait.setVisible(on)
+        if on:
+            self._b_err.setVisible(False)
         self._fit_card(self._stack.currentIndex())
 
     # -- actions -------------------------------------------------------------
@@ -555,7 +837,8 @@ class WelcomeOverlay(QWidget):
 
     def dismiss(self) -> None:
         """Close the wizard the same as 'Continue without account' - called by
-        the main window's Escape shortcut."""
+        the main window's Escape shortcut. A sync still fetching stops."""
+        self._cancel_sync()
         self._explore()
 
     def _demo(self) -> None:
@@ -613,6 +896,22 @@ class WelcomeOverlay(QWidget):
         self._t_ok.setText(tr("onb_trakt_connected"))
         self._t_finish.setText(
             tr("onb_finish_done") if connected else tr("onb_finish"))
+        self._w_bring.set_plain(tr("onb_bring_offer"))
+        self._c_note.setText(self._no_sources_text())
+        self._b_title.setText(tr("onb_bring_title"))
+        self._b_sub.setText(tr("onb_bring_sub", page=tr("sync_title")))
+        self._b_code.setPlaceholderText(tr("sync_code"))
+        self._b_go.setText(tr("onb_bring_go"))
+        self._b_wait.setText(tr("onb_bring_fetching"))
+        self._b_private.setText(tr("sync_privacy_title"))
+        self._b_or.setText(tr("onb_or"))
+        self._b_restore.setText(tr("onb_restore_backup"))
+        self._b_ready.setText(tr("onb_restore_ready"))
+        self._b_quit.setText(tr("onb_restore_quit"))
+        self._b_back.setText(tr("onb_back"))
+        if not self._b_allowed:
+            from ..core import build_check
+            self._b_err.setText(build_check.notice("sync"))
 
     # -- geometry ------------------------------------------------------------
 
@@ -673,6 +972,10 @@ class WelcomeOverlay(QWidget):
         self._stack.setCurrentIndex(0)
         self._c_err.setText("")
         self._c_err.setVisible(False)
+        self._c_note.setVisible(False)
+        self._b_err.setVisible(False)
+        self._b_rerr.setVisible(False)
+        self._set_busy(False)
         if not self._flash.isActive():
             self._flash.start(1300)
 

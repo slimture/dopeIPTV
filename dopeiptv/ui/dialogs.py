@@ -2116,3 +2116,41 @@ class RestoreBackupDialog(QDialog):
         if self.replace.isChecked() and self.replace.isEnabled():
             return "replace"
         return "add"
+
+
+def pick_backup(parent) -> tuple[Any, str]:
+    """A backup file picked and read (core/backup.py): (it, "") - or
+    (None, why) for a file that is not one, (None, "") for none picked.
+    Settings' restore and the welcome's both start here."""
+    from PyQt6.QtWidgets import QFileDialog
+
+    from ..core import backup
+    from ..core.log import log
+    from .widgets import file_dialog_options
+    path, _f = QFileDialog.getOpenFileName(
+        parent, tr("restore_title"), "",
+        tr("file_filter_json") + ";;" + tr("file_filter_all"),
+        options=file_dialog_options())
+    if not path:
+        return None, ""
+    try:
+        return backup.read(path), ""
+    except backup.BackupError as exc:
+        log.warning("restore: %s", exc)
+        return None, (tr("pl_import_unreadable", error=exc.detail)
+                      if exc.reason == "unreadable"
+                      else tr("restore_newer", version=exc.detail or "?")
+                      if exc.reason == "newer" else tr("restore_invalid"))
+
+
+def stage_backup(b: Any) -> str:
+    """*b* left to be put back over everything at the next start
+    (core/backup.stage): "" - or why it could not be."""
+    from ..core import backup
+    from ..core.log import log
+    try:
+        backup.stage(b)
+    except (OSError, ValueError) as exc:
+        log.warning("restore: not staged: %s", exc)
+        return tr("pl_export_failed", error=exc)
+    return ""

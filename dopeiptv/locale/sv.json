@@ -2879,5 +2879,18 @@
   "set_about_version": "Version {version}",
   "epg_no_guide_any": "Ingen programguide för de här kanalerna.",
   "set_guide_now_front": "Nu-linjen över programmen",
-  "set_guide_now_front_hint": "Av går linjen som visar tiden just nu bakom programmen och syns mellan dem. På går den över dem."
+  "set_guide_now_front_hint": "Av går linjen som visar tiden just nu bakom programmen och syns mellan dem. På går den över dem.",
+  "onb_bring_offer": "Använder du redan dopeIPTV på en annan dator? Ta med dina inställningar",
+  "onb_bring_title": "Ta med dina inställningar",
+  "onb_bring_sub": "Skriv synkkoden från din andra dator. Du hittar den där under Inställningar → {page}.",
+  "onb_bring_go": "Ta med dem",
+  "onb_bring_fetching": "Hämtar dina inställningar…",
+  "onb_or": "eller",
+  "onb_restore_backup": "Återställ en säkerhetskopia…",
+  "onb_restore_ready": "Din säkerhetskopia är klar. dopeIPTV lägger in den nästa gång det startar.",
+  "onb_restore_quit": "Avsluta nu",
+  "onb_sync_no_sources": "Dina inställningar och profiler är här. Dina källor följde inte med – slå på ”{what}” under {where} på båda datorerna, eller lägg till en här.",
+  "onb_sync_err_net": "Kom inte fram till dopeiptv.org. Kontrollera anslutningen och försök igen.",
+  "onb_sync_err_none": "Inget är synkat under den koden. Kontrollera den på din andra dator och försök igen.",
+  "onb_sync_err_other": "Det gick inte just nu. Försök igen om en stund."
 }

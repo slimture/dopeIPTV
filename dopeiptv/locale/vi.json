@@ -2879,5 +2879,18 @@
   "set_about_version": "Phiên bản {version}",
   "epg_no_guide_any": "Không có lịch phát chương trình cho các kênh này.",
   "set_guide_now_front": "Vạch hiện tại phía trên chương trình",
-  "set_guide_now_front_hint": "Tắt: vạch đánh dấu thời điểm hiện tại chạy phía sau các chương trình và hiện giữa chúng. Bật: vạch chạy đè lên chúng."
+  "set_guide_now_front_hint": "Tắt: vạch đánh dấu thời điểm hiện tại chạy phía sau các chương trình và hiện giữa chúng. Bật: vạch chạy đè lên chúng.",
+  "onb_bring_offer": "Bạn đã dùng dopeIPTV trên máy tính khác? Mang cài đặt của bạn sang",
+  "onb_bring_title": "Mang cài đặt của bạn sang",
+  "onb_bring_sub": "Nhập mã đồng bộ từ máy tính kia. Bạn tìm thấy nó ở máy đó trong Cài đặt → {page}.",
+  "onb_bring_go": "Mang sang",
+  "onb_bring_fetching": "Đang lấy cài đặt của bạn…",
+  "onb_or": "hoặc",
+  "onb_restore_backup": "Khôi phục bản sao lưu…",
+  "onb_restore_ready": "Bản sao lưu của bạn đã sẵn sàng. dopeIPTV sẽ áp dụng nó vào lần khởi động tới.",
+  "onb_restore_quit": "Thoát ngay",
+  "onb_sync_no_sources": "Cài đặt và hồ sơ của bạn đã ở đây. Các nguồn của bạn chưa được mang theo – hãy bật “{what}” trong {where} trên cả hai máy, hoặc thêm một nguồn ở đây.",
+  "onb_sync_err_net": "Không kết nối được dopeiptv.org. Hãy kiểm tra kết nối rồi thử lại.",
+  "onb_sync_err_none": "Không có gì được đồng bộ dưới mã đó. Hãy kiểm tra trên máy kia rồi thử lại.",
+  "onb_sync_err_other": "Lần này chưa được. Hãy thử lại sau giây lát."
 }
