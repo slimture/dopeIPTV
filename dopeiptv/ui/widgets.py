@@ -237,6 +237,51 @@ class SolecraftLink(QPushButton):
         super().leaveEvent(event)
 
 
+_TMDB_SVG = Path(__file__).resolve().parent.parent / "assets" / "tmdb.svg"
+TMDB_URL = "https://www.themoviedb.org"
+
+
+def tmdb_pixmap(height: int, dpr: float = 1.0) -> QPixmap | None:
+    """TMDB's own logo (its short one, as TMDB publishes it - colours left
+    as they are) *height* px tall, or None when it cannot be read."""
+    reader = QImageReader(str(_TMDB_SVG))
+    size = reader.size()
+    if not size.isValid() or size.height() <= 0:
+        return None
+    px_h = max(1, round(height * dpr))
+    reader.setScaledSize(QSize(round(size.width() * px_h / size.height()), px_h))
+    img = reader.read()
+    if img.isNull():
+        return None
+    pm = QPixmap.fromImage(img)
+    pm.setDevicePixelRatio(dpr)
+    return pm
+
+
+class TmdbLink(QPushButton):
+    """TMDB's logo beside the credit TMDB asks for, a link to its site;
+    small, well below the app's own mark. The name in text where the logo
+    cannot be drawn."""
+
+    HEIGHT = 10
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip("TMDB - themoviedb.org")
+        self.setAccessibleName("TMDB")
+        self.setFlat(True)
+        self.setStyleSheet("QPushButton { border:none; background:transparent;"
+                           " padding:3px 0; font-size:11px; }")
+        pm = tmdb_pixmap(self.HEIGHT, self.devicePixelRatioF())
+        if pm is None:
+            self.setText("TMDB")
+        else:
+            self.setIcon(QIcon(pm))
+            self.setIconSize(QSize(round(pm.width() / pm.devicePixelRatio()),
+                                   self.HEIGHT))
+
+
 class _ChipPainting:
     """A button drawn as a filled circle with its icon in the middle, once
     ``set_chip`` has been called (until then it paints as ever).

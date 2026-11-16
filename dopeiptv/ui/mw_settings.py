@@ -2985,7 +2985,15 @@ class _SettingsMixin:
         credit.setWordWrap(True)
         credit.setOpenExternalLinks(True)
         credit.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
-        lay.addWidget(credit)
+        # TMDB's logo beside its credit, as its attribution rules ask.
+        from .widgets import TMDB_URL, TmdbLink
+        tmdb = TmdbLink()
+        tmdb.clicked.connect(lambda: open_url(TMDB_URL))
+        credit_row = QHBoxLayout()
+        credit_row.setSpacing(10)
+        credit_row.addWidget(tmdb, 0, Qt.AlignmentFlag.AlignTop)
+        credit_row.addWidget(credit, 1)
+        lay.addLayout(credit_row)
 
         # Who makes it, beside Close: the Solecraft logotype, quiet like the
         # links above (the website's footer says it the same way).

@@ -169,6 +169,22 @@ def test_notes_from_an_unknown_version_still_show_the_newest():
         "Just text.", "1.4.2") == "Just text."
 
 
+def test_tmdbs_logo_ships_and_draws_beside_its_credit():
+    """About shows TMDB's own logo by its credit, as TMDB's attribution
+    asks: the file ships with the package, unchanged in colour, small."""
+    app = QApplication.instance() or QApplication([])   # kept: QPixmap needs it
+    from dopeiptv.ui.widgets import TmdbLink, tmdb_pixmap
+    pm = tmdb_pixmap(10)
+    assert pm is not None and pm.height() == 10 and pm.width() > 60
+    link = TmdbLink()
+    assert not link.icon().isNull() and link.text() == ""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(root, "dopeiptv", "assets", "tmdb.svg"), encoding="utf-8") as fh:
+        svg = fh.read()
+    assert "#90cea1" in svg and "#00b3e5" in svg       # TMDB's own colours
+    del link, app
+
+
 def test_the_solecraft_logotype_ships_and_draws():
     """About's "Made by" draws the logotype from the package's assets; a
     build that left the file out would fall back to plain text."""
