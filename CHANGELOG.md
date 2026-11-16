@@ -63,6 +63,12 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   counted as a connection of the source in use; it is no provider's and
   is no longer counted, so it brings no question and no refusal from
   server mode.
+- A recording of what plays that went on over a new connection lost its
+  source: it was counted on every source and lost that source's VPN rule
+  and own network route. It now keeps the source of the channel it
+  records - also when that channel was from failover, the Search page or
+  a source switched away from, where it went on with the new source's
+  channel of the same number; it now goes on at the address it played.
 
 ## [1.6.0]
 

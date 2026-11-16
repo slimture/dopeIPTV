@@ -342,17 +342,22 @@ class RecordingManager(QObject):
     def add_inplayer_job(self, title: str, path: str,
                          stop_ts: float | None, url: str = "",
                          icon: str | None = None,
-                         recorder: Any = None, channel: str = "") -> dict:
+                         recorder: Any = None, channel: str = "",
+                         extra: dict | None = None) -> dict:
         """Register a recording that rides the embedded player's stream -
         or, with *recorder*, reads the player's own rewind buffer (a
         BufferRecorder): no connection of its own, whole through a pause,
-        and able to go on in the background (keep_in_background)."""
+        and able to go on in the background (keep_in_background). *extra*:
+        what else it keeps (its source, which a recording continued over a
+        connection of its own takes), never one of the keys above."""
         job: dict[str, Any] = {
             "id": uuid.uuid4().hex[:10], "url": url, "title": title,
             "start": time.time(), "stop": stop_ts, "folder": "",
             "status": "recording", "path": path, "error": "",
             "proc": None, "inplayer": True, "stream_icon": icon or "",
             "recorder": recorder, "channel": channel or ""}
+        for k, v in (extra or {}).items():
+            job.setdefault(k, v)
         self.jobs.append(job)
         if icon and path:
             self.write_info(path, "", "", icon=icon)

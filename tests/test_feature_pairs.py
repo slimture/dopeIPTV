@@ -1583,3 +1583,77 @@ def test_a_web_stream_or_a_station_is_no_provider_s_connection():
     w._note_playing_source(url, 7, "live")
     w._last_playback = {"url": url, "kind": "live"}
     assert [(u.kind, u.source) for u in w._conn_uses()] == [("player", "a")]
+
+
+def test_a_recording_continued_over_a_new_connection_keeps_its_source():
+    """What plays (A's channel) is recorded in the player; B is in use
+    since. Switched away with "go on over a new connection", the recording
+    is still A's - counted there, with A's VPN rule and route - as the one
+    in the player was."""
+    from dopeiptv.ui.mw_recording import _RecordingMixin
+
+    url = "http://a.invalid/live/u/p/7.ts"
+    made: list[dict] = []
+
+    class Rec:
+        def __init__(self):
+            self.jobs: list[dict] = []
+
+        def build_path(self, title, channel=""):
+            return "/nowhere/news.ts"
+
+        def add_inplayer_job(self, title, path, stop_ts, url="", icon=None,
+                             recorder=None, channel="", extra=None):
+            job = {"id": "j1", "title": title, "url": url, "status": "recording",
+                   "inplayer": True, "stop": stop_ts, "recorder": recorder}
+            for k, v in (extra or {}).items():
+                job.setdefault(k, v)
+            self.jobs.append(job)
+            return job
+
+        def buffer_recording(self, _job):
+            return False
+
+        def finish_all_inplayer(self, _reason):
+            for j in self.jobs:
+                j["status"] = "done"
+
+        def add_job(self, url, title, start, stop, folder="", icon=None, channel="",
+                    extra=None):
+            made.append({"url": url, **(extra or {})})
+            return made[-1]
+
+        def total_cap_exceeded(self):
+            return False
+
+    class W(_source_window(), _RecordingMixin):
+        def playback_mode(self):
+            return "embedded"
+
+        def channel_display_name(self, it):
+            return it.get("name") or ""
+
+        def _set_status(self, *_a, **_k):
+            pass
+
+    w = W()
+    w.rec = Rec()
+    # The client is the source in use's.
+    w.client = SimpleNamespace(max_connections=None, live_url=lambda sid, fmt="ts": (
+        f"http://{w.playlist_store.active_id}.invalid/live/u/p/{sid}.{fmt}"))
+    w.player = SimpleNamespace(current_url=url, _dvr=None, _dvr_pool=None, _paused=False,
+                               isVisible=lambda: True, start_stream_record=lambda _path: True,
+                               take_buffer_recorder=lambda: None)
+    row = {"stream_id": 7, "name": "News"}
+    w._note_playing_source(url, 7, "live")
+    w._last_playback = {"url": url, "kind": "live"}
+    w._playing_group, w._playing_key, w._playing_item = "live", 7, row
+    w.playlist_store.active_id = "b"            # the stream goes on
+    w._record_now(row, 30)                      # the player's own Record
+    job = w.rec.jobs[-1]
+    assert (job.get("source"), job.get("source_kind"), job.get("url")) == ("a", "xtream", url), \
+        "A's, at A's address - not B's channel 7"
+    w.answer = 1                                # go on over a new connection
+    assert w._guard_rec_switch("http://b.invalid/live/u/p/3.ts", "Sport")
+    assert made and (made[-1].get("source"), made[-1].get("source_kind")) == ("a", "xtream"), made
+    assert made[-1]["url"] == url

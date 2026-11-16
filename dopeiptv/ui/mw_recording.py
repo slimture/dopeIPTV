@@ -232,11 +232,14 @@ class _RecordingMixin:
             if can_cont and idx == 1:
                 self.rec.finish_all_inplayer(
                     "continued over a new connection")
+                # Its source as the one in the player kept it: its count,
+                # the VPN guard's rule and its route.
                 self.rec.add_job(j["url"],
                                  tr("rec_continued_title", title=j["title"]),
                                  time.time(), j.get("stop"),
                                  icon=j.get("stream_icon"),
-                                 channel=j.get("channel") or "")
+                                 channel=j.get("channel") or "",
+                                 extra=self._rec_source_of(j))
                 self._multi_stream_ok = True
                 return True
             return False
@@ -509,6 +512,25 @@ class _RecordingMixin:
         return {"source": str(pl.get("id") or ""),
                 "source_kind": str(pl.get("kind") or "xtream")}
 
+    def _rec_player_source(self) -> dict:
+        """What a recording of the player's own stream keeps of its source,
+        as _rec_source does: the source it plays from (failover's, the
+        Search page's, or one switched away from since it started)."""
+        mine = getattr(self, "_conn_player_source", None)
+        if not callable(mine):
+            return self._rec_source()
+        pid = str(mine() or "")
+        store = getattr(self, "playlist_store", None)
+        pl = store.get(pid) if store is not None and pid else None
+        if not pl:
+            return {}
+        return {"source": pid, "source_kind": str(pl.get("kind") or "xtream")}
+
+    @staticmethod
+    def _rec_source_of(job: dict) -> dict:
+        """The source a recording keeps (_rec_source), copied from *job*."""
+        return {k: job[k] for k in ("source", "source_kind") if job.get(k)}
+
     def _rec_extra(self, ch: dict, later: bool | None = None) -> dict:
         """What a recording of channel *ch* keeps besides its address: its
         source and - from a client whose links are short-lived (a portal),
@@ -579,7 +601,8 @@ class _RecordingMixin:
                     url=self._rec_inplayer_url(it),
                     icon=it.get("stream_icon"),
                     recorder=self.player.take_buffer_recorder(),
-                    channel=self.channel_display_name(it))
+                    channel=self.channel_display_name(it),
+                    extra=self._rec_player_source())
                 self._set_status("● " + tr("rec_started_inplayer",
                                            title=title, length=length))
                 self._warn_pause_while_recording()
@@ -640,11 +663,17 @@ class _RecordingMixin:
     def _rec_inplayer_url(self, it) -> str:
         """The address a recording of the player's own stream keeps: the
         source's - unless that one is slow to get (a media server would
-        open the channel once more for it, a portal ask create_link), then
-        the one the player was given."""
+        open the channel once more for it, a portal ask create_link), or
+        what plays is from another source than the one in use (whose
+        client would give its own channel of that number): then the one
+        the player was given."""
+        given = str((getattr(self, "_last_playback", None) or {}).get("url") or "")
+        mine = self._rec_player_source().get("source")
+        if given and mine and mine != self._rec_source().get("source"):
+            return given
         waits = getattr(self, "_link_waits", None)
         if waits is not None and waits(partial(_window_live, self, it["stream_id"])) is not None:
-            return str((getattr(self, "_last_playback", None) or {}).get("url") or "")
+            return given
         return self.client.live_url(it["stream_id"], "ts")
 
     def _switch_and_record(self, it, stop_ts, length: str) -> None:
@@ -668,7 +697,8 @@ class _RecordingMixin:
                 title, path, stop_ts,
                 url=self._rec_inplayer_url(it),
                 icon=it.get("stream_icon"),
-                recorder=self.player.take_buffer_recorder())
+                recorder=self.player.take_buffer_recorder(),
+                extra=self._rec_player_source())
             self._set_status("● " + tr("rec_started_inplayer",
                                        title=title, length=length))
             self._warn_pause_while_recording()
