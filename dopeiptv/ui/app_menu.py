@@ -49,6 +49,14 @@ def open_website() -> None:
     open_url(WEBSITE)
 
 
+def in_app_menu(name: str, mac: bool | None = None) -> bool:
+    """Whether entry *name* sits in macOS's application menu (by its role)
+    rather than in its menu in GROUPS. *mac*: default, on macOS."""
+    if mac is None:
+        mac = sys.platform == "darwin"
+    return bool(mac) and name in _MAC_ROLES
+
+
 def lay_out(menubar, actions: dict[str, QAction], mac: bool | None = None) -> dict[str, QMenu]:
     """*actions* (by the names in GROUPS; a missing one is left out) put in
     *menubar*'s menus; {"file"/"view"/"history"/"help": its QMenu}, a menu

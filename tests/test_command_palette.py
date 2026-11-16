@@ -273,6 +273,46 @@ def test_its_keys_are_shown_as_the_system_writes_them(app):
     assert key_parts("") == []
 
 
+@pytest.mark.parametrize("platform", ["darwin", "linux", "win32"])
+def test_a_menu_entry_is_named_by_the_menu_it_is_in(app, monkeypatch, platform):
+    """An entry says which menu it is in. On macOS About, Settings, Quit
+    and the supporter's entries are in the application menu, named like the
+    app - not in Help or File, where they are on Linux and Windows."""
+    from PyQt6.QtGui import QAction
+    from PyQt6.QtWidgets import QWidget
+
+    from dopeiptv import APP_NAME
+    from dopeiptv.i18n import tr
+    from dopeiptv.ui import app_menu, mw_palette
+
+    monkeypatch.setattr(sys, "platform", platform)
+
+    class Host(QWidget, mw_palette._PaletteMixin):
+        pass
+
+    host = Host()
+    host.shortcut_keys = lambda: dict(shortcut_keys.DEFAULTS)
+    host._shortcut_callbacks = lambda: {sid: (lambda: None) for sid, *_ in shortcut_keys.ACTIONS}
+    host._player_up = lambda: False
+    host.can_cast_playing = lambda: True
+    names = [n for _g, _where, group in app_menu.GROUPS for n in group]
+    host._menu_actions = {n: QAction(f"Menu entry {n}", host) for n in names}
+    kinds = {e.payload[1].text(): e.kind for e in host._palette_action_entries()
+             if e.payload[0] == "action"}
+    kinds = {text.removeprefix("Menu entry "): kind for text, kind in kinds.items()}
+    assert set(kinds) == set(names)
+    mac = platform == "darwin"
+    for name in ("about", "supporter", "donate"):
+        assert kinds[name] == (APP_NAME if mac else tr("menu_help")), name
+    for name in ("settings", "quit"):
+        assert kinds[name] == (APP_NAME if mac else tr("menu_file")), name
+    # Everything else is where it is on every system.
+    assert kinds["feedback"] == kinds["website"] == tr("menu_help")
+    assert kinds["open_video"] == tr("menu_file")
+    assert kinds["multiview"] == tr("menu_view") and kinds["stats"] == tr("nav_history")
+    host.deleteLater()
+
+
 
 def _catalogue_host(client, source="p1"):
     """A window stand-in with the palette's catalogue code and nothing else."""

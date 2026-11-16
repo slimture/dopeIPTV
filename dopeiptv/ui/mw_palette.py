@@ -48,6 +48,7 @@ from ..core.search_all import MIN_QUERY
 from ..core.workers import run_async
 from ..i18n import tr
 from .app_menu import GROUPS as MENU_GROUPS
+from .app_menu import in_app_menu
 from .command_palette import CommandPalette, Entry
 from .qt_i18n import format_when
 
@@ -236,8 +237,11 @@ class _PaletteMixin:
                              payload=("call", cbs[sid])))
         acts = getattr(self, "_menu_actions", {})
         for _group, where, names in MENU_GROUPS:
-            kind = tr(_MENU_KIND[where]) if where in _MENU_KIND else APP_NAME
+            menu = tr(_MENU_KIND[where]) if where in _MENU_KIND else APP_NAME
             for name in names:
+                # About, Settings, Quit and the supporter's entries are in
+                # the application menu on macOS: named by it there.
+                kind = APP_NAME if in_app_menu(name) else menu
                 act = acts.get(name)
                 if act is None or sip.isdeleted(act) or not act.isVisible():
                     continue

@@ -12,6 +12,9 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 - "Night mode could not be turned on for this stream" - and why a typed
   channel number did not play - wraps in the picture's corner instead of
   running off the edge of a narrow docked player.
+- On macOS the command palette names About, Settings, Quit, the
+  supporter key and Donate by the application menu they are in
+  ("dopeIPTV"), not Help or File.
 
 ## [1.6.1]
 
