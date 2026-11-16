@@ -9,9 +9,60 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [1.6.1]
 
+A calmer guide, night mode you can hear, the visualiser for channels
+that are sound alone, settings brought over to a new computer from the
+welcome, the same menu bar on every system, and fixes - above all to
+how connections to the account are counted.
+
 ### Added
 
 - The welcome brings your settings over from another computer: "Already use dopeIPTV on another computer? Bring your settings" on its first page takes the sync code from there (joined as Settings > Sync joins it, fetched off the window's thread) or restores a backup. Profiles, settings and favorites come along; sources and watch history too where the other computer syncs them, and then this one syncs them as well. With sources the welcome closes and loads them (and asks "Who's watching?" with two profiles or more); without, the connect step says why. A wrong code, nothing under it or no network is said plainly and leaves sync off; a modified build is refused as in Settings. A restored backup is staged for the next start, with Quit to get there.
+- An audio-only stream from a source (an iHeart channel in an M3U, a DVB
+  radio channel, a film that is only sound) shows the visualiser instead
+  of a black picture, decided once mpv has listed its tracks - a stream
+  with video is never touched; two more styles, Vectorscope and
+  Frequencies, and Waveform no longer draws over a checkerboard.
+
+### Changed
+
+- The guide is calmer and denser: rows 44 px high instead of 60 (TV
+  mode's guide keeps its large ones), flat cards with a small gap instead
+  of borders and bevels, the programme on the air tinted with the accent
+  and a thin strip of how far it got instead of a thick accent frame, the
+  past dimmed, and one thin accent line at the current time through the
+  board and its header. A wide card says when it starts under its title;
+  a card too narrow for a readable title shows none ("Ny…" is gone), its
+  tooltip has the title and times.
+- The guide's channel column is narrower (160 px), its names in a quieter
+  normal weight, the catch-up mark small and after the name. Its edge can
+  be dragged wider or narrower (a double-click puts it back), remembered
+  on this computer; a narrow guide shows the logos alone, the name in the
+  tooltip and a short form of it where there is no logo.
+- A guide row with no programmes is an empty field, why in its tooltip -
+  said once over the board when no channel has a guide, not on every row.
+  A "channel" that is only a heading in the provider's list ("-= Sweden
+  =-", "#### SE ####") is drawn as a heading over the channels below it,
+  with nothing to click.
+- The guide's line at the time now runs behind the programmes and shows
+  between them; Settings > Guide > "Now line over the programmes" puts
+  it in front.
+- The menu bar is the same on Windows, Linux and macOS: File, View,
+  History and Help, with Settings and Quit in File and About last in
+  Help, where people look for them, in place of the one "dopeIPTV" menu
+  on Windows and Linux. macOS looks as before: Qt moves About, Settings,
+  Quit and the supporter entries into the application menu.
+- About and the version can be found in Settings: General ends with an
+  "About dopeIPTV" row showing the version, which opens About over
+  Settings, and the Settings search finds it by "about", "version" or
+  "update" (issue #31 - it was only in the menu bar's first menu).
+- Server mode, its port in use: the app says whose it is - dopeIPTV's own
+  server (a `dopeiptv --server` started from a terminal or at login, or
+  another window) or another program - and offers the next free port
+  (past the remote API's and the phone remote's) in its note and on the
+  Nerd page's line; one click stores it and starts the server there,
+  nothing changes without it. `dopeiptv --server` logs the same, with the
+  `--port` to start with. Any other reason a port does not open is said
+  as before.
 
 ### Fixed
 
@@ -73,53 +124,9 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   records - also when that channel was from failover, the Search page or
   a source switched away from, where it went on with the new source's
   channel of the same number; it now goes on at the address it played.
-### Changed
-
-- Server mode, its port in use: the app says whose it is - dopeIPTV's own
-  server (a `dopeiptv --server` started from a terminal or at login, or
-  another window) or another program - and offers the next free port
-  (past the remote API's and the phone remote's) in its note and on the
-  Nerd page's line; one click stores it and starts the server there,
-  nothing changes without it. `dopeiptv --server` logs the same, with the
-  `--port` to start with. Any other reason a port does not open is said
-  as before.
-- About and the version can be found in Settings: General ends with an
-  "About dopeIPTV" row showing the version, which opens About over
-  Settings, and the Settings search finds it by "about", "version" or
-  "update" (issue #31 - it was only in the menu bar's first menu).
 - The welcome's connect step on a low screen: the first time it showed, wrapped text (the box finder's note above all) was cut off and the card ran past the window. The step now scrolls inside the card, and what Find on my network says sits under the link at the field's width.
 - A series' page played an episode on one click, whatever "Auto-play preview on selection" said. It now follows that setting as the lists do: off (the default), one click picks the episode and a double click or Enter plays it.
-
-- The menu bar is the same on Windows, Linux and macOS: File, View,
-  History and Help, with Settings and Quit in File and About last in
-  Help, where people look for them, in place of the one "dopeIPTV" menu
-  on Windows and Linux. macOS looks as before: Qt moves About, Settings,
-  Quit and the supporter entries into the application menu.
-
-- The guide is calmer and denser: rows 44 px high instead of 60 (TV
-  mode's guide keeps its large ones), flat cards with a small gap instead
-  of borders and bevels, the programme on the air tinted with the accent
-  and a thin strip of how far it got instead of a thick accent frame, the
-  past dimmed, and one thin accent line at the current time through the
-  board and its header. A wide card says when it starts under its title;
-  a card too narrow for a readable title shows none ("Ny…" is gone), its
-  tooltip has the title and times.
-- The guide's channel column is narrower (160 px), its names in a quieter
-  normal weight, the catch-up mark small and after the name. Its edge can
-  be dragged wider or narrower (a double-click puts it back), remembered
-  on this computer; a narrow guide shows the logos alone, the name in the
-  tooltip and a short form of it where there is no logo.
-- A guide row with no programmes is an empty field, why in its tooltip -
-  said once over the board when no channel has a guide, not on every row.
-  A "channel" that is only a heading in the provider's list ("-= Sweden
-  =-", "#### SE ####") is drawn as a heading over the channels below it,
-  with nothing to click.
 - The welcome's connect step showed the MAC address, the media server sign-in and Find on my network for Xtream until another kind or a language was picked.
-- An audio-only stream from a source (an iHeart channel in an M3U, a DVB
-  radio channel, a film that is only sound) shows the visualiser instead
-  of a black picture, decided once mpv has listed its tracks - a stream
-  with video is never touched; two more styles, Vectorscope and
-  Frequencies, and Waveform no longer draws over a checkerboard.
 
 ## [1.6.0]
 

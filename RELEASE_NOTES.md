@@ -1,3 +1,27 @@
+## dopeIPTV 1.6.1
+
+**A calmer guide, night mode you can hear, the visualizer for music channels, and your settings on a new computer in one step.**
+
+### New and better
+
+- **A calmer, denser guide.** Lower rows, so more channels fit; a narrower channel column that shows only the logos when the guide is narrow (drag its edge to set the width); flat cards with a thin progress bar on what is on now; a line at the time now; separators like "-= Sweden =-" as headings; and rows without guide data left empty instead of repeating the same sentence. The now line runs behind the programmes - **Settings → Guide** puts it in front.
+- **Night mode you can hear.** Quiet speech comes up clearly and loud adverts and bangs come down - press `N`. It says so however you switch it, and tells you when it could not be turned on for a stream.
+- **The visualizer for music and radio channels.** A channel in your playlist with sound but no picture now shows the visualizer instead of a black screen. Two new styles, Vectorscope and Frequencies, make five - in the player's options menu.
+- **New computer? Bring your settings from the welcome.** Type the sync code from your other computer, or restore a backup: your profiles and settings come over, and your sources too when the other computer syncs them. Encrypted on your computer before it is sent - dopeiptv.org keeps only bytes it cannot read.
+- **The same menu bar everywhere.** File, View, History and Help on Windows, Linux and macOS - About is under Help (on a Mac in the dopeIPTV menu, as before). **Settings → General** now ends with About and the version too.
+- **Server mode tells you who has its port** - dopeIPTV's own server started earlier, or another program - and offers the next free one with one click.
+
+### Fixed
+
+- Keyboard shortcuts sync between your computers again - between computers of the same system, since `⌘` is not `Ctrl`.
+- A series' page played an episode on one click. Now one click picks it and a double click or `Enter` plays it, as in the lists - unless **Auto-play preview on selection** is on.
+- Connections to your account are counted right: a cast on the source it comes from, a stream the player gave up on no longer, a rewind buffer kept by a recording or a cast only on its own source, and YouTube, Twitch and radio not at all. A cast or a recording after you switched source no longer picks the new source's channel with the same number.
+- TV mode: Stop while a dropped channel waited to reconnect now stops it.
+- Trakt and Simkl: switching profile quickly while a sign-in was renewed could sign you out.
+- The welcome on small screens: the text was cut off and the card ran past the window; the Xtream form also showed fields that belong to other kinds.
+
+On the AppImage from 1.2.15 or later, or the Windows or Mac app from 1.4.5? Click **Update now** in the banner - or download 1.6.1 from [dopeiptv.org](https://dopeiptv.org).
+
 ## dopeIPTV 1.6.0
 
 **A profile for everyone at home, a TV mode for the sofa with your phone as its remote, one search across all your sources, and Jellyfin, Emby and Plex as sources.**
