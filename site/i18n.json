@@ -63,6 +63,7 @@
         "fa": "fa_IR",
         "ur": "ur_PK"
     },
-    "help_shots": ["set-language", "set-playback", "set-playlists", "set-home", "set-parental", "set-testbuilds"],
+    "help_shots": ["set-language", "set-playback", "set-playlists", "set-home", "set-parental", "set-testbuilds",
+                   "set-profiles", "set-sync", "more-simkl", "watch-night", "watch-web", "more-castback", "fix-vlan"],
     "help_shot_size": [860, 600]
 }
