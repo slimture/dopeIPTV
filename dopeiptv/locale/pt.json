@@ -2916,5 +2916,11 @@
   "local_search_count": "{n} encontrados nesta pasta e nas subpastas",
   "local_search_none": "Nada encontrado nesta pasta nem nas subpastas.",
   "local_search_more": "Apenas os {n} primeiros são mostrados - digite mais para refinar.",
-  "local_search_partial": "Nem todas as subpastas foram pesquisadas - abra uma para pesquisar nela."
+  "local_search_partial": "Nem todas as subpastas foram pesquisadas - abra uma para pesquisar nela.",
+  "list_filter_placeholder": "Filtrar esta lista…",
+  "local_search_placeholder": "Pesquisar nesta pasta e nas subpastas…",
+  "cat_find_live": "Encontrar categorias por nome ou canal…",
+  "cat_find_vod": "Encontrar categorias por nome ou filme…",
+  "cat_find_series": "Encontrar categorias por nome ou série…",
+  "sa_placeholder_all": "Busque tudo em todas as suas fontes (ex.: Star Trek)"
 }

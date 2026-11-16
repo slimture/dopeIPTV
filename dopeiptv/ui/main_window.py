@@ -809,7 +809,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cat_search_btn.setCheckable(True)
         self.cat_search_btn.setAutoRaise(True)
         self.cat_search_btn.setFixedSize(22, 18)
-        self.cat_search_btn.setToolTip(tr("cat_search_placeholder"))
         self._apply_cat_search_icon()   # ink-centred 🔍 (not a top-left glyph)
         self.cat_search_btn.toggled.connect(self._toggle_cat_search)
         cat_hdr.addWidget(self.cat_search_btn)
@@ -819,10 +818,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Search that spans category names AND their channels: type "germany"
         # or "bbc" and the matching categories float up (ranked by how many of
         # their channels match), each previewing a few hits. Double-click to
-        # enter that category. Hidden until the 🔍 toggle is clicked.
+        # enter that category. Hidden until the 🔍 toggle is clicked. Its
+        # words, and the toggle's tooltip, follow the section
+        # (_sync_cat_search_hint).
         self.cat_search = QLineEdit(objectName="CatSearch")
-        self.cat_search.setPlaceholderText(tr("cat_search_placeholder"))
         self.cat_search.setClearButtonEnabled(True)
+        self._sync_cat_search_hint()
         self.cat_search.textChanged.connect(self._on_cat_search)
         self.cat_search.hide()
         sl.addWidget(self.cat_search)
@@ -967,7 +968,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         ml.addLayout(busy_row)
 
         self.search = QLineEdit(objectName="Search")
-        self.search.setPlaceholderText(tr("search_placeholder"))
+        self.search.setPlaceholderText(tr("list_filter_placeholder"))
         self.search.setClearButtonEnabled(True)
         self._preview_timer = QTimer(self)
         self._preview_timer.setSingleShot(True)
@@ -2477,6 +2478,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             else QAbstractItemView.SelectionMode.SingleSelection)
         self.listw.set_fav_drag(mode == "fav")
         self.search.clear()
+        self._sync_search_hint()
         self._load_categories()
         self._update_sync_btn()
         # Opening Watched is a good moment to pull the latest Trakt
@@ -2582,13 +2584,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             cat_mode = self.mode in ("live", "vod", "series")
             # Category search where categories exist; a plain list filter in the
             # folder/list sections (Favorites, Watch Later, Watched, Recordings,
-            # History) so the same 🔍 works everywhere, adapted to each.
+            # History, Local files) so the same 🔍 works everywhere, adapted
+            # to each.
             show = cat_mode or self.mode in (
                 "fav", "watchlist", "watched", "rec", "history", "local")
             self._cat_search_supported = show
-            self.cat_search.setPlaceholderText(
-                tr("cat_search_placeholder") if cat_mode
-                else tr("cat_search_items"))
+            self._sync_cat_search_hint()
             self.cat_search.blockSignals(True)
             self.cat_search.clear()
             self.cat_search.blockSignals(False)

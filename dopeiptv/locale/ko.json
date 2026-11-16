@@ -2916,5 +2916,11 @@
   "local_search_count": "이 폴더와 하위 폴더에서 {n}개 찾음",
   "local_search_none": "이 폴더와 하위 폴더에서 아무것도 찾지 못했습니다.",
   "local_search_more": "처음 {n}개만 표시합니다. 더 입력해 범위를 좁히세요.",
-  "local_search_partial": "모든 하위 폴더를 검색하지는 않았습니다. 폴더를 열어 그 안을 검색하세요."
+  "local_search_partial": "모든 하위 폴더를 검색하지는 않았습니다. 폴더를 열어 그 안을 검색하세요.",
+  "list_filter_placeholder": "이 목록 필터…",
+  "local_search_placeholder": "이 폴더와 하위 폴더 검색…",
+  "cat_find_live": "이름 또는 채널로 카테고리 찾기…",
+  "cat_find_vod": "이름 또는 영화로 카테고리 찾기…",
+  "cat_find_series": "이름 또는 시리즈로 카테고리 찾기…",
+  "sa_placeholder_all": "모든 소스에서 모두 검색 (예: Star Trek)"
 }

@@ -2916,5 +2916,11 @@
   "local_search_count": "{n} gefunden in diesem Ordner und seinen Unterordnern",
   "local_search_none": "In diesem Ordner und seinen Unterordnern wurde nichts gefunden.",
   "local_search_more": "Nur die ersten {n} werden gezeigt - tipp weiter, um einzugrenzen.",
-  "local_search_partial": "Nicht alle Unterordner wurden durchsucht - öffne einen, um ihn zu durchsuchen."
+  "local_search_partial": "Nicht alle Unterordner wurden durchsucht - öffne einen, um ihn zu durchsuchen.",
+  "list_filter_placeholder": "Diese Liste filtern…",
+  "local_search_placeholder": "Diesen Ordner und seine Unterordner durchsuchen…",
+  "cat_find_live": "Kategorien nach Name oder Sender finden…",
+  "cat_find_vod": "Kategorien nach Name oder Film finden…",
+  "cat_find_series": "Kategorien nach Name oder Serie finden…",
+  "sa_placeholder_all": "Alles in all deinen Quellen suchen (z. B. Star Trek)"
 }

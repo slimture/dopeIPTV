@@ -2916,5 +2916,11 @@
   "local_search_count": "このフォルダーとサブフォルダーで {n} 件見つかりました",
   "local_search_none": "このフォルダーとサブフォルダーには見つかりませんでした。",
   "local_search_more": "最初の {n} 件のみ表示しています。絞り込むにはさらに入力してください。",
-  "local_search_partial": "すべてのサブフォルダーは検索していません。検索するにはフォルダーを開いてください。"
+  "local_search_partial": "すべてのサブフォルダーは検索していません。検索するにはフォルダーを開いてください。",
+  "list_filter_placeholder": "このリストを絞り込む…",
+  "local_search_placeholder": "このフォルダーとサブフォルダーを検索…",
+  "cat_find_live": "名前またはチャンネルでカテゴリーを探す…",
+  "cat_find_vod": "名前または映画でカテゴリーを探す…",
+  "cat_find_series": "名前またはシリーズでカテゴリーを探す…",
+  "sa_placeholder_all": "すべてのソースからすべてを検索 (例: Star Trek)"
 }

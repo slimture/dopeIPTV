@@ -415,7 +415,8 @@ _STRINGS: dict[str, dict[str, str]] = {
 
     # ── Search ────────────────────────────────────────────────────────────
 
-    "search_placeholder": {"en": "Search channels, movies or series…"},
+    "list_filter_placeholder": {"en": "Filter this list…"},
+    "local_search_placeholder": {"en": "Search this folder and its subfolders…"},
 
     # ── Detail panel / metadata labels ────────────────────────────────────
 
@@ -2110,8 +2111,9 @@ _STRINGS: dict[str, dict[str, str]] = {
     "settings_reset_confirm_2": {"en": "Are you really sure? This can't be undone."},
     "settings_reset_done": {"en": "All settings have been reset. dopeIPTV will now close - start it again to set up your first playlist."},
 
-    "cat_search_placeholder": {"en": "Search categories & channels…"},
-    "cat_search_items": {"en": "Search this list…"},
+    "cat_find_live": {"en": "Find categories by name or channel…"},
+    "cat_find_vod": {"en": "Find categories by name or movie…"},
+    "cat_find_series": {"en": "Find categories by name or series…"},
     "cat_search_none": {"en": "No matching categories"},
 
     "reminders_menu": {"en": "Reminders…"},
@@ -3090,7 +3092,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "pal_search_all": {"en": "Search everywhere for “{query}”"},
     "pal_search_all_more": {"en": "Channels, programmes, movies and series in all your sources"},
     "sa_title": {"en": "Search everywhere"},
-    "sa_placeholder": {"en": "Search channels, programmes, movies and series (e.g. Star Trek)"},
+    "sa_placeholder_all": {"en": "Search everything in all your sources (e.g. Star Trek)"},
     "sa_filter_all": {"en": "All"},
     "sa_group_channels": {"en": "Channels"},
     "sa_group_programmes": {"en": "Programmes"},

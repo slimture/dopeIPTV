@@ -2916,5 +2916,11 @@
   "local_search_count": "Pronađeno u ovoj fascikli i podfasciklama: {n}",
   "local_search_none": "Ništa nije pronađeno u ovoj fascikli ni u njenim podfasciklama.",
   "local_search_more": "Prikazano je samo prvih {n} - unesite više da suzite izbor.",
-  "local_search_partial": "Nisu pretražene sve podfascikle - otvorite jednu da je pretražite."
+  "local_search_partial": "Nisu pretražene sve podfascikle - otvorite jednu da je pretražite.",
+  "list_filter_placeholder": "Filtriraj ovu listu…",
+  "local_search_placeholder": "Pretraži ovu fasciklu i njene podfascikle…",
+  "cat_find_live": "Pronađi kategorije po nazivu ili kanalu…",
+  "cat_find_vod": "Pronađi kategorije po nazivu ili filmu…",
+  "cat_find_series": "Pronađi kategorije po nazivu ili seriji…",
+  "sa_placeholder_all": "Pretražite sve u svim svojim izvorima (npr. Star Trek)"
 }

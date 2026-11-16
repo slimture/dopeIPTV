@@ -113,9 +113,7 @@ class _RadioMixin:
         gen = self._radio_gen
         restoring, self._radio_restoring = self._radio_restoring, False
         self.back_btn.hide()
-        self.search.setPlaceholderText(
-            tr("radio_search_placeholder") if cat == SEARCH
-            else tr("search_placeholder"))
+        self._sync_search_hint()       # radio-browser.info under Search
         if cat in GROUP_KINDS:
             grp = self._radio_group
             if restoring and grp and grp[0] == cat:

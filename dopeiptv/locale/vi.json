@@ -2916,5 +2916,11 @@
   "local_search_count": "Tìm thấy {n} trong thư mục này và các thư mục con",
   "local_search_none": "Không tìm thấy gì trong thư mục này hoặc các thư mục con.",
   "local_search_more": "Chỉ hiện {n} kết quả đầu tiên - gõ thêm để thu hẹp.",
-  "local_search_partial": "Chưa tìm hết mọi thư mục con - mở một thư mục để tìm trong đó."
+  "local_search_partial": "Chưa tìm hết mọi thư mục con - mở một thư mục để tìm trong đó.",
+  "list_filter_placeholder": "Lọc danh sách này…",
+  "local_search_placeholder": "Tìm trong thư mục này và các thư mục con…",
+  "cat_find_live": "Tìm danh mục theo tên hoặc kênh…",
+  "cat_find_vod": "Tìm danh mục theo tên hoặc phim…",
+  "cat_find_series": "Tìm danh mục theo tên hoặc loạt phim…",
+  "sa_placeholder_all": "Tìm mọi thứ trong tất cả các nguồn của bạn (vd. Star Trek)"
 }

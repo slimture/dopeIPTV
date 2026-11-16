@@ -2916,5 +2916,11 @@
   "local_search_count": "{n} résultats dans ce dossier et ses sous-dossiers",
   "local_search_none": "Rien trouvé dans ce dossier ni dans ses sous-dossiers.",
   "local_search_more": "Seuls les {n} premiers sont affichés - précisez votre recherche.",
-  "local_search_partial": "Tous les sous-dossiers n'ont pas été parcourus - ouvrez-en un pour y chercher."
+  "local_search_partial": "Tous les sous-dossiers n'ont pas été parcourus - ouvrez-en un pour y chercher.",
+  "list_filter_placeholder": "Filtrer cette liste…",
+  "local_search_placeholder": "Rechercher dans ce dossier et ses sous-dossiers…",
+  "cat_find_live": "Trouver des catégories par nom ou par chaîne…",
+  "cat_find_vod": "Trouver des catégories par nom ou par film…",
+  "cat_find_series": "Trouver des catégories par nom ou par série…",
+  "sa_placeholder_all": "Tout rechercher, dans toutes vos sources (ex. Star Trek)"
 }

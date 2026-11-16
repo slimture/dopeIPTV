@@ -2916,5 +2916,11 @@
   "local_search_count": "{n} ditemukan di folder ini dan subfoldernya",
   "local_search_none": "Tidak ada yang ditemukan di folder ini atau subfoldernya.",
   "local_search_more": "Hanya {n} pertama yang ditampilkan - ketik lebih banyak untuk mempersempit.",
-  "local_search_partial": "Tidak semua subfolder dicari - buka salah satunya untuk mencari di sana."
+  "local_search_partial": "Tidak semua subfolder dicari - buka salah satunya untuk mencari di sana.",
+  "list_filter_placeholder": "Saring daftar ini…",
+  "local_search_placeholder": "Cari di folder ini dan subfoldernya…",
+  "cat_find_live": "Temukan kategori menurut nama atau saluran…",
+  "cat_find_vod": "Temukan kategori menurut nama atau film…",
+  "cat_find_series": "Temukan kategori menurut nama atau serial…",
+  "sa_placeholder_all": "Cari semuanya di semua sumber (mis. Star Trek)"
 }

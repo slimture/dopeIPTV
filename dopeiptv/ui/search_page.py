@@ -444,7 +444,7 @@ class SearchPage(QWidget):
         lay.setSpacing(10)
         self.field = QLineEdit(objectName="Search")
         self.field.setClearButtonEnabled(True)
-        self.field.setPlaceholderText(tr("sa_placeholder"))
+        self.field.setPlaceholderText(tr("sa_placeholder_all"))
         self.field.setAccessibleName(tr("sa_title"))
         self.field.textChanged.connect(self._typed)
         self.field.returnPressed.connect(self._enter_in_field)
@@ -504,7 +504,7 @@ class SearchPage(QWidget):
         self.view.viewport().update()
 
     def retranslate(self) -> None:
-        self.field.setPlaceholderText(tr("sa_placeholder"))
+        self.field.setPlaceholderText(tr("sa_placeholder_all"))
         self.field.setAccessibleName(tr("sa_title"))
         self.chips["all"].setText(tr("sa_filter_all"))
         for group in sa.GROUPS:

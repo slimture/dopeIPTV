@@ -2916,5 +2916,11 @@
   "local_search_count": "נמצאו בתיקייה זו ובתיקיות המשנה שלה: {n}",
   "local_search_none": "לא נמצא דבר בתיקייה זו או בתיקיות המשנה שלה.",
   "local_search_more": "מוצגים רק {n} הראשונים - הקלד עוד כדי לצמצם.",
-  "local_search_partial": "לא נסרקו כל תיקיות המשנה - פתח אחת כדי לחפש בה."
+  "local_search_partial": "לא נסרקו כל תיקיות המשנה - פתח אחת כדי לחפש בה.",
+  "list_filter_placeholder": "סנן רשימה זו…",
+  "local_search_placeholder": "חפש בתיקייה זו ובתיקיות המשנה שלה…",
+  "cat_find_live": "מצא קטגוריות לפי שם או ערוץ…",
+  "cat_find_vod": "מצא קטגוריות לפי שם או סרט…",
+  "cat_find_series": "מצא קטגוריות לפי שם או סדרה…",
+  "sa_placeholder_all": "חפש הכול בכל המקורות שלך (למשל Star Trek)"
 }

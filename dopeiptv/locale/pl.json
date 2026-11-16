@@ -2916,5 +2916,11 @@
   "local_search_count": "Znaleziono w tym folderze i podfolderach: {n}",
   "local_search_none": "Nic nie znaleziono w tym folderze ani w jego podfolderach.",
   "local_search_more": "Pokazano tylko pierwsze {n} - wpisz więcej, aby zawęzić.",
-  "local_search_partial": "Nie przeszukano wszystkich podfolderów - otwórz jeden, aby go przeszukać."
+  "local_search_partial": "Nie przeszukano wszystkich podfolderów - otwórz jeden, aby go przeszukać.",
+  "list_filter_placeholder": "Filtruj tę listę…",
+  "local_search_placeholder": "Szukaj w tym folderze i jego podfolderach…",
+  "cat_find_live": "Znajdź kategorie po nazwie lub kanale…",
+  "cat_find_vod": "Znajdź kategorie po nazwie lub filmie…",
+  "cat_find_series": "Znajdź kategorie po nazwie lub serialu…",
+  "sa_placeholder_all": "Szukaj wszystkiego we wszystkich swoich źródłach (np. Star Trek)"
 }

@@ -2916,5 +2916,11 @@
   "local_search_count": "{n} hittade i mappen och dess undermappar",
   "local_search_none": "Inget hittades i mappen eller dess undermappar.",
   "local_search_more": "Bara de första {n} visas - skriv mer för att snäva in.",
-  "local_search_partial": "Alla undermappar söktes inte igenom - öppna en för att söka i den."
+  "local_search_partial": "Alla undermappar söktes inte igenom - öppna en för att söka i den.",
+  "list_filter_placeholder": "Filtrera listan…",
+  "local_search_placeholder": "Sök i mappen och dess undermappar…",
+  "cat_find_live": "Hitta kategorier efter namn eller kanal…",
+  "cat_find_vod": "Hitta kategorier efter namn eller film…",
+  "cat_find_series": "Hitta kategorier efter namn eller serie…",
+  "sa_placeholder_all": "Sök i allt, i alla dina källor (t.ex. Star Trek)"
 }

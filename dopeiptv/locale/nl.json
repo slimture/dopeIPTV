@@ -2916,5 +2916,11 @@
   "local_search_count": "{n} gevonden in deze map en de submappen",
   "local_search_none": "Niets gevonden in deze map of de submappen.",
   "local_search_more": "Alleen de eerste {n} worden getoond - typ verder om te verfijnen.",
-  "local_search_partial": "Niet alle submappen zijn doorzocht - open er een om daarin te zoeken."
+  "local_search_partial": "Niet alle submappen zijn doorzocht - open er een om daarin te zoeken.",
+  "list_filter_placeholder": "Deze lijst filteren…",
+  "local_search_placeholder": "Zoeken in deze map en de submappen…",
+  "cat_find_live": "Categorieën vinden op naam of kanaal…",
+  "cat_find_vod": "Categorieën vinden op naam of film…",
+  "cat_find_series": "Categorieën vinden op naam of serie…",
+  "sa_placeholder_all": "Alles zoeken in al je bronnen (bijv. Star Trek)"
 }

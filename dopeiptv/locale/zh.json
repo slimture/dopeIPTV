@@ -2916,5 +2916,11 @@
   "local_search_count": "在此文件夹及其子文件夹中找到 {n} 个",
   "local_search_none": "此文件夹及其子文件夹中未找到任何内容。",
   "local_search_more": "仅显示前 {n} 个——继续输入以缩小范围。",
-  "local_search_partial": "并未搜索所有子文件夹——打开其中一个以在其中搜索。"
+  "local_search_partial": "并未搜索所有子文件夹——打开其中一个以在其中搜索。",
+  "list_filter_placeholder": "筛选此列表…",
+  "local_search_placeholder": "搜索此文件夹及其子文件夹…",
+  "cat_find_live": "按名称或频道查找分类…",
+  "cat_find_vod": "按名称或电影查找分类…",
+  "cat_find_series": "按名称或剧集查找分类…",
+  "sa_placeholder_all": "在所有来源中搜索一切（例如 Star Trek）"
 }

@@ -3,9 +3,11 @@
 The sidebar 🔍 search: in the provider sections (TV/Movies/Series) it ranks
 categories by how many of their channels match (a per-mode index fetched once);
 in the folder/list sections (Favorites, Watch Later, Watched, Recordings,
-History) it filters the on-screen items by name. Split out of main_window.py;
-methods operate on MainWindow state (self.cat_search, self.list_model,
-self._load_categories, ...) through the mixin, so behaviour is identical.
+History, Local files) it filters the on-screen items by name. Split out of
+main_window.py; methods operate on MainWindow state (self.cat_search,
+self.list_model, self._load_categories, ...) through the mixin, so behaviour
+is identical. What each box says it does is set here too (#32): the one over
+the list filters the list shown, the sidebar's finds categories.
 """
 from __future__ import annotations
 
@@ -15,10 +17,39 @@ from PyQt6.QtWidgets import QListWidgetItem
 from ..core.profiles import adult_category
 from ..core.workers import run_async
 from ..i18n import tr
+from .mw_radio import SEARCH
 
 
 class _SearchMixin:
     """MainWindow mixin: the search box and debounced result filtering."""
+
+    # What the sidebar's box finds in the sections with categories (#32):
+    # a category by its name, or by a channel, film or series in it.
+    _CAT_FIND = {"live": "cat_find_live", "vod": "cat_find_vod",
+                 "series": "cat_find_series"}
+
+    def _sync_search_hint(self) -> None:
+        """The box over the list says what it looks through (#32): the list
+        shown; in a folder of Local files that folder and its subfolders;
+        under Radio's Search the whole radio-browser.info directory."""
+        mode = getattr(self, "mode", "")
+        if mode == "local" and self._local_walk_mode():
+            key = "local_search_placeholder"
+        elif mode == "radio" and getattr(self, "_current_cat", None) == SEARCH:
+            key = "radio_search_placeholder"
+        else:
+            key = "list_filter_placeholder"
+        self.search.setPlaceholderText(tr(key))
+
+    def _sync_cat_search_hint(self) -> None:
+        """The sidebar's box and its 🔍 toggle say what it finds: categories
+        by name or by what is in them, or - in the list sections - the same
+        filter of the list shown as the box over it."""
+        text = tr(self._CAT_FIND.get(getattr(self, "mode", ""),
+                                     "list_filter_placeholder"))
+        self.cat_search.setPlaceholderText(text)
+        self.cat_search_btn.setToolTip(text)
+
     def _toggle_cat_search(self, on: bool) -> None:
         self.cat_search.setVisible(on)
         if on:
@@ -38,7 +69,8 @@ class _SearchMixin:
                 return
             self._ensure_search_index(
                 self.mode, lambda idx: self._render_cat_search(q, idx))
-        elif self.mode in ("fav", "watchlist", "watched", "rec", "history"):
+        elif self.mode in ("fav", "watchlist", "watched", "rec", "history",
+                           "local"):
             # Folder/list sections have no provider categories to rank, so the
             # search just filters the items on screen by name.
             if not q:
@@ -49,6 +81,10 @@ class _SearchMixin:
     def _render_item_search(self, q: str) -> None:
         kind = self._content_kind()
         text = self.search.text().lower().strip()   # honour the top search too
+        if self.mode == "local" and self._local_walk_mode():
+            # A folder's rows are the top search's matches already - found
+            # by their file names, which the name filter could drop.
+            text = ""
         hidden = self.channel_ov.anything_hidden()
         items = [it for it in (self.all_items or [])
                  if not it.get("_header")

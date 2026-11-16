@@ -479,7 +479,8 @@ class _SettingsMixin:
             self._donate_btn.setToolTip(tr("donate_support"))
             self._donate_btn.setAccessibleName(tr("donate_support"))
         self._update_playlist_btn()
-        self.search.setPlaceholderText(tr("search_placeholder"))
+        self._sync_search_hint()
+        self._sync_cat_search_hint()
         self._size_label.setText(tr("label_size"))
         self._sort_label.setText(tr("label_sort"))
         # Icon only: the 30 px poster overlay has no room for a label, and

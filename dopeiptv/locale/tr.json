@@ -2916,5 +2916,11 @@
   "local_search_count": "Bu klasörde ve alt klasörlerinde {n} sonuç bulundu",
   "local_search_none": "Bu klasörde veya alt klasörlerinde bir şey bulunamadı.",
   "local_search_more": "Yalnızca ilk {n} sonuç gösteriliyor - daraltmak için yazmaya devam edin.",
-  "local_search_partial": "Tüm alt klasörler aranmadı - içinde aramak için birini açın."
+  "local_search_partial": "Tüm alt klasörler aranmadı - içinde aramak için birini açın.",
+  "list_filter_placeholder": "Bu listeyi filtrele…",
+  "local_search_placeholder": "Bu klasörde ve alt klasörlerinde ara…",
+  "cat_find_live": "Kategorileri ada veya kanala göre bul…",
+  "cat_find_vod": "Kategorileri ada veya filme göre bul…",
+  "cat_find_series": "Kategorileri ada veya diziye göre bul…",
+  "sa_placeholder_all": "Tüm kaynaklarınızda her şeyi ara (ör. Star Trek)"
 }

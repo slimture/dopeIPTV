@@ -273,11 +273,13 @@ class _LocalFilesMixin:
         self._local_cancel_walk()
         if self._local_view() == "series" and isinstance(root, str) \
                 and not getattr(self, "_local_ctx", None):
+            self._sync_search_hint()
             if getattr(self, "_local_series", None):
                 self._load_local_episodes()
             else:
                 self._load_local_library(root)
             return
+        self._sync_search_hint()
         base = getattr(self, "_local_ctx", None) or root
         if not base or not isinstance(base, str):
             self._render_rows([], "rec", tr("local_empty"))

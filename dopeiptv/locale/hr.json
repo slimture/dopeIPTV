@@ -2916,5 +2916,11 @@
   "local_search_count": "Pronađeno u ovoj mapi i podmapama: {n}",
   "local_search_none": "Ništa nije pronađeno u ovoj mapi ni u njezinim podmapama.",
   "local_search_more": "Prikazano je samo prvih {n} - upiši više da suziš izbor.",
-  "local_search_partial": "Nisu pretražene sve podmape - otvori jednu da je pretražiš."
+  "local_search_partial": "Nisu pretražene sve podmape - otvori jednu da je pretražiš.",
+  "list_filter_placeholder": "Filtriraj ovaj popis…",
+  "local_search_placeholder": "Traži u ovoj mapi i njezinim podmapama…",
+  "cat_find_live": "Pronađi kategorije po nazivu ili kanalu…",
+  "cat_find_vod": "Pronađi kategorije po nazivu ili filmu…",
+  "cat_find_series": "Pronađi kategorije po nazivu ili seriji…",
+  "sa_placeholder_all": "Traži sve u svim svojim izvorima (npr. Star Trek)"
 }

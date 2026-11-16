@@ -128,6 +128,9 @@ class _Stub(_LocalFilesMixin):
     def _sorted(self, items):
         return items
 
+    def _sync_search_hint(self):
+        pass
+
     def _search_filter(self, items):
         t = self.search_text.lower()
         return [i for i in items if t in i["name"].lower()] if t else items
