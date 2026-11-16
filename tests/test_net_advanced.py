@@ -123,11 +123,13 @@ class FakeDoh:
 
 class Origin:
     """Serves the test clip over http, or https with *cert*; records each
-    request's Host header and the TLS server name it came with."""
+    request's Host header and the TLS server name it came with. *redirect*:
+    sends every request on there (a panel to its load balancer)."""
 
-    def __init__(self, cert: tuple[str, str] | None = None):
+    def __init__(self, cert: tuple[str, str] | None = None, redirect: str | None = None):
         self.requests: list[dict] = []
         self.sni: list[str | None] = []
+        self.redirect = redirect
         me = self
 
         class H(BaseHTTPRequestHandler):
@@ -138,6 +140,12 @@ class Origin:
 
             def do_GET(self):
                 me.requests.append({"path": self.path, "host": self.headers.get("Host")})
+                if me.redirect:
+                    self.send_response(302)
+                    self.send_header("Location", me.redirect + self.path)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
                 self.send_response(200)
                 self.send_header("Content-Type", "video/mp2t")
                 self.send_header("Content-Length", str(len(TS)))
@@ -188,6 +196,42 @@ def _make_cert(tmp: Path, name: str, tag: str) -> tuple[str, str]:
                        capture_output=True, timeout=30)
     if r.returncode:
         pytest.skip(f"openssl could not make a certificate: {r.stderr[-200:]!r}")
+    return str(cert), str(key)
+
+
+def _make_ca(tmp: Path) -> tuple[str, str]:
+    """A certificate authority of the test's own (its certificate, its key)."""
+    if shutil.which("openssl") is None:
+        pytest.skip("no openssl command to make a test authority")
+    cnf, pem, key = tmp / "ca.cnf", tmp / "ca.pem", tmp / "ca.key"
+    cnf.write_text("[req]\ndistinguished_name = dn\nprompt = no\nx509_extensions = v3_ca\n"
+                   "[dn]\nCN = dopeIPTV test authority\n"
+                   "[v3_ca]\nbasicConstraints = critical,CA:TRUE\n"
+                   "keyUsage = critical,keyCertSign,cRLSign\nsubjectKeyIdentifier = hash\n"
+                   "authorityKeyIdentifier = keyid:always\n", encoding="utf-8")
+    r = subprocess.run(["openssl", "req", "-x509", "-new", "-newkey", "ec", "-pkeyopt",
+                        "ec_paramgen_curve:prime256v1", "-nodes", "-keyout", str(key), "-out", str(pem),
+                        "-days", "3", "-config", str(cnf)], capture_output=True, timeout=30)
+    if r.returncode:
+        pytest.skip(f"openssl could not make a test authority: {r.stderr[-200:]!r}")
+    return str(pem), str(key)
+
+
+def _make_signed(tmp: Path, ca: tuple[str, str], name: str, tag: str) -> tuple[str, str]:
+    """A certificate for *name* signed by the test's authority *ca*."""
+    cert, key, csr, ext = (tmp / f"{tag}.pem", tmp / f"{tag}.key", tmp / f"{tag}.csr",
+                           tmp / f"{tag}.ext")
+    ext.write_text("basicConstraints = critical,CA:FALSE\nkeyUsage = critical,digitalSignature\n"
+                   f"extendedKeyUsage = serverAuth\nsubjectAltName = DNS:{name}\n"
+                   "subjectKeyIdentifier = hash\nauthorityKeyIdentifier = keyid,issuer\n",
+                   encoding="utf-8")
+    for cmd in (["openssl", "req", "-new", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1",
+                 "-nodes", "-keyout", str(key), "-out", str(csr), "-subj", f"/CN={name}"],
+                ["openssl", "x509", "-req", "-in", str(csr), "-CA", ca[0], "-CAkey", ca[1],
+                 "-CAcreateserial", "-out", str(cert), "-days", "3", "-extfile", str(ext)]):
+        r = subprocess.run(cmd, capture_output=True, timeout=30)
+        if r.returncode:
+            pytest.skip(f"openssl could not sign a test certificate: {r.stderr[-200:]!r}")
     return str(cert), str(key)
 
 
@@ -598,6 +642,85 @@ def test_a_changed_certificate_stops_the_bridge(servers, tmp_path):
         assert r.returncode != 0 and home.requests == []
         assert any("changed" in f for f in bridge.failures)
         assert cert_pin.mismatch("nas.example", home.port) is not None
+    finally:
+        bridge.close()
+
+
+def _pinned_and_others(servers, tmp_path, redirect_to: str | None = None):
+    """A route with own DNS and the home server's certificate pinned; beside
+    the home server another host with a certificate of its own (trusted by
+    nobody) and a CDN whose certificate the test's authority signed."""
+    ca = _make_ca(tmp_path)
+    dns = servers(FakeDoh, {n: ["127.0.0.1"] for n in ("nas.example", "other.example", "cdn.example")})
+    other = servers(Origin, _make_cert(tmp_path, "other.example", "o"))
+    cdn = servers(Origin, _make_signed(tmp_path, ca, "cdn.example", "c"))
+    to = {"other": f"https://other.example:{other.port}", "cdn": f"https://cdn.example:{cdn.port}"}
+    nas_cert = _make_cert(tmp_path, "nas.example", "n")
+    home = servers(Origin, nas_cert, redirect=to.get(redirect_to or ""))
+    source = {"dns": "custom", "dns_url": dns.url, **cert_pin.pin_options("nas.example", home.port, _fp(nas_cert))}
+    route = net_route.route_for(source, on())
+    return ca, route, source, home, other, cdn
+
+
+def _connect(bridge, target: str) -> str:
+    """The bridge's answer to CONNECT *target*: its status line."""
+    with socket.create_connection(("127.0.0.1", bridge.port), timeout=15) as s:
+        s.sendall(f"CONNECT {target} HTTP/1.1\r\nHost: {target}\r\n\r\n".encode())
+        return s.recv(4096).split(b"\r\n", 1)[0].decode()
+
+
+def test_another_host_than_the_pinned_one_is_checked_before_its_tunnel(servers, tmp_path):
+    """The player checks no certificate in a stream to a pinned host, and
+    every connection of that stream comes through the bridge: any other
+    https host is checked there as the player would, and refused when the
+    check fails - only the pinned host goes by its pin."""
+    ca, route, _source, home, other, cdn = _pinned_and_others(servers, tmp_path)
+    bridge = net_bridge.Bridge(route, cafile=ca[0])
+    try:
+        assert _connect(bridge, f"nas.example:{home.port}").startswith("HTTP/1.1 200")
+        assert _connect(bridge, f"other.example:{other.port}").startswith("HTTP/1.1 502")
+        assert any("other.example" in f and "not trusted" in f for f in bridge.failures)
+        assert _connect(bridge, f"cdn.example:{cdn.port}").startswith("HTTP/1.1 200")
+        assert cdn.sni == ["cdn.example"]                 # checked for its own name
+        assert _connect(bridge, f"cdn.example:{cdn.port}").startswith("HTTP/1.1 200")
+        assert len(cdn.sni) == 1                          # and then kept a while
+        # The pinned host on another port is another host.
+        assert _connect(bridge, f"nas.example:{other.port}").startswith("HTTP/1.1 502")
+    finally:
+        bridge.close()
+    # The system's authorities by default: the test's own is none of them.
+    system = net_bridge.Bridge(route)
+    try:
+        assert _connect(system, f"cdn.example:{cdn.port}").startswith("HTTP/1.1 502")
+    finally:
+        system.close()
+    # A route with no pin: the player checks every certificate itself, as before.
+    plain = net_bridge.Bridge(Route(servers=route.servers), cafile=ca[0])
+    try:
+        assert _connect(plain, f"other.example:{other.port}").startswith("HTTP/1.1 200")
+    finally:
+        plain.close()
+
+
+@pytest.mark.parametrize("to, plays", [("other", False), ("cdn", True)])
+def test_a_redirect_from_the_pinned_host_goes_no_further_unchecked(servers, tmp_path, to, plays):
+    """ffmpeg records the pinned host with -tls_verify 0 through the bridge;
+    the pinned server sends it on to another https host. One whose
+    certificate nobody signed is refused; one an authority signed plays."""
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("no ffmpeg here")
+    ca, route, source, home, other, cdn = _pinned_and_others(servers, tmp_path, redirect_to=to)
+    bridge = net_bridge.Bridge(route, cafile=ca[0])
+    try:
+        r = subprocess.run(_recorder(bridge, source, f"https://nas.example:{home.port}/live/5.ts"),
+                           capture_output=True, timeout=60)
+        assert home.requests and home.requests[0]["path"] == "/live/5.ts"
+        if plays:
+            assert r.returncode == 0, r.stderr[-400:]
+            assert cdn.requests and cdn.requests[0]["path"] == "/live/5.ts"
+        else:
+            assert r.returncode != 0 and other.requests == []
+            assert any("other.example" in f and "not trusted" in f for f in bridge.failures)
     finally:
         bridge.close()
 

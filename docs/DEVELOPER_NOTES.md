@@ -161,7 +161,11 @@ nothing - while Nerd is off or nothing is set.
   mpv does not check certificates (`tls-verify` is off by default), so for a
   pinned source the bridge makes a TLS connection of its own before it opens
   a tunnel and refuses it when the fingerprint differs (rechecked every
-  ten minutes).
+  ten minutes). A newer mpv or ffmpeg is told not to check that stream's
+  chain itself (`checks_pin`), which would cover its redirects and HLS
+  segments on other hosts too - so on a route with a pin the bridge checks
+  every other https host against the system's authorities, for its name,
+  before that tunnel opens, and refuses it when the check fails.
 - **Not covered**: rtmp / rtsp / udp streams and multiview cells use the
   system's resolver; names only the home network knows are never sent to a
   public DNS; a custom DoH server's own name is resolved by the system (the

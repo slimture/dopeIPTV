@@ -258,15 +258,34 @@ def fetch(host: str, port: int, timeout: float = 8.0, route: Any = None) -> Cert
     return read(der)
 
 
-def system_trust(host: str, port: int, timeout: float = 8.0, route: Any = None) -> tuple[bool, str]:
-    """Does the system (the CA list requests uses) trust what *host* shows,
-    for that name? (yes, "") or (no, why)."""
-    from . import net_route
+def trust_context(cafile: str | None = None) -> ssl.SSLContext:
+    """What a certificate is checked against where the player would check
+    it: this system's authorities and the list requests uses (certifi - a
+    frozen build may not find the system's where it looks); *cafile* alone
+    when it is given."""
+    if cafile:
+        return ssl.create_default_context(cafile=cafile)
+    ctx = ssl.create_default_context()
     try:
         import certifi
-        ctx = ssl.create_default_context(cafile=certifi.where())
-    except ImportError:
-        ctx = ssl.create_default_context()
+        ctx.load_verify_locations(cafile=certifi.where())
+    except (ImportError, OSError, ssl.SSLError):
+        pass
+    return ctx
+
+
+def system_trust(host: str, port: int, timeout: float = 8.0, route: Any = None,
+                 context: ssl.SSLContext | None = None) -> tuple[bool, str]:
+    """Does the system (the CA list requests uses, or *context*'s) trust
+    what *host* shows, for that name? (yes, "") or (no, why)."""
+    from . import net_route
+    ctx = context
+    if ctx is None:
+        try:
+            import certifi
+            ctx = ssl.create_default_context(cafile=certifi.where())
+        except ImportError:
+            ctx = ssl.create_default_context()
     sock = net_route.open_connection(route, host, port, timeout)
     try:
         with ctx.wrap_socket(sock, server_hostname=host):

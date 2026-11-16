@@ -25,6 +25,13 @@ no authority, and a newer ffmpeg or mpv checks the chain by default (FFmpeg
 9 and mpv 0.42 here; FFmpeg 6 and mpv 0.37 did not), so for a stream to a
 pinned host - and only there - they are told not to (checks_pin).
 
+That leaves the rest of such a stream unchecked by them: a redirect, or an
+HLS segment on another host, comes through the bridge too. So on a route
+with a pin every other https host is checked here before its tunnel opens,
+as the player would check it - a TLS connection of its own, the system's
+authorities, for that name; again after TRUST_RECHECK seconds - and the
+tunnel is refused when that fails. Only the pinned host goes by its pin.
+
 Only this computer connects (127.0.0.1), each route has a bridge of its own
 on a port of its own, and what is not a proxy's request (a web page's
 GET /...) is refused.
@@ -34,6 +41,7 @@ from __future__ import annotations
 
 import selectors
 import socket
+import ssl
 import threading
 import time
 from urllib.parse import urlsplit
@@ -43,6 +51,7 @@ from .log import log
 from .net_route import Route
 
 PIN_RECHECK = 600.0
+TRUST_RECHECK = 600.0
 CONNECT_TIMEOUT = 10.0
 HEAD_MAX = 64 * 1024
 _HOP = (b"proxy-connection", b"proxy-authorization", b"connection", b"keep-alive")
@@ -136,10 +145,14 @@ def pipe(a: socket.socket, b: socket.socket) -> None:
 
 
 class Bridge:
-    """One route's proxy on 127.0.0.1."""
+    """One route's proxy on 127.0.0.1. *cafile*: the authorities another
+    host than the pinned one is checked against, in place of the system's."""
 
-    def __init__(self, route: Route) -> None:
+    def __init__(self, route: Route, cafile: str | None = None) -> None:
         self.route = route
+        self.cafile = cafile
+        self._trust_ctx: ssl.SSLContext | None = None
+        self._trust_ok: dict[tuple[str, int], float] = {}
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._sock.bind(("127.0.0.1", 0))
         self._sock.listen(64)
@@ -181,6 +194,8 @@ class Bridge:
     def _check_pin(self, host: str, port: int) -> None:
         pinned = self.route.pin(host, port)
         if pinned is None:
+            if self.route.pins:
+                self._check_trust(host, port)
             return
         now = time.monotonic()
         with self._lock:
@@ -193,6 +208,23 @@ class Bridge:
         cert_pin.clear_mismatch(host, port)
         with self._lock:
             self._pins_ok[(host, port)] = now + PIN_RECHECK
+
+    def _check_trust(self, host: str, port: int) -> None:
+        """Another host than the pinned one, on a route with a pin: the
+        player checks no certificate in a stream to the pinned host, so this
+        host's is checked here (the module's docstring)."""
+        now = time.monotonic()
+        with self._lock:
+            if self._trust_ok.get((host, port), 0.0) > now:
+                return
+            if self._trust_ctx is None:
+                self._trust_ctx = cert_pin.trust_context(self.cafile)
+            ctx = self._trust_ctx
+        trusted, why = cert_pin.system_trust(host, port, CONNECT_TIMEOUT, self.route, context=ctx)
+        if not trusted:
+            raise Refused(f"its certificate is not trusted ({why})")
+        with self._lock:
+            self._trust_ok[(host, port)] = now + TRUST_RECHECK
 
     def _serve(self, client: socket.socket) -> None:
         up: socket.socket | None = None
