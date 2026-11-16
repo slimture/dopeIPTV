@@ -2903,5 +2903,13 @@
   "rec_waiting_room": "đang chờ kết nối rảnh",
   "rec_record_anyway": "Vẫn ghi",
   "rec_reason_no_room": "không có kết nối nào đến tài khoản của bạn còn rảnh",
-  "phone_page_show_in_list": "Hiện trong danh sách"
+  "phone_page_show_in_list": "Hiện trong danh sách",
+  "setting_video_thread": "Vẽ hình trên luồng riêng",
+  "setting_video_thread_hint": "Giữ cuộn mượt khi video đang phát, và video mượt khi bạn cuộn. Chỉ tắt khi cần tìm lỗi. Áp dụng khi dopeIPTV khởi động lại.",
+  "nerd_video_path": "Vẽ video",
+  "nerd_video_path_hint": "Nơi trình phát vẽ hình. Trên luồng riêng, không gì trong cửa sổ phải chờ video.",
+  "video_path_thread": "Luồng riêng",
+  "video_path_window": "Luồng của cửa sổ",
+  "video_path_off": "Luồng của cửa sổ - đã tắt",
+  "video_path_fallback": "Luồng của cửa sổ - không khởi động được luồng riêng: {reason}"
 }

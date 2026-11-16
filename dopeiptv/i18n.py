@@ -3127,6 +3127,14 @@ _STRINGS: dict[str, dict[str, str]] = {
     "onb_sync_err_net": {"en": "Couldn't reach dopeiptv.org. Check your connection and try again."},
     "onb_sync_err_none": {"en": "Nothing is synced under that code. Check it on your other computer and try again."},
     "onb_sync_err_other": {"en": "That didn't work just now. Try again in a moment."},
+    "setting_video_thread": {"en": "Draw the picture on its own thread"},
+    "setting_video_thread_hint": {"en": "Keeps scrolling smooth while video plays, and the video smooth while you scroll. Turn it off only to troubleshoot. Applies when dopeIPTV starts again."},
+    "nerd_video_path": {"en": "Video drawing"},
+    "nerd_video_path_hint": {"en": "Where the player draws its picture. On its own thread nothing in the window waits for the video."},
+    "video_path_thread": {"en": "Own thread"},
+    "video_path_window": {"en": "Window thread"},
+    "video_path_off": {"en": "Window thread - switched off"},
+    "video_path_fallback": {"en": "Window thread - its own thread could not start: {reason}"},
 }
 
 

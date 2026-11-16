@@ -2903,5 +2903,13 @@
   "rec_waiting_room": "väntar på en ledig anslutning",
   "rec_record_anyway": "Spela in ändå",
   "rec_reason_no_room": "ingen anslutning till ditt konto var ledig",
-  "phone_page_show_in_list": "Visa i listan"
+  "phone_page_show_in_list": "Visa i listan",
+  "setting_video_thread": "Rita bilden i en egen tråd",
+  "setting_video_thread_hint": "Håller scrollningen jämn medan video spelas, och videon jämn medan du scrollar. Stäng bara av den för felsökning. Gäller nästa gång dopeIPTV startar.",
+  "nerd_video_path": "Videoritning",
+  "nerd_video_path_hint": "Var spelaren ritar sin bild. I en egen tråd väntar ingenting i fönstret på videon.",
+  "video_path_thread": "Egen tråd",
+  "video_path_window": "Fönstrets tråd",
+  "video_path_off": "Fönstrets tråd - avstängd",
+  "video_path_fallback": "Fönstrets tråd - den egna tråden kunde inte starta: {reason}"
 }

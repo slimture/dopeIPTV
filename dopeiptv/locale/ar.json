@@ -2903,5 +2903,13 @@
   "rec_waiting_room": "في انتظار اتصال متاح",
   "rec_record_anyway": "التسجيل على أي حال",
   "rec_reason_no_room": "لم يكن هناك اتصال متاح بحسابك",
-  "phone_page_show_in_list": "إظهار في القائمة"
+  "phone_page_show_in_list": "إظهار في القائمة",
+  "setting_video_thread": "رسم الصورة في مسار خاص بها",
+  "setting_video_thread_hint": "يبقي التمرير سلسًا أثناء تشغيل الفيديو، والفيديو سلسًا أثناء التمرير. لا توقفه إلا لاستكشاف الأخطاء. يسري عند تشغيل dopeIPTV من جديد.",
+  "nerd_video_path": "رسم الفيديو",
+  "nerd_video_path_hint": "أين يرسم المشغّل صورته. في مسار خاص بها لا ينتظر شيء في النافذة الفيديو.",
+  "video_path_thread": "مسار خاص",
+  "video_path_window": "مسار النافذة",
+  "video_path_off": "مسار النافذة - متوقف",
+  "video_path_fallback": "مسار النافذة - تعذّر بدء المسار الخاص: {reason}"
 }

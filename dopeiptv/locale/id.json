@@ -2903,5 +2903,13 @@
   "rec_waiting_room": "menunggu koneksi kosong",
   "rec_record_anyway": "Tetap rekam",
   "rec_reason_no_room": "tidak ada koneksi ke akunmu yang kosong",
-  "phone_page_show_in_list": "Tampilkan di daftar"
+  "phone_page_show_in_list": "Tampilkan di daftar",
+  "setting_video_thread": "Gambar video di thread tersendiri",
+  "setting_video_thread_hint": "Menjaga gulir tetap mulus saat video diputar, dan video tetap mulus saat kamu menggulir. Matikan hanya untuk mencari masalah. Berlaku saat dopeIPTV dijalankan lagi.",
+  "nerd_video_path": "Penggambaran video",
+  "nerd_video_path_hint": "Tempat pemutar menggambar videonya. Di thread tersendiri, tidak ada yang di jendela menunggu video.",
+  "video_path_thread": "Thread tersendiri",
+  "video_path_window": "Thread jendela",
+  "video_path_off": "Thread jendela - dimatikan",
+  "video_path_fallback": "Thread jendela - thread tersendiri tidak bisa dimulai: {reason}"
 }

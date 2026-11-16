@@ -172,6 +172,8 @@ map and the one-way import rule.
 | `services/together.py` | Watch together, the catalogue side: what plays here as a `Media`, the same title (TMDB id, else title and year; an episode by its season and number; a channel as failover matches it), what the room plays found in this source (`locate`, off the window's thread) |
 | `core/platform_macos.py` | macOS-specific helpers |
 | `core/platform_windows.py` | Windows-specific helpers |
+| `media/video_thread.py` | The picture drawn on a thread of its own (`ThreadedVideoSurface`, the default): a native child window (`QWindow` in `createWindowContainer`, taking no input or focus) that a render thread (`_Renderer`: its GL context, mpv's render context, woken by mpv's update callback - polled on Windows) draws and swaps, never the window's thread; the widgets over the picture stay where they are and get their input as ever, what they show drawn into it by mpv (`_Overlays`, `overlay-add`, again only when one changes); the native window shown only while mpv has a picture; the pop-out's own window drawn instead (`ThreadedMirror`); a surface going lets go of it first (`release`); `make_video_surface` (which surface, `can_start`), `swap_for_fallback` (the window-thread surface in its place when it cannot draw); made current again after a resize, a move or another screen (every frame on macOS, where Qt updates the NSOpenGLContext there), nothing drawn into a window that cannot be seen (only Wayland's covered window counts as seen); `video_check`, the release build's `--video-check` (a generated test picture drawn; 3 when the machine cannot try) |
+| `core/video_mode.py` | How the picture is drawn: on its own thread unless `video_own_thread` is off or `DOPEIPTV_VIDEO_THREAD=0` (`wanted`), the window's thread and why (a fallback's reason, `note_failed`), its line for Nerd > Diagnostics and the error report (`line`) |
 | `media/embedded.py` | Embedded mpv player widget (night mode's switch in the options menu, `_sync_night` on each play, a core that refused it not asked again until it is switched, the sound checked at a stream's start (`_night_on_event`), one `night_mode_changed` for every way it is switched - the menu, the key, Settings - and `night_mode_refused`; a SAT>IP source's RTSP transport for the file alone, `rtsp_file_options`; the equaliser's labelled filter; the loading indicator over the picture, `media/loading_overlay.py`) |
 | `media/players.py` | External player launch, libmpv detection; whether libmpv's FFmpeg decodes teletext (`teletext_decoder`: libzvbi) |
 | `media/teletext_subs.py` | Teletext and DVB subtitles in the player (`TeletextSubsMixin`): their subtitle menu entries ("Swedish - teletext 199"), the page set before the track, the PMT's pages from the rewind buffer or a local .ts, the channel's page and the preferred language's, a libmpv without libzvbi said so (never an error); the options menu's Teletext… |
@@ -182,7 +184,7 @@ map and the one-way import rule.
 | `media/audio_only.py` | Sound with no picture (`AudioOnlyMixin`): whether the stream play() opened is audio alone, read on mpv's file-loaded for that file and its later track-list changes (never an earlier stream's), said once per change (`audio_only_changed`); it only reads - the window's `_on_audio_only` puts the visualiser up, never on a stream with video |
 | `core/stream_info.py` | Validated stream metadata and bounded per-source/channel cache; whether a track list has a real picture (`has_picture`: cover art and still images are none) or is sound alone (`audio_only`) |
 | `media/seek_slider.py` | The seek bar slider (`_SeekSlider`): click, drag, hover time |
-| `media/video_surface.py` | The video surface mpv draws into (`_MpvGLWidget`) and the Linux pop-out's raster mirror |
+| `media/video_surface.py` | The window-thread video surface (`_MpvGLWidget`: the fallback and the switch's other side; `DOPEIPTV_GUI_RENDER=tuned` takes its waits off the window's thread) and the Linux pop-out's raster mirror; the core's options (`build_core`) for every surface |
 | `media/subtitle_text.py` | Stray right-to-left marks out of subtitle files before mpv reads them |
 | `ui/main_window.py` | MainWindow composition root (+ `mw_*` mixins) |
 | `ui/app_menu.py` | The app's menus, one layout on every platform: File (Settings and Quit at its foot), View, History, Help (About last); on macOS About, Settings, Quit and the supporter entries go into the application menu by their roles (`_MAC_ROLES`), the rest never moved by its words; no empty menu, no stray separator |
@@ -447,7 +449,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   dvr_store/ingest/server/session/pool/record, updates, log, player_exec,
   wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys,
   build_check, gcguard, contest, connections, tuners, rtsp, mirrors,
-  conn_test, health, home_net, nerd, nerd_lists, channel_numbers,
+  conn_test, health, home_net, nerd, nerd_lists, channel_numbers, video_mode,
   shortcut_keys, palette_match, search_all, guide_rows, channel_prefs,
   http_login, commands,
   instance, nerd_check, privacy, rec_extras, series_rules, series_view,

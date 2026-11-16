@@ -2903,5 +2903,13 @@
   "rec_waiting_room": "in attesa di una connessione libera",
   "rec_record_anyway": "Registra comunque",
   "rec_reason_no_room": "nessuna connessione al tuo account era libera",
-  "phone_page_show_in_list": "Mostra nell'elenco"
+  "phone_page_show_in_list": "Mostra nell'elenco",
+  "setting_video_thread": "Disegna l'immagine in un thread dedicato",
+  "setting_video_thread_hint": "Mantiene fluido lo scorrimento mentre un video è in riproduzione, e fluido il video mentre scorri. Disattivalo solo per risolvere problemi. Si applica al prossimo avvio di dopeIPTV.",
+  "nerd_video_path": "Disegno del video",
+  "nerd_video_path_hint": "Dove il lettore disegna l'immagine. In un thread dedicato nulla nella finestra aspetta il video.",
+  "video_path_thread": "Thread dedicato",
+  "video_path_window": "Thread della finestra",
+  "video_path_off": "Thread della finestra - disattivato",
+  "video_path_fallback": "Thread della finestra - il thread dedicato non è partito: {reason}"
 }

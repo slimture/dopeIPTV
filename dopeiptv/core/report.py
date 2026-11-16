@@ -114,6 +114,8 @@ def system_lines() -> list[str]:
         lines.append(f"python-mpv {getattr(mpv, '__version__', '?')}")
     except Exception:
         lines.append("libmpv: not loaded")
+    from . import video_mode
+    lines.append(video_mode.line())
     return lines
 
 

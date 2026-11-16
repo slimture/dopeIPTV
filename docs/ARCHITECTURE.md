@@ -125,8 +125,11 @@ dopeiptv/
   media/               Playback
     embedded.py        EmbeddedPlayer: the in-app player
     seek_slider.py     The seek bar slider: click, drag, hover time
-    video_surface.py   _MpvGLWidget(QOpenGLWidget), the surface mpv draws
-                       into; the Linux pop-out's raster mirror
+    video_thread.py    ThreadedVideoSurface (the default): a native window
+                       a render thread of its own draws mpv's frames into;
+                       the overlays drawn into the picture by mpv
+    video_surface.py   _MpvGLWidget(QOpenGLWidget), the window-thread surface
+                       (fallback and switch); the Linux pop-out's raster mirror
     rewind_bar.py      DVR row + timeshift timeline over the video
     dvr_player.py      The player's side of the app-kept buffer
     players.py         External player launch (mpv IPC / VLC), libmpv detect
@@ -276,8 +279,9 @@ colours, which is why `ui/__init__` exposes
    caches parsed XML to disk (per-playlist, 6h TTL, stale-first).
 
 4. **Playback** goes through either `EmbeddedPlayer` (libmpv OpenGL
-   render API inside a QOpenGLWidget) or an external player launched by
-   `players.py`.
+   render API, drawn on a thread of its own into a native window - or,
+   switched off or as a fallback, inside a QOpenGLWidget on the window's
+   thread) or an external player launched by `players.py`.
 
 5. **Rewind / DVR**: by default mpv's own demuxer cache is the rewind
    buffer (in memory, or on disk with `local_buffer.py`).  With

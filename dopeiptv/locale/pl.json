@@ -2903,5 +2903,13 @@
   "rec_waiting_room": "czeka na wolne połączenie",
   "rec_record_anyway": "Mimo to nagraj",
   "rec_reason_no_room": "żadne połączenie z twoim kontem nie było wolne",
-  "phone_page_show_in_list": "Pokaż na liście"
+  "phone_page_show_in_list": "Pokaż na liście",
+  "setting_video_thread": "Rysuj obraz we własnym wątku",
+  "setting_video_thread_hint": "Przewijanie pozostaje płynne podczas odtwarzania wideo, a wideo płynne podczas przewijania. Wyłącz tylko przy szukaniu problemów. Działa od następnego uruchomienia dopeIPTV.",
+  "nerd_video_path": "Rysowanie wideo",
+  "nerd_video_path_hint": "Gdzie odtwarzacz rysuje obraz. We własnym wątku nic w oknie nie czeka na wideo.",
+  "video_path_thread": "Własny wątek",
+  "video_path_window": "Wątek okna",
+  "video_path_off": "Wątek okna - wyłączone",
+  "video_path_fallback": "Wątek okna - własny wątek nie mógł się uruchomić: {reason}"
 }

@@ -36,7 +36,7 @@ from ..core.log import log
 from ..i18n import tr
 from ..media.loading_overlay import LoadingOverlay, quiet
 from ..media.seek_slider import _SeekSlider
-from ..media.video_surface import _MpvGLWidget
+from ..media.video_thread import make_video_surface, swap_for_fallback
 from ..media import players
 from .widgets import (
     drag_frameless_resize, exec_menu_over_video, frameless_resize_edges,
@@ -189,7 +189,9 @@ class _MultiviewCell(QWidget):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
-        self.video = _MpvGLWidget(self)
+        # Drawn on a thread of its own like the docked player's, unless that
+        # is off or cannot start (media/video_thread.py).
+        self.video = make_video_surface(self)
         self.video.setMinimumSize(0, 0)
         # Hover must reveal the overlays (title, controls, the window's close
         # button) without a pressed button - same as the docked player. Without
@@ -197,11 +199,7 @@ class _MultiviewCell(QWidget):
         # never appear.
         self.video.setMouseTracking(True)
         lay.addWidget(self.video)
-        self.video.video_mouse_press.connect(self._on_press)
-        self.video.video_mouse_move.connect(self._on_move)
-        self.video.video_mouse_release.connect(self._on_release)
-        self.video.video_dbl_click.connect(self.maximize_requested)
-        self.video.playback_error.connect(self._on_error)
+        self._wire_video(self.video)
 
         # Active-cell marker: a full-rect border painted as a child ON TOP of
         # the GL surface (a stylesheet border on the cell itself is covered by
@@ -292,6 +290,31 @@ class _MultiviewCell(QWidget):
         self._live_btn.hide()
         self._apply_live_style(True)
         self.set_focused(False)
+
+    def _wire_video(self, v) -> None:
+        v.video_mouse_press.connect(self._on_press)
+        v.video_mouse_move.connect(self._on_move)
+        v.video_mouse_release.connect(self._on_release)
+        v.video_dbl_click.connect(self.maximize_requested)
+        v.playback_error.connect(self._on_error)
+        fallback = getattr(v, "fallback", None)
+        if fallback is not None:
+            fallback.connect(self._video_fallback)
+
+    def _video_fallback(self, _reason: str) -> None:
+        """This cell's picture could not be drawn on its own thread: the
+        window-thread surface takes its place, its labels and controls with
+        it, and a stream that was starting starts again."""
+        if getattr(self.video, "threaded", False) is not True:
+            return
+        self.video = swap_for_fallback(self.video, self._wire_video)
+        if self.url:
+            QTimer.singleShot(0, partial(self._replay, self.url))
+
+    def _replay(self, url: str) -> None:
+        if self.url == url:
+            self.play(url, self.title, item=self._item, client=self._client,
+                      guide=self._guide, playlist=self.playlist_name)
 
     def _apply_live_style(self, live: bool) -> None:
         """Red solid '● LIVE' pill at the live edge; a bordered '⏭ LIVE'

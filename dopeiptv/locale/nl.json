@@ -2903,5 +2903,13 @@
   "rec_waiting_room": "wacht op een vrije verbinding",
   "rec_record_anyway": "Toch opnemen",
   "rec_reason_no_room": "er was geen verbinding met je account vrij",
-  "phone_page_show_in_list": "Toon in lijst"
+  "phone_page_show_in_list": "Toon in lijst",
+  "setting_video_thread": "Beeld in een eigen thread tekenen",
+  "setting_video_thread_hint": "Houdt scrollen soepel terwijl er video speelt, en de video soepel terwijl je scrolt. Zet het alleen uit om problemen op te sporen. Geldt vanaf de volgende start van dopeIPTV.",
+  "nerd_video_path": "Video tekenen",
+  "nerd_video_path_hint": "Waar de speler zijn beeld tekent. In een eigen thread wacht niets in het venster op de video.",
+  "video_path_thread": "Eigen thread",
+  "video_path_window": "Thread van het venster",
+  "video_path_off": "Thread van het venster - uitgezet",
+  "video_path_fallback": "Thread van het venster - de eigen thread kon niet starten: {reason}"
 }

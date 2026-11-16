@@ -2903,5 +2903,13 @@
   "rec_waiting_room": "inasubiri muunganisho huru",
   "rec_record_anyway": "Rekodi hata hivyo",
   "rec_reason_no_room": "hakukuwa na muunganisho huru kwa akaunti yako",
-  "phone_page_show_in_list": "Onyesha kwenye orodha"
+  "phone_page_show_in_list": "Onyesha kwenye orodha",
+  "setting_video_thread": "Chora picha kwenye uzi wake yenyewe",
+  "setting_video_thread_hint": "Huweka usogezaji laini video inapocheza, na video laini unaposogeza. Izime tu kwa kutafuta tatizo. Inatumika dopeIPTV inapoanzishwa tena.",
+  "nerd_video_path": "Uchoraji wa video",
+  "nerd_video_path_hint": "Mahali kichezaji kinapochora picha yake. Kwenye uzi wake yenyewe, hakuna kitu dirishani kinachosubiri video.",
+  "video_path_thread": "Uzi wake yenyewe",
+  "video_path_window": "Uzi wa dirisha",
+  "video_path_off": "Uzi wa dirisha - imezimwa",
+  "video_path_fallback": "Uzi wa dirisha - uzi wake yenyewe haukuweza kuanza: {reason}"
 }

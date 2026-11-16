@@ -2903,5 +2903,13 @@
   "rec_waiting_room": "ממתין לחיבור פנוי",
   "rec_record_anyway": "להקליט בכל זאת",
   "rec_reason_no_room": "לא היה חיבור פנוי לחשבון שלכם",
-  "phone_page_show_in_list": "הצגה ברשימה"
+  "phone_page_show_in_list": "הצגה ברשימה",
+  "setting_video_thread": "ציור התמונה בתהליכון משלה",
+  "setting_video_thread_hint": "שומר על גלילה חלקה בזמן שסרטון מתנגן, ועל הסרטון חלק בזמן הגלילה. כבו רק לצורך פתרון בעיות. ייכנס לתוקף בהפעלה הבאה של dopeIPTV.",
+  "nerd_video_path": "ציור הווידאו",
+  "nerd_video_path_hint": "היכן הנגן מצייר את התמונה שלו. בתהליכון משלה, שום דבר בחלון לא ממתין לווידאו.",
+  "video_path_thread": "תהליכון משלה",
+  "video_path_window": "תהליכון החלון",
+  "video_path_off": "תהליכון החלון - כבוי",
+  "video_path_fallback": "תהליכון החלון - התהליכון הנפרד לא הצליח להתחיל: {reason}"
 }

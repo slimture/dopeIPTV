@@ -2903,5 +2903,13 @@
   "rec_waiting_room": "空き接続を待機中",
   "rec_record_anyway": "それでも録画",
   "rec_reason_no_room": "アカウントへの接続に空きがありませんでした",
-  "phone_page_show_in_list": "リストで表示"
+  "phone_page_show_in_list": "リストで表示",
+  "setting_video_thread": "映像を専用のスレッドで描画",
+  "setting_video_thread_hint": "動画の再生中もスクロールを滑らかに、スクロール中も動画を滑らかに保ちます。オフにするのは問題を調べるときだけにしてください。dopeIPTV を次に起動したときから有効です。",
+  "nerd_video_path": "映像の描画",
+  "nerd_video_path_hint": "プレーヤーが映像をどこで描画するか。専用スレッドなら、ウィンドウ内のものが映像を待つことはありません。",
+  "video_path_thread": "専用スレッド",
+  "video_path_window": "ウィンドウのスレッド",
+  "video_path_off": "ウィンドウのスレッド - オフ",
+  "video_path_fallback": "ウィンドウのスレッド - 専用スレッドを開始できませんでした: {reason}"
 }

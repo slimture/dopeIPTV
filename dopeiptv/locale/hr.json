@@ -2903,5 +2903,13 @@
   "rec_waiting_room": "čeka slobodnu vezu",
   "rec_record_anyway": "Ipak snimi",
   "rec_reason_no_room": "nijedna veza prema tvom računu nije bila slobodna",
-  "phone_page_show_in_list": "Prikaži na popisu"
+  "phone_page_show_in_list": "Prikaži na popisu",
+  "setting_video_thread": "Crtaj sliku u vlastitoj niti",
+  "setting_video_thread_hint": "Pomicanje ostaje glatko dok se video reproducira, a video glatko dok pomičeš. Isključi samo za otklanjanje problema. Primjenjuje se pri sljedećem pokretanju dopeIPTV-a.",
+  "nerd_video_path": "Crtanje videa",
+  "nerd_video_path_hint": "Gdje player crta sliku. U vlastitoj niti ništa u prozoru ne čeka video.",
+  "video_path_thread": "Vlastita nit",
+  "video_path_window": "Nit prozora",
+  "video_path_off": "Nit prozora - isključeno",
+  "video_path_fallback": "Nit prozora - vlastita nit nije se mogla pokrenuti: {reason}"
 }

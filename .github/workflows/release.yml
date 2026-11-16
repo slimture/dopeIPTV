@@ -1243,6 +1243,23 @@ jobs:
             hdiutil detach "$MOUNT" || true; exit 1
           fi
           echo "::endgroup::"
+          # The picture drawn on a thread of its own (media/video_thread.py):
+          # its GL context made on the render thread and a generated test
+          # picture shown in a small window. A runner whose OpenGL cannot try
+          # (no threaded GL, no window on screen) exits 3 - skipped, said so.
+          # Drawing nothing where it could, or a crash, fails the build: the
+          # app falls back to the window's thread on such a Mac, but a crash
+          # on the render thread is not caught by that.
+          echo "::group::--video-check (the video's own render thread)"
+          VRC=0
+          perl -e 'alarm shift; exec @ARGV' 120 "$BIN" --video-check || VRC=$?
+          echo "::endgroup::"
+          case "$VRC" in
+            0) echo "video check: frames drawn on the render thread" ;;
+            3) echo "::notice::--video-check skipped: this runner's OpenGL cannot try the threaded video surface (see the log above)" ;;
+            *) echo "::error::--video-check failed (exit $VRC): the threaded video surface did not draw on the mounted .app"
+               hdiutil detach "$MOUNT" || true; exit 1 ;;
+          esac
           # Signed and notarised, the app still holds what its build manifest
           # lists - so it calls itself official on a Mac (build_check.py).
           if [ -e "$APP/Contents/Resources/dopeiptv/_build_manifest.json" ]; then

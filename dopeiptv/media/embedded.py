@@ -34,6 +34,7 @@ from .subtitle_text import fixed_bytes
 from .stream_info import StreamInfoMixin
 from .teletext_subs import TeletextSubsMixin
 from .video_surface import _MpvGLWidget, _RasterMirror
+from .video_thread import make_video_surface, swap_for_fallback
 from ..ui.theme import P
 
 
@@ -756,7 +757,9 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(2)
 
-        self.video = _MpvGLWidget(self)
+        # Drawn on a thread of its own unless switched off or impossible
+        # here (media/video_thread.py); else the window-thread surface.
+        self.video = make_video_surface(self, settings)
         # This player switches adaptive streams to the variant Nerd's cap
         # allows (_watch_variants): its core may open them on the smallest.
         self.video.variant_picker = True
@@ -769,6 +772,8 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         # surface the "aborted / loading failed" mpv fires while it winds
         # the stream down as a "Stream error" toast.
         self._stopping = False
+        self._play_args: tuple | None = None
+        self._video_swapped = False
         self._wire_video(self.video)
         self._ov_surface = self.video   # overlays anchor here (see __init__)
         # Continuous seek while an arrow key is held down.
@@ -1545,7 +1550,14 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         # tick and has therefore never run on macOS.
         _mac_raster = (sys.platform == "darwin"
                        and os.environ.get("DOPEIPTV_MAC_RASTER") == "1")
-        if (sys.platform.startswith("linux") or sys.platform == "win32"
+        threaded = getattr(self.video, "threaded", False) is True
+        if threaded:
+            # The picture's own thread draws into the pop-out's own native
+            # window instead (media/video_thread.py): nothing is read back,
+            # nothing GL moves between windows, no timer drives it.
+            m = self.video.make_mirror(parent)
+            tick, interval = None, 0
+        elif (sys.platform.startswith("linux") or sys.platform == "win32"
                 or _mac_raster):
             # DEFAULT Linux and Windows path: raster mirror (see
             # _RasterMirror). Every GL presentation route in a second window
@@ -1596,12 +1608,13 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         # is still on the surface, and any gap around the placeholder shows it
         # frozen - intermittently, depending on how the reflow interleaved.
         self.video.update()
-        self._mirror_timer = QTimer(self)
-        # Precise, not coarse: Qt's default timer slack (~5%) is visible as
-        # frame-pacing jitter at video rates.
-        self._mirror_timer.setTimerType(Qt.TimerType.PreciseTimer)
-        self._mirror_timer.timeout.connect(tick)
-        self._mirror_timer.start(interval)
+        if tick is not None:
+            self._mirror_timer = QTimer(self)
+            # Precise, not coarse: Qt's default timer slack (~5%) is visible
+            # as frame-pacing jitter at video rates.
+            self._mirror_timer.setTimerType(Qt.TimerType.PreciseTimer)
+            self._mirror_timer.timeout.connect(tick)
+            self._mirror_timer.start(interval)
         # Float the seek bar, timeshift timeline and stats over the mirror:
         # reparent them into the pop-out window and anchor placement to the
         # mirror. They're plain widgets, so moving them is safe.
@@ -1639,6 +1652,7 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         # than guessed at.
         log.info("VID mirror start took %.0fms (path=%s)",
                  (time.monotonic() - _t_start) * 1000,
+                 "thread" if threaded else
                  "raster" if isinstance(m, _RasterMirror) else "gl")
         return m
 
@@ -1803,6 +1817,9 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
                 self._mirror_fbos = [None, None]
         self._mirror_pending = None
         self.video._render_suspended = False
+        drop = getattr(self.video, "drop_mirror", None)
+        if drop is not None:
+            drop()                # the picture's own thread: back to docked
         # Overlays back onto the docked player.
         self._ov_surface = self.video
         for ov in (self.seek_overlay, self.ts_timeline, self._stats_overlay,
@@ -1918,6 +1935,9 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         """Connect a video widget's signals/filters to the player."""
         w.installEventFilter(self)
         w.setMouseTracking(True)
+        fallback = getattr(w, "fallback", None)
+        if fallback is not None:
+            fallback.connect(self._video_fallback)
         w.playback_error.connect(self._on_playback_error)
         w.eof_event.connect(self._on_mpv_eof)
         w.video_dbl_click.connect(self._on_video_dbl_click)
@@ -1926,6 +1946,30 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         w.video_mouse_release.connect(self._on_video_release)
         w.video_key_press.connect(self._on_seek_key_press)
         w.video_key_release.connect(self._on_seek_key_release)
+
+    def _video_fallback(self, reason: str) -> None:
+        """The picture's own thread could not draw (media/video_thread.py):
+        the window-thread surface takes its place, and a stream that was
+        starting starts again on it."""
+        old = self.video
+        if getattr(old, "threaded", False) is not True:
+            return
+        if self._mirror is not None:
+            self.popout_requested.emit()     # back to docked first
+        again = self._play_args if self.current_url is not None else None
+        self.video = swap_for_fallback(old, self._wire_video)
+        self._video_swapped = True
+        self._ov_surface = self.video
+        self._lock_video_box()
+        for ov in (self.seek_overlay, self.ts_timeline, self._stats_overlay, self.nextup_btn,
+                   self.local_buffer_bar, self.stream_info_badge, self._ld_overlay,
+                   self.live_badge, self.sleep_badge, self.number_badge, self._blackout):
+            if ov is not None and ov.parentWidget() is self:
+                ov.raise_()
+        log.warning("video: the window's thread draws the picture from now on (%s)", reason)
+        if again is not None:
+            url, title, start, kw = again
+            QTimer.singleShot(0, lambda: self.play(url, title, start, **kw))
 
     def _settle_after_reparent(self) -> None:
         """Re-lock the video box and re-place any visible overlay against the
@@ -3003,6 +3047,10 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         # Settings turned it off. own_buffer False: never dopeIPTV's own
         # (an address opened by hand, which need not be a stream at all) -
         # mpv opens it, with mpv's own rewind.
+        # What a fallback of the video surface plays again (_video_fallback).
+        self._play_args = (url, title, start, {"local_buffer": local_buffer,
+                                               "buffer_key": buffer_key, "web": web,
+                                               "own_buffer": own_buffer})
         live = local_buffer
         # Nerd: the channel this is (set_channel, one-shot) and the settings
         # of its own it plays with - none for anything else.
@@ -3059,6 +3107,15 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
             if self.video.mpv is None:
                 self.video.show()
                 QApplication.instance().processEvents()
+                ensure = getattr(self.video, "ensure_started", None)
+                if ensure is not None:
+                    ensure()
+                if self.video.mpv is None and self._video_swapped:
+                    # The threaded surface could not start: the window-thread
+                    # one took its place (_video_fallback) and starts now.
+                    self._video_swapped = False
+                    self.video.show()
+                    QApplication.instance().processEvents()
             if self.video.mpv is None:
                 raise RuntimeError("OpenGL context not ready")
             m = self.video.mpv

@@ -2903,5 +2903,13 @@
   "rec_waiting_room": "aguardando uma conexão livre",
   "rec_record_anyway": "Gravar mesmo assim",
   "rec_reason_no_room": "nenhuma conexão com a sua conta estava livre",
-  "phone_page_show_in_list": "Mostrar na lista"
+  "phone_page_show_in_list": "Mostrar na lista",
+  "setting_video_thread": "Desenhar a imagem em uma thread própria",
+  "setting_video_thread_hint": "Mantém a rolagem suave enquanto um vídeo toca, e o vídeo suave enquanto você rola. Desative só para resolver problemas. Vale a partir da próxima vez que o dopeIPTV for aberto.",
+  "nerd_video_path": "Desenho do vídeo",
+  "nerd_video_path_hint": "Onde o player desenha a imagem. Em uma thread própria, nada na janela espera pelo vídeo.",
+  "video_path_thread": "Thread própria",
+  "video_path_window": "Thread da janela",
+  "video_path_off": "Thread da janela - desativada",
+  "video_path_fallback": "Thread da janela - a thread própria não pôde iniciar: {reason}"
 }

@@ -76,9 +76,49 @@ been tried yet.
 ## Embedded player
 
 The embedded player uses libmpv's OpenGL render API via `python-mpv`.
-The `_MpvGLWidget` subclasses `QOpenGLWidget` and feeds frames through
-`MpvRenderContext`.  This is the only way to get tear-free video inside
-a Qt widget.
+
+By default the picture is drawn on a thread of its own
+(`media/video_thread.py`): each surface is a native child window (a
+`QWindow` in `QWidget.createWindowContainer`) and a render thread owns the
+GL context and mpv's render context. mpv's update callback only wakes that
+thread; it renders straight into the window and swaps, so the waits for a
+frame's display time and for vsync never land on the window's thread, and
+the window has no GL widget left - a scroll repaints only what moved. Every
+video frame through the window's thread had kept it busy 99% of the time
+while video played (scrolling stuck at the video's frame rate).
+
+The widgets over the picture (loading indicator, DVR row, stats, badges,
+the fullscreen controls, multiview's labels) stay where they are: the
+native window takes no input (`WindowTransparentForInput`), so they get
+their clicks, hover and tooltips as before, and what they show is drawn
+into the picture by mpv (`overlay-add`, BGRA premultiplied), again only
+when one changes. While mpv has no picture the native window is hidden and
+everything is plain Qt.
+
+Switched off (Settings > Picture & sound, or `DOPEIPTV_VIDEO_THREAD=0`), or
+when the own thread cannot start (no threaded OpenGL, no GL context or render
+context, no frame shown), the old surface takes over: `_MpvGLWidget`
+subclasses `QOpenGLWidget` and feeds frames through `MpvRenderContext` on
+the window's thread. The reason is logged and shown in Nerd > Diagnostics
+and the error report. `DOPEIPTV_GUI_RENDER=tuned` takes that surface's
+waits off the window's thread.
+
+mpv's render API calls (update, render, free) need the GL context current
+on the calling thread. Never set `update_cb = None` on a live render
+context: python-mpv drops the old callback before handing mpv the new one,
+and mpv's thread may still be calling it.
+
+macOS: the render thread makes its context current on the window before
+every frame. Qt's Cocoa context marks itself for an update when the view's
+frame or screen changes (on the main thread) and applies it - the
+`NSOpenGLContext` update - in `makeCurrent`, which is how Qt's own threaded
+render loop keeps it right. A window macOS reports occluded or minimized is
+not exposed and gets no frames (mpv is told they were skipped), so a
+hidden window never swaps into a surface vsync would hold. Only on Wayland
+does a covered window still count as seen (the compositor stops its frame
+callbacks, as under the fullscreen window). The release build's mac smoke
+test runs `--video-check`: a generated test picture drawn on the render
+thread, or skipped (exit 3) where the runner's OpenGL cannot try.
 
 Requirements: `python-mpv` pip package + `libmpv.so` / `libmpv.dylib`
 system library.

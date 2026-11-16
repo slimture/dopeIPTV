@@ -207,11 +207,14 @@ class _PopoutMixin:
         if self._player_fs:
             self._exit_player_fullscreen()
 
-        if _use_mirror_popout():
+        if _use_mirror_popout() or getattr(self.player.video, "threaded", False) is True:
             # macOS cannot reparent a QOpenGLWidget between windows without the
             # picture freezing on a stale shared-context layer, and Linux/Mesa
             # never presents GL in a second window at all - both mirror the
-            # stream instead of moving the player. Windows reparents (below).
+            # stream instead of moving the player. Windows reparents (below),
+            # unless the picture has a thread of its own: then the pop-out gets
+            # a native window of its own on every system, which that thread
+            # draws into (media/video_thread.py) - nothing moves at all.
             self._popout_macos()
             return
 

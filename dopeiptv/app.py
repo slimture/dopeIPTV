@@ -377,6 +377,14 @@ def main() -> int:
         from .core.platform_windows import setup_opengl
         setup_opengl()
 
+    if "--video-check" in sys.argv:
+        # Packaging check: the picture drawn on a thread of its own, its GL
+        # context made and a generated test picture shown (exit 0); 3 when
+        # this machine cannot try (no threaded OpenGL, no screen), 1 when it
+        # could and drew nothing.
+        from .media.video_thread import video_check
+        return video_check()
+
     # A backup restored over everything in Settings waits for this moment:
     # put in place before anything reads the settings it replaces (the size
     # of the interface below included) - but only by a start that opens the

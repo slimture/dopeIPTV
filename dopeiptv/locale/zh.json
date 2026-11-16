@@ -2903,5 +2903,13 @@
   "rec_waiting_room": "正在等待空闲连接",
   "rec_record_anyway": "仍然录制",
   "rec_reason_no_room": "你的账户没有空闲连接",
-  "phone_page_show_in_list": "在列表中显示"
+  "phone_page_show_in_list": "在列表中显示",
+  "setting_video_thread": "在独立线程中绘制画面",
+  "setting_video_thread_hint": "播放视频时滚动依然流畅，滚动时视频也依然流畅。仅在排查问题时关闭。下次启动 dopeIPTV 时生效。",
+  "nerd_video_path": "视频绘制",
+  "nerd_video_path_hint": "播放器在哪里绘制画面。在独立线程中，窗口里的任何内容都不必等待视频。",
+  "video_path_thread": "独立线程",
+  "video_path_window": "窗口线程",
+  "video_path_off": "窗口线程 - 已关闭",
+  "video_path_fallback": "窗口线程 - 独立线程无法启动：{reason}"
 }

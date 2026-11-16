@@ -2903,5 +2903,13 @@
   "rec_waiting_room": "en attente d'une connexion libre",
   "rec_record_anyway": "Enregistrer quand même",
   "rec_reason_no_room": "aucune connexion à ton compte n'était libre",
-  "phone_page_show_in_list": "Afficher dans la liste"
+  "phone_page_show_in_list": "Afficher dans la liste",
+  "setting_video_thread": "Dessiner l'image dans son propre thread",
+  "setting_video_thread_hint": "Garde le défilement fluide pendant la lecture d'une vidéo, et la vidéo fluide pendant que vous faites défiler. Ne le désactivez que pour un dépannage. S'applique au prochain démarrage de dopeIPTV.",
+  "nerd_video_path": "Affichage de la vidéo",
+  "nerd_video_path_hint": "Où le lecteur dessine son image. Dans son propre thread, rien dans la fenêtre n'attend la vidéo.",
+  "video_path_thread": "Thread dédié",
+  "video_path_window": "Thread de la fenêtre",
+  "video_path_off": "Thread de la fenêtre - désactivé",
+  "video_path_fallback": "Thread de la fenêtre - son propre thread n'a pas pu démarrer : {reason}"
 }

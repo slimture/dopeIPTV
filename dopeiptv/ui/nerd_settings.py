@@ -806,6 +806,10 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
                       diagnostics(settings), state="info").exec()
     info_btn.clicked.connect(show_diag)
     c.row(tr("nerd_diag_row"), info_btn, tr("nerd_diag_hint"), search="diagnostics bug report copy")
+    # How the player draws its picture now (core/video_mode.py), so a
+    # fallback to the window's thread never goes unnoticed.
+    c.row(tr("nerd_video_path"), QLabel(video_path_text()), tr("nerd_video_path_hint"),
+          search="video thread drawing render OpenGL fallback")
     # The active source's connection, step by step (core/conn_test.py).
     conn_btn = QPushButton(tr("ct_button"))
 
@@ -1443,6 +1447,19 @@ def _hbox(*widgets: QWidget) -> QHBoxLayout:
     return h
 
 
+def video_path_text() -> str:
+    """How the player draws its picture, in the user's words."""
+    from ..core import video_mode
+    why = video_mode.why()
+    if video_mode.mode() == video_mode.THREAD:
+        return tr("video_path_thread")
+    if why.startswith("fallback: "):
+        return tr("video_path_fallback", reason=why[len("fallback: "):])
+    if why.startswith("switched off"):
+        return tr("video_path_off")
+    return tr("video_path_window")
+
+
 def diagnostics(settings: Any) -> str:
     """What a bug report needs, without a single secret: versions, the
     system, which Nerd options are set (their names, and values only where
@@ -1460,6 +1477,8 @@ def diagnostics(settings: Any) -> str:
         lines.append(f"libmpv: {getattr(mpv, '__version__', '?')} (python-mpv)")
     except Exception as e:
         lines.append(f"libmpv: not loaded ({type(e).__name__})")
+    from ..core import video_mode
+    lines.append(video_mode.line())
     n = nerd.Nerd(settings)
     lines.append(f"Nerd: {'on' if n.on else 'off'}")
     safe = {"nerd_ip_family", "nerd_net_timeout", "nerd_reconnect_max", "nerd_spdif", "nerd_video_sync",

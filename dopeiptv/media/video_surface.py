@@ -286,8 +286,14 @@ class _MpvGLWidget(QOpenGLWidget):
         ctx = self._ctx
         if ctx is None:
             return True
+        # mpv may do GL work in update(): this widget's context is current
+        # for it, as for the render.
         try:
-            return bool(ctx.update())
+            self.makeCurrent()
+            try:
+                return bool(ctx.update())
+            finally:
+                self.doneCurrent()
         except Exception:
             return True
 

@@ -2903,5 +2903,13 @@
   "rec_waiting_room": "boş bir bağlantı bekleniyor",
   "rec_record_anyway": "Yine de kaydet",
   "rec_reason_no_room": "hesabına boş bağlantı yoktu",
-  "phone_page_show_in_list": "Listede göster"
+  "phone_page_show_in_list": "Listede göster",
+  "setting_video_thread": "Görüntüyü kendi iş parçacığında çiz",
+  "setting_video_thread_hint": "Video oynarken kaydırmayı, kaydırırken de videoyu akıcı tutar. Yalnızca sorun giderirken kapatın. dopeIPTV bir sonraki açılışta geçerli olur.",
+  "nerd_video_path": "Video çizimi",
+  "nerd_video_path_hint": "Oynatıcının görüntüsünü nerede çizdiği. Kendi iş parçacığında pencerede hiçbir şey videoyu beklemez.",
+  "video_path_thread": "Kendi iş parçacığı",
+  "video_path_window": "Pencerenin iş parçacığı",
+  "video_path_off": "Pencerenin iş parçacığı - kapalı",
+  "video_path_fallback": "Pencerenin iş parçacığı - kendi iş parçacığı başlatılamadı: {reason}"
 }

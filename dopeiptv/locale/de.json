@@ -2903,5 +2903,13 @@
   "rec_waiting_room": "wartet auf eine freie Verbindung",
   "rec_record_anyway": "Trotzdem aufnehmen",
   "rec_reason_no_room": "keine Verbindung zu deinem Konto war frei",
-  "phone_page_show_in_list": "In der Liste zeigen"
+  "phone_page_show_in_list": "In der Liste zeigen",
+  "setting_video_thread": "Bild in einem eigenen Thread zeichnen",
+  "setting_video_thread_hint": "Hält das Scrollen flüssig, während ein Video läuft, und das Video flüssig beim Scrollen. Nur zur Fehlersuche ausschalten. Gilt ab dem nächsten Start von dopeIPTV.",
+  "nerd_video_path": "Videodarstellung",
+  "nerd_video_path_hint": "Wo der Player sein Bild zeichnet. In einem eigenen Thread wartet nichts im Fenster auf das Video.",
+  "video_path_thread": "Eigener Thread",
+  "video_path_window": "Fenster-Thread",
+  "video_path_off": "Fenster-Thread – ausgeschaltet",
+  "video_path_fallback": "Fenster-Thread – der eigene Thread konnte nicht starten: {reason}"
 }

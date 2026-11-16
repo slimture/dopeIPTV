@@ -35,7 +35,9 @@ has two profiles or more.
 - Audio & subtitles: `audio_lang`, `sub_mode`, `sub_lang`, `sub_lang2` (this profile's; the language picks a teletext subtitle page too; the page chosen per channel in the player's menu is `teletext_pages`, no row)
 - How subtitles look: `sub_scale`, `sub_color`, `sub_background`
 - Video: `aspect_mode`, `video_deinterlace`, `video_sharpen`, `video_tonemapping`
-- Decoding: `hwdec_mode`; link → Nerd › Player (passthrough, video sync,
+- Decoding: `hwdec_mode`; `video_own_thread` (the picture drawn on a thread
+  of its own; off falls back to the window's thread, also
+  `DOPEIPTV_VIDEO_THREAD=0`); link → Nerd › Player (passthrough, video sync,
   interpolation, audio delay per channel, mpv)
 
 **Guide** (`guide`)
@@ -256,7 +258,8 @@ while Nerd is on, and so are the link rows that lead to them.
 
 **Diagnostics** (`nerd_diag`)
 - (untitled): `nerd_log_level`, `nerd_log_file`, the log folder, the
-  diagnostics to copy, Test connection, Stream analysis (opens its window
+  diagnostics to copy, how the video is drawn (own thread, or the window's
+  and why; no key), Test connection, Stream analysis (opens its window
   over the player; Settings closes)
 - Stats for nerds: `nerd_overlay_more`
 - Stream health: `nerd_health`; the worst channels, clear

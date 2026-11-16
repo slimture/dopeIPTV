@@ -2903,5 +2903,13 @@
   "rec_waiting_room": "در انتظار یک اتصال آزاد",
   "rec_record_anyway": "در هر صورت ضبط کن",
   "rec_reason_no_room": "هیچ اتصال آزادی به حساب شما نبود",
-  "phone_page_show_in_list": "نمایش در فهرست"
+  "phone_page_show_in_list": "نمایش در فهرست",
+  "setting_video_thread": "کشیدن تصویر در رشته‌ی جداگانه",
+  "setting_video_thread_hint": "هنگام پخش ویدیو پیمایش را روان نگه می‌دارد و هنگام پیمایش، ویدیو را. فقط برای عیب‌یابی خاموشش کنید. از اجرای بعدی dopeIPTV اعمال می‌شود.",
+  "nerd_video_path": "کشیدن ویدیو",
+  "nerd_video_path_hint": "پخش‌کننده تصویرش را کجا می‌کشد. در رشته‌ی جداگانه، هیچ چیز در پنجره منتظر ویدیو نمی‌ماند.",
+  "video_path_thread": "رشته‌ی جداگانه",
+  "video_path_window": "رشته‌ی پنجره",
+  "video_path_off": "رشته‌ی پنجره - خاموش",
+  "video_path_fallback": "رشته‌ی پنجره - رشته‌ی جداگانه شروع نشد: {reason}"
 }

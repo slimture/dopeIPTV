@@ -2903,5 +2903,13 @@
   "rec_waiting_room": "빈 연결을 기다리는 중",
   "rec_record_anyway": "그래도 녹화",
   "rec_reason_no_room": "계정에 사용할 수 있는 빈 연결이 없었음",
-  "phone_page_show_in_list": "목록에서 보기"
+  "phone_page_show_in_list": "목록에서 보기",
+  "setting_video_thread": "영상을 전용 스레드에서 그리기",
+  "setting_video_thread_hint": "영상이 재생되는 동안에도 스크롤이 부드럽고, 스크롤하는 동안에도 영상이 부드럽게 유지됩니다. 문제를 해결할 때만 끄세요. dopeIPTV를 다시 시작하면 적용됩니다.",
+  "nerd_video_path": "영상 그리기",
+  "nerd_video_path_hint": "플레이어가 영상을 어디에서 그리는지 보여 줍니다. 전용 스레드에서는 창의 어떤 것도 영상을 기다리지 않습니다.",
+  "video_path_thread": "전용 스레드",
+  "video_path_window": "창 스레드",
+  "video_path_off": "창 스레드 - 꺼짐",
+  "video_path_fallback": "창 스레드 - 전용 스레드를 시작할 수 없었습니다: {reason}"
 }

@@ -2903,5 +2903,13 @@
   "rec_waiting_room": "esperando una conexión libre",
   "rec_record_anyway": "Grabar de todos modos",
   "rec_reason_no_room": "no había ninguna conexión libre a tu cuenta",
-  "phone_page_show_in_list": "Mostrar en la lista"
+  "phone_page_show_in_list": "Mostrar en la lista",
+  "setting_video_thread": "Dibujar la imagen en su propio hilo",
+  "setting_video_thread_hint": "Mantiene fluido el desplazamiento mientras se reproduce un vídeo, y el vídeo fluido mientras te desplazas. Desactívalo solo para solucionar problemas. Se aplica la próxima vez que se inicie dopeIPTV.",
+  "nerd_video_path": "Dibujo del vídeo",
+  "nerd_video_path_hint": "Dónde dibuja el reproductor su imagen. En su propio hilo, nada en la ventana espera al vídeo.",
+  "video_path_thread": "Hilo propio",
+  "video_path_window": "Hilo de la ventana",
+  "video_path_off": "Hilo de la ventana - desactivado",
+  "video_path_fallback": "Hilo de la ventana - su propio hilo no pudo iniciarse: {reason}"
 }
