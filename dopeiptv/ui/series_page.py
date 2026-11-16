@@ -7,10 +7,15 @@ seasons, and the season's episodes as cards (ui/series_cards.py).
 Pure presentation: the page draws what it is given and says what was
 asked (its signals); it never plays, fetches or stores anything. Pictures
 come through the window's image loaders (core/workers.LogoLoader), asked
-for only for the cards on screen and painted when they are in - never
-fetched on the window's thread. A season of hundreds of episodes is one
-list of uniform rows: a season shown is a model reset, nothing built per
-episode.
+for only for the cards on screen and a few past its edges, and painted
+when they are in - never fetched or decoded on the window's thread. A
+season of hundreds of episodes is one list of uniform rows: a season shown
+is a model reset, nothing built per episode.
+
+Scrolling moves what is drawn already and paints only the strip that
+comes into view: the page's body is opaque (``_Body``), so Qt can shift
+its pixels; over a see-through body every scroll step painted every card
+on screen again.
 """
 
 from __future__ import annotations
@@ -18,7 +23,7 @@ from __future__ import annotations
 import time
 
 from PyQt6 import sip
-from PyQt6.QtCore import QPoint, QPointF, QRect, QRectF, QSize, Qt, pyqtSignal
+from PyQt6.QtCore import QEvent, QPoint, QPointF, QRect, QRectF, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QIcon, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap
 from PyQt6.QtWidgets import (
     QButtonGroup, QFrame, QHBoxLayout, QLabel, QProgressBar, QPushButton, QScrollArea,
@@ -164,6 +169,8 @@ class SeriesHeader(QWidget):
         super().__init__(parent)
         self.setObjectName("SeriesHeader")
         self._backdrop: QPixmap | None = None
+        #: The backdrop scaled to the header's size: (width, height, pixmap).
+        self._backdrop_at: tuple[int, int, QPixmap] | None = None
         self._expanded = False
         self._plot = ""
         lay = QHBoxLayout(self)
@@ -337,7 +344,20 @@ class SeriesHeader(QWidget):
 
     def set_backdrop(self, pm: QPixmap | None) -> None:
         self._backdrop = pm if pm is not None and not pm.isNull() else None
+        self._backdrop_at = None
         self.update()
+
+    def _scaled_backdrop(self, pm: QPixmap) -> QPixmap:
+        """The backdrop covering the header, scaled once per size - not on
+        every paint (a 1280-wide picture scaled each time a scroll step
+        showed a strip of the header)."""
+        w, h = self.width(), self.height()
+        kept = self._backdrop_at
+        if kept is not None and kept[0] == w and kept[1] == h:
+            return kept[2]
+        img = _cover(pm, w, h)
+        self._backdrop_at = (w, h, img)
+        return img
 
     def has_backdrop(self) -> bool:
         return self._backdrop is not None
@@ -408,7 +428,7 @@ class SeriesHeader(QWidget):
         p.fillPath(path, _c("pane"))
         pm = self._backdrop
         if pm is not None:
-            img = _cover(pm, self.width(), self.height())
+            img = self._scaled_backdrop(pm)
             p.drawPixmap((self.width() - img.width()) // 2,
                          (self.height() - img.height()) // 2, img)
             # Toward the page's own colour - dark on a dark theme, light on a
@@ -430,6 +450,32 @@ class SeriesHeader(QWidget):
 
 # -- the page ------------------------------------------------------------------------
 
+class _Body(QWidget):
+    """What the page's scroll area moves: opaque, in the page's own colour
+    (the middle pane's, which showed through it before). Qt shifts an opaque
+    widget's pixels when it scrolls and paints only the strip that comes
+    into view; a see-through one it paints whole on every step.
+
+    The application's style sheet makes a scroll area's content see-through
+    (and takes the opaque mark off on every polish), so the mark is put back
+    after each."""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
+
+    def event(self, e) -> bool:
+        done = super().event(e)
+        if e.type() in (QEvent.Type.Polish, QEvent.Type.StyleChange):
+            self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
+        return done
+
+    def paintEvent(self, e) -> None:
+        p = QPainter(self)
+        p.fillRect(e.rect(), QColor(P["bg"]))
+        p.end()
+
+
 class SeriesPage(QWidget):
     """The whole page: Back, the header, the seasons, the episodes - and a
     calm word in the episodes' place while they load (or why they did
@@ -446,6 +492,9 @@ class SeriesPage(QWidget):
     #: A second ask to play the same episode within this long is the
     #: same ask (a double click, a key held down).
     PLAY_DEBOUNCE_S = 0.8
+    #: Cards past either edge of the screen whose pictures are asked for
+    #: already, so they are in by the time they scroll on.
+    AHEAD = 3
 
     def __init__(self, stills_loader=None, parent=None) -> None:
         super().__init__(parent)
@@ -458,7 +507,9 @@ class SeriesPage(QWidget):
         self.current = -1
         self._fallback: QPixmap | None = None
         self._last_play: tuple[str, float] = ("", 0.0)
-        self.stills = ImageSource(stills_loader, self._repaint_cards)
+        self.stills = ImageSource(stills_loader, self._repaint_cards, self._still_arrived)
+        #: The span of cards whose pictures were asked for last (_ask_ahead).
+        self._ahead: tuple | None = None
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 10, 0, 0)
         outer.setSpacing(6)
@@ -480,7 +531,7 @@ class SeriesPage(QWidget):
         self.area.setFrameShape(QFrame.Shape.NoFrame)
         self.area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.area.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        body = QWidget()
+        body = _Body()
         body.setObjectName("SeriesBody")
         self.body = body
         lay = QVBoxLayout(body)
@@ -524,9 +575,11 @@ class SeriesPage(QWidget):
         self.view.back.connect(self.back_requested)
         self.view.moved.connect(self._reveal)
         self.view.width_changed.connect(self._fit_view)
+        self.view.placed.connect(self._ask_ahead)
         lay.addWidget(self.view)
         lay.addStretch(1)
         self.area.setWidget(body)
+        self.area.verticalScrollBar().valueChanged.connect(self._ask_ahead)
         outer.addWidget(self.area, 1)
         self.restyle()
 
@@ -572,6 +625,8 @@ class SeriesPage(QWidget):
         self.playing_fraction = 0.0
         self._fallback = None
         self.stills.forget()
+        self._ahead = None
+        self.delegate.covers.clear()
         self.model.set_items([])
         self.season_bar.set_seasons([], -1)
         self.season_bar.hide()
@@ -625,9 +680,11 @@ class SeriesPage(QWidget):
         season = self.seasons[i]
         if changed:
             self.model.set_items(season.episodes)
+            self._ahead = None
         self.season_bar.set_current(i)
         self.count.setText(tr("count_episodes", n=len(season.episodes)))
         self._fit_view()
+        self._ask_ahead()
         if changed:
             self.season_shown.emit(i)
 
@@ -712,6 +769,64 @@ class SeriesPage(QWidget):
     def _repaint_cards(self) -> None:
         if not sip.isdeleted(self):
             self.view.viewport().update()
+
+    def _rows_on_screen(self, margin: int = 0) -> range:
+        """The rows of the cards the page's scroll area shows (the list is
+        as tall as its cards), *margin* more at either end."""
+        n = self.model.rowCount()
+        lv, vp = self.view.viewport(), self.area.viewport()
+        if not n or sip.isdeleted(lv) or not self.view.isVisible():
+            return range(0)
+        top = lv.mapFrom(vp, QPoint(0, 0)).y()
+        bottom = top + vp.height() - 1
+        # Uniform rows, one under the other: the first one's place and the
+        # step to the next say where every row is.
+        first = self.view.visualRect(self.model.index(0, 0))
+        step = (self.view.visualRect(self.model.index(1, 0)).top() - first.top()
+                if n > 1 else first.height())
+        if step <= 0 or first.height() <= 0:
+            return range(0)
+        a = max(0, (top - first.top()) // step)
+        b = min(n - 1, (bottom - first.top()) // step)
+        if b < a or bottom < first.top():
+            return range(0)                     # the list is off screen
+        return range(max(0, a - margin), min(n - 1, b + margin) + 1)
+
+    def _still_arrived(self, url: str) -> None:
+        """A card's picture is in: those cards on screen painted again, not
+        every card (a scroll step then has nothing old to paint again)."""
+        if sip.isdeleted(self):
+            return
+        lv = self.view.viewport()
+        for row in self._rows_on_screen():
+            ep = self.model.item_at(row)
+            if ep is not None and sv.still_of(ep) == url:
+                lv.update(self.view.visualRect(self.model.index(row, 0)))
+
+    def _ask_ahead(self, *_a) -> None:
+        """The pictures of the cards on screen and of a few past its edges
+        asked for, so the next ones are in when they scroll on (once per
+        span of cards: most scroll steps stay within the same)."""
+        if sip.isdeleted(self) or self.stills.loader is None:
+            return
+        rows = self._rows_on_screen(self.AHEAD)
+        key = (self.current, self.model.rowCount(), rows.start, rows.stop)
+        if key == self._ahead:
+            return
+        self._ahead = key
+        for row in rows:
+            ep = self.model.item_at(row)
+            if ep is not None:
+                self.stills.want(sv.still_of(ep))
+
+    def resizeEvent(self, e) -> None:
+        super().resizeEvent(e)
+        self._ask_ahead()                       # a taller page shows more cards
+
+    def showEvent(self, e) -> None:
+        super().showEvent(e)
+        self._ahead = None                      # nothing was on screen while hidden
+        self._ask_ahead()
 
     def mousePressEvent(self, e) -> None:
         if e.button() == Qt.MouseButton.BackButton:

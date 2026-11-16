@@ -278,6 +278,293 @@ def test_a_season_of_150_builds_at_once_and_its_pictures_come_on_threads(app, mo
     page.deleteLater()
 
 
+# -- scrolling stays cheap (the page was slower to scroll than any list) --------------
+
+class _MemoryLoader:
+    """A loader with its pictures in memory already (or none): what the
+    page asks for is noted, nothing is fetched."""
+
+    def __init__(self, pictures=None):
+        self.cache = dict(pictures or {})
+        self.asked: list[str] = []
+
+    def is_dead(self, _url):
+        return False
+
+    def get(self, url, _callback):
+        self.asked.append(url)
+
+
+def _still_url(i):
+    return f"http://img.example/s/{i}.jpg"
+
+
+def _picture(w, h, colour):
+    from PyQt6.QtGui import QColor, QPixmap
+    pm = QPixmap(w, h)
+    pm.fill(QColor(colour))
+    return pm
+
+
+def _season(n, stills=True):
+    eps = [_ep(7000 + i, i, season=1, title=f"Episode number {i}",
+               plot="Something happens and then something else happens " * 3,
+               secs=2700, still=_still_url(i) if stills else "")
+           for i in range(1, n + 1)]
+    for ep in eps:
+        ep["_sp_label"] = f"E{ep['episode_num']} · {ep['title']}"
+        ep["_sp_short"] = f"E{ep['episode_num']}"
+    return eps
+
+
+def _page_in_the_pane(app, loader, eps, size=(900, 800)):
+    """The page as the window holds it: in the middle pane, the app's
+    style sheet on (it is what makes a scroll area's content see-through)."""
+    from PyQt6.QtWidgets import QVBoxLayout, QWidget
+    from dopeiptv.ui import theme
+    from dopeiptv.ui.series_page import SeriesPage
+    app.setStyleSheet(theme.build_style())
+    host = QWidget(objectName="MiddlePane")
+    lay = QVBoxLayout(host)
+    lay.setContentsMargins(0, 0, 0, 0)
+    page = SeriesPage(loader)
+    lay.addWidget(page)
+    host.resize(*size)
+    host.show()
+    app.processEvents()
+    page.header.set_text("Show", "2020", "A plot. " * 20)
+    backdrop = _picture(1280, 720, "#335577")
+    page.header.set_backdrop(backdrop)
+    page.set_fallback_art(backdrop)
+    page.set_seasons(sv.seasons(eps), [("S1", "")], 0)
+    app.processEvents()
+    return host, page
+
+
+def _flush(app, host):
+    from PyQt6.QtCore import QEvent
+    from PyQt6.QtWidgets import QApplication
+    app.processEvents()
+    QApplication.sendEvent(host, QEvent(QEvent.Type.UpdateRequest))
+    app.processEvents()
+
+
+def test_a_scroll_step_paints_only_the_strip_that_comes_into_view(app, monkeypatch):
+    """The page's body is opaque, so a scroll step moves what is drawn and
+    paints only the strip that comes into view - a card or two. Over the
+    see-through body every step painted every card on screen again (eight
+    to nine of them), and nothing is laid out again per step."""
+    from dopeiptv.ui.series_cards import EpisodeDelegate
+    eps = _season(150)
+    loader = _MemoryLoader({_still_url(i): _picture(320, 180, "#446688")
+                            for i in range(1, 151)})
+    paints, hints = [0], [0]
+    real_paint, real_hint = EpisodeDelegate.paint, EpisodeDelegate.sizeHint
+
+    def paint(self, p, option, index):
+        paints[0] += 1
+        real_paint(self, p, option, index)
+
+    def size_hint(self, option, index):
+        hints[0] += 1
+        return real_hint(self, option, index)
+
+    monkeypatch.setattr(EpisodeDelegate, "paint", paint)
+    monkeypatch.setattr(EpisodeDelegate, "sizeHint", size_hint)
+    host, page = _page_in_the_pane(app, loader, eps)
+    try:
+        sb = page.area.verticalScrollBar()
+        start = page.view.mapTo(page.body, page.view.rect().topLeft()).y()
+        sb.setValue(start)
+        _flush(app, host)
+        assert paints[0] >= 5, "the cards on screen were not painted"
+        per_step = []
+        hints[0] = 0
+        for v in range(start + 60, start + 60 * 31, 60):
+            paints[0] = 0
+            sb.setValue(v)
+            _flush(app, host)
+            per_step.append(paints[0])
+        assert max(per_step) <= 3, per_step
+        assert sum(per_step) <= len(per_step) * 2, per_step
+        assert hints[0] == 0, f"laid out again while scrolling ({hints[0]} size hints)"
+    finally:
+        host.close()
+        host.deleteLater()
+        app.setStyleSheet("")
+
+
+class _SlowLoader(_MemoryLoader):
+    """Pictures come in when the test says (the loader's threads, held)."""
+
+    def __init__(self):
+        super().__init__()
+        self.waiting: list = []
+
+    def get(self, url, callback):
+        super().get(url, callback)
+        self.waiting.append((url, callback))
+
+    def deliver(self, count):
+        for url, callback in self.waiting[:count]:
+            n = int(url.rsplit("/", 1)[1].split(".")[0])
+            pm = _picture(320, 180, f"#{(n * 40) % 256:02x}{(n * 90) % 256:02x}80")
+            self.cache[url] = pm
+            callback(pm)
+        del self.waiting[:count]
+
+
+def test_what_is_on_screen_is_what_the_page_paints_while_pictures_come_in(app):
+    """Scrolled step by step while pictures come in between the steps: what
+    the window shows (moved pixels, the strips painted, the cards painted
+    again for their picture) is a fresh paint of the page - no card
+    left with its stand-in, no strip out of place."""
+    from PyQt6.QtGui import QImage
+    eps = _season(60)
+    loader = _SlowLoader()
+    host, page = _page_in_the_pane(app, loader, eps, size=(820, 700))
+    try:
+        sb = page.area.verticalScrollBar()
+
+        def on_screen() -> QImage:
+            return host.screen().grabWindow(host.winId()).toImage().convertToFormat(
+                QImage.Format.Format_RGB32)
+
+        def painted() -> QImage:
+            return host.grab().toImage().convertToFormat(QImage.Format.Format_RGB32)
+
+        def same(a: QImage, b: QImage) -> bool:
+            # A gradient painted in strips can land a level off at a seam;
+            # a card left with its stand-in is far off.
+            if a == b:
+                return True
+            pa = a.constBits().asstring(a.sizeInBytes())
+            pb = b.constBits().asstring(b.sizeInBytes())
+            return not any(abs(x - y) > 2 for x, y in zip(pa, pb, strict=True))
+
+        _flush(app, host)
+        steps = compared = 0
+        for v in list(range(0, 2400, 45)) + list(range(2400, 0, -70)):
+            sb.setValue(v)
+            _flush(app, host)
+            steps += 1
+            if steps % 3 == 0:
+                loader.deliver(4)                # a few in, between two steps
+                _flush(app, host)
+            if steps % 9 == 0:
+                shown, fresh = on_screen(), painted()
+                if shown.size() == fresh.size():
+                    assert same(shown, fresh), f"stale on screen at {v}"
+                    compared += 1
+        loader.deliver(len(loader.waiting))
+        _flush(app, host)
+        shown, fresh = on_screen(), painted()
+        if shown.size() == fresh.size():
+            assert same(shown, fresh), "stale on screen at the end"
+            compared += 1
+        assert compared, "what is on screen could not be read"
+    finally:
+        host.close()
+        host.deleteLater()
+        app.setStyleSheet("")
+
+
+def test_cards_and_header_scale_their_pictures_once(app, monkeypatch):
+    """A card's still (or the series' picture standing in) and the header's
+    backdrop are scaled to their size once, then painted as they are - not
+    smooth-scaled again on every paint."""
+    from dopeiptv.ui import series_cards, series_page
+    scaled: list[tuple] = []
+    real = series_cards._cover
+
+    def counting(pm, w, h):
+        scaled.append((pm.cacheKey(), w, h))
+        return real(pm, w, h)
+
+    monkeypatch.setattr(series_cards, "_cover", counting)
+    monkeypatch.setattr(series_page, "_cover", counting)
+    eps = _season(40)
+    # Every third card without a picture of its own: the series' stands in.
+    loader = _MemoryLoader({_still_url(i): _picture(320, 180, "#446688")
+                            for i in range(1, 41) if i % 3})
+    host, page = _page_in_the_pane(app, loader, eps)
+    try:
+        sb = page.area.verticalScrollBar()
+        page.grab()
+        for v in range(0, sb.maximum() + 1, 90):
+            sb.setValue(v)
+            _flush(app, host)
+        first = list(scaled)
+        assert first, "nothing was painted"
+        assert len(first) == len(set(first)), "a picture was scaled twice"
+        for v in range(sb.maximum(), -1, -90):
+            sb.setValue(v)
+            _flush(app, host)
+        page.grab()
+        host.grab()
+        assert scaled == first, f"{len(scaled) - len(first)} scales on later paints"
+        assert len(page.delegate.covers) <= len(set(first))
+        # Another series: the scaled copies go with it.
+        page.reset()
+        assert len(page.delegate.covers) == 0
+    finally:
+        host.close()
+        host.deleteLater()
+        app.setStyleSheet("")
+
+
+def test_pictures_asked_for_on_screen_and_a_few_past_it(app):
+    """Only the cards on screen and AHEAD past either edge ask for their
+    pictures - before they scroll on - and a picture that comes in paints
+    again only the cards that show it."""
+    from PyQt6.QtCore import QPoint
+    eps = _season(150)
+    loader = _MemoryLoader()
+    host, page = _page_in_the_pane(app, loader, eps)
+    try:
+        area, view = page.area, page.view
+        sb = area.verticalScrollBar()
+        index = page.model.index
+        near: set[int] = set()
+        for v in (0, 700, 5000, 9000, sb.maximum()):
+            sb.setValue(v)
+            _flush(app, host)
+            at = view.viewport().mapTo(area.viewport(), QPoint(0, 0))
+            seen = {r for r in range(150)
+                    if view.visualRect(index(r, 0)).translated(at).intersects(
+                        area.viewport().rect())}
+            rows = set(page._rows_on_screen())
+            assert rows == seen, (v, sorted(rows), sorted(seen))
+            ahead = set(page._rows_on_screen(page.AHEAD))
+            assert seen <= ahead and len(ahead) <= len(seen) + 2 * page.AHEAD
+            # The ones about to scroll on are asked for before they show.
+            assert {_still_url(r + 1) for r in ahead} <= set(loader.asked), v
+            near |= set(page._rows_on_screen(page.AHEAD + 1))
+        # Nothing far from where the page was asked for (a row of slack for
+        # the first ask, made before the page's layout settled), nothing twice.
+        asked_rows = {int(u.rsplit("/", 1)[1].split(".")[0]) - 1 for u in loader.asked}
+        assert asked_rows <= near, sorted(asked_rows - near)
+        assert len(loader.asked) == len(set(loader.asked)), "a picture asked for twice"
+        # One picture in: only its card painted again.
+        sb.setValue(5000)
+        _flush(app, host)
+        row = next(iter(page._rows_on_screen()))
+        updated = []
+        lv = view.viewport()
+        real_update = lv.update
+        lv.update = lambda *a: updated.append(a)
+        try:
+            page._still_arrived(_still_url(row + 1))
+            page._still_arrived("http://img.example/nowhere.jpg")
+        finally:
+            lv.update = real_update
+        assert updated == [(view.visualRect(index(row, 0)),)], updated
+    finally:
+        host.close()
+        host.deleteLater()
+        app.setStyleSheet("")
+
+
 # -- in the window -------------------------------------------------------------------
 
 _CHILD = r"""

@@ -6,13 +6,17 @@ playing marked - and its keys. Mirrored in a right-to-left language
 (``card_layout``).
 
 Pictures through the window's image loaders (``ImageSource``): asked for
-only for the cards painted, i.e. on screen, fetched on the loaders' own
-threads and painted when they come.
+only for the cards on screen and a few past its edges, fetched (and
+decoded) on the loaders' own threads and painted when they come - only the
+cards that show them painted again. A card's picture is scaled to its size
+once (``Covers``), never on every paint.
 """
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass, field
+from functools import partial
 from typing import TYPE_CHECKING, Callable
 
 from PyQt6.QtCore import (
@@ -48,6 +52,47 @@ def _cover(pm: QPixmap, w: int, h: int) -> QPixmap:
                      Qt.TransformationMode.SmoothTransformation)
 
 
+class Covers:
+    """Pictures scaled to cover a w x h box (``_cover``), kept per picture
+    and size: scaled once, then painted as they are. A smooth scale of every
+    card's still - of a 1280-wide backdrop for a card still waiting for its
+    own - on every paint was most of what a scroll step cost.
+
+    Keyed by the pixmap's cacheKey (the loader's copy; one evicted and read
+    again is a new key), bounded in bytes, the least recently painted going
+    first."""
+
+    def __init__(self, max_bytes: int = 16 * 1024 * 1024) -> None:
+        self.max_bytes = max_bytes
+        self._kept: OrderedDict[tuple[int, int, int], QPixmap] = OrderedDict()
+        self._bytes = 0
+
+    def get(self, pm: QPixmap, w: int, h: int) -> QPixmap:
+        key = (pm.cacheKey(), w, h)
+        hit = self._kept.get(key)
+        if hit is not None:
+            self._kept.move_to_end(key)
+            return hit
+        img = _cover(pm, w, h)
+        self._kept[key] = img
+        self._bytes += self._cost(img)
+        while len(self._kept) > 1 and self._bytes > self.max_bytes:
+            _k, old = self._kept.popitem(last=False)
+            self._bytes -= self._cost(old)
+        return img
+
+    def clear(self) -> None:
+        self._kept.clear()
+        self._bytes = 0
+
+    def __len__(self) -> int:
+        return len(self._kept)
+
+    @staticmethod
+    def _cost(pm: QPixmap) -> int:
+        return max(1024, pm.width() * pm.height() * 4)
+
+
 def wrap_lines(fm: QFontMetrics, text: str, width: int, lines: int) -> list[str]:
     """*text* in at most *lines* lines of *width* pixels, the last one cut
     with an ellipsis when there is more."""
@@ -74,11 +119,13 @@ def wrap_lines(fm: QFontMetrics, text: str, width: int, lines: int) -> list[str]
 class ImageSource:
     """Pictures for the page: from a loader's memory when there, else
     asked for (on the loader's own threads) and the page repainted when
-    they come. A picture is asked for once per page."""
+    they come - all of it (*repaint*), or only where that picture shows
+    (*arrived*, given its address). A picture is asked for once per page."""
 
-    def __init__(self, loader, repaint) -> None:
+    def __init__(self, loader, repaint, arrived: Callable[[str], None] | None = None) -> None:
         self.loader = loader
         self._repaint = repaint
+        self._arrived_at = arrived
         self._asked: set[str] = set()
 
     def get(self, url: str | None) -> QPixmap | None:
@@ -87,16 +134,26 @@ class ImageSource:
         pm = self.loader.cache.get(url)
         if pm is not None:
             return pm if not pm.isNull() else None
-        if url not in self._asked and not self.loader.is_dead(url):
-            self._asked.add(url)
-            self.loader.get(url, self._arrived)
+        self.want(url)
         return None
+
+    def want(self, url: str | None) -> None:
+        """*url* asked for now, before it is painted (a card about to come
+        on screen); nothing when it is in memory, asked already or dead."""
+        if (not url or self.loader is None or url in self._asked
+                or url in self.loader.cache or self.loader.is_dead(url)):
+            return
+        self._asked.add(url)
+        self.loader.get(url, partial(self._arrived, url))
 
     def forget(self) -> None:
         self._asked.clear()
 
-    def _arrived(self, _pm) -> None:
-        self._repaint()
+    def _arrived(self, url: str, _pm) -> None:
+        if self._arrived_at is not None:
+            self._arrived_at(url)
+        else:
+            self._repaint()
 
 
 @dataclass
@@ -184,6 +241,8 @@ class EpisodeDelegate(QStyledItemDelegate):
         super().__init__(page)
         self._page = page
         self._wrapped: dict[tuple, list[str]] = {}
+        #: Each card's picture at its size, scaled once.
+        self.covers = Covers()
 
     def forget_text(self) -> None:
         self._wrapped.clear()
@@ -247,7 +306,7 @@ class EpisodeDelegate(QStyledItemDelegate):
         if pm is None:
             pm = page.fallback_art()
         if pm is not None and not pm.isNull():
-            img = _cover(pm, r.width(), r.height())
+            img = self.covers.get(pm, r.width(), r.height())
             p.drawPixmap(r.x() - (img.width() - r.width()) // 2,
                          r.y() - (img.height() - r.height()) // 2, img)
             if not own:
@@ -407,6 +466,8 @@ class EpisodeView(QListView):
     back = pyqtSignal()
     moved = pyqtSignal(QRect)
     width_changed = pyqtSignal()
+    #: Moved or resized in the page (not scrolled: the page's body moves).
+    placed = pyqtSignal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -521,6 +582,11 @@ class EpisodeView(QListView):
             self._width_key = key
             self.scheduleDelayedItemsLayout()
             self.width_changed.emit()
+        self.placed.emit()
+
+    def moveEvent(self, e) -> None:
+        super().moveEvent(e)
+        self.placed.emit()
 
     def focusInEvent(self, e) -> None:
         super().focusInEvent(e)

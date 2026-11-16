@@ -65,6 +65,16 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 - The phone remote fits small phones: from 320 px wide (iPhone SE 1st generation, small Androids) and on its side, the bar's tabs and search, the dock's volume and keys and the remote's d-pad and keys wrap or sit side by side as there is room, every button is at least 44 px, the remote's labels are never cut mid-word, and the notch, the home bar and the status bar are kept clear.
 - Scrolling on the computer no longer stutters while the phone remote is on: a poll never loads the programme guide on the window's thread any more (a guide not yet in memory was downloaded and parsed there, freezing the window for seconds), now and next are looked up off it, the playing channel and the favourites are worked out again only when they change, the same state again costs the phone nothing (304), and the page asks every 3 s instead of 1.5 s once nothing has changed for a while (every second just after a tap).
 
+- A series' page scrolls smoothly: a scroll step moves what is drawn and
+  paints only the strip that comes into view (it painted every card on
+  screen again, each with its picture smooth-scaled anew, and the header's
+  backdrop too), a card's picture is scaled to its size once, and a
+  picture that comes in paints only its own card. Pictures everywhere -
+  lists, Home, posters, Search, the series page - are decoded once, on the
+  loaders' threads and without holding up the window, already at their
+  size; the window only puts them up (each was decoded a second time there,
+  about 5 ms for an episode's still). Nothing looks different.
+
 ## [1.6.1]
 
 A calmer guide, a night mode that tames loud adverts and bangs without
