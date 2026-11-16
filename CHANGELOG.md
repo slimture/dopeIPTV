@@ -228,6 +228,14 @@ how connections to the account are counted.
   source's page's tabs were shown for a moment as windows of their own,
   each asking GNOME for an activation token it never used, and GNOME waited
   for them to time out.
+- Settings opens about four times as fast (about 85 ms instead of 375 ms
+  with Nerd on and five sources; on one of Nerd's pages about 205 ms) and
+  the video beside it stands still far less: only the page it opens on is
+  built, every other the first time it is shown or a search reaches it.
+  What each page stores, and when, is unchanged; a page never opened
+  stores nothing.
+- Settings > Appearance: switching on "Follow the system" shows the light
+  theme row at once; it stayed hidden until Settings was opened again.
 
 ## [1.6.0]
 

@@ -392,8 +392,13 @@ def idle():
     wait(lambda: not getattr(w, "_series_busy", False))
     app.processEvents()
 
-# Settings untouched: no padding key written (0 and 0 stay the default).
-QDialog.exec = lambda self: 1
+# Settings untouched: no padding key written (0 and 0 stay the default) -
+# its Recording page built, as it is when shown.
+def untouched(self):
+    from dopeiptv.ui.settings_ui import SettingsShell
+    self.findChild(SettingsShell).show_page("recording")
+    return 1
+QDialog.exec = untouched
 w.open_settings()
 assert s.value(sr.PAD_BEFORE_KEY) is None and s.value(sr.PAD_AFTER_KEY) is None
 s.setValue(sr.PAD_BEFORE_KEY, 2)
@@ -493,6 +498,8 @@ assert mine[0]["stream_key"] == "3" and mine[0]["prog_start"] == base and "rule"
 # 7. Settings > Recording: the padding steppers and the rules, deleted at once
 # with the recordings they scheduled that had not started.
 def settings(self):
+    from dopeiptv.ui.settings_ui import SettingsShell
+    self.findChild(SettingsShell).show_page("recording")   # built as it shows
     boxes = {b.accessibleName(): b for b in self.findChildren(Stepper)}
     assert boxes[tr("rec_pad_before")].value() == 2 and boxes[tr("rec_pad_after")].value() == 10
     boxes[tr("rec_pad_before")].setValue(5)

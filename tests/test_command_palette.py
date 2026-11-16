@@ -556,8 +556,6 @@ QDialog.exec = in_settings
 choose(palette(), lambda e: e is got[0])
 assert wait(lambda: "page" in seen), seen
 assert seen == {"page": night["page"], "row": night["name"], "prop": True}, seen
-# Settings opened: its rows read again, the same.
-assert [(r["page"], r["name"]) for r in w._settings_index] == [(r["page"], r["name"]) for r in rows]
 nerd_row = next(r for r in rows if r["gated"])
 assert nerd_row["nerd"] and nerd_row["where"].startswith(tr("nerd_page"))
 
@@ -569,6 +567,9 @@ def is_nerd_row(e):
 
 QTest.keyClick(w, Qt.Key.Key_K, CTRL)
 assert wait(lambda: palette() is not None)
+# Settings opened and closed: its rows read again as the palette opens, the same.
+assert wait(lambda: getattr(w, "_settings_index", None) is not None), "Settings indexed again"
+assert [(r["page"], r["name"]) for r in w._settings_index] == [(r["page"], r["name"]) for r in rows]
 assert not any(is_nerd_row(e) for e in ask(nerd_row["name"]))
 s.setValue("nerd_enabled", "true")
 hit = [e for e in ask(nerd_row["name"]) if is_nerd_row(e)]

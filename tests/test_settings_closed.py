@@ -6,7 +6,8 @@ too), all restyled at every theme change - measured offscreen, a theme
 change went from 0.04 s to 1.6 s after one Settings opened and 9 s after
 five. A closed window is now deleted a while after it closes
 (SETTINGS_KEEP_MS), and an answer still on its way to one of its rows (the
-account looked up as every window opens) finds it gone without an error.
+account looked up as the Sources page is built) finds it gone without an
+error.
 """
 from __future__ import annotations
 
@@ -75,14 +76,14 @@ def kept():
     return [x for x in w.findChildren(QDialog) if x.windowTitle() == tr("settings_title")]
 
 
-w.open_settings()
+w.open_settings(at_page="playlists")
 QTest.qWait(30)
 # Right after it closed it is still there, for an answer on its way.
 first = kept()
 assert len(first) == 1, len(first)
 MainWindow.SETTINGS_KEEP_MS = 20       # for these, their minute gone by
 for _ in range(3):
-    w.open_settings()
+    w.open_settings(at_page="playlists")
     QTest.qWait(30)
 w.open_settings(index_only=True)
 end = time.monotonic() + 10

@@ -8,6 +8,9 @@ main window owns a GL widget, see test_robustness - and check that:
 - the switches that replaced Yes/No lists store the same "true"/"false";
 - search narrows the sidebar to the pages that have a match;
 - dragging playlists reorders them, and the playlist menu follows.
+
+Each page is built the first time it is needed (shown, searched, indexed):
+the checks that walk every page build them all first (``built``).
 """
 
 import os
@@ -77,9 +80,14 @@ w = MainWindow(DemoClient(), s, store)
 def snapshot():
     return {k: str(s.value(k)) for k in s.allKeys()}
 
-# 1. OK with nothing touched changes nothing.
+def built(dlg):
+    shell = dlg.findChild(SettingsShell)
+    shell.build_all()
+    return shell
+
+# 1. OK with nothing touched changes nothing - every page built.
 before = snapshot()
-QDialog.exec = lambda self: 1
+QDialog.exec = lambda self: built(self) and 1
 w.open_settings()
 after = snapshot()
 diff = {k: (before[k], v) for k, v in after.items()
@@ -92,6 +100,7 @@ assert set(after) - set(before) <= {"force_x11", "mpris"}, (
 # 2. The switches store what the Yes/No lists stored.
 def flip_and_ok(labels):
     def run(self):
+        built(self)
         for sw in self.findChildren(ToggleSwitch):
             if sw.accessibleName() in labels:
                 sw.setChecked(not sw.isChecked())
@@ -144,6 +153,7 @@ w.open_settings()
 
 # 4. Dragging a playlist reorders the store and the playlist menu.
 def reorder_and_cancel(self):
+    built(self)
     lst = self.findChild(ReorderList)
     assert [lst.item(i).data(0x0100) for i in range(lst.count())] == \
         ["a", "b", "c"]
@@ -163,7 +173,7 @@ assert names.index("C") < names.index("A") < names.index("B"), names
 
 # 5. Reset all settings lives on the Advanced page now, not beside OK.
 def reset_button_place(self):
-    shell = self.findChild(SettingsShell)
+    shell = built(self)
     adv = shell.pages[[p.key for p in shell.pages].index("advanced")]
     assert [b for b in adv.findChildren(QPushButton)
             if b.objectName() == "Danger"]
@@ -176,7 +186,7 @@ w.open_settings()
 def column_widths(self):
     self.show()
     app.processEvents()
-    shell = self.findChild(SettingsShell)
+    shell = built(self)
     widths = set()
     for page in shell.pages:
         shell.stack.setCurrentWidget(page)
@@ -194,6 +204,7 @@ w.followed.follow({"series_id": 2, "name": "Beta"})
 w.followed.follow({"series_id": 1, "name": "alpha"})
 def followed_series(self):
     from PyQt6.QtWidgets import QListWidget
+    built(self)
     lst = self.findChild(QListWidget, "FollowedList")
     assert [lst.item(i).text() for i in range(lst.count())] == \
         ["alpha", "Beta"]
@@ -212,6 +223,7 @@ assert w.followed.is_followed(1) and not w.followed.is_followed(2)
 # accent; following the desktop shows the light-mode row.
 def pick_look(self):
     from dopeiptv.ui.settings_ui import ColorDot, ThemeTile
+    built(self)
     [t for t in self.findChildren(ThemeTile) if t.key == "latte"][0].click()
     [d for d in self.findChildren(ColorDot) if d.key == "mint"][0].click()
     return 0
@@ -227,7 +239,7 @@ assert P["bg"] == "#EFF1F5" and P["accent"] == "#34CFA0", P
 # for them; Nerd's pages come out under NERD, in its colour, while it is on.
 def layout(self):
     from PyQt6.QtCore import Qt
-    shell = self.findChild(SettingsShell)
+    shell = built(self)
     nav = shell.nav
     rows = [(nav.item(i).data(0x0100), nav.item(i).flags())
             for i in range(nav.count())]
@@ -321,6 +333,7 @@ w.open_settings()
 # made; there is one Close and no Cancel.
 def live(self):
     import time as _t
+    built(self)
     names = [b.text() for b in self.findChildren(QPushButton)
              if b.objectName() == "Primary"]
     assert tr("common_close") in names, names

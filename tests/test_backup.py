@@ -550,6 +550,7 @@ w.close = lambda: closed.append(1) or True
 
 def run(self):
     shell = self.findChild(SettingsShell)
+    shell.build_all()                   # each page is built as it is needed
     general = next(p for p in shell.pages if p.key == "general")
     plists = next(p for p in shell.pages if p.key == "playlists")
     mine = {b.text(): b for b in general.findChildren(QPushButton)}

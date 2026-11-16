@@ -423,7 +423,12 @@ def page_of(widget):
         p = p.parentWidget()
     return p
 
+def every_page(dlg):
+    from dopeiptv.ui.settings_ui import SettingsShell
+    dlg.findChild(SettingsShell).build_all()     # each is built as it is needed
+
 def in_settings(self):
+    every_page(self)
     btn = next(b for b in self.findChildren(KeyButton) if b.sid == "sidebar")
     assert page_of(btn).key == "shortcuts", page_of(btn).key
     assert {page_of(b).key for b in self.findChildren(KeyButton)} == {"shortcuts"}
@@ -452,7 +457,7 @@ assert toggles(Qt.Key.Key_F8, NONE) and not toggles(Qt.Key.Key_F9, NONE)
 # Opening Settings and changing nothing stores nothing for keys never set.
 s.remove("keyboard_shortcuts")
 w.apply_shortcuts()
-QDialog.exec = lambda self: 0
+QDialog.exec = lambda self: every_page(self) or 0
 w.open_settings()
 assert s.value("keyboard_shortcuts") is None, s.value("keyboard_shortcuts")
 assert w._shortcuts["sidebar"].key() == QKeySequence("Ctrl+B")

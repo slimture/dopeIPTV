@@ -192,7 +192,7 @@ map and the one-way import rule.
 | `ui/app_menu.py` | The app's menus, one layout on every platform: File (Settings and Quit at its foot), View, History, Help (About last); on macOS About, Settings, Quit and the supporter entries go into the application menu by their roles (`_MAC_ROLES`), the rest never moved by its words; no empty menu, no stray separator |
 | `ui/channel_list.py` | List model, view, delegate painting |
 | `ui/dialogs.py` | Dialog windows; `SourceFields` (a source's connection fields and what they mean, no layout) and the Add source quick form (`PlaylistDialog`) |
-| `ui/settings_ui.py` | Settings building blocks: sidebar shell (group headings, a group's pages shown only while it is on), search view (each page's group over it), pages, a page below a page (`open_sub`: a source's own, in place of Sources), sections (`card`), rows (with a mark before the control: a source's own or shared), link rows to a page elsewhere, switches, steppers, chips |
+| `ui/settings_ui.py` | Settings building blocks: sidebar shell (group headings, a group's pages shown only while it is on), search view (each page's group over it), pages - each built the first time it is needed (`set_builder`, `ensure_built`; a search or the palette's index `build_all`, a filter a builder asks for run once it is done), a page below a page (`open_sub`: a source's own, in place of Sources), sections (`card`), rows (with a mark before the control: a source's own or shared), link rows to a page elsewhere, switches, steppers, chips |
 | `ui/qt_i18n.py` | Qt's own strings and QLocale dates in the app's language |
 | `ui/home_widgets.py` | Home's featured strip, shelves and cards (pure presentation) |
 | `ui/tmdb_match.py` | Manual TMDB match dialog |
@@ -377,9 +377,13 @@ it is used, wire it to a menu action.
 
 **Add a new setting**: add the QSettings key read/write in the relevant
 method in `ui/mw_settings.py` (usually `open_settings`): a `card.row()` or
-`card.toggle()` on the page it belongs to, and the write-back in the
-`if d.exec():` block at the end. Rows are found by the Settings search
-automatically. A number takes a `Stepper` (not a bare `QSpinBox`), a
+`card.toggle()` in the builder of the page it belongs to (`build_<page>`,
+run the first time the page is shown or searched - never as the window
+opens), and the write-back in that page's `commit_<page>(put, changed,
+final)` beside it. Rows are found by the Settings search automatically.
+Never show a widget before it is in a row (`setVisible(True)` on one with
+no parent is a window of its own: on GNOME the pointer spins for seconds);
+`tests/test_settings_lazy.py` fails on one. A number takes a `Stepper` (not a bare `QSpinBox`), a
 time offset a `DurationSpin` and a size a `SizeSpin`, each in a `Stepper`;
 a set of on/off choices of one kind takes `Chip`s in a `ChipGroups` rather
 than a column of switches. Settings apply as they change (`commit()` in

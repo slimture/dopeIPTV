@@ -44,6 +44,7 @@ def titles(page):
 def run(self):
     self.show()
     shell = self.findChild(SettingsShell)
+    shell.build_all()                   # each page is built as it is needed
     seen["pages"] = [p.key for p in shell.pages]
     pages = {p.key: p for p in shell.pages}
     seen["history"] = titles(pages["history"])

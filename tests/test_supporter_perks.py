@@ -203,6 +203,8 @@ w.open_supporter = lambda key="": opened.append(1)
 
 def in_settings(check):
     def run(self):
+        from dopeiptv.ui.settings_ui import SettingsShell
+        self.findChild(SettingsShell).build_all()     # each is built as it is needed
         check(self)
         return 1
     saved = QDialog.exec

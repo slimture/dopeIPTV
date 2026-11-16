@@ -68,6 +68,7 @@ def wait(cond, secs=3.0):
 def check(self):
     self.show()
     shell = self.findChild(SettingsShell)
+    shell.build_all()                   # each page is built as it is needed
     nav = shell.nav
     pages = {p.key: p for p in shell.pages}
     # The rows that lead to Nerd's pages (General's About leads to a window).

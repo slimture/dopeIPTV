@@ -208,7 +208,9 @@ ytdlp.update = lambda *a, **k: calls.append("update")
 
 
 def check(self):
-    pages = {p.key: p for p in self.findChild(SettingsShell).pages}
+    shell = self.findChild(SettingsShell)
+    shell.build_all()                   # each page is built as it is needed
+    pages = {p.key: p for p in shell.pages}
     switches = {x.accessibleName(): x for x in self.findChildren(ToggleSwitch)}
     managed, clicks = switches[tr("ytdlp_managed")], switches[tr("radio_report_clicks")]
     assert pages["playback"].isAncestorOf(managed) and managed.isChecked()

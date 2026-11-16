@@ -250,6 +250,8 @@ assert 895_000 < left <= 900_000, left
 # Settings: Feedback with both buttons; Answers opens over Settings itself.
 seen = {}
 def in_settings(self):
+    from dopeiptv.ui.settings_ui import SettingsShell
+    self.findChild(SettingsShell).show_page("general")     # built as it shows
     for b in self.findChildren(QPushButton):
         if b.text() == tr("feedback_menu") + "…":
             b.click(); seen["feedback"] = True

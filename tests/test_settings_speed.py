@@ -7,9 +7,10 @@ beside it keeps going (the GUI thread draws it).
 - The pages' sidebar icons are drawn once a session, not every opening.
 - In the real window (a child process, as test_settings_window): nothing
   walks a directory or touches the network on the window's thread while
-  Settings opens, with Nerd on and several kinds of source; the image cache
-  is counted off it once the window is up and its row says the size; and
-  Nerd's checks start only once the window is shown.
+  Settings opens or builds a page, with Nerd on and several kinds of
+  source; the image cache is counted off it once the window is up and its
+  row says the size; and Nerd's checks start only once the window is
+  shown.
 """
 from __future__ import annotations
 
@@ -183,12 +184,14 @@ state = {}
 
 
 def run(self):
-    guard["on"] = False                  # built: the rest is the event loop's
-    state["built_index"] = list(w._settings_index)
     self.show()
+    shell = self.findChild(SettingsShell)
+    # Every other page as it is first shown or searched: built with the
+    # same care as the one it opens on.
+    shell.build_all()
+    guard["on"] = False                  # built: the rest is the event loop's
     end = time.monotonic() + 8
     label = tr("settings_image_cache_label", size="…")
-    shell = self.findChild(SettingsShell)
     adv = next(p for p in shell.pages if p.key == "advanced")
     row = next(r for c in adv.cards for r, _t in c.rows
                if getattr(r, "label", None) is not None
@@ -212,8 +215,10 @@ assert state["label"] != tr("settings_image_cache_label", size="…"), state
 from dopeiptv.core.recording import format_size
 assert state["label"] == tr("settings_image_cache_label", size=format_size(40 * 500)), state
 assert started and all(started), started
-# The palette's index is the window's as before: every row, Nerd's too.
-assert any(r["nerd"] for r in state["built_index"])
+# The palette's index: every row, Nerd's too, from a window never shown.
+w.open_settings(index_only=True)
+assert any(r["nerd"] for r in w._settings_index)
+assert started and all(started), started
 print("SPEED_OK", flush=True)
 """
 

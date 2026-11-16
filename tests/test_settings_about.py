@@ -44,6 +44,7 @@ w.show_about = fake_about
 def check(self):
     self.show()
     shell = self.findChild(SettingsShell)
+    shell.show_page("general")          # built as it shows
     general = next(p for p in shell.pages if p.key == "general")
     rows = [r for c in general.cards for r, _t in c.rows
             if getattr(r, "label", None) is not None and r.label.text() == tr("menu_about")]

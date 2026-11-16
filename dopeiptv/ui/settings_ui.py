@@ -39,6 +39,7 @@ from PyQt6.QtWidgets import (
     QStyledItemDelegate, QToolButton, QVBoxLayout, QWidget,
 )
 
+from ..core.log import log
 from .theme import (
     HEART, P, SUPPORTER_THEMES, THEMES, _luminance, _mix, corner_radius,
     resolve_accent, rounded,
@@ -344,6 +345,18 @@ class SettingsPage(QScrollArea):
         self.cards: list[SettingsCard] = []
         #: The controls in the column down the right of the cards.
         self.column: list[QWidget] = []
+        self._builder: Callable[[], None] | None = None
+
+    @property
+    def built(self) -> bool:
+        """Its cards are there: built already, or nothing to build."""
+        return self._builder is None
+
+    def set_builder(self, fn: Callable[[], None]) -> None:
+        """*fn* fills the page the first time it is needed - shown, searched
+        or indexed (SettingsShell.ensure_built) - not as the window opens.
+        Pages given the same *fn* are filled by it together (Nerd's)."""
+        self._builder = fn
 
     def sizeHint(self) -> QSize:                     # noqa: N802 - Qt's name
         # What QScrollArea asks for at most, 36 x 24 lines of text - what it
@@ -585,6 +598,17 @@ class SettingsShell(QWidget):
         #: A page below a page (a source's own, under Sources), shown in its
         #: place while open: see open_sub.
         self.sub: QWidget | None = None
+        #: Told of each page as it is built (open_settings: the wheel guard
+        #: and the change hookups for its controls).
+        self.page_built: Callable[[SettingsPage], None] | None = None
+        # Pages are built as they show once the window is put together
+        # (ready()): until then the page it opens on may still change.
+        self._live = False
+        # Pages being built (a count: a build can start one more), and a
+        # filter asked for meanwhile, run once they are (_settle).
+        self._building = 0
+        self._filtering = False
+        self._refilter = False
         self.nav.page_chosen.connect(self._show)
         self.search.textChanged.connect(self._filter)
         self.stack.currentChanged.connect(self._stack_changed)
@@ -616,6 +640,74 @@ class SettingsShell(QWidget):
         self.nav.addItem(item)
         self._items[page.key] = item
         return page
+
+    # -- pages built as they are needed ------------------------------------------
+    # Every page built as the window opened was some 2300 widgets, each
+    # polished as it showed and before the window answered the compositor:
+    # on GNOME the pointer spun (its activation token waits for that) and
+    # the video beside it stood still. Now the page it opens on is built,
+    # every other the first time it shows, a search reaches it or the
+    # command palette's index asks for it.
+
+    def ready(self) -> None:
+        """The window is put together: the page on show is built now, and
+        from now on every page as it is shown."""
+        self._live = True
+        page = self.stack.currentWidget()
+        if isinstance(page, SettingsPage):
+            self.ensure_built(page)
+
+    def ensure_built(self, page: SettingsPage) -> None:
+        """*page* filled if it is not yet - with the pages that share its
+        builder - told to ``page_built`` and filtered as the search says."""
+        fn = page._builder
+        if fn is None:
+            return
+        together = [p for p in self.pages if p._builder is fn]
+        for p in together:
+            p._builder = None
+        self._building += 1
+        try:
+            fn()
+        except Exception:
+            # A page that fails shows what it has; the rest of Settings works.
+            log.exception("settings: page %s not built", page.key)
+        finally:
+            self._building -= 1
+        needle = " ".join(self.search.text().split()).casefold()
+        for p in together:
+            if self.page_built is not None:
+                self.page_built(p)
+            p.apply_filter(needle)
+        if self._aligned:
+            self.align_column()          # one width down every page built so far
+        self._settle()
+
+    def build_all(self, include_off: bool = True) -> None:
+        """Every page built now: for a search (the pages it reaches), the
+        command palette's index and tests. *include_off*: the pages left
+        out (Nerd's while it is off) too."""
+        self._building += 1
+        try:
+            for page in list(self.pages):
+                if include_off or page.key not in self._off:
+                    self.ensure_built(page)
+        finally:
+            self._building -= 1
+        self._settle()
+
+    def _settle(self) -> None:
+        """The filter a builder asked for (Nerd's turns its pages on or
+        off), run once, when every page being built is: run in the middle
+        of a build, a search laid out its whole view once more, half built."""
+        if self._building or self._filtering or not self._refilter:
+            return
+        self._refilter = False
+        self._filter(self.search.text())
+
+    def complete(self) -> bool:
+        """Every page is built."""
+        return all(p.built for p in self.pages)
 
     def set_gated(self, group: str, keys: list[str]) -> None:
         """*keys* are shown only while *group* is on (set_group_enabled):
@@ -781,7 +873,10 @@ class SettingsShell(QWidget):
             self.stack.setCurrentWidget(self._page_at(self.nav.currentRow()) or self._none)
 
     def _stack_changed(self, _index: int) -> None:
-        if self.sub is not None and self.stack.currentWidget() is not self.sub:
+        cur = self.stack.currentWidget()
+        if self._live and isinstance(cur, SettingsPage) and not cur.built:
+            self.ensure_built(cur)       # shown some other way than _show
+        if self.sub is not None and cur is not self.sub:
             self.close_sub()
 
     def _page_at(self, row: int) -> SettingsPage | None:
@@ -798,6 +893,8 @@ class SettingsShell(QWidget):
             QTimer.singleShot(0, lambda: self.results.verticalScrollBar()
                               .setValue(page.body.y()))
         else:
+            if self._live:
+                self.ensure_built(page)  # before it shows: no empty frame
             self.stack.setCurrentWidget(page)
 
     def _ordered_pages(self) -> list[SettingsPage]:
@@ -848,7 +945,19 @@ class SettingsShell(QWidget):
         return page.key if page is not None else None
 
     def _filter(self, text: str) -> None:
+        if self._building:
+            self._refilter = True        # once the pages being built are
+            return
         needle = " ".join(text.split()).casefold()
+        if needle:
+            # A search reaches every page: those not built yet are built
+            # now, once a visit (the pages left out are not searched).
+            self._filtering = True
+            try:
+                self.build_all(include_off=False)
+            finally:
+                self._filtering = False
+            self._refilter = False       # this is the filter asked for
         first = None
         for page in self.pages:
             hit = page.key not in self._off and page.apply_filter(needle)
@@ -937,6 +1046,7 @@ class SettingsShell(QWidget):
         page = next((p for p in self.pages if p.key == key), None)
         if page is None or key in self._off:
             return False
+        self.ensure_built(page)
         self.show_page(key)
         target = None
         if 0 <= card < len(page.cards) and 0 <= row < len(page.cards[card].rows):

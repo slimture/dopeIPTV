@@ -259,6 +259,8 @@ assert len(rule_reminders()) == 2
 # 5. Settings > Recording lists the reminder rule as one; deleting it takes
 # its reminders still to come along, and leaves the recordings be.
 def settings(self):
+    from dopeiptv.ui.settings_ui import SettingsShell
+    self.findChild(SettingsShell).show_page("recording")   # built as it shows
     lst = self.findChild(QListWidget, "SeriesRuleList")
     rows = [lst.item(i).text() for i in range(lst.count())]
     assert tr("series_row_remind", rule=tr("series_row_word_any", word="news")) in rows, rows
