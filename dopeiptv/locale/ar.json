@@ -2875,5 +2875,6 @@
   "nerd_ck_server_ours_app": "نافذة أخرى من dopeIPTV على هذا الكمبيوتر تقدّم الخادم بالفعل على المنفذ {port}. أوقف خادمها أو اختر منفذًا آخر.",
   "nerd_ck_server_taken": "المنفذ {port} يستخدمه برنامج آخر.",
   "nerd_server_use_port": "استخدام المنفذ {port}",
-  "nerd_server_use_port_click": "انقر هنا لاستخدام المنفذ {port} بدلًا منه."
+  "nerd_server_use_port_click": "انقر هنا لاستخدام المنفذ {port} بدلًا منه.",
+  "set_about_version": "الإصدار {version}"
 }

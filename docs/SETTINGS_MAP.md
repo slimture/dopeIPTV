@@ -170,6 +170,8 @@ or "Shared" and where the shared one lives. Nerd's rows only while it is on.
   `supporter_icon`, ask for a donation now and then (`donate_ask`; the
   household's - its rhythm and snooze are `donate_until`, `donate_period`,
   `donate_first_seen`, not settings)
+- (no heading) About dopeIPTV with the version, a link row that opens About
+  over Settings (no key; found as "about", "version", "update")
 
 **Appearance** (`appearance`)
 - Theme: `theme`, `accent` (+ `accent_custom`), `theme_follow_system`,

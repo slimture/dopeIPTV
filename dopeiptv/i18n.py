@@ -3099,6 +3099,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "sa_recording_set": {"en": "{title} will be recorded from {source}."},
     "sa_open_series": {"en": "Open series"},
     "sa_from_source": {"en": "From {source}"},
+    "set_about_version": {"en": "Version {version}"},
 }
 
 

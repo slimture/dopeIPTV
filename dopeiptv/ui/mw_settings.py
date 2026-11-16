@@ -959,6 +959,22 @@ class _SettingsMixin:
         from ..core import donate_rhythm
         ask_box = c.toggle(tr("set_donate_ask"), donate_rhythm.asking(self.settings),
                            tr("set_donate_ask_hint"))
+
+        # About and the version, where a search of Settings finds them: they
+        # were only in the menu bar's first menu (issue #31). Over Settings,
+        # as its child, so it is never hidden behind it.
+        def about() -> None:
+            self.show_about(parent=d)
+            # Seven taps on its version turn Nerd on; the switch here
+            # follows, or closing Settings would store it off again.
+            box = nerd_switch["box"]
+            if box is not None and not box.isChecked() and is_on("nerd_enabled", "false"):
+                box.setChecked(True)
+        general.card().link(
+            tr("menu_about"), tr("set_about_version", version=VERSION),
+            tr("common_open"), about,
+            search=f"about version update updates release notes changelog "
+                   f"{tr('set_card_updates')} {tr('about_check_updates')}")
         # Sync between computers, for everyone (mw_sync).
         if hasattr(self, "_build_sync_card"):
             self._build_sync_card(sync_page, d)
@@ -2847,8 +2863,11 @@ class _SettingsMixin:
         body = re.sub(r"\n{3,}", "\n\n", body)
         return body.strip()
 
-    def show_about(self) -> None:
-        d = QDialog(self)
+    def show_about(self, *, parent: QWidget | None = None) -> None:
+        """About and the update check; over *parent* when given (Settings),
+        else over the window. Keyword-only: a signal's argument never
+        lands in it."""
+        d = QDialog(parent or self)
         d.setWindowTitle(tr("menu_about"))   # "About dopeIPTV": named already
         # Wide enough for the release notes from the start: see notes below.
         d.setMinimumWidth(520)
@@ -3014,6 +3033,9 @@ class _SettingsMixin:
         lay.addLayout(foot)
 
         def done(rel) -> None:
+            # Opened over Settings, it goes when that window is deleted.
+            if sip.isdeleted(d):
+                return
             recheck.setEnabled(True)
             if not rel or not rel.get("tag"):
                 status.setText(tr("about_check_failed"))
@@ -3049,6 +3071,8 @@ class _SettingsMixin:
                 dl_btn.hide()
 
         def fail(_e) -> None:
+            if sip.isdeleted(d):
+                return
             recheck.setEnabled(True)
             status.setText(tr("about_check_failed"))
 

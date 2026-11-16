@@ -108,6 +108,39 @@ def test_the_answer_never_resizes_or_overlaps(monkeypatch, tag):
         assert h >= need, f"{text!r} is cut: {h}px of {need}px"
 
 
+def test_over_settings_it_is_its_child_and_a_late_answer_is_harmless(monkeypatch):
+    """Opened from Settings' About row: over Settings, as its child. Settings
+    is deleted a minute after it closes - About with it - and an update
+    check still on its way then finds nothing to touch."""
+    from PyQt6 import sip
+    app = QApplication.instance() or QApplication([])
+    pending = []
+    monkeypatch.setattr(mw_settings, "run_async",
+                        lambda pool, fn, done, fail: pending.append((done, fail)))
+    seen: dict = {}
+
+    def fake_exec(dialog):
+        seen["parent"] = dialog.parent()
+        return 0
+
+    monkeypatch.setattr(QDialog, "exec", fake_exec)
+    host = _Host()
+    settings = QDialog(host)
+    mw_settings._SettingsMixin.show_about(host, parent=settings)
+    assert seen["parent"] is settings
+    about = settings.findChild(QDialog)
+    assert about is not None
+    sip.delete(settings)
+    assert sip.isdeleted(about)
+    done, fail = pending[-1]
+    done({"tag": "v99.0.0", "body": "x", "url": "https://example.invalid"})
+    fail(RuntimeError("late"))
+    # From the menu, over the window as before.
+    mw_settings._SettingsMixin.show_about(host)
+    assert seen["parent"] is host
+    del app
+
+
 def test_a_failed_check_leaves_no_overlap(monkeypatch):
     seen = _open_about(monkeypatch, None)
     rows = seen["rows"]

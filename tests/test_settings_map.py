@@ -70,7 +70,9 @@ def check(self):
     shell = self.findChild(SettingsShell)
     nav = shell.nav
     pages = {p.key: p for p in shell.pages}
-    links = [b for b in self.findChildren(QPushButton) if b.objectName() == "SettingsLink"]
+    # The rows that lead to Nerd's pages (General's About leads to a window).
+    links = [b for b in self.findChildren(QPushButton) if b.objectName() == "SettingsLink"
+             and b.text().startswith(tr("nerd_page"))]
     switch = next(x for x in self.findChildren(ToggleSwitch) if x.accessibleName() == tr("nerd_switch"))
 
     # -- Nerd off: its pages, and the rows that lead to them, are not there.

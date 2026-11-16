@@ -238,17 +238,19 @@ class SettingsCard(QFrame):
         return lbl
 
     def link(self, label: str, hint: str, target: str,
-             on_click: Callable[[], None], badge: QWidget | None = None) -> QWidget:
+             on_click: Callable[[], None], badge: QWidget | None = None,
+             search: str = "") -> QWidget:
         """A row that leads to settings kept on another page ("4 Nerd
         settings for stream and buffer", what they are, "Nerd › Player →"):
-        one setting has one place, and the page beside it says where."""
+        one setting has one place, and the page beside it says where - or to
+        a window of its own (About). *search* as for row()."""
         rtl = QLocale().textDirection() == Qt.LayoutDirection.RightToLeft
         btn = QPushButton(f"{target}  {'←' if rtl else '→'}")
         btn.setObjectName("SettingsLink")
         btn.setFlat(True)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.clicked.connect(lambda _c=False: on_click())
-        w = self.row(label, btn, hint, search=target, badge=badge)
+        w = self.row(label, btn, hint, search=f"{target} {search}", badge=badge)
         w.label.setObjectName("SettingsLinkLabel")
         w.link = btn
         return w

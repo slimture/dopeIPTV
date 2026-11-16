@@ -79,6 +79,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   nothing changes without it. `dopeiptv --server` logs the same, with the
   `--port` to start with. Any other reason a port does not open is said
   as before.
+- About and the version can be found in Settings: General ends with an
+  "About dopeIPTV" row showing the version, which opens About over
+  Settings, and the Settings search finds it by "about", "version" or
+  "update" (issue #31 - it was only in the menu bar's first menu).
 
 ## [1.6.0]
 

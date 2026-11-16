@@ -2875,5 +2875,6 @@
   "nerd_ck_server_ours_app": "Ett annat dopeIPTV-fönster på den här datorn delar redan på port {port}. Stäng av servern där eller välj en annan port.",
   "nerd_ck_server_taken": "Port {port} används av ett annat program.",
   "nerd_server_use_port": "Använd port {port}",
-  "nerd_server_use_port_click": "Klicka här för att använda port {port} i stället."
+  "nerd_server_use_port_click": "Klicka här för att använda port {port} i stället.",
+  "set_about_version": "Version {version}"
 }
