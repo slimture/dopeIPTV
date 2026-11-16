@@ -2934,5 +2934,11 @@
   "phone_page_sleep_left": "Si ferma tra {n} min",
   "phone_rec_ask": "Registrare {title}?",
   "phone_rec_stop_ask": "Fermare la registrazione di {title}?",
-  "status_guide_still_loading": "La guida ai programmi richiede un po' di tempo: apparirà appena pronta."
+  "status_guide_still_loading": "La guida ai programmi richiede un po' di tempo: apparirà appena pronta.",
+  "notice_more": "altri {n}",
+  "notice_working": "In corso",
+  "notice_dismiss": "Chiudi",
+  "notice_info": "Avviso",
+  "notice_warning": "Attenzione",
+  "notice_error": "Errore"
 }

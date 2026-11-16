@@ -2934,5 +2934,11 @@
   "phone_page_sleep_left": "يتوقف بعد {n} دقيقة",
   "phone_rec_ask": "تسجيل {title}؟",
   "phone_rec_stop_ask": "إيقاف تسجيل {title}؟",
-  "status_guide_still_loading": "يستغرق دليل البرامج بعض الوقت - سيظهر فور اكتماله."
+  "status_guide_still_loading": "يستغرق دليل البرامج بعض الوقت - سيظهر فور اكتماله.",
+  "notice_more": "{n} أخرى",
+  "notice_working": "قيد التنفيذ",
+  "notice_dismiss": "إغلاق",
+  "notice_info": "ملاحظة",
+  "notice_warning": "تحذير",
+  "notice_error": "خطأ"
 }

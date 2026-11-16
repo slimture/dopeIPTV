@@ -66,27 +66,31 @@ def test_new_answers_counted_merged_and_marked_seen():
 
 def test_a_note_with_an_action_does_it_when_clicked_and_one_without_does_nothing():
     pytest.importorskip("PyQt6.QtWidgets")
-    from PyQt6.QtCore import Qt
+    from PyQt6.QtCore import QRect, Qt
     from PyQt6.QtTest import QTest
     from PyQt6.QtWidgets import QApplication, QWidget
 
-    from dopeiptv.ui.widgets import _Toast
+    from dopeiptv.ui.notices import NoticeArea, NoticeHub
     app = QApplication.instance() or QApplication([])
     host = QWidget()
     host.resize(600, 400)
     host.show()
-    toast = _Toast(host)
+    hub = NoticeHub(host)
+    area = NoticeArea(hub, host)
+    area.set_anchor(QRect(0, 0, 600, 400))
     clicked = []
-    toast.show_message("Answered - click to read", 5000, on_click=lambda: clicked.append(1))
-    assert toast.cursor().shape() == Qt.CursorShape.PointingHandCursor
-    QTest.mouseClick(toast, Qt.MouseButton.LeftButton)
+    hub.post("Answered - click to read", ms=5000, action=lambda: clicked.append(1))
+    [card] = area.card_widgets()
+    assert card.cursor().shape() == Qt.CursorShape.PointingHandCursor
+    QTest.mouseClick(card, Qt.MouseButton.LeftButton)
     app.processEvents()
-    assert clicked == [1] and toast.isHidden()
-    toast.show_message("Just a note", 5000)
-    assert toast.cursor().shape() != Qt.CursorShape.PointingHandCursor
-    QTest.mouseClick(toast, Qt.MouseButton.LeftButton)
+    assert clicked == [1] and not hub.cards() and not area.card_widgets()
+    hub.post("Just a note", ms=5000)
+    [card] = area.card_widgets()
+    assert card.cursor().shape() != Qt.CursorShape.PointingHandCursor
+    QTest.mouseClick(card, Qt.MouseButton.LeftButton)
     app.processEvents()
-    assert clicked == [1] and toast.isVisible()
+    assert clicked == [1] and card.isVisible() and hub.texts() == ["Just a note"]
     host.close()
 
 
@@ -212,11 +216,13 @@ inbox.answers[report.code_hash("mid")] = [{"t": int(now - 3600), "code": "fixed"
 w._answers_last = 0.0
 w._ask_answers()
 assert wait(lambda: toasts), toasts
-assert "answered" in toasts[-1] and w._toast.isVisible()
+[card] = [c for c in w._notice_area.card_widgets() if "answered" in c.label.text()]
+assert "answered" in toasts[-1] and card.isVisible()
 assert w._answers_action.text() == tr("fba_menu") + " (1)…"
-QTest.mouseClick(w._toast, Qt.MouseButton.LeftButton)
+QTest.mouseClick(card, Qt.MouseButton.LeftButton)
 assert wait(lambda: w._answers_window() is not None)
-assert report.unread(report.tickets(s)) == 0 and w._toast.isHidden()
+assert report.unread(report.tickets(s)) == 0
+assert not any("answered" in t for t in w.notices.texts())
 w._answers_window().close(); app.processEvents()
 
 # After a report with a code goes (the real Send): asked two minutes on, then

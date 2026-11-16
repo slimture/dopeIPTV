@@ -199,6 +199,7 @@ map and the one-way import rule.
 | `ui/tmdb_match.py` | Manual TMDB match dialog |
 | `ui/subtitle_search.py` | OpenSubtitles search dialog |
 | `ui/widgets.py` | Small standalone widgets |
+| `ui/notices.py` | One place for the app's transient notices, drawn in one corner (the list pane's bottom on the side away from the sidebar, above its status line; mirrored right to left; never over the video): `NoticeHub` - jobs under tokens (`start`, `update`, `finish`, `fail`, `cancel`, a newer job of the same key replaces one, every job a safety timeout, a late answer nothing) and cards (`post`: info/warning/error, an action as its button or a click on the card, a dismiss, timed unless it waits for an answer, the same key or words refresh the card there, three at most; `hold` while the video fills the screen or TV mode shows); `NoticeArea` draws it (`ActivityLine`: a spinner, the newest job's words and "· 2 more", all on hover and click; `NoticeCard`), P's colours, flat; `hub_of(window)` for producers |
 | `ui/nav_widgets.py` | The sidebar's `NavButton` (leading bar when selected, a dot / pill / muted count painted over it), `SideRule`, the hairline between its groups, `SourceAvatar` at its foot (the active source's initials on the accent, `source_initials`) and `SourceLabel` over the categories (the active source's name, its kind in a muted chip, a chevron; painted, cut with an ellipsis, mirrored right to left) |
 | `ui/mw_pane_follow.py` | The middle pane follows what plays (`_PaneFollowMixin`): one function the playback path calls (`_pane_follow_soon` from `_start_playback`, a moment after the stream started): what started from outside the pane and is not what it shows - a channel to TV and its category, an episode to its series' page marked, a film to Movies and its category, a local file to its folder, a station to Radio, a recording to Recordings (`_jump_to_now_playing`), the pages left as their Back to the list does; never a web stream, the same title again (reconnect, archive), another source's channel, a play from the pane itself (`from_pane`: the Search and Guide pages; `_keep_origin` carries it past `_links_later`), while typing in a field that holds text, with a dialog or menu open, or in TV mode |
 | `ui/mw_source_label.py` | The active source in plain sight: its name and kind over the categories (the chip only with two sources or more; hidden on the rail; a click opens the avatar's menu under it), the list's source in the status line (`_set_list_status`: "Pirat · 120 channels"), what plays from another source said there (`_note_playing_source`, `_status_playing`: "Playing: X - from Pirat"; failover's title names its own), the list's line back on Stop, its name in TV mode's header; every change through `_update_playlist_btn` |
@@ -306,7 +307,9 @@ row in the table above; in short:
   week a month, About's link), `mw_onboarding` (the welcome; its Bring step
   with Settings' own sync join and restore: the other computer's sources and
   history followed where it syncs them, a miss leaves sync off), `mw_busy`
-  (loading indicator), `mw_updates` (update badge), `mw_report` (feedback,
+  (the notices' corner, `ui/notices.py`: the list's and the guide's work as
+  jobs, the older `_show_toast` / `_flash_status` / `_set_status` routed
+  there), `mw_updates` (update badge), `mw_report` (feedback,
   error reports and the answers to them).
 - Watching: `mw_recording`, `mw_series` (series recording rules),
   `mw_multiview` (multiview), `mw_popout` (detached-window player),

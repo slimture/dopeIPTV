@@ -102,6 +102,9 @@ class _Stub(_LocalFilesMixin):
     def _hide_busy(self):
         pass
 
+    def _busy_say(self, _text):
+        pass
+
     def _set_status(self, *_a, **_k):
         pass
 

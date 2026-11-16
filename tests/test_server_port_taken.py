@@ -290,8 +290,8 @@ def _window(tmp_path, port: int):
         def _show_toast(self, text, _ms) -> None:
             self.told.append(text)
 
-        def _show_action_toast(self, text, _ms, act) -> None:
-            self.told.append(text)
+        def _show_action_toast(self, text, _ms, act, label=None) -> None:
+            self.told.append(text + " | " + (label or ""))
             self.acts.append(act)
     return Window()
 
@@ -305,7 +305,7 @@ def test_the_window_says_another_program_and_takes_the_next_port_on_a_click(app,
         assert _pump_until(lambda: w.told), "the note came"
         assert "another program" in w.told[0]
         free = w._home_offer
-        assert free > b.port and f"use port {free} instead" in w.told[0]
+        assert free > b.port and f"Use port {free}" in w.told[0]
         assert w.settings.value("nerd_server_port") == str(b.port)     # nothing without the click
         st = w._server_state()
         assert not st["running"] and st["taken"] == b.port and 3673 in st["avoid"]

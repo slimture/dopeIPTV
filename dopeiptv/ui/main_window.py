@@ -58,13 +58,14 @@ from .dialogs import PlaylistDialog
 from .nav_widgets import NavButton, SideRule, SourceAvatar, SourceLabel
 from .app_menu import MENUS, lay_out, open_website
 from .widgets import (
-    FlowRow, HeartButton, _SidebarLogo, _Toast,
+    FlowRow, HeartButton, _SidebarLogo,
     cast_strip_icon, confirm, file_dialog_options,
 )
 from .mw_settings import _SettingsMixin
 from .mw_trakt import _TraktMixin
 from .mw_recording import _RecordingMixin
 from .mw_busy import _BusyMixin
+from .notices import hub_of
 from .mw_airplay import _AirPlayMixin
 from .mw_cast import _CastMixin
 from .mw_chanprefs import _ChannelPrefsMixin
@@ -965,22 +966,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # leaving a huge gap on the right (see channel_list._justify_grid).
         ml.setContentsMargins(0, 14, 0, 10)
         ml.setSpacing(10)
-
-        busy_row = QHBoxLayout()
-        busy_row.setSpacing(8)
-        self.loading_bar = QProgressBar(objectName="LoadBar")
-        self.loading_bar.setRange(0, 0)
-        self.loading_bar.setTextVisible(False)
-        # A label beside the top strip that names what's loading, so a
-        # refresh (where the list keeps its old rows and the centred overlay
-        # stays hidden) still says e.g. 'Updating TV guide…'.
-        self._busy_label = QLabel("")
-        self._busy_label.setStyleSheet(
-            f"color:{P['accent']}; font-size:11px; font-weight:600;")
-        busy_row.addWidget(self.loading_bar, 1)
-        busy_row.addWidget(self._busy_label)
-        self._hide_busy()
-        ml.addLayout(busy_row)
+        # No loading strip over the list any more: it pushed the list down
+        # and up as work came and went. What the app is doing is said in the
+        # notices' corner (mw_busy, ui/notices.py).
 
         self.search = QLineEdit(objectName="Search")
         self.search.setPlaceholderText(tr("list_filter_placeholder"))
@@ -1720,12 +1708,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         min_h = (min(box_h, 180) + 240) if self.player else 320
         self._base_min = QSize(700, min_h)
         self.setMinimumSize(self._base_min)
-        # Parent the toast to the window itself, not the splitter: a QSplitter
-        # treats every child widget as a pane and overrides its geometry, so an
-        # overlay parented to it gets squeezed/misplaced when the splitter
-        # relayouts (e.g. after the playlist loads). As a free child of the
-        # main window it floats correctly over the content.
-        self._toast = _Toast(self)
+        # The notices' corner (mw_busy, ui/notices.py), a free child of the
+        # window itself, not the splitter: a QSplitter treats every child
+        # widget as a pane and overrides its geometry.
+        self._init_notices()
 
         self.tick = QTimer(self)
         self.tick.timeout.connect(self._refresh_progress)
@@ -3748,7 +3734,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         __init__, before the busy machinery exists."""
         if self.list_model.rowCount() <= 0:
             return
-        if hasattr(self, "_hide_busy") and hasattr(self, "loading_bar"):
+        if hasattr(self, "_hide_busy") and hasattr(self, "notices"):
             self._hide_busy()
 
     def _apply_filter(self) -> None:
@@ -4306,7 +4292,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # whatever listing happens to be on screen.
         self._queue_explicit = True
         self._sync_queue_buttons()
-        self._set_status(tr("queue_added", n=len(rows)))
+        hub_of(self).post(tr("queue_added", n=len(rows)), ms=4000)
 
     def queue_clear(self) -> None:
         self._track_queue = []
@@ -5650,59 +5636,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             note(tr("nerd_vpn_blocked"))
         return True
 
-    def _show_toast(self, text: str, duration_ms: int = 0) -> None:
-        self._toast.show_message(text, duration_ms)
-
-    def _show_action_toast(self, text: str, duration_ms: int, on_click) -> None:
-        """A note that does *on_click* when clicked (and goes)."""
-        self._toast.show_message(text, duration_ms, on_click=on_click)
-
     def _loading_message(self) -> str:
         return {"live": tr("status_loading_channels"),
                 "vod": tr("status_loading_movies"),
                 "series": tr("status_loading_series")}.get(
             self.mode, tr("status_loading_content"))
-
-    def _write_status(self, text: str, error: bool = False,
-                      emphasis: bool = False) -> None:
-        # Errors are red; activity/transient messages use the theme accent and
-        # semibold (like the update text) so you actually notice something
-        # happened; the resting readout (channel count) stays calm and muted.
-        if error:
-            style = f"color:{P['error']}; font-size:11px; font-weight:600;"
-        elif emphasis:
-            style = f"color:{P['accent']}; font-size:11px; font-weight:600;"
-        else:
-            style = f"color:{P['muted3']}; font-size:11px;"
-        self.count_lbl.setStyleSheet(style)
-        self.count_lbl.setText(text)
-
-    def _set_status(self, text: str, error: bool = False,
-                    emphasis: bool = False) -> None:
-        """Set the resting readout of the bottom status line (channel count,
-        what's playing, an error, ...). Remembered so a transient flash can
-        return to it. Pass ``emphasis`` for activity messages that should stand
-        out (accent, semibold) rather than the muted count style."""
-        self._rest_status = (text, error, emphasis)
-        self._write_status(text, error, emphasis)
-
-    def _flash_status(self, text: str, ms: int = 4000) -> None:
-        """Briefly show an activity message in the status line, then return to
-        the resting readout. Used for momentary events (guide refresh, cache
-        cleared, ...) so they surface in the same place as everything else
-        instead of a separate overlay, without lingering afterwards. Emphasised
-        so it's easy to notice."""
-        self._write_status(text, False, emphasis=True)
-        token = getattr(self, "_flash_token", 0) + 1
-        self._flash_token = token
-
-        def restore() -> None:
-            if getattr(self, "_flash_token", 0) != token:
-                return   # a newer status write already took over
-            rest = getattr(self, "_rest_status", ("", False, False))
-            self._write_status(*rest)
-
-        QTimer.singleShot(ms, restore)
 
     MAX_STREAM_RETRIES = 2
 
@@ -6228,7 +6166,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self.mode not in ("live", "fav") and not (from_player and self._live_playing()):
             return
         self._chan_buffer = (self._chan_buffer + str(int(digit)))[:5]
-        self._set_status(tr("chan_entry", num=self._chan_buffer))
         self._chan_entry_show(self._chan_buffer, self.CHAN_ENTRY_MS + 1000)
         self._chan_timer.start(self.CHAN_ENTRY_MS)
 
@@ -6245,10 +6182,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if p is not None and p.isVisible() and p.current_url is not None:
             p.show_number_entry(text, ms)
         elif text:
-            self._show_toast(tr("chan_entry", num=text) if text.isdigit() else text, ms)
+            # One card that follows the digits as they are typed.
+            hub_of(self).post(tr("chan_entry", num=text) if text.isdigit() else text,
+                              ms=ms, key="chan_entry")
+        else:
+            hub_of(self).dismiss_key("chan_entry")
 
     def _chan_not_found(self, number) -> None:
-        self._set_status(tr("chan_not_found", num=number))
         self._chan_entry_show(tr("chan_not_found", num=number), 2500)
 
     def _channel_jump(self) -> None:

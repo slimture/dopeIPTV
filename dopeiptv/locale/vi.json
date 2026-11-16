@@ -2934,5 +2934,11 @@
   "phone_page_sleep_left": "Dừng sau {n} phút",
   "phone_rec_ask": "Ghi hình {title}?",
   "phone_rec_stop_ask": "Dừng ghi hình {title}?",
-  "status_guide_still_loading": "Lịch phát chương trình đang tải hơi lâu - sẽ hiện ra ngay khi sẵn sàng."
+  "status_guide_still_loading": "Lịch phát chương trình đang tải hơi lâu - sẽ hiện ra ngay khi sẵn sàng.",
+  "notice_more": "thêm {n}",
+  "notice_working": "Đang thực hiện",
+  "notice_dismiss": "Bỏ qua",
+  "notice_info": "Thông báo",
+  "notice_warning": "Cảnh báo",
+  "notice_error": "Lỗi"
 }

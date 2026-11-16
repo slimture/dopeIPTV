@@ -34,6 +34,7 @@ from ..core.log import log, redact_url
 from ..core.stores import FAV_DEFAULT_GROUP
 from ..core.workers import run_async
 from ..i18n import tr
+from .notices import hub_of
 from .theme import P
 
 #: Error reasons (core/ytdlp.YtdlpError) -> what the person is told.
@@ -173,7 +174,6 @@ class _WebStreamsMixin:
             return
         # No hook in this libmpv (built without Lua): yt-dlp is asked here.
         self._show_busy(tr("web_opening"))
-        self._set_status(tr("web_opening"), emphasis=True)
         run_async(self.pool, partial(ytdlp.resolve, found.path, url),
                   partial(self._web_resolved, self._web_gen, url, name, item, found),
                   partial(self._web_resolve_failed, self._web_gen))
@@ -257,7 +257,10 @@ class _WebStreamsMixin:
         timer.timeout.connect(self._ytdlp_progress)
         job["timer"] = timer
         timer.start()
-        self._show_busy(tr("ytdlp_downloading"))
+        # A download is work the window does: a job of its own, its words
+        # following the bytes, ended by the answer (or let go if none comes).
+        job["notice"] = hub_of(self).start(tr("ytdlp_downloading"), key="ytdlp",
+                                           timeout_ms=120_000)
         self._ytdlp_progress()
         run_async(self.pool, partial(ytdlp.update if update else ytdlp.install,
                                      progress=progress),
@@ -269,8 +272,11 @@ class _WebStreamsMixin:
             return
         mb = job["got"] / 1e6
         total = job["total"] / 1e6
-        self._set_status(tr("ytdlp_downloading_n", got=f"{mb:.0f}",
-                            total=f"{total:.0f}" if total else "?"), emphasis=True)
+        if job["got"] != job.get("said"):
+            job["said"] = job["got"]
+            hub_of(self).update(job.get("notice", 0), tr(
+                "ytdlp_downloading_n", got=f"{mb:.0f}",
+                total=f"{total:.0f}" if total else "?"))
 
     def _ytdlp_finish(self) -> dict:
         job, self._ytdlp_job = self._ytdlp_job or {}, None
@@ -278,7 +284,7 @@ class _WebStreamsMixin:
         if timer is not None:
             timer.stop()
             timer.deleteLater()
-        self._hide_busy()
+        hub_of(self).finish(job.get("notice", 0))
         return job
 
     def _ytdlp_installed(self, tag) -> None:
@@ -286,7 +292,6 @@ class _WebStreamsMixin:
         self.settings.setValue(ytdlp.SETTING_CHECKED, int(time.time()))
         # No tag from an update: the copy there is the newest already.
         text = tr("ytdlp_installed", version=tag or ytdlp.installed_tag() or "?")
-        self._set_status(text)
         self._show_toast(text, 4000)
         if job.get("done") is not None:
             job["done"](True, text)
@@ -298,8 +303,8 @@ class _WebStreamsMixin:
         reason = str(msg or "").partition(":")[0].strip()
         text = tr(_ERR_TEXT.get(reason, "ytdlp_err_download"))
         log.warning("yt-dlp download failed: %s", msg)
-        self._set_status(text, error=True)
         if job.get("done") is not None:
+            self._set_status(text, error=True)
             job["done"](False, text)
         else:
             self._choice_dialog(tr("ytdlp_title"), text, [(tr("common_ok"), "primary")])

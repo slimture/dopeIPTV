@@ -18,6 +18,7 @@ from ..providers.oauth_loopback import capture_oauth_redirect
 from ..providers.trakt import (
     ACTIVATE_URL, OAUTH_PORT, REDIRECT_URI, new_pkce_pair,
 )
+from .notices import hub_of
 from .theme import P
 from ..core.workers import run_async
 from ..core.xdg import open_url
@@ -177,6 +178,8 @@ class _TraktMixin:
                 return
         self._watched_sync_running = True
         running.add(pid)
+        # Work the window does: a job, ended by the sync's end below.
+        hub_of(self).start(tr("trakt_syncing"), key="watched_sync", timeout_ms=120_000)
         ends = self.__dict__.setdefault("_watched_sync_ends", [])
         # The profile's own stores, as they are now: a switch while this runs
         # leaves its answer with the profile it was asked for.
@@ -310,6 +313,7 @@ class _TraktMixin:
                         pass
 
     def _on_watched_sync_done(self) -> None:
+        hub_of(self).end_key("watched_sync")
         if not _sync_ended(self):
             return      # the profile before's: its marks are in its own stores
         # Nudge the visible list so the newly-known 'seen' markers
@@ -321,6 +325,7 @@ class _TraktMixin:
             self._load_items(self._watched_subcat)
 
     def _on_watched_sync_failed(self) -> None:
+        hub_of(self).end_key("watched_sync")
         _sync_ended(self)
 
     # -- Watched (Sedda) list ------------------------------------------------
@@ -350,7 +355,6 @@ class _TraktMixin:
         self._maybe_sync_watched(force=True)
         if self.mode == "fav" and self._fav_section == "trakt":
             self._load_trakt_favorites()
-        self._set_status(tr("trakt_syncing"))
 
     def _trakt_watched_item(self, tmdb_id: int, kind: str,
                             meta: dict | None) -> dict:

@@ -271,8 +271,9 @@ class _ServerMixin:
             self._show_toast(text, 8000)
             return
         self._home_offer = taken.free
-        self._show_action_toast(text + "\n" + tr("nerd_server_use_port_click", port=taken.free),
-                                10_000, self._server_take_offer)
+        # A card with its button: the port is taken only when the person asks.
+        self._show_action_toast(text, 15_000, self._server_take_offer,
+                                label=tr("nerd_server_use_port", port=taken.free))
 
     def _server_take_offer(self) -> None:
         """The note clicked: its port taken."""

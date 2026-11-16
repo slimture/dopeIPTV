@@ -2934,5 +2934,11 @@
   "phone_page_sleep_left": "หยุดในอีก {n} นาที",
   "phone_rec_ask": "บันทึก {title} หรือไม่?",
   "phone_rec_stop_ask": "หยุดบันทึก {title} หรือไม่?",
-  "status_guide_still_loading": "ผังรายการใช้เวลาโหลดนานสักหน่อย - จะแสดงทันทีที่พร้อม"
+  "status_guide_still_loading": "ผังรายการใช้เวลาโหลดนานสักหน่อย - จะแสดงทันทีที่พร้อม",
+  "notice_more": "อีก {n} รายการ",
+  "notice_working": "กำลังดำเนินการ",
+  "notice_dismiss": "ปิด",
+  "notice_info": "แจ้งให้ทราบ",
+  "notice_warning": "คำเตือน",
+  "notice_error": "ข้อผิดพลาด"
 }

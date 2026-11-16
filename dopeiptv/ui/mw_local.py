@@ -1023,7 +1023,7 @@ class _LocalFilesMixin:
                     getattr(self, "_local_series_index", {}),
                     getattr(self, "_local_movies_rows", []),
                     getattr(self, "_local_collection_index", {}))
-                self._set_status(self._local_scan_note())
+                self._busy_say(self._local_scan_note())
             return
         self._local_scan_root = root
         self._local_scan_token = getattr(self, "_local_scan_token", 0) + 1
@@ -1162,7 +1162,7 @@ class _LocalFilesMixin:
                 else:
                     # Drilled in: the list is not ours to touch, but the
                     # progress note still is.
-                    self._set_status(self._local_scan_note(state))
+                    self._busy_say(self._local_scan_note(state))
                 self._show_busy(self._local_scan_note(state))
                 # Persist the merged partial view every ~15 s, so quitting
                 # or switching away mid-walk keeps everything found so far
@@ -1582,7 +1582,7 @@ class _LocalFilesMixin:
         self._render_rows(rows, "rec", tr("local_empty"))
         self._local_lib_shown = (self.all_items, sig)
         if getattr(self, "_local_scan_active", False):
-            self._set_status(self._local_scan_note())
+            self._busy_say(self._local_scan_note())
         self._local_resolve_posters(
             [r for r in rows if r.get("_kind") in ("local", "localseries")])
         self._local_fetch_album_art(rows)

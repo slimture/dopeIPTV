@@ -2934,5 +2934,11 @@
   "phone_page_sleep_left": "Остановится через {n} мин",
   "phone_rec_ask": "Записать {title}?",
   "phone_rec_stop_ask": "Остановить запись {title}?",
-  "status_guide_still_loading": "Телепрограмма загружается дольше обычного - она появится, как только будет готова."
+  "status_guide_still_loading": "Телепрограмма загружается дольше обычного - она появится, как только будет готова.",
+  "notice_more": "ещё {n}",
+  "notice_working": "Выполняется",
+  "notice_dismiss": "Закрыть",
+  "notice_info": "Уведомление",
+  "notice_warning": "Предупреждение",
+  "notice_error": "Ошибка"
 }

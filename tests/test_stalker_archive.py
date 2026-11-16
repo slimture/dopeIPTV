@@ -539,7 +539,10 @@ def until(done, secs=20.0):
 
 
 def status():
-    return w.count_lbl.text()
+    # What the window said last: its newest card (ui/notices.py), else the
+    # status line.
+    said = w.notices.texts()
+    return said[-1] if said else w.count_lbl.text()
 
 
 chans = {r["stream_id"]: r for r in client.live_streams(None)}

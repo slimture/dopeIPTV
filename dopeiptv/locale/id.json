@@ -2934,5 +2934,11 @@
   "phone_page_sleep_left": "Berhenti dalam {n} mnt",
   "phone_rec_ask": "Rekam {title}?",
   "phone_rec_stop_ask": "Hentikan perekaman {title}?",
-  "status_guide_still_loading": "Panduan program butuh waktu agak lama - akan muncul begitu siap."
+  "status_guide_still_loading": "Panduan program butuh waktu agak lama - akan muncul begitu siap.",
+  "notice_more": "{n} lagi",
+  "notice_working": "Sedang berjalan",
+  "notice_dismiss": "Tutup",
+  "notice_info": "Catatan",
+  "notice_warning": "Peringatan",
+  "notice_error": "Kesalahan"
 }

@@ -1,10 +1,11 @@
-"""The "Loading programme guide…" strip at the top of the middle pane has one
-owner and a token per load (ui/mw_busy.py, MainWindow._load_guide): every
-way a load ends - done, from the disk cache, failed, raised, never answering
-- ends it; a late word or end of an older load (a source switched away
-from, a refresh replaced) neither keeps it nor ends a newer one's; a list
-loaded meanwhile does not end it; a load a lookup started on its own gets an
-owner. It stayed on screen until a category change hid it."""
+""""Loading programme guide…" has one owner and a token per load
+(ui/mw_busy.py, MainWindow._load_guide), shown as a job in the notices'
+corner (ui/notices.py): every way a load ends - done, from the disk cache,
+failed, raised, never answering - ends it; a late word or end of an older
+load (a source switched away from, a refresh replaced) neither keeps it nor
+ends a newer one's; a list loaded meanwhile does not end it; a load a lookup
+started on its own gets an owner. It stayed on screen until a category
+change hid it."""
 from __future__ import annotations
 
 import os
@@ -12,28 +13,26 @@ import time
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt6.QtWidgets import QApplication, QLabel, QProgressBar, QWidget
+from PyQt6.QtWidgets import QApplication, QWidget
 
 import dopeiptv.ui.main_window as mw
 from dopeiptv.i18n import tr
 from dopeiptv.providers.epg import XmltvGuide
 from dopeiptv.ui.mw_busy import _BusyMixin
+from dopeiptv.ui.notices import NoticeHub
 
 _app = QApplication.instance() or QApplication([])
 
 
 class _Window(_BusyMixin, QWidget):
-    """The window's busy strip and guide load, nothing else."""
+    """The window's notices and guide load, nothing else."""
     _ensure_xmltv_loaded = mw.MainWindow._ensure_xmltv_loaded
     _load_guide = mw.MainWindow._load_guide
     pool = None
 
     def __init__(self, guide=None):
         super().__init__()
-        self.loading_bar = QProgressBar()
-        self._busy_label = QLabel("")
-        self._hide_busy()
-        self.notes: list[str] = []
+        self.notices = NoticeHub(self)
         self.refreshed = 0
         self.list_model = type("M", (), {})()
         self.list_model.refresh_all = self._refresh
@@ -53,14 +52,16 @@ class _Window(_BusyMixin, QWidget):
         # The signal, delivered at once (on the window's thread it is queued).
         return lambda value: self._on_epg_progress(token, value)
 
-    def _flash_status(self, text, ms=4000):
-        self.notes.append(text)
+    @property
+    def notes(self) -> list[str]:
+        return self.notices.texts()
 
     def shown(self) -> bool:
-        return not self.loading_bar.isHidden()
+        return bool(self.notices.jobs())
 
     def words(self) -> str:
-        return self._busy_label.text()
+        jobs = self.notices.jobs()
+        return jobs[0].text if jobs else ""
 
 
 def _jobs(monkeypatch):

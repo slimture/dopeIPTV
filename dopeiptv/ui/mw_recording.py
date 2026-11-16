@@ -16,6 +16,7 @@ from ..core.connections import Use
 from ..core.log import log, redact_url
 from ..core.privacy import for_log
 from ..core.recording import SCRAMBLED, RecordingManager, format_size, free_path, safe_filename
+from .notices import hub_of
 from .theme import P
 from .widgets import confirm
 from ..core.workers import run_async
@@ -678,8 +679,8 @@ class _RecordingMixin:
         stop = j.get("stop")
         length = (tr("rec_until_stopped") if stop is None
                   else tr("rec_for_minutes", n=max(1, int((float(stop) - time.time()) // 60))))
-        self._set_status("● " + tr("rec_started_inplayer", title=j.get("title") or "",
-                                   length=length))
+        hub_of(self).post("● " + tr("rec_started_inplayer", title=j.get("title") or "",
+                                     length=length), ms=6000)
         self._warn_pause_while_recording()
         return True
 
@@ -790,8 +791,8 @@ class _RecordingMixin:
                     recorder=self.player.take_buffer_recorder(),
                     channel=self.channel_display_name(it),
                     extra=self._rec_player_source())
-                self._set_status("● " + tr("rec_started_inplayer",
-                                           title=title, length=length))
+                hub_of(self).post("● " + tr("rec_started_inplayer",
+                                             title=title, length=length), ms=6000)
                 self._warn_pause_while_recording()
                 return
 
@@ -843,9 +844,9 @@ class _RecordingMixin:
                          icon=it.get("stream_icon"),
                          channel=self.channel_display_name(it),
                          extra=self._rec_source())
-        self._set_status("● " + tr("rec_started_to", title=title,
-                                   length=length,
-                                   folder=self.rec.directory()))
+        hub_of(self).post("● " + tr("rec_started_to", title=title,
+                                     length=length,
+                                     folder=self.rec.directory()), ms=6000)
 
     def _rec_inplayer_url(self, it) -> str:
         """The address a recording of the player's own stream keeps: the
@@ -886,8 +887,8 @@ class _RecordingMixin:
                 icon=it.get("stream_icon"),
                 recorder=self.player.take_buffer_recorder(),
                 extra=self._rec_player_source())
-            self._set_status("● " + tr("rec_started_inplayer",
-                                       title=title, length=length))
+            hub_of(self).post("● " + tr("rec_started_inplayer",
+                                         title=title, length=length), ms=6000)
             self._warn_pause_while_recording()
         elif self._recorder_ready():
             url = self.client.live_url(it["stream_id"], "ts")
@@ -895,9 +896,9 @@ class _RecordingMixin:
                              icon=it.get("stream_icon"),
                              channel=self.channel_display_name(it),
                              extra=self._rec_source())
-            self._set_status("● " + tr("rec_started_to", title=title,
-                                       length=length,
-                                       folder=self.rec.directory()))
+            hub_of(self).post("● " + tr("rec_started_to", title=title,
+                                         length=length,
+                                         folder=self.rec.directory()), ms=6000)
 
     def _schedule_recording(self, it) -> None:
         if not self._recorder_ready() or it.get("stream_id") is None:
@@ -955,8 +956,8 @@ class _RecordingMixin:
                          icon=it.get("stream_icon"),
                          channel=self.channel_display_name(it),
                          extra=extra)
-        self._set_status(tr("rec_scheduled_for", title=title,
-                            when=format_when(start_ts)))
+        hub_of(self).post(tr("rec_scheduled_for", title=title,
+                              when=format_when(start_ts)), ms=6000)
 
     def _edit_job_times(self, job_id: str) -> None:
         job = next((j for j in self.rec.jobs if j["id"] == job_id), None)
@@ -1543,13 +1544,16 @@ class _RecordingMixin:
         # real video do we switch the player to it (one clean swap); if none do,
         # the channel is marked as having no working catch-up and the user just
         # gets a status message, with no stutter.
-        self._flash_status(tr("ts_checking"))
+        # The check is work the window does: a job of its own (a newer
+        # check replaces it), ended with its answer.
+        hub_of(self).start(tr("ts_checking"), key="ts_check", timeout_ms=60_000)
         probe_token = getattr(self, "_ts_probe_token", 0) + 1
         self._ts_probe_token = probe_token
 
         def done(res):
             if probe_token != getattr(self, "_ts_probe_token", 0):
                 return   # a newer play/probe superseded this one
+            hub_of(self).end_key("ts_check")
             url, proven_dead = (res if isinstance(res, tuple)
                                 else (res, True))
             if not url:

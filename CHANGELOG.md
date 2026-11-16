@@ -102,6 +102,24 @@ how connections to the account are counted.
   and art lookups; the library's cache is read from disk once a session,
   written off the window's thread, and a walk that finds nothing new
   leaves the list as it is.
+- The app's notices are in one place instead of four. What it is doing
+  (a list or the guide loading, a library scan, a download, a sync, an
+  archive check) was a strip at the top of the list that pushed it down
+  and up, or words in the status line that stayed; what it told you was a
+  dark note in the middle of the window's foot, or the status line in red.
+  Now both live in one corner - the bottom of the list on the side away
+  from the sidebar, just above its status line, never over the video: one
+  calm line with a spinner and the newest job ("Loading programme guide…
+  · 2 more", all of them on hover or a click), each job ended by its own
+  work, a newer one of the same kind or its own time limit; and above it
+  small cards for errors, offers and notes, each with its action and a
+  dismiss, gone by themselves unless they wait for an answer, the same
+  note again refreshing the one there. Nothing is drawn while the video
+  fills the screen or TV mode shows; cards wait until you are back. The
+  status line keeps the list's count and what plays. What is about the
+  picture (loading, reconnecting, a typed channel number) stays over the
+  video, and real questions stay dialogs. Screen readers hear a new card;
+  right to left mirrors the corner.
 - "Loading programme guide…" no longer stays at the top of the list after
   the guide is in. The strip was shown by any guide download - also one a
   lookup started on its own (the detail panel, a past programme, TV mode),

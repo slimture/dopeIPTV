@@ -347,18 +347,22 @@ w._player_fs = False
 w._report_wait_action.trigger()
 assert len(shown) == 4 and "Segmentation fault" in shown[-1] and not w._report_wait_action.isVisible()
 
-# The note itself: a click does what it was given, once, and it goes; a
-# plain note's click does nothing.
+# The note itself, a card in the notices' corner: a click does what it was
+# given, once, and it goes; a plain card's click does nothing.
 clicked = []
-t = w._toast
-t.show_message("note", 5000, on_click=lambda: clicked.append(1))
+area = w._notice_area
+w.notices.post("note", ms=5000, action=lambda: clicked.append(1))
+spin()
+[t] = [c for c in area.card_widgets() if c.label.text() == "note"]
 QTest.mouseClick(t, Qt.MouseButton.LeftButton)
 spin()
-assert clicked == [1] and t.isHidden(), clicked
-t.show_message("plain", 5000)
+assert clicked == [1] and "note" not in w.notices.texts(), clicked
+w.notices.post("plain", ms=5000)
+spin()
+[t] = [c for c in area.card_widgets() if c.label.text() == "plain"]
 QTest.mouseClick(t, Qt.MouseButton.LeftButton)
 spin()
-assert clicked == [1] and not t.isHidden()
+assert clicked == [1] and "plain" in w.notices.texts()
 print("REPORT_WAITS_OK")
 """
 

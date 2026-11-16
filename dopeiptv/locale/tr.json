@@ -2934,5 +2934,11 @@
   "phone_page_sleep_left": "{n} dk sonra durur",
   "phone_rec_ask": "{title} kaydedilsin mi?",
   "phone_rec_stop_ask": "{title} kaydı durdurulsun mu?",
-  "status_guide_still_loading": "Program kılavuzu biraz zaman alıyor - hazır olur olmaz görünecek."
+  "status_guide_still_loading": "Program kılavuzu biraz zaman alıyor - hazır olur olmaz görünecek.",
+  "notice_more": "{n} tane daha",
+  "notice_working": "Devam ediyor",
+  "notice_dismiss": "Kapat",
+  "notice_info": "Bilgi",
+  "notice_warning": "Uyarı",
+  "notice_error": "Hata"
 }

@@ -259,7 +259,15 @@ w = MainWindow(make_client(pls[0]), s, store)
 played, toasts = [], []
 w._start_playback = lambda url, title, icon, key, kind, record=True, item=None, catchup=False: \
     played.append((url, title, kind))
-w._show_toast = lambda text, ms=0: toasts.append(text)
+_post = w.notices.post
+
+
+def _said(text, **kw):          # every card the window posts (ui/notices.py)
+    toasts.append(text)
+    return _post(text, **kw)
+
+
+w.notices.post = _said
 TV4, K5 = xt.base + "/live/anna/pw-anna/401.ts", xt.base + "/live/anna/pw-anna/405.ts"
 
 def wait(cond, n=600):

@@ -2934,5 +2934,11 @@
   "phone_page_sleep_left": "{n} منٹ میں رک جائے گا",
   "phone_rec_ask": "{title} ریکارڈ کریں؟",
   "phone_rec_stop_ask": "{title} کی ریکارڈنگ روکیں؟",
-  "status_guide_still_loading": "پروگرام گائیڈ میں کچھ وقت لگ رہا ہے - تیار ہوتے ہی نظر آ جائے گی۔"
+  "status_guide_still_loading": "پروگرام گائیڈ میں کچھ وقت لگ رہا ہے - تیار ہوتے ہی نظر آ جائے گی۔",
+  "notice_more": "{n} مزید",
+  "notice_working": "جاری ہے",
+  "notice_dismiss": "بند کریں",
+  "notice_info": "اطلاع",
+  "notice_warning": "انتباہ",
+  "notice_error": "خرابی"
 }

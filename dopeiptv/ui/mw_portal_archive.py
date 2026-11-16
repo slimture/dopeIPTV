@@ -17,6 +17,7 @@ from ..core.log import log, redact_url
 from ..core.privacy import for_log
 from ..core.workers import run_async
 from ..i18n import tr
+from .notices import hub_of
 
 
 class _PortalArchiveMixin:
@@ -42,13 +43,16 @@ class _PortalArchiveMixin:
             return
         client = self.client
         stop = (prog or {}).get("stop_timestamp")
-        self._flash_status(tr("ts_checking"))
+        # The ask is work the window does: a job ended by its own answer (a
+        # newer ask replaces it; Stop or another source leave it to that).
+        job = hub_of(self).start(tr("ts_checking"), key="ts_check", timeout_ms=60_000)
         token = getattr(self, "_ts_probe_token", 0) + 1
         self._ts_probe_token = token
         # _failover_gen moves on with every start - the auto-preview's too -
         # and with Stop (mw_failover); _diag_gen only with _start_playback.
         ctx: dict[str, Any] = {
-            "token": token, "client": client, "gen": getattr(self, "_failover_gen", 0),
+            "token": token, "job": job, "client": client,
+            "gen": getattr(self, "_failover_gen", 0),
             "item": it, "prog": prog, "origin": prog_origin, "after_end": after_end}
         log.debug("[ts] portal archive: channel %s from %s%s", for_log(sid),
                   for_log(datetime.fromtimestamp(start)), " (a programme)" if prog else "")
@@ -66,6 +70,7 @@ class _PortalArchiveMixin:
                 and ctx["gen"] == getattr(self, "_failover_gen", 0))
 
     def _portal_archive_ready(self, ctx: dict, got) -> None:
+        hub_of(self).finish(ctx.get("job", 0))
         if not self._portal_archive_current(ctx):
             return
         url = got.get("url") if isinstance(got, dict) else None
@@ -113,6 +118,7 @@ class _PortalArchiveMixin:
         """No link: the portal has no such programme or gave nothing for
         it (*err* None), or it was not reached (*err*, which proves nothing
         about the archive - no channel is marked for it)."""
+        hub_of(self).finish(ctx.get("job", 0))
         if not self._portal_archive_current(ctx):
             return
         if err is not None:

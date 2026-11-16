@@ -6,14 +6,14 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import (
-    QEvent, QPointF, QRect, QRectF, QSize, Qt, QTimer, pyqtSignal,
+    QEvent, QPointF, QRect, QRectF, QSize, Qt, pyqtSignal,
 )
 from PyQt6.QtGui import (
     QColor, QIcon, QImage, QImageReader, QLinearGradient, QPainter, QPainterPath,
     QPen, QPixmap,
 )
 from PyQt6.QtWidgets import (
-    QLabel, QLayout, QLayoutItem, QMessageBox, QPushButton, QWidget,
+    QLayout, QLayoutItem, QMessageBox, QPushButton, QWidget,
 )
 
 from .. import APP_NAME
@@ -416,64 +416,6 @@ class _ClickableWidget(QWidget):
         if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit()
         super().mousePressEvent(event)
-
-
-class _Toast(QLabel):
-    """Non-intrusive overlay notification that fades away after a few seconds."""
-
-    DURATION_MS = 3500
-
-    def __init__(self, parent: QWidget) -> None:
-        super().__init__(parent)
-        self.setWordWrap(True)
-        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setStyleSheet(
-            "background: rgba(30,30,36,220); color: #ECECF1;"
-            "border-radius: 10px; padding: 10px 18px;"
-            "font-size: 12px; font-weight: 500;")
-        self.hide()
-        self._on_click = None
-        self._timer = QTimer(self)
-        self._timer.setSingleShot(True)
-        self._timer.timeout.connect(self._dismiss)
-
-    def show_message(self, text: str, duration_ms: int = 0, on_click=None) -> None:
-        """*on_click*: what a click on the note does (it goes then); without
-        one a click does nothing, as before."""
-        self._on_click = on_click
-        if on_click is not None:
-            self.setCursor(Qt.CursorShape.PointingHandCursor)
-        else:
-            self.unsetCursor()
-        self.setText(text)
-        self.adjustSize()
-        self.setFixedWidth(min(320, max(180, self.sizeHint().width() + 20)))
-        self.adjustSize()
-        self._place()
-        self.show()
-        self.raise_()
-        self._timer.start(duration_ms or self.DURATION_MS)
-
-    def _place(self) -> None:
-        p = self.parent()
-        if p:
-            self.move((p.width() - self.width()) // 2,
-                      p.height() - self.height() - 30)
-
-    def mousePressEvent(self, event) -> None:      # noqa: N802 - Qt hook
-        act = self._on_click
-        if act is None or event.button() != Qt.MouseButton.LeftButton:
-            super().mousePressEvent(event)
-            return
-        event.accept()
-        self._dismiss()
-        # After this event: what it opens may run an event loop of its own.
-        QTimer.singleShot(0, act)
-
-    def _dismiss(self) -> None:
-        self._on_click = None
-        self._timer.stop()
-        self.hide()
 
 
 class MenuBarDot(QWidget):

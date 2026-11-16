@@ -2934,5 +2934,11 @@
   "phone_page_sleep_left": "S'arrête dans {n} min",
   "phone_rec_ask": "Enregistrer {title} ?",
   "phone_rec_stop_ask": "Arrêter l'enregistrement de {title} ?",
-  "status_guide_still_loading": "Le guide des programmes prend un peu de temps - il s'affichera dès qu'il sera prêt."
+  "status_guide_still_loading": "Le guide des programmes prend un peu de temps - il s'affichera dès qu'il sera prêt.",
+  "notice_more": "{n} de plus",
+  "notice_working": "En cours",
+  "notice_dismiss": "Ignorer",
+  "notice_info": "Information",
+  "notice_warning": "Avertissement",
+  "notice_error": "Erreur"
 }
