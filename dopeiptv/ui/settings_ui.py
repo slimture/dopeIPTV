@@ -24,11 +24,12 @@ from collections.abc import Callable
 
 from PyQt6 import sip
 from PyQt6.QtCore import (
-    QLocale, QPoint, QPointF, QRect, QRectF, QSize, Qt, QTimer, pyqtSignal,
+    QLocale, QObject, QPoint, QPointF, QRect, QRectF, QSize, Qt, QTimer,
+    pyqtSignal,
 )
 from PyQt6.QtGui import (
     QColor, QConicalGradient, QFont, QFontMetrics, QIcon, QPainter,
-    QPainterPath, QPen, QPixmap,
+    QPainterPath, QPaintEvent, QPen, QPixmap, QShowEvent,
 )
 from PyQt6.QtWidgets import (
     QAbstractButton, QAbstractSpinBox, QButtonGroup, QCheckBox, QFrame,
@@ -105,6 +106,16 @@ def _muted(text: str, size: int = 12) -> QLabel:
 
 #: Space above and below the content of a row.
 ROW_PAD = 10
+
+
+def set_shown(w: QWidget, on: bool) -> None:
+    """*w* shown or hidden - touched only when that changes something. A
+    row not hidden already shows with its page; setVisible(True) on it
+    polishes it and lays it out there and then, which every search and
+    every shown_if did again for every row of every page while the window
+    was being built, most of them on pages never looked at."""
+    if w.isHidden() == on:
+        w.setVisible(on)
 
 
 class SettingsCard(QFrame):
@@ -267,17 +278,17 @@ class SettingsCard(QFrame):
             cond = self._shown_if.get(id(w))
             if cond is not None and not cond():
                 hit = False
-            w.setVisible(hit)
+            set_shown(w, hit)
             line = w.property("_divider")
             if line is not None:
-                line.setVisible(hit and not first)
+                set_shown(line, hit and not first)
             if hit:
                 first = False
                 shown = True
-        self.setVisible(shown)
+        set_shown(self, shown)
         title = self.property("_title")
         if title is not None:
-            title.setVisible(shown)
+            set_shown(title, shown)
         return shown
 
 
@@ -331,6 +342,15 @@ class SettingsPage(QScrollArea):
         self.cards: list[SettingsCard] = []
         #: The controls in the column down the right of the cards.
         self.column: list[QWidget] = []
+
+    def sizeHint(self) -> QSize:                     # noqa: N802 - Qt's name
+        # What QScrollArea asks for at most, 36 x 24 lines of text - what it
+        # asks for any page longer than a few rows - without working out the
+        # whole page first: the stack of pages asked every page for its size
+        # as the window was shown, which laid out every row of every page,
+        # most of them never looked at. A page is laid out when it shows.
+        h = self.fontMetrics().height()
+        return QSize(36 * h, 24 * h)
 
     def set_crumb(self, text: str, on_click: Callable[[], None]) -> QPushButton:
         """A way back above the title ("Nerd ›" on Nerd's own pages), in
@@ -398,7 +418,7 @@ class SettingsPage(QScrollArea):
             if c.apply_filter(needle, all_of):
                 shown = True
         if self._subtitle is not None:
-            self._subtitle.setVisible(not needle)
+            set_shown(self._subtitle, not needle)
         return shown or not needle
 
 
@@ -1278,7 +1298,22 @@ def page_icon(kind: str, base, size: int = 18, tint: str | None = None) -> QIcon
     return icon
 
 
+#: The icons drawn here, by (kind, size, colour): each Settings window drew
+#: every page's anew. A theme's colours are a few more; kept to a bound.
+_OWN_ICONS: dict[tuple[str, int, str], QPixmap | None] = {}
+_OWN_ICONS_MAX = 256
+
+
 def _own_icon(kind: str, s: int, colour: str) -> QPixmap | None:
+    key = (kind, s, colour)
+    if key not in _OWN_ICONS:
+        if len(_OWN_ICONS) >= _OWN_ICONS_MAX:
+            _OWN_ICONS.clear()
+        _OWN_ICONS[key] = _draw_own_icon(kind, s, colour)
+    return _OWN_ICONS[key]
+
+
+def _draw_own_icon(kind: str, s: int, colour: str) -> QPixmap | None:
     if kind not in ("palette", "play", "subtitles", "picture", "lock",
                     "wrench", "image", "trakt", "nerd", "network", "box",
                     "knobs", "channels", "remote", "cast", "sync", "plug",
@@ -1478,6 +1513,47 @@ def _own_icon(kind: str, s: int, colour: str) -> QPixmap | None:
             pr.setBrush(Qt.BrushStyle.NoBrush)
     pr.end()
     return pm
+
+
+class _AfterShown(QObject):
+    """Runs *fn* once, just after *window* is first drawn - from the event
+    loop, so the window is up first - and never for a window that is not
+    shown (Settings built only for the command palette's index)."""
+
+    #: When no paint follows the show (a window that opens minimised).
+    FALLBACK_MS = 400
+
+    def __init__(self, window: QWidget, fn: Callable[[], None]) -> None:
+        super().__init__(window)
+        self._fn: Callable[[], None] | None = fn
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self._run)
+        if window.isVisible():                      # up already
+            self._timer.start(0)
+        else:
+            window.installEventFilter(self)
+
+    def eventFilter(self, obj, event) -> bool:        # noqa: N802 - Qt hook
+        if isinstance(event, QShowEvent):
+            if not self._timer.isActive():
+                self._timer.start(self.FALLBACK_MS)
+        elif isinstance(event, QPaintEvent):
+            obj.removeEventFilter(self)
+            self._timer.start(0)
+        return False
+
+    def _run(self) -> None:
+        fn, self._fn = self._fn, None
+        if fn is not None:
+            fn()
+
+
+def after_shown(window: QWidget, fn: Callable[[], None]) -> None:
+    """*fn()* once *window* is up and drawn: what a window needs only once
+    it shows - a check of a setting, a size counted on disk - kept out of
+    the time it takes to build and show it."""
+    _AfterShown(window, fn)
 
 
 def hbox(*widgets, stretch: bool = True, spacing: int = 8) -> QHBoxLayout:

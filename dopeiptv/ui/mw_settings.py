@@ -12,6 +12,7 @@ from datetime import datetime
 
 import os
 
+from PyQt6 import sip
 from PyQt6.QtCore import QEvent, QLocale, QObject, Qt, QTimer
 from PyQt6.QtGui import QColor, QIcon
 from PyQt6.QtWidgets import (
@@ -79,7 +80,8 @@ from .settings_ui import (
     Chip, ChipGroups, ChoicePicker, ColorDot, DurationSpin, GridSpin,
     PlaylistDelegate, ReorderList, SettingsPage, SizeSpin, Stepper,
     ValueSlider, size_text,
-    SettingsShell, ThemeTile, fit_to_rows, hbox, page_icon, settings_style,
+    SettingsShell, ThemeTile, after_shown, fit_to_rows, hbox, page_icon,
+    settings_style,
 )
 from .widgets import confirm, file_dialog_options
 from ..core.updates import GITHUB_REPO, fetch_update, offered
@@ -531,7 +533,7 @@ class _SettingsMixin:
     _MAX_VISIBLE = 14
 
     @staticmethod
-    def _install_wheel_guard(d) -> None:
+    def _install_wheel_guard(d, controls: list | None = None) -> None:
         """Guard every value control in the dialog so scrolling the page can't
         change a setting under the cursor - you click to change, not scroll
         past.
@@ -547,12 +549,18 @@ class _SettingsMixin:
         The guard object is parented to the dialog: a module-level singleton
         QObject could have its C++ side torn down under some app lifetimes
         (seen in the test suite), leaving installEventFilter a dangling
-        wrapper."""
+        wrapper.
+
+        *controls*: the dialog's widgets from a walk already made (each walk
+        wraps every object in the dialog for Python); those of the three
+        kinds among them are guarded."""
         wheel_guard = _WheelGuard(d)
+        kinds = (QComboBox, QAbstractSpinBox, QAbstractSlider)
         # One tree walk over all three control types (a tuple arg), not three.
-        for w in d.findChildren(
-                (QComboBox, QAbstractSpinBox, QAbstractSlider)):
-            if isinstance(w, QScrollBar):
+        if controls is None:
+            controls = d.findChildren(kinds)
+        for w in controls:
+            if isinstance(w, QScrollBar) or not isinstance(w, kinds):
                 continue
             w.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
             w.installEventFilter(wheel_guard)
@@ -1223,11 +1231,23 @@ class _SettingsMixin:
             dvr_dir.mkdir(parents=True, exist_ok=True)
             open_url(dvr_dir.as_uri())
         where_btn.clicked.connect(open_dvr_dir)
-        where_row = c.row(
-            tr("setting_dvr_where") + " · " + tr(
-                "dvr_where_now", size=format_size(dir_size_bytes(dvr_dir))),
-            where_btn, tr("setting_dvr_where_hint") + "\n" + str(dvr_dir))
+
+        def where_text(size: str) -> str:
+            return tr("setting_dvr_where") + " · " + tr("dvr_where_now", size=size)
+        where_row = c.row(where_text("…"), where_btn,
+                          tr("setting_dvr_where_hint") + "\n" + str(dvr_dir))
         c.shown_if(where_row, kept_box.isChecked)
+
+        def show_dvr_size(total: int) -> None:
+            if not sip.isdeleted(where_row.label):
+                where_row.label.setText(where_text(format_size(total)))
+        pool = self.pool
+
+        def count_dvr() -> None:
+            run_async(pool, dir_size_bytes, show_dvr_size, None, dvr_dir)
+        # Counted off the window's thread once it is up: a buffer kept on
+        # disk is thousands of segments, one stat each.
+        after_shown(d, count_dvr)
         # mpv's disk cache is beside the point with the app's own buffer.
         c.shown_if(rewind_disk_box.parentWidget(),
                    lambda: not kept_box.isChecked())
@@ -2165,11 +2185,20 @@ class _SettingsMixin:
         loc_note = caches.note(tr("set_caches_hint"))
         c = maint
 
-        def refresh_cache_label() -> None:
-            total = sum(dir_size_bytes(d) for d in cache_dirs)
+        def show_cache_size(total: int) -> None:
+            if sip.isdeleted(cache_row.label):
+                return
             cache_row.label.setText(
                 tr("settings_image_cache_label", size=format_size(total)))
             clear_cache_btn.setEnabled(total > 0)
+
+        def cache_size() -> int:
+            return sum(dir_size_bytes(cdir) for cdir in cache_dirs)
+
+        def refresh_cache_label() -> None:
+            # Off the window's thread: every cached logo and poster is a
+            # stat, tens of thousands of them for a big source.
+            run_async(pool, cache_size, show_cache_size)
 
         def clear_cache() -> None:
             for cdir in cache_dirs:
@@ -2204,7 +2233,7 @@ class _SettingsMixin:
         nerd_link(maint, "set_link_diag",
                   [tr("nerd_log_level"), tr("nerd_log_file"),
                    tr("nerd_card_view"), tr("nerd_card_health")], "diag")
-        refresh_cache_label()
+        after_shown(d, refresh_cache_label)
         x11_box = None
         if sys.platform.startswith("linux"):
             c = adv.card(tr("set_card_system"))
@@ -2499,7 +2528,12 @@ class _SettingsMixin:
         self._nerd_lists_changed = False
         d.finished.connect(lambda _r: self._nerd_lists_rebuild())
         d.setUpdatesEnabled(True)
-        self._install_wheel_guard(d)
+        # One walk over the window's thousands of widgets for every control
+        # the wheel guard and the changes applied as made need (seven walks
+        # before, each wrapping every object for Python).
+        controls = d.findChildren((QComboBox, QAbstractButton, QAbstractSpinBox,
+                                   QAbstractSlider, QLineEdit, QPlainTextEdit))
+        self._install_wheel_guard(d, controls)
 
         def flag(box) -> str:
             return "true" if box.isChecked() else "false"
@@ -2733,21 +2767,18 @@ class _SettingsMixin:
         def soon(*_a) -> None:
             live.start()
 
-        for combo in d.findChildren(QComboBox):
-            combo.currentIndexChanged.connect(soon)
-        for button in d.findChildren(QAbstractButton):
-            if button.isCheckable():
-                button.toggled.connect(soon)
-        for spin in d.findChildren(QSpinBox):
-            spin.valueChanged.connect(soon)
-        for slider in d.findChildren(QAbstractSlider):
-            slider.valueChanged.connect(soon)
-        for edit in d.findChildren(QLineEdit):
-            if edit is not shell.search and not isinstance(
-                    edit.parent(), QAbstractSpinBox):
-                edit.editingFinished.connect(soon)
-        for text in d.findChildren(QPlainTextEdit):
-            text.textChanged.connect(soon)
+        for w in controls:
+            if isinstance(w, QComboBox):
+                w.currentIndexChanged.connect(soon)
+            if isinstance(w, QAbstractButton) and w.isCheckable():
+                w.toggled.connect(soon)
+            if isinstance(w, (QSpinBox, QAbstractSlider)):
+                w.valueChanged.connect(soon)
+            if (isinstance(w, QLineEdit) and w is not shell.search
+                    and not isinstance(w.parent(), QAbstractSpinBox)):
+                w.editingFinished.connect(soon)
+            if isinstance(w, QPlainTextEdit):
+                w.textChanged.connect(soon)
         # The key rows change no control watched above: they say so.
         key_editor.changed.connect(soon)
         # Asked to open on a source's page (the source menu's entry).

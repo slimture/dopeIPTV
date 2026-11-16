@@ -29,7 +29,9 @@ from ..core.log import log, log_dir
 from ..i18n import tr
 from ..media.players import throwaway_mpv
 from .nerd_check_line import CheckLine
-from .settings_ui import Chip, ChipGroups, SettingsPage, Stepper, ToggleSwitch
+from .settings_ui import (
+    Chip, ChipGroups, SettingsPage, Stepper, ToggleSwitch, after_shown,
+)
 
 UA_CHOICES = [("", "nerd_ua_default"), ("vlc", "VLC"), ("kodi", "Kodi"), ("tivimate", "TiviMate"),
               ("smarters", "IPTV Smarters"), ("ffmpeg", "FFmpeg"), ("mag", "MAG box"),
@@ -984,7 +986,10 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     if show_pages is not None:
         show_pages(n.on)
     if n.on:
-        start_checks()
+        # Once the window is up, not while it is being built: their threads
+        # took turns with the build, and each answer restyled its line
+        # before the window had shown anything.
+        after_shown(parent, start_checks)
 
     shown = values()
     refresh_parts()

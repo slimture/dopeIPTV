@@ -153,13 +153,24 @@ class KeyButton(QPushButton):
             self.captured.emit(self.sid, seq)
 
 
+#: The two icons by kind and colours: two for each of the rows, drawn anew
+#: every time Settings opened.
+_ICONS: dict[tuple[str, str, str], QIcon] = {}
+
+
 def _icon(kind: str) -> QIcon:
     """A cross ("clear") or a circular arrow turning back ("reset"), drawn:
     "↺" is an empty box in fonts without it. Dimmed while there is nothing
     to clear or put back."""
     from .theme import P
-    icon = QIcon(_drawn(kind, P["text"]))
-    icon.addPixmap(_drawn(kind, P.get("muted", P["text2"])), QIcon.Mode.Disabled)
+    key = (kind, P["text"], P.get("muted", P["text2"]))
+    icon = _ICONS.get(key)
+    if icon is None:
+        if len(_ICONS) > 32:          # a theme or two at a time
+            _ICONS.clear()
+        icon = QIcon(_drawn(kind, key[1]))
+        icon.addPixmap(_drawn(kind, key[2]), QIcon.Mode.Disabled)
+        _ICONS[key] = icon
     return icon
 
 
