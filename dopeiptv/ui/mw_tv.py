@@ -323,6 +323,15 @@ class _TvMixin:
             elif not on and self._tv_on:
                 self.exit_tv_mode()
             return {"ok": True, "tv_mode": self._tv_on}
+        if what == "text":
+            # Typed on the phone's own keyboard into the text entry TV mode
+            # shows (its search), instead of its keyboard on screen.
+            text = tv_input.entry_text(value)
+            entry = self._tv_text_entry()
+            if entry is None:
+                return {"ok": False, "tv_mode": bool(self._tv_on)}
+            entry.set_text(text)
+            return {"ok": True, "tv_mode": True, "text": entry.query}
         if what != "tv_key":
             raise ValueError(f"unknown action: {what}")
         action = tv_input.remote_action(value)
@@ -333,6 +342,14 @@ class _TvMixin:
             self._tv_input(action)
             return {"ok": True, "tv_mode": True}
         return {"ok": self._tv_off_key(action), "tv_mode": False}
+
+    def _tv_text_entry(self):
+        """The text entry TV mode shows now - its search screen, not under
+        the picture - else None (the phone offers its keyboard while there
+        is one)."""
+        if not self._tv_on or self._tv_watching or self._tv_page is None:
+            return None
+        return self._tv_page.search_screen()
 
     def _tv_off_key(self, action: str) -> bool:
         """A TV key while TV mode is off: the player's own control where

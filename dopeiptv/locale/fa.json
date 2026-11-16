@@ -2919,5 +2919,7 @@
   "cat_find_vod": "یافتن دسته‌ها با نام یا فیلم…",
   "cat_find_series": "یافتن دسته‌ها با نام یا سریال…",
   "sa_placeholder_all": "جستجو در همه‌چیز، در همهٔ منابع شما (مثلاً Star Trek)",
-  "phone_page_ep_prev": "قسمت قبلی"
+  "phone_page_ep_prev": "قسمت قبلی",
+  "phone_page_seek": "موقعیت پخش",
+  "phone_tv_type": "برای جستجو در تلویزیون تایپ کنید"
 }

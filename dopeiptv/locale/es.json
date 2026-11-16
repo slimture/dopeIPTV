@@ -2919,5 +2919,7 @@
   "cat_find_vod": "Buscar categorías por nombre o película…",
   "cat_find_series": "Buscar categorías por nombre o serie…",
   "sa_placeholder_all": "Busca en todo, en todas tus fuentes (p. ej. Star Trek)",
-  "phone_page_ep_prev": "Episodio anterior"
+  "phone_page_ep_prev": "Episodio anterior",
+  "phone_page_seek": "Posición de reproducción",
+  "phone_tv_type": "Escribe para buscar en la tele"
 }

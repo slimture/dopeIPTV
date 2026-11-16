@@ -26,6 +26,7 @@ core/phone_remote.py), and the page asks less often while nothing changes."""
 from __future__ import annotations
 
 import hashlib
+import math
 import threading
 import time
 from typing import Any
@@ -174,6 +175,8 @@ def page_words() -> dict[str, str]:
             "watched": tr("history_chip_watched"), "playing": tr("sp_playing"),
             "search_radio": tr("radio_search_placeholder"), "search_here": tr("local_search_placeholder"),
             "nothing_here": tr("tv_nothing_here"), "find": tr("nav_search"),
+            "skip_back": tr("tooltip_back_10s"), "skip_fwd": tr("tooltip_forward_30s"),
+            "seek": tr("phone_page_seek"), "tv_type": tr("phone_tv_type"),
             **tv_words()}
 
 
@@ -401,7 +404,9 @@ class _PhoneMixin(_PhoneBrowseMixin):
             from ..i18n import current_language, is_rtl
             from .theme import effective_theme, is_light
             dark, light = page_palettes(is_light(effective_theme(self.settings)))
-            return phone_page.render(dark, light, page_words(), current_language(), is_rtl())
+            from ..media.embedded import EmbeddedPlayer
+            return phone_page.render(dark, light, page_words(), current_language(), is_rtl(),
+                                     skips=(EmbeddedPlayer.SEEK_BACK, EmbeddedPlayer.SEEK_FWD))
         if action in ("_play", "toggle", "next", "previous", "calendar") \
                 and getattr(self, "_profile_locked", lambda: False)():
             # "Who's watching?" waits for the PIN at start: nothing of the
@@ -432,6 +437,9 @@ class _PhoneMixin(_PhoneBrowseMixin):
             return self.tv_command("tv", params.get("mode", "toggle"))
         if action == "tv_key":
             return self.tv_command("tv_key", params.get("action"))
+        if action == "tv_text":
+            # The phone's own keyboard into TV mode's search (mw_tv).
+            return self.tv_command("text", params.get("text"))
         if action in ("toggle", "stop"):
             self._remote_media("playpause" if action == "toggle" else "stop")
             return {"ok": True}
@@ -443,6 +451,8 @@ class _PhoneMixin(_PhoneBrowseMixin):
                 # keys and autoplay go - where it got to, without the question.
                 return {"ok": self._advance_episode(step, ask=False)}
             return {"ok": self._play_channel_step(step)}
+        if action == "seek":
+            return self._phone_seek(params)
         if action == "volume":
             try:
                 value = max(0.0, min(100.0, float(params.get("value"))))
@@ -574,6 +584,12 @@ class _PhoneMixin(_PhoneBrowseMixin):
         out: dict[str, Any] = {"state": st["state"], "volume": volume, "muted": muted,
                                "source": st.get("source") or "", "stamp": self._phone_stamp(),
                                "tv_mode": bool(st.get("tv_mode")), "sections": self._phone_sections()}
+        if out["tv_mode"]:
+            # A text entry on the TV (its search): the phone offers its own
+            # keyboard for it. Its text changes only as it is typed.
+            entry = getattr(self, "_tv_text_entry", lambda: None)()
+            if entry is not None:
+                out["tv_entry"] = str(entry.query)
         note = self._phone_note_now()
         locked = getattr(self, "_profile_locked", lambda: False)()
         if locked:
@@ -598,6 +614,9 @@ class _PhoneMixin(_PhoneBrowseMixin):
         kind = st.get("kind") or ""
         out.update(kind=kind, title=st.get("title") or "", position=st.get("position") or 0,
                    duration=st.get("duration") or 0)
+        # A title with a length can be sought in (the media keys' own test: a
+        # film, an episode, a file, a recording - never a live channel).
+        out["seek"] = bool(out["duration"])
         item = last.get("item") or {}
         if kind == "live" and item.get("stream_id") is not None:
             out["channel"] = self._phone_channel(item, st.get("title") or "")
@@ -605,6 +624,29 @@ class _PhoneMixin(_PhoneBrowseMixin):
         if kind == "episode":
             out["episode"] = self._phone_episode(last)
         return out, None
+
+    def _phone_seek(self, params: dict) -> dict[str, Any]:
+        """A place in what plays, from the phone - ``to`` seconds from its
+        start (the bar let go), or ``by`` seconds from where it is (the skip
+        keys): through the media keys' own seek (``set_position``, the
+        player's _do_seek, as its seek bar does), clamped to the title's
+        length. Nothing for a stream that cannot seek: a live channel, a
+        stream with no length."""
+        given = "to" if params.get("to") is not None else "by"
+        try:
+            value = float(params.get(given))
+        except (TypeError, ValueError):
+            raise ValueError('give "to" (seconds from the start) or "by" (seconds, + or -)') from None
+        if not math.isfinite(value):
+            raise ValueError('give "to" (seconds from the start) or "by" (seconds, + or -)')
+        snap = self.mpris_snapshot()
+        length = float(snap.get("length") or 0)
+        if snap.get("status") == "Stopped" or not snap.get("can_seek") or length <= 0:
+            return {"ok": False}
+        target = value if given == "to" else float(snap.get("position") or 0) + value
+        target = max(0.0, min(length, target))
+        self._remote_media("set_position", target)
+        return {"ok": True, "position": round(target, 1)}
 
     def _phone_sections(self) -> list[str]:
         """The page's sections: Movies and Series only where the source has

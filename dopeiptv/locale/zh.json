@@ -2919,5 +2919,7 @@
   "cat_find_vod": "按名称或电影查找分类…",
   "cat_find_series": "按名称或剧集查找分类…",
   "sa_placeholder_all": "在所有来源中搜索一切（例如 Star Trek）",
-  "phone_page_ep_prev": "上一集"
+  "phone_page_ep_prev": "上一集",
+  "phone_page_seek": "播放位置",
+  "phone_tv_type": "输入以在电视上搜索"
 }

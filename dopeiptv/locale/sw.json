@@ -2919,5 +2919,7 @@
   "cat_find_vod": "Tafuta aina kwa jina au filamu…",
   "cat_find_series": "Tafuta aina kwa jina au msururu…",
   "sa_placeholder_all": "Tafuta kila kitu katika vyanzo vyako vyote (k.m. Star Trek)",
-  "phone_page_ep_prev": "Kipindi kilichotangulia"
+  "phone_page_ep_prev": "Kipindi kilichotangulia",
+  "phone_page_seek": "Mahali pa uchezaji",
+  "phone_tv_type": "Andika ili kutafuta kwenye TV"
 }

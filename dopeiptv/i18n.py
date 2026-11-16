@@ -3027,6 +3027,8 @@ _STRINGS: dict[str, dict[str, str]] = {
     "phone_page_locked": {"en": "Who's watching? Choose your profile in the app first."},
     "phone_page_show_in_list": {"en": "Show in list"},
     "phone_page_ep_prev": {"en": "Previous episode"},
+    "phone_page_seek": {"en": "Playback position"},
+    "phone_tv_type": {"en": "Type to search on the TV"},
     "backup_kind_profiles": {"en": "Profiles"},
     # -- a home network split in VLANs (core/home_net.py, providers/lan_scan.py,
     #    providers/cast_devices.py) --

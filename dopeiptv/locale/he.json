@@ -2919,5 +2919,7 @@
   "cat_find_vod": "מצא קטגוריות לפי שם או סרט…",
   "cat_find_series": "מצא קטגוריות לפי שם או סדרה…",
   "sa_placeholder_all": "חפש הכול בכל המקורות שלך (למשל Star Trek)",
-  "phone_page_ep_prev": "הפרק הקודם"
+  "phone_page_ep_prev": "הפרק הקודם",
+  "phone_page_seek": "מיקום ההפעלה",
+  "phone_tv_type": "הקלידו כדי לחפש בטלוויזיה"
 }

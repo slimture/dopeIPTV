@@ -2919,5 +2919,7 @@
   "cat_find_vod": "ابحث عن الفئات بالاسم أو الفيلم…",
   "cat_find_series": "ابحث عن الفئات بالاسم أو المسلسل…",
   "sa_placeholder_all": "ابحث في كل شيء في جميع مصادرك (مثلًا Star Trek)",
-  "phone_page_ep_prev": "الحلقة السابقة"
+  "phone_page_ep_prev": "الحلقة السابقة",
+  "phone_page_seek": "موضع التشغيل",
+  "phone_tv_type": "اكتب للبحث على التلفاز"
 }

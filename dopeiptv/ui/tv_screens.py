@@ -636,6 +636,14 @@ class SearchScreen(TvScreen):
         self.query = (self.query + text)[:60]
         self._changed()
 
+    def set_text(self, text: str) -> None:
+        """The whole query at once, typed elsewhere (the phone's own
+        keyboard): searched as typing here is, a moment after the last key."""
+        text = text[:60]
+        if text != self.query:
+            self.query = text
+            self._changed()
+
     def delete(self) -> bool:
         if not self.query:
             return False

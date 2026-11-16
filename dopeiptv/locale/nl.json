@@ -2919,5 +2919,7 @@
   "cat_find_vod": "Categorieën vinden op naam of film…",
   "cat_find_series": "Categorieën vinden op naam of serie…",
   "sa_placeholder_all": "Alles zoeken in al je bronnen (bijv. Star Trek)",
-  "phone_page_ep_prev": "Vorige aflevering"
+  "phone_page_ep_prev": "Vorige aflevering",
+  "phone_page_seek": "Afspeelpositie",
+  "phone_tv_type": "Typ om op de tv te zoeken"
 }

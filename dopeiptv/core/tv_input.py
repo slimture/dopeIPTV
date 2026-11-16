@@ -87,6 +87,37 @@ def remote_action(value: Any) -> str | None:
     return action if action in ALL else None
 
 
+#: What a text entry of TV mode's (its search) takes from elsewhere at most -
+#: the search's own cap.
+TEXT_MAX = 60
+#: Kept of the invisible characters: the joiners emoji are made of.
+_JOINERS = frozenset("‌‍")
+
+
+def entry_text(value: Any) -> str:
+    """Text typed elsewhere (the phone's own keyboard) for TV mode's text
+    entry: plain text - line breaks and tabs as spaces, control and other
+    invisible characters left out - at most TEXT_MAX characters. ValueError
+    for anything that is not text, or longer."""
+    import unicodedata
+    if not isinstance(value, str):
+        raise ValueError('"text" is the text to type')
+    if len(value) > TEXT_MAX * 4:
+        raise ValueError(f'"text" is at most {TEXT_MAX} characters')
+    out = []
+    for c in value:
+        if c in "\t\r\n":
+            out.append(" ")
+        elif unicodedata.category(c).startswith("C") and c not in _JOINERS:
+            continue
+        else:
+            out.append(c)
+    text = "".join(out)
+    if len(text) > TEXT_MAX:
+        raise ValueError(f'"text" is at most {TEXT_MAX} characters')
+    return text
+
+
 # -- LIRC ---------------------------------------------------------------------
 
 #: lircd's key names (the kernel's, as lircd.conf files use them).

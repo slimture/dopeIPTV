@@ -34,7 +34,13 @@ the phone's own gesture (the history's state) - goes up one place.
 
 While an episode plays, Now playing names its series with "S2 E5 · Title"
 under it and offers its Episodes view, and the dock's channel keys are the
-episode before and after it (api/previous, api/next).
+episode before and after it (api/previous, api/next). A title with a
+length - a film, an episode, a file, a recording - is sought there: the bar
+dragged (the time under the finger shown, one api/seek when it is let go)
+and the player's own skip steps, mirrored right to left. A tap on a search
+box focuses its field in the tap's own handler, so the phone's keyboard
+comes up at once; while TV mode shows its search, the remote has a field
+that types into it with the phone's own keyboard (api/tv_text).
 
 It fits a phone from 320 px wide up, upright or on its side: sizes are
 fluid (clamp, min, flex and grid that wrap - the bar's tabs and search, the
@@ -68,6 +74,7 @@ import re
 from typing import Any
 
 from .phone_remote import HOLD_MS, TAP_SLOP
+from .tv_input import TEXT_MAX
 
 #: The palette keys the page uses, as ui/theme.py names them.
 COLOURS = ("bg", "pane", "side", "hover", "sel", "input", "btn", "btn_hover", "border",
@@ -82,7 +89,7 @@ WORDS = ("channels", "favorites", "search", "nothing", "next", "paused", "offlin
          "profile", "profile_pin", "tv_picture", "tv_now_playing", "show_in_list",
          "ep_prev", "ep_next", "episodes", "movies", "series", "recent", "local", "radio",
          "recordings", "back_to", "min", "watched", "playing", "search_radio", "search_here",
-         "nothing_here", "find")
+         "nothing_here", "find", "skip_back", "skip_fwd", "seek", "tv_type")
 _HEX = re.compile(r"#[0-9A-Fa-f]{6}")
 
 
@@ -112,12 +119,16 @@ def _sha(text: str) -> str:
 
 
 def render(dark: dict[str, Any], light: dict[str, Any], words: dict[str, str],
-           lang: str = "en", rtl: bool = False) -> tuple[bytes, str]:
-    """The page as UTF-8 and its Content-Security-Policy."""
+           lang: str = "en", rtl: bool = False,
+           skips: tuple[int, int] = (10, 30)) -> tuple[bytes, str]:
+    """The page as UTF-8 and its Content-Security-Policy. *skips*: the
+    player's own skip back and forward, in seconds."""
     style = (_CSS.replace("@@DARK@@", css_vars(dark)).replace("@@LIGHT@@", css_vars(light)))
     texts = {k: str(words.get(k) or "") for k in WORDS}
     script = (_JS.replace("@@WORDS@@", _js_literal(texts))
-              .replace("@@TOUCH@@", _js_literal({"hold": HOLD_MS, "slop": TAP_SLOP})))
+              .replace("@@TOUCH@@", _js_literal({"hold": HOLD_MS, "slop": TAP_SLOP}))
+              .replace("@@SKIP@@", _js_literal({"back": abs(int(skips[0])), "fwd": abs(int(skips[1])),
+                                               "text_max": TEXT_MAX})))
     lang = lang if re.fullmatch(r"[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})?", lang or "") else "en"
     bg_dark = str(dark.get("bg") or "") if _HEX.fullmatch(str(dark.get("bg") or "")) else ""
     bg_light = str(light.get("bg") or "") if _HEX.fullmatch(str(light.get("bg") or "")) else ""
@@ -198,8 +209,8 @@ _HTML = """<!doctype html>
       <div class="nowLabel" id="nowLabel" hidden></div>
       <div class="nowTitle" id="nowTitle"></div>
       <div class="nowProg"><span class="chip" id="nowPaused" hidden></span><span id="nowProg"></span></div>
-      <div class="bar" id="nowBarWrap" hidden><i id="nowBar"></i></div>
-      <div class="nowTimes" id="nowTimes"><span id="nowStart"></span><span id="nowEnd"></span></div>
+      <div class="seekbar" id="nowBarWrap" hidden><div class="bar"><i id="nowBar"></i></div><span class="knob" id="nowKnob"></span><span class="seekTip" id="seekTip" hidden></span></div>
+      <div class="nowTimes" id="nowTimes"><span id="nowStart"></span><span class="skips" id="skips" hidden><button class="skip" id="skipBack"><svg class="flip" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.6 8.6A7.6 7.6 0 1 1 4.4 12.5"/><path d="M5.3 3.9v4.9h4.9"/></svg><b></b></button><button class="skip" id="skipFwd"><svg class="flip" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.4 8.6A7.6 7.6 0 1 0 19.6 12.5"/><path d="M18.7 3.9v4.9h-4.9"/></svg><b></b></button></span><span id="nowEnd"></span></div>
       <div class="next" id="nowNext"></div>
       <button class="showIn" id="showIn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M4 12h7M4 18h10"/><circle cx="17.5" cy="12" r="3"/></svg><span id="showInText"></span></button>
       <button class="showIn" id="epsBtn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M7.5 9h9M7.5 12.5h9M7.5 16h5"/></svg><span id="epsBtnText"></span></button>
@@ -224,7 +235,7 @@ _HTML = """<!doctype html>
     </div>
     <label class="search" id="searchBox">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
-      <input id="q" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+      <input id="q" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
     </label>
   </div>
   <ul class="list" id="list"></ul>
@@ -245,6 +256,10 @@ _HTML = """<!doctype html>
     <div class="empty" id="epsEmpty" hidden></div>
   </section>
   <section class="tvr" id="tvr" hidden>
+    <label class="search tvText" id="tvTextBox" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01M8 14h8"/></svg>
+      <input id="tvText" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+    </label>
     <div class="pad" id="pad">
       <button class="arr up" id="kUp" data-a="up"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
       <button class="arr left" id="kLeft" data-a="left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
@@ -374,10 +389,30 @@ svg .fill{fill:currentColor;stroke:none}
   -webkit-line-clamp:2;overflow-wrap:anywhere}
 .chip{flex:none;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:2px 7px;
   border-radius:999px;background:var(--sel);color:var(--text2)}
-.bar{height:4px;border-radius:2px;background:var(--btn);margin-top:10px;overflow:hidden}
+.seekbar{position:relative;margin-top:10px}
+.bar{height:4px;border-radius:2px;background:var(--btn);overflow:hidden}
 .bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:2px}
-.nowTimes{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-top:4px;
-  font-variant-numeric:tabular-nums}
+.seekbar.can{margin-top:0;height:44px;display:flex;align-items:center;cursor:pointer;touch-action:none;
+  user-select:none;-webkit-user-select:none}
+.seekbar.can .bar{flex:1;height:6px;border-radius:3px}
+.knob{display:none;position:absolute;top:50%;inset-inline-start:0;width:18px;height:18px;margin-top:-9px;
+  margin-inline-start:-9px;border-radius:50%;background:var(--text);pointer-events:none}
+.seekbar.can .knob{display:block}
+.seekbar.drag .knob{width:24px;height:24px;margin-top:-12px;margin-inline-start:-12px}
+.seekbar:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.seekTip{position:absolute;bottom:calc(100% - 2px);inset-inline-start:0;transform:translateX(-50%);padding:4px 9px;
+  border-radius:8px;background:var(--accent);color:var(--on-accent);font-size:13px;font-weight:700;
+  font-variant-numeric:tabular-nums;white-space:nowrap;pointer-events:none;z-index:1}
+[dir=rtl] .seekTip{transform:translateX(50%)}
+.nowTimes{display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--muted);font-size:12px;
+  margin-top:4px;font-variant-numeric:tabular-nums}
+.skips{display:flex;gap:clamp(6px,2.5vw,12px)}
+.skip{position:relative;flex:none;width:44px;height:44px;border-radius:50%;background:var(--btn);color:var(--text);
+  display:flex;align-items:center;justify-content:center}
+.skip:active{background:var(--btn-hover)}
+.skip svg{width:30px;height:30px;stroke-width:1.8}
+.skip b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding-top:2px;
+  font-size:10px;font-weight:700;letter-spacing:-.2px}
 .next{color:var(--muted);font-size:13px;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .showIn{display:inline-flex;align-items:center;gap:7px;max-width:100%;min-height:44px;margin-top:10px;padding:0 14px 0 11px;
   border-radius:999px;background:var(--btn);color:var(--text);font-size:14px;font-weight:600}
@@ -495,6 +530,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;bac
 .key[disabled]{opacity:.45}
 body.tv{padding-bottom:0}
 body.tv .nowTimes,body.tv .next{display:none}
+.tvText{flex:1 1 100%}
 .tvr{--pad:clamp(150px,min(72vw,calc(var(--vh)*42)),272px);display:flex;flex-wrap:wrap;align-items:flex-start;
   justify-content:center;gap:clamp(10px,calc(var(--vh)*2.2),16px) 20px;
   padding:clamp(8px,calc(var(--vh)*2),14px) 0 calc(18px + var(--safe-b))}
@@ -552,6 +588,7 @@ _JS = r"""
 "use strict";
 const W = @@WORDS@@;
 const T = @@TOUCH@@;
+const SKIP = @@SKIP@@;
 const $ = (id) => document.getElementById(id);
 const LANG = document.documentElement.lang || "en";
 // The app's language, in the phone's own variant of it when it has one (en-GB: 24 hours).
@@ -631,7 +668,100 @@ function at(ts) { return clock.format(new Date(ts * 1000)); }
 
 function setBar(frac) {
   hide($("nowBarWrap"), frac === null);
-  if (frac !== null) $("nowBar").style.setProperty("width", (Math.max(0, Math.min(1, frac)) * 100).toFixed(1) + "%");
+  if (frac === null) return;
+  const pct = (Math.max(0, Math.min(1, frac)) * 100).toFixed(1) + "%";
+  $("nowBar").style.setProperty("width", pct);
+  $("nowKnob").style.setProperty("inset-inline-start", pct);
+}
+
+// -- Seeking in a film, an episode, a file or a recording -----------------------------
+// The bar dragged (the time under the finger shown, one seek sent when it is
+// let go) and the player's own skip steps; through the app's seek, which
+// clamps to the title's length. The bar stays where it was sent until the
+// app's position catches up.
+let drag = null, hold = null;
+
+function canSeek() { return !!st.seek && st.duration > 0 && st.state !== "stopped" && !tvOn; }
+
+function playPos() {
+  return (st.position || 0) + (st.state === "playing" ? (Date.now() - stAt) / 1000 : 0);
+}
+
+function seekable() {
+  const on = canSeek(), w = $("nowBarWrap");
+  w.classList.toggle("can", on);
+  hide($("skips"), !on);
+  if (on) {
+    w.setAttribute("role", "slider"); w.setAttribute("tabindex", "0");
+    w.setAttribute("aria-label", W.seek); w.setAttribute("aria-valuemin", "0");
+  } else {
+    for (const a of ["role", "tabindex", "aria-label", "aria-valuemin", "aria-valuemax", "aria-valuenow",
+                     "aria-valuetext"]) w.removeAttribute(a);
+    if (drag) seekEnd(null);
+  }
+}
+
+function barFrac(e) {
+  const r = $("nowBarWrap").getBoundingClientRect();
+  const x = document.documentElement.dir === "rtl" ? r.right - e.clientX : e.clientX - r.left;
+  return r.width > 0 ? Math.max(0, Math.min(1, x / r.width)) : 0;
+}
+
+function dragShow(frac) {
+  const t = frac * st.duration, tip = $("seekTip");
+  setBar(frac);
+  $("nowStart").textContent = hms(t);
+  tip.textContent = hms(t);
+  tip.style.setProperty("inset-inline-start", (frac * 100).toFixed(2) + "%");
+  hide(tip, false);
+}
+
+function seekEnd(frac) {
+  const d = drag;
+  drag = null;
+  $("nowBarWrap").classList.remove("drag");
+  hide($("seekTip"), true);
+  if (frac === null || !d || !canSeek()) { tick(); return; }
+  const t = frac * st.duration;
+  seekTo(t, {to: Math.round(t * 10) / 10});
+}
+
+function seekTo(t, body) {
+  t = Math.max(0, Math.min(st.duration, t));
+  hold = {to: t, at: Date.now(), until: Date.now() + 2500};
+  st.position = t; stAt = Date.now();
+  tick();
+  send("api/seek", body);
+}
+
+function skip(by) { if (canSeek()) seekTo(playPos() + by, {by}); }
+
+function seekBar() {
+  const w = $("nowBarWrap");
+  w.addEventListener("pointerdown", (e) => {
+    if (!canSeek() || (e.pointerType === "mouse" && e.button !== 0)) return;
+    e.preventDefault();
+    drag = {id: e.pointerId};
+    try { w.setPointerCapture(e.pointerId); } catch (x) { /* already up */ }
+    w.classList.add("drag");
+    dragShow(barFrac(e));
+  });
+  w.addEventListener("pointermove", (e) => { if (drag && e.pointerId === drag.id) dragShow(barFrac(e)); });
+  w.addEventListener("pointerup", (e) => { if (drag && e.pointerId === drag.id) seekEnd(barFrac(e)); });
+  w.addEventListener("pointercancel", () => { if (drag) seekEnd(null); });
+  w.addEventListener("click", (e) => { if (canSeek()) e.stopPropagation(); });
+  w.addEventListener("keydown", (e) => {
+    if (!canSeek()) return;
+    const rtl = document.documentElement.dir === "rtl";
+    const by = {ArrowLeft: rtl ? SKIP.fwd : -SKIP.back, ArrowRight: rtl ? -SKIP.back : SKIP.fwd,
+                ArrowDown: -SKIP.back, ArrowUp: SKIP.fwd}[e.key];
+    if (by) { e.preventDefault(); skip(by); }
+  });
+  for (const [id, by, w2] of [["skipBack", -SKIP.back, "skip_back"], ["skipFwd", SKIP.fwd, "skip_fwd"]]) {
+    $(id).lastElementChild.textContent = String(Math.abs(by));
+    label(id, W[w2]);
+    $(id).addEventListener("click", () => skip(by));
+  }
 }
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -676,9 +806,17 @@ function profileMenu() {
 }
 
 function show(s) {
+  if (hold) {
+    // Sent a moment ago: the bar stays where it was sent until the app is there too.
+    const want = hold.to + (s.state === "playing" ? (Date.now() - hold.at) / 1000 : 0);
+    if (Date.now() < hold.until && s.duration > 0 && Math.abs((s.position || 0) - want) > 2) s.position = want;
+    else hold = null;
+  }
   st = s; stAt = Date.now();
   setTv(s.tv_mode);
   sections(s.sections);
+  seekable();
+  tvEntry(s);
   $("source").textContent = s.source || "";
   showProfile(s);
   const playing = s.state === "playing", stopped = s.state === "stopped";
@@ -729,14 +867,21 @@ function show(s) {
 function tick() {
   const s = st;
   if (!s || s.state === "stopped") { setBar(null); $("nowStart").textContent = $("nowEnd").textContent = ""; return; }
+  if (drag) { epsTick(); return; }                  // the finger's place, not the clock's
   const now = (s.time || Date.now() / 1000) + (Date.now() - stAt) / 1000;
-  if (s.now && s.now.stop > s.now.start) {
+  if (s.now && s.now.stop > s.now.start && !(s.seek && s.duration > 0)) {
     setBar((now - s.now.start) / (s.now.stop - s.now.start));
     $("nowStart").textContent = at(s.now.start); $("nowEnd").textContent = at(s.now.stop);
   } else if (s.duration > 0) {
-    const pos = (s.position || 0) + (s.state === "playing" ? (Date.now() - stAt) / 1000 : 0);
+    const pos = Math.min(s.duration, playPos());
     setBar(pos / s.duration);
     $("nowStart").textContent = hms(pos); $("nowEnd").textContent = hms(s.duration);
+    if (canSeek()) {
+      const w = $("nowBarWrap");
+      w.setAttribute("aria-valuemax", String(Math.round(s.duration)));
+      w.setAttribute("aria-valuenow", String(Math.round(pos)));
+      w.setAttribute("aria-valuetext", hms(pos) + " / " + hms(s.duration));
+    }
   } else { setBar(null); $("nowStart").textContent = $("nowEnd").textContent = ""; }
   epsTick();
 }
@@ -1262,7 +1407,7 @@ function setTv(on) {
   hide($("browse"), on || eps.open); hide($("eps"), on || !eps.open); hide($("tvr"), !on); hide($("dock"), on);
   document.body.classList.toggle("tv", on);
   $("tvBtn").setAttribute("aria-pressed", String(on));
-  nowCard(); dockRoom(); offer(); epsOffer(st.state !== "stopped" && st.episode || null);
+  nowCard(); dockRoom(); offer(); epsOffer(st.state !== "stopped" && st.episode || null); seekable();
   if (on) window.scrollTo({top: 0});
   else if (follow) followSoon(0);
 }
@@ -1299,7 +1444,37 @@ function touchpad() {
   t.addEventListener("contextmenu", (e) => e.preventDefault());
 }
 
+// TV mode's search on the TV: typed on the phone's own keyboard instead of
+// walking the one on screen with the arrows. What is typed goes to the TV a
+// moment after the last key (api/tv_text); what the TV shows comes back with
+// the state, and never over what is being typed here.
+let tvTextTimer = 0, tvTextSent = null;
+
+function tvEntry(s) {
+  const box = $("tvTextBox"), input = $("tvText");
+  const on = !!s.tv_mode && typeof s.tv_entry === "string";
+  hide(box, !on);
+  if (!on) { tvTextSent = null; return; }
+  if (document.activeElement !== input && s.tv_entry !== input.value
+      && (tvTextSent === null || s.tv_entry === tvTextSent)) input.value = s.tv_entry;
+}
+
+function tvTextSend() {
+  clearTimeout(tvTextTimer);
+  const text = $("tvText").value.slice(0, SKIP.text_max);
+  if (text === tvTextSent) return;
+  tvTextSent = text;
+  send("api/tv_text", {text});
+}
+
 function initTv() {
+  const tvText = $("tvText");
+  tvText.maxLength = SKIP.text_max;
+  tvText.placeholder = W.tv_type; tvText.setAttribute("aria-label", W.tv_type);
+  tvText.addEventListener("input", () => { clearTimeout(tvTextTimer); tvTextTimer = setTimeout(tvTextSend, 250); });
+  tvText.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); tvTextSend(); tvText.blur(); } });
+  tvText.addEventListener("blur", tvTextSend);
+  focusOnTap($("tvTextBox"), tvText);
   $("tvBtnText").textContent = W.tv_mode; label("tvBtn", W.tv_switch);
   for (const [id, w] of [["kUp", "up"], ["kDown", "down"], ["kLeft", "left"], ["kRight", "right"],
                          ["kVolUp", "vol_up"], ["kVolDown", "vol_down"], ["kPlay", "play_pause"],
@@ -1329,11 +1504,25 @@ function initTv() {
   touchpad(); setTouch(touchOn); setTv(false);
 }
 
+// A tap anywhere on a search box focuses its field in the tap's own handler:
+// iOS opens the keyboard only for a focus made there, never after a wait.
+function focusOnTap(box, input) {
+  box.addEventListener("click", (e) => { if (e.target !== input) input.focus(); });
+}
+
 function init() {
   for (const [id, w] of [["tabAll", "channels"], ["tabFav", "favorites"], ["tabVod", "movies"],
                          ["tabSeries", "series"], ["tabRecent", "recent"], ["tabLocal", "local"],
                          ["tabRadio", "radio"], ["tabRec", "recordings"]]) $(id).textContent = W[w];
   $("q").placeholder = W.search; $("q").setAttribute("aria-label", W.search);
+  focusOnTap($("searchBox"), $("q"));
+  $("q").addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    if (isLib()) { clearTimeout(qTimer); libLoad(false); }
+    $("q").blur();                                    // the keyboard goes; the results stay
+  });
+  seekBar();
   label("crumbBack", W.back_to); label("epsBack", W.back_to);
   $("epsBtnText").textContent = W.episodes;
   label("toggle", W.play_pause); label("stop", W.stop); label("chUp", W.ch_up); label("chDown", W.ch_down);

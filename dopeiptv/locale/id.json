@@ -2919,5 +2919,7 @@
   "cat_find_vod": "Temukan kategori menurut nama atau film…",
   "cat_find_series": "Temukan kategori menurut nama atau serial…",
   "sa_placeholder_all": "Cari semuanya di semua sumber (mis. Star Trek)",
-  "phone_page_ep_prev": "Episode sebelumnya"
+  "phone_page_ep_prev": "Episode sebelumnya",
+  "phone_page_seek": "Posisi pemutaran",
+  "phone_tv_type": "Ketik untuk mencari di TV"
 }

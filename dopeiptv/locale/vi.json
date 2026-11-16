@@ -2919,5 +2919,7 @@
   "cat_find_vod": "Tìm danh mục theo tên hoặc phim…",
   "cat_find_series": "Tìm danh mục theo tên hoặc loạt phim…",
   "sa_placeholder_all": "Tìm mọi thứ trong tất cả các nguồn của bạn (vd. Star Trek)",
-  "phone_page_ep_prev": "Tập trước"
+  "phone_page_ep_prev": "Tập trước",
+  "phone_page_seek": "Vị trí phát",
+  "phone_tv_type": "Gõ để tìm trên TV"
 }

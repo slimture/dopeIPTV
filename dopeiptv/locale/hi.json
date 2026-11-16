@@ -2919,5 +2919,7 @@
   "cat_find_vod": "नाम या फ़िल्म से श्रेणियाँ ढूँढें…",
   "cat_find_series": "नाम या सीरीज़ से श्रेणियाँ ढूँढें…",
   "sa_placeholder_all": "अपने सभी स्रोतों में सब कुछ खोजें (जैसे Star Trek)",
-  "phone_page_ep_prev": "पिछला एपिसोड"
+  "phone_page_ep_prev": "पिछला एपिसोड",
+  "phone_page_seek": "प्लेबैक की स्थिति",
+  "phone_tv_type": "टीवी पर खोजने के लिए टाइप करें"
 }
