@@ -334,11 +334,16 @@ def pump(n=10):
 
 
 def settle(cond, secs=10):
+    # Still so once what is queued has run: the window's start reloads its
+    # list once more (a timer), and a list seen for a moment went empty.
     end = time.time() + secs
-    while not cond() and time.time() < end:
+    while time.time() < end:
+        if cond():
+            pump(2)
+            if cond():
+                return
         pump(2)
         time.sleep(0.01)
-    pump(2)
     assert cond(), "timed out"
 
 
