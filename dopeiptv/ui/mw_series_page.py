@@ -226,6 +226,19 @@ class _SeriesPageMixin:
             log.info("series page: not for this profile")
             self._leave_series_page()
             return
+        # Whatever the answer, the page never stays loading: an episode list
+        # it could not take ends in the page's error, with Retry.
+        try:
+            self._sp_take_info(client, info)
+        except Exception:
+            log.exception("series page: the episodes of %s were not shown",
+                          (self._sp_ctx or {}).get("series_id"))
+            if self._sp_cache:
+                self._sp_cache.pop((id(client), str((self._sp_ctx or {}).get("series_id"))), None)
+            page.set_failed(tr("err_series_open"))
+
+    def _sp_take_info(self, client, info) -> None:
+        """A series_info answer on the page (kept a few minutes)."""
         info = info if isinstance(info, dict) else {}
         series = self._sp_ctx or {}
         sid = series.get("series_id")

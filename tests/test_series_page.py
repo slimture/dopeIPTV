@@ -847,6 +847,32 @@ assert w._ep_queue_override is None, "watch together left its queue"
 w._together_room = None
 w._guard_stream_switch = guard
 
+# -- episodes as a list of lists (PHP: seasons 0..n) and a flat list -----------------
+w._leave_series_page()
+w.client.series_info = lambda sid: {"episodes": [season(0, 1), season(1, 2)]}
+w._open_series_page({"series_id": 140, "name": "Show 40"})
+settle(lambda: bool(w._sp_seasons))
+assert [s.number for s in w._sp_seasons] == [1, 0], [s.number for s in w._sp_seasons]
+w._leave_series_page()
+flat = season(1, 2) + season(2, 1)
+for e in flat:
+    e["season"] = int(e["id"]) // 1000
+w.client.series_info = lambda sid: {"episodes": flat}
+w._open_series_page({"series_id": 141, "name": "Show 41"})
+settle(lambda: bool(w._sp_seasons))
+assert [s.number for s in w._sp_seasons] == [1, 2]
+assert [len(s.episodes) for s in w._sp_seasons] == [2, 1]
+w._leave_series_page()
+
+# -- whatever the answer: the page never stays loading ------------------------------
+rows = w._episode_rows
+w._episode_rows = lambda info, series: 1 / 0
+w._open_series_page({"series_id": 150, "name": "Show 50"})
+settle(lambda: not w._series_page.loading.isVisibleTo(w._series_page))
+assert w._series_page.retry.isVisibleTo(w._series_page), "no way to try again"
+w._episode_rows = rows
+w._leave_series_page()
+
 print("SERIES_REVIEW2_OK", flush=True)
 os._exit(0)
 """
@@ -859,4 +885,48 @@ def test_series_page_review_regressions_more(tmp_path):
                           text=True, env=env, cwd=_REPO_ROOT, timeout=240)
     assert "SERIES_REVIEW2_OK" in proc.stdout, (
         f"stdout={proc.stdout[-3000:]!r}\nstderr={proc.stderr[-4000:]!r}")
+
+
+def _old_episode_rows(info, series):
+    """MainWindow._episode_rows as it was (a dict of seasons only): the
+    dict form must come out exactly the same."""
+    from dopeiptv.i18n import tr
+    series_cover = (series.get("cover") or series.get("cover_big")
+                    or series.get("stream_icon") or "")
+    series_title = series.get("name") or series.get("title") or ""
+    episodes = []
+    for season, eps in ((info or {}).get("episodes") or {}).items():
+        for ep in eps:
+            ep["season"] = season
+            ep["name"] = (f"S{season} * E{ep.get('episode_num', '?')} - "
+                          f"{ep.get('title') or tr('misc_episode')}")
+            still = (ep.get("info") or {}).get("movie_image") or ""
+            ep["stream_icon"] = ep.get("stream_icon") or still or series_cover
+            ep["_series_title"] = series_title
+            episodes.append(ep)
+    return episodes
+
+
+def test_episode_rows_take_a_dict_a_flat_list_or_a_list_of_lists(app):
+    import copy
+    from dopeiptv.ui.main_window import MainWindow
+    series = {"name": "Show", "cover": "http://c/p.jpg"}
+    shaped = {"episodes": {"1": [_ep(11, 1, title="One", still="http://s/1.jpg"), _ep(12, 2)],
+                           "0": [_ep(1, 1, title="")]}}
+    old = _old_episode_rows(copy.deepcopy(shaped), series)
+    new = MainWindow._episode_rows(copy.deepcopy(shaped), series)
+    assert new == old
+    # PHP panels: seasons keyed 0..n come as a list of lists, the index the season.
+    rows = MainWindow._episode_rows({"episodes": [[_ep(1, 1)], [_ep(11, 1), _ep(12, 2)]]}, series)
+    assert [(r["id"], r["season"]) for r in rows] == [("1", "0"), ("11", "1"), ("12", "1")]
+    assert rows[1]["name"].startswith("S1 * E1") and rows[1]["_series_title"] == "Show"
+    # A flat list: each row says its season.
+    rows = MainWindow._episode_rows({"episodes": [_ep(21, 1, season=2), _ep(11, 1, season="1"),
+                                                  "junk", None]}, series)
+    assert [(r["id"], r["season"]) for r in rows] == [("21", 2), ("11", "1")]
+    assert rows[0]["name"].startswith("S2 * E1")
+    assert [s.number for s in sv.seasons(rows)] == [1, 2]
+    # Nothing usable: no rows, never an exception.
+    for info in ({}, {"episodes": None}, {"episodes": []}, {"episodes": {"1": None}}, None, []):
+        assert MainWindow._episode_rows(info, series) == []
 

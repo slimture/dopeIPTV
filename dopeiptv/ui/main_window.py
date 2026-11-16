@@ -3679,12 +3679,24 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         series_cover = (series.get("cover") or series.get("cover_big")
                         or series.get("stream_icon") or "")
         series_title = series.get("name") or series.get("title") or ""
+        raw = info.get("episodes") if isinstance(info, dict) else None
+        groups: list[tuple] = []
+        if isinstance(raw, dict):
+            groups = list(raw.items())
+        elif isinstance(raw, list):
+            # Seasons keyed 0..n come from a PHP panel as a list of lists
+            # (the index is the season); a flat list says it on each row.
+            groups = [(str(i), eps) if isinstance(eps, list) else (None, [eps])
+                      for i, eps in enumerate(raw)]
         episodes = []
-        for season, eps in ((info or {}).get("episodes") or {}).items():
-            for ep in eps:
+        for key, eps in groups:
+            for ep in eps or []:
+                if not isinstance(ep, dict):
+                    continue
+                season = key if key is not None else ep.get("season")
                 ep["season"] = season
                 ep["name"] = (
-                    f"S{season} * E{ep.get('episode_num', '?')} - "
+                    f"S{'?' if season is None else season} * E{ep.get('episode_num', '?')} - "
                     f"{ep.get('title') or tr('misc_episode')}")
                 still = (ep.get("info") or {}).get("movie_image") or ""
                 ep["stream_icon"] = (ep.get("stream_icon") or still
