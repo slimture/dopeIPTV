@@ -100,3 +100,84 @@ def test_home_shows_no_stray_windows():
     assert "NO_STRAY_OK" in proc.stdout, (
         f"a widget was shown as a window of its own\n"
         f"stdout={proc.stdout!r}\nstderr={proc.stderr[-2000:]!r}")
+
+
+_MARKS = r"""
+import os, tempfile
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from PyQt6.QtCore import QEvent, QObject, QSettings, Qt
+from PyQt6.QtWidgets import QApplication, QHBoxLayout, QWidget
+
+from dopeiptv.core.stores import PlaylistStore
+from dopeiptv.ui.source_page import Origin, SourcePage
+
+app = QApplication.instance() or QApplication([])
+stray = []
+mine = []
+
+
+class Watch(QObject):
+    def eventFilter(self, obj, ev):
+        if (ev.type() == QEvent.Type.Show and isinstance(obj, QWidget) and obj.isWindow()
+                and obj not in mine and obj.windowType() not in (Qt.WindowType.Popup, Qt.WindowType.ToolTip,
+                                             Qt.WindowType.Dialog)):
+            stray.append(type(obj).__name__)
+        return False
+
+
+watch = Watch()
+app.installEventFilter(watch)
+host = QWidget()
+mine.append(host)
+row = QHBoxLayout(host)
+host.show()
+app.processEvents()
+# A mark given its text before its row ("This profile's", "In use"): shown
+# with the row, never on its own; an empty one stays hidden in it.
+own, empty = Origin(), Origin()
+own.set("This profile's", True)
+empty.set("", False)
+row.addWidget(own)
+row.addWidget(empty)
+for _ in range(5):
+    app.processEvents()
+assert own.isVisible() and not empty.isVisible(), (own.isVisible(), empty.isVisible())
+own.set("", True)
+assert not own.isVisible()
+own.set("Shared", False)
+assert own.isVisible()
+# A source's own page: its tabs and marks, Nerd on and off.
+s = QSettings(os.path.join(tempfile.mkdtemp(), "s.ini"), QSettings.Format.IniFormat)
+store = PlaylistStore(s)
+pl = store.add({"name": "Box", "kind": "enigma2", "server": "http://192.0.2.10"})
+for nerd_on in (True, False):
+    page = SourcePage(pl, store=store, nerd_on=nerd_on, settings=s)
+    mine.append(page)
+    page.resize(800, 600)
+    page.show()
+    for _ in range(5):
+        app.processEvents()
+    assert page.tabs["net"].isVisible() == nerd_on
+    assert page.tabs["conn"].isVisible()
+    page.close()
+assert not stray, stray
+print("MARKS_OK", flush=True)
+os._exit(0)
+"""
+
+
+def test_marks_and_a_source_pages_tabs_never_show_on_their_own():
+    """On GNOME (Wayland) a widget shown as a window of its own for a moment
+    asks for an activation token it never uses, and the pointer spins until
+    it times out: Settings' "This profile's" and "In use" marks did, and a
+    source's page's tabs - some 25 s after Settings opened."""
+    try:
+        import PyQt6  # noqa: F401
+    except Exception:
+        pytest.skip("PyQt6 not available")
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+    proc = subprocess.run(
+        [sys.executable, "-c", _MARKS], capture_output=True, text=True,
+        env=env, cwd=_REPO_ROOT, timeout=120)
+    assert "MARKS_OK" in proc.stdout, (
+        f"stdout={proc.stdout!r}\nstderr={proc.stderr[-2000:]!r}")

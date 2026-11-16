@@ -223,6 +223,11 @@ how connections to the account are counted.
 - On a series' page, the poster under the video read "play" while one of
   its episodes played, and a click on it started the episode over
   instead of pausing it. It now pauses and resumes it, as for a channel.
+- GNOME (Wayland): the pointer no longer spins for some 25 seconds after
+  Settings opens. Each "This profile's" mark, Profiles' "In use" and a
+  source's page's tabs were shown for a moment as windows of their own,
+  each asking GNOME for an activation token it never used, and GNOME waited
+  for them to time out.
 
 ## [1.6.0]
 

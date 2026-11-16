@@ -171,8 +171,17 @@ class Origin(QLabel):
         self.setObjectName("SourceOrigin")
 
     def set(self, text: str, own: bool) -> None:
+        """Its text and colour. Before it is in its row an empty text hides
+        it and a text leaves it to show with the row: shown with no parent
+        it was a window of its own for a moment - on GNOME (Wayland) one
+        asking for an activation token it never used, and the pointer spun
+        for seconds after Settings opened, once for every "This profile's"
+        mark."""
         self.setText(text)
-        self.setVisible(bool(text))
+        if self.parentWidget() is not None:
+            self.setVisible(bool(text))
+        elif not text:
+            self.hide()
         ink = P.get("nerd", P["accent"]) if own else P["text2"]
         fill = _mix(ink, P["bg"], 0.16) if own else P.get("btn", P["bg"])
         self.setStyleSheet(f"QLabel#SourceOrigin {{ color:{ink}; background:{fill}; border-radius:9px;"
@@ -344,9 +353,11 @@ class SourcePage(SourceFields, QScrollArea):
             group.addButton(tab)
             bar.addWidget(tab)
             self.tabs[key] = tab
-            tab.setVisible(key != "net" or self._nerd_on)
         bar.addStretch(1)
         self._col.addLayout(bar)
+        # In the page first: shown in a bar on no widget yet, a tab was a
+        # window of its own for a moment (on GNOME the pointer spun).
+        self.tabs["net"].setVisible(self._nerd_on)
         line = QFrame()
         line.setObjectName("SettingsDivider")
         line.setFixedHeight(1)
