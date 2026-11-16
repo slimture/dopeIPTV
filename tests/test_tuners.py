@@ -385,6 +385,23 @@ def test_the_players_own_tuner_is_let_go_on_a_zap(no_async):
     assert tr("tuner_w_own", what=tr("conn_k_player")) in w.asked[-1][1]
 
 
+def test_the_box_is_still_asked_when_it_is_a_satip_source_too(no_async):
+    # The receiver also serves SAT>IP (minisatip) and is a source of that
+    # kind as well: its SAT>IP count has room, and the box's own check -
+    # its TV, its recordings - still asks.
+    w = window(BoxClient())
+    w._tuner_cache().put("box1", ONE_TUNER_TV)
+    w.playlist_store.playlists = lambda: [{"id": "sat9", "kind": "satip", "name": "Box SAT>IP",
+                                          "server": "http://box.example.com"}]
+    assert not w._guard_stream_switch(BOX + ref(0x802), "Eurosport")
+    assert tr("tuner_cuts", what=tr("tuner_w_tv", name="SVT1 HD")) in w.asked[-1][1]
+    # A SAT>IP stream from it names no transponder: nothing more asked.
+    w.asked.clear()
+    assert w._guard_stream_switch("rtsp://box.example.com:554/?src=1&freq=11494&pol=h"
+                                  "&msys=dvbs2&sr=22000&pids=0,5100", "Das Erste")
+    assert not w.asked
+
+
 def test_a_multiview_cell_and_a_recording_get_the_same_question(no_async):
     rec = Tune("recording", "Rapport", "3FB:1:C00000")
     w = window(BoxClient())

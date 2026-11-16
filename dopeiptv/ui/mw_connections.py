@@ -520,8 +520,12 @@ class _ConnectionsMixin:
         on its TV, next to *uses* (the app's own as they will be)? The
         Verdict when it would; None when not, or when it cannot be told. A
         SAT>IP server's: when its tuners would run out (``counted``)."""
-        mine, sat = self._satip_verdict(url, uses)
-        if mine:
+        # A SAT>IP server's count first; with room there, an Enigma2 box on
+        # the same address (minisatip on the receiver) is still asked - its
+        # recordings and its TV are what this check is for. A SAT>IP
+        # stream itself names no transponder, so nothing more is asked.
+        _mine, sat = self._satip_verdict(url, uses)
+        if sat is not None:
             return sat
         try:
             key = tuners.stream_key(url)
