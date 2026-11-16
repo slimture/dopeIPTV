@@ -533,3 +533,12 @@ def test_a_refused_report_is_not_called_sent():
         assert report.fetch_replies(["x"]) is None
     finally:
         report._post = real
+
+
+def test_a_test_build_s_version_is_no_address():
+    from dopeiptv import __version__
+    base = ".".join(__version__.split(".")[:3])
+    out = report.scrub(f"dopeIPTV {base}.123\n09:10:58 INFO {base}.123 starting\n"
+                       "connected to 10.0.0.12 and 127.0.0.1")
+    assert f"dopeIPTV {base}.123" in out and f"INFO {base}.123 starting" in out
+    assert "10.0.0.12" not in out and "<ip>" in out and "127.0.0.1" in out

@@ -48,6 +48,14 @@ _KEYVAL = re.compile(r"(?i)\b(user(?:name)?|pass(?:word)?|pwd|token|key|api_key|
                      r"auth|sid|session|mac|play_token|login)(\s*[=:]\s*)([^\s&'\",;]+)")
 
 
+def _not_an_address(text: str) -> bool:
+    """Loopback - or the app's own test build's version, which has four
+    numbers too ("1.6.0.123": the version and the build's run)."""
+    from .. import __version__
+    base = ".".join(__version__.split(".")[:3])
+    return text.startswith("127.") or text.startswith(base + ".")
+
+
 def scrub(text: str, personal: Iterable[str] = ()) -> str:
     """*text* without anything that identifies a stream or a person."""
     # Whole addresses first (a login or a name inside one goes with it),
@@ -59,7 +67,7 @@ def scrub(text: str, personal: Iterable[str] = ()) -> str:
     out = _EMAIL.sub("<email>", out)
     out = _MAC.sub("<mac>", out)
     out = _IPV6.sub("<ip>", out)
-    out = _IPV4.sub(lambda m: m.group(0) if m.group(0).startswith("127.") else "<ip>", out)
+    out = _IPV4.sub(lambda m: m.group(0) if _not_an_address(m.group(0)) else "<ip>", out)
     out = _KEYVAL.sub(lambda m: f"{m.group(1)}{m.group(2)}<hidden>", out)
     home = os.path.expanduser("~")
     if len(home) > 1:
