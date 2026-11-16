@@ -12,7 +12,9 @@ the accent as the focus ring.
 
 Everything is reached with the arrows (core/tv_nav.py: a list moves its
 own rows, else the nearest element that way; up from a screen's top is
-its tab), OK plays or opens, Back goes back a step and then to Home. The
+its tab), OK plays or opens, Back goes back a step and then to Home, and
+on Home asks to leave TV mode (pressed again, it leaves). The page is laid
+out for the full screen before it is first drawn (``prepare``). The
 data is the window's (its stores, its client, its guide) and playing goes
 through the window's own path (ui/mw_tv.py); nothing here plays itself.
 Here: the page, the screens' base, Home, Channels and Options; the guide,
@@ -24,7 +26,7 @@ from __future__ import annotations
 import time
 
 from PyQt6 import sip
-from PyQt6.QtCore import QPoint, QRect, Qt, QTimer
+from PyQt6.QtCore import QEvent, QMargins, QPoint, QRect, QSize, Qt, QTimer
 from PyQt6.QtGui import QFontMetrics
 from PyQt6.QtWidgets import (
     QApplication, QFrame, QHBoxLayout, QLabel, QScrollArea, QStackedWidget,
@@ -546,6 +548,9 @@ class OptionsScreen(TvScreen):
         self.tiles["profile"].setVisible(prof is not None)
         if prof is not None:
             self.tiles["profile"].set_text(self.tiles["profile"].title, prof.name)
+        # Leaving: its key on a keyboard beside it (Ctrl+Shift+T).
+        key = getattr(w, "_tv_leave_key_text", lambda: "")()
+        self.tiles["exit"].set_text(self.tiles["exit"].title, key)
 
     def _clicked(self) -> None:
         tile = self.sender()
@@ -676,6 +681,9 @@ class TvPage(QWidget):
         self.current = ""
         self._focus: QWidget | None = None
         self._last: dict[str, QWidget] = {}
+        # Shown from the picture for a look (the guide's key over it): Back
+        # returns to the picture (ui/mw_tv.py _tv_browse).
+        self.picture_back = False
         self._tick()
         self.refresh_source()
         self._place_margins()
@@ -688,10 +696,26 @@ class TvPage(QWidget):
         return {"red": tr("tv_key_fav"), "green": tr("nav_guide"),
                 "yellow": tr("tv_search"), "blue": tr("tv_options")}
 
-    def _place_margins(self) -> None:
-        w, h = max(1, self.width()), max(1, self.height())
+    def _place_margins(self, size: QSize | None = None) -> None:
+        w = max(1, size.width() if size is not None else self.width())
+        h = max(1, size.height() if size is not None else self.height())
         mx, my = int(w * self.SAFE), int(h * self.SAFE)
-        self._outer.setContentsMargins(mx, my, mx, my)
+        if self._outer.contentsMargins() != QMargins(mx, my, mx, my):
+            self._outer.setContentsMargins(mx, my, mx, my)
+
+    def prepare(self, size: QSize) -> None:
+        """Laid out for *size* now - its safe margins and every layout in it
+        - so that the page is drawn complete the first time it is drawn."""
+        if size.isEmpty():
+            return
+        self._place_margins(size)
+        if self.size() != size:
+            self.resize(size)
+        QApplication.sendPostedEvents(None, QEvent.Type.LayoutRequest)
+        lay = self.layout()
+        if lay is not None:
+            lay.activate()
+        self._place_flash()
 
     def resizeEvent(self, e) -> None:
         super().resizeEvent(e)
@@ -718,8 +742,15 @@ class TvPage(QWidget):
         elif self.focus_widget() is self.now:
             self._to_current_tab()
         self.now.setVisible(playing)
-        self.hint.setText(tr("tv_hint_playing") if playing else tr("tv_hint"))
+        self.hint.setText(self.hint_text(playing))
         self._place_flash()
+
+    def hint_text(self, playing: bool) -> str:
+        """The foot's hint: what OK and Back do here - and, but for a look
+        from the picture (Back returns to it), how TV mode is left."""
+        if playing and self.picture_back:
+            return tr("tv_hint_playing")
+        return f"{tr('tv_hint_now') if playing else tr('tv_hint')} · {tr('tv_hint_leave')}"
 
     def now_shown(self) -> bool:
         return not self.now.isHidden()
@@ -957,19 +988,25 @@ class TvPage(QWidget):
 
     def back(self) -> None:
         """A step back inside the screen, else out of it: to the picture
-        when one plays behind, else Home, and on Home to its tab."""
+        after a look from it (or from Now playing), else to Home - and on
+        Home, Back asks to leave TV mode, and leaves it when pressed again.
+        Back always leads out: never round between the page and the picture."""
         cur = self.focus_widget()
         scr = self.screens.get(self.current)
         if scr is not None and cur is not None and cur not in self.tabs \
                 and cur is not self.now and scr.back(cur):
             return
-        if self.window._tv_has_picture():
-            self.window._tv_picture()
+        w = self.window
+        if w._tv_has_picture() and (self.picture_back or cur is self.now):
+            w._tv_picture()
             return
         if self.current != "home":
             self.show_screen("home")
             return
         self.set_focus(self.tab("home"))
+        leave = getattr(w, "_tv_back_at_home", None)
+        if callable(leave):
+            leave()
 
     def run(self, payload: tuple) -> None:
         """What a tile stands for, done: play, open a series, a screen."""

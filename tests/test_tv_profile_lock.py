@@ -8,7 +8,7 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from dopeiptv.ui.mw_tv import _TvMixin  # noqa: E402
+from dopeiptv.ui.mw_tv import _Before, _TvMixin  # noqa: E402
 
 _APP = None
 
@@ -60,6 +60,9 @@ class _Stack:
     def setCurrentIndex(self, i):  # noqa: N802 - Qt's name
         self.index = i
 
+    def updatesEnabled(self):  # noqa: N802 - Qt's name
+        return True
+
 
 class _Locked(_TvMixin):
     def __init__(self):
@@ -69,7 +72,7 @@ class _Locked(_TvMixin):
         self._tv_page = _Page()
         self.player = _Player()
         self._player_fs = False
-        self._tv_saved = (True, False, None, None)
+        self._tv_saved = _Before(True, False, None, None, None, False, False, None, False)
         self._center_stack = _Stack()
         self.done = []
 
@@ -97,6 +100,9 @@ class _Locked(_TvMixin):
 
     def menuBar(self):  # noqa: N802 - Qt's name
         return _Bar()
+
+    def isFullScreen(self):  # noqa: N802 - Qt's name
+        return True
 
     def _update_mid_compact(self):
         pass

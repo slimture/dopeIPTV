@@ -10,9 +10,11 @@ whatever starts a stream meanwhile - a screen here, the phone remote, a
 command - brings the picture up full screen (the docked player's
 fullscreen), with a big info bar on any key and channel up/down zapping.
 Back over the picture goes back to the screen it came from (a number being
-typed and the info bar go first), and so do the guide, search and options
-keys to theirs: the stream goes on behind the page, Now playing above its
-tabs, and Back, Play or OK on Now playing return to it. Stop stops it.
+typed and the info bar go first), the stream going on behind the page with
+Now playing above its tabs; Play, or OK on Now playing, returns to it. The
+guide, search and options keys over the picture are a look at theirs: Back
+there returns to the picture. Back goes on towards Home, and on Home asks
+to leave TV mode - pressed again, it leaves. Stop stops the stream.
 
 Keys come to one event filter while TV mode is on: every key without
 Ctrl, Alt or Meta is TV mode's (a remote that acts as a keyboard, a CEC
@@ -24,16 +26,32 @@ a pad or LIRC become keys for it.
 The phone remote, the remote API and Home Assistant turn it on and off and
 press its keys through one method, tv_command - the pad's way in; while TV
 mode is off only the player's own controls among those keys do anything.
+
+TV mode is on exactly while ``_tv_on`` is: enter_tv_mode sets it, and
+exit_tv_mode - the one way out - clears it and puts the window back as it
+was (_Before: full screen or maximized, its geometry, the central page, the
+panes' widths, the sidebar, the docked player's height, a pop-out). Every
+way out goes there: Back on Home (asked once, then again), Options' Leave
+TV mode, its key, the View menu, tv_command, the picture's own way out of
+full screen (its button, a double click: TV mode is that full screen), and
+the window manager taking full screen away. While it is on it holds the
+central stack: what moves the window's own pages meanwhile (switch_mode,
+Home) only changes where leaving lands (_tv_land_on).
+
+Its page is drawn complete or not at all: from the moment TV mode is asked
+until the window manager has made the window full screen, a plain curtain
+in the theme's background stands in its place, and the page comes in laid
+out at that size (_tv_hold_paint).
 """
 
 from __future__ import annotations
 
 import time
-from typing import Any
+from typing import Any, NamedTuple
 
 from PyQt6 import sip
-from PyQt6.QtCore import QEvent, QObject, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QKeyEvent, QWindow
+from PyQt6.QtCore import QEvent, QObject, QRect, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QKeyEvent, QKeySequence, QWindow
 from PyQt6.QtWidgets import QApplication, QWidget
 
 from ..core import tv_input
@@ -93,6 +111,31 @@ DIGITS_MS = 1500
 #: The info bar's time on screen.
 INFO_MS = 6000
 _SLEEP_STEPS = (0, 15, 30, 45, 60, 90, 120)
+#: How long a second Back on Home leaves TV mode after the first asked.
+LEAVE_MS = 4000
+#: The longest the page waits for the window to be full screen before it
+#: is drawn anyway (a window manager that does not make it so).
+REVEAL_MS = 900
+
+
+def _sizes(sizes) -> list | None:
+    """The panes' widths worth putting back: none from a splitter that was
+    never laid out."""
+    out = [int(x) for x in (sizes or [])]
+    return out if sum(out) > 0 else None
+
+
+class _Before(NamedTuple):
+    """The window as it was before TV mode: what leaving it puts back."""
+    fullscreen: bool
+    maximized: bool
+    geometry: QRect | None
+    page: QWidget | None
+    sizes: list | None          # the panes' widths (the splitter)
+    collapsed: bool             # the sidebar as a rail
+    auto_collapsed: bool
+    player_height: int | None   # the docked player's height (its handle's)
+    popped_out: bool            # the player in a window of its own
 
 
 def key_action(key, modifiers) -> str | None:
@@ -123,6 +166,15 @@ class _TvKeys(QObject):
 
     def eventFilter(self, obj, event) -> bool:  # noqa: N802 - Qt's name
         t = event.type()
+        if t in (QEvent.Type.WindowStateChange, QEvent.Type.Resize):
+            w = self._w
+            if obj is w and not sip.isdeleted(w) and w._tv_on:
+                if t == QEvent.Type.Resize:
+                    if w._tv_curtain_up():
+                        QTimer.singleShot(0, w._tv_reveal_tick)   # full screen: the page now
+                else:
+                    w._tv_state_changed()
+            return False
         if t not in (QEvent.Type.KeyPress, QEvent.Type.ShortcutOverride):
             return False
         w = self._w
@@ -141,12 +193,18 @@ class _TvMixin:
     _tv_filter: _TvKeys | None = None
     _tv_hub = None
     _tv_bridge: _TvBridge | None = None
-    _tv_saved: tuple | None = None
+    _tv_saved: _Before | None = None
     _tv_lineup: list | None = None
     _tv_gen = 0
     _tv_finished_gen = -1
     _tv_digits = ""
     _tv_wired = False
+    _tv_leave_until = 0.0
+    _tv_reveal_timer: QTimer | None = None
+    _tv_reveal_by = 0.0
+    _tv_shown = False               # its page drawn at least once since it was asked
+    _tv_restoring: _Before | None = None    # left, the window still on its way back
+    _tv_sizes_later: list | None = None
 
     # -- on and off --------------------------------------------------------------------
 
@@ -165,23 +223,44 @@ class _TvMixin:
             return
         self.enter_tv_mode()
 
+    def _tv_before(self) -> _Before:
+        """The window now, as leaving TV mode is to put it back."""
+        pending = self._tv_restoring
+        if pending is not None:
+            # Left a moment ago, the window not back yet: as it was then.
+            return pending
+        handle = getattr(self, "_player_resize", None)
+        height = getattr(handle, "_preferred", None) if handle is not None else None
+        popped = (getattr(self, "_popout_win", None) is not None
+                  and not getattr(self, "_fs_via_popout", False))
+        collapsed = bool(getattr(self, "_sidebar_collapsed", False))
+        auto = bool(getattr(self, "_auto_collapsed", False))
+        if self._player_fs:
+            # Watching full screen already: the window as it was before that,
+            # its lists and the docked player beside them.
+            return _Before(bool(getattr(self, "_was_fullscreen", False)),
+                           bool(getattr(self, "_was_maximized", False)),
+                           getattr(self, "_pre_fs_geo", None) or self.normalGeometry(),
+                           None, _sizes(getattr(self, "_fs_splitter_sizes", None)),
+                           collapsed, auto, height, popped)
+        geo = self.normalGeometry() if (self.isMaximized() or self.isFullScreen()) \
+            else self.geometry()
+        return _Before(self.isFullScreen(), self.isMaximized(), QRect(geo),
+                       self._center_stack.currentWidget(), _sizes(self._root.sizes()),
+                       collapsed, auto, height, popped)
+
     def enter_tv_mode(self) -> None:
         if self._tv_on:
             return
         from .tv_mode import TvPage
         log.info("tv mode: on")
+        before = self._tv_before()
+        self._tv_restoring = None
+        self._settle_cancel()
         self._exit_popout_if_active()
+        self._tv_saved = before
         if self._player_fs:
-            # Watching full screen already: what the window was before that.
-            self._tv_saved = (getattr(self, "_was_fullscreen", False),
-                              getattr(self, "_was_maximized", False),
-                              getattr(self, "_pre_fs_geo", None) or self.geometry(),
-                              None)
             self._was_fullscreen = True
-        else:
-            self._tv_saved = (self.isFullScreen(), self.isMaximized(),
-                              self.normalGeometry() if self.isMaximized() else self.geometry(),
-                              self._center_stack.currentWidget())
         self._tv_wire()
         page = self._tv_page
         if page is None or sip.isdeleted(page):
@@ -189,10 +268,21 @@ class _TvMixin:
             self._center_stack.addWidget(page)
         self._tv_on = True
         self._tv_watching = False
+        self._tv_leave_until = 0.0
+        self._tv_sync_action()
         if hasattr(self, "_donate_show"):
             self._donate_show()          # no asking in TV mode (mw_donate)
-        self.menuBar().hide()
         self._hide_busy()
+        picture = self._tv_has_picture()
+        self._tv_shown = picture
+        page.picture_back = False
+        page.prepare(self._tv_screen_rect().size())
+        if picture:
+            self._center_stack.setCurrentWidget(page)
+        else:
+            # Its page is drawn once, complete, at the size of the screen.
+            self._tv_hold_paint()
+        self.menuBar().hide()
         if not self.isFullScreen():
             self.showFullScreen()
         app = QApplication.instance()
@@ -200,10 +290,10 @@ class _TvMixin:
             self._tv_filter = _TvKeys(self)
         app.installEventFilter(self._tv_filter)
         self._tv_inputs_start()
-        self._center_stack.setCurrentWidget(page)
         page.show_screen("home")
-        if self._tv_has_picture():
+        if picture:
             self._tv_picture()
+        self._tv_reveal_tick()
         self._events_tv_mode()
         if getattr(self, "_profile_picker", None) is not None \
                 or getattr(self, "_profile_must_pick", False):
@@ -212,35 +302,44 @@ class _TvMixin:
             page.show_screen("profiles")
 
     def exit_tv_mode(self) -> None:
+        """The one way out of TV mode: the window as it was before it."""
         if not self._tv_on:
             return
         log.info("tv mode: off")
         self._tv_on = False
+        self._tv_release_paint()
         app = QApplication.instance()
         if self._tv_filter is not None:
             app.removeEventFilter(self._tv_filter)
         self._tv_inputs_stop()
         self._tv_hide_info()
+        if getattr(self, "_tv_digit_timer", None) is not None:
+            self._tv_digit_timer.stop()
+        self._tv_digits = ""
+        self._tv_leave_until = 0.0
         self._tv_watching = False
+        flash = getattr(self._tv_page, "flash_lbl", None)
+        if isinstance(flash, QWidget) and not sip.isdeleted(flash):
+            flash.hide()                # "Press Back again…" not there the next time
+        before = self._tv_saved or _Before(False, False, None, None, None, False, False,
+                                           None, False)
+        self._tv_saved = None
+        # The panes and the sidebar are put back once the window is: until
+        # then its resizes are none of theirs.
+        self._tv_restoring = before
         if self._player_fs:
             # The window's state is put back below, as it was before.
             self._was_fullscreen = True
+            if before.sizes:
+                self._fs_splitter_sizes = list(before.sizes)
             self._exit_player_fullscreen()
-        fs, maximized, geo, page = self._tv_saved or (False, False, None, None)
-        idx = self._center_stack.indexOf(page) if page is not None else -1
-        if idx >= 0 and page is not self._tv_page:
-            self._center_stack.setCurrentIndex(idx)
-        else:
-            self._center_stack.setCurrentIndex(0)
+        page = before.page
+        idx = self._center_stack.indexOf(page) if page is not None and not sip.isdeleted(page) \
+            else -1
+        self._center_stack.setCurrentIndex(idx if idx >= 0 and page is not self._tv_page else 0)
         self.menuBar().show()
-        if not fs:
-            if maximized:
-                self.showMaximized()
-            else:
-                self.showNormal()
-                if geo is not None:
-                    self.setGeometry(geo)
-        QTimer.singleShot(0, self._update_mid_compact)
+        self._tv_sync_action()
+        self._tv_window_back(before)
         self._events_tv_mode()
         if hasattr(self, "_donate_show"):
             self._donate_show()          # the heart back, if its week runs
@@ -249,6 +348,159 @@ class _TvMixin:
             # window's own picker again, never the profile without it.
             self.show_profile_picker()
 
+    def _tv_window_back(self, before: _Before) -> None:
+        """The window's own state as it was before TV mode, then - once the
+        window manager has it there - the panes, the sidebar, the docked
+        player and a pop-out."""
+        if before.fullscreen:
+            if not self.isFullScreen():
+                self.showFullScreen()
+            QTimer.singleShot(0, self._tv_restored)
+            return
+        if not self.isFullScreen() and self._tv_full_sized():
+            # Qt let go of its full screen (a resize meanwhile) while the
+            # window manager kept it: asked again, so that leaving it is
+            # asked of the window manager at all.
+            self.setWindowState(self.windowState() | Qt.WindowState.WindowFullScreen)
+        if before.maximized:
+            self.showMaximized()
+            self._after_fullscreen_left(self._tv_restored)
+        else:
+            self.showNormal()
+            self._restore_normal_geometry(before.geometry, then=self._tv_restored)
+
+    def _tv_restored(self) -> None:
+        """The window is back: what TV mode changed inside it, put back."""
+        before, self._tv_restoring = self._tv_restoring, None
+        if before is None or self._tv_on:
+            return
+        if before.collapsed != bool(getattr(self, "_sidebar_collapsed", False)):
+            self._set_sidebar_collapsed(before.collapsed)
+        self._auto_collapsed = before.auto_collapsed
+        if before.sizes:
+            if self._center_stack.currentIndex() == 0:
+                self._root.setSizes(list(before.sizes))
+            else:
+                # Back on Home: the lists' panes get their widths when they
+                # are shown again (hidden, the splitter has no width of its own).
+                self._tv_sizes_later = list(before.sizes)
+        handle = getattr(self, "_player_resize", None)
+        if handle is not None and before.player_height:
+            handle._preferred = before.player_height
+            handle.apply_height()
+        self._end_fs_exit()
+        self._update_mid_compact()
+        if before.popped_out and self._tv_has_picture() and self._popout_win is None:
+            self._toggle_popout()
+
+    def _tv_state_changed(self) -> None:
+        """The window's state changed while TV mode is on: the window
+        manager taking its full screen away (a key of its own, its menu)
+        leaves TV mode - TV mode is that full screen - once it is sure."""
+        if self._tv_shown and not self.isFullScreen() and not self.isMinimized():
+            QTimer.singleShot(250, self._tv_check_state)
+
+    def _tv_check_state(self) -> None:
+        if self._tv_on and self._tv_shown and not self.isFullScreen() \
+                and not self.isMinimized() and not self._tv_full_sized():
+            log.info("tv mode: the window left full screen - TV mode ends")
+            self.exit_tv_mode()
+
+    def _tv_sync_action(self) -> None:
+        """The View menu's entry checked while TV mode is on."""
+        act = (getattr(self, "_menu_actions", None) or {}).get("tv_mode")
+        if act is not None and act.isCheckable() and act.isChecked() != self._tv_on:
+            act.setChecked(self._tv_on)
+
+    def _tv_leave_key_text(self) -> str:
+        """TV mode's key as this system writes it ("" when it has none)."""
+        get = getattr(self, "shortcut_sequence", None)
+        seq = get("tv_mode") if callable(get) else ""
+        return QKeySequence(seq).toString(QKeySequence.SequenceFormat.NativeText) if seq else ""
+
+    # -- the page drawn once, complete ---------------------------------------------------
+
+    def _tv_screen_rect(self) -> QRect:
+        scr = self.screen() or QApplication.primaryScreen()
+        return scr.geometry() if scr is not None else QRect(0, 0, 1920, 1080)
+
+    def _tv_full_sized(self) -> bool:
+        return self.size() == self._tv_screen_rect().size()
+
+    def _tv_hold_paint(self) -> None:
+        """A plain curtain in the theme's background in the page's place
+        until the window is full screen: the window manager makes it so a
+        moment after it is asked (X11, Wayland), and the page shown meanwhile
+        at the window's old size visibly folded into place. The window goes
+        on drawing (the curtain) - nothing waits on a frame that never comes."""
+        curtain = getattr(self, "_tv_curtain", None)
+        if curtain is None or sip.isdeleted(curtain):
+            curtain = self._tv_curtain = QWidget()
+            curtain.setObjectName("TvCurtain")
+            curtain.setAutoFillBackground(True)
+            self._center_stack.addWidget(curtain)
+        from .theme import P
+        curtain.setStyleSheet(f"#TvCurtain {{ background: {P['bg']}; }}")
+        if self._tv_reveal_timer is None:
+            self._tv_reveal_timer = QTimer(self)
+            self._tv_reveal_timer.setInterval(15)
+            self._tv_reveal_timer.timeout.connect(self._tv_reveal_tick)
+        self._tv_reveal_by = time.monotonic() + REVEAL_MS / 1000.0
+        self._center_stack.setCurrentWidget(curtain)
+        self._tv_reveal_timer.start()
+
+    def _tv_curtain_up(self) -> bool:
+        curtain = getattr(self, "_tv_curtain", None)
+        return curtain is not None and self._center_stack.currentWidget() is curtain
+
+    def _tv_reveal_tick(self) -> None:
+        if not self._tv_curtain_up():
+            if self._tv_reveal_timer is not None:
+                self._tv_reveal_timer.stop()
+            return
+        if self._tv_full_sized() or time.monotonic() >= self._tv_reveal_by:
+            self._tv_release_paint()
+
+    def _tv_release_paint(self) -> None:
+        """The page in place of the curtain - laid out first at the size the
+        window has, so that it is drawn complete."""
+        t = self._tv_reveal_timer
+        if t is not None:
+            t.stop()
+        if not self._tv_curtain_up():
+            return
+        stack = self._center_stack
+        page = self._tv_page
+        if self._tv_on and page is not None and not sip.isdeleted(page):
+            # The window's own layout first: the stack at the size it has now.
+            QApplication.sendPostedEvents(None, QEvent.Type.LayoutRequest)
+            page.prepare(stack.size())
+            stack.setCurrentWidget(page)
+            if not self._tv_watching:
+                page.focus_into()
+        else:
+            stack.setCurrentIndex(0)
+        self._tv_shown = True
+
+    def _tv_land_on(self, target) -> bool:
+        """While TV mode is on it holds the central stack: *target* (a page,
+        or its index) becomes where leaving TV mode lands instead of being
+        shown now. False when TV mode is off - the caller shows it."""
+        if not self._tv_on:
+            return False
+        stack = self._center_stack
+        page = stack.widget(target) if isinstance(target, int) else target
+        before = self._tv_saved
+        if before is not None and page is not None and page is not self._tv_page:
+            self._tv_saved = before._replace(page=page)
+        return True
+
+    def _tv_player_left_fullscreen(self) -> None:
+        """The picture's own way out of full screen - its button, a double
+        click - in TV mode: TV mode is that full screen, so it ends."""
+        log.info("tv mode: the picture left full screen")
+        self.exit_tv_mode()
+
     def _tv_wire(self) -> None:
         if self._tv_wired:
             return
@@ -256,6 +508,7 @@ class _TvMixin:
         if self.player is not None:
             self.player.stopped.connect(self._tv_player_stopped)
             self.player.finished.connect(self._tv_player_finished)
+        self._center_stack.currentChanged.connect(self._tv_stack_changed)
         self._tv_digit_timer = QTimer(self)
         self._tv_digit_timer.setSingleShot(True)
         self._tv_digit_timer.timeout.connect(self._tv_digits_done)
@@ -265,6 +518,16 @@ class _TvMixin:
         self._tv_info_tick = QTimer(self)
         self._tv_info_tick.setInterval(1000)
         self._tv_info_tick.timeout.connect(self._tv_fill_info)
+
+    def _tv_stack_changed(self, index: int) -> None:
+        """The lists shown again after TV mode left them hidden (Home was
+        in front): their panes' widths as before, before they are drawn -
+        laid out first, so the splitter has its own width to divide."""
+        sizes = self._tv_sizes_later
+        if index == 0 and sizes and not self._tv_on:
+            self._tv_sizes_later = None
+            QApplication.sendPostedEvents(None, QEvent.Type.LayoutRequest)
+            self._root.setSizes(sizes)
 
     # -- the inputs ---------------------------------------------------------------------
 
@@ -436,6 +699,8 @@ class _TvMixin:
     def _tv_action(self, action: str) -> None:
         if not self._tv_on:
             return
+        if action != "back" and getattr(self, "_tv_leave_until", 0.0):
+            self._tv_leave_disarm()
         page = self._tv_page
         if page is not None and getattr(self, "_profile_locked", lambda: False)():
             # Who is watching first: a number, the volume or Play would
@@ -571,17 +836,33 @@ class _TvMixin:
         """TV mode, before a stream opens: the player's page shown first.
         Its video surface makes the mpv core when it is first shown - behind
         TV mode's page it never was, play() was refused and the first stream
-        from TV mode fell back to an external mpv window behind the app."""
+        from TV mode fell back to an external mpv window behind the app.
+        Shown in the picture's own layout (the docked full screen): the
+        window's lists never come up behind TV mode for that moment."""
         if not self._tv_on:
             return
         p = self.player
         if p is None or getattr(p.video, "mpv", None) is not None:
             return
+        self._tv_release_paint()
+        if not self._player_fs:
+            self._enter_docked_fullscreen()
         if self._center_stack.currentIndex() != 0:
             self._center_stack.setCurrentIndex(0)
         p.show()
         p.video.show()
         QApplication.processEvents()
+
+    def _tv_refused(self) -> None:
+        """The player could not start a stream in TV mode (_start_playback):
+        said on TV mode's page, where it is seen - never the window's lists
+        left behind it."""
+        if not self._tv_on:
+            return
+        self._tv_browse()
+        page = self._tv_page
+        if page is not None:
+            page.flash(tr("tv_play_refused"), 6000)
 
     def _tv_started(self, kind: str) -> None:
         """A stream started (_start_playback): in TV mode, the picture."""
@@ -593,7 +874,11 @@ class _TvMixin:
         """What plays, full screen."""
         if not self._tv_on or not self._tv_has_picture():
             return
+        self._tv_release_paint()
         self._tv_watching = True
+        page = self._tv_page
+        if page is not None:
+            page.picture_back = False
         if self._center_stack.currentIndex() != 0:
             self._center_stack.setCurrentIndex(0)
         if not self._player_fs:
@@ -605,9 +890,14 @@ class _TvMixin:
         self._tv_show_info()
 
     def _tv_browse(self, screen: str | None = None) -> None:
-        """TV mode's page again - what plays goes on behind it."""
+        """TV mode's page again - what plays goes on behind it. With
+        *screen* (the guide, search, options or Home key over the picture) a
+        look at it: Back there returns to the picture. Without, Back from
+        the picture: the screen it came from, and Back goes on from there
+        towards Home and out."""
         if not self._tv_on:
             return
+        was_watching = self._tv_watching
         self._tv_watching = False
         self._tv_hide_info()
         if self._player_fs:
@@ -617,6 +907,7 @@ class _TvMixin:
         page = self._tv_page
         if page is None:
             return
+        page.picture_back = bool(screen) and was_watching
         self._center_stack.setCurrentWidget(page)
         if screen:
             page.show_screen(screen)
@@ -824,6 +1115,26 @@ class _TvMixin:
             self.player.show_number_entry(text, ms)
         elif self._tv_page is not None:
             self._tv_page.flash(text, ms)
+
+    def _tv_back_at_home(self) -> None:
+        """Back on Home, with nothing further back: the first asks, a second
+        within a few seconds leaves TV mode - so Back always leads out, and
+        never by one press too many."""
+        now = time.monotonic()
+        if self._tv_leave_until and now < self._tv_leave_until:
+            self.exit_tv_mode()
+            return
+        self._tv_leave_until = now + LEAVE_MS / 1000.0
+        page = self._tv_page
+        if page is not None:
+            page.flash(tr("tv_leave_again"), LEAVE_MS)
+
+    def _tv_leave_disarm(self) -> None:
+        self._tv_leave_until = 0.0
+        flash = getattr(self._tv_page, "flash_lbl", None)
+        if isinstance(flash, QWidget) and not sip.isdeleted(flash) \
+                and flash.text() == tr("tv_leave_again"):
+            flash.hide()
 
     def _tv_digit(self, n: int) -> None:
         """A number typed on the page: the channel with it, after a pause."""

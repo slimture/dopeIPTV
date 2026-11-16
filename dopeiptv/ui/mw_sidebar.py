@@ -203,7 +203,7 @@ class _SidebarMixin:
         # splitterMoved, so nothing flipped it back ("after fullscreen the
         # middle column turns into icons"). _end_fs_exit recomputes from the
         # restored geometry instead.
-        if getattr(self, "_fs_exiting", False):
+        if getattr(self, "_fs_exiting", False) or getattr(self, "_tv_restoring", None) is not None:
             return
         w = self._mid.width()
         # Hysteresis: enter compact under 400, leave only above 430, so the
@@ -294,6 +294,10 @@ class _SidebarMixin:
         if (getattr(self, "_player_fs", False)
                 or getattr(self, "_fs_exiting", False)
                 or getattr(self, "_side_dragging", False)
+                # TV mode's full screen and the way back from it (mw_tv):
+                # not the person's resizes either.
+                or getattr(self, "_tv_on", False)
+                or getattr(self, "_tv_restoring", None) is not None
                 or not hasattr(self, "_det")):
             return
         narrow = self._sidebar_narrow()

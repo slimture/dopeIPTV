@@ -191,6 +191,11 @@ class _PopoutMixin:
         detached."""
         if not self.player:
             return
+        if getattr(self, "_tv_on", False):
+            # The picture's pop-out button in TV mode: a window of its own is
+            # no full screen, so TV mode ends first (mw_tv) and the player
+            # pops out of the window it leaves behind.
+            self.exit_tv_mode()
         # WINDOWS ONLY. Popping out reparents the control bar into the new
         # window mid-click, and on Windows the button release is then delivered
         # to whatever widget ends up under the pointer instead - the poster's

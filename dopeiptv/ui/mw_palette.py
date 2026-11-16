@@ -171,6 +171,8 @@ class _PaletteMixin:
     # -- open, close -------------------------------------------------------------
 
     def _open_palette(self) -> None:
+        if getattr(self, "_tv_on", False):
+            return            # TV mode takes the keys: the palette's field would get none
         active = QApplication.activeWindow()
         if active is not None and active is not self:
             return            # the pop-out, multiview: the palette is the window's

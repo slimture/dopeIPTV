@@ -299,8 +299,17 @@ key(Qt.Key.Key_Escape)
 assert until(lambda: not w._tv_watching)
 assert w._tv_has_picture() and w.player.current_url == played[-1]
 assert page.current == "guide" and w._center_stack.currentWidget() is page
-assert not page.now.isHidden() and page.hint.text() == tr("tv_hint_playing")
-key(Qt.Key.Key_Escape)                          # Back on the page: the picture again
+assert not page.now.isHidden()
+assert page.hint.text() == f"{tr('tv_hint_now')} · {tr('tv_hint_leave')}", page.hint.text()
+# Back goes on towards Home - never round to the picture again - and on
+# Home asks before it leaves TV mode; any other key takes the question back.
+key(Qt.Key.Key_Escape)
+assert page.current == "home" and not w._tv_watching and w._tv_has_picture()
+key(Qt.Key.Key_Escape)
+assert w._tv_on and page.flash_lbl.isVisible() and page.flash_lbl.text() == tr("tv_leave_again")
+key(Qt.Key.Key_Right)
+assert w._tv_on and not page.flash_lbl.isVisible()
+key(Qt.Key.Key_P)                               # Play: the picture again
 assert until(lambda: w._tv_watching)
 key(Qt.Key.Key_X)                               # Stop stops
 assert until(lambda: not w._tv_watching and not w._tv_has_picture())

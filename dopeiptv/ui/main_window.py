@@ -518,6 +518,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         together_action = action(tr("together_title") + "…", self.open_together)
         phone_action = action(tr("phone_menu"), self.open_phone_remote)
         tv_action = action(tr("tv_mode"), self.toggle_tv_mode)
+        # Checked while TV mode is on (mw_tv): on macOS the menu bar stays
+        # in reach over it, and it says so in the window's own terms.
+        tv_action.setCheckable(True)
         teletext_action = action(tr("ttx_menu"), self.open_teletext)
         self._teletext_action = teletext_action
         calendar_action = action(tr("cal_menu"), self.open_calendar_export)
@@ -1361,7 +1364,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.source_of = self._conn_player_source
             self.player.fs_btn.clicked.connect(self._toggle_player_fullscreen)
             self.player.double_clicked.connect(self._toggle_player_fullscreen)
-            self.player.exit_fullscreen.connect(self._exit_player_fullscreen)
+            self.player.exit_fullscreen.connect(self._player_exit_fullscreen)
             self.player.timeshift_menu.connect(self._player_timeshift_menu)
             self.player.record_menu.connect(self._player_record_menu)
             self.rec.stop_inplayer_cb = self.player.stop_stream_record
@@ -2073,8 +2076,22 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         st.polish(self._det)
         self._det.update()
 
+    def _player_exit_fullscreen(self) -> None:
+        """The player's own Exit fullscreen button: in TV mode that full
+        screen is TV mode's, so TV mode ends (mw_tv) - never the window's
+        lists with TV mode still on behind them."""
+        if getattr(self, "_tv_on", False):
+            self._tv_player_left_fullscreen()
+            return
+        self._exit_player_fullscreen()
+
     def _toggle_player_fullscreen(self) -> None:
         if not self.player or not self.player.isVisible():
+            return
+        if getattr(self, "_tv_on", False):
+            # A double click on TV mode's picture, its fullscreen button:
+            # out of TV mode's full screen, so out of TV mode.
+            self._tv_player_left_fullscreen()
             return
         now = time.time()
         if now - getattr(self, "_fs_toggled_at", 0.0) < 0.4:
@@ -2509,8 +2526,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     # -- modes and categories ------------------------------------------------------
 
     def switch_mode(self, mode: str) -> None:
-        # Any mode switch drops back from the Home page to the classic view.
-        if getattr(self, "_center_stack", None) is not None:
+        # Any mode switch drops back from the Home page to the classic view
+        # (in TV mode: where leaving it lands - TV mode holds the window).
+        if getattr(self, "_center_stack", None) is not None and not self._tv_land_on(0):
             self._center_stack.setCurrentIndex(0)
         # ... and from the Guide page to the list - unless the guide itself
         # tunes a channel: tune_from_guide's jump in the list runs under it.
@@ -5467,6 +5485,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 log.warning("embedded play() refused %s in TV mode",
                             redact_url(url))
                 self._show_stream_error(tr("tv_play_refused"))
+                self._tv_refused()      # said on its page, back on it
             else:
                 log.warning("embedded play() refused %s - falling back to an "
                             "external mpv window", redact_url(url))
@@ -6342,7 +6361,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         separate window, so the main window geometry stays valid to save."""
         if not hasattr(self, "_root"):
             return
-        if self.isFullScreen() or self._player_fs:
+        # Nor in TV mode, nor while the window comes back from it: that
+        # size is the screen's, and the panes' widths are not the person's.
+        if self.isFullScreen() or self._player_fs or getattr(self, "_tv_on", False) \
+                or getattr(self, "_tv_restoring", None) is not None:
             return
         self.settings.setValue("splitter_state", self._root.saveState())
         self.settings.setValue("window_geometry", self.saveGeometry())

@@ -16,42 +16,60 @@ _SRC = (Path(__file__).resolve().parent.parent / "dopeiptv/ui/main_window.py"
 
 
 class _Shown:
-    def __init__(self):
+    def __init__(self, log=None, name=""):
         self.shown = 0
         self.mpv = None
+        self._log, self._name = log, name
 
     def show(self):
         self.shown += 1
+        if self._log is not None:
+            self._log.append(self._name)
 
 
 class _Player(_Shown):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, log=None):
+        super().__init__(log, "player")
         self.video = _Shown()
 
 
 class _Stack:
-    def __init__(self, index):
+    def __init__(self, index, log=None):
         self.index = index
+        self._log = log
 
     def currentIndex(self):  # noqa: N802 - Qt's name
         return self.index
 
     def setCurrentIndex(self, i):  # noqa: N802 - Qt's name
         self.index = i
+        if self._log is not None:
+            self._log.append(f"stack {i}")
+
+    def updatesEnabled(self):  # noqa: N802 - Qt's name
+        return True
 
 
 class _Win(_TvMixin):
     def __init__(self, on, index=3):
+        self.log: list[str] = []
         self._tv_on = on
-        self.player = _Player()
-        self._center_stack = _Stack(index)
+        self._player_fs = False
+        self.player = _Player(self.log)
+        self._center_stack = _Stack(index, self.log)
+
+    def _enter_docked_fullscreen(self):
+        self._player_fs = True
+        self.log.append("fullscreen")
 
 
 def test_tv_mode_shows_the_player_before_its_first_stream():
     w = _Win(True)
     w._tv_before_play()
     assert w._center_stack.index == 0 and w.player.shown and w.player.video.shown
+    # In the picture's own layout first: the window's lists never come up
+    # behind TV mode for the moment the player is shown.
+    assert w.log == ["fullscreen", "stack 0", "player"], w.log
 
 
 def test_nothing_changes_outside_tv_mode_or_once_the_core_is_made():
@@ -137,13 +155,19 @@ def test_the_page_shows_what_plays_and_ok_on_it_is_the_picture():
     page.refresh_now()
     assert page.now not in page.tabs and not page.now.isHidden()
     assert page.now in page.focusables()
-    assert "SVT1 HD" in page.now.title and page.hint.text() == tr("tv_hint_playing")
+    # The hint says how to get back to the picture, and how TV mode is left.
+    assert "SVT1 HD" in page.now.title
+    assert page.hint.text() == f"{tr('tv_hint_now')} · {tr('tv_hint_leave')}"
+    page.picture_back = True                    # a look from the picture: Back returns
+    page.refresh_now()
+    assert page.hint.text() == tr("tv_hint_playing")
     page.now.click()
     assert win.pictures == 1
     win.playing = False
+    page.picture_back = False
     page.refresh_now()
     assert page.now.isHidden() and page.now not in page.focusables()
-    assert page.hint.text() == tr("tv_hint")
+    assert page.hint.text() == f"{tr('tv_hint')} · {tr('tv_hint_leave')}"
 
 
 def test_now_playing_moves_up_from_the_tabs_and_back_down():

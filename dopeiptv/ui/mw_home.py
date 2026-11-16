@@ -1132,6 +1132,8 @@ class _HomeMixin:
     def _show_home_page(self) -> None:
         if not self._home_enabled():
             return
+        if self._tv_land_on(self._ensure_home_page()):
+            return          # TV mode holds the window: Home is where leaving it lands
         # Clear any classic-view loading strip/overlay so it doesn't linger
         # behind (and reappear on) the Home page.
         self._hide_busy()
@@ -1147,7 +1149,8 @@ class _HomeMixin:
         self._check_nav("home")
 
     def _leave_home(self) -> None:
-        self._center_stack.setCurrentIndex(0)
+        if not self._tv_land_on(0):
+            self._center_stack.setCurrentIndex(0)
         self._check_nav(self._nav_key_for_mode(self.mode))
         if hasattr(self, "_donate_show"):
             self._donate_show()         # Home's donate card off screen: the heart
