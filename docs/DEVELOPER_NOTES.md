@@ -92,7 +92,11 @@ the fullscreen controls, multiview's labels) stay where they are: the
 native window takes no input (`WindowTransparentForInput`), so they get
 their clicks, hover and tooltips as before, and what they show is drawn
 into the picture by mpv (`overlay-add`, BGRA premultiplied), again only
-when one changes. While mpv has no picture the native window is hidden and
+when one changes. Each is rendered into a transparent image with
+`DrawChildren` alone - only what it paints itself, as over the old
+surface (`DrawWindowBackground` filled its rectangle: a square box around
+the round centre button) - and only once the layout waiting for it has
+run (`_settle`), so mpv never gets a picture of it laid out the old way. While mpv has no picture the native window is hidden and
 everything is plain Qt. Any of those widgets can be deleted at any moment
 (a notice, a dialog, the pop-out's button): the layer never asks a deleted
 one anything (`sip.isdeleted`; its `destroyed` signal takes it off the

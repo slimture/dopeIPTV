@@ -445,3 +445,106 @@ def test_a_click_double_click_and_right_click_reach_the_player_as_before():
     assert new == old
     assert ("press", "LeftButton") in old and ("double",) in old
     assert ("press", "RightButton") in old
+
+
+# -- what mpv is handed: what the widget paints, nothing more --------------------------
+
+def _image_of(layer, w):
+    """The picture of *w* the layer hands mpv (its last one)."""
+    layer._full = True
+    layer._flush()
+    oid = next(o for o, x, _g in layer._shown if x is w)
+    return layer._imgs[oid][-1]
+
+
+def test_a_round_button_is_handed_over_round_with_soft_edges():
+    from PyQt6.QtWidgets import QPushButton
+    host, surface, layer, stats, bar, badge, under = _setup()
+    b = QPushButton(host)
+    b.setObjectName("CenterPlay")
+    b.setFixedSize(72, 72)
+    b.setStyleSheet("#CenterPlay { background: rgba(16,16,20,140); border:none;"
+                    " border-radius:36px; }")
+    b.move(120, 50)
+    b.show()
+    img = _image_of(layer, b)
+    w, h = img.width(), img.height()
+    corners = [img.pixelColor(x, y).alpha() for x, y in
+               ((1, 1), (w - 2, 1), (1, h - 2), (w - 2, h - 2))]
+    assert corners == [0, 0, 0, 0]              # no square box around it
+    assert img.pixelColor(w // 2, h // 2).alpha() > 100
+    edge = {img.pixelColor(x, h // 2).alpha() for x in range(0, 6)}
+    assert any(0 < a < 140 for a in edge)        # anti-aliased, not cut
+    layer.stop()
+
+
+def test_a_widget_that_fills_its_background_still_does():
+    host, surface, layer, stats, bar, badge, under = _setup()
+    panel = QWidget(host)
+    panel.setAutoFillBackground(True)
+    pal = panel.palette()
+    from PyQt6.QtGui import QColor
+    pal.setColor(panel.backgroundRole(), QColor(10, 20, 30))
+    panel.setPalette(pal)
+    panel.setGeometry(150, 100, 60, 30)
+    panel.show()
+    img = _image_of(layer, panel)
+    assert img.pixelColor(1, 1).alpha() == 255
+    # A label without a background of its own: only its text.
+    img = _image_of(layer, badge)
+    assert img.pixelColor(1, 1).alpha() == 0
+    layer.stop()
+
+
+def test_a_row_is_handed_over_laid_out_as_it_will_be_painted():
+    # The DVR row: a time label beside a slider. Its text grows just before
+    # the picture is taken - the layout that follows must come first, or mpv
+    # shows the row laid out the old way until the next picture.
+    from PyQt6.QtWidgets import QHBoxLayout, QSlider
+    host, surface, layer, stats, bar, badge, under = _setup()
+    row = QWidget(host)
+    lay = QHBoxLayout(row)
+    lay.setContentsMargins(4, 2, 4, 2)
+    label = QLabel("0:07", row)
+    slider = QSlider(video_thread.Qt.Orientation.Horizontal, row)
+    lay.addWidget(label)
+    lay.addWidget(slider, 1)
+    row.setGeometry(10, 120, 300, 28)
+    row.show()
+    app.processEvents()
+    layer._flush()
+    label.setText("DVR −1:23:45 / 2:00:00")          # a layout request waits
+    seen = []
+    orig = layer._add
+
+    def add(core, oid, w, g):
+        if w is row:
+            seen.append(slider.x())
+        orig(core, oid, w, g)
+    layer._add = add
+    layer._dirty.update(o for o, w, _g in layer._shown if w is row)
+    layer._flush()
+    app.processEvents()
+    assert seen and seen[-1] == slider.x()            # never the old layout
+    layer.stop()
+
+
+def test_the_rows_time_keeps_its_width_while_shown():
+    from dopeiptv.media.rewind_bar import steady_width
+    from PyQt6.QtWidgets import QHBoxLayout
+    bar_ = QWidget()
+    QHBoxLayout(bar_).addWidget(label := QLabel("DVR 0:07"))
+    bar_.show()
+    widths = []
+    for text in ("DVR 0:07", "DVR 0:11", "DVR 0:19", "DVR 1:00"):
+        label.setText(text)
+        steady_width(label, bar_)
+        widths.append(label.minimumWidth())
+    assert len(set(widths)) == 1                      # digits ticking: no change
+    label.setText("DVR −0:21 / 1:00")
+    steady_width(label, bar_)
+    assert label.minimumWidth() > widths[0]           # a longer text: wider
+    bar_.hide()
+    label.setText("DVR 0:30")
+    steady_width(label, bar_)
+    assert label.minimumWidth() == 0                  # hidden: afresh

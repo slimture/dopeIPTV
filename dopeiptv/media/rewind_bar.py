@@ -9,6 +9,7 @@ Mixed into EmbeddedPlayer; it reads the player's attributes.
 """
 from __future__ import annotations
 
+import re
 import time
 
 from PyQt6.QtCore import QRectF, Qt, QTimer, pyqtSignal
@@ -93,6 +94,32 @@ class _BarSwitch(QWidget):
         dvr.setToolTip(tr("bar_dvr_tip"))
         ts.setText(tr("player_timeshift"))
         ts.setToolTip(tr("bar_timeshift_tip"))
+
+
+_DIGIT = re.compile(r"\d")
+
+
+def steady_width(label: QLabel, bar: QWidget, showing: bool = False) -> None:
+    """While *bar* is up, *label* is as wide as its text with every digit
+    its widest, and never narrower than it was: a time ticking from 0:08
+    to 0:11 changed the label's width - and moved the slider beside it -
+    nearly every second, and a picture of the row taken between the text
+    and its layout showed it squeezed. Hidden, it starts afresh; *showing*:
+    the bar is about to show (set before it is placed, never after)."""
+    if bar.isHidden() and not showing:
+        if label.minimumWidth():
+            label.setMinimumWidth(0)
+        return
+    label.ensurePolished()           # its style sheet's font, not the default
+    text = label.text()
+    fm = label.fontMetrics()
+    widest = max("0123456789", key=fm.horizontalAdvance)
+    # (Not from sizeHint(): a label's includes the minimum width set here.)
+    m = label.contentsMargins()
+    extra = m.left() + m.right() + 2 * max(0, label.margin()) + max(0, label.indent())
+    want = fm.horizontalAdvance(_DIGIT.sub(widest, text)) + extra + 1
+    if want > label.minimumWidth():
+        label.setMinimumWidth(want)
 
 
 class RewindBarMixin:
@@ -252,6 +279,7 @@ class RewindBarMixin:
         # Same as _show_seek_overlay: only the fade timer is re-armed while
         # it's already on screen (this is called from the mouse-move path).
         if not self.ts_timeline.isVisible():
+            steady_width(self.ts_label, self.ts_timeline, showing=True)
             self._place_ts_timeline()
             self.ts_timeline.show()
             self.ts_timeline.raise_()
@@ -310,6 +338,9 @@ class RewindBarMixin:
         else:
             edge = f"−{self._fmt_offset(offset_min)}"
         self.ts_label.setText(f"{edge} · {title}" if title else edge)
+        timeline = getattr(self, "ts_timeline", None)
+        if timeline is not None:
+            steady_width(self.ts_label, timeline)
         self.ts_live_btn.setVisible(not live)
 
     def _on_ts_seek(self, value: int) -> None:
@@ -366,6 +397,7 @@ class RewindBarMixin:
         # Placed only as it appears: re-placing on every pointer event was a
         # layout pass (and a repaint of the video) each time.
         if bar.isHidden():
+            steady_width(self.local_buffer_time, bar, showing=True)
             self._place_local_buffer()
             bar.show()
             bar.raise_()
@@ -471,6 +503,9 @@ class RewindBarMixin:
         self.local_buffer_time.setText(
             f"{name}{span}" if at_live
             else f"{name}−{_format_time(behind)} / {span}")
+        bar = getattr(self, "local_buffer_bar", None)
+        if bar is not None:
+            steady_width(self.local_buffer_time, bar)
         # The app's own buffer: a tick where it has a gap (a channel left
         # and come back to, or a reconnect), and the clock under the pointer.
         if self._dvr is not None:

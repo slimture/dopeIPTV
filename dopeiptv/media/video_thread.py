@@ -36,7 +36,9 @@ import weakref
 from typing import Any, Callable
 
 from PyQt6 import sip
-from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, Qt, QThread, QTimer, pyqtSignal
+from PyQt6.QtCore import (
+    QCoreApplication, QEvent, QObject, QPoint, QRect, Qt, QThread, QTimer, pyqtSignal,
+)
 from PyQt6.QtGui import (
     QColor, QGuiApplication, QImage, QOffscreenSurface, QOpenGLContext, QPainter, QRegion,
     QSurface, QSurfaceFormat, QWindow,
@@ -568,7 +570,7 @@ class _Overlays(QObject):
 
     _WATCH = frozenset({QEvent.Type.Paint, QEvent.Type.Show, QEvent.Type.Hide, QEvent.Type.Move,
                         QEvent.Type.Resize, QEvent.Type.ZOrderChange, QEvent.Type.ParentChange,
-                        QEvent.Type.ChildAdded})
+                        QEvent.Type.ChildAdded, QEvent.Type.LayoutRequest})
 
     def __init__(self, surface: "ThreadedVideoSurface") -> None:
         super().__init__(surface)
@@ -714,6 +716,24 @@ class _Overlays(QObject):
             return None
         return r.x(), r.y(), r.width(), r.height()
 
+    def _settle(self, w: QWidget) -> None:
+        """*w* as its next paint will show it: the layout requests waiting
+        for it and its children (a text that changed width, a button shown
+        or hidden, a new size) carried out now, before it is drawn - so mpv
+        is never handed a picture of it laid out the old way (the DVR row
+        first squeezed, then its own size)."""
+        if not w.isVisible():
+            return
+        self._rendering = True       # what settling moves is drawn just after
+        try:
+            for c in [w, *w.findChildren(QWidget)]:
+                QCoreApplication.sendPostedEvents(c, QEvent.Type.LayoutRequest.value)
+            lay = w.layout()
+            if lay is not None:
+                lay.activate()
+        finally:
+            self._rendering = False
+
     def _flush(self) -> None:
         if self._stopped:
             return
@@ -732,6 +752,7 @@ class _Overlays(QObject):
                     if not _alive(w):
                         continue
                     self._watch(w)
+                    self._settle(w)
                     g = self._geometry(w)
                     if g is not None:
                         want.append((w, g))
@@ -749,6 +770,7 @@ class _Overlays(QObject):
             else:
                 for oid, w, g in self._shown:
                     if oid in self._dirty:
+                        self._settle(w)
                         if self._geometry(w) != g:
                             self._full = True
                             break
@@ -774,12 +796,16 @@ class _Overlays(QObject):
         pw, ph = max(1, round(g[2] * dpr)), max(1, round(g[3] * dpr))
         img = QImage(pw, ph, QImage.Format.Format_ARGB32_Premultiplied)
         img.setDevicePixelRatio(dpr)
-        img.fill(QColor(0, 0, 0, 0))
+        img.fill(Qt.GlobalColor.transparent)
         p = QPainter(img)
         self._rendering = True
         try:
-            w.render(p, QPoint(0, 0), QRegion(),
-                     QWidget.RenderFlag.DrawChildren | QWidget.RenderFlag.DrawWindowBackground)
+            # Only what the widget paints itself, as over the old surface:
+            # DrawWindowBackground fills its rectangle with the palette's
+            # window colour first - a square box around the round centre
+            # button. A widget that fills its background (autoFillBackground,
+            # a style sheet's) still does.
+            w.render(p, QPoint(0, 0), QRegion(), QWidget.RenderFlag.DrawChildren)
         finally:
             self._rendering = False
             p.end()
