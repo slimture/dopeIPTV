@@ -45,8 +45,9 @@ def _make(autoplay="true", mode="embedded", last=None):
         f.played.append((title, key, kind))
 
     f._start_playback = start
-    for name in ("_autoplay_next_episode", "_next_episode_item",
-                 "_has_next_episode", "_advance_to_next_episode"):
+    for name in ("_autoplay_next_episode", "_next_episode_item", "_episode_step_item",
+                 "_has_next_episode", "_has_previous_episode", "_advance_to_next_episode",
+                 "_advance_episode"):
         setattr(f, name, getattr(MainWindow, name).__get__(f))
     return f
 

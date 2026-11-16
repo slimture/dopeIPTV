@@ -4,7 +4,11 @@ asks for: what plays, the channels, the commands, TV mode on or off and its
 keys, a channel's logo from the app's own cache (the window fetches one
 into it, on this server's thread, when it is not there yet) and the calendar
 (core/ical.py). The touchpad's gestures are read here (``gesture``): a
-swipe is an arrow, a tap OK, a long press Back.
+swipe is an arrow, a tap OK, a long press Back. Everything else the app
+plays: a page of a list (api/browse: films, series, Recent, local files,
+radio, recordings), a series' episodes (api/episodes), a row played by the
+id it was listed with (api/play_ref), a poster made small (thumb/) - the
+query string only the few keys they take (``query_params``).
 
 Off until the person turns it on ("Phone remote…"). Only a phone at a
 private address gets an answer - any part of a home network split in
@@ -12,14 +16,16 @@ VLANs, never the internet (core/home_net.py). Every address starts
 with a long random token, /<token>/, which is what the code on the screen
 holds: a request without it gets 403 and nothing else, and an address that
 keeps guessing is shut out for a while. Each address may ask only so often
-(a token bucket). Nothing else is served - not the remote API, whose own
+(a token bucket; a list's pictures, many at once as it scrolls, in a more
+generous bucket of their own). Nothing else is served - not the remote API, whose own
 server stays on this computer unless the person chose otherwise.
 
 Like remote_api.py, it knows nothing of the window: *call(action, params)*
 does the work (the window hands it to its own thread). Reading is GET,
 anything that changes something is POST. The state carries an ETag that
 leaves its clock out (``state_tag``): the page asks with it, and the same
-state again is a 304 with nothing to read.
+state again is a 304 with nothing to read - a page of a list and a series'
+episodes too.
 """
 
 from __future__ import annotations
@@ -33,7 +39,7 @@ import time
 from collections import OrderedDict
 from http.server import BaseHTTPRequestHandler
 from typing import Any, Callable
-from urllib.parse import unquote, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 from . import home_net
 from .log import log
@@ -48,9 +54,17 @@ REQUEST_TIMEOUT = 15
 LOGO_MAX = 2 * 1024 * 1024    # a logo served, or fetched for the phone
 LOGO_TIMEOUT = 5.0            # a logo fetched for the phone (not on disk yet)
 
-READ = frozenset({"state", "channels"})
+READ = frozenset({"state", "channels", "browse", "episodes"})
 WRITE = frozenset({"play", "toggle", "stop", "next", "previous", "volume", "mute",
-                   "tv", "tv_key", "touch", "profile"})
+                   "tv", "tv_key", "touch", "profile", "play_ref"})
+#: What a reading request may say in its query string (core/phone_browse.py
+#: checks each further), and how long each may be.
+QUERY_KEYS = frozenset({"p", "o", "q", "sid", "v", "ref"})
+QUERY_MAX = 400
+#: The pictures a list shows (logos, posters) come many at once as it is
+#: scrolled: a bucket of their own, more generous than the rest's.
+PICTURES_RATE = 60.0
+PICTURES_BURST = 300.0
 
 #: The touchpad, in CSS pixels and milliseconds: a swipe moves this far at
 #: least (the larger axis gives its direction), a tap no more than
@@ -90,6 +104,20 @@ def image_type(data: bytes) -> str | None:
     if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
         return "image/webp"
     return None
+
+
+def query_params(query: str) -> dict[str, str]:
+    """A reading request's query string: only the keys the page sends,
+    each once and short."""
+    out: dict[str, str] = {}
+    try:
+        got = parse_qs(query or "", keep_blank_values=False, max_num_fields=16)
+    except ValueError:
+        return out
+    for key, values in got.items():
+        if key in QUERY_KEYS and values and len(values[0]) <= QUERY_MAX:
+            out[key] = values[0]
+    return out
 
 
 def state_tag(state: dict[str, Any]) -> str:
@@ -183,11 +211,13 @@ class PhoneServer:
     def __init__(self, port: int, token: str, call: Callable[[str, dict], Any],
                  page: Callable[[], tuple[bytes, str]], host: str = "0.0.0.0",
                  limiter: RateLimiter | None = None,
-                 asset: Callable[[str], tuple[bytes, str] | None] | None = None) -> None:
+                 asset: Callable[[str], tuple[bytes, str] | None] | None = None,
+                 pictures: RateLimiter | None = None) -> None:
         self.host, self.port, self.token = host, int(port), token
         self.call, self.page = call, page
         self.asset = asset
         self.limiter = limiter or RateLimiter()
+        self.pictures = pictures or RateLimiter(rate=PICTURES_RATE, burst=PICTURES_BURST)
         self._httpd: _Server | None = None
         self._thread: threading.Thread | None = None
 
@@ -274,11 +304,14 @@ def _make_handler(server: PhoneServer) -> type[BaseHTTPRequestHandler]:
                 self._text(403, "forbidden")
                 return
             lim = server.limiter
-            if lim.blocked(who) or not lim.allow(who):
+            parts = urlsplit(self.path)
+            path = parts.path
+            segs = path.split("/")
+            # A list's pictures in a bucket of their own (a shut-out is one).
+            bucket = server.pictures if len(segs) > 3 and segs[2] in ("thumb", "logo") else lim
+            if lim.blocked(who) or not bucket.allow(who):
                 self._send(429, b"too many requests", "text/plain; charset=utf-8", {"Retry-After": "10"})
                 return
-            path = urlsplit(self.path).path
-            segs = path.split("/")
             given = unquote(segs[1]) if len(segs) > 1 else ""
             if not server.authorized(given):
                 # Only what looks like a try at the token counts: a phone's
@@ -299,9 +332,11 @@ def _make_handler(server: PhoneServer) -> type[BaseHTTPRequestHandler]:
                     self._send(200, html, "text/html; charset=utf-8",
                                {"Content-Security-Policy": csp})
                 elif rest.startswith("api/"):
-                    self._api(rest[4:], method)
+                    self._api(rest[4:], method, parts.query)
                 elif rest.startswith("logo/") and reading:
                     self._logo(unquote(rest[5:]))
+                elif rest.startswith("thumb/") and reading:
+                    self._thumb(unquote(rest[6:]))
                 elif rest in ASSETS and reading:
                     got = server.asset(rest) if server.asset is not None else None
                     if not got:
@@ -325,17 +360,18 @@ def _make_handler(server: PhoneServer) -> type[BaseHTTPRequestHandler]:
                 log.warning("phone remote: %s failed: %s", rest.split("/")[0] or "page", e)
                 self._json(500, {"error": type(e).__name__})
 
-        def _api(self, action: str, method: str) -> None:
+        def _api(self, action: str, method: str, query: str = "") -> None:
             if action in READ:
                 if method not in ("GET", "HEAD"):
                     self._json(405, {"error": "use GET"})
                     return
-                result = server.call(action, {})
-                if action != "state" or not isinstance(result, dict):
+                result = server.call(action, query_params(query) if action in ("browse", "episodes") else {})
+                if action == "channels" or not isinstance(result, dict):
                     self._json(200, result)
                     return
-                # The page asks with the tag of the state it shows: the same
-                # state again is a 304 and nothing to read.
+                # The page asks with the tag of what it shows (the state, a
+                # page of a list, a series' episodes): the same again is a
+                # 304 and nothing to read.
                 tag = state_tag(result)
                 if self.headers.get("If-None-Match", "").strip() == tag:
                     self._send(304, b"", "application/json; charset=utf-8", {"ETag": tag})
@@ -366,6 +402,17 @@ def _make_handler(server: PhoneServer) -> type[BaseHTTPRequestHandler]:
                 action, params = "tv_key", {"action": key}
             result = server.call(action, params)
             self._json(200, result if isinstance(result, dict) else {"ok": True})
+
+        def _thumb(self, ident: str) -> None:
+            """A poster's or a station's small picture, made on the server's
+            thread by the window (bytes), never decoded on its own thread."""
+            got = server.call("thumb", {"id": ident}) if ident else None
+            data = got if isinstance(got, (bytes, bytearray)) else b""
+            ctype = image_type(bytes(data[:16])) if 0 < len(data) <= LOGO_MAX else None
+            if ctype is None:
+                self._json(404, {"error": "no picture"})
+                return
+            self._send(200, bytes(data), ctype, {"Cache-Control": "private, max-age=86400"})
 
         def _logo(self, ident: str) -> None:
             path = server.call("logo", {"id": ident}) if ident else None

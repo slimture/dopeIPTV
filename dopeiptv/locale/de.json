@@ -2918,5 +2918,6 @@
   "cat_find_live": "Kategorien nach Name oder Sender finden…",
   "cat_find_vod": "Kategorien nach Name oder Film finden…",
   "cat_find_series": "Kategorien nach Name oder Serie finden…",
-  "sa_placeholder_all": "Alles in all deinen Quellen suchen (z. B. Star Trek)"
+  "sa_placeholder_all": "Alles in all deinen Quellen suchen (z. B. Star Trek)",
+  "phone_page_ep_prev": "Vorherige Folge"
 }

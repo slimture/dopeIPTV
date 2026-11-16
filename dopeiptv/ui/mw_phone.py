@@ -7,7 +7,13 @@ mode on and off and its keys through mw_tv's tv_command (the page turns
 into a remote while TV mode is on).
 
 Only what the lists show can be listed or played from the phone: no channel
-from a hidden or locked category, no favourite from a locked folder.
+from a hidden or locked category, no favourite from a locked folder. Films,
+series and their episodes, Recent, local files, radio and recordings are
+mw_phone_browse's. While an episode plays the state says which (its series,
+"S2 E5 · Title", whether one comes before and after it, the version of its
+Episodes view), and the phone's previous and next are the episode before
+and after it in its queue - the media keys' and autoplay's path, where it
+got to without the resume question.
 
 The window's thread does as little as it can for a poll: what plays is read
 there, while what is on now and next is looked up on the server's thread from
@@ -31,6 +37,7 @@ from ..core.phone_remote import (
 )
 from ..core.remote_api import lan_addresses
 from ..i18n import tr
+from .mw_phone_browse import _PhoneBrowseMixin
 from .mw_remote import _Bridge
 
 ON_KEY = "phone_remote"
@@ -85,6 +92,9 @@ def _home_screen_assets() -> dict[str, tuple[bytes, str]]:
 #: to hear, and how long its page then says it.
 PHONE_ASKED_S = 15.0
 PHONE_NOTE_S = 20.0
+#: The Episodes view of what plays is asked for again at least this often
+#: (a watched mark made on the computer meanwhile).
+EPISODES_FRESH_S = 300
 #: Ports tried after the one used last: the default and the next few, then
 #: any the system gives.
 _PORTS = tuple(range(DEFAULT_PORT, DEFAULT_PORT + 10)) + (0,)
@@ -157,6 +167,13 @@ def page_words() -> dict[str, str]:
             "mute": tr("tooltip_mute_unmute"), "volume": tr("tooltip_volume"),
             "loading": tr("common_loading"), "profile": tr("profile_who_short"),
             "profile_pin": tr("phone_page_profile_pin"), "show_in_list": tr("phone_page_show_in_list"),
+            "ep_prev": tr("phone_page_ep_prev"), "ep_next": tr("tooltip_next_episode"),
+            "episodes": tr("sp_episodes"), "movies": tr("nav_movies"), "series": tr("nav_series"),
+            "recent": tr("label_recent"), "local": tr("nav_local"), "radio": tr("nav_radio"),
+            "recordings": tr("nav_recordings"), "back_to": tr("btn_back"), "min": tr("opt_minutes"),
+            "watched": tr("history_chip_watched"), "playing": tr("sp_playing"),
+            "search_radio": tr("radio_search_placeholder"), "search_here": tr("local_search_placeholder"),
+            "nothing_here": tr("tv_nothing_here"), "find": tr("nav_search"),
             **tv_words()}
 
 
@@ -189,7 +206,7 @@ def page_palettes(light_now: bool) -> tuple[dict[str, str], dict[str, str]]:
     return dict(dark, **accent), dict(light, **accent)
 
 
-class _PhoneMixin:
+class _PhoneMixin(_PhoneBrowseMixin):
     _phone: PhoneServer | None = None
     _phone_error: str = ""
     _phone_bridge: _Bridge | None = None
@@ -322,6 +339,16 @@ class _PhoneMixin:
             ident = str(params.get("id") or "")
             icon = (self._phone_icons or {}).get(ident) or bridge.call("_now_icon", {"id": ident})
             return self._phone_logo_file(str(icon or ""))
+        # Everything else the app plays (mw_phone_browse): films, series and
+        # their episodes, Recent, local files, radio, recordings.
+        if action == "browse":
+            return self._phone_browse(bridge, params)
+        if action == "episodes":
+            return self._phone_episodes(bridge, params)
+        if action == "play_ref":
+            return self._phone_play_ref(bridge, params)
+        if action == "thumb":
+            return self._phone_thumb(params)
         return bridge.call(action, params)
 
     def _phone_logo_file(self, icon: str) -> str | None:
@@ -363,6 +390,8 @@ class _PhoneMixin:
 
     # -- the work (the window's thread) -----------------------------------------------
     def _phone_do(self, action: str, params: dict) -> Any:
+        if action.startswith("_pb_"):
+            return self._pb_do(action, params)
         if action == "_client":
             return self.client
         if action == "_kids":
@@ -408,7 +437,12 @@ class _PhoneMixin:
             return {"ok": True}
         if action in ("next", "previous"):
             self._phone_asked()
-            return {"ok": self._play_channel_step(1 if action == "next" else -1)}
+            step = 1 if action == "next" else -1
+            if (getattr(self, "_last_playback", None) or {}).get("kind") == "episode":
+                # The episode after or before it in its queue, as the media
+                # keys and autoplay go - where it got to, without the question.
+                return {"ok": self._advance_episode(step, ask=False)}
+            return {"ok": self._play_channel_step(step)}
         if action == "volume":
             try:
                 value = max(0.0, min(100.0, float(params.get("value"))))
@@ -539,7 +573,7 @@ class _PhoneMixin:
             volume = int(getattr(p, "_vol_before_mute", volume) or 0)
         out: dict[str, Any] = {"state": st["state"], "volume": volume, "muted": muted,
                                "source": st.get("source") or "", "stamp": self._phone_stamp(),
-                               "tv_mode": bool(st.get("tv_mode"))}
+                               "tv_mode": bool(st.get("tv_mode")), "sections": self._phone_sections()}
         note = self._phone_note_now()
         locked = getattr(self, "_profile_locked", lambda: False)()
         if locked:
@@ -568,4 +602,50 @@ class _PhoneMixin:
         if kind == "live" and item.get("stream_id") is not None:
             out["channel"] = self._phone_channel(item, st.get("title") or "")
             return out, (getattr(self, "xmltv", None), item)
+        if kind == "episode":
+            out["episode"] = self._phone_episode(last)
         return out, None
+
+    def _phone_sections(self) -> list[str]:
+        """The page's sections: Movies and Series only where the source has
+        them (the nav's own probe)."""
+        avail = getattr(self, "_mode_avail", None) or {}
+        return [s for s in ("all", "fav", "vod", "series", "recent", "local", "radio", "rec")
+                if avail.get(s) is not False]
+
+    def _phone_episode(self, last: dict) -> dict[str, Any]:
+        """The playing episode as Now playing shows it - its series, "S2 E5
+        · Title", whether there is one before and after it - and the version
+        of its series' Episodes view (mw_phone_browse); worked out again
+        only when something of it changed."""
+        from ..core import series_view as sv
+        item = last.get("item") or {}
+        ctx = last.get("series_ctx") or {}
+        key = getattr(self, "_playing_key", None)
+        prev, nxt = self._has_previous_episode(), self._has_next_episode()
+        bucket = int(time.time() // EPISODES_FRESH_S)
+        memo_key = (id(item), str(key), id(ctx), prev, nxt, bucket, last.get("title"))
+        memo = self.__dict__.get("_phone_ep_memo")
+        if memo is not None and memo[0] == memo_key:
+            return memo[1]
+        sid = ctx.get("series_id")
+        series = str(ctx.get("name") or ctx.get("title") or "")
+        try:
+            if sid is not None:
+                series = self.channel_ov.display_name("series", sid, series)
+        except Exception:
+            pass
+        s, e = sv.season_of(item.get("season")), sv.episode_number(item)
+        se = (tr("sp_se", s=s, e=e) if s is not None and e is not None
+              else tr("sp_episode_short", n=e) if e is not None else "")
+        title = sv.episode_title(item, series)
+        label = f"{se} · {title}" if se and title else se or title or str(last.get("title") or "")
+        art = next((str(v) for v in (ctx.get("cover"), ctx.get("stream_icon"), item.get("stream_icon"))
+                    if str(v or "").lower().startswith(("http://", "https://"))), "")
+        img = self._pb()[1].put("img", art, {"cover": art}) if art else ""
+        version = hashlib.sha1(f"{sid}|{key}|{bucket}".encode()).hexdigest()[:10]
+        info = {"series": series, "sid": "" if sid is None else str(sid), "label": label,
+                "key": "" if key is None else str(key), "prev": prev, "next": nxt,
+                "v": version, "img": img}
+        self.__dict__["_phone_ep_memo"] = (memo_key, info)
+        return info

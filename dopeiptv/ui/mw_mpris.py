@@ -179,7 +179,8 @@ class _MprisMixin:
             "position": p.playback_position() if length > 0 else 0.0,
             "can_seek": length > 0,
             "can_next": can_next,
-            "can_prev": kind in ("live", "local"),
+            "can_prev": (self._has_previous_episode() if kind == "episode"
+                         else kind in ("live", "local")),
             "volume": p.vol.value() / 100.0,
             "live": kind == "live",
             "audio": audio,
@@ -277,7 +278,10 @@ class _MprisMixin:
             elif active:
                 self._zap(1)
         elif name == "previous":
-            if active and kind != "episode":
+            if kind == "episode":
+                if self._has_previous_episode():
+                    self._advance_episode(-1)
+            elif active:
                 self._zap(-1)
         elif name == "seek" and active:
             p._relative_seek(float(arg or 0.0))

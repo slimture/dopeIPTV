@@ -144,6 +144,7 @@ files = [
     "dopeiptv/core/ical.py",
     "dopeiptv/core/phone_remote.py",
     "dopeiptv/core/phone_page.py",
+    "dopeiptv/core/phone_browse.py",
     "dopeiptv/core/report.py",
     "dopeiptv/core/supporter.py",
     "dopeiptv/core/backup.py",

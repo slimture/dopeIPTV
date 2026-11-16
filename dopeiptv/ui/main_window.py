@@ -5038,26 +5038,42 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _autoplay_next_episode(self) -> bool:
         return self.settings.value("autoplay_next_episode", "true") == "true"
 
-    def _next_episode_item(self):
-        """The next episode after the one currently/last playing, as
-        (item, queue, next_index, series_ctx) - or None if there isn't one."""
+    def _episode_step_item(self, direction: int = 1):
+        """The episode after (1) or before (-1) the one playing or played
+        last, in its queue, as (item, queue, index, series_ctx) - or None."""
         last = getattr(self, "_last_playback", None)
         if not last or last.get("kind") != "episode":
             return None
         queue = last.get("ep_queue") or []
         idx = last.get("ep_index", -1)
-        if idx < 0 or idx + 1 >= len(queue):
+        to = idx + (1 if direction > 0 else -1)
+        if idx < 0 or not 0 <= to < len(queue):
             return None
-        return queue[idx + 1], queue, idx + 1, last.get("series_ctx")
+        return queue[to], queue, to, last.get("series_ctx")
+
+    def _next_episode_item(self):
+        """The next episode after the one currently/last playing, as
+        (item, queue, next_index, series_ctx) - or None if there isn't one."""
+        return self._episode_step_item(1)
 
     def _has_next_episode(self) -> bool:
         return self._next_episode_item() is not None
 
-    def _advance_to_next_episode(self) -> bool:
+    def _has_previous_episode(self) -> bool:
+        return self._episode_step_item(-1) is not None
+
+    def _advance_to_next_episode(self, ask: bool = True) -> bool:
         """Play the next episode in the current series, carrying the episode
         queue forward so it keeps advancing. Returns False if there's no next
         episode or we're not on the embedded player."""
-        nxt = self._next_episode_item()
+        return self._advance_episode(1, ask)
+
+    def _advance_episode(self, direction: int, ask: bool = True) -> bool:
+        """The next (1) or previous (-1) episode in the queue of the one
+        playing - autoplay's, the player's button, the media keys, the phone.
+        *ask* False: where it got to without the resume question (a remote
+        has no one at the computer to answer it)."""
+        nxt = self._episode_step_item(direction)
         # On a running cast the next one goes to the TV (mw_cast), whatever
         # this computer plays with.
         casting = getattr(self, "_cast_runs", None)
@@ -5073,14 +5089,24 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if not url:
                 return False
             title = item.get("name") or item.get("title") or "dopeIPTV"
+            key = self._item_key(item)
+            if not ask:
+                self._start_at_once(key, "episode", item)
             self._ep_queue_override = queue
             self._ep_index_override = index
             self._start_playback(
                 url, title, item.get("stream_icon") or item.get("cover"),
-                self._item_key(item), "episode", record=True, item=item)
+                key, "episode", record=True, item=item)
             return True
         finally:
             self.series_ctx = saved
+            self._sp_start_once = None
+
+    def _start_at_once(self, key, kind: str, item=None) -> None:
+        """The next _start_playback of *key* starts where it got to, without
+        the resume question (once; the caller clears _sp_start_once after)."""
+        pos = self._ms_resume_at(key, kind, item, self.resume.saved_position(key, kind))
+        self._sp_start_once = (key, pos) if pos > 0 else None
 
     def _on_player_finished(self) -> None:
         """End-of-file from the player. For a live stream that means the

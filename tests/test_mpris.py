@@ -234,8 +234,16 @@ def _window(kind="movie"):
         def _multiview_active(self):
             return None
 
+        prev = False
+
         def _has_next_episode(self):
             return True
+
+        def _has_previous_episode(self):
+            return self.prev
+
+        def _advance_episode(self, direction, ask=True):
+            calls.append(("episode", direction))
 
         def _play_next_episode(self):
             calls.append("next episode")
@@ -264,6 +272,9 @@ def test_window_reports_what_is_playing():
     assert s["can_next"] and s["can_prev"]
     ep, _ = _window("episode")
     assert ep.mpris_snapshot()["artist"] == "Blender Shorts"
+    assert ep.mpris_snapshot()["can_next"] and not ep.mpris_snapshot()["can_prev"]
+    ep.prev = True                        # an episode before it in its queue
+    assert ep.mpris_snapshot()["can_prev"]
     w.player.current_url = None
     assert w.mpris_snapshot()["status"] == "Stopped"
 
@@ -290,6 +301,10 @@ def test_window_does_what_the_desktop_asks(monkeypatch):
     ep.mpris_command("next")
     ep.mpris_command("previous")          # no previous episode to go to
     assert calls == ["next episode"]
+    ep.prev = True
+    time.sleep(0.4)
+    ep.mpris_command("previous")          # the one before it, as the phone's
+    assert calls == ["next episode", ("episode", -1)]
     live, calls = _window("live")
     live.mpris_command("next")
     time.sleep(0.4)

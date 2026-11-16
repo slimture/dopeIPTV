@@ -18,6 +18,24 @@ person's own scrolling has rested a moment (the page opens at its top). A channe
 (Favourites, a search) is not switched to on its own - the tab and the
 search are the person's - but offered under Now playing: "Show in list".
 
+Everything else the app plays is a section of its own in the same row as
+Channels and Favourites (a row that scrolls sideways on its own on a small
+phone): Movies and Series by category, Recent (Continue watching and
+History), Local files by folder with the folder search, Radio (the
+favourite stations, a search of the directory) and Recordings - lists the
+app serves a page at a time (api/browse), asked with their tags (the same
+again is a 304), the next page asked for as the list nears its end, small
+pictures the app made (thumb/). A category or folder opened is a place
+with a way back; a series opens its Episodes view (api/episodes): the
+season chips, Specials last, the season's episodes as compact lines -
+number, title, length, watched, how far - the playing one marked and
+brought into view, following it to the next. Back - the page's arrow or
+the phone's own gesture (the history's state) - goes up one place.
+
+While an episode plays, Now playing names its series with "S2 E5 · Title"
+under it and offers its Episodes view, and the dock's channel keys are the
+episode before and after it (api/previous, api/next).
+
 It fits a phone from 320 px wide up, upright or on its side: sizes are
 fluid (clamp, min, flex and grid that wrap - the bar's tabs and search, the
 dock's volume and keys, the remote's pad and keys sit side by side when
@@ -61,7 +79,10 @@ WORDS = ("channels", "favorites", "search", "nothing", "next", "paused", "offlin
          "loading", "tv_mode", "tv_switch", "ok", "up", "down", "left", "right", "back", "options",
          "vol_up", "vol_down", "digits", "touchpad", "touch_hint",
          "key_red", "key_green", "key_yellow", "key_blue",
-         "profile", "profile_pin", "tv_picture", "tv_now_playing", "show_in_list")
+         "profile", "profile_pin", "tv_picture", "tv_now_playing", "show_in_list",
+         "ep_prev", "ep_next", "episodes", "movies", "series", "recent", "local", "radio",
+         "recordings", "back_to", "min", "watched", "playing", "search_radio", "search_here",
+         "nothing_here", "find")
 _HEX = re.compile(r"#[0-9A-Fa-f]{6}")
 
 
@@ -181,24 +202,48 @@ _HTML = """<!doctype html>
       <div class="nowTimes" id="nowTimes"><span id="nowStart"></span><span id="nowEnd"></span></div>
       <div class="next" id="nowNext"></div>
       <button class="showIn" id="showIn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M4 12h7M4 18h10"/><circle cx="17.5" cy="12" r="3"/></svg><span id="showInText"></span></button>
+      <button class="showIn" id="epsBtn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M7.5 9h9M7.5 12.5h9M7.5 16h5"/></svg><span id="epsBtnText"></span></button>
     </div>
     <span class="nowPill" id="nowPill" aria-hidden="true" hidden><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="12.5" rx="2"/><path d="M8.5 20.5h7"/><path class="fill" d="M10.2 8.2v4.6l4-2.3z"/></svg><span id="nowPillText"></span></span>
   </section>
   <div id="browse">
   <div class="sticky" id="bar">
-    <div class="tabs" role="tablist">
-      <button class="tab" id="tabAll" role="tab" aria-selected="true"></button>
-      <button class="tab" id="tabFav" role="tab" aria-selected="false"></button>
+    <div class="tabs" id="tabs" role="tablist">
+      <button class="tab" id="tabAll" data-s="all" role="tab" aria-selected="true"></button>
+      <button class="tab" id="tabFav" data-s="fav" role="tab" aria-selected="false"></button>
+      <button class="tab" id="tabVod" data-s="vod" role="tab" aria-selected="false"></button>
+      <button class="tab" id="tabSeries" data-s="series" role="tab" aria-selected="false"></button>
+      <button class="tab" id="tabRecent" data-s="recent" role="tab" aria-selected="false"></button>
+      <button class="tab" id="tabLocal" data-s="local" role="tab" aria-selected="false"></button>
+      <button class="tab" id="tabRadio" data-s="radio" role="tab" aria-selected="false"></button>
+      <button class="tab" id="tabRec" data-s="rec" role="tab" aria-selected="false"></button>
     </div>
-    <label class="search">
+    <div class="crumb" id="crumb" hidden>
+      <button class="back" id="crumbBack"><svg class="flip" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <span id="crumbTitle" dir="auto"></span>
+    </div>
+    <label class="search" id="searchBox">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
       <input id="q" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
     </label>
   </div>
   <ul class="list" id="list"></ul>
+  <ul class="list" id="lib" hidden></ul>
   <div class="empty" id="empty" hidden></div>
+  <div class="empty" id="libEmpty" hidden></div>
   <div id="more"></div>
   </div>
+  <section class="eps" id="eps" hidden>
+    <div class="sticky" id="epsHead">
+      <div class="crumb">
+        <button class="back" id="epsBack"><svg class="flip" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <span id="epsTitle" dir="auto"></span>
+      </div>
+      <div class="tabs" id="seasons" role="tablist" hidden></div>
+    </div>
+    <ul class="list" id="epList"></ul>
+    <div class="empty" id="epsEmpty" hidden></div>
+  </section>
   <section class="tvr" id="tvr" hidden>
     <div class="pad" id="pad">
       <button class="arr up" id="kUp" data-a="up"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
@@ -325,6 +370,8 @@ svg .fill{fill:currentColor;stroke:none}
 .nowTitle{font-size:clamp(16px,4.8vw,18px);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nowProg{color:var(--text2);margin-top:2px;display:flex;gap:8px;align-items:center;min-width:0}
 .nowProg span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.now.ep .nowProg span:last-child{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;
+  -webkit-line-clamp:2;overflow-wrap:anywhere}
 .chip{flex:none;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:2px 7px;
   border-radius:999px;background:var(--sel);color:var(--text2)}
 .bar{height:4px;border-radius:2px;background:var(--btn);margin-top:10px;overflow:hidden}
@@ -352,11 +399,25 @@ svg .fill{fill:currentColor;stroke:none}
 .now.act:active .nowPill{filter:brightness(1.1)}
 .sticky{position:sticky;top:var(--safe-t);z-index:2;background:var(--bg);display:flex;flex-wrap:wrap;gap:8px;
   padding:clamp(6px,calc(var(--vh)*1.8),12px) 0 8px}
-.tabs{flex:1 1 240px;display:flex;gap:6px;background:var(--pane);border-radius:var(--radius);padding:3px}
-.tab{flex:1;min-width:0;min-height:44px;padding:0 6px;border-radius:9px;color:var(--muted);font-weight:600;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tabs{flex:1 1 100%;min-width:0;display:flex;gap:4px;background:var(--pane);border-radius:var(--radius);padding:3px;
+  overflow:auto hidden;scrollbar-width:none;overscroll-behavior:contain;scroll-padding-inline:3px}
+.tabs::-webkit-scrollbar{display:none}
+.tabs.fadeEnd{--fade:linear-gradient(to right,black calc(100% - 40px),transparent)}
+.tabs.fadeStart{--fade:linear-gradient(to left,black calc(100% - 40px),transparent)}
+.tabs.fadeStart.fadeEnd{--fade:linear-gradient(to right,transparent,black 40px,black calc(100% - 40px),transparent)}
+[dir=rtl] .tabs.fadeEnd{--fade:linear-gradient(to left,black calc(100% - 40px),transparent)}
+[dir=rtl] .tabs.fadeStart{--fade:linear-gradient(to right,black calc(100% - 40px),transparent)}
+[dir=rtl] .tabs.fadeStart.fadeEnd{--fade:linear-gradient(to right,transparent,black 40px,black calc(100% - 40px),transparent)}
+.tabs.fadeStart,.tabs.fadeEnd{-webkit-mask-image:var(--fade);mask-image:var(--fade)}
+.tab{flex:1 0 auto;min-width:44px;min-height:44px;padding:0 12px;border-radius:9px;color:var(--muted);font-weight:600;
+  white-space:nowrap}
 .tab[aria-selected=true]{background:var(--sel);color:var(--text)}
-.search{flex:1 1 240px;min-width:0;display:flex;align-items:center;gap:8px;background:var(--input);border-radius:var(--radius);
+.crumb{flex:1 1 100%;min-width:0;display:flex;align-items:center;gap:4px;min-height:44px}
+.crumb span{flex:1;min-width:0;font-weight:700;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.back{flex:none;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  color:var(--text2);background:var(--pane)}
+.back:active{background:var(--btn)}
+.search{flex:1 1 100%;min-width:0;display:flex;align-items:center;gap:8px;background:var(--input);border-radius:var(--radius);
   padding:0 12px;min-height:50px;color:var(--muted)}
 .search svg{width:20px;height:20px;flex:none}
 .search input{flex:1;min-width:0;border:0;background:none;color:var(--text);font:inherit;font-size:16px;height:44px;outline:none}
@@ -385,6 +446,23 @@ svg .fill{fill:currentColor;stroke:none}
 .star{flex:none;color:var(--accent)}
 .star svg{width:18px;height:18px}
 .empty{color:var(--muted);text-align:center;padding:32px 16px}
+.list li.head{padding:14px clamp(10px,3.5vw,14px) 6px;color:var(--muted);font-size:12px;font-weight:700;
+  letter-spacing:.4px;text-transform:uppercase;contain-intrinsic-size:auto 38px}
+.lg.poster{height:56px;border-radius:6px}
+.lg.poster img{object-fit:cover;padding:0}
+.lg.dir{color:var(--accent)}
+.lg.dir svg{width:22px;height:22px}
+.txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.txt .name{flex:none}
+.sub{color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pbar{height:3px;border-radius:2px;background:var(--btn);overflow:hidden;margin-top:4px}
+.pbar i{display:block;height:100%;width:0;background:var(--accent);border-radius:2px}
+.ok{flex:none;color:var(--ok)}
+.ok svg,.chev svg{width:20px;height:20px}
+.chev{flex:none;color:var(--muted)}
+.ep .num{flex-basis:clamp(30px,9vw,40px);font-weight:600}
+.row.playing .num{color:var(--accent)}
+.eps{padding-bottom:8px}
 #more{height:1px}
 .dock{position:fixed;left:0;right:0;bottom:0;z-index:3;background:var(--pane);box-shadow:0 -1px 0 var(--border);
   padding:clamp(6px,calc(var(--vh)*1.6),10px) var(--gut-r) calc(clamp(8px,calc(var(--vh)*2),12px) + var(--safe-b)) var(--gut-l)}
@@ -483,7 +561,10 @@ let channels = [], byId = new Map(), favs = [], favSet = new Set(), stamp = null
 let tab = "all", query = "", playingId = null, shown = 0, rows = [], st = {}, stAt = 0;
 let pollTimer = 0, fails = 0, volUntil = 0, volTimer = 0, gone = false, nowImgId = null, nowSeen = true;
 let tvOn = null, touchOn = false, etag = "", same = 0, quickUntil = 0;
-try { if (localStorage.getItem("tab") === "fav") tab = "fav"; } catch (e) { /* private mode */ }
+// The sections: the channels (all, favourites) on this page, the rest served a page at a time.
+const CHANNELS = ["all", "fav"];
+const SECTIONS = ["all", "fav", "vod", "series", "recent", "local", "radio", "rec"];
+try { const t = localStorage.getItem("tab"); if (SECTIONS.includes(t)) tab = t; } catch (e) { /* private mode */ }
 try { touchOn = localStorage.getItem("touchpad") === "1"; } catch (e) { /* private mode */ }
 
 async function api(path, body) {
@@ -505,6 +586,24 @@ async function getState() {
   const s = await r.json();
   etag = r.headers.get("ETag") || "";
   return s;
+}
+
+// A list, asked with the tag of the copy the page has: the same again is a
+// 304, and that copy.
+const kept = new Map();
+async function getList(path) {
+  const k = kept.get(path);
+  const r = await fetch(path, {cache: "no-store", headers: k ? {"If-None-Match": k.tag} : {}});
+  if (r.status === 304 && k) return k.data;
+  if (r.status === 403) { expired(); throw new Error("403"); }
+  if (!r.ok) throw new Error(String(r.status));
+  const data = await r.json();
+  const tag = r.headers.get("ETag");
+  if (tag) {
+    kept.delete(path); kept.set(path, {tag, data});
+    if (kept.size > 40) kept.delete(kept.keys().next().value);
+  }
+  return data;
 }
 
 // The hidden attribute itself: an SVG element has no .hidden property.
@@ -579,21 +678,25 @@ function profileMenu() {
 function show(s) {
   st = s; stAt = Date.now();
   setTv(s.tv_mode);
+  sections(s.sections);
   $("source").textContent = s.source || "";
   showProfile(s);
   const playing = s.state === "playing", stopped = s.state === "stopped";
   hide($("icoPlay"), playing); hide($("icoPause"), !playing);
-  const ch = s.channel || null;
-  const title = stopped ? W.nothing : (ch ? ch.name : s.title) || "";
+  const ch = s.channel || null, ep = !stopped && s.episode || null;
+  // An episode: its series, and "S2 E5 · Title" under it.
+  const title = stopped ? W.nothing : (ch ? ch.name : ep && ep.series ? ep.series : s.title) || "";
   $("nowTitle").textContent = title;
   $("nowPaused").textContent = W.paused; hide($("nowPaused"), s.state !== "paused");
-  $("nowProg").textContent = stopped ? "" : (s.now ? s.now.title : (ch ? "" : s.programme || ""));
+  $("nowProg").textContent = stopped ? "" : (s.now ? s.now.title : ep ? ep.label : (ch ? "" : s.programme || ""));
+  $("now").classList.toggle("ep", !!ep);
   $("nowNext").textContent = !stopped && s.next ? W.next + " " + at(s.next.start) + " · " + s.next.title : "";
-  const img = $("nowImg"), id = ch && ch.logo ? String(ch.id) : null;
+  const img = $("nowImg");
+  const id = ch && ch.logo ? "logo/" + encodeURIComponent(String(ch.id)) : ep && ep.img ? "thumb/" + ep.img : null;
   if (id !== nowImgId) {
     nowImgId = id;
     hide(img, true);
-    if (id) img.src = "logo/" + encodeURIComponent(id); else img.removeAttribute("src");
+    if (id) img.src = id; else img.removeAttribute("src");
   }
   $("nowInitials").textContent = stopped ? "" : initials(title);
   $("nowLogo").classList.toggle("long", $("nowInitials").textContent.length > 3);
@@ -604,7 +707,7 @@ function show(s) {
   hide($("icoVol"), s.muted); hide($("icoMute"), !s.muted);
   $("mute").classList.toggle("on", !!s.muted);
   const mini = $("mini");
-  mini.textContent = stopped ? "" : title + (s.now ? " · " + s.now.title : "");
+  mini.textContent = stopped ? "" : title + (s.now ? " · " + s.now.title : ep ? " · " + ep.label : "");
   hide(mini, nowSeen || !mini.textContent);
   // A channel of another source (failover, the search) is no row of these
   // lists. The page opens at its top with the row marked; a change follows.
@@ -615,7 +718,12 @@ function show(s) {
     followSoon(0);
   }
   opened = true;
-  for (const k of ["chDown", "chUp"]) $(k).disabled = !(s.kind === "live" && !stopped);
+  // Channel down and up; while an episode plays, the episode before and after it.
+  const live = s.kind === "live" && !stopped;
+  $("chDown").disabled = !(live || (ep && ep.prev));
+  $("chUp").disabled = !(live || (ep && ep.next));
+  label("chDown", ep ? W.ep_prev : W.ch_down); label("chUp", ep ? W.ep_next : W.ch_up);
+  epsOffer(ep);
 }
 
 function tick() {
@@ -630,6 +738,7 @@ function tick() {
     setBar(pos / s.duration);
     $("nowStart").textContent = hms(pos); $("nowEnd").textContent = hms(s.duration);
   } else { setBar(null); $("nowStart").textContent = $("nowEnd").textContent = ""; }
+  epsTick();
 }
 
 function setVol(v) {
@@ -685,6 +794,7 @@ function filtered() {
 }
 
 function render() {
+  if (isLib()) { rows = []; shown = 0; drawn++; return; }        // a section of its own (libLoad)
   rows = filtered(); shown = 0; drawn++;
   $("list").textContent = "";
   const empty = $("empty");
@@ -754,7 +864,7 @@ function playingRow() { return playingId && byId.has(playingId) ? byId.get(playi
 // "Show in list": the playing channel is in this source's list, not in the one shown.
 function offer() {
   const c = playingRow();
-  hide($("showIn"), tvOn || !c || rows.includes(c));
+  hide($("showIn"), tvOn || isLib() || !c || rows.includes(c));
 }
 
 function followNow() {
@@ -783,8 +893,8 @@ function fillTo(n) {
   requestAnimationFrame(step);
 }
 
-function bringIntoView(el) {
-  const bar = $("bar"), dock = $("dock");
+function bringIntoView(el, head) {
+  const bar = head || $("bar"), dock = $("dock");
   const r = el.getBoundingClientRect();
   const top = Math.max(0, bar.getBoundingClientRect().bottom);
   const bottom = dock.hasAttribute("hidden") ? window.innerHeight : dock.getBoundingClientRect().top;
@@ -801,7 +911,7 @@ function showInList() {
   const c = playingRow();
   if (!c) return;
   if (query) { query = ""; $("q").value = ""; }
-  if (tab === "fav" && !favSet.has(playingId)) setTab("all"); else render();
+  if (isLib() || (tab === "fav" && !favSet.has(playingId))) setTab("all"); else render();
   follow = 2; followNow();
 }
 
@@ -821,6 +931,287 @@ function dockRoom() {
   document.documentElement.style.setProperty("--dock", (d.hasAttribute("hidden") ? 0 : d.offsetHeight + 12) + "px");
 }
 
+// -- Movies, Series, Recent, Local files, Radio, Recordings ---------------------------------
+// Lists the app serves a page at a time (api/browse, with their tags), a
+// stack of places per section - a category, a folder - and Back through
+// them, the phone's own back gesture too (the history's state).
+const lib = {stack: {}, items: [], next: null, gen: 0, loading: false};
+let qTimer = 0;
+const FOLDER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>';
+const CHEV = '<svg class="flip" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
+const CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
+function isLib() { return !CHANNELS.includes(tab); }
+function libAt() { const s = lib.stack[tab]; return s && s.length ? s[s.length - 1] : {p: tab, title: ""}; }
+function libDepth() { return (lib.stack[tab] || []).length; }
+// Local files' first page lists the folders: there is nothing to search in yet.
+function libSearchable() { return !(tab === "local" && libDepth() <= 1); }
+
+let shownSections = "";
+function sections(list) {
+  const key = (list || []).join(",");
+  if (key === shownSections) return;
+  shownSections = key;
+  for (const b of $("tabs").children) hide(b, !!list && !list.includes(b.dataset.s));
+  if (list && !list.includes(tab)) setTab("all");
+  edges($("tabs"));
+}
+
+// A row of chips that goes on past the screen fades at that edge: there is more.
+function edges(el) {
+  const max = el.scrollWidth - el.clientWidth, x = Math.abs(el.scrollLeft);
+  el.classList.toggle("fadeStart", x > 2);
+  el.classList.toggle("fadeEnd", x < max - 2);
+}
+
+function crumb() {
+  const deep = isLib() && libDepth() > 1;
+  hide($("crumb"), !deep);
+  $("crumbTitle").textContent = deep ? libAt().title || "" : "";
+  hide($("searchBox"), isLib() && !libSearchable());
+  // Short enough for the smallest phone; what it searches said in full to a screen reader.
+  const full = !isLib() ? W.search : tab === "radio" ? W.search_radio : tab === "local" ? W.search_here : W.find;
+  $("q").placeholder = isLib() ? W.find : W.search; $("q").setAttribute("aria-label", full);
+}
+
+function libEmpty(text) { const e = $("libEmpty"); e.textContent = text || ""; hide(e, !text); }
+
+async function libLoad(more) {
+  if (!isLib()) return;
+  if (more && (lib.loading || lib.next === null)) return;
+  const at = libAt(), gen = more ? lib.gen : ++lib.gen, o = more ? lib.next : 0;
+  const q = libSearchable() ? query.trim() : "";
+  lib.loading = true;
+  if (!more) { lib.items = []; lib.next = null; $("lib").textContent = ""; libEmpty(W.loading); }
+  try {
+    const d = await getList("api/browse?p=" + encodeURIComponent(at.p) + (q ? "&q=" + encodeURIComponent(q) : "")
+                            + (o ? "&o=" + o : ""));
+    if (gen !== lib.gen) return;
+    const items = d.items || [];
+    lib.items = more ? lib.items.concat(items) : items;
+    lib.next = d.next === undefined ? null : d.next;
+    if (!at.title && d.title) { at.title = d.title; crumb(); }
+    const frag = document.createDocumentFragment();
+    for (const it of items) frag.append(libRow(it));
+    $("lib").append(frag);
+    libEmpty(lib.items.length ? "" : d.locked ? st.note || W.nothing_here : q ? W.none_found : W.nothing_here);
+  } catch (e) {
+    if (gen === lib.gen && !more) libEmpty(gone ? W.expired : W.offline);
+  } finally {
+    if (gen === lib.gen) lib.loading = false;
+  }
+}
+
+function bar(pct) {
+  const b = document.createElement("span"); b.className = "pbar";
+  const i = document.createElement("i"); i.style.setProperty("width", Math.max(0, Math.min(100, pct)) + "%");
+  b.append(i);
+  return b;
+}
+
+function textBlock(name, sub, pct) {
+  const txt = document.createElement("span"); txt.className = "txt";
+  const n = document.createElement("span"); n.className = "name"; n.dir = "auto"; n.textContent = name;
+  txt.append(n);
+  if (sub) { const u = document.createElement("span"); u.className = "sub"; u.dir = "auto"; u.textContent = sub; txt.append(u); }
+  if (pct) txt.append(bar(pct));
+  return txt;
+}
+
+function mark(html, cls) { const m = document.createElement("span"); m.className = cls; m.innerHTML = html; return m; }
+
+function libRow(it) {
+  const li = document.createElement("li");
+  if (it.k === "head") { li.className = "head"; li.textContent = it.name || ""; return li; }
+  const b = document.createElement("button");
+  b.className = "row";
+  b.dataset.k = it.k || "";
+  b.dataset.name = it.name || "";
+  for (const f of ["p", "ref", "sid"]) if (it[f]) b.dataset[f] = it[f];
+  const lg = document.createElement("span");
+  if (it.k === "dir") { lg.className = "lg dir"; lg.innerHTML = FOLDER; }
+  else {
+    const ini = document.createElement("span"); ini.textContent = initials(it.name);
+    lg.className = "lg" + (it.img && tab !== "radio" ? " poster" : "") + (ini.textContent.length > 3 ? " long" : "");
+    lg.append(ini);
+    if (it.img && it.ref) {
+      // Asked for only as the row nears the screen: a small copy the app made.
+      const img = new Image(); img.alt = ""; img.loading = "lazy"; img.decoding = "async";
+      img.addEventListener("load", () => lg.classList.add("pic"));
+      img.addEventListener("error", () => img.remove());
+      img.src = "thumb/" + it.ref;
+      lg.append(img);
+    }
+  }
+  b.append(lg, textBlock(it.name || "", it.sub || "", it.pct || 0));
+  if (it.w) b.append(mark(CHECK, "ok"));
+  else if (it.k === "dir" || it.k === "series") b.append(mark(CHEV, "chev"));
+  li.append(b);
+  return li;
+}
+
+function libPush(p, title) {
+  (lib.stack[tab] = lib.stack[tab] || [{p: tab, title: ""}]).push({p, title});
+  query = ""; $("q").value = "";
+  try { history.pushState({at: tab}, ""); } catch (e) { /* no history */ }
+  crumb(); libLoad(false);
+  window.scrollTo({top: Math.min(window.scrollY, Math.max(0, $("lib").offsetTop - 120))});
+}
+
+function libPop() {
+  const s = lib.stack[tab];
+  if (!isLib() || !s || s.length <= 1) return false;
+  s.pop(); query = ""; $("q").value = "";
+  crumb(); libLoad(false);
+  return true;
+}
+
+function libPressed(e) {
+  const b = e.target.closest(".row");
+  if (!b) return;
+  const k = b.dataset.k;
+  if (k === "dir") libPush(b.dataset.p, b.dataset.name);
+  else if (k === "series") openEps(b.dataset.sid, b.dataset.ref || "", b.dataset.name);
+  else if (k === "play" && b.dataset.ref) {
+    b.classList.add("pending");
+    send("api/play_ref", {ref: b.dataset.ref}).then(() => b.classList.remove("pending"));
+  }
+}
+
+// -- Episodes: a series' seasons and episodes, the playing one marked ---------------------
+const eps = {open: false, sid: "", ref: "", v: "", playing: "", data: null, season: 0, gen: 0};
+
+function epsEmpty(text) { const e = $("epsEmpty"); e.textContent = text || ""; hide(e, !text); }
+
+// Now playing offers the view while an episode plays; an open one follows it.
+function epsOffer(ep) {
+  hide($("epsBtn"), !!tvOn || !ep || !ep.sid);
+  if (!eps.open || !ep || ep.sid !== eps.sid) return;
+  if (ep.v !== eps.v || ep.key !== eps.playing) loadEps(false);
+}
+
+function openEps(sid, ref, name) {
+  if (!sid) return;
+  Object.assign(eps, {open: true, sid: String(sid), ref: ref || "", v: "", playing: "", data: null, season: -1});
+  $("epsTitle").textContent = name || "";
+  $("epList").textContent = ""; $("seasons").textContent = ""; hide($("seasons"), true);
+  epsEmpty(W.loading);
+  hide($("browse"), true); hide($("eps"), !!tvOn);
+  try { history.pushState({eps: 1}, ""); } catch (e) { /* no history */ }
+  window.scrollTo({top: 0});
+  loadEps(true);
+}
+
+function closeEps() {
+  if (!eps.open) return;
+  eps.open = false; eps.gen++;
+  hide($("eps"), true); hide($("browse"), !!tvOn);
+  dockRoom();
+  if (follow) followSoon(0);
+}
+
+function epsPlaying() {
+  const ep = st.state !== "stopped" && st.episode;
+  return ep && ep.sid === eps.sid ? ep.key : "";
+}
+
+async function loadEps(first) {
+  const gen = ++eps.gen;
+  const ep = st.state !== "stopped" && st.episode && st.episode.sid === eps.sid ? st.episode : null;
+  const v = ep ? ep.v : "", was = eps.playing;
+  // Asked once per version: while the view loads, a poll asks nothing again.
+  eps.v = v; eps.playing = ep ? ep.key : was;
+  try {
+    const d = await getList("api/episodes?sid=" + encodeURIComponent(eps.sid) + (eps.ref ? "&ref=" + eps.ref : "")
+                            + (v ? "&v=" + v : ""));
+    if (gen !== eps.gen || !eps.open) return;
+    eps.data = d;
+    eps.playing = epsPlaying() || d.playing || "";
+    if (d.series) $("epsTitle").textContent = d.series;
+    const seasons = d.seasons || [];
+    // Opened on the playing episode's season (else the next one's); a change
+    // of episode takes the view along to its season.
+    const playingAt = seasons.findIndex((s) => (s.episodes || []).some((e) => e.key === eps.playing));
+    if (first || eps.season < 0 || eps.season >= seasons.length) eps.season = d.open || 0;
+    else if (eps.playing !== was && playingAt >= 0) eps.season = playingAt;
+    drawSeasons();
+    drawEps(first || eps.playing !== was);
+  } catch (e) {
+    if (gen === eps.gen) { eps.v = ""; if (first) epsEmpty(gone ? W.expired : W.offline); }
+  }
+}
+
+function drawSeasons() {
+  const box = $("seasons"), seasons = (eps.data && eps.data.seasons) || [];
+  box.textContent = "";
+  hide(box, seasons.length < 2);
+  seasons.forEach((s, i) => {
+    const b = document.createElement("button");
+    b.className = "tab"; b.setAttribute("role", "tab"); b.dataset.i = String(i);
+    b.setAttribute("aria-selected", String(i === eps.season));
+    b.textContent = s.label || "";
+    box.append(b);
+  });
+  const on = box.querySelector('[aria-selected="true"]');
+  if (on && on.scrollIntoView) on.scrollIntoView({block: "nearest", inline: "nearest"});
+  edges(box);
+}
+
+function epRow(e) {
+  const li = document.createElement("li");
+  const b = document.createElement("button");
+  const now = e.key === eps.playing;
+  b.className = "row ep" + (now ? " playing" : "");
+  b.dataset.ref = e.ref || ""; b.dataset.key = e.key || "";
+  const num = document.createElement("span"); num.className = "num"; num.textContent = e.n || "";
+  const sub = [e.min ? W.min.replace("{n}", e.min) : "", now ? W.playing : e.watched ? W.watched : ""]
+    .filter(Boolean).join(" · ");
+  const txt = textBlock(e.title || e.n || "", sub, now ? 0 : e.pct || 0);
+  if (now) txt.append(bar(0));
+  b.append(num, txt);
+  if (e.watched && !now) b.append(mark(CHECK, "ok"));
+  li.append(b);
+  return li;
+}
+
+function drawEps(bring) {
+  const list = $("epList"), seasons = (eps.data && eps.data.seasons) || [];
+  const season = seasons[eps.season] || {episodes: []};
+  list.textContent = "";
+  const frag = document.createDocumentFragment();
+  for (const e of season.episodes || []) frag.append(epRow(e));
+  list.append(frag);
+  epsEmpty(seasons.length ? "" : eps.data && eps.data.locked ? st.note || W.nothing_here : W.nothing_here);
+  epsTick();
+  if (bring) {
+    const at = list.querySelector(".row.playing");
+    if (at) requestAnimationFrame(() => bringIntoView(at, $("epsHead")));
+  }
+}
+
+// The playing episode's bar, from what the state says of where it is.
+function epsTick() {
+  if (!eps.open || !st.duration) return;
+  const i = $("epList").querySelector(".row.playing .pbar i");
+  if (!i) return;
+  const pos = (st.position || 0) + (st.state === "playing" ? (Date.now() - stAt) / 1000 : 0);
+  i.style.setProperty("width", Math.max(0, Math.min(100, 100 * pos / st.duration)).toFixed(1) + "%");
+}
+
+function epsPressed(e) {
+  const b = e.target.closest(".row");
+  if (!b || !b.dataset.ref) return;
+  b.classList.add("pending");
+  send("api/play_ref", {ref: b.dataset.ref}).then(() => b.classList.remove("pending"));
+}
+
+// Back - the page's arrows and the phone's own gesture: the Episodes view
+// first, then a section's place before.
+function goneBack() {
+  if (eps.open) { closeEps(); return; }
+  libPop();
+}
+
 function soon() { clearTimeout(pollTimer); pollTimer = setTimeout(poll, 350); }
 
 async function send(path, body) {
@@ -830,12 +1221,21 @@ async function send(path, body) {
 }
 
 function setTab(t) {
+  if (!SECTIONS.includes(t)) t = "all";
+  const was = tab;
   tab = t;
-  $("tabAll").setAttribute("aria-selected", String(t === "all"));
-  $("tabFav").setAttribute("aria-selected", String(t === "fav"));
+  for (const b of $("tabs").children) b.setAttribute("aria-selected", String(b.dataset.s === t));
   try { localStorage.setItem("tab", t); } catch (e) { /* private mode */ }
-  render();
-  window.scrollTo({top: Math.min(window.scrollY, $("list").offsetTop - 120)});
+  if (was !== t && (isLib() || !CHANNELS.includes(was))) { query = ""; $("q").value = ""; }
+  const on = $("tabs").querySelector('[aria-selected="true"]');
+  if (on && on.scrollIntoView) on.scrollIntoView({block: "nearest", inline: "nearest"});
+  hide($("list"), isLib()); hide($("lib"), !isLib()); hide($("empty"), isLib() || !$("empty").textContent);
+  if (isLib()) {
+    if (!lib.stack[t]) lib.stack[t] = [{p: t, title: ""}];
+    crumb(); libLoad(false);
+  } else { hide($("libEmpty"), true); crumb(); render(); }
+  const list = isLib() ? $("lib") : $("list");
+  window.scrollTo({top: Math.min(window.scrollY, Math.max(0, list.offsetTop - 120))});
 }
 
 function label(id, text) { const b = $(id); b.setAttribute("aria-label", text); b.title = text; }
@@ -859,10 +1259,10 @@ function setTv(on) {
   on = !!on;
   if (on === tvOn) return;
   tvOn = on;
-  hide($("browse"), on); hide($("tvr"), !on); hide($("dock"), on);
+  hide($("browse"), on || eps.open); hide($("eps"), on || !eps.open); hide($("tvr"), !on); hide($("dock"), on);
   document.body.classList.toggle("tv", on);
   $("tvBtn").setAttribute("aria-pressed", String(on));
-  nowCard(); dockRoom(); offer();
+  nowCard(); dockRoom(); offer(); epsOffer(st.state !== "stopped" && st.episode || null);
   if (on) window.scrollTo({top: 0});
   else if (follow) followSoon(0);
 }
@@ -930,17 +1330,44 @@ function initTv() {
 }
 
 function init() {
-  $("tabAll").textContent = W.channels; $("tabFav").textContent = W.favorites;
+  for (const [id, w] of [["tabAll", "channels"], ["tabFav", "favorites"], ["tabVod", "movies"],
+                         ["tabSeries", "series"], ["tabRecent", "recent"], ["tabLocal", "local"],
+                         ["tabRadio", "radio"], ["tabRec", "recordings"]]) $(id).textContent = W[w];
   $("q").placeholder = W.search; $("q").setAttribute("aria-label", W.search);
+  label("crumbBack", W.back_to); label("epsBack", W.back_to);
+  $("epsBtnText").textContent = W.episodes;
   label("toggle", W.play_pause); label("stop", W.stop); label("chUp", W.ch_up); label("chDown", W.ch_down);
   label("mute", W.mute); $("vol").setAttribute("aria-label", W.volume);
   $("nowTitle").textContent = W.loading;
   $("showInText").textContent = W.show_in_list;
   initTv();
   setTab(tab);
-  $("tabAll").addEventListener("click", () => setTab("all"));
-  $("tabFav").addEventListener("click", () => setTab("fav"));
-  $("q").addEventListener("input", (e) => { query = e.target.value; render(); });
+  $("tabs").addEventListener("click", (e) => {
+    const b = e.target.closest(".tab");
+    if (b && b.dataset.s) setTab(b.dataset.s);
+  });
+  $("q").addEventListener("input", (e) => {
+    query = e.target.value;
+    if (!isLib()) { render(); return; }
+    clearTimeout(qTimer);
+    qTimer = setTimeout(() => libLoad(false), tab === "radio" || tab === "local" ? 600 : 250);
+  });
+  $("lib").addEventListener("click", libPressed);
+  $("epList").addEventListener("click", epsPressed);
+  $("seasons").addEventListener("click", (e) => {
+    const b = e.target.closest(".tab");
+    if (!b) return;
+    eps.season = Number(b.dataset.i) || 0;
+    drawSeasons(); drawEps(false);
+    window.scrollTo({top: Math.min(window.scrollY, Math.max(0, $("epList").offsetTop - 160))});
+  });
+  $("epsBtn").addEventListener("click", () => {
+    const ep = st.episode;
+    if (ep && ep.sid) openEps(ep.sid, "", ep.series);
+  });
+  for (const id of ["crumbBack", "epsBack"]) $(id).addEventListener("click", () => history.back());
+  try { history.replaceState({top: 1}, ""); } catch (e) { /* no history */ }
+  window.addEventListener("popstate", goneBack);
   $("showIn").addEventListener("click", showInList);
   $("list").addEventListener("click", (e) => {
     const b = e.target.closest(".row");
@@ -973,8 +1400,10 @@ function init() {
   $("nowImg").addEventListener("load", () => { hide($("nowImg"), false); hide($("nowInitials"), true); });
   $("nowImg").addEventListener("error", () => { hide($("nowImg"), true); hide($("nowInitials"), false); });
   if ("IntersectionObserver" in window) {
-    new IntersectionObserver((es) => { if (es.some((x) => x.isIntersecting) && shown < rows.length) more(); },
-                             {rootMargin: "600px"}).observe($("more"));
+    new IntersectionObserver((es) => {
+      if (!es.some((x) => x.isIntersecting)) return;
+      if (isLib()) libLoad(true); else if (shown < rows.length) more();
+    }, {rootMargin: "600px"}).observe($("more"));
     new IntersectionObserver((es) => {
       nowSeen = es[0].isIntersecting;
       hide($("mini"), nowSeen || !$("mini").textContent);
@@ -982,7 +1411,12 @@ function init() {
   }
   if ("ResizeObserver" in window) new ResizeObserver(dockRoom).observe($("dock"));
   window.addEventListener("resize", dockRoom);
-  watchHands(); dockRoom();
+  for (const id of ["tabs", "seasons"]) {
+    const row = $(id);
+    row.addEventListener("scroll", () => edges(row), {passive: true});
+    window.addEventListener("resize", () => edges(row));
+  }
+  watchHands(); dockRoom(); edges($("tabs"));
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) { poll(); if (follow) followSoon(0); } else clearTimeout(pollTimer);
   });

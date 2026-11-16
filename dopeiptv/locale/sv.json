@@ -2918,5 +2918,6 @@
   "cat_find_live": "Hitta kategorier efter namn eller kanal…",
   "cat_find_vod": "Hitta kategorier efter namn eller film…",
   "cat_find_series": "Hitta kategorier efter namn eller serie…",
-  "sa_placeholder_all": "Sök i allt, i alla dina källor (t.ex. Star Trek)"
+  "sa_placeholder_all": "Sök i allt, i alla dina källor (t.ex. Star Trek)",
+  "phone_page_ep_prev": "Föregående avsnitt"
 }

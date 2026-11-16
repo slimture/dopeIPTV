@@ -736,17 +736,30 @@ class _SeriesPageMixin:
         if self._sp_local is not None:
             self._sp_play_local(ep, at)
             return
+        self._play_series_episode(self._sp_ctx or {}, self._sp_seasons, ep, at)
+
+    def _play_series_episode(self, series: dict, seasons: list, ep: dict,
+                             at: float | None = None) -> bool:
+        """A source's episode *ep* of *series* in the docked player, with
+        the series as its context for the moment - resume, marks, Trakt and
+        Simkl, History, and autoplay's queue (*seasons* in order, the
+        Specials among themselves). *at*: where it starts, without the
+        resume question. The page plays through here, and the phone's
+        Episodes view (mw_phone_browse). False when nothing could start."""
         if ep.get("id") is None:
-            return
-        if self._links_later(partial(self._sp_episode_url, ep), partial(self._sp_play, ep, at)):
-            return
+            return False
+        if self._links_later(partial(self._sp_episode_url, ep),
+                             partial(self._play_series_episode, series, seasons, ep, at)):
+            return True
         url = self._sp_episode_url(ep)
         if not url:
             self._set_status(tr("err_series_open"), error=True)
-            return
-        queue = self._sp_queue(ep)
+            return False
+        key = self._item_key(ep)
+        season = next((s for s in seasons if any(e is ep for e in s.episodes)), None)
+        queue = sv.flow(seasons, specials=bool(season and season.specials))
         saved = self.series_ctx
-        self.series_ctx = self._sp_ctx
+        self.series_ctx = series
         try:
             self._ep_queue_override = queue
             self._ep_index_override = next((i for i, e in enumerate(queue) if e is ep), -1)
@@ -763,6 +776,7 @@ class _SeriesPageMixin:
             # next episode played from elsewhere.
             self._ep_queue_override = None
             self._ep_index_override = -1
+        return True
 
     def _sp_episode_url(self, ep: dict) -> str:
         return self.client.episode_url(ep.get("id"), ep.get("container_extension")) or ""

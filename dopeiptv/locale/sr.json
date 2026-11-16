@@ -2918,5 +2918,6 @@
   "cat_find_live": "Pronađi kategorije po nazivu ili kanalu…",
   "cat_find_vod": "Pronađi kategorije po nazivu ili filmu…",
   "cat_find_series": "Pronađi kategorije po nazivu ili seriji…",
-  "sa_placeholder_all": "Pretražite sve u svim svojim izvorima (npr. Star Trek)"
+  "sa_placeholder_all": "Pretražite sve u svim svojim izvorima (npr. Star Trek)",
+  "phone_page_ep_prev": "Prethodna epizoda"
 }

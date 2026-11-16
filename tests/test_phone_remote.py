@@ -287,10 +287,10 @@ def test_the_page_is_whole_in_itself_and_its_policy_allows_only_it():
 
 def test_the_page_asks_only_its_own_server():
     script = phone_page._JS
-    asked = set(re.findall(r'"(api/[a-z_]+|logo/)"', script))
+    asked = set(re.findall(r'"(api/[a-z_]+|logo/|thumb/)[?"]', script))
     assert asked == {"api/state", "api/channels", "api/play", "api/toggle", "api/stop", "api/next",
                      "api/previous", "api/mute", "api/volume", "api/tv", "api/tv_key", "api/touch", "api/profile",
-                     "logo/"}
+                     "api/play_ref", "api/browse", "api/episodes", "logo/", "thumb/"}
     assert {a[4:] for a in asked if a.startswith("api/")} <= phone_remote.READ | phone_remote.WRITE
 
 
