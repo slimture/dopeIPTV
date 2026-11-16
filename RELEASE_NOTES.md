@@ -1,9 +1,10 @@
 ## dopeIPTV 1.6.1
 
-**A calmer guide, a night mode that tames loud adverts and bangs, the visualizer for music channels, and your settings on a new computer in one step.**
+**Smooth scrolling while video plays, a calmer guide, a night mode that tames loud adverts and bangs, the visualizer for music channels, and your settings on a new computer in one step.**
 
 ### New and better
 
+- **Smooth while something plays.** The picture is now drawn on its own, apart from the rest of the window: scrolling a list, the guide or a series' page stays smooth while a channel, a film or the visualizer plays, and nothing in the window can make the video stutter. If a computer cannot draw it that way, dopeIPTV uses the old way by itself - **Settings → Nerd → Diagnostics** says which.
 - **A calmer, denser guide.** Lower rows, so more channels fit; a narrower channel column that shows only the logos when the guide is narrow (drag its edge to set the width); flat cards with a thin progress bar on what is on now; a line at the time now; separators like "-= Sweden =-" as headings; and rows without guide data left empty instead of repeating the same sentence. The now line runs behind the programmes - **Settings → Guide** puts it in front.
 - **Night mode that works.** Loud adverts, explosions and bangs come down while ordinary speech stays exactly as it is - it never makes anything louder - press `N`. It says so however you switch it, and tells you when it could not be turned on for a stream.
 - **The visualizer for music and radio channels.** A channel in your playlist with sound but no picture now shows the visualizer instead of a black screen. Two new styles, Vectorscope and Frequencies, make five - in the player's options menu.
