@@ -138,6 +138,18 @@ def count_line():
     return tr("count_channels", n=n)
 
 
+def list_line(source):
+    # The status line once the list's work on the pool has landed: on a
+    # loaded machine one pump is not always enough for the filter's rows.
+    want = tr("status_list_source", source=source, text=count_line())
+    for _ in range(300):
+        if w.count_lbl.text() == want:
+            break
+        pump(1)
+        want = tr("status_list_source", source=source, text=count_line())
+    return want
+
+
 def switch_to(pl):
     store.set_active(pl["id"])
     w._update_playlist_btn()
@@ -157,7 +169,7 @@ assert lbl.mapTo(w, lbl.rect().topLeft()).y() >= \
 
 # -- the status line: the list's source, nothing playing ----------------------------
 assert w.list_model.rowCount() > 0
-assert w.count_lbl.text() == tr("status_list_source", source="Pirat", text=count_line()), \
+assert w.count_lbl.text() == list_line("Pirat"), \
     w.count_lbl.text()
 
 # -- a click opens the avatar's menu, under the name --------------------------------
@@ -181,7 +193,7 @@ assert sip.isdeleted(menu), "the source menu was kept"
 # -- another source: the name and kind follow, the status line too ------------------
 switch_to(jelly)
 assert (lbl.name(), lbl.kind()) == ("Jellyfin test", "Jellyfin")
-assert w.count_lbl.text() == tr("status_list_source", source="Jellyfin test", text=count_line())
+assert w.count_lbl.text() == list_line("Jellyfin test")
 
 # -- something plays from Pirat while Jellyfin test's list shows ----------------------
 url = "http://pirat.invalid/live/1.ts"
@@ -212,14 +224,14 @@ w._playing_src = (pirat["id"], "Pirat")
 w._set_status(w._status_playing("SVT1 HD"))
 # Stop: the list's own line again, with its source.
 w._on_player_stopped()
-assert w.count_lbl.text() == tr("status_list_source", source="Jellyfin test", text=count_line()), \
+assert w.count_lbl.text() == list_line("Jellyfin test"), \
     w.count_lbl.text()
 
 # -- a rename: the name and the status line follow -----------------------------------
 store.update(jelly["id"], name="Jellyfin hemma")
 w._update_playlist_btn()
 assert lbl.name() == "Jellyfin hemma"
-assert w.count_lbl.text() == tr("status_list_source", source="Jellyfin hemma", text=count_line())
+assert w.count_lbl.text() == list_line("Jellyfin hemma")
 
 # -- TV mode's header: the source beside the clock, following a switch ---------------
 from dopeiptv.ui.tv_mode import TvPage
