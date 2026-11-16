@@ -5,11 +5,15 @@ prompt when one comes due. Split out of main_window.py to keep the core window
 smaller; every method operates on MainWindow state (self.reminders,
 self.switch_mode, self.play_live_channel, ...) through the mixin, so behaviour
 is identical to when these lived on MainWindow directly.
+
+The other sources' reminders (set from the Search page) fire too, whichever
+source is in use; Watch now plays their channel from their own source.
 """
 from __future__ import annotations
 
 import time
 
+from ..core.log import log
 from ..i18n import tr
 
 
@@ -83,13 +87,47 @@ class _RemindersMixin:
         RemindersDialog(self).exec()
 
     def _check_reminders(self) -> None:
-        due = self.reminders.due(int(time.time()))
+        now = int(time.time())
+        due = list(self.reminders.due(now)) + self._other_sources_due(now)
         if not due:
             return
         if len(due) == 1:
             self._fire_reminder(due[0])
         else:
             self._fire_reminders(due)
+
+    def _other_sources_due(self, now: int) -> list:
+        """The reminders of the other sources that are due now - set from
+        the Search page, they fire whichever source is in use; each knows
+        its source (``_source``), whose channel Watch now plays."""
+        store = getattr(self, "playlist_store", None)
+        if store is None:
+            return []
+        from ..services.reminders import ReminderStore
+        out = []
+        try:
+            for pl in store.playlists():
+                pid = pl.get("id")
+                if not pid or pid == store.active_id:
+                    continue
+                for r in ReminderStore(self._own(self.settings), pid).due(now):
+                    out.append(dict(r, _source=dict(pl)))
+        except Exception:
+            log.debug("reminders: the other sources' were not read", exc_info=True)
+        return out
+
+    def _watch_reminded(self, r: dict) -> None:
+        """Watch now: the reminder's channel - from its own source when that
+        is not the one in use (the Search page's way: no switch)."""
+        ch = r.get("ch") or {}
+        if ch.get("stream_id") is None:
+            return
+        pl = r.get("_source")
+        if isinstance(pl, dict) and hasattr(self, "_play_channel_elsewhere"):
+            self._play_channel_elsewhere(pl, dict(ch))
+            return
+        self.switch_mode("live")
+        self.play_live_channel(ch)
 
     def _fire_reminder(self, r: dict) -> None:
         ch = r.get("ch") or {}
@@ -100,9 +138,8 @@ class _RemindersMixin:
                channel=ch.get("name") or ""),
             [(tr("reminder_watch_now"), "primary"),
              (tr("common_dismiss"), "normal")])
-        if idx == 0 and ch.get("stream_id") is not None:
-            self.switch_mode("live")
-            self.play_live_channel(ch)
+        if idx == 0:
+            self._watch_reminded(r)
 
     def _fire_reminders(self, due: list) -> None:
         """Several reminders came due at once: one dialog listing them, each a
@@ -116,7 +153,4 @@ class _RemindersMixin:
             tr("reminder_now_title"),
             tr("reminder_multi_body", n=len(due)), options)
         if idx is not None and idx < len(due):
-            ch = (due[idx].get("ch") or {})
-            if ch.get("stream_id") is not None:
-                self.switch_mode("live")
-                self.play_live_channel(ch)
+            self._watch_reminded(due[idx])

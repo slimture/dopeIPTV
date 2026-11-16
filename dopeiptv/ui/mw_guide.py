@@ -138,6 +138,8 @@ class _GuideMixin:
             self._check_nav("home")
         elif self._guide_page_showing():
             self._check_nav("guide")
+        elif self._search_page_showing():
+            self._check_nav("search")
         else:
             self._check_nav(self._nav_key_for_mode(self.mode))
 

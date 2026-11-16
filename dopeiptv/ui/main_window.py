@@ -107,6 +107,7 @@ from .mw_popout import _PopoutMixin
 from .mw_reminders import _RemindersMixin
 from .mw_series import _SeriesMixin
 from .mw_series_page import _SeriesPageMixin
+from .mw_search_all import _SearchAllMixin
 from .mw_stats import _StatsMixin
 from .mw_search import _SearchMixin
 from .mw_shortcuts import _ShortcutsMixin
@@ -146,7 +147,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _NavMixin, _SourceLabelMixin, _ShortcutsMixin, _PaletteMixin, _OnboardingMixin, _SortMixin,
                  _LocalFilesMixin, _RadioMixin, _WebStreamsMixin,
                  _PopoutMixin, _MultiviewMixin, _HomeMixin, _GuideMixin,
-                 _SeriesPageMixin, _MprisMixin,
+                 _SeriesPageMixin, _SearchAllMixin, _MprisMixin,
                  _FollowMixin, _SubtitlesMixin, _CastMixin, _AirPlayMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
                  _HealthMixin, _TsAnalysisMixin, _StreamInfoMixin, _ChannelPrefsMixin, _RemoteMixin, _PhoneMixin, _ServerMixin, _CalendarMixin,
@@ -474,6 +475,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Its name over the categories, TV mode's header and the status
         # line follow every change the avatar does (mw_source_label).
         self._update_source_label()
+        # ...and the Search page lets go of what it read of a source removed
+        # or edited since.
+        self._search_sources_changed()
         store = self.playlist_store
         pl = store.get(store.active_id) if (store and store.active_id) else None
         name = ((pl or {}).get("name") or (pl or {}).get("server") or "")
@@ -651,7 +655,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # programme bars on a timeline. Drawn, not emoji: every OS renders its
         # own emoji font differently.
         self._rail_glyphs = {
-            "home": "home", "live": "tv", "guide": "guide", "vod": "movie",
+            "home": "home", "search": "search", "live": "tv", "guide": "guide", "vod": "movie",
             "series": "series", "rec": "rec", "local": "folder_o",
             "radio": "radio", "fav": "star", "watchlist": "bookmark", "history": "clock",
         }
@@ -687,10 +691,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._apply_nav_color(key)
 
         # Places: where content lives, always at the top. Home first - it is
-        # not a MODE (it swaps the whole central stack), and the Guide is a
-        # page over the list, no mode either; _on_nav_clicked sends each
-        # where it belongs.
-        for key, text in (("home", tr("nav_home")), ("live", tr("nav_tv")),
+        # not a MODE (it swaps the whole central stack) - then Search, across
+        # every source; it and the Guide are pages over the list, no modes
+        # either; _on_nav_clicked sends each where it belongs.
+        for key, text in (("home", tr("nav_home")), ("search", tr("nav_search")),
+                          ("live", tr("nav_tv")),
                           ("guide", tr("nav_guide")),
                           ("vod", tr("nav_movies")),
                           ("series", tr("nav_series")),
@@ -846,6 +851,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # A category clicked while the Guide shows: that category's list.
         self.cat_list.itemClicked.connect(self._guide_category_clicked)
         self.cat_list.itemClicked.connect(self._sp_category_clicked)
+        self.cat_list.itemClicked.connect(self._search_category_clicked)
         self.cat_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.cat_list.customContextMenuRequested.connect(self._cat_menu)
         sl.addWidget(self.cat_list, 1)
@@ -2148,6 +2154,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self._series_page_visible():
             self._leave_series_page()
             return
+        # The Search page: its field emptied first, then back where you were.
+        if self._search_page_visible():
+            self._search_escape()
+            return
         self._exit_player_fullscreen()
 
     def _exit_player_fullscreen(self) -> None:
@@ -2271,6 +2281,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Whole-catalogue copies built from the previous fetch (or provider).
         self._full_catalog = None
         self._search_index_cache = {}
+        if force:
+            self._search_source_refreshed()   # the Search page reads it anew
         self._clear_ts_broken()   # re-trust the provider's tv_archive flags
         pl = self.playlist_store.active() if self.playlist_store else None
         pid = (pl or {}).get("id")
@@ -2350,7 +2362,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                             tr("pl_dropped_switch", name=pl["name"])):
             self.switch_playlist(pl["id"])
 
-    def switch_playlist(self, pid: str) -> None:
+    def switch_playlist(self, pid: str, then=None) -> None:
+        """Use source *pid* from now on, once it answers; *then* runs after
+        (the Search page plays a film of it, or opens a series)."""
         pl = self.playlist_store.get(pid) if self.playlist_store else None
         if not pl:
             return
@@ -2397,6 +2411,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # fresh - no forced network reload. A manual Refresh or the auto-
             # refresh time setting still drives a real re-fetch.
             self.refresh_playlist(force=False)
+            if then is not None:
+                then()
 
         def fail(msg):
             self._hide_busy()
@@ -2423,8 +2439,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not getattr(self, "_guide_hold", False):
             self._close_guide_page()
         self._close_series_page()       # a series' page gives way to the list
+        # ...and the Search page, unless the window moves on by itself (a
+        # source switched to from it has no list of the mode shown).
+        if not getattr(self, "_search_hold", False):
+            self._close_search_page()
         # Watched is History's second filter: History is the entry lit.
         self._check_nav("guide" if self._guide_page_showing()
+                        else "search" if self._search_page_showing()
                         else self._nav_key_for_mode(mode))
         self.mode = mode
         self.series_ctx = None
@@ -2505,11 +2526,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # (Its shortcut and menu entries still open it.)
         if guide is not None:
             guide.setVisible(known["live"] is not False)
-        # If the mode you're on just got hidden, move to the first visible one.
+        # If the mode you're on just got hidden, move to the first visible one
+        # (under the Search page, which stays: the window moved, not you).
         if self.mode in modes and known[self.mode] is False:
             for m in modes:
                 if known[m] is not False:
-                    self.switch_mode(m)
+                    self._search_hold = True
+                    try:
+                        self.switch_mode(m)
+                    finally:
+                        self._search_hold = False
                     break
 
     def _remembered_cat_row(self, default_row: int = 0) -> int:
@@ -2535,6 +2561,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _load_categories(self) -> None:
         self._load_gen += 1
         gen = self._load_gen
+        # The Search page on screen follows the lists: the lock shut (Lock
+        # now), a category hidden or locked - found again at once.
+        self._search_rules_check()
         # Reset the category search: it only applies to the provider sections
         # that actually have categories (live/movies/series). Collapse the box
         # back to just its 🔍 toggle on every section switch.
@@ -2838,6 +2867,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # Arrowed through the sidebar's categories: their list, in the
             # series page's place (a click does the same, _sp_category_clicked).
             self._sp_category_clicked()
+        if self._search_page_showing() and self.cat_list.hasFocus():
+            self._search_category_clicked()
         self.series_ctx = None
         self.back_btn.hide()
         self._update_sync_btn()

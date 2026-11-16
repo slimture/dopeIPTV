@@ -131,8 +131,10 @@ class _SourceLabelMixin:
         return source_name(now) or src[1]       # renamed since, or removed
 
     def _failover_playing(self) -> bool:
+        """Failover's stream plays (its title names its source already)."""
         fk = getattr(self, "_failover_key", None)
-        return fk is not None and getattr(self, "_playing_key", None) == fk
+        return (fk is not None and getattr(self, "_playing_key", None) == fk
+                and getattr(self, "_failover_named", True))
 
     def _status_playing(self, title: str) -> str:
         """"Playing: X" - and "from Pirat" when X is not the shown source's

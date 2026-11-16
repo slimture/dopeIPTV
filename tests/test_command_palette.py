@@ -224,8 +224,13 @@ def test_a_big_guide_is_never_matched_on_the_window_s_thread(app, monkeypatch):
         assert on_window == [], f"matched on the window's thread: {on_window}"
         assert not pal.none.isVisibleTo(pal), "nothing found is not said while it looks"
         assert settled(), q
-        got = [e.text.split(" · ")[0] for e in pal.entries if e.group == "channels"]
+        got = [e.text.split(" · ")[0] for e in pal.entries
+               if e.group == "channels" and e.payload[0] != "search_all"]
         assert got == expected(q), (q, got)
+        # Last, the Search page with the query, across every source (a
+        # query of one letter would find nothing there).
+        last = pal.entries[-1].payload
+        assert (last == ("search_all", q)) == (len(q) > 1), (q, last)
     assert on_window == []
 
     # Typed on before the answer came: only the newest query's rows go in.
@@ -534,7 +539,10 @@ s.setValue("nerd_enabled", "false")
 played = []
 w.tune_from_guide = lambda ch: played.append(ch.get("name"))
 chans = [e for e in ask("SINTEL") if e.group == "channels"]
-assert [(e.kind, e.text) for e in chans] == [(tr("pal_kind_channel"), "Sintel")], chans
+assert [(e.kind, e.text) for e in chans[:-1]] == [(tr("pal_kind_channel"), "Sintel")], chans
+# The last row: the Search page with what was typed, every source's.
+assert chans[-1].payload == ("search_all", "SINTEL"), chans[-1]
+assert chans[-1].text == tr("pal_search_all", query="SINTEL")
 assert [e.text for e in ask("3") if e.group == "channels" and e.payload[0] == "channel"][:1] == ["Sintel"]
 prog = next(e for e in ask("nattsandning musik") if e.group == "channels")
 assert prog.payload[0] == "programme" and prog.kind == tr("pal_kind_programme")

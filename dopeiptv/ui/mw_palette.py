@@ -12,7 +12,8 @@ window. It finds, as it is typed in:
   number, its series by title and the guide's programmes from now on by
   title - a channel chosen plays, a series opens its page
   (ui/mw_series_page.py), a programme offers play, record and remind, as
-  the guide does.
+  the guide does - and last "Search everywhere for …", the Search page
+  with what was typed, across every source (ui/mw_search_all.py).
 
 The channels and the guide are folded once per opening on a worker
 (core/palette_match.py); the series follow in a job of their own, never
@@ -43,6 +44,7 @@ from .. import APP_NAME
 from ..core import channel_numbers, privacy, profiles, shortcut_keys
 from ..core.log import log
 from ..core.palette_match import Index, fold, words
+from ..core.search_all import MIN_QUERY
 from ..core.workers import run_async
 from ..i18n import tr
 from .app_menu import GROUPS as MENU_GROUPS
@@ -388,9 +390,19 @@ class _PaletteMixin:
         cat = getattr(self, "_pal_catalogue", None)
         if cat is not None and cat.size() > MATCH_HERE:
             self._palette_match_later(cat, query, terms, out)
-            return out
+            return out + self._palette_everywhere(query)
         out += self._palette_find_channels(query, terms)
-        return out
+        return out + self._palette_everywhere(query)
+
+    @staticmethod
+    def _palette_everywhere(query: str) -> list[Entry]:
+        """The last row: the Search page with *query*, across every source
+        (none for a query it would find nothing for)."""
+        q = " ".join(query.split())
+        if len(" ".join(words(q))) < MIN_QUERY:
+            return []
+        return [Entry("channels", tr("nav_search"), tr("pal_search_all", query=q),
+                      more=tr("pal_search_all_more"), payload=("search_all", q))]
 
     def _palette_match_later(self, cat: PaletteCatalogue, query: str, terms: list[str],
                              now: list[Entry]) -> None:
@@ -420,7 +432,8 @@ class _PaletteMixin:
         if (hits is None or pal is None or gen != getattr(self, "_pal_latest", [0])[0]
                 or getattr(self, "_pal_catalogue", None) is not cat):
             return
-        pal.deliver(query, now + self._palette_channel_entries(cat, *hits))
+        pal.deliver(query, now + self._palette_channel_entries(cat, *hits)
+                    + self._palette_everywhere(query))
 
     def _palette_match_failed(self, gen: int, cat: PaletteCatalogue, query: str,
                               now: list[Entry], err) -> None:
@@ -553,6 +566,8 @@ class _PaletteMixin:
             self.tune_from_guide(what)
         elif kind == "series":
             self._open_series_page(what)
+        elif kind == "search_all":
+            self._open_search_page(what)
         elif kind == "record":
             ch, p = what
             self._record_programme(ch, {"title": p.get("title")},

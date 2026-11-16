@@ -22,6 +22,9 @@ class _FailoverMixin:
     _failover_row: dict | None = None       # the other source's row of it
     _failover_key: Any = None
     _failover_tried: Any = None
+    # The stream's title names its source (failover's), or the status line
+    # says it (a channel of another source played from the Search page).
+    _failover_named = True
     # Moves on with every start and stop: a lookup that comes back after the
     # user played something else, or pressed Stop, must not take over.
     _failover_gen = 0
@@ -95,16 +98,28 @@ class _FailoverMixin:
         return out
 
     def _failover_play(self, pl: dict, row: dict, url: str, name: str) -> None:
+        source = str(pl.get("name") or pl.get("server") or "")
+        self._play_other_source(pl, row, url, f"{row.get('name') or name} · {source}",
+                                named=True)
+        self._show_toast(tr("failover_playing", name=name, source=source), 6000)
+
+    def _play_other_source(self, pl: dict, row: dict, url: str, title: str = "",
+                           named: bool = False) -> None:
+        """*row*, a live channel of source *pl* - not the one in use - in the
+        docked player through the window's path, the active source left as
+        it is: with that source's own user agent and proxy (Nerd), counted
+        against that source's account, under a key of its own (no row of
+        the active source's lists is taken for it; Recently viewed is the
+        active source's). Failover's title names the source (*named*);
+        otherwise the status line says it ("from Pirat")."""
         nerd.set_source(pl)
         self._failover_source = pl
         self._failover_url = url
-        source = str(pl.get("name") or pl.get("server") or "")
-        title = f"{row.get('name') or name} · {source}"
+        self._failover_named = named
         self._failover_row = dict(row)
         self._failover_key = f"failover:{pl.get('id')}:{row.get('stream_id')}"
-        self._start_playback(url, title, row.get("stream_icon"), self._failover_key,
-                             "live", record=False)
-        self._show_toast(tr("failover_playing", name=name, source=source), 6000)
+        self._start_playback(url, title or str(row.get("name") or "dopeIPTV"),
+                             row.get("stream_icon"), self._failover_key, "live", record=False)
 
     def _failover_row_for(self, key: Any) -> dict | None:
         """The other source's row of the channel playing from it as *key* -

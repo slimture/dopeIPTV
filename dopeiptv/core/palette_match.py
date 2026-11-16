@@ -84,6 +84,13 @@ class Index:
         """The positions of at most *limit* texts that match *query*: the
         best first, a shorter text before a longer one at the same score,
         then the order given."""
+        return [i for _s, i in self.scored(query, limit, terms)]
+
+    def scored(self, query: str, limit: int,
+               terms: Sequence[str] | None = None) -> list[tuple[int, int]]:
+        """``search`` with each match's score: (score, position), the best
+        first - what puts the matches of several indexes in one order (the
+        search across sources, core/search_all.py)."""
         terms = list(terms) if terms is not None else words(query)
         if not terms or limit <= 0:
             return []
@@ -100,4 +107,4 @@ class Index:
                     else:
                         hits.append((s, -len(f), -i))
         best = heapq.nlargest(limit, hits)
-        return [-i for _s, _n, i in best]
+        return [(s, -i) for s, _n, i in best]

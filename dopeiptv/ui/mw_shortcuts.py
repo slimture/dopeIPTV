@@ -193,7 +193,7 @@ class _ShortcutsMixin:
             "record": self._shortcut_record,
             "stats": self._shortcut_stats,
             "epg_guide": self._shortcut_epg_guide,
-            "epg_search": self._open_epg_search,
+            "epg_search": self._shortcut_search,
             "reminders": self._open_reminders,
             "sidebar": self._shortcut_sidebar,
             "focus_mode": self._shortcut_focus_mode,

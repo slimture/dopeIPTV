@@ -64,6 +64,7 @@ class _SeriesPageMixin:
     _sp_ctx: dict | None = None
     _sp_local: str | None = None
     _sp_return_home = False
+    _sp_return_search = False
     _sp_seasons: list = []
     _sp_next: sv.NextUp | None = None
     _sp_start_once: tuple | None = None
@@ -135,11 +136,12 @@ class _SeriesPageMixin:
         return True
 
     def _open_series_page(self, series: dict, focus: Any = None,
-                          home: bool | None = None) -> None:
+                          home: bool | None = None, from_search: bool = False) -> None:
         """*series*' page (a series row: its series_id at least), on the
         episode *focus* when one is asked for (what plays, a new one).
         *home*: opened from Home (Back goes there) - by default, whether
-        Home shows."""
+        Home shows. *from_search*: from the Search page (Back goes there,
+        its results as they were)."""
         if not isinstance(series, dict) or series.get("series_id") is None:
             return
         if not self._sp_allowed(series):
@@ -148,7 +150,7 @@ class _SeriesPageMixin:
         same = (self._series_page_showing() and self._sp_local is None
                 and str((self._sp_ctx or {}).get("series_id")) == str(series["series_id"]))
         self._sp_local = None
-        page = self._sp_show_page(home)
+        page = self._sp_show_page(home, from_search)
         if same and self._sp_seasons:
             if focus is not None:
                 page.focus_episode(str(focus))
@@ -164,13 +166,14 @@ class _SeriesPageMixin:
         self._sp_fetch()
         page.view.setFocus()
 
-    def _sp_show_page(self, home: bool | None = None) -> SeriesPage:
+    def _sp_show_page(self, home: bool | None = None, from_search: bool = False) -> SeriesPage:
         """The page in the middle pane. From Home, the Series entry is lit
-        (Back goes Home); from a list, that list's stays lit (Back goes
-        there)."""
+        (Back goes Home); from the Search page, Search's (Back goes there);
+        from a list, that list's stays lit (Back goes there)."""
         showing = self._home_showing()
-        back_home = (showing if home is None else home) or (
-            self._series_page_showing() and self._sp_return_home)
+        back_search = from_search or (self._series_page_showing() and self._sp_return_search)
+        back_home = not back_search and ((showing if home is None else home) or (
+            self._series_page_showing() and self._sp_return_home))
         if showing:
             self._leave_home()
         self._close_guide_page()
@@ -179,7 +182,9 @@ class _SeriesPageMixin:
         page = self._ensure_series_page()
         self._mid_stack.setCurrentWidget(page)
         self._sp_return_home = back_home
-        self._check_nav("series" if back_home else self._nav_key_for_mode(self.mode))
+        self._sp_return_search = back_search
+        self._check_nav("search" if back_search else "series" if back_home
+                        else self._nav_key_for_mode(self.mode))
         if self._sp_timer is not None:
             self._sp_timer.start()
         return page
@@ -930,6 +935,7 @@ class _SeriesPageMixin:
     def _close_series_page(self) -> None:
         """The list back in the middle pane (the page kept, hidden)."""
         self._sp_return_home = False
+        self._sp_return_search = False
         if self._sp_timer is not None:
             self._sp_timer.stop()
         if self._series_page_showing():
@@ -940,8 +946,11 @@ class _SeriesPageMixin:
         else the list under it, as it was, with its entry lit."""
         if not self._series_page_showing():
             return
-        home = self._sp_return_home
+        home, search = self._sp_return_home, self._sp_return_search
         self._close_series_page()
+        if search:
+            self._sa_back_from_series()
+            return
         if home and self._home_enabled():
             self._show_home_page()
             return

@@ -401,6 +401,12 @@ class StalkerClient(Mirrored, ListCache):
     # those whose rows are films or series.
     _LIVE_KEYS = ("itv_all", "itv_genre")
     _TITLE_KEYS = ("vod", "series")
+    # A portal's catalogue comes a page at a time - hundreds of requests for
+    # all of it - so the search across sources reads only the lists fetched
+    # before (loaded), and never pages through the rest.
+    paged_lists = True
+    # Categories read from disk at most, looking for their lists (loaded).
+    LOADED_CATEGORIES = 500
 
     def __init__(self, server: str, mac: str,
                  cache_path: str | None = None) -> None:
@@ -746,6 +752,58 @@ class StalkerClient(Mirrored, ListCache):
                 if isinstance(row, dict) and str(row.get(field)) == want:
                     return row
         return None
+
+    def _held(self, key: tuple) -> list | None:
+        """*key*'s list as fetched before - in memory, else its copy on
+        disk, whatever its age; None when it never was. Nothing is asked of
+        the portal."""
+        with self._list_lock:
+            hit = self._list_cache.get(key)
+        if hit is None:
+            hit = self._disk_hit(key)
+        return list(hit[1]) if hit is not None and isinstance(hit[1], list) else None
+
+    def loaded(self, kind: str) -> tuple[list[dict], list[dict], bool]:
+        """(rows, categories, whole) of *kind* ("live", "vod" or "series")
+        from the lists fetched before - this session's, or their copies on
+        disk - and nothing asked of the portal: *whole* when the whole
+        catalogue of that kind is among them. The search across sources
+        reads a portal this way (paged_lists)."""
+        if kind == "live":
+            cats = self._held(("itv_genres",)) or []
+            every = self._held(("itv_all",)) or self._held(("itv_genre", "*"))
+
+            def key_of(cid: str) -> tuple:
+                return ("itv_genre", cid)
+            ident = "stream_id"
+        else:
+            mod = self._held(("series_module",))
+            module = "series" if kind == "series" and mod and mod[0] == "series" else "vod"
+            cats = self._held((("series_categories",) if module == "series"
+                               else ("vod_categories",))) or []
+            every = self._held((module, "list", "*"))
+
+            def key_of(cid: str) -> tuple:
+                return (module, "list", cid)
+            ident = "series_id" if kind == "series" else "stream_id"
+        whole = every is not None
+        lists = [every] if every is not None else []
+        if every is None:
+            ids = [str(c.get("category_id")) for c in cats
+                   if isinstance(c, dict) and c.get("category_id") is not None]
+            whole = bool(ids) and len(ids) <= self.LOADED_CATEGORIES
+            for cid in ids[:self.LOADED_CATEGORIES]:
+                held = self._held(key_of(cid))
+                if held is None:
+                    whole = False
+                else:
+                    lists.append(held)
+        rows: dict[str, dict] = {}
+        for got in lists:
+            for r in got:
+                if isinstance(r, dict) and r.get(ident) is not None:
+                    rows.setdefault(str(r[ident]), r)
+        return list(rows.values()), cats, whole
 
     def _root(self) -> str:
         ep = self._endpoint or (self._endpoints[0] if self._endpoints

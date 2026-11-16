@@ -158,7 +158,7 @@ w._set_sidebar_collapsed(False)
 pump(10)
 
 # -- the order: places, MINE, the foot ----------------------------------------
-places = ["home", "live", "guide", "vod", "series", "rec", "local", "radio"]
+places = ["home", "search", "live", "guide", "vod", "series", "rec", "local", "radio"]
 mine = ["fav", "watchlist", "history"]
 assert list(w.nav_btns) == places + mine, list(w.nav_btns)
 assert "watched" not in w.nav_btns

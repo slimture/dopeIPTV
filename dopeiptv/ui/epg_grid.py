@@ -836,8 +836,8 @@ class EpgGrid(QWidget):
         return self.CH_COL_W + (ts - self._start) / 60 * self._ppm
 
     def _open_search(self) -> None:
-        from .epg_search import EpgSearchDialog
-        EpgSearchDialog(self.window).exec()
+        """The Search page, across every source's guide (and the rest)."""
+        self.window._open_search_page()
 
     def _bar_icon(self, kind: str) -> QIcon:
         """Drawn icons for the toolbar buttons (search / reminders / scheduled
