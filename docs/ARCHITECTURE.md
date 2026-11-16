@@ -254,8 +254,9 @@ dopeiptv/
 Import direction is one-way: `ui` may use `services`, `media`, `core`
 and `providers`; `services` builds on `providers`/`core` but never
 imports `ui`; `media` and `providers` may use `core`; `core` depends on
-nothing above it.  (The one cross-edge is `media.embedded` -> `ui.theme`
-for player-overlay colours, which is why `ui/__init__` exposes
+nothing above it.  (The one cross-edge is the player's overlays -
+`media.embedded` and `media.loading_overlay` - -> `ui.theme` for their
+colours, which is why `ui/__init__` exposes
 `MainWindow` lazily so touching `ui.theme` never drags in the window.)
 
 ## Data flow
