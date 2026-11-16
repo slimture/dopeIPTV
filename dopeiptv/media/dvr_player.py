@@ -71,6 +71,19 @@ class DvrPlayerMixin:
     #: its own, or None (the server let go of what the player needs first).
     #: None while server mode is off: playback is as it always was.
     live_hook: "Callable[[str, str | None], DvrSession | None] | None" = None
+    #: The window's answer to which source (id) the stream about to open is
+    #: from (ui/mw_connections): put on its session, so a buffer a recording
+    #: or a cast keeps after the player moved on is counted on its own
+    #: account. None: not known, as before.
+    source_of: "Callable[[], str] | None" = None
+
+    def _dvr_source(self) -> str:
+        ask = self.source_of
+        try:
+            return str(ask() or "") if ask is not None else ""
+        except Exception as e:      # never in the way of playback
+            log.debug("DVR: the stream's source not known: %s", e)
+            return ""
 
     # -- settings --------------------------------------------------------------
 
@@ -109,7 +122,7 @@ class DvrPlayerMixin:
                 self._dvr_pool = DvrPool(dvr_base(), minutes * 60,
                                          self._dvr_space_bytes())
             self._dvr_pool.configure(minutes * 60, self._dvr_space_bytes())
-            session = self._dvr_pool.open(url, key)
+            session = self._dvr_pool.open(url, key, source=self._dvr_source())
         except Exception as e:
             from ..core.dvr_ingest import NotAStream
             if isinstance(e, NotAStream):
@@ -139,6 +152,8 @@ class DvrPlayerMixin:
         try:
             pool.adopt(session)
             url = session.live_url()
+            if not getattr(session, "source", ""):
+                session.source = self._dvr_source()
         except Exception as e:
             log.warning("DVR: the server's channel not shared (%s) - playing as before", e)
             return None

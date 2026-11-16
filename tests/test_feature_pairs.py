@@ -1507,3 +1507,58 @@ def test_a_stream_the_player_gave_up_on_holds_no_connection():
     assert counted() == []
     dvr.state = "streaming"
     assert counted() == [("buffer", "a")]
+
+
+class _Ingest:
+    """A provider connection that only says whether it is open."""
+
+    def __init__(self, url, store):
+        self.url, self.store, self.state, self.connections = url, store, "streaming", 1
+
+    def start(self):
+        pass
+
+    def stop(self, wait=0.0):
+        self.state = "stopped"
+
+
+def test_a_buffer_a_recording_or_a_cast_keeps_is_its_own_source_s(tmp_path):
+    """A's channel watched from the rewind buffer, kept streaming by a cast
+    (or a recording) after the player moved on: that buffer is A's
+    connection - counted on A, none on B, so server mode serves B's devices.
+    Server mode's own session is its source's from the start."""
+    from dopeiptv.core.dvr_pool import DvrPool
+    from dopeiptv.media.dvr_player import DvrPlayerMixin
+
+    pool = DvrPool(tmp_path, 600.0, 10**9, ingest_factory=_Ingest, min_free=0)
+
+    class P(DvrPlayerMixin):
+        def __init__(self):
+            self._settings = _S(live_rewind_kept="true")
+            self._dvr_pool, self._dvr, self.current_url = pool, None, None
+
+        def _live_rewind_minutes(self):
+            return 10
+
+    try:
+        w = _source_window()()
+        p = P()
+        p.source_of = w._conn_player_source         # as the window sets it
+        a_url = "http://a.invalid/live/u/p/7.ts"
+        w._note_playing_source(a_url, 7, "live")
+        w._last_playback = {"url": a_url}
+        assert p._dvr_start(a_url, "live:7")
+        kept = p._dvr
+        kept.hold("cast-live:1")                    # the TV may go back in it
+        p._end_dvr()                                # the player moves on
+        assert kept.streaming
+        w.player = SimpleNamespace(current_url=None, _dvr=None, _dvr_pool=pool)
+        w.playlist_store.active_id = "b"
+        uses = w._conn_uses()
+        assert [(u.kind, u.source) for u in uses] == [("buffer", "a")]
+        assert connections.own_count(uses, "b") == 0
+        srv = pool.acquire("http://b.invalid/live/u/p/1.ts", "srv:b\x1f1", "server",
+                           source="b")
+        assert srv.source == "b"
+    finally:
+        pool.close_all()

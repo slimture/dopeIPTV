@@ -33,9 +33,14 @@ class DvrSession:
     def __init__(self, url: str, base: Path, keep_seconds: float,
                  max_bytes: int, ingest: Ingest | None = None,
                  key: str | None = None,
-                 ingest_factory: IngestFactory | None = None) -> None:
+                 ingest_factory: IngestFactory | None = None,
+                 source: str = "") -> None:
         self.url = url
         self.key = key or url
+        #: The source (id) whose account its connection is on - what the
+        #: app's count says of a buffer a recording or a cast keeps after
+        #: the player moved on; "" when not known (it counts on every one).
+        self.source = source
         self.token = secrets.token_hex(8)
         self.store = SegmentStore(session_dir(base, self.token),
                                   keep_seconds, max_bytes)

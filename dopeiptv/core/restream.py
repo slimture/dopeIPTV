@@ -303,7 +303,8 @@ class Restreamer:
             pool.shared = True
             self._pools.add(pool)
             try:
-                session = pool.acquire(url, "srv:" + key, SERVER, self._ingest_for(source))
+                session = pool.acquire(url, "srv:" + key, SERVER, self._ingest_for(source),
+                                       source=source)
             except NotAStream as e:
                 raise Busy(NO_DATA, f"the provider sent {e}, not a stream") from None
             ch = Channel(key, source, stream, name, url, session, pool, self._clock())

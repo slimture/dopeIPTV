@@ -59,12 +59,14 @@ class DvrPool:
 
     # -- the channel on screen -----------------------------------------------
 
-    def open(self, url: str, key: str | None = None) -> DvrSession:
+    def open(self, url: str, key: str | None = None,
+             source: str = "") -> DvrSession:
         """The session for a channel about to be watched: its own again if
-        it was watched before (or is being recorded), else a new one.
-        NotAStream for one whose provider sent a page or a message instead
-        of a stream: this session it plays as it did before the buffer
-        (mpv opens the address and says what it found)."""
+        it was watched before (or is being recorded), else a new one - the
+        connection of source *source* (its id) from now. NotAStream for one
+        whose provider sent a page or a message instead of a stream: this
+        session it plays as it did before the buffer (mpv opens the address
+        and says what it found)."""
         key = key or url
         with self._lock:
             s = self._sessions.get(key)
@@ -87,6 +89,8 @@ class DvrPool:
                 self._sessions[key] = s
             elif s.frozen:
                 s.resume(url)
+            if source:
+                s.source = source
             s.store.keep_seconds = self.keep_seconds
             s.last_used = self._clock()
             self.active = s
@@ -126,12 +130,14 @@ class DvrPool:
     # -- read from elsewhere (server mode, core/restream.py) ------------------
 
     def acquire(self, url: str, key: str, who: str,
-                ingest_factory: IngestFactory | None = None) -> DvrSession:
+                ingest_factory: IngestFactory | None = None,
+                source: str = "") -> DvrSession:
         """The session for a channel *who* reads without watching it here:
         its own again (resumed when frozen) or a new one - never the one on
-        screen. Held for *who* until let_go. NotAStream, as for open(), for
-        one whose provider sent a page or a message a moment ago: not asked
-        again for each device that tries (a TV's app retries by itself)."""
+        screen - of source *source*. Held for *who* until let_go. NotAStream,
+        as for open(), for one whose provider sent a page or a message a
+        moment ago: not asked again for each device that tries (a TV's app
+        retries by itself)."""
         with self._lock:
             s = self._sessions.get(key)
             if s is not None and s.closed:
@@ -149,6 +155,8 @@ class DvrPool:
                 self._sessions[key] = s
             elif s.frozen:
                 s.resume(url)
+            if source:
+                s.source = source
             s.hold(who)
             s.last_used = self._clock()
             self._enforce()

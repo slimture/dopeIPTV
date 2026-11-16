@@ -144,9 +144,12 @@ class _ConnectionsMixin:
             for s in (pool.sessions if pool is not None else []):
                 # Kept by a recording or a cast - not one server mode alone
                 # reads for other devices: that one gives way (mw_server).
+                # Its source's (the player puts it on the session), "" -
+                # every source - when not known.
                 only = getattr(s, "held_only_by", None)
                 if s is not dvr and s.streaming and not (callable(only) and only(SERVER_HOLD)):
-                    uses.append(Use("buffer", "", str(getattr(s, "url", "") or "")))
+                    uses.append(Use("buffer", str(getattr(s, "source", "") or ""),
+                                    str(getattr(s, "url", "") or "")))
         except Exception as e:      # the player half torn down
             log.debug("connections: player not counted: %s", e)
         rec = getattr(self, "rec", None)

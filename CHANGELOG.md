@@ -55,6 +55,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   connection until Stop, so a test asked for nothing and server mode
   refused devices for it; once the player gives up on it, it no longer
   counts (a stall, and the slow reconnect, still do).
+- A rewind buffer kept streaming by a recording or a cast after the
+  player moved on counted as a connection on every source; it now counts
+  only on the source its channel is from, so server mode no longer
+  refuses another source's devices for it.
 
 ## [1.6.0]
 

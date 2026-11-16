@@ -1352,6 +1352,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if embedded_playback_supported():
             self.player = EmbeddedPlayer(settings=self.settings)
             self.player.hide()
+            # Whose account a rewind buffer's connection is on (mw_connections).
+            self.player.source_of = self._conn_player_source
             self.player.fs_btn.clicked.connect(self._toggle_player_fullscreen)
             self.player.double_clicked.connect(self._toggle_player_fullscreen)
             self.player.exit_fullscreen.connect(self._exit_player_fullscreen)
