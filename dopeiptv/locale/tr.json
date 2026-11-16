@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "{title} için hatırlatıcı kaldırıldı",
   "sa_recording_set": "{title}, {source} kaynağından kaydedilecek.",
   "sa_open_series": "Diziyi aç",
-  "sa_from_source": "{source} kaynağından"
+  "sa_from_source": "{source} kaynağından",
+  "night_refused": "Gece modu bu yayın için açılamadı"
 }

@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "已移除 {title} 的提醒",
   "sa_recording_set": "将从 {source} 录制 {title}。",
   "sa_open_series": "打开剧集",
-  "sa_from_source": "来自 {source}"
+  "sa_from_source": "来自 {source}",
+  "night_refused": "当前播放无法开启夜间模式"
 }

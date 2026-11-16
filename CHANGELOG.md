@@ -7,6 +7,23 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.6.1]
+
+### Fixed
+
+- Night mode can be heard. The leveller alone, with slow settings, did
+  little anyone could hear - a short bang stood as far over the speech as
+  without it. A gentle compressor now goes before a quicker leveller
+  (`acompressor`, then `dynaudnorm` with 150 ms slices smoothed over five):
+  quiet speech comes up by about 18 dB within a second, and loud adverts
+  and explosions stand far less over it. Turning it on or off from the
+  player's menu or Settings says so in the picture's corner as the N key
+  does (the status line without a picture), once whichever way it was
+  switched; a player whose FFmpeg cannot build the filter says "Night mode
+  could not be turned on for this stream" instead of claiming it is on,
+  and a stream's sound that did not start through it is brought back
+  without it rather than left silent.
+
 ## [1.6.0]
 
 Profiles for the household, TV mode with the phone as its remote, a page

@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "Kikumbusho cha {title} kimeondolewa",
   "sa_recording_set": "{title} kitarekodiwa kutoka {source}.",
   "sa_open_series": "Fungua msururu",
-  "sa_from_source": "Kutoka {source}"
+  "sa_from_source": "Kutoka {source}",
+  "night_refused": "Hali ya usiku haikuweza kuwashwa kwa mtiririko huu"
 }

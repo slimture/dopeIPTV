@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "یادآور {title} حذف شد",
   "sa_recording_set": "{title} از {source} ضبط خواهد شد.",
   "sa_open_series": "باز کردن سریال",
-  "sa_from_source": "از {source}"
+  "sa_from_source": "از {source}",
+  "night_refused": "حالت شب برای این پخش روشن نشد"
 }

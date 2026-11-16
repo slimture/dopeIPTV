@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "Đã xóa nhắc nhở cho {title}",
   "sa_recording_set": "{title} sẽ được ghi từ {source}.",
   "sa_open_series": "Mở loạt phim",
-  "sa_from_source": "Từ {source}"
+  "sa_from_source": "Từ {source}",
+  "night_refused": "Không bật được chế độ ban đêm cho luồng này"
 }

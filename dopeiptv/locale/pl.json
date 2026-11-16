@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "Usunięto przypomnienie dla {title}",
   "sa_recording_set": "{title} zostanie nagrany z {source}.",
   "sa_open_series": "Otwórz serial",
-  "sa_from_source": "Z {source}"
+  "sa_from_source": "Z {source}",
+  "night_refused": "Nie udało się włączyć trybu nocnego dla tej transmisji"
 }

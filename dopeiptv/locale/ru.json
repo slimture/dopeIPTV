@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "Напоминание для {title} удалено",
   "sa_recording_set": "{title} будет записан из {source}.",
   "sa_open_series": "Открыть сериал",
-  "sa_from_source": "Из {source}"
+  "sa_from_source": "Из {source}",
+  "night_refused": "Не удалось включить ночной режим для этой трансляции"
 }

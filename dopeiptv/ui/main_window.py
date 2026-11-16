@@ -1427,8 +1427,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self.settings.value("vis_on", "true") == "true",
                 self.settings.value("vis_style", "bars"))
             self.player.vis_choose = self._vis_choose
-            # Night mode's key in the player's menu (the window's keys).
+            # Night mode's key in the player's menu (the window's keys), and
+            # one notice however it was switched (mw_shortcuts).
             self.player.night_key = self._night_key_text
+            self.player.night_mode_changed.connect(self._night_mode_told)
+            self.player.night_mode_refused.connect(self._night_mode_refused)
             # The teletext viewer, in the player's menu while a channel plays.
             self.player.open_teletext = self.open_teletext
             self.player.teletext_key = self._ttx_key_text

@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "Pengingat untuk {title} dihapus",
   "sa_recording_set": "{title} akan direkam dari {source}.",
   "sa_open_series": "Buka serial",
-  "sa_from_source": "Dari {source}"
+  "sa_from_source": "Dari {source}",
+  "night_refused": "Mode malam tidak dapat diaktifkan untuk siaran ini"
 }

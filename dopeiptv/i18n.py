@@ -2525,6 +2525,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "night_mode_hint": {"en": "Evens out the sound: loud adverts and scenes come down, quiet dialogue comes up. Turns on at once, the stream plays on."},
     "night_on": {"en": "Night mode on"},
     "night_off": {"en": "Night mode off"},
+    "night_refused": {"en": "Night mode could not be turned on for this stream"},
     "sc_night_mode": {"en": "Night mode (sound)"},
     "rec_mp4_setting": {"en": "Save recordings as MP4"},
     "rec_mp4_hint": {"en": "When a recording has ended, it is copied into an MP4 that plays anywhere - nothing is re-encoded - and the .ts is removed. Subtitles and teletext stay only in a .ts; if anything goes wrong, the .ts is kept."},

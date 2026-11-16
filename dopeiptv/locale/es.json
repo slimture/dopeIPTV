@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "Recordatorio de {title} eliminado",
   "sa_recording_set": "{title} se grabará desde {source}.",
   "sa_open_series": "Abrir la serie",
-  "sa_from_source": "De {source}"
+  "sa_from_source": "De {source}",
+  "night_refused": "No se pudo activar el modo nocturno en esta emisión"
 }

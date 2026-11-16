@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "{title} 알림이 삭제되었습니다",
   "sa_recording_set": "{title}을(를) {source}에서 녹화합니다.",
   "sa_open_series": "시리즈 열기",
-  "sa_from_source": "{source}에서"
+  "sa_from_source": "{source}에서",
+  "night_refused": "이 스트림에서는 야간 모드를 켤 수 없었습니다"
 }

@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "Påminnelsen för {title} är borttagen",
   "sa_recording_set": "{title} spelas in från {source}.",
   "sa_open_series": "Öppna serien",
-  "sa_from_source": "Från {source}"
+  "sa_from_source": "Från {source}",
+  "night_refused": "Nattläget gick inte att slå på för den här sändningen"
 }

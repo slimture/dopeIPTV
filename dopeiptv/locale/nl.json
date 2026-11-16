@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "Herinnering voor {title} verwijderd",
   "sa_recording_set": "{title} wordt opgenomen van {source}.",
   "sa_open_series": "Serie openen",
-  "sa_from_source": "Uit {source}"
+  "sa_from_source": "Uit {source}",
+  "night_refused": "Nachtmodus kon voor deze stream niet worden aangezet"
 }

@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "{title} کی یاد دہانی ہٹا دی گئی",
   "sa_recording_set": "{title} کو {source} سے ریکارڈ کیا جائے گا۔",
   "sa_open_series": "سیریز کھولیں",
-  "sa_from_source": "{source} سے"
+  "sa_from_source": "{source} سے",
+  "night_refused": "اس اسٹریم کے لیے رات کا موڈ آن نہیں ہو سکا"
 }

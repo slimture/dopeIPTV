@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "Podsetnik za {title} uklonjen",
   "sa_recording_set": "{title} će biti snimljen sa izvora {source}.",
   "sa_open_series": "Otvori seriju",
-  "sa_from_source": "Iz izvora {source}"
+  "sa_from_source": "Iz izvora {source}",
+  "night_refused": "Noćni režim nije mogao da se uključi za ovaj prenos"
 }

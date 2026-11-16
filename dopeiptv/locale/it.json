@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "Promemoria rimosso per {title}",
   "sa_recording_set": "{title} sarà registrato da {source}.",
   "sa_open_series": "Apri la serie",
-  "sa_from_source": "Da {source}"
+  "sa_from_source": "Da {source}",
+  "night_refused": "Impossibile attivare la modalità notte per questa trasmissione"
 }

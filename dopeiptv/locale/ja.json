@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "{title}のリマインダーを削除しました",
   "sa_recording_set": "{title} を {source} から録画します。",
   "sa_open_series": "シリーズを開く",
-  "sa_from_source": "{source} から"
+  "sa_from_source": "{source} から",
+  "night_refused": "このストリームではナイトモードをオンにできませんでした"
 }

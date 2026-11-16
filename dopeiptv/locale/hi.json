@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "{title} का रिमाइंडर हटाया गया",
   "sa_recording_set": "{title} {source} से रिकॉर्ड किया जाएगा।",
   "sa_open_series": "सीरीज़ खोलें",
-  "sa_from_source": "{source} से"
+  "sa_from_source": "{source} से",
+  "night_refused": "इस स्ट्रीम के लिए नाइट मोड चालू नहीं हो सका"
 }

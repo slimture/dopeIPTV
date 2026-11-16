@@ -625,7 +625,12 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
     program_seek = pyqtSignal(int)     # seconds from the picked programme start
     track_selected = pyqtSignal(str, object)  # "aid"/"sid", track id or "no"
     subtitle_added = pyqtSignal(str)          # a subtitle file now showing
-    night_mode_changed = pyqtSignal(bool)     # turned on/off from the menu
+    # Night mode switched on or off - the options menu, the window's key or
+    # Settings: the window says so (night_mode_failed: the core refused it).
+    night_mode_changed = pyqtSignal(bool)
+    # A stream's sound did not start through the night filter: it plays
+    # without it now, and the window says so.
+    night_mode_refused = pyqtSignal()
 
     OVERLAY_HIDE_MS = 3000
     VIDEO_BOX_HEIGHT = 260
@@ -706,6 +711,9 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         self._night_on = night_mode.enabled(settings)
         self._night_core = None
         self._night_now = False
+        # That core refused the filter: not asked again until night mode
+        # is switched (a new core is asked afresh).
+        self._night_refused = False
         # The window's key for it, shown in the options menu ("" for none).
         self.night_key = None
         # Docked video-box height scales with the display so the mini player
@@ -1130,6 +1138,8 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         # The loading indicator over the picture (media/loading_overlay.py):
         # a sibling of the video like the overlays above, never its child.
         self._init_loading()
+        # Night mode: did a stream's sound start through its filter?
+        self._ld_event.connect(self._night_on_event)
 
         # Top-left "am I live?" badge: red LIVE at the live edge, a neutral
         # TIMESHIFT pill when watching the catch-up archive. A sibling of the
@@ -2748,9 +2758,13 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         """Night mode on or off, onto the core at once while the stream
         plays on, and kept for every stream after (core/night_mode.py).
         Only the audio chain changes. Storing the choice is the caller's
-        (toggle_night_mode stores it)."""
+        (toggle_night_mode stores it). Every way of switching it - the
+        options menu, the window's key, Settings - comes here, and
+        night_mode_changed tells the window, which says so once."""
         self._night_on = bool(on)
+        self._night_refused = False     # switched by hand: asked again
         self._sync_night()
+        self.night_mode_changed.emit(self._night_on)
 
     def toggle_night_mode(self) -> bool:
         """The options menu's entry and the window's key: flipped,
@@ -2758,8 +2772,14 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         on = not self._night_on
         night_mode.store(self._settings, on)
         self.set_night_mode(on)
-        self.night_mode_changed.emit(on)
         return on
+
+    def night_mode_failed(self) -> bool:
+        """Night mode is on, and the core in use refused its filter: the
+        stream plays without it."""
+        m = self.video.mpv
+        core = self._night_core() if self._night_core is not None else None
+        return bool(self._night_on and self._night_refused and m is not None and core is m)
 
     def _night_from_menu(self, _checked: bool = False) -> None:
         self.toggle_night_mode()
@@ -2768,25 +2788,58 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         """The core as night mode wants it. Written only when that differs
         from what this core was given: a play() with nothing changed writes
         nothing, and a core created after the choice (its GL surface builds
-        it lazily) gets it on its first play()."""
+        it lazily) gets it on its first play(). A core that refused it is
+        not asked again by every play() - only once night mode is switched
+        again, or a new core is made. Never raises."""
         m = self.video.mpv
         if m is None:
             return
         core = self._night_core() if self._night_core is not None else None
-        given = self._night_now if core is m else False
-        if given == self._night_on:
+        mine = core is m
+        given = self._night_now if mine else False
+        if given == self._night_on or (mine and self._night_refused):
             return
-        if not night_mode.apply(m, self._night_on):
-            log.info("night mode: the player did not take its audio filter")
-            return
+        took = night_mode.apply(m, self._night_on)
         import weakref
         try:
             self._night_core = weakref.ref(m)
         except TypeError:
             self._night_core = None
             return
-        self._night_now = self._night_on
-        log.info("night mode %s", "on" if self._night_on else "off")
+        if took:
+            self._night_now, self._night_refused = self._night_on, False
+            log.info("night mode %s", "on" if self._night_on else "off")
+        elif self._night_on:
+            night_mode.remove(m)            # nothing half-made left on it
+            self._night_now, self._night_refused = False, True
+            log.warning("night mode: the player did not take its audio filter - "
+                        "the sound plays as it is")
+        else:
+            log.warning("night mode: the audio filter did not come off - "
+                        "tried again with the next stream")
+
+    def _night_on_event(self, name: str, _value=None) -> None:
+        """(the window's thread) A stream's playback-restart with night mode
+        on: did its sound start through the filter? A core given it before
+        any stream (its first, or after a rebuild) only finds out then that
+        its ffmpeg cannot build it, and mpv drops the sound. Then it comes
+        off this core, the sound comes back (core/night_mode.rescue_sound)
+        and the window says so. A stream that plays its sound - nearly
+        every one - costs a property read."""
+        if name != "playback-restart" or not self._night_on or not self._night_now:
+            return
+        m = self.video.mpv
+        core = self._night_core() if self._night_core is not None else None
+        if m is None or core is not m or self.current_url is None:
+            return
+        if night_mode.sound_plays(m) is not False:
+            return
+        if not night_mode.rescue_sound(m):
+            return
+        self._night_now, self._night_refused = False, True
+        log.warning("night mode: the stream's sound did not start through its "
+                    "filter - it plays without it")
+        self.night_mode_refused.emit()
 
     def set_track_prefs(self, aid=None, sid=None) -> None:
         """Arm one-shot audio/subtitle track ids for the next play() - the

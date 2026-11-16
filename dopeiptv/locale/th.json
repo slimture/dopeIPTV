@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "ลบการเตือนสำหรับ {title} แล้ว",
   "sa_recording_set": "จะบันทึก {title} จาก {source}",
   "sa_open_series": "เปิดซีรีส์",
-  "sa_from_source": "จาก {source}"
+  "sa_from_source": "จาก {source}",
+  "night_refused": "เปิดโหมดกลางคืนสำหรับสตรีมนี้ไม่ได้"
 }

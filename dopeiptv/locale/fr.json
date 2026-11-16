@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "Rappel supprimé pour {title}",
   "sa_recording_set": "{title} sera enregistré depuis {source}.",
   "sa_open_series": "Ouvrir la série",
-  "sa_from_source": "Depuis {source}"
+  "sa_from_source": "Depuis {source}",
+  "night_refused": "Impossible d'activer le mode nuit pour ce flux"
 }

@@ -77,14 +77,37 @@ class _ShortcutsMixin:
 
     def _shortcut_night_mode(self) -> None:
         """Night mode for the sound, on or off - the docked player's core,
-        which the pop-out shows too; said in the picture's corner."""
+        which the pop-out shows too. The player tells _night_mode_told,
+        which says so."""
         if self._typing() or not self.player:
             return
-        on = self.player.toggle_night_mode()
-        if self.player.isVisible() and self.player.current_url:
-            self.player.show_number_entry(tr("night_on" if on else "night_off"), 1500)
+        self.player.toggle_night_mode()
+
+    def _night_mode_told(self, on: bool) -> None:
+        """Night mode was switched - the key, the player's menu or Settings:
+        said once, the same way for all of them, in the picture's corner
+        (the status line when no picture shows). A core that refused the
+        filter is said too."""
+        p = self.player
+        if p is None:
+            return
+        if on and p.night_mode_failed():
+            self._night_mode_refused()
         else:
-            self._flash_status(tr("night_on" if on else "night_off"))
+            self._night_say(tr("night_on" if on else "night_off"), 1500)
+
+    def _night_mode_refused(self) -> None:
+        """Night mode is on, but the stream plays without its filter: the
+        core refused it, as it was switched on or as a stream's sound
+        started (media/embedded.py _night_on_event)."""
+        self._night_say(tr("night_refused"), 4000)
+
+    def _night_say(self, text: str, ms: int) -> None:
+        p = self.player
+        if p is not None and p.isVisible() and p.current_url:
+            p.show_number_entry(text, ms)
+        else:
+            self._flash_status(text)
 
     def _shortcut_zap(self, step: int) -> None:
         if self._multiview_active() is None:

@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "أُزيل التذكير لـ {title}",
   "sa_recording_set": "سيُسجَّل {title} من {source}.",
   "sa_open_series": "فتح المسلسل",
-  "sa_from_source": "من {source}"
+  "sa_from_source": "من {source}",
+  "night_refused": "تعذّر تشغيل الوضع الليلي لهذا البث"
 }

@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "Lembrete removido para {title}",
   "sa_recording_set": "{title} será gravado de {source}.",
   "sa_open_series": "Abrir a série",
-  "sa_from_source": "De {source}"
+  "sa_from_source": "De {source}",
+  "night_refused": "Não foi possível ligar o modo noturno nesta transmissão"
 }

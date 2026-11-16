@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "התזכורת עבור {title} הוסרה",
   "sa_recording_set": "{title} יוקלט מ־{source}.",
   "sa_open_series": "פתח את הסדרה",
-  "sa_from_source": "מתוך {source}"
+  "sa_from_source": "מתוך {source}",
+  "night_refused": "לא ניתן להפעיל מצב לילה בשידור הזה"
 }

@@ -2869,5 +2869,6 @@
   "sa_reminder_removed": "Η υπενθύμιση για {title} αφαιρέθηκε",
   "sa_recording_set": "Το {title} θα εγγραφεί από {source}.",
   "sa_open_series": "Άνοιγμα σειράς",
-  "sa_from_source": "Από {source}"
+  "sa_from_source": "Από {source}",
+  "night_refused": "Η νυχτερινή λειτουργία δεν μπόρεσε να ενεργοποιηθεί για αυτή τη ροή"
 }
