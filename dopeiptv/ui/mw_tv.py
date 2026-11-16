@@ -377,7 +377,10 @@ class _TvMixin:
                 or QApplication.activePopupWidget() is not None):
             return False
         if isinstance(obj, QWidget):
-            return obj.window() is self
+            # Qt's own window(): TV mode's page and Home keep the main window
+            # in an attribute of that name, and a key going up the parents
+            # (any with Ctrl, Ctrl+Shift+T to leave) reached them and raised.
+            return QWidget.window(obj) is self
         if isinstance(obj, QWindow):
             return obj is self.windowHandle()
         return False

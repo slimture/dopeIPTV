@@ -102,7 +102,9 @@ class _PopoutWindow(QWidget):
             player._reveal_local_buffer()
 
     def eventFilter(self, obj, event) -> bool:
-        if not isinstance(obj, QWidget) or obj.window() is not self:
+        # Qt's own window(): TV mode's page and Home keep the main window in
+        # an attribute of that name - called, it raised for every event they got.
+        if not isinstance(obj, QWidget) or QWidget.window(obj) is not self:
             return False
         kind = event.type()
         if kind == QEvent.Type.MouseButtonRelease and self._edge_drag_active:
