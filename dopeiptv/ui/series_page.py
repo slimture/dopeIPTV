@@ -268,6 +268,20 @@ class SeriesHeader(QWidget):
             f"QPushButton#SeriesLink {{ color:{P['accent']}; background:transparent;"
             " border:none; padding:0; font-size:12px; font-weight:600; }"
             f"QPushButton#SeriesLink:hover {{ color:{P['accent_hi']}; }}")
+        # Over a backdrop washed toward a light page the actions' usual fill
+        # is nearly the colour under them: they read as bare words. A wash of
+        # the text colour darkens whatever is under them by as much, so they
+        # stand out from any backdrop (and from the plain surface).
+        light = QColor(P["bg"]).lightness() > QColor(P["text"]).lightness()
+        ink = QColor(P["text"])
+        wash = f"rgba({ink.red()},{ink.green()},{ink.blue()},"
+        acts = (f"QPushButton#InlineToggle, QToolButton#InlineToggle {{ background:{wash}0.16); }}"
+                "QPushButton#InlineToggle:hover, QToolButton#InlineToggle:hover"
+                f" {{ background:{wash}0.24); }}"
+                f"QPushButton#InlineToggle:checked {{ background:{P['accent']};"
+                f" color:{P['on_accent']}; }}") if light else ""
+        for b in self._acts:
+            b.setStyleSheet(acts)
         dpr = self.devicePixelRatioF() or 1.0
         self.play_btn.setIcon(drawn_icon("play", 14, P["on_accent"], dpr=dpr))
         self.more_btn.setIcon(drawn_icon("more", 16, P["text2"], dpr=dpr))

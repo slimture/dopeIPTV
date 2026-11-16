@@ -25,6 +25,229 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   what this computer has; hidden, locked and, for a kids profile, adult
   categories are never searched, and nothing is kept past leaving the
   page while viewing privately. It replaces the Search the guide window.
+
+## [1.6.0]
+
+Profiles for the household, TV mode with the phone as its remote, a page
+for every series, Jellyfin, Emby and Plex, SAT>IP and four more home
+backends as sources, the Enigma2 extras and its channel lists, server
+mode, casting to Kodi and an Apple TV, teletext, the command palette,
+radio and web streams, Watch together, and sync for everyone.
+
+### Added
+
+- Profiles, one per person in the household (Settings > Profiles, up to
+  eight): favorites of every kind, history and resume points, Watch
+  later, watched marks, followed series, reminders, statistics, Trakt and
+  Simkl, Home's sections, theme and accent, audio and subtitle languages
+  are a profile's own (declared in `core/profiles.py`); sources,
+  recordings and their rules, the guide, devices, Nerd, playback and the
+  parental lock are the household's. "Who's watching?" at start (and in
+  TV mode), a four-digit PIN hashed as the parental PIN, kids profiles
+  that never see a locked or adult category and open Settings only with
+  a grown-up's PIN; switching stops what plays and needs no restart. The
+  first start copies everything into the first profile and leaves the
+  old keys for a downgrade. Sync and the full backup carry every profile
+  (sync never a PIN); the phone remote, the remote API and Home Assistant
+  show and switch it.
+- TV mode (View menu, Ctrl+Shift+T, `--tv`, "Start in TV mode"): a
+  10-foot page of its own - Home, Channels with now/next, the guide in
+  large, Movies and Series in posters, Search with a keyboard on screen,
+  Options (sound, subtitles, sleep timer, leave) - run with the arrows,
+  OK, Back, Menu, the colour keys, channel up/down and digits from a
+  remote that acts as a keyboard, an HDMI-CEC remote, a game controller
+  (SDL2 through the optional pysdl2, else Linux evdev) or LIRC. The
+  picture full screen with a big info bar, Now playing in a row above the
+  tabs while a stream goes on behind the page, Back to the page and Stop
+  to stop.
+- Phone remote (View > Phone remote…, off until turned on): one page on
+  the home network behind a long random token, its address as a QR code
+  (`core/qr.py`) - the source's channels with search, favorites and
+  logos, play, channel up/down, play/pause, stop, volume and mute, now
+  and next. In TV mode a remote (d-pad or touchpad, colour keys, volume
+  and channel rockers, number keys), the Now playing card back to the
+  picture. On a phone's home screen as "dopeIPTV Remote" with the app's
+  icon (web app manifest, apple-touch-icon, a maskable icon). New address
+  shuts out every phone that had the old one; a client that keeps
+  guessing is shut out for ten minutes, every client rate-limited. TV
+  mode and its keys also from the remote API (`/api/tv`, `/api/tv_key`)
+  and Home Assistant.
+- Jellyfin and Emby (AuthenticateByName, Quick Connect, Live TV through
+  PlaybackInfo, the file or the server's HLS, UDP 7359 discovery) and
+  Plex (PIN sign-in in the browser, the best of a server's connections,
+  direct play or the transcoder, Live TV from the server's DVR, GDM
+  discovery) as sources: a token and never a password, the server's
+  artwork, resume points and watched marks on the rows, playback reported
+  back (start, every 10 s, pause, stop) and marks sent back, nothing in
+  private viewing, the server's partly watched titles in Continue
+  watching.
+- VDR (restfulapi with streamdev-server, or streamdev's M3U alone),
+  DVBViewer Media Server, NextPVR (v5+, PIN) and MythTV (Services API;
+  its channels for the guide, no live TV over HTTP and said so) as source
+  kinds, with groups, logos, guides, recordings as films and Record on
+  the box; Find on my network asks their ports, every host's ports at
+  once.
+- Enigma2: the tuner signal (SNR, AGC, BER) in Stats for nerds and a box
+  info window; a screenshot of the box's TV (`/grab`) with Save; its
+  remote control; its recordings renamed, moved and deleted; a channel
+  it cannot decrypt said so (diagnosis, stream health, failover,
+  multiview, recordings); transcoding on port 8002 as a source's own Nerd
+  option.
+- Enigma2 tuners in the connections count: the box's tuners, running
+  recordings and what its TV shows (`/web/about`, `/web/timerlist`,
+  `/web/getcurrent`); a zap from any way in, a multiview cell, a cast or
+  a recording over its own connection that would cut one off is asked
+  about first (Go ahead anyway); a ring marks those channels; Nerd >
+  Diagnostics shows what is in use. A box that does not answer never
+  holds playback up.
+- Enigma2 AutoTimer: the box's own rules beside the app's under
+  Settings > Recording > Series recordings - new, edit, on/off, preview,
+  Run now - each row saying who records it; "Record series…" offers a rule on the
+  box; what the box records itself the series plan leaves to it.
+- Kodi as a cast target: found by mDNS or added with its login, played
+  over JSON-RPC with the source's user agent and headers (never a
+  loopback address), pause, seek, volume and the strip's state.
+- AirPlay to an Apple TV on macOS, the way Apple documents it: an
+  AVPlayer with Apple's own AirPlay button in a small window of its own;
+  HLS or MP4 the Apple TV decodes as it is, the rest repackaged by ffmpeg
+  as fMP4 HLS on a LAN server under a token; the strip drives it.
+- Casting: a channel, film or episode picked while a cast runs goes to
+  the same receiver through the playback path's checks; the archive and
+  the rewind buffer reach the TV as one growing playlist
+  (`providers/cast_feed.py`); going back during a live cast uses the
+  rewind buffer while it holds the moment, else the archive; "Keep the
+  rewind buffer while casting" (Settings > Casting, off - one more
+  connection, asked first over a full or unknown limit); "Add a device by
+  address…" for a Chromecast, a DLNA TV or a Kodi on another part of the
+  network, kept and listed after a restart.
+- DVB subtitles and teletext subtitle pages in the subtitle menu by
+  language and page, the page kept per channel and picked by the
+  preferred language; a teletext viewer (View menu, the player's menu,
+  T) decoded in plain Python from dopeIPTV's own rewind buffer, never a
+  second connection; "Keep teletext and subtitles" leaves such a
+  recording a .ts when saving as MP4.
+- Command palette (Ctrl+K / Cmd+K): the menu's and the rebindable
+  actions, every Settings row, the source's channels and the guide's
+  programmes from one field.
+- Internet radio from radio-browser.info (Radio, under Local files):
+  directory lists, search, countries, languages, genres, favourite
+  stations; a click reported only when turned on.
+- YouTube Live, Twitch and similar sites through yt-dlp (Open address…,
+  Ctrl+L, `--play`, `dopeiptv://`): mpv's ytdl hook or the address
+  resolved by the app; the system's yt-dlp or the official release
+  downloaded into the user's data folder, checked against SHA2-256SUMS
+  and updated at most once a day while used - never in our packages.
+- Watch together: a room's 8-character code, each person on their own
+  source (TMDB id, else title and year), kept in step within about a
+  second; messages sealed with a key from the code (PBKDF2, HKDF,
+  ChaCha20-Poly1305), passed on by dopeiptv.org/together/; never during
+  private viewing.
+- Night mode for the sound (ffmpeg's dynaudnorm, one labelled filter; N,
+  the player's menu, Settings > Playback).
+- Recordings as MP4 (Settings > Recording, off by default): remuxed off
+  the window's thread, the .ts deleted only once the MP4 is plausibly
+  whole; a remux cut short is done at the next start.
+- Series rules that remind instead of record, and "Remind me of every
+  airing…" in the guide.
+- Your statistics (History > Your statistics…): time watched by week,
+  month, year, weekday and hour, top channels, movies and series, the
+  longest streak; this computer only, never synced.
+- Export to calendar… (File, the Reminders window): reminders and
+  scheduled recordings as RFC 5545 iCalendar, and a subscription address
+  from the remote API or the phone remote.
+- Simkl beside Trakt (AUTH V2 device sign-in, the access token renewed,
+  sign-out revokes), and Discord status (Settings > Integrations, off by
+  default; nothing during private viewing).
+- The system's media controls on macOS (Now Playing) and Windows (the
+  System Media Transport Controls), as MPRIS on Linux.
+- Stream information (Settings > Playback, off by default): resolution,
+  frame rate and codec on a channel change and in the channel list, from
+  what the player saw (#24, @lmerega).
+- Connections to the account (for everyone): "1 of 2 connections in use"
+  in the account details; the app's own counted (player, rewind buffers,
+  recordings over their own connection, multiview cells, casts), and a
+  plain warning with Go ahead anyway before one more would go over.
+- Nerd: backup addresses per source (the next tried on no answer, TLS or
+  5xx, never on 401/403/404); Test connection (DNS, TCP, TLS, the login,
+  a live channel's first byte and speed); own DNS over HTTPS (Cloudflare,
+  Quad9, Google or custom); low latency for live; an IP version per
+  source; a trusted certificate per source (pinned by fingerprint, a
+  question before casting it); stream analysis, a simple TR 101 290 read
+  from the rewind buffer; Home Assistant's commands over MQTT (buttons,
+  volume, favourites, play by name or number, TV mode); Other networks
+  (VLANs) searched by unicast.
+- A page for every series: opening a series - from its list, Favorites,
+  Watch later, Home's shelves, Continue watching, New episodes, the
+  command palette (series are found there now) or an actor's titles -
+  shows its own page where the list is, as on Plex or Jellyfin: the
+  backdrop (or poster), title, year, rating, genres and plot, one button
+  that plays on (Continue S2 E5 with its progress, or Play S1 E1),
+  Favorite, Follow and Watch later, the seasons in one row of chips
+  (Specials last; the one picked kept per series, a profile's own) and
+  the season's episodes as cards with their still, length, plot, watched
+  check and progress, the next one marked. Back (the arrow, Esc, the
+  mouse's back button) shows the list exactly as it was. Episodes from
+  the source's own series info (Xtream, Stalker, Jellyfin/Emby/Plex) or a
+  local library, off the window's thread; TMDB fills a missing backdrop
+  and stills. TV mode's series screen gets season tabs the same way.
+- SAT>IP servers as a source kind (Fritz!Box Cable, Octopus NET,
+  Digibit, Kathrein EXIP, minisatip, Tvheadend's SAT>IP server): found by
+  SSDP with Find on my network (the other networks by unicast), the
+  tuners from `X_SATIPCAP`, the channels from the server's own list, a
+  Fritz!Box's lists or an M3U given as a file or an address; stable ids
+  from the tuning, RTSP over TCP by default (UDP, or HTTP where the
+  server wants it), each stream counted as one of the server's tuners -
+  a multiview cell, a recording or a cast that would need one more asks
+  first. No guide from SAT>IP: the source's XMLTV address gives one.
+- An Enigma2 box's channel lists edited from the app (the box's menu ->
+  "Edit the box's channel lists…", through OpenWebif's bouquet editor):
+  TV and radio bouquets made, renamed, moved and removed, channels
+  dragged into order, renamed and removed, markers and spacers, channels
+  added from all, a satellite's or a provider's, with a search. Each
+  change goes to the box in the order made, off the window's thread; the
+  box takes a backup of its lists first, offered to save, and Undo puts
+  it back; the source reads its channels again when the window closes.
+  Never for a kids profile, never touching what plays.
+- Server mode (Nerd > Remote and automation, off by default, or
+  `dopeiptv --server` without a window, for a NAS or a Raspberry Pi):
+  dopeIPTV as the home's server - a playlist and the guide for VLC, Kodi
+  and a TV's IPTV app, and an HDHomeRun tuner Plex, Jellyfin and Emby
+  find by themselves (`discover.json`, `lineup.json`, UDP 65001), the
+  guide under the tuner's channel numbers. Each channel is fetched once
+  into a rewind buffer session and shared by everyone watching it, the
+  app's own player included; never more channels at once than the
+  account allows, the app's own viewing and recordings first, and a
+  device that would need one more is told all tuners are in use. The
+  guides it hands out are kept fresh: each served source's downloaded
+  again once it is six hours old, with or without the window. Home
+  addresses only, a token on all but the tuner's endpoints; a page in the
+  browser shows who watches what and holds its settings (port, tuners,
+  which sources and categories - never a hidden, locked or adult one).
+- Official builds: each package carries a signed manifest of its own
+  files (`tools/build_manifest.py`, release.yml); a modified build leaves
+  dopeiptv.org's services alone (Watch together, sync, the update check
+  and self-update, reports - offered to copy instead) and About says so;
+  requests to dopeiptv.org carry `X-dopeIPTV-Build`.
+
+### Changed
+
+- Settings: the sidebar in groups - Watch, Content, Accounts and
+  integrations, System, and Nerd in its colour - every setting in one
+  place (`docs/SETTINGS_MAP.md`). Casting, Watch history (Trakt and Simkl
+  together), Sync, Integrations, Keyboard shortcuts and Profiles are
+  pages of their own; Nerd's pages are five beside Status, with one link
+  row on each everyday page they belong beside.
+- A page of its own for each source in Settings (Connection, Network,
+  Streams, Guide, Advanced), each row marked own or shared and where;
+  adding keeps the quick form, then opens the new source's page.
+- The active source's name over the categories, with its kind in a chip
+  when there are two sources or more, a click opening the source menu;
+  the status line says the list's source, and what plays from another
+  source says so.
+- Settings opens in about half the time, and the video beside it
+  stutters less: the app-wide event filters let what they do not handle
+  through at once, hidden pages are not laid out, cache sizes are counted
+  off the window's thread and Nerd's checks run after the window shows.
 - Sync between computers is for everyone, not only supporters: no
   supporter key is needed or sent. The Sync page says in plain words what
   dopeiptv.org gets - bytes encrypted on the computer with a key from the
@@ -46,6 +269,61 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 - Settings' sidebar: "Sync" for Sync between computers, and shorter names
   where a page's name was cut off (Remote and automation in 17 languages,
   Greek's Boxes and lists, Russian's Parental lock).
+- Every feature with the others: casts and multiview cells meet the VPN
+  guard; a cast counts as one of the account's connections; a multiview
+  cell plays with the source's Nerd options; a channel asked for by name
+  is only one the lists show; the live preview ends what played before
+  as a zap does; a playback that was private stays private to its end
+  for every reporter.
+- The remote API and the phone remote let in every private range and
+  this computer's own address, never a public one.
+- Open a video, folders and backups: the system's own file dialog on
+  macOS and Windows; Qt's own stays on Linux.
+- Web pages through yt-dlp play with mpv's own network defaults, not the
+  ones tuned for IPTV.
+- macOS: the player's core leaves out mpv's built-in scripts the app
+  never uses.
+- Windows: every server the app runs binds exclusively and without a
+  reverse lookup of the computer's name.
+- Requirements: PyObjC (macOS) and PyWinRT (Windows), with platform
+  markers.
+
+### Fixed
+
+- "Cast to TV" was listed twice in the video's right-click menu and in
+  the pop-out's.
+- A channel previewed after music played with the visualiser in place of
+  its picture.
+- A reminder set from the guide lost its programme's end.
+- With mpv 0.42 the highest quality for adaptive streams stayed on the
+  smallest variant (variants shown as editions).
+- macOS: libmpv could crash in its audio-device watch when a route came
+  or went as a player closed.
+- Windows: a cast could take seconds to start (the servers' reverse
+  lookup); a server could share a port another program held; the rewind
+  buffer could not delete a segment still open; `file:///C:/...` and a
+  Windows path on `--play`.
+- The guide's compact bar never switched with a large font.
+- A table header's empty end was a light strip on dark themes.
+- A Nerd check line could show as a window of its own for a moment and
+  take the focus while Settings was built.
+- A source's options all set back to their defaults kept the old ones.
+- Text boxes of a source's Nerd options were light text on white.
+- Open address with a web page in place of a stream asked for it twice
+  a second through the rewind buffer: the buffer takes only a stream
+  (a page, a playlist or a message ends at once), a few KB is a failed
+  try, and a channel whose provider sent no stream is played without the
+  buffer for a while.
+- Test connection called a source with no live channel failed, and a
+  media server not a server.
+- Failover could pick a channel the other source's lists hide or lock.
+- A source with a trusted certificate: another host the stream went to
+  (a redirect, a segment elsewhere) is checked against the system's
+  authorities.
+- The stream played after a web page kept that page's options.
+- Trakt and Simkl: a sign-in renewed on a worker was written to the
+  settings from that thread.
+- Sync: Start and Join one over the other cut each other short.
 
 ## [1.5.0]
 

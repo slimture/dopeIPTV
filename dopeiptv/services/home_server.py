@@ -50,6 +50,7 @@ from ..core.nerd_check import FAIL, OK, WARN, Check
 from ..core.phone_remote import RateLimiter
 from ..core.remote_api import lan_addresses
 from ..core.restream import BOX, NO_DATA, TUNERS, VPN, Busy, Restreamer, ffmpeg_opener, is_hls
+from .guide_keeper import GuideKeeper
 from .share import Share, lineup_guide, public_logo
 
 DEFAULT_PORT = 3675             # the remote API's 3673, the phone remote's 3674, and one
@@ -212,6 +213,10 @@ class HomeServer:
         self.port = config.port
         self._guide_path = guide_path
         self.share = Share(self.served, make_client=make_client, guide_path=guide_path)
+        #: The served sources' guides kept fresh; the window keeps its active
+        #: source's itself (a host's ``guides_kept``).
+        self.guides = GuideKeeper(self.served, self.share._client,
+                                  kept=getattr(host, "guides_kept", None), guide_path=guide_path)
         self.limiter = RateLimiter()
         #: Who may use the endpoints that need no token.
         self.local = home_net.LocalNetworks()
@@ -247,6 +252,7 @@ class HomeServer:
                 self._udp = udp
         threading.Thread(target=self._learn_limits, name="home-server-limits",
                          daemon=True).start()
+        self.guides.start()
         log.info("server: listening on port %d (%d tuner(s))", self.port, self.total())
 
     def move(self, port: int) -> bool:
@@ -272,6 +278,7 @@ class HomeServer:
         return True
 
     def stop(self) -> None:
+        self.guides.stop()
         self.restream.close()
         udp, self._udp = self._udp, None
         if udp is not None:

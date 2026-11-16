@@ -45,6 +45,7 @@ class _WindowHost:
     def __init__(self, win: Any, bridge: _Bridge) -> None:
         self.win, self.bridge = win, bridge
         self.snapshot: list[dict] = []
+        self.active = ""
         self.kept_pool: Any = None
 
     def sources(self) -> list[dict]:
@@ -74,6 +75,11 @@ class _WindowHost:
         except Exception:
             return None
         return None
+
+    def guides_kept(self) -> set[str]:
+        """The window refreshes its active source's guide itself; the
+        server keeps the other sources' it serves (services/guide_keeper)."""
+        return {self.active} if self.active else set()
 
     def pool(self) -> Any:
         p = getattr(self.win, "player", None)
@@ -211,6 +217,7 @@ class _ServerMixin:
         items = [dict(p) for p in store.playlists()]
         active = store.active_id
         host.snapshot = sorted(items, key=lambda p: p.get("id") != active)
+        host.active = str(active or "")
         srv = self._home
         if srv is not None:
             srv.refresh()

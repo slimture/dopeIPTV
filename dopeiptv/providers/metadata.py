@@ -529,6 +529,8 @@ class PosterResolver(QObject):
         # match" left that title without a poster for good.
         self._failed: set[str] = set()
         self._waiting: dict[str, list[Callable]] = {}
+        # Titles whose backdrop was asked for this session (fill_backdrop).
+        self._backdrop_asked: set[str] = set()
         self._dirty = False
         # tmdb-id lookup cache ("vod:123"/"series:456" -> {name, poster}).
         self._byid_cache: dict[str, dict] = (
@@ -809,6 +811,42 @@ class PosterResolver(QObject):
             pass
 
         run_async(self.pool, fetch, done, fail)
+
+    def fill_backdrop(self, title: str, kind: str,
+                      callback: Callable[[dict], None]) -> bool:
+        """A title matched before backdrops were kept (its entry has no
+        "backdrop_url"): its details asked for again by its TMDB id, once a
+        session, on the pool - only the backdrop (None: there is none) put
+        beside what the entry had, and *callback* given the entry. False
+        when there is nothing to ask for."""
+        key = self._key(title, kind)
+        entry = self._cache.get(key)
+        tid = entry.get("tmdb_id") if isinstance(entry, dict) else None
+        if (not isinstance(entry, dict) or not isinstance(tid, int)
+                or "backdrop_url" in entry or key in self._backdrop_asked):
+            return False
+        self._backdrop_asked.add(key)
+        # Bound after the test: a default is typed where it is written.
+        ident: int = tid
+
+        def fetch(t: int = ident, k: str = kind) -> dict | None:
+            return self.client.fetch_details_by_id(t, k)
+
+        def done(details: Any, key: str = key, t: int = ident) -> None:
+            d = self._cache.get(key)
+            if not isinstance(d, dict) or d.get("tmdb_id") != t:
+                return              # matched anew meanwhile
+            d = dict(d)
+            d["backdrop_url"] = (details or {}).get("backdrop_url")
+            self._cache[key] = d
+            self._save()
+            try:
+                callback(d)
+            except RuntimeError:
+                pass
+
+        run_async(self.pool, fetch, done, lambda _msg: None)
+        return True
 
     def clear_manual_match(self, title: str, kind: str) -> None:
         """Drop a previously-set manual pick so the next lookup goes back

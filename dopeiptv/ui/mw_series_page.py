@@ -231,6 +231,19 @@ class _SeriesPageMixin:
             log.info("series page: not for this profile")
             self._leave_series_page()
             return
+        # Whatever the answer, the page never stays loading: an episode list
+        # it could not take ends in the page's error, with Retry.
+        try:
+            self._sp_take_info(client, info)
+        except Exception:
+            log.exception("series page: the episodes of %s were not shown",
+                          (self._sp_ctx or {}).get("series_id"))
+            if self._sp_cache:
+                self._sp_cache.pop((id(client), str((self._sp_ctx or {}).get("series_id"))), None)
+            page.set_failed(tr("err_series_open"))
+
+    def _sp_take_info(self, client, info) -> None:
+        """A series_info answer on the page (kept a few minutes)."""
         info = info if isinstance(info, dict) else {}
         series = self._sp_ctx or {}
         sid = series.get("series_id")
@@ -245,6 +258,10 @@ class _SeriesPageMixin:
         if series.get("category_id") is None and extra.get("category_id") is not None:
             series["category_id"] = extra["category_id"]
         episodes = self._episode_rows(info, series)
+        # The same rows come back from the cache: what was new when the page
+        # opened last has been seen since (_follow_entered marks it anew).
+        for ep in episodes:
+            ep.pop("_new", None)
         first_new = self._follow_entered(sid, info, episodes)
         if not self._sp_focus and first_new is not None:
             self._sp_focus = str(first_new)
@@ -367,6 +384,7 @@ class _SeriesPageMixin:
                                     "backdrop": "", "asked": False}
         if extra is not None:
             head["info"] = dict(extra)
+            head["source_in"] = True
         info, td = head["info"], head["tmdb"]
         ctx = self._sp_ctx or {}
         title = self._sp_title()
@@ -413,6 +431,14 @@ class _SeriesPageMixin:
             head["backdrop"] = backdrop
             if backdrop:
                 self._sp_art().get(backdrop, partial(self._sp_backdrop_in, gen, backdrop))
+        # A title TMDB matched before backdrops were kept (no "backdrop_url"
+        # in its entry), the source giving none either: asked for again by
+        # its id, once, off the window's thread (_sp_tmdb_in draws it).
+        fill = getattr(self.tmdb, "fill_backdrop", None)
+        if (callable(fill) and td and "backdrop_url" not in td and not backdrop
+                and head.get("source_in") and not head.get("backdrop_asked")):
+            head["backdrop_asked"] = True
+            fill(title, "series", partial(self._sp_tmdb_in, gen))
 
     def _sp_tmdb_in(self, gen: int, details) -> None:
         page = self._series_page
@@ -650,12 +676,8 @@ class _SeriesPageMixin:
         nxt = self._sp_next
         if nxt is None or nxt.episode is None:
             return
-        if nxt.resume and nxt.progress.pos > 0:
-            self._sp_start_once = (self._item_key(nxt.episode), nxt.progress.pos)
-        try:
-            self._sp_play(nxt.episode)
-        finally:
-            self._sp_start_once = None
+        at = nxt.progress.pos if nxt.resume and nxt.progress.pos > 0 else None
+        self._sp_play(nxt.episode, at)
 
     def _sp_queue(self, ep: dict) -> list[dict]:
         """What autoplay goes on to after *ep*: its seasons in order (the
@@ -677,22 +699,27 @@ class _SeriesPageMixin:
                     return e
         return ep
 
-    def _sp_play(self, ep) -> None:
-        """An episode in the docked player; the page stays."""
+    def _sp_play(self, ep, at: float | None = None) -> None:
+        """An episode in the docked player; the page stays. *at*: where it
+        starts, without the resume question (Continue)."""
         if not isinstance(ep, dict):
             return
         ep = self._sp_own(ep)
         key = self._item_key(ep)
         p = getattr(self, "player", None)
+        # The same id of another kind (a live channel's) is another title:
+        # ids are unique only within a type.
+        group = "local" if self._sp_local is not None else "episode"
         if (key is not None and str(key) == str(getattr(self, "_playing_key", None))
+                and getattr(self, "_playing_group", None) == group
                 and p is not None and getattr(p, "current_url", None)):
             return                      # it plays already: nothing to start over
         if self._sp_local is not None:
-            self._sp_play_local(ep)
+            self._sp_play_local(ep, at)
             return
         if ep.get("id") is None:
             return
-        if self._links_later(partial(self._sp_episode_url, ep), partial(self._sp_play, ep)):
+        if self._links_later(partial(self._sp_episode_url, ep), partial(self._sp_play, ep, at)):
             return
         url = self._sp_episode_url(ep)
         if not url:
@@ -704,16 +731,24 @@ class _SeriesPageMixin:
         try:
             self._ep_queue_override = queue
             self._ep_index_override = next((i for i, e in enumerate(queue) if e is ep), -1)
+            if at is not None:
+                self._sp_start_once = (key, at)
             self._start_playback(url, ep.get("name") or ep.get("title") or "dopeIPTV",
                                  ep.get("stream_icon") or ep.get("cover"), key,
                                  "episode", record=True, item=ep)
         finally:
             self.series_ctx = saved
+            self._sp_start_once = None
+            # Taken by _start_playback - unless it turned back (the
+            # recordings' question, the VPN guard): then never left for the
+            # next episode played from elsewhere.
+            self._ep_queue_override = None
+            self._ep_index_override = -1
 
     def _sp_episode_url(self, ep: dict) -> str:
         return self.client.episode_url(ep.get("id"), ep.get("container_extension")) or ""
 
-    def _sp_play_local(self, ep: dict) -> None:
+    def _sp_play_local(self, ep: dict, at: float | None = None) -> None:
         import os
         path = ep.get("_path")
         if not path or not os.path.isfile(path):
@@ -723,14 +758,24 @@ class _SeriesPageMixin:
             # The series plays on, episode after episode (the play queue).
             self._track_queue = self._sp_queue(ep)
             self._queue_explicit = False
-        self._start_playback(path, ep.get("name") or os.path.basename(path),
-                             ep.get("stream_icon"), path, "local", record=True, item=ep)
+        if at is not None:
+            self._sp_start_once = (path, at)
+        try:
+            self._start_playback(path, ep.get("name") or os.path.basename(path),
+                                 ep.get("stream_icon"), path, "local", record=True, item=ep)
+        finally:
+            self._sp_start_once = None
 
     def _sp_play_external(self, ep: dict, player: str) -> None:
         if self._sp_local is not None:
             path = ep.get("_path")
             if path:
                 launch_player(player, path, ep.get("name") or "", self)
+            return
+        # A portal's address is asked for off the window's thread (as the
+        # list's Open externally does).
+        if self._links_later(partial(self._sp_episode_url, ep),
+                             partial(self._sp_play_external, ep, player)):
             return
         url = self._sp_episode_url(ep)
         if not url or not self._confirm_external_while_playing() \

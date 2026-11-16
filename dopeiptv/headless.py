@@ -3,7 +3,8 @@
 
 No widget is imported, nor anything that draws (QtGui, mpv): only QtCore
 for the settings, plain threads for the rest. The same settings, sources
-and downloaded guides as the app - the household's, never a profile's own
+and guides as the app - each served source's guide downloaded again when it
+is six hours old (services/guide_keeper.py) - the household's, never a profile's own
 (the settings are read as they are, not through core/profiles.py) - and the
 usual log (stderr, DOPEIPTV_LOG_FILE, Nerd's log file). Ctrl+C or SIGTERM
 stops it: every viewer is let go, every provider connection closed, the

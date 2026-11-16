@@ -1048,8 +1048,20 @@ class HomePage(QWidget):
             w._show_detail(it)   # panel follows this row, not the last selection
         except Exception:
             pass
-        w._start_playback(url, it.get("name") or "dopeIPTV",
-                          it.get("stream_icon"), it.get("_key"), kind, item=it)
+        saved = w.series_ctx
+        if kind == "episode":
+            # Its series around the play, as a Continue-watching card's: the
+            # resume point, marks and scrobbles are filed under it. No queue
+            # from the list on screen (History's rows are no episodes).
+            w.series_ctx = ctx
+            w._ep_queue_override, w._ep_index_override = [], -1
+        try:
+            w._start_playback(url, it.get("name") or "dopeIPTV",
+                              it.get("stream_icon"), it.get("_key"), kind, item=it)
+        finally:
+            w.series_ctx = saved
+            if kind == "episode":
+                w._ep_queue_override, w._ep_index_override = None, -1
         if kind == "episode":
             # Same landing as a continue-watching card: played as an EPISODE
             # (so the resume prompt finds its saved position), then its

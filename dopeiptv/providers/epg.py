@@ -579,6 +579,24 @@ class XmltvGuide:
         # Not cached here: the parse process keeps it (_parse_and_index).
         return b"".join(chunks)
 
+    def refresh_file(self) -> int:
+        """Download the guide and keep it on disk without reading it into
+        memory - server mode hands out the file itself. Its index stays: an
+        index older than the file makes the next load read the file again.
+        An answer that is no XMLTV guide (a provider's error page) leaves the
+        copy there is. Returns the bytes kept."""
+        data = self._download()
+        head = data[:65536]
+        if head[:2] == b"\x1f\x8b":
+            try:
+                head = zlib.decompressobj(16 + zlib.MAX_WBITS).decompress(head, 8192)
+            except zlib.error:
+                head = b""
+        if b"<tv" not in head[:8192]:
+            raise RuntimeError("the answer is no XMLTV guide")
+        self._write_cache(data)
+        return len(data)
+
     def _download_many(self, urls: list[str]) -> bytes:
         """Several guides as one: each fetched (gzip or not), their
         channels and programmes in one <tv>. One that fails is left out;

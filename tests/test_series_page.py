@@ -568,3 +568,436 @@ def test_the_series_page_in_the_window(tmp_path):
                           env=env, cwd=_REPO_ROOT, timeout=240)
     assert "SERIES_PAGE_OK" in proc.stdout, (
         f"stdout={proc.stdout[-3000:]!r}\nstderr={proc.stderr[-4000:]!r}")
+
+
+# -- regressions found in review ------------------------------------------------------
+
+_CHILD_REVIEW = r"""
+import os, tempfile, threading, time
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from PyQt6.QtCore import QSettings
+from PyQt6.QtWidgets import QApplication
+
+_tmp = tempfile.mkdtemp()
+QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, _tmp)
+
+from dopeiptv.providers.client import DemoClient
+from dopeiptv.ui import main_window as mw_mod, mw_series_page
+from dopeiptv.ui.main_window import MainWindow
+
+app = QApplication.instance() or QApplication([])
+settings = QSettings(os.path.join(_tmp, "s.ini"), QSettings.Format.IniFormat)
+settings.setValue("home_enabled", "false")
+launched = []
+mw_mod.launch_player = lambda *a, **k: launched.append(a)
+mw_series_page.launch_player = lambda *a, **k: launched.append(a)
+w = MainWindow(DemoClient(), settings)
+w.cover.resolver = None
+asked = []
+w._choice_dialog = lambda *a, **k: asked.append(a) or 0
+
+def settle(cond, secs=10):
+    end = time.time() + secs
+    while not cond() and time.time() < end:
+        app.processEvents()
+        time.sleep(0.01)
+    app.processEvents()
+    assert cond(), "timed out"
+
+def season(n, count):
+    return [{"id": str(n * 1000 + e), "episode_num": e, "title": f"Ep {e}",
+             "container_extension": "mkv",
+             "info": {"plot": "A plot.", "duration_secs": 2700}} for e in range(1, count + 1)]
+
+info = {"info": {"name": "Show 30"}, "episodes": {"1": season(1, 3), "2": season(2, 2)}}
+w.client.series_info = lambda sid: info
+w.client.episode_url = lambda i, ext=None: f"http://x/series/u/p/{i}.mkv"
+w.resize(1440, 900)
+w.show()
+settle(lambda: w.list_model.rowCount() > 0)
+series = {"series_id": 130, "name": "Show 30", "category_id": "6"}
+
+def episode(eid):
+    return next(e for s in w._sp_seasons for e in s.episodes if e["id"] == eid)
+
+# -- a followed series' new episodes are new once: opened again within the
+#    ten minutes its episodes are kept, none of them is still "new" -----------
+w.followed.follow(series)
+w.followed.update(130, {"episodes": {"1": season(1, 2)}})
+w.followed.update(130, {"episodes": {"1": season(1, 3), "2": season(2, 2)}})
+assert set(w.followed.new_ids(130)) == {"1003", "2001", "2002"}
+w._open_series_page(series)
+settle(lambda: bool(w._sp_seasons))
+page = w._series_page
+assert page.states["1003"].new and page.states["2002"].new
+w._leave_series_page()
+w._open_series_page(series)
+settle(lambda: bool(w._sp_seasons))
+stale = [k for k, s in w._series_page.states.items() if s.new]
+assert stale == [], f"seen episodes still marked new: {stale}"
+
+# -- a live channel whose id is an episode's (ids are unique only within a
+#    type) does not stop that episode from playing ---------------------------
+w._start_playback("http://x/live/u/p/2002.ts", "Channel", None, 2002, "live")
+if not getattr(w.player, "current_url", None):
+    w.player.current_url = "http://x/live/u/p/2002.ts"
+assert w._playing_group == "live" and str(w._playing_key) == "2002"
+w._sp_play(episode("2002"))
+assert w._last_playback["kind"] == "episode" and str(w._last_playback["key"]) == "2002", \
+    w._last_playback
+
+# -- an episode the recordings' question turned back leaves no autoplay
+#    queue behind for the next episode played from elsewhere ---------------------
+guard = w._guard_stream_switch
+w._guard_stream_switch = lambda url, title: False
+w._sp_play(episode("1001"))
+w._guard_stream_switch = guard
+assert str(w._last_playback["key"]) == "2002"
+assert w._ep_queue_override is None, w._ep_queue_override
+
+# -- a portal (its addresses slow to get): Open externally asks for the
+#    address off the window's thread, and Continue still starts where it got
+#    to without the question --------------------------------------------------
+ready, blocked = set(), []
+def slow_url(i, ext=None):
+    on_main = threading.current_thread() is threading.main_thread()
+    if on_main and str(i) not in ready:
+        blocked.append(str(i))
+    if not on_main:
+        time.sleep(0.05)
+        ready.add(str(i))
+    return f"http://x/series/u/p/{i}.mkv"
+w.client.episode_url = slow_url
+w.client.slow_links = True
+w.client.link_ready = lambda name, ident: str(ident) in ready
+w._choice_dialog = lambda *a, **k: asked.append(a) or 1      # open anyway
+launched.clear()
+w._sp_play_external(episode("1002"), "mpv")
+settle(lambda: launched)
+assert blocked == [], f"the address was asked for on the window's thread: {blocked}"
+assert launched[-1][1].endswith("/1002.mkv"), launched
+
+w._sp_play(episode("1001"))
+settle(lambda: str(w._last_playback["key"]) == "1001")
+w.resume.record("episode", "2001", 1350, 2700, item={"id": "2001"},
+                series_ctx={"series_id": 130, "name": "Show 30"})
+w._sp_refresh()
+nxt = w._sp_next
+assert nxt.episode["id"] == "2001" and nxt.resume, (nxt.episode, nxt.resume)
+asked.clear()
+w._choice_dialog = lambda *a, **k: asked.append(a) or 0
+w._sp_primary()
+settle(lambda: str(w._last_playback["key"]) == "2001")
+assert asked == [], f"Continue asked whether to resume: {asked}"
+assert blocked == [], blocked
+print("SERIES_REVIEW_OK", flush=True)
+os._exit(0)
+"""
+
+
+def test_series_page_review_regressions_in_the_window(tmp_path):
+    pytest.importorskip("PyQt6")
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen", XDG_CONFIG_HOME=str(tmp_path))
+    proc = subprocess.run([sys.executable, "-c", _CHILD_REVIEW], capture_output=True,
+                          text=True, env=env, cwd=_REPO_ROOT, timeout=240)
+    assert "SERIES_REVIEW_OK" in proc.stdout, (
+        f"stdout={proc.stdout[-3000:]!r}\nstderr={proc.stderr[-4000:]!r}")
+
+
+def test_the_header_buttons_read_over_a_backdrop_on_a_light_theme(app):
+    """Favorite, Follow, Watch later and ⋯ stand out from the backdrop washed
+    toward a light page - a dark, a mid and a light one - and from the plain
+    surface: their usual fill was nearly the colour under them."""
+    from PyQt6.QtCore import QPoint
+    from PyQt6.QtGui import QColor, QPixmap
+    from dopeiptv.ui import theme
+    from dopeiptv.ui.series_page import SeriesHeader
+    light = [k for k, t in theme.THEMES.items() if t.get("light")]
+    assert len(light) >= 3
+    try:
+        for key in light:
+            theme.apply_theme(theme=key)
+            app.setStyleSheet(theme.build_style())
+            for colour in (QColor(20, 20, 30), QColor(90, 70, 50), QColor(220, 200, 180), None):
+                h = SeriesHeader()
+                h.resize(760, 240)
+                h.set_text("Show", "2020", "A plot.")
+                h.set_actions(True)
+                h.set_primary("Play S1 E1", None, "")
+                if colour is not None:
+                    backdrop = QPixmap(640, 360)
+                    backdrop.fill(colour)
+                    h.set_backdrop(backdrop)
+                h.show()
+                app.processEvents()
+                img = h.grab().toImage()
+                for b in (h.fav_btn, h.later_btn, h.more_btn):
+                    inside = b.mapTo(h, QPoint(4, b.height() // 2))
+                    beside = b.mapTo(h, QPoint(-3, b.height() // 2))
+                    fill = img.pixelColor(inside).name()
+                    ground = img.pixelColor(beside).name()
+                    ratio = theme.contrast(fill, ground)
+                    assert ratio >= 1.2, (key, colour and colour.name(), b.text() or "more",
+                                          fill, ground, ratio)
+                h.close()
+                h.deleteLater()
+    finally:
+        theme.apply_theme(theme="graphite")
+        app.setStyleSheet("")
+
+
+_CHILD_REVIEW2 = r"""
+import os, tempfile, time
+from types import SimpleNamespace
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from PyQt6.QtCore import QSettings
+from PyQt6.QtWidgets import QApplication
+
+_tmp = tempfile.mkdtemp()
+QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, _tmp)
+
+from dopeiptv.providers.client import DemoClient
+from dopeiptv.ui import main_window as mw_mod, mw_cast, mw_series_page
+from dopeiptv.ui.main_window import MainWindow
+
+app = QApplication.instance() or QApplication([])
+settings = QSettings(os.path.join(_tmp, "s.ini"), QSettings.Format.IniFormat)
+settings.setValue("home_enabled", "false")
+mw_mod.launch_player = lambda *a, **k: None
+mw_series_page.launch_player = lambda *a, **k: None
+
+
+class FakeDialog:
+    def __init__(self, *a, **k):
+        pass
+
+    def exec(self):
+        return 0
+
+
+mw_cast.CastDialog = FakeDialog
+w = MainWindow(DemoClient(), settings)
+w.cover.resolver = None
+w._choice_dialog = lambda *a, **k: 0
+
+def settle(cond, secs=10):
+    end = time.time() + secs
+    while not cond() and time.time() < end:
+        app.processEvents()
+        time.sleep(0.01)
+    app.processEvents()
+    assert cond(), "timed out"
+
+def season(n, count):
+    return [{"id": str(n * 1000 + e), "episode_num": e, "title": f"Ep {e}",
+             "container_extension": "mkv",
+             "info": {"plot": "A plot.", "duration_secs": 2700}} for e in range(1, count + 1)]
+
+info = {"info": {"name": "Show 30"}, "episodes": {"1": season(1, 3), "2": season(2, 2)}}
+w.client.series_info = lambda sid: info
+w.client.episode_url = lambda i, ext=None: f"http://x/series/u/p/{i}.mkv"
+w.resize(1440, 900)
+w.show()
+settle(lambda: w.list_model.rowCount() > 0)
+series = {"series_id": 130, "name": "Show 30", "category_id": "6"}
+w._open_series_page(series)
+settle(lambda: bool(w._sp_seasons))
+page = w._series_page
+
+def episode(eid):
+    return next(e for s in w._sp_seasons for e in s.episodes if e["id"] == eid)
+
+# -- a cast from the page: History keeps the episode's series, also when the
+#    receiver says it plays after the dialog closed (and on every strip
+#    refresh after) -----------------------------------------------------------------
+ep = episode("1002")
+w._sp_with_series(w._open_cast_dialog, ep)
+assert w.series_ctx is None
+w.show_cast_strip("Living room TV", ep["name"])
+w.show_cast_strip("Living room TV", ep["name"])
+row = next(r for r in w.history.items() if str(r.get("_key")) == "1002")
+assert row["_kind"] == "episode" and (row.get("_series_ctx") or {}).get("series_id") == 130, row
+w.show_cast_strip(None)
+
+# -- an episode replayed from History: played with its series (marks, resume,
+#    scrobbles), marked on its page, no stray autoplay queue -------------------------
+hist = {"_url": "http://x/series/u/p/2001.mkv", "_key": "2001", "_kind": "episode",
+        "name": "Show 30 · S2 * E1 - Ep 1",
+        "_series_ctx": {"series_id": 130, "name": "Show 30"}}
+w._ensure_home_page()._play_history(hist)
+app.processEvents()
+lp = w._last_playback
+assert str(lp["key"]) == "2001" and (lp.get("series_ctx") or {}).get("series_id") == 130, lp
+assert lp["ep_queue"] == [], [e.get("name") for e in lp["ep_queue"]][:3]
+assert w.series_ctx is None
+settle(lambda: w._series_page_showing() and w._series_page.playing_key == "2001")
+
+# -- TV mode and watch together: an episode turned back leaves no queue -------------
+guard = w._guard_stream_switch
+w._guard_stream_switch = lambda url, title: False
+w._tv_play_episode(episode("1001"), series, [episode("1001"), episode("1002")])
+assert w._ep_queue_override is None, "TV mode left its queue"
+w._together_room = SimpleNamespace(clock=SimpleNamespace(now_ms=lambda: 0))
+found = SimpleNamespace(kind="episode", row=episode("1003"), url="http://x/series/u/p/1003.mkv",
+                        series=series, queue=[episode("1003")])
+state = SimpleNamespace(position_at=lambda now: 0.0, playing=False,
+                        media=SimpleNamespace(name="Ep 3"))
+w._together_play(found, state)
+assert w._ep_queue_override is None, "watch together left its queue"
+w._together_room = None
+w._guard_stream_switch = guard
+
+# -- episodes as a list of lists (PHP: seasons 0..n) and a flat list -----------------
+w._leave_series_page()
+w.client.series_info = lambda sid: {"episodes": [season(0, 1), season(1, 2)]}
+w._open_series_page({"series_id": 140, "name": "Show 40"})
+settle(lambda: bool(w._sp_seasons))
+assert [s.number for s in w._sp_seasons] == [1, 0], [s.number for s in w._sp_seasons]
+w._leave_series_page()
+flat = season(1, 2) + season(2, 1)
+for e in flat:
+    e["season"] = int(e["id"]) // 1000
+w.client.series_info = lambda sid: {"episodes": flat}
+w._open_series_page({"series_id": 141, "name": "Show 41"})
+settle(lambda: bool(w._sp_seasons))
+assert [s.number for s in w._sp_seasons] == [1, 2]
+assert [len(s.episodes) for s in w._sp_seasons] == [2, 1]
+w._leave_series_page()
+
+# -- whatever the answer: the page never stays loading ------------------------------
+rows = w._episode_rows
+w._episode_rows = lambda info, series: 1 / 0
+w._open_series_page({"series_id": 150, "name": "Show 50"})
+settle(lambda: not w._series_page.loading.isVisibleTo(w._series_page))
+assert w._series_page.retry.isVisibleTo(w._series_page), "no way to try again"
+w._episode_rows = rows
+w._leave_series_page()
+
+# -- a title TMDB matched before backdrops were kept: its details asked for
+#    again by its id, once, and the backdrop shown ---------------------------------
+asked = []
+
+class Resolver:
+    client = SimpleNamespace(season_episodes=lambda tid, n: {})
+
+    def __getattr__(self, name):            # the list's covers: none here
+        return lambda *a, **k: None
+
+    def is_resolved(self, title, kind):
+        return True
+
+    def get_full(self, title, kind, callback):
+        return {"tmdb_id": 55, "poster_url": None}
+
+    def tmdb_id_for(self, title, kind):
+        return 55
+
+    def fill_backdrop(self, title, kind, callback):
+        asked.append(title)
+        callback({"tmdb_id": 55, "poster_url": None,
+                  "backdrop_url": "https://img.invalid/w780/b.jpg"})
+        return True
+
+w.cover.resolver = Resolver()
+w.client.series_info = lambda sid: info
+w._open_series_page({"series_id": 160, "name": "Show 60"})
+settle(lambda: bool(w._sp_seasons))
+assert asked == ["Show 60"], asked
+assert w._sp_head["backdrop"] == "https://img.invalid/w780/b.jpg", w._sp_head
+w._sp_refresh()
+w._sp_fill_header(None)
+assert asked == ["Show 60"], asked
+w.cover.resolver = None
+print("SERIES_REVIEW2_OK", flush=True)
+os._exit(0)
+"""
+
+
+def test_series_page_review_regressions_more(tmp_path):
+    pytest.importorskip("PyQt6")
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen", XDG_CONFIG_HOME=str(tmp_path))
+    proc = subprocess.run([sys.executable, "-c", _CHILD_REVIEW2], capture_output=True,
+                          text=True, env=env, cwd=_REPO_ROOT, timeout=240)
+    assert "SERIES_REVIEW2_OK" in proc.stdout, (
+        f"stdout={proc.stdout[-3000:]!r}\nstderr={proc.stderr[-4000:]!r}")
+
+
+def _old_episode_rows(info, series):
+    """MainWindow._episode_rows as it was (a dict of seasons only): the
+    dict form must come out exactly the same."""
+    from dopeiptv.i18n import tr
+    series_cover = (series.get("cover") or series.get("cover_big")
+                    or series.get("stream_icon") or "")
+    series_title = series.get("name") or series.get("title") or ""
+    episodes = []
+    for season, eps in ((info or {}).get("episodes") or {}).items():
+        for ep in eps:
+            ep["season"] = season
+            ep["name"] = (f"S{season} * E{ep.get('episode_num', '?')} - "
+                          f"{ep.get('title') or tr('misc_episode')}")
+            still = (ep.get("info") or {}).get("movie_image") or ""
+            ep["stream_icon"] = ep.get("stream_icon") or still or series_cover
+            ep["_series_title"] = series_title
+            episodes.append(ep)
+    return episodes
+
+
+def test_episode_rows_take_a_dict_a_flat_list_or_a_list_of_lists(app):
+    import copy
+    from dopeiptv.ui.main_window import MainWindow
+    series = {"name": "Show", "cover": "http://c/p.jpg"}
+    shaped = {"episodes": {"1": [_ep(11, 1, title="One", still="http://s/1.jpg"), _ep(12, 2)],
+                           "0": [_ep(1, 1, title="")]}}
+    old = _old_episode_rows(copy.deepcopy(shaped), series)
+    new = MainWindow._episode_rows(copy.deepcopy(shaped), series)
+    assert new == old
+    # PHP panels: seasons keyed 0..n come as a list of lists, the index the season.
+    rows = MainWindow._episode_rows({"episodes": [[_ep(1, 1)], [_ep(11, 1), _ep(12, 2)]]}, series)
+    assert [(r["id"], r["season"]) for r in rows] == [("1", "0"), ("11", "1"), ("12", "1")]
+    assert rows[1]["name"].startswith("S1 * E1") and rows[1]["_series_title"] == "Show"
+    # A flat list: each row says its season.
+    rows = MainWindow._episode_rows({"episodes": [_ep(21, 1, season=2), _ep(11, 1, season="1"),
+                                                  "junk", None]}, series)
+    assert [(r["id"], r["season"]) for r in rows] == [("21", 2), ("11", "1")]
+    assert rows[0]["name"].startswith("S2 * E1")
+    assert [s.number for s in sv.seasons(rows)] == [1, 2]
+    # Nothing usable: no rows, never an exception.
+    for info in ({}, {"episodes": None}, {"episodes": []}, {"episodes": {"1": None}}, None, []):
+        assert MainWindow._episode_rows(info, series) == []
+
+
+def test_a_backdrop_for_a_title_matched_before_backdrops_were_kept(app, tmp_path):
+    """A TMDB entry cached before 1.6.0 has no backdrop_url: its details are
+    asked for again by its id, once, on the pool - the backdrop (or None)
+    kept beside what was there; the cache version stays."""
+    from unittest.mock import MagicMock
+
+    from PyQt6.QtCore import QSettings, QThreadPool
+    from dopeiptv.providers.metadata import PosterResolver
+    settings = QSettings(str(tmp_path / "s.ini"), QSettings.Format.IniFormat)
+    client = MagicMock()
+    client.fetch_details_by_id.return_value = {
+        "tmdb_id": 7, "poster_url": "https://tmdb/other.jpg",
+        "backdrop_url": "https://tmdb/w780/b.jpg"}
+    pool = QThreadPool()
+    pool.setMaxThreadCount(1)
+    r = PosterResolver(pool, settings, client)
+    key = r._key("Show", "series")
+    r._cache[key] = {"tmdb_id": 7, "poster_url": "https://tmdb/p.jpg", "manual": True}
+    got = []
+    assert r.fill_backdrop("Show", "series", got.append) is True
+    end = time.time() + 5
+    while not got and time.time() < end:
+        pool.waitForDone(50)
+        app.processEvents()
+    assert got and got[0]["backdrop_url"] == "https://tmdb/w780/b.jpg", got
+    entry = r.get_full("Show", "series", lambda d: None)
+    assert entry["backdrop_url"] == "https://tmdb/w780/b.jpg"
+    assert entry["poster_url"] == "https://tmdb/p.jpg" and entry["manual"]   # kept
+    # Asked for once: never again, not for an entry that has its backdrop.
+    assert r.fill_backdrop("Show", "series", got.append) is False
+    r._cache[r._key("Other", "series")] = {"tmdb_id": 8, "backdrop_url": None}
+    assert r.fill_backdrop("Other", "series", got.append) is False
+    assert r.fill_backdrop("Unknown", "series", got.append) is False
+    assert client.fetch_details_by_id.call_count == 1
+    assert client.fetch_details_by_id.call_args[0] == (7, "series")
