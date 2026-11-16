@@ -55,8 +55,7 @@ from .player_resize import PlayerResizeHandle
 from ..core.wakelock import WakeLock
 from .dialogs import PlaylistDialog
 from .nav_widgets import NavButton, SideRule, SourceAvatar, SourceLabel
-# fold_into_app_menu: imported from here as well (tests, older callers).
-from .app_menu import MAC_MENUS, fold_into_app_menu, lay_out, open_website  # noqa: F401
+from .app_menu import MENUS, lay_out, open_website
 from .widgets import (
     FlowRow, HeartButton, _SidebarLogo, _Toast,
     cast_strip_icon, confirm, file_dialog_options,
@@ -527,10 +526,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         website_action = action(tr("menu_website"), open_website)
         about_action = action(tr("menu_about"), self.show_about)
         quit_action = action(tr("menu_quit"), self.close)
-        # Grouped as each platform has it (app_menu): on macOS a menu bar of
-        # its own - the application menu by the roles, File, View, History,
-        # Help - with no second "dopeIPTV" menu; elsewhere the one menu.
-        # Kept by name: the command palette lists them.
+        # File, View, History and Help on every platform (app_menu); on
+        # macOS About, Settings, Quit and the supporter entries go into the
+        # application menu by their roles. Kept by name: the command
+        # palette lists them.
         self._menu_actions = {
             "about": about_action, "settings": settings_action,
             "open_video": open_video_action, "open_address": open_address_action,
@@ -543,7 +542,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             **report_actions, "website": website_action,
             "supporter": self._supporter_action, "donate": self._donate_action,
             "quit": quit_action}
-        menus = lay_out(self.menuBar(), self._menu_actions, sys.platform == "darwin")
+        menus = lay_out(self.menuBar(), self._menu_actions)
         self._answers_menu = menus["help"]
         # Only while something is playing - there is nothing to send
         # otherwise, and a dead entry is worse than none.
@@ -577,8 +576,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             clear_action: lambda: tr("clear_menu") + "…",
             stats_action: lambda: tr("stats_menu") + "…",
         }
-        if sys.platform == "darwin":
-            for key, title in MAC_MENUS:
+        for key, title in MENUS:
+            if key in menus:
                 self._i18n_actions[menus[key].menuAction()] = partial(tr, title)
 
         root = QSplitter(Qt.Orientation.Horizontal)

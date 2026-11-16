@@ -183,7 +183,7 @@ map and the one-way import rule.
 | `media/video_surface.py` | The video surface mpv draws into (`_MpvGLWidget`) and the Linux pop-out's raster mirror |
 | `media/subtitle_text.py` | Stray right-to-left marks out of subtitle files before mpv reads them |
 | `ui/main_window.py` | MainWindow composition root (+ `mw_*` mixins) |
-| `ui/app_menu.py` | The app's menus per platform: macOS's menu bar (app menu by roles, File, View, History, Help), elsewhere the one menu in the same groups |
+| `ui/app_menu.py` | The app's menus, one layout on every platform: File (Settings and Quit at its foot), View, History, Help (About last); on macOS About, Settings, Quit and the supporter entries go into the application menu by their roles (`_MAC_ROLES`), the rest never moved by its words; no empty menu, no stray separator |
 | `ui/channel_list.py` | List model, view, delegate painting |
 | `ui/dialogs.py` | Dialog windows; `SourceFields` (a source's connection fields and what they mean, no layout) and the Add source quick form (`PlaylistDialog`) |
 | `ui/settings_ui.py` | Settings building blocks: sidebar shell (group headings, a group's pages shown only while it is on), search view (each page's group over it), pages, a page below a page (`open_sub`: a source's own, in place of Sources), sections (`card`), rows (with a mark before the control: a source's own or shared), link rows to a page elsewhere, switches, steppers, chips |

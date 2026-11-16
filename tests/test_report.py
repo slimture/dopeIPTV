@@ -379,26 +379,6 @@ def test_ordinary_text_is_left_alone(keep):
     assert report.scrub(keep) == keep
 
 
-def test_on_a_mac_no_entry_is_left_for_a_second_app_menu():
-    """Every app-menu entry without a standard role is folded into the real
-    application menu on macOS (Send feedback… once was not: two dopeIPTV
-    menus side by side)."""
-    pytest.importorskip("PyQt6.QtWidgets")
-    from PyQt6.QtGui import QAction
-    from PyQt6.QtWidgets import QApplication, QMenu
-
-    from dopeiptv.ui.main_window import fold_into_app_menu
-    app = QApplication.instance() or QApplication([])  # noqa: F841
-    menu = QMenu()
-    plain = menu.addAction("Send feedback…")
-    about = menu.addAction("About")
-    about.setMenuRole(QAction.MenuRole.AboutRole)
-    menu.addSeparator()
-    fold_into_app_menu(menu)
-    assert plain.menuRole() == QAction.MenuRole.ApplicationSpecificRole
-    assert about.menuRole() == QAction.MenuRole.AboutRole
-
-
 def test_feedback_waits_a_minute_and_stops_for_the_day():
     now = 1_000_000.0
     assert report.feedback_wait([], now) == ""

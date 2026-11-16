@@ -1,38 +1,46 @@
-"""The app's menus, laid out the way each platform expects.
+"""The app's menus: one layout on every platform.
 
-macOS: a real menu bar - the application menu (About, the supporter key
-and donating, Preferences, Quit: Qt moves them there by their roles), then
-File, View, History and Help. Linux and Windows: the one "dopeIPTV" menu,
-the same groups one under the other with separators between them. The
+File, View, History and Help in the menu bar, the same entries in the same
+places on Linux, Windows and macOS - Settings and Quit in File, About last
+in Help, where people look for them. On macOS Qt moves About, Settings and
+Quit into the application menu by their roles, and the supporter key and
+donating go there too (ApplicationSpecificRole), so it looks as it always
+has; every other entry is kept from being moved there by its words. The
 actions are made by the window (they keep their shortcuts and handlers);
 this only says where each goes."""
 
 from __future__ import annotations
 
-from PyQt6.QtGui import QAction, QKeySequence
+import sys
 
-from .. import APP_NAME
+from PyQt6.QtGui import QAction, QKeySequence
+from PyQt6.QtWidgets import QMenu
+
 from ..core.xdg import open_url
 from ..i18n import tr
 
-#: The entries in their groups: (group, the menu it is on macOS, actions).
+#: The entries in their groups, a separator between two groups in one
+#: menu: (group, its menu, actions).
 GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
-    ("about", "app", ("about",)),
-    ("prefs", "app", ("settings",)),
     ("file", "file", ("open_video", "open_address", "refresh", "reminders", "calendar")),
+    ("prefs", "file", ("settings",)),
+    ("quit", "file", ("quit",)),
     ("view", "view", ("tv_mode", "teletext", "multiview", "cast", "together", "phone")),
     ("history", "history", ("stats", "private", "clear")),
     ("help", "help", ("feedback", "answers", "report_wait", "website")),
-    ("support", "app", ("supporter", "donate")),
-    ("quit", "app", ("quit",)),
+    ("support", "help", ("supporter", "donate")),
+    ("about", "help", ("about",)),
 )
 
-#: macOS's menus in the bar, in order, and their titles.
-MAC_MENUS: tuple[tuple[str, str], ...] = (
+#: The menus in the bar, in order, and their titles.
+MENUS: tuple[tuple[str, str], ...] = (
     ("file", "menu_file"), ("view", "menu_view"), ("history", "nav_history"), ("help", "menu_help"))
 
-_ROLES = {"about": QAction.MenuRole.AboutRole, "settings": QAction.MenuRole.PreferencesRole,
-          "quit": QAction.MenuRole.QuitRole}
+#: macOS: what goes into the application menu, by its role.
+_MAC_ROLES = {"about": QAction.MenuRole.AboutRole, "settings": QAction.MenuRole.PreferencesRole,
+              "quit": QAction.MenuRole.QuitRole,
+              "supporter": QAction.MenuRole.ApplicationSpecificRole,
+              "donate": QAction.MenuRole.ApplicationSpecificRole}
 
 WEBSITE = "https://dopeiptv.org/?ref=app-help"
 
@@ -41,48 +49,34 @@ def open_website() -> None:
     open_url(WEBSITE)
 
 
-def fold_into_app_menu(menu) -> None:
-    """macOS: every entry of *menu* without a standard role goes into the
-    one real application menu - an entry left with none makes Qt keep a
-    second menu named like the app beside it."""
-    for act in menu.actions():
-        if not act.isSeparator() and act.menuRole() in (QAction.MenuRole.TextHeuristicRole,
-                                                        QAction.MenuRole.NoRole):
-            act.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
-
-
-def lay_out(menubar, actions: dict[str, QAction], mac: bool) -> dict[str, object]:
+def lay_out(menubar, actions: dict[str, QAction], mac: bool | None = None) -> dict[str, QMenu]:
     """*actions* (by the names in GROUPS; a missing one is left out) put in
-    *menubar*'s menus; {"app"/"file"/"view"/"history"/"help": its QMenu} -
-    on Linux and Windows all five are the one menu."""
-    app_menu = menubar.addMenu(APP_NAME)
-    menus: dict[str, object] = {"app": app_menu}
-    for key, title in MAC_MENUS:
-        menus[key] = menubar.addMenu(tr(title)) if mac else app_menu
-    for _group, where, names in GROUPS:
-        present = [n for n in names if n in actions]
-        if not present:
+    *menubar*'s menus; {"file"/"view"/"history"/"help": its QMenu}, a menu
+    with nothing in it not made. *mac*: macOS's roles (default: on macOS)."""
+    if mac is None:
+        mac = sys.platform == "darwin"
+    menus: dict[str, QMenu] = {}
+    for key, title in MENUS:
+        groups = [present for _group, where, names in GROUPS if where == key
+                  if (present := [n for n in names if n in actions])]
+        if not groups:
             continue
-        menu = menus[where] if mac else app_menu
-        if not mac and app_menu.actions():
-            app_menu.addSeparator()
-        for name in present:
-            act = actions[name]
-            menu.addAction(act)
-            if name in _ROLES:
-                # A no-op on Linux and Windows.
-                act.setMenuRole(_ROLES[name])
-            elif not mac:
-                continue
-            elif where == "app":
-                act.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
-            else:
-                # Never moved by its words ("Settings", "About", "Quit" in
-                # some language) into the application menu.
-                act.setMenuRole(QAction.MenuRole.NoRole)
+        menu = menus[key] = menubar.addMenu(tr(title))
+        for present in groups:
+            # On macOS a group that moves to the application menu leaves
+            # no separator behind; a hidden entry's are Qt's to collapse.
+            moved = mac and all(n in _MAC_ROLES for n in present)
+            if menu.actions() and not moved:
+                menu.addSeparator()
+            for name in present:
+                act = actions[name]
+                menu.addAction(act)
+                if mac:
+                    # NoRole: never moved by its words ("Settings", "About",
+                    # "Quit" in some language) into the application menu.
+                    act.setMenuRole(_MAC_ROLES.get(name, QAction.MenuRole.NoRole))
     if mac:
         settings = actions.get("settings")
         if settings is not None and settings.shortcut().isEmpty():
             settings.setShortcut(QKeySequence(QKeySequence.StandardKey.Preferences))
-        fold_into_app_menu(app_menu)
     return menus

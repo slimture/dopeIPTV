@@ -86,6 +86,12 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 - The welcome's connect step on a low screen: the first time it showed, wrapped text (the box finder's note above all) was cut off and the card ran past the window. The step now scrolls inside the card, and what Find on my network says sits under the link at the field's width.
 - A series' page played an episode on one click, whatever "Auto-play preview on selection" said. It now follows that setting as the lists do: off (the default), one click picks the episode and a double click or Enter plays it.
 
+- The menu bar is the same on Windows, Linux and macOS: File, View,
+  History and Help, with Settings and Quit in File and About last in
+  Help, where people look for them, in place of the one "dopeIPTV" menu
+  on Windows and Linux. macOS looks as before: Qt moves About, Settings,
+  Quit and the supporter entries into the application menu.
+
 ## [1.6.0]
 
 Profiles for the household, TV mode with the phone as its remote, a page
