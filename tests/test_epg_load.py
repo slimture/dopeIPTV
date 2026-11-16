@@ -232,7 +232,9 @@ def test_one_guide_load_at_a_time(monkeypatch):
                         lambda _pool, fn, done, err=None: jobs.append(
                             (fn, done)))
 
-    class _Window:
+    from dopeiptv.ui.mw_busy import _BusyMixin
+
+    class _Window(_BusyMixin):
         _ensure_xmltv_loaded = mw.MainWindow._ensure_xmltv_loaded
         _load_guide = mw.MainWindow._load_guide
         pool = None
@@ -244,8 +246,13 @@ def test_one_guide_load_at_a_time(monkeypatch):
             self.list_model = type("M", (), {"refresh_all": lambda s: None})()
             self.epg_asked = 0
 
-        def _epg_progress_finished(self):
-            self.finished += 1
+        def _guide_progress(self, token):
+            return None
+
+        def _guide_busy_end(self, token, note=None):
+            ended = super()._guide_busy_end(token, note)
+            self.finished += ended
+            return ended
 
         def _request_epg(self):
             self.epg_asked += 1

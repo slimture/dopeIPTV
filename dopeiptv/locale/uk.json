@@ -2933,5 +2933,6 @@
   "phone_page_tracks": "Субтитри та звук",
   "phone_page_sleep_left": "Зупиниться через {n} хв",
   "phone_rec_ask": "Записати {title}?",
-  "phone_rec_stop_ask": "Зупинити запис {title}?"
+  "phone_rec_stop_ask": "Зупинити запис {title}?",
+  "status_guide_still_loading": "Програма передач завантажується довше, ніж зазвичай, - вона з'явиться, щойно буде готова."
 }

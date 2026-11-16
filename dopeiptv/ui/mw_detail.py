@@ -775,6 +775,12 @@ class _DetailMixin:
         key = self._item_key(it)
         self._clear_epg_rows()
         self._epg_note(tr("status_loading_programme_guide"))
+        # The window owns the guide's load (and its loading strip): a guide
+        # not in yet is loaded under its token - also when the lookup below
+        # gets to the download first - and this panel is asked again then.
+        ensure = getattr(self, "_ensure_xmltv_loaded", None)
+        if ensure is not None:
+            ensure()
 
         def fetch():
             # Many providers' short_epg returns only 2-3 entries even when the

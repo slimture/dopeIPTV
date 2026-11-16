@@ -10,6 +10,7 @@ import threading
 import time
 from functools import partial
 
+from PyQt6 import sip
 from PyQt6.QtCore import (
     QEvent, QPoint, QPointF, QSettings, QSize, Qt, QThreadPool,
     QTimer, pyqtSignal,
@@ -129,6 +130,14 @@ from ..core.workers import (
 _UNSET = object()
 
 
+def _gone(obj) -> bool:
+    """Whether Qt has deleted *obj* (an async answer arriving late)."""
+    try:
+        return sip.isdeleted(obj)
+    except TypeError:           # not a Qt object (a test's window)
+        return False
+
+
 # The status row's "123 channels", per kind of list.
 _COUNT_KEYS = {
     "live": "count_channels", "vod": "count_movies",
@@ -158,7 +167,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _TeletextMixin, _ProfilesMixin, QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
-    epg_progress = pyqtSignal(int)
+    # A guide download's progress: (the load's token, percent). Token 0 is a
+    # load the window did not start (mw_busy._on_epg_progress).
+    epg_progress = pyqtSignal(int, int)
 
     def __init__(self, client: XtreamClient, settings: QSettings,
                  playlists: PlaylistStore | None = None) -> None:
@@ -238,7 +249,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.xmltv = XmltvGuide(
             client, (active_pl or {}).get("epg_url") or None,
             cache_path=epg_cache_path(pid) if pid else None,
-            progress_cb=self.epg_progress.emit)
+            progress_cb=self._guide_progress(0))
         self.xmltv.delay_minutes = self._epg_delay_minutes()
         # The household's profiles (core/profiles.py); each store below is
         # the profile's in use, pinned to it.
@@ -2396,7 +2407,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.xmltv = XmltvGuide(
             self.client, (pl or {}).get("epg_url") or None,
             cache_path=epg_cache_path(pid) if pid else None,
-            progress_cb=self.epg_progress.emit)
+            progress_cb=self._guide_progress(0))
         # The new guide keeps the guide offset (Settings, and a source's own
         # with Nerd); a refresh used to drop it until the app restarted.
         self.xmltv.delay_minutes = self._epg_delay_minutes()
@@ -2404,13 +2415,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Name the wait after what the user did (refresh the playlist), not the
         # guide reload that happens to be the slow part of it. Shown in the top
         # loading strip only (the bottom line stays the channel count).
-        self._busy_epg_msg = tr("status_refreshing_playlist")
         self._show_busy(tr("status_refreshing_playlist"))
         self._load_categories()
         # New/refreshed provider: re-learn which Browse modes it has and hide
         # the empty ones (Browse nav is shown by default until this resolves).
         self._refresh_mode_availability()
-        self._load_guide(force=force)
+        self._load_guide(force=force, label=tr("status_refreshing_playlist"))
 
     def _refresh_epg_now(self) -> None:
         """Force a fresh EPG fetch now (Settings button) without reloading the
@@ -2441,7 +2451,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Rebuild the (empty) guide against the demo client, then load the
         # Live channels through the usual mode switch.
         self.xmltv = XmltvGuide(self.client, None, cache_path=None,
-                                progress_cb=self.epg_progress.emit)
+                                progress_cb=self._guide_progress(0))
         self.switch_mode("live")
         self._update_provider_hint()   # hides the '+ Add provider' hint
         self._show_toast(tr("demo_notice"), 8000)
@@ -3415,18 +3425,35 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             log.info("EPG: the guide is old or runs out soon - refreshing")
             self._load_guide(force=True)
 
-    def _load_guide(self, force: bool = False) -> None:
-        """Load the current guide on the pool. The download drives the
-        "Loading programme guide" strip via epg_progress, so the load must
-        END that indicator too, on completion and failure alike - without it
-        the strip lingered (until the watchdog, or a category switch)."""
+    def _guide_progress(self, token: int):
+        """A guide's progress callback for the load with *token* (0: one the
+        window did not start). Called on the loading thread; the signal
+        brings it to the window's."""
+        return partial(self.epg_progress.emit, token)
+
+    def _load_guide(self, force: bool = False, label: str | None = None) -> None:
+        """Load the current guide on the pool. This load owns the "Loading
+        programme guide" strip (mw_busy) under a token of its own: its
+        download's progress shows it, its end - done, failed or raised -
+        ends it, and an older load's late word touches neither. *label*
+        names the wait after what the person did."""
         x = self.xmltv
         self._guide_loading = x
+        token = self._guide_busy_begin(label)
+        self._guide_load_token = token
+        # Whichever thread downloads this guide now (this load, or a lookup
+        # that got there first) reports under this load's token.
+        x.progress_cb = self._guide_progress(token)
 
         def finished(ok) -> None:
-            if getattr(self, "_guide_loading", None) is x:
+            if _gone(self):
+                return
+            if (getattr(self, "_guide_loading", None) is x
+                    and getattr(self, "_guide_load_token", 0) == token):
                 self._guide_loading = None
-            self._epg_progress_finished()
+            self._guide_busy_end(
+                token, None if ok or x is not self.xmltv
+                else tr("detail_epg_failed"))
             if ok and x is self.xmltv:
                 self.list_model.refresh_all()
                 if hasattr(self, "_request_epg"):
@@ -3437,6 +3464,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 # A guide in (or a new one): what the series rules ask for.
                 if hasattr(self, "_check_series_rules"):
                     self._check_series_rules()
+                # TV mode's now and next, which never load it themselves.
+                if hasattr(self, "_tv_guide_in"):
+                    self._tv_guide_in()
 
         run_async(self.pool, lambda: x.ensure_loaded(force=force),
                   finished, lambda _e: finished(False))

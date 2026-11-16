@@ -47,9 +47,19 @@ from .tv_widgets import (
 
 def now_next(window, it: dict) -> tuple[str, str, float | None]:
     """What is on a channel (its time and title), what comes next, and how
-    far the one on air has got - from the guide, "" where it knows none."""
+    far the one on air has got - from the guide, "" where it knows none.
+    Only a guide in memory: one not in yet is never loaded here, on the
+    window's thread (a download and parse froze TV mode, and its loading
+    strip had no end) - the window loads it on the pool and the screens
+    show it once it is in (``TvPage.guide_in``)."""
     try:
-        progs = window.xmltv.listings_for(it, 2) or []
+        guide = window.xmltv
+        if not guide.is_loaded():
+            ensure = getattr(window, "_ensure_xmltv_loaded", None)
+            if callable(ensure):
+                ensure()
+            return "", "", None
+        progs = guide.listings_for(it, 2) or []
     except Exception:
         progs = []
     if not progs:
@@ -321,6 +331,19 @@ class HomeScreen(TvScreen):
         if isinstance(tile, TvTile) and isinstance(tile.payload, tuple):
             self.page.run(tile.payload)
 
+    def guide_in(self) -> None:
+        """The guide is in: each channel tile says what is on, in place -
+        the focus stays where it is."""
+        for shelf in self.shelves:
+            if sip.isdeleted(shelf):
+                continue
+            for tile in shelf.tiles():
+                payload = tile.payload
+                if isinstance(payload, tuple) and payload and payload[0] == "channel":
+                    on, _next, frac = now_next(self.w, payload[1])
+                    tile.progress = frac
+                    tile.set_text(tile.title, on)
+
     def focusables(self) -> list[QWidget]:
         out: list[QWidget] = []
         for shelf in self.shelves:
@@ -366,6 +389,10 @@ class ChannelsScreen(TvScreen):
     def _sub(self, it: dict):
         on, nxt, frac = now_next(self.w, it)
         return "   ·   ".join(x for x in (on, nxt) if x), frac
+
+    def guide_in(self) -> None:
+        """The guide is in: the rows ask for now and next as they paint."""
+        self.chans.viewport().update()
 
     def enter(self) -> None:
         if not self._loaded:
@@ -815,6 +842,14 @@ class TvPage(QWidget):
             self.screens[key] = scr
             self.stack.addWidget(scr)
         return scr
+
+    def guide_in(self) -> None:
+        """The programme guide came in: the screens made so far show what is
+        on (they never load it themselves - ``now_next``)."""
+        for scr in list(self.screens.values()):
+            fn = getattr(scr, "guide_in", None)
+            if callable(fn) and not sip.isdeleted(scr):
+                fn()
 
     def show_screen(self, key: str, focus: bool = True) -> TvScreen:
         scr = self.screen(key)

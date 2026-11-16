@@ -2933,5 +2933,6 @@
   "phone_page_tracks": "Sous-titres et son",
   "phone_page_sleep_left": "S'arrête dans {n} min",
   "phone_rec_ask": "Enregistrer {title} ?",
-  "phone_rec_stop_ask": "Arrêter l'enregistrement de {title} ?"
+  "phone_rec_stop_ask": "Arrêter l'enregistrement de {title} ?",
+  "status_guide_still_loading": "Le guide des programmes prend un peu de temps - il s'affichera dès qu'il sera prêt."
 }

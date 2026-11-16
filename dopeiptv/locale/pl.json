@@ -2933,5 +2933,6 @@
   "phone_page_tracks": "Napisy i dźwięk",
   "phone_page_sleep_left": "Zatrzyma się za {n} min",
   "phone_rec_ask": "Nagrać {title}?",
-  "phone_rec_stop_ask": "Zatrzymać nagrywanie {title}?"
+  "phone_rec_stop_ask": "Zatrzymać nagrywanie {title}?",
+  "status_guide_still_loading": "Wczytywanie przewodnika po programach trwa dłużej - pojawi się, gdy tylko będzie gotowy."
 }

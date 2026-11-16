@@ -2933,5 +2933,6 @@
   "phone_page_tracks": "उपशीर्षक और ध्वनि",
   "phone_page_sleep_left": "{n} मिनट में रुकेगा",
   "phone_rec_ask": "{title} रिकॉर्ड करें?",
-  "phone_rec_stop_ask": "{title} की रिकॉर्डिंग रोकें?"
+  "phone_rec_stop_ask": "{title} की रिकॉर्डिंग रोकें?",
+  "status_guide_still_loading": "कार्यक्रम गाइड में थोड़ा समय लग रहा है - तैयार होते ही दिखेगी।"
 }

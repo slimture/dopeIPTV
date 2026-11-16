@@ -199,8 +199,9 @@ def test_ensure_xmltv_loaded_ends_the_progress_indicator(monkeypatch):
     until the watchdog or a category switch happened to hide it. Both the
     success and the failure callback must finish the progress indicator."""
     import dopeiptv.ui.main_window as mw
+    from dopeiptv.ui.mw_busy import _BusyMixin
 
-    class _Stub:
+    class _Stub(_BusyMixin):
         _ensure_xmltv_loaded = mw.MainWindow._ensure_xmltv_loaded
         _load_guide = mw.MainWindow._load_guide
 
@@ -216,8 +217,13 @@ def test_ensure_xmltv_loaded_ends_the_progress_indicator(monkeypatch):
         def _bump(self, what):
             setattr(self, what, getattr(self, what) + 1)
 
-        def _epg_progress_finished(self):
-            self.finished += 1
+        def _guide_progress(self, token):
+            return None
+
+        def _guide_busy_end(self, token, note=None):
+            ended = super()._guide_busy_end(token, note)
+            self.finished += ended
+            return ended
 
     def run_now(_pool, fn, done, err=None):
         try:

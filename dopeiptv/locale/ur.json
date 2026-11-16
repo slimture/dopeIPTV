@@ -2933,5 +2933,6 @@
   "phone_page_tracks": "سب ٹائٹل اور آواز",
   "phone_page_sleep_left": "{n} منٹ میں رک جائے گا",
   "phone_rec_ask": "{title} ریکارڈ کریں؟",
-  "phone_rec_stop_ask": "{title} کی ریکارڈنگ روکیں؟"
+  "phone_rec_stop_ask": "{title} کی ریکارڈنگ روکیں؟",
+  "status_guide_still_loading": "پروگرام گائیڈ میں کچھ وقت لگ رہا ہے - تیار ہوتے ہی نظر آ جائے گی۔"
 }

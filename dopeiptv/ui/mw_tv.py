@@ -985,7 +985,12 @@ class _TvMixin:
                     self.logos.get(icon, self._tv_logo_in)
                 info["logo"] = pm
             try:
-                progs = self.xmltv.listings_for(it, 2) or []
+                # A guide in memory only - never loaded on this thread.
+                if self.xmltv.is_loaded():
+                    progs = self.xmltv.listings_for(it, 2) or []
+                else:
+                    progs = []
+                    self._ensure_xmltv_loaded()
             except Exception:
                 progs = []
             now = time.time()
@@ -1028,6 +1033,15 @@ class _TvMixin:
 
     def _tv_logo_in(self, _pm) -> None:
         if self._tv_watching:
+            self._tv_fill_info()
+
+    def _tv_guide_in(self) -> None:
+        """The programme guide came in (main_window._load_guide): TV mode's
+        screens and info bar say what is on."""
+        page = getattr(self, "_tv_page", None)
+        if page is not None and not sip.isdeleted(page):
+            page.guide_in()
+        if getattr(self, "_tv_watching", False):
             self._tv_fill_info()
 
     # -- what the keys do ------------------------------------------------------------------------

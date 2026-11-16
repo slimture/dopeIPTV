@@ -2933,5 +2933,6 @@
   "phone_page_tracks": "الترجمة والصوت",
   "phone_page_sleep_left": "يتوقف بعد {n} دقيقة",
   "phone_rec_ask": "تسجيل {title}؟",
-  "phone_rec_stop_ask": "إيقاف تسجيل {title}؟"
+  "phone_rec_stop_ask": "إيقاف تسجيل {title}؟",
+  "status_guide_still_loading": "يستغرق دليل البرامج بعض الوقت - سيظهر فور اكتماله."
 }

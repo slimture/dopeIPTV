@@ -2933,5 +2933,6 @@
   "phone_page_tracks": "Titlovi i zvuk",
   "phone_page_sleep_left": "Zaustavlja se za {n} min",
   "phone_rec_ask": "Snimiti {title}?",
-  "phone_rec_stop_ask": "Zaustaviti snimanje {title}?"
+  "phone_rec_stop_ask": "Zaustaviti snimanje {title}?",
+  "status_guide_still_loading": "Programski vodič se učitava duže nego obično - pojaviće se čim bude spreman."
 }

@@ -2933,5 +2933,6 @@
   "phone_page_tracks": "Untertitel und Ton",
   "phone_page_sleep_left": "Stoppt in {n} Min.",
   "phone_rec_ask": "{title} aufnehmen?",
-  "phone_rec_stop_ask": "Aufnahme von {title} stoppen?"
+  "phone_rec_stop_ask": "Aufnahme von {title} stoppen?",
+  "status_guide_still_loading": "Der Programmführer braucht etwas länger - er erscheint, sobald er da ist."
 }

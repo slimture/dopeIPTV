@@ -358,6 +358,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "status_refreshing_playlist": {"en": "Refreshing playlist…"},
     "status_connecting": {"en": "Connecting to {name}…"},
     "status_loading_programme_guide": {"en": "Loading programme guide…"},
+    "status_guide_still_loading": {"en": "The programme guide is taking a while - it shows up once it is in."},
     "status_playing": {"en": "Playing: {title}"},
     "status_playing_from": {"en": "Playing: {title} - from {source}"},
     "status_list_source": {"en": "{source} · {text}"},

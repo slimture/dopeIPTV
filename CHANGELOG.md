@@ -102,6 +102,17 @@ how connections to the account are counted.
   and art lookups; the library's cache is read from disk once a session,
   written off the window's thread, and a walk that finds nothing new
   leaves the list as it is.
+- "Loading programme guide…" no longer stays at the top of the list after
+  the guide is in. The strip was shown by any guide download - also one a
+  lookup started on its own (the detail panel, a past programme, TV mode),
+  or the previous source's still going after a switch - and nothing of
+  those ended it, so it stayed until a category change hid it. Now the
+  window owns each guide load under a token of its own: only that load
+  shows the strip and its end ends it (done, from the disk cache, failed
+  or no guide at all), a late word from an older load changes nothing, a
+  list loaded meanwhile leaves it alone, and a load that says nothing for a
+  minute is let go with a calm note in the status line. TV mode's now and
+  next no longer download and parse the guide on the window's thread.
 - Night mode brings loud parts down and nothing up. In 1.6.0 its leveller
   (`dynaudnorm`) did little to a bang and lifted quiet passages, making
   plain speech louder and its level ride with every pause - "louder, and

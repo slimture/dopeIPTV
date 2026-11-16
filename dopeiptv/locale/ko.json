@@ -2933,5 +2933,6 @@
   "phone_page_tracks": "자막 및 음성",
   "phone_page_sleep_left": "{n}분 후 정지",
   "phone_rec_ask": "{title}을(를) 녹화하시겠습니까?",
-  "phone_rec_stop_ask": "{title} 녹화를 정지하시겠습니까?"
+  "phone_rec_stop_ask": "{title} 녹화를 정지하시겠습니까?",
+  "status_guide_still_loading": "프로그램 가이드를 불러오는 데 시간이 걸리고 있습니다. 준비되는 대로 표시됩니다."
 }

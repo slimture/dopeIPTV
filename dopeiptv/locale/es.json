@@ -2933,5 +2933,6 @@
   "phone_page_tracks": "Subtítulos y sonido",
   "phone_page_sleep_left": "Se detiene en {n} min",
   "phone_rec_ask": "¿Grabar {title}?",
-  "phone_rec_stop_ask": "¿Detener la grabación de {title}?"
+  "phone_rec_stop_ask": "¿Detener la grabación de {title}?",
+  "status_guide_still_loading": "La guía de programación está tardando un poco; aparecerá en cuanto esté lista."
 }
