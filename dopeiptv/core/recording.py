@@ -131,6 +131,11 @@ class RecordingManager(QObject):
         # a function that gets it, run off the window's thread - or None
         # when there is no way to (its source is gone). Set by the window.
         self.address_for: Callable[[dict], Callable[[], str] | None] | None = None
+        # (window's thread) Told just before a recording opens a connection
+        # of its own: server mode lets go of a channel it streams to other
+        # devices when the account has no room for both. Set by the window
+        # while server mode runs.
+        self.before_spawn: Callable[[dict], None] | None = None
         self._address_in.connect(self._address_came,
                                  Qt.ConnectionType.QueuedConnection)
         # Recordings saved as MP4 (rec_mp4): the .ts files being copied now,
@@ -672,6 +677,11 @@ class RecordingManager(QObject):
             j["status"] = "failed"
             j["error"] = "neither ffmpeg nor mpv found"
             return
+        if self.before_spawn is not None:
+            try:
+                self.before_spawn(j)
+            except Exception as e:
+                log.debug("record: before the connection: %s", e)
         try:
             path = self.build_path(j["title"], j.get("folder") or "", j.get("channel") or "")
         except OSError as e:

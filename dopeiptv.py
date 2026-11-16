@@ -25,6 +25,11 @@ from dopeiptv.core._alloc import maybe_preload_allocator
 
 maybe_preload_allocator()
 
+# Server mode without a window (dopeiptv/headless.py): no widget, no mpv.
+if "--server" in sys.argv[1:]:
+    from dopeiptv.headless import main as server_main
+    sys.exit(server_main([a for a in sys.argv[1:] if a != "--server"]))
+
 from dopeiptv.app import main  # noqa: E402  (after the optional re-exec)
 
 if __name__ == "__main__":

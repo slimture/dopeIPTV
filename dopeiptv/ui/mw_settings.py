@@ -2241,7 +2241,8 @@ class _SettingsMixin:
             health_store=lambda: self.health,
             numbers=self._chno_settings,
             in_use=getattr(self, "_in_use_card", None),
-            analysis=lambda: (d.accept(), QTimer.singleShot(0, self.open_ts_analysis)))
+            analysis=lambda: (d.accept(), QTimer.singleShot(0, self.open_ts_analysis)),
+            server=getattr(self, "_server_state", None))
         # The link rows to Nerd's pages follow its switch (a turn of it runs
         # every page's filter again); shown now if it is on.
         nerd_switch["box"] = getattr(nerd_commit, "switch", None)
@@ -2692,6 +2693,8 @@ class _SettingsMixin:
                     self._remote_apply()
                 if "nerd_enabled" in changed or any(k.startswith(("nerd_hooks", "nerd_mqtt")) for k in changed):
                     self._events_apply()
+                if "nerd_enabled" in changed or any(k.startswith("nerd_server") for k in changed):
+                    self._server_apply()
 
             if any(k.startswith("mv_") for k in changed):
                 self._apply_multiview_settings()

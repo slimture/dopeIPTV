@@ -77,6 +77,7 @@ from .mw_ts_analysis import _TsAnalysisMixin
 from .mw_stream_info import _StreamInfoMixin
 from .mw_remote import _RemoteMixin
 from .mw_phone import _PhoneMixin
+from .mw_server import _ServerMixin
 from .mw_calendar import _CalendarMixin
 from .mw_events import _EventsMixin
 from .mw_media import _MediaServerMixin
@@ -146,7 +147,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _MprisMixin,
                  _FollowMixin, _SubtitlesMixin, _CastMixin, _AirPlayMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
-                 _HealthMixin, _TsAnalysisMixin, _StreamInfoMixin, _ChannelPrefsMixin, _RemoteMixin, _PhoneMixin, _CalendarMixin,
+                 _HealthMixin, _TsAnalysisMixin, _StreamInfoMixin, _ChannelPrefsMixin, _RemoteMixin, _PhoneMixin, _ServerMixin, _CalendarMixin,
                  _EventsMixin, _ReportMixin,
                  _PortalArchiveMixin, _SeriesMixin, _SyncMixin,
                  _ConnectionsMixin, _MirrorsMixin, _TogetherMixin, _StatsMixin,
@@ -6112,6 +6113,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._discord_quit()
         self._remote_stop()
         self.phone_remote_stop(keep=True)
+        self._server_stop(wait=True)
         self.cover.flush()
         if self._trakt_active:
             active = self._trakt_active

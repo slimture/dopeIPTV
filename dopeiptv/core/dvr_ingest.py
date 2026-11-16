@@ -170,6 +170,11 @@ class Ingest:
 
     @staticmethod
     def _default_open(url: str, **kw: Any) -> Any:
+        from . import nerd
+        return open_for(nerd.source(), url, **kw)
+
+    @staticmethod
+    def _open_source(src: dict | None, url: str, **kw: Any) -> Any:
         # A login in the address is answered as the box asks (Tvheadend
         # wants digest, which requests alone never sends); the Nerd page's
         # user agent, headers and proxy apply as they do for the player -
@@ -180,7 +185,6 @@ class Ingest:
         from .http_login import get_with_login
         n = nerd.current()
         if n.on:
-            src = nerd.source()
             headers = dict(kw.pop("headers", None) or {})
             headers["User-Agent"] = n.user_agent(src)
             headers.update(n.headers(src))
@@ -396,6 +400,20 @@ class Ingest:
         now = time.monotonic()
         return sum(1 for t in self._drops
                    if now - t <= self.CONTEST_WINDOW) >= self.CONTEST_DROPS
+
+
+def open_for(src: dict | None, url: str, **kw: Any) -> Any:
+    """The provider stream *url* of source *src* (its options and kind, as
+    core/nerd.set_source keeps them), opened as the player opens it."""
+    return Ingest._open_source(src, url, **kw)
+
+
+def opener_for(src: dict | None) -> Callable[..., Any]:
+    """An Ingest opener for source *src* - a channel of a source that is
+    not the one on screen (server mode) keeps its own options."""
+    def opener(url: str, **kw: Any) -> Any:
+        return open_for(src, url, **kw)
+    return opener
 
 
 def wait_until(predicate: Callable[[], bool], timeout: float,

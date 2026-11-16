@@ -169,6 +169,97 @@ class Share:
         yield b"</tv>\n"
 
 
+def lineup_guide(guides: list[tuple[str, str]], channels: list[dict]) -> Iterator[bytes]:
+    """The guides of *guides* - (source id, path) - as one XMLTV guide whose
+    channel ids are a lineup's numbers (server mode's HDHomeRun
+    lineup.json), so Plex and Jellyfin map it by themselves. Each channel
+    of *channels* - {"number", "name", "source", "epg_id", "logo"} - finds
+    its guide channel in its own source's guide by id, else by name, and
+    gets that channel's programmes under its number; what no lineup channel
+    has is left out. Read and written an element at a time (a guide is
+    often hundreds of MB)."""
+    import xml.etree.ElementTree as ET
+    from xml.sax.saxutils import quoteattr
+
+    told: set[str] = set()
+
+    def channel_xml(ch: dict, names: list[str], icon: str) -> bytes:
+        num = str(ch["number"])
+        out = [f"<channel id={quoteattr(num)}>"]
+        for n in dict.fromkeys([str(ch.get("name") or num), num, *names]):
+            if n:
+                out.append(f"<display-name>{_esc(n)}</display-name>")
+        if icon or ch.get("logo"):
+            out.append(f"<icon src={quoteattr(icon or str(ch.get('logo')))}/>")
+        out.append("</channel>\n")
+        told.add(num)
+        return "".join(out).encode("utf-8")
+
+    yield (b'<?xml version="1.0" encoding="UTF-8"?>\n'
+           b'<!DOCTYPE tv SYSTEM "xmltv.dtd">\n<tv generator-info-name="dopeIPTV">\n')
+    for source, path in guides:
+        by_id: dict[str, list[dict]] = {}
+        by_name: dict[str, list[dict]] = {}
+        for ch in channels:
+            if str(ch.get("source") or "") != source:
+                continue
+            if ch.get("epg_id"):
+                by_id.setdefault(str(ch["epg_id"]), []).append(ch)
+            by_name.setdefault(str(ch.get("name") or "").casefold(), []).append(ch)
+        if not by_id and not by_name:
+            continue
+        found: dict[str, list[dict]] = {}   # the guide's channel id -> lineup channels
+        parser = ET.XMLPullParser(events=("start", "end"))
+        depth = 0
+        root: Any = None
+        try:
+            for chunk in plain_chunks(path):
+                parser.feed(chunk)
+                out: list[bytes] = []
+                events: Any = parser.read_events()
+                for event, elem in events:
+                    if event == "start":
+                        if depth == 0:
+                            root = elem
+                        depth += 1
+                        continue
+                    depth -= 1
+                    if depth != 1 or root is None:
+                        continue
+                    if elem.tag == "channel":
+                        cid = elem.get("id") or ""
+                        names = [(d.text or "").strip() for d in elem.findall("display-name")]
+                        mine: list[dict] = by_id.get(cid) or next(
+                            (by_name[n.casefold()] for n in names if n.casefold() in by_name), [])
+                        mine = [c for c in mine if str(c["number"]) not in told]
+                        if mine:
+                            found[cid] = found.get(cid, []) + mine
+                            icon_el = elem.find("icon")
+                            icon = icon_el.get("src", "") if icon_el is not None else ""
+                            out += [channel_xml(c, names, icon) for c in mine]
+                    elif elem.tag == "programme":
+                        ref = elem.get("channel") or ""
+                        for c in found.get(ref) or by_id.get(ref) or []:
+                            elem.set("channel", str(c["number"]))
+                            out.append(ET.tostring(elem, encoding="utf-8", xml_declaration=False)
+                                       .rstrip() + b"\n")
+                    root.clear()
+                if out:
+                    yield b"".join(out)
+        except FileNotFoundError:
+            continue
+        except (OSError, ValueError, zlib.error, ET.ParseError) as e:
+            log.info("server: a guide left out from where it broke off (%s)", e)
+    rest = [ch for ch in channels if str(ch["number"]) not in told]
+    if rest:
+        yield b"".join(channel_xml(c, [], "") for c in rest)
+    yield b"</tv>\n"
+
+
+def _esc(text: str) -> str:
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def plain_chunks(path: str) -> Iterator[bytes]:
     """A cached guide's XML, gzip or not, every gzip member of it."""
     with open(path, "rb") as fh:

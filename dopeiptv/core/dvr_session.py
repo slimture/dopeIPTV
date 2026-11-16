@@ -182,6 +182,17 @@ class DvrSession:
         with self._lock:
             return bool(self._holds)
 
+    def held_by(self, who: str) -> bool:
+        with self._lock:
+            return who in self._holds
+
+    def held_only_by(self, who: str) -> bool:
+        """*who* alone keeps it streaming: no other hold, no recording (the
+        server mode's restream, which the app's own count leaves out)."""
+        with self._lock:
+            return self._holds == {who} and not any(
+                r.alive and not r.stopping for r in self.recorders)
+
     def _recording_ended(self, rec: BufferRecorder) -> None:
         with self._lock:
             if rec in self.recorders:

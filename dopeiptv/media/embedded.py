@@ -2867,10 +2867,21 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
         # Settings asks for it, a live channel gets one: mpv plays its local
         # server, and the session reads the provider.
         self._end_dvr()
+        # Server mode streams this channel to other devices already: its
+        # connection is shared, not opened twice (and for anything else
+        # the server lets go of what the player needs first).
+        source = None
+        hook = self.live_hook if not web else None
+        if hook is not None:
+            try:
+                shared = hook(url, buffer_key if live else None)
+                source = self._dvr_adopt(shared) if live and shared is not None else None
+            except Exception as e:
+                log.debug("server mode's hook: %s", e)
         # buffer_key: the channel, whatever its address - a portal hands
         # out a new one each time - so its history is found again.
-        source = self._dvr_start(url, buffer_key) \
-            if local_buffer and own_buffer else None
+        if source is None and local_buffer and own_buffer:
+            source = self._dvr_start(url, buffer_key)
         self._local_buffer_enabled = local_buffer
         self._local_buffer_ready = False
         self._bar_view = self._chosen_bar()

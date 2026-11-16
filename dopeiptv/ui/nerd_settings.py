@@ -81,7 +81,8 @@ PART_KEYS = {
     "serve": ("nerd_remote", "nerd_share", "nerd_remote_lan", "nerd_remote_port", "nerd_hooks",
               "nerd_hooks_urls", "nerd_mqtt", "nerd_mqtt_host", "nerd_mqtt_port", "nerd_mqtt_tls",
               "nerd_mqtt_client", "nerd_mqtt_prefix", "nerd_mqtt_ha", "nerd_mqtt_commands",
-              "nerd_rec_template", "nerd_rec_post"),
+              "nerd_rec_template", "nerd_rec_post", "nerd_server", "nerd_server_port",
+              "nerd_server_tuners", "nerd_server_sources"),
     "diag": ("nerd_log_level", "nerd_log_file", "nerd_overlay_more", "nerd_health"),
 }
 #: Parts that share a page: the channel lists with the boxes, what follows a
@@ -181,6 +182,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
           numbers: Callable[[str, bool, Callable[[int], None]], None] | None = None,
           in_use: Callable[[Callable[[list[tuple[str, str]]], None]], None] | None = None,
           analysis: Callable[[], None] | None = None,
+          server: Callable[[], dict] | None = None,
           ) -> Callable[[Callable[[str, Any], None]], None]:
     """*page* is Nerd's own, Status: the switch, what is in Nerd, how it
     works. *pages* ("net", "boxes", "player", "serve", "diag") take the
@@ -200,7 +202,8 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     be read). *in_use(fill)*: what is in use now - the account's
     connections and each box's tuners - handed to *fill* as lines while
     Diagnostics shows (ui/mw_connections.py). *analysis*: opens the stream analysis of what plays (Settings
-    closes first, so the window sits beside the picture)."""
+    closes first, so the window sits beside the picture). *server*: how
+    server mode stands now (ui/mw_server.py's state), for its line."""
     n = _Defaults(settings)
     sub = pages or {}
 
@@ -732,6 +735,10 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
           search="token password secret key", below=remote_line)
     c.note(tr("nerd_applies_remote"))
 
+    # -- server mode: dopeIPTV as the home's server ----------------------------------------
+    server_values = _server_card(at("serve"), n, settings, lines, playlists, server)
+    server_on = server_values.switch  # type: ignore[attr-defined]
+
     # -- events pushed out: webhooks and MQTT ------------------------------------------------
     hooks = _events_cards(at("serve"), n, lines)
 
@@ -912,6 +919,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
         put("nerd_remote_port", port.value())
         put("nerd_remote_token", token.text().strip())
         out.update(hooks())
+        out.update(server_values())
         out.update(dns_values())
         out.update(lan_values())
         out.update(latency_values())
@@ -936,6 +944,8 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
             return tr("nerd_part_boxes", n=len(boxes)), True
         if key == "serve" and (remote_on.isChecked() or share_on.isChecked()):
             return tr("nerd_part_on", port=port.value()), True
+        if key == "serve" and server_on.isChecked():
+            return tr("nerd_part_on", port=server_values.port()), True  # type: ignore[attr-defined]
         now = values()
         changed = sum(1 for k in PART_KEYS.get(key, ()) if now.get(k, "") != n.defaults.get(k, ""))
         if changed:
@@ -992,6 +1002,93 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     #: The switch: the link rows on other pages show only while it is on.
     commit.switch = switch  # type: ignore[attr-defined]
     return commit
+
+
+def _server_card(page: SettingsPage, n: nerd.Nerd, settings: Any, lines: list[CheckLine],
+                 playlists: Callable[[], tuple[list[dict], str | None]] | None,
+                 state: Callable[[], dict] | None) -> Callable[[], dict[str, str]]:
+    """Server mode (services/home_server.py): the switch, channels at once,
+    the port, the sources served, the addresses and how it stands. Returns
+    what the card holds, as the settings it is stored as."""
+    import json
+
+    from ..services import home_server as hs
+    c = page.card(tr("nerd_card_server"))
+    on = ToggleSwitch(n.flag(hs.K_ON))
+    on.setAccessibleName(tr("nerd_server"))
+    c.row(tr("nerd_server"), on, tr("nerd_server_hint"),
+          search="server HDHomeRun Plex Jellyfin Emby Channels DVR tuner restream VLC Kodi "
+                 "headless --server NAS Threadfin xTeVe")
+    tuners = Stepper(lo=0, hi=hs.MAX_TUNERS, value=n.num(hs.K_TUNERS, 0), width=190)
+    tuners.spin.setSpecialValueText(tr("nerd_server_tuners_auto"))
+    c.row(tr("srv_tuners"), tuners, tr("srv_tuners_hint"),
+          search="tuners connections at once limit account")
+    port = Stepper(lo=1024, hi=65535, value=n.num(hs.K_PORT, hs.DEFAULT_PORT), width=150)
+    c.row(tr("nerd_remote_port"), port, tr("srv_port_hint"), search="port")
+    chosen = hs.parse_sources(n.get(hs.K_SOURCES))
+    sources = (playlists()[0] if playlists is not None else []) or []
+    chips: list[tuple[str, Chip]] = []
+    for pl in sources:
+        pid = str(pl.get("id") or "")
+        if pid and pl.get("kind") != "local":
+            chips.append((pid, Chip(str(pl.get("name") or pl.get("server") or pid), pid in chosen)))
+    if chips:
+        c.widget(ChipGroups([(tr("nerd_server_sources"), [ch for _p, ch in chips])]),
+                 tr("nerd_server_sources") + " " + " ".join(ch.text() for _p, ch in chips))
+    c.note(tr("nerd_server_sources_hint"))
+
+    def token() -> str:
+        got = str(settings.value(hs.K_TOKEN, "") or "").strip()
+        if not got:
+            got = hs.read_config(settings).token
+        return got
+
+    def base() -> str:
+        from ..core.remote_api import lan_addresses
+        return f"http://{(lan_addresses() or ['127.0.0.1'])[0]}:{port.value()}"
+
+    open_btn = QPushButton(tr("nerd_server_open"))
+    copy_tuner = QPushButton(tr("nerd_server_copy_tuner"))
+    copy_m3u = QPushButton(tr("nerd_server_copy_m3u"))
+
+    def copy(btn: QPushButton, text: str) -> None:
+        from PyQt6.QtCore import QTimer
+        from PyQt6.QtWidgets import QApplication
+        QApplication.clipboard().setText(text)
+        label = btn.text()
+        btn.setText("✓ " + tr("problem_copied"))
+        QTimer.singleShot(1500, lambda: btn.setText(label) if not sip.isdeleted(btn) else None)
+
+    def open_page() -> None:
+        from urllib.parse import quote
+
+        from ..core.xdg import open_url
+        open_url(f"http://127.0.0.1:{port.value()}/?token={quote(token())}")
+    open_btn.clicked.connect(lambda _c=False: open_page())
+    copy_tuner.clicked.connect(lambda _c=False: copy(copy_tuner, base()))
+    copy_m3u.clicked.connect(lambda _c=False: copy(copy_m3u, f"{base()}/playlist.m3u?token={token()}"))
+
+    def job() -> Any:
+        if state is None:
+            return None
+        st = state()
+        return lambda: hs.check_server(bool(st.get("on")), bool(st.get("running")),
+                                       int(st.get("port") or 0), str(st.get("error") or ""),
+                                       st.get("status"), st.get("addresses"))
+    line = CheckLine(job, tr("nerd_card_server"), test=True)
+    lines.append(line)
+    c.row(tr("srv_addresses"), _fitted(open_btn, copy_tuner, copy_m3u),
+          tr("srv_addr_tuner_hint"), search="address URL copy browser tuner playlist token",
+          below=line)
+
+    def values() -> dict[str, str]:
+        picked = {pid: chosen.get(pid, []) for pid, chip in chips if chip.isChecked()}
+        return {hs.K_ON: "true" if on.isChecked() else "false",
+                hs.K_TUNERS: str(tuners.value()), hs.K_PORT: str(port.value()),
+                hs.K_SOURCES: json.dumps(picked, sort_keys=True) if picked else ""}
+    values.switch = on  # type: ignore[attr-defined]
+    values.port = port.value  # type: ignore[attr-defined]
+    return values
 
 
 def _events_cards(page: SettingsPage, n: nerd.Nerd, lines: list[CheckLine]) -> Callable[[], dict[str, str]]:

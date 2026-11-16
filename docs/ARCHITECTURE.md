@@ -12,11 +12,14 @@ sees).
 ## Module map
 
 ```
-dopeiptv.py            Thin launcher (calls dopeiptv.app.main)
+dopeiptv.py            Thin launcher (calls dopeiptv.app.main; --server: headless)
 
 dopeiptv/
   __init__.py          Package metadata (APP_NAME, ORG, VERSION)
   app.py               QApplication bootstrap, login flow
+  launcher.py          The installed command: app.main, or headless with --server
+  headless.py          Server mode without a window (services/home_server.py):
+                       QtCore for the settings, no widget, no mpv
   i18n.py              English source strings + set_language / tr()
   locale/              One <code>.json per non-English language (26 files)
 

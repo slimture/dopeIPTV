@@ -42,6 +42,8 @@ KIND_WORDS = {"player": "conn_k_player", "buffer": "conn_k_buffer",
               "cast": "conn_k_cast"}
 #: How often a box that is the source is asked what its tuners do.
 TUNER_TICK_MS = 20000
+#: The hold server mode puts on a buffer it reads (core/restream.SERVER).
+SERVER_HOLD = "server"
 
 
 def may_read_stream(widget: Any, source_id: str = "") -> bool:
@@ -109,7 +111,10 @@ class _ConnectionsMixin:
                 uses.append(Use("player", src, str(p.current_url)))
             pool = getattr(p, "_dvr_pool", None) if p is not None else None
             for s in (pool.sessions if pool is not None else []):
-                if s is not dvr and s.streaming:      # kept by a recording
+                # Kept by a recording or a cast - not one server mode alone
+                # reads for other devices: that one gives way (mw_server).
+                only = getattr(s, "held_only_by", None)
+                if s is not dvr and s.streaming and not (callable(only) and only(SERVER_HOLD)):
                     uses.append(Use("buffer", "", str(getattr(s, "url", "") or "")))
         except Exception as e:      # the player half torn down
             log.debug("connections: player not counted: %s", e)
@@ -152,7 +157,7 @@ class _ConnectionsMixin:
         if info is not None:
             limit, active = connections.numbers((info or {}).get("user_info"))
             if own is None:
-                own = connections.own_count(self._conn_uses(), src)
+                own = connections.own_count(self._conn_uses(), src) + self._conn_served(src)
             led.report(src, limit, active, own)
             return
         seen = getattr(getattr(self, "client", None), "account_seen", None)
@@ -161,7 +166,16 @@ class _ConnectionsMixin:
         at = float(seen.get("at") or 0.0)
         fresh = time.monotonic() - at <= SEEN_FRESH_SECS
         led.report(src, seen.get("max"), seen.get("active") if fresh else None,
-                   connections.own_count(self._conn_uses(), src), at=at)
+                   connections.own_count(self._conn_uses(), src) + self._conn_served(src), at=at)
+
+    def _conn_served(self, source: str) -> int:
+        """Connections server mode holds to *source* for other devices: the
+        app's, as the provider counts them, though not the app's own use."""
+        srv = getattr(self, "_home", None)
+        try:
+            return int(srv.restream.in_use(source)) if srv is not None else 0
+        except Exception:
+            return 0
 
     def _conn_limit(self) -> int | None:
         n = getattr(getattr(self, "client", None), "max_connections", None)
@@ -250,6 +264,14 @@ class _ConnectionsMixin:
 
     # -- the places a connection is opened -----------------------------------------------
 
+    def _conn_server_room(self, uses: list[Use] | None = None, source: str | None = None) -> None:
+        """Server mode, while it runs, lets go of a channel it streams to
+        other devices when the app's own new connection needs its room: the
+        app's own use wins (mw_server)."""
+        room = getattr(self, "_server_make_room", None)
+        if callable(room):
+            room(uses, source)
+
     def _conn_ok_multiview(self, cell: int | None, url: str = "") -> bool:
         """*url* into multiview cell *cell* (None: the first free one): the
         docked player lets its stream go first where Settings says so, and
@@ -268,6 +290,7 @@ class _ConnectionsMixin:
                 target = next((c for c in cells if c.url is None),
                               getattr(win, "_focused", None) or cells[0])
         uses = self._conn_uses(free_player=free_player, free_cell=target)
+        self._conn_server_room(uses)
         v = self._conn_verdict(uses)
         t = self._tuner_verdict(url, uses)
         if v is None and t is None:
@@ -281,6 +304,7 @@ class _ConnectionsMixin:
         if not connections.is_network(url):
             return True
         uses = [u for u in self._conn_uses(free_player=True) if u.kind != "cast"]
+        self._conn_server_room(uses)
         v = self._conn_verdict(uses)
         t = self._tuner_verdict(url, uses)
         if v is None and t is None:
@@ -300,6 +324,7 @@ class _ConnectionsMixin:
             if cap:
                 uses = [u for u in self._conn_uses(free_player=True) if u.kind != "cast"]
                 uses.append(Use("cast", src, url))
+                self._conn_server_room(uses)
                 v = self._conn_ledger().check(src, uses, 1, limit=cap)
         except Exception as e:
             log.debug("connections: the buffer beside the cast not counted: %s", e)
@@ -330,6 +355,7 @@ class _ConnectionsMixin:
         try:
             self._conn_seen()
             uses = self._conn_uses()
+            self._conn_server_room(uses, src)
             own = connections.own_count(uses, src)
             cap = (self._conn_limit() if src == active else None) or self._conn_ledger().limit(src)
             v = self._conn_ledger().check(src, uses, 1, limit=cap) if cap else None
@@ -643,6 +669,8 @@ class _ConnectionsMixin:
             line = tr("inuse_source", name=self._tuner_source_name(pid), count=count)
             who = self._conn_who(connections.kinds_of(used, pid), others)
             lines.append(("head", line + (" " + tr("conn_used_by", who=who) if who else "")))
+        served = getattr(self, "_server_in_use_lines", None)
+        lines += served() if callable(served) else []
         if not lines:
             lines.append(("item", tr("inuse_none")))
         boxes = self._tuner_boxes()

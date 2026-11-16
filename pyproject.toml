@@ -44,7 +44,7 @@ Issues = "https://github.com/slimture/dopeIPTV/issues"
 Donate = "https://dopeiptv.org/#donate"
 
 [project.scripts]
-dopeiptv = "dopeiptv.app:main"
+dopeiptv = "dopeiptv.launcher:main"
 
 [tool.setuptools.packages.find]
 include = ["dopeiptv*"]
@@ -182,6 +182,12 @@ files = [
     "dopeiptv/core/net_adapter.py",
     "dopeiptv/core/net_bridge.py",
     "dopeiptv/core/live_latency.py",
+    "dopeiptv/core/restream.py",
+    "dopeiptv/core/hdhr.py",
+    "dopeiptv/core/server_page.py",
+    "dopeiptv/services/home_server.py",
+    "dopeiptv/headless.py",
+    "dopeiptv/launcher.py",
     "dopeiptv/services/failover.py",
     "dopeiptv/services/together.py",
     "dopeiptv/services/share.py",

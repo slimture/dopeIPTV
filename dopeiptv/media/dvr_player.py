@@ -32,6 +32,8 @@ from ..core.log import log, redact_url
 from ..i18n import tr
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from ..core.dvr_pool import DvrPool
     from ..core.dvr_record import BufferRecorder
     from ..core.dvr_session import DvrSession
@@ -63,6 +65,12 @@ class DvrPlayerMixin:
     _dvr_origin = 0.0
     _dvr_open_wall: float | None = None
     _dvr_reopened = 0.0
+    #: Server mode (ui/mw_server.py) while it runs: asked before a stream
+    #: opens, with (url, a live channel's buffer key or None) - the session
+    #: the server streams that channel from, to play without a connection of
+    #: its own, or None (the server let go of what the player needs first).
+    #: None while server mode is off: playback is as it always was.
+    live_hook: "Callable[[str, str | None], DvrSession | None] | None" = None
 
     # -- settings --------------------------------------------------------------
 
@@ -88,6 +96,7 @@ class DvrPlayerMixin:
         play, or None to play the provider's as before."""
         if not self._dvr_wanted(url):
             if (self._dvr_pool is not None and not self._settings_dvr_on()
+                    and not self._dvr_pool.shared
                     and not any(s.recording for s in self._dvr_pool.sessions)):
                 # Turned off: the history of the channels left goes too.
                 self._dvr_pool.close_all()
@@ -119,6 +128,38 @@ class DvrPlayerMixin:
         log.info("DVR: own buffer for %s (%d min, %d GB)", redact_url(url),
                  minutes, self._dvr_space_bytes() >> 30)
         return session.live_url()
+
+    def _dvr_adopt(self, session: "DvrSession") -> str | None:
+        """Play *session*, which server mode streams already: its local
+        server, no second provider connection. The address mpv plays, or
+        None to play as before."""
+        pool = self._dvr_pool
+        if pool is None or session.closed:
+            return None
+        try:
+            pool.adopt(session)
+            url = session.live_url()
+        except Exception as e:
+            log.warning("DVR: the server's channel not shared (%s) - playing as before", e)
+            return None
+        self._dvr = session
+        self._dvr_origin = session.origin
+        self._dvr_open_wall = None
+        self._dvr_open_seq = None
+        self._dvr_reopened = 0.0
+        log.info("DVR: the server's connection for this channel, shared")
+        return url
+
+    def dvr_pool_for_server(self, keep_seconds: float) -> "DvrPool":
+        """The pool server mode reads its channels from: the player's own
+        (made now, with the rewind buffer's space, when it has none), so a
+        channel both watch has one connection."""
+        if self._dvr_pool is None:
+            from ..core.dvr_pool import DvrPool
+            minutes = self._live_rewind_minutes()
+            self._dvr_pool = DvrPool(dvr_base(), max(keep_seconds, minutes * 60),
+                                     self._dvr_space_bytes())
+        return self._dvr_pool
 
     def _end_dvr(self) -> None:
         """Leave the session - its provider connection closes at once,

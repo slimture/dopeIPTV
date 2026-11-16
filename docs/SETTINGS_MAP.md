@@ -235,6 +235,13 @@ while Nerd is on, and so are the link rows that lead to them.
 - Remote control: `nerd_remote`
 - Share with other players: `nerd_share`; copy the playlist and guide addresses
 - Who can reach it: `nerd_remote_lan`, `nerd_remote_port`, `nerd_remote_token`
+- Server for the home (server mode, `services/home_server.py`): `nerd_server`,
+  `nerd_server_tuners` (0: the account's limit), `nerd_server_port`,
+  `nerd_server_sources` (the sources as chips; the categories in each are
+  chosen on the server's page in a browser, which also changes the port and
+  the tuners); open the page, copy the tuner's and the playlist's
+  addresses, how it stands. Not shown: `nerd_server_token`,
+  `nerd_server_device_id` (made once, never in a backup)
 - Webhooks: `nerd_hooks`, `nerd_hooks_urls`, `nerd_hooks_header`
 - MQTT: `nerd_mqtt`, `nerd_mqtt_host`, `nerd_mqtt_port`, `nerd_mqtt_tls`,
   `nerd_mqtt_user` + `nerd_mqtt_pass`, `nerd_mqtt_client`, `nerd_mqtt_prefix`,

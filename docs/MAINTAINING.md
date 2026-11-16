@@ -504,30 +504,69 @@ for movierename/moviemove, `/grab` and `/web/signal` are not verified, and
 transcoding (the 8002 query and its units) needs a real box with an
 encoder.
 
-### Planned: server mode, after the Enigma2 work
+### Server mode: built (November 2026), to be seen with real devices
 
 dopeIPTV as the home's server as well as its player - what Threadfin,
-xTeVe and Dispatcharr are for, in the same program. Four parts, built
-together:
+xTeVe and Dispatcharr are for, in the same program
+(`services/home_server.py`; Settings > Nerd > Remote and automation >
+Server for the home, off by default; `dopeiptv --server` without a window,
+`dopeiptv/headless.py`).
 
-- **Without a window.** A headless start (`--server`) for a NAS, a
-  Raspberry Pi, Docker or a systemd service: starts with the computer,
-  runs series rules, reminders' recordings and the guide's refresh day
-  and night. Linux first (AppImage, .deb, a container image); the same
-  code on macOS and Windows.
-- **Streams through dopeIPTV.** Today sharing sends a player on to the
-  source's own address. Restreaming instead fetches it here, so a
-  source's user agent, headers, own DNS, trusted certificate, proxy,
-  rewrite rules, backup addresses and failover apply to every device on
-  the network, and viewers of the same channel share one connection to
-  the account (counted in `core/connections.py`). Redirect stays as an
-  option.
-- **An HDHomeRun tuner** (`discover.json`, `lineup.json`, `lineup_status.json`,
-  SSDP/UDP discovery), so Plex, Jellyfin, Emby and Channels DVR find
-  dopeIPTV by themselves; as many tuners as the account's connections.
-- **Settings in a browser**: sources, status (connections, tuners,
-  recordings, stream health), recordings and series rules - behind a
-  token like the remote API, this computer only unless chosen.
+- **Without a window**: `dopeiptv --server` (`--port N`,
+  `--no-discovery`) imports no widget, nothing that draws and no mpv - only
+  QtCore for the settings, plain threads for the rest; the household's
+  sources, settings and downloaded guides (never a profile's own), the
+  usual log; Ctrl+C / SIGTERM stop it cleanly. The page in a browser shows
+  the command to start it with the computer. Run it or the window's
+  server, not both: two processes cannot count each other's connections.
+- **Restream** (`core/restream.py`): `/stream/<source id>/<stream id>`
+  and the tuner's `/auto/v<number>` fetch a channel here, once, into a
+  rewind buffer session (`core/dvr_*`), and every viewer reads its store
+  from a few seconds behind live; one more than 20 s behind is dropped,
+  never slowing the others. The last viewer gone, the connection stays
+  10 s, at once given to another channel that needs the tuner. In the
+  window the pool is the player's own: the player and a device watching
+  one channel share its one connection, whoever was first (the player's
+  `live_hook`, `DvrPool.adopt` / `acquire`). An HLS channel is copied
+  into TS by ffmpeg (one connection, ffmpeg's).
+- **One connection**: the tuners are the account's limit when it says
+  (else one, or what the person sets - its hint says what it costs); a
+  request beyond them gets 503 (`X-HDHomeRun-Error: 805 All Tuners In
+  Use`), never a connection more. The app's own player, recordings,
+  multiview cells, casts and tests come first: before one opens, the
+  server lets go of its channels that leave no room
+  (`ui/mw_server.py` `_server_make_room`, `RecordingManager.before_spawn`,
+  mw_connections' checks). An Enigma2 box is asked before a channel that
+  would cut off its recording or its TV (`core/tuners.py`).
+- **HDHomeRun tuner** (`core/hdhr.py`): `discover.json`, `lineup.json`,
+  `lineup_status.json`, `device.xml`, `lineup.post`, and the answer to
+  libhdhomerun's discover broadcast on UDP 65001 (device id with its
+  checksum, made once per install, kept out of backups and sync). The
+  guide at `/xmltv.xml` carries the lineup's numbers as its channel ids
+  (`services/share.lineup_guide`).
+- **Who and what**: home addresses only; a token on everything but the
+  tuner's endpoints (Plex cannot send one - the settings say so); the
+  sources and categories chosen, never a hidden, locked or adult one nor a
+  channel hidden by hand; nothing a device watches enters history,
+  statistics, Trakt or Simkl.
+
+To be seen with real devices (tested against a fake provider, fake HLS
+and the loopback only):
+
+- **Plex**: that it finds the tuner by the UDP discovery and adds it
+  (model HDTC-2US, no DeviceAuth), maps the XMLTV guide by the numbers,
+  and how it behaves on a 503 and when it changes channel - whether it
+  closes the old stream before asking for the new one at one tuner.
+- **Jellyfin and Emby**: adding it as an HDHomeRun tuner (they read
+  `discover.json` and `lineup.json`; `TunerCount` keeps them off the old
+  TCP control protocol) and mapping the guide.
+- **Channels DVR**, VLC and Kodi on the playlist, a TV's IPTV app.
+- A Raspberry Pi or NAS without a desktop: the headless start with no
+  libGL or X libraries installed, and systemd's stop.
+- Not yet: the headless server refreshing the guide by itself (it serves
+  the one the app last downloaded), running series rules and scheduled
+  recordings without the window, SSDP announcing (only the HDHomeRun UDP
+  discovery), and a Docker image.
 
 ### Ideas to talk through before anything is built
 
@@ -653,7 +692,7 @@ server:
   socket). Still open: native HDMI-CEC (libcec's cec-client, or a kernel
   CEC adapter's keymap, turns the TV remote into keys today), a channel
   list over the picture, the on-screen keyboard beyond Latin letters.
-- **dopeIPTV as an HDHomeRun tuner**: part of server mode (above).
+- **dopeIPTV as an HDHomeRun tuner**: built with server mode (above).
 - **Android TV and Fire TV**: PyQt6 does not get there in practice; an
   app of its own would be a separate project. Until then the shared
   playlist and guide, the remote API and the HDHomeRun emulation let apps
@@ -678,7 +717,7 @@ FEATURES and README; the website's help in every language):
   frameworks; tvOS 18 shut out other senders' video). Elsewhere: cast to a
   Chromecast, a DLNA TV or Kodi - or let an IPTV app on the Apple TV (VLC,
   iPlayTV and the like) read dopeIPTV's shared playlist and guide, and
-  Plex or Jellyfin find it as an HDHomeRun tuner once that is in.
+  Plex or Jellyfin find it as an HDHomeRun tuner (server mode).
 
 ### Every feature works with the others
 

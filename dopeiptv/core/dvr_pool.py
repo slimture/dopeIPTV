@@ -50,6 +50,9 @@ class DvrPool:
         # and when.
         self._refused: dict[str, tuple[str, float]] = {}
         self.active: DvrSession | None = None
+        #: Server mode reads its channels from this pool too (core/restream.py):
+        #: the player must not close it when its own buffer is turned off.
+        self.shared = False
         self._lock = threading.RLock()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -119,6 +122,50 @@ class DvrPool:
         self._refused[s.key] = (why, time.monotonic())
         log.info("DVR pool: %s sent %s - played without the buffer for "
                  "%.0f min", redact_url(s.url), why, self.REFUSED_FOR / 60)
+
+    # -- read from elsewhere (server mode, core/restream.py) ------------------
+
+    def acquire(self, url: str, key: str, who: str,
+                ingest_factory: IngestFactory | None = None) -> DvrSession:
+        """The session for a channel *who* reads without watching it here:
+        its own again (resumed when frozen) or a new one - never the one on
+        screen. Held for *who* until let_go."""
+        with self._lock:
+            s = self._sessions.get(key)
+            if s is not None and s.closed:
+                s = None
+            if s is None:
+                s = DvrSession(url, self.base, self.keep_seconds,
+                               self.max_bytes, key=key,
+                               ingest_factory=ingest_factory or self._factory)
+                s.on_recording_done = self._recording_done
+                self._sessions[key] = s
+            elif s.frozen:
+                s.resume(url)
+            s.hold(who)
+            s.last_used = self._clock()
+            self._enforce()
+            self._start_ticking()
+            return s
+
+    def adopt(self, s: DvrSession) -> DvrSession:
+        """The player watches *s*, which another reader opened (the
+        restream's channel the person tunes to): no second connection."""
+        with self._lock:
+            if s.frozen:
+                s.resume()
+            s.last_used = self._clock()
+            self.active = s
+            if s.key not in self._sessions:
+                self._sessions[s.key] = s
+            self._enforce()
+            self._start_ticking()
+            return s
+
+    def let_go(self, s: DvrSession, who: str) -> None:
+        """*who* is done with *s*: frozen once nothing else reads it."""
+        s.let_go(who)
+        self._recording_done(s)
 
     def _recording_done(self, s: DvrSession) -> None:
         with self._lock:

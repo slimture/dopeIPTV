@@ -100,6 +100,9 @@ _LEFT_OUT = frozenset({
     # This install's own id at Jellyfin, Emby and Plex: each computer has its
     # own (providers/mediaserver.py).
     "media_device_id",
+    # Server mode's token (whoever has it watches through this computer) and
+    # its HDHomeRun device id: two computers with one id confuse Plex.
+    "nerd_server_token", "nerd_server_device_id",
     # Caches the app fills again by itself.
     "local_tmdb_posters", "local_tmdb_posters_v2", "music_art_v1",
     "cast_devices", "subtitle_files", "nerd_health_data",
