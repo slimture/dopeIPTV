@@ -5,14 +5,16 @@
 ### New and better
 
 - **Smooth while something plays.** The picture is now drawn on its own, apart from the rest of the window: scrolling a list, the guide or a series' page stays smooth while a channel, a film or the visualizer plays, and nothing in the window can make the video stutter. If a computer cannot draw it that way, dopeIPTV uses the old way by itself - **Settings → Nerd → Diagnostics** says which.
-- **A calmer, denser guide.** Lower rows, so more channels fit; a narrower channel column that shows only the logos when the guide is narrow (drag its edge to set the width); flat cards with a thin progress bar on what is on now; a line at the time now; separators like "-= Sweden =-" as headings; and rows without guide data left empty instead of repeating the same sentence. The now line runs behind the programmes - **Settings → Guide** puts it in front.
+- **A calmer, denser guide.** Lower rows, so more channels fit; a narrower channel column that shows only the logos when the guide is narrow (drag its edge to set the width); flat cards with a thin progress bar on what is on now; separators like "-= Sweden =-" as headings; and rows without guide data left empty instead of repeating the same sentence. Want a line at the time now? **Settings → Guide** turns it on.
 - **Night mode that works.** Loud adverts, explosions and bangs come down while ordinary speech stays exactly as it is - it never makes anything louder - press `N`. It says so however you switch it, and tells you when it could not be turned on for a stream.
 - **The visualizer for music and radio channels.** A channel in your playlist with sound but no picture now shows the visualizer instead of a black screen. Two new styles, Vectorscope and Frequencies, make five - in the player's options menu.
 - **New computer? Bring your settings from the welcome.** Type the sync code from your other computer, or restore a backup: your profiles and settings come over, and your sources too when the other computer syncs them. Encrypted on your computer before it is sent - dopeiptv.org keeps only bytes it cannot read.
 - **The same menu bar everywhere.** File, View, History and Help on Windows, Linux and macOS - About is under Help (on a Mac in the dopeIPTV menu, as before). **Settings → General** now ends with About and the version too.
 - **Server mode tells you who has its port** - dopeIPTV's own server started earlier, or another program - and offers the next free one with one click.
 - **Pictures load without slowing anything down.** Posters, logos and episode pictures are decoded once, away from the window, so lists, Home and above all a series' page scroll smoothly while they load.
+- **The phone remote plays everything the app plays.** Movies and series by category, Continue watching and History, Local files with their search, radio and recordings - and while an episode plays, its season's episodes with the one playing marked, previous and next episode on the buttons.
 - **The phone remote fits small phones** - down to the smallest iPhone SE, upright or on its side - and **follows what plays**: change channel anywhere and the page marks it and scrolls to it.
+- **The middle of the window follows what plays.** Start a channel from the phone or the media keys while a series' page shows, and the channel list comes up with it marked - the same for a film, an episode, a file, a station or a recording. Not while you type, in a dialog or in TV mode.
 
 ### Fixed
 
@@ -22,6 +24,9 @@
 - Searching in a Local files folder finds files in its subfolders too.
 - The search boxes say what they search: the list, the categories, or everything.
 - A click on the picture shows the controls instead of pausing; the pause button and `Space` pause.
+- The round pause button over the picture had a square box around it, and the rewind bar came up squeezed for a moment before its normal size.
+- On a series' page, the poster's play and pause button under the video now controls the episode that plays.
+- Home's back button stays at the top while the page scrolls.
 - TV mode: Stop while a dropped channel waited to reconnect now stops it.
 - A scheduled recording that comes due while you watch no longer opens a second connection by itself: it records from what plays when it is the same channel, and otherwise waits for a free connection or your OK.
 - The same provider account added twice is counted as one account.
