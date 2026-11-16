@@ -427,6 +427,9 @@ class SearchPage(QWidget):
     query_changed = pyqtSignal(str)
     activated = pyqtSignal(object)
     menu_requested = pyqtSignal(object, QPoint)
+    #: On screen (True) or left (False): another page in its place, the
+    #: pane folded away, the window minimised.
+    shown_changed = pyqtSignal(bool)
 
     def __init__(self, loader=None, parent=None) -> None:
         super().__init__(parent)
@@ -683,7 +686,9 @@ class SearchPage(QWidget):
         if self.results is not None and any(
                 h.on_air(time.time()) for h in self.results.hits.get("programmes", [])):
             self._tick.start()
+        self.shown_changed.emit(True)
 
     def hideEvent(self, e) -> None:
         super().hideEvent(e)
         self._tick.stop()
+        self.shown_changed.emit(False)

@@ -475,6 +475,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Its name over the categories, TV mode's header and the status
         # line follow every change the avatar does (mw_source_label).
         self._update_source_label()
+        # ...and the Search page lets go of what it read of a source removed
+        # or edited since.
+        self._search_sources_changed()
         store = self.playlist_store
         pl = store.get(store.active_id) if (store and store.active_id) else None
         name = ((pl or {}).get("name") or (pl or {}).get("server") or "")

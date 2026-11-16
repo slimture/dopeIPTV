@@ -40,7 +40,7 @@ from functools import partial
 from typing import Any
 
 from PyQt6 import sip
-from PyQt6.QtCore import QObject, QPoint, QThreadPool
+from PyQt6.QtCore import QObject, QPoint, QThreadPool, QTimer
 from PyQt6.QtWidgets import QApplication, QMenu
 
 from ..core import nerd, privacy, profiles
@@ -75,6 +75,10 @@ class _SearchAllMixin:
     #: Who the results were found for (the profile, kids, the lock).
     _sa_made_for: tuple | None = None
     _search_hold = False
+    #: The guide weeks are let go this long after the page is left (a big
+    #: one is tens of MB); the next search reads them again.
+    SA_RELEASE_MS = 5 * 60 * 1000
+    _sa_release: Any = None
 
     # -- where it is ------------------------------------------------------------------
 
@@ -93,6 +97,7 @@ class _SearchAllMixin:
             page.query_changed.connect(self._sa_query)
             page.activated.connect(self._sa_activate)
             page.menu_requested.connect(self._sa_menu)
+            page.shown_changed.connect(self._sa_page_shown)
             self._search_page = page
             self._mid_stack.addWidget(page)
         return page
@@ -113,6 +118,44 @@ class _SearchAllMixin:
         if self._sa_sources is None:
             self._sa_sources = ss.Sources()
         return self._sa_sources
+
+    # -- letting the guide weeks go ---------------------------------------------------
+
+    def _sa_new_timer(self) -> Any:
+        return QTimer(self if isinstance(self, QObject) else None)
+
+    def _sa_release_timer(self) -> Any:
+        timer = self._sa_release
+        if timer is None:
+            timer = self._sa_release = self._sa_new_timer()
+            timer.setSingleShot(True)
+            timer.setInterval(self.SA_RELEASE_MS)
+            timer.timeout.connect(self._sa_release_guides)
+        return timer
+
+    def _sa_page_shown(self, shown: bool) -> None:
+        """The page on screen again: its guide weeks stay. Left: they go a
+        while after (SA_RELEASE_MS), unless it comes back first."""
+        timer = self._sa_release_timer()
+        if shown:
+            timer.stop()
+        else:
+            timer.start()
+
+    def _sa_release_guides(self) -> None:
+        """Every guide week let go now (one a worker reads is not kept)."""
+        store = self._sa_sources
+        if store is not None:
+            gone = store.release_guides()
+            if gone:
+                log.info("search: %d guide weeks let go", gone)
+
+    def _search_sources_changed(self) -> None:
+        """A source added, removed or edited (the avatar shows it): what was
+        read of one removed or changed goes at once."""
+        store = self._sa_sources
+        if store is not None and getattr(self, "playlist_store", None) is not None:
+            store.keep({p.source.id: ss.signature(p.playlist) for p in self._sa_plans()})
 
     # -- opening it, leaving it --------------------------------------------------------
 
@@ -286,12 +329,17 @@ class _SearchAllMixin:
         page = self._search_page
         if page is None or sip.isdeleted(page):
             return
-        self._sa_prepare()              # its guide next, once its lists are in
+        showing = self._search_page_showing()
+        if showing:
+            # Its guide next, once its lists are in - while the page is
+            # there: away from it nothing more is read (what was read goes
+            # a while after, _sa_page_shown), and coming back reads on.
+            self._sa_prepare()
         # More is in: the query again, the row picked and the scroll kept -
         # only while the page is on screen (coming back, it is as it was).
-        if self._search_page_showing() and page.query().strip():
+        if showing and page.query().strip():
             self._sa_query(page.query(), keep_place=True)
-        elif not self._sa_loading:
+        elif not self._sa_loading or not showing:
             page.set_busy(False)
 
     def _sa_source_failed(self, pid: str, key: tuple, err: Any = None) -> None:
@@ -308,10 +356,12 @@ class _SearchAllMixin:
         self.__dict__.pop("_sa_gave_up", None)
 
     def _search_profile_changed(self) -> None:
-        """Another profile: nothing found for the one before is shown."""
+        """Another profile: nothing found for the one before is shown, and
+        the guide weeks made for it go at once."""
         page = self._search_page
         self._sa_latest_gen()
         self._sa_made_for = None
+        self._sa_release_guides()
         if page is not None and not sip.isdeleted(page):
             page.field.blockSignals(True)
             page.field.clear()

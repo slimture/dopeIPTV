@@ -188,6 +188,13 @@ class Sources:
         # A source's guide week (None: it has none here), under the key it
         # was read for, and when.
         self._guides: dict[str, tuple[tuple, sa.GuideTable | None, float]] = {}
+        # What a source was read as (signature()), to let it go once changed.
+        self._sigs: dict[str, str] = {}
+        # Generations: a source's moves on as what was read of it is let go
+        # (keep), the weeks' as every guide week is (release_guides). What
+        # a worker read under an older one is not kept: it uses it, once.
+        self._gen: dict[str, int] = {}
+        self._weeks_gen = 0
 
     # -- clients --------------------------------------------------------------------
 
@@ -222,25 +229,30 @@ class Sources:
         """(worker) The source's catalogue - made now unless one for the
         same key is in. A source that cannot be read gives an empty one
         (FAILED), read again only once its lists are refreshed (drop)."""
-        with self._busy_for(plan.source.id):
+        pid = plan.source.id
+        with self._busy_for(pid):
             have = self.ready(plan)
             if have is not None:
                 return have
+            with self._lock:
+                gen = self._gen.get(pid, 0)
             try:
                 client = plan.client if plan.client is not None else self.client(plan.playlist)
-                cat = build_catalogue(plan, client, partial(self._read_kept, plan))
+                cat = build_catalogue(plan, client, partial(self._read_kept, plan, gen))
             except Exception as e:
                 log.info("search: a source could not be read (%s)", type(e).__name__)
                 cat = sa.Catalogue(plan.source, partial=sa.FAILED)
             with self._lock:
-                self._cats[plan.source.id] = (plan.key, cat)
+                if gen == self._gen.get(pid, 0):
+                    self._cats[pid] = (plan.key, cat)
+                    self._sigs[pid] = signature(plan.playlist)
             log.info("search: %s - %d channels, %d films, %d series%s", plan.source.kind,
                      len(cat.channels), len(cat.movies), len(cat.series),
                      f" (only in part: {cat.partial})" if cat.partial else "")
             return cat
 
-    def _read_kept(self, plan: Plan, client: Any, mode: str, list_fn: str, cats_fn: str
-                   ) -> tuple[list, list | None, str]:
+    def _read_kept(self, plan: Plan, gen: int, client: Any, mode: str, list_fn: str,
+                   cats_fn: str) -> tuple[list, list | None, str]:
         """(worker) One kind of the source's lists: asked of it once while
         the source is as it was (its client's list cache lasts minutes - asked
         again, a big catalogue came down once more). A portal's is read anew
@@ -257,6 +269,8 @@ class Sources:
         got = _read(client, mode, list_fn, cats_fn)
         if got[2] != sa.FAILED:
             with self._lock:
+                if gen != self._gen.get(pid, 0):
+                    return got              # the source was let go meanwhile
                 have = self._rows.get(pid)
                 if have is None or have[0] != sig:
                     have = self._rows[pid] = (sig, {})
@@ -291,30 +305,39 @@ class Sources:
         """(worker) A week of the source's guide from now, over *cat*'s
         channels - from the window's guide in memory, or the copy on disk;
         never a download. None without one (remembered: not looked for
-        again until there is one)."""
+        again until there is one). A week read while the weeks or the source
+        were let go is this caller's to use, not kept."""
         now = time.time() if now is None else now
-        with self._busy_for(plan.source.id):
+        pid = plan.source.id
+        with self._busy_for(pid):
             key = self._guide_key(plan)
             got = self._guide_entry(plan, now, key)
             if got is not None:
                 return got[1]
+            with self._lock:
+                gen = (self._gen.get(pid, 0), self._weeks_gen)
             table: sa.GuideTable | None = None
             try:
-                if key is None:
-                    table = None
-                elif plan.guide is not None:
-                    table = sa.GuideTable(plan.source, cat.channels, plan.guide.schedule, now)
-                else:
-                    with self._guide_lock:          # one guide in memory at a time
-                        g = self._open_guide(str(key[1]))
-                        if g.load_cached():
-                            table = sa.GuideTable(plan.source, cat.channels, g.schedule, now)
-                        del g
+                if key is not None:
+                    # One week built at a time, and one guide from disk in
+                    # memory at a time: building one is the peak.
+                    with self._guide_lock:
+                        if plan.guide is not None:
+                            table = sa.GuideTable(plan.source, cat.channels,
+                                                  plan.guide.schedule, now)
+                        else:
+                            g = self._open_guide(str(key[1]))
+                            if g.load_cached():
+                                table = sa.GuideTable(plan.source, cat.channels, g.schedule, now)
+                            del g
             except Exception as e:
                 log.info("search: a guide could not be read (%s)", type(e).__name__)
                 table = None
             with self._lock:
-                self._guides[plan.source.id] = ((plan.key, key), table, now)
+                if gen != (self._gen.get(pid, 0), self._weeks_gen):
+                    return table
+                self._guides[pid] = ((plan.key, key), table, now)
+                self._sigs[pid] = signature(plan.playlist)
             if table is not None:
                 log.info("search: a guide's week - %d airings%s", len(table),
                          " (cut short)" if table.cut else "")
@@ -343,9 +366,39 @@ class Sources:
         """Everything of the sources not in *keep* let go (removed ones)."""
         ids = set(keep)
         with self._lock:
-            for store in (self._clients, self._cats, self._guides, self._rows):
+            for store in (self._clients, self._cats, self._guides, self._rows, self._sigs):
                 for pid in [p for p in store if p not in ids]:
                     store.pop(pid, None)
+
+    def keep(self, signatures: Mapping[str, str]) -> None:
+        """(the window's thread) Only the sources in *signatures* (id ->
+        signature()) as they are now: everything read of one removed or
+        changed since let go at once - and what a worker is reading of it
+        now is not kept."""
+        with self._lock:
+            gone = set()
+            for pid in (set(self._busy) | set(self._clients) | set(self._cats)
+                        | set(self._guides) | set(self._rows)):
+                sig = signatures.get(pid)
+                had = [self._sigs.get(pid)] + [h[0] for h in (self._clients.get(pid),
+                                                              self._rows.get(pid)) if h]
+                if sig is None or any(h is not None and h != sig for h in had):
+                    gone.add(pid)
+            for pid in gone:
+                self._gen[pid] = self._gen.get(pid, 0) + 1
+                for store in (self._clients, self._cats, self._guides, self._rows, self._sigs):
+                    store.pop(pid, None)
+
+    def release_guides(self) -> int:
+        """(any thread) Every guide week let go - the source in use's too, it
+        is made again from the guide the window has - and one being read now
+        not kept; each is read again when next asked for. How many went."""
+        with self._lock:
+            self._weeks_gen += 1
+            gone = [pid for pid, got in self._guides.items() if got[1] is not None]
+            for pid in gone:
+                del self._guides[pid]
+        return len(gone)
 
     def drop(self, pid: str) -> None:
         """One source's catalogue and guide week made anew next time (its

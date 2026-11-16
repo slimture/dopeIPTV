@@ -396,6 +396,89 @@ def test_the_guide_in_use_is_read_from_memory():
     assert len(store.guide(plan, store.catalogue(plan), NOW)) == 3
 
 
+def _disk_store(tmp_path, on_read=None):
+    """Sources with a guide on disk for b and c, counting each read; *on_read*
+    runs while a guide is being read (on its worker)."""
+    reads = []
+
+    class Disk:
+        def __init__(self, path):
+            reads.append(path)
+
+        def load_cached(self):
+            if on_read is not None:
+                on_read()
+            return True
+
+        def schedule(self, ch):
+            return SVT
+
+    for pid in ("b", "c"):
+        (tmp_path / f"epg_{pid}.xml").write_bytes(b"x")
+    store = ss.Sources(make_client=lambda pl: _Client(
+        live=[{"stream_id": 1, "name": "SVT1", "epg_channel_id": "svt"}]),
+        guide_path=lambda pid: str(tmp_path / f"epg_{pid}.xml"), open_guide=Disk)
+    return store, reads
+
+
+def test_guide_weeks_are_let_go_and_read_again_when_next_asked_for(tmp_path):
+    store, reads = _disk_store(tmp_path)
+
+    class Mem:
+        def is_loaded(self):
+            return True
+
+        def schedule(self, ch):
+            return SVT
+
+    other = _plan()
+    here = _plan(client=_Client(live=[{"stream_id": 1, "name": "SVT1"}]), guide=Mem(),
+                 source=A)
+    for p in (other, here):
+        assert store.guide(p, store.catalogue(p), NOW) is not None
+    assert store.release_guides() == 2              # every week, the one in use's too
+    assert store.guide_in(other, NOW) is None and not store.done(other, NOW)
+    assert store.guide_in(here, NOW) is None and not store.done(here, NOW)
+    assert store.ready(other) is not None           # the lists stay: only the weeks go
+    assert len(store.guide(other, store.catalogue(other), NOW)) == 3
+    assert len(reads) == 2                          # read again from disk
+
+
+def test_a_week_read_while_the_weeks_are_let_go_is_not_kept(tmp_path):
+    holder = {}
+    store, reads = _disk_store(tmp_path, on_read=lambda: holder["store"].release_guides())
+    holder["store"] = store
+    plan = _plan()
+    table = store.guide(plan, store.catalogue(plan), NOW)
+    assert table is not None and len(table) == 3     # the worker still has it
+    assert store.guide_in(plan, NOW) is None and not store.done(plan, NOW)
+
+
+def test_what_was_read_of_a_source_removed_or_changed_goes_at_once(tmp_path):
+    store, _reads = _disk_store(tmp_path)
+    b, c = _plan(), _plan(source=sa.Source("c", "Third"))
+    for p in (b, c):
+        store.guide(p, store.catalogue(p), NOW)
+    sig_c = ss.signature(c.playlist)
+    store.keep({"c": sig_c})                         # b removed
+    assert store.ready(b) is None and store.guide_in(b, NOW) is None
+    assert store.ready(c) is not None and store.guide_in(c, NOW) is not None
+    store.keep({"c": ss.signature(dict(c.playlist, server="http://new"))})   # c edited
+    assert store.ready(c) is None and store.guide_in(c, NOW) is None
+
+
+def test_a_weeks_descriptions_are_kept_once_as_they_are_matched():
+    long = "Star Trek " + "x" * 400
+    sched = _sched((NOW + H, NOW + 2 * H, "A", long),
+                   (NOW + 3 * H, NOW + 4 * H, "B", long + "y"),
+                   (NOW + 5 * H, NOW + 6 * H, "C", "STAR  trek"),
+                   (NOW + 7 * H, NOW + 8 * H, "D", "Star Trek"))
+    table = sa.GuideTable(A, [{"stream_id": 1, "name": "X"}], lambda ch: sched, NOW)
+    assert len(table.fdescs) == 2                    # the same text once, the same cut once
+    res = sa.search("trek", [], [table], now=NOW)
+    assert sorted(h.title for h in res.hits["programmes"]) == ["A", "B", "C", "D"]
+
+
 def test_the_xmltv_guide_loads_its_cache_without_a_download(tmp_path, monkeypatch):
     from dopeiptv.providers.epg import XmltvGuide
     g = XmltvGuide(None, cache_path=str(tmp_path / "epg_x.xml"))

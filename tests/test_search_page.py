@@ -224,6 +224,90 @@ def test_results_found_before_a_sources_rules_changed_are_not_acted_on(monkeypat
     assert not w._sa_still_allowed()                 # a channel of Nordic's hidden by hand
 
 
+class _Timer:
+    """A single-shot timer that fires when told to."""
+
+    def __init__(self):
+        self.interval, self.single, self.active, self.slots = None, None, False, []
+
+    def setSingleShot(self, single):
+        self.single = single
+
+    def setInterval(self, ms):
+        self.interval = ms
+
+    def start(self):
+        self.active = True
+
+    def stop(self):
+        self.active = False
+
+    @property
+    def timeout(self):
+        return self
+
+    def connect(self, slot):
+        self.slots.append(slot)
+
+    def fire(self):
+        self.active = False
+        for slot in self.slots:
+            slot()
+
+
+def test_the_guide_weeks_go_a_while_after_the_page_is_left(monkeypatch):
+    w, _jobs = _stub_window(monkeypatch)
+    timer = _Timer()
+    w._sa_new_timer = lambda: timer
+    released, kept = [], []
+    w._sa_sources.release_guides = lambda: released.append(1) or 0
+    w._sa_sources.keep = lambda signatures: kept.append(sorted(signatures))
+    w._sa_page_shown(False)                          # left
+    assert timer.active and timer.single and timer.interval == 5 * 60 * 1000
+    w._sa_page_shown(True)                           # back in time: kept
+    assert not timer.active and released == []
+    w._sa_page_shown(False)
+    timer.fire()
+    assert released == [1]
+    w._search_profile_changed()                      # another profile: at once
+    assert released == [1, 1]
+    w.playlist_store.items.pop("b")                  # a source removed (or edited)
+    w._search_sources_changed()
+    assert kept == [["a"]]
+
+
+def _stub_page():
+    from PyQt6.QtCore import QObject
+
+    class Page(QObject):
+        shown, busy = "results", None
+
+        def show_results(self, results, keep_place=True):
+            self.shown = results
+
+        def set_busy(self, busy):
+            self.busy = busy
+
+        def query(self):
+            return "vegas"
+
+    return Page()
+
+
+def test_away_from_the_page_nothing_more_is_read(monkeypatch):
+    w, _jobs = _stub_window(monkeypatch)
+    w._search_page = page = _stub_page()
+    prepared = []
+    w._sa_prepare = lambda plans=None: prepared.append(1)
+    w._sa_query = lambda text, keep_place=False: w.queries.append(text)
+    w._search_page_showing = lambda: False
+    w._sa_source_in("b")                             # its lists came while away
+    assert prepared == [] and w.queries == [] and page.busy is False
+    w._search_page_showing = lambda: True
+    w._sa_source_in("b")
+    assert prepared == [1] and w.queries == ["vegas"]
+
+
 _CHILD = r"""
 import os, sys, tempfile, time
 from array import array
@@ -538,8 +622,11 @@ assert w._search_page_showing()
 # -- kept for the next visit - but not while viewing privately --------------------------------
 assert page.query() == "star trek"
 w.switch_mode("live")
+# Left: the guide weeks go a while after, unless it comes back first.
+assert w._sa_release.isActive() and w._sa_release.interval() == 5 * 60 * 1000
 w._open_search_page()
 pump()
+assert not w._sa_release.isActive()
 assert page.query() == "star trek" and page.results is not None
 from dopeiptv.core import privacy
 privacy.set_private(True)

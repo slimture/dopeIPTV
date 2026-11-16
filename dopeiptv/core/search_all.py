@@ -204,32 +204,43 @@ class GuideTable:
         self.cut = len(found) > limit
         if self.cut:
             found = heapq.nsmallest(limit, found, key=lambda a: a[0])
+        # Building a big week is the peak of its memory: what is only needed
+        # meanwhile goes as soon as it is done with, and a description is
+        # kept once by what is matched (folded), not once more as it was.
         title_at: dict[str, int] = {}
-        desc_at: dict[str, int] = {}
+        seen_desc: dict[str, int] = {}      # by the guide's own strings: no copies
+        desc_at: dict[str, int] = {}        # by the folded text kept
         self.title_text: list[str] = []
         self.ftitles: list[str] = []
         self.fdescs: list[str] = []
-        rows: list[tuple[int, int, int, int, int]] = []
-        for st, sp, ci, title, desc in found:
+        rows: list[Any] = found             # turned into the rows in place
+        for k, (st, sp, ci, title, desc) in enumerate(found):
             t = title_at.get(title)
             if t is None:
                 t = title_at[title] = len(self.title_text)
                 self.title_text.append(title)
                 self.ftitles.append(fold(title))
-            d = -1
-            text = " ".join(str(desc or "").split())[:DESC_CHARS]
-            if text:
-                d = desc_at.get(text, -1)
-                if d < 0:
-                    d = desc_at[text] = len(self.fdescs)
-                    self.fdescs.append(fold(text))
-            rows.append((t, st, sp, ci, d))
+            d = seen_desc.get(desc)
+            if d is None:
+                d = -1
+                text = " ".join(str(desc or "").split())[:DESC_CHARS]
+                if text:
+                    f = fold(text)
+                    d = desc_at.get(f, -1)
+                    if d < 0:
+                        d = desc_at[f] = len(self.fdescs)
+                        self.fdescs.append(f)
+                seen_desc[desc] = d
+            rows[k] = (t, st, sp, ci, d)
+        del found, title_at, seen_desc, desc_at
         rows.sort()
         self.starts = array("q", (r[1] for r in rows))
         self.stops = array("q", (r[2] for r in rows))
         self.chans = array("i", (r[3] for r in rows))
         self.tix = array("i", (r[0] for r in rows))
         self.dix = array("i", (r[4] for r in rows))
+        n = len(rows)
+        del rows
         # Where each title's airings begin: they are in title order, and
         # every title has one at least.
         self._t_first = array("i", [0] * (len(self.title_text) + 1))
@@ -238,16 +249,22 @@ class GuideTable:
             if t != prev:
                 self._t_first[t] = pos
                 prev = t
-        self._t_first[len(self.title_text)] = len(rows)
-        # The airings by description, for a word found only there.
-        order = sorted((d, pos) for pos, d in enumerate(self.dix) if d >= 0)
-        self._by_desc = array("i", (pos for _d, pos in order))
-        self._d_first = array("i", [0] * (len(self.fdescs) + 1))
-        at = 0
-        for d in range(len(self.fdescs) + 1):
-            while at < len(order) and order[at][0] < d:
-                at += 1
-            self._d_first[d] = at
+        self._t_first[len(self.title_text)] = n
+        # The airings by description, for a word found only there: counted
+        # per description, then placed in air-position order within each.
+        first = array("i", [0]) * (len(self.fdescs) + 1)
+        for d in self.dix:
+            if d >= 0:
+                first[d + 1] += 1
+        for d in range(len(self.fdescs)):
+            first[d + 1] += first[d]
+        self._d_first = first
+        nxt = array("i", first)
+        self._by_desc = array("i", [0]) * first[len(self.fdescs)]
+        for pos, d in enumerate(self.dix):
+            if d >= 0:
+                self._by_desc[nxt[d]] = pos
+                nxt[d] += 1
 
     def __len__(self) -> int:
         return len(self.starts)
