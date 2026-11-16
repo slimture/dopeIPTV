@@ -11,7 +11,7 @@ import threading
 
 from PyQt6 import sip
 from PyQt6.QtCore import Qt, QThreadPool, pyqtSignal
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMenu, QPushButton, QWidget
+from PyQt6.QtWidgets import QLabel, QMenu, QPushButton, QVBoxLayout, QWidget
 
 from ..core.workers import run_async
 from ..i18n import tr
@@ -95,13 +95,15 @@ class FindOnNetwork(QPushButton):
         self.status.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         self.status.hide()
         # The row a form places under the address: the link, then what it
-        # found (or did not).
+        # found (or did not) under it at the field's whole width - beside
+        # the link, the note about a network split in VLANs wrapped into a
+        # dozen narrow lines.
         self.row = QWidget()
-        lay = QHBoxLayout(self.row)
+        lay = QVBoxLayout(self.row)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(10)
-        lay.addWidget(self)
-        lay.addWidget(self.status, 1)
+        lay.setSpacing(2)
+        lay.addWidget(self, 0, Qt.AlignmentFlag.AlignLeft)
+        lay.addWidget(self.status)
         self.clicked.connect(self._start)
         self._busy = False
         self._cancel = threading.Event()

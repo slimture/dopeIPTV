@@ -163,3 +163,41 @@ def test_trakt_connected_shows_confirmation():
     assert ov._t_ok.isVisibleTo(ov._stack.widget(2))
     from dopeiptv.i18n import tr
     assert ov._t_finish.text() == tr("onb_finish_done")
+
+
+def test_the_connect_step_fits_a_low_window_the_first_time():
+    """The first time the wizard showed (before a page had been laid out at
+    the card's width) a wrapped label got the height of fewer lines: on a
+    low screen the box finder's note was cut mid-sentence and the card ran
+    past the window. Now every line shows, the card stays inside the
+    window and the page scrolls, never wider than the card."""
+    try:
+        import PyQt6  # noqa: F401
+    except Exception:
+        pytest.skip("PyQt6 not available")
+    from PyQt6.QtWidgets import QLabel, QWidget
+
+    from dopeiptv.ui import box_finder
+    app, win, ov, _ = _overlay()
+    win.setCentralWidget(QWidget())
+    win.resize(1100, 600)
+    win.show()
+    ov.cover()
+    app.processEvents()
+    ov._toggle_nerd()
+    ov._stack.setCurrentIndex(1)
+    ov._conn_kind.setCurrentIndex(ov._conn_kind.findData("enigma2"))
+    ov._finder.status.setText(box_finder.nothing_found_text())
+    ov._finder.status.show()
+    ov._fit_card(1)
+    for _ in range(5):
+        app.processEvents()
+    page = ov._stack.currentWidget()
+    for lbl in page.findChildren(QLabel):
+        if lbl.isVisible() and lbl.wordWrap() and lbl.text():
+            assert lbl.height() >= lbl.heightForWidth(lbl.width()), lbl.text()[:30]
+    card = ov._card.geometry()
+    assert card.top() >= 0 and card.bottom() < ov.height()
+    assert ov._stack.height() > ov._scroll.height()          # it scrolls
+    assert page.width() <= ov._scroll.viewport().width()     # nothing cut on the right
+    win.close()

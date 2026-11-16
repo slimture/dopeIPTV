@@ -83,6 +83,7 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   "About dopeIPTV" row showing the version, which opens About over
   Settings, and the Settings search finds it by "about", "version" or
   "update" (issue #31 - it was only in the menu bar's first menu).
+- The welcome's connect step on a low screen: the first time it showed, wrapped text (the box finder's note above all) was cut off and the card ran past the window. The step now scrolls inside the card, and what Find on my network says sits under the link at the field's width.
 
 ## [1.6.0]
 

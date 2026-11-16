@@ -24,7 +24,7 @@ from typing import Callable
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QComboBox, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QSizePolicy, QStackedWidget, QVBoxLayout, QWidget,
+    QPushButton, QScrollArea, QSizePolicy, QStackedWidget, QVBoxLayout, QWidget,
 )
 
 from ..i18n import LANGUAGES, tr
@@ -49,6 +49,12 @@ class WelcomeOverlay(QWidget):
         "ようこそ", "환영합니다", "Karibu", "مرحبا", "خوش آمدید",
         "ברוכים הבאים", "خوش آمدید",
     )
+    #: The card's width and its inner padding; the pages lay out in what is
+    #: left between the paddings.
+    CARD_W = 430
+    PAD = 26
+    #: Room kept free above and below the card when it fills the window.
+    MARGIN = 16
 
     def __init__(self, parent: QWidget, *, settings,
                  # (server, user, password, kind, name) - and a portal's MAC
@@ -73,6 +79,7 @@ class WelcomeOverlay(QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setStyleSheet(
             f"#WelcomeOverlay {{ background: {P['bg']}; }}"
+            "#WelcomeScroll, #WelcomeScrollView { background: transparent; border: none; }"
             f"#WelcomeCard {{ background: {P['pane']};"
             f" border: 1px solid {P['border']}; border-radius: 16px; }}"
             f"#Hero {{ font-size: 23px; font-weight: 800; color: {P['text']}; }}"
@@ -92,21 +99,39 @@ class WelcomeOverlay(QWidget):
         # Stretches above and below keep the card at its natural (content)
         # height, centred - without them the card stretches to fill the whole
         # overlay, so no amount of inner compression would shrink it.
-        outer = QVBoxLayout(self)
+        outer = self._outer = QVBoxLayout(self)
         outer.addStretch(1)
         self._card = QFrame(objectName="WelcomeCard")
-        self._card.setFixedWidth(430)
+        self._card.setFixedWidth(self.CARD_W)
         self._card.setSizePolicy(QSizePolicy.Policy.Fixed,
                                  QSizePolicy.Policy.Maximum)
         card_l = QVBoxLayout(self._card)
-        card_l.setContentsMargins(26, 16, 26, 16)
+        card_l.setContentsMargins(self.PAD, 16, self.PAD, 16)
         card_l.setSpacing(6)
 
         self._stack = QStackedWidget()
         self._stack.addWidget(self._build_welcome_page())   # 0
         self._stack.addWidget(self._build_connect_page())   # 1
         self._stack.addWidget(self._build_trakt_page())     # 2
-        card_l.addWidget(self._stack)
+        # The pages scroll inside the card when the window is too low for
+        # the whole page (a small screen, a long language, the box finder's
+        # note): the card never grows past the window and cuts them off.
+        self._scroll = QScrollArea(objectName="WelcomeScroll")
+        self._scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._scroll.viewport().setObjectName("WelcomeScrollView")
+        self._scroll.viewport().setAutoFillBackground(False)
+        self._scroll.setWidget(self._stack)
+        # setWidget paints the page with the window's colour; the card's own
+        # shows through. And the page follows the viewport's width, also
+        # when the scroll bar takes some of it, instead of being cut off on
+        # the right at the width of its widest field.
+        self._stack.setAutoFillBackground(False)
+        self._stack.setSizePolicy(QSizePolicy.Policy.Ignored,
+                                  QSizePolicy.Policy.Fixed)
+        card_l.addWidget(self._scroll)
         outer.addWidget(self._card, 0, Qt.AlignmentFlag.AlignHCenter)
         outer.addStretch(1)
         # A QStackedWidget otherwise reserves the height of its tallest page,
@@ -228,6 +253,11 @@ class WelcomeOverlay(QWidget):
         add_media_kinds(self._conn_kind)
         if self._nerd_on():
             add_box_kinds(self._conn_kind)
+        # A long kind's name ("Enigma2 box (VU+, Dreambox, Zgemma...)") is
+        # cut short rather than widening the form past the card.
+        self._conn_kind.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self._conn_kind.setMinimumContentsLength(12)
         self._conn_kind.currentIndexChanged.connect(self._update_conn_kind)
         self._name = QLineEdit(s.value("playlist_name", "") if s else "")
         self._name.setPlaceholderText(tr("playlist_name_hint"))
@@ -582,16 +612,56 @@ class WelcomeOverlay(QWidget):
 
     # -- geometry ------------------------------------------------------------
 
-    def _fit_card(self, idx: int) -> None:
+    @staticmethod
+    def _page_height(page: QWidget, width: int) -> int:
+        """The height *page* needs at *width*. Its size hint alone fell
+        short wherever text wraps: before the page had been laid out at the
+        card's width (the first time the wizard shows), a wrapped label
+        asked for the height of fewer lines and was cut off - the box
+        finder's note in the middle of a sentence."""
+        # Asked, not resized: adjustSize() here gave the page its hint's
+        # width, wider than the card, and the stack never laid it back.
+        lay = page.layout()
+        if lay is not None:
+            lay.invalidate()
+        if lay is not None and lay.hasHeightForWidth():
+            return max(1, lay.heightForWidth(width))
+        return page.sizeHint().height()
+
+    def _room(self) -> int:
+        """The height the pages may take before they scroll: what the
+        overlay leaves inside the card; 0 while it is not up yet."""
+        if not self.isVisible() or self.height() <= 0:
+            return 0
+        m = self._outer.contentsMargins()
+        card = self._card.layout().contentsMargins()
+        return max(120, self.height() - m.top() - m.bottom()
+                   - card.top() - card.bottom() - 2 * self.MARGIN)
+
+    def _fit_card(self, idx: int, cover: bool = True) -> None:
         # A QStackedWidget always reserves the height of its tallest page.
         # Pin it to the current page's height so the short welcome page isn't
         # padded out to the size of the connect form.
         cur = self._stack.widget(idx)
-        cur.adjustSize()
-        self._stack.setFixedHeight(cur.sizeHint().height())
+        if cur is None:
+            return
+        width = self.CARD_W - 2 * self.PAD
+        need = self._page_height(cur, width)
+        room = self._room()
+        if room and need > room:
+            # It scrolls: the bar takes its width from the page, which then
+            # wraps into more lines.
+            width -= self._scroll.verticalScrollBar().sizeHint().width()
+            need = self._page_height(cur, width)
+        self._stack.setFixedHeight(need)
+        self._scroll.setFixedHeight(min(need, room) if room else need)
         self._card.adjustSize()
-        if self.isVisible():
+        if cover and self.isVisible():
             self.cover()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._fit_card(self._stack.currentIndex(), cover=False)
 
     def reset(self) -> None:
         """Return to the first page and resume the greeting flash (used when
@@ -610,4 +680,5 @@ class WelcomeOverlay(QWidget):
         self.setGeometry(central.geometry() if central else parent.rect())
         self.raise_()
         self.show()
+        self._fit_card(self._stack.currentIndex(), cover=False)
         self.setFocus()   # so Esc works without clicking first
