@@ -7,74 +7,6 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
-### Changed
-
-- About says what the app is today - IPTV and the TV at home: Xtream
-  Codes, M3U, Stalker portals, Enigma2 and other boxes, Jellyfin, Emby
-  and Plex, with a guide, recordings, TV mode and casting - not only
-  "Xtream Codes and M3U playlists", in every language.
-
-### Fixed
-
-- "Night mode could not be turned on for this stream" - and why a typed
-  channel number did not play - wraps in the picture's corner instead of
-  running off the edge of a narrow docked player.
-- On macOS the command palette names About, Settings, Quit, the
-  supporter key and Donate by the application menu they are in
-  ("dopeIPTV"), not Help or File.
-- After an upgrade from 1.5, a row removed from Recently viewed, a title
-  removed from Continue watching or a series no longer followed in the
-  first profile is gone from the copy the first start left for a
-  downgrade too - before, it stayed there, and in every backup made
-  after.
-- Night mode (N) and teletext (T), new in 1.6, no longer stay without a
-  key for good when an earlier version's shortcuts gave N or T to
-  another action: nothing is stored for them, so once the key is free
-  again they have it.
-- The loading indicator: a playlist address (a .m3u or .pls station, a
-  yt-dlp playlist) says "Connecting…" and then "Still loading…" until
-  its entry plays, not "Buffering…" after a second; the second line of a
-  wrapped note is no longer cut at the bottom (Chinese, Japanese, the
-  ellipsis); the pop-out's own play/pause disc no longer sits under it
-  taking clicks.
-
-- A cast of what plays from another source than the one in use (started
-  before a switch, by failover or from the Search page) checked the
-  trusted certificate of the source in use, and a Kodi or an Apple TV got
-  that source's user agent, headers and proxy. It now asks about the pin
-  of the source the stream comes from, and the receiver gets that
-  source's own options.
-- A scheduled recording that came due while something played from the
-  same account opened a second connection without a word. It is now
-  counted as one started by hand: its channel playing, it is recorded from
-  the player's rewind buffer (from its start, as far back as the buffer
-  holds) or the player's stream, with no connection of its own; with room
-  on the account it opens its own; over a full limit, or one the provider
-  does not say while the app already holds a connection to it, it waits -
-  nothing opened - with a note offering "Record anyway", starts by itself
-  once there is room (Stop, or play its channel), and fails at its stop
-  time saying no connection was free.
-- The same provider account added twice (another name, other categories,
-  or as Xtream and as its M3U) counted each source against a limit of its
-  own. Sources with the same server and user name now share one count and
-  one limit: questions, server mode's room and Nerd > Diagnostics' In use
-  now (one line for the account).
-- The phone remote follows what plays: when the channel changes - on the computer, from the page's channel up and down or from another remote - its row is marked and scrolled into view, smoothly and centred, once your own scrolling has rested a moment. A channel the list shown leaves out (Favourites, a search) gets a "Show in list" button under Now playing instead of the page switching lists by itself. A channel playing from another source no longer marks a row of the same number in this one's list.
-
-
-- The phone remote fits small phones: from 320 px wide (iPhone SE 1st generation, small Androids) and on its side, the bar's tabs and search, the dock's volume and keys and the remote's d-pad and keys wrap or sit side by side as there is room, every button is at least 44 px, the remote's labels are never cut mid-word, and the notch, the home bar and the status bar are kept clear.
-- Scrolling on the computer no longer stutters while the phone remote is on: a poll never loads the programme guide on the window's thread any more (a guide not yet in memory was downloaded and parsed there, freezing the window for seconds), now and next are looked up off it, the playing channel and the favourites are worked out again only when they change, the same state again costs the phone nothing (304), and the page asks every 3 s instead of 1.5 s once nothing has changed for a while (every second just after a tap).
-
-- A series' page scrolls smoothly: a scroll step moves what is drawn and
-  paints only the strip that comes into view (it painted every card on
-  screen again, each with its picture smooth-scaled anew, and the header's
-  backdrop too), a card's picture is scaled to its size once, and a
-  picture that comes in paints only its own card. Pictures everywhere -
-  lists, Home, posters, Search, the series page - are decoded once, on the
-  loaders' threads and without holding up the window, already at their
-  size; the window only puts them up (each was decoded a second time there,
-  about 5 ms for an episode's still). Nothing looks different.
-
 ## [1.6.1]
 
 A calmer guide, a night mode that tames loud adverts and bangs without
@@ -131,6 +63,10 @@ how connections to the account are counted.
   nothing changes without it. `dopeiptv --server` logs the same, with the
   `--port` to start with. Any other reason a port does not open is said
   as before.
+- About says what the app is today - IPTV and the TV at home: Xtream
+  Codes, M3U, Stalker portals, Enigma2 and other boxes, Jellyfin, Emby
+  and Plex, with a guide, recordings, TV mode and casting - not only
+  "Xtream Codes and M3U playlists", in every language.
 
 ### Fixed
 
@@ -200,6 +136,64 @@ how connections to the account are counted.
 - The welcome's connect step on a low screen: the first time it showed, wrapped text (the box finder's note above all) was cut off and the card ran past the window. The step now scrolls inside the card, and what Find on my network says sits under the link at the field's width.
 - A series' page played an episode on one click, whatever "Auto-play preview on selection" said. It now follows that setting as the lists do: off (the default), one click picks the episode and a double click or Enter plays it.
 - The welcome's connect step showed the MAC address, the media server sign-in and Find on my network for Xtream until another kind or a language was picked.
+- "Night mode could not be turned on for this stream" - and why a typed
+  channel number did not play - wraps in the picture's corner instead of
+  running off the edge of a narrow docked player.
+- On macOS the command palette names About, Settings, Quit, the
+  supporter key and Donate by the application menu they are in
+  ("dopeIPTV"), not Help or File.
+- After an upgrade from 1.5, a row removed from Recently viewed, a title
+  removed from Continue watching or a series no longer followed in the
+  first profile is gone from the copy the first start left for a
+  downgrade too - before, it stayed there, and in every backup made
+  after.
+- Night mode (N) and teletext (T), new in 1.6, no longer stay without a
+  key for good when an earlier version's shortcuts gave N or T to
+  another action: nothing is stored for them, so once the key is free
+  again they have it.
+- The loading indicator: a playlist address (a .m3u or .pls station, a
+  yt-dlp playlist) says "Connecting…" and then "Still loading…" until
+  its entry plays, not "Buffering…" after a second; the second line of a
+  wrapped note is no longer cut at the bottom (Chinese, Japanese, the
+  ellipsis); the pop-out's own play/pause disc no longer sits under it
+  taking clicks.
+
+- A cast of what plays from another source than the one in use (started
+  before a switch, by failover or from the Search page) checked the
+  trusted certificate of the source in use, and a Kodi or an Apple TV got
+  that source's user agent, headers and proxy. It now asks about the pin
+  of the source the stream comes from, and the receiver gets that
+  source's own options.
+- A scheduled recording that came due while something played from the
+  same account opened a second connection without a word. It is now
+  counted as one started by hand: its channel playing, it is recorded from
+  the player's rewind buffer (from its start, as far back as the buffer
+  holds) or the player's stream, with no connection of its own; with room
+  on the account it opens its own; over a full limit, or one the provider
+  does not say while the app already holds a connection to it, it waits -
+  nothing opened - with a note offering "Record anyway", starts by itself
+  once there is room (Stop, or play its channel), and fails at its stop
+  time saying no connection was free.
+- The same provider account added twice (another name, other categories,
+  or as Xtream and as its M3U) counted each source against a limit of its
+  own. Sources with the same server and user name now share one count and
+  one limit: questions, server mode's room and Nerd > Diagnostics' In use
+  now (one line for the account).
+- The phone remote follows what plays: when the channel changes - on the computer, from the page's channel up and down or from another remote - its row is marked and scrolled into view, smoothly and centred, once your own scrolling has rested a moment. A channel the list shown leaves out (Favourites, a search) gets a "Show in list" button under Now playing instead of the page switching lists by itself. A channel playing from another source no longer marks a row of the same number in this one's list.
+
+
+- The phone remote fits small phones: from 320 px wide (iPhone SE 1st generation, small Androids) and on its side, the bar's tabs and search, the dock's volume and keys and the remote's d-pad and keys wrap or sit side by side as there is room, every button is at least 44 px, the remote's labels are never cut mid-word, and the notch, the home bar and the status bar are kept clear.
+- Scrolling on the computer no longer stutters while the phone remote is on: a poll never loads the programme guide on the window's thread any more (a guide not yet in memory was downloaded and parsed there, freezing the window for seconds), now and next are looked up off it, the playing channel and the favourites are worked out again only when they change, the same state again costs the phone nothing (304), and the page asks every 3 s instead of 1.5 s once nothing has changed for a while (every second just after a tap).
+
+- A series' page scrolls smoothly: a scroll step moves what is drawn and
+  paints only the strip that comes into view (it painted every card on
+  screen again, each with its picture smooth-scaled anew, and the header's
+  backdrop too), a card's picture is scaled to its size once, and a
+  picture that comes in paints only its own card. Pictures everywhere -
+  lists, Home, posters, Search, the series page - are decoded once, on the
+  loaders' threads and without holding up the window, already at their
+  size; the window only puts them up (each was decoded a second time there,
+  about 5 ms for an episode's still). Nothing looks different.
 
 ## [1.6.0]
 

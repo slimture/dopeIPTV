@@ -10,6 +10,8 @@
 - **New computer? Bring your settings from the welcome.** Type the sync code from your other computer, or restore a backup: your profiles and settings come over, and your sources too when the other computer syncs them. Encrypted on your computer before it is sent - dopeiptv.org keeps only bytes it cannot read.
 - **The same menu bar everywhere.** File, View, History and Help on Windows, Linux and macOS - About is under Help (on a Mac in the dopeIPTV menu, as before). **Settings → General** now ends with About and the version too.
 - **Server mode tells you who has its port** - dopeIPTV's own server started earlier, or another program - and offers the next free one with one click.
+- **Pictures load without slowing anything down.** Posters, logos and episode pictures are decoded once, away from the window, so lists, Home and above all a series' page scroll smoothly while they load.
+- **The phone remote fits small phones** - down to the smallest iPhone SE, upright or on its side - and **follows what plays**: change channel anywhere and the page marks it and scrolls to it.
 
 ### Fixed
 
@@ -17,6 +19,11 @@
 - A series' page played an episode on one click. Now one click picks it and a double click or `Enter` plays it, as in the lists - unless **Auto-play preview on selection** is on.
 - Connections to your account are counted right: a cast on the source it comes from, a stream the player gave up on no longer, a rewind buffer kept by a recording or a cast only on its own source, and YouTube, Twitch and radio not at all. A cast or a recording after you switched source no longer picks the new source's channel with the same number.
 - TV mode: Stop while a dropped channel waited to reconnect now stops it.
+- A scheduled recording that comes due while you watch no longer opens a second connection by itself: it records from what plays when it is the same channel, and otherwise waits for a free connection or your OK.
+- The same provider account added twice is counted as one account.
+- A cast checks the trusted certificate of the source the stream comes from.
+- With the phone remote on, a single request could freeze the window for seconds while the guide loaded; it no longer does.
+- Smaller things: night mode's notice fits a narrow player, the command palette names the macOS menus right, `N` and `T` get their keys back, and the loading indicator no longer says "Buffering" too early for a playlist address.
 - Trakt and Simkl: switching profile quickly while a sign-in was renewed could sign you out.
 - The welcome on small screens: the text was cut off and the card ran past the window; the Xtream form also showed fields that belong to other kinds.
 
