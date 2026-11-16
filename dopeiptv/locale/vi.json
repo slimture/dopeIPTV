@@ -2940,5 +2940,16 @@
   "notice_dismiss": "Bỏ qua",
   "notice_info": "Thông báo",
   "notice_warning": "Cảnh báo",
-  "notice_error": "Lỗi"
+  "notice_error": "Lỗi",
+  "notice_guide_preparing": "Đang chuẩn bị lịch phát…",
+  "notice_guide_sources": "Đang tải lịch phát · {n} nguồn",
+  "notice_reading_folder": "Đang đọc thư mục {name}…",
+  "notice_searching_in": "Đang tìm trong {name}…",
+  "notice_found": "đã tìm thấy {n}",
+  "notice_files": "{n} tệp",
+  "notice_saving_mp4": "Đang lưu {title} thành MP4…",
+  "notice_reading_source": "Đang đọc {name}…",
+  "notice_reading_sources": "Đang đọc các nguồn của bạn · {n}",
+  "notice_scanning_network": "Đang quét mạng…",
+  "notice_less": "Thu gọn"
 }

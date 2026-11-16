@@ -31,6 +31,7 @@ from .. import ORG
 from ..core import build_check, sync
 from ..core.log import log
 from ..core.workers import run_async
+from .notices import hub_of
 from ..i18n import tr
 from .theme import P
 
@@ -238,6 +239,9 @@ class _SyncMixin:
         self._sync_job = (self._sync_gen, snap, cats, state)
         self._sync_busy = True
         self._sync_set_status("running")
+        # A round is work the window does: a job until its answer is in.
+        hub_of(self).start(tr("sync_running"), key="settings_sync", kind="sync",
+                           timeout_ms=180_000)
         run_async(self._sync_pool, _work, self._sync_done, self._sync_crashed,
                   remote, key, state.doc, snap, cats, state.fresh, state.joining,
                   frozenset(state.seen))
@@ -251,6 +255,7 @@ class _SyncMixin:
     def _sync_done(self, result: object) -> None:
         job, self._sync_job = self._sync_job, None
         self._sync_busy = False
+        hub_of(self).end_key("settings_sync")
         if job is None or job[0] != self._sync_gen or not self._sync_on():
             # Stopped, or started again with another code, meanwhile: this
             # one's result is dropped; a new code's first round follows.

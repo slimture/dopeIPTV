@@ -2940,5 +2940,16 @@
   "notice_dismiss": "Закрити",
   "notice_info": "Повідомлення",
   "notice_warning": "Попередження",
-  "notice_error": "Помилка"
+  "notice_error": "Помилка",
+  "notice_guide_preparing": "Підготовка програми передач…",
+  "notice_guide_sources": "Завантаження програми · джерел: {n}",
+  "notice_reading_folder": "Читання теки {name}…",
+  "notice_searching_in": "Пошук у {name}…",
+  "notice_found": "знайдено: {n}",
+  "notice_files": "файлів: {n}",
+  "notice_saving_mp4": "Збереження «{title}» як MP4…",
+  "notice_reading_source": "Читання {name}…",
+  "notice_reading_sources": "Читання ваших джерел · {n}",
+  "notice_scanning_network": "Сканування мережі…",
+  "notice_less": "Згорнути"
 }

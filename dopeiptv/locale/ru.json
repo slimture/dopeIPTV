@@ -2940,5 +2940,16 @@
   "notice_dismiss": "Закрыть",
   "notice_info": "Уведомление",
   "notice_warning": "Предупреждение",
-  "notice_error": "Ошибка"
+  "notice_error": "Ошибка",
+  "notice_guide_preparing": "Подготовка телепрограммы…",
+  "notice_guide_sources": "Загрузка телепрограммы · источников: {n}",
+  "notice_reading_folder": "Чтение папки {name}…",
+  "notice_searching_in": "Поиск в {name}…",
+  "notice_found": "найдено: {n}",
+  "notice_files": "файлов: {n}",
+  "notice_saving_mp4": "Сохранение «{title}» в MP4…",
+  "notice_reading_source": "Чтение {name}…",
+  "notice_reading_sources": "Чтение источников · {n}",
+  "notice_scanning_network": "Поиск в сети…",
+  "notice_less": "Свернуть"
 }

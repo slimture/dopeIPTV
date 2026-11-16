@@ -44,6 +44,7 @@ from ..core.profiles import adult_item
 from ..core.workers import LogoLoader, run_async, tmdb_url_from_provider
 from ..i18n import tr
 from ..media.players import launch_player
+from .notices import hub_of
 from .series_page import EpisodeState, SeriesPage
 
 #: Where the season a person picked is kept (the profile's own:
@@ -209,10 +210,13 @@ class _SeriesPageMixin:
             self._sp_info_in(gen, client, (True, hit[1]))
             return
         page.set_loading(True, tr("status_loading_episodes"))
+        # The activity too, ended by the answer (a newer series replaces it).
+        job = hub_of(self).start(tr("status_loading_episodes"), key="series_page",
+                                 kind="list", mine=True, timeout_ms=120_000)
         keep = getattr(self, "_kids_keep", lambda _m: None)("series")
         run_async(self.pool, partial(_fetch, client, sid, ctx, keep),
-                  partial(self._sp_info_in, gen, client),
-                  partial(self._sp_info_failed, gen))
+                  partial(self._sp_info_in, gen, client, job=job),
+                  partial(self._sp_info_failed, gen, job=job))
 
     def _sp_retry(self) -> None:
         if self._sp_local is not None:
@@ -221,7 +225,8 @@ class _SeriesPageMixin:
         self._sp_gen += 1
         self._sp_fetch(fresh=True)
 
-    def _sp_info_failed(self, gen: int, msg) -> None:
+    def _sp_info_failed(self, gen: int, msg, job: int = 0) -> None:
+        hub_of(self).finish(job)
         page = self._series_page
         if gen != self._sp_gen or page is None or sip.isdeleted(page):
             return
@@ -229,7 +234,8 @@ class _SeriesPageMixin:
                     (self._sp_ctx or {}).get("series_id"), msg)
         page.set_failed(tr("err_series_open"))
 
-    def _sp_info_in(self, gen: int, client, got) -> None:
+    def _sp_info_in(self, gen: int, client, got, job: int = 0) -> None:
+        hub_of(self).finish(job)
         page = self._series_page
         if (gen != self._sp_gen or page is None or sip.isdeleted(page)
                 or client is not self.client):

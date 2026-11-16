@@ -2940,5 +2940,16 @@
   "notice_dismiss": "ปิด",
   "notice_info": "แจ้งให้ทราบ",
   "notice_warning": "คำเตือน",
-  "notice_error": "ข้อผิดพลาด"
+  "notice_error": "ข้อผิดพลาด",
+  "notice_guide_preparing": "กำลังเตรียมผังรายการ…",
+  "notice_guide_sources": "กำลังโหลดผังรายการ · {n} แหล่ง",
+  "notice_reading_folder": "กำลังอ่านโฟลเดอร์ {name}…",
+  "notice_searching_in": "กำลังค้นหาใน {name}…",
+  "notice_found": "พบ {n} รายการ",
+  "notice_files": "{n} ไฟล์",
+  "notice_saving_mp4": "กำลังบันทึก {title} เป็น MP4…",
+  "notice_reading_source": "กำลังอ่าน {name}…",
+  "notice_reading_sources": "กำลังอ่านแหล่งของคุณ · {n}",
+  "notice_scanning_network": "กำลังสแกนเครือข่าย…",
+  "notice_less": "แสดงน้อยลง"
 }

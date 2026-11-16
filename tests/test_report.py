@@ -350,16 +350,16 @@ assert len(shown) == 4 and "Segmentation fault" in shown[-1] and not w._report_w
 # The note itself, a card in the notices' corner: a click does what it was
 # given, once, and it goes; a plain card's click does nothing.
 clicked = []
-area = w._notice_area
+area = w._notice_cards
 w.notices.post("note", ms=5000, action=lambda: clicked.append(1))
 spin()
-[t] = [c for c in area.card_widgets() if c.label.text() == "note"]
+[t] = [c for c in area.card_widgets() if c.title.text() == "note"]
 QTest.mouseClick(t, Qt.MouseButton.LeftButton)
 spin()
 assert clicked == [1] and "note" not in w.notices.texts(), clicked
 w.notices.post("plain", ms=5000)
 spin()
-[t] = [c for c in area.card_widgets() if c.label.text() == "plain"]
+[t] = [c for c in area.card_widgets() if c.title.text() == "plain"]
 QTest.mouseClick(t, Qt.MouseButton.LeftButton)
 spin()
 assert clicked == [1] and "plain" in w.notices.texts()

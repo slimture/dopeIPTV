@@ -2940,5 +2940,16 @@
   "notice_dismiss": "Odbaci",
   "notice_info": "Obavijest",
   "notice_warning": "Upozorenje",
-  "notice_error": "Pogreška"
+  "notice_error": "Pogreška",
+  "notice_guide_preparing": "Pripremanje programskog vodiča…",
+  "notice_guide_sources": "Učitavanje vodiča · {n} izvora",
+  "notice_reading_folder": "Čitanje mape {name}…",
+  "notice_searching_in": "Pretraživanje u {name}…",
+  "notice_found": "pronađeno: {n}",
+  "notice_files": "datoteka: {n}",
+  "notice_saving_mp4": "Spremanje {title} kao MP4…",
+  "notice_reading_source": "Čitanje {name}…",
+  "notice_reading_sources": "Čitanje vaših izvora · {n}",
+  "notice_scanning_network": "Pretraživanje mreže…",
+  "notice_less": "Prikaži manje"
 }

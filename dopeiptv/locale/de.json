@@ -2940,5 +2940,16 @@
   "notice_dismiss": "Ausblenden",
   "notice_info": "Hinweis",
   "notice_warning": "Warnung",
-  "notice_error": "Fehler"
+  "notice_error": "Fehler",
+  "notice_guide_preparing": "Programmführer wird vorbereitet…",
+  "notice_guide_sources": "Programmführer wird geladen · {n} Quellen",
+  "notice_reading_folder": "Ordner {name} wird gelesen…",
+  "notice_searching_in": "Suche in {name}…",
+  "notice_found": "{n} gefunden",
+  "notice_files": "{n} Dateien",
+  "notice_saving_mp4": "{title} wird als MP4 gespeichert…",
+  "notice_reading_source": "{name} wird gelesen…",
+  "notice_reading_sources": "Deine Quellen werden gelesen · {n}",
+  "notice_scanning_network": "Netzwerk wird durchsucht…",
+  "notice_less": "Weniger anzeigen"
 }

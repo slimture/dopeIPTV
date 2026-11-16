@@ -2940,5 +2940,16 @@
   "notice_dismiss": "Sluiten",
   "notice_info": "Melding",
   "notice_warning": "Waarschuwing",
-  "notice_error": "Fout"
+  "notice_error": "Fout",
+  "notice_guide_preparing": "Programmagids voorbereiden…",
+  "notice_guide_sources": "Gids laden · {n} bronnen",
+  "notice_reading_folder": "Map {name} lezen…",
+  "notice_searching_in": "Zoeken in {name}…",
+  "notice_found": "{n} gevonden",
+  "notice_files": "{n} bestanden",
+  "notice_saving_mp4": "{title} opslaan als MP4…",
+  "notice_reading_source": "{name} lezen…",
+  "notice_reading_sources": "Je bronnen lezen · {n}",
+  "notice_scanning_network": "Netwerk scannen…",
+  "notice_less": "Minder tonen"
 }

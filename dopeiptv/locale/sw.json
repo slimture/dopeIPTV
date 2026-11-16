@@ -2940,5 +2940,16 @@
   "notice_dismiss": "Ondoa",
   "notice_info": "Taarifa",
   "notice_warning": "Onyo",
-  "notice_error": "Hitilafu"
+  "notice_error": "Hitilafu",
+  "notice_guide_preparing": "Inaandaa mwongozo wa vipindi…",
+  "notice_guide_sources": "Inapakia mwongozo · vyanzo {n}",
+  "notice_reading_folder": "Inasoma folda {name}…",
+  "notice_searching_in": "Inatafuta katika {name}…",
+  "notice_found": "{n} zimepatikana",
+  "notice_files": "faili {n}",
+  "notice_saving_mp4": "Inahifadhi {title} kama MP4…",
+  "notice_reading_source": "Inasoma {name}…",
+  "notice_reading_sources": "Inasoma vyanzo vyako · {n}",
+  "notice_scanning_network": "Inachanganua mtandao…",
+  "notice_less": "Onyesha machache"
 }

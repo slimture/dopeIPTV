@@ -260,7 +260,7 @@ class _WebStreamsMixin:
         # A download is work the window does: a job of its own, its words
         # following the bytes, ended by the answer (or let go if none comes).
         job["notice"] = hub_of(self).start(tr("ytdlp_downloading"), key="ytdlp",
-                                           timeout_ms=120_000)
+                                           kind="download", mine=True, timeout_ms=120_000)
         self._ytdlp_progress()
         run_async(self.pool, partial(ytdlp.update if update else ytdlp.install,
                                      progress=progress),
@@ -276,7 +276,9 @@ class _WebStreamsMixin:
             job["said"] = job["got"]
             hub_of(self).update(job.get("notice", 0), tr(
                 "ytdlp_downloading_n", got=f"{mb:.0f}",
-                total=f"{total:.0f}" if total else "?"))
+                total=f"{total:.0f}" if total else "?"),
+                done=float(job["got"]) if job["total"] else None,
+                total=float(job["total"]) if job["total"] else None)
 
     def _ytdlp_finish(self) -> dict:
         job, self._ytdlp_job = self._ytdlp_job or {}, None

@@ -2940,5 +2940,16 @@
   "notice_dismiss": "بستن",
   "notice_info": "یادداشت",
   "notice_warning": "هشدار",
-  "notice_error": "خطا"
+  "notice_error": "خطا",
+  "notice_guide_preparing": "در حال آماده‌سازی راهنمای برنامه…",
+  "notice_guide_sources": "بارگذاری راهنما · {n} منبع",
+  "notice_reading_folder": "در حال خواندن پوشه {name}…",
+  "notice_searching_in": "در حال جست‌وجو در {name}…",
+  "notice_found": "{n} مورد پیدا شد",
+  "notice_files": "{n} فایل",
+  "notice_saving_mp4": "در حال ذخیره {title} به‌صورت MP4…",
+  "notice_reading_source": "در حال خواندن {name}…",
+  "notice_reading_sources": "در حال خواندن منابع شما · {n}",
+  "notice_scanning_network": "در حال پویش شبکه…",
+  "notice_less": "نمایش کمتر"
 }

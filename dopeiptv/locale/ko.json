@@ -2940,5 +2940,16 @@
   "notice_dismiss": "닫기",
   "notice_info": "알림",
   "notice_warning": "경고",
-  "notice_error": "오류"
+  "notice_error": "오류",
+  "notice_guide_preparing": "프로그램 가이드 준비 중…",
+  "notice_guide_sources": "가이드 불러오는 중 · 소스 {n}개",
+  "notice_reading_folder": "{name} 폴더 읽는 중…",
+  "notice_searching_in": "{name}에서 검색 중…",
+  "notice_found": "{n}개 찾음",
+  "notice_files": "파일 {n}개",
+  "notice_saving_mp4": "{title}을(를) MP4로 저장하는 중…",
+  "notice_reading_source": "{name} 읽는 중…",
+  "notice_reading_sources": "소스 읽는 중 · {n}",
+  "notice_scanning_network": "네트워크 검색 중…",
+  "notice_less": "간단히 보기"
 }

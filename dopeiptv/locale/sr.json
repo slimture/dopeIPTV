@@ -2940,5 +2940,16 @@
   "notice_dismiss": "Odbaci",
   "notice_info": "Obaveštenje",
   "notice_warning": "Upozorenje",
-  "notice_error": "Greška"
+  "notice_error": "Greška",
+  "notice_guide_preparing": "Priprema programskog vodiča…",
+  "notice_guide_sources": "Učitavanje vodiča · izvora: {n}",
+  "notice_reading_folder": "Čitanje fascikle {name}…",
+  "notice_searching_in": "Pretraga u {name}…",
+  "notice_found": "pronađeno: {n}",
+  "notice_files": "datoteka: {n}",
+  "notice_saving_mp4": "Čuvanje {title} kao MP4…",
+  "notice_reading_source": "Čitanje {name}…",
+  "notice_reading_sources": "Čitanje vaših izvora · {n}",
+  "notice_scanning_network": "Pretraga mreže…",
+  "notice_less": "Prikaži manje"
 }

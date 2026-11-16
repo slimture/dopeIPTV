@@ -2940,5 +2940,16 @@
   "notice_dismiss": "Kapat",
   "notice_info": "Bilgi",
   "notice_warning": "Uyarı",
-  "notice_error": "Hata"
+  "notice_error": "Hata",
+  "notice_guide_preparing": "Program kılavuzu hazırlanıyor…",
+  "notice_guide_sources": "Kılavuz yükleniyor · {n} kaynak",
+  "notice_reading_folder": "{name} klasörü okunuyor…",
+  "notice_searching_in": "{name} içinde aranıyor…",
+  "notice_found": "{n} bulundu",
+  "notice_files": "{n} dosya",
+  "notice_saving_mp4": "{title} MP4 olarak kaydediliyor…",
+  "notice_reading_source": "{name} okunuyor…",
+  "notice_reading_sources": "Kaynaklarınız okunuyor · {n}",
+  "notice_scanning_network": "Ağ taranıyor…",
+  "notice_less": "Daha az göster"
 }

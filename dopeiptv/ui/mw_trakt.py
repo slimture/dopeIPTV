@@ -179,7 +179,8 @@ class _TraktMixin:
         self._watched_sync_running = True
         running.add(pid)
         # Work the window does: a job, ended by the sync's end below.
-        hub_of(self).start(tr("trakt_syncing"), key="watched_sync", timeout_ms=120_000)
+        hub_of(self).start(tr("trakt_syncing"), key="watched_sync", kind="sync",
+                           mine=force, timeout_ms=120_000)
         ends = self.__dict__.setdefault("_watched_sync_ends", [])
         # The profile's own stores, as they are now: a switch while this runs
         # leaves its answer with the profile it was asked for.

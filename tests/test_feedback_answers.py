@@ -70,13 +70,14 @@ def test_a_note_with_an_action_does_it_when_clicked_and_one_without_does_nothing
     from PyQt6.QtTest import QTest
     from PyQt6.QtWidgets import QApplication, QWidget
 
-    from dopeiptv.ui.notices import NoticeArea, NoticeHub
+    from dopeiptv.ui.notice_widgets import CardStack
+    from dopeiptv.ui.notices import NoticeHub
     app = QApplication.instance() or QApplication([])
     host = QWidget()
     host.resize(600, 400)
     host.show()
     hub = NoticeHub(host)
-    area = NoticeArea(hub, host)
+    area = CardStack(hub, host)
     area.set_anchor(QRect(0, 0, 600, 400))
     clicked = []
     hub.post("Answered - click to read", ms=5000, action=lambda: clicked.append(1))
@@ -216,7 +217,7 @@ inbox.answers[report.code_hash("mid")] = [{"t": int(now - 3600), "code": "fixed"
 w._answers_last = 0.0
 w._ask_answers()
 assert wait(lambda: toasts), toasts
-[card] = [c for c in w._notice_area.card_widgets() if "answered" in c.label.text()]
+[card] = [c for c in w._notice_cards.card_widgets() if "answered" in c.title.text()]
 assert "answered" in toasts[-1] and card.isVisible()
 assert w._answers_action.text() == tr("fba_menu") + " (1)…"
 QTest.mouseClick(card, Qt.MouseButton.LeftButton)

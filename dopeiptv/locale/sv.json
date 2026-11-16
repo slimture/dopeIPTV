@@ -2940,5 +2940,16 @@
   "notice_dismiss": "Stäng",
   "notice_info": "Meddelande",
   "notice_warning": "Varning",
-  "notice_error": "Fel"
+  "notice_error": "Fel",
+  "notice_guide_preparing": "Förbereder programguiden…",
+  "notice_guide_sources": "Laddar guide · {n} källor",
+  "notice_reading_folder": "Läser mappen {name}…",
+  "notice_searching_in": "Söker i {name}…",
+  "notice_found": "{n} hittade",
+  "notice_files": "{n} filer",
+  "notice_saving_mp4": "Sparar {title} som MP4…",
+  "notice_reading_source": "Läser {name}…",
+  "notice_reading_sources": "Läser dina källor · {n}",
+  "notice_scanning_network": "Söker igenom nätverket…",
+  "notice_less": "Visa färre"
 }

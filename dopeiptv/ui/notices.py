@@ -1,30 +1,43 @@
-"""One place for the app's transient notices.
+"""One place for what the app is doing and what it tells you - the state.
 
-Two kinds, drawn together in one corner of the window - the bottom of the
-list pane on the side away from the sidebar (mirrored right to left), just
-above its status line; never over the video, nothing drawn while the video
-fills the screen or TV mode shows:
+Everything is in one corner, the one away from the video (bottom left;
+mirrored right to left):
 
-- **Activity** - background work the window does: a list or the guide
-  loading, a scan, a download, a sync. Each job is started with a token and
-  ended by its owner (``finish`` / ``fail`` / ``cancel``), replaced by a
-  newer job with the same key, or let go by its own safety timeout - a job
-  can never stay. One compact line shows it: a spinner and the newest job's
-  words, "· 2 more" for the rest; all of them on hover and on a click.
+- **Activity** - background work that takes a while: a list or the guide
+  loading, a folder read or searched, the network scanned, a sync, an
+  update check, a download, a recording saved as MP4. Each job is started
+  with a token and ended by its owner (``finish`` / ``fail`` / ``cancel``),
+  replaced by a newer job with the same key, or let go by its own safety
+  timeout - a job can never stay. It shows only once it has run for
+  ``SHOW_AFTER_MS`` (short work never flickers) and, once shown, stays at
+  least ``MIN_SHOWN_MS``. One line at the foot of the sidebar, just above
+  the source avatar (a ring with a count on the icon rail; on Home, where
+  there is no sidebar, at the same corner): an icon for the kind of work,
+  the job the person started first - else the oldest - "+N" for the rest,
+  a calm accent bar when its progress is known, a gentle spinner when not.
+  Jobs of one group merge into one line with a count ("Loading guide · 3
+  sources", their progress summed). A click or Enter opens the panel of
+  every job - its icon, words, progress and a Cancel where the producer
+  can stop it - which follows them live and closes when the last one ends.
 - **Cards** - what needs the person: an error, an offer with its action, a
-  short note. A stack of small cards, the newest nearest the corner, each
-  with a dismiss; gone by itself after its time unless it waits for an
-  answer; the same words (or key) again refresh the card already there
-  instead of stacking a second. Held while the video fills the screen or TV
-  mode shows, then shown (a plain note that went stale meanwhile is dropped).
+  short note. They stack upward from the bottom-left of the list pane,
+  next to the activity line, never over the video or the sidebar: at most
+  three, the newest on top, older ones folded into "+N more"; a card with
+  an action sorts above the passing ones and stays until answered or
+  dismissed, an error stays until dismissed, a passing note goes after
+  ``CARD_MS`` (held while the pointer rests on the cards); the same words
+  again are one card with a count.
 
-What is about the picture itself (the loading overlay, reconnecting, the
+While the video fills the screen, TV mode shows or the picture is popped
+out, nothing is drawn: cards wait until you are back, work goes on unseen.
+What is about the picture itself (its loading overlay, reconnecting, the
 stream banner, a typed channel number) stays over the video, and real
-questions stay modal dialogs.
+questions stay dialogs.
 
-``NoticeHub`` is the state and its timers, no widgets; ``NoticeArea`` draws
-it. Producers reach the window's hub through ``hub_of(window)``, which is a
-quiet stand-in on a window without one (a test's).
+``NoticeHub`` is the state and its timers; ``Activity`` is a producer's
+handle on one job, safe from any thread and usable as a context manager;
+ui/notice_widgets.py draws it in P's colours, flat, rounded like the app's
+surfaces.
 """
 from __future__ import annotations
 
@@ -33,18 +46,15 @@ from dataclasses import dataclass
 from functools import partial
 from typing import Any, Callable
 
-from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, QRectF, QSize, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen, QRegion
-from PyQt6.QtWidgets import (
-    QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QToolButton,
-    QToolTip, QVBoxLayout, QWidget,
-)
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+from PyQt6.QtWidgets import QApplication
 
 from ..core.log import log
-from ..i18n import tr
-from .theme import P
 
 LEVELS = ("info", "warning", "error")
+#: The kinds of work an icon is drawn for; anything else is "work".
+KINDS = ("work", "list", "guide", "folder", "search", "network", "sync", "update",
+         "download", "record")
 
 
 @dataclass
@@ -52,19 +62,56 @@ class Job:
     token: int
     text: str
     key: str | None
+    kind: str
     started: float
+    mine: bool = False
+    done: float | None = None
+    total: float | None = None
+    cancel: Callable[[], Any] | None = None
+    group: str | None = None
+    group_text: Callable[[int], str] | None = None
+    shown_at: float | None = None
+
+    def progress(self) -> float | None:
+        if self.done is None or not self.total:
+            return None
+        return max(0.0, min(1.0, float(self.done) / float(self.total)))
+
+
+@dataclass
+class Entry:
+    """One line of the activity: a job, or a group of them merged."""
+    tokens: list[int]
+    text: str
+    kind: str
+    progress: float | None
+    mine: bool
+    started: float
+    cancellable: bool
 
 
 @dataclass
 class Card:
     id: int
-    text: str
+    title: str
+    body: str
     level: str
     action: Callable[[], Any] | None
     action_label: str | None
-    ms: int                 # 0: it waits for an answer
+    ms: int                         # 0: it stays until answered or dismissed
     key: str | None
     posted: float
+    count: int = 1
+    left: float = 0.0               # what was left of its time when paused
+
+    @property
+    def text(self) -> str:
+        return self.title + ("\n" + self.body if self.body else "")
+
+    @property
+    def asks(self) -> bool:
+        """It waits for an answer: it has an action."""
+        return self.action is not None
 
 
 class NoticeHub(QObject):
@@ -75,10 +122,15 @@ class NoticeHub(QObject):
     #: A job its owner never ended is let go after this (each word from it -
     #: ``update`` - starts the time again).
     JOB_TIMEOUT_MS = 10 * 60_000
-    #: How long a card stays, by level, when its producer names no time.
-    CARD_MS = {"info": 5000, "warning": 8000, "error": 12000}
-    MAX_CARDS = 3
-    #: A plain note held this long (seconds) while the video filled the
+    #: A job shows once it ran this long, and stays at least the next.
+    SHOW_AFTER_MS = 400
+    MIN_SHOWN_MS = 600
+    #: A passing card's time when its producer names none, and the least.
+    CARD_MS = 6000
+    CARD_MIN_MS = 3000
+    MAX_SHOWN = 3
+    MAX_CARDS = 12
+    #: A passing note held this long (seconds) while the video filled the
     #: screen is no news any more when it comes back.
     HELD_STALE_S = 120.0
 
@@ -88,24 +140,40 @@ class NoticeHub(QObject):
         self._jobs: dict[int, Job] = {}
         self._job_timers: dict[int, QTimer] = {}
         self._on_expire: dict[int, Callable[[], Any] | None] = {}
+        self._lingering: dict[int, tuple[Job, float]] = {}
+        self._vis = QTimer(self)
+        self._vis.setSingleShot(True)
+        self._vis.timeout.connect(self._tick)
         self._cards: list[Card] = []
         self._card_timers: dict[int, QTimer] = {}
         self._held = False
+        self._paused = False
 
     # -- jobs -------------------------------------------------------------------
 
-    def start(self, text: str, *, key: str | None = None, timeout_ms: int | None = None,
-              on_expire: Callable[[], Any] | None = None) -> int:
-        """A job begins; its token is what ends it. A job already running
-        under *key* is replaced (ended quietly - its token is dead from now
-        on). *on_expire* runs if the safety timeout lets it go."""
+    def start(self, text: str, *, key: str | None = None, kind: str = "work",
+              mine: bool = False, timeout_ms: int | None = None,
+              on_expire: Callable[[], Any] | None = None,
+              cancel: Callable[[], Any] | None = None, group: str | None = None,
+              group_text: Callable[[int], str] | None = None,
+              done: float | None = None, total: float | None = None) -> int:
+        """A job begins; its token is what ends it. *kind* picks its icon,
+        *mine* says the person started it (it leads the line), *cancel* lets
+        the panel stop it, *group* merges it with others into one line
+        (*group_text(n)* its words). A job already running under *key* is
+        replaced: its token is dead from now on, and a replacement already
+        on screen stays on screen."""
+        shown_at = None
         if key is not None:
             old = self.token_for(key)
             if old:
-                self._end(old, emit=False)
+                shown_at = self._jobs[old].shown_at
+                self._end(old, emit=False, linger=False)
         self._seq += 1
         token = self._seq
-        self._jobs[token] = Job(token, str(text or ""), key, time.monotonic())
+        self._jobs[token] = Job(token, str(text or ""), key,
+                                kind if kind in KINDS else "work", time.monotonic(),
+                                mine, done, total, cancel, group, group_text, shown_at)
         self._on_expire[token] = on_expire
         t = QTimer(self)
         t.setSingleShot(True)
@@ -113,19 +181,26 @@ class NoticeHub(QObject):
         t.timeout.connect(partial(self._expired, token))
         t.start()
         self._job_timers[token] = t
+        self._arm()
         self.changed.emit()
         return token
 
-    def update(self, token: int, text: str | None = None) -> bool:
-        """A word from a running job: its safety time starts again, and
-        *text* replaces its words. False for a job that is over."""
+    def update(self, token: int, text: str | None = None, *, done: float | None = None,
+               total: float | None = None) -> bool:
+        """A word from a running job: its safety time starts again; *text*,
+        *done* and *total* (its progress) replace what it said. False for a
+        job that is over."""
         job = self._jobs.get(token)
         if job is None:
             return False
         self._job_timers[token].start()
-        if text is not None and str(text) != job.text:
-            job.text = str(text)
-            self.changed.emit()
+        new = (job.text if text is None else str(text),
+               job.done if done is None else done,
+               job.total if total is None else total)
+        if new != (job.text, job.done, job.total):
+            job.text, job.done, job.total = new
+            if job.shown_at is not None:
+                self.changed.emit()
         return True
 
     def finish(self, token: int) -> bool:
@@ -145,6 +220,21 @@ class NoticeHub(QObject):
         self.post(text, **card)
         return True
 
+    def request_cancel(self, tokens: list[int]) -> bool:
+        """The person asked to stop these jobs (the panel's Cancel): each
+        producer is told, and the jobs end."""
+        stopped = False
+        for token in tokens:
+            job = self._jobs.get(token)
+            if job is None or job.cancel is None:
+                continue
+            try:
+                job.cancel()
+            except Exception:
+                log.debug("notices: a job's cancel failed", exc_info=True)
+            stopped = self._end(token, linger=False) or stopped
+        return stopped
+
     def end_key(self, key: str) -> bool:
         token = self.token_for(key)
         return self._end(token) if token else False
@@ -158,19 +248,75 @@ class NoticeHub(QObject):
     def alive(self, token: int) -> bool:
         return token in self._jobs
 
-    def jobs(self) -> list[Job]:
-        """The running jobs, the newest first."""
-        return sorted(self._jobs.values(), key=lambda j: j.token, reverse=True)
+    def job(self, token: int) -> Job | None:
+        return self._jobs.get(token)
 
-    def _end(self, token: int, emit: bool = True) -> bool:
-        if token not in self._jobs:
+    def jobs(self) -> list[Job]:
+        """The running jobs, in the order they began."""
+        return sorted(self._jobs.values(), key=lambda j: j.token)
+
+    def entries(self) -> list[Entry]:
+        """What the activity shows: the jobs that ran long enough (and the
+        ended ones still in their least time), a group merged into one,
+        the person's own first, then the oldest."""
+        shown = [j for j in self._jobs.values() if j.shown_at is not None]
+        shown += [j for j, _until in self._lingering.values()]
+        shown.sort(key=lambda j: j.token)
+        out: list[Entry] = []
+        groups: dict[str, list[Job]] = {}
+        for j in shown:
+            if j.group:
+                groups.setdefault(j.group, []).append(j)
+        seen: set[str] = set()
+        for j in shown:
+            members = groups.get(j.group or "", [j]) if j.group else [j]
+            if j.group:
+                if j.group in seen:
+                    continue
+                seen.add(j.group)
+            out.append(self._entry(members))
+        out.sort(key=lambda e: (not e.mine, e.started))
+        return out
+
+    def line_text(self) -> str:
+        """The line's words: the first entry, "+N" for the rest."""
+        es = self.entries()
+        if not es:
+            return ""
+        return es[0].text + (f"  +{len(es) - 1}" if len(es) > 1 else "")
+
+    def _entry(self, jobs: list[Job]) -> Entry:
+        live = [j for j in jobs if j.token in self._jobs]
+        first = jobs[0]
+        if len(jobs) == 1:
+            text = first.text
+        elif first.group_text is not None:
+            text = first.group_text(len(jobs))
+        else:
+            text = f"{first.text} · {len(jobs)}"
+        totals = [(j.done, j.total) for j in jobs]
+        progress = None
+        if all(d is not None and t for d, t in totals):
+            progress = max(0.0, min(1.0, sum(float(d or 0) for d, _t in totals)
+                                    / sum(float(t or 0) for _d, t in totals)))
+        return Entry([j.token for j in jobs], text, first.kind, progress,
+                     any(j.mine for j in jobs), min(j.started for j in jobs),
+                     bool(live) and all(j.cancel is not None for j in live))
+
+    def _end(self, token: int, emit: bool = True, linger: bool = True) -> bool:
+        job = self._jobs.pop(token, None)
+        if job is None:
             return False
-        del self._jobs[token]
         self._on_expire.pop(token, None)
         t = self._job_timers.pop(token, None)
         if t is not None:
             t.stop()
             t.deleteLater()
+        if linger and job.shown_at is not None:
+            until = job.shown_at + self.MIN_SHOWN_MS / 1000.0
+            if until > time.monotonic():
+                self._lingering[token] = (job, until)
+        self._arm()
         if emit:
             self.changed.emit()
         return True
@@ -180,43 +326,84 @@ class NoticeHub(QObject):
         if job is None:
             return
         cb = self._on_expire.get(token)
-        log.info("notices: a job its owner did not end was let go (%s)", job.key or "-")
-        self._end(token)
+        log.info("notices: a job its owner did not end was let go (%s)", job.key or job.kind)
+        self._end(token, linger=False)
         if cb is not None:
             try:
                 cb()
             except Exception:
                 log.debug("notices: the job's expiry hook failed", exc_info=True)
 
+    def _arm(self) -> None:
+        """The one timer, set to the next moment a job shows or a shown one
+        may go - and nothing at all while no job runs."""
+        now = time.monotonic()
+        nxt = [j.started + self.SHOW_AFTER_MS / 1000.0
+               for j in self._jobs.values() if j.shown_at is None]
+        nxt += [until for _j, until in self._lingering.values()]
+        if not nxt:
+            self._vis.stop()
+            return
+        self._vis.start(max(0, int((min(nxt) - now) * 1000) + 1))
+
+    def _tick(self) -> None:
+        now = time.monotonic()
+        moved = False
+        for j in self._jobs.values():
+            if j.shown_at is None and now - j.started >= self.SHOW_AFTER_MS / 1000.0:
+                j.shown_at = now
+                moved = True
+        for token, (_j, until) in list(self._lingering.items()):
+            if until <= now:
+                del self._lingering[token]
+                moved = True
+        self._arm()
+        if moved:
+            self.changed.emit()
+
     # -- cards ------------------------------------------------------------------
 
-    def post(self, text: str, *, level: str = "info", action: Callable[[], Any] | None = None,
-             action_label: str | None = None, ms: int | None = None, key: str | None = None,
-             answer: bool = False) -> int:
-        """A card. *action* is what its button (or, without *action_label*,
-        a click on the card) does; *ms* how long it stays (by level when
-        not given); *answer* keeps it until the person acts or dismisses
-        it. The same *key* - or the same words at the same level - again
-        refreshes the card already there."""
+    def post(self, text: str, *, title: str | None = None, level: str = "info",
+             action: Callable[[], Any] | None = None, action_label: str | None = None,
+             ms: int | None = None, key: str | None = None, answer: bool = False) -> int:
+        """A card. *title* in bold over *text* - else the text's first line
+        is its title and the rest its line. *action* is what its button (or,
+        without *action_label*, a click on the card) does; a card with one,
+        or an *answer* wanted, stays until answered or dismissed, an error
+        until dismissed, a passing note *ms* (``CARD_MS`` when not given).
+        The same *key* - or the same words - again refresh the card there;
+        the same words count up."""
         text = str(text or "").strip()
-        if not text:
+        if title is not None:
+            head, body = str(title).strip(), text
+        else:
+            head, _nl, body = text.partition("\n")
+            head, body = head.strip(), body.strip()
+        if not head and not body:
             return 0
+        if not head:
+            head, body = body, ""
         level = level if level in LEVELS else "info"
-        stay = 0 if answer else int(ms if ms else self.CARD_MS[level])
+        stays = answer or action is not None or level == "error"
+        stay = 0 if stays else max(self.CARD_MIN_MS, int(ms or self.CARD_MS))
         card = next((c for c in self._cards if (key is not None and c.key == key)
-                     or (key is None and c.key is None and c.text == text
-                         and c.level == level)), None)
+                     or (key is None and c.key is None and c.title == head
+                         and c.body == body and c.level == level)), None)
+        now = time.monotonic()
         if card is not None:
             self._cards.remove(card)
-            card.text, card.level, card.action = text, level, action
-            card.action_label, card.ms, card.posted = action_label, stay, time.monotonic()
+            same = (card.title, card.body) == (head, body)
+            card.count = card.count + 1 if same and key is None else 1
+            card.title, card.body, card.level, card.action = head, body, level, action
+            card.action_label, card.ms, card.posted = action_label, stay, now
         else:
             self._seq += 1
-            card = Card(self._seq, text, level, action, action_label, stay, key,
-                        time.monotonic())
+            card = Card(self._seq, head, body, level, action, action_label, stay, key, now)
         self._cards.append(card)
         while len(self._cards) > self.MAX_CARDS:
-            self._drop(self._cards[0].id)
+            old = next((c for c in self._cards if not c.asks and c.level != "error"),
+                       self._cards[0])
+            self._drop(old.id)
         self._time_card(card)
         self.changed.emit()
         return card.id
@@ -248,6 +435,13 @@ class NoticeHub(QObject):
         """The cards, the oldest first."""
         return list(self._cards)
 
+    def shown_cards(self) -> list[Card]:
+        """The cards as the stack draws them, from the top: the ones that
+        ask for an answer, then the rest - each the newest first."""
+        asks = [c for c in self._cards if c.asks]
+        rest = [c for c in self._cards if not c.asks]
+        return list(reversed(asks)) + list(reversed(rest))
+
     def texts(self) -> list[str]:
         return [c.text for c in self._cards]
 
@@ -258,27 +452,28 @@ class NoticeHub(QObject):
             t.stop()
             t.deleteLater()
 
-    def _time_card(self, card: Card) -> None:
+    def _time_card(self, card: Card, left: float | None = None) -> None:
         t = self._card_timers.get(card.id)
-        if card.ms <= 0 or self._held:
+        if card.ms <= 0 or self._held or self._paused:
             if t is not None:
                 t.stop()
+            card.left = float(card.ms) if left is None else left
             return
         if t is None:
             t = QTimer(self)
             t.setSingleShot(True)
             t.timeout.connect(partial(self.dismiss, card.id))
             self._card_timers[card.id] = t
-        t.start(card.ms)
+        t.start(int(max(1500.0, card.ms if left is None else left)))
 
-    # -- held while the video fills the screen ----------------------------------
+    # -- held, paused --------------------------------------------------------
 
     @property
     def held(self) -> bool:
         return self._held
 
     def hold(self, on: bool) -> None:
-        """While held no card is drawn and none runs out; back, the plain
+        """While held no card is drawn and none runs out; back, the passing
         notes that went stale meanwhile are dropped and the rest shown with
         their whole time."""
         on = bool(on)
@@ -288,12 +483,28 @@ class NoticeHub(QObject):
         if not on:
             now = time.monotonic()
             for c in list(self._cards):
-                if (c.level == "info" and c.action is None and c.ms > 0
-                        and now - c.posted > self.HELD_STALE_S):
+                if not c.asks and c.level == "info" and now - c.posted > self.HELD_STALE_S:
                     self._drop(c.id)
         for c in self._cards:
             self._time_card(c)
         self.changed.emit()
+
+    def pause(self, on: bool) -> None:
+        """The pointer rests on the cards: none runs out until it leaves,
+        then each has what was left of its time."""
+        on = bool(on)
+        if on == self._paused:
+            return
+        self._paused = on
+        for c in self._cards:
+            t = self._card_timers.get(c.id)
+            if on:
+                left = float(t.remainingTime()) if t is not None and t.isActive() else float(c.ms)
+                if t is not None:
+                    t.stop()
+                c.left = left
+            else:
+                self._time_card(c, c.left or None)
 
 
 class _NullHub:
@@ -303,7 +514,7 @@ class _NullHub:
 
     def __getattr__(self, name: str) -> Callable[..., Any]:
         def nothing(*_a: Any, **_k: Any) -> Any:
-            return [] if name in ("jobs", "cards", "texts") else 0
+            return [] if name in ("jobs", "cards", "texts", "entries", "shown_cards") else 0
         return nothing
 
 
@@ -316,349 +527,66 @@ def hub_of(window: Any) -> Any:
     return hub if isinstance(hub, NoticeHub) else _NULL
 
 
-# -- drawing -------------------------------------------------------------------
+def app_hub() -> Any:
+    """The hub of the app's main window, for a part of the app with no
+    window of its own at hand (a form in a dialog)."""
+    app = QApplication.instance()
+    if app is not None:
+        for w in QApplication.topLevelWidgets():
+            hub = getattr(w, "notices", None)
+            if isinstance(hub, NoticeHub):
+                return hub
+    return _NULL
 
-class ActivityLine(QWidget):
-    """The running jobs as one calm line: a spinner, the newest job's
-    words and "· N more". Hover or click lists them all."""
 
-    MAX_W = 300
-    TICK_MS = 80
+class Activity:
+    """A producer's handle on one job, safe from any thread: what it says is
+    handed to the window's thread in order. Also a context manager - the
+    job ends with the block, and an exception makes it a failure::
 
-    def __init__(self, hub: NoticeHub, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setObjectName("NoticeActivity")
+        job = activity(win, tr("notice_reading_folder", name="Music"), kind="folder")
+        job.say(done=40, total=120)       # on a worker: fine
+        job.finish()
+    """
+
+    def __init__(self, hub: Any, text: str, **kw: Any) -> None:
         self._hub = hub
-        self._angle = 0
-        self._text = ""
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        # Its own font, used for its size and its painting alike: the app's
-        # style sheet would change the widget's font once it is polished.
-        f = QFont(self.font())
-        f.setPixelSize(11)
-        f.setWeight(QFont.Weight.DemiBold)
-        self._font = f
-        self._spin = QTimer(self)
-        self._spin.setInterval(self.TICK_MS)
-        self._spin.timeout.connect(self._turn)
+        self.token = 0
+        self._call(self._start, text, kw)
 
-    def refresh(self) -> None:
-        jobs = self._hub.jobs()
-        if not jobs:
-            self._text = ""
-            self.setToolTip("")
-            self.setAccessibleName("")
+    def _call(self, fn: Callable[..., Any], *args: Any) -> None:
+        if isinstance(self._hub, _NullHub):
             return
-        more = len(jobs) - 1
-        self._text = jobs[0].text + (" · " + tr("notice_more", n=more) if more else "")
-        lines = [j.text for j in jobs]
-        self.setToolTip("\n".join(lines))
-        self.setAccessibleName(tr("notice_working") + ": " + "; ".join(lines))
-        self.updateGeometry()
-        self.adjustSize()
-        self.update()
+        from ..core.workers import on_gui_thread
+        on_gui_thread(fn, *args)
 
-    def text(self) -> str:
-        return self._text
+    def _start(self, text: str, kw: dict) -> None:
+        self.token = self._hub.start(text, **kw)
 
-    def sizeHint(self) -> QSize:
-        fm = QFontMetrics(self._font)
-        h = max(24, fm.height() + 10)
-        # Room for the words as drawn (a fractional advance rounds up).
-        w = min(self.MAX_W, fm.horizontalAdvance(self._text) + h + 24)
-        return QSize(w, h)
+    def say(self, text: str | None = None, *, done: float | None = None,
+            total: float | None = None) -> None:
+        self._call(lambda: self._hub.update(self.token, text, done=done, total=total))
 
-    def _turn(self) -> None:
-        self._angle = (self._angle + 30) % 360
-        self.update()
+    def finish(self) -> None:
+        self._call(lambda: self._hub.finish(self.token))
 
-    def showEvent(self, e) -> None:      # noqa: N802 - Qt hook
-        super().showEvent(e)
-        self._spin.start()
+    def cancel(self) -> None:
+        self._call(lambda: self._hub.cancel(self.token))
 
-    def hideEvent(self, e) -> None:      # noqa: N802 - Qt hook
-        self._spin.stop()
-        super().hideEvent(e)
+    def fail(self, text: str) -> None:
+        self._call(lambda: self._hub.fail(self.token, text))
 
-    def mousePressEvent(self, e) -> None:    # noqa: N802 - Qt hook
-        if e.button() == Qt.MouseButton.LeftButton and self.toolTip():
-            QToolTip.showText(self.mapToGlobal(QPoint(0, 0)), self.toolTip(), self)
-            e.accept()
-            return
-        super().mousePressEvent(e)
+    def __enter__(self) -> "Activity":
+        return self
 
-    def paintEvent(self, _e) -> None:    # noqa: N802 - Qt hook
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        r = QRectF(self.rect())
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(P['hover']))
-        p.drawRoundedRect(r, r.height() / 2, r.height() / 2)
-        rtl = self.layoutDirection() == Qt.LayoutDirection.RightToLeft
-        d = 10.0
-        cy = r.height() / 2
-        sx = r.width() - 10 - d if rtl else 10.0
-        pen = QPen(QColor(P['accent']), 2)
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        p.setPen(pen)
-        p.setBrush(Qt.BrushStyle.NoBrush)
-        p.drawArc(QRectF(sx, cy - d / 2, d, d), -self._angle * 16, 270 * 16)
-        p.setPen(QColor(P['text2']))
-        tx = 10 + d + 8
-        text_r = QRect(int(10 if rtl else tx), 0, int(r.width() - tx - 10), int(r.height()))
-        p.setFont(self._font)
-        fm = QFontMetrics(self._font)
-        shown = fm.elidedText(self._text, Qt.TextElideMode.ElideRight, text_r.width())
-        align = Qt.AlignmentFlag.AlignVCenter | (Qt.AlignmentFlag.AlignRight if rtl
-                                                 else Qt.AlignmentFlag.AlignLeft)
-        p.drawText(text_r, int(align), shown)
-        p.end()
-
-
-class NoticeCard(QFrame):
-    """One card: its words, its action, a dismiss. Flat, on the theme's
-    raised surface, a thin leading bar in its level's colour."""
-
-    def __init__(self, hub: NoticeHub, card: Card, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setObjectName("NoticeCard")
-        self._hub = hub
-        self.card_id = card.id
-        self._level = card.level
-        self._whole = False
-        lay = QHBoxLayout(self)
-        lay.setContentsMargins(14, 8, 6, 8)
-        lay.setSpacing(6)
-        self.label = QLabel()
-        self.label.setObjectName("NoticeText")
-        self.label.setWordWrap(True)
-        self.label.setTextFormat(Qt.TextFormat.PlainText)
-        self.label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        lay.addWidget(self.label, 1)
-        self.action_btn = QPushButton()
-        self.action_btn.setObjectName("NoticeAction")
-        self.action_btn.setFlat(True)
-        self.action_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.action_btn.clicked.connect(self._act)
-        lay.addWidget(self.action_btn, 0, Qt.AlignmentFlag.AlignVCenter)
-        self.close_btn = QToolButton()
-        self.close_btn.setObjectName("NoticeDismiss")
-        self.close_btn.setText("✕")
-        self.close_btn.setAutoRaise(True)
-        self.close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.close_btn.setToolTip(tr("notice_dismiss"))
-        self.close_btn.setAccessibleName(tr("notice_dismiss"))
-        self.close_btn.clicked.connect(self._dismiss)
-        lay.addWidget(self.close_btn, 0, Qt.AlignmentFlag.AlignTop)
-        self.show_card(card)
-
-    def show_card(self, card: Card) -> None:
-        self._level = card.level
-        self.label.setText(card.text)
-        self.setAccessibleName(card.text)
-        self.setAccessibleDescription(tr("notice_" + card.level))
-        has = card.action is not None
-        self.action_btn.setVisible(has and bool(card.action_label))
-        self.action_btn.setText(card.action_label or "")
-        self.action_btn.setAccessibleName(card.action_label or "")
-        # A note written to be clicked ("click here"): the card is its button.
-        self._whole = has and not card.action_label
-        if self._whole:
-            self.setCursor(Qt.CursorShape.PointingHandCursor)
-            self.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+    def __exit__(self, exc_type: Any, exc: Any, _tb: Any) -> bool:
+        if exc is None:
+            self.finish()
         else:
-            self.unsetCursor()
-            self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.restyle()
-
-    def restyle(self) -> None:
-        bar = {"error": P['error'], "warning": P['warn']}.get(
-            self._level, P['accent'])
-        surface = P['btn']
-        rtl = self.layoutDirection() == Qt.LayoutDirection.RightToLeft
-        side = "right" if rtl else "left"
-        self.setStyleSheet(
-            f"#NoticeCard {{ background: {surface}; border: none;"
-            f" border-{side}: 3px solid {bar}; border-radius: 8px; }}"
-            f"#NoticeText {{ color: {P['text']}; font-size: 12px;"
-            " background: transparent; }"
-            f"#NoticeAction {{ color: {P['accent']}; font-size: 12px;"
-            " font-weight: 600; background: transparent; border: none; padding: 2px 6px; }"
-            f"#NoticeAction:hover {{ background: {P['btn_hover']};"
-            " border-radius: 6px; }"
-            f"#NoticeDismiss {{ color: {P['muted']}; background: transparent;"
-            " border: none; font-size: 11px; padding: 2px 4px; }"
-            f"#NoticeDismiss:hover {{ color: {P['text']}; }}")
-
-    def _act(self) -> None:
-        self._hub.activate(self.card_id)
-
-    def _dismiss(self) -> None:
-        self._hub.dismiss(self.card_id)
-
-    def mousePressEvent(self, e) -> None:    # noqa: N802 - Qt hook
-        if self._whole and e.button() == Qt.MouseButton.LeftButton:
-            e.accept()
-            self._act()
-            return
-        super().mousePressEvent(e)
-
-    def keyPressEvent(self, e) -> None:      # noqa: N802 - Qt hook
-        if self._whole and e.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
-            self._act()
-            return
-        if e.key() == Qt.Key.Key_Escape:
-            self._dismiss()
-            return
-        super().keyPressEvent(e)
-
-
-def _announce(widget: QWidget) -> None:
-    """Tell a screen reader a card came (an alert, as a toast's role is)."""
-    try:
-        from PyQt6.QtGui import QAccessible, QAccessibleEvent
-        QAccessible.updateAccessibility(QAccessibleEvent(widget, QAccessible.Event.Alert))
-    except Exception:
-        log.debug("notices: no accessibility event", exc_info=True)
-
-
-class NoticeArea(QWidget):
-    """The cards and the activity line, stacked in the window's corner. A
-    free child of the window (a splitter would lay it out as a pane), as
-    large as what it shows and clicks pass around it."""
-
-    MAX_W = 360
-    INSET = 12
-    GAP = 6
-
-    def __init__(self, hub: NoticeHub, parent: QWidget) -> None:
-        super().__init__(parent)
-        self.setObjectName("NoticeArea")
-        self._hub = hub
-        self._anchor: QRect | None = None
-        self._rtl = False
-        self._cards: dict[int, NoticeCard] = {}
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(self.GAP)
-        self._lay = lay
-        self.activity = ActivityLine(hub, self)
-        lay.addWidget(self.activity, 0, Qt.AlignmentFlag.AlignTrailing)
-        self.activity.hide()
-        hub.changed.connect(self.sync)
-        self.hide()
-
-    def card_widgets(self) -> list[NoticeCard]:
-        """The cards drawn, the oldest first."""
-        return [self._cards[c.id] for c in self._hub.cards() if c.id in self._cards]
-
-    def sync(self) -> None:
-        """What the hub holds, drawn."""
-        hub = self._hub
-        alive = {c.id for c in hub.cards()}
-        for cid in list(self._cards):
-            if cid not in alive:
-                w = self._cards.pop(cid)
-                self._lay.removeWidget(w)
-                w.hide()
-                w.deleteLater()
-        fresh: list[NoticeCard] = []
-        for i, c in enumerate(hub.cards()):
-            w = self._cards.get(c.id)
-            if w is None:
-                w = NoticeCard(hub, c, self)
-                self._cards[c.id] = w
-                fresh.append(w)
-            else:
-                w.show_card(c)
-            self._lay.removeWidget(w)
-            self._lay.insertWidget(i, w)
-            w.setVisible(True)
-        # Shown first: a hidden widget's new size is not passed on to the
-        # layout, and the line kept the width of its words before.
-        self.activity.setVisible(bool(hub.jobs()))
-        self.activity.refresh()
-        self.place()
-        if self.isVisible():
-            for w in fresh:
-                _announce(w)
-
-    def set_anchor(self, rect: QRect | None, rtl: bool = False) -> None:
-        """Where the corner is: the bottom of *rect* (window coordinates),
-        on its trailing side; None draws nothing (the video fills the
-        screen, TV mode)."""
-        self._anchor = QRect(rect) if rect is not None else None
-        self._rtl = bool(rtl)
-        self.place()
-
-    def place(self) -> None:
-        r = self._anchor
-        hub = self._hub
-        show = (r is not None and not hub.held
-                and (bool(hub.cards()) or bool(hub.jobs())))
-        if not show or r is None:
-            self.hide()
-            return
-        w = max(160, min(self.MAX_W, r.width() - 2 * self.INSET))
-        self._lay.invalidate()
-        for card in self._cards.values():
-            card.setFixedWidth(w)
-        self.setFixedWidth(w)
-        self._lay.activate()
-        h = self._lay.sizeHint().height()
-        self.setFixedHeight(min(h, max(40, r.height() - 2 * self.INSET)))
-        x = r.left() + self.INSET if self._rtl else r.right() - self.INSET - w + 1
-        y = r.bottom() - self.INSET - self.height() + 1
-        self.move(x, y)
-        self.show()
-        self.raise_()
-        self._lay.activate()
-        self._mask()
-
-    def event(self, e) -> bool:     # noqa: D102 - Qt hook
-        done = super().event(e)
-        if e.type() in (QEvent.Type.LayoutRequest, QEvent.Type.Resize):
-            self._mask()        # its children moved: clicks pass around them again
-        return done
-
-    def _mask(self) -> None:
-        region = QRegion()
-        for child in [*self._cards.values(), self.activity]:
-            if child.isVisible():
-                region = region.united(QRegion(child.geometry()))
-        if region.isEmpty():
-            self.clearMask()
-        else:
-            self.setMask(region)
-
-    def restyle(self) -> None:
-        for w in self._cards.values():
-            w.restyle()
-        self.activity.update()
-
-
-class Follow(QObject):
-    """Calls *callback* once, soon after any watched widget moved, changed
-    size, showed or hid - the corner follows the window's panes."""
-
-    _EVENTS = (QEvent.Type.Resize, QEvent.Type.Move, QEvent.Type.Show, QEvent.Type.Hide,
-               QEvent.Type.LayoutDirectionChange)
-
-    def __init__(self, callback: Callable[[], Any], parent: QObject) -> None:
-        super().__init__(parent)
-        self._timer = QTimer(self)
-        self._timer.setSingleShot(True)
-        self._timer.setInterval(0)
-        self._timer.timeout.connect(callback)
-
-    def watch(self, obj: QObject) -> None:
-        obj.installEventFilter(self)
-
-    def poke(self) -> None:
-        self._timer.start()
-
-    def eventFilter(self, obj, event) -> bool:   # noqa: N802 - Qt hook
-        if event.type() in self._EVENTS:
-            self._timer.start()
+            self.fail(str(exc) or exc_type.__name__)
         return False
+
+
+def activity(window: Any, text: str, **kw: Any) -> Activity:
+    """A job on *window*'s hub (``NoticeHub.start``'s options), as a handle."""
+    return Activity(hub_of(window) if window is not None else app_hub(), text, **kw)

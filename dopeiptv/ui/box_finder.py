@@ -14,6 +14,7 @@ from PyQt6.QtCore import Qt, QThreadPool, pyqtSignal
 from PyQt6.QtWidgets import QLabel, QMenu, QPushButton, QVBoxLayout, QWidget
 
 from ..core.workers import run_async
+from .notices import activity
 from ..i18n import tr
 from . import theme
 from .theme import P
@@ -130,10 +131,21 @@ class FindOnNetwork(QPushButton):
         self.setText(tr("playlist_searching_network"))
         self.setToolTip(tr("playlist_search_stop_tip"))
         self.status.hide()
+        # Work the app does: a job in the window's activity, how far the
+        # sweep got as its progress, stoppable from there too.
+        self._job = activity(None, tr("notice_scanning_network"), kind="network",
+                             mine=True, cancel=self._cancel.set, done=0.0, total=100.0,
+                             timeout_ms=5 * 60_000)
+        job = self._job
+        self.destroyed.connect(job.finish)     # its form went while it searched
         run_async(QThreadPool.globalInstance(), lan_scan.scan, self._done, self._failed,
+                  progress=lambda pct: job.say(done=float(pct), total=100.0),
                   cancel=self._cancel)
 
     def _reset(self) -> None:
+        job, self._job = getattr(self, "_job", None), None
+        if job is not None:
+            job.finish()
         self._busy = False
         self.setText(tr("playlist_find_on_network"))
         self.setToolTip("")

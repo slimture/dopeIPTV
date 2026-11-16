@@ -2940,5 +2940,16 @@
   "notice_dismiss": "关闭",
   "notice_info": "提示",
   "notice_warning": "警告",
-  "notice_error": "错误"
+  "notice_error": "错误",
+  "notice_guide_preparing": "正在准备节目指南…",
+  "notice_guide_sources": "正在加载指南 · {n} 个来源",
+  "notice_reading_folder": "正在读取文件夹 {name}…",
+  "notice_searching_in": "正在 {name} 中搜索…",
+  "notice_found": "已找到 {n} 项",
+  "notice_files": "{n} 个文件",
+  "notice_saving_mp4": "正在将 {title} 保存为 MP4…",
+  "notice_reading_source": "正在读取 {name}…",
+  "notice_reading_sources": "正在读取你的来源 · {n}",
+  "notice_scanning_network": "正在扫描网络…",
+  "notice_less": "收起"
 }

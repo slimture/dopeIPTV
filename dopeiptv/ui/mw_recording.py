@@ -132,9 +132,28 @@ class _RecordingMixin:
                 cur.data(Qt.ItemDataRole.UserRole) if cur else None)
         elif n:
             # Transient only - the persistent "● REC" pill is the lasting
-            # indicator. A resting _set_status here used to linger as
-            # "Recording N streams" long after recording had stopped.
-            self._flash_status(tr("rec_running_n", n=n))
+            # indicator. One card, refreshed (not counted up) as the jobs
+            # change.
+            hub_of(self).post(tr("rec_running_n", n=n), key="rec_running", ms=4000)
+        self._remux_jobs()
+
+    def _remux_jobs(self) -> None:
+        """A finished recording saved as MP4 (core/recording.py's remux, on
+        a thread of its own) is work the window does: a job from its start
+        to its end, keyed by its file."""
+        hub = hub_of(self)
+        running = {str(j.get("path") or ""): j for j in getattr(self.rec, "jobs", [])
+                   if j.get("remux") == "running" and j.get("path")}
+        shown = self.__dict__.setdefault("_remux_shown", set())
+        for path in list(shown):
+            if path not in running:
+                shown.discard(path)
+                hub.end_key("remux:" + path)
+        for path, j in running.items():
+            if path not in shown:
+                shown.add(path)
+                hub.start(tr("notice_saving_mp4", title=j.get("title") or ""),
+                          key="remux:" + path, kind="record", timeout_ms=30 * 60_000)
 
     def _on_recording_stopped(self, title: str, reason: str) -> None:
         why = rec_reason(reason)
@@ -1546,7 +1565,8 @@ class _RecordingMixin:
         # gets a status message, with no stutter.
         # The check is work the window does: a job of its own (a newer
         # check replaces it), ended with its answer.
-        hub_of(self).start(tr("ts_checking"), key="ts_check", timeout_ms=60_000)
+        hub_of(self).start(tr("ts_checking"), key="ts_check", kind="guide", mine=True,
+                           timeout_ms=60_000)
         probe_token = getattr(self, "_ts_probe_token", 0) + 1
         self._ts_probe_token = probe_token
 

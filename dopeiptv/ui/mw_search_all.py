@@ -54,12 +54,18 @@ from ..i18n import tr
 from ..services import search_sources as ss
 from ..services.failover import Shown
 from .mw_pane_follow import from_pane
+from .notices import hub_of
 from .search_page import SearchPage
 
 #: Why a source was searched only in part, as the page says it.
 _PARTLY = {sa.PAGED: "sa_partly_paged", sa.FAILED: "sa_partly_failed",
            sa.GUIDE_CUT: "sa_partly_guide"}
 _MODES = ("live", "vod", "series")
+
+
+def _sources_group(n: int) -> str:
+    """Sources read together for the search, as one line."""
+    return tr("notice_reading_sources", n=n)
 
 
 class _SearchAllMixin:
@@ -321,10 +327,16 @@ class _SearchAllMixin:
             else:
                 continue
             loading.add(pid)
+            # Each source read is a job; read together they are one line
+            # ("Reading your sources · 3").
+            hub_of(self).start(tr("notice_reading_source", name=plan.source.name),
+                               key="sa:" + pid, kind="search", group="sa_sources",
+                               group_text=_sources_group, timeout_ms=5 * 60_000)
             run_async(self._sa_pool(0), job, partial(self._sa_source_in, pid),
                       partial(self._sa_source_failed, pid, plan.key))
 
     def _sa_source_in(self, pid: str, _got: Any = None) -> None:
+        hub_of(self).end_key("sa:" + pid)
         if self._sa_loading is not None:
             self._sa_loading.discard(pid)
         page = self._search_page

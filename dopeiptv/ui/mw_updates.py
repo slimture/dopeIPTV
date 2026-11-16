@@ -25,6 +25,7 @@ from ..core.xdg import open_url
 from ..core.workers import run_async
 from ..i18n import tr
 from .dialogs import UpdateDialog
+from .notices import hub_of
 from .theme import P
 
 #: How soon a step that needs the build's verdict looks again while the
@@ -124,7 +125,11 @@ class _UpdatesMixin:
                 self.settings.value("update_latest_tag", "") or "")
             return
 
+        job = hub_of(self).start(tr("about_checking"), key="update_check", kind="update",
+                                 timeout_ms=120_000)
+
         def done(rel):
+            hub_of(self).finish(job)
             rel = rel or {}
             tag = rel.get("tag", "") or ""
             self.settings.setValue("update_check_ts", str(int(time.time())))
@@ -132,8 +137,11 @@ class _UpdatesMixin:
             self._remember_update(rel)
             self._apply_update_state(tag)
 
+        def failed(_e) -> None:
+            hub_of(self).finish(job)
+
         run_async(self.pool, lambda: fetch_update(GITHUB_REPO, channel),
-                  done, lambda _e: None)
+                  done, failed)
 
     def _apply_cached_update(self) -> None:
         """Light the badge from the last cached result at startup so it appears

@@ -2940,5 +2940,16 @@
   "notice_dismiss": "Απόρριψη",
   "notice_info": "Σημείωση",
   "notice_warning": "Προειδοποίηση",
-  "notice_error": "Σφάλμα"
+  "notice_error": "Σφάλμα",
+  "notice_guide_preparing": "Προετοιμασία οδηγού προγράμματος…",
+  "notice_guide_sources": "Φόρτωση οδηγού · {n} πηγές",
+  "notice_reading_folder": "Ανάγνωση φακέλου {name}…",
+  "notice_searching_in": "Αναζήτηση στο {name}…",
+  "notice_found": "βρέθηκαν {n}",
+  "notice_files": "{n} αρχεία",
+  "notice_saving_mp4": "Αποθήκευση του {title} ως MP4…",
+  "notice_reading_source": "Ανάγνωση {name}…",
+  "notice_reading_sources": "Ανάγνωση των πηγών σας · {n}",
+  "notice_scanning_network": "Σάρωση δικτύου…",
+  "notice_less": "Λιγότερα"
 }

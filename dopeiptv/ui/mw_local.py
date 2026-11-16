@@ -689,7 +689,10 @@ class _LocalFilesMixin:
         self._local_walk = search
         self._local_hit_dirs = {}
         self._local_search_said = ""
-        self._show_busy(tr("local_searching"))
+        # Plain words: where it searches, and how many it found so far.
+        self._local_search_where = tr("notice_searching_in",
+                                      name=os.path.basename(base.rstrip(os.sep)) or base)
+        self._show_busy(self._local_search_where, kind="search")
         self._local_search_step(search, {}, {"painted": None, "n": -1})
 
     def _local_walk_order(self) -> bool:
@@ -718,7 +721,9 @@ class _LocalFilesMixin:
                 self._local_search_paint(search, rows, state)
             if not finished:
                 # The rows put in place took the strip down; the walk goes on.
-                self._show_busy(tr("local_searching"))
+                where = getattr(self, "_local_search_where", "") or tr("local_searching")
+                self._show_busy(where + (" · " + tr("notice_found", n=len(search.hits))
+                                         if search.hits else ""), kind="search")
                 self._local_search_step(search, rows, state)
                 return
             self._local_walk = None
@@ -1050,7 +1055,7 @@ class _LocalFilesMixin:
             if time.monotonic() - last < 120.0:
                 return   # scanned moments ago: the cache render is current
         self._local_scan_active = True
-        self._show_busy(tr("local_scanning"))
+        self._show_busy(tr("local_scanning"), kind="folder")
         self._local_pulse_start()
         log.info("library scan starting: %s", root)
         state = {"walker": os.walk(root), "series": {}, "collections": {},
@@ -1163,7 +1168,7 @@ class _LocalFilesMixin:
                     # Drilled in: the list is not ours to touch, but the
                     # progress note still is.
                     self._busy_say(self._local_scan_note(state))
-                self._show_busy(self._local_scan_note(state))
+                self._show_busy(self._local_scan_note(state), kind="folder")
                 # Persist the merged partial view every ~15 s, so quitting
                 # or switching away mid-walk keeps everything found so far
                 # instead of starting over from nothing.
@@ -1493,7 +1498,7 @@ class _LocalFilesMixin:
                 t = QTimer()
                 t.setInterval(15000)
                 t.timeout.connect(
-                    lambda: self._show_busy(self._local_scan_note()))
+                    lambda: self._show_busy(self._local_scan_note(), kind="folder"))
                 self._local_scan_pulse = t
             t.start()
         except Exception:
@@ -1594,9 +1599,12 @@ class _LocalFilesMixin:
             return tr("local_scanning")
         where = os.path.basename(
             (st.get("at") or "").rstrip(os.sep))
-        note = tr("local_scanning_n", files=st.get("files", 0),
+        if where:
+            # Plain words: the folder it reads, and what it found so far.
+            return (tr("notice_reading_folder", name=where) + " · "
+                    + tr("notice_files", n=st.get("files", 0)))
+        return tr("local_scanning_n", files=st.get("files", 0),
                   folders=st.get("dirs", 0))
-        return f"{note}  ·  {where}" if where else note
 
     def _local_search_text(self) -> str:
         sb = getattr(self, "search", None)

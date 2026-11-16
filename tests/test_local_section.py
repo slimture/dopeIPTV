@@ -89,7 +89,7 @@ class _Stub(_LocalFilesMixin):
     # runs where ffmpeg is installed - so the suite failed on such a machine.
     _load_gen = 0
 
-    def _show_busy(self, msg=None):
+    def _show_busy(self, msg=None, **_kw):
         pass
 
     def _library_cache(self):

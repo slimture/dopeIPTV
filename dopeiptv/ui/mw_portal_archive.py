@@ -45,7 +45,8 @@ class _PortalArchiveMixin:
         stop = (prog or {}).get("stop_timestamp")
         # The ask is work the window does: a job ended by its own answer (a
         # newer ask replaces it; Stop or another source leave it to that).
-        job = hub_of(self).start(tr("ts_checking"), key="ts_check", timeout_ms=60_000)
+        job = hub_of(self).start(tr("ts_checking"), key="ts_check", kind="guide",
+                                 mine=True, timeout_ms=60_000)
         token = getattr(self, "_ts_probe_token", 0) + 1
         self._ts_probe_token = token
         # _failover_gen moves on with every start - the auto-preview's too -

@@ -61,7 +61,7 @@ class _Window(_BusyMixin, QWidget):
 
     def words(self) -> str:
         jobs = self.notices.jobs()
-        return jobs[0].text if jobs else ""
+        return jobs[-1].text if jobs else ""
 
 
 def _jobs(monkeypatch):

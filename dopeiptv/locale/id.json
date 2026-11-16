@@ -2940,5 +2940,16 @@
   "notice_dismiss": "Tutup",
   "notice_info": "Catatan",
   "notice_warning": "Peringatan",
-  "notice_error": "Kesalahan"
+  "notice_error": "Kesalahan",
+  "notice_guide_preparing": "Menyiapkan panduan program…",
+  "notice_guide_sources": "Memuat panduan · {n} sumber",
+  "notice_reading_folder": "Membaca folder {name}…",
+  "notice_searching_in": "Mencari di {name}…",
+  "notice_found": "{n} ditemukan",
+  "notice_files": "{n} file",
+  "notice_saving_mp4": "Menyimpan {title} sebagai MP4…",
+  "notice_reading_source": "Membaca {name}…",
+  "notice_reading_sources": "Membaca sumber Anda · {n}",
+  "notice_scanning_network": "Memindai jaringan…",
+  "notice_less": "Tampilkan lebih sedikit"
 }

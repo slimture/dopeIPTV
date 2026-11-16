@@ -103,23 +103,32 @@ how connections to the account are counted.
   written off the window's thread, and a walk that finds nothing new
   leaves the list as it is.
 - The app's notices are in one place instead of four. What it is doing
-  (a list or the guide loading, a library scan, a download, a sync, an
-  archive check) was a strip at the top of the list that pushed it down
-  and up, or words in the status line that stayed; what it told you was a
-  dark note in the middle of the window's foot, or the status line in red.
-  Now both live in one corner - the bottom of the list on the side away
-  from the sidebar, just above its status line, never over the video: one
-  calm line with a spinner and the newest job ("Loading programme guide…
-  · 2 more", all of them on hover or a click), each job ended by its own
-  work, a newer one of the same kind or its own time limit; and above it
-  small cards for errors, offers and notes, each with its action and a
-  dismiss, gone by themselves unless they wait for an answer, the same
-  note again refreshing the one there. Nothing is drawn while the video
-  fills the screen or TV mode shows; cards wait until you are back. The
-  status line keeps the list's count and what plays. What is about the
-  picture (loading, reconnecting, a typed channel number) stays over the
-  video, and real questions stay dialogs. Screen readers hear a new card;
-  right to left mirrors the corner.
+  (a list or the guide loading, a folder read or searched, the network
+  scanned, a sync, an update check, a download, a recording saved as MP4)
+  was a strip at the top of the list that pushed it down and up, or words
+  in the status line that stayed; what it told you was a dark note at the
+  window's foot, or the status line in red. Now both live in one corner,
+  away from the video: at the foot of the sidebar, just above the source
+  avatar, one calm line - an icon for the kind of work, what you started
+  first (else the oldest) and "+2" for the rest, an accent bar when the
+  progress is known ("Loading programme guide… 45%"), a gentle spinner
+  when not; guides loading together are one line ("Loading guide · 3
+  sources"). A click opens every job with its progress and a Cancel where
+  it can stop. Short work never flickers in (it shows after 0.4 s, then
+  for at least 0.6 s), every job ends with its work, a newer one of the
+  same kind or its own time limit. On the icon rail it is a ring with a
+  count; on Home it sits at the same corner. Next to it, at the bottom of
+  the list, small cards for errors, offers and notes: a title, a line, one
+  action and a dismiss; three at most, the newest on top and "+N more"
+  for the rest; an offer stays above the passing notes until answered, an
+  error until dismissed, a passing note goes after 6 s (not while the
+  pointer rests on it); the same note twice is one card with a count.
+  Nothing is drawn while the video fills the screen, TV mode shows or the
+  picture is popped out - cards wait until you are back. The status line
+  keeps the list's count and what plays; what is about the picture
+  (loading, reconnecting, a typed channel number) stays over the video,
+  and real questions stay dialogs. Readable on every theme, mirrored right
+  to left, read out by screen readers.
 - "Loading programme guide…" no longer stays at the top of the list after
   the guide is in. The strip was shown by any guide download - also one a
   lookup started on its own (the detail panel, a past programme, TV mode),

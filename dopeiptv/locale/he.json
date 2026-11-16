@@ -2940,5 +2940,16 @@
   "notice_dismiss": "סגירה",
   "notice_info": "הודעה",
   "notice_warning": "אזהרה",
-  "notice_error": "שגיאה"
+  "notice_error": "שגיאה",
+  "notice_guide_preparing": "מכין את מדריך התוכניות…",
+  "notice_guide_sources": "טוען מדריך · {n} מקורות",
+  "notice_reading_folder": "קורא את התיקייה {name}…",
+  "notice_searching_in": "מחפש ב-{name}…",
+  "notice_found": "נמצאו {n}",
+  "notice_files": "{n} קבצים",
+  "notice_saving_mp4": "שומר את {title} כ-MP4…",
+  "notice_reading_source": "קורא את {name}…",
+  "notice_reading_sources": "קורא את המקורות שלך · {n}",
+  "notice_scanning_network": "סורק את הרשת…",
+  "notice_less": "הצג פחות"
 }

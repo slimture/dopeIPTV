@@ -2940,5 +2940,16 @@
   "notice_dismiss": "Chiudi",
   "notice_info": "Avviso",
   "notice_warning": "Attenzione",
-  "notice_error": "Errore"
+  "notice_error": "Errore",
+  "notice_guide_preparing": "Preparazione della guida…",
+  "notice_guide_sources": "Caricamento guida · {n} sorgenti",
+  "notice_reading_folder": "Lettura della cartella {name}…",
+  "notice_searching_in": "Ricerca in {name}…",
+  "notice_found": "{n} trovati",
+  "notice_files": "{n} file",
+  "notice_saving_mp4": "Salvataggio di {title} come MP4…",
+  "notice_reading_source": "Lettura di {name}…",
+  "notice_reading_sources": "Lettura delle tue sorgenti · {n}",
+  "notice_scanning_network": "Scansione della rete…",
+  "notice_less": "Mostra meno"
 }

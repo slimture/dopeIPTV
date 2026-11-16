@@ -2940,5 +2940,16 @@
   "notice_dismiss": "閉じる",
   "notice_info": "お知らせ",
   "notice_warning": "警告",
-  "notice_error": "エラー"
+  "notice_error": "エラー",
+  "notice_guide_preparing": "番組表を準備中…",
+  "notice_guide_sources": "番組表を読み込み中 · {n} 件のソース",
+  "notice_reading_folder": "フォルダ {name} を読み込み中…",
+  "notice_searching_in": "{name} を検索中…",
+  "notice_found": "{n} 件見つかりました",
+  "notice_files": "{n} ファイル",
+  "notice_saving_mp4": "{title} を MP4 として保存中…",
+  "notice_reading_source": "{name} を読み込み中…",
+  "notice_reading_sources": "ソースを読み込み中 · {n}",
+  "notice_scanning_network": "ネットワークをスキャン中…",
+  "notice_less": "表示を減らす"
 }

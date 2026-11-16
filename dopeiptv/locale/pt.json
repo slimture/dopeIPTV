@@ -2940,5 +2940,16 @@
   "notice_dismiss": "Dispensar",
   "notice_info": "Aviso",
   "notice_warning": "Atenção",
-  "notice_error": "Erro"
+  "notice_error": "Erro",
+  "notice_guide_preparing": "Preparando o guia…",
+  "notice_guide_sources": "Carregando guia · {n} fontes",
+  "notice_reading_folder": "Lendo a pasta {name}…",
+  "notice_searching_in": "Pesquisando em {name}…",
+  "notice_found": "{n} encontrados",
+  "notice_files": "{n} arquivos",
+  "notice_saving_mp4": "Salvando {title} como MP4…",
+  "notice_reading_source": "Lendo {name}…",
+  "notice_reading_sources": "Lendo suas fontes · {n}",
+  "notice_scanning_network": "Verificando a rede…",
+  "notice_less": "Mostrar menos"
 }

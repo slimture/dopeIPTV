@@ -2940,5 +2940,16 @@
   "notice_dismiss": "بند کریں",
   "notice_info": "اطلاع",
   "notice_warning": "انتباہ",
-  "notice_error": "خرابی"
+  "notice_error": "خرابی",
+  "notice_guide_preparing": "پروگرام گائیڈ تیار ہو رہی ہے…",
+  "notice_guide_sources": "گائیڈ لوڈ ہو رہی ہے · {n} ذرائع",
+  "notice_reading_folder": "فولڈر {name} پڑھا جا رہا ہے…",
+  "notice_searching_in": "{name} میں تلاش جاری ہے…",
+  "notice_found": "{n} ملے",
+  "notice_files": "{n} فائلیں",
+  "notice_saving_mp4": "{title} کو MP4 کے طور پر محفوظ کیا جا رہا ہے…",
+  "notice_reading_source": "{name} پڑھا جا رہا ہے…",
+  "notice_reading_sources": "آپ کے ذرائع پڑھے جا رہے ہیں · {n}",
+  "notice_scanning_network": "نیٹ ورک اسکین ہو رہا ہے…",
+  "notice_less": "کم دکھائیں"
 }

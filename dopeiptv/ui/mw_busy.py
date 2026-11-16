@@ -1,5 +1,5 @@
 """The window's side of its notices (ui/notices.py): what the app is doing
-and what it tells the person, in one corner of the window.
+and what it tells the person, in one corner - the one away from the video.
 
 Every older way in leads there, so each producer keeps its call:
 
@@ -10,18 +10,22 @@ Every older way in leads there, so each producer keeps its call:
   list's own empty state.
 - The programme guide (``_guide_busy_begin`` / ``_on_epg_progress`` /
   ``_guide_busy_end``): one owner, a token per load. Only the load the
-  window started last shows a job ("guide") or ends it - a late word from an
-  older load (a source switched away from, a refresh replaced) changes
-  nothing, and a list loaded meanwhile does not end it. A load that says
-  nothing for ``GUIDE_QUIET_MS`` is let go with a calm note.
+  window started last shows a job ("guide", with its percentage) or ends it
+  - a late word from an older load (a source switched away from, a refresh
+  replaced) changes nothing, and a list loaded meanwhile does not end it. A
+  load that says nothing for ``GUIDE_QUIET_MS`` is let go with a calm note.
 - ``_show_toast`` / ``_show_action_toast`` / ``_flash_status`` - a card.
 - ``_set_status`` - the status line keeps only the list's state and what
   plays; activity words (``emphasis``) are a job ("status") until the next
   status, an error a card.
 
-Where the corner is (``_notices_place``): the bottom of the list pane on the
-side away from the sidebar, above its status line - never over the video;
-nothing drawn while the video fills the screen or TV mode shows (cards wait).
+Where things are (``_notices_place``): the activity line at the foot of the
+sidebar, just above the source avatar (a ring on the icon rail; on a page
+with no sidebar - Home - at the same corner); the cards stacked upward from
+the bottom of the list pane on the sidebar's side, above its status line -
+never over the video or its controls, never over the sidebar. Nothing is
+drawn while the video fills the screen, TV mode shows or the picture is
+popped out: cards wait, work goes on unseen.
 """
 from __future__ import annotations
 
@@ -30,8 +34,14 @@ from PyQt6.QtWidgets import QLabel
 
 from ..core.log import log
 from ..i18n import tr
-from .notices import Follow, NoticeArea, NoticeHub, hub_of
+from .notice_widgets import ActivityLine, ActivityPanel, CardStack, Follow
+from .notices import NoticeHub, hub_of
 from .theme import P
+
+
+def _guide_group(n: int) -> str:
+    """Guides loading together (the window's and the served sources')."""
+    return tr("notice_guide_sources", n=n)
 
 
 class _BusyMixin:
@@ -47,6 +57,8 @@ class _BusyMixin:
     #: Activity words in the status line ("Reconnecting…") last until the
     #: next status - or this long.
     STATUS_JOB_MS = 30_000
+    #: The app's margin from the window's edges and between its surfaces.
+    NOTICE_MARGIN = 16
 
     # The list's own (None: not busy, "" busy without words) and the guide's:
     # the load that owns it (0: none), whether its job shows (a guide from
@@ -60,64 +72,146 @@ class _BusyMixin:
     # -- the hub and its corner -------------------------------------------------
 
     def _init_notices(self) -> None:
-        """Made once in _build_ui: the hub, its corner, and what moves it."""
-        self.notices = NoticeHub(self)
-        self._notice_area = NoticeArea(self.notices, self)
+        """Made once in _build_ui: the hub, the activity line at the
+        sidebar's foot (and its stand-in for pages with no sidebar), the
+        cards, the panel, and what moves them."""
+        hub = self.notices = NoticeHub(self)
+        line = self._activity_line = ActivityLine(hub)
+        rule = getattr(self, "_bottom_rule", None)
+        host = rule.parentWidget() if rule is not None else None
+        lay = host.layout() if host is not None else None
+        if lay is not None:
+            # Just above the hairline over the source avatar: a stretch above
+            # takes its room, so nothing in the sidebar moves for it.
+            lay.insertWidget(lay.indexOf(rule), line)
+            lay.insertSpacing(lay.indexOf(rule), 6)
+        self._activity_float = ActivityLine(hub, self, floating=True)
+        self._notice_cards = CardStack(hub, self)
+        self._notice_panel = ActivityPanel(hub, self)
+        for ln in (line, self._activity_float):
+            ln.open_panel.connect(self._notices_open_panel)
         self._notice_follow = Follow(self._notices_place, self)
         for w in (self, getattr(self, "_mid", None), getattr(self, "_center_stack", None),
-                  getattr(self, "count_lbl", None)):
+                  getattr(self, "count_lbl", None), getattr(self, "_side", None),
+                  self._notice_panel):
             if w is not None:
                 self._notice_follow.watch(w)
         cs = getattr(self, "_center_stack", None)
         if cs is not None:
             cs.currentChanged.connect(self._notice_follow.poke)
-        self.notices.changed.connect(self._notice_follow.poke)
+        hub.changed.connect(self._notices_changed)
+
+    def _notices_changed(self) -> None:
+        # Placed at once (cheap): the line on Home must not show a frame at
+        # the window's corner before it is moved to its own.
+        self._notices_place()
 
     def _notices_held(self) -> bool:
-        """The video fills the screen, or TV mode shows: no card drawn."""
-        return bool(getattr(self, "_player_fs", False) or getattr(self, "_tv_on", False))
+        """The video fills the screen, TV mode shows, or the picture is
+        popped out: nothing drawn."""
+        pop = getattr(self, "_popout_win", None)
+        try:
+            popped = pop is not None and pop.isVisible()
+        except RuntimeError:            # deleted under us
+            popped = False
+        return bool(getattr(self, "_player_fs", False) or getattr(self, "_tv_on", False)
+                    or popped)
+
+    def _notices_sidebar_shown(self) -> bool:
+        cs = getattr(self, "_center_stack", None)
+        side = getattr(self, "_side", None)
+        return (cs is not None and side is not None
+                and cs.currentWidget() is getattr(self, "_root", None) and side.isVisible())
 
     def _notices_place(self) -> None:
-        area = getattr(self, "_notice_area", None)
-        if area is None:
+        cards = getattr(self, "_notice_cards", None)
+        if cards is None:
             return
         held = self._notices_held()
         self.notices.hold(held)
+        rtl = self.layoutDirection() == Qt.LayoutDirection.RightToLeft
+        line, floater = self._activity_line, self._activity_float
+        line.set_ring(bool(getattr(self, "_sidebar_collapsed", False)))
         if held:
-            area.set_anchor(None)
+            line.hide()
+            floater.hide()
+            cards.set_anchor(None)
+            self._notice_panel.close_panel()
             return
+        line.refresh()
+        m = self.NOTICE_MARGIN
         cs = getattr(self, "_center_stack", None)
         mid = getattr(self, "_mid", None)
-        root = getattr(self, "_root", None)
-        if (cs is not None and mid is not None and cs.currentWidget() is root
-                and mid.isVisible()):
-            rect = QRect(mid.mapTo(self, QPoint(0, 0)), mid.size())
-            lbl = getattr(self, "count_lbl", None)
-            if lbl is not None and lbl.isVisible():
-                top = lbl.mapTo(self, QPoint(0, 0)).y()
-                if rect.top() < top < rect.bottom():
-                    rect.setBottom(top - 2)
-        elif cs is not None:
-            rect = QRect(cs.mapTo(self, QPoint(0, 0)), cs.size())
+        det = getattr(self, "_det", None)
+        if self._notices_sidebar_shown():
+            floater.hide()
+            if mid is not None and mid.isVisible():
+                rect = QRect(mid.mapTo(self, QPoint(0, 0)), mid.size())
+                lbl = getattr(self, "count_lbl", None)
+                if lbl is not None and lbl.isVisible():
+                    top = lbl.mapTo(self, QPoint(0, 0)).y()
+                    if rect.top() < top < rect.bottom():
+                        rect.setBottom(top + m - 6)
+            elif det is not None:
+                # Focus mode: under the player and its controls only.
+                rect = QRect(det.mapTo(self, QPoint(0, 0)), det.size())
+                player = getattr(self, "player", None)
+                if player is not None and player.isVisible():
+                    rect.setTop(player.mapTo(self, QPoint(0, player.height())).y() + 8)
+            else:
+                rect = self.rect()
         else:
-            rect = self.rect()
-        area.set_anchor(rect, self.layoutDirection() == Qt.LayoutDirection.RightToLeft)
+            # A page with no sidebar (Home): the line at the same corner.
+            area = (QRect(cs.mapTo(self, QPoint(0, 0)), cs.size()) if cs is not None
+                    else self.rect())
+            floater.refresh()
+            if not floater.isHidden():
+                hint = floater.sizeHint()
+                fw = min(hint.width(), 300)
+                fx = area.right() - m - fw + 1 if rtl else area.left() + m
+                floater.setGeometry(fx, area.bottom() - m - floater.height() + 1, fw,
+                                    floater.height())
+                floater.raise_()
+                area.setBottom(area.bottom() - floater.height() - 8)
+            rect = area
+        panel = self._notice_panel
+        if not panel.isHidden():
+            panel._place()
+            # The panel open: the cards step aside, never under it.
+            pg = panel.geometry()
+            if rtl:
+                rect.setRight(min(rect.right(), pg.left() - 8 + m))
+            else:
+                rect.setLeft(max(rect.left(), pg.right() + 8 - m))
+        cards.set_anchor(rect, rtl)
+
+    def _notices_open_panel(self) -> None:
+        panel = self._notice_panel
+        if not panel.isHidden():
+            panel.close_panel()
+            return
+        line = self.sender() if isinstance(self.sender(), ActivityLine) else self._activity_line
+        panel.open_at(line, beside=bool(getattr(self, "_sidebar_collapsed", False))
+                      and line is self._activity_line)
 
     def _notices_restyle(self) -> None:
-        area = getattr(self, "_notice_area", None)
-        if area is not None:
-            area.restyle()
+        cards = getattr(self, "_notice_cards", None)
+        if cards is not None:
+            cards.restyle()
+            self._notice_panel.restyle()
+            self._activity_line.update()
+            self._activity_float.update()
 
     # -- the list's work ----------------------------------------------------------
 
-    def _show_busy(self, message: str | None = None) -> None:
+    def _show_busy(self, message: str | None = None, kind: str = "list") -> None:
         """The list's (or another place's) work, as a job; and - when the
         list is empty and a message is given - a centred spinner + label
         over it ('Loading movies…'), so it reads as 'working', not a broken
         blank list. Its job ends by itself after LIST_TIMEOUT_MS."""
         self._busy_main = message or ""
         hub_of(self).start(message or tr("status_loading_content"), key="list",
-                           timeout_ms=self.LIST_TIMEOUT_MS,
+                           kind=kind, mine=True, timeout_ms=self.LIST_TIMEOUT_MS,
                            on_expire=self._busy_expired)
         self._update_busy_overlay(message)
 
@@ -218,11 +312,19 @@ class _BusyMixin:
         if token != self._guide_busy_token:
             return          # an older load's late word
         hub = hub_of(self)
-        if not hub.update(self._guide_busy_job):
+        words = self._guide_busy_msg or tr("status_loading_programme_guide")
+        if value >= 100:
+            # Downloaded: the parse and index say nothing until they are done.
+            words, done, total = tr("notice_guide_preparing"), 0.0, 0.0
+        elif value >= 0:
+            done, total = float(value), 100.0
+        else:
+            done = total = None
+        if not hub.update(self._guide_busy_job, words, done=done, total=total):
             self._guide_busy_job = hub.start(
-                self._guide_busy_msg or tr("status_loading_programme_guide"),
-                key="guide", timeout_ms=self.GUIDE_QUIET_MS,
-                on_expire=self._guide_busy_quiet)
+                words, key="guide", kind="guide", mine=bool(self._guide_busy_msg),
+                group="guide", group_text=_guide_group, done=done, total=total,
+                timeout_ms=self.GUIDE_QUIET_MS, on_expire=self._guide_busy_quiet)
 
     def _guide_busy_shown(self) -> bool:
         return bool(self._guide_busy_job) and hub_of(self).alive(self._guide_busy_job)

@@ -2940,5 +2940,16 @@
   "notice_dismiss": "हटाएँ",
   "notice_info": "सूचना",
   "notice_warning": "चेतावनी",
-  "notice_error": "त्रुटि"
+  "notice_error": "त्रुटि",
+  "notice_guide_preparing": "कार्यक्रम गाइड तैयार हो रही है…",
+  "notice_guide_sources": "गाइड लोड हो रही है · {n} स्रोत",
+  "notice_reading_folder": "फ़ोल्डर {name} पढ़ा जा रहा है…",
+  "notice_searching_in": "{name} में खोजा जा रहा है…",
+  "notice_found": "{n} मिले",
+  "notice_files": "{n} फ़ाइलें",
+  "notice_saving_mp4": "{title} को MP4 के रूप में सहेजा जा रहा है…",
+  "notice_reading_source": "{name} पढ़ा जा रहा है…",
+  "notice_reading_sources": "आपके स्रोत पढ़े जा रहे हैं · {n}",
+  "notice_scanning_network": "नेटवर्क स्कैन हो रहा है…",
+  "notice_less": "कम दिखाएँ"
 }
