@@ -5742,6 +5742,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         stream simply stop instead of fighting for the slot."""
         lp = getattr(self, "_last_playback", None)
         if not (self.player and self.player.isVisible()):
+            if reason == "eof":
+                # Ended, and nothing opens it again: it holds no connection.
+                self._conn_gave_up()
             return
         if not lp or lp.get("kind") != "live":
             return
@@ -5757,6 +5760,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._set_status(msg, emphasis=True)
             self.player.set_overlay_info(msg)
             self.player.hide_loading()
+            if reason == "eof":
+                # Ended, and not opened again: the picture stays until Stop,
+                # but it holds no connection (a stall may still be read).
+                self._conn_gave_up()
             return
         if reason == "eof":
             # The provider ended a stream that was playing. Drops like that,

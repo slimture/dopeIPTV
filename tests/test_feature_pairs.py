@@ -1394,3 +1394,116 @@ def test_a_cast_is_counted_against_the_source_it_is_from(monkeypatch):
     assert w._cast_ctx["source_id"] == "b"
     w.cast.active = object()
     assert [(u.kind, u.source) for u in w._conn_uses()] == [("cast", "b")]
+
+
+def _source_window():
+    """A window with the connections count and the source label: nothing
+    plays, no limit known, source a in use."""
+    from dopeiptv.ui.mw_connections import _ConnectionsMixin
+    from dopeiptv.ui.mw_source_label import _SourceLabelMixin
+
+    class W(_ConnectionsMixin, _SourceLabelMixin):
+        def __init__(self):
+            self.client = SimpleNamespace(max_connections=None)
+            self.player = SimpleNamespace(current_url=None, _dvr=None, _dvr_pool=None)
+            self.rec = SimpleNamespace(jobs=[])
+            self._multiview_win = None
+            self.playlist_store = _Sources("a")
+            self._failover_source = self._failover_key = None
+            self._last_playback = None
+            self.cast = SimpleNamespace(active=None)
+            self._cast_ctx = None
+            self.settings = _S(mv_stop_docked="true")
+            self.asked: list[str] = []
+            self.answer = None
+
+        def _item_key(self, it):
+            return (it or {}).get("stream_id") or (it or {}).get("_key")
+
+        def _choice_dialog(self, title, message, options, dont_ask_setting=None):
+            self.asked.append(message)
+            return len(options) - 1 if self.answer is None else self.answer
+    return W
+
+
+def test_a_stream_the_player_gave_up_on_holds_no_connection():
+    """A live channel dropped and nothing opens it again (Settings: no
+    reconnect): its last picture stays until Stop, but it holds no
+    connection - not counted, so a test, a recording or server mode's
+    device is not refused for it. A stall may still be read, and the slow
+    reconnect wants it back: both still counted. The next play of the very
+    channel is counted again. From the rewind buffer: not counted once the
+    buffer's own connection gave up too."""
+    from dopeiptv.ui.main_window import MainWindow
+
+    url = "http://a.invalid/live/u/p/7.ts"
+
+    class P:
+        def __init__(self, dvr=None):
+            self.current_url, self._dvr, self._dvr_pool = url, dvr, None
+            self._play_gen, self.visible = 3, True
+
+        def isVisible(self):  # noqa: N802 - Qt's name
+            return self.visible
+
+        def set_overlay_info(self, _text):
+            pass
+
+        def hide_loading(self):
+            pass
+
+        def playback_position(self):
+            return 0.0
+
+    class W(_source_window()):
+        MAX_STREAM_RETRIES = MainWindow.MAX_STREAM_RETRIES
+        _reconnect_live = MainWindow._reconnect_live
+        _auto_reconnect_live = MainWindow._auto_reconnect_live
+
+        def _health_drop(self):
+            pass
+
+        def _health_stuck(self):
+            pass
+
+        def _set_status(self, *_a, **_k):
+            pass
+
+        def _arm_slow_reconnect(self):
+            self.slow = True
+
+    w = W()
+    w.player = P()
+    w._note_playing_source(url, 7, "live")
+    w._last_playback = {"url": url, "kind": "live", "key": 7}
+    w.settings["auto_reconnect_live"] = "false"
+
+    def counted():
+        return [(u.kind, u.source) for u in w._conn_uses()]
+
+    w._reconnect_live("stall")              # mpv may still be reading it
+    assert counted() == [("player", "a")]
+    w._reconnect_live("eof")                # ended, and nothing opens it again
+    assert counted() == []
+    w.client.max_connections = 1
+    assert w._conn_ok_test("a") and not w.asked, "a test of A reads without a question"
+    w.player._play_gen += 1                 # the same channel played again
+    assert counted() == [("player", "a")]
+    # Reconnects on: the quick ones spent, the slow one wants it back.
+    w.settings["auto_reconnect_live"] = "true"
+    w._stream_retries, w._last_stream_error_ts = MainWindow.MAX_STREAM_RETRIES, 9e12
+    w._reconnect_live("eof")
+    assert getattr(w, "slow", False) and counted() == [("player", "a")]
+    # No player on screen to open it again: given up too.
+    w.player.visible = False
+    w._reconnect_live("eof")
+    assert counted() == []
+    # From the rewind buffer: its connection gave up too - nothing; one
+    # still streaming (a recording in the player reads it) is counted.
+    w.settings["auto_reconnect_live"] = "false"
+    dvr = SimpleNamespace(streaming=True, recording=False, url=url, state="failed")
+    w.player = P(dvr)
+    w._reconnect_live("eof")
+    assert counted() == []
+    dvr.state = "streaming"
+    assert counted() == [("buffer", "a")]

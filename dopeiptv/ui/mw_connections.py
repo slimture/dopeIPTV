@@ -99,6 +99,26 @@ class _ConnectionsMixin:
             return str(src[0])
         return self._conn_source()
 
+    #: (address, play generation) of the stream the player gave up on.
+    _conn_dead: tuple[str, Any] | None = None
+
+    def _conn_gave_up(self) -> None:
+        """The player gave up on what it plays: its stream ended and nothing
+        opens it again (reconnects off, or no player on screen to). The last
+        picture stays until Stop, but no connection is held - not counted
+        from now to the next play (the player's play generation moves on)."""
+        p = getattr(self, "player", None)
+        url = getattr(p, "current_url", None) if p is not None else None
+        if url:
+            self._conn_dead = (str(url), getattr(p, "_play_gen", None))
+            log.info("connections: the player gave up on its stream - not counted")
+
+    def _conn_player_dead(self, p: Any) -> bool:
+        """The player still shows the stream it gave up on (_conn_gave_up)."""
+        dead = self._conn_dead
+        return dead is not None and dead == (
+            str(getattr(p, "current_url", None) or ""), getattr(p, "_play_gen", None))
+
     def _conn_uses(self, free_player: bool = False, free_cell=None) -> list[Use]:
         """The connections the app holds now. *free_player*: as they will be
         once the player has let its stream go (its buffer stays while a
@@ -109,11 +129,16 @@ class _ConnectionsMixin:
         src = self._conn_player_source()
         dvr = getattr(p, "_dvr", None) if p is not None else None
         try:
-            if dvr is not None and dvr.streaming:
+            # Given up on: none held - from the buffer, once its own
+            # connection gave up too (one still streaming is read still).
+            dead = p is not None and self._conn_player_dead(p)
+            if (dvr is not None and dvr.streaming
+                    and not (dead and getattr(dvr, "state", "") == "failed")):
                 if not free_player or dvr.recording:
                     uses.append(Use("buffer", src, str(getattr(dvr, "url", "") or "")))
             elif (p is not None and getattr(p, "current_url", None)
-                  and connections.is_network(p.current_url) and not free_player):
+                  and connections.is_network(p.current_url) and not free_player
+                  and not dead):
                 uses.append(Use("player", src, str(p.current_url)))
             pool = getattr(p, "_dvr_pool", None) if p is not None else None
             for s in (pool.sessions if pool is not None else []):

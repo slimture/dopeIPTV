@@ -51,6 +51,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   counted on that source's account, and server mode sees it there. Cast
   after a source switch, what plays went to the TV as the new source's
   channel of the same number; it now goes by the address it plays from.
+- A live channel that dropped with reconnects off stayed counted as a
+  connection until Stop, so a test asked for nothing and server mode
+  refused devices for it; once the player gives up on it, it no longer
+  counts (a stall, and the slow reconnect, still do).
 
 ## [1.6.0]
 
