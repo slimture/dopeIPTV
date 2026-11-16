@@ -8,10 +8,13 @@ name: Nightly
 # never show as the latest release, so the Releases channel and the website
 # never see them. Only the newest few are kept.
 on:
-  # By hand (Actions > Nightly > Run workflow, on testing) while work
-  # lands many times a day and is tried from a checkout; push: [testing]
-  # brings back a build per push. (A schedule would build main: GitHub
+  # A build per push to testing (a burst of pushes builds only the newest:
+  # see concurrency), and by hand (Actions > Nightly > Run workflow, on
+  # testing). While work lands many times a day and is tried from a
+  # checkout, drop push: for a while. (A schedule would build main: GitHub
   # runs scheduled workflows from the default branch only.)
+  push:
+    branches: [testing]
   workflow_dispatch:
 
 permissions:
