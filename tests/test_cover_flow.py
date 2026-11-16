@@ -14,6 +14,7 @@ user experiences failure modes:
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -359,6 +360,126 @@ def test_logo_loader_a_non_image_200_is_not_fetched_on_every_paint(
     assert loader.is_dead(url)
     assert not any(p.is_file() for p in tmp_path.rglob("*"))
     assert calls["n"] == 1
+
+
+def _picture_bytes(w: int, h: int, fmt: str, alpha: bool = False) -> bytes:
+    """A picture with detail in it (gradients, shapes), encoded as *fmt*."""
+    from PyQt6.QtCore import QBuffer, QIODevice, QPointF, QRectF, Qt
+    from PyQt6.QtGui import QColor, QImage, QLinearGradient, QPainter
+    img = QImage(w, h, QImage.Format.Format_ARGB32 if alpha else QImage.Format.Format_RGB32)
+    img.fill(QColor(0, 0, 0, 0) if alpha else QColor("#203040"))
+    p = QPainter(img)
+    if not alpha:
+        g = QLinearGradient(QPointF(0, 0), QPointF(w, h))
+        g.setColorAt(0, QColor("#123456"))
+        g.setColorAt(1, QColor("#e0a040"))
+        p.fillRect(img.rect(), g)
+    p.setPen(Qt.PenStyle.NoPen)
+    for i in range(40):
+        p.setBrush(QColor((i * 53) % 256, (i * 97) % 256, (i * 31) % 256, 190))
+        p.drawEllipse(QRectF((i * 37) % w, (i * 23) % h, w / 5, h / 4))
+    p.end()
+    buf = QBuffer()
+    buf.open(QIODevice.OpenModeFlag.WriteOnly)
+    img.save(buf, fmt)
+    return bytes(buf.data())
+
+
+def test_logo_loader_decodes_once_off_the_gui_thread_at_its_size(qapp, tmp_path, monkeypatch):
+    """Each picture is decoded once, on the loader's pool - from the network,
+    from the disk cache and from a local file - and handed to the GUI thread
+    decoded and scaled already: the GUI thread only makes the pixmap. It
+    decoded every picture a second time (and scaled it) there, about 5 ms
+    for an episode's still, while the worker's own decode held the GIL."""
+    import threading
+    from PyQt6.QtGui import QImage
+    from dopeiptv.core import workers
+    from dopeiptv.core.workers import LogoLoader
+
+    jpeg = _picture_bytes(640, 360, "JPEG")
+    decodes: list[bool] = []
+    real_decode = workers.decode_image
+
+    def decode(data, fit=0):
+        decodes.append(threading.current_thread() is threading.main_thread())
+        return real_decode(data, fit)
+
+    handed: list = []
+    real_run = workers.run_async
+
+    def run(pool, fn, on_done, on_fail=None, *a, **k):
+        def done(result, _cb=on_done):
+            handed.append(result)
+            _cb(result)
+        return real_run(pool, fn, done, on_fail, *a, **k)
+
+    class FakeResp:
+        status_code = 200
+        content = jpeg
+        def raise_for_status(self): pass
+
+    monkeypatch.setattr(workers, "decode_image", decode)
+    monkeypatch.setattr(workers, "run_async", run)
+    monkeypatch.setattr("dopeiptv.core.workers.requests.get",
+                        lambda u, headers=None, timeout=None: FakeResp())
+    pool = _pool()
+    loader = LogoLoader(pool, max_size=64, cache_dir=tmp_path / "cache", disk_budget=0)
+    got = []
+    loader.get("https://cdn/still.jpg", got.append)          # the network
+    _drain_pool(pool, qapp)
+    loader.cache.clear()
+    loader.get("https://cdn/still.jpg", got.append)          # the disk cache
+    _drain_pool(pool, qapp)
+    local = tmp_path / "thumb.jpg"
+    local.write_bytes(jpeg)
+    loader.get(str(local), got.append)                       # a local file
+    _drain_pool(pool, qapp)
+    assert len(decodes) == 3, f"{len(decodes)} decodes for 3 pictures"
+    assert not any(decodes), "a picture was decoded on the GUI thread"
+    assert len(handed) == 3
+    for _url, img in handed:
+        assert isinstance(img, QImage) and (img.width(), img.height()) == (64, 36)
+        assert img.format() in (QImage.Format.Format_RGB32,
+                                QImage.Format.Format_ARGB32_Premultiplied)
+    assert len(got) == 3 and all((pm.width(), pm.height()) == (64, 36) for pm in got)
+    # Through the reader, which lets go of the GIL while it decodes - never
+    # loadFromData, which PyQt runs holding it.
+    src = Path(workers.__file__).read_text(encoding="utf-8")
+    assert "loadFromData(" not in src
+
+
+def test_decoded_pictures_have_the_pixels_the_gui_thread_made(qapp):
+    """decode_image on a worker gives the very pixels QPixmap.loadFromData
+    and scaled() gave on the GUI thread - JPEG and PNG, larger and smaller
+    than the cache's size, with and without alpha, palette PNGs: the lists,
+    Home, posters and the series page look exactly as they did."""
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtGui import QImage, QPixmap
+    from dopeiptv.core.workers import decode_image, is_picture
+
+    def before(data, fit):
+        pm = QPixmap()
+        assert pm.loadFromData(data)
+        return pm.scaled(fit, fit, Qt.AspectRatioMode.KeepAspectRatio,
+                         Qt.TransformationMode.SmoothTransformation).toImage()
+
+    from PyQt6.QtCore import QBuffer, QIODevice
+    palette = QImage()
+    assert palette.loadFromData(_picture_bytes(300, 200, "PNG"))
+    buf = QBuffer()
+    buf.open(QIODevice.OpenModeFlag.WriteOnly)
+    palette.convertToFormat(QImage.Format.Format_Indexed8).save(buf, "PNG")
+    cases = [(_picture_bytes(1280, 720, "JPEG"), 320), (_picture_bytes(500, 281, "JPEG"), 320),
+             (_picture_bytes(300, 450, "JPEG"), 320), (_picture_bytes(512, 512, "PNG", True), 320),
+             (_picture_bytes(100, 60, "PNG", True), 320), (_picture_bytes(400, 400, "PNG"), 96),
+             (bytes(buf.data()), 320), (_picture_bytes(320, 180, "JPEG"), 320)]
+    for data, fit in cases:
+        img = decode_image(data, fit)
+        assert img is not None
+        assert QPixmap.fromImage(img).toImage() == before(data, fit), (len(data), fit)
+    assert decode_image(b"<html>login</html>", 64) is None
+    assert decode_image(b"", 64) is None
+    assert not is_picture(b"not-a-png") and is_picture(cases[0][0])
 
 
 def test_logo_loader_trimming_keeps_a_shared_dead_map(qapp):

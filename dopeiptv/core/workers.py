@@ -110,10 +110,60 @@ def choose_cover_url(title_tmdb, raw_provider, kind, is_dead):
 
 from ._lazy_requests import requests
 from PyQt6.QtCore import (
-    QObject, QRunnable, QStandardPaths, QThreadPool, QTimer, Qt, pyqtSignal,
-    pyqtSlot,
+    QBuffer, QIODevice, QObject, QRunnable, QStandardPaths, QThreadPool, QTimer,
+    Qt, pyqtSignal, pyqtSlot,
 )
-from PyQt6.QtGui import QImage, QPixmap
+from PyQt6.QtGui import QImage, QImageReader, QPixmap
+
+#: The formats a QPixmap keeps a picture in on the raster backends: an image
+#: already in one becomes a pixmap without a conversion on the GUI thread.
+_PIXMAP_FORMATS = (QImage.Format.Format_RGB32, QImage.Format.Format_ARGB32_Premultiplied)
+
+
+def decode_image(data: bytes, fit: int = 0) -> QImage | None:
+    """*data* as a picture, or None when it is none - on the calling thread,
+    which is a worker's, never the GUI thread's.
+
+    Through QImageReader.read, which lets go of the GIL while it decodes:
+    PyQt holds it through QImage.loadFromData (and QPixmap's), so a worker
+    decoding a large JPEG that way stopped the window's Python for as long.
+    *fit*: then scaled to fit a fit x fit square, as the image cache keeps it
+    - the aspect kept, smooth, a smaller picture made larger. The same steps
+    the GUI thread took through QPixmap - into the pixmap's own format
+    first (a JPEG is in it already), then that very ``scaled(fit, fit,
+    KeepAspectRatio, SmoothTransformation)`` - so the pixels are the same;
+    not the reader's own scaled decoding, whose pixels differ a little. The
+    result becomes a QPixmap without a conversion."""
+    buf = _read_only(data)
+    if buf is None:
+        return None
+    img = QImageReader(buf).read()
+    if img.isNull():
+        return None
+    if img.format() not in _PIXMAP_FORMATS:
+        img = img.convertToFormat(QImage.Format.Format_ARGB32_Premultiplied
+                                  if img.hasAlphaChannel() else QImage.Format.Format_RGB32)
+    if fit > 0 and img.size().scaled(fit, fit, Qt.AspectRatioMode.KeepAspectRatio) != img.size():
+        img = img.scaled(fit, fit, Qt.AspectRatioMode.KeepAspectRatio,
+                         Qt.TransformationMode.SmoothTransformation)
+    return img
+
+
+def is_picture(data: bytes) -> bool:
+    """Whether *data* decodes as a picture: decoded whole (a truncated file
+    fails), on a worker, the GIL let go meanwhile - as ``decode_image``."""
+    buf = _read_only(data)
+    return buf is not None and not QImageReader(buf).read().isNull()
+
+
+def _read_only(data: bytes) -> QBuffer | None:
+    """*data* as a device to read a picture from; None when there is none.
+    The caller keeps it while a reader reads from it."""
+    if not data:
+        return None
+    buf = QBuffer()
+    buf.setData(data)
+    return buf if buf.open(QIODevice.OpenModeFlag.ReadOnly) else None
 
 
 def default_image_cache_dir(sub: str = "images") -> Path:
@@ -306,6 +356,10 @@ class LogoLoader(QObject):
     this small for tiny list icons and larger for anything meant to be
     shown big (posters, cast photos), since a low-res cache blurs badly
     once scaled back up.
+
+    A picture is decoded once, on the loader's pool, already at that size
+    (``decode_image``: the GIL let go while it decodes); the GUI thread only
+    makes the pixmap of it, never a decode or a scale.
     """
 
     def __init__(self, pool: QThreadPool, max_size: int = 96,
@@ -500,7 +554,7 @@ class LogoLoader(QObject):
         address or its host on cooldown, an answer that is not an image or
         is larger than *max_bytes*. As the lists' own fetches: the same user
         agent and route, the same dead-address and host cooldowns. No Qt
-        object but a QImage (thread-safe), to check the bytes decode."""
+        object but a QImageReader (thread-safe), to check the bytes decode."""
         dp = self._disk_path(url)
         if dp is None or not url.lower().startswith(("http://", "https://")):
             return None
@@ -546,7 +600,7 @@ class LogoLoader(QObject):
                 # Too big for this reader only: the lists may still show it.
                 _img_dbg(f"file too big {url}")
                 return None
-            if not data or not QImage().loadFromData(data):
+            if not is_picture(data):
                 _img_dbg(f"file not a picture ({len(data)}B) {url}")
                 self._mark_dead(url, self.dead_ttl_permanent)
                 return None
@@ -601,41 +655,36 @@ class LogoLoader(QObject):
         # expression is typed where it is written, not where the narrowing
         # happened, so the parameter took the declared `str | None`.
         src: str = url
+        fit = self.max_size
 
-        def fetch(u: str = src, dp: Path | None = disk_path) -> tuple[str, bytes]:
+        # fetch() answers with the picture decoded here, on the pool, at the
+        # size the cache keeps (decode_image): None when nothing was served
+        # (skipped, gone, unreadable), a null QImage when what was served is
+        # no picture. A QImage, never a QPixmap: QPixmap is GUI-thread only in
+        # Qt6 and touching one here aborts the whole process on newer PyQt6.
+        def fetch(u: str = src, dp: Path | None = disk_path) -> tuple[str, QImage | None]:
             # A local absolute path (a generated video thumbnail, never a
             # provider URL) is read straight off disk - no network machinery,
             # no circuit breaker, no second disk cache.
             if u.startswith("/") or u.startswith("file://"):
                 try:
                     data = Path(u.removeprefix("file://")).read_bytes()
-                    probe = QImage()
-                    if data and probe.loadFromData(data):
-                        return u, data
                 except OSError:
-                    pass
-                return u, b""
-            # Disk cache read: validate by attempting to decode. If a
-            # previous session was killed mid-write (e.g. crash on
-            # shutdown) the file is truncated and QPixmap.loadFromData
-            # will fail - in that case unlink the bad file and fall
-            # through to a fresh network fetch so the cover isn't
-            # stuck as a placeholder forever.
+                    return u, None
+                return u, decode_image(data, fit)
+            # Disk cache read: validate by decoding it. If a previous
+            # session was killed mid-write (e.g. crash on shutdown) the file
+            # is truncated and does not decode - in that case unlink the bad
+            # file and fall through to a fresh network fetch so the cover
+            # isn't stuck as a placeholder forever.
             if dp is not None and dp.exists():
                 try:
                     data = dp.read_bytes()
                     if data:
-                        # QImage is thread-safe; QPixmap is GUI-thread
-                        # only in Qt6 and touching it here aborts the
-                        # whole process on newer PyQt6 (qFatal fires
-                        # from pyqt6_err_print). We only need to
-                        # validate that the bytes decode - the actual
-                        # QPixmap conversion happens in done() which
-                        # runs on the main thread.
-                        probe = QImage()
-                        if probe.loadFromData(data):
+                        img = decode_image(data, fit)
+                        if img is not None:
                             _img_dbg(f"disk hit {u}")
-                            return u, data
+                            return u, img
                         _img_dbg(f"disk CORRUPT, refetching {u}")
                         dp.unlink(missing_ok=True)
                 except OSError:
@@ -648,12 +697,12 @@ class LogoLoader(QObject):
             # category queues hundreds of jobs for one host before the
             # first couple fail and mark it dead; without this re-check,
             # every already-queued job still spends its full connect
-            # timeout on a host we already know is down. Returning empty
-            # bytes makes done() paint nothing (placeholder) without a
-            # network round-trip or another strike.
+            # timeout on a host we already know is down. Returning nothing
+            # makes done() paint nothing (placeholder) without a network
+            # round-trip or another strike.
             if self.is_dead(u):
                 _img_dbg(f"host cooldown skip {u}")
-                return u, b""
+                return u, None
             # Short connect timeout: a host that's down should cost a
             # worker ~3 s, not the full read timeout - with hundreds
             # of URLs on one dead provider host that difference is
@@ -675,10 +724,13 @@ class LogoLoader(QObject):
             r.raise_for_status()
             data = r.content
             _img_dbg(f"net {r.status_code} ok {len(data)}B {u}")
+            if not data:
+                return u, None
+            img = decode_image(data, fit)
             # A 200 that is not an image (a panel's HTML error page) must not
             # reach the disk cache: the next paint read it back, found it
             # corrupt, deleted it and fetched again - on every paint.
-            if dp is not None and QImage().loadFromData(data):
+            if dp is not None and img is not None:
                 try:
                     dp.parent.mkdir(parents=True, exist_ok=True)
                     # Write to a sibling temp path and rename so a crash
@@ -689,13 +741,13 @@ class LogoLoader(QObject):
                     tmp.replace(dp)
                 except OSError as e:
                     _img_dbg(f"disk WRITE FAILED {e} {u}")
-            return u, data
+            return u, img if img is not None else QImage()
 
-        def done(result: tuple[str, bytes]) -> None:
-            u, data = result
+        def done(result: tuple[str, QImage | None]) -> None:
+            u, img = result
             callbacks = self.waiting.pop(u, [])
-            if not data:
-                # Empty = skipped (host on cooldown) or nothing served.
+            if img is None:
+                # Nothing = skipped (host on cooldown) or nothing served.
                 # Just drop the pending entry; the delegate keeps the
                 # placeholder and will re-try once the cooldown expires.
                 # Nothing served and no cooldown yet (a local thumbnail that
@@ -704,9 +756,11 @@ class LogoLoader(QObject):
                 if not self.is_dead(u):
                     self._mark_dead(u, self.dead_ttl_transient)
                 return
-            pm = QPixmap()
-            if not pm.loadFromData(data):
-                _img_dbg(f"DECODE FAILED {len(data)}B DEAD(1h) {u}")
+            # Decoded and scaled on the pool already: only the pixmap is
+            # made here, from an image in a format it takes as it is.
+            pm = QPixmap.fromImage(img) if not img.isNull() else QPixmap()
+            if pm.isNull():
+                _img_dbg(f"DECODE FAILED DEAD(1h) {u}")
                 self._mark_dead(u, self.dead_ttl_permanent)
                 for cb in callbacks:
                     try:
@@ -714,9 +768,6 @@ class LogoLoader(QObject):
                     except RuntimeError:
                         pass
                 return
-            pm = pm.scaled(self.max_size, self.max_size,
-                           Qt.AspectRatioMode.KeepAspectRatio,
-                           Qt.TransformationMode.SmoothTransformation)
             self._store(u, pm)
             for cb in callbacks:
                 try:
