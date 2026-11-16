@@ -181,6 +181,23 @@ def clear_recent(settings: Any, resume_settings: Any, history: Any, seconds: int
             out["titles"] += clear_history(store, since, None)
     if positions:
         out["positions"] = clear_resume(resume_settings, since)
+    # The first profile's history as the first start with profiles left it
+    # under the old names (core/profiles.left_behind): cleared the same, not
+    # counted - it is not what the window shows.
+    from . import profiles
+    old = profiles.left_behind(settings)
+    if old is not None:
+        for key in history_keys(old):
+            store = HistoryStore(old, key)
+            if channels:
+                clear_history(store, since, CHANNEL_KINDS)
+            if titles:
+                clear_history(store, since, TITLE_KINDS)
+            if channels and titles:
+                clear_history(store, since, None)
+    old = profiles.left_behind(resume_settings)
+    if positions and old is not None:
+        clear_resume(old, since)
     kinds: set[str] = set()
     if channels:
         kinds.add(viewing_stats.CHANNEL)

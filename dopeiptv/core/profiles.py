@@ -618,6 +618,22 @@ def migrate(main: Any, others: Iterable[Any] = (), name: str = "Me",
     return True
 
 
+def left_behind(settings: Any) -> Any | None:
+    """The keys' old names in *settings*, where migrate() left the first
+    profile's own as they were - for the first profile's view of a settings
+    file; None for another profile's, and with no profiles in play. What a
+    person takes out for good (history cleared, an account signed out) is
+    taken out there too: left there it stayed in the file, went into every
+    backup, and a downgrade brought it back."""
+    if isinstance(settings, PinnedSettings):
+        pid = settings.pid
+    elif isinstance(settings, ProfileSettings):
+        pid = _active
+    else:
+        return None
+    return PinnedSettings(settings, "") if pid == MAIN_ID else None
+
+
 def start(main: Any, others: Iterable[Any] = (), name: str = "Me",
           version: str = "") -> ProfileStore:
     """At start, before anything reads the settings: the first profile made

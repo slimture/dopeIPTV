@@ -69,11 +69,17 @@ class KeptValues:
         window's thread brings nothing back."""
         with self._lock:
             now = {k: self._values[k] for k in keys if k in self._values}
+        # A sign-out of the first profile's: not left under the keys' old
+        # names either (core/profiles.left_behind).
+        from .profiles import left_behind
+        old = left_behind(self.settings)
         for key in keys:
             if key in now:
                 self.settings.setValue(key, now[key])
             else:
                 self.settings.remove(key)
+                if old is not None:
+                    old.remove(key)
 
 
 # The implicit "just add it here" bucket every category has. Items land

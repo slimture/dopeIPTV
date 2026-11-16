@@ -606,3 +606,50 @@ def test_the_household_list_reads_back_whatever_is_in_it(tmp_path):
         ("me", "Me", "blue", False), ("k", "Kid", "blue", True)]
     s.setValue(profiles.K_LIST, "not json")
     assert ProfileStore(s).profiles() == []
+
+
+# -- what the first start left under the old names ----------------------------------------
+
+def test_what_is_cleared_or_signed_out_is_not_left_under_the_old_names(tmp_path):
+    """1.5's keys stay under their old names for a downgrade (migrate): the
+    history a person clears and the account they sign out of must not stay
+    there - in the settings file and in every backup made after."""
+    from dopeiptv.providers.simkl import SimklClient
+    from dopeiptv.providers.trakt import TraktClient
+    views, store, kid = _two(tmp_path)
+    raw_main, raw_resume = profiles.raw(views["main"]), profiles.raw(views["resume"])
+    assert json.loads(raw_main.value("history_a")) and raw_main.value("trakt_access_token") == "tok"
+
+    def clear(seconds):
+        return privacy.clear_recent(
+            views["main"], views["resume"],
+            HistoryStore(profiles.pinned(views["main"]), "history_a"), seconds)
+
+    # Another profile's clearing and signing out are its own: the first's stay.
+    profiles.activate(kid.id)
+    clear(0)
+    TraktClient(profiles.pinned(views["main"], kid.id)).disconnect()
+    assert raw_main.value("history_a") == OLD_MAIN["history_a"]
+    assert raw_resume.value("resume_positions_a") == OLD_RESUME["resume_positions_a"]
+    assert raw_main.value("trakt_access_token") == "tok"
+
+    # The last hour cleared: what was watched before it stays, there too.
+    profiles.activate(MAIN_ID)
+    clear(3600)
+    assert raw_main.value("history_a") == OLD_MAIN["history_a"]
+
+    # Everything cleared, both accounts signed out: gone under the old names.
+    assert clear(0) == {"channels": 1, "titles": 0, "positions": 1}
+    assert json.loads(raw_main.value("history_a")) == []
+    assert json.loads(raw_resume.value("resume_positions_a")) == {}
+    TraktClient(profiles.pinned(views["main"], MAIN_ID)).disconnect()
+    SimklClient(profiles.pinned(views["main"], MAIN_ID))._forget()     # disconnect, nothing sent
+    for key in ("trakt_access_token", "trakt_refresh_token", "trakt_expires_at",
+                "simkl_access_token"):
+        assert not raw_main.contains(key), key
+        assert not raw_main.contains(f"profiles/{MAIN_ID}/{key}"), key
+    made = json.dumps(backup.collect({"main": raw_main, "resume": raw_resume}, "1.6.0"))
+    assert '"tok"' not in made and "http://x/1" not in made and "SVT1" in made
+    # What was not taken out is there as it was, for a downgrade.
+    assert raw_main.value("favorites_a") == OLD_MAIN["favorites_a"]
+    assert raw_main.value("theme") == "nord"
