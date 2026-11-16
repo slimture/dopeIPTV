@@ -2019,7 +2019,7 @@
   "together_not_here": "{title} finns inte i din källa. De andra fortsätter titta.",
   "together_not_shareable": "Det här går inte att titta på tillsammans – bara filmer, avsnitt och livekanaler från en källa, inte dina egna filer eller inspelningar.",
   "night_mode": "Nattläge",
-  "night_mode_hint": "Jämnar ut ljudet: höga reklamavbrott och scener sänks, tyst dialog höjs. Slås på direkt, sändningen fortsätter.",
+  "night_mode_hint": "Sänker höga reklamavbrott, smällar och scener mot talets nivå, så att du kan låta volymen vara. Aldrig högre, och talet lämnas som det är. Slås på direkt, sändningen fortsätter.",
   "night_on": "Nattläge på",
   "night_off": "Nattläge av",
   "sc_night_mode": "Nattläge (ljud)",

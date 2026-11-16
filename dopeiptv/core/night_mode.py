@@ -1,52 +1,57 @@
-"""Night mode for the sound: loud adverts and explosions brought down,
-quiet dialogue brought up, so the volume can stay where it is late at night.
+"""Night mode for the sound: loud adverts, bangs and scenes brought down
+towards the level of speech, so the volume can stay where it is late at
+night. Never louder than without it, and plain speech - the news - is left
+as it is.
 
-One audio filter on the player's core, through mpv's ``lavfi`` wrapper: a
-gentle compressor, then ffmpeg's Dynamic Audio Normalizer. The normalizer
-cuts the sound into short slices, finds the gain that would take each
-slice's peak to the target, and smooths those gains over the slices around
-it with a Gaussian window (after a minimum filter, so a loud slice lowers
-the gain *before* it arrives and nothing clips). The compressor in front
-evens out what is loud and dense within a slice - an advert's music, the
-rumble after an explosion - before the leveller sees it, so that comes out
-a little less loud next to speech than the leveller alone leaves it.
+One audio filter on the player's core, through mpv's ``lavfi`` wrapper:
+three of ffmpeg's compressors (``acompressor``) one after the other. Each
+only ever turns the sound down (no makeup gain) and has a hard knee
+(``knee=1``): below its threshold it does nothing at all. The thresholds
+are plain numbers, so no ffmpeg has to read "dB":
 
-The leveller alone, with quarter-second slices smoothed over four seconds
-(1.6.0), was measured to do little anyone could hear: a short bang stood
-37 dB over the speech around it, as it did without, and a scene had to stay
-quiet or loud for several seconds before the level moved at all. These
-values bring that bang to 16 dB over the speech, and quiet speech up by
-about 18 dB within a second; a dense advert 15 dB louder than the speech
-before it ends up less than 4 dB louder. The values, and why:
+- the level: ``threshold=0.133`` (-17.5 dBFS) on the sound's slow RMS,
+  ``ratio=4``, ``attack=2000``, ``release=9000`` (the longest acompressor
+  takes: it comes down over a second or two and back over several, so it
+  never rides between words or speakers) - an advert break, a loud scene,
+  a channel mastered hot, brought down steadily;
+- the scene: ``threshold=0.25`` (-12 dBFS), ``ratio=8``, ``attack=50``,
+  ``release=1000`` - an explosion, a shout;
+- the bang: ``threshold=0.35`` (-9 dBFS), ``ratio=20``, ``attack=5``,
+  ``release=400`` - a shot or a door caught as it starts, let go before the
+  next words.
 
-- ``acompressor=threshold=0.063`` (-24 dBFS, written as a plain number so
-  no ffmpeg has to read "dB"): above it the level is compressed,
-  ``ratio=3`` - gently; ``attack=5`` ms catches a bang as it starts,
-  ``release=200`` ms lets go before the next words. It never raises
-  anything (no makeup gain), so it can not clip;
-- ``dynaudnorm f=150``: slices of 150 ms - a loud advert or a sudden
-  explosion is brought down, and quiet speech up, within a second;
-- ``g=5``: smoothed over five slices (three quarters of a second): quick,
-  yet not within a syllable;
-- ``p=0.7``: peaks to -3 dBFS, headroom kept;
-- ``m=10``: at most 20 dB of gain, so silence and background hiss are not
-  pumped up to full level;
-- the rest as ffmpeg has them: one gain for all channels in both (the
-  stereo or surround image does not shift), no DC correction.
+Speech at broadcast level (-23 LUFS) stays under all three. Measured with
+speech-like test signals and ITU-R BS.1770 loudness, on a real core
+(tests/test_night_mode.py holds it to the rules): news at -24 LUFS, two
+speakers, changes by 0.0 LU and
+its gain does not move, the pauses between words neither; a channel
+mastered hot (-16 LUFS) comes down about 5 LU, steadily (within 2.2 dB for
+one speaker); bangs over quiet dialogue end up 8 dB less loud than
+without, an advert 11 LU louder than the speech around it about 4 dB
+nearer it, and every signal tried is as loud as before or quieter.
 
-Only filters and options every ffmpeg in use knows are given -
-``acompressor`` and these four of ``dynaudnorm`` have been in ffmpeg since
-3.0 (2016), and the oldest libmpv the app runs with is built on a newer
-one. A graph the core's
-ffmpeg refuses would cost a stream its sound, so the player checks that the
-filter took (has_filter) and that the sound came up through it. It is put
-on the core with a label of its own (``@dopeiptv-night``) and taken off by
-that label: nothing else on the audio chain - the music equaliser, an
-``af`` from Nerd's mpv options - is touched, and the picture never is. mpv
-keeps the filter from stream to stream on that core, so it holds through
-channel changes, the rewind buffer and the pop-out; and it is applied on
-the fly - turning it on ramps the level in, turning it off returns it at
-once, the stream keeps playing.
+Nothing is lifted. The 1.6.0 leveller (``dynaudnorm``, which takes each
+slice of sound towards a peak target) and the first 1.6.1 test build (a
+quicker one after a compressor) raised what was quiet: they made
+news-like speech 4.4 and 7.9 LU louder and rode its gain by 5 to 7 dB -
+"louder, and it wobbles". A leveller that lifts can not leave plain
+speech alone and never be louder. ``dynaudnorm`` also holds the sound back
+by its whole window (its frames times their number: 3.5 s for 1.6.0's),
+which a live stream pays at every start and every switch; these
+compressors hold back nothing.
+
+Only options ``acompressor`` has had since ffmpeg 3.0 (2016) are given -
+the oldest libmpv the app runs with is built on a newer one - and the
+rest are ffmpeg's own: one gain for all channels (the stereo or surround
+image does not shift). A graph the core's ffmpeg refuses would cost a
+stream its sound, so the player checks that the filter took (has_filter)
+and that the sound came up through it. It is put on the core with a label
+of its own (``@dopeiptv-night``) and taken off by that label: nothing else
+on the audio chain - the music equaliser, an ``af`` from Nerd's mpv
+options - is touched, and the picture never is. mpv keeps the filter from
+stream to stream on that core, so it holds through channel changes, the
+rewind buffer and the pop-out; and it is applied on the fly, the stream
+keeps playing.
 """
 
 from __future__ import annotations
@@ -58,8 +63,9 @@ KEY = "night_mode"
 #: The label the filter carries on the core.
 LABEL = "dopeiptv-night"
 #: The filter graph handed to mpv's lavfi wrapper.
-GRAPH = ("acompressor=threshold=0.063:ratio=3:attack=5:release=200,"
-         "dynaudnorm=f=150:g=5:p=0.7:m=10")
+GRAPH = ("acompressor=threshold=0.133:ratio=4:attack=2000:release=9000:knee=1,"
+         "acompressor=threshold=0.25:ratio=8:attack=50:release=1000:knee=1,"
+         "acompressor=threshold=0.35:ratio=20:attack=5:release=400:knee=1")
 
 
 class Readable(Protocol):

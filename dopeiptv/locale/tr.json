@@ -2019,7 +2019,7 @@
   "together_not_here": "{title} kaynağında yok. Diğerleri izlemeye devam ediyor.",
   "together_not_shareable": "Bu birlikte izlenemez – yalnızca bir kaynaktaki filmler, bölümler ve canlı kanallar izlenebilir, kendi dosyaların ya da kayıtların değil.",
   "night_mode": "Gece modu",
-  "night_mode_hint": "Sesi dengeler: yüksek reklamlar ve sahneler kısılır, alçak sesli diyaloglar yükselir. Hemen devreye girer, yayın sürer.",
+  "night_mode_hint": "Yüksek reklamları, patlamaları ve sahneleri konuşma seviyesine doğru kısar, böylece ses düzeyi olduğu yerde kalabilir. Asla daha yüksek değil; konuşma olduğu gibi kalır. Hemen devreye girer, yayın sürer.",
   "night_on": "Gece modu açık",
   "night_off": "Gece modu kapalı",
   "sc_night_mode": "Gece modu (ses)",

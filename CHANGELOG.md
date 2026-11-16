@@ -66,18 +66,23 @@ how connections to the account are counted.
 
 ### Fixed
 
-- Night mode can be heard. The leveller alone, with slow settings, did
-  little anyone could hear - a short bang stood as far over the speech as
-  without it. A gentle compressor now goes before a quicker leveller
-  (`acompressor`, then `dynaudnorm` with 150 ms slices smoothed over five):
-  quiet speech comes up by about 18 dB within a second, and loud adverts
-  and explosions stand far less over it. Turning it on or off from the
-  player's menu or Settings says so in the picture's corner as the N key
-  does (the status line without a picture), once whichever way it was
-  switched; a player whose FFmpeg cannot build the filter says "Night mode
-  could not be turned on for this stream" instead of claiming it is on,
-  and a stream's sound that did not start through it is brought back
-  without it rather than left silent.
+- Night mode brings loud parts down and nothing up. In 1.6.0 its leveller
+  (`dynaudnorm`) did little to a bang and lifted quiet passages, making
+  plain speech louder and its level ride with every pause - "louder, and
+  it wobbles" - and it held the sound back by 3.5 s at every start. Three
+  compressors that only ever turn down now take its place: a slow one
+  for a loud advert break, a loud scene or a channel mastered hot, one for
+  an explosion or a shout, and a quick one for a shot or a door. Speech at
+  broadcast level stays under all three, so the news sounds as without
+  it (a channel mastered hotter comes down, steadily); measured, bangs over quiet dialogue end up 8 dB less loud,
+  an advert 11 LU louder than the speech around it about 4 dB nearer it,
+  and nothing is ever louder than with night mode off. Turning it on or
+  off from the player's menu or Settings says so in the picture's corner
+  as the N key does (the status line without a picture), once whichever
+  way it was switched; a player whose FFmpeg cannot build the filter says
+  "Night mode could not be turned on for this stream" instead of claiming
+  it is on, and a stream's sound that did not start through it is brought
+  back without it rather than left silent.
 - TV mode: Stop pressed while a dropped channel waited for the app's
   reconnect - the Stop key over the page or the picture, the phone
   remote's or Home Assistant's - stopped nothing, and the reconnect then

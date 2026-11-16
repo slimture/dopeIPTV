@@ -2019,7 +2019,7 @@
   "together_not_here": "{title} nije u tvom izvoru. Drugi nastavljaju gledati.",
   "together_not_shareable": "Ovo se ne može gledati zajedno – samo filmovi, epizode i kanali uživo iz izvora, ne tvoje datoteke ni snimke.",
   "night_mode": "Noćni način",
-  "night_mode_hint": "Ujednačuje zvuk: glasne reklame i scene se stišaju, tihi dijalozi pojačaju. Uključuje se odmah, prijenos se nastavlja.",
+  "night_mode_hint": "Stišava glasne reklame, praskove i scene prema razini govora, pa glasnoća može ostati gdje jest. Nikad glasnije; govor ostaje kakav jest. Uključuje se odmah, prijenos se nastavlja.",
   "night_on": "Noćni način uključen",
   "night_off": "Noćni način isključen",
   "sc_night_mode": "Noćni način (zvuk)",

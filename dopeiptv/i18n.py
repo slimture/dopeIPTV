@@ -2534,7 +2534,7 @@ _STRINGS: dict[str, dict[str, str]] = {
 
     # ── Everyday: night mode, recordings as MP4, series reminders, statistics ──
     "night_mode": {"en": "Night mode"},
-    "night_mode_hint": {"en": "Evens out the sound: loud adverts and scenes come down, quiet dialogue comes up. Turns on at once, the stream plays on."},
+    "night_mode_hint": {"en": "Brings loud adverts, bangs and scenes down towards the level of speech, so the volume can stay where it is. Never louder; speech stays as it is. Turns on at once, the stream plays on."},
     "night_on": {"en": "Night mode on"},
     "night_off": {"en": "Night mode off"},
     "night_refused": {"en": "Night mode could not be turned on for this stream"},

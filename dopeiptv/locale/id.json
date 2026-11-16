@@ -2019,7 +2019,7 @@
   "together_not_here": "{title} tidak ada di sumbermu. Yang lain tetap menonton.",
   "together_not_shareable": "Ini tidak bisa ditonton bareng – hanya film, episode, dan saluran langsung dari sumber, bukan berkas atau rekamanmu sendiri.",
   "night_mode": "Mode malam",
-  "night_mode_hint": "Meratakan suara: iklan dan adegan yang keras dipelankan, dialog yang pelan dikeraskan. Langsung aktif, siaran tetap berjalan.",
+  "night_mode_hint": "Menurunkan iklan, ledakan, dan adegan yang keras ke arah tingkat suara percakapan, sehingga volume bisa tetap di tempatnya. Tidak pernah lebih keras; percakapan tetap seperti adanya. Langsung aktif, siaran tetap berjalan.",
   "night_on": "Mode malam aktif",
   "night_off": "Mode malam nonaktif",
   "sc_night_mode": "Mode malam (suara)",

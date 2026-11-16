@@ -2019,7 +2019,7 @@
   "together_not_here": "{title} n'est pas dans ta source. Les autres continuent de regarder.",
   "together_not_shareable": "Impossible de regarder ceci ensemble – seulement les films, épisodes et chaînes en direct d'une source, pas tes propres fichiers ni enregistrements.",
   "night_mode": "Mode nuit",
-  "night_mode_hint": "Égalise le son : les publicités et scènes bruyantes baissent, les dialogues discrets montent. S'active aussitôt, le flux continue.",
+  "night_mode_hint": "Ramène les publicités, détonations et scènes bruyantes vers le niveau des dialogues, pour que le volume puisse rester où il est. Jamais plus fort ; les dialogues restent tels quels. S'active aussitôt, le flux continue.",
   "night_on": "Mode nuit activé",
   "night_off": "Mode nuit désactivé",
   "sc_night_mode": "Mode nuit (son)",
