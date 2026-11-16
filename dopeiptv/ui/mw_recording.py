@@ -193,7 +193,8 @@ class _RecordingMixin:
         return tuner_ok is None or tuner_ok(url)
 
     def _guard_rec_switch(self, url: str, title: str) -> bool:
-        if not url or not str(url).startswith("http"):
+        # A stream from the network (a SAT>IP server's RTSP too), not a file.
+        if not url or not str(url).startswith(("http", "rtsp")):
             return True
         active = [j for j in self.rec.jobs if j["status"] == "recording"]
         # Back to a channel recorded in the background from its rewind

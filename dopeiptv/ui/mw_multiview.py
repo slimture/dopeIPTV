@@ -463,7 +463,13 @@ class _MultiviewCell(QWidget):
                     m, nerd.source(), self._nerd_applied, url=url)
             except Exception as e:
                 log.debug("multiview: Nerd's stream options not set: %s", e)
-            m.play(url)
+            # A SAT>IP source's RTSP transport, for this stream alone.
+            from ..media.embedded import load_with_options, rtsp_file_options
+            opts = rtsp_file_options(url)
+            if opts:
+                load_with_options(m, url, opts)
+            else:
+                m.play(url)
             return True
         except Exception as e:
             log.warning("multiview cell play failed: %s: %s",

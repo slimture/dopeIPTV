@@ -233,10 +233,21 @@ class _MediaServerMixin:
         """Live TV with no channels: why, when the server says (Plex). A box
         says it whenever it has one - MythTV lists its channels for the
         guide only, VDR's may lack streamdev - or else what its guide lacks
-        (a VDR with streamdev alone)."""
+        (a VDR with streamdev alone, a SAT>IP server), unless the source has
+        a guide address of its own."""
         client = getattr(self, "client", None)
         note, guide = (getattr(client, name, "") for name in ("live_note", "guide_note"))
         if isinstance(note, str) and note and (not categories or self._ms_client() is None):
             self._set_status(note)
-        elif isinstance(guide, str) and guide:
+        elif isinstance(guide, str) and guide and not self._source_guide_url():
             self._set_status(guide)
+
+    def _source_guide_url(self) -> str:
+        """The active source's own guide address: with one, what its box's
+        guide lacks (a SAT>IP server has none) is not said."""
+        store = getattr(self, "playlist_store", None)
+        try:
+            pl = store.active() if store is not None else None
+        except Exception:
+            pl = None
+        return str((pl or {}).get("epg_url") or "").strip()

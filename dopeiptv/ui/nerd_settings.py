@@ -64,7 +64,7 @@ def text_box(value: str, placeholder: str, lines: int = 4) -> QPlainTextEdit:
 
 
 BOX_NAMES = {"enigma2": "Enigma2", "tvheadend": "Tvheadend", "hdhomerun": "HDHomeRun", "vdr": "VDR",
-             "dvbviewer": "DVBViewer", "nextpvr": "NextPVR", "mythtv": "MythTV"}
+             "dvbviewer": "DVBViewer", "nextpvr": "NextPVR", "mythtv": "MythTV", "satip": "SAT>IP"}
 
 #: Nerd's pages in the order its list shows them, and the settings on each
 #: (what "2 changed" counts; boxes are counted as boxes).
@@ -374,13 +374,13 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
             btn.clicked.connect(lambda _c=False, pid=pl.get("id"): edit and pid and edit(pid))
             c.row(str(pl.get("name") or pl.get("server") or ""), btn,
                   f"{BOX_NAMES.get(pl.get('kind') or '', '')} · {pl.get('server') or ''}",
-                  search="box Enigma2 Tvheadend HDHomeRun VDR DVBViewer NextPVR MythTV")
+                  search="box Enigma2 Tvheadend HDHomeRun VDR DVBViewer NextPVR MythTV SAT>IP")
         if not boxes:
             c.note(tr("nerd_no_boxes"))
         if add is not None:
             add_btn = QPushButton(tr("nerd_add_box"))
             add_btn.clicked.connect(lambda _c=False: add())
-            c.layout_row(_hbox(add_btn), "box Enigma2 Tvheadend HDHomeRun VDR DVBViewer NextPVR MythTV add")
+            c.layout_row(_hbox(add_btn), "box Enigma2 Tvheadend HDHomeRun VDR DVBViewer NextPVR MythTV SAT>IP add")
 
     # -- channels: picons ------------------------------------------------------------------
     c = at("lists").card(tr("nerd_card_picons"))

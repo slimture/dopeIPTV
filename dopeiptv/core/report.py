@@ -120,7 +120,7 @@ AREA_WORDS: dict[str, tuple[str, ...]] = {
     "guide": ("epg", "xmltv", "guide"),
     "recording": ("record", "dvr recording", "stream-record", "rec "),
     "lists": ("m3u", "xtream", "stalker", "enigma2", "tvheadend", "hdhomerun", "jellyfin", "emby", "plex",
-              "vdr", "dvbviewer", "nextpvr", "mythtv", "lan scan", "queue",
+              "vdr", "dvbviewer", "nextpvr", "mythtv", "satip", "lan scan", "queue",
               "playlist", "channel", "categor", "source", "tmdb", "popular"),
     "settings": ("nerd", "settings", "i18n", "icon theme", "desktop entry", "remote", "share"),
     "cast": ("cast", "dlna", "chromecast"),

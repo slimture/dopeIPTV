@@ -15,6 +15,12 @@ thread and its answer kept a few seconds (every ~20 s while a box is the
 source); a box that does not answer says nothing and stops nothing. A ring
 in the channel list marks the channels that would cut something off now,
 and Nerd > Diagnostics shows what is in use ("In use now").
+
+A SAT>IP server's tuners are counted by the app itself (providers/satip.py,
+no request): each stream from it takes one of its system's, and before a
+multiview cell, a cast, a recording over its own connection or a zap beside
+them would find none free - or, the server saying no number, would be its
+second - the same question says so.
 """
 
 from __future__ import annotations
@@ -223,6 +229,8 @@ class _ConnectionsMixin:
         tuners) before *what* (an i18n key: what is about to open the
         stream); True to go ahead."""
         self._conn_tell_phone(v, tuner)
+        if what == "tuner_what" and tuner is not None and tuner.counted:
+            what = "satip_what"
         parts = [tr(what)]
         if v is not None:
             parts.append(self._conn_warning(v))
@@ -364,22 +372,30 @@ class _ConnectionsMixin:
     def _tuner_boxes(self) -> list[tuple[str, str, Any]]:
         """(source id, name, client) of each Enigma2 box source: the active
         one's own client, the others' made once (no request)."""
+        return self._kind_clients("enigma2", "tuner_state", "_tuner_clients")
+
+    def _satip_servers(self) -> list[tuple[str, str, Any]]:
+        """(source id, name, client) of each SAT>IP source, as for boxes."""
+        return self._kind_clients("satip", "tuner_verdict", "_satip_clients")
+
+    def _kind_clients(self, kind: str, has: str, memo: str) -> list[tuple[str, str, Any]]:
         active = self._conn_source()
         out: list[tuple[str, str, Any]] = []
         client = getattr(self, "client", None)
-        if hasattr(client, "tuner_state"):
+        if hasattr(client, has):
             out.append((active, self._tuner_source_name(active), client))
         lists = getattr(getattr(self, "playlist_store", None), "playlists", None)
         try:
             pls = list(lists()) if callable(lists) else []
         except Exception:
             pls = []
-        made = getattr(self, "_tuner_clients", None)
+        made = getattr(self, memo, None)
         if made is None:
-            made = self._tuner_clients = {}
+            made = {}
+            setattr(self, memo, made)
         for pl in pls:
             pid = str(pl.get("id") or "")
-            if pl.get("kind") != "enigma2" or not pid or pid == active:
+            if pl.get("kind") != kind or not pid or pid == active:
                 continue
             mark = (pl.get("server"), pl.get("username"), pl.get("password"),
                     repr(sorted((pl.get("options") or {}).items())))
@@ -462,10 +478,25 @@ class _ConnectionsMixin:
                 out.append(tuners.Tune(u.kind, "", key))
         return out
 
+    def _satip_verdict(self, url: str, uses: list[Use]) -> tuple[bool, tuners.Verdict | None]:
+        """(whether *url* is a SAT>IP server's, the Verdict when its tuners
+        would run out with it next to *uses*) - counted here, no request."""
+        try:
+            for _pid, _name, client in self._satip_servers():
+                if client.own_stream(url):
+                    return True, client.tuner_verdict(url, uses)
+        except Exception as e:      # the check must never stand in the way
+            log.debug("tuners: the SAT>IP server's not checked: %s", e)
+        return False, None
+
     def _tuner_verdict(self, url: str, uses: list[Use]) -> tuners.Verdict | None:
         """Would *url*, from a box, cut off a recording or what the box shows
         on its TV, next to *uses* (the app's own as they will be)? The
-        Verdict when it would; None when not, or when it cannot be told."""
+        Verdict when it would; None when not, or when it cannot be told. A
+        SAT>IP server's: when its tuners would run out (``counted``)."""
+        mine, sat = self._satip_verdict(url, uses)
+        if mine:
+            return sat
         try:
             key = tuners.stream_key(url)
             box = self._tuner_box_for(url) if key else None
@@ -501,6 +532,14 @@ class _ConnectionsMixin:
         return ", ".join(parts)
 
     def _tuner_warning(self, v: tuners.Verdict) -> str:
+        if v.counted:
+            # A SAT>IP server: all its tuners held by the app's own streams
+            # (or, no number said, one), whichever gives way.
+            who = self._tune_words(v.cut)
+            head = (tr("satip_full", n=v.tuners, system=v.system) if v.tuners and v.system
+                    else tr("satip_full_any", n=v.tuners) if v.tuners else tr("satip_unknown"))
+            return " ".join(x for x in (head, tr("conn_used_by", who=who) if who else "",
+                                        tr("satip_risk")) if x)
         return tr("tuner_full", n=v.tuners) + " " + tr("tuner_cuts", what=self._tune_words(v.cut))
 
     def _tuner_ok(self, url: str, uses: list[Use] | None = None,
@@ -622,6 +661,19 @@ class _ConnectionsMixin:
             lines += [("item", "• " + self._tune_words(users)) for users in held.values()]
         if boxes:
             lines.append(("note", tr("inuse_mark_note")))
+        for pid, name, client in self._satip_servers():
+            try:
+                own = [u for u in uses if u.url and client.own_stream(u.url)]
+                limit = client.tuner_limit()
+            except Exception as e:
+                log.debug("in use: a SAT>IP server not counted: %s", e)
+                continue
+            if pid != active and not own:
+                continue
+            lines.append(("head", tr("inuse_box_tuners", name=name, n=len(own), total=limit) if limit
+                          else tr("inuse_satip_unknown", name=name, n=len(own))))
+            if own:
+                lines.append(("item", "• " + self._tune_words([tuners.Tune(u.kind) for u in own])))
         return lines
 
     def _in_use_card(self, fill: Callable[[list[tuple[str, str]]], None]) -> None:

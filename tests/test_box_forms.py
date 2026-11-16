@@ -100,3 +100,37 @@ def test_a_found_home_server_fills_the_form(app):
     d._box_found({"kind": "nextpvr", "server": "http://192.168.1.52:8866", "name": "NextPVR - 192.168.1.52",
                   "login": True})
     assert d.kind.currentData() == "nextpvr" and d.name.text() == "NextPVR"
+
+
+def test_a_satip_server_asks_for_its_address_and_maybe_a_list(app):
+    from dopeiptv.i18n import tr
+    d = PlaylistDialog()
+    d.kind.setCurrentIndex(d.kind.findData("satip"))
+    assert _shown(d.finder.row) and not _shown(d.user) and not _shown(d.pw) and not _shown(d.mac)
+    assert _shown(d.satip_m3u) and d._satip_lbl.text() == tr("satip_m3u")
+    d.server.setText("10.0.0.9")
+    assert d.problem() is None and "options" not in d.values()
+    d.satip_m3u.setText("/home/me/Astra 19.2E.m3u")
+    assert d.values()["options"] == {"m3u": "/home/me/Astra 19.2E.m3u"}
+    # Found on the network: where its description is, kept for its address only.
+    d._box_found({"kind": "satip", "server": "http://10.0.0.9", "name": "Octopus NET - 10.0.0.9",
+                  "description": "http://10.0.0.9:8080/desc.xml"})
+    assert d.name.text() == "Octopus NET"
+    assert d.values()["options"]["description"] == "http://10.0.0.9:8080/desc.xml"
+    d.server.setText("10.0.0.10")
+    assert "description" not in d.values()["options"]
+    d.kind.setCurrentIndex(d.kind.findData("enigma2"))
+    assert not _shown(d.satip_m3u)
+
+
+def test_the_fritzbox_cable_preset_is_a_satip_source(app):
+    from dopeiptv.providers.satip import split_lists
+    from dopeiptv.ui.source_presets import PRESETS, fill
+    p = next(p for p in PRESETS if p.kind == "satip")
+    src = fill(p, "")
+    assert src["kind"] == "satip" and src["server"] == "http://fritz.box"
+    assert split_lists(src["m3u"]) == [f"http://fritz.box/dvb/m3u/{n}.m3u" for n in ("tvhd", "tvsd", "radio")]
+    d = PlaylistDialog()
+    d._preset_picked(src)
+    v = d.values()
+    assert (v["kind"], v["server"], v["options"]["m3u"]) == ("satip", "http://fritz.box", src["m3u"])

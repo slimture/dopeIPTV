@@ -15,6 +15,13 @@ the player, its rewind buffer, multiview cells, recordings over their own
 connection, a cast - are core/connections.py's count, each with the
 address it plays.
 
+A SAT>IP server (providers/satip.py) is counted another way
+(``counted``): it gives each stream a tuner of its own - a server may
+share one between two streams of a transponder, but none has to - and says
+how many it has of each system, so a stream is one tuner against that
+number; one whose number is not known holds as soon as one is in use (most
+have one or two, and the app opens a second by itself only after asking).
+
 It only says: nothing here stops a stream. A box that does not say how
 many tuners it has says nothing at all.
 """
@@ -24,7 +31,7 @@ from __future__ import annotations
 import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Sequence
 from urllib.parse import unquote, urlsplit
 
 #: What a verdict says: free to watch, it takes the last free tuner, or it
@@ -82,6 +89,11 @@ class Verdict:
     tuners: int
     in_use: int
     cut: tuple[Tune, ...] = ()
+    #: A server whose tuners are counted one per stream (``counted``): the
+    #: system they are for, as a person reads it ("DVB-S/S2"; "" for any),
+    #: *tuners* 0 when their number is not known.
+    system: str = ""
+    counted: bool = False
 
     @property
     def cuts_recording(self) -> bool:
@@ -230,6 +242,24 @@ def verdict(state: BoxState | None, key: str | None,
     # the app's own, in the order the box listed them.
     gives_way = min(held.values(), key=_weight)
     return Verdict(CUTS, state.tuners, in_use, tuple(gives_way))
+
+
+def counted(limit: int | None, held: Sequence[Tune], system: str = "") -> Verdict:
+    """One more stream on a server that gives each stream a tuner of its
+    own (SAT>IP): *held* the app's own streams on those tuners now (as they
+    will be), *limit* how many there are (None or 0: not said). FREE with
+    one to spare, LAST when this takes the last, CUTS when none is left -
+    and, their number not known, as soon as one is held. A CUTS names what
+    holds them (``cut``)."""
+    n = len(held)
+    if not limit or limit < 0:
+        return Verdict(CUTS if n else FREE, 0, n, tuple(held) if n else (), system, True)
+    free = limit - n
+    if free >= 2:
+        return Verdict(FREE, limit, n, (), system, True)
+    if free == 1:
+        return Verdict(LAST, limit, n, (), system, True)
+    return Verdict(CUTS, limit, n, tuple(held), system, True)
 
 
 # -- each box's state, kept a few seconds ------------------------------------------------

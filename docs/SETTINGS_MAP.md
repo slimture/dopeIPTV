@@ -98,7 +98,9 @@ or "Shared" and where the shared one lives. Nerd's rows only while it is on.
   media server; a bare host gets the kind's port - VDR 8002, DVBViewer 8089,
   NextPVR 8866, MythTV 6544), `username` + `password` (NextPVR: `password`
   alone, named PIN), a media server's sign-in (`token`, options `user_id`,
-  `server_id`, `connections`), `mac` (Stalker)
+  `server_id`, `connections`), `mac` (Stalker); a SAT>IP server's channel
+  lists, option `m3u` (empty: the server's own), and where Find on my
+  network found its description, option `description` (not shown)
 - Network (Nerd, the whole tab): options `user_agent`, `referer`, `headers`,
   `proxy` (shared: Nerd › Network), `dns` + `dns_url`, `ip_family`,
   `backup_servers`, `cert_pin` + `cert_pin_for` (shared: the system's); the
@@ -108,7 +110,10 @@ or "Shared" and where the shared one lives. Nerd's rows only while it is on.
   `catchup_template`, `rewrite`; each kind's: `stream_port`, `transcode`,
   `transcode_more`, `stream_login`, `iptv_direct` (Enigma2), `profile`
   (Tvheadend), `transcode` (HDHomeRun), `streamdev_port` (VDR),
-  `stream_port` (DVBViewer), `ms_quality` (media servers)
+  `stream_port` (DVBViewer), `ms_quality` (media servers); a SAT>IP
+  server's, for everyone: `transport` (RTSP over TCP - the default, not
+  stored -, UDP or HTTP), `http_port` (with HTTP), `tuners` (0: as the
+  server says)
 - Guide: `epg_url`; Nerd: `epg_shift` (on top of Guide's shared
   `epg_delay_min`), `picons` (Enigma2), `cloud_guide` (HDHomeRun); picons →
   Nerd › Boxes and lists (shared: `nerd_picon_dir`); channel numbers

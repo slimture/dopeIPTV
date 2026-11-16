@@ -513,6 +513,9 @@ class SourceNerdPanel(QWidget):
             url = f"http://{login}{host}:{self.dvb_port.value()}/upnp/channelstream/1.ts"
         elif kind == "nextpvr":
             url = origin + "/live?channeloid=7179&client=dopeIPTV&sid=…"
+        elif kind == "satip":
+            url = (f"rtsp://{host}:554/?src=1&freq=11494&pol=h&ro=0.35&msys=dvbs2&mtype=8psk"
+                   "&plts=on&sr=22000&fec=23&pids=0,5100,5101,5102,5104")
         else:
             url = origin + "/channel/1.ts"
         return {"live_url": url, "_example": True}

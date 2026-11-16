@@ -1,20 +1,21 @@
 """Find TV boxes and servers on the home network: Enigma2 receivers,
 Tvheadend servers, HDHomeRun tuners (and what imitates one), VDR
 (restfulapi, else streamdev), DVBViewer Media Servers, NextPVR and MythTV
-backends, and the media servers - Jellyfin, Emby and Plex; and, for the
-cast window, what can be cast to on another part of the network:
-Chromecasts, Kodis and DLNA TVs.
+backends, SAT>IP servers, and the media servers - Jellyfin, Emby and Plex;
+and, for the cast window, what can be cast to on another part of the
+network: Chromecasts, Kodis and DLNA TVs.
 
 HDHomeRun tuners, Jellyfin and Emby (UDP 7359) and Plex (GDM, UDP 32414)
-answer a broadcast; everything is also asked directly, every address of the
-local /24 on the port its kind listens on (a server in a container often
-never hears a broadcast). Only private networks are scanned, only when the
-user asks.
+answer a broadcast, SAT>IP servers an SSDP search (providers/satip.py);
+everything else is also asked directly, every address of the local /24 on
+the port its kind listens on (a server in a container often never hears a
+broadcast). Only private networks are scanned, only when the user asks.
 
 A broadcast or a multicast search (mDNS, SSDP) does not cross to another
 part of a network split in VLANs unless the router passes it on; a question
 to one address does. The other networks Nerd > Network lists
-(core/home_net.py) are asked that way, together with the local /24.
+(core/home_net.py) are asked that way, together with the local /24 - and a
+SAT>IP server there by UPnP's unicast search (UDP 1900).
 
 Every address and port is tried at once (``open_ports``; ``sweep`` per
 address): a few hundred connections in flight without a thread each, well
@@ -51,7 +52,7 @@ from ..core import home_net
 from ..core._lazy_requests import requests
 from ..core.log import log
 from ..core.nerd_check import OK, WARN, Check
-from . import dlna, hdhomerun, jellyfin, plex
+from . import dlna, hdhomerun, jellyfin, plex, satip
 from .boxes import USER_AGENT, child_text, parse_xml
 
 PORTS = {"enigma2": 80, "tvheadend": 9981, "hdhomerun": 80, "jellyfin": 8096, "plex": 32400,
@@ -403,18 +404,21 @@ def _hdhr(sess, base: str, host: str, found: list[dict]) -> None:
 def scan(progress: Callable[[int], None] | None = None, hosts: list[str] | None = None,
          ports: dict[str, int] | None = None, workers: int = 64,
          broadcast: bool = True, extra: list[str] | None = None,
-         cancel: threading.Event | None = None) -> list[dict]:
+         cancel: threading.Event | None = None, ssdp_port: int = satip.SSDP_PORT) -> list[dict]:
     """Every box and server found: the broadcasts first (HDHomeRun,
-    Jellyfin and Emby, Plex's GDM), then each address of the local networks
-    (or *hosts*) and of the other networks Nerd lists (*extra*: their
-    addresses; None: as the settings say) asked directly - all of them swept
-    at once first, and only an address that took a connection asked what it
-    is. One entry per address; stopped (*cancel*), what was found so far."""
+    Jellyfin and Emby, Plex's GDM, SAT>IP's SSDP search), then each address
+    of the local networks (or *hosts*) and of the other networks Nerd lists
+    (*extra*: their addresses; None: as the settings say) asked directly -
+    all of them swept at once first, and only an address that took a
+    connection asked what it is; a SAT>IP server on the other networks by a
+    search sent to each (*ssdp_port*). One entry per address; stopped
+    (*cancel*), what was found so far."""
     found: dict[tuple[str, str], dict] = {}
     if broadcast:
-        # The three listen at once: each waits out its own answers.
-        with ThreadPoolExecutor(max_workers=3) as pool:
-            asks = [pool.submit(f) for f in (hdhomerun.discover, jellyfin.discover, plex.discover)]
+        # The four listen at once: each waits out its own answers.
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            asks = [pool.submit(f) for f in (hdhomerun.discover, jellyfin.discover, plex.discover,
+                                              satip.discover)]
             answers: list[list[dict]] = []
             for a in asks:
                 try:
@@ -426,7 +430,7 @@ def scan(progress: Callable[[int], None] | None = None, hosts: list[str] | None 
             found[("hdhomerun", d["server"].rstrip("/"))] = {
                 "kind": "hdhomerun", "server": d["server"].rstrip("/"),
                 "name": f"HDHomeRun {d.get('device_id', '')}".strip()}
-        for d in answers[1] + answers[2]:
+        for d in answers[1] + answers[2] + answers[3]:
             found[(d["kind"], d["server"].rstrip("/"))] = dict(d, server=d["server"].rstrip("/"))
     if hosts is None:
         hosts = [str(ip) for net in local_networks() for ip in net.hosts()]
@@ -441,6 +445,10 @@ def scan(progress: Callable[[int], None] | None = None, hosts: list[str] | None 
     def stopped() -> bool:
         return cancel is not None and cancel.is_set()
     every = dict(PORTS, **(ports or {}))
+    # A SAT>IP server on another network answers a search sent to it, beside
+    # the sweep (its own wait, not one more after it).
+    searcher = ThreadPoolExecutor(max_workers=1)
+    sat = searcher.submit(satip.discover_at, extra, 1.5, ssdp_port, cancel) if extra else None
     # Which addresses have one of the ports open at all, every one asked at
     # once; only those are asked what they are.
     opened = sweep(everyone, every.values(), cancel=cancel)
@@ -457,6 +465,13 @@ def scan(progress: Callable[[int], None] | None = None, hosts: list[str] | None 
                     found[(d["kind"], d["server"].rstrip("/"))] = d
                 if progress:
                     progress(min(99, 50 + done * 50 // len(alive)))
+    try:
+        for d in sat.result() if sat is not None else []:
+            found[("satip", d["server"].rstrip("/"))] = dict(d, server=d["server"].rstrip("/"))
+    except Exception as e:
+        log.debug("lan scan: the SAT>IP search failed: %s", e)
+    finally:
+        searcher.shutdown(wait=False)
     if progress:
         progress(100)
     if extra:

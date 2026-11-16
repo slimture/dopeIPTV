@@ -146,9 +146,10 @@ class Renderer:
 
 
 def ssdp_search(timeout: float = 3.0,
-                addr: tuple[str, int] = SSDP_ADDR) -> list[str]:
+                addr: tuple[str, int] = SSDP_ADDR,
+                targets: tuple[str, ...] = SEARCH_TARGETS) -> list[str]:
     """The description address of everything that answers a search for a
-    media renderer."""
+    media renderer (or for *targets*: a SAT>IP server's, providers/satip.py)."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM,
                          socket.IPPROTO_UDP)
     found: list[str] = []
@@ -162,7 +163,7 @@ def ssdp_search(timeout: float = 3.0,
         except OSError:
             pass
         sock.settimeout(0.4)
-        for st in SEARCH_TARGETS:
+        for st in targets:
             msg = ("M-SEARCH * HTTP/1.1\r\n"
                    f"HOST: {SSDP_ADDR[0]}:{SSDP_ADDR[1]}\r\n"
                    'MAN: "ssdp:discover"\r\n'
@@ -213,10 +214,12 @@ def _locations(data: bytes) -> list[str]:
 
 
 def ssdp_unicast(hosts: list[str], timeout: float = 2.0, port: int = 1900,
-                 cancel: Any = None) -> dict[str, list[str]]:
+                 cancel: Any = None,
+                 targets: tuple[str, ...] = SEARCH_TARGETS) -> dict[str, list[str]]:
     """Each of *hosts* (addresses) asked directly - UPnP 1.1's unicast
     M-SEARCH, which reaches another part of a network split in VLANs where
-    the multicast one does not. {address: description addresses}."""
+    the multicast one does not - for a media renderer, or for *targets*.
+    {address: description addresses}."""
     found: dict[str, list[str]] = {}
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
@@ -228,7 +231,7 @@ def ssdp_unicast(hosts: list[str], timeout: float = 2.0, port: int = 1900,
         for host in hosts:
             if cancel is not None and cancel.is_set():
                 return found
-            for st in SEARCH_TARGETS:
+            for st in targets:
                 msg = ("M-SEARCH * HTTP/1.1\r\n"
                        f"HOST: {host}:{port}\r\n"
                        'MAN: "ssdp:discover"\r\n'

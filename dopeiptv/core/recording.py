@@ -682,6 +682,7 @@ class RecordingManager(QObject):
                 if j.get("stop") else None)
         from .net_bridge import recorder_options
         through = recorder_options(kind, *self._bridge(j))
+        through = [*self._rtsp_options(j, kind), *through]
         if kind == "ffmpeg":
             cmd = [exe, "-y", "-loglevel", "error",
                    *self._input_options(j["url"]),
@@ -733,6 +734,27 @@ class RecordingManager(QObject):
         url = str(j.get("url") or "")
         address = net_bridge.address_for(src, url)
         return address, bool(address) and net_bridge.checks_pin(src, url)
+
+    def _rtsp_options(self, j: dict, kind: str) -> list[str]:
+        """The RTSP transport a SAT>IP source asks for, for a recording of
+        one of its RTSP addresses (core/rtsp.py) - the source it was made
+        from read again, as it is now; none for anything else."""
+        from . import rtsp
+        url = str(j.get("url") or "")
+        if j.get("source_kind") not in rtsp.KINDS or not rtsp.is_rtsp(url):
+            return []
+        src: dict = {"_kind": j.get("source_kind")}
+        pid = str(j.get("source") or "")
+        if pid:
+            try:
+                from .stores import PlaylistStore
+                pl = PlaylistStore(self.settings).get(pid)
+            except Exception as e:
+                log.debug("record: no source %s for its transport: %s", pid, e)
+                pl = None
+            if pl:
+                src = dict(pl.get("options") or {}, _kind=pl.get("kind") or "xtream")
+        return rtsp.ffmpeg_options(src, url) if kind == "ffmpeg" else rtsp.mpv_args(src, url)
 
     @staticmethod
     def _input_options(url: str) -> list[str]:

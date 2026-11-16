@@ -40,7 +40,7 @@ from .theme import P, _mix, ink_on
 KIND_NAMES = {"xtream": "Xtream", "m3u": "M3U", "stalker": "Stalker", "enigma2": "Enigma2",
               "tvheadend": "Tvheadend", "hdhomerun": "HDHomeRun", "vdr": "VDR",
               "dvbviewer": "DVBViewer", "nextpvr": "NextPVR", "mythtv": "MythTV",
-              "jellyfin": "Jellyfin", "emby": "Emby", "plex": "Plex"}
+              "satip": "SAT>IP", "jellyfin": "Jellyfin", "emby": "Emby", "plex": "Plex"}
 TABS = ("conn", "net", "streams", "guide", "adv")
 #: A kind's switches that are about its streams or its guide; the rest are
 #: on Advanced.
@@ -425,6 +425,10 @@ class SourcePage(SourceFields, QScrollArea):
         signin = c.widget(self.signin)
         c.shown_if(signin, lambda: self.kind.currentData() in MEDIA_KINDS)
         c.shown_if(c.row(tr("playlist_mac"), self.mac), lambda: self._parts.get("mac", False))
+        # A SAT>IP server's channels: the lists given, else its own.
+        c.shown_if(c.row(tr("satip_m3u"), self.satip_m3u, tr("satip_m3u_hint"), stretch_control=True,
+                         search="SAT>IP M3U channel list"),
+                   lambda: self._parts.get("satip", False))
 
     # -- Network (Nerd) ---------------------------------------------------------------------
 
@@ -544,6 +548,16 @@ class SourcePage(SourceFields, QScrollArea):
         badge.set(tr("src_shared"), False)
         c.link(tr("setting_stream_format"), tr("src_follows", where=_where(tr("set_grp_watch"), tr("tab_playback"))),
                tr("tab_playback"), lambda: self._go("playback"), badge=badge)
+        # A SAT>IP server's own, for everyone: how its streams travel, its
+        # HTTP port when they come over HTTP, how many of its tuners to use.
+        sat = lambda: self._parts.get("satip", False)  # noqa: E731
+        c.shown_if(c.row(tr("satip_transport"), self.satip_transport, tr("satip_transport_hint"),
+                         search="SAT>IP RTSP TCP UDP HTTP"), sat)
+        c.shown_if(c.row(tr("satip_http_port"), Stepper(self.satip_http_port), tr("satip_http_port_hint")),
+                   lambda: sat() and self.satip_transport.currentData() == "http")
+        c.shown_if(c.row(tr("satip_tuners"), Stepper(self.satip_tuners, width=230), tr("satip_tuners_hint"),
+                         search="SAT>IP tuners"), sat)
+        self.satip_transport.currentIndexChanged.connect(self._refresh_cards)
         if self.nerd_panel is None:
             return
         p = self.nerd_panel
@@ -639,9 +653,13 @@ class SourcePage(SourceFields, QScrollArea):
         self._parts = self._kind_fields()
         self.server_row.label.setText(self._parts["server_label"])
         self.pw_row.label.setText(self._parts["pw_label"])
+        self._refresh_cards()
+        self._update_header()
+
+    def _refresh_cards(self, *_a: Any) -> None:
+        """Each row shown or not as the kind (and what it chose) says now."""
         for c in self._cards:
             c.refresh()
-        self._update_header()
 
     # -- storing ------------------------------------------------------------------------------
 

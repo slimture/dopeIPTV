@@ -516,6 +516,20 @@ WEB_FILE_OPTIONS = {"demuxer-lavf-o": "", "demuxer-lavf-analyzeduration": "0",
                     "network-timeout": "60"}
 
 
+def rtsp_file_options(url: str | None) -> dict[str, str]:
+    """A SAT>IP source's RTSP transport for *url* alone (core/rtsp.py): TCP
+    or UDP as the playing source says. {} for every other address, which
+    opens exactly as before."""
+    if not url:
+        return {}
+    try:
+        from ..core import nerd, rtsp
+        return rtsp.mpv_options(nerd.source(), url)
+    except Exception as e:
+        log.debug("rtsp transport not set: %s", e)
+        return {}
+
+
 def load_with_options(m, url: str, options: dict[str, str]) -> bool:
     """loadfile with options for this file alone. mpv 0.38 put an index
     before the options, and python-mpv's loadfile follows the libmpv only in
@@ -3043,8 +3057,11 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
                 self._arm_stream_info(m, source or url)
             except Exception as e:
                 log.debug("Stream info unavailable: %s", e)
+            rtsp_opts = {} if web or source else rtsp_file_options(url)
             if web:
                 self._own_file_options = load_with_options(m, url, WEB_FILE_OPTIONS)
+            elif rtsp_opts:
+                self._own_file_options = load_with_options(m, url, rtsp_opts)
             else:
                 m.play(source or url)
             self.current_url = url

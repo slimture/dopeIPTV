@@ -1,6 +1,7 @@
 """Presets in the source dialog (with Nerd on): devices and servers that hand
 out an M3U playlist and an XMLTV guide at known addresses - pick one, give
-its host, and both are filled in."""
+its host, and both are filled in. A Fritz!Box Cable is also a SAT>IP server
+(providers/satip.py): its preset is that source, with its three lists."""
 
 from __future__ import annotations
 
@@ -20,9 +21,14 @@ class Preset:
     host: str          # the usual host ("" - ask)
     m3u: str           # "{host}" is replaced
     epg: str = ""
+    kind: str = "m3u"  # "satip": the host is the server, m3u its lists
 
+
+_FRITZ = "http://{host}/dvb/m3u/"
 
 PRESETS = (
+    Preset("Fritz!Box Cable (SAT>IP)", "fritz.box",
+           f"{_FRITZ}tvhd.m3u {_FRITZ}tvsd.m3u {_FRITZ}radio.m3u", kind="satip"),
     Preset("Fritz!Box TV (HD)", "fritz.box", "http://{host}/dvb/m3u/tvhd.m3u"),
     Preset("Fritz!Box TV (SD)", "fritz.box", "http://{host}/dvb/m3u/tvsd.m3u"),
     Preset("Fritz!Box Radio", "fritz.box", "http://{host}/dvb/m3u/radio.m3u"),
@@ -39,8 +45,11 @@ PRESETS = (
 def fill(preset: Preset, host: str) -> dict:
     """The source a preset gives for *host*: kind, address, guide, name."""
     h = (host or preset.host).strip().removeprefix("http://").removeprefix("https://").strip("/")
-    return {"kind": "m3u", "server": preset.m3u.format(host=h),
-            "epg_url": preset.epg.format(host=h) if preset.epg else "", "name": preset.label}
+    out = {"kind": preset.kind, "server": preset.m3u.format(host=h),
+           "epg_url": preset.epg.format(host=h) if preset.epg else "", "name": preset.label}
+    if preset.kind == "satip":
+        out.update(server=f"http://{h}", m3u=preset.m3u.format(host=h))
+    return out
 
 
 class PresetButton(QPushButton):

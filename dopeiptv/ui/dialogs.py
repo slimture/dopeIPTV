@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QApplication, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
     QFrame, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
     QListWidgetItem, QMessageBox, QProgressBar, QPushButton, QScrollArea,
-    QVBoxLayout, QWidget,
+    QSpinBox, QVBoxLayout, QWidget,
 )
 
 from ..i18n import tr
@@ -65,13 +65,22 @@ class FitScroll(QScrollArea):
         return QSize(hint.width(), min(hint.height(), 200))
 
 
+#: A SAT>IP source's own options (providers/satip.py), which its fields
+#: hold for everyone: its channel lists, how its streams travel, the HTTP
+#: port, how many of its tuners the app may use, where its description was
+#: found.
+SATIP_KEYS = ("m3u", "transport", "http_port", "tuners", "description")
+SATIP_HTTP_PORT = 8875
+
+
 class SourceFields:
     """A source's connection fields and what they mean - name, kind,
     address, login, MAC, guide address, refresh, a media server's sign-in,
-    Find on my network - without a layout of their own: the Add dialog puts
-    them in a form, a source's page in Settings (ui/source_page.py) on its
-    tabs. Mixed into the QWidget that holds them (it parents the sign-in and
-    the finder); *nerd_panel*, the source's own Nerd options, is the page's
+    Find on my network, a SAT>IP server's channel list, transport and
+    tuners - without a layout of their own: the Add dialog puts them in a
+    form, a source's page in Settings (ui/source_page.py) on its tabs. Mixed
+    into the QWidget that holds them (it parents the sign-in and the
+    finder); *nerd_panel*, the source's own Nerd options, is the page's
     while Nerd is on."""
 
     # (value, i18n key) - the label is translated at construction time.
@@ -133,6 +142,59 @@ class SourceFields:
                                   playlist if editing else None)
         self.server.textChanged.connect(self.signin.form_changed)
         self.user.textChanged.connect(self.signin.form_changed)
+        self._build_satip(self._options)
+
+    def _build_satip(self, options: dict) -> None:
+        """A SAT>IP server's fields: its channel lists (M3U, a file or an
+        address), how its streams travel, the HTTP port, its tuners."""
+        self.satip_m3u = QLineEdit(str(options.get("m3u") or ""))
+        self.satip_m3u.setPlaceholderText(tr("satip_m3u_placeholder"))
+        self.satip_transport = QComboBox()
+        for value, key in (("tcp", "satip_tr_tcp"), ("udp", "satip_tr_udp"), ("http", "satip_tr_http")):
+            self.satip_transport.addItem(tr(key), value)
+        idx = self.satip_transport.findData(str(options.get("transport") or "tcp").lower())
+        self.satip_transport.setCurrentIndex(max(0, idx))
+        self.satip_http_port = QSpinBox()
+        self.satip_http_port.setRange(1, 65535)
+        self.satip_tuners = QSpinBox()
+        self.satip_tuners.setRange(0, 64)
+        self.satip_tuners.setSpecialValueText(tr("satip_tuners_auto"))
+        for box, key, default in ((self.satip_http_port, "http_port", SATIP_HTTP_PORT),
+                                  (self.satip_tuners, "tuners", 0)):
+            try:
+                box.setValue(int(options.get(key) or default))
+            except (TypeError, ValueError):
+                box.setValue(default)
+        # Where Find on my network found the server's description.
+        self._satip_desc = str(options.get("description") or "")
+
+    def _satip_options(self, options: dict) -> dict:
+        """*options* with a SAT>IP source's own as its fields say (each at
+        its default left out); a description found for another address is
+        not kept."""
+        out = {k: v for k, v in options.items() if k not in SATIP_KEYS}
+        lists = self.satip_m3u.text().strip()
+        if lists:
+            out["m3u"] = lists
+        transport = self.satip_transport.currentData()
+        if transport != "tcp":
+            out["transport"] = transport
+        if transport == "http" and self.satip_http_port.value() != SATIP_HTTP_PORT:
+            out["http_port"] = str(self.satip_http_port.value())
+        if self.satip_tuners.value():
+            out["tuners"] = str(self.satip_tuners.value())
+        desc = self._satip_desc
+        if desc:
+            from urllib.parse import urlsplit
+            typed = self.server.text().strip()
+            try:
+                there = (urlsplit(desc).hostname or "").lower()
+                here = (urlsplit(typed if "://" in typed else "http://" + typed).hostname or "").lower()
+            except ValueError:
+                there, here = "", "-"
+            if there and there == here:
+                out["description"] = desc
+        return out
 
     def _kind_fields(self) -> dict[str, Any]:
         """What the kind shows: the address's label, which rows (address,
@@ -174,6 +236,7 @@ class SourceFields:
             "pw_label": tr("login_pin") if pin else tr("login_password"),
             "mac": stalker,
             "finder": box or media,
+            "satip": kind == "satip",
         }
 
     def _source_now(self) -> dict:
@@ -203,6 +266,8 @@ class SourceFields:
         self.server.setText(src["server"])
         if src.get("epg_url"):
             self.epg_url.setText(src["epg_url"])
+        if src.get("m3u"):
+            self.satip_m3u.setText(src["m3u"])
         if not self.name.text().strip():
             self.name.setText(src["name"])
 
@@ -212,6 +277,8 @@ class SourceFields:
         if idx >= 0:
             self.kind.setCurrentIndex(idx)
         self.server.setText(found.get("server", ""))
+        if found.get("kind") == "satip":
+            self._satip_desc = str(found.get("description") or "")
         if not self.name.text().strip():
             self.name.setText(str(found.get("name", "")).split(" - ")[0])
         if found.get("login") or found.get("kind") in ("jellyfin", "emby"):
@@ -292,6 +359,8 @@ class SourceFields:
         }
         options = (self.nerd_panel.values() if self.nerd_panel is not None
                    else dict(self._options))
+        if out["kind"] == "satip":
+            options = self._satip_options(options)
         if out["kind"] in MEDIA_KINDS:
             # What the sign-in left: the token and the ids, never a password.
             got = self.signin.values()
@@ -344,6 +413,7 @@ class PlaylistDialog(SourceFields, QDialog):
         self._user_lbl = QLabel(tr("login_username"))
         self._pw_lbl = QLabel(tr("login_password"))
         self._mac_lbl = QLabel(tr("playlist_mac"))
+        self._satip_lbl = QLabel(tr("satip_m3u"))
         form.addRow(tr("playlist_name"), self.name)
         form.addRow(tr("playlist_kind"), self.kind)
         # Nerd: devices and servers with known playlist/guide addresses.
@@ -360,6 +430,7 @@ class PlaylistDialog(SourceFields, QDialog):
         self.signin.finished.connect(self._signin_finished)
         form.addRow("", self.signin)
         form.addRow(self._mac_lbl, self.mac)
+        form.addRow(self._satip_lbl, self.satip_m3u)
         form.addRow(tr("playlist_custom_epg_url"), self.epg_url)
         form.addRow(tr("playlist_auto_refresh"), self.refresh)
         lay.addLayout(form)
@@ -395,6 +466,8 @@ class PlaylistDialog(SourceFields, QDialog):
         self._pw_lbl.setText(shown["pw_label"])
         for w in (self._mac_lbl, self.mac):
             w.setVisible(shown["mac"])
+        for w in (self._satip_lbl, self.satip_m3u):
+            w.setVisible(shown["satip"])
         self.finder.row.setVisible(shown["finder"])
         self._fit()
 

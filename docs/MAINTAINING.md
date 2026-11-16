@@ -600,6 +600,42 @@ Still to be seen on real servers:
   it only over the Myth protocol; its channels are listed for the guide and
   recording, and say why they do not play.
 
+**SAT>IP servers**: built - a source kind (`providers/satip.py`) for
+Digital Devices' Octopus NET, Telestar's Digibit, Kathrein's EXIP,
+minisatip, a Fritz!Box Cable and Tvheadend's SAT>IP server. Found by SSDP
+(multicast, and sent to Nerd's other networks and to a typed address), its
+description's `X_SATIPCAP` as tuners per system, channels from the
+server's `X_SATIPM3U`, a Fritz!Box's three lists or an M3U the person gives
+(the source's page, Connection; a Nerd preset fills a Fritz!Box Cable in),
+ids from the tuning, RTSP over TCP by default with UDP or HTTP per source
+(`core/rtsp.py`: mpv's `rtsp-transport` for that file alone, ffmpeg's
+`-rtsp_transport` for a recording), no guide but the source's own XMLTV
+(said plainly). Each stream counts as one of the server's tuners of its
+system (`tuner_verdict`, `core/tuners.py`'s `counted`), the person may give
+fewer; before a multiview cell, a cast or a recording would find none free
+- or be the second when the server says no number - the window asks
+(`ui/mw_connections.py`). Every test runs against fakes on the loopback
+(SSDP answer, device.xml, M3U, RTSP OPTIONS). Still to be seen on a real
+server:
+
+- **Descriptions**: the paths tried when no search answers (minisatip
+  `:8080/desc.xml`, Fritz!Box `:49000/satipdesc.xml`, Tvheadend
+  `:9981/satip_server/desc.xml`, Octopus NET `/octoserve/octonet.xml`),
+  and what each writes in `X_SATIPCAP` (a combined tuner listed under two
+  systems: the source's Tuners then caps them together).
+- **Lists**: the Fritz!Box's `/dvb/m3u/` lists and their `avm=1` query on a
+  current FRITZ!OS; Octopus NET's and Tvheadend's `X_SATIPM3U` answers.
+- **Playback**: RTSP over TCP (interleaved) on each server - the Fritz!Box
+  in particular; mpv taking `rtsp-transport` as a per-file option on the
+  mpv versions in the packages; which servers stream the same query over
+  HTTP, and on which port (8875 here unless the source says; minisatip's is
+  8080); a cast of a SAT>IP channel (a TV cannot play RTSP - HTTP is what a
+  TV can fetch); ffmpeg recording over RTSP with `-rtsp_transport`.
+- **Tuners**: whether a server shares a tuner between two streams of one
+  transponder (counted as two here), and what other devices take from it
+  (not known to the app - RTSP DESCRIBE on `rtsp://server/` lists the
+  server's sessions on some servers and could tell it).
+
 **Other kinds of streams** (yt-dlp's sites and radio-browser.info are in:
 `core/ytdlp.py`, `ui/mw_webstreams.py`, `providers/radio_browser.py`,
 `ui/mw_radio.py`)

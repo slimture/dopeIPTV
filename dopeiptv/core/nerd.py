@@ -55,7 +55,7 @@ VPN_PATTERNS = re.compile(r"^(wg|tun|tap|ppp|ipsec|tailscale|nordlynx|proton|mul
 
 _TRUE = ("1", "true", "yes", "on")
 # Sources on the home network: no proxy unless one is named for them.
-BOX_KINDS = ("enigma2", "tvheadend", "hdhomerun", "vdr", "dvbviewer", "nextpvr", "mythtv")
+BOX_KINDS = ("enigma2", "tvheadend", "hdhomerun", "vdr", "dvbviewer", "nextpvr", "mythtv", "satip")
 # Media servers: the same while their address is on the home network.
 MEDIA_KINDS = ("jellyfin", "emby", "plex")
 
@@ -252,7 +252,7 @@ def is_lan_url(url: str) -> bool:
 
 def is_local_stream(url: str, source_kind: str | None = None) -> bool:
     """On the home network as the VPN guard counts it: a box's source (an
-    Enigma2 receiver, a Tvheadend, VDR, DVBViewer, NextPVR or MythTV
+    Enigma2 receiver, a Tvheadend, VDR, DVBViewer, NextPVR, MythTV or SAT>IP
     server, an HDHomeRun) whatever its address, or any source's stream at a
     home address."""
     return (source_kind or "") in BOX_KINDS or is_lan_url(url)

@@ -33,7 +33,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 from urllib.parse import unquote, urljoin, urlsplit
 
-from . import mirrors, nerd
+from . import mirrors, nerd, rtsp
 from .log import log
 
 STEPS = ("dns", "tcp", "tls", "login", "stream", "speed")
@@ -218,7 +218,10 @@ class ConnTest:
 
     def _run(self) -> None:
         self._client = client = self._make_client(self.source) if self._make_client else None
-        url = str(getattr(client, "server", "") or self.source.get("server") or "")
+        # A client may name the address its streams come from (a SAT>IP
+        # server's RTSP port) for the network's steps.
+        url = str(getattr(client, "test_address", "") or getattr(client, "server", "")
+                  or self.source.get("server") or "")
         self.address = url
         if "://" not in url or url.lower().startswith("file:"):
             for name in ("dns", "tcp", "tls"):
@@ -514,6 +517,19 @@ class ConnTest:
             raise _Stop()
         url, name = found
         name = name or "?"
+        if rtsp.is_rtsp(url):
+            # An RTSP stream (a SAT>IP server's): the server asked whether
+            # it answers RTSP, nothing set up - the player reads it itself.
+            t0 = time.monotonic()
+            said = rtsp.options_at(url, CONNECT_SECS)
+            if said is None:
+                self._set("stream", FAIL, "ct_stream_fail", {"channel": name, "error": "RTSP"},
+                          _ms(t0), "no RTSP answer")
+                raise _Stop()
+            self._set("stream", OK if said["status"] < 400 else WARN, "ct_stream_rtsp",
+                      {"channel": name}, _ms(t0), f"RTSP {said['status']} {said['server']}".strip())
+            self._set("speed", SKIP, "ct_skip_rtsp")
+            return
         session = self._stream_session(url)
         self._hold(session)
         try:

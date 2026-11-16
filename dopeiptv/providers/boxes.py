@@ -1,7 +1,7 @@
 """Boxes and servers on the home network, behind XtreamClient's interface.
 
-What the Enigma2, Tvheadend, HDHomeRun, VDR, DVBViewer, NextPVR and MythTV
-clients share: the address and an optional login (basic or digest,
+What the Enigma2, Tvheadend, HDHomeRun, VDR, DVBViewer, NextPVR, MythTV and
+SAT>IP clients share: the address and an optional login (basic or digest,
 whichever the box asks for), a catalogue loaded once and kept when a
 refresh fails, stable channel ids (a favourite survives a box that reorders
 its bouquets), the box's recordings as films, and the box's own programme

@@ -328,3 +328,27 @@ def test_the_home_servers_fields_on_their_tabs(settings):
     # Without Nerd: the connection alone, the PIN named so.
     off = source_page({"name": "NextPVR", "kind": "nextpvr", "server": "http://10.0.0.9:8866"}, nerd_on=False)
     assert not shown(off, off.user) and shown(off, off.pw) and off.pw_row.label.text() == tr("login_pin")
+
+
+def test_a_satip_servers_fields_on_their_tabs(settings):
+    d = source_page({"name": "Octopus", "kind": "satip", "server": "10.0.0.9",
+                     "options": {"m3u": "http://10.0.0.9/list.m3u", "transport": "udp", "tuners": "2"}})
+    assert tab_of(d, d.satip_m3u) == "conn" and shown(d, d.satip_m3u) and shown(d, d.finder.row)
+    for w in (d.satip_transport, d.satip_tuners):
+        assert tab_of(d, w) == "streams" and shown(d, w)
+    assert not shown(d, d.satip_http_port) and not shown(d, d.user) and not shown(d, d.pw)
+    assert d.satip_transport.currentData() == "udp" and d.satip_tuners.value() == 2
+    # The HTTP port only for streams over HTTP.
+    d.satip_transport.setCurrentIndex(d.satip_transport.findData("http"))
+    assert shown(d, d.satip_http_port) and d.satip_http_port.value() == 8875
+    d.satip_http_port.setValue(8080)
+    d.satip_tuners.setValue(0)
+    assert d.values()["options"] == {"m3u": "http://10.0.0.9/list.m3u", "transport": "http",
+                                     "http_port": "8080"}
+    d.kind.setCurrentIndex(d.kind.findData("vdr"))
+    assert not shown(d, d.satip_m3u) and not shown(d, d.satip_transport)
+    # Without Nerd too: a SAT>IP server's fields are everyone's.
+    off = source_page({"name": "Fritz", "kind": "satip", "server": "fritz.box"}, nerd_on=False)
+    assert shown(off, off.satip_m3u) and shown(off, off.satip_transport) and shown(off, off.satip_tuners)
+    assert off.satip_tuners.specialValueText() == tr("satip_tuners_auto")
+    assert "options" not in off.values()
