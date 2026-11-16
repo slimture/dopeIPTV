@@ -38,6 +38,7 @@ from .nerd_check import FAIL, OK, WARN, Check
 from .exclusive_bind import ExclusiveBindMixin
 
 DEFAULT_PORT = 3673            # D-O-P-E on a phone's keypad
+PORT_KEY = "nerd_remote_port"
 MAX_BODY = 64 * 1024
 API_VERSION = 1
 # Seconds a connection may sit without a byte coming or going: a client on

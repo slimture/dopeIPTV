@@ -2870,5 +2870,10 @@
   "sa_recording_set": "{title} از {source} ضبط خواهد شد.",
   "sa_open_series": "باز کردن سریال",
   "sa_from_source": "از {source}",
-  "night_refused": "حالت شب برای این پخش روشن نشد"
+  "night_refused": "حالت شب برای این پخش روشن نشد",
+  "nerd_ck_server_ours": "سرور dopeIPTV از قبل روی این رایانه در حال اجراست (از ترمینال یا هنگام ورود اجرا شده) – روی درگاه {port}. آن را متوقف کنید یا درگاه دیگری انتخاب کنید.",
+  "nerd_ck_server_ours_app": "پنجرهٔ دیگری از dopeIPTV روی این رایانه از قبل روی درگاه {port} سرویس می‌دهد. سرور آن را خاموش کنید یا درگاه دیگری انتخاب کنید.",
+  "nerd_ck_server_taken": "درگاه {port} در دست برنامهٔ دیگری است.",
+  "nerd_server_use_port": "استفاده از درگاه {port}",
+  "nerd_server_use_port_click": "برای استفاده از درگاه {port} به‌جای آن، اینجا کلیک کنید."
 }

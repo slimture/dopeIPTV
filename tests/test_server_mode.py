@@ -788,14 +788,26 @@ def test_a_port_already_taken_leaves_no_thread_running(tmp_path):
         def _show_toast(self, text, _ms) -> None:
             self.told.append(text)
 
+        def _show_action_toast(self, text, _ms, _act) -> None:
+            self.told.append(text)
+
     def ticking() -> int:
         return sum(1 for t in threading.enumerate() if t.name == "restream" and t.is_alive())
+
+    def told() -> bool:
+        # The note comes once it is known whose the port is (off the
+        # window's thread, handed to it).
+        from PyQt6.QtCore import QCoreApplication
+        if QCoreApplication.instance() is not None:
+            QCoreApplication.processEvents()
+        return bool(w.told)
 
     before = ticking()
     w = Window()
     try:
         w._server_start()
-        assert w._home is None and w.told and not pool.shared
+        assert w._home is None and not pool.shared
+        assert wait_until(told, 10), "the note came"
         assert wait_until(lambda: ticking() == before, 5), "the failed server's restream stopped"
     finally:
         blocker.close()

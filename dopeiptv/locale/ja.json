@@ -2870,5 +2870,10 @@
   "sa_recording_set": "{title} を {source} から録画します。",
   "sa_open_series": "シリーズを開く",
   "sa_from_source": "{source} から",
-  "night_refused": "このストリームではナイトモードをオンにできませんでした"
+  "night_refused": "このストリームではナイトモードをオンにできませんでした",
+  "nerd_ck_server_ours": "dopeIPTV のサーバーがこのコンピューターですでに動いています（ターミナルから、またはログイン時に起動）。ポートは {port} です。それを止めるか、別のポートを選んでください。",
+  "nerd_ck_server_ours_app": "このコンピューターの別の dopeIPTV ウィンドウが、すでにポート {port} でサーバーを動かしています。そちらのサーバーをオフにするか、別のポートを選んでください。",
+  "nerd_ck_server_taken": "ポート {port} はほかのプログラムが使っています。",
+  "nerd_server_use_port": "ポート {port} を使う",
+  "nerd_server_use_port_click": "ここをクリックすると、代わりにポート {port} を使います。"
 }

@@ -16,6 +16,12 @@ nothing here runs: no hook on the player, nothing counted.
 Nothing a device watches is the person's: no history, statistics, Trakt or
 Simkl, Discord or events - the restream never goes through the playback
 path those hook into.
+
+Its port in use: whose it is - dopeIPTV's own server (a ``--server`` from a
+terminal or at login, another window) or another program - asked off the
+window's thread (home_server.look_at_port) and said in a note that offers
+the next port free; a click stores it and starts the server there, nothing
+changes without one. The Nerd page's line says the same, with a button.
 """
 
 from __future__ import annotations
@@ -41,6 +47,8 @@ class _WindowHost:
     #: The app's own use as the window counts it holds another device's too
     #: (mw_connections' ledger).
     counts_others = True
+    #: What the server's answers say it is (home_server.MARK).
+    kind = "window"
 
     def __init__(self, win: Any, bridge: _Bridge) -> None:
         self.win, self.bridge = win, bridge
@@ -104,6 +112,10 @@ class _ServerMixin:
     _home_host: _WindowHost | None = None
     _home_bridge: _Bridge | None = None
     _home_error: str = ""
+    #: The port it could not listen on because it is in use (0: none).
+    _home_taken: int = 0
+    #: The port the note offers in its place (0: none).
+    _home_offer: int = 0
     _home_timer: Any = None
     _home_stopping: threading.Thread | None = None
 
@@ -123,8 +135,14 @@ class _ServerMixin:
             from ..services.home_server import read_config
             cfg = read_config(self.settings)
             srv.refresh(cfg)
-            if cfg.port != srv.port and not srv.move(cfg.port):
+            if cfg.port == srv.port or srv.move(cfg.port):
+                self._home_error, self._home_taken = "", 0
+            else:
+                # It goes on where it is.
                 self._home_error = srv.error
+                self._home_taken = cfg.port if srv.taken else 0
+                if srv.taken:
+                    self._server_ask_holder(cfg.port)
         return self._server_state()
 
     def _server_start(self) -> None:
@@ -151,13 +169,19 @@ class _ServerMixin:
         try:
             srv.start()
         except OSError as e:
+            from ..services.home_server import port_taken
             srv.stop()                  # its restream's thread, started with it
             self._home_error = f"{type(e).__name__}: {e}"
             log.warning("server: cannot listen on port %s: %s", cfg.port, e)
-            self._show_toast(tr("nerd_ck_server_down", port=cfg.port), 6000)
             host.kept_pool.shared = False
+            if port_taken(e):
+                self._home_taken = cfg.port
+                self._server_ask_holder(cfg.port)       # the note once it is known whose
+            else:
+                self._home_taken = 0
+                self._show_toast(tr("nerd_ck_server_down", port=cfg.port), 6000)
             return
-        self._home, self._home_error = srv, ""
+        self._home, self._home_error, self._home_taken = srv, "", 0
         if p is not None and callable(shared):
             p.live_hook = self._server_live_hook
         rec = getattr(self, "rec", None)
@@ -174,6 +198,7 @@ class _ServerMixin:
         """Every device's stream ends, every connection of the server's
         closes (*wait*: before this returns - the app is closing)."""
         srv, self._home = self._home, None
+        self._home_taken = self._home_offer = 0
         p = getattr(self, "player", None)
         if p is not None and getattr(p, "live_hook", None) is not None:
             p.live_hook = None
@@ -195,19 +220,75 @@ class _ServerMixin:
             t.start()
 
     def _server_state(self) -> dict[str, Any]:
+        """How it stands, for the Nerd page's line: *taken* the port found in
+        use (0: none), *avoid* the app's other servers' ports."""
         srv = self._home
-        from ..services.home_server import DEFAULT_PORT
+        from ..services.home_server import DEFAULT_PORT, avoided_ports
+        avoid = sorted(avoided_ports(self.settings))
         if srv is None:
             try:
                 port = int(self.settings.value("nerd_server_port", DEFAULT_PORT))
             except (TypeError, ValueError):
                 port = DEFAULT_PORT
-            return {"on": server_wanted(self.settings), "running": False, "port": port,
-                    "error": self._home_error, "status": None, "addresses": None}
+            on = server_wanted(self.settings)
+            return {"on": on, "running": False, "port": port,
+                    "error": self._home_error, "status": None, "addresses": None,
+                    "taken": port if on and self._home_taken == port else 0, "avoid": avoid}
         base = srv.base()
+        taken = self._home_taken if self._home_taken != srv.port else 0
         return {"on": True, "running": srv.running, "port": srv.port, "error": self._home_error,
                 "status": srv.restream.status(),
-                "addresses": srv.addresses(base)}
+                "addresses": srv.addresses(base), "taken": taken, "avoid": avoid}
+
+    # -- its port in use -----------------------------------------------------------------------
+    def _server_ask_holder(self, port: int) -> None:
+        """Whose *port* is, asked off the window's thread (on loopback, a
+        moment); the note says it then, with the next port free."""
+        from ..services.home_server import avoided_ports
+        avoid = avoided_ports(self.settings)
+        threading.Thread(target=self._server_holder_job, args=(port, avoid),
+                         name="home-server-port", daemon=True).start()
+
+    def _server_holder_job(self, port: int, avoid: set[int]) -> None:
+        from ..core.workers import on_gui_thread
+        from ..services.home_server import look_at_port
+        try:
+            taken = look_at_port(port, avoid)
+        except Exception as e:          # never in the way: the note stays unsaid
+            log.debug("server: whose port %d is not found out: %s", port, e)
+            return
+        log.info("server: port %d is in use (%s); the next free one: %s", port, taken.holder,
+                 taken.free or "none near it")
+        on_gui_thread(self._server_holder_said, taken)
+
+    def _server_holder_said(self, taken: Any) -> None:
+        """(the window's thread) Whose the port is: said in a note that offers
+        the next port free - unless it changed meanwhile."""
+        if not taken.port or self._home_taken != taken.port:
+            return
+        text = tr(taken.key, port=taken.port)
+        if not taken.free:
+            self._show_toast(text, 8000)
+            return
+        self._home_offer = taken.free
+        self._show_action_toast(text + "\n" + tr("nerd_server_use_port_click", port=taken.free),
+                                10_000, self._server_take_offer)
+
+    def _server_take_offer(self) -> None:
+        """The note clicked: its port taken."""
+        port, self._home_offer = self._home_offer, 0
+        if port:
+            self._server_use_port(port)
+
+    def _server_use_port(self, port: int) -> None:
+        """The person chose *port* in place of the one in use: stored, and
+        the server started there (or moved, while it runs on another).
+        Only ever from their click."""
+        from ..services.home_server import K_PORT
+        if not server_wanted(self.settings):
+            return                      # turned off meanwhile: nothing to start
+        self.settings.setValue(K_PORT, str(port))
+        self._server_apply()
 
     def _server_sources_now(self) -> None:
         host = self._home_host

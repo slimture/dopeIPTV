@@ -19,7 +19,7 @@ from typing import Any
 from ..core import channel_numbers
 from ..core.log import log
 from ..core.phone_remote import (
-    DEFAULT_PORT, LOGO_MAX, LOGO_TIMEOUT, PhoneServer, new_token, page_url,
+    DEFAULT_PORT, LOGO_MAX, LOGO_TIMEOUT, PORT_KEY, PhoneServer, new_token, page_url,
 )
 from ..core.remote_api import lan_addresses
 from ..i18n import tr
@@ -71,7 +71,8 @@ def _home_screen_assets() -> dict[str, tuple[bytes, str]]:
         if png:
             out[name] = (png, "image/png")
     return out
-PORT_KEY = "phone_remote_port"
+
+
 #: How long after the phone asked for a channel what stops it is the phone's
 #: to hear, and how long its page then says it.
 PHONE_ASKED_S = 15.0

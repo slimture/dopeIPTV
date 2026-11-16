@@ -2870,5 +2870,10 @@
   "sa_recording_set": "{title} sera enregistré depuis {source}.",
   "sa_open_series": "Ouvrir la série",
   "sa_from_source": "Depuis {source}",
-  "night_refused": "Impossible d'activer le mode nuit pour ce flux"
+  "night_refused": "Impossible d'activer le mode nuit pour ce flux",
+  "nerd_ck_server_ours": "Le serveur de dopeIPTV tourne déjà sur cet ordinateur (lancé depuis un terminal ou à l'ouverture de session) – sur le port {port}. Arrête-le ou choisis un autre port.",
+  "nerd_ck_server_ours_app": "Une autre fenêtre de dopeIPTV sur cet ordinateur sert déjà sur le port {port}. Désactive son serveur ou choisis un autre port.",
+  "nerd_ck_server_taken": "Le port {port} est utilisé par un autre programme.",
+  "nerd_server_use_port": "Utiliser le port {port}",
+  "nerd_server_use_port_click": "Clique ici pour utiliser plutôt le port {port}."
 }

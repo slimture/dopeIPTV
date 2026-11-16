@@ -6,6 +6,9 @@ asks the network.
 A check is made in two halves: *job()* runs on the window's thread and reads
 the controls, returning the function to run off it (or None: nothing to
 check, the line hides); that function returns a core.nerd_check.Check.
+
+A result can offer a way out (*action*): a button beside it - "Use port
+3676" - that does it, after which the line looks again.
 """
 
 from __future__ import annotations
@@ -24,6 +27,11 @@ from .theme import P
 GLYPHS = {OK: "✓", WARN: "!", FAIL: "✗", INFO: "i"}
 
 Job = Callable[[], "Callable[[], Check | None] | None"]
+#: What a result offers: its button's words and what a click does, or None.
+Action = Callable[[Check], "tuple[str, Callable[[], None]] | None"]
+#: How long after its button the line looks again: past Settings' own
+#: store of a changed control (350 ms), which the action may lean on.
+AGAIN_MS = 900
 
 
 class CheckLine(QWidget):
@@ -32,11 +40,13 @@ class CheckLine(QWidget):
     by itself, shortly after its setting changes. *preview*: with a Test
     button, what the line says until Test is pressed (and again shortly
     after the setting changes) - a quick look made on the window's thread,
-    never one that waits on the network."""
+    never one that waits on the network. *action*: what a result offers,
+    as a button beside it (never done without its click)."""
 
     def __init__(self, job: Job, title: str, test: bool = False,
                  parent: QWidget | None = None, test_text: str = "",
-                 preview: Callable[[], Check | None] | None = None) -> None:
+                 preview: Callable[[], Check | None] | None = None,
+                 action: Action | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("NerdCheck")
         self._job, self._title = job, title
@@ -63,6 +73,14 @@ class CheckLine(QWidget):
         h.addWidget(self.glyph)
         h.addWidget(self.text, 1)
         h.addWidget(self.details)
+        self._action = action
+        self._act: Callable[[], None] | None = None
+        self.action_btn: QPushButton | None = None
+        if action is not None:
+            self.action_btn = QPushButton("")
+            self.action_btn.clicked.connect(self._do_action)
+            self.action_btn.hide()
+            h.addWidget(self.action_btn)
         self.test_btn: QPushButton | None = None
         if test:
             self.test_btn = QPushButton(self._test_text)
@@ -76,6 +94,10 @@ class CheckLine(QWidget):
         self._look.setSingleShot(True)
         self._look.setInterval(300)
         self._look.timeout.connect(self.show_preview)
+        self._again = QTimer(self)
+        self._again.setSingleShot(True)
+        self._again.setInterval(AGAIN_MS)
+        self._again.timeout.connect(self.run)
         if self._preview is not None:
             self.show_preview()
         elif test:
@@ -110,13 +132,20 @@ class CheckLine(QWidget):
             result = self._preview()
         except Exception as e:     # a control in a state nobody foresaw
             self._result = None
+            self._offer(None)
             self._show(FAIL, tr("nerd_ck_error"), f"{type(e).__name__}: {e}")
             return
         self._result = result
+        self._offer(result)
         if result is None:
             self._show(INFO, tr("nerd_ck_untested"))
         else:
             self._show(result.state, tr(result.key, **result.params), result.detail)
+
+    def look_again(self) -> None:
+        """Run again a moment from now (a change it reads was made
+        elsewhere, and is stored a moment later)."""
+        self._again.start()
 
     def start(self) -> None:
         """The first look, when the page is built."""
@@ -126,6 +155,8 @@ class CheckLine(QWidget):
 
     def run(self, explicit: bool = False) -> None:
         self._soon.stop()
+        self._again.stop()
+        self._offer(None)
         try:
             work = self._job()
         except Exception as e:     # a control in a state nobody foresaw
@@ -164,6 +195,7 @@ class CheckLine(QWidget):
         if self.test_btn is not None:
             self.test_btn.setText(self._test_text)
         self._result = result
+        self._offer(result)
         if result is None:
             if self.test_btn is None:
                 self.hide()
@@ -175,6 +207,31 @@ class CheckLine(QWidget):
         self._show(result.state, tr(result.key, **result.params), result.detail)
         if self._explicit and result.state == FAIL and result.detail:
             QTimer.singleShot(0, self.show_problem)
+
+    # -- what a result offers ------------------------------------------------
+
+    def _offer(self, result: Check | None) -> None:
+        btn = self.action_btn
+        if btn is None or self._action is None:
+            return
+        try:
+            got = self._action(result) if result is not None else None
+        except Exception:       # a result nobody foresaw offers nothing
+            got = None
+        self._act = got[1] if got else None
+        if got:
+            btn.setText(got[0])
+            btn.setAccessibleName(got[0])
+        btn.setVisible(bool(got))
+
+    def _do_action(self) -> None:
+        act, self._act = self._act, None
+        if act is None:
+            return
+        if self.action_btn is not None:
+            self.action_btn.hide()
+        act()
+        self.look_again()
 
     # -- showing -------------------------------------------------------------
 

@@ -26,19 +26,29 @@ core/server_page.py), the playlist, the guide and the stream addresses
 
 The server knows the app only through its *host* (Host below): the window
 (ui/mw_server.py) or the headless runner.
+
+Its port taken (``port_taken``): who holds it is asked once, on loopback
+(``look_at_port``: its ``discover.json``, nothing else) - dopeIPTV's own
+server says so in every answer (``MARK``: the window's or a ``--server``'s),
+one before 1.6.1 by its name - and the next port free is found by binding
+(``next_free_port``), the app's other servers' ports left out
+(``avoided_ports``). The caller says it; the port changes only when the
+person chooses it.
 """
 from __future__ import annotations
 
+import errno
 import hmac
 import json
 import re
 import secrets
+import socket
 import sys
 import threading
 import time
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any, Callable, Iterator, Protocol
+from typing import Any, Callable, Iterable, Iterator, Protocol
 from urllib.parse import parse_qs, quote, unquote, urlsplit
 
 from ..core import connections, hdhr, home_net
@@ -71,6 +81,18 @@ HDHR_PATHS = ("/discover.json", "/lineup.json", "/lineup_status.json", "/device.
 _AUTO = re.compile(r"^/auto/v([0-9]{1,6}(?:\.[0-9]{1,3})?)$")
 SAFE_HEADERS = {"X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer",
                 "X-Frame-Options": "DENY"}
+#: In every answer: dopeIPTV's own server, and whose - its host's ``kind``
+#: (HOLDER_WINDOW, HOLDER_HEADLESS), else "server".
+MARK = "X-dopeIPTV-Server"
+#: Who holds a port (look_at_port): dopeIPTV's server in the window, one
+#: started as ``--server``, one that does not say which (before 1.6.1), or
+#: another program.
+HOLDER_WINDOW = "window"
+HOLDER_HEADLESS = "headless"
+HOLDER_OURS = "dopeiptv"
+HOLDER_OTHER = "other"
+#: Windows' WSAEADDRINUSE, whichever errno a Python there gives with it.
+_WSAEADDRINUSE = 10048
 
 
 # -- the settings ------------------------------------------------------------------------
@@ -189,6 +211,8 @@ class Host(Protocol):
         """Settings the browser page changed, stored; the settings now."""
     def page(self) -> tuple[bytes, str]:
         """The browser page and its Content-Security-Policy."""
+    # And, where a host has them: ``kind`` (HOLDER_WINDOW, HOLDER_HEADLESS:
+    # what MARK says), ``counts_others``, ``guides_kept``.
 
 
 @dataclass(frozen=True)
@@ -231,6 +255,10 @@ class HomeServer:
         self._thread: threading.Thread | None = None
         self._udp: hdhr.Responder | None = None
         self.error = ""
+        #: The last move found its port in use (port_taken).
+        self.taken = False
+        #: What MARK says in every answer.
+        self.mark = str(getattr(host, "kind", "") or "server")
 
     # -- on and off ---------------------------------------------------------------------
     @property
@@ -264,8 +292,10 @@ class HomeServer:
             httpd = _Server((self.bind, port), _make_handler(self))
         except OSError as e:
             self.error = f"{type(e).__name__}: {e}"
+            self.taken = port_taken(e)
             log.warning("server: cannot move to port %d (%s) - it stays on %d", port, e, self.port)
             return False
+        self.error, self.taken = "", False
         old, self._httpd = self._httpd, httpd
         self.port = httpd.server_address[1]
         self._thread = threading.Thread(target=httpd.serve_forever, name="home-server",
@@ -606,7 +636,7 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
-            for k, v in {**SAFE_HEADERS, **(extra or {})}.items():
+            for k, v in {**SAFE_HEADERS, MARK: server.mark, **(extra or {})}.items():
                 self.send_header(k, v)
             self.end_headers()
             if self.command != "HEAD":
@@ -830,13 +860,136 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
     return Handler
 
 
+# -- a port that is taken --------------------------------------------------------------------
+
+#: Seconds the holder of a port is given for each step of its answer.
+HOLDER_TIMEOUT = 1.5
+
+
+def port_taken(e: BaseException) -> bool:
+    """Whether *e* says the port is in use (EADDRINUSE, Windows'
+    WSAEADDRINUSE) - not any other reason a port does not open."""
+    if not isinstance(e, OSError):
+        return False
+    return (e.errno in (errno.EADDRINUSE, _WSAEADDRINUSE)
+            or getattr(e, "winerror", None) == _WSAEADDRINUSE)
+
+
+def avoided_ports(settings: Any) -> set[int]:
+    """The app's other servers' ports - the remote API's and the phone
+    remote's, their defaults and as set: never offered for this one."""
+    from ..core import phone_remote, remote_api
+    out = {remote_api.DEFAULT_PORT, phone_remote.DEFAULT_PORT}
+    for key in (remote_api.PORT_KEY, phone_remote.PORT_KEY):
+        n = _int(settings.value(key, 0), 0, 1, 65535)
+        if n:
+            out.add(n)
+    return out
+
+
+def bindable(port: int, bind: str = "0.0.0.0") -> bool:
+    """Whether the server could listen on *port* now, bound as it binds
+    (_Server: exclusively on Windows, SO_REUSEADDR elsewhere)."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        if sys.platform == "win32":
+            excl = getattr(socket, "SO_EXCLUSIVEADDRUSE", None)
+            if excl is not None:
+                s.setsockopt(socket.SOL_SOCKET, excl, 1)
+        else:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind((bind, port))
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
+
+
+def next_free_port(port: int, avoid: Iterable[int] = (), bind: str = "0.0.0.0",
+                   tries: int = 100) -> int | None:
+    """The first port after *port* the server could listen on now, each
+    tried by binding it; the app's other servers' (*avoid*) left out. None
+    when none of the next *tries* is free."""
+    skip = set(avoid)
+    for p in range(port + 1, min(65535, port + tries) + 1):
+        if p not in skip and bindable(p, bind):
+            return p
+    return None
+
+
+def port_holder(port: int, host: str = "127.0.0.1", timeout: float = HOLDER_TIMEOUT) -> str:
+    """Who listens on *port* on this computer (HOLDER_*): its
+    ``discover.json`` asked on loopback - no token, nothing else sent.
+    dopeIPTV's server says so (MARK); one before 1.6.1 by its name, in its
+    Server header and as the manufacturer in its discover.json. No answer,
+    or any other answer: another program."""
+    import http.client
+    deadline = time.monotonic() + 2 * timeout
+    conn = http.client.HTTPConnection(host, port, timeout=timeout)
+    try:
+        conn.request("GET", "/discover.json", headers={"Accept": "application/json"})
+        resp = conn.getresponse()
+        mark = (resp.getheader(MARK) or "").strip().lower()
+        if mark:
+            return mark if mark in (HOLDER_WINDOW, HOLDER_HEADLESS) else HOLDER_OURS
+        name = (resp.getheader("Server") or "").split("/")[0].strip()
+        if resp.status != 200 or name != hdhr.MANUFACTURER:
+            return HOLDER_OTHER
+        body = b""
+        while len(body) < MAX_BODY and time.monotonic() < deadline:
+            chunk = resp.read(min(4096, MAX_BODY - len(body)))
+            if not chunk:
+                break
+            body += chunk
+        data = json.loads(body.decode("utf-8", "replace"))
+    except (OSError, http.client.HTTPException, ValueError):
+        return HOLDER_OTHER
+    finally:
+        conn.close()
+    ours = isinstance(data, dict) and data.get("Manufacturer") == hdhr.MANUFACTURER
+    return HOLDER_OURS if ours else HOLDER_OTHER
+
+
+@dataclass(frozen=True)
+class Taken:
+    """A port found in use: who holds it (HOLDER_*) and the next port free
+    (None: none near it)."""
+    port: int
+    holder: str
+    free: int | None = None
+
+    @property
+    def ours(self) -> bool:
+        return self.holder != HOLDER_OTHER
+
+    @property
+    def key(self) -> str:
+        """What the window says of it."""
+        if self.holder == HOLDER_WINDOW:
+            return "nerd_ck_server_ours_app"
+        return "nerd_ck_server_ours" if self.ours else "nerd_ck_server_taken"
+
+
+def look_at_port(port: int, avoid: Iterable[int] = (), bind: str = "0.0.0.0",
+                 timeout: float = HOLDER_TIMEOUT) -> Taken:
+    """(off the window's thread) *port*, found in use: who holds it, and the
+    next port free."""
+    return Taken(port, port_holder(port, timeout=timeout), next_free_port(port, avoid, bind))
+
+
 # -- the Nerd page's line ------------------------------------------------------------------
 
 def check_server(on: bool, running: bool, port: int, error: str, status: dict | None,
-                 addresses: dict[str, str] | None) -> Check:
-    """How the server stands, for the line under its switch."""
+                 addresses: dict[str, str] | None, taken: Taken | None = None) -> Check:
+    """How the server stands, for the line under its switch. *taken*: the
+    port it was to listen on is in use (it runs on *port* still when a move
+    found it so); the next free one, in the params, is offered there."""
     if not on:
         return Check(WARN, "nerd_ck_server_off", {})
+    if taken is not None and (not running or taken.port != port):
+        return Check(WARN if running else FAIL, taken.key,
+                     {"port": taken.port, "free": taken.free}, error)
     if not running:
         return Check(FAIL, "nerd_ck_server_down", {"port": port}, error)
     st = status or {}

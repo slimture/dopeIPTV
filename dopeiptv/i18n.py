@@ -1705,6 +1705,13 @@ _STRINGS: dict[str, dict[str, str]] = {
     "nerd_ck_server_off": {"en": "The server is off."},
     "nerd_ck_server_down": {"en": "The server is not running: port {port} could not be opened - another program may be using it."},
     "nerd_ck_server_ok": {"en": "Running on port {port}: {n} of {total} tuners in use."},
+    # Its port in use: whose it is (services/home_server.look_at_port), and
+    # the next port free offered (ui/mw_server.py, the line's button).
+    "nerd_ck_server_ours": {"en": "dopeIPTV's server is already running on this computer (started from a terminal or at login) - on port {port}. Stop it, or pick another port."},
+    "nerd_ck_server_ours_app": {"en": "Another dopeIPTV window on this computer is already serving on port {port}. Turn its server off, or pick another port."},
+    "nerd_ck_server_taken": {"en": "Port {port} is in use by another program."},
+    "nerd_server_use_port": {"en": "Use port {port}"},
+    "nerd_server_use_port_click": {"en": "Click here to use port {port} instead."},
     "inuse_server": {"en": "dopeIPTV's server: {n} of {total} tuners for other devices"},
     "srv_page_title": {"en": "dopeIPTV server"},
     "srv_in_use": {"en": "{n} of {total} tuners in use"},

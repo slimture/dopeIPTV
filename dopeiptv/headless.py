@@ -32,6 +32,8 @@ class HeadlessHost:
 
     POOL_KEEP_S = 120.0
     POOL_BYTES = 2 << 30
+    #: What the server's answers say it is (home_server.MARK).
+    kind = "headless"
 
     def __init__(self, settings: Any) -> None:
         self.settings = settings
@@ -137,6 +139,20 @@ def _follow_settings(server: Any, host: HeadlessHost, port_given: bool) -> None:
         log.debug("server: settings not read again: %s", e)
 
 
+def taken_note(taken: Any) -> str:
+    """The log's words for a port found in use (home_server.Taken): whose it
+    is, and the port free next - nothing is changed."""
+    from .services import home_server as hs
+    who = {hs.HOLDER_WINDOW: "dopeIPTV's own server has it - the app's window, with server "
+                             "mode on (Nerd > Remote and automation)",
+           hs.HOLDER_HEADLESS: "dopeIPTV's own server has it - another `dopeiptv --server`",
+           hs.HOLDER_OURS: "dopeIPTV's own server has it - the app's window or another "
+                           "`dopeiptv --server`"}.get(taken.holder, "another program uses it")
+    nxt = (f"port {taken.free} is free: start with --port {taken.free}" if taken.free
+           else "none of the next ports is free")
+    return f"port {taken.port} is taken: {who}; {nxt}"
+
+
 def _arg(argv: list[str], name: str) -> str | None:
     if name in argv:
         i = argv.index(name)
@@ -162,7 +178,9 @@ def main(argv: list[str] | None = None) -> int:
     from .i18n import set_language
     set_language(str(settings.value("language", "en") or "en"))
     nerd.install(settings)
-    from .services.home_server import HomeServer, read_config
+    from .services.home_server import (
+        HomeServer, avoided_ports, look_at_port, port_taken, read_config,
+    )
     host = HeadlessHost(settings)
     cfg = read_config(settings)
     register_secrets(cfg.token)
@@ -177,8 +195,12 @@ def main(argv: list[str] | None = None) -> int:
     try:
         server.start()
     except OSError as e:
-        log.error("server: cannot listen on port %d (%s) - is the app's own server, or "
-                  "another program, on it?", cfg.port, e)
+        server.stop()                   # its restream's thread, started with it
+        if port_taken(e):
+            taken = look_at_port(cfg.port, avoided_ports(settings), server.bind)
+            log.error("server: cannot listen on port %d (%s) - %s", cfg.port, e, taken_note(taken))
+        else:
+            log.error("server: cannot listen on port %d (%s)", cfg.port, e)
         host.close()
         return 2
     page = server.addresses(server.base())["page"]

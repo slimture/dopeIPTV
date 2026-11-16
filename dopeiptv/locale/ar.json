@@ -2870,5 +2870,10 @@
   "sa_recording_set": "سيُسجَّل {title} من {source}.",
   "sa_open_series": "فتح المسلسل",
   "sa_from_source": "من {source}",
-  "night_refused": "تعذّر تشغيل الوضع الليلي لهذا البث"
+  "night_refused": "تعذّر تشغيل الوضع الليلي لهذا البث",
+  "nerd_ck_server_ours": "خادم dopeIPTV يعمل بالفعل على هذا الكمبيوتر (شُغِّل من الطرفية أو عند تسجيل الدخول) – على المنفذ {port}. أوقفه أو اختر منفذًا آخر.",
+  "nerd_ck_server_ours_app": "نافذة أخرى من dopeIPTV على هذا الكمبيوتر تقدّم الخادم بالفعل على المنفذ {port}. أوقف خادمها أو اختر منفذًا آخر.",
+  "nerd_ck_server_taken": "المنفذ {port} يستخدمه برنامج آخر.",
+  "nerd_server_use_port": "استخدام المنفذ {port}",
+  "nerd_server_use_port_click": "انقر هنا لاستخدام المنفذ {port} بدلًا منه."
 }

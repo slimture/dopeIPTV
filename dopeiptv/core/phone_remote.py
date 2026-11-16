@@ -37,6 +37,8 @@ from .log import log
 from .remote_api import _own, _Server
 
 DEFAULT_PORT = 3674           # the remote API's 3673, and one
+#: The port it listened on last (it moves on to the next when that one is taken).
+PORT_KEY = "phone_remote_port"
 TOKEN_BYTES = 24              # 32 characters, 192 bits
 MAX_BODY = 4096
 REQUEST_TIMEOUT = 15

@@ -2870,5 +2870,10 @@
   "sa_recording_set": "{title}, {source} kaynağından kaydedilecek.",
   "sa_open_series": "Diziyi aç",
   "sa_from_source": "{source} kaynağından",
-  "night_refused": "Gece modu bu yayın için açılamadı"
+  "night_refused": "Gece modu bu yayın için açılamadı",
+  "nerd_ck_server_ours": "dopeIPTV'nin sunucusu bu bilgisayarda zaten çalışıyor (bir terminalden ya da oturum açılırken başlatıldı) – {port} bağlantı noktasında. Onu durdur ya da başka bir bağlantı noktası seç.",
+  "nerd_ck_server_ours_app": "Bu bilgisayardaki başka bir dopeIPTV penceresi {port} bağlantı noktasında zaten sunuyor. Oradaki sunucuyu kapat ya da başka bir bağlantı noktası seç.",
+  "nerd_ck_server_taken": "{port} bağlantı noktasını başka bir program kullanıyor.",
+  "nerd_server_use_port": "{port} bağlantı noktasını kullan",
+  "nerd_server_use_port_click": "Bunun yerine {port} bağlantı noktasını kullanmak için buraya tıkla."
 }

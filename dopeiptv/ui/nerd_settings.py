@@ -1077,12 +1077,31 @@ def _server_card(page: SettingsPage, n: nerd.Nerd, settings: Any, lines: list[Ch
         if state is None:
             return None
         st = state()
-        return lambda: hs.check_server(bool(st.get("on")), bool(st.get("running")),
-                                       int(st.get("port") or 0), str(st.get("error") or ""),
-                                       st.get("status"), st.get("addresses"))
-    line = CheckLine(job, tr("nerd_card_server"), test=True)
+        taken_port = int(st.get("taken") or 0)
+        avoid = [int(p) for p in st.get("avoid") or []]
+
+        def look() -> Any:
+            # Its port in use: whose it is, and the next one free (loopback).
+            taken = hs.look_at_port(taken_port, avoid) if taken_port else None
+            return hs.check_server(bool(st.get("on")), bool(st.get("running")),
+                                   int(st.get("port") or 0), str(st.get("error") or ""),
+                                   st.get("status"), st.get("addresses"), taken)
+        return look
+
+    def offer(result: Any) -> tuple[str, Callable[[], None]] | None:
+        failed = result.state in (nerd_check.FAIL, nerd_check.WARN)
+        free = result.params.get("free") if failed else None
+        if type(free) is not int:
+            return None
+        # Set as the person would set it: Settings stores it a moment later
+        # and the server starts there; the line then looks again.
+        return tr("nerd_server_use_port", port=free), lambda: port.setValue(free)
+    line = CheckLine(job, tr("nerd_card_server"), test=True, action=offer)
     line.auto = True            # it only reads how the server stands
     lines.append(line)
+    # The switch or the port changed: how it stands once Settings has applied it.
+    on.toggled.connect(line.look_again)
+    port.valueChanged.connect(line.look_again)
     # The three buttons on a line of their own: in a row's control column
     # their words were cut off.
     c.layout_row(_hbox(open_btn, copy_tuner, copy_m3u),

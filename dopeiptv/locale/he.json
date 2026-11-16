@@ -2870,5 +2870,10 @@
   "sa_recording_set": "{title} יוקלט מ־{source}.",
   "sa_open_series": "פתח את הסדרה",
   "sa_from_source": "מתוך {source}",
-  "night_refused": "לא ניתן להפעיל מצב לילה בשידור הזה"
+  "night_refused": "לא ניתן להפעיל מצב לילה בשידור הזה",
+  "nerd_ck_server_ours": "השרת של dopeIPTV כבר פועל במחשב הזה (הופעל מהמסוף או בכניסה למערכת) – בפורט {port}. עצרו אותו או בחרו פורט אחר.",
+  "nerd_ck_server_ours_app": "חלון אחר של dopeIPTV במחשב הזה כבר מגיש בפורט {port}. כבו שם את השרת או בחרו פורט אחר.",
+  "nerd_ck_server_taken": "תוכנה אחרת משתמשת בפורט {port}.",
+  "nerd_server_use_port": "להשתמש בפורט {port}",
+  "nerd_server_use_port_click": "לחצו כאן כדי להשתמש בפורט {port} במקום."
 }

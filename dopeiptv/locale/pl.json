@@ -2870,5 +2870,10 @@
   "sa_recording_set": "{title} zostanie nagrany z {source}.",
   "sa_open_series": "Otwórz serial",
   "sa_from_source": "Z {source}",
-  "night_refused": "Nie udało się włączyć trybu nocnego dla tej transmisji"
+  "night_refused": "Nie udało się włączyć trybu nocnego dla tej transmisji",
+  "nerd_ck_server_ours": "Serwer dopeIPTV już działa na tym komputerze (uruchomiony z terminala albo przy logowaniu) – na porcie {port}. Zatrzymaj go albo wybierz inny port.",
+  "nerd_ck_server_ours_app": "Inne okno dopeIPTV na tym komputerze już udostępnia serwer na porcie {port}. Wyłącz tam serwer albo wybierz inny port.",
+  "nerd_ck_server_taken": "Port {port} jest używany przez inny program.",
+  "nerd_server_use_port": "Użyj portu {port}",
+  "nerd_server_use_port_click": "Kliknij tutaj, aby zamiast tego użyć portu {port}."
 }

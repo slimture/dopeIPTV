@@ -2870,5 +2870,10 @@
   "sa_recording_set": "{title} wird von {source} aufgenommen.",
   "sa_open_series": "Serie öffnen",
   "sa_from_source": "Aus {source}",
-  "night_refused": "Nachtmodus ließ sich für diesen Stream nicht einschalten"
+  "night_refused": "Nachtmodus ließ sich für diesen Stream nicht einschalten",
+  "nerd_ck_server_ours": "Der Server von dopeIPTV läuft schon auf diesem Computer (aus einem Terminal oder bei der Anmeldung gestartet) – auf Port {port}. Beende ihn oder wähle einen anderen Port.",
+  "nerd_ck_server_ours_app": "Ein anderes dopeIPTV-Fenster auf diesem Computer stellt schon auf Port {port} bereit. Schalte dort den Server aus oder wähle einen anderen Port.",
+  "nerd_ck_server_taken": "Port {port} wird von einem anderen Programm verwendet.",
+  "nerd_server_use_port": "Port {port} verwenden",
+  "nerd_server_use_port_click": "Hier klicken, um stattdessen Port {port} zu verwenden."
 }

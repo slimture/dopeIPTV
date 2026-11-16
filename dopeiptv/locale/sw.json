@@ -2870,5 +2870,10 @@
   "sa_recording_set": "{title} kitarekodiwa kutoka {source}.",
   "sa_open_series": "Fungua msururu",
   "sa_from_source": "Kutoka {source}",
-  "night_refused": "Hali ya usiku haikuweza kuwashwa kwa mtiririko huu"
+  "night_refused": "Hali ya usiku haikuweza kuwashwa kwa mtiririko huu",
+  "nerd_ck_server_ours": "Seva ya dopeIPTV tayari inaendeshwa kwenye kompyuta hii (iliyoanzishwa kutoka kwenye terminali au wakati wa kuingia) – kwenye mlango {port}. Isimamishe, au chagua mlango mwingine.",
+  "nerd_ck_server_ours_app": "Dirisha jingine la dopeIPTV kwenye kompyuta hii tayari linatoa huduma kwenye mlango {port}. Zima seva yake huko, au chagua mlango mwingine.",
+  "nerd_ck_server_taken": "Mlango {port} unatumiwa na programu nyingine.",
+  "nerd_server_use_port": "Tumia mlango {port}",
+  "nerd_server_use_port_click": "Bofya hapa kutumia mlango {port} badala yake."
 }

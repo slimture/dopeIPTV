@@ -69,6 +69,16 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   records - also when that channel was from failover, the Search page or
   a source switched away from, where it went on with the new source's
   channel of the same number; it now goes on at the address it played.
+### Changed
+
+- Server mode, its port in use: the app says whose it is - dopeIPTV's own
+  server (a `dopeiptv --server` started from a terminal or at login, or
+  another window) or another program - and offers the next free port
+  (past the remote API's and the phone remote's) in its note and on the
+  Nerd page's line; one click stores it and starts the server there,
+  nothing changes without it. `dopeiptv --server` logs the same, with the
+  `--port` to start with. Any other reason a port does not open is said
+  as before.
 
 ## [1.6.0]
 
