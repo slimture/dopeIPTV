@@ -99,6 +99,8 @@ dopeiptv/
                        a remote with a touchpad while TV mode is on)
     qr.py              QR code encoder (byte mode, level M, versions 1-40)
     ical.py            Reminders and recordings as iCalendar (RFC 5545)
+    search_all.py      One search across every source: rows as the lists show
+                       them, a guide's week compact, four groups ranked
     shortcut_keys.py   Keyboard shortcuts: the actions, the app's keys, the
                        user's over them, never two on one key
     log.py             Central logging (configure_logging, DOPEIPTV_LOG)
@@ -146,6 +148,8 @@ dopeiptv/
                        in an NSPanel of its own, a CastHub receiver
                        (PyObjC's AVFoundation, AVKit, AppKit)
     notify.py          Desktop notifications (org.freedesktop.Notifications)
+    search_sources.py  The search across sources: each source's client, lists
+                       (a portal's only as loaded) and guide from disk, once
     popular.py         Popular right now: TMDB's chart of the week matched
                        against the provider's catalogue (Home shelves)
 
@@ -206,6 +210,10 @@ dopeiptv/
     mw_guide.py        The Guide page in the middle pane, and its pop-out
     mw_series_page.py  A series' page in the middle pane: opened from anywhere,
                        played through the window's path, Back to the list as it was
+    mw_search_all.py   The Search page in the middle pane: one search across
+                       every source, a hit played or opened through the
+                       window's path (another source's channel without a switch)
+    search_page.py     The Search page itself: field, chips, grouped results
     series_page.py     The series page itself: header, season chips, the list
     series_cards.py    Its episode cards: model, painted card, keys, lazy pictures
     home_widgets.py    Home's featured strip, shelves and cards
@@ -231,7 +239,6 @@ dopeiptv/
     dialogs.py         Playlist editor, content manager
     epg_grid.py        The guide (EpgGrid): timeline grid, filter, bar -
                        on the Guide page or in its window (EpgGridDialog)
-    epg_search.py      Programme search across the whole guide
     reminders.py       Reminders manager dialog
     calendar_export.py Export to calendar… (an .ics, the subscription addresses)
     phone_remote.py    Phone remote… dialog: the code (QrView), the address

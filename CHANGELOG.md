@@ -7,6 +7,24 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+- One search across every source (issue #29): a Search page in the
+  sidebar's places, on Ctrl+Shift+F (a key of your own for the old guide
+  search carries over), the guide's Search button and the command
+  palette's "Search everywhere for …". It finds channels, the guide's
+  programmes from now to a week ahead, movies and series in all your
+  sources, in four groups with a few rows each and Show all, every row
+  naming its source; a programme on now has a Live mark and a progress
+  bar. A hit plays in the docked player and the results stay; Back from
+  a series' page comes to them as they were, Esc empties the field and
+  then goes back. Another source's channel plays without switching to
+  it (the status line says from where), its reminders fire whichever
+  source is in use and a recording asks it for the address as it
+  starts; its movies and series switch to it first. Each source's lists
+  are read once a session off the window's thread - a portal's only as
+  far as they were opened, said on the page - and its guide only from
+  what this computer has; hidden, locked and, for a kids profile, adult
+  categories are never searched, and nothing is kept past leaving the
+  page while viewing privately. It replaces the Search the guide window.
 - Sync between computers is for everyone, not only supporters: no
   supporter key is needed or sent. The Sync page says in plain words what
   dopeiptv.org gets - bytes encrypted on the computer with a key from the

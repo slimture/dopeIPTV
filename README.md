@@ -266,7 +266,7 @@ hand costs nothing either.
 | `Ctrl`+`B` | Collapse / expand the sidebar (icon rail) |
 | `Ctrl`+`Shift`+`M` | Focus mode (hide the list) |
 | `Ctrl`+`G` | Open the EPG guide |
-| `Ctrl`+`Shift`+`F` | Search the guide |
+| `Ctrl`+`Shift`+`F` | Search everywhere: every source's channels, guide, movies and series |
 | `Ctrl`+`Shift`+`R` | Reminders |
 | `Ctrl`+`O` | Open a video file |
 | `M` | Mute |
