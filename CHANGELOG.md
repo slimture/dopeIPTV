@@ -27,6 +27,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   first profile is gone from the copy the first start left for a
   downgrade too - before, it stayed there, and in every backup made
   after.
+- Night mode (N) and teletext (T), new in 1.6, no longer stay without a
+  key for good when an earlier version's shortcuts gave N or T to
+  another action: nothing is stored for them, so once the key is free
+  again they have it.
 
 ## [1.6.1]
 

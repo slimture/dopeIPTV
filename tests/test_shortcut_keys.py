@@ -66,8 +66,10 @@ def test_the_old_editors_keys_are_carried_over_once():
     assert nk.migrate(s, "linux") == 2
     assert "shortcut/linux/pause" not in s and "shortcut/linux/stats" not in s
     assert s["shortcut/darwin/mute"] == "J"                 # another system's, left alone
-    # The old editor never checked for clashes: Ctrl+B was the sidebar's too.
-    assert json.loads(s["keyboard_shortcuts"]) == {"pause": "K", "stats": "Ctrl+B", "sidebar": ""}
+    # The old editor never checked for clashes: Ctrl+B was the sidebar's too,
+    # which has none while stats has it - and gets it back once it is free.
+    assert json.loads(s["keyboard_shortcuts"]) == {"pause": "K", "stats": "Ctrl+B"}
+    assert nk.from_settings(s)["sidebar"] == ""
     assert nk.migrate(s, "linux") == 0                       # once
     # A key set since wins over an old one.
     s = _Settings({"shortcut/linux/stats": "F9", "keyboard_shortcuts": json.dumps({"mute": "F9"})})
@@ -151,7 +153,29 @@ def test_never_two_actions_on_one_key_whatever_is_stored():
     assert eff["stats"] == "Ctrl+B" and eff["sidebar"] == ""
     # Tidied, the same keys with the fewest overrides.
     assert nk.effective(nk.tidy(over)) == eff
-    assert nk.tidy(over) == {"mute": "Space", "pause": "", "stats": "Ctrl+B", "sidebar": ""}
+    assert nk.tidy(over) == {"mute": "Space", "stats": "Ctrl+B"}
+
+
+def test_a_new_action_whose_key_the_user_has_gets_it_once_it_is_free():
+    """1.5's keys gave mute N and record T; 1.6 brought night mode on N and
+    teletext on T. They have no key while the user's keys hold them - and
+    nothing is stored for that, so once N or T is free again they have it,
+    not "no key" until a reset. A key the user cleared stays cleared."""
+    stored = json.dumps({"epg_search": "Ctrl+E", "mute": "N", "record": "T"})
+    over = nk.parse(stored)
+    eff = nk.effective(over)
+    assert eff["mute"] == "N" and eff["night_mode"] == ""
+    assert eff["record"] == "T" and eff["teletext"] == ""
+    # Opened and closed in Settings: stored as it was.
+    assert json.loads(nk.dump(over)) == json.loads(stored)
+    over, lost = nk.assign(nk.tidy(over), "mute", "Ctrl+Alt+M")
+    assert lost == [] and nk.effective(over)["night_mode"] == "N"
+    over, lost = nk.assign(over, "record", nk.DEFAULTS["record"])
+    assert lost == [] and nk.effective(over)["teletext"] == "T"
+    assert over == {"epg_search": "Ctrl+E", "mute": "Ctrl+Alt+M"}
+    # Cleared by the user: no key, kept so, whatever is free.
+    over, _lost = nk.assign(over, "night_mode", "")
+    assert over["night_mode"] == "" and nk.effective(nk.tidy(over))["night_mode"] == ""
 
 
 @pytest.mark.parametrize("key,why", [

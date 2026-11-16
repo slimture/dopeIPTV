@@ -253,9 +253,20 @@ def effective(overrides: dict[str, str], platform: str = sys.platform) -> dict[s
 
 def tidy(overrides: dict[str, str], platform: str = sys.platform) -> dict[str, str]:
     """The fewest overrides that give the same keys: one per action whose
-    key is not the app's own, "" for one left without a key."""
+    key is not the app's own, "" for one the user left without a key. An
+    action that has none only because another action holds its own key
+    (an action new in this version whose key the user had given to
+    another) stores nothing: freed, the key is its own again."""
     eff = effective(overrides, platform)
-    return {sid: eff[sid] for sid, default, _l in ACTIONS if eff[sid] != default}
+    return {sid: eff[sid] for sid, default, _l in ACTIONS
+            if eff[sid] != default and (eff[sid] or _cleared(overrides, sid))}
+
+
+def _cleared(overrides: dict[str, str], sid: str) -> bool:
+    """*sid* is "" in *overrides*: the user cleared its key, or gave it to
+    another action (assign)."""
+    seq = overrides.get(sid)
+    return isinstance(seq, str) and not seq.strip()
 
 
 def dump(overrides: dict[str, str], platform: str = sys.platform) -> str:
