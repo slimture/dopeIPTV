@@ -383,6 +383,52 @@ def test_a_refresh_on_a_worker_is_used_at_once_and_stored_on_the_windows_thread(
     assert s.off_main == []                                # never read or written there
 
 
+def test_a_renewal_out_when_sign_out_is_pressed_brings_nothing_back(monkeypatch):
+    """Sign out while a worker's renewal waits for Trakt's answer: the
+    answer that comes after neither signs in again (in memory or in the
+    settings) nor is a refusal of it anything to undo."""
+    widgets = pytest.importorskip("PyQt6.QtWidgets")
+    app = widgets.QApplication.instance() or widgets.QApplication([])
+    out, answered = threading.Event(), threading.Event()
+    answers = [_TokenResp(200, {"access_token": "AT2", "refresh_token": "RT2",
+                                "expires_in": 86400})]
+
+    def post(*_a, **_k):
+        out.set()
+        answered.wait(10)
+        return answers.pop(0)
+    monkeypatch.setattr(T.requests, "post", post)
+    s = _ThreadSettings(trakt_client_id="CID", trakt_access_token="AT1",
+                        trakt_refresh_token="RT1", trakt_expires_at=int(time.time()) + 60,
+                        trakt_fav_list_slug="mine")
+    tc = T.TraktClient(s)
+    worker = threading.Thread(target=tc._ensure_fresh_token)
+    worker.start()
+    assert out.wait(10)
+    tc.disconnect()                          # Sign out, on the window's thread
+    answered.set()
+    worker.join(10)
+    assert not tc.is_connected() and tc.refresh_token == ""
+    app.processEvents()
+    assert not any(k in s for k in T.TOKEN_KEYS) and s.off_main == []
+    assert not T.TraktClient(s).is_connected()
+    # The same with Trakt refusing it: still signed out, nothing written.
+    s = _ThreadSettings(trakt_client_id="CID", trakt_access_token="AT1",
+                        trakt_refresh_token="RT1", trakt_expires_at=int(time.time()) + 60)
+    tc = T.TraktClient(s)
+    out.clear()
+    answered.clear()
+    answers[:] = [_TokenResp(400, {"error": "invalid_grant"})] * 2
+    worker = threading.Thread(target=tc._ensure_fresh_token)
+    worker.start()
+    assert out.wait(10)
+    tc.disconnect()
+    answered.set()
+    worker.join(10)
+    app.processEvents()
+    assert not tc.is_connected() and not any(k in s for k in T.TOKEN_KEYS)
+
+
 def test_a_server_error_keeps_the_sign_in(monkeypatch):
     monkeypatch.setattr(T.requests, "post",
                         lambda *a, **k: _TokenResp(503))

@@ -30,6 +30,14 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   It now stops it as the Stop button does (1.6.0 fixed this for the
   button); the media keys' Stop, and the phone's and Home Assistant's
   outside TV mode, too.
+- Trakt and Simkl: a quick switch to another profile and back while a
+  sign-in was being renewed could leave the profile's new client with the
+  refresh token Trakt had just retired, and its next renewal then signed
+  the profile out of Trakt. A profile's sign-in is now kept once for every
+  client made for it, renewed by one of them at a time, and a renewal's
+  answer lands only on the sign-in it renewed: never over a newer one,
+  and never after Sign out, which a renewal still on its way used to undo
+  by storing the tokens again.
 
 ## [1.6.0]
 

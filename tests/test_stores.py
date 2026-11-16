@@ -377,3 +377,54 @@ def test_an_import_skips_what_it_cannot_use():
         {"kind": "m3u", "server": " http://ok/list.m3u "}]) == 1
     assert store.playlists()[0]["server"] == "http://ok/list.m3u"
     assert store.playlists()[0]["name"] == "ok"
+
+
+class _Sign(dict):
+    """A settings object for KeptValues (one per test: what it keeps is
+    shared by every KeptValues made over it)."""
+
+    def value(self, key, default=None):
+        return self.get(key, default)
+
+    def setValue(self, key, value):  # noqa: N802 - Qt's name
+        self[key] = value
+
+    def remove(self, key):
+        self.pop(key, None)
+
+
+def test_kept_values_are_one_for_every_client_of_a_settings_file():
+    from dopeiptv.core.stores import KeptValues
+    s = _Sign(tok="a", ref="r1")
+    first, second = KeptValues(s, ("tok", "ref")), KeptValues(s, ("tok", "ref"))
+    first.put({"tok": "b", "ref": "r2"})
+    assert second.value("tok") == "b" and second.value("ref") == "r2"
+    assert s == {"tok": "b", "ref": "r2"}            # no application: written at once
+    # Read from the settings where a client is made, when no write is on
+    # its way there: a change made behind the clients' backs is seen.
+    s["tok"] = "c"
+    assert KeptValues(s, ("tok", "ref")).value("tok") == "c" == first.value("tok")
+    # Another settings object (another file) keeps its own.
+    assert KeptValues(_Sign(tok="x"), ("tok", "ref")).value("tok") == "x"
+    assert first.renewal is second.renewal          # one renewal at a time for them all
+
+
+def test_a_renewals_answer_lands_only_on_the_sign_in_it_renewed():
+    from dopeiptv.core.stores import KeptValues
+    s = _Sign(tok="a", ref="r1", slug="list")
+    old, new = KeptValues(s, ("tok", "ref", "slug")), KeptValues(s, ("tok", "ref", "slug"))
+    held, since_old = old.snapshot("tok", "ref")
+    assert held == {"tok": "a", "ref": "r1"}
+    _held, since_new = new.snapshot("tok", "ref")
+    # Another key of theirs changing is no reason to let a renewal go.
+    new.put({"slug": "other"})
+    assert new.put({"tok": "b", "ref": "r2"}, since=since_new)
+    # The older renewal comes after the newer one: not kept, nor its refusal.
+    assert not old.put({"tok": "stale", "ref": "r1b"}, since=since_old)
+    assert not old.drop("tok", "ref", since=since_old)
+    assert (new.value("tok"), new.value("ref")) == ("b", "r2") == (s["tok"], s["ref"])
+    # A sign-out while a renewal is out: its answer brings nothing back.
+    _held, since = new.snapshot("tok", "ref")
+    old.drop("tok", "ref", "slug")
+    assert not new.put({"tok": "late", "ref": "r3"}, since=since)
+    assert new.value("tok") is None and "tok" not in s and "slug" not in s

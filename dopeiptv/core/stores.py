@@ -20,44 +20,145 @@ from PyQt6.QtCore import QSettings
 from . import privacy
 
 
+class _Kept:
+    """One profile's values in one settings file, shared by every
+    KeptValues made for them: what memory holds, each key's version (one
+    up with every change), the writes still on their way to the settings,
+    and the lock a renewal holds."""
+
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.values: dict[str, Any] = {}
+        self.versions: dict[str, int] = {}
+        self.pending = 0
+        self.renewal = threading.Lock()
+
+
+#: (the settings file's object, profile, keys) -> what they keep; an entry
+#: goes with its settings object.
+_KEPT: dict[tuple[int, str, tuple[str, ...]], _Kept] = {}
+_KEPT_LOCK = threading.Lock()
+
+
+def _kept_for(settings: Any, keys: tuple[str, ...]) -> _Kept:
+    """The values kept for *settings*' file and profile: one for every
+    client made for them, from the first. A settings object that cannot
+    say which file it is, or cannot be followed, keeps its own."""
+    import weakref
+
+    from .profiles import view_of
+    view = view_of(settings)
+    if view is None:
+        return _Kept()
+    base, pid = view
+    key = (id(base), pid, keys)
+    with _KEPT_LOCK:
+        kept = _KEPT.get(key)
+        if kept is None:
+            try:
+                # Gone with the object, before its id can be another's.
+                weakref.finalize(base, _KEPT.pop, key, None)
+            except TypeError:
+                return _Kept()
+            kept = _KEPT[key] = _Kept()
+        return kept
+
+
 class KeptValues:
     """A few keys of a settings object held in memory, for a client whose
-    workers read and renew them (Trakt's and Simkl's sign-in). Read once,
-    where the client is made (the window's thread); changed here at once,
-    so a worker reads what it has just renewed; written to the settings on
-    the window's thread (core/workers.on_gui_thread) - one QSettings object
-    is not safe to use from two threads. *settings* may be a profile's
-    pinned view (core/profiles.py): written to that profile, whichever is
-    in use by then."""
+    workers read and renew them (Trakt's and Simkl's sign-in). Changed here
+    at once, so a worker reads what it has just renewed; written to the
+    settings on the window's thread (core/workers.on_gui_thread) - one
+    QSettings object is not safe to use from two threads. *settings* may be
+    a profile's pinned view (core/profiles.py): written to that profile,
+    whichever is in use by then.
+
+    One profile's values in one settings file are kept once, for every
+    client made for them: the window makes new clients at a profile switch
+    while a worker may still hold an old one, and a renewal that one makes
+    - a refresh token is used once - is what the new client must go on
+    with. They are read from the settings where a client is made (the
+    window's thread), unless a write is still on its way there.
+
+    A renewal starts from a snapshot() and hands its stamp back to put() or
+    drop() as *since*: its answer is kept only if none of those keys
+    changed meanwhile - not after a sign-out, a new sign-in or a newer
+    renewal."""
 
     def __init__(self, settings: Any, keys: Iterable[str]) -> None:
         self.settings = settings
-        self._lock = threading.Lock()
-        self._values: dict[str, Any] = {}
+        keys = tuple(keys)
+        self._kept = _kept_for(settings, keys)
+        read: dict[str, Any] = {}
         for key in keys:
             try:
                 value = settings.value(key, None)
             except Exception:
                 value = None
             if value is not None and value != "":
-                self._values[key] = value
+                read[key] = value
+        kept = self._kept
+        with kept.lock:
+            if kept.pending:
+                return            # memory is ahead of the settings
+            for key in keys:
+                if read.get(key) != kept.values.get(key):
+                    kept.versions[key] = kept.versions.get(key, 0) + 1
+            kept.values = read
+
+    @property
+    def renewal(self) -> threading.Lock:
+        """Held while a renewal runs - one at a time for the profile, by
+        every client made for it."""
+        return self._kept.renewal
 
     def value(self, key: str, default: Any = None) -> Any:
-        with self._lock:
-            return self._values.get(key, default)
+        with self._kept.lock:
+            return self._kept.values.get(key, default)
 
-    def put(self, values: Mapping[str, Any]) -> None:
-        """*values* in memory now, in the settings on the window's thread."""
-        with self._lock:
-            self._values.update(values)
+    def snapshot(self, *keys: str) -> tuple[dict[str, Any], dict[str, int]]:
+        """*keys*' values now and where they stand (the stamp), read
+        together: what a renewal starts from."""
+        kept = self._kept
+        with kept.lock:
+            return ({k: kept.values.get(k) for k in keys},
+                    {k: kept.versions.get(k, 0) for k in keys})
+
+    def put(self, values: Mapping[str, Any], since: Mapping[str, int] | None = None) -> bool:
+        """*values* in memory now, in the settings on the window's thread.
+        With *since* (a snapshot's stamp) only if none of its keys changed
+        meanwhile; False when it came too late and nothing was written."""
+        kept = self._kept
+        with kept.lock:
+            if not self._still(since):
+                return False
+            kept.values.update(values)
+            self._changed(tuple(values))
         self._flush(tuple(values))
+        return True
 
-    def drop(self, *keys: str) -> None:
-        """*keys* gone from memory now, from the settings on the window's thread."""
-        with self._lock:
+    def drop(self, *keys: str, since: Mapping[str, int] | None = None) -> bool:
+        """*keys* gone from memory now, from the settings on the window's
+        thread - with *since*, as put() takes it."""
+        kept = self._kept
+        with kept.lock:
+            if not self._still(since):
+                return False
             for key in keys:
-                self._values.pop(key, None)
+                kept.values.pop(key, None)
+            self._changed(keys)
         self._flush(keys)
+        return True
+
+    def _still(self, since: Mapping[str, int] | None) -> bool:
+        versions = self._kept.versions
+        return since is None or all(versions.get(k, 0) == v for k, v in since.items())
+
+    def _changed(self, keys: tuple[str, ...]) -> None:
+        kept = self._kept
+        for key in keys:
+            kept.versions[key] = kept.versions.get(key, 0) + 1
+        kept.pending += 1
 
     def _flush(self, keys: tuple[str, ...]) -> None:
         from .workers import on_gui_thread
@@ -67,19 +168,24 @@ class KeptValues:
         """(the window's thread) The settings made what memory holds now -
         so a write queued from a worker that lands after a sign-out on the
         window's thread brings nothing back."""
-        with self._lock:
-            now = {k: self._values[k] for k in keys if k in self._values}
-        # A sign-out of the first profile's: not left under the keys' old
-        # names either (core/profiles.left_behind).
-        from .profiles import left_behind
-        old = left_behind(self.settings)
-        for key in keys:
-            if key in now:
-                self.settings.setValue(key, now[key])
-            else:
-                self.settings.remove(key)
-                if old is not None:
-                    old.remove(key)
+        kept = self._kept
+        try:
+            with kept.lock:
+                now = {k: kept.values[k] for k in keys if k in kept.values}
+            # A sign-out of the first profile's: not left under the keys'
+            # old names either (core/profiles.left_behind).
+            from .profiles import left_behind
+            old = left_behind(self.settings)
+            for key in keys:
+                if key in now:
+                    self.settings.setValue(key, now[key])
+                else:
+                    self.settings.remove(key)
+                    if old is not None:
+                        old.remove(key)
+        finally:
+            with kept.lock:
+                kept.pending -= 1
 
 
 # The implicit "just add it here" bucket every category has. Items land

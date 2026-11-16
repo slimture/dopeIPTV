@@ -278,6 +278,114 @@ def test_a_renewal_on_a_worker_after_a_switch_is_kept_by_its_own_profile(tmp_pat
     assert T.TraktClient(mine).access_token == "me-new"              # a client made later reads it
 
 
+class _OnceTrakt:
+    """Trakt's token endpoint: a refresh token is good once. An answer in
+    *holds* is kept back until its event is set - renewed at Trakt, the
+    answer still on its way."""
+
+    class Answer:
+        def __init__(self, code, body):
+            self.status_code, self._body = code, body
+
+        def json(self):
+            return self._body
+
+    def __init__(self, good: str):
+        import threading
+        self.good, self.n, self.sent = {good}, 0, []
+        self.lock = threading.Lock()
+        self.holds: dict = {}
+        self.arrived = threading.Event()
+
+    def post(self, url, json=None, **_kw):
+        rt = json["refresh_token"]
+        with self.lock:
+            self.sent.append(rt)
+            if rt in self.good:
+                self.good.discard(rt)
+                self.n += 1
+                self.good.add(f"ref{self.n}")
+                answer = self.Answer(200, {"access_token": f"acc{self.n}",
+                                           "refresh_token": f"ref{self.n}", "expires_in": 86400})
+            else:
+                answer = self.Answer(400, {"error": "invalid_grant"})
+            hold = self.holds.pop(rt, None)
+        if hold is not None:
+            self.arrived.set()
+            hold.wait(10)
+        return answer
+
+
+def _settle(app, done, secs: float = 5.0):
+    import time
+    end = time.monotonic() + secs
+    while not done() and time.monotonic() < end:
+        app.processEvents()
+        time.sleep(0.01)
+
+
+def test_a_renewal_in_flight_through_a_switch_and_back_is_what_the_new_client_goes_on_with(
+        tmp_path, monkeypatch):
+    """A→B→A while a worker of the first client renews: the client made on
+    the way back must not keep the refresh token Trakt has just retired -
+    its next renewal would be refused and sign the profile out."""
+    import threading
+    widgets = pytest.importorskip("PyQt6.QtWidgets")
+    app = widgets.QApplication.instance() or widgets.QApplication([])
+    from dopeiptv.providers import trakt as T
+    trakt = _OnceTrakt("ref")
+    monkeypatch.setattr(T.requests, "post", trakt.post)
+    views, store, kid = _two(tmp_path)
+    old = T.TraktClient(profiles.pinned(views["main"], MAIN_ID))       # "ref", due long ago
+    trakt.holds["ref"] = answered = threading.Event()
+    worker = threading.Thread(target=old._ensure_fresh_token)          # a watched sync's
+    worker.start()
+    assert trakt.arrived.wait(10)                 # renewed at Trakt, the answer on its way
+    profiles.activate(kid.id)                     # Lisa...
+    T.TraktClient(profiles.pinned(views["main"], kid.id))
+    profiles.activate(MAIN_ID)                    # ...and back: a new client
+    new = T.TraktClient(profiles.pinned(views["main"], MAIN_ID))
+    answered.set()
+    worker.join(10)
+    assert (new.access_token, new.refresh_token) == ("acc1", "ref1")
+    assert new.refresh_tokens() is True           # its next renewal: Trakt's own token
+    assert trakt.sent == ["ref", "ref1"] and new.is_connected()
+    mine = profiles.pinned(views["main"], MAIN_ID)
+    _settle(app, lambda: mine.value("trakt_refresh_token") == "ref2")
+    assert (mine.value("trakt_access_token"), mine.value("trakt_refresh_token")) == ("acc2", "ref2")
+    assert profiles.pinned(views["main"], kid.id).value("trakt_access_token", "") == ""
+
+
+def test_the_profiles_clients_renew_one_at_a_time_and_a_newer_answer_stays(
+        tmp_path, monkeypatch):
+    """A worker of the new client that finds the sign-in due while the old
+    client's renewal is out waits for it, and goes on with what it brought
+    - never a second renewal with the same, retired token."""
+    import threading
+    widgets = pytest.importorskip("PyQt6.QtWidgets")
+    app = widgets.QApplication.instance() or widgets.QApplication([])
+    from dopeiptv.providers import trakt as T
+    trakt = _OnceTrakt("ref")
+    monkeypatch.setattr(T.requests, "post", trakt.post)
+    views, store, kid = _two(tmp_path)
+    old = T.TraktClient(profiles.pinned(views["main"], MAIN_ID))
+    new = T.TraktClient(profiles.pinned(views["main"], MAIN_ID))
+    trakt.holds["ref"] = answered = threading.Event()
+    first = threading.Thread(target=old._ensure_fresh_token)
+    first.start()
+    assert trakt.arrived.wait(10)
+    second = threading.Thread(target=new._ensure_fresh_token)
+    second.start()
+    second.join(0.3)
+    assert second.is_alive()                      # waits for the renewal under way
+    answered.set()
+    first.join(10)
+    second.join(10)
+    assert trakt.sent == ["ref"] and new.refresh_token == "ref1" and old.refresh_token == "ref1"
+    _settle(app, lambda: profiles.pinned(views["main"], MAIN_ID).value("trakt_refresh_token") == "ref1")
+    assert profiles.pinned(views["main"], MAIN_ID).value("trakt_refresh_token") == "ref1"
+
+
 def test_a_simkl_sign_in_is_the_profiles_own_with_its_refresh_token(tmp_path):
     # The access token alone was a profile's own: the refresh token and its
     # expiry were the household's, so a second sign-in took the first

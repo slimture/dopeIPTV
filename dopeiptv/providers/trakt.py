@@ -47,6 +47,8 @@ REFRESH_BACKOFF = 300
 #: in memory by the client (KeptValues).
 TOKEN_KEYS = ("trakt_access_token", "trakt_refresh_token", "trakt_expires_at",
               "trakt_fav_list_slug")
+#: The sign-in itself: what a renewal starts from and changes.
+SIGN_IN_KEYS = TOKEN_KEYS[:3]
 
 # dopeIPTV's own registered Trakt application, bundled so users get a true
 # one-click "Sign in with Trakt" with zero setup. A user who prefers their own
@@ -99,13 +101,16 @@ class TraktClient:
 
     def __init__(self, settings: QSettings) -> None:
         self.settings = settings
-        # The sign-in, read once here (the window's thread): renewed in
-        # memory on a worker, written to the settings on the window's
-        # thread (KeptValues) - never a QSettings write from a worker.
+        # The sign-in, read here (the window's thread): renewed in memory
+        # on a worker, written to the settings on the window's thread
+        # (KeptValues) - never a QSettings write from a worker. Kept once
+        # for the profile, by every client made for it: one a worker still
+        # holds after a profile switch renews for the client made since.
         self._kept = KeptValues(settings, TOKEN_KEYS)
         # A refresh token is single-use: two workers refreshing at once would
-        # leave one of them holding a token Trakt has already retired.
-        self._refresh_lock = threading.Lock()
+        # leave one of them holding a token Trakt has already retired - the
+        # profile's other clients' workers too.
+        self._refresh_lock: threading.Lock = self._kept.renewal
         self._refresh_retry_at = 0.0
 
     # -- credentials / tokens (persisted via QSettings) ---------------------
@@ -153,11 +158,14 @@ class TraktClient:
         # one must not go on writing to a list slug that is not theirs.
         self._kept.drop(*TOKEN_KEYS)
 
-    def _store_tokens(self, data: dict) -> None:
-        self._kept.put({
+    def _store_tokens(self, data: dict, since: dict[str, int] | None = None) -> bool:
+        """A token answer kept - a renewal's (*since*: its snapshot's
+        stamp) only if the sign-in did not change meanwhile."""
+        return self._kept.put({
             "trakt_access_token": data.get("access_token", ""),
             "trakt_refresh_token": data.get("refresh_token", ""),
-            "trakt_expires_at": int(time.time()) + int(data.get("expires_in", 0))})
+            "trakt_expires_at": int(time.time()) + int(data.get("expires_in", 0))},
+            since=since)
 
     # -- device-code OAuth flow ----------------------------------------------
 
@@ -267,11 +275,19 @@ class TraktClient:
 
         Without this the app never renewed anything: the stored refresh
         token and expiry went unread, and when the access token ran out
-        every Trakt call failed quietly until the user signed in again."""
+        every Trakt call failed quietly until the user signed in again.
+
+        The answer lands only on the sign-in it renewed: after a sign-out,
+        a new sign-in or another client's renewal of this profile while the
+        request was out, it is let go (False) - it must neither bring the
+        tokens back nor overwrite newer ones, nor a refusal sign out what
+        was renewed meanwhile."""
         tried: list[str] = []
         grants_refused = 0
+        held, since = self._kept.snapshot(*SIGN_IN_KEYS)
+        refresh_token = str(held.get("trakt_refresh_token") or "")
         for uri in (self.redirect_uri, OOB_REDIRECT_URI):
-            body = {"refresh_token": self.refresh_token,
+            body = {"refresh_token": refresh_token,
                     "client_id": self.client_id,
                     "redirect_uri": uri,
                     "grant_type": "refresh_token"}
@@ -286,7 +302,10 @@ class TraktClient:
                 self._refresh_retry_at = time.monotonic() + REFRESH_BACKOFF
                 return False
             if r.status_code in (200, 201):
-                self._store_tokens(r.json())
+                if not self._store_tokens(r.json(), since=since):
+                    log.info("trakt: a renewal answered after the sign-in "
+                             "changed - not kept")
+                    return False
                 log.info("trakt: access token refreshed")
                 return True
             tried.append(f"{r.status_code}{_oauth_error(r)}")
@@ -297,10 +316,14 @@ class TraktClient:
             # before it ("invalid_grant: session not found"). Keeping the dead
             # token only made every Trakt call fail quietly while Settings
             # still said "Connected"; dropping it says what is true and puts
-            # the Connect button back.
+            # the Connect button back - the favorites list with it, as
+            # disconnect() does. Not a sign-in renewed meanwhile.
+            if not self._kept.drop(*TOKEN_KEYS, since=since):
+                log.info("trakt: a renewal refused after the sign-in changed "
+                         "- left as it is")
+                return False
             log.warning("trakt: the saved sign-in can no longer be renewed "
                         "(%s) - connect to Trakt again", "; ".join(tried))
-            self.disconnect()
             return False
         log.warning("trakt: token refresh refused (HTTP %s) - sign in to "
                     "Trakt again", "/".join(tried))

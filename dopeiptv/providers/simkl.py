@@ -46,6 +46,8 @@ TOKEN_KEY = "simkl_access_token"
 REFRESH_KEY = "simkl_refresh_token"
 #: When the access token stops being accepted (unix seconds; 0: not known).
 EXPIRES_KEY = "simkl_token_expires"
+#: The sign-in, kept in memory by the client (KeptValues).
+SIGN_IN_KEYS = (TOKEN_KEY, REFRESH_KEY, EXPIRES_KEY)
 #: Scrobbles and marks write; without media:write the token is read-only.
 SCOPE = "media:read media:write"
 DEVICE_GRANT = "urn:ietf:params:oauth:grant-type:device_code"
@@ -257,15 +259,17 @@ class SimklClient:
     def __init__(self, settings: Settings, session: Any = None,
                  client_id: str | None = None) -> None:
         self.settings = settings
-        # The sign-in, read once here (the window's thread): renewed in
-        # memory on a worker, written to the settings on the window's
-        # thread (KeptValues) - never a settings write from a worker.
-        self._kept = KeptValues(settings, (TOKEN_KEY, REFRESH_KEY, EXPIRES_KEY))
+        # The sign-in, read here (the window's thread): renewed in memory
+        # on a worker, written to the settings on the window's thread
+        # (KeptValues) - never a settings write from a worker. Kept once
+        # for the profile, by every client made for it, and renewed by one
+        # of them at a time.
+        self._kept = KeptValues(settings, SIGN_IN_KEYS)
         self.session = session
         self._client_id = client_id
         self._items: tuple[float, Any] | None = None
         self._lock = threading.Lock()
-        self._token_lock = threading.Lock()
+        self._token_lock: threading.Lock = self._kept.renewal
         #: user_code -> device_code for a sign-in under way (the device code
         #: is what is polled with; never shown, never logged).
         self._device: dict[str, str] = {}
@@ -296,9 +300,13 @@ class SimklClient:
             threading.Thread(target=self._revoke, args=(token,), daemon=True,
                              name="simkl-revoke").start()
 
-    def _forget(self) -> None:
-        self._kept.drop(TOKEN_KEY, REFRESH_KEY, EXPIRES_KEY)
+    def _forget(self, since: Mapping[str, int] | None = None) -> bool:
+        """Signed out here - with *since* (a renewal's stamp) only if the
+        sign-in did not change meanwhile. False when it was left."""
+        if not self._kept.drop(*SIGN_IN_KEYS, since=since):
+            return False
         self._items = None
+        return True
 
     def _revoke(self, token: str) -> None:
         try:
@@ -310,8 +318,10 @@ class SimklClient:
 
     # -- the tokens -------------------------------------------------------------
 
-    def _store(self, data: Mapping[str, Any]) -> bool:
-        """An /oauth2/token answer kept. False when it carried no token."""
+    def _store(self, data: Mapping[str, Any], since: Mapping[str, int] | None = None) -> bool:
+        """An /oauth2/token answer kept - a renewal's (*since*: its stamp)
+        only if the sign-in did not change meanwhile. False when it carried
+        no token, or came too late."""
         token = str(data.get("access_token") or "")
         if not token:
             return False
@@ -324,7 +334,9 @@ class SimklClient:
         except (TypeError, ValueError):
             life = 0
         kept[EXPIRES_KEY] = int(time.time()) + life if life > 0 else 0
-        self._kept.put(kept)
+        if not self._kept.put(kept, since=since):
+            log.info("simkl: a renewal answered after the sign-in changed - not kept")
+            return False
         scope = str(data.get("scope") or "")
         if scope and "media:write" not in scope.split():
             # An unknown scope is downgraded to read-only, never refused.
@@ -342,9 +354,13 @@ class SimklClient:
     def refresh(self) -> bool:
         """A new access token from the refresh token. False when there is
         none, or Simkl refused it - then the sign-in is gone (revoked from
-        Simkl's Connected Apps, or 180 days unused) and is forgotten here."""
+        Simkl's Connected Apps, or 180 days unused) and is forgotten here.
+        The answer lands only on the sign-in it renewed: after a sign-out,
+        a new sign-in or another client's renewal of this profile while the
+        request was out, it is let go."""
         with self._token_lock:
-            rt = str(self._kept.value(REFRESH_KEY, "") or "")
+            held, since = self._kept.snapshot(*SIGN_IN_KEYS)
+            rt = str(held.get(REFRESH_KEY) or "")
             if not rt or not self.client_id:
                 return False
             try:
@@ -354,12 +370,15 @@ class SimklClient:
             except Exception as e:  # noqa: BLE001 - offline: try again later
                 log.info("simkl: could not renew the sign-in (%s)", type(e).__name__)
                 return False
-            if r.status_code == 200 and self._store(r.json() or {}):
+            if r.status_code == 200 and self._store(r.json() or {}, since=since):
                 log.info("simkl: sign-in renewed")
                 return True
             if r.status_code in (400, 401):
-                log.warning("simkl: the sign-in was not renewed - connect again")
-                self._forget()
+                if self._forget(since=since):
+                    log.warning("simkl: the sign-in was not renewed - connect again")
+                else:
+                    log.info("simkl: a renewal refused after the sign-in changed "
+                             "- left as it is")
             return False
 
     def _fresh(self) -> None:

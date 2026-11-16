@@ -271,6 +271,38 @@ def test_a_renewal_on_a_worker_is_used_at_once_and_written_on_the_windows_thread
     assert not any(k in s.d for k in keys) and s.off_main == []
 
 
+def test_a_renewal_out_when_sign_out_is_pressed_brings_nothing_back():
+    """Sign out while a worker's renewal waits for Simkl's answer: the
+    answer that comes after signs nothing in again."""
+    widgets = pytest.importorskip("PyQt6.QtWidgets")
+    app = widgets.QApplication.instance() or widgets.QApplication([])
+    keys = (simkl.TOKEN_KEY, simkl.REFRESH_KEY, simkl.EXPIRES_KEY)
+    out, answered = threading.Event(), threading.Event()
+
+    class Slow(FakeSimkl):
+        def post(self, url, **kw):
+            if url.endswith("/oauth2/token"):
+                out.set()
+                answered.wait(10)
+            return super().post(url, **kw)
+
+    fake = Slow()
+    fake.token_answers = [Resp(200, dict(TOKENS, access_token="LATE"))]
+    s = _ThreadSettings(**{simkl.TOKEN_KEY: "OLD", simkl.REFRESH_KEY: "simkl_rt_R",
+                           simkl.EXPIRES_KEY: int(time.time()) + 60})
+    c = simkl.SimklClient(s, session=fake, client_id="CID")
+    worker = threading.Thread(target=c.refresh)
+    worker.start()
+    assert out.wait(10)
+    c.disconnect()                           # Sign out, on the window's thread
+    answered.set()
+    worker.join(10)
+    assert not c.is_connected() and c.access_token == ""
+    app.processEvents()
+    assert not any(k in s.d for k in keys) and s.off_main == []
+    assert not simkl.SimklClient(s, session=fake, client_id="CID").is_connected()
+
+
 def test_signing_out_revokes_the_grant():
     fake = FakeSimkl()
     c = _signed_in(fake, **{simkl.REFRESH_KEY: "simkl_rt_R"})

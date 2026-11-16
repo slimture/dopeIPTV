@@ -264,6 +264,22 @@ def raw(settings: Any) -> Any:
     return settings
 
 
+def view_of(settings: Any) -> tuple[Any, str] | None:
+    """(the object behind *settings*' file, the profile its keys are read
+    for): the same for every pinned view of one profile in one file, made
+    when it may be (core/stores.KeptValues shares by it). A plain settings
+    object is its own, for no profile; None for a ProfileSettings itself,
+    whose view follows the profile in use."""
+    if isinstance(settings, ProfileSettings):
+        return None
+    pid = ""
+    if isinstance(settings, PinnedSettings):
+        pid, settings = settings.pid, settings.raw()
+    if isinstance(settings, RawSettings):
+        settings = settings._base
+    return settings, pid
+
+
 class PinnedSettings:
     """One profile's view of a settings file, whichever profile is active:
     what a store is given, so a store kept past a switch writes to its own
