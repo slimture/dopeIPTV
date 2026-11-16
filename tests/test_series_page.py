@@ -721,6 +721,9 @@ assert page.view.currentIndex().row() == 2
 QTest.mouseDClick(page.view.viewport(), Qt.MouseButton.LeftButton, pos=r.center())
 app.processEvents()
 assert str(w._last_playback["key"]) == "1003" and w._series_page_showing()
+# The poster under the video pauses what the page plays (it read "play").
+w.player.current_url = w.player.current_url or "http://example.invalid/ep.mkv"
+assert w._series_page_playing() and w._overlay_state() != "play", w._overlay_state()
 assert page.playing_key == "1003" and page.current == 0
 w.playback_mode = lambda: "embedded"
 assert w._advance_to_next_episode()

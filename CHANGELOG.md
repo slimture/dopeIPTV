@@ -215,6 +215,9 @@ how connections to the account are counted.
   in Favorites and History - it did nothing there. The box over the list
   no longer keeps saying "Search radio-browser.info…" after leaving
   Radio's Search.
+- On a series' page, the poster under the video read "play" while one of
+  its episodes played, and a click on it started the episode over
+  instead of pausing it. It now pauses and resumes it, as for a channel.
 
 ## [1.6.0]
 

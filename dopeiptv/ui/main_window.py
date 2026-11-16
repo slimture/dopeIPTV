@@ -1794,6 +1794,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                         and self._playing_key is not None
                         and self._current_key is not None
                         and str(self._current_key) == str(self._playing_key))
+        if not playing_this and self._series_page_playing():
+            # A series' page: the row selected in the list is the series,
+            # never the episode that plays - the poster read "play" while an
+            # episode of this very series played, and a click started it over.
+            playing_this = True
         if not playing_this:
             return "play"
         # Base the pause/stop decision on what's PLAYING, not the row that

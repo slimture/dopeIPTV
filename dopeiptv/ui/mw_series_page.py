@@ -97,6 +97,11 @@ class _SeriesPageMixin:
             page.play_requested.connect(self._sp_play)
             page.menu_requested.connect(self._sp_episode_menu)
             page.season_shown.connect(self._sp_season_shown)
+            # The poster under the video reads the page's episode while the
+            # page is up, the list's row once it is gone.
+            stack = getattr(self, "_mid_stack", None)
+            if stack is not None:
+                stack.currentChanged.connect(lambda _i: self._apply_play_icon())
             page.season_picked.connect(self._sp_season_picked)
             page.retry_requested.connect(self._sp_retry)
             h = page.header
@@ -480,6 +485,16 @@ class _SeriesPageMixin:
         pid = getattr(store, "active_id", None) or ""
         return f"{pid}:{(self._sp_ctx or {}).get('series_id')}"
 
+    def _series_page_playing(self) -> bool:
+        """The series page is up and one of its episodes plays (the poster
+        under the video then pauses and resumes it)."""
+        try:
+            page = getattr(self, "_series_page", None)
+            return bool(page is not None and not sip.isdeleted(page)
+                        and self._series_page_showing() and self._sp_playing()[0])
+        except Exception:
+            return False
+
     def _sp_playing(self) -> tuple[str, float]:
         """(key, how far) of what plays when it is one of this page's."""
         lp = getattr(self, "_last_playback", None) or {}
@@ -599,6 +614,7 @@ class _SeriesPageMixin:
             if playing and self._series_page_showing():
                 page.focus_episode(playing, take_focus=False)
             self._sp_refresh()
+            self._apply_play_icon()
         except Exception:
             log.exception("series page: what plays was not marked")
 
