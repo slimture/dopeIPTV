@@ -39,7 +39,7 @@ from ..media.seek_slider import _SeekSlider
 from ..media.video_thread import make_video_surface, swap_for_fallback
 from ..media import players
 from .widgets import (
-    drag_frameless_resize, exec_menu_over_video, frameless_resize_edges,
+    drag_frameless_resize, frameless_resize_edges, popup_menu_over_video,
     resize_edge_cursor, start_frameless_resize)
 
 
@@ -1261,7 +1261,7 @@ class _MultiviewWindow(QWidget):
         bar.triggered.connect(lambda: self._set_frameless(not frameless))
         m.addSeparator()
         m.addAction(tr("mv_close"), self.close)
-        exec_menu_over_video(m, pos)
+        popup_menu_over_video(m, pos)
 
     # -- overlays + polling + keyboard --------------------------------------
 
@@ -1527,7 +1527,7 @@ class _MultiviewMixin:
         menu.addSeparator()
         # Casting and Watch together come once, with the options above.
         menu.addAction(tr("mv_add"), self._send_docked_to_multiview)
-        exec_menu_over_video(menu, global_pos)
+        popup_menu_over_video(menu, global_pos)
 
     def _send_docked_to_multiview(self) -> None:
         p = getattr(self, "player", None)

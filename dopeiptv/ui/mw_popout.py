@@ -27,7 +27,7 @@ from PyQt6.QtWidgets import (
 
 from ..i18n import tr
 from .widgets import (
-    drag_frameless_resize, exec_menu_over_video, frameless_resize_edges,
+    drag_frameless_resize, frameless_resize_edges, popup_menu_over_video,
     resize_edge_cursor, start_frameless_resize)
 
 
@@ -789,7 +789,7 @@ class _PopoutMixin:
                     m.addAction(text, action)
         m.addSeparator()
         m.addAction(tr("tooltip_popout_exit"), self._exit_popout)
-        exec_menu_over_video(m, global_pos)
+        popup_menu_over_video(m, global_pos)
 
     def _set_popout_on_top(self, on: bool) -> None:
         self.settings.setValue("popout_on_top", "true" if on else "false")

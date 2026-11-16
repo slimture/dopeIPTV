@@ -49,6 +49,7 @@ from ..core.log import log
 from ..i18n import tr
 from .qt_i18n import format_when
 from .theme import P, corner_radius
+from .widgets import popup_menu_over_video
 
 
 class _GridView(QGraphicsView):
@@ -2465,7 +2466,7 @@ class EpgGrid(QWidget):
         m = QMenu(self)
         if not data:
             m.addAction(tr("btn_refresh_epg"), self._refresh_guide)
-            m.exec(global_pos)
+            popup_menu_over_video(m, global_pos)
             return
         ch, p = data["channel"], data["prog"]
         self._selected = data
@@ -2476,7 +2477,7 @@ class EpgGrid(QWidget):
             m.addAction(tr("epg_play_channel"), lambda: self._tune(ch))
             m.addSeparator()
             m.addAction(tr("btn_refresh_epg"), self._refresh_guide)
-            m.exec(global_pos)
+            popup_menu_over_video(m, global_pos)
             return
         past = p["stop_timestamp"] < time.time()
         if past and self.window._timeshift_days(ch):
@@ -2509,7 +2510,7 @@ class EpgGrid(QWidget):
                     lambda: self.window._add_reminder(ch, p))
         m.addSeparator()
         m.addAction(tr("btn_refresh_epg"), self._refresh_guide)
-        m.exec(global_pos)
+        popup_menu_over_video(m, global_pos)
 
     def _record(self, ch: dict, p: dict) -> None:
         # The detail panel's path, not a job of its own: a programme on the

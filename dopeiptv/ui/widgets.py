@@ -21,17 +21,28 @@ from . import theme as _theme
 from .theme import HEART, P, on_accent
 
 
-def exec_menu_over_video(menu, global_pos) -> None:
-    """Pop *menu* at *global_pos* so it renders cleanly over the embedded
-    video. On macOS a QMenu shown over a layer-backed QOpenGLWidget bleeds
-    through - the GL surface keeps repainting behind the non-native popup, so
-    the video shows through the menu. Forcing the menu to a native window
-    (winId materialises its own NSWindow surface) makes it composite above the
-    GL layer. A no-op cost elsewhere, so it's unconditional apart from darwin."""
+def popup_menu_over_video(menu, global_pos) -> None:
+    """Pop *menu* at *global_pos* over the video - shown, not run (popup(),
+    never exec()).
+
+    These menus open on a right-button press, and Qt follows every right
+    press with a context-menu event of its own once the press is handled -
+    since Qt 6.9 to the widget the pointer was last over. exec() inside the
+    press ran the menu's own loop first, so that event came after a click
+    on one of its items, to the widget under that item: where the menu hung
+    over a list or the guide, its row's own menu opened (record...), as if
+    the click went through the menu. Shown and left to its signals, the
+    press ends at once and the event goes to the video, nobody's menu.
+
+    On macOS a QMenu shown over a layer-backed QOpenGLWidget bleeds through -
+    the GL surface keeps repainting behind the non-native popup, so the video
+    shows through the menu. Forcing the menu to a native window (winId
+    materialises its own NSWindow surface) makes it composite above the GL
+    layer. A no-op cost elsewhere, so it's unconditional apart from darwin."""
     if sys.platform == "darwin":
         menu.setAttribute(Qt.WidgetAttribute.WA_NativeWindow, True)
         menu.winId()
-    menu.exec(global_pos)
+    menu.popup(global_pos)
 
 
 RESIZE_MARGIN = 8          # grab band along a frameless window's edges

@@ -91,7 +91,7 @@ def test_the_docked_right_click_stop_is_the_stop_button(monkeypatch):
     from dopeiptv.ui import mw_multiview
 
     shown = []
-    monkeypatch.setattr(mw_multiview, "exec_menu_over_video",
+    monkeypatch.setattr(mw_multiview, "popup_menu_over_video",
                         lambda menu, _pos: shown.append(menu))
 
     class Win(QWidget, mw_multiview._MultiviewMixin):
@@ -111,7 +111,7 @@ def test_the_popout_right_click_stop_is_the_stop_button(monkeypatch):
     from dopeiptv.ui import mw_popout
 
     shown = []
-    monkeypatch.setattr(mw_popout, "exec_menu_over_video",
+    monkeypatch.setattr(mw_popout, "popup_menu_over_video",
                         lambda menu, _pos: shown.append(menu))
 
     class Win(QWidget, mw_popout._PopoutMixin):

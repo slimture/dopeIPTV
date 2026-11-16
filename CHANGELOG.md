@@ -236,6 +236,11 @@ how connections to the account are counted.
   stores nothing.
 - Settings > Appearance: switching on "Follow the system" shows the light
   theme row at once; it stayed hidden until Settings was opened again.
+- A click on the video's right-click menu where it hangs over a list or
+  the guide no longer goes through to what is under it: the item did its
+  work, then that row's own menu (Record…) opened on top, mostly on
+  Wayland with Qt 6.9 and later. The same for the pop-out's, a multiview
+  cell's and the guide's own right-click menus.
 
 ## [1.6.0]
 

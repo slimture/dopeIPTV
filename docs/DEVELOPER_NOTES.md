@@ -107,6 +107,17 @@ lets go of a window before it goes - `release` on the window's
 it), the pop-out's when it is dropped, the whole thread when its surface
 is destroyed (`_Ending`) - and a window gone under it is no failure.
 
+Menus over the video are windows of their own (popups, never drawn into
+mpv). The right-click ones - docked, fullscreen, pop-out, a multiview
+cell, the guide - open on the button's press and go through
+`ui/widgets.popup_menu_over_video`: shown with `popup()`, never `exec()`.
+Qt follows a right press with a context-menu event once the press is
+handled, since 6.9 to the widget the pointer was over last; a menu run
+inside the press let that event through only after a click on one of its
+items - to the row under that item, whose own menu then opened (on
+Wayland, where the compositor puts the pointer on the window under the
+menu as it goes).
+
 Switched off (Settings > Picture & sound, or `DOPEIPTV_VIDEO_THREAD=0`), or
 when the own thread cannot start (no threaded OpenGL, no GL context or render
 context, no frame shown), the old surface takes over: `_MpvGLWidget`
