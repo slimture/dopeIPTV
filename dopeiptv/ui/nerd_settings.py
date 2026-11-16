@@ -808,8 +808,9 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     c.row(tr("nerd_diag_row"), info_btn, tr("nerd_diag_hint"), search="diagnostics bug report copy")
     # How the player draws its picture now (core/video_mode.py), so a
     # fallback to the window's thread never goes unnoticed.
-    c.row(tr("nerd_video_path"), QLabel(video_path_text()), tr("nerd_video_path_hint"),
-          search="video thread drawing render OpenGL fallback")
+    chip, why = video_path_chip()
+    c.row(tr("nerd_video_path"), chip, tr("nerd_video_path_hint"),
+          search="video thread drawing render OpenGL fallback", below=why)
     # The active source's connection, step by step (core/conn_test.py).
     conn_btn = QPushButton(tr("ct_button"))
 
@@ -1445,6 +1446,35 @@ def _hbox(*widgets: QWidget) -> QHBoxLayout:
         h.addWidget(w)
     h.addStretch(1)
     return h
+
+
+def video_path_chip() -> tuple[QLabel, QLabel | None]:
+    """How the player draws its picture as a small status chip - green on
+    its own thread, amber on the window's - with the reason, if there is
+    one, as a line under the row rather than a long chip."""
+    from PyQt6.QtCore import Qt
+
+    from ..core import video_mode
+    from .theme import P, tinted
+    own = video_mode.mode() == video_mode.THREAD
+    short = tr("video_path_thread") if own else tr("video_path_window")
+    tone = P["ok"] if own else P["warn"]
+    wash, _ink = tinted(tone, P["pane"], 0.16, P["text"])
+    chip = QLabel(f"<span style='color:{tone}'>\u25cf</span>&nbsp;&nbsp;{short}")
+    chip.setTextFormat(Qt.TextFormat.RichText)
+    chip.setStyleSheet(f"background:{wash}; color:{P['text']}; font-size:12px;"
+                       f" font-weight:600; border-radius:11px; padding:0 12px;")
+    # A radius over half the height is drawn square: the height is set.
+    chip.setFixedSize(chip.sizeHint().width(), 24)
+    chip.setAccessibleName(video_path_text())
+    full = video_path_text()
+    why = None
+    if full != short:
+        why = QLabel(full)
+        why.setObjectName("SettingsHint")
+        why.setWordWrap(True)
+        why.setStyleSheet("font-size:12px;")
+    return chip, why
 
 
 def video_path_text() -> str:
