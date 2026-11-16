@@ -1198,3 +1198,78 @@ def test_the_phone_remote_and_home_assistant_meet_the_transponder_check():
     assert "TUNERS_WINDOW_OK" in proc.stdout, (
         f"a play from the phone or Home Assistant missed the box's tuners\n"
         f"stdout={proc.stdout!r}\nstderr={proc.stderr[-3000:]!r}")
+
+
+# -- one count: what plays, and the source in use changed under it ---------------------
+
+def test_what_plays_stays_its_own_sources_after_the_source_in_use_changes():
+    """A channel of source A plays on; the person switches to source B (the
+    stream goes on - the status line says "from A"). The player's connection
+    is still A's account's: counted there, not against B's, and server mode
+    joins it for a device that asks for that channel instead of opening a
+    second connection to A."""
+    from dopeiptv.core import connections
+    from dopeiptv.ui.mw_connections import _ConnectionsMixin
+    from dopeiptv.ui.mw_server import _WindowHost
+    from dopeiptv.ui.mw_source_label import _SourceLabelMixin
+
+    url = "http://a.invalid/live/u/p/7.ts"
+    dvr = SimpleNamespace(streaming=True, recording=False, url=url, key="live:k7")
+
+    class Store:
+        active_id = "a"
+
+        def get(self, pid):
+            return {"id": pid, "name": pid.upper()}
+
+    class W(_ConnectionsMixin, _SourceLabelMixin):
+        def __init__(self):
+            self.client = SimpleNamespace(max_connections=1)
+            self.player = SimpleNamespace(current_url="http://127.0.0.1:1/x", _dvr=dvr,
+                                          _dvr_pool=SimpleNamespace(sessions=[dvr]))
+            self.rec = SimpleNamespace(jobs=[])
+            self._multiview_win = None
+            self.playlist_store = Store()
+            self._failover_source = None
+            self._failover_key = None
+            self._last_playback = None
+            self.cast = SimpleNamespace(active=None)
+            self._playing_item = {"stream_id": 7}
+            self.settings = _S(mv_stop_docked="false")
+            self.asked: list[str] = []
+
+        def _item_key(self, _it):
+            return "k7"
+
+        def _choice_dialog(self, title, message, options, dont_ask_setting=None):
+            self.asked.append(message)
+            return len(options) - 1
+
+    w = W()
+    w._note_playing_source(url, "k7", "live")       # as _start_playback does
+    w._last_playback = {"url": url}
+    assert [(u.kind, u.source) for u in w._conn_uses()] == [("buffer", "a")]
+    host = _WindowHost(w, None)
+    assert host.app_session("a", "7") is dvr
+    w._conn_ledger().report("a", 1, None, 1)        # A's provider said: one connection
+
+    w.playlist_store.active_id = "b"                # switch_playlist: nothing stops
+    uses = w._conn_uses()
+    assert [(u.kind, u.source) for u in uses] == [("buffer", "a")]
+    assert connections.own_count(uses, "a") == 1 and connections.own_count(uses, "b") == 0
+    # A recording or a multiview cell of B's is its first connection to B.
+    assert w._conn_verdict(uses) is None
+    assert host.app_session("a", "7") is dvr        # joined, not opened once more
+    assert host.app_session("b", "7") is None       # B's channel 7 is another channel
+    # The docked stream into a multiview cell beside the player (Settings
+    # keeps the player): A's second connection, asked about; B's first is not.
+    assert not w._conn_ok_multiview(None, url, "a") and len(w.asked) == 1
+    assert w._conn_ok_multiview(None, "http://b.invalid/live/u/p/1.ts") and len(w.asked) == 1
+    # Play after Stop of the same address is still A's.
+    w._note_playing_source(url, "k7", "live")
+    assert w._conn_player_source() == "a"
+    # A file of one's own, then a channel of B: B's.
+    w._note_playing_source("/home/x/film.mkv", "f", "local")
+    assert w._conn_player_source() == "b"
+    w._note_playing_source("http://b.invalid/live/u/p/7.ts", "k7", "live")
+    assert w._conn_player_source() == "b"

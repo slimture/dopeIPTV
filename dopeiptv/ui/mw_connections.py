@@ -87,10 +87,16 @@ class _ConnectionsMixin:
         return str(getattr(store, "active_id", "") or "") if store is not None else ""
 
     def _conn_player_source(self) -> str:
-        """The source the docked player plays from (failover: another)."""
+        """The source the docked player plays from: failover's or the Search
+        page's other one, else the one what plays was started from
+        (mw_source_label) - a switch to another source does not stop the
+        stream, and its connection stays its own account's."""
         other = getattr(self, "_failover_source", None)
         if other:
             return str(other.get("id") or "")
+        src = getattr(self, "_playing_src", None)
+        if src and src[0]:
+            return str(src[0])
         return self._conn_source()
 
     def _conn_uses(self, free_player: bool = False, free_cell=None) -> list[Use]:
@@ -184,12 +190,17 @@ class _ConnectionsMixin:
         except (TypeError, ValueError):
             return None
 
-    def _conn_verdict(self, uses: list[Use], adding: int = 1) -> connections.Verdict | None:
-        """Over the active source's limit with *adding* more next to *uses*?"""
+    def _conn_verdict(self, uses: list[Use], adding: int = 1,
+                      source: str = "") -> connections.Verdict | None:
+        """Over the limit of *source* (the active source when not given)
+        with *adding* more next to *uses*? Another source's limit is the one
+        its provider gave while it was the one in use."""
         try:
             self._conn_seen()
-            return self._conn_ledger().check(self._conn_source(), uses, adding,
-                                             limit=self._conn_limit())
+            active = self._conn_source()
+            src = str(source or active)
+            return self._conn_ledger().check(
+                src, uses, adding, limit=self._conn_limit() if src == active else None)
         except Exception as e:      # counting must never stand in the way
             log.debug("connections: not checked: %s", e)
             return None
@@ -273,11 +284,13 @@ class _ConnectionsMixin:
         if callable(room):
             room(uses, source)
 
-    def _conn_ok_multiview(self, cell: int | None, url: str = "") -> bool:
+    def _conn_ok_multiview(self, cell: int | None, url: str = "", source: str = "") -> bool:
         """*url* into multiview cell *cell* (None: the first free one): the
         docked player lets its stream go first where Settings says so, and
         a cell that plays already gives its stream up for the new one. A
-        file of this computer's takes no connection."""
+        file of this computer's takes no connection. *source*: the source
+        it is from when not the one in use (the docked player's stream,
+        started before a switch or from the Search page)."""
         if not connections.is_network(url):
             return True
         free_player = self.settings.value("mv_stop_docked", "true") == "true"
@@ -291,12 +304,12 @@ class _ConnectionsMixin:
                 target = next((c for c in cells if c.url is None),
                               getattr(win, "_focused", None) or cells[0])
         uses = self._conn_uses(free_player=free_player, free_cell=target)
-        v = self._conn_verdict(uses)
+        v = self._conn_verdict(uses, source=source)
         t = self._tuner_verdict(url, uses)
         go = v is None and t is None or self._conn_ask(
             v, "conn_what_multiview" if v is not None else "tuner_what", t)
         if go:
-            self._conn_server_room(uses)
+            self._conn_server_room(uses, source or None)
         return go
 
     def _conn_ok_cast(self, url: str = "") -> bool:

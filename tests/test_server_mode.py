@@ -947,7 +947,7 @@ def _asking(answer: bool):
         def _conn_uses(self, free_player=False, free_cell=None):
             return [connections.Use("player", "p1", "http://p.invalid/live/1.ts")]
 
-        def _conn_verdict(self, _uses):
+        def _conn_verdict(self, _uses, **_k):
             return full
 
         def _tuner_verdict(self, _url, _uses):

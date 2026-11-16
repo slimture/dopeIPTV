@@ -1545,7 +1545,7 @@ class _MultiviewMixin:
         # One more connection to the account: said first when the account
         # does not allow it (core/connections.py), and only then.
         ok = getattr(self, "_conn_ok_multiview", None)
-        if ok is not None and not ok(cell, url):
+        if ok is not None and not ok(cell, url, source):
             return
         # Free the docked player's connection: otherwise a single-connection
         # account refuses the multiview cell (the same channel then only plays
