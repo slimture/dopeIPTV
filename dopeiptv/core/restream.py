@@ -264,10 +264,11 @@ class Restreamer:
                     raise refused
             with self._lock:
                 if self._epoch != epoch:
-                    continue            # the app took a connection meanwhile
+                    continue            # the app took a connection meanwhile: counted again
                 v = self._join(key, source, stream, url, client, name, others, app)
-                if v is not None:
-                    return v
+                if v is None:
+                    break
+                return v
         raise Busy(TUNERS, "all tuners in use")
 
     def _join(self, key: str, source: str, stream: str, url: str, client: str,
