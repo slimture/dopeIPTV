@@ -4544,6 +4544,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                           self._item_key(it), "live", it, False):
             return
         self._failover_leave(url, self._item_key(it))
+        self._reconnect_off = False
         # The preview path never reaches _start_playback, so it must carry the
         # same side effects itself: the multiview-conflict question (close it
         # and free its connections, or keep both) and the History entry -
@@ -4925,6 +4926,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._save_resume_position()
         self._maybe_auto_mark_watched()
         self._failover_stopped()
+        # A reconnect under way (its timer, a backup address asked for) is
+        # no longer wanted: Stop is Stop.
+        self._reconnect_off = True
+        # Nor a channel whose address is still being asked for (a portal's
+        # link, _links_later): it would start after the Stop.
+        gens = getattr(self, "_link_gens", None)
+        if gens is not None and "play" in gens:
+            gens["play"] += 1
         privacy.playback_stopped()
         self._playing_key = None
         self._playing_group = None
@@ -5077,6 +5086,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                                       catchup):
             return
         self._failover_leave(url, key)
+        self._reconnect_off = False
         # A click that led here also armed the auto-preview timer; kill it so
         # a pending preview can't fire 350 ms later and stomp this playback.
         if hasattr(self, "_preview_timer"):
@@ -5877,6 +5887,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if getattr(self, "_diag_shown", False):
             log.info("retry skipped: a failure diagnosis was already shown")
             return
+        # Stop was pressed (or a profile switched, a cast took over) while
+        # the reconnect waited: the stream must not come back by itself.
+        if getattr(self, "_reconnect_off", False):
+            log.info("retry skipped: playback was stopped meanwhile")
+            return
         lp = getattr(self, "_last_playback", None)
         if not lp or lp.get("kind") != "live":
             log.info("retry skipped: last playback is %r, not live",
@@ -5913,8 +5928,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                                  lp.get("key"), "live", record=False,
                                  own_buffer=False)
         elif lp.get("url"):
+            # Another source's channel (failover, the Search page) was kept
+            # out of Recently viewed when it started: its reconnect too.
+            other = getattr(self, "_failover_row_for", None)
+            kw = ({"record": False}
+                  if other is not None and other(lp.get("key")) is not None else {})
             self._start_playback(lp["url"], lp["title"], lp.get("icon_url"),
-                                 lp.get("key"), "live")
+                                 lp.get("key"), "live", **kw)
 
     def _last_channel(self) -> None:
         """Jump back to the previously watched live channel (TV 'last' key)."""

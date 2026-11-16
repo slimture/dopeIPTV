@@ -356,9 +356,20 @@ class _ProfilesMixin:
         if mv is not None and not sip.isdeleted(mv) and mv.isVisible():
             mv.close()
         p = getattr(self, "player", None)
-        if p is not None and getattr(p, "current_url", None):
+        # Also a channel waiting for its reconnect (no address in the player
+        # then): it would come back by itself, in the next profile.
+        if p is not None and (getattr(p, "current_url", None)
+                              or getattr(self, "_playing_group", None)):
             self._save_resume_position()
             p.stop_btn.click()
+        # What played last is the profile before's own: Play after a Stop,
+        # Last channel or a reconnect bring nothing of it into this one. (A
+        # cast goes on through a switch, and keeps what it plays.)
+        casting = getattr(self, "_cast_runs", None)
+        if not (callable(casting) and casting()):
+            self._last_playback = None
+        self._prev_live_item = None
+        self._reconnect_off = True
 
     def _profile_refresh(self) -> None:
         """Everything that shows the profile's own, shown again."""
