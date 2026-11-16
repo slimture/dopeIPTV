@@ -90,6 +90,7 @@ class _SourceLabelMixin:
         hint = menu.sizeHint()
         x = lbl.width() - hint.width() if lbl.isRightToLeft() else 0
         menu.exec(lbl.mapToGlobal(QPoint(x, lbl.height() + 2)))
+        menu.deleteLater()
 
     def _tv_source_name(self) -> str:
         """The source's name for TV mode's header ("" without one)."""

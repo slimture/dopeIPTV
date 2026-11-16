@@ -142,6 +142,10 @@ acts = [(a.text(), a.isChecked()) for a in menus[-1].actions()]
 assert acts == [("Min IPTV", True), ("Familjen", False), ("", False),
                 (tr("src_settings_menu"), False), ("", False),
                 (tr("profile_manage"), False)], acts
+from PyQt6 import sip
+from PyQt6.QtCore import QCoreApplication, QEvent
+QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete.value)
+assert sip.isdeleted(menus[-1]), "the avatar's menu was kept"
 
 # -- another source, a new name, a new theme: the avatar follows ------------------
 store.set_active(family["id"])

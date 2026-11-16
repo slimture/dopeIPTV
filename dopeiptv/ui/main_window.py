@@ -462,6 +462,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         hint = menu.sizeHint()
         x = top.x() + (btn.width() - hint.width()) // 2
         menu.exec(QPoint(x, top.y() - hint.height() - 4))
+        menu.deleteLater()
 
     def _update_playlist_btn(self) -> None:
         """Put the active source on the avatar at the sidebar's foot: its

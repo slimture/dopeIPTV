@@ -172,6 +172,11 @@ assert acts == [("Pirat", True), ("Pappa", False), ("Jellyfin test", False), (""
 assert pos is not None and pos.y() >= lbl.mapToGlobal(lbl.rect().bottomLeft()).y()
 next(a for a in menu.actions() if a.text() == "Pappa").trigger()
 assert switched == [pappa["id"]], switched
+# The menu goes once it has closed, not at the end of the session.
+from PyQt6 import sip
+from PyQt6.QtCore import QCoreApplication, QEvent
+QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete.value)
+assert sip.isdeleted(menu), "the source menu was kept"
 
 # -- another source: the name and kind follow, the status line too ------------------
 switch_to(jelly)
