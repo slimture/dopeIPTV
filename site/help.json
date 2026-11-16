@@ -2,6 +2,7 @@
     "about": [
         "what",
         "free",
+        "heart",
         "channels",
         "systems",
         "languages"
@@ -14,12 +15,14 @@
         "m3u",
         "stalker",
         "pvr",
+        "satip",
         "media",
         "demo",
         "update"
     ],
     "watch": [
         "play",
+        "series",
         "seek",
         "rewind",
         "fullscreen",
@@ -59,6 +62,8 @@
         "castfix",
         "castback",
         "appletv",
+        "server",
+        "headless",
         "together",
         "subs",
         "trakt",
@@ -79,6 +84,7 @@
         "profiles",
         "sync",
         "hide",
+        "bouquets",
         "playlists",
         "home",
         "testbuilds"
