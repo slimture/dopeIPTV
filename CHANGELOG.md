@@ -204,6 +204,18 @@ radio and web streams, Watch together, and sync for everyone.
   addresses only, a token on all but the tuner's endpoints; a page in the
   browser shows who watches what and holds its settings (port, tuners,
   which sources and categories - never a hidden, locked or adult one).
+- A loading indicator over the picture (issue #27): a stream that takes
+  a moment shows a spinner, the channel's logo or the title's poster when
+  the app holds it already, its name and "Connecting…" - "Still loading"
+  after 8 s, "Reconnecting…" for the app's reconnect - from a third of a
+  second after it was asked for until mpv's first picture
+  (`playback-restart`), and "Buffering… 45%" when playback waits a second
+  or more for its cache, a seek or the rewind buffer. Gone at once on a
+  stop, an error and the next stream; docked, full screen, TV mode, the
+  pop-out (over its mirror) and, as a small spinner, each multiview cell.
+  It follows mpv's events on its own thread and only shows: no command to
+  mpv, no connection, no download, clicks go through it
+  (`media/loading_overlay.py`).
 - Official builds: each package carries a signed manifest of its own
   files (`tools/build_manifest.py`, release.yml); a modified build leaves
   dopeiptv.org's services alone (Watch together, sync, the update check
