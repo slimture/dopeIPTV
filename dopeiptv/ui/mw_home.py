@@ -84,6 +84,25 @@ class HomePage(QWidget):
         self._body = QVBoxLayout()
         self._hero: _Hero | None = None
         self._scroll.setWidget(self._canvas)
+        # The back chip floats over the page instead of scrolling away with
+        # the featured strip: it sits in its slot in the top bar and stays at
+        # the top once the page scrolls past it, so going back is always one
+        # click away.
+        from .widgets import RoundChip
+        self._back = RoundChip(self)
+        self._back.setIcon(chevron_icon(16, P["text"]))
+        self._back.setIconSize(QSize(16, 16))
+        self._back.setFixedSize(34, 34)
+        fill, edge = QColor(P["bg"]), QColor(P["text"])
+        fill.setAlphaF(0.55)
+        edge.setAlphaF(0.12)
+        self._back.set_chip(fill, edge, QColor(P["accent"]))
+        self._back.setToolTip(tr("common_close"))
+        self._back.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._back.clicked.connect(window._leave_home)
+        self._back.hide()
+        self._back_slot: QWidget | None = None
+        self._scroll.verticalScrollBar().valueChanged.connect(lambda _v: self._place_back())
 
     # -- building --------------------------------------------------------------
 
@@ -123,6 +142,30 @@ class HomePage(QWidget):
         "#HomeNavBtn:hover { background: %(hover)s; }"
     )
 
+    #: How close to the top the floating back chip stays once scrolled.
+    BACK_TOP = 8
+
+    def _place_back(self) -> None:
+        """The back chip over its slot in the top bar, and at the top once
+        the slot has scrolled out of sight."""
+        slot = self._back_slot
+        try:
+            import PyQt6.sip as _sip
+            if slot is None or _sip.isdeleted(slot) or not self.isVisible():
+                self._back.hide()
+                return
+            pos = slot.mapTo(self, slot.rect().topLeft())
+        except RuntimeError:
+            self._back.hide()
+            return
+        self._back.move(pos.x(), max(self.BACK_TOP, pos.y()))
+        self._back.show()
+        self._back.raise_()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._place_back()
+
     def _top_bar(self) -> QWidget:
         """Quick-nav segment (like the reference apps' top bar) + a close X.
         Text-only labels sitting inside one rounded pill, each with a rounded
@@ -147,7 +190,7 @@ class HomePage(QWidget):
 
         # The two round chips (back, heart): filled like the nav pill, drawn
         # as one circle each (see widgets._ChipPainting).
-        from .widgets import HeartButton, RoundChip
+        from .widgets import HeartButton
         fill, edge = QColor(P["bg"]), QColor(P["text"])
         fill.setAlphaF(0.55)
         edge.setAlphaF(0.12)
@@ -157,15 +200,12 @@ class HomePage(QWidget):
         # classic three-column view (replaces the old close X in the right
         # corner - leaving Home is navigation, and navigation-back lives on
         # the left).
-        back = RoundChip(bar)
-        back.setIcon(chevron_icon(16, P["text"]))
-        back.setIconSize(QSize(16, 16))
-        back.setFixedSize(34, 34)
-        back.set_chip(*chip)
-        back.setToolTip(tr("common_close"))
-        back.setCursor(Qt.CursorShape.PointingHandCursor)
-        back.clicked.connect(w._leave_home)
-        h.addWidget(back)
+        # Its slot: the chip itself floats over the page (self._back).
+        slot = QWidget(bar)
+        slot.setFixedSize(34, 34)
+        h.addWidget(slot)
+        self._back_slot = slot
+        QTimer.singleShot(0, self._place_back)
         h.addStretch(1)
 
         group = QFrame(objectName="HomeNavGroup")
@@ -832,6 +872,7 @@ class HomePage(QWidget):
         # the hero on macOS. Force a clean repaint every time Home is shown.
         super().showEvent(e)
         self._repaint_after_reflow()
+        QTimer.singleShot(0, self._place_back)
 
     def _fill_channels(self, chan: list) -> None:
         w = self.window

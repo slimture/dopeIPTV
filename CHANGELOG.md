@@ -75,6 +75,8 @@ how connections to the account are counted.
 - A click on the picture brings the controls up and pauses nothing; the
   centre button, the play/pause button and the keys pause. A click meant
   to bring the controls back or give the window focus stopped the picture.
+- Home's back button stays at the top when the page scrolls, so going
+  back is always one click away; it scrolled away with the featured strip.
 
 ### Fixed
 
