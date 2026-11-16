@@ -2878,8 +2878,6 @@
   "nerd_server_use_port_click": "Klik hier om in plaats daarvan poort {port} te gebruiken.",
   "set_about_version": "Versie {version}",
   "epg_no_guide_any": "Geen programmagids voor deze kanalen.",
-  "set_guide_now_front": "Nu-lijn over de programma's",
-  "set_guide_now_front_hint": "Uit loopt de lijn die de huidige tijd aangeeft achter de programma's en is tussen ze te zien. Aan loopt hij eroverheen.",
   "onb_bring_offer": "Gebruik je dopeIPTV al op een andere computer? Neem je instellingen mee",
   "onb_bring_title": "Neem je instellingen mee",
   "onb_bring_sub": "Typ de synchronisatiecode van je andere computer. Je vindt hem daar onder Instellingen → {page}.",
@@ -2895,5 +2893,7 @@
   "onb_sync_err_other": "Dat lukte nu niet. Probeer het zo opnieuw.",
   "onb_bring_private": "Versleuteld op deze computer voordat er iets wordt verstuurd - dopeiptv.org bewaart alleen gegevens die het niet kan lezen. Geen account, geen e-mail.",
   "vis_style_scope": "Vectorscoop",
-  "vis_style_freqs": "Frequenties"
+  "vis_style_freqs": "Frequenties",
+  "set_guide_now_line": "Lijn bij de huidige tijd",
+  "set_guide_now_line_hint": "Een dunne lijn door de gids bij de huidige tijd, over de programma's. Uit toont de balk van wat nu speelt hoe ver het is."
 }

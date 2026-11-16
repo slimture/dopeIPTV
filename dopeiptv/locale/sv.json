@@ -2878,8 +2878,6 @@
   "nerd_server_use_port_click": "Klicka här för att använda port {port} i stället.",
   "set_about_version": "Version {version}",
   "epg_no_guide_any": "Ingen programguide för de här kanalerna.",
-  "set_guide_now_front": "Nu-linjen över programmen",
-  "set_guide_now_front_hint": "Av går linjen som visar tiden just nu bakom programmen och syns mellan dem. På går den över dem.",
   "onb_bring_offer": "Använder du redan dopeIPTV på en annan dator? Ta med dina inställningar",
   "onb_bring_title": "Ta med dina inställningar",
   "onb_bring_sub": "Skriv synkkoden från din andra dator. Du hittar den där under Inställningar → {page}.",
@@ -2895,5 +2893,7 @@
   "onb_sync_err_other": "Det gick inte just nu. Försök igen om en stund.",
   "onb_bring_private": "Krypteras på den här datorn innan något skickas - dopeiptv.org sparar bara data som den inte kan läsa. Inget konto, ingen e-post.",
   "vis_style_scope": "Vektorskop",
-  "vis_style_freqs": "Frekvenser"
+  "vis_style_freqs": "Frekvenser",
+  "set_guide_now_line": "Linje vid tiden just nu",
+  "set_guide_now_line_hint": "En tunn linje genom guiden vid tiden just nu, ovanpå programmen. Av visar remsan på det som sänds hur långt det har kommit."
 }

@@ -168,9 +168,10 @@ class EpgGrid(QWidget):
     BOARD_MIN_W = 600
     COL_GRIP = 4             # how near its edge the column can be taken
     COL_KEY = "guide_channel_col"
-    #: The now line over the programmes ("true") or behind them, seen
-    #: between them (the default); its piece in the header always shows.
-    NOW_FRONT_KEY = "guide_now_line_front"
+    #: A line at the time now, over the programmes, when the person turns
+    #: it on (Settings > Guide); off by default - the strip on the card on
+    #: the air shows the time. Behind the cards it looked broken.
+    NOW_LINE_KEY = "guide_now_line"
     COL_ADAPTS = True        # TV mode's guide keeps its own, large column
     # The scale before the guide knows its room, and what its window is
     # sized by: 420 px per hour. Once on screen the board fits its width.
@@ -1490,13 +1491,13 @@ class EpgGrid(QWidget):
     def _draw_now_line(self, grid_h: int) -> None:
         """One thin accent line at the current time, through the rows and
         the header; the timers that keep the board up to date move it (and
-        only run while the guide is on screen). Behind the cards, seen in
-        the gaps between them, or over them when the person chose so
-        (NOW_FRONT_KEY); under the titles and the pinned column either way."""
+        only run while the guide is on screen). Shown only when the person
+        turned it on (NOW_LINE_KEY): over the cards, under the titles and
+        the pinned column."""
         pen = self._now_pen()
         self._now_line = self.scene.addLine(
             0, self.HEADER_H, 0, self.HEADER_H + grid_h, pen)
-        self._now_line.setZValue(self._now_z())
+        self._now_line.setZValue(7)
         self._now_line.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
         # The header's piece is pinned with it: group first, then position
         # (group-local, as every other item of a pinned group).
@@ -1506,21 +1507,17 @@ class EpgGrid(QWidget):
         self._header_group.addToGroup(self._now_head)
         self._place_now_line(time.time())
 
-    def _now_z(self) -> float:
-        """Over the cards (5) and under the titles (8), or behind the cards
-        and over the rows' backgrounds (2)."""
+    def _now_shown(self) -> bool:
         st = getattr(self.window, "settings", None)
         try:
-            front = st is not None and str(st.value(self.NOW_FRONT_KEY, "false")) == "true"
+            return st is not None and str(st.value(self.NOW_LINE_KEY, "false")) == "true"
         except Exception:
-            front = False
-        return 7.0 if front else 3.0
+            return False
 
     def _place_now_line(self, now: float) -> None:
         if self._now_line is None or self._now_head is None:
             return
-        self._now_line.setZValue(self._now_z())
-        on = self._start <= now <= self._stop
+        on = self._now_shown() and self._start <= now <= self._stop
         x = self._x(now)
         for item in (self._now_line, self._now_head):
             item.setVisible(on)

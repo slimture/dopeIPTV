@@ -238,7 +238,7 @@ SETTINGS_ALLOW = frozenset({
     "audio_lang", "sub_mode", "sub_lang", "sub_lang2", "sub_scale", "sub_color",
     "sub_background", "aspect_mode", "video_deinterlace", "video_sharpen",
     "video_tonemapping",
-    "epg_upcoming_count", "epg_delay_min", "replay_delay_min", "guide_now_line_front",
+    "epg_upcoming_count", "epg_delay_min", "replay_delay_min", "guide_now_line",
     "mv_frameless", "mv_on_top", "mv_remember_geo", "mv_stop_docked",
     "mv_new_unmuted", "mv_conflict_mode", "mv_autohide_secs", "mv_seek_step_min",
     "mv_cells",

@@ -2878,8 +2878,6 @@
   "nerd_server_use_port_click": "点击这里改用端口 {port}。",
   "set_about_version": "版本 {version}",
   "epg_no_guide_any": "这些频道暂无节目指南。",
-  "set_guide_now_front": "当前时间线显示在节目上方",
-  "set_guide_now_front_hint": "关闭时，标示当前时间的线从节目后面经过，只在节目之间露出。开启时，它从节目上方穿过。",
   "onb_bring_offer": "已经在另一台电脑上使用 dopeIPTV？把设置带过来",
   "onb_bring_title": "把你的设置带过来",
   "onb_bring_sub": "输入另一台电脑上的同步代码。可以在那台电脑的 设置 → {page} 中找到。",
@@ -2895,5 +2893,7 @@
   "onb_sync_err_other": "这次没有成功。请稍后再试。",
   "onb_bring_private": "发送前在这台电脑上加密 - dopeiptv.org 只保存它无法读取的数据。无需账户，无需邮箱。",
   "vis_style_scope": "矢量示波器",
-  "vis_style_freqs": "频率"
+  "vis_style_freqs": "频率",
+  "set_guide_now_line": "当前时间线",
+  "set_guide_now_line_hint": "在节目指南的当前时间处、节目上方显示一条细线。关闭时，正在播出节目的进度条会显示播放进度。"
 }

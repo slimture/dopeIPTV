@@ -2878,8 +2878,6 @@
   "nerd_server_use_port_click": "ここをクリックすると、代わりにポート {port} を使います。",
   "set_about_version": "バージョン {version}",
   "epg_no_guide_any": "これらのチャンネルには番組表がありません。",
-  "set_guide_now_front": "現在時刻の線を番組の上に表示",
-  "set_guide_now_front_hint": "オフでは現在時刻を示す線は番組の後ろを通り、番組の間に見えます。オンでは番組の上を横切ります。",
   "onb_bring_offer": "ほかのパソコンでも dopeIPTV を使っていますか？ 設定を引き継ぐ",
   "onb_bring_title": "設定を引き継ぐ",
   "onb_bring_sub": "ほかのパソコンの同期コードを入力してください。そのパソコンの 設定 → {page} にあります。",
@@ -2895,5 +2893,7 @@
   "onb_sync_err_other": "うまくいきませんでした。少ししてからもう一度お試しください。",
   "onb_bring_private": "送信前にこのコンピューターで暗号化されます。dopeiptv.org が保存するのは読めないデータだけです。アカウントもメールも不要です。",
   "vis_style_scope": "ベクトルスコープ",
-  "vis_style_freqs": "周波数"
+  "vis_style_freqs": "周波数",
+  "set_guide_now_line": "現在時刻の線",
+  "set_guide_now_line_hint": "番組表の現在時刻に、番組の上に細い線を表示します。オフでは放送中の番組のバーで進み具合がわかります。"
 }

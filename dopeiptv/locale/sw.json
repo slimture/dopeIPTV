@@ -2878,8 +2878,6 @@
   "nerd_server_use_port_click": "Bofya hapa kutumia mlango {port} badala yake.",
   "set_about_version": "Toleo {version}",
   "epg_no_guide_any": "Hakuna mwongozo wa vipindi kwa vituo hivi.",
-  "set_guide_now_front": "Mstari wa sasa juu ya vipindi",
-  "set_guide_now_front_hint": "Ukizimwa, mstari unaoonyesha saa ya sasa hupita nyuma ya vipindi na huonekana kati yake. Ukiwashwa, hupita juu yake.",
   "onb_bring_offer": "Tayari unatumia dopeIPTV kwenye kompyuta nyingine? Leta mipangilio yako",
   "onb_bring_title": "Leta mipangilio yako",
   "onb_bring_sub": "Andika msimbo wa kusawazisha kutoka kompyuta yako nyingine. Utaupata huko kwenye Mipangilio → {page}.",
@@ -2895,5 +2893,7 @@
   "onb_sync_err_other": "Hilo halikufaulu sasa hivi. Jaribu tena baada ya muda mfupi.",
   "onb_bring_private": "Husimbwa kwenye kompyuta hii kabla ya kutumwa - dopeiptv.org huhifadhi tu data isiyoweza kuisoma. Hakuna akaunti, hakuna barua pepe.",
   "vis_style_scope": "Vekta skopu",
-  "vis_style_freqs": "Masafa"
+  "vis_style_freqs": "Masafa",
+  "set_guide_now_line": "Mstari wa saa ya sasa",
+  "set_guide_now_line_hint": "Mstari mwembamba kwenye mwongozo kwenye saa ya sasa, juu ya vipindi. Ukizimwa, upau wa kipindi kinachoonyeshwa sasa huonyesha kimefika wapi."
 }

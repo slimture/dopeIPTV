@@ -397,7 +397,10 @@ assert strip is not None and strip.parentItem() is on_air["item"]
 assert strip.brush().color() == QColor(P["accent"])
 now_x = g._x(time.time())
 assert abs(strip.rect().right() - now_x) < 2, (strip.rect().right(), now_x)
-assert abs(g._now_line.pos().x() - now_x) < 2 and g._now_line.isVisible()
+assert abs(g._now_line.pos().x() - now_x) < 2 and not g._now_line.isVisible()   # off by default
+w.settings.setValue("guide_now_line", "true")
+g._place_now_line(time.time())
+assert g._now_line.isVisible()
 assert abs(g._now_head.pos().x() - now_x) < 2
 assert g._now_head.parentItem() is g._header_group
 # The strip is paint: a click on it is the card's.
@@ -521,9 +524,9 @@ def test_recording_from_the_guide_takes_the_detail_panels_path():
         ch, {"title": "News"}, 100.0, 200.0)
 
 
-def test_the_now_line_sits_behind_the_cards_unless_chosen_in_front():
-    """Behind the cards by default (seen between them, never through a
-    title); over them with Settings > Guide's switch on."""
+def test_the_now_line_shows_only_when_turned_on():
+    """Off by default (behind the cards it looked broken); turned on in
+    Settings > Guide, over the cards and under the titles."""
     from PyQt6.QtCore import QSettings
     from PyQt6.QtWidgets import QApplication
 
@@ -538,7 +541,7 @@ def test_the_now_line_sits_behind_the_cards_unless_chosen_in_front():
 
     grid = EpgGrid.__new__(EpgGrid)
     grid.window = _W()
-    assert grid._now_z() < 5 < 7 <= 8                 # under the cards (z 5)
-    s.setValue(EpgGrid.NOW_FRONT_KEY, "true")
-    assert 5 < grid._now_z() < 8                       # over them, under the titles
+    assert not grid._now_shown()
+    s.setValue(EpgGrid.NOW_LINE_KEY, "true")
+    assert grid._now_shown()
     s.clear()

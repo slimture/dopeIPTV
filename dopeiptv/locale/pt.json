@@ -2878,8 +2878,6 @@
   "nerd_server_use_port_click": "Clique aqui para usar a porta {port} no lugar.",
   "set_about_version": "Versão {version}",
   "epg_no_guide_any": "Nenhum guia de programação para estes canais.",
-  "set_guide_now_front": "Linha de agora sobre os programas",
-  "set_guide_now_front_hint": "Desligada, a linha que marca a hora atual passa atrás dos programas e aparece entre eles. Ligada, ela passa por cima deles.",
   "onb_bring_offer": "Já usa o dopeIPTV em outro computador? Traga suas configurações",
   "onb_bring_title": "Traga suas configurações",
   "onb_bring_sub": "Digite o código de sincronização do seu outro computador. Você o encontra lá em Configurações → {page}.",
@@ -2895,5 +2893,7 @@
   "onb_sync_err_other": "Não deu certo desta vez. Tente de novo em instantes.",
   "onb_bring_private": "Criptografado neste computador antes do envio - o dopeiptv.org só guarda dados que não consegue ler. Sem conta, sem e-mail.",
   "vis_style_scope": "Vetorscópio",
-  "vis_style_freqs": "Frequências"
+  "vis_style_freqs": "Frequências",
+  "set_guide_now_line": "Linha na hora atual",
+  "set_guide_now_line_hint": "Uma linha fina no guia na hora atual, por cima dos programas. Desligada, a barra do que está passando mostra quanto já foi."
 }

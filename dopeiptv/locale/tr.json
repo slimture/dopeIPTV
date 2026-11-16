@@ -2878,8 +2878,6 @@
   "nerd_server_use_port_click": "Bunun yerine {port} bağlantı noktasını kullanmak için buraya tıkla.",
   "set_about_version": "Sürüm {version}",
   "epg_no_guide_any": "Bu kanallar için program kılavuzu yok.",
-  "set_guide_now_front": "Şimdi çizgisi programların üstünde",
-  "set_guide_now_front_hint": "Kapalıyken şu anki saati gösteren çizgi programların arkasından geçer ve aralarında görünür. Açıkken üzerlerinden geçer.",
   "onb_bring_offer": "dopeIPTV'yi zaten başka bir bilgisayarda mı kullanıyorsun? Ayarlarını getir",
   "onb_bring_title": "Ayarlarını getir",
   "onb_bring_sub": "Diğer bilgisayarındaki eşitleme kodunu yaz. Orada Ayarlar → {page} altında bulursun.",
@@ -2895,5 +2893,7 @@
   "onb_sync_err_other": "Bu sefer olmadı. Birazdan yeniden dene.",
   "onb_bring_private": "Gönderilmeden önce bu bilgisayarda şifrelenir - dopeiptv.org yalnızca okuyamadığı verileri saklar. Hesap yok, e-posta yok.",
   "vis_style_scope": "Vektörskop",
-  "vis_style_freqs": "Frekanslar"
+  "vis_style_freqs": "Frekanslar",
+  "set_guide_now_line": "Şu anki saat çizgisi",
+  "set_guide_now_line_hint": "Rehberde şu anki saatte, programların üstünde ince bir çizgi. Kapalıyken yayındaki programın çubuğu ne kadar ilerlediğini gösterir."
 }

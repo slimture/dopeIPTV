@@ -2878,8 +2878,6 @@
   "nerd_server_use_port_click": "Klikni ovde da umesto toga koristiš port {port}.",
   "set_about_version": "Verzija {version}",
   "epg_no_guide_any": "Nema programskog vodiča za ove kanale.",
-  "set_guide_now_front": "Linija „sada” preko emisija",
-  "set_guide_now_front_hint": "Isključeno: linija koja označava trenutno vreme prolazi iza emisija i vidi se između njih. Uključeno: prelazi preko njih.",
   "onb_bring_offer": "Već koristiš dopeIPTV na drugom računaru? Prenesi svoja podešavanja",
   "onb_bring_title": "Prenesi svoja podešavanja",
   "onb_bring_sub": "Upiši kôd za sinhronizaciju sa drugog računara. Naći ćeš ga tamo pod Podešavanja → {page}.",
@@ -2895,5 +2893,7 @@
   "onb_sync_err_other": "To sada nije uspelo. Pokušaj ponovo za trenutak.",
   "onb_bring_private": "Šifruje se na ovom računaru pre slanja - dopeiptv.org čuva samo podatke koje ne može da pročita. Bez naloga i e-pošte.",
   "vis_style_scope": "Vektorskop",
-  "vis_style_freqs": "Frekvencije"
+  "vis_style_freqs": "Frekvencije",
+  "set_guide_now_line": "Linija trenutnog vremena",
+  "set_guide_now_line_hint": "Tanka linija kroz vodič na trenutnom vremenu, preko emisija. Isključeno: traka emisije koja traje pokazuje koliko je odmakla."
 }

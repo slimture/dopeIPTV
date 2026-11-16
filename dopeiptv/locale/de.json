@@ -2878,8 +2878,6 @@
   "nerd_server_use_port_click": "Hier klicken, um stattdessen Port {port} zu verwenden.",
   "set_about_version": "Version {version}",
   "epg_no_guide_any": "Kein Programmführer für diese Kanäle.",
-  "set_guide_now_front": "Jetzt-Linie über den Sendungen",
-  "set_guide_now_front_hint": "Aus läuft die Linie, die die aktuelle Zeit markiert, hinter den Sendungen und ist zwischen ihnen zu sehen. An läuft sie über sie hinweg.",
   "onb_bring_offer": "Nutzt du dopeIPTV schon auf einem anderen Computer? Einstellungen mitnehmen",
   "onb_bring_title": "Deine Einstellungen mitnehmen",
   "onb_bring_sub": "Gib den Sync-Code von deinem anderen Computer ein. Du findest ihn dort unter Einstellungen → {page}.",
@@ -2895,5 +2893,7 @@
   "onb_sync_err_other": "Das hat gerade nicht geklappt. Versuche es gleich noch einmal.",
   "onb_bring_private": "Wird auf diesem Computer verschlüsselt, bevor etwas gesendet wird - dopeiptv.org speichert nur Daten, die es nicht lesen kann. Kein Konto, keine E-Mail.",
   "vis_style_scope": "Vektorskop",
-  "vis_style_freqs": "Frequenzen"
+  "vis_style_freqs": "Frequenzen",
+  "set_guide_now_line": "Linie bei der aktuellen Zeit",
+  "set_guide_now_line_hint": "Eine dünne Linie durch den Guide bei der aktuellen Zeit, über den Sendungen. Aus zeigt der Balken der laufenden Sendung, wie weit sie ist."
 }

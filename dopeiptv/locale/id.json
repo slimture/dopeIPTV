@@ -2878,8 +2878,6 @@
   "nerd_server_use_port_click": "Klik di sini untuk memakai port {port} sebagai gantinya.",
   "set_about_version": "Versi {version}",
   "epg_no_guide_any": "Tidak ada panduan program untuk saluran-saluran ini.",
-  "set_guide_now_front": "Garis sekarang di atas acara",
-  "set_guide_now_front_hint": "Mati: garis penanda waktu sekarang lewat di belakang acara dan terlihat di antaranya. Nyala: garis melintasi acara.",
   "onb_bring_offer": "Sudah memakai dopeIPTV di komputer lain? Bawa pengaturan Anda",
   "onb_bring_title": "Bawa pengaturan Anda",
   "onb_bring_sub": "Ketik kode sinkron dari komputer Anda yang lain. Anda menemukannya di sana pada Pengaturan → {page}.",
@@ -2895,5 +2893,7 @@
   "onb_sync_err_other": "Itu belum berhasil. Coba lagi sebentar lagi.",
   "onb_bring_private": "Dienkripsi di komputer ini sebelum dikirim - dopeiptv.org hanya menyimpan data yang tidak bisa dibacanya. Tanpa akun, tanpa email.",
   "vis_style_scope": "Vektorskop",
-  "vis_style_freqs": "Frekuensi"
+  "vis_style_freqs": "Frekuensi",
+  "set_guide_now_line": "Garis waktu sekarang",
+  "set_guide_now_line_hint": "Garis tipis di panduan pada waktu sekarang, di atas acara. Mati: bilah acara yang sedang tayang menunjukkan sejauh mana acaranya."
 }

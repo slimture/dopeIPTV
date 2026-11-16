@@ -2878,8 +2878,6 @@
   "nerd_server_use_port_click": "Fai clic qui per usare invece la porta {port}.",
   "set_about_version": "Versione {version}",
   "epg_no_guide_any": "Nessuna guida ai programmi per questi canali.",
-  "set_guide_now_front": "Linea dell'ora sopra i programmi",
-  "set_guide_now_front_hint": "Disattivata, la linea che segna l'ora attuale passa dietro i programmi e si vede tra l'uno e l'altro. Attivata, li attraversa.",
   "onb_bring_offer": "Usi già dopeIPTV su un altro computer? Porta qui le tue impostazioni",
   "onb_bring_title": "Porta qui le tue impostazioni",
   "onb_bring_sub": "Scrivi il codice di sincronizzazione dell'altro computer. Lo trovi lì in Impostazioni → {page}.",
@@ -2895,5 +2893,7 @@
   "onb_sync_err_other": "Non ha funzionato. Riprova tra un momento.",
   "onb_bring_private": "Cifrato su questo computer prima dell'invio: dopeiptv.org conserva solo dati che non può leggere. Nessun account, nessuna email.",
   "vis_style_scope": "Vettorscopio",
-  "vis_style_freqs": "Frequenze"
+  "vis_style_freqs": "Frequenze",
+  "set_guide_now_line": "Linea all'ora attuale",
+  "set_guide_now_line_hint": "Una linea sottile nella guida all'ora attuale, sopra i programmi. Disattivata, la barra del programma in onda mostra a che punto è."
 }

@@ -2878,8 +2878,6 @@
   "nerd_server_use_port_click": "Kliknij tutaj, aby zamiast tego użyć portu {port}.",
   "set_about_version": "Wersja {version}",
   "epg_no_guide_any": "Brak przewodnika po programach dla tych kanałów.",
-  "set_guide_now_front": "Linia „teraz” nad programami",
-  "set_guide_now_front_hint": "Wyłączona: linia oznaczająca bieżący czas biegnie za programami i widać ją między nimi. Włączona: przechodzi przez nie.",
   "onb_bring_offer": "Używasz już dopeIPTV na innym komputerze? Przenieś swoje ustawienia",
   "onb_bring_title": "Przenieś swoje ustawienia",
   "onb_bring_sub": "Wpisz kod synchronizacji z drugiego komputera. Znajdziesz go tam w Ustawienia → {page}.",
@@ -2895,5 +2893,7 @@
   "onb_sync_err_other": "Tym razem się nie udało. Spróbuj ponownie za chwilę.",
   "onb_bring_private": "Szyfrowane na tym komputerze przed wysłaniem - dopeiptv.org przechowuje tylko dane, których nie może odczytać. Bez konta i bez e-maila.",
   "vis_style_scope": "Wektoroskop",
-  "vis_style_freqs": "Częstotliwości"
+  "vis_style_freqs": "Częstotliwości",
+  "set_guide_now_line": "Linia aktualnej godziny",
+  "set_guide_now_line_hint": "Cienka linia w przewodniku w miejscu bieżącej godziny, nad programami. Wyłączona: pasek trwającego programu pokazuje, ile już minęło."
 }

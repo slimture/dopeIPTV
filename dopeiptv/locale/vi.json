@@ -2878,8 +2878,6 @@
   "nerd_server_use_port_click": "Nhấp vào đây để dùng cổng {port} thay thế.",
   "set_about_version": "Phiên bản {version}",
   "epg_no_guide_any": "Không có lịch phát chương trình cho các kênh này.",
-  "set_guide_now_front": "Vạch hiện tại phía trên chương trình",
-  "set_guide_now_front_hint": "Tắt: vạch đánh dấu thời điểm hiện tại chạy phía sau các chương trình và hiện giữa chúng. Bật: vạch chạy đè lên chúng.",
   "onb_bring_offer": "Bạn đã dùng dopeIPTV trên máy tính khác? Mang cài đặt của bạn sang",
   "onb_bring_title": "Mang cài đặt của bạn sang",
   "onb_bring_sub": "Nhập mã đồng bộ từ máy tính kia. Bạn tìm thấy nó ở máy đó trong Cài đặt → {page}.",
@@ -2895,5 +2893,7 @@
   "onb_sync_err_other": "Lần này chưa được. Hãy thử lại sau giây lát.",
   "onb_bring_private": "Được mã hóa trên máy này trước khi gửi - dopeiptv.org chỉ giữ dữ liệu mà nó không đọc được. Không tài khoản, không email.",
   "vis_style_scope": "Vectorscope",
-  "vis_style_freqs": "Tần số"
+  "vis_style_freqs": "Tần số",
+  "set_guide_now_line": "Vạch thời điểm hiện tại",
+  "set_guide_now_line_hint": "Một vạch mảnh trong lịch tại thời điểm hiện tại, nằm trên các chương trình. Tắt: thanh của chương trình đang phát cho biết đã phát đến đâu."
 }

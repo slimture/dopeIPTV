@@ -2878,8 +2878,6 @@
   "nerd_server_use_port_click": "대신 {port} 포트를 쓰려면 여기를 클릭하세요.",
   "set_about_version": "버전 {version}",
   "epg_no_guide_any": "이 채널들에는 프로그램 가이드가 없습니다.",
-  "set_guide_now_front": "현재 시각 선을 프로그램 위에",
-  "set_guide_now_front_hint": "끄면 현재 시각을 표시하는 선이 프로그램 뒤로 지나가 프로그램 사이에서 보입니다. 켜면 프로그램 위를 가로지릅니다.",
   "onb_bring_offer": "다른 컴퓨터에서 이미 dopeIPTV를 쓰고 계신가요? 설정 가져오기",
   "onb_bring_title": "설정 가져오기",
   "onb_bring_sub": "다른 컴퓨터의 동기화 코드를 입력하세요. 그 컴퓨터의 설정 → {page}에 있습니다.",
@@ -2895,5 +2893,7 @@
   "onb_sync_err_other": "지금은 되지 않았습니다. 잠시 후 다시 시도하세요.",
   "onb_bring_private": "보내기 전에 이 컴퓨터에서 암호화됩니다. dopeiptv.org는 읽을 수 없는 데이터만 보관합니다. 계정도 이메일도 없습니다.",
   "vis_style_scope": "벡터스코프",
-  "vis_style_freqs": "주파수"
+  "vis_style_freqs": "주파수",
+  "set_guide_now_line": "현재 시각 선",
+  "set_guide_now_line_hint": "편성표의 현재 시각에 프로그램 위로 가는 선을 표시합니다. 끄면 방송 중인 프로그램의 막대가 진행 정도를 보여줍니다."
 }

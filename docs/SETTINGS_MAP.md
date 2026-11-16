@@ -39,7 +39,7 @@ has two profiles or more.
   interpolation, audio delay per channel, mpv)
 
 **Guide** (`guide`)
-- (untitled): `epg_upcoming_count`, `guide_now_line_front`
+- (untitled): `epg_upcoming_count`, `guide_now_line`
 - Time offsets: `replay_delay_min`, `epg_delay_min`
 - Guide data: Refresh guide, Clear guide cache
 
