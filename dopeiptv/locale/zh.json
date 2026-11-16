@@ -294,14 +294,10 @@
   "about_github": "GitHub",
   "about_all_releases": "所有版本",
   "donate_support": "支持 dopeIPTV",
-  "set_donate_heart": "在侧边栏显示爱心",
-  "set_donate_heart_hint": "关闭后会隐藏三个月，之后重新出现。",
   "donate_hide": "隐藏三个月",
-  "donate_done": "我已经捐过了",
   "home_donate_title": "喜欢 dopeIPTV 吗？",
   "home_donate_body": "它免费、无广告、不追踪。任何金额的捐助都能帮助它保持这样。",
   "home_donate_btn": "捐助",
-  "home_donate_later": "以后再说",
   "about_checking": "正在检查更新……",
   "about_up_to_date": "你已是最新版本。",
   "about_update_available": "有新版本可用：{version}",
@@ -2820,5 +2816,9 @@
   "status_playing_from": "正在播放：{title}（来自 {source}）",
   "status_list_source": "{source} · {text}",
   "source_label_name": "来源：{name}",
-  "source_label_hint": "列表显示的是此来源——点击可切换到其他来源或打开它的设置"
+  "source_label_hint": "列表显示的是此来源——点击可切换到其他来源或打开它的设置",
+  "set_donate_ask": "偶尔请求捐助",
+  "set_donate_ask_hint": "在你观看几个小时后，每月有一周在标志旁显示一颗小爱心。关闭后不会再请求；“支持 dopeIPTV”仍在菜单和“关于 dopeIPTV”中。",
+  "donate_did": "我已捐助",
+  "donate_later": "暂时不用"
 }

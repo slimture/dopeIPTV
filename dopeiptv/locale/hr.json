@@ -294,14 +294,10 @@
   "about_github": "GitHub",
   "about_all_releases": "Sva izdanja",
   "donate_support": "Podržite dopeIPTV",
-  "set_donate_heart": "Prikaži srce u bočnoj traci",
-  "set_donate_heart_hint": "Kad je isključeno, ostaje skriveno tri mjeseca, a zatim se vraća.",
   "donate_hide": "Sakrij na tri mjeseca",
-  "donate_done": "Donacija je već dana",
   "home_donate_title": "Sviđa li vam se dopeIPTV?",
   "home_donate_body": "Besplatan je, bez oglasa i bez praćenja. Donacija bilo kojeg iznosa pomaže da tako i ostane.",
   "home_donate_btn": "Doniraj",
-  "home_donate_later": "Ne sada",
   "about_checking": "Provjera ažuriranja…",
   "about_up_to_date": "Imaš najnoviju verziju.",
   "about_update_available": "Dostupna je nova verzija: {version}",
@@ -2820,5 +2816,9 @@
   "status_playing_from": "Reproducira se: {title} – iz izvora {source}",
   "status_list_source": "{source} · {text}",
   "source_label_name": "Izvor: {name}",
-  "source_label_hint": "Popisi prikazuju ovaj izvor – kliknite za prelazak na drugi ili za otvaranje njegovih postavki"
+  "source_label_hint": "Popisi prikazuju ovaj izvor – kliknite za prelazak na drugi ili za otvaranje njegovih postavki",
+  "set_donate_ask": "Povremeno traži donaciju",
+  "set_donate_ask_hint": "Jedan tjedan mjesečno, kad pogledate nekoliko sati: malo srce uz logotip. Kad je isključeno, nikad ne traži – „Podržite dopeIPTV” ostaje u izborniku i u prozoru O dopeIPTV.",
+  "donate_did": "Donacija je dana",
+  "donate_later": "Trenutačno ne"
 }

@@ -294,14 +294,10 @@
   "about_github": "GitHub",
   "about_all_releases": "Alla versioner",
   "donate_support": "Stöd dopeIPTV",
-  "set_donate_heart": "Visa hjärtat i sidopanelen",
-  "set_donate_heart_hint": "Avstängt är det dolt i tre månader, sedan kommer det tillbaka.",
   "donate_hide": "Dölj i tre månader",
-  "donate_done": "Jag har redan donerat",
   "home_donate_title": "Gillar du dopeIPTV?",
   "home_donate_body": "Den är gratis, utan reklam och utan spårning. En donation, oavsett belopp, hjälper till att hålla det så.",
   "home_donate_btn": "Donera",
-  "home_donate_later": "Inte nu",
   "about_checking": "Söker efter uppdateringar…",
   "about_up_to_date": "Du har den senaste versionen.",
   "about_update_available": "En ny version finns: {version}",
@@ -2820,5 +2816,9 @@
   "status_playing_from": "Spelar: {title} – från {source}",
   "status_list_source": "{source} · {text}",
   "source_label_name": "Källa: {name}",
-  "source_label_hint": "Listorna visar den här källan – klicka för att byta till en annan eller öppna dess inställningar"
+  "source_label_hint": "Listorna visar den här källan – klicka för att byta till en annan eller öppna dess inställningar",
+  "set_donate_ask": "Be om en donation då och då",
+  "set_donate_ask_hint": "En vecka i månaden, när du har tittat några timmar: ett litet hjärta vid loggan. Avstängt frågar appen aldrig – Stöd dopeIPTV finns kvar i menyn och under Om dopeIPTV.",
+  "donate_did": "Jag har donerat",
+  "donate_later": "Inte just nu"
 }

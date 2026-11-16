@@ -294,14 +294,10 @@
   "about_github": "GitHub",
   "about_all_releases": "Semua rilis",
   "donate_support": "Dukung dopeIPTV",
-  "set_donate_heart": "Tampilkan hati di bilah samping",
-  "set_donate_heart_hint": "Jika dimatikan, hati disembunyikan selama tiga bulan, lalu muncul kembali.",
   "donate_hide": "Sembunyikan selama tiga bulan",
-  "donate_done": "Saya sudah berdonasi",
   "home_donate_title": "Suka dopeIPTV?",
   "home_donate_body": "Gratis, tanpa iklan dan tanpa pelacakan. Donasi berapa pun membantu agar tetap begitu.",
   "home_donate_btn": "Donasi",
-  "home_donate_later": "Nanti saja",
   "about_checking": "Memeriksa pembaruan…",
   "about_up_to_date": "Anda menggunakan versi terbaru.",
   "about_update_available": "Versi baru tersedia: {version}",
@@ -2820,5 +2816,9 @@
   "status_playing_from": "Memutar: {title} - dari {source}",
   "status_list_source": "{source} · {text}",
   "source_label_name": "Sumber: {name}",
-  "source_label_hint": "Daftar menampilkan sumber ini - klik untuk beralih ke sumber lain atau membuka setelannya"
+  "source_label_hint": "Daftar menampilkan sumber ini - klik untuk beralih ke sumber lain atau membuka setelannya",
+  "set_donate_ask": "Sesekali minta donasi",
+  "set_donate_ask_hint": "Satu minggu setiap bulan, setelah Anda menonton beberapa jam: hati kecil di dekat logo. Jika dimatikan, tidak pernah meminta – “Dukung dopeIPTV” tetap ada di menu dan di Tentang dopeIPTV.",
+  "donate_did": "Saya sudah berdonasi",
+  "donate_later": "Nanti dulu"
 }

@@ -230,6 +230,13 @@ class ViewingLog:
     def empty(self) -> bool:
         return not any(t["h"] for t in self.titles.values())
 
+    def watched_since(self, since: float) -> float:
+        """The seconds watched from *since* on (whole hours: the one *since*
+        falls in counts)."""
+        cut = _hour_key(since)
+        return sum(secs for t in self.titles.values()
+                   for key, secs in t["h"].items() if key >= cut)
+
     def rows(self) -> Iterator["Row"]:
         for tid, t in self.titles.items():
             for key, secs in t["h"].items():

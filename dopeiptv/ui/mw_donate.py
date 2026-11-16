@@ -1,17 +1,24 @@
-"""Donating, from inside the app - there, never in the way.
+"""Donating, from inside the app - asked now and then, never in the way.
 
-Four places: a small heart beside the sidebar's logo (its words in the
-tooltip) - and at the top right of Home, which hides the sidebar - "Support dopeIPTV…" in the app menu and in About, and one card on
-Home once the app has been used for real (about
-ten hours of watching). The card's "Not now" puts it away for three
-months; "Donate" for a year; left alone, it goes by itself after a week,
-for three months too. "I've already donated" in the heart's menu puts the
-heart and the card away for good (the app cannot know: no accounts, the
-payment is on the website), until the Settings switch turns it on. The heart hides for three months too - its
-right-click menu, or a switch in Settings, General - and comes back by
-itself. Nothing ever pops up, and nothing shows on a first run or over a
-playing video. Every way opens the donate dialog on
-the website, with a ?ref= saying which (the site's statistics read it).
+"Support dopeIPTV…" is always in the app menu and in About. Beyond that
+the app asks in one rhythm (core/donate_rhythm.py): one week a month, once
+it is used for real - five hours watched in the last 30 days, two weeks
+after the first run - a small heart on the sidebar's logo (and at the top
+right of Home, which hides the sidebar). The first day of that week the
+heart has its colour, or Home has its card instead while Home is shown -
+never both; the other six days it is muted. Nothing beats, pulses or pops
+up. Left alone it goes after its week and comes back next month.
+
+What answers it answers both, the heart and the card: Donate opens the
+donate dialog on the website (with a ?ref= saying from where - the site's
+statistics read it) and ends the week; "Not right now" and the heart's
+right-click "Hide for three months" put it away for three months; "I've
+donated" for a year, taken at the person's word. A supporter key: never
+asked. Settings, General can switch the asking off altogether. It is not
+drawn in full screen, in TV mode, in private viewing or for a kids
+profile - the week's days still count.
+
+Every key is the household's (core/donate_rhythm.py), none a profile's own.
 """
 
 from __future__ import annotations
@@ -20,36 +27,104 @@ import time
 
 from PyQt6.QtCore import QTimer
 
+from ..core import donate_rhythm as rhythm
 from ..core.log import log
 from ..core.xdg import open_url
 from ..i18n import tr
-from .theme import P
+from .theme import HEART, P
 
 # #support: the donate band, not the payment form - an invitation, not
 # a bill (#donate opens the form, for links from people already decided).
 DONATE_URL = "https://dopeiptv.org/?ref={ref}#support"
-#: Minutes of watching before Home shows the card.
-CARD_AFTER_MIN = 600
-SNOOZE_SECS = 90 * 86400          # "Not now"
-THANKS_SECS = 365 * 86400         # "Donate": not asked again for a year
-SHOWN_SECS = 7 * 86400            # left alone this long, the card goes by itself
-#: Minutes counted in memory before they are written (the settings file is
-#: not rewritten every minute of a film).
-_WRITE_EVERY = 5
+#: How long the seconds watched are taken as known (the household's logs
+#: are read again only after this, and only while a period could begin).
+WATCH_MEMO_S = 600.0
 
 
 class _DonateMixin:
+    _donate_card_w = None          # Home's card while it is there
+    _donate_bright = True          # the hearts' ink: the colour, or muted
+
     def _init_donate(self) -> None:
-        self._donate_unsaved = 0
+        try:
+            logs = self._donate_logs()
+            earliest = min((v.since for v in logs if v.since > 0), default=0.0)
+            rhythm.migrate(self.settings, self._donate_time(), earliest)
+        except Exception as e:
+            log.warning("donate: %s", e)
         self._donate_tick = QTimer(self)
         self._donate_tick.setInterval(60_000)
-        self._donate_tick.timeout.connect(self._donate_count)
+        self._donate_tick.timeout.connect(self._donate_minute)
         self._donate_tick.start()
 
-    # -- the sidebar's heart ---------------------------------------------------
-    def _donate_thanked(self) -> bool:
-        return str(self.settings.value("donate_thanked", "false")) == "true"
+    def _donate_time(self) -> float:
+        """The clock the rhythm reads (a test sets its own)."""
+        return time.time()
 
+    # -- what the rhythm reads ----------------------------------------------
+    def _donate_logs(self) -> list:
+        """Every profile's viewing log: the household's use of the app. The
+        profile in use's as the window holds it (minutes not saved yet
+        included), the others' as stored."""
+        from ..core import profiles, viewing_stats
+        live = getattr(self, "_stats_log", None)
+        if not isinstance(self.settings, profiles.ProfileSettings):
+            return [live if live is not None else viewing_stats.ViewingLog(self.settings)]
+        store = getattr(self, "profiles", None)
+        active = profiles.active_id()
+        pids = [p.id for p in store.profiles()] if store is not None else []
+        if active not in pids:
+            pids.append(active)
+        return [live if pid == active and live is not None
+                else viewing_stats.ViewingLog(profiles.pinned(self.settings, pid))
+                for pid in pids]
+
+    def _donate_watched_s(self) -> float:
+        """Seconds watched in the last 30 days, every profile's."""
+        now = self._donate_time()
+        memo = getattr(self, "_donate_watch_memo", None)
+        if memo is not None and 0 <= now - memo[0] < WATCH_MEMO_S:
+            return memo[1]
+        since = now - rhythm.WATCH_DAYS * rhythm.DAY
+        total = sum(v.watched_since(since) for v in self._donate_logs())
+        self._donate_watch_memo = (now, total)
+        return total
+
+    def _donate_quiet(self) -> bool:
+        """Where asking would be in the way: video in full screen (docked
+        or popped out), TV mode, private viewing, a kids profile."""
+        from ..core import privacy
+        if privacy.private() or getattr(self, "_tv_on", False) \
+                or getattr(self, "_player_fs", False):
+            return True
+        pop = getattr(self, "_popout_win", None)
+        try:
+            if pop is not None and pop.isFullScreen():
+                return True
+        except RuntimeError:
+            pass
+        kids = getattr(self, "_profile_kids", None)
+        try:
+            return bool(kids is not None and kids())
+        except Exception:
+            return False
+
+    def _donate_phase(self, sup=False) -> str:
+        """Where the rhythm is now (a period begun if one may, and it would
+        be seen). *sup*: the supporter key, if the caller has it read."""
+        if sup is False:
+            sup = self._supporter()
+        if sup is not None or not rhythm.asking(self.settings):
+            return rhythm.OFF
+        try:
+            return rhythm.step(self.settings, self._donate_time(),
+                               self._donate_watched_s,
+                               can_begin=not self._donate_quiet())
+        except Exception as e:
+            log.warning("donate: %s", e)
+            return rhythm.OFF
+
+    # -- the sidebar's heart ---------------------------------------------------
     def _supporter(self):
         from ..core import supporter
         return supporter.stored(self.settings)
@@ -59,15 +134,6 @@ class _DonateMixin:
             return self._supporter() is not None
         except Exception:                      # no settings yet
             return False
-
-    def _donate_heart_due(self) -> bool:
-        if self._donate_thanked() and self._supporter() is None:
-            return False
-        try:
-            until = float(self.settings.value("donate_heart_until", 0) or 0)
-        except (TypeError, ValueError):
-            until = 0.0
-        return time.time() >= until
 
     def _build_heart_badge(self) -> None:
         """The donate heart, laid over the logo like the private marker
@@ -106,16 +172,73 @@ class _DonateMixin:
         btn.move(x0 + w - btn.width() // 2 - 3, y0 + h - btn.height() // 2 - 1)
         btn.raise_()
 
+    def _donate_ink(self) -> str:
+        """The hearts' colour at rest: the heart's own the first day of a
+        period, the theme's muted ink after it."""
+        return HEART if self._donate_bright else P.get("muted", HEART)
+
+    def _donate_card_now(self):
+        card = self._donate_card_w
+        if card is None:
+            return None
+        from PyQt6 import sip
+        if sip.isdeleted(card):
+            self._donate_card_w = None
+            return None
+        return card
+
+    def _donate_card_shows(self, card) -> bool:
+        showing = getattr(self, "_home_showing", None)
+        return bool(showing()) if showing is not None else not card.isHidden()
+
+    def _donate_drop_card(self, card) -> None:
+        self._donate_card_w = None
+        try:
+            card.hide()
+            card.deleteLater()
+        except RuntimeError:
+            pass
+
+    def _donate_show(self, sup=False) -> str:
+        """The hearts and Home's card as the rhythm says: one of them at a
+        time, none while it would be in the way."""
+        try:
+            return self._donate_place(sup)
+        except Exception as e:                 # never in the way of anything
+            log.warning("donate: %s", e)
+            return rhythm.OFF
+
+    def _donate_place(self, sup) -> str:
+        ph = self._donate_phase(sup)
+        quiet = self._donate_quiet()
+        card = self._donate_card_now()
+        if card is not None and (ph != rhythm.BRIGHT or quiet):
+            self._donate_drop_card(card)        # its day is over, or answered
+            card = None
+        shown = ph != rhythm.OFF and not quiet
+        self._donate_bright = ph == rhythm.BRIGHT
+        ink = self._donate_ink()
+        on_home = card is not None and self._donate_card_shows(card)
+        btn = getattr(self, "_donate_btn", None)
+        if btn is not None:
+            btn.set_rest(ink)
+            btn.setVisible(shown and not on_home)
+        home = getattr(self, "_home_heart", None)      # Home's, top right
+        if home is not None:
+            try:
+                home.set_rest(ink)
+                home.setVisible(shown and card is None)
+            except RuntimeError:                       # Home was rebuilt
+                self._home_heart = None
+        self._place_logo_marks()
+        return ph
+
     def _donate_heart_refresh(self) -> None:
         btn = getattr(self, "_donate_btn", None)
         if btn is None:
             return
-        from ..core import privacy
-        sup = self._supporter()
         # A supporter's heart is gone: the logo itself says it instead.
-        # While private viewing is on its marker has the logo to itself.
-        due = self._donate_heart_due() and sup is None
-        shown = due and not privacy.private()
+        sup = self._supporter()
         tip = tr("donate_support") + "\n" + tr("heart_tip_key")
         for heart in (btn, getattr(self, "_home_heart", None)):
             try:
@@ -123,20 +246,18 @@ class _DonateMixin:
                     heart.setToolTip(tip)
             except RuntimeError:
                 pass
-        btn.setVisible(shown)
         from .qt_i18n import format_month
         logo = getattr(self, "_sidebar_logo", None)
         if logo is not None and hasattr(logo, "set_supporter"):
             logo.set_supporter(sup is not None, tr("supporter_tip", date=format_month(sup["since"]))
                                if sup is not None else "")
-        self._place_logo_marks()
-        home = getattr(self, "_home_heart", None)      # Home's, top right
-        if home is not None:
-            try:
-                home.setVisible(due)
-            except RuntimeError:                       # Home was rebuilt
-                self._home_heart = None
+        self._donate_show(sup)
         self._supporter_perks(sup)
+
+    def _donate_minute(self) -> None:
+        """Once a minute: a period begun or over, its first day gone, a
+        snooze run out - and the supporter key's perks kept in step."""
+        self._donate_heart_refresh()
 
     # -- what the key opens ----------------------------------------------------
     def _supporter_perks(self, sup) -> None:
@@ -170,38 +291,40 @@ class _DonateMixin:
         except Exception as e:
             log.warning("supporter icon: %s", e)
 
+    # -- the answers -------------------------------------------------------------
     def donated(self) -> None:
-        """Said they have: the heart and Home's card go for good."""
-        self.settings.setValue("donate_thanked", "true")
-        self._donate_heart_refresh()
-
-    def show_donate_heart(self) -> None:
-        self.settings.remove("donate_thanked")
-        self.settings.setValue("donate_heart_until", 0)
+        """"I've donated": not asked for a year - the heart and the card."""
+        rhythm.put_away(self.settings, self._donate_time(), rhythm.DONATED_S)
         self._donate_heart_refresh()
 
     def hide_donate_heart(self) -> None:
-        self.settings.setValue("donate_heart_until", time.time() + SNOOZE_SECS)
+        """"Not right now", "Hide for three months": the heart and the card."""
+        rhythm.put_away(self.settings, self._donate_time(), rhythm.LATER_S)
         self._donate_heart_refresh()
+
+    def _donate_go(self, ref: str) -> None:
+        """Donate, from where it was asked: the website's donate dialog, and
+        this month's asking is over."""
+        self.open_donate(ref)
+        rhythm.end_period(self.settings, self._donate_time())
+        self._donate_heart_refresh()
+
+    def _donate_go_heart(self) -> None:
+        self._donate_go("app-heart")
+
+    def _donate_go_home(self) -> None:
+        self._donate_go("app-home")
 
     def _donate_heart_menu(self, pos, btn=None) -> None:
         from PyQt6.QtWidgets import QMenu
         btn = btn or self._donate_btn
         menu = QMenu(btn)
-        menu.addAction(tr("donate_support"), lambda: self.open_donate("app-heart"))
+        menu.addAction(tr("donate_support"), self._donate_go_heart)
         menu.addAction(tr("supporter_menu"), self.open_supporter)
         menu.addAction(tr("donate_hide"), self.hide_donate_heart)
         if self._supporter() is None:
-            menu.addAction(tr("donate_done"), self.already_donated)
+            menu.addAction(tr("donate_did"), self.donated)
         menu.exec(btn.mapToGlobal(pos))
-
-    def already_donated(self) -> None:
-        """"I've already donated": the key's window first - with a key the
-        app knows for sure, and the heart says thank you; closed without one,
-        taken at their word as before."""
-        self.open_supporter()
-        if self._supporter() is None:
-            self.donated()
 
     def heart_clicked(self, ref: str = "app-heart") -> None:
         """The heart: the donate page, or for a supporter their thank-you
@@ -209,7 +332,7 @@ class _DonateMixin:
         if self._supporter() is not None:
             self.open_supporter()
         else:
-            self.open_donate(ref)
+            self._donate_go(ref)
 
     def open_supporter(self, key: str = "") -> None:
         """The supporter window; *key* (from a dopeiptv://supporter link)
@@ -221,79 +344,21 @@ class _DonateMixin:
         d.exec()
         self._donate_heart_refresh()
 
-    def _donate_count(self) -> None:
-        """A minute of watching, by the same sign that keeps the screen
-        awake while something plays (the docked player or multiview)."""
-        if not getattr(self, "_donate_btn", None) or not self._donate_btn.isVisible():
-            self._donate_heart_refresh()        # its three months may be up
-        wake = getattr(self, "wake", None)
-        if wake is None or not wake.held:
-            return
-        self._donate_unsaved += 1
-        if self._donate_unsaved >= _WRITE_EVERY:
-            self.settings.setValue("donate_watch_min",
-                                   self._donate_watched() + self._donate_unsaved)
-            self._donate_unsaved = 0
-
-    def _donate_watched(self) -> int:
-        try:
-            return int(self.settings.value("donate_watch_min", 0) or 0)
-        except (TypeError, ValueError):
-            return 0
-
     def open_donate(self, ref: str) -> None:
         open_url(DONATE_URL.format(ref=ref))
 
-    def _donate_card_due(self) -> bool:
-        # A supporter is not asked (they can still donate: the menu, About,
-        # their heart's thank-you).
-        if self._donate_thanked() or self._supporter() is not None:
-            return False
-        if self._donate_watched() + getattr(self, "_donate_unsaved", 0) \
-                < CARD_AFTER_MIN:
-            return False
-        try:
-            until = float(self.settings.value("donate_card_until", 0) or 0)
-            shown = float(self.settings.value("donate_card_shown", 0) or 0)
-        except (TypeError, ValueError):
-            until = shown = 0.0
-        if time.time() < until:
-            return False
-        if shown and time.time() - shown > SHOWN_SECS:
-            # A week on Home and neither button pressed: it has been seen.
-            self.settings.setValue("donate_card_until", time.time() + SNOOZE_SECS)
-            self.settings.remove("donate_card_shown")
-            return False
-        return True
-
+    # -- Home's card ---------------------------------------------------------------
     def _donate_card(self):
-        """The Home card, or None while it is not due."""
-        if not self._donate_card_due():
+        """Home's card, the first day of a period, or None (Home's heart
+        stands in for it the rest of the week)."""
+        if self._donate_phase() != rhythm.BRIGHT or self._donate_quiet():
             return None
         from .home_widgets import DonateCard
-        if not self.settings.value("donate_card_shown"):
-            self.settings.setValue("donate_card_shown", time.time())
         card = DonateCard(tr("home_donate_title"), tr("home_donate_body"),
-                          tr("home_donate_btn"), tr("home_donate_later"),
-                          tr("donate_done"))
-
-        def away(secs: int) -> None:
-            self.settings.setValue("donate_card_until", time.time() + secs)
-            self.settings.remove("donate_card_shown")
-            card.hide()
-            card.deleteLater()
-
-        def donate() -> None:
-            self.open_donate("app-home")
-            away(THANKS_SECS)
-
-        card.donate.connect(donate)
-        card.later.connect(lambda: away(SNOOZE_SECS))
-
-        def already() -> None:
-            self.already_donated()
-            card.hide()
-            card.deleteLater()
-
-        card.already.connect(already)
+                          tr("home_donate_btn"), tr("donate_later"),
+                          tr("donate_did"))
+        card.donate.connect(self._donate_go_home)
+        card.later.connect(self.hide_donate_heart)
+        card.already.connect(self.donated)
+        self._donate_card_w = card
         return card

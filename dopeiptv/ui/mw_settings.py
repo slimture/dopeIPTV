@@ -915,7 +915,8 @@ class _SettingsMixin:
         tv_found.setWordWrap(True)
         c.row(tr("tv_inputs_found"), tv_found, tr("tv_inputs_found_hint"),
               search="lirc gamepad controller joystick cec remote evdev sdl")
-        # The sidebar's heart, last and quiet: off hides it for three months.
+        # Supporting the app: feedback, the supporter key, and - last and
+        # quiet - whether the app asks for a donation now and then.
         c = support_card = general.card(tr("donate_support"))
         # What the supporter key opens: read once here, again only after the
         # key's window (every check of a key is a signature check).
@@ -956,8 +957,11 @@ class _SettingsMixin:
                                 is_on("supporter_icon", "true"),
                                 tr("set_supporter_icon_hint"))
             c.shown_if(c.rows[-1][0], lambda: key_state["mine"] is not None)
-        heart_box = c.toggle(tr("set_donate_heart"), self._donate_heart_due(),
-                             tr("set_donate_heart_hint"))
+        # Asking for a donation now and then (mw_donate): the household's,
+        # off for good until switched on again.
+        from ..core import donate_rhythm
+        ask_box = c.toggle(tr("set_donate_ask"), donate_rhythm.asking(self.settings),
+                           tr("set_donate_ask_hint"))
         # Sync between computers, for everyone (mw_sync).
         if hasattr(self, "_build_sync_card"):
             self._build_sync_card(sync_page, d)
@@ -2587,13 +2591,9 @@ class _SettingsMixin:
             if night_mode.KEY in changed and self.player:
                 self.player.set_night_mode(night_box.isChecked())
             put("check_updates", flag(updates_box))
-            if heart_box.isChecked() != self._donate_heart_due():
-                if heart_box.isChecked():
-                    self.show_donate_heart()
-                    changed.add("donate_heart_until")
-                else:
-                    self.hide_donate_heart()
-                    changed.add("donate_heart_until")
+            # Written once switched (on is the default).
+            if ask_box.isChecked() != donate_rhythm.asking(self.settings):
+                put(donate_rhythm.K_ASK, flag(ask_box))
                 self._donate_heart_refresh()
             # Written once switched (on is the default): an untouched window
             # stores nothing.

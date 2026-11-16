@@ -114,7 +114,9 @@ OWN_STORES = {
 #: that keeps them out of a profile).
 SHARED = ("sources", "recordings and recording rules", "the guide",
           "devices: cast, boxes", "Nerd", "playback and network settings",
-          "the window layout", "the parental lock's PIN and locked categories")
+          "the window layout", "the parental lock's PIN and locked categories",
+          "asking for a donation: a donation is for the app, not one person "
+          "(core/donate_rhythm.py)")
 SHARED_EXAMPLES = ("playlists", "active_playlist", "recording_jobs", "recordings_dir",
                    "series_rules_abc", "category_overrides_abc", "channel_overrides_abc",
                    "cast_devices", "kodi_devices", "nerd_enabled", "nerd_proxy",
@@ -122,6 +124,8 @@ SHARED_EXAMPLES = ("playlists", "active_playlist", "recording_jobs", "recordings
                    "window_geometry", "splitter_state", "language",
                    "parental_pin_hash", "parental_salt", "epg_delay_min",
                    "trakt_client_id", "trakt_client_secret", "home_enabled",
+                   "donate_ask", "donate_until", "donate_period",
+                   "donate_period_end", "donate_first_seen",
                    K_LIST, K_ACTIVE, K_ASK, K_MIGRATED, K_REMOVED)
 
 

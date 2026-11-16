@@ -15,6 +15,16 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   writes per address and the space all copies take (a new copy waits while
   it is full; HTTP 507 reads "no room right now", 401/403 "turned down").
   The supporter's icon and two themes stay theirs.
+- The app asks for a donation in a calmer rhythm: the heart on the logo
+  shows one week a month, once the app is used for real (five hours watched
+  in the last 30 days, two weeks after the first run) - in its colour the
+  first day, muted after, never moving - and goes by itself after the week.
+  Home's card takes its place on the first day while Home shows, never both.
+  "Not right now" (and the right-click's Hide for three months) puts both
+  away for three months, the new "I've donated" for a year; a supporter key
+  is never asked. Nothing shows in full screen, TV mode, private viewing or
+  a kids profile. Settings, General: "Ask for a donation now and then" turns
+  it off altogether; Support dopeIPTV stays in the menu and in About.
 - Settings' sidebar: "Sync" for Sync between computers, and shorter names
   where a page's name was cut off (Remote and automation in 17 languages,
   Greek's Boxes and lists, Russian's Parental lock).

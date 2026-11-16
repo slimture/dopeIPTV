@@ -805,36 +805,20 @@ class _Hero(QWidget):
         p.end()
 
 
-class _BeatingHeart(QWidget):
-    """A heart that beats twice when it comes into view."""
+class _StillHeart(QWidget):
+    """The card's heart: still - nothing that asks for money moves (a
+    beating heart read as nagging)."""
 
     def __init__(self, size: int = 34) -> None:
         super().__init__()
         self._size = size
-        self._scale = 1.0
         self.setFixedSize(size + 8, size + 8)
-        from PyQt6.QtCore import QVariantAnimation
-        self._beat = QVariantAnimation(self)
-        self._beat.setDuration(1000)
-        self._beat.setStartValue(1.0)
-        for at, v in ((0.15, 1.22), (0.3, 0.95), (0.45, 1.14), (0.62, 1.0)):
-            self._beat.setKeyValueAt(at, v)
-        self._beat.setEndValue(1.0)
-        self._beat.valueChanged.connect(self._set)
-
-    def _set(self, v) -> None:
-        self._scale = float(v)
-        self.update()
-
-    def showEvent(self, event) -> None:
-        QTimer.singleShot(350, self._beat.start)
-        super().showEvent(event)
 
     def paintEvent(self, _event) -> None:
         from .widgets import heart_path
         pr = QPainter(self)
         pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        s = self._size * self._scale
+        s = float(self._size)
         pr.translate((self.width() - s) / 2, (self.height() - s) / 2)
         grad = QLinearGradient(0, 0, s, s)
         grad.setColorAt(0.0, QColor(HEART).lighter(135))
@@ -848,8 +832,9 @@ class _BeatingHeart(QWidget):
 
 class DonateCard(QFrame):
     """Home's one note about donating: a heart, two lines and Donate / Not
-    now - a card among the shelves, never a window that pops up. Shown only
-    after real use (mw_donate decides when)."""
+    right now / I've donated - a card among the shelves, never a window that
+    pops up. Shown the first day of a month's asking (mw_donate decides
+    when)."""
 
     donate = pyqtSignal()
     later = pyqtSignal()
@@ -881,7 +866,7 @@ class DonateCard(QFrame):
         h = QHBoxLayout(self)
         h.setContentsMargins(18, 14, 18, 14)
         h.setSpacing(14)
-        h.addWidget(_BeatingHeart(), 0, Qt.AlignmentFlag.AlignVCenter)
+        h.addWidget(_StillHeart(), 0, Qt.AlignmentFlag.AlignVCenter)
         text = QVBoxLayout()
         text.setSpacing(3)
         t = QLabel(title)

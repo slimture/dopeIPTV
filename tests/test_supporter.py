@@ -85,7 +85,7 @@ def test_a_stored_key_is_checked_once_not_on_every_ask(monkeypatch):
 
 
 _WINDOW = r"""
-import os, sys, json, tempfile
+import os, sys, json, tempfile, time
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtCore import QSettings
 from PyQt6.QtWidgets import QApplication
@@ -99,11 +99,13 @@ from dopeiptv.ui import dialogs
 app = QApplication.instance() or QApplication([])
 QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, tempfile.mkdtemp())
 s = QSettings(os.path.join(tempfile.mkdtemp(), "s.ini"), QSettings.Format.IniFormat)
-s.setValue("donate_watch_min", 5000)           # used for real: the card would be due
+# Used for real, a month's asking going on: the heart and the card would show.
+s.setValue("donate_first_seen", time.time() - 60 * 86400)
+s.setValue("donate_period", time.time() - 60)
 w = MainWindow(DemoClient(), s, PlaylistStore(s))
 opened = []
 w.open_donate = lambda ref: opened.append(ref)
-assert w._donate_card_due() and not w._sidebar_logo._supporter
+assert w._donate_phase() != "off" and not w._sidebar_logo._supporter
 w.heart_clicked("app-heart")
 assert opened == ["app-heart"]
 # The key pasted in its window: checked as it is typed, kept when good.
@@ -119,7 +121,7 @@ w._donate_heart_refresh()
 # A supporter's mark is the logo itself; the heart is gone.
 assert w._sidebar_logo._supporter and "2026" in w._sidebar_logo.toolTip()
 assert w._donate_btn.isHidden()
-assert not w._donate_card_due()                # not asked any more
+assert w._donate_phase() == "off" and w._donate_card() is None   # not asked any more
 # The heart now opens the thank-you, which still offers to donate.
 shown = []
 dialogs.SupporterDialog.exec = lambda self: shown.append(self.supporter) or 1
@@ -127,10 +129,12 @@ w.heart_clicked("app-heart")
 assert shown and shown[-1] is not None and opened[-1] == "supporter"
 # Removed: as before.
 s.remove("supporter_key")
+s.setValue("donate_period", time.time() - 60)  # (the click above ended the week)
+s.remove("donate_period_end")
 w._donate_heart_refresh()
-assert not w._sidebar_logo._supporter and w._donate_card_due()
+assert not w._sidebar_logo._supporter and w._donate_phase() != "off"
 # Where a key goes, in plain sight: the app menu, the heart's tip, the
-# window saying where the key is; "I've already donated" asks for it.
+# window saying where the key is.
 from dopeiptv.i18n import tr
 assert w._supporter_action.text() == tr("supporter_menu") + "…"
 n = len(shown)
@@ -159,8 +163,8 @@ for _ in range(10):
     app.processEvents()
 assert logo.width() >= logo.LOGO_W == 92
 s.remove("supporter_key")
-w.already_donated()                           # closed without a key: taken at their word
-assert s.value("donate_thanked") == "true"
+w.donated()                                   # "I've donated": taken at their word, a year
+assert float(s.value("donate_until")) >= time.time() + 364 * 86400
 print("SUPPORTER_OK")
 """
 

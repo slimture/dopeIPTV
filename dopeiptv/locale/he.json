@@ -294,14 +294,10 @@
   "about_github": "GitHub",
   "about_all_releases": "כל הגרסאות",
   "donate_support": "תמכו ב־dopeIPTV",
-  "set_donate_heart": "הצגת הלב בסרגל הצד",
-  "set_donate_heart_hint": "כשהוא כבוי הוא מוסתר לשלושה חודשים ואז חוזר.",
   "donate_hide": "הסתרה לשלושה חודשים",
-  "donate_done": "כבר תרמתי",
   "home_donate_title": "נהנים מ־dopeIPTV?",
   "home_donate_body": "הוא חינמי, בלי פרסומות ובלי מעקב. תרומה בכל סכום עוזרת לשמור על זה כך.",
   "home_donate_btn": "תרומה",
-  "home_donate_later": "לא עכשיו",
   "about_checking": "בודק עדכונים…",
   "about_up_to_date": "אתה בגרסה האחרונה.",
   "about_update_available": "גרסה חדשה זמינה: {version}",
@@ -2820,5 +2816,9 @@
   "status_playing_from": "מתנגן: {title} - מ-{source}",
   "status_list_source": "‏{source} · {text}",
   "source_label_name": "מקור: {name}",
-  "source_label_hint": "הרשימות מציגות את המקור הזה - לחצו כדי לעבור למקור אחר או לפתוח את ההגדרות שלו"
+  "source_label_hint": "הרשימות מציגות את המקור הזה - לחצו כדי לעבור למקור אחר או לפתוח את ההגדרות שלו",
+  "set_donate_ask": "בקשת תרומה מדי פעם",
+  "set_donate_ask_hint": "שבוע אחד בחודש, אחרי כמה שעות צפייה: לב קטן ליד הלוגו. כשזה כבוי, אין בקשה לעולם – „תמכו ב־dopeIPTV” נשאר בתפריט ובחלון „אודות dopeIPTV”.",
+  "donate_did": "תרמתי",
+  "donate_later": "לא כרגע"
 }

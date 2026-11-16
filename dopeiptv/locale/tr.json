@@ -294,14 +294,10 @@
   "about_github": "GitHub",
   "about_all_releases": "Tüm sürümler",
   "donate_support": "dopeIPTV'yi destekleyin",
-  "set_donate_heart": "Kenar çubuğunda kalbi göster",
-  "set_donate_heart_hint": "Kapatıldığında üç ay gizli kalır, sonra geri gelir.",
   "donate_hide": "Üç ay gizle",
-  "donate_done": "Zaten bağış yaptım",
   "home_donate_title": "dopeIPTV'yi beğendiniz mi?",
   "home_donate_body": "Ücretsiz; reklam yok, takip yok. Her miktarda bağış böyle kalmasına yardımcı olur.",
   "home_donate_btn": "Bağış yap",
-  "home_donate_later": "Şimdi değil",
   "about_checking": "Güncellemeler denetleniyor…",
   "about_up_to_date": "En son sürümü kullanıyorsunuz.",
   "about_update_available": "Yeni bir sürüm mevcut: {version}",
@@ -2820,5 +2816,9 @@
   "status_playing_from": "Oynatılıyor: {title} - {source} kaynağından",
   "status_list_source": "{source} · {text}",
   "source_label_name": "Kaynak: {name}",
-  "source_label_hint": "Listeler bu kaynağı gösteriyor - başka bir kaynağa geçmek ya da ayarlarını açmak için tıklayın"
+  "source_label_hint": "Listeler bu kaynağı gösteriyor - başka bir kaynağa geçmek ya da ayarlarını açmak için tıklayın",
+  "set_donate_ask": "Ara sıra bağış iste",
+  "set_donate_ask_hint": "Birkaç saat izledikten sonra ayda bir hafta: logonun yanında küçük bir kalp. Kapatıldığında hiç istemez – “dopeIPTV'yi destekleyin” menüde ve dopeIPTV Hakkında'da kalır.",
+  "donate_did": "Bağış yaptım",
+  "donate_later": "Şu an değil"
 }

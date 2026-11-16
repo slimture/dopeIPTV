@@ -189,6 +189,8 @@ class _TvMixin:
             self._center_stack.addWidget(page)
         self._tv_on = True
         self._tv_watching = False
+        if hasattr(self, "_donate_show"):
+            self._donate_show()          # no asking in TV mode (mw_donate)
         self.menuBar().hide()
         self._hide_busy()
         if not self.isFullScreen():
@@ -240,6 +242,8 @@ class _TvMixin:
                     self.setGeometry(geo)
         QTimer.singleShot(0, self._update_mid_compact)
         self._events_tv_mode()
+        if hasattr(self, "_donate_show"):
+            self._donate_show()          # the heart back, if its week runs
         if getattr(self, "_profile_must_pick", False):
             # TV mode's "Who's watching?" was up for a profile's PIN: the
             # window's own picker again, never the profile without it.

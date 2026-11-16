@@ -265,7 +265,10 @@ class _NavMixin:
         # The source's avatar beside it is painted in the accent (it reads
         # the theme as it paints; _update_playlist_btn repaints it).
         if hasattr(self, "_donate_btn"):
-            self._donate_btn.set_rest(HEART)
+            # Its colour the first day of a month's asking, muted after
+            # (mw_donate) - in the new theme's muted ink.
+            self._donate_btn.set_rest(self._donate_ink() if hasattr(self, "_donate_ink")
+                                      else HEART)
             if hasattr(self, "_heart_chip"):          # ringed in the new sidebar colour
                 self._heart_chip()
         if hasattr(self, "_playlist_btn"):

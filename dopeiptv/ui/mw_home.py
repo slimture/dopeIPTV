@@ -192,7 +192,9 @@ class HomePage(QWidget):
         h.addStretch(1)
         # Top-RIGHT, mirroring the back chip: the donate heart (Home hides
         # the sidebar, and its heart with it). Hidden, it keeps its room so
-        # the nav pill stays centred.
+        # the nav pill stays centred. Shown or not, and in which ink, once
+        # the page knows whether it has the donate card (mw_donate: never
+        # both).
         # Parented, and in the layout before setVisible: a parentless widget
         # shown is a window of its own for a moment - on GNOME (Wayland)
         # that asked for an activation token it never used, and the pointer
@@ -210,7 +212,7 @@ class HomePage(QWidget):
         keep = heart.sizePolicy()
         keep.setRetainSizeWhenHidden(True)
         heart.setSizePolicy(keep)
-        heart.setVisible(w._donate_heart_due())
+        heart.setVisible(False)
         w._home_heart = heart
         return bar
 
@@ -234,11 +236,14 @@ class HomePage(QWidget):
         self._v.addLayout(self._body)
         body = self._body
 
-        # One note about donating, once the app has been used for real
+        # One note about donating, the first day of a month's asking
         # (mw_donate decides when); a card among the shelves, not a popup.
+        # The heart at the top right stands in for it the rest of the week.
         note = w._donate_card() if hasattr(w, "_donate_card") else None
         if note is not None:
             body.addWidget(note)
+        if hasattr(w, "_donate_show"):
+            w._donate_show()
 
         if on("home_sh_resume"):
             rows = []
@@ -1109,12 +1114,16 @@ class _HomeMixin:
         page = self._ensure_home_page()
         page.refresh()
         self._center_stack.setCurrentWidget(page)
+        if hasattr(self, "_donate_show"):
+            self._donate_show()         # the donate card on screen: no heart
         page.setFocus()
         self._check_nav("home")
 
     def _leave_home(self) -> None:
         self._center_stack.setCurrentIndex(0)
         self._check_nav(self._nav_key_for_mode(self.mode))
+        if hasattr(self, "_donate_show"):
+            self._donate_show()         # Home's donate card off screen: the heart
         # The middle pane was hidden while Home showed, so its width was stale
         # and the control strip could sit in the wrong compact/full form (icons
         # despite a wide window). Recompute once the classic view has laid out.

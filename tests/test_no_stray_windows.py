@@ -36,7 +36,10 @@ GcGuard(app)
 settings = QSettings("dopeiptv-test", "stray-windows")
 settings.clear()
 settings.setValue("home_enabled", "true")
-settings.setValue("donate_watch_min", 5000)     # Home's donate card is due
+# A month's asking on its first day: Home's donate card and its heart.
+import time
+settings.setValue("donate_first_seen", time.time() - 60 * 86400)
+settings.setValue("donate_period", time.time() - 60)
 stray = []
 main = []
 
@@ -68,7 +71,8 @@ step(w._leave_home)
 step(w._show_home_page)
 step(w._apply_home_settings)
 step(w.hide_donate_heart)
-step(w.show_donate_heart)
+settings.remove("donate_until")
+step(w._donate_heart_refresh)
 step(w._leave_home)
 step(w._show_home_page)
 # Home switched off in Settings, while it shows and again after.

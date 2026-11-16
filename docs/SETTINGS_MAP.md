@@ -167,7 +167,9 @@ or "Shared" and where the shared one lives. Nerd's rows only while it is on.
 - TV mode: Open TV mode, `tv_mode_start`, `tv_inputs` (game controllers and
   LIRC), the remotes and controllers found
 - Support dopeIPTV: feedback and its answers, `supporter_key` (its window),
-  `supporter_icon`, the sidebar heart (`donate_heart_until`)
+  `supporter_icon`, ask for a donation now and then (`donate_ask`; the
+  household's - its rhythm and snooze are `donate_until`, `donate_period`,
+  `donate_first_seen`, not settings)
 
 **Appearance** (`appearance`)
 - Theme: `theme`, `accent` (+ `accent_custom`), `theme_follow_system`,

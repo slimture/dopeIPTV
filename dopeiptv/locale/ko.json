@@ -294,14 +294,10 @@
   "about_github": "GitHub",
   "about_all_releases": "모든 릴리스",
   "donate_support": "dopeIPTV 후원하기",
-  "set_donate_heart": "사이드바에 하트 표시",
-  "set_donate_heart_hint": "끄면 3개월 동안 숨겨졌다가 다시 나타납니다.",
   "donate_hide": "3개월 동안 숨기기",
-  "donate_done": "이미 후원했어요",
   "home_donate_title": "dopeIPTV가 마음에 드시나요?",
   "home_donate_body": "무료이며 광고도 추적도 없습니다. 금액에 상관없이 후원은 이 상태를 지키는 데 도움이 됩니다.",
   "home_donate_btn": "후원하기",
-  "home_donate_later": "나중에",
   "about_checking": "업데이트 확인 중…",
   "about_up_to_date": "최신 버전을 사용 중입니다.",
   "about_update_available": "새 버전이 있습니다: {version}",
@@ -2820,5 +2816,9 @@
   "status_playing_from": "재생 중: {title} - {source}에서",
   "status_list_source": "{source} · {text}",
   "source_label_name": "소스: {name}",
-  "source_label_hint": "목록에 이 소스가 표시됩니다. 클릭하면 다른 소스로 전환하거나 설정을 열 수 있습니다"
+  "source_label_hint": "목록에 이 소스가 표시됩니다. 클릭하면 다른 소스로 전환하거나 설정을 열 수 있습니다",
+  "set_donate_ask": "가끔 후원 요청하기",
+  "set_donate_ask_hint": "몇 시간 시청한 뒤 한 달에 일주일 동안 로고 옆에 작은 하트가 표시됩니다. 끄면 절대 요청하지 않으며, 'dopeIPTV 후원하기'는 메뉴와 'dopeIPTV 정보'에 그대로 있습니다.",
+  "donate_did": "후원했어요",
+  "donate_later": "지금은 괜찮아요"
 }

@@ -294,14 +294,10 @@
   "about_github": "GitHub",
   "about_all_releases": "Todas as versões",
   "donate_support": "Apoie o dopeIPTV",
-  "set_donate_heart": "Mostrar o coração na barra lateral",
-  "set_donate_heart_hint": "Desligado, fica oculto por três meses e depois volta.",
   "donate_hide": "Ocultar por três meses",
-  "donate_done": "Já fiz uma doação",
   "home_donate_title": "Está gostando do dopeIPTV?",
   "home_donate_body": "É gratuito, sem anúncios e sem rastreamento. Uma doação de qualquer valor ajuda a manter assim.",
   "home_donate_btn": "Doar",
-  "home_donate_later": "Agora não",
   "about_checking": "Verificando atualizações…",
   "about_up_to_date": "Você está na versão mais recente.",
   "about_update_available": "Uma nova versão está disponível: {version}",
@@ -2820,5 +2816,9 @@
   "status_playing_from": "Reproduzindo: {title} - de {source}",
   "status_list_source": "{source} · {text}",
   "source_label_name": "Fonte: {name}",
-  "source_label_hint": "As listas mostram esta fonte - clique para trocar para outra ou abrir as configurações dela"
+  "source_label_hint": "As listas mostram esta fonte - clique para trocar para outra ou abrir as configurações dela",
+  "set_donate_ask": "Pedir uma doação de vez em quando",
+  "set_donate_ask_hint": "Uma semana por mês, depois que você assistir algumas horas: um pequeno coração perto do logo. Desligado, nunca pede – “Apoie o dopeIPTV” continua no menu e em Sobre o dopeIPTV.",
+  "donate_did": "Já doei",
+  "donate_later": "No momento, não"
 }

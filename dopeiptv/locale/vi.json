@@ -294,14 +294,10 @@
   "about_github": "GitHub",
   "about_all_releases": "Tất cả bản phát hành",
   "donate_support": "Ủng hộ dopeIPTV",
-  "set_donate_heart": "Hiện trái tim ở thanh bên",
-  "set_donate_heart_hint": "Khi tắt, trái tim sẽ ẩn trong ba tháng rồi hiện lại.",
   "donate_hide": "Ẩn trong ba tháng",
-  "donate_done": "Tôi đã ủng hộ rồi",
   "home_donate_title": "Bạn thích dopeIPTV chứ?",
   "home_donate_body": "Ứng dụng miễn phí, không quảng cáo và không theo dõi. Một khoản ủng hộ dù nhỏ cũng giúp giữ nguyên như vậy.",
   "home_donate_btn": "Ủng hộ",
-  "home_donate_later": "Để sau",
   "about_checking": "Đang kiểm tra cập nhật…",
   "about_up_to_date": "Bạn đang dùng phiên bản mới nhất.",
   "about_update_available": "Có phiên bản mới: {version}",
@@ -2820,5 +2816,9 @@
   "status_playing_from": "Đang phát: {title} - từ {source}",
   "status_list_source": "{source} · {text}",
   "source_label_name": "Nguồn: {name}",
-  "source_label_hint": "Danh sách đang hiển thị nguồn này - bấm để chuyển sang nguồn khác hoặc mở cài đặt của nguồn"
+  "source_label_hint": "Danh sách đang hiển thị nguồn này - bấm để chuyển sang nguồn khác hoặc mở cài đặt của nguồn",
+  "set_donate_ask": "Thỉnh thoảng xin ủng hộ",
+  "set_donate_ask_hint": "Một tuần mỗi tháng, sau khi bạn đã xem vài giờ: một trái tim nhỏ cạnh logo. Khi tắt, ứng dụng không bao giờ xin – “Ủng hộ dopeIPTV” vẫn có trong menu và trong Giới thiệu dopeIPTV.",
+  "donate_did": "Tôi đã ủng hộ",
+  "donate_later": "Lúc khác"
 }

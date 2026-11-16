@@ -294,14 +294,10 @@
   "about_github": "GitHub",
   "about_all_releases": "すべてのリリース",
   "donate_support": "dopeIPTV を支援",
-  "set_donate_heart": "サイドバーにハートを表示",
-  "set_donate_heart_hint": "オフにすると3か月間非表示になり、その後また表示されます。",
   "donate_hide": "3か月間非表示にする",
-  "donate_done": "寄付済みです",
   "home_donate_title": "dopeIPTV を気に入っていただけましたか？",
   "home_donate_body": "無料で、広告も追跡もありません。金額を問わず寄付が、このままであり続ける助けになります。",
   "home_donate_btn": "寄付する",
-  "home_donate_later": "今はしない",
   "about_checking": "アップデートを確認中…",
   "about_up_to_date": "最新バージョンをご利用中です。",
   "about_update_available": "新しいバージョンが利用可能です：{version}",
@@ -2820,5 +2816,9 @@
   "status_playing_from": "再生中：{title}（{source} から）",
   "status_list_source": "{source} · {text}",
   "source_label_name": "ソース：{name}",
-  "source_label_hint": "リストにはこのソースが表示されています。クリックすると別のソースに切り替えたり、設定を開いたりできます"
+  "source_label_hint": "リストにはこのソースが表示されています。クリックすると別のソースに切り替えたり、設定を開いたりできます",
+  "set_donate_ask": "ときどき寄付をお願いする",
+  "set_donate_ask_hint": "数時間視聴したあと、月に1週間だけロゴのそばに小さなハートを表示します。オフにすると一切お願いしません。「dopeIPTV を支援」はメニューと「dopeIPTVについて」に残ります。",
+  "donate_did": "寄付しました",
+  "donate_later": "今はやめておく"
 }

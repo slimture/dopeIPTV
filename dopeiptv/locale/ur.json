@@ -294,14 +294,10 @@
   "about_github": "GitHub",
   "about_all_releases": "تمام ریلیزز",
   "donate_support": "dopeIPTV کی مدد کریں",
-  "set_donate_heart": "سائیڈ بار میں دل دکھائیں",
-  "set_donate_heart_hint": "بند کرنے پر یہ تین ماہ تک چھپا رہتا ہے، پھر واپس آ جاتا ہے۔",
   "donate_hide": "تین ماہ کے لیے چھپائیں",
-  "donate_done": "عطیہ پہلے ہی دے دیا ہے",
   "home_donate_title": "کیا dopeIPTV پسند آ رہا ہے؟",
   "home_donate_body": "یہ مفت ہے، بغیر اشتہارات اور بغیر ٹریکنگ کے۔ کسی بھی رقم کا عطیہ اسے ایسا ہی رکھنے میں مدد کرتا ہے۔",
   "home_donate_btn": "عطیہ دیں",
-  "home_donate_later": "ابھی نہیں",
   "about_checking": "اپ ڈیٹس چیک ہو رہے ہیں…",
   "about_up_to_date": "آپ تازہ ترین ورژن پر ہیں۔",
   "about_update_available": "ایک نیا ورژن دستیاب ہے: {version}",
@@ -2820,5 +2816,9 @@
   "status_playing_from": "چل رہا ہے: {title} - {source} سے",
   "status_list_source": "‏{source} · {text}",
   "source_label_name": "ماخذ: {name}",
-  "source_label_hint": "فہرستیں یہ ماخذ دکھا رہی ہیں - کسی دوسرے ماخذ پر جانے یا اس کی ترتیبات کھولنے کے لیے کلک کریں"
+  "source_label_hint": "فہرستیں یہ ماخذ دکھا رہی ہیں - کسی دوسرے ماخذ پر جانے یا اس کی ترتیبات کھولنے کے لیے کلک کریں",
+  "set_donate_ask": "کبھی کبھار عطیے کی درخواست",
+  "set_donate_ask_hint": "مہینے میں ایک ہفتہ، جب آپ چند گھنٹے دیکھ چکے ہوں: لوگو کے پاس ایک چھوٹا سا دل۔ بند کرنے پر یہ کبھی نہیں مانگتا – «dopeIPTV کی مدد کریں» مینو میں اور «dopeIPTV کے بارے میں» میں رہتا ہے۔",
+  "donate_did": "میں نے عطیہ دے دیا ہے",
+  "donate_later": "فی الحال نہیں"
 }

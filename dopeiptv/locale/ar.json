@@ -294,14 +294,10 @@
   "about_github": "GitHub",
   "about_all_releases": "كل الإصدارات",
   "donate_support": "ادعم dopeIPTV",
-  "set_donate_heart": "إظهار القلب في الشريط الجانبي",
-  "set_donate_heart_hint": "عند إيقافه يبقى مخفيًا ثلاثة أشهر ثم يعود.",
   "donate_hide": "إخفاء لمدة ثلاثة أشهر",
-  "donate_done": "لقد تبرعت بالفعل",
   "home_donate_title": "هل يعجبك dopeIPTV؟",
   "home_donate_body": "إنه مجاني، بلا إعلانات ولا تتبّع. أي تبرّع، مهما كان صغيرًا، يساعد على إبقائه كذلك.",
   "home_donate_btn": "تبرّع",
-  "home_donate_later": "ليس الآن",
   "about_checking": "جارٍ التحقق من التحديثات…",
   "about_up_to_date": "أنت على أحدث إصدار.",
   "about_update_available": "يتوفّر إصدار جديد: {version}",
@@ -2820,5 +2816,9 @@
   "status_playing_from": "قيد التشغيل: {title} - من {source}",
   "status_list_source": "‏{source} · {text}",
   "source_label_name": "المصدر: {name}",
-  "source_label_hint": "القوائم تعرض هذا المصدر - انقر للتبديل إلى مصدر آخر أو لفتح إعداداته"
+  "source_label_hint": "القوائم تعرض هذا المصدر - انقر للتبديل إلى مصدر آخر أو لفتح إعداداته",
+  "set_donate_ask": "طلب تبرّع من حين لآخر",
+  "set_donate_ask_hint": "أسبوع واحد في الشهر، بعد أن تشاهد بضع ساعات: قلب صغير بجانب الشعار. عند إيقافه لا يطلب أبدًا، ويبقى «ادعم dopeIPTV» في القائمة وفي «حول dopeIPTV».",
+  "donate_did": "لقد تبرّعت",
+  "donate_later": "ليس الآن"
 }
