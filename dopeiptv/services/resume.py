@@ -160,6 +160,20 @@ class ResumeStore:
         pos = float(saved.get("pos") or 0)
         return pos if pos > 60 else 0.0
 
+    def progress(self, key, kind: str) -> tuple[float, float, int]:
+        """(position, length, when kept) of a title's resume point in
+        seconds and Unix time; zeros when there is none (a series' page
+        draws its episodes' bars from it)."""
+        group = self._KIND_TO_GROUP.get(kind)
+        saved = self._data.get(f"{group}:{key}") if group else None
+        if not isinstance(saved, dict):
+            return 0.0, 0.0, 0
+        try:
+            return (float(saved.get("pos") or 0), float(saved.get("dur") or 0),
+                    int(saved.get("ts") or 0))
+        except (TypeError, ValueError):
+            return 0.0, 0.0, 0
+
     def saved_at(self, key, kind: str) -> int:
         """When a title's resume point was kept here (Unix time), 0 for none:
         a media server's own point wins when it is newer."""

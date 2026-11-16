@@ -248,10 +248,21 @@ def test_library_view_groups_episodes_into_series(tmp_path, monkeypatch):
     assert len(series) == 1 and series[0]["_series_title"] == "Show Name"
     assert len(movies) == 1 and movies[0]["name"] == "En Film (2020)"
 
-    # Drilling in: episodes sorted by season/episode under season headers,
-    # tagged so they never scrobble as movies.
-    w._local_open_series("Show Name")
-    assert w.back_btn.visible is True
+    # Opening it: the series' own page, over the library as it is
+    # (ui/mw_series_page.py, tested in test_series_page.py).
+    opened = []
+    w._open_local_series_page = lambda title, row=None: opened.append((title, row))
+    w._local_open_series("Show Name", series[0])
+    assert opened == [("Show Name", series[0])]
+    assert w.back_btn.visible is not True and w._local_series is None
+
+    # A place kept from before the page (the old drill-in) still shows
+    # the episodes sorted by season/episode under season headers, tagged
+    # so they never scrobble as movies.
+    w._local_push_nav("localseries::Show Name")
+    w._local_series = "Show Name"
+    w.back_btn.show()
+    w._load_local_episodes()
     names = [r.get("_header") or r["name"] for r in w.rendered]
     assert names[0] and "1" in str(names[0])          # season 1 header first
     eps = [r for r in w.rendered if not r.get("_header")]

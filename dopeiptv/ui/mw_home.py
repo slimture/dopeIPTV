@@ -982,22 +982,11 @@ class HomePage(QWidget):
             # Play first: the continue-episode path builds its URL from the
             # stored context, independent of whatever mode the list is in.
             w.play_item(it)
-            # Then land the middle column inside the series' episode list with
-            # this episode selected - the same drill + pending-jump dance as
-            # the now-playing jump. Just calling switch_mode left the user on
-            # "all series": its async category load resets the list when it
-            # lands, so the drill must ride the category-load callback.
+            # Then the series' page with this episode marked as playing;
+            # Back goes Home again (mw_series_page).
             ctx = it.get("_series_ctx") or {}
             if ctx.get("series_id") is not None:
-                w._pending_jump_key = w._item_key(it)
-                QTimer.singleShot(8000, w._clear_pending_jump)
-                if w.mode != "series":
-                    w._pending_series_drill = ctx
-                    w.switch_mode("series")
-                else:
-                    w._enter_series(ctx)
-            elif w.mode != "series":
-                w.switch_mode("series")
+                w._open_series_page(ctx, focus=w._item_key(it), home=True)
             return
         sid = it.get("stream_id")
         # A snapshot-derived row (Continue watching seeded by a play from
@@ -1028,18 +1017,9 @@ class HomePage(QWidget):
             w._item_key(it), "movie", item=it)
 
     def _open_series(self, it: dict) -> None:
-        # Land under Series and drill straight into this show's episode list.
-        w = self.window
-        w._leave_home()
-        if w.mode != "series":
-            # Switching modes reloads the Series categories asynchronously; when
-            # that lands it would reset the middle list to "all series" and undo
-            # an immediate _enter_series (the "first click just shows all shows"
-            # bug). Hand the drill to the category-load callback instead.
-            w._pending_series_drill = it
-            w.switch_mode("series")
-        else:
-            w._enter_series(it)
+        """The show's own page in the middle pane; Back comes Home again
+        (mw_series_page). The list beside it is left as it was."""
+        self.window._open_series_page(it, home=True)
 
     def _play_history(self, it: dict) -> None:
         """Replay a history row: land under the right category, then play from
@@ -1059,20 +1039,7 @@ class HomePage(QWidget):
             # An old entry recorded before the series snapshot existed: no
             # context to resume/drill with, so it can only replay as a movie.
             kind = "movie"
-        if kind == "episode":
-            # Same landing as a continue-watching card: play as an EPISODE
-            # (so the resume prompt finds its saved position) and drill the
-            # middle column into the series' episode list with this episode
-            # selected - the drill rides the async category load, a plain
-            # switch_mode landed on "all series".
-            w._pending_jump_key = it.get("_key")
-            QTimer.singleShot(8000, w._clear_pending_jump)
-            if w.mode != "series":
-                w._pending_series_drill = ctx
-                w.switch_mode("series")
-            else:
-                w._enter_series(ctx)
-        else:
+        if kind != "episode":
             target = {"live": "live", "movie": "vod"}.get(kind)
             if target and w.mode != target:
                 w.switch_mode(target)
@@ -1083,6 +1050,11 @@ class HomePage(QWidget):
             pass
         w._start_playback(url, it.get("name") or "dopeIPTV",
                           it.get("stream_icon"), it.get("_key"), kind, item=it)
+        if kind == "episode":
+            # Same landing as a continue-watching card: played as an EPISODE
+            # (so the resume prompt finds its saved position), then its
+            # series' page with the episode marked; Back goes Home again.
+            w._open_series_page(ctx, focus=it.get("_key"), home=True)
 
     def keyPressEvent(self, e) -> None:
         if e.key() == Qt.Key.Key_Escape:
@@ -1111,6 +1083,7 @@ class _HomeMixin:
         # behind (and reappear on) the Home page.
         self._hide_busy()
         self._close_guide_page()      # a place of its own: the Guide page goes
+        self._close_series_page()     # ...and a series' page
         page = self._ensure_home_page()
         page.refresh()
         self._center_stack.setCurrentWidget(page)

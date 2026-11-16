@@ -14,7 +14,7 @@ from .widgets import _ClickableWidget
 from ..core.log import log, redact_url
 from ..core.privacy import for_log
 from ..core.workers import run_async, tmdb_url_from_provider
-from PyQt6.QtCore import QSize, QTimer, Qt
+from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QIcon, QPainter, QPainterPath, QPixmap
 from PyQt6.QtWidgets import QApplication, QDialog,QDialogButtonBox, QFrame, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QMenu, QVBoxLayout, QWidget
 from datetime import datetime
@@ -727,16 +727,8 @@ class _DetailMixin:
             self._reveal_item_in_list(it, "vod")
             return
         if kind == "series":
-            # A show: drill into its episode list rather than "play" it. The
-            # drill has to ride the async category load (see mw_home), or the
-            # load lands afterwards and bounces back to "all series".
-            self._pending_jump_key = self._item_key(it)
-            QTimer.singleShot(8000, self._clear_pending_jump)
-            if self.mode != "series":
-                self._pending_series_drill = it
-                self.switch_mode("series")
-            else:
-                self._enter_series(it)
+            # A show: its own page rather than "play" it (mw_series_page).
+            self._open_series_page(it)
             return
         # A movie: select it where it lives, then play it. _reveal_item_in_list
         # is the same path Home uses - it rides the category load instead of

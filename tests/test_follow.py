@@ -197,15 +197,16 @@ texts = " | ".join(l.text() for l in w._home_page.findChildren(QLabel))
 assert tr("home_new_episodes") in texts and "Fav Series" in texts, texts
 assert "S1 E3" in texts, texts
 
-# Opening the series flags the new episode, selects it, and it is seen.
+# Opening the series flags the new episode, says which (its page opens on
+# it - ui/mw_series_page.py), and it is seen. The list's pending jump is
+# not armed with an episode's id: that could select a series sharing it.
 w._leave_home()
 eps = [dict(e) for e in answers["12"]["episodes"]["1"]]
 w._pending_jump_key = None
-w._follow_entered(12, answers["12"], eps)
+assert w._follow_entered(12, answers["12"], eps) == "103"
 assert [e.get("_new", False) for e in eps] == [False, False, True]
-assert w._pending_jump_key == "103"
+assert w._pending_jump_key is None
 assert w.followed.new_ids(12) == [] and w.followed.with_new() == []
-w._pending_jump_key = None
 
 # A check with nothing new says nothing.
 toasts.clear()

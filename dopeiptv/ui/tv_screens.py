@@ -3,6 +3,12 @@ the guide - the app's own (ui/epg_grid.py) in large, run by the arrows -
 films and series in posters with a series' episodes, and the search with
 its keyboard on screen. What they show is the window's; OK hands what was
 picked to the page, which plays it through the window's own path.
+
+A series' episodes are laid out as on its page in the window
+(ui/series_page.py, core/series_view.py): a row of seasons over the
+season's episodes, each with its length, how far it got or that it was
+watched, opened on the season of the episode to watch next - Left and
+Right in the list go to the season before or after, Up to the row.
 """
 
 from __future__ import annotations
@@ -15,6 +21,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from ..core import series_view as sv
 from ..core.log import log
 from ..core.profiles import adult_category, adult_item
 from ..core.workers import run_async
@@ -233,8 +240,35 @@ class MediaScreen(TvScreen):
         self.stack = QStackedWidget()
         self.grid = TvGrid(self.w.poster_art, self._art)
         self.episodes = TvList(loader=None, logos=False, sub_fn=self._ep_sub, row_h=84)
+        # A series: its seasons in a row over the season's episodes.
+        self.ep_box = QWidget()
+        box = QVBoxLayout(self.ep_box)
+        box.setContentsMargins(0, 0, 0, 0)
+        box.setSpacing(px(12))
+        self.season_area = QScrollArea()
+        self.season_area.setWidgetResizable(True)
+        self.season_area.setFrameShape(QFrame.Shape.NoFrame)
+        self.season_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.season_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.season_area.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.season_area.setStyleSheet("background: transparent;")
+        row = QWidget()
+        self.season_row = QHBoxLayout(row)
+        self.season_row.setContentsMargins(0, 0, 0, 0)
+        self.season_row.setSpacing(px(6))
+        self.season_row.addStretch(1)
+        self.season_area.setWidget(row)
+        self.season_area.setFixedHeight(px(64 + 2 * TvTile.RING))
+        box.addWidget(self.season_area)
+        box.addWidget(self.episodes, 1)
+        self.season_tiles: list[TvTile] = []
+        self.seasons: list[sv.Season] = []
+        self.season_at = -1
+        self.queue: list[dict] = []
+        self.next_key = ""
+        self.ep_states: dict[str, tuple[bool, sv.Progress]] = {}
         self.stack.addWidget(self.grid)
-        self.stack.addWidget(self.episodes)
+        self.stack.addWidget(self.ep_box)
         right.addWidget(self.stack, 1)
         self.note = self._note(tr("status_loading_channels"))
         right.addWidget(self.note)
@@ -255,13 +289,31 @@ class MediaScreen(TvScreen):
         except Exception:
             return raw
 
-    @staticmethod
-    def _ep_sub(it: dict):
-        info = it.get("info") or {}
-        return str(info.get("duration") or info.get("releasedate") or ""), None
+    def _ep_sub(self, it: dict):
+        """Under an episode: up next, its length, how far it got (the bar)
+        or that it was watched."""
+        key = sv.episode_key(it)
+        watched, prog = self.ep_states.get(key, (False, sv.Progress()))
+        parts = []
+        if key and key == self.next_key:
+            parts.append(tr("sp_up_next"))
+        mins = sv.minutes_of(it)
+        if mins:
+            parts.append(tr("opt_minutes", n=mins))
+        if watched:
+            parts.append(tr("nav_watched"))
+        elif prog.started and prog.minutes_left:
+            parts.append(tr("home_min_left", n=prog.minutes_left))
+        if not parts:
+            info = it.get("info") or {}
+            parts.append(str(info.get("duration") or info.get("releasedate") or ""))
+        frac = prog.fraction if prog.started and not watched else None
+        return " · ".join(p for p in parts if p), frac
 
     def enter(self) -> None:
         if self._loaded:
+            if self.series is not None and self.seasons:
+                self._ep_refresh()
             return
         self._loaded = True
         fn = (self.w.client.vod_categories if self.kind == "vod"
@@ -278,6 +330,7 @@ class MediaScreen(TvScreen):
         self.cats.set_items([], "cat")
         self.grid.set_items([], self.kind)
         self.episodes.set_items([], "episode")
+        self._set_seasons([])
         self.stack.setCurrentWidget(self.grid)
         self.head.setText("")
         if self.page.current == self.key:
@@ -367,20 +420,108 @@ class MediaScreen(TvScreen):
         if gen != self._gen or sip.isdeleted(self):
             return
         rows = self.w._episode_rows(info or {}, series)
-        self.episodes.set_items(rows, "episode")
-        self.stack.setCurrentWidget(self.episodes)
+        seasons = sv.seasons(rows)
+        self.queue = sv.flow(seasons)
+        self._set_seasons(seasons)
+        nxt = self._ep_refresh(draw=False)
+        at = sv.opening_season(seasons, nxt, None)
+        self.season_at = -1
+        self._show_tv_season(at, nxt.episode)
+        self.stack.setCurrentWidget(self.ep_box)
         self.note.setVisible(not rows)
         if not rows:
             self.note.setText(tr("tv_nothing_here"))
         if rows and self.page.current == self.key:
             self.page.set_focus(self.episodes)
 
+    def _set_seasons(self, seasons: list) -> None:
+        for tile in self.season_tiles:
+            self.season_row.removeWidget(tile)
+            tile.hide()
+            tile.deleteLater()
+        self.season_tiles = []
+        self.seasons = list(seasons)
+        self.season_at = -1
+        for i, season in enumerate(self.seasons):
+            if season.specials:
+                text = tr("sp_specials")
+            elif season.number is None:
+                text = tr("sp_episodes")
+            else:
+                text = tr("local_season", n=season.number)
+            tile = TvTile(text, w=150, h=64, kind="tab")
+            tile.payload = ("season", i)
+            tile.clicked.connect(self._season_clicked)
+            self.season_row.insertWidget(i, tile)
+            self.season_tiles.append(tile)
+        self.season_area.setVisible(len(self.seasons) > 1)
+
+    def _season_clicked(self) -> None:
+        tile = self.sender()
+        if isinstance(tile, TvTile) and isinstance(tile.payload, tuple):
+            self._show_tv_season(int(tile.payload[1]))
+            if self.episodes.count():
+                self.page.set_focus(self.episodes)
+
+    def _show_tv_season(self, i: int, focus: dict | None = None) -> None:
+        if not 0 <= i < len(self.seasons):
+            self.episodes.set_items([], "episode")
+            return
+        season = self.seasons[i]
+        row = 0
+        if focus is not None:
+            key = sv.episode_key(focus)
+            row = next((n for n, e in enumerate(season.episodes)
+                        if sv.episode_key(e) == key), 0)
+        self.season_at = i
+        self.episodes.set_items(season.episodes, "episode", row)
+        for n, tile in enumerate(self.season_tiles):
+            tile.current = n == i
+            tile.update()
+
+    def _ep_refresh(self, draw: bool = True) -> sv.NextUp:
+        """Every episode's marks and the one next, from the window (back
+        from watching one, too)."""
+        series = self.series or {}
+        prog = getattr(self.w, "_sp_episode_progress", None)
+        states: dict[str, tuple[bool, sv.Progress]] = {}
+        for s in self.seasons:
+            for ep in s.episodes:
+                states[sv.episode_key(ep)] = (prog(ep, series) if prog is not None
+                                              else (False, sv.Progress()))
+        self.ep_states = states
+        nxt = sv.next_up(self.queue,
+                         lambda e: states.get(sv.episode_key(e), (False,))[0],
+                         lambda e: states.get(sv.episode_key(e), (False, sv.Progress()))[1])
+        self.next_key = sv.episode_key(nxt.episode) if nxt.episode is not None else ""
+        if draw:
+            self.episodes.viewport().update()
+        return nxt
+
     def focusables(self) -> list[QWidget]:
         out: list[QWidget] = [self.cats]
         shown = self.stack.currentWidget()
-        if isinstance(shown, (TvGrid, TvList)) and shown.count():
+        if shown is self.ep_box:
+            if len(self.season_tiles) > 1:
+                out.extend(self.season_tiles)
+            if self.episodes.count():
+                out.append(self.episodes)
+        elif isinstance(shown, (TvGrid, TvList)) and shown.count():
             out.append(shown)
         return out
+
+    def move(self, cur: QWidget, direction: str) -> bool:
+        if (cur is self.episodes and direction in ("left", "right")
+                and len(self.seasons) > 1):
+            # Left/Right in the episodes: the season before or after.
+            step = -1 if direction == "left" else 1
+            if self.isRightToLeft():
+                step = -step
+            i = max(0, min(len(self.seasons) - 1, self.season_at + step))
+            if i != self.season_at:
+                self._show_tv_season(i)
+            return True
+        return super().move(cur, direction)
 
     def activate(self, cur: QWidget) -> None:
         if cur is self.cats:
@@ -400,10 +541,15 @@ class MediaScreen(TvScreen):
         elif cur is self.episodes:
             ep = self.episodes.current_item()
             if ep and self.series is not None:
-                self.page.run(("episode", ep, self.series, self.episodes.items()))
+                # Autoplay goes on through the seasons (Specials among
+                # themselves), as from the series' page.
+                specials = 0 <= self.season_at < len(self.seasons) \
+                    and self.seasons[self.season_at].specials
+                queue = sv.flow(self.seasons, specials=specials)
+                self.page.run(("episode", ep, self.series, queue))
 
     def back(self, cur: QWidget | None) -> bool:
-        if self.stack.currentWidget() is self.episodes:
+        if self.stack.currentWidget() is self.ep_box:
             self._gen += 1
             self.series = None
             cat = self.cats.current_item() or {}

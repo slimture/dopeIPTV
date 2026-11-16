@@ -62,9 +62,10 @@ class _NavMixin:
             self._show_home_page()
         elif key == "guide":
             self._open_epg_guide()
-        elif (self._guide_page_showing()
+        elif ((self._guide_page_showing() or self._series_page_showing())
                 and key == self._nav_key_for_mode(self.mode)):
             self._close_guide_page()
+            self._close_series_page()
             self._check_nav(key)
             self.listw.setFocus()
         elif key == "history":

@@ -91,19 +91,18 @@ assert w._home_showing()
 w.switch_mode("live"); app.processEvents()
 assert not w._home_showing()
 
-# A continue-watching EPISODE card must play the episode AND drill the middle
-# column into its series' episode list: the drill rides the async category
-# load (a plain switch_mode landed on "all series" when that load reset the
-# list), and the pending-jump key selects the episode row once the list fills.
+# A continue-watching EPISODE card must play the episode AND open its
+# series' page with that episode asked for (ui/mw_series_page.py) - Back
+# from there comes Home again. The list beside it is left as it was.
 played = []
 w.play_item = lambda it, *a, **k: played.append(it.get("id"))
 ctx = {"series_id": 12, "name": "Fav Series"}
 page._play_media({"_kind": "episode", "id": 42, "name": "S1 * E3 - Ep",
                   "container_extension": "mp4", "_series_ctx": ctx})
 assert played == [42], played                 # played, before navigation
-assert w.mode == "series"
-assert w._pending_series_drill == ctx          # drill armed for the cat load
-assert w._pending_jump_key == 42, w._pending_jump_key
+assert not w._home_showing() and w._series_page_showing()
+assert str(w._sp_ctx["series_id"]) == "12" and w._sp_focus == "42", w._sp_focus
+assert w._sp_return_home
 app.processEvents()
 
 # A Recently-viewed EPISODE row (carrying the stored series snapshot) plays
@@ -114,15 +113,13 @@ w.switch_mode("live"); app.processEvents()
 hist_plays = []
 w._start_playback = (lambda url, title, icon, key, kind, *a, **kw:
                      hist_plays.append((url, kind)))
-w._pending_series_drill = None
+assert not w._series_page_showing()            # a mode switch takes it away
 page._play_history({"_kind": "episode", "_key": 77,
                     "_url": "http://x/series/77.mp4",
                     "name": "Show · S1 * E1 - Pilot",
                     "_series_ctx": {"series_id": 12, "name": "Fav Series"}})
 assert hist_plays == [("http://x/series/77.mp4", "episode")], hist_plays
-assert w.mode == "series"
-assert w._pending_series_drill == {"series_id": 12, "name": "Fav Series"}
-assert w._pending_jump_key == 77, w._pending_jump_key
+assert w._series_page_showing() and w._sp_focus == "77", w._sp_focus
 app.processEvents()
 # ...while an OLD entry without the snapshot still replays (as a movie).
 w.switch_mode("live"); app.processEvents()

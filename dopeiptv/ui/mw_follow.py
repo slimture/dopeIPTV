@@ -90,12 +90,13 @@ class _FollowMixin:
             self._home_page.refresh()
 
     def _follow_entered(self, series_id: Any, info: Any,
-                        episodes: list) -> None:
-        """The series' episode list is open: flag what is new, select the
-        first of it, and count it as seen from now on."""
+                        episodes: list) -> Any:
+        """The series' page is open: flag what is new, count it as seen
+        from now on, and say the first new episode's id (the page opens
+        on it) - None when there is none."""
         store = self.followed
         if not store.is_followed(series_id):
-            return
+            return None
         new = {str(i) for i in store.new_ids(series_id)}
         first = None
         for ep in episodes:
@@ -103,11 +104,9 @@ class _FollowMixin:
                 ep["_new"] = True
                 if first is None:
                     first = ep.get("id")
-        if first is not None and self._pending_jump_key is None:
-            self._pending_jump_key = first
-            QTimer.singleShot(8000, self._clear_pending_jump)
         store.seen(series_id, info)
         self._refresh_nav_status()
+        return first
 
     # -- the background check -------------------------------------------------
 

@@ -106,6 +106,7 @@ from .mw_onboarding import _OnboardingMixin
 from .mw_popout import _PopoutMixin
 from .mw_reminders import _RemindersMixin
 from .mw_series import _SeriesMixin
+from .mw_series_page import _SeriesPageMixin
 from .mw_stats import _StatsMixin
 from .mw_search import _SearchMixin
 from .mw_shortcuts import _ShortcutsMixin
@@ -145,7 +146,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _NavMixin, _SourceLabelMixin, _ShortcutsMixin, _PaletteMixin, _OnboardingMixin, _SortMixin,
                  _LocalFilesMixin, _RadioMixin, _WebStreamsMixin,
                  _PopoutMixin, _MultiviewMixin, _HomeMixin, _GuideMixin,
-                 _MprisMixin,
+                 _SeriesPageMixin, _MprisMixin,
                  _FollowMixin, _SubtitlesMixin, _CastMixin, _AirPlayMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
                  _HealthMixin, _TsAnalysisMixin, _StreamInfoMixin, _ChannelPrefsMixin, _RemoteMixin, _PhoneMixin, _ServerMixin, _CalendarMixin,
@@ -843,6 +844,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cat_list.currentItemChanged.connect(self._category_changed)
         # A category clicked while the Guide shows: that category's list.
         self.cat_list.itemClicked.connect(self._guide_category_clicked)
+        self.cat_list.itemClicked.connect(self._sp_category_clicked)
         self.cat_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.cat_list.customContextMenuRequested.connect(self._cat_menu)
         sl.addWidget(self.cat_list, 1)
@@ -2141,6 +2143,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self._guide_page_visible():
             self._leave_guide_page()
             return
+        # ...and a series' page goes back to the list (or Home) it came from.
+        if self._series_page_visible():
+            self._leave_series_page()
+            return
         self._exit_player_fullscreen()
 
     def _exit_player_fullscreen(self) -> None:
@@ -2383,6 +2389,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._home_chan_cache = None
             self._recent_cache = {}
             self._guide_source_changed()    # the old source's guide goes
+            self._sp_source_changed()       # and a series' page of it
             if self._home_showing():
                 self._home_page.refresh()
             # Switching rebuilds the list but loads the guide from cache when
@@ -2414,6 +2421,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # tunes a channel: tune_from_guide's jump in the list runs under it.
         if not getattr(self, "_guide_hold", False):
             self._close_guide_page()
+        self._close_series_page()       # a series' page gives way to the list
         # Watched is History's second filter: History is the entry lit.
         self._check_nav("guide" if self._guide_page_showing()
                         else self._nav_key_for_mode(mode))
@@ -2781,16 +2789,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                             Qt.ItemDataRole.UserRole) == keep:
                         row = i
                         break
-            # A series drill-in was requested while switching into Series mode
-            # (e.g. clicking a show on Home). Honour it now that the categories
-            # have loaded, instead of selecting a category - otherwise this
-            # late category load would overwrite the episode list and bounce
-            # the user back to "all series" (they'd have to click twice).
-            pend = getattr(self, "_pending_series_drill", None)
-            if pend is not None and request_mode == "series":
-                self._pending_series_drill = None
-                self._enter_series(pend)
-                return
             self.cat_list.setCurrentRow(row)
 
         def fail(msg):
@@ -2835,6 +2833,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self.series_ctx:
             log.info("category changed while inside a series - leaving the "
                      "episode list (cat=%r)", cat)
+        if self._series_page_showing() and self.cat_list.hasFocus():
+            # Arrowed through the sidebar's categories: their list, in the
+            # series page's place (a click does the same, _sp_category_clicked).
+            self._sp_category_clicked()
         self.series_ctx = None
         self.back_btn.hide()
         self._update_sync_btn()
@@ -3405,11 +3407,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self._playing_key is None or playing is None:
             self._show_toast(tr("toast_nothing_playing"))
             return
+        # A playing episode is on its series' page, marked there. Before the
+        # list is looked through: an episode's id can be a series' id too.
+        if self._playing_group == "episode" and lp.get("series_ctx"):
+            self._open_series_page(lp["series_ctx"], focus=self._playing_key)
+            return
         if self._try_select_playing():
             return
-        # A playing episode lives inside its series' episode list - re-enter
-        # the series (snapshot taken at playback start), and the pending-jump
-        # hook in _apply_filter selects the episode once the list loads.
         # A local file lives in its own folder - go to the Local files
         # section and browse to the folder the file is in, then select it.
         if self._playing_group == "local":
@@ -3421,21 +3425,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     self.switch_mode("local")
                 self._local_reveal(path)
                 return
-        if self._playing_group == "episode" and lp.get("series_ctx"):
-            self._pending_jump_key = self._playing_key
-            QTimer.singleShot(8000, self._clear_pending_jump)
-            if self.mode != "series":
-                # Switching modes reloads the Series categories asynchronously;
-                # an immediate _enter_series would be undone when that load
-                # lands and resets the list to "all series" (the same race
-                # Home's series cards hit). Hand the drill to the category-load
-                # callback instead, which enters the series once the categories
-                # are in - the pending-jump key then selects the episode.
-                self._pending_series_drill = lp["series_ctx"]
-                self.switch_mode("series")
-            else:
-                self._enter_series(lp["series_ctx"])
-            return
         # Not in the current (possibly category-filtered) list: remember the
         # target and navigate to a view that contains it, then select once it
         # has loaded (see _load_categories / _apply_filter). Land on the item's
@@ -3706,38 +3695,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         return episodes
 
     def _enter_series(self, series) -> None:
-        sid = series.get("series_id")
-        if sid is None:
+        """A series opened (from any list, Home, a search): its own page
+        in the middle pane, over the list it came from (mw_series_page)."""
+        if series.get("series_id") is None:
             return
-        self._show_busy(tr("status_loading_episodes"))
-
-        def done(info):
-            self._hide_busy()
-            episodes = self._episode_rows(info, series)
-            # A series entered from a slim snapshot (resume ctx) doesn't know
-            # its category; series_info usually does. Backfill it so backing
-            # out of the episodes can land in the series' own category.
-            sctx = series
-            if sctx.get("category_id") is None:
-                cid = (info.get("info") or {}).get("category_id")
-                if cid is not None:
-                    sctx = dict(sctx)
-                    sctx["category_id"] = cid
-            self.series_ctx = sctx
-            self._follow_entered(sid, info, episodes)
-            self.all_items = episodes
-            self.back_btn.setText("<-  " + tr("btn_back_to_series"))
-            self.back_btn.show()
-            self.search.clear()
-            self._apply_filter()
-
-        def failed(msg):
-            self._hide_busy()
-            log.warning("series_info(%s) failed: %s", sid, msg)
-            self._set_status(tr("err_series_open"), error=True)
-
-        run_async(self.pool, lambda: self.client.series_info(sid),
-                  done, failed)
+        self._open_series_page(series)
 
     def _leave_series(self) -> None:
         # The back button is shared: in the Local files section it walks up
@@ -3977,7 +3939,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self._local_descend(path, it.get("_key"))
                 return
             if it.get("_kind") == "localseries":
-                self._local_open_series(it.get("_series_title") or "")
+                self._local_open_series(it.get("_series_title") or "", it)
                 return
             if it.get("_kind") in ("localcollection", "localalbum"):
                 self._local_descend(path, it.get("_key"))
@@ -4929,6 +4891,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.listw.viewport().update()
         self.setWindowTitle(self._base_title)
         self._source_status_stopped()     # the list's line again, its source with it
+        self._sp_refresh_soon()        # where it stopped, on a series' page
 
     def _autoplay_next_episode(self) -> bool:
         return self.settings.value("autoplay_next_episode", "true") == "true"
@@ -5096,6 +5059,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Watch together: what the room plays starts where the room is,
         # without the resume question.
         together_at = self._together_take_start()
+        if together_at is None:
+            # A series page's Continue: where it got to, without the question.
+            together_at = self._sp_take_start(key)
         if together_at is not None:
             resume_at = together_at
         else:
@@ -5170,6 +5136,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                                "recording": "rec",
                                "local": "local", "radio": "radio",
                                "web": "web"}.get(kind)
+        # A series' page marks what plays and goes to it (autoplay's next).
+        self._sp_playback_started(key, kind)
         self.listw.viewport().update()
         self.setWindowTitle(title or self._base_title)
         self._set_status(self._status_playing(title))

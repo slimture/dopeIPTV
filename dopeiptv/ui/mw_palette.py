@@ -8,9 +8,11 @@ window. It finds, as it is typed in:
 - SETTINGS: every row the Settings search reaches (SettingsShell.index),
   Nerd's in its colour and only while Nerd is on - chosen, Settings opens
   on its page with the row lit;
-- CHANNELS AND PROGRAMMES: the active source's channels by name or number,
-  and the guide's programmes from now on by title - a channel chosen plays,
-  a programme offers play, record and remind, as the guide does.
+- CHANNELS, SERIES AND PROGRAMMES: the active source's channels by name or
+  number, its series by title and the guide's programmes from now on by
+  title - a channel chosen plays, a series opens its page
+  (ui/mw_series_page.py), a programme offers play, record and remind, as
+  the guide does.
 
 The channels and the guide are folded once per opening on a worker
 (core/palette_match.py). A query over a few thousand of them is a pass of
@@ -47,7 +49,7 @@ from .qt_i18n import format_when
 #: The guide is looked through from now for this long.
 GUIDE_HOURS = 12
 #: A few of each, the best first.
-LIMITS = {"actions": 4, "settings": 4, "channels": 4, "programmes": 3}
+LIMITS = {"actions": 4, "settings": 4, "channels": 4, "series": 3, "programmes": 3}
 #: Shown before anything is typed.
 FIRST_ACTIONS = 8
 #: Channel names and programme titles matched on the window's thread at
@@ -66,7 +68,9 @@ class PaletteCatalogue:
     thread."""
 
     def __init__(self, key: tuple, chans: list[dict], cats: dict[str, str],
-                 numbers: list[str], airings: list[tuple[dict, dict]]) -> None:
+                 numbers: list[str], airings: list[tuple[dict, dict]],
+                 series: list[dict] | None = None,
+                 series_cats: dict[str, str] | None = None) -> None:
         self.key = key
         self.chans = chans
         self.cats = cats
@@ -78,6 +82,14 @@ class PaletteCatalogue:
         self.names = Index(str(c.get("name") or "") for c in chans)
         self.airings = airings
         self.titles = Index(str(p.get("title") or "") for _c, p in airings)
+        self.series = list(series or [])
+        self.series_cats = dict(series_cats or {})
+        self.series_names = Index(str(s.get("name") or s.get("title") or "")
+                                  for s in self.series)
+
+    def size(self) -> int:
+        """How much a query goes through (on a worker past MATCH_HERE)."""
+        return len(self.names) + len(self.titles) + len(self.series_names)
 
 
 def _number(value) -> str:
@@ -103,6 +115,16 @@ def _channel_hits(cat: PaletteCatalogue, query: str, terms: list[str],
     if latest is not None and latest[0] != gen:
         return None
     return hits[:LIMITS["channels"]], cat.titles.search(query, LIMITS["programmes"] * 3, terms)
+
+
+def _all_hits(cat: PaletteCatalogue, query: str, terms: list[str],
+              latest: list[int] | None = None, gen: int = 0) -> tuple | None:
+    """_channel_hits and the series *query* finds: (channels, programmes,
+    series), or None when a newer query came meanwhile."""
+    found = _channel_hits(cat, query, terms, latest, gen)
+    if found is None or (latest is not None and latest[0] != gen):
+        return None
+    return found[0], found[1], cat.series_names.search(query, LIMITS["series"], terms)
 
 
 class _PaletteMixin:
@@ -239,6 +261,7 @@ class _PaletteMixin:
         if have is not None and have.key != key:
             self._pal_catalogue = None
         keep = self._catalog_filter("live")
+        keep_series = self._catalog_filter("series")
         numbers = channel_numbers.active(self._chno_pid())
         now = time.time()
 
@@ -253,7 +276,17 @@ class _PaletteMixin:
             nums = [_number(channel_numbers.shown(c, numbers)) for c in chans]
             airings = (xmltv.airings(chans, now, now + GUIDE_HOURS * 3600)
                        if xmltv is not None and hasattr(xmltv, "airings") else [])
-            return PaletteCatalogue(key, chans, cats, nums, airings)
+            # The series too: chosen, one opens its page.
+            series: list[dict] = []
+            series_cats: dict[str, str] = {}
+            try:
+                series = [s for s in (client.series_list(None) or [])
+                          if s.get("series_id") is not None and keep_series(s)]
+                for c in client.series_categories() or []:
+                    series_cats[str(c.get("category_id"))] = str(c.get("category_name") or "")
+            except Exception:
+                series = series or []
+            return PaletteCatalogue(key, chans, cats, nums, airings, series, series_cats)
 
         run_async(self.pool, work, self._palette_catalogue_ready,
                   self._palette_catalogue_failed)
@@ -276,7 +309,7 @@ class _PaletteMixin:
         out = [acts[i] for i in self._pal_action_index.search(query, LIMITS["actions"], terms)]
         out += self._palette_find_settings(query, terms)
         cat = getattr(self, "_pal_catalogue", None)
-        if cat is not None and len(cat.names) + len(cat.titles) > MATCH_HERE:
+        if cat is not None and cat.size() > MATCH_HERE:
             self._palette_match_later(cat, query, terms, out)
             return out
         out += self._palette_find_channels(query, terms)
@@ -300,7 +333,7 @@ class _PaletteMixin:
             pool = self._pal_pool = QThreadPool(self) if isinstance(self, QObject) else QThreadPool()
             pool.setMaxThreadCount(1)              # one at a time: the newest wins anyway
         pal.expect(query)
-        run_async(pool, partial(_channel_hits, cat, query, terms, latest, latest[0]),
+        run_async(pool, partial(_all_hits, cat, query, terms, latest, latest[0]),
                   partial(self._palette_matched, latest[0], cat, query, now),
                   partial(self._palette_match_failed, latest[0], cat, query, now))
 
@@ -315,7 +348,7 @@ class _PaletteMixin:
     def _palette_match_failed(self, gen: int, cat: PaletteCatalogue, query: str,
                               now: list[Entry], err) -> None:
         log.debug("palette: the channels were not looked through: %s", err)
-        self._palette_matched(gen, cat, query, now, ([], []))
+        self._palette_matched(gen, cat, query, now, ([], [], []))
 
     def _palette_find_settings(self, query: str, terms: list[str]) -> list[Entry]:
         idx = self._palette_settings_lookup()
@@ -339,12 +372,13 @@ class _PaletteMixin:
         cat = getattr(self, "_pal_catalogue", None)
         if cat is None:
             return []
-        found = _channel_hits(cat, query, terms)
+        found = _all_hits(cat, query, terms)
         return self._palette_channel_entries(cat, *found) if found else []
 
     def _palette_channel_entries(self, cat: PaletteCatalogue, hits: list[int],
-                                 titles: list[int]) -> list[Entry]:
-        """The rows of what _channel_hits found (the window's thread)."""
+                                 titles: list[int],
+                                 series: list[int] | None = None) -> list[Entry]:
+        """The rows of what _all_hits found (the window's thread)."""
         source = self._palette_source_name()
         out: list[Entry] = []
         for i in hits:
@@ -353,6 +387,15 @@ class _PaletteMixin:
             where = " · ".join(t for t in (cat.numbers[i], source, category) if t)
             out.append(Entry("channels", tr("pal_kind_channel"), str(ch.get("name") or ""),
                              where=where, more=where, payload=("channel", ch)))
+        for i in series or []:
+            row = cat.series[i]
+            category = cat.series_cats.get(str(row.get("category_id")), "")
+            where = " · ".join(t for t in (source, category) if t)
+            plot = " ".join(str(row.get("plot") or "").split())[:240]
+            out.append(Entry("channels", tr("misc_series"),
+                             str(row.get("name") or row.get("title") or ""),
+                             where=where, more=" · ".join(t for t in (where, plot) if t),
+                             payload=("series", row)))
         now = time.time()
         shown = 0
         for i in titles:
@@ -431,6 +474,8 @@ class _PaletteMixin:
                                at_row=(what["card"], what["row"], what["name"]))
         elif kind == "channel":
             self.tune_from_guide(what)
+        elif kind == "series":
+            self._open_series_page(what)
         elif kind == "record":
             ch, p = what
             self._record_programme(ch, {"title": p.get("title")},

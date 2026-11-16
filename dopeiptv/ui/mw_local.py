@@ -1096,8 +1096,12 @@ class _LocalFilesMixin:
         except OSError as e:
             log.warning("library cache save failed: %s", e)
 
-    def _local_open_series(self, title: str) -> None:
+    def _local_open_series(self, title: str, row: dict | None = None) -> None:
         if not title:
+            return
+        if (getattr(self, "_local_series_index", {}) or {}).get(title):
+            # Its own page, over the library as it is (mw_series_page).
+            self._open_local_series_page(title, row)
             return
         self._local_push_nav(f"localseries::{title}")
         self._local_clear_search()
@@ -1574,7 +1578,7 @@ class _LocalFilesMixin:
         elif it.get("_kind") == "localseries":
             m.addAction(tr("ctx_open"),
                         lambda: self._local_open_series(
-                            it.get("_series_title") or ""))
+                            it.get("_series_title") or "", it))
         elif it.get("_kind") in ("localcollection", "localalbum"):
             m.addAction(tr("ctx_open"),
                         lambda: self._local_descend(it.get("_path")))

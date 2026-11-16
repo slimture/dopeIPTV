@@ -67,6 +67,8 @@ dopeiptv/
                        the plausibility check, the .ts kept unless it passed
     series_rules.py    Series recordings: rules, airings found, the plan, padding;
                        a rule that reminds instead, its reminders' plan
+    series_view.py     A series as its page shows it: seasons (Specials last),
+                       the next episode, the season it opens on and the one kept
     night_mode.py      Night mode for the sound: one labelled audio filter
     viewing_stats.py   Your statistics: seconds watched per title and hour, the
                        sums (this computer only, never synced)
@@ -202,6 +204,10 @@ dopeiptv/
     mw_subtitles.py    Subtitles from OpenSubtitles; remembered per title
     mw_home.py         The Home page (shelves: resume, favourites, new)
     mw_guide.py        The Guide page in the middle pane, and its pop-out
+    mw_series_page.py  A series' page in the middle pane: opened from anywhere,
+                       played through the window's path, Back to the list as it was
+    series_page.py     The series page itself: header, season chips, the list
+    series_cards.py    Its episode cards: model, painted card, keys, lazy pictures
     home_widgets.py    Home's featured strip, shelves and cards
     mw_local.py        Local files: folders, library view, music queue
     mw_radio.py        Radio: radio-browser.info's stations, played as music

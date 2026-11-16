@@ -368,6 +368,7 @@ class _ProfilesMixin:
         self._recent_cache = {}
         self._search_index_cache = {}     # the sidebar search's, made for the profile before
         self._guide_source_changed()      # its reminders' marks: drawn anew
+        self._sp_source_changed()         # a series' page: the profile's own marks
         self._update_playlist_btn()
         self._refresh_nav_status()
         try:

@@ -65,7 +65,9 @@ class Client(DemoClient):
 
     def series_info(self, sid):
         return {"episodes": {"1": [{"id": 9000 + j, "episode_num": j + 1, "title": f"Ep {j + 1}",
-                                    "container_extension": "mp4"} for j in range(3)]}}
+                                    "container_extension": "mp4"} for j in range(3)],
+                             "2": [{"id": 9100 + j, "episode_num": j + 1, "title": f"Ep {j + 1}",
+                                    "container_extension": "mp4"} for j in range(2)]}}
 
     def episode_url(self, eid, ext=None):
         return f"http://tv.invalid/ep/{eid}.{ext or 'mp4'}"
@@ -244,7 +246,15 @@ until(lambda: page.screen("series").grid.count() > 0)
 ser = page.screen("series")
 page.set_focus(ser.grid)
 key(Qt.Key.Key_Return)                          # a series opens its episodes
-assert until(lambda: ser.stack.currentWidget() is ser.episodes and ser.episodes.count() == 3)
+assert until(lambda: ser.stack.currentWidget() is ser.ep_box and ser.episodes.count() == 3)
+# Its seasons in a row over them (as on its page in the window): Right and
+# Left in the episodes go to the season after and before.
+assert len(ser.season_tiles) == 2 and ser.season_area.isVisibleTo(ser)
+assert ser.season_tiles[0].current and ser.season_at == 0
+key(Qt.Key.Key_Right)
+assert ser.season_at == 1 and ser.episodes.count() == 2 and ser.season_tiles[1].current
+key(Qt.Key.Key_Left)
+assert ser.season_at == 0 and ser.episodes.count() == 3
 key(Qt.Key.Key_Escape)                          # back to the posters
 assert ser.stack.currentWidget() is ser.grid and page.current == "series"
 

@@ -87,6 +87,8 @@ OWN_KEYS = frozenset({
     # The languages to hear and read, and the tracks picked per title.
     "audio_lang", "sub_mode", "sub_lang", "sub_lang2", "sub_last_lang",
     "track_prefs",
+    # The season last picked on each series' page (ui/mw_series_page.py).
+    "series_seasons",
 })
 #: Families: the name itself or the name + "_<source id>" (and the
 #: favourites' "_locked" / "_colors" beside it).

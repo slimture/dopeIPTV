@@ -53,6 +53,10 @@ class TmdbClient:
     # old w342 without visibly upscaling/blurring in the detail panel.
     IMG_BASE = "https://image.tmdb.org/t/p/w500"
     PROFILE_IMG_BASE = "https://image.tmdb.org/t/p/w185"
+    # A series' page lays its backdrop across the pane, an episode's still
+    # in a card a few hundred pixels wide.
+    BACKDROP_IMG_BASE = "https://image.tmdb.org/t/p/w780"
+    STILL_IMG_BASE = "https://image.tmdb.org/t/p/w300"
     BASE = "https://api.themoviedb.org/3"
 
     def __init__(self, api_key: str) -> None:
@@ -151,10 +155,13 @@ class TmdbClient:
         genres = ", ".join(g.get("name", "") for g in d.get("genres") or []
                           if g.get("name"))
         release = (d.get("release_date") or d.get("first_air_date") or "")
+        backdrop = d.get("backdrop_path") or best.get("backdrop_path")
         return {
             "tmdb_id": tid,
             "title": d.get("title") or d.get("name") or "",
             "poster_url": f"{self.IMG_BASE}{poster_path}" if poster_path else None,
+            "backdrop_url": (f"{self.BACKDROP_IMG_BASE}{backdrop}"
+                             if backdrop else None),
             "rating": d.get("vote_average") or None,
             "imdb_id": (d.get("external_ids") or {}).get("imdb_id"),
             "cast": cast,
@@ -270,10 +277,13 @@ class TmdbClient:
         genres = ", ".join(g.get("name", "") for g in d.get("genres") or []
                           if g.get("name"))
         release = (d.get("release_date") or d.get("first_air_date") or "")
+        backdrop = d.get("backdrop_path")
         return {
             "tmdb_id": int(tmdb_id),
             "title": d.get("title") or d.get("name") or "",
             "poster_url": f"{self.IMG_BASE}{poster_path}" if poster_path else None,
+            "backdrop_url": (f"{self.BACKDROP_IMG_BASE}{backdrop}"
+                             if backdrop else None),
             "rating": d.get("vote_average") or None,
             "imdb_id": (d.get("external_ids") or {}).get("imdb_id"),
             "cast": cast,
@@ -281,6 +291,26 @@ class TmdbClient:
             "genres": genres,
             "release_date": release,
         }
+
+    def season_episodes(self, tmdb_id: int, season: int) -> dict[int, dict]:
+        """A season of a show by its TMDB id: episode number -> {"still",
+        "overview", "name", "runtime"} - what a series' page shows for an
+        episode its source gives no picture of."""
+        r = requests.get(
+            f"{self.BASE}/tv/{int(tmdb_id)}/season/{int(season)}",
+            params={"api_key": self.api_key}, timeout=10)
+        r.raise_for_status()
+        out: dict[int, dict] = {}
+        for ep in (r.json() or {}).get("episodes") or []:
+            n = ep.get("episode_number")
+            if not isinstance(n, int):
+                continue
+            still = ep.get("still_path")
+            out[n] = {"still": f"{self.STILL_IMG_BASE}{still}" if still else "",
+                      "overview": str(ep.get("overview") or ""),
+                      "name": str(ep.get("name") or ""),
+                      "runtime": ep.get("runtime") if isinstance(ep.get("runtime"), int) else 0}
+        return out
 
     def search_person(self, name: str) -> int | None:
         """Resolve a person's name to their TMDB id (top match)."""
