@@ -17,11 +17,14 @@ server stays on this computer unless the person chose otherwise.
 
 Like remote_api.py, it knows nothing of the window: *call(action, params)*
 does the work (the window hands it to its own thread). Reading is GET,
-anything that changes something is POST.
+anything that changes something is POST. The state carries an ETag that
+leaves its clock out (``state_tag``): the page asks with it, and the same
+state again is a 304 with nothing to read.
 """
 
 from __future__ import annotations
 
+import hashlib
 import hmac
 import json
 import secrets
@@ -87,6 +90,14 @@ def image_type(data: bytes) -> str | None:
     if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
         return "image/webp"
     return None
+
+
+def state_tag(state: dict[str, Any]) -> str:
+    """The state's ETag: the same for the same state whatever the clock
+    says ("time" changes with every answer and is left out)."""
+    rest = {k: v for k, v in state.items() if k != "time"}
+    raw = json.dumps(rest, sort_keys=True, ensure_ascii=False, default=str)
+    return '"' + hashlib.sha1(raw.encode("utf-8")).hexdigest()[:20] + '"'
 
 
 def gesture(dx: float, dy: float, ms: float) -> str | None:
@@ -319,7 +330,18 @@ def _make_handler(server: PhoneServer) -> type[BaseHTTPRequestHandler]:
                 if method not in ("GET", "HEAD"):
                     self._json(405, {"error": "use GET"})
                     return
-                self._json(200, server.call(action, {}))
+                result = server.call(action, {})
+                if action != "state" or not isinstance(result, dict):
+                    self._json(200, result)
+                    return
+                # The page asks with the tag of the state it shows: the same
+                # state again is a 304 and nothing to read.
+                tag = state_tag(result)
+                if self.headers.get("If-None-Match", "").strip() == tag:
+                    self._send(304, b"", "application/json; charset=utf-8", {"ETag": tag})
+                    return
+                self._send(200, json.dumps(result, ensure_ascii=False).encode("utf-8"),
+                           "application/json; charset=utf-8", {"ETag": tag})
                 return
             if action not in WRITE:
                 self._json(404, {"error": "not found"})

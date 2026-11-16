@@ -7,7 +7,15 @@ mode on and off and its keys through mw_tv's tv_command (the page turns
 into a remote while TV mode is on).
 
 Only what the lists show can be listed or played from the phone: no channel
-from a hidden or locked category, no favourite from a locked folder."""
+from a hidden or locked category, no favourite from a locked folder.
+
+The window's thread does as little as it can for a poll: what plays is read
+there, while what is on now and next is looked up on the server's thread from
+a guide already in memory (never loaded for a poll: that was a download and
+parse on the window's thread), the playing channel's number and logo are
+kept per channel, and the stamp is worked out again only when something it
+depends on changed. The same state again costs the phone nothing (its ETag,
+core/phone_remote.py), and the page asks less often while nothing changes."""
 
 from __future__ import annotations
 
@@ -87,6 +95,47 @@ _LOGO_LOCK = threading.Lock()
 _LOGO_FAILED_MAX = 4096
 
 
+def _now_next(guide: Any, item: dict, now: float) -> dict[str, Any]:
+    """What is on *item*'s channel now and next, from a guide already in
+    memory - on the server's thread; a guide not loaded yet is not loaded
+    for this (it was a download and parse on the window's thread)."""
+    out: dict[str, Any] = {}
+    try:
+        if guide is None or not guide.is_loaded():
+            return out
+        listings = guide.listings_for(item, 3)
+    except Exception:
+        return out
+    for prog in listings:
+        entry = {"title": prog.get("title") or "", "start": prog.get("start_timestamp"),
+                 "stop": prog.get("stop_timestamp")}
+        if "now" not in out and (prog.get("start_timestamp") or 0) <= now < (prog.get("stop_timestamp") or 0):
+            out["now"] = entry
+        elif (prog.get("start_timestamp") or 0) > now and "next" not in out:
+            out["next"] = entry
+    return out
+
+
+def _logo_address(icon: Any, picons: frozenset[str]) -> str:
+    """*icon* when the phone may be shown it: a web address, or a picon
+    from Nerd's folder (*picons*) - no other file on this computer; else ""."""
+    icon = str(icon or "").strip()
+    if icon.lower().startswith(("http://", "https://")):
+        return icon
+    if not icon:
+        return ""
+    return icon if icon.removeprefix("file://") in picons else ""
+
+
+def _listed(shown: list[dict], numbers: dict, picons: frozenset[str]) -> tuple[list[dict], dict[str, str]]:
+    """The phone's rows and their logos' addresses (on the server's thread)."""
+    icons = {str(r.get("stream_id")): icon for r in shown
+             if (icon := _logo_address(r.get("stream_icon"), picons))}
+    listed = [{"id": r.get("stream_id"), "name": str(r.get("name") or ""),
+               "number": channel_numbers.shown(r, numbers)} for r in shown]
+    return listed, icons
+
+
 def _picon_files() -> frozenset[str]:
     """The picons in Nerd's folder while Nerd is on: the only files on this
     computer a logo for the phone may be."""
@@ -107,7 +156,8 @@ def page_words() -> dict[str, str]:
             "ch_up": tr("phone_page_ch_up"), "ch_down": tr("phone_page_ch_down"),
             "mute": tr("tooltip_mute_unmute"), "volume": tr("tooltip_volume"),
             "loading": tr("common_loading"), "profile": tr("profile_who_short"),
-            "profile_pin": tr("phone_page_profile_pin"), **tv_words()}
+            "profile_pin": tr("phone_page_profile_pin"), "show_in_list": tr("phone_page_show_in_list"),
+            **tv_words()}
 
 
 def tv_words() -> dict[str, str]:
@@ -144,6 +194,10 @@ class _PhoneMixin:
     _phone_error: str = ""
     _phone_bridge: _Bridge | None = None
     _phone_icons: dict | None = None        # stream id -> its logo's address, as last listed
+    #: (what the stamp depends on, the stamp) and (the playing item's key,
+    #: what the page is told of it) - worked out again only on a change.
+    _phone_stamp_memo: tuple | None = None
+    _phone_item_memo: tuple | None = None
 
     # -- on and off (the window's thread) ---------------------------------------------
     def _phone_apply(self) -> None:
@@ -243,19 +297,27 @@ class _PhoneMixin:
         bridge = self._phone_bridge
         if bridge is None:
             raise TimeoutError(action)
-        if action == "channels":
-            listed = bridge.call("_channels", {"rows": self._phone_rows(bridge)})
-            icons: dict[str, str] = listed.pop("_icons")
-            for c in listed["channels"]:
-                c["logo"] = bool(icons.get(str(c["id"])))
-            self._phone_icons = icons
-            return listed
+        if action == "state":
+            # The window's thread reads what plays; now and next are looked
+            # up here, in a guide already in memory.
+            state, target = bridge.call("_state", {})
+            state["time"] = time.time()
+            if target is not None:
+                state.update(_now_next(target[0], target[1], state["time"]))
+            return state
         if action == "play":
             want = str(params.get("id") or "")
             row = next((r for r in self._phone_rows(bridge) if str(r.get("stream_id")) == want), None)
             if row is None:
                 raise ValueError("no such channel")
             return bridge.call("_play", {"row": row})
+        if action == "channels":
+            got = bridge.call("_channels", {"rows": self._phone_rows(bridge)})
+            listed, icons = _listed(got["rows"], got["numbers"], got["picons"])
+            for c in listed:
+                c["logo"] = bool(icons.get(str(c["id"])))
+            self._phone_icons = icons
+            return {"channels": listed, "favorites": got["favorites"]}
         if action == "logo":
             ident = str(params.get("id") or "")
             icon = (self._phone_icons or {}).get(ident) or bridge.call("_now_icon", {"id": ident})
@@ -294,14 +356,10 @@ class _PhoneMixin:
         """*icon* when the phone may be shown it (the window's thread): a
         web address, or a picon from Nerd's folder - no other file on this
         computer; else ""."""
-        icon = str(icon or "").strip()
-        if icon.lower().startswith(("http://", "https://")):
-            return icon
-        if not icon:
-            return ""
-        if picons is None:
-            picons = _picon_files()
-        return icon if icon.removeprefix("file://") in picons else ""
+        text = str(icon or "").strip()
+        if not text or text.lower().startswith(("http://", "https://")):
+            return text
+        return _logo_address(text, _picon_files() if picons is None else picons)
 
     # -- the work (the window's thread) -----------------------------------------------
     def _phone_do(self, action: str, params: dict) -> Any:
@@ -321,7 +379,7 @@ class _PhoneMixin:
             # profile's is played before it is given (the page says why).
             self._profile_refuse_locked()
         if action == "_channels":
-            return self._phone_channels(params.get("rows") or [])
+            return self._phone_shown(params.get("rows") or [])
         if action == "_play":
             row = params.get("row") or {}
             if not self._chno_rows([row]):
@@ -337,6 +395,8 @@ class _PhoneMixin:
             return self._phone_logo_address(item.get("stream_icon")) or None
         if action == "state":
             return self._phone_state()
+        if action == "_state":
+            return self._phone_state_parts()
         if action == "calendar":
             return self._calendar_text()
         if action == "tv":
@@ -369,19 +429,23 @@ class _PhoneMixin:
         raise ValueError(f"unknown action: {action}")
 
     def _phone_channels(self, rows: list[dict]) -> dict[str, Any]:
+        """The phone's list of *rows*, whole (a request builds it on the
+        server's thread from _phone_shown)."""
+        got = self._phone_shown(rows)
+        listed, icons = _listed(got["rows"], got["numbers"], got["picons"])
+        return {"channels": listed, "favorites": got["favorites"], "_icons": icons}
+
+    def _phone_shown(self, rows: list[dict]) -> dict[str, Any]:
+        """What the lists show of *rows*, with what the server's thread
+        needs to turn them into the phone's (_listed)."""
         if getattr(self, "_profile_locked", lambda: False)():
             # Who is watching is not said yet: no list of the profile's.
-            return {"channels": [], "favorites": [], "_icons": {}}
+            return {"rows": [], "numbers": {}, "picons": frozenset(), "favorites": []}
         shown = self._chno_rows(rows)
-        numbers = channel_numbers.active(self._chno_pid())
-        picons = _picon_files()
-        icons = {str(r.get("stream_id")): icon for r in shown
-                 if (icon := self._phone_logo_address(r.get("stream_icon"), picons))}
-        listed = [{"id": r.get("stream_id"), "name": str(r.get("name") or ""),
-                   "number": channel_numbers.shown(r, numbers)} for r in shown]
         here = {str(r.get("stream_id")) for r in shown}
         favs = [f.get("stream_id") for f in self._favorite_channels() if str(f.get("stream_id")) in here]
-        return {"channels": listed, "favorites": favs, "_icons": icons}
+        return {"rows": shown, "numbers": channel_numbers.active(self._chno_pid()),
+                "picons": _picon_files(), "favorites": favs}
 
     # -- why a play the phone asked for did not start ------------------------------------
 
@@ -418,21 +482,62 @@ class _PhoneMixin:
         profile, who is watching said at start, a kids profile's limits
         known (mw_profiles)."""
         from ..core import profiles
-        favs = ",".join(str(f.get("stream_id")) for f in self._favorite_channels())
         locked = getattr(self, "_profile_locked", lambda: False)()
-        raw = (f"{self._chno_pid()}|{id(self.client)}|{profiles.active_id()}|{locked}"
-               f"|{self.__dict__.get('_kids_ver', 0)}|{favs}")
-        return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
+        pid, active = self._chno_pid(), profiles.active_id()
+        kids_ver = self.__dict__.get("_kids_ver", 0)
+        favs = getattr(self, "favs", None)
+        version = getattr(favs, "version", None)
+        unlocked = bool(getattr(getattr(self, "parental", None), "session_unlocked", False))
+        # Everything the favourites as listed depend on: the store, its
+        # changes, a locked folder opened, the profile and its limits.
+        key = (pid, id(self.client), active, locked, kids_ver, id(favs), version, unlocked)
+        memo = self._phone_stamp_memo
+        if version is not None and memo is not None and memo[0] == key:
+            return memo[1]
+        ids = ",".join(str(f.get("stream_id")) for f in self._favorite_channels())
+        raw = f"{pid}|{id(self.client)}|{active}|{locked}|{kids_ver}|{ids}"
+        stamp = hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
+        self._phone_stamp_memo = (key, stamp)
+        return stamp
+
+    def _phone_channel(self, item: dict, title: str) -> dict[str, Any]:
+        """The playing channel as the page shows and finds it in its list;
+        *here*: it plays from the source the lists show (a channel failover
+        or the search played from another source has an id of that one's)."""
+        from ..core import nerd
+        sid = item.get("stream_id")
+        number = channel_numbers.active(self._chno_pid()).get(str(sid))
+        key = (id(item), sid, item.get("name"), item.get("stream_icon"), title, number,
+               id(nerd.current()))
+        memo = self._phone_item_memo
+        if memo is None or memo[0] != key:
+            memo = (key, {"id": sid, "name": item.get("name") or title or "",
+                          "number": number if number is not None else channel_numbers.own_number(item),
+                          "logo": bool(self._phone_logo_address(item.get("stream_icon")))})
+            self._phone_item_memo = memo
+        elsewhere = getattr(self, "_playing_elsewhere", None)
+        return dict(memo[1], here=not (elsewhere() if callable(elsewhere) else ""))
 
     def _phone_state(self) -> dict[str, Any]:
+        """The page's state, whole (a poll asks _phone_state_parts and looks
+        up now and next on the server's thread)."""
+        out, target = self._phone_state_parts()
+        out["time"] = time.time()
+        if target is not None:
+            out.update(_now_next(target[0], target[1], out["time"]))
+        return out
+
+    def _phone_state_parts(self) -> tuple[dict[str, Any], tuple | None]:
+        """What the window's thread reads for a poll: the state but for the
+        clock and the guide, and (guide, channel) to look now and next up
+        in - or None."""
         st = self._remote_status()
         p = self.player
         muted = bool(getattr(p, "_muted", False)) if p is not None else False
         volume = st.get("volume", 0)
         if muted:
             volume = int(getattr(p, "_vol_before_mute", volume) or 0)
-        now = time.time()
-        out: dict[str, Any] = {"state": st["state"], "time": now, "volume": volume, "muted": muted,
+        out: dict[str, Any] = {"state": st["state"], "volume": volume, "muted": muted,
                                "source": st.get("source") or "", "stamp": self._phone_stamp(),
                                "tv_mode": bool(st.get("tv_mode"))}
         note = self._phone_note_now()
@@ -454,25 +559,13 @@ class _PhoneMixin:
                     row["fill"] = fills.get(row["id"], "")
             out.update(state)
         if st["state"] == "stopped" or locked:
-            return out
+            return out, None
         last = getattr(self, "_last_playback", None) or {}
         kind = st.get("kind") or ""
         out.update(kind=kind, title=st.get("title") or "", position=st.get("position") or 0,
                    duration=st.get("duration") or 0)
         item = last.get("item") or {}
         if kind == "live" and item.get("stream_id") is not None:
-            out["channel"] = {"id": item.get("stream_id"), "name": item.get("name") or st.get("title") or "",
-                              "number": channel_numbers.shown(item, channel_numbers.active(self._chno_pid())),
-                              "logo": bool(self._phone_logo_address(item.get("stream_icon")))}
-            try:
-                listings = self.xmltv.listings_for(item, 3)
-            except Exception:
-                listings = []
-            for prog in listings:
-                entry = {"title": prog.get("title") or "", "start": prog.get("start_timestamp"),
-                         "stop": prog.get("stop_timestamp")}
-                if "now" not in out and (prog.get("start_timestamp") or 0) <= now < (prog.get("stop_timestamp") or 0):
-                    out["now"] = entry
-                elif (prog.get("start_timestamp") or 0) > now and "next" not in out:
-                    out["next"] = entry
-        return out
+            out["channel"] = self._phone_channel(item, st.get("title") or "")
+            return out, (getattr(self, "xmltv", None), item)
+        return out, None

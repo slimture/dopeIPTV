@@ -2902,5 +2902,6 @@
   "rec_held_wait": "Blijven wachten",
   "rec_waiting_room": "wacht op een vrije verbinding",
   "rec_record_anyway": "Toch opnemen",
-  "rec_reason_no_room": "er was geen verbinding met je account vrij"
+  "rec_reason_no_room": "er was geen verbinding met je account vrij",
+  "phone_page_show_in_list": "Toon in lijst"
 }

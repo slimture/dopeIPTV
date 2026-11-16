@@ -3018,6 +3018,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "profile_own_tip": {"en": "Kept for each profile: a change here is for the profile in use."},
     "phone_page_profile_pin": {"en": "That profile has a PIN: choose it in the app."},
     "phone_page_locked": {"en": "Who's watching? Choose your profile in the app first."},
+    "phone_page_show_in_list": {"en": "Show in list"},
     "backup_kind_profiles": {"en": "Profiles"},
     # -- a home network split in VLANs (core/home_net.py, providers/lan_scan.py,
     #    providers/cast_devices.py) --

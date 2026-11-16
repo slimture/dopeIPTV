@@ -2902,5 +2902,6 @@
   "rec_held_wait": "Beklemeye devam et",
   "rec_waiting_room": "boş bir bağlantı bekleniyor",
   "rec_record_anyway": "Yine de kaydet",
-  "rec_reason_no_room": "hesabına boş bağlantı yoktu"
+  "rec_reason_no_room": "hesabına boş bağlantı yoktu",
+  "phone_page_show_in_list": "Listede göster"
 }

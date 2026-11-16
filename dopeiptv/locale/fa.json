@@ -2902,5 +2902,6 @@
   "rec_held_wait": "ادامهٔ انتظار",
   "rec_waiting_room": "در انتظار یک اتصال آزاد",
   "rec_record_anyway": "در هر صورت ضبط کن",
-  "rec_reason_no_room": "هیچ اتصال آزادی به حساب شما نبود"
+  "rec_reason_no_room": "هیچ اتصال آزادی به حساب شما نبود",
+  "phone_page_show_in_list": "نمایش در فهرست"
 }

@@ -2902,5 +2902,6 @@
   "rec_held_wait": "انتظار جاری رکھیں",
   "rec_waiting_room": "خالی کنکشن کا انتظار",
   "rec_record_anyway": "پھر بھی ریکارڈ کریں",
-  "rec_reason_no_room": "آپ کے اکاؤنٹ کا کوئی کنکشن خالی نہیں تھا"
+  "rec_reason_no_room": "آپ کے اکاؤنٹ کا کوئی کنکشن خالی نہیں تھا",
+  "phone_page_show_in_list": "فہرست میں دکھائیں"
 }

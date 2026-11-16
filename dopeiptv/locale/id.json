@@ -2902,5 +2902,6 @@
   "rec_held_wait": "Tetap menunggu",
   "rec_waiting_room": "menunggu koneksi kosong",
   "rec_record_anyway": "Tetap rekam",
-  "rec_reason_no_room": "tidak ada koneksi ke akunmu yang kosong"
+  "rec_reason_no_room": "tidak ada koneksi ke akunmu yang kosong",
+  "phone_page_show_in_list": "Tampilkan di daftar"
 }

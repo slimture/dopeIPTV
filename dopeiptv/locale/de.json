@@ -2902,5 +2902,6 @@
   "rec_held_wait": "Weiter warten",
   "rec_waiting_room": "wartet auf eine freie Verbindung",
   "rec_record_anyway": "Trotzdem aufnehmen",
-  "rec_reason_no_room": "keine Verbindung zu deinem Konto war frei"
+  "rec_reason_no_room": "keine Verbindung zu deinem Konto war frei",
+  "phone_page_show_in_list": "In der Liste zeigen"
 }

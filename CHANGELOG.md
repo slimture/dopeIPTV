@@ -59,6 +59,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   own. Sources with the same server and user name now share one count and
   one limit: questions, server mode's room and Nerd > Diagnostics' In use
   now (one line for the account).
+- The phone remote follows what plays: when the channel changes - on the computer, from the page's channel up and down or from another remote - its row is marked and scrolled into view, smoothly and centred, once your own scrolling has rested a moment. A channel the list shown leaves out (Favourites, a search) gets a "Show in list" button under Now playing instead of the page switching lists by itself. A channel playing from another source no longer marks a row of the same number in this one's list.
+
+
+- The phone remote fits small phones: from 320 px wide (iPhone SE 1st generation, small Androids) and on its side, the bar's tabs and search, the dock's volume and keys and the remote's d-pad and keys wrap or sit side by side as there is room, every button is at least 44 px, the remote's labels are never cut mid-word, and the notch, the home bar and the status bar are kept clear.
+- Scrolling on the computer no longer stutters while the phone remote is on: a poll never loads the programme guide on the window's thread any more (a guide not yet in memory was downloaded and parsed there, freezing the window for seconds), now and next are looked up off it, the playing channel and the favourites are worked out again only when they change, the same state again costs the phone nothing (304), and the page asks every 3 s instead of 1.5 s once nothing has changed for a while (every second just after a tap).
 
 ## [1.6.1]
 

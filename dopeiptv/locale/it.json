@@ -2902,5 +2902,6 @@
   "rec_held_wait": "Continua ad aspettare",
   "rec_waiting_room": "in attesa di una connessione libera",
   "rec_record_anyway": "Registra comunque",
-  "rec_reason_no_room": "nessuna connessione al tuo account era libera"
+  "rec_reason_no_room": "nessuna connessione al tuo account era libera",
+  "phone_page_show_in_list": "Mostra nell'elenco"
 }

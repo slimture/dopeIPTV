@@ -2902,5 +2902,6 @@
   "rec_held_wait": "Fortsätt vänta",
   "rec_waiting_room": "väntar på en ledig anslutning",
   "rec_record_anyway": "Spela in ändå",
-  "rec_reason_no_room": "ingen anslutning till ditt konto var ledig"
+  "rec_reason_no_room": "ingen anslutning till ditt konto var ledig",
+  "phone_page_show_in_list": "Visa i listan"
 }

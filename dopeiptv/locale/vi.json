@@ -2902,5 +2902,6 @@
   "rec_held_wait": "Tiếp tục chờ",
   "rec_waiting_room": "đang chờ kết nối rảnh",
   "rec_record_anyway": "Vẫn ghi",
-  "rec_reason_no_room": "không có kết nối nào đến tài khoản của bạn còn rảnh"
+  "rec_reason_no_room": "không có kết nối nào đến tài khoản của bạn còn rảnh",
+  "phone_page_show_in_list": "Hiện trong danh sách"
 }

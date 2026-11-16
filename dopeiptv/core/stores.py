@@ -239,9 +239,13 @@ class FavoriteStore:
     #: Told after every change (the window passes the list on to Home
     #: Assistant); never allowed to break the save.
     on_change: Any = None
+    #: One more with every change and every folder locked or opened (the
+    #: phone remote's stamp is worked out again only then).
+    version = 0
 
     def _save(self) -> None:
         self.settings.setValue(self.key, json.dumps(self.groups))
+        self.version += 1
         if self.on_change is not None:
             try:
                 self.on_change()
@@ -375,6 +379,7 @@ class FavoriteStore:
         (current.add if locked else current.discard)(group)
         self.settings.setValue(f"{self.key}_locked",
                                json.dumps(sorted(current)))
+        self.version += 1
         if self.on_change is not None:
             try:
                 self.on_change()

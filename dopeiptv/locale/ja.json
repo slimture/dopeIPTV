@@ -2902,5 +2902,6 @@
   "rec_held_wait": "待機を続ける",
   "rec_waiting_room": "空き接続を待機中",
   "rec_record_anyway": "それでも録画",
-  "rec_reason_no_room": "アカウントへの接続に空きがありませんでした"
+  "rec_reason_no_room": "アカウントへの接続に空きがありませんでした",
+  "phone_page_show_in_list": "リストで表示"
 }

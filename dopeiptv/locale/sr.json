@@ -2902,5 +2902,6 @@
   "rec_held_wait": "Nastavi da čekaš",
   "rec_waiting_room": "čeka slobodnu vezu",
   "rec_record_anyway": "Ipak snimi",
-  "rec_reason_no_room": "nijedna veza ka tvom nalogu nije bila slobodna"
+  "rec_reason_no_room": "nijedna veza ka tvom nalogu nije bila slobodna",
+  "phone_page_show_in_list": "Prikaži na listi"
 }

@@ -2902,5 +2902,6 @@
   "rec_held_wait": "مواصلة الانتظار",
   "rec_waiting_room": "في انتظار اتصال متاح",
   "rec_record_anyway": "التسجيل على أي حال",
-  "rec_reason_no_room": "لم يكن هناك اتصال متاح بحسابك"
+  "rec_reason_no_room": "لم يكن هناك اتصال متاح بحسابك",
+  "phone_page_show_in_list": "إظهار في القائمة"
 }

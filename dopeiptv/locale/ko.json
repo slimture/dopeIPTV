@@ -2902,5 +2902,6 @@
   "rec_held_wait": "계속 기다리기",
   "rec_waiting_room": "빈 연결을 기다리는 중",
   "rec_record_anyway": "그래도 녹화",
-  "rec_reason_no_room": "계정에 사용할 수 있는 빈 연결이 없었음"
+  "rec_reason_no_room": "계정에 사용할 수 있는 빈 연결이 없었음",
+  "phone_page_show_in_list": "목록에서 보기"
 }

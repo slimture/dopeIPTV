@@ -2902,5 +2902,6 @@
   "rec_held_wait": "รอต่อไป",
   "rec_waiting_room": "กำลังรอการเชื่อมต่อที่ว่าง",
   "rec_record_anyway": "บันทึกเลย",
-  "rec_reason_no_room": "ไม่มีการเชื่อมต่อกับบัญชีของคุณที่ว่าง"
+  "rec_reason_no_room": "ไม่มีการเชื่อมต่อกับบัญชีของคุณที่ว่าง",
+  "phone_page_show_in_list": "แสดงในรายการ"
 }

@@ -7,7 +7,21 @@ more: a tap lists the others), what plays at the top (the channel, what is
 on now and next), the channels and favourites with a search in the middle, and the
 controls - channel down and up, play/pause, stop, volume and mute - docked
 at the bottom where a thumb reaches. It asks the app what plays every 1.5 s
-while it is on screen, and not at all while it is not.
+while it is on screen (every second for a while after a tap, every 3 s once
+nothing has changed for a while), and not at all while it is not; it asks
+with the tag of the state it shows, and the same state again is a 304.
+
+It follows what plays: the playing channel's row is marked, and when the
+channel changes - on the computer, from the page or from another remote - it
+is brought into view, centred between the bar on top and the dock, once the
+person's own scrolling has rested a moment (the page opens at its top). A channel the list shown leaves out
+(Favourites, a search) is not switched to on its own - the tab and the
+search are the person's - but offered under Now playing: "Show in list".
+
+It fits a phone from 320 px wide up, upright or on its side: sizes are
+fluid (clamp, min, flex and grid that wrap - the bar's tabs and search, the
+dock's volume and keys, the remote's pad and keys sit side by side when
+there is room), every key at least 44 px, the safe areas kept clear.
 
 While TV mode is on (the state says so; the button in the header turns it
 on and off) the page is a remote instead: a d-pad with OK, Back and
@@ -47,7 +61,7 @@ WORDS = ("channels", "favorites", "search", "nothing", "next", "paused", "offlin
          "loading", "tv_mode", "tv_switch", "ok", "up", "down", "left", "right", "back", "options",
          "vol_up", "vol_down", "digits", "touchpad", "touch_hint",
          "key_red", "key_green", "key_yellow", "key_blue",
-         "profile", "profile_pin", "tv_picture", "tv_now_playing")
+         "profile", "profile_pin", "tv_picture", "tv_now_playing", "show_in_list")
 _HEX = re.compile(r"#[0-9A-Fa-f]{6}")
 
 
@@ -166,11 +180,12 @@ _HTML = """<!doctype html>
       <div class="bar" id="nowBarWrap" hidden><i id="nowBar"></i></div>
       <div class="nowTimes" id="nowTimes"><span id="nowStart"></span><span id="nowEnd"></span></div>
       <div class="next" id="nowNext"></div>
+      <button class="showIn" id="showIn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M4 12h7M4 18h10"/><circle cx="17.5" cy="12" r="3"/></svg><span id="showInText"></span></button>
     </div>
     <span class="nowPill" id="nowPill" aria-hidden="true" hidden><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="12.5" rx="2"/><path d="M8.5 20.5h7"/><path class="fill" d="M10.2 8.2v4.6l4-2.3z"/></svg><span id="nowPillText"></span></span>
   </section>
   <div id="browse">
-  <div class="sticky">
+  <div class="sticky" id="bar">
     <div class="tabs" role="tablist">
       <button class="tab" id="tabAll" role="tab" aria-selected="true"></button>
       <button class="tab" id="tabFav" role="tab" aria-selected="false"></button>
@@ -193,6 +208,7 @@ _HTML = """<!doctype html>
       <button class="arr down" id="kDown" data-a="down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
     </div>
     <div class="touch" id="touch" hidden><span id="touchHint"></span></div>
+    <div class="side">
     <div class="pair">
       <button class="pill" id="kBack" data-a="back"><svg class="flip" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><span id="kBackText"></span></button>
       <button class="pill" id="padMode" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle class="fill" cx="12" cy="15" r="2.6"/><path d="M7 15a5 5 0 0 1 10 0M3.8 15a8.2 8.2 0 0 1 16.4 0"/></svg><span id="padModeText"></span></button>
@@ -227,9 +243,11 @@ _HTML = """<!doctype html>
       <button data-a="digit_7">7</button><button data-a="digit_8">8</button><button data-a="digit_9">9</button>
       <button class="zero" data-a="digit_0">0</button>
     </div>
+    </div>
   </section>
 </main>
 <footer class="dock" id="dock">
+  <div class="dockIn">
   <div class="mini" id="mini" hidden></div>
   <div class="vol">
     <button class="icon" id="mute">
@@ -248,6 +266,7 @@ _HTML = """<!doctype html>
     <button class="key" id="stop"><svg viewBox="0 0 24 24" aria-hidden="true"><rect class="fill" x="6.5" y="6.5" width="11" height="11" rx="1.5"/></svg></button>
     <button class="key" id="chUp"><svg class="flip" viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M15.6 5H18v14h-2.4zM5 5v14l9.5-7z"/></svg></button>
   </div>
+  </div>
 </footer>
 <script>@@SCRIPT@@</script>
 </body>
@@ -255,44 +274,55 @@ _HTML = """<!doctype html>
 """
 
 _CSS = """
-:root{@@DARK@@;color-scheme:dark;--radius:12px;--dock:172px}
+:root{@@DARK@@;color-scheme:dark;--radius:12px;--dock:172px;--vh:1vh;
+  --safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);
+  --gut-l:max(clamp(12px,4vw,16px),env(safe-area-inset-left,0px));
+  --gut-r:max(clamp(12px,4vw,16px),env(safe-area-inset-right,0px));
+  --key-h:clamp(46px,calc(var(--vh)*8.5),54px)}
+@supports (height:1dvh){:root{--vh:1dvh}}
 @media (prefers-color-scheme: light){:root{@@LIGHT@@;color-scheme:light}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--text);
   font:15px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans",Ubuntu,Cantarell,"Helvetica Neue",Arial,sans-serif;
   -webkit-text-size-adjust:100%;text-size-adjust:100%}
-body{min-height:100vh;padding-bottom:calc(var(--dock) + env(safe-area-inset-bottom))}
-#app{max-width:560px;margin:0 auto;padding:0 16px}
+body{min-height:100vh;padding-bottom:var(--dock)}
+body::before{content:"";position:fixed;left:0;right:0;top:0;height:var(--safe-t);background:var(--bg);z-index:4}
+#app{max-width:560px;margin:0 auto;padding:0 var(--gut-r) 0 var(--gut-l)}
 button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer;touch-action:manipulation}
 button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 svg .fill{fill:currentColor;stroke:none}
 [hidden]{display:none!important}
 [dir=rtl] .flip{transform:scaleX(-1)}
-.top{display:flex;align-items:center;gap:10px;padding:calc(12px + env(safe-area-inset-top)) 2px 10px}
-.brand{font-weight:700;letter-spacing:.2px}
-.source{flex:1;min-width:0;color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tvBtn{flex:none;display:flex;align-items:center;gap:6px;height:36px;padding:0 12px;border-radius:999px;
-  background:var(--btn);color:var(--text2);font-size:13px;font-weight:600}
-.tvBtn svg{width:18px;height:18px}
+.top{display:flex;align-items:center;gap:clamp(6px,2.5vw,10px);min-width:0;
+  padding:calc(clamp(6px,calc(var(--vh)*1.6),12px) + var(--safe-t)) 2px clamp(6px,calc(var(--vh)*1.4),10px)}
+.brand{flex:none;font-weight:700;letter-spacing:.2px}
+.source{flex:1 1 0;min-width:0;color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tvBtn{flex:none;display:flex;align-items:center;justify-content:center;gap:6px;min-width:44px;height:44px;padding:0 12px;
+  border-radius:999px;background:var(--btn);color:var(--text2);font-size:13px;font-weight:600;white-space:nowrap}
+.tvBtn svg{width:18px;height:18px;flex:none}
 .tvBtn[aria-pressed=true]{background:var(--accent);color:var(--on-accent)}
-.pchip{display:flex;align-items:center;gap:6px;flex:none;min-height:34px;padding:3px 10px 3px 3px;border-radius:999px;
-  background:var(--pane);color:var(--text2);font-size:13px;font-weight:600;max-width:40%}
-.pchip .pname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pchip{display:flex;align-items:center;gap:6px;flex:0 1 auto;min-width:44px;min-height:44px;padding:3px 10px 3px 3px;
+  border-radius:999px;background:var(--pane);color:var(--text2);font-size:13px;font-weight:600;max-width:40%}
+.pchip .pname{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pav{flex:none;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
   background:var(--pf,var(--accent));color:var(--on-accent);font-size:12px;font-weight:700}
+.pchip .pav{width:38px;height:38px;font-size:13px}
+@media (max-width:359.98px){.tvBtn{padding:0}.tvBtn span{display:none}.pchip{padding-inline-end:3px}.pchip .pname{display:none}}
 .pmenu{background:var(--pane);border-radius:var(--radius);padding:4px;margin:0 0 10px;display:flex;flex-direction:column}
 .pmenu button{display:flex;align-items:center;gap:10px;min-height:48px;padding:6px 10px;border-radius:9px;text-align:start}
 .pmenu button[aria-checked=true]{background:var(--sel);color:var(--text)}
 .pmenu button:active{background:var(--hover)}
 .pmenu .lock{margin-inline-start:auto;color:var(--muted);font-size:12px}
-.banner{background:var(--pane);color:var(--error);border-radius:var(--radius);padding:12px 14px;margin:0 0 10px;font-size:14px}
-.now{display:flex;gap:14px;align-items:flex-start;background:var(--pane);border-radius:var(--radius);padding:14px}
-.logo{flex:0 0 56px;height:56px;border-radius:10px;background:var(--btn);display:flex;align-items:center;
-  justify-content:center;overflow:hidden;font-weight:700;font-size:18px;color:var(--text2)}
+.banner{background:var(--pane);color:var(--error);border-radius:var(--radius);padding:12px 14px;margin:0 0 10px;font-size:14px;
+  overflow-wrap:anywhere}
+.now{display:flex;gap:clamp(10px,3.5vw,14px);align-items:flex-start;background:var(--pane);border-radius:var(--radius);
+  padding:clamp(10px,3.5vw,14px)}
+.logo{flex:0 0 clamp(44px,14vw,56px);height:clamp(44px,14vw,56px);border-radius:10px;background:var(--btn);display:flex;
+  align-items:center;justify-content:center;overflow:hidden;font-weight:700;font-size:clamp(15px,4.6vw,18px);color:var(--text2)}
 .logo img{width:100%;height:100%;object-fit:contain;padding:6px}
 .nowText{min-width:0;flex:1}
-.nowTitle{font-size:18px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nowTitle{font-size:clamp(16px,4.8vw,18px);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nowProg{color:var(--text2);margin-top:2px;display:flex;gap:8px;align-items:center;min-width:0}
 .nowProg span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chip{flex:none;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:2px 7px;
@@ -302,6 +332,11 @@ svg .fill{fill:currentColor;stroke:none}
 .nowTimes{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-top:4px;
   font-variant-numeric:tabular-nums}
 .next{color:var(--muted);font-size:13px;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.showIn{display:inline-flex;align-items:center;gap:7px;max-width:100%;min-height:44px;margin-top:10px;padding:0 14px 0 11px;
+  border-radius:999px;background:var(--btn);color:var(--text);font-size:14px;font-weight:600}
+.showIn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.showIn svg{width:18px;height:18px;flex:none;color:var(--accent)}
+.showIn:active{background:var(--btn-hover)}
 .now.act{flex-wrap:wrap;row-gap:12px;min-height:48px;cursor:pointer;user-select:none;-webkit-user-select:none;
   touch-action:manipulation}
 .now.act .nowText{flex:1 1 180px}
@@ -310,29 +345,35 @@ svg .fill{fill:currentColor;stroke:none}
 .nowLabel{color:var(--text2);font-size:12px;font-weight:700;letter-spacing:.2px;margin-bottom:1px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nowPill{flex:none;max-width:100%;margin-inline-start:auto;align-self:center;display:flex;align-items:center;gap:7px;
-  height:40px;padding:0 16px 0 13px;border-radius:999px;background:var(--accent);color:var(--on-accent);
+  height:44px;padding:0 16px 0 13px;border-radius:999px;background:var(--accent);color:var(--on-accent);
   font-size:14px;font-weight:700;white-space:nowrap}
 .nowPill span{overflow:hidden;text-overflow:ellipsis}
 .nowPill svg{width:20px;height:20px;flex:none}
 .now.act:active .nowPill{filter:brightness(1.1)}
-.sticky{position:sticky;top:0;z-index:2;background:var(--bg);padding:12px 0 8px}
-.tabs{display:flex;gap:6px;background:var(--pane);border-radius:var(--radius);padding:4px}
-.tab{flex:1;min-height:40px;border-radius:9px;color:var(--muted);font-weight:600}
+.sticky{position:sticky;top:var(--safe-t);z-index:2;background:var(--bg);display:flex;flex-wrap:wrap;gap:8px;
+  padding:clamp(6px,calc(var(--vh)*1.8),12px) 0 8px}
+.tabs{flex:1 1 240px;display:flex;gap:6px;background:var(--pane);border-radius:var(--radius);padding:3px}
+.tab{flex:1;min-width:0;min-height:44px;padding:0 6px;border-radius:9px;color:var(--muted);font-weight:600;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tab[aria-selected=true]{background:var(--sel);color:var(--text)}
-.search{display:flex;align-items:center;gap:8px;margin-top:8px;background:var(--input);border-radius:var(--radius);
-  padding:0 12px;min-height:46px;color:var(--muted)}
+.search{flex:1 1 240px;min-width:0;display:flex;align-items:center;gap:8px;background:var(--input);border-radius:var(--radius);
+  padding:0 12px;min-height:50px;color:var(--muted)}
 .search svg{width:20px;height:20px;flex:none}
 .search input{flex:1;min-width:0;border:0;background:none;color:var(--text);font:inherit;font-size:16px;height:44px;outline:none}
 .search input::placeholder{color:var(--muted)}
 .list{list-style:none;margin:0;padding:0;background:var(--pane);border-radius:var(--radius);overflow:hidden}
 .list:empty{display:none}
+.list li{content-visibility:auto;contain-intrinsic-size:auto 58px}
 .list li+li .row{box-shadow:inset 0 1px 0 var(--border)}
-.row{display:flex;align-items:center;gap:12px;width:100%;min-height:58px;padding:8px 14px;text-align:start;position:relative}
+.row{display:flex;align-items:center;gap:clamp(8px,3vw,12px);width:100%;min-height:58px;padding:8px clamp(10px,3.5vw,14px);
+  text-align:start;position:relative}
 .row:active{background:var(--hover)}
 .row.playing{background:var(--sel)}
 .row.playing::before{content:"";position:absolute;inset-inline-start:0;top:10px;bottom:10px;width:3px;border-radius:2px;background:var(--accent)}
+.row.playing .name{font-weight:600}
 .row.pending{opacity:.6}
-.num{flex:0 0 34px;color:var(--muted);font-size:13px;text-align:end;font-variant-numeric:tabular-nums}
+.num{flex:0 0 clamp(26px,8vw,34px);color:var(--muted);font-size:13px;text-align:end;font-variant-numeric:tabular-nums;
+  overflow:hidden;white-space:nowrap}
 .lg{flex:0 0 40px;height:40px;border-radius:8px;background:var(--btn);display:flex;align-items:center;justify-content:center;
   overflow:hidden;color:var(--text2);font-weight:700;font-size:13px;position:relative}
 .lg img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:4px;opacity:0}
@@ -345,11 +386,12 @@ svg .fill{fill:currentColor;stroke:none}
 .star svg{width:18px;height:18px}
 .empty{color:var(--muted);text-align:center;padding:32px 16px}
 #more{height:1px}
-.dock{position:fixed;left:0;right:0;bottom:0;z-index:3;background:var(--pane);
-  box-shadow:0 -1px 0 var(--border);padding:10px 16px calc(12px + env(safe-area-inset-bottom))}
-.dock>*{max-width:528px;margin-left:auto;margin-right:auto}
-.mini{color:var(--text2);font-size:13px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:6px}
-.vol{display:flex;align-items:center;gap:10px}
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:3;background:var(--pane);box-shadow:0 -1px 0 var(--border);
+  padding:clamp(6px,calc(var(--vh)*1.6),10px) var(--gut-r) calc(clamp(8px,calc(var(--vh)*2),12px) + var(--safe-b)) var(--gut-l)}
+.dockIn{max-width:528px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;column-gap:16px;
+  row-gap:clamp(4px,calc(var(--vh)*1.2),8px)}
+.mini{flex:1 0 100%;min-width:0;color:var(--text2);font-size:13px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vol{flex:1 1 200px;min-width:0;display:flex;align-items:center;gap:clamp(6px,2.5vw,10px)}
 .icon{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text2);flex:none}
 .icon:active{background:var(--btn)}
 .icon.on{color:var(--error)}
@@ -365,8 +407,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;heigh
 input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:var(--btn)}
 input[type=range]::-moz-range-progress{height:6px;border-radius:3px;background:var(--accent)}
 input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:var(--text);border:0}
-.keys{display:flex;gap:10px;margin-top:8px}
-.key{flex:1;height:60px;border-radius:var(--radius);background:var(--btn);display:flex;align-items:center;justify-content:center}
+.keys{flex:1 1 260px;min-width:0;display:flex;gap:clamp(6px,2.5vw,10px)}
+.key{flex:1;min-width:44px;height:clamp(48px,calc(var(--vh)*9),60px);border-radius:var(--radius);background:var(--btn);
+  display:flex;align-items:center;justify-content:center}
 .key:active{background:var(--btn-hover)}
 .key svg{width:28px;height:28px}
 .key.primary{background:var(--accent);color:var(--on-accent);flex:1.4}
@@ -374,48 +417,54 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;bac
 .key[disabled]{opacity:.45}
 body.tv{padding-bottom:0}
 body.tv .nowTimes,body.tv .next{display:none}
-.tvr{padding:14px 0 calc(18px + env(safe-area-inset-bottom))}
+.tvr{--pad:clamp(150px,min(72vw,calc(var(--vh)*42)),272px);display:flex;flex-wrap:wrap;align-items:flex-start;
+  justify-content:center;gap:clamp(10px,calc(var(--vh)*2.2),16px) 20px;
+  padding:clamp(8px,calc(var(--vh)*2),14px) 0 calc(18px + var(--safe-b))}
 .pad,.colours,.deck,.digits{direction:ltr}
-.pad{width:min(72vw,272px);aspect-ratio:1;margin:0 auto;border-radius:50%;background:var(--pane);
+.pad{flex:none;width:var(--pad);aspect-ratio:1;margin:0 auto;border-radius:50%;background:var(--pane);
   box-shadow:inset 0 0 0 1px var(--border);display:grid;grid-template:1fr 1.1fr 1fr/1fr 1.1fr 1fr}
 .arr{display:flex;align-items:center;justify-content:center;color:var(--text2);border-radius:50%}
 .arr:active{background:var(--hover);color:var(--text)}
-.arr svg{width:30px;height:30px}
+.arr svg{width:clamp(24px,calc(var(--pad)*.11),30px);height:clamp(24px,calc(var(--pad)*.11),30px)}
 .up{grid-area:1/2}.left{grid-area:2/1}.right{grid-area:2/3}.down{grid-area:3/2}
-.okk{grid-area:2/2;margin:4px;border-radius:50%;background:var(--accent);color:var(--on-accent);font-weight:700;font-size:19px}
+.okk{grid-area:2/2;margin:4px;border-radius:50%;background:var(--accent);color:var(--on-accent);font-weight:700;
+  font-size:clamp(16px,calc(var(--pad)*.07),19px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .okk:active{filter:brightness(1.1)}
-.touch{height:min(72vw,272px);border-radius:24px;background:var(--pane);box-shadow:inset 0 0 0 1px var(--border);
-  display:flex;align-items:center;justify-content:center;text-align:center;padding:28px;color:var(--muted);font-size:14px;
+.touch{flex:1 1 var(--pad);min-width:min(100%,var(--pad));height:var(--pad);border-radius:24px;background:var(--pane);
+  box-shadow:inset 0 0 0 1px var(--border);display:flex;align-items:center;justify-content:center;text-align:center;
+  padding:clamp(16px,6vw,28px);color:var(--muted);font-size:14px;
   touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .touch.down{background:var(--hover)}
-.pair{display:flex;gap:10px;margin-top:16px}
-.pill{flex:1;min-width:0;height:48px;border-radius:var(--radius);background:var(--btn);display:flex;align-items:center;
-  justify-content:center;gap:7px;font-size:14px;font-weight:600;padding:0 8px}
-.pill span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.side{flex:1 1 280px;min-width:0;display:flex;flex-direction:column;gap:clamp(8px,calc(var(--vh)*1.8),12px)}
+.pair{display:flex;gap:clamp(6px,2.5vw,10px)}
+.pill{flex:1 1 0;min-width:0;min-height:52px;padding:6px 4px;border-radius:var(--radius);background:var(--btn);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12.5px;font-weight:600}
+.pill span{max-width:100%;line-height:1.15;text-align:center;overflow-wrap:break-word}
 .pill svg{width:20px;height:20px;flex:none}
 .pill:active{background:var(--btn-hover)}
 .pill[aria-pressed=true]{background:var(--sel);color:var(--accent)}
-.colours{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
-.ck{min-width:0;height:54px;border-radius:var(--radius);background:var(--btn);display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:7px;padding:0 4px;color:var(--text2);font-size:11.5px;font-weight:600}
+.colours{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:clamp(5px,2vw,8px)}
+.ck{min-width:0;min-height:var(--key-h);border-radius:var(--radius);background:var(--btn);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:6px;padding:6px 3px;color:var(--text2);font-size:clamp(10.5px,3.3vw,11.5px);font-weight:600}
 .ck:active{background:var(--btn-hover)}
-.ck i{display:block;width:30px;height:6px;border-radius:3px}
-.ck span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ck i{display:block;flex:none;width:min(30px,70%);height:6px;border-radius:3px}
+.ck span{max-width:100%;line-height:1.1;text-align:center;overflow:hidden;overflow-wrap:anywhere;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
 .ck .r{background:var(--key-red)}.ck .g{background:var(--key-green)}.ck .y{background:var(--key-yellow)}.ck .b{background:var(--key-blue)}
-.deck{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:10px;margin-top:12px}
+.deck{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:clamp(6px,2.5vw,10px)}
 .rock{display:flex;flex-direction:column;border-radius:var(--radius);background:var(--btn);overflow:hidden}
-.rock button{height:54px;display:flex;align-items:center;justify-content:center}
+.rock button{height:var(--key-h);display:flex;align-items:center;justify-content:center}
 .rock button:active{background:var(--btn-hover)}
-.rock .mid{height:26px;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.rock .mid{height:clamp(18px,calc(var(--vh)*4),26px);display:flex;align-items:center;justify-content:center;color:var(--muted)}
 .rock .mid svg{width:17px;height:17px}
-.midc{display:flex;flex-direction:column;gap:10px}
-.midc .key{flex:1;height:auto;margin:0}
-.fold{width:100%;height:46px;margin-top:12px;border-radius:var(--radius);background:var(--pane);display:flex;
+.midc{display:flex;flex-direction:column;gap:clamp(6px,2.5vw,10px)}
+.midc .key{flex:1;height:auto;min-height:44px;margin:0}
+.fold{width:100%;min-height:46px;border-radius:var(--radius);background:var(--pane);display:flex;
   align-items:center;justify-content:center;gap:8px;color:var(--text2);font-weight:600;font-size:14px}
 .fold svg{width:18px;height:18px}
 .fold[aria-expanded=true]{color:var(--text)}
-.digits{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
-.digits button{height:54px;border-radius:var(--radius);background:var(--btn);font-size:22px;font-weight:600;
+.digits{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(6px,2vw,8px)}
+.digits button{height:var(--key-h);border-radius:var(--radius);background:var(--btn);font-size:22px;font-weight:600;
   font-variant-numeric:tabular-nums}
 .digits button:active{background:var(--btn-hover)}
 .digits .zero{grid-column:2}
@@ -430,10 +479,10 @@ const LANG = document.documentElement.lang || "en";
 // The app's language, in the phone's own variant of it when it has one (en-GB: 24 hours).
 const LOCALE = (navigator.languages || []).find((l) => l.toLowerCase().split("-")[0] === LANG.toLowerCase()) || LANG;
 const clock = new Intl.DateTimeFormat(LOCALE, {hour: "2-digit", minute: "2-digit"});
-let channels = [], byId = new Map(), favs = [], favSet = new Set(), stamp = null;
+let channels = [], byId = new Map(), favs = [], favSet = new Set(), stamp = null, loading = false;
 let tab = "all", query = "", playingId = null, shown = 0, rows = [], st = {}, stAt = 0;
 let pollTimer = 0, fails = 0, volUntil = 0, volTimer = 0, gone = false, nowImgId = null, nowSeen = true;
-let tvOn = null, touchOn = false;
+let tvOn = null, touchOn = false, etag = "", same = 0, quickUntil = 0;
 try { if (localStorage.getItem("tab") === "fav") tab = "fav"; } catch (e) { /* private mode */ }
 try { touchOn = localStorage.getItem("touchpad") === "1"; } catch (e) { /* private mode */ }
 
@@ -444,6 +493,18 @@ async function api(path, body) {
   if (r.status === 403) { expired(); throw new Error("403"); }
   if (!r.ok) throw new Error(String(r.status));
   return r.json();
+}
+
+// What plays, asked with the tag of the state shown: null when it is the
+// same (a 304 - nothing to read or draw again).
+async function getState() {
+  const r = await fetch("api/state", {cache: "no-store", headers: etag ? {"If-None-Match": etag} : {}});
+  if (r.status === 304) return null;
+  if (r.status === 403) { expired(); throw new Error("403"); }
+  if (!r.ok) throw new Error(String(r.status));
+  const s = await r.json();
+  etag = r.headers.get("ETag") || "";
+  return s;
 }
 
 // The hidden attribute itself: an SVG element has no .hidden property.
@@ -545,8 +606,15 @@ function show(s) {
   const mini = $("mini");
   mini.textContent = stopped ? "" : title + (s.now ? " · " + s.now.title : "");
   hide(mini, nowSeen || !mini.textContent);
-  const pid = ch ? String(ch.id) : null;
-  if (pid !== playingId) { playingId = pid; markPlaying(); }
+  // A channel of another source (failover, the search) is no row of these
+  // lists. The page opens at its top with the row marked; a change follows.
+  const pid = ch && ch.here !== false ? String(ch.id) : null;
+  if (pid !== playingId) {
+    playingId = pid; markPlaying();
+    follow = pid && opened ? Math.max(follow, 1) : 0;
+    followSoon(0);
+  }
+  opened = true;
   for (const k of ["chDown", "chUp"]) $(k).disabled = !(s.kind === "live" && !stopped);
 }
 
@@ -570,31 +638,43 @@ function setVol(v) {
   $("volText").textContent = v + "%";
 }
 
+// Every 1.5 s; every second for a while after a tap; every 3 s once nothing
+// has changed for a while; backing off while the app cannot be reached.
+function pollDelay() {
+  if (fails) return Math.min(8000, 1500 * (fails + 1));
+  if (Date.now() < quickUntil) return 1000;
+  return same >= 8 ? 3000 : 1500;
+}
+
 async function poll() {
   clearTimeout(pollTimer);
   if (gone) return;
   try {
-    const s = await api("api/state");
-    fails = 0; banner(s.note || "");
-    show(s);
-    if (s.stamp !== stamp) loadChannels(s.stamp);
+    const s = await getState();
+    fails = 0;
+    if (s) {
+      same = 0; banner(s.note || "");
+      show(s);
+      if (s.stamp !== stamp) loadChannels(s.stamp);
+    } else { same++; banner(st.note || ""); }
   } catch (e) {
     if (gone) return;
     fails++; banner(W.offline);
   }
-  if (!document.hidden) pollTimer = setTimeout(poll, fails ? Math.min(8000, 1500 * (fails + 1)) : 1500);
+  if (!document.hidden) pollTimer = setTimeout(poll, pollDelay());
 }
 
 async function loadChannels(want) {
-  stamp = want;
+  stamp = want; loading = true;
   try {
     const d = await api("api/channels");
     channels = (d.channels || []).map((c) => Object.assign(c, {key: fold(c.name)}));
     byId = new Map(channels.map((c) => [String(c.id), c]));
     favs = (d.favorites || []).map(String).filter((id) => byId.has(id));
     favSet = new Set(favs);
+    loading = false;
     render();
-  } catch (e) { stamp = null; }
+  } catch (e) { stamp = null; loading = false; }
 }
 
 function filtered() {
@@ -605,12 +685,14 @@ function filtered() {
 }
 
 function render() {
-  rows = filtered(); shown = 0;
+  rows = filtered(); shown = 0; drawn++;
   $("list").textContent = "";
   const empty = $("empty");
   empty.textContent = rows.length ? "" : (stamp === null ? W.loading : tab === "fav" && !query ? W.no_favorites : W.none_found);
   hide(empty, rows.length);
   more();
+  offer();
+  if (follow) followSoon(0);
 }
 
 const STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg>';
@@ -641,8 +723,10 @@ function row(c) {
   return li;
 }
 
-function more() {
-  const list = $("list"), end = Math.min(rows.length, shown + 120);
+function more() { addRows(shown + 120); }
+
+function addRows(upTo) {
+  const list = $("list"), end = Math.min(rows.length, upTo);
   const frag = document.createDocumentFragment();
   for (; shown < end; shown++) frag.append(row(rows[shown]));
   list.append(frag);
@@ -650,12 +734,98 @@ function more() {
 
 function markPlaying() {
   for (const b of document.querySelectorAll(".row")) b.classList.toggle("playing", b.dataset.id === playingId);
+  offer();
+}
+
+// Follow what plays: its row marked, and brought into view - centred between
+// the bar on top and the dock, smoothly - once the person's own scrolling
+// has rested a moment (follow 1), or at once when asked (follow 2). A channel
+// the list shown leaves out (Favourites, a search) is offered instead:
+// "Show in list" under Now playing switches to it. Nothing here asks the app
+// for more than the state it reads anyway.
+const REST_MS = 1200;
+let follow = 0, followTimer = 0, opened = false, drawn = 0;
+let touching = false, touchedAt = 0, autoUntil = 0;
+
+function followSoon(ms) { clearTimeout(followTimer); followTimer = setTimeout(followNow, ms); }
+
+function playingRow() { return playingId && byId.has(playingId) ? byId.get(playingId) : null; }
+
+// "Show in list": the playing channel is in this source's list, not in the one shown.
+function offer() {
+  const c = playingRow();
+  hide($("showIn"), tvOn || !c || rows.includes(c));
+}
+
+function followNow() {
+  if (!follow || tvOn || document.hidden || loading || stamp === null) return;   // again when that changes
+  const c = playingRow(), i = c ? rows.indexOf(c) : -1;
+  offer();
+  if (i < 0) { follow = 0; return; }
+  if (follow === 1) {
+    const wait = touching ? REST_MS : touchedAt + REST_MS - Date.now();
+    if (wait > 0) { followSoon(wait); return; }
+  }
+  if (i >= shown) { fillTo(i + 40); return; }
+  const li = $("list").children[i];
+  follow = 0;
+  if (li) bringIntoView(li);
+}
+
+// Rows up to *n* drawn a few hundred a frame, then the follow goes on.
+function fillTo(n) {
+  const gen = drawn;
+  const step = () => {
+    if (gen !== drawn) return;
+    addRows(shown + 600);
+    if (shown < Math.min(n, rows.length)) requestAnimationFrame(step); else followSoon(0);
+  };
+  requestAnimationFrame(step);
+}
+
+function bringIntoView(el) {
+  const bar = $("bar"), dock = $("dock");
+  const r = el.getBoundingClientRect();
+  const top = Math.max(0, bar.getBoundingClientRect().bottom);
+  const bottom = dock.hasAttribute("hidden") ? window.innerHeight : dock.getBoundingClientRect().top;
+  if (r.top >= top - 1 && r.bottom <= bottom + 1) return;          // in view: the mark is enough
+  const stuck = parseFloat(getComputedStyle(bar).top) || 0;
+  const mid = (stuck + bar.offsetHeight + bottom) / 2;
+  const y = Math.max(0, window.scrollY + r.top + r.height / 2 - mid);
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  autoUntil = Date.now() + (still ? 200 : 1200);
+  window.scrollTo({top: y, behavior: still ? "auto" : "smooth"});
+}
+
+function showInList() {
+  const c = playingRow();
+  if (!c) return;
+  if (query) { query = ""; $("q").value = ""; }
+  if (tab === "fav" && !favSet.has(playingId)) setTab("all"); else render();
+  follow = 2; followNow();
+}
+
+// The person's own touch, wheel and scrolling (not the follow's own scroll).
+function watchHands() {
+  const touched = () => { touchedAt = Date.now(); };
+  const opt = {passive: true};
+  window.addEventListener("touchstart", () => { touching = true; touched(); }, opt);
+  for (const t of ["touchend", "touchcancel"]) window.addEventListener(t, () => { touching = false; touched(); }, opt);
+  for (const t of ["wheel", "pointerdown", "keydown"]) window.addEventListener(t, touched, opt);
+  window.addEventListener("scroll", () => { if (Date.now() > autoUntil) touched(); }, opt);
+}
+
+// The list ends above the dock, however tall the dock is on this phone.
+function dockRoom() {
+  const d = $("dock");
+  document.documentElement.style.setProperty("--dock", (d.hasAttribute("hidden") ? 0 : d.offsetHeight + 12) + "px");
 }
 
 function soon() { clearTimeout(pollTimer); pollTimer = setTimeout(poll, 350); }
 
 async function send(path, body) {
   if (navigator.vibrate) navigator.vibrate(8);
+  quickUntil = Date.now() + 10000;
   try { const r = await api(path, body || {}); soon(); return r; } catch (e) { soon(); return null; }
 }
 
@@ -692,8 +862,9 @@ function setTv(on) {
   hide($("browse"), on); hide($("tvr"), !on); hide($("dock"), on);
   document.body.classList.toggle("tv", on);
   $("tvBtn").setAttribute("aria-pressed", String(on));
-  nowCard();
+  nowCard(); dockRoom(); offer();
   if (on) window.scrollTo({top: 0});
+  else if (follow) followSoon(0);
 }
 
 function setTouch(on) {
@@ -764,11 +935,13 @@ function init() {
   label("toggle", W.play_pause); label("stop", W.stop); label("chUp", W.ch_up); label("chDown", W.ch_down);
   label("mute", W.mute); $("vol").setAttribute("aria-label", W.volume);
   $("nowTitle").textContent = W.loading;
+  $("showInText").textContent = W.show_in_list;
   initTv();
   setTab(tab);
   $("tabAll").addEventListener("click", () => setTab("all"));
   $("tabFav").addEventListener("click", () => setTab("fav"));
   $("q").addEventListener("input", (e) => { query = e.target.value; render(); });
+  $("showIn").addEventListener("click", showInList);
   $("list").addEventListener("click", (e) => {
     const b = e.target.closest(".row");
     if (!b) return;
@@ -807,7 +980,12 @@ function init() {
       hide($("mini"), nowSeen || !$("mini").textContent);
     }).observe($("now"));
   }
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); else clearTimeout(pollTimer); });
+  if ("ResizeObserver" in window) new ResizeObserver(dockRoom).observe($("dock"));
+  window.addEventListener("resize", dockRoom);
+  watchHands(); dockRoom();
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) { poll(); if (follow) followSoon(0); } else clearTimeout(pollTimer);
+  });
   setInterval(tick, 1000);
   poll();
 }

@@ -2902,5 +2902,6 @@
   "rec_held_wait": "להמשיך להמתין",
   "rec_waiting_room": "ממתין לחיבור פנוי",
   "rec_record_anyway": "להקליט בכל זאת",
-  "rec_reason_no_room": "לא היה חיבור פנוי לחשבון שלכם"
+  "rec_reason_no_room": "לא היה חיבור פנוי לחשבון שלכם",
+  "phone_page_show_in_list": "הצגה ברשימה"
 }

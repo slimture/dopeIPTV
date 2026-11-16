@@ -2902,5 +2902,6 @@
   "rec_held_wait": "Endelea kusubiri",
   "rec_waiting_room": "inasubiri muunganisho huru",
   "rec_record_anyway": "Rekodi hata hivyo",
-  "rec_reason_no_room": "hakukuwa na muunganisho huru kwa akaunti yako"
+  "rec_reason_no_room": "hakukuwa na muunganisho huru kwa akaunti yako",
+  "phone_page_show_in_list": "Onyesha kwenye orodha"
 }

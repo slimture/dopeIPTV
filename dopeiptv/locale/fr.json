@@ -2902,5 +2902,6 @@
   "rec_held_wait": "Continuer d'attendre",
   "rec_waiting_room": "en attente d'une connexion libre",
   "rec_record_anyway": "Enregistrer quand même",
-  "rec_reason_no_room": "aucune connexion à ton compte n'était libre"
+  "rec_reason_no_room": "aucune connexion à ton compte n'était libre",
+  "phone_page_show_in_list": "Afficher dans la liste"
 }
