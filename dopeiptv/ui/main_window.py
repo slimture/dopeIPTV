@@ -2561,6 +2561,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _load_categories(self) -> None:
         self._load_gen += 1
         gen = self._load_gen
+        # The Search page on screen follows the lists: the lock shut (Lock
+        # now), a category hidden or locked - found again at once.
+        self._search_rules_check()
         # Reset the category search: it only applies to the provider sections
         # that actually have categories (live/movies/series). Collapse the box
         # back to just its 🔍 toggle on every section switch.

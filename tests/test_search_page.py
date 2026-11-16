@@ -308,6 +308,20 @@ def test_away_from_the_page_nothing_more_is_read(monkeypatch):
     assert prepared == [1] and w.queries == ["vegas"]
 
 
+def test_lock_now_with_the_page_open_finds_again_at_once(monkeypatch):
+    w, _jobs = _stub_window(monkeypatch)
+    w._search_page = page = _stub_page()
+    w._sa_query = lambda text, keep_place=False: w.queries.append(text)
+    w._search_page_visible = lambda: True
+    w.parental.session_unlocked = True
+    w._sa_made_for = w._sa_made_key()
+    w._search_rules_check()                          # nothing changed: as it is
+    assert page.shown == "results" and w.queries == []
+    w.parental.session_unlocked = False              # Lock now
+    w._search_rules_check()
+    assert page.shown is None and w.queries == ["vegas"]
+
+
 _CHILD = r"""
 import os, sys, tempfile, time
 from array import array
@@ -636,6 +650,24 @@ w._open_search_page()
 pump()
 assert page.query() == "" and page.results is None
 privacy.set_private(False)
+
+# -- the lock shut with the page open (Lock now): a locked category's rows go at once ---
+assert store.active_id == "b"                      # Nordic's since its film
+w.overrides.update("live", "n", locked=True)
+w.parental.session_unlocked = True
+
+
+def channels():
+    return [h.title for h in page.results.hits["channels"]] if page.results else []
+
+
+w._open_search_page("vegas")
+settle(lambda: "Vegas Nordic" in channels())
+w.parental.lock_session()
+w._load_categories()
+settle(lambda: page.results is not None and "Vegas Sport" in channels()
+       and "Vegas Nordic" not in channels())
+w.overrides.update("live", "n", locked=False)
 
 # -- its key while the video fills the screen: the page in the window, shown ------------
 w.switch_mode("live")

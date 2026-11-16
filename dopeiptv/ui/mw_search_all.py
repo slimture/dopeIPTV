@@ -464,6 +464,13 @@ class _SearchAllMixin:
             return False
         return True
 
+    def _search_rules_check(self) -> None:
+        """The lists were shown anew (the lock shut or opened, a category
+        hidden or locked): the page on screen found again at once if its
+        results were made otherwise - locked rows off the screen too."""
+        if self._sa_made_for is not None and self._search_page_visible():
+            self._sa_still_allowed()
+
     def _sa_activate(self, hit: sa.Hit) -> None:
         if not self._sa_still_allowed():
             return
