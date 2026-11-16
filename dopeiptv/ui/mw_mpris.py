@@ -260,9 +260,11 @@ class _MprisMixin:
             # player's own button does.
             p.toggle_pause()
         elif name == "stop":
-            if active:
+            if active or self._stoppable():
                 # The button, not player.stop(): it is what also ends the
-                # recording, the Trakt scrobble and the wake lock.
+                # recording, the Trakt scrobble and the wake lock - and puts
+                # off a reconnect that waits (the phone remote's Stop, Home
+                # Assistant's, TV mode's keys while it is off come here too).
                 p.stop_btn.click()
         elif name in ("next", "previous") and not active \
                 and self._media_cast_channel():

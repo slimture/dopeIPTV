@@ -75,6 +75,66 @@ def test_stop_while_a_portals_link_is_asked_for_is_not_undone_by_the_link(monkey
     assert calls == ["again"]
 
 
+def _tv_host(watching: bool) -> tuple[SimpleNamespace, list]:
+    """TV mode, over its page or the picture: a live channel dropped and
+    the app's reconnect waits - no address in the player then."""
+    item = {"stream_id": 7, "name": "Seven"}
+    h, calls = _stopped_host({"url": "http://h/live/7.ts", "title": "Seven", "key": 7,
+                              "kind": "live", "item": item})
+    clicks: list = []
+
+    def click():                   # the Stop button: the player says stopped
+        clicks.append(1)
+        MainWindow._on_player_stopped(h)
+
+    h.player = SimpleNamespace(current_url=None, stop_btn=SimpleNamespace(click=click))
+    h._playing_key, h._playing_group, h._playing_item = 7, "live", item
+    h._tv_on, h._tv_watching, h._tv_page, h._tv_digits = True, watching, None, ""
+    h._tv_browse = lambda screen=None: calls.append("page")
+    h._multiview_active = h._mpris_refresh_soon = lambda: None
+    for name in ("_stoppable", "_tv_action", "_tv_watch_action", "_tv_stop", "_tv_off_key",
+                 "_remote_media", "mpris_command", "_media_active", "tv_command"):
+        setattr(h, name, getattr(MainWindow, name).__get__(h))
+    h._media_press_key = MainWindow._media_press_key       # a staticmethod
+    h._tv_input = h._tv_action           # no dialog over the window (mw_tv._tv_input)
+    h.clicks = clicks
+    return h, calls
+
+
+def test_tv_modes_stop_during_a_reconnect_wait_is_not_undone_by_its_timer():
+    # The Stop key over TV mode's page, and over the picture (_tv_stop).
+    for watching, press in ((False, "_tv_action"), (True, "_tv_watch_action")):
+        h, calls = _tv_host(watching)
+        getattr(h, press)("stop")
+        assert h.clicks == [1] and h._playing_group is None, press
+        MainWindow._retry_last_stream(h)     # the reconnect's timer, armed before
+        assert calls == (["page"] if watching else []), (press, calls)
+
+
+def test_the_phones_and_home_assistants_stop_during_a_reconnect_wait_too():
+    # tv_command's TV key, with TV mode on - and off, where it is the
+    # media controls' Stop (the phone remote's own Stop and Home
+    # Assistant's come that way as well).
+    for tv_on in (True, False):
+        h, calls = _tv_host(False)
+        h._tv_on = tv_on
+        assert h.tv_command("tv_key", "stop")["ok"]
+        assert h.clicks == [1] and h._playing_group is None, tv_on
+        MainWindow._retry_last_stream(h)
+        assert calls == [], (tv_on, calls)
+
+
+def test_tv_modes_stop_with_nothing_playing_or_waiting_stops_nothing():
+    h, calls = _tv_host(False)
+    h._playing_key = h._playing_group = h._playing_item = None
+    h._tv_action("stop")
+    h._tv_watch_action("stop")
+    h.tv_command("tv_key", "stop")
+    h._tv_on = False
+    h.tv_command("tv_key", "stop")
+    assert h.clicks == [] and calls == ["page"]          # Stop over the picture: the page
+
+
 def test_a_reconnect_keeps_another_sources_channel_out_of_recently_viewed():
     last = {"url": "http://other/live/9.ts", "title": "Nine · Other", "key": "failover:b:9",
             "kind": "live", "item": None, "own_buffer": True}

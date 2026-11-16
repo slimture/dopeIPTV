@@ -23,6 +23,13 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   could not be turned on for this stream" instead of claiming it is on,
   and a stream's sound that did not start through it is brought back
   without it rather than left silent.
+- TV mode: Stop pressed while a dropped channel waited for the app's
+  reconnect - the Stop key over the page or the picture, the phone
+  remote's or Home Assistant's - stopped nothing, and the reconnect then
+  started the channel again and brought the picture back over the page.
+  It now stops it as the Stop button does (1.6.0 fixed this for the
+  button); the media keys' Stop, and the phone's and Home Assistant's
+  outside TV mode, too.
 
 ## [1.6.0]
 

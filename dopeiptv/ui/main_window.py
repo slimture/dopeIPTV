@@ -4922,6 +4922,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         finally:
             self.series_ctx = saved_ctx
 
+    def _stoppable(self) -> bool:
+        """Whether Stop has something to stop: a stream in the player, or a
+        channel waiting for the app's reconnect - no address in the player
+        then (its 0.3 s / 1.5 s timer, a backup address asked for), yet it
+        would start again by itself. Stop pressed then is the Stop button's
+        click all the same, and _on_player_stopped puts the reconnect off
+        (the profile switch stops on the same)."""
+        p = self.player
+        return p is not None and bool(getattr(p, "current_url", None)
+                                      or getattr(self, "_playing_group", None))
+
     def _on_player_stopped(self) -> None:
         """The Stop button was pressed. Save the resume point while the player
         still knows the position, then clear the now-playing highlight/title.

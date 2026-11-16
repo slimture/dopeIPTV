@@ -445,7 +445,9 @@ class _TvMixin:
             if self._tv_has_picture():
                 self._tv_picture()
             return
-        if action == "stop" and self._tv_has_picture():
+        if action == "stop" and self._stoppable():
+            # Also a channel waiting for the app's reconnect: it would come
+            # back over the page by itself.
             self.player.stop_btn.click()
             return
         page = self._tv_page
@@ -603,13 +605,13 @@ class _TvMixin:
         page.refresh_now()
 
     def _tv_stop(self) -> None:
-        """Stop over the picture (or a film's end): the stream stops, the
-        page comes back."""
-        p = self.player
-        if p is not None and p.current_url is not None:
+        """Stop over the picture (or a film's end): the stream stops - or,
+        waiting for the app's reconnect, does not start again by itself -
+        and the page comes back."""
+        if self._stoppable():
             # The Stop button's own way: recordings in the player, the wake
-            # lock, the scrobbles - all as a click does.
-            p.stop_btn.click()
+            # lock, the scrobbles, the reconnect put off - all as a click does.
+            self.player.stop_btn.click()
         self._tv_browse()
 
     def _tv_player_stopped(self) -> None:
