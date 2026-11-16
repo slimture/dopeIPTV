@@ -129,11 +129,18 @@ class DvrPool:
                 ingest_factory: IngestFactory | None = None) -> DvrSession:
         """The session for a channel *who* reads without watching it here:
         its own again (resumed when frozen) or a new one - never the one on
-        screen. Held for *who* until let_go."""
+        screen. Held for *who* until let_go. NotAStream, as for open(), for
+        one whose provider sent a page or a message a moment ago: not asked
+        again for each device that tries (a TV's app retries by itself)."""
         with self._lock:
             s = self._sessions.get(key)
             if s is not None and s.closed:
                 s = None
+            said = self._refused.get(key)
+            if said is not None:
+                if time.monotonic() - said[1] <= self.REFUSED_FOR:
+                    raise NotAStream(said[0])
+                del self._refused[key]
             if s is None:
                 s = DvrSession(url, self.base, self.keep_seconds,
                                self.max_bytes, key=key,
@@ -164,6 +171,8 @@ class DvrPool:
 
     def let_go(self, s: DvrSession, who: str) -> None:
         """*who* is done with *s*: frozen once nothing else reads it."""
+        with self._lock:
+            self._note_refused(s)
         s.let_go(who)
         self._recording_done(s)
 

@@ -22,7 +22,7 @@ import time
 import zlib
 from typing import Any, Callable, Iterator
 
-from ..core.log import log
+from ..core.log import log, redact_url
 from ..core.remote_api import stream_path
 
 _STEP = 1 << 18
@@ -189,8 +189,9 @@ def lineup_guide(guides: list[tuple[str, str]], channels: list[dict]) -> Iterato
         for n in dict.fromkeys([str(ch.get("name") or num), num, *names]):
             if n:
                 out.append(f"<display-name>{_esc(n)}</display-name>")
-        if icon or ch.get("logo"):
-            out.append(f"<icon src={quoteattr(icon or str(ch.get('logo')))}/>")
+        icon = public_logo(icon) or public_logo(ch.get("logo"))
+        if icon:
+            out.append(f"<icon src={quoteattr(icon)}/>")
         out.append("</channel>\n")
         told.add(num)
         return "".join(out).encode("utf-8")
@@ -258,6 +259,17 @@ def lineup_guide(guides: list[tuple[str, str]], channels: list[dict]) -> Iterato
 
 def _esc(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def public_logo(url: Any) -> str:
+    """*url* when it may be handed to another device as a channel's logo: a
+    web address with no login in it - else "". A box's picon carries its
+    user:password@ (providers/boxes.with_login), a Plex logo the account's
+    X-Plex-Token; a Nerd picon is a file of this computer's."""
+    text = str(url or "").strip()
+    if not text.lower().startswith(("http://", "https://")):
+        return ""
+    return text if redact_url(text) == text else ""
 
 
 def plain_chunks(path: str) -> Iterator[bytes]:

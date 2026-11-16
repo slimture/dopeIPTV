@@ -138,6 +138,7 @@ class _ServerMixin:
         try:
             srv.start()
         except OSError as e:
+            srv.stop()                  # its restream's thread, started with it
             self._home_error = f"{type(e).__name__}: {e}"
             log.warning("server: cannot listen on port %s: %s", cfg.port, e)
             self._show_toast(tr("nerd_ck_server_down", port=cfg.port), 6000)

@@ -47,7 +47,7 @@ from ..core.nerd_check import FAIL, OK, WARN, Check
 from ..core.phone_remote import RateLimiter
 from ..core.remote_api import lan_addresses
 from ..core.restream import BOX, NO_DATA, TUNERS, VPN, Busy, Restreamer, ffmpeg_opener, is_hls
-from .share import Share, lineup_guide
+from .share import Share, lineup_guide, public_logo
 
 DEFAULT_PORT = 3675             # the remote API's 3673, the phone remote's 3674, and one
 MAX_TUNERS = 64
@@ -151,6 +151,11 @@ def launch_command() -> str:
     appimage = os.environ.get("APPIMAGE")
     if appimage:
         return f'"{appimage}" --server'
+    # In the Flatpak, "dopeiptv" is the sandbox's own command, not one the
+    # computer's shell or a systemd service has.
+    flatpak = os.environ.get("FLATPAK_ID", "")
+    if re.fullmatch(r"[A-Za-z0-9_.-]+", flatpak):
+        return f"flatpak run {flatpak} --server"
     if getattr(sys, "frozen", False):
         return f'"{sys.executable}" --server'
     import shutil
@@ -330,7 +335,9 @@ class HomeServer:
             taken.add(num)
             out.append(LineupChannel(num, str(r.get("name") or num), str(pl["id"]),
                                      str(r.get("stream_id")), str(r.get("epg_channel_id") or ""),
-                                     str(r.get("stream_icon") or ""), group))
+                                     # A logo with a box's login or a token in it
+                                     # is left out: devices never get either.
+                                     public_logo(r.get("stream_icon")), group))
         with self._lineup_lock:
             self._lineup = (time.monotonic(), out)
         return out
@@ -437,6 +444,12 @@ class HomeServer:
                 return Busy(VPN, "no VPN up (Nerd's VPN guard)")
             if is_hls(url) and not _ffmpeg():
                 return Busy(NO_DATA, "an adaptive (HLS) channel needs ffmpeg to be restreamed")
+            scheme = urlsplit(url).scheme.lower()
+            if scheme not in ("http", "https"):
+                # A SAT>IP server's RTSP, a multicast udp:// - which the
+                # buffer's connection cannot read: said now, not after five
+                # tries and some sixteen seconds.
+                return Busy(NO_DATA, f"a {scheme or 'local'} address is not restreamed, only HTTP")
             client = self._client_of(pid)
             key = tuners.stream_key(url)
             if client is None or key is None or not hasattr(client, "tuner_state"):

@@ -61,6 +61,14 @@ class _ProviderHandler(BaseHTTPRequestHandler):
             srv.connections[self.path] = srv.connections.get(self.path, 0) + 1
             srv.open_now += 1
         try:
+            if self.path.startswith("/page/"):      # an expired account's answer
+                body = b"<html><body>Your subscription has expired</body></html>" * 20
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
             self.send_response(200)
             self.send_header("Content-Type", "video/mp2t")
             self.end_headers()
@@ -652,3 +660,135 @@ def test_the_player_adopts_the_server_s_session(monkeypatch, tmp_path, provider)
         assert provider.connections == {"/live/1.ts": 1}
     finally:
         pool.close_all(wait=2.0)
+
+
+# -- what devices are never given, and channels the server cannot carry ----------------------------
+
+def _serving(tmp_path, client):
+    pool = DvrPool(tmp_path / "dvr", 60.0, 10**9, min_free=0)
+    cfg = hs.Config(port=0, token=TOKEN, device_id=hdhr.new_device_id())
+    srv = hs.HomeServer(Host(pool), cfg, bind="127.0.0.1", discovery_port=0,
+                        make_client=lambda _pl: client,
+                        guide_path=lambda pid: str(tmp_path / f"epg_{pid}.xml"))
+    srv.start()
+    return srv, pool
+
+
+def test_logos_with_a_login_or_a_token_never_reach_a_device(tmp_path):
+    from dopeiptv.services.share import public_logo
+
+    class Logos(FakeClient):
+        def live_streams(self, _cat=None):
+            return [{"stream_id": 1, "name": "Box", "category_id": "1", "num": 1,
+                     "epg_channel_id": "box.tv",
+                     "stream_icon": "http://root:box-secret@192.168.1.9/picon/1_0_19.png"},
+                    {"stream_id": 2, "name": "Plex", "category_id": "1", "num": 2,
+                     "stream_icon": "http://192.168.1.8:32400/photo/:/transcode?url=%2Fx"
+                                    "&X-Plex-Token=plex-secret"},
+                    {"stream_id": 3, "name": "Picon", "category_id": "1", "num": 3,
+                     "stream_icon": "/home/someone/picons/3.png"},
+                    {"stream_id": 4, "name": "Plain", "category_id": "1", "num": 4,
+                     "stream_icon": "https://logos.example/4.png"}]
+
+    (tmp_path / "epg_p1.xml").write_text(
+        '<?xml version="1.0" encoding="UTF-8"?><tv><channel id="box.tv"><display-name>Box</display-name>'
+        '<icon src="http://root:box-secret@192.168.1.9/picon/guide.png"/></channel></tv>',
+        encoding="utf-8")
+    srv, pool = _serving(tmp_path, Logos("http://x.invalid"))
+    try:
+        m3u = _get(srv, f"/playlist.m3u?token={TOKEN}").read().decode()
+        guide = _get(srv, f"/xmltv.xml?token={TOKEN}").read().decode()
+        for text in (m3u, guide):
+            assert "secret" not in text and "/home/someone" not in text
+            assert "https://logos.example/4.png" in text, "a logo without a login stays"
+    finally:
+        srv.stop()
+        pool.close_all(wait=2.0)
+    assert public_logo("https://logos.example/4.png") == "https://logos.example/4.png"
+    assert public_logo("http://u:p@box/picon.png") == ""
+    assert public_logo("file:///tmp/x.png") == "" and public_logo(None) == ""
+
+
+def test_a_channel_whose_provider_sends_a_page_is_not_asked_again_for_every_try(tmp_path, provider):
+    class Expired(FakeClient):
+        def live_url(self, sid, fmt="ts"):
+            return f"{self.base}/page/{sid}.ts"
+
+    srv, pool = _serving(tmp_path, Expired(f"http://127.0.0.1:{provider.server_address[1]}"))
+    srv.restream.TICK = 0.1
+    try:
+        for _try in range(4):                   # a TV's app trying again by itself
+            with pytest.raises(urllib.error.HTTPError) as e:
+                _get(srv, "/auto/v5")
+            assert e.value.code == 503
+            assert e.value.headers["X-HDHomeRun-Error"] == "807 No Video Data"
+        assert provider.connections == {"/page/1.ts": 1}, "the page asked for once, not each time"
+    finally:
+        srv.stop()
+        pool.close_all(wait=2.0)
+
+
+def test_an_address_the_server_cannot_read_is_refused_at_once(tmp_path):
+    class SatIp(FakeClient):
+        def live_url(self, sid, fmt="ts"):
+            return "rtsp://192.168.1.7:554/?src=1&freq=11494&pol=h&msys=dvbs2&sr=22000&pids=0"
+
+    srv, pool = _serving(tmp_path, SatIp("http://x.invalid"))
+    try:
+        began = time.monotonic()
+        with pytest.raises(urllib.error.HTTPError) as e:
+            _get(srv, "/auto/v5")
+        assert e.value.code == 503 and e.value.headers["X-HDHomeRun-Error"] == "807 No Video Data"
+        assert "rtsp" in e.value.read().decode()
+        assert time.monotonic() - began < 5, "said at once, not after the buffer's five tries"
+        assert srv.restream.in_use() == 0 and not pool.sessions
+    finally:
+        srv.stop()
+        pool.close_all(wait=2.0)
+
+
+def test_the_command_to_start_it_in_the_flatpak_is_the_host_s(monkeypatch):
+    monkeypatch.delenv("APPIMAGE", raising=False)
+    monkeypatch.setenv("FLATPAK_ID", "io.github.slimture.dopeIPTV")
+    assert hs.launch_command() == "flatpak run io.github.slimture.dopeIPTV --server"
+    monkeypatch.delenv("FLATPAK_ID")
+    assert hs.launch_command().endswith("--server")
+
+
+def test_a_port_already_taken_leaves_no_thread_running(tmp_path):
+    from PyQt6.QtCore import QSettings
+
+    from dopeiptv.ui import mw_server
+
+    blocker = socket.socket()
+    blocker.bind(("0.0.0.0", 0))
+    blocker.listen(1)
+    port = blocker.getsockname()[1]
+    settings = QSettings(str(tmp_path / "s.ini"), QSettings.Format.IniFormat)
+    settings.setValue("nerd_server_port", str(port))
+    pool = DvrPool(tmp_path / "dvr", 60.0, 10**9, min_free=0)
+
+    class Player:
+        live_hook = None
+
+        def dvr_pool_for_server(self, _keep):
+            return pool
+
+    class Window(mw_server._ServerMixin):
+        def __init__(self) -> None:
+            self.settings, self.player, self.told = settings, Player(), []
+
+        def _show_toast(self, text, _ms) -> None:
+            self.told.append(text)
+
+    def ticking() -> int:
+        return sum(1 for t in threading.enumerate() if t.name == "restream" and t.is_alive())
+
+    before = ticking()
+    w = Window()
+    try:
+        w._server_start()
+        assert w._home is None and w.told and not pool.shared
+        assert wait_until(lambda: ticking() == before, 5), "the failed server's restream stopped"
+    finally:
+        blocker.close()

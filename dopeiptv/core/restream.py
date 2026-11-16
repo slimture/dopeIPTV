@@ -37,6 +37,7 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
+from .dvr_ingest import NotAStream
 from .dvr_pool import DvrPool
 from .dvr_session import DvrSession, IngestFactory
 from .dvr_store import Segment
@@ -289,7 +290,10 @@ class Restreamer:
             pool = self._pool()
             pool.shared = True
             self._pools.add(pool)
-            session = pool.acquire(url, "srv:" + key, SERVER, self._ingest_for(source))
+            try:
+                session = pool.acquire(url, "srv:" + key, SERVER, self._ingest_for(source))
+            except NotAStream as e:
+                raise Busy(NO_DATA, f"the provider sent {e}, not a stream") from None
             ch = Channel(key, source, stream, name, url, session, pool, self._clock())
             self._channels[key] = ch
             log.info("restream: %s opened (%s) - %d of %d tuner(s) in use", name or "a channel",
