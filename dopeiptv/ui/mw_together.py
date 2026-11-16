@@ -417,6 +417,8 @@ class _TogetherMixin:
                                          item=row)
                 finally:
                     self.series_ctx = saved
+                    # Taken by _start_playback, unless it turned back.
+                    self._ep_queue_override, self._ep_index_override = None, -1
         finally:
             self._together_start_at = None
 

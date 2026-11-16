@@ -777,6 +777,9 @@ class _TvMixin:
                                  item=ep)
         finally:
             self.series_ctx = saved
+            # Taken by _start_playback, unless it turned back: never left
+            # for the next episode played from elsewhere.
+            self._ep_queue_override, self._ep_index_override = None, -1
 
     def _tv_toggle_favorite(self, it: dict) -> None:
         """The red key: a channel in or out of the favorites."""

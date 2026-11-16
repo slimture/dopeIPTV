@@ -196,6 +196,11 @@ class _CastMixin:
             # History, written when the receiver says it plays.
             "resume": getattr(self, "resume", None),
             "history": getattr(self, "history", None),
+            # An episode's series, for its History row: the receiver says it
+            # plays after the dialog, when a series' page set it only for
+            # the moment (mw_series_page).
+            "series_ctx": (self.series_ctx
+                           if self._play_kind_for(it) == "episode" else None),
             # For History: the row's own kind and address, kept apart from
             # the address currently on the receiver, which an archive resume
             # or a track change replaces.
@@ -795,6 +800,7 @@ class _CastMixin:
             "group": self._RESUME_GROUP.get(rkind or ""), "key": key,
             "resume": getattr(self, "resume", None),
             "history": getattr(self, "history", None),
+            "series_ctx": self.series_ctx if kind == "episode" else None,
             "item": item, "kind": kind, "row_url": url, "row_source": url,
             "url": url, "source": url, "codecs": [], "height": 0, "fps": 0.0,
             "audio": audio, "subs": subs, "duration": 0.0, "tracks": {},
@@ -1074,7 +1080,8 @@ class _CastMixin:
         if callable(show):
             show()
 
-    def _history_extra(self, kind: str, item, title: str) -> dict | None:
+    def _history_extra(self, kind: str, item, title: str,
+                       series: dict | None = None) -> dict | None:
         """What a History row needs beyond its address, for this kind.
 
         For a live channel, its stream_id and archive depth, so a later replay
@@ -1098,7 +1105,9 @@ class _CastMixin:
                     if item.get(k)}
         if kind != "episode":
             return None
-        sctx = self.series_ctx or {}
+        # *series*: the episode's own, kept with it (a cast's); else the
+        # one it plays under now.
+        sctx = (series if series is not None else self.series_ctx) or {}
         if sctx.get("series_id") is None:
             return None
         slim = {k: sctx.get(k)
@@ -1139,7 +1148,8 @@ class _CastMixin:
         store.add(url, ctx.get("title") or "",
                          it.get("stream_icon") or it.get("cover"), key, kind,
                          extra=self._history_extra(kind, it,
-                                                   ctx.get("title") or ""))
+                                                   ctx.get("title") or "",
+                                                   ctx.get("series_ctx")))
 
     def manage_cast(self) -> None:
         """Reopen the cast panel on the session that is already running.

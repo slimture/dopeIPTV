@@ -744,3 +744,119 @@ def test_the_header_buttons_read_over_a_backdrop_on_a_light_theme(app):
     finally:
         theme.apply_theme(theme="graphite")
         app.setStyleSheet("")
+
+
+_CHILD_REVIEW2 = r"""
+import os, tempfile, time
+from types import SimpleNamespace
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from PyQt6.QtCore import QSettings
+from PyQt6.QtWidgets import QApplication
+
+_tmp = tempfile.mkdtemp()
+QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, _tmp)
+
+from dopeiptv.providers.client import DemoClient
+from dopeiptv.ui import main_window as mw_mod, mw_cast, mw_series_page
+from dopeiptv.ui.main_window import MainWindow
+
+app = QApplication.instance() or QApplication([])
+settings = QSettings(os.path.join(_tmp, "s.ini"), QSettings.Format.IniFormat)
+settings.setValue("home_enabled", "false")
+mw_mod.launch_player = lambda *a, **k: None
+mw_series_page.launch_player = lambda *a, **k: None
+
+
+class FakeDialog:
+    def __init__(self, *a, **k):
+        pass
+
+    def exec(self):
+        return 0
+
+
+mw_cast.CastDialog = FakeDialog
+w = MainWindow(DemoClient(), settings)
+w.cover.resolver = None
+w._choice_dialog = lambda *a, **k: 0
+
+def settle(cond, secs=10):
+    end = time.time() + secs
+    while not cond() and time.time() < end:
+        app.processEvents()
+        time.sleep(0.01)
+    app.processEvents()
+    assert cond(), "timed out"
+
+def season(n, count):
+    return [{"id": str(n * 1000 + e), "episode_num": e, "title": f"Ep {e}",
+             "container_extension": "mkv",
+             "info": {"plot": "A plot.", "duration_secs": 2700}} for e in range(1, count + 1)]
+
+info = {"info": {"name": "Show 30"}, "episodes": {"1": season(1, 3), "2": season(2, 2)}}
+w.client.series_info = lambda sid: info
+w.client.episode_url = lambda i, ext=None: f"http://x/series/u/p/{i}.mkv"
+w.resize(1440, 900)
+w.show()
+settle(lambda: w.list_model.rowCount() > 0)
+series = {"series_id": 130, "name": "Show 30", "category_id": "6"}
+w._open_series_page(series)
+settle(lambda: bool(w._sp_seasons))
+page = w._series_page
+
+def episode(eid):
+    return next(e for s in w._sp_seasons for e in s.episodes if e["id"] == eid)
+
+# -- a cast from the page: History keeps the episode's series, also when the
+#    receiver says it plays after the dialog closed (and on every strip
+#    refresh after) -----------------------------------------------------------------
+ep = episode("1002")
+w._sp_with_series(w._open_cast_dialog, ep)
+assert w.series_ctx is None
+w.show_cast_strip("Living room TV", ep["name"])
+w.show_cast_strip("Living room TV", ep["name"])
+row = next(r for r in w.history.items() if str(r.get("_key")) == "1002")
+assert row["_kind"] == "episode" and (row.get("_series_ctx") or {}).get("series_id") == 130, row
+w.show_cast_strip(None)
+
+# -- an episode replayed from History: played with its series (marks, resume,
+#    scrobbles), marked on its page, no stray autoplay queue -------------------------
+hist = {"_url": "http://x/series/u/p/2001.mkv", "_key": "2001", "_kind": "episode",
+        "name": "Show 30 · S2 * E1 - Ep 1",
+        "_series_ctx": {"series_id": 130, "name": "Show 30"}}
+w._ensure_home_page()._play_history(hist)
+app.processEvents()
+lp = w._last_playback
+assert str(lp["key"]) == "2001" and (lp.get("series_ctx") or {}).get("series_id") == 130, lp
+assert lp["ep_queue"] == [], [e.get("name") for e in lp["ep_queue"]][:3]
+assert w.series_ctx is None
+settle(lambda: w._series_page_showing() and w._series_page.playing_key == "2001")
+
+# -- TV mode and watch together: an episode turned back leaves no queue -------------
+guard = w._guard_stream_switch
+w._guard_stream_switch = lambda url, title: False
+w._tv_play_episode(episode("1001"), series, [episode("1001"), episode("1002")])
+assert w._ep_queue_override is None, "TV mode left its queue"
+w._together_room = SimpleNamespace(clock=SimpleNamespace(now_ms=lambda: 0))
+found = SimpleNamespace(kind="episode", row=episode("1003"), url="http://x/series/u/p/1003.mkv",
+                        series=series, queue=[episode("1003")])
+state = SimpleNamespace(position_at=lambda now: 0.0, playing=False,
+                        media=SimpleNamespace(name="Ep 3"))
+w._together_play(found, state)
+assert w._ep_queue_override is None, "watch together left its queue"
+w._together_room = None
+w._guard_stream_switch = guard
+
+print("SERIES_REVIEW2_OK", flush=True)
+os._exit(0)
+"""
+
+
+def test_series_page_review_regressions_more(tmp_path):
+    pytest.importorskip("PyQt6")
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen", XDG_CONFIG_HOME=str(tmp_path))
+    proc = subprocess.run([sys.executable, "-c", _CHILD_REVIEW2], capture_output=True,
+                          text=True, env=env, cwd=_REPO_ROOT, timeout=240)
+    assert "SERIES_REVIEW2_OK" in proc.stdout, (
+        f"stdout={proc.stdout[-3000:]!r}\nstderr={proc.stderr[-4000:]!r}")
+
