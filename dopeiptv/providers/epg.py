@@ -667,6 +667,16 @@ class XmltvGuide:
                 self._failed = not self._loaded
             return self._loaded
 
+    def load_cached(self) -> bool:
+        """The guide this computer has on disk into memory, whatever its
+        age - never a download (the search across sources reads another
+        source's guide this way). True when there is one."""
+        if self._loaded:
+            return True
+        with self._lock:
+            return self._loaded or (self._cache_age() is not None
+                                    and self._load_from_disk())
+
     def _load_from_disk(self) -> bool:
         """The guide on disk into memory. Its index alone does it - the XML
         beside it is unpacked and parsed again only when the index is
@@ -760,6 +770,12 @@ class XmltvGuide:
             except OSError:
                 pass
         return True
+
+    def schedule(self, item: dict) -> Schedule | None:
+        """*item*'s channel's programmes as kept (starts, stops, titles,
+        descriptions, in air order) - only a guide in memory, nothing
+        loaded."""
+        return self._sched_for(item) if self._loaded else None
 
     def _sched_for(self, item: dict) -> tuple[array, array, tuple, tuple] | None:
         cid = (item.get("epg_channel_id") or "").strip().lower()

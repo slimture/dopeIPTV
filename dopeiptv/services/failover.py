@@ -62,19 +62,24 @@ class Shown:
     excluded: frozenset[str] = frozenset()
     hidden: frozenset[str] = frozenset()
     names: Mapping[str, str] = field(default_factory=dict)
+    #: The rows given a name of the user's: their key -> that name.
+    titles: Mapping[str, str] = field(default_factory=dict)
 
     @classmethod
-    def of(cls, cats: Any, chans: Any, locked: bool = True) -> Shown:
+    def of(cls, cats: Any, chans: Any, locked: bool = True, mode: str = "live") -> Shown:
         """From that source's CategoryOverrides and ChannelOverrides
-        (core/stores.py); *locked*: its locked categories are left out too."""
-        live = cats.data.get("live") if isinstance(getattr(cats, "data", None), dict) else None
-        names = {str(cid): str(e["name"]) for cid, e in (live or {}).items()
+        (core/stores.py); *locked*: its locked categories are left out too.
+        *mode*: of its channels ("live"), films ("vod") or series."""
+        given = cats.data.get(mode) if isinstance(getattr(cats, "data", None), dict) else None
+        names = {str(cid): str(e["name"]) for cid, e in (given or {}).items()
                  if isinstance(e, dict) and e.get("name")}
-        own = chans.data.get("live") if isinstance(getattr(chans, "data", None), dict) else None
+        own = chans.data.get(mode) if isinstance(getattr(chans, "data", None), dict) else None
         hidden = frozenset(str(k) for k, e in (own or {}).items()
                            if isinstance(e, dict) and e.get("hidden"))
-        return cls(frozenset(str(c) for c in cats.excluded_ids("live", include_locked=locked)),
-                   hidden, names)
+        titles = {str(k): str(e["name"]) for k, e in (own or {}).items()
+                  if isinstance(e, dict) and e.get("name")}
+        return cls(frozenset(str(c) for c in cats.excluded_ids(mode, include_locked=locked)),
+                   hidden, names, titles)
 
     def keep(self, row: dict) -> bool:
         if str(row.get("category_id")) in self.excluded:
