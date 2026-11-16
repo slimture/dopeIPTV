@@ -15,7 +15,7 @@ from PyQt6.QtCore import (
     QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QAction, QColor, QIcon, QKeySequence, QPainter,
+    QAction, QColor, QGuiApplication, QIcon, QKeySequence, QPainter,
     QPixmap, QShortcut,
 )
 from PyQt6.QtWidgets import (
@@ -2233,9 +2233,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     # Deterministically restore the exact windowed
                     # size/position - a manually-enlarged window otherwise
                     # comes back smaller.
-                    geo = getattr(self, "_pre_fs_geo", None)
-                    if geo is not None:
-                        self.setGeometry(geo)
+                    self._restore_normal_geometry(getattr(self, "_pre_fs_geo", None))
             # Restore the window geometry *before* unlocking the video's
             # fixed height - _lock_video_box() reads the player's current
             # size, and computing it while the window is still fullscreen-
@@ -2267,6 +2265,68 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             QTimer.singleShot(0, lambda: (
                 self.listw.verticalScrollBar().setValue(scroll)))
         self._update_provider_hint()   # bring the hint back if in explore mode
+
+    def _restore_normal_geometry(self, geo, then=None) -> None:
+        """showNormal() was asked: *geo* (the window's own rectangle) put
+        back, then *then* run. On X11 and Wayland only once the window
+        manager has taken the window out of full screen: set at once, it
+        raced that and the window crept down and shrank by its title bar
+        each time (mutter); on Wayland it shrank by Qt's own decorations
+        even when left alone (weston). Elsewhere at once, as it always was."""
+        platform = QGuiApplication.platformName()
+        if platform != "xcb" and not platform.startswith("wayland"):
+            if geo is not None:
+                self.setGeometry(geo)
+            if then is not None:
+                self._after_fullscreen_left(then)
+            return
+        self._after_fullscreen_left(then, geo)
+
+    def _after_fullscreen_left(self, then=None, geo=None) -> None:
+        """*then* once the window is out of full screen - the window
+        manager's size, not the screen's, twice in a row - or after a second
+        and a half at most; *geo* set first if the window has another. A
+        newer call's geometry wins, and what an earlier one was to run still
+        runs (TV mode's put-back is never lost to a quick full screen)."""
+        t = getattr(self, "_settle_timer", None)
+        if t is None:
+            t = self._settle_timer = QTimer(self)
+            t.setInterval(20)
+            t.timeout.connect(self._settle_tick)
+        job = getattr(self, "_settle_job", None)
+        thens = list(job["then"]) if job else []
+        if then is not None:
+            thens.append(then)
+        self._settle_job = {"geo": geo, "then": thens, "until": time.monotonic() + 1.5, "seen": 0}
+        t.start()
+
+    def _settle_tick(self) -> None:
+        job = getattr(self, "_settle_job", None)
+        if job is None:
+            self._settle_cancel()
+            return
+        scr = self.screen() or QApplication.primaryScreen()
+        full = scr.geometry().size() if scr is not None else None
+        if full is None or self.size() != full:
+            job["seen"] += 1
+        if job["seen"] < 2 and time.monotonic() < job["until"]:
+            return
+        self._settle_cancel()
+        geo = job["geo"]
+        if geo is not None and not (self.isFullScreen() or self.isMaximized()) \
+                and self.geometry() != geo:
+            self.setGeometry(geo)
+        for fn in job["then"]:
+            try:
+                fn()
+            except Exception:
+                log.exception("the window after full screen")
+
+    def _settle_cancel(self) -> None:
+        self._settle_job = None
+        t = getattr(self, "_settle_timer", None)
+        if t is not None:
+            t.stop()
 
     # -- playlists -----------------------------------------------------------------
 
