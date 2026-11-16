@@ -1416,6 +1416,8 @@ class _SettingsMixin:
         c.shown_if(c.widget(os_status), lambda: bool(os_status.text()))
 
         def os_say(text: str, style: str) -> None:
+            if sip.isdeleted(os_status):        # an answer after the window went
+                return
             os_status.setText(text)
             os_status.setStyleSheet(style)
             os_card.refresh()
@@ -2001,11 +2003,15 @@ class _SettingsMixin:
                 return True
 
             def ok(_r):
+                if sip.isdeleted(tmdb_status):  # an answer after the window went
+                    return
                 tmdb_status.setText(tr("tmdb_key_works"))
                 tmdb_status.setStyleSheet(
                     f"color:{P['accent']}; font-size:12px; font-weight:600;")
 
             def fail(msg):
+                if sip.isdeleted(tmdb_status):
+                    return
                 tmdb_status.setText(tr("tmdb_key_failed", msg=msg))
                 tmdb_status.setStyleSheet(
                     f"color:{P['error']}; font-size:12px;")
@@ -2367,6 +2373,10 @@ class _SettingsMixin:
             account_lbl.setText(tr("account_loading"))
 
             def done(info, pid=pid):
+                # Asked as every window opens: the answer can come after the
+                # window went (deleted a while after it closed).
+                if sip.isdeleted(pl_list) or sip.isdeleted(account_lbl):
+                    return
                 # Ignore a stale answer if the selection moved on meanwhile.
                 if selected_pid() == pid:
                     account_lbl.setText(self._format_account(info))
@@ -2519,9 +2529,9 @@ class _SettingsMixin:
         # What the command palette finds among the settings, in this language.
         self._settings_index = shell.index()
         if index_only:
-            # Built for the index alone: never shown, nothing to store. Left
-            # as every closed Settings window is, so an answer still on its
-            # way to one of its rows finds it there.
+            # Built for the index alone: never shown, nothing to store. Kept
+            # a while as every closed Settings window is (_settings_closed).
+            self._settings_closed(d)
             return
         if at_page:
             if not shell.highlight(at_page, *(at_row or (-1, -1, ""))):
@@ -2792,6 +2802,20 @@ class _SettingsMixin:
         d.exec()
         live.stop()
         commit(final=True)
+        self._settings_closed(d)
+
+    #: How long a closed Settings window is kept before it is deleted.
+    SETTINGS_KEEP_MS = 60_000
+
+    def _settings_closed(self, d: QDialog) -> None:
+        """A closed (or never shown) Settings window: deleted a minute
+        later. Kept that long so an answer still on its way to one of its
+        rows - an account looked up as it opened, a key being tested -
+        finds it there (each such answer also checks its row is still
+        there). Never deleted, every window stayed behind: some 2300
+        widgets each, all restyled at every theme change, which took
+        seconds more with every Settings opened in a session."""
+        QTimer.singleShot(self.SETTINGS_KEEP_MS, d.deleteLater)
 
     @staticmethod
     def _format_release_notes(body: str, current: str = "",

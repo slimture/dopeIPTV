@@ -21,6 +21,7 @@ from ..providers.trakt import (
 from .theme import P
 from ..core.workers import run_async
 from ..core.xdg import open_url
+from PyQt6 import sip
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtWidgets import (
     QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
@@ -1179,16 +1180,24 @@ class _TraktMixin:
                         f"{ep.get('title') or ''}")
             return watched or "?"
 
+        # Opened from Settings, it goes with that window (deleted a while
+        # after it closed): an answer after that has nowhere to go.
         def load_failed(msg) -> None:
+            if sip.isdeleted(status):
+                return
             status.setText(tr("trakt_load_failed", msg=msg))
 
         def load_history(items) -> None:
+            if sip.isdeleted(hist_list) or sip.isdeleted(status):
+                return
             hist_list.clear()
             for e in items:
                 hist_list.addItem(fmt_history(e))
             status.setText("")
 
         def load_watchlist(items) -> None:
+            if sip.isdeleted(wl_list):
+                return
             wl_list.clear()
             for e in items:
                 wl_list.addItem(fmt_watchlist(e))

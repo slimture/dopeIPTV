@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import threading
 
+from PyQt6 import sip
 from PyQt6.QtCore import Qt, QThreadPool, pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMenu, QPushButton, QWidget
 
@@ -136,6 +137,8 @@ class FindOnNetwork(QPushButton):
         self.setToolTip("")
 
     def _failed(self, _err=None) -> None:
+        if sip.isdeleted(self):       # its form went while it searched
+            return
         self._reset()
         self._say(nothing_found_text())
 
@@ -144,6 +147,8 @@ class FindOnNetwork(QPushButton):
         self.status.setVisible(bool(text))
 
     def _done(self, found) -> None:
+        if sip.isdeleted(self):
+            return
         self._reset()
         found = list(found or [])
         if not found:
