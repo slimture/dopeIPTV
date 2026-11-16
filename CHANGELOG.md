@@ -38,6 +38,13 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   answer lands only on the sign-in it renewed: never over a newer one,
   and never after Sign out, which a renewal still on its way used to undo
   by storing the tokens again.
+- Keyboard shortcuts did not sync between computers: sync still looked
+  for the keys the editor kept before 1.5.0. They sync now, and only
+  between computers of the same system - macOS with macOS, Linux with
+  Linux, Windows with Windows - since ⌘ is not Ctrl and each system keeps
+  keys of its own. A computer leaves another system's keys as they are,
+  and its first sync after the update takes the keys the other computers
+  of its system already share.
 
 ## [1.6.0]
 
