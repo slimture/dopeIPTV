@@ -35,6 +35,7 @@ import time
 import weakref
 from typing import Any, Callable
 
+from PyQt6 import sip
 from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, Qt, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import (
     QColor, QGuiApplication, QImage, QOffscreenSurface, QOpenGLContext, QPainter, QRegion,
@@ -153,6 +154,15 @@ def swap_for_fallback(old: QWidget, wire: Callable[[QWidget], None]) -> QWidget:
     return new
 
 
+def _alive(obj: Any) -> bool:
+    """A Qt object whose C++ side still exists (a widget over the picture
+    can be deleted at any time - a notice, a dialog, the pop-out's button)."""
+    try:
+        return obj is not None and not sip.isdeleted(obj)
+    except TypeError:
+        return False
+
+
 # -- the native window ------------------------------------------------------------
 
 
@@ -167,6 +177,9 @@ class _VideoWindow(QWindow):
         self._changed = changed
         self._going = going
         self.shown_once = False
+        # Its native surface is about to go or went: never drawn into again
+        # until it is made anew (a recreated window says SurfaceCreated).
+        self.gone = False
         self.setSurfaceType(QSurface.SurfaceType.OpenGLSurface)
         self.setFormat(_surface_format())
         self.setFlags(self.flags() | Qt.WindowType.WindowTransparentForInput
@@ -175,25 +188,42 @@ class _VideoWindow(QWindow):
         self.screenChanged.connect(self._screen_changed)
 
     def _screen_changed(self, _screen) -> None:
-        self._changed()
+        self._tell()
+
+    def _tell(self) -> None:
+        # Called from Qt's events: whatever the owner does must not raise
+        # out of them (it may be on its way out itself).
+        try:
+            self._changed()
+        except Exception as e:
+            log.debug("video window: %s", e)
 
     def exposeEvent(self, e) -> None:
         if self.isExposed():
             self.shown_once = True
-        self._changed()
+        self._tell()
 
     def resizeEvent(self, e) -> None:
-        self._changed()
+        self._tell()
 
     def event(self, e) -> bool:
         t = int(e.type())
         if t in _DPR_EVENTS:
-            self._changed()
-        elif (t == _PLATFORM_SURFACE and self._going is not None
-              and e.surfaceEventType() == e.SurfaceEventType.SurfaceAboutToBeDestroyed):
-            # The native window goes (a window recreated: frameless, on top,
-            # a reparent): the render thread lets go of it first.
-            self._going(self)
+            self._tell()
+        elif t == _PLATFORM_SURFACE:
+            kind = e.surfaceEventType()
+            if kind == e.SurfaceEventType.SurfaceAboutToBeDestroyed:
+                # The native window goes (a window recreated: frameless, on
+                # top, a reparent; or deleted - QWindowContainer destroys it
+                # explicitly first): the render thread lets go of it first.
+                self.gone = True
+                if self._going is not None:
+                    try:
+                        self._going(self)
+                    except Exception as ex:
+                        log.debug("video window going: %s", ex)
+            elif kind == e.SurfaceEventType.SurfaceCreated:
+                self.gone = False
         return super().event(e)
 
 
@@ -232,8 +262,12 @@ def _on_screen(win: QWindow) -> bool:
                            and not top.windowStates() & Qt.WindowState.WindowMinimized)
 
 
+def _usable(win: Any) -> bool:
+    return _alive(win) and not getattr(win, "gone", False)
+
+
 def _target_of(win: QWindow | None, shown: bool) -> _Target:
-    if win is None:
+    if win is None or not _usable(win):
         return _Target(None, 0, 0, False)
     dpr = win.devicePixelRatio() or 1.0
     w, h = max(1, round(win.width() * dpr)), max(1, round(win.height() * dpr))
@@ -329,6 +363,17 @@ class _Renderer(QThread):
         if not ok:
             log.warning("video thread: did not let go of a window in %.1f s", timeout)
         return ok
+
+    def _drop_target(self, window: Any) -> None:
+        with self._lock:
+            if self._target.window is window:
+                self._target = _Target(None, 0, 0, False)
+
+    def finish(self, *_args) -> None:
+        """Stop and wait: before what it draws into or with goes."""
+        self.stop()
+        if self.isRunning() and not self.wait(5000):
+            log.error("video thread: %s did not stop", self.objectName())
 
     # -- this thread --------------------------------------------------------------
     def _get_proc_address(self, _ctx, name: bytes) -> int:
@@ -454,25 +499,46 @@ class _Renderer(QThread):
                 continue
             if not (frame or redraw):
                 continue
-            t0 = time.monotonic()
-            if (remake or current is not target.window
-                    or QOpenGLContext.currentContext() is not ctx):
-                if not ctx.makeCurrent(target.window):
-                    failed_makes += 1
-                    if failed_makes in (1, 50):
-                        log.warning("video thread: the window could not be drawn into (%d)",
-                                    failed_makes)
+            if not _usable(target.window):
+                # Its window went (or is going) before the window's thread
+                # said so: nothing to draw into, an ordinary state.
+                self._drop_target(target.window)
+                if current is not None:
                     ctx.makeCurrent(self._off)
                     current = None
-                    continue
-                current = target.window
-            failed_makes = 0
-            if blank:
-                self._clear_black()
-            else:
-                rctx.render(flip_y=True, opengl_fbo={
-                    "fbo": int(ctx.defaultFramebufferObject()), "w": target.w, "h": target.h})
-            ctx.swapBuffers(target.window)
+                if frame:
+                    rctx.render(skip_rendering=True)
+                    rctx.report_swap()
+                    self.pending_since = 0.0
+                continue
+            t0 = time.monotonic()
+            try:
+                if (remake or current is not target.window
+                        or QOpenGLContext.currentContext() is not ctx):
+                    if not ctx.makeCurrent(target.window):
+                        failed_makes += 1
+                        if failed_makes in (1, 50):
+                            log.warning("video thread: the window could not be drawn into (%d)",
+                                        failed_makes)
+                        ctx.makeCurrent(self._off)
+                        current = None
+                        continue
+                    current = target.window
+                failed_makes = 0
+                if blank:
+                    self._clear_black()
+                else:
+                    rctx.render(flip_y=True, opengl_fbo={
+                        "fbo": int(ctx.defaultFramebufferObject()), "w": target.w, "h": target.h})
+                ctx.swapBuffers(target.window)
+            except RuntimeError as e:
+                # sip: the window's wrapper was deleted under us. Not a
+                # failure of the render thread - the window is gone.
+                log.info("video thread: its window went (%s)", e)
+                self._drop_target(target.window)
+                ctx.makeCurrent(self._off)
+                current = None
+                continue
             if not blank:
                 rctx.report_swap()
             self.render_ms = (time.monotonic() - t0) * 1000.0
@@ -514,6 +580,7 @@ class _Overlays(QObject):
         self._dirty: set[int] = set()        # ids of widgets painted again
         self._full = True
         self._rendering = False              # our own render() paints them too
+        self._stopped = False                # uninstalled: for good
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.setInterval(OVERLAY_MS)
@@ -531,12 +598,24 @@ class _Overlays(QObject):
         self.relook()
 
     def relook(self) -> None:
+        if self._stopped:
+            return
         self._full = True
         if not self._timer.isActive():
             self._timer.start()
 
-    def _candidates(self) -> list[QWidget]:
+    def _over_alive(self) -> QWidget | None:
         over = self._over
+        if not _alive(over):
+            # The pop-out's mirror went before the surface was told: back
+            # over the surface itself.
+            over = self._over = self._surface
+        return over if _alive(over) else None
+
+    def _candidates(self) -> list[QWidget]:
+        over = self._over_alive()
+        if over is None:
+            return []
         box = getattr(over, "_box", None)
         out = [c for c in over.children()
                if isinstance(c, QWidget) and c is not box and not c.isWindow()]
@@ -552,25 +631,60 @@ class _Overlays(QObject):
 
     def _watch(self, w: QWidget) -> None:
         if w in self._watched:
-            return
-        self._watched.add(w)
-        w.installEventFilter(self)
-        for c in w.findChildren(QWidget):
-            if c not in self._watched:
-                self._watched.add(c)
-                c.installEventFilter(self)
+            return              # its children come in through ChildAdded
+        for c in [w, *w.findChildren(QWidget)]:
+            if c in self._watched or not _alive(c):
+                continue
+            self._watched.add(c)
+            c.installEventFilter(self)
+            # A widget deleted is taken off the picture at once - nothing
+            # here keeps hold of it (or asks it anything) after that.
+            c.destroyed.connect(self._gone)
+
+    def _gone(self, obj: Any = None) -> None:
+        # *obj* is the wrapper sip finds for the address now - not always
+        # the one held here (a Python-made widget's is already marked
+        # deleted): both are let go.
+        for w in list(self._watched):
+            if w is obj or not _alive(w):
+                self._watched.discard(w)
+        self._prune(obj)
+        self.relook()
+
+    def _prune(self, obj: Any = None) -> bool:
+        """Take the deleted widgets (and *obj*, going) out of what is shown,
+        their mpv overlays with them. Whether there were any."""
+        dead = [(oid, w) for oid, w, _g in self._shown if w is obj or not _alive(w)]
+        if not dead:
+            return False
+        core = self._surface.mpv if _alive(self._surface) else None
+        gone = {oid for oid, _w in dead}
+        for oid in gone:
+            if core is not None:
+                self._remove(core, oid)
+            else:
+                self._imgs.pop(oid, None)
+        self._shown = [e for e in self._shown if e[0] not in gone]
+        self._dirty -= gone
+        return True
 
     def eventFilter(self, obj, event) -> bool:
-        if self._rendering:
+        # An event filter must never raise: every widget here can be deleted
+        # at any moment. Anything odd - look at them all again.
+        # (getattr: a filter can be called on its way out, its state gone.)
+        if getattr(self, "_rendering", True) or getattr(self, "_stopped", True):
             return False
-        t = event.type()
-        if t in self._WATCH:
+        try:
+            t = event.type()
+            if t not in self._WATCH:
+                return False
             if t == QEvent.Type.ChildAdded:
                 child = event.child()
-                if isinstance(child, QWidget):
+                if isinstance(child, QWidget) and _alive(child):
                     self._watch(child)
                 self._full = True
             elif t == QEvent.Type.Paint:
+                self._prune()
                 for oid, w, _g in self._shown:
                     if w is obj or (isinstance(obj, QWidget) and w.isAncestorOf(obj)):
                         self._dirty.add(oid)
@@ -581,10 +695,15 @@ class _Overlays(QObject):
                 self._full = True
             if not self._timer.isActive():
                 self._timer.start()
+        except Exception as e:
+            self._full = True
+            log.debug("video overlays: event: %s", e)
         return False
 
     def _geometry(self, w: QWidget) -> tuple[int, int, int, int] | None:
-        over = self._over
+        over = self._over_alive()
+        if over is None or not _alive(w):
+            return None
         if not w.isVisible() or w.width() <= 0 or w.height() <= 0:
             return None
         if w.testAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen):
@@ -596,7 +715,13 @@ class _Overlays(QObject):
         return r.x(), r.y(), r.width(), r.height()
 
     def _flush(self) -> None:
-        core = self._surface.mpv
+        if self._stopped:
+            return
+        if self._over is not self._surface and not _alive(self._over):
+            self._over_alive()
+            self._full = True
+        self._prune()
+        core = self._surface.mpv if _alive(self._surface) else None
         if core is None:
             return
         try:
@@ -604,6 +729,8 @@ class _Overlays(QObject):
                 self._full = False
                 want: list[tuple[QWidget, tuple]] = []
                 for w in self._candidates():
+                    if not _alive(w):
+                        continue
                     self._watch(w)
                     g = self._geometry(w)
                     if g is not None:
@@ -616,7 +743,7 @@ class _Overlays(QObject):
                     if prev is None or prev[0] is not w or prev[1] != g or oid in self._dirty:
                         self._add(core, oid, w, g)
                     shown.append((oid, w, g))
-                for oid in range(len(want), len(self._shown)):
+                for oid in sorted(set(old) - set(range(len(want)))):
                     self._remove(core, oid)
                 self._shown = shown
             else:
@@ -632,13 +759,18 @@ class _Overlays(QObject):
                       if oid in self._dirty)
             self._timer.setInterval(BIG_OVERLAY_MS if big else OVERLAY_MS)
             self._dirty.clear()
-            if self._full:
-                self._timer.start()
         except Exception as e:
+            # A widget deleted half-way: shown again from scratch.
+            self._full = True
             log.debug("video overlays: %s", e)
+        if self._full and not self._stopped:
+            self._timer.start()
 
     def _add(self, core, oid: int, w: QWidget, g: tuple) -> None:
-        dpr = self._over.devicePixelRatioF() or 1.0
+        over = self._over_alive()
+        if over is None or not _alive(w):
+            return
+        dpr = over.devicePixelRatioF() or 1.0
         pw, ph = max(1, round(g[2] * dpr)), max(1, round(g[3] * dpr))
         img = QImage(pw, ph, QImage.Format.Format_ARGB32_Premultiplied)
         img.setDevicePixelRatio(dpr)
@@ -666,19 +798,58 @@ class _Overlays(QObject):
         self._imgs.pop(oid, None)
 
     def clear(self) -> None:
-        core = self._surface.mpv
+        core = self._surface.mpv if _alive(self._surface) else None
         if core is not None:
             for oid, _w, _g in self._shown:
                 self._remove(core, oid)
         self._shown = []
+        self._imgs.clear()
+        self._dirty.clear()
         self._full = True
 
     def stop(self) -> None:
         self._scan.stop()
         self._timer.stop()
 
+    def uninstall(self) -> None:
+        """For good (the surface falls back or goes): no filter left on any
+        widget, nothing held."""
+        self._stopped = True
+        self.stop()
+        self.clear()
+        for w in list(self._watched):
+            if _alive(w):
+                try:
+                    w.removeEventFilter(self)
+                    w.destroyed.disconnect(self._gone)
+                except (RuntimeError, TypeError):
+                    pass
+        self._watched.clear()
+
 
 # -- the surface --------------------------------------------------------------------
+
+
+class _Ending:
+    """What a surface leaves running - its render thread, its mpv core -
+    ended if the surface is destroyed without shutdown() (its destroyed
+    signal: nothing is asked of the surface itself then, it is gone). The
+    thread first: mpv's render context goes before its core."""
+
+    def __init__(self) -> None:
+        self.renderer: _Renderer | None = None
+        self.core: Any = None
+
+    def end(self, *_args) -> None:
+        r, self.renderer = self.renderer, None
+        if r is not None:
+            r.finish()
+        m, self.core = self.core, None
+        if m is not None:
+            try:
+                m.terminate()
+            except Exception:
+                pass
 
 
 _LIVE: "weakref.WeakSet[ThreadedVideoSurface]" = weakref.WeakSet()
@@ -770,6 +941,8 @@ class ThreadedVideoSurface(QWidget):
         self._watchdog.setInterval(1000)
         self._watchdog.timeout.connect(self._check_stuck)
         self._started_at = 0.0
+        self._ending = _Ending()
+        self.destroyed.connect(self._ending.end)
 
     # -- what the player reads ----------------------------------------------------
     @property
@@ -828,6 +1001,7 @@ class ThreadedVideoSurface(QWidget):
             self.mpv = None
             self._give_up(f"mpv: {type(e).__name__}: {e}")
             return
+        self._ending.core = self.mpv
         fmt = _surface_format()
         off = QOffscreenSurface(self.screen())
         off.setFormat(fmt)
@@ -839,6 +1013,7 @@ class ThreadedVideoSurface(QWidget):
         self._offscreen = off
         r = _Renderer(self.mpv, off, fmt, self._name, self._told)
         self._renderer = r
+        self._ending.renderer = r
         r.start()
         if not r.ready.wait(START_TIMEOUT_S) or r.error:
             reason = r.error or "the render thread did not start"
@@ -869,11 +1044,13 @@ class ThreadedVideoSurface(QWidget):
 
     def _give_up(self, reason: str) -> None:
         self._failed = reason
+        self._overlays.uninstall()
         video_mode.note_failed(reason)
         log.warning("video: drawn on the window's thread (fallback: %s)", reason)
         self.fallback.emit(reason)
 
     def _kill_core(self) -> None:
+        self._ending.core = None
         m, self.mpv = self.mpv, None
         if m is not None:
             try:
@@ -882,19 +1059,27 @@ class ThreadedVideoSurface(QWidget):
                 pass
 
     def _stop_renderer(self) -> None:
+        self._ending.renderer = None
         r, self._renderer = self._renderer, None
         if r is not None:
-            r.stop()
-            if not r.wait(5000):
-                log.error("video thread: %s did not stop", r.objectName())
+            r.finish()
 
     # -- the picture: where it goes, whether it shows ---------------------------------
+    def _live_mirror(self) -> "ThreadedMirror | None":
+        """The pop-out's mirror - or none if it was deleted before
+        drop_mirror() (its window going away with it)."""
+        m = self._mirror
+        if m is not None and not _alive(m):
+            self._mirror = m = None
+            self._overlays.place_over(self)
+        return m
+
     def _window_changed(self) -> None:
         r = self._renderer
-        if r is None:
+        if r is None or not _alive(self):
             return
         try:
-            m = self._mirror
+            m = self._live_mirror()
             if m is not None:
                 t = _target_of(m._win, m.isVisible() and m._box.isVisible())
             else:
@@ -904,6 +1089,11 @@ class ThreadedVideoSurface(QWidget):
         r.set_target(t)
 
     def _window_going(self, win: QWindow) -> None:
+        if not _alive(self):
+            # This surface is being destroyed (its window goes with it):
+            # its thread and core end here, before the window does.
+            self._ending.end()
+            return
         r = self._renderer
         if r is not None:
             r.release(win)
@@ -918,7 +1108,7 @@ class ThreadedVideoSurface(QWidget):
         first frame, for sound alone and when stopped, what is under it (the
         loading indicator, black) is plain Qt."""
         show = self._vo and not self._blank and self.mpv is not None
-        m = self._mirror
+        m = self._live_mirror()
         if m is not None:
             m._box.setVisible(show)
             self._box.hide()
@@ -978,8 +1168,14 @@ class ThreadedVideoSurface(QWidget):
         self._sync_box()
         if m is not None:
             m._owner = None
-            m.hide()
-            m.deleteLater()
+            # Let go of its window now, not when it is deleted: the thread
+            # may still be drawing the frame it began there.
+            r = self._renderer
+            if r is not None and _alive(m):
+                r.release(m._win)
+            if _alive(m):
+                m.hide()
+                m.deleteLater()
 
     # -- input (the widget itself gets it: the native window takes none) -------------
     def keyPressEvent(self, event) -> None:
@@ -1014,8 +1210,7 @@ class ThreadedVideoSurface(QWidget):
     # -- end ------------------------------------------------------------------------
     def shutdown(self) -> None:
         self._watchdog.stop()
-        self._overlays.stop()
-        self._overlays.clear()
+        self._overlays.uninstall()
         self._stop_renderer()
         self._kill_core()
         off, self._offscreen = self._offscreen, None

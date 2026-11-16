@@ -93,7 +93,15 @@ native window takes no input (`WindowTransparentForInput`), so they get
 their clicks, hover and tooltips as before, and what they show is drawn
 into the picture by mpv (`overlay-add`, BGRA premultiplied), again only
 when one changes. While mpv has no picture the native window is hidden and
-everything is plain Qt.
+everything is plain Qt. Any of those widgets can be deleted at any moment
+(a notice, a dialog, the pop-out's button): the layer never asks a deleted
+one anything (`sip.isdeleted`; its `destroyed` signal takes it off the
+picture at once), its event filter never raises, and it is uninstalled
+from every widget when the surface falls back or goes. The render thread
+lets go of a window before it goes - `release` on the window's
+`SurfaceAboutToBeDestroyed` (QWindowContainer sends it before deleting
+it), the pop-out's when it is dropped, the whole thread when its surface
+is destroyed (`_Ending`) - and a window gone under it is no failure.
 
 Switched off (Settings > Picture & sound, or `DOPEIPTV_VIDEO_THREAD=0`), or
 when the own thread cannot start (no threaded OpenGL, no GL context or render

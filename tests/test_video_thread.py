@@ -246,3 +246,202 @@ def test_a_renderer_that_is_not_running_lets_go_at_once():
     from PyQt6.QtGui import QWindow
     r = video_thread._Renderer(None, None, None, "t", video_thread._Told())
     assert r.release(QWindow()) is True
+
+
+# -- widgets over the picture come and go (1.6.1: deleted buttons) --------------------
+
+class _Hook:
+    """sys.excepthook while a test runs: what an event filter raised."""
+
+    def __init__(self, monkeypatch):
+        import sys
+        self.seen = []
+        monkeypatch.setattr(sys, "excepthook", lambda *a: self.seen.append(a[1]))
+
+
+def _deferred():
+    from PyQt6.QtCore import QCoreApplication, QEvent
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete.value)
+    app.processEvents()
+
+
+def _paint_all(host):
+    host.repaint()
+    for w in host.findChildren(QWidget):
+        w.repaint()
+    app.processEvents()
+
+
+def test_buttons_deleted_over_the_picture_never_raise(monkeypatch):
+    from PyQt6 import sip
+    from PyQt6.QtWidgets import QPushButton
+    hook = _Hook(monkeypatch)
+    host, surface, layer, stats, bar, badge, under = _setup()
+    for round_ in range(20):
+        made = []
+        for i in range(3):
+            b = QPushButton(f"notice {round_}.{i}", host if i % 2 else surface)
+            b.setGeometry(20 + 30 * i, 60, 60, 24)
+            b.show()
+            made.append(b)
+        layer.relook()                   # what the 300 ms scan does
+        layer._flush()
+        assert any(w is made[0] for _oid, w, _g in layer._shown)
+        # Gone two ways: deleted at once, and later through the event loop.
+        sip.delete(made[0])
+        made[1].deleteLater()
+        _deferred()
+        _paint_all(host)
+        layer._flush()
+        made[2].deleteLater()
+        _deferred()
+        _paint_all(host)
+        layer.relook()
+        layer._flush()
+    assert hook.seen == []
+    assert all(video_thread._alive(w) for _oid, w, _g in layer._shown)
+    assert all(video_thread._alive(w) for w in list(layer._watched))
+    layer.stop()
+
+
+def test_a_deleted_overlay_leaves_the_picture_at_once():
+    from PyQt6 import sip
+    from PyQt6.QtWidgets import QPushButton
+    host, surface, layer, stats, bar, badge, under = _setup()
+    b = QPushButton("Retry", host)
+    b.setGeometry(40, 80, 80, 24)
+    b.show()
+    layer._flush()
+    oid = next(o for o, w, _g in layer._shown if w is b)
+    surface.mpv.calls.clear()
+    sip.delete(b)
+    assert ("overlay-remove", oid) in surface.mpv.calls
+    assert all(w is not b for _o, w, _g in layer._shown)
+    layer.stop()
+
+
+def test_ids_left_over_after_a_middle_one_goes_are_taken_off():
+    from PyQt6 import sip
+    from PyQt6.QtWidgets import QPushButton
+    host, surface, layer, stats, bar, badge, under = _setup()
+    b = QPushButton("middle", host)
+    b.setGeometry(40, 80, 80, 24)
+    b.show()
+    c = QPushButton("last", host)
+    c.setGeometry(140, 80, 80, 24)
+    c.show()
+    layer._flush()
+    top = max(o for o, _w, _g in layer._shown)
+    sip.delete(b)                    # off the picture now, a hole in the ids
+    surface.mpv.calls.clear()
+    layer._full = True
+    layer._flush()
+    shown = {o for o, _w, _g in layer._shown}
+    removed = {cl[1] for cl in surface.mpv.calls if cl[0] == "overlay-remove"}
+    assert top not in shown and top in removed
+    assert shown == set(range(len(shown)))
+    layer.stop()
+
+
+def test_uninstalled_the_layer_watches_nothing(monkeypatch):
+    from PyQt6.QtWidgets import QPushButton
+    hook = _Hook(monkeypatch)
+    host, surface, layer, stats, bar, badge, under = _setup()
+    layer._flush()
+    layer.uninstall()
+    assert not layer._shown and not list(layer._watched)
+    b = QPushButton("after", host)
+    b.show()
+    _paint_all(host)
+    b.deleteLater()
+    _deferred()
+    layer._flush()
+    layer.relook()
+    assert hook.seen == [] and not layer._shown
+
+
+def test_the_pop_out_mirror_deleted_first_falls_back_to_the_surface(monkeypatch):
+    hook = _Hook(monkeypatch)
+    host, surface, layer, stats, bar, badge, under = _setup()
+    pop = QWidget()
+    mirror = _Surface(pop)
+    pop.show()
+    layer.place_over(mirror)
+    layer._flush()
+    pop.deleteLater()
+    _deferred()
+    layer._flush()
+    assert layer._over is surface and hook.seen == []
+    layer.stop()
+
+
+def test_a_window_on_its_way_out_is_never_drawn_into():
+    from PyQt6 import sip
+    win = video_thread._VideoWindow(lambda: None)
+    win.resize(100, 100)
+    assert video_thread._target_of(win, True).window is win
+    win.gone = True
+    assert video_thread._target_of(win, True).window is None
+    win.gone = False
+    sip.delete(win)
+    assert video_thread._target_of(win, True).window is None
+
+
+def test_a_surface_destroyed_without_shutdown_ends_what_it_runs():
+    class _Thread:
+        finished = False
+
+        def finish(self):
+            self.finished = True
+
+    class _Core:
+        ended = False
+
+        def terminate(self):
+            self.ended = True
+
+    host = QWidget()
+    s = video_thread.ThreadedVideoSurface(host)
+    t, c = _Thread(), _Core()
+    s._ending.renderer, s._ending.core = t, c
+    host.deleteLater()
+    _deferred()
+    assert t.finished and c.ended
+
+
+# -- the mouse on the picture: as on the window-thread surface ------------------------
+
+def _mouse_log(surface_type):
+    from PyQt6.QtCore import QPoint, Qt
+    from PyQt6.QtTest import QTest
+    host = QWidget()
+    host.resize(320, 200)
+    lay = QVBoxLayout(host)
+    lay.setContentsMargins(0, 0, 0, 0)
+    s = surface_type(host)
+    lay.addWidget(s)
+    host.show()
+    app.processEvents()
+    seen = []
+    s.video_mouse_press.connect(lambda e: seen.append(("press", e.button().name)))
+    s.video_mouse_release.connect(lambda e: seen.append(("release", e.button().name)))
+    s.video_dbl_click.connect(lambda: seen.append(("double",)))
+    win = host.windowHandle()
+    at = QPoint(60, 50)              # off the centre, on the picture
+    QTest.mouseClick(win, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, at)
+    seen.append("|")
+    QTest.mouseDClick(win, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, at)
+    seen.append("|")
+    QTest.mouseClick(win, Qt.MouseButton.RightButton, Qt.KeyboardModifier.NoModifier, at)
+    if hasattr(s, "shutdown"):
+        s.shutdown()
+    host.close()
+    return seen
+
+
+def test_a_click_double_click_and_right_click_reach_the_player_as_before():
+    old = _mouse_log(video_surface._MpvGLWidget)
+    new = _mouse_log(video_thread.ThreadedVideoSurface)
+    assert new == old
+    assert ("press", "LeftButton") in old and ("double",) in old
+    assert ("press", "RightButton") in old
