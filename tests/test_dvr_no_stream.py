@@ -196,6 +196,33 @@ def test_a_stream_that_drops_with_a_megabyte_each_time_goes_on(answer, tmp_path)
     assert s.total_bytes() > 1_000_000
 
 
+def test_a_message_on_a_reconnect_after_a_stream_is_a_failed_try(answer, tmp_path):
+    # No regression: a channel that streamed, dropped, and is told "Max
+    # connections reached" while the provider still counts the dropped
+    # connection is tried again, as before - not refused for good (the
+    # pool would then play it without the buffer for ten minutes).
+    def body(w) -> None:
+        if srv.connections in (2, 3):
+            w.write(b"Max connections reached\r\n")
+            return
+        for _ in range(60):
+            w.write(PKT * 140)
+            time.sleep(0.005)
+    srv = answer(body, "video/mp2t")
+    s = _store(tmp_path)
+    ing = Quick(srv.url, s)
+    ing.start()
+    assert wait_until(lambda: srv.connections >= 4 or ing.state == "failed", 20)
+    assert ing.refused is None and ing.state != "failed", srv.connections
+    ing.stop(wait=5)
+    # Never streamed: the same message is given up at once.
+    first = answer(b"Max connections reached\r\n", "text/plain")
+    ing = Quick(first.url, _store(tmp_path / "b"))
+    ing.start()
+    assert wait_until(lambda: ing.state == "failed", 5)
+    assert ing.refused == "text" and first.connections == 1
+
+
 # -- the local server ------------------------------------------------------------------
 
 

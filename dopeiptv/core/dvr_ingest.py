@@ -21,7 +21,9 @@ web page, an error message) is a failed try, not a run: such an address was
 opened again twice a second for ever. And an answer that is plainly no
 stream - a web page, JSON, a playlist, a line of text - is given up at
 once (``NotAStream``), with no try after it; the window then plays the
-address as it did before the buffer (core/dvr_pool.py remembers it).
+address as it did before the buffer (core/dvr_pool.py remembers it). Once
+the address has streamed, such an answer on a reconnect is a failed try
+instead: a provider's message while it still counts the dropped connection.
 """
 from __future__ import annotations
 
@@ -317,7 +319,17 @@ class Ingest:
                              "after %.0f s and %.1f MB",
                              time.monotonic() - began, got / 1e6)
             except NotAStream as e:
-                if not self._stop.is_set():
+                if self._stop.is_set():
+                    pass
+                elif self._drops:
+                    # The address streamed a moment ago: a message now (a
+                    # provider still counting the dropped connection against
+                    # the account's limit) is a failed try, as before - the
+                    # failures add up, the page is not taken for good.
+                    log.info("DVR ingest: the provider sent %s (%s) after a "
+                             "stream - a failed try", e,
+                             self._content_type(resp) or "no type")
+                else:
                     self.refused = str(e)
                     log.info("DVR ingest: the provider sent %s (%s), not a "
                              "stream - given up, not asked again", e,
