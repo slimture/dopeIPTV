@@ -12,13 +12,19 @@ app's own at the time it was given.
 
 It only counts and says: nothing here stops a stream. Unknown numbers
 (no limit given, a source of another kind) say nothing at all.
+
+Two sources of one provider account - the same server and user name, added
+twice under other names or with other categories, or as Xtream and as its
+M3U - share that account's connections: counted and checked as one
+(``account_of``, ``accounts``, ``on_accounts``).
 """
 
 from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Mapping
+from urllib.parse import parse_qs, urlsplit
 
 #: The app's own kinds of connection, in the order a sentence names them.
 KINDS = ("player", "buffer", "recording", "multiview", "cast")
@@ -89,6 +95,62 @@ def is_network(url: str | None) -> bool:
     return host not in ("127.0.0.1", "localhost", "[::1]") and not host.startswith("127.")
 
 
+_DEFAULT_PORTS = {"http": 80, "https": 443}
+
+
+def account_of(playlist: dict | None) -> str:
+    """The provider account a source is on, normalised: scheme, host, port
+    and user name ("http://h.example.com:8080|u") - an M3U's from the
+    ``username`` in its address, a portal's its MAC address. "" when it
+    tells none (no server, or no user name: a box, a plain M3U)."""
+    pl = playlist or {}
+    server = str(pl.get("server") or "").strip()
+    if not server:
+        return ""
+    if "://" not in server:
+        server = "http://" + server
+    try:
+        parts = urlsplit(server)
+        scheme = parts.scheme.lower()
+        host = (parts.hostname or "").rstrip(".")
+        port = parts.port or _DEFAULT_PORTS.get(scheme)
+    except ValueError:
+        return ""
+    if not host:
+        return ""
+    user = str(pl.get("username") or "").strip()
+    if not user:
+        user = str((parse_qs(parts.query).get("username") or [""])[0]).strip()
+    if not user and pl.get("mac"):
+        user = "mac=" + str(pl.get("mac")).strip().lower()
+    if not user:
+        return ""
+    where = f"[{host}]" if ":" in host else host
+    return f"{scheme}://{where}:{port or ''}|{user}"
+
+
+def accounts(playlists: Iterable[dict]) -> dict[str, str]:
+    """Source id -> the id that stands for its account: the first source,
+    in the list's order, on the same provider account (account_of); itself
+    when no other source shares it."""
+    first: dict[str, str] = {}
+    out: dict[str, str] = {}
+    for pl in playlists:
+        pid = str((pl or {}).get("id") or "")
+        if not pid:
+            continue
+        key = account_of(pl)
+        out[pid] = first.setdefault(key, pid) if key else pid
+    return out
+
+
+def on_accounts(uses: Iterable[Use], account: Mapping[str, str]) -> list[Use]:
+    """*uses* with each one's source put as its account (accounts()); an
+    unknown source stays unknown."""
+    return [Use(u.kind, account.get(u.source, u.source) if u.source else "", u.url)
+            for u in uses]
+
+
 def own_count(uses: Iterable[Use], source: str) -> int:
     """The app's connections to *source* (an unknown source counts)."""
     return sum(1 for u in uses if not u.source or u.source == source)
@@ -103,7 +165,9 @@ def kinds_of(uses: Iterable[Use], source: str) -> tuple[str, ...]:
 class Ledger:
     """What each source's provider last said, kept with the app's own count
     at that moment - so that what it counted besides the app (another
-    device) can be told from the app's own connections later."""
+    device) can be told from the app's own connections later. Keyed by the
+    id that stands for the source's account (accounts()), so two sources of
+    one account are one entry."""
 
     def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
         self._clock = clock

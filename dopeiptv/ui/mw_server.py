@@ -313,9 +313,10 @@ class _ServerMixin:
                 self._conn_seen()       # what the provider last said, into the ledger
             except Exception as e:
                 log.debug("server: the provider's count not read: %s", e)
-            uses = self._conn_uses()
-            own = connections.own_count(uses, pid) + self._conn_ledger().others(pid)
-            return own, [u.url for u in uses if u.url and (not u.source or u.source == pid)]
+            # By account: another source on the same account counts too.
+            uses, key = self._conn_by_account(self._conn_uses(), pid)
+            own = connections.own_count(uses, key) + self._conn_ledger().others(key)
+            return own, [u.url for u in uses if u.url and (not u.source or u.source == key)]
         if action == "save":
             from ..services.home_server import read_config
             for key, value in dict(params.get("changes") or {}).items():
@@ -374,8 +375,8 @@ class _ServerMixin:
             return
         try:
             src = self._conn_source() if source is None else source
-            listed = self._conn_uses() if uses is None else uses
-            own = connections.own_count(listed, src) + self._conn_ledger().others(src) + 1
+            listed, key = self._conn_by_account(self._conn_uses() if uses is None else uses, src)
+            own = connections.own_count(listed, key) + self._conn_ledger().others(key) + 1
             gone = srv.restream.make_room(src, own)
             if gone:
                 log.info("server: %d channel(s) let go for the app's own viewing", gone)

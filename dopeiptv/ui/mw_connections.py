@@ -7,6 +7,11 @@ what the account allows, with the choice to go ahead anyway.
 For everyone, not only Nerd. Nothing is said while the account gives no
 limit, and nothing is ever stopped: the warning is a question.
 
+Two sources of one provider account (the same server and user name, added
+twice) are one account here: their connections are counted together
+against its one limit (core/connections.accounts), each use keeping its
+own source.
+
 An Enigma2 box's tuners are in the same count (core/tuners.py): before a
 zap, a multiview cell, a cast or a recording over its own connection opens
 a stream from the box that would cut off a recording or what the box shows
@@ -86,6 +91,47 @@ class _ConnectionsMixin:
         """The active source's id: whose account the checks are about."""
         store = getattr(self, "playlist_store", None)
         return str(getattr(store, "active_id", "") or "") if store is not None else ""
+
+    def _conn_accounts(self) -> dict[str, str]:
+        """Source id -> the id that stands for its provider account: two
+        sources of one account (the same server and user name) share one
+        (core/connections.accounts)."""
+        store = getattr(self, "playlist_store", None)
+        lists = getattr(store, "playlists", None)
+        try:
+            pls = list(lists()) if callable(lists) else []
+        except Exception:
+            pls = []
+        try:
+            return connections.accounts(p for p in pls if isinstance(p, dict))
+        except Exception as e:      # counting must never stand in the way
+            log.debug("connections: the accounts not told apart: %s", e)
+            return {}
+
+    def _conn_account(self, source: str, account: dict[str, str] | None = None) -> str:
+        """The id that stands for *source*'s account (itself when no other
+        source is on it)."""
+        acc = self._conn_accounts() if account is None else account
+        return acc.get(source, source) if source else source
+
+    def _conn_by_account(self, uses: list[Use], source: str) -> tuple[list[Use], str]:
+        """(*uses* with each source put as its account, *source*'s account):
+        what the ledger counts and checks."""
+        acc = self._conn_accounts()
+        return connections.on_accounts(uses, acc), self._conn_account(source, acc)
+
+    def _conn_own(self, uses: list[Use], source: str) -> int:
+        """The app's connections to *source*'s account among *uses* - those
+        of another source on the same account too."""
+        listed, key = self._conn_by_account(uses, source)
+        return connections.own_count(listed, key)
+
+    def _conn_cap(self, account: str) -> int | None:
+        """The limit of *account* (an id from _conn_account): the source in
+        use's client's while it is on that account, else what its provider
+        said while it was the one in use."""
+        mine = self._conn_limit() if account == self._conn_account(self._conn_source()) else None
+        return mine or self._conn_ledger().limit(account)
 
     def _conn_player_source(self) -> str:
         """The source the docked player plays from: failover's or the Search
@@ -202,26 +248,33 @@ class _ConnectionsMixin:
         - its count in use only while it is fresh."""
         led = self._conn_ledger()
         src = self._conn_source() if source is None else source
+        key = self._conn_account(src)
         if info is not None:
             limit, active = connections.numbers((info or {}).get("user_info"))
             if own is None:
-                own = connections.own_count(self._conn_uses(), src) + self._conn_served(src)
-            led.report(src, limit, active, own)
+                own = self._conn_own(self._conn_uses(), src) + self._conn_served(src)
+            led.report(key, limit, active, own)
             return
         seen = getattr(getattr(self, "client", None), "account_seen", None)
         if not isinstance(seen, dict) or source not in (None, self._conn_source()):
             return
         at = float(seen.get("at") or 0.0)
         fresh = time.monotonic() - at <= SEEN_FRESH_SECS
-        led.report(src, seen.get("max"), seen.get("active") if fresh else None,
-                   connections.own_count(self._conn_uses(), src) + self._conn_served(src), at=at)
+        led.report(key, seen.get("max"), seen.get("active") if fresh else None,
+                   self._conn_own(self._conn_uses(), src) + self._conn_served(src), at=at)
 
     def _conn_served(self, source: str) -> int:
-        """Connections server mode holds to *source* for other devices: the
-        app's, as the provider counts them, though not the app's own use."""
+        """Connections server mode holds to *source*'s account (every source
+        on it) for other devices: the app's, as the provider counts them,
+        though not the app's own use."""
         srv = getattr(self, "_home", None)
+        if srv is None:
+            return 0
         try:
-            return int(srv.restream.in_use(source)) if srv is not None else 0
+            acc = self._conn_accounts()
+            key = acc.get(source, source)
+            pids = [p for p, k in acc.items() if k == key] or [source]
+            return sum(int(srv.restream.in_use(p)) for p in pids)
         except Exception:
             return 0
 
@@ -234,15 +287,15 @@ class _ConnectionsMixin:
 
     def _conn_verdict(self, uses: list[Use], adding: int = 1,
                       source: str = "") -> connections.Verdict | None:
-        """Over the limit of *source* (the active source when not given)
-        with *adding* more next to *uses*? Another source's limit is the one
-        its provider gave while it was the one in use."""
+        """Over the limit of *source*'s account (the active source when not
+        given) with *adding* more next to *uses*? Another source's limit is
+        the one its provider gave while it was the one in use; a source on
+        the same account as another counts that one's uses too."""
         try:
             self._conn_seen()
-            active = self._conn_source()
-            src = str(source or active)
-            return self._conn_ledger().check(
-                src, uses, adding, limit=self._conn_limit() if src == active else None)
+            src = str(source or self._conn_source())
+            listed, key = self._conn_by_account(uses, src)
+            return self._conn_ledger().check(key, listed, adding, limit=self._conn_cap(key))
         except Exception as e:      # counting must never stand in the way
             log.debug("connections: not checked: %s", e)
             return None
@@ -383,11 +436,12 @@ class _ConnectionsMixin:
         uses: list[Use] | None = None
         try:
             self._conn_seen()
-            cap = (self._conn_limit() if src == active else None) or self._conn_ledger().limit(src)
+            cap = self._conn_cap(self._conn_account(src))
             if cap:
                 uses = [u for u in self._conn_uses(free_player=True) if u.kind != "cast"]
                 uses.append(Use("cast", src, url))
-                v = self._conn_ledger().check(src, uses, 1, limit=cap)
+                listed, key = self._conn_by_account(uses, src)
+                v = self._conn_ledger().check(key, listed, 1, limit=cap)
         except Exception as e:
             log.debug("connections: the buffer beside the cast not counted: %s", e)
             cap, v, uses = None, None, None
@@ -421,9 +475,10 @@ class _ConnectionsMixin:
         try:
             self._conn_seen()
             uses = self._conn_uses()
-            own = connections.own_count(uses, src)
-            cap = (self._conn_limit() if src == active else None) or self._conn_ledger().limit(src)
-            v = self._conn_ledger().check(src, uses, 1, limit=cap) if cap else None
+            listed, key = self._conn_by_account(uses, src)
+            own = connections.own_count(listed, key)
+            cap = self._conn_cap(key)
+            v = self._conn_ledger().check(key, listed, 1, limit=cap) if cap else None
         except Exception as e:
             log.debug("connections: the test not counted: %s", e)
             own, cap, v = 1, None, None
@@ -723,22 +778,26 @@ class _ConnectionsMixin:
         lines: list[tuple[str, str]] = []
         uses = self._conn_uses()
         led = self._conn_ledger()
-        active = self._conn_source()
+        acc = self._conn_accounts()
+        active = self._conn_account(self._conn_source(), acc)
         try:
             self._conn_seen()
         except Exception as e:
             log.debug("in use: the provider's count not read: %s", e)
+        # One line per account: two sources of one account share it.
         by_source: dict[str, list[Use]] = {}
-        for u in uses:
+        for u in connections.on_accounts(uses, acc):
             by_source.setdefault(u.source or active, []).append(u)
         if active not in by_source and self._conn_limit():
             by_source[active] = []
         for pid, used in by_source.items():
-            limit = (self._conn_limit() if pid == active else None) or led.limit(pid)
+            limit = self._conn_cap(pid)
             others = led.others(pid)
             n = len(used) + others
             count = tr("conn_in_use", n=n, max=limit) if limit else tr("conn_in_use_only", n=n)
-            line = tr("inuse_source", name=self._tuner_source_name(pid), count=count)
+            names = [self._tuner_source_name(p) for p, k in acc.items() if k == pid] or [
+                self._tuner_source_name(pid)]
+            line = tr("inuse_source", name=" / ".join(dict.fromkeys(names)), count=count)
             who = self._conn_who(connections.kinds_of(used, pid), others)
             lines.append(("head", line + (" " + tr("conn_used_by", who=who) if who else "")))
         served = getattr(self, "_server_in_use_lines", None)

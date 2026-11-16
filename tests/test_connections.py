@@ -85,3 +85,47 @@ def test_older_answers_do_not_replace_newer():
     assert led.limit("a") == 2 and led.others("a") == 0     # a later answer without a limit
     led.forget("a")
     assert led.limit("a") is None
+
+
+def test_one_provider_account_however_it_was_added():
+    """The same server and user name is one account: other names, another
+    category set, the scheme's own port written or not, the host's case, an
+    M3U of the same panel; a portal by its MAC address."""
+    a = {"id": "a", "server": "http://Panel.example.com", "username": "u"}
+    assert cn.account_of(a) == "http://panel.example.com:80|u"
+    for same in ({"server": "panel.example.com:80", "username": "u"},
+                 {"server": "http://panel.example.com:80/", "username": " u "},
+                 {"server": "http://panel.example.com/get.php?username=u&password=p&type=m3u",
+                  "kind": "m3u"}):
+        assert cn.account_of(same) == cn.account_of(a), same
+    for other in ({"server": "http://panel.example.com", "username": "v"},
+                  {"server": "https://panel.example.com", "username": "u"},
+                  {"server": "http://panel.example.com:8080", "username": "u"},
+                  {"server": "http://other.example.com", "username": "u"}):
+        assert cn.account_of(other) != cn.account_of(a), other
+    # Nothing to tell: no server, no user name (a box, a plain M3U).
+    assert cn.account_of({"server": "http://box.local"}) == ""
+    assert cn.account_of({"username": "u"}) == "" and cn.account_of(None) == ""
+    assert cn.account_of({"server": "http://[fd00::5]:8080", "username": "u"}) == \
+        "http://[fd00::5]:8080|u"
+    assert cn.account_of({"server": "http://portal.example/c/", "mac": "00:1A:79:AA:BB:CC"}) == \
+        "http://portal.example:80|mac=00:1a:79:aa:bb:cc"
+
+
+def test_two_sources_of_one_account_share_its_limit():
+    pls = [{"id": "a", "server": "http://p.example.com", "username": "u"},
+           {"id": "box", "server": "http://box.local"},
+           {"id": "b", "server": "http://P.example.com:80", "username": "u"},
+           {"id": "c", "server": "http://p.example.com", "username": "w"}]
+    acc = cn.accounts(pls)
+    assert acc == {"a": "a", "box": "box", "b": "a", "c": "c"}
+    uses = cn.on_accounts([Use("player", "a"), Use("recording", "b"), Use("cast", "c"),
+                           Use("multiview", "")], acc)
+    assert [(u.kind, u.source) for u in uses] == [
+        ("player", "a"), ("recording", "a"), ("cast", "c"), ("multiview", "")]
+    led = Ledger(Clock())
+    led.report(acc["b"], 2, None, own=0)          # b's provider said two: a's too
+    v = led.check(acc["b"], uses)
+    assert v is not None and v.own == 3 and v.limit == 2   # a's player, b's recording, the cell
+    assert v.kinds == ("player", "recording", "multiview")
+    assert led.check(acc["c"], uses) is None       # another account: its own (unknown) limit

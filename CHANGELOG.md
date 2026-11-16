@@ -44,6 +44,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   that source's user agent, headers and proxy. It now asks about the pin
   of the source the stream comes from, and the receiver gets that
   source's own options.
+- The same provider account added twice (another name, other categories,
+  or as Xtream and as its M3U) counted each source against a limit of its
+  own. Sources with the same server and user name now share one count and
+  one limit: questions, server mode's room and Nerd > Diagnostics' In use
+  now (one line for the account).
 
 ## [1.6.1]
 

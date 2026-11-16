@@ -1814,3 +1814,56 @@ def test_a_recording_continued_over_a_new_connection_keeps_its_source():
     assert made and (made[-1].get("source"), made[-1].get("source_kind")) == ("a", "xtream"), made
     assert made[-1]["url"] == url
 
+
+# -- one count: one provider account added as two sources -------------------------------
+
+class _OneAccountTwice(_Sources):
+    """a and b: one provider account, added twice (another name, other
+    categories); c: another user on the same server."""
+
+    _SERVERS = {"a": ("http://p.example.com:8080", "u"),
+                "b": ("http://P.example.com:8080/", "u"),
+                "c": ("http://p.example.com:8080", "other")}
+
+    def get(self, pid):
+        if pid not in self._SERVERS:
+            return None
+        server, user = self._SERVERS[pid]
+        return {"id": pid, "name": pid.upper(), "kind": "xtream", "server": server,
+                "username": user}
+
+    def playlists(self):
+        return [self.get(p) for p in ("a", "b", "c")]
+
+
+def test_two_sources_of_one_account_count_against_its_one_limit():
+    """A's channel plays; B, the same account added again, is in use since.
+    B's multiview cell or a test of B's stream is the account's second
+    connection - its one is the player's - so it is asked about; each
+    source counted on its own said nothing. Another user on the same server
+    is another account. In use now shows the account once."""
+    w = _source_window()()
+    w.playlist_store = _OneAccountTwice("a")
+    w.settings["mv_stop_docked"] = "false"          # the player plays on beside the cell
+    url = "http://p.example.com:8080/live/u/p/7.ts"
+    w.player.current_url = url
+    w._note_playing_source(url, 7, "live")
+    w._last_playback = {"url": url, "kind": "live"}
+    w._conn_seen("a", {"user_info": {"max_connections": "1", "active_cons": "1"}})
+    w.playlist_store.active_id = "b"
+    assert [(u.kind, u.source) for u in w._conn_uses()] == [("player", "a")]
+    assert not w._conn_ok_multiview(None, "http://p.example.com:8080/live/u/p/9.ts", "b")
+    assert len(w.asked) == 1 and tr("conn_over", max=1, n=1) in w.asked[0]
+    assert tr("conn_k_player") in w.asked[0]
+    assert not w._conn_ok_test("b") and len(w.asked) == 2
+    assert w._conn_verdict(w._conn_uses(), source="b").limit == 1
+    # Another user's account: its own count, nothing in use there.
+    assert w._conn_ok_multiview(None, "http://p.example.com:8080/live/other/p/1.ts", "c")
+    assert w._conn_ok_test("c") and len(w.asked) == 2
+    heads = [text for kind, text in w._in_use_lines(ask=False) if kind == "head"]
+    assert heads == [tr("inuse_source", name="A / B", count=tr("conn_in_use", n=1, max=1))
+                     + " " + tr("conn_used_by", who=tr("conn_k_player"))], heads
+    # Each its own account (another user on b): B's first connection.
+    w.playlist_store._SERVERS = dict(_OneAccountTwice._SERVERS, b=("http://p.example.com:8080", "v"))
+    assert w._conn_ok_multiview(None, "http://p.example.com:8080/live/v/p/9.ts", "b")
+    assert len(w.asked) == 2

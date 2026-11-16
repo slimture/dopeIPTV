@@ -2342,7 +2342,7 @@ class _SettingsMixin:
             another device's."""
             pid = pl.get("id")
             seen = getattr(self, "_conn_seen", None)
-            own = (connections.own_count(self._conn_uses(), str(pid))
+            own = (self._conn_own(self._conn_uses(), str(pid))
                    if seen is not None else 0)
 
             def fetch(pl=pl):
