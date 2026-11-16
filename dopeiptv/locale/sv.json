@@ -2911,5 +2911,10 @@
   "video_path_thread": "Egen tråd",
   "video_path_window": "Fönstrets tråd",
   "video_path_off": "Fönstrets tråd - avstängd",
-  "video_path_fallback": "Fönstrets tråd - den egna tråden kunde inte starta: {reason}"
+  "video_path_fallback": "Fönstrets tråd - den egna tråden kunde inte starta: {reason}",
+  "local_searching": "Söker i mappen och dess undermappar…",
+  "local_search_count": "{n} hittade i mappen och dess undermappar",
+  "local_search_none": "Inget hittades i mappen eller dess undermappar.",
+  "local_search_more": "Bara de första {n} visas - skriv mer för att snäva in.",
+  "local_search_partial": "Alla undermappar söktes inte igenom - öppna en för att söka i den."
 }

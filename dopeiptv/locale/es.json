@@ -2911,5 +2911,10 @@
   "video_path_thread": "Hilo propio",
   "video_path_window": "Hilo de la ventana",
   "video_path_off": "Hilo de la ventana - desactivado",
-  "video_path_fallback": "Hilo de la ventana - su propio hilo no pudo iniciarse: {reason}"
+  "video_path_fallback": "Hilo de la ventana - su propio hilo no pudo iniciarse: {reason}",
+  "local_searching": "Buscando en esta carpeta y sus subcarpetas…",
+  "local_search_count": "{n} encontrados en esta carpeta y sus subcarpetas",
+  "local_search_none": "No se encontró nada en esta carpeta ni en sus subcarpetas.",
+  "local_search_more": "Solo se muestran los {n} primeros; escribe más para afinar.",
+  "local_search_partial": "No se buscó en todas las subcarpetas; abre una para buscar en ella."
 }

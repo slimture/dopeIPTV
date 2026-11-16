@@ -2911,5 +2911,10 @@
   "video_path_thread": "Eigen thread",
   "video_path_window": "Thread van het venster",
   "video_path_off": "Thread van het venster - uitgezet",
-  "video_path_fallback": "Thread van het venster - de eigen thread kon niet starten: {reason}"
+  "video_path_fallback": "Thread van het venster - de eigen thread kon niet starten: {reason}",
+  "local_searching": "Bezig met zoeken in deze map en de submappen…",
+  "local_search_count": "{n} gevonden in deze map en de submappen",
+  "local_search_none": "Niets gevonden in deze map of de submappen.",
+  "local_search_more": "Alleen de eerste {n} worden getoond - typ verder om te verfijnen.",
+  "local_search_partial": "Niet alle submappen zijn doorzocht - open er een om daarin te zoeken."
 }

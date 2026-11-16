@@ -9,6 +9,7 @@ import os
 
 import pytest
 
+from dopeiptv.i18n import tr
 from dopeiptv.ui.main_window import MainWindow
 from dopeiptv.ui.mw_local import _LocalFilesMixin, _pretty_gvfs
 
@@ -119,6 +120,13 @@ class _Stub(_LocalFilesMixin):
     # the render/search/playback surface the mixin leans on
     def _render_rows(self, rows, kind, empty_msg=None):
         self.rendered = rows
+        self.all_items = rows
+
+    def _set_list_status(self, text):
+        self.status = text
+
+    def _sorted(self, items):
+        return items
 
     def _search_filter(self, items):
         t = self.search_text.lower()
@@ -1314,3 +1322,174 @@ def test_leaving_mid_scan_lets_the_next_visit_scan_again(tmp_path,
     fn, done = calls[-1]
     done(fn())
     assert any(r.get("_kind") == "localseries" for r in w.rendered)
+
+
+# -- the search through a folder and its subfolders (#33) -------------------------
+
+def _music_videos(tmp_path):
+    """root/ with a top-level video and a reggae subfolder (O:\\MusicVideos\\
+    reggae in the report), one level deeper too."""
+    root = tmp_path / "MusicVideos"
+    (root / "reggae" / "live").mkdir(parents=True)
+    (root / "Top Song.mkv").write_bytes(b"x")
+    (root / "reggae" / "Bob.Marley-One.Love.mkv").write_bytes(b"x")
+    (root / "reggae" / "Toots - Pressure Drop.mkv").write_bytes(b"x")
+    (root / "reggae" / "live" / "Bob Marley - Exodus Live.mkv").write_bytes(b"x")
+    return str(root)
+
+
+def test_search_in_a_folder_finds_files_in_its_subfolders(tmp_path):
+    w = _Stub()
+    root = _music_videos(tmp_path)
+    w._current_cat = root
+    w.search_text = "bob marley"
+    w._load_local_items(root)
+    assert [r["name"] for r in w.rendered] == ["Bob Marley-One Love",
+                                               "Bob Marley - Exodus Live"]
+    # Each says where it is, muted under its name.
+    assert [r["_sub"] for r in w.rendered] == \
+        ["reggae", os.path.join("reggae", "live")]
+    assert all(r["_hit"] and r["_kind"] == "local" for r in w.rendered)
+    assert w.rendered[0]["_tip"] == os.path.join(
+        "reggae", "Bob.Marley-One.Love.mkv")
+    assert w.status == tr("local_search_count", n=2)
+
+
+def test_an_emptied_search_shows_the_folder_as_before(tmp_path):
+    w = _Stub()
+    root = _music_videos(tmp_path)
+    w._current_cat = root
+    w.search_text = "toots"
+    w._load_local_items(root)
+    assert [r["name"] for r in w.rendered] == ["Toots - Pressure Drop"]
+
+    # The same query again (a sort, a view change): the matches stay.
+    assert w._local_search_hook() is True
+    assert [r["name"] for r in w.rendered] == ["Toots - Pressure Drop"]
+
+    w.search_text = ""
+    assert w._local_search_hook() is True
+    assert [r["_kind"] for r in w.rendered] == ["localdir", "local"]
+    assert not any(r.get("_hit") for r in w.rendered)
+    assert w._local_search_hook() is False   # nothing changed: the filter's
+
+
+def test_nothing_found_says_so(tmp_path):
+    w = _Stub()
+    root = _music_videos(tmp_path)
+    w._current_cat = root
+    w.search_text = "zzz"
+    w._load_local_items(root)
+    assert w.rendered == []
+    assert w.status == tr("local_search_none")
+
+
+def test_the_caps_are_said(tmp_path, monkeypatch):
+    import functools
+
+    import dopeiptv.core.local_search as ls
+    real = ls.TreeSearch
+    w = _Stub()
+    root = _music_videos(tmp_path)
+    w._current_cat = root
+    w.search_text = "o"                 # in every name
+    monkeypatch.setattr(ls, "TreeSearch",
+                        functools.partial(real, max_hits=2))
+    w._load_local_items(root)
+    assert len(w.rendered) == 2
+    assert w.status == tr("local_search_count", n=2) + "  ·  " + \
+        tr("local_search_more", n=2)
+
+    monkeypatch.setattr(ls, "TreeSearch",
+                        functools.partial(real, max_depth=1))
+    w.search_text = "live"
+    w._load_local_items(root)
+    assert [r["name"] for r in w.rendered] == ["live"]     # the folder
+    assert w.status.endswith(tr("local_search_partial"))
+
+
+def test_a_newer_query_or_another_folder_cancels_the_walk(tmp_path,
+                                                          monkeypatch):
+    import dopeiptv.ui.mw_local as ml
+    jobs = []
+    monkeypatch.setattr(ml, "run_async",
+                        lambda pool, fn, done, err=None: jobs.append(
+                            (fn, done)))
+    w = _Stub()
+    root = _music_videos(tmp_path)
+    w._current_cat = root
+    w.search_text = "bob"
+    w._load_local_items(root)
+    first = w._local_walk
+    fn1, done1 = jobs[-1]
+
+    w.search_text = "toots"             # typed on: the newest query wins
+    assert w._local_search_hook() is True
+    assert first.cancelled and w._local_walk is not first
+    fn2, done2 = jobs[-1]
+    done1(fn1())                        # the old walk lands late: ignored
+    assert w.rendered == []
+    done2(fn2())
+    while w._local_walk is not None:    # its later slices
+        fn, done = jobs[-1]
+        done(fn())
+    assert [r["name"] for r in w.rendered] == ["Toots - Pressure Drop"]
+
+    # Another folder opened mid-walk: that walk stops too.
+    w.search_text = "bob"
+    assert w._local_search_hook() is True
+    walking = w._local_walk
+    w._local_descend(os.path.join(root, "reggae"))
+    assert walking.cancelled and w._local_walk is not walking
+
+
+def test_the_library_view_keeps_its_own_search(tmp_path):
+    w = _Stub()
+    root = _music_videos(tmp_path)
+    w._current_cat = root
+    assert w._local_walk_mode() is True
+    w.settings.setValue("local_view", "series")
+    assert w._local_walk_mode() is False          # its rows, by name
+    w._local_ctx = os.path.join(root, "reggae")   # a folder opened from it
+    assert w._local_walk_mode() is True
+    w._local_series = "Some Show"                 # a series' episodes
+    assert w._local_walk_mode() is False
+
+
+def test_a_match_plays_on_through_its_own_folder(tmp_path):
+    """The queue a matched track starts is its own folder's tracks, as
+    playing it from there makes it - never the other matches."""
+    root = tmp_path / "Music"
+    album = root / "Artist" / "Album"
+    album.mkdir(parents=True)
+    for n in ("01 Intro.mp3", "02 Jail.mp3", "03 Outro.mp3", "cover.jpg"):
+        (album / n).write_bytes(b"x")
+    (root / "Other Jail Song.mp3").write_bytes(b"x")
+
+    w = _Stub()
+    w._current_cat = str(root)
+    w.search_text = "jail"
+    w._load_local_items(str(root))
+    hit = next(r for r in w.rendered if r["_path"].endswith("02 Jail.mp3"))
+    assert len(w.rendered) == 2
+
+    rows = w._local_hit_folder(hit["_path"], hit)
+    assert [os.path.basename(r["_path"]) for r in rows] == \
+        ["01 Intro.mp3", "02 Jail.mp3", "03 Outro.mp3"]
+    assert rows[1] is hit                 # the row on screen, as it is
+    assert not any(r.get("_needs_tags") for r in rows)   # named from tags
+
+    q = _queue_stub()
+    q._local_hit_folder = w._local_hit_folder
+    q.all_items = list(w.rendered)
+    q._start_playback(hit["_path"], hit["name"], None, hit["_path"], "local",
+                      item=hit)
+    assert [os.path.basename(t["_path"]) for t in q._track_queue] == \
+        ["01 Intro.mp3", "02 Jail.mp3", "03 Outro.mp3"]
+    assert q._track_index == 1
+    assert q._queue_autoplay() is True
+    assert q.played[-1].endswith("03 Outro.mp3")
+
+    # A file the walk did not keep a folder for plays as before.
+    assert w._local_hit_folder(str(tmp_path / "x" / "Jail.mp3"), {}) is None
+    assert w._local_hit_folder(str(album / "04 New.mp3"), {}) is None

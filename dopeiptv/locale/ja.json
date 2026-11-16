@@ -2911,5 +2911,10 @@
   "video_path_thread": "専用スレッド",
   "video_path_window": "ウィンドウのスレッド",
   "video_path_off": "ウィンドウのスレッド - オフ",
-  "video_path_fallback": "ウィンドウのスレッド - 専用スレッドを開始できませんでした: {reason}"
+  "video_path_fallback": "ウィンドウのスレッド - 専用スレッドを開始できませんでした: {reason}",
+  "local_searching": "このフォルダーとサブフォルダーを検索中…",
+  "local_search_count": "このフォルダーとサブフォルダーで {n} 件見つかりました",
+  "local_search_none": "このフォルダーとサブフォルダーには見つかりませんでした。",
+  "local_search_more": "最初の {n} 件のみ表示しています。絞り込むにはさらに入力してください。",
+  "local_search_partial": "すべてのサブフォルダーは検索していません。検索するにはフォルダーを開いてください。"
 }

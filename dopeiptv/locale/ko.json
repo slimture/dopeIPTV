@@ -2911,5 +2911,10 @@
   "video_path_thread": "전용 스레드",
   "video_path_window": "창 스레드",
   "video_path_off": "창 스레드 - 꺼짐",
-  "video_path_fallback": "창 스레드 - 전용 스레드를 시작할 수 없었습니다: {reason}"
+  "video_path_fallback": "창 스레드 - 전용 스레드를 시작할 수 없었습니다: {reason}",
+  "local_searching": "이 폴더와 하위 폴더 검색 중…",
+  "local_search_count": "이 폴더와 하위 폴더에서 {n}개 찾음",
+  "local_search_none": "이 폴더와 하위 폴더에서 아무것도 찾지 못했습니다.",
+  "local_search_more": "처음 {n}개만 표시합니다. 더 입력해 범위를 좁히세요.",
+  "local_search_partial": "모든 하위 폴더를 검색하지는 않았습니다. 폴더를 열어 그 안을 검색하세요."
 }

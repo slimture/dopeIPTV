@@ -2911,5 +2911,10 @@
   "video_path_thread": "独立线程",
   "video_path_window": "窗口线程",
   "video_path_off": "窗口线程 - 已关闭",
-  "video_path_fallback": "窗口线程 - 独立线程无法启动：{reason}"
+  "video_path_fallback": "窗口线程 - 独立线程无法启动：{reason}",
+  "local_searching": "正在搜索此文件夹及其子文件夹…",
+  "local_search_count": "在此文件夹及其子文件夹中找到 {n} 个",
+  "local_search_none": "此文件夹及其子文件夹中未找到任何内容。",
+  "local_search_more": "仅显示前 {n} 个——继续输入以缩小范围。",
+  "local_search_partial": "并未搜索所有子文件夹——打开其中一个以在其中搜索。"
 }

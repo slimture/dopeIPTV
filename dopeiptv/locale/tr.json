@@ -2911,5 +2911,10 @@
   "video_path_thread": "Kendi iş parçacığı",
   "video_path_window": "Pencerenin iş parçacığı",
   "video_path_off": "Pencerenin iş parçacığı - kapalı",
-  "video_path_fallback": "Pencerenin iş parçacığı - kendi iş parçacığı başlatılamadı: {reason}"
+  "video_path_fallback": "Pencerenin iş parçacığı - kendi iş parçacığı başlatılamadı: {reason}",
+  "local_searching": "Bu klasörde ve alt klasörlerinde aranıyor…",
+  "local_search_count": "Bu klasörde ve alt klasörlerinde {n} sonuç bulundu",
+  "local_search_none": "Bu klasörde veya alt klasörlerinde bir şey bulunamadı.",
+  "local_search_more": "Yalnızca ilk {n} sonuç gösteriliyor - daraltmak için yazmaya devam edin.",
+  "local_search_partial": "Tüm alt klasörler aranmadı - içinde aramak için birini açın."
 }

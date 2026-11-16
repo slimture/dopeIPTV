@@ -470,6 +470,10 @@ class ChannelListModel(QAbstractListModel):
             return it
         if role == Qt.ItemDataRole.DisplayRole:
             return it.get("name") or it.get("title") or "?"
+        if role == Qt.ItemDataRole.ToolTipRole:
+            # Where a row is, when it says (a Local files search's match) -
+            # the poster wall has no line under the name for it.
+            return it.get("_tip") or None
         return None
 
     def set_items(self, items: list, kind: str) -> None:

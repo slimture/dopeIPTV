@@ -2911,5 +2911,10 @@
   "video_path_thread": "Sopstvena nit",
   "video_path_window": "Nit prozora",
   "video_path_off": "Nit prozora - isključeno",
-  "video_path_fallback": "Nit prozora - sopstvena nit nije mogla da se pokrene: {reason}"
+  "video_path_fallback": "Nit prozora - sopstvena nit nije mogla da se pokrene: {reason}",
+  "local_searching": "Pretraga ove fascikle i njenih podfascikli…",
+  "local_search_count": "Pronađeno u ovoj fascikli i podfasciklama: {n}",
+  "local_search_none": "Ništa nije pronađeno u ovoj fascikli ni u njenim podfasciklama.",
+  "local_search_more": "Prikazano je samo prvih {n} - unesite više da suzite izbor.",
+  "local_search_partial": "Nisu pretražene sve podfascikle - otvorite jednu da je pretražite."
 }

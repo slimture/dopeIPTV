@@ -2911,5 +2911,10 @@
   "video_path_thread": "Thread dédié",
   "video_path_window": "Thread de la fenêtre",
   "video_path_off": "Thread de la fenêtre - désactivé",
-  "video_path_fallback": "Thread de la fenêtre - son propre thread n'a pas pu démarrer : {reason}"
+  "video_path_fallback": "Thread de la fenêtre - son propre thread n'a pas pu démarrer : {reason}",
+  "local_searching": "Recherche dans ce dossier et ses sous-dossiers…",
+  "local_search_count": "{n} résultats dans ce dossier et ses sous-dossiers",
+  "local_search_none": "Rien trouvé dans ce dossier ni dans ses sous-dossiers.",
+  "local_search_more": "Seuls les {n} premiers sont affichés - précisez votre recherche.",
+  "local_search_partial": "Tous les sous-dossiers n'ont pas été parcourus - ouvrez-en un pour y chercher."
 }

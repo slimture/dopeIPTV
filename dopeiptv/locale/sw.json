@@ -2911,5 +2911,10 @@
   "video_path_thread": "Uzi wake yenyewe",
   "video_path_window": "Uzi wa dirisha",
   "video_path_off": "Uzi wa dirisha - imezimwa",
-  "video_path_fallback": "Uzi wa dirisha - uzi wake yenyewe haukuweza kuanza: {reason}"
+  "video_path_fallback": "Uzi wa dirisha - uzi wake yenyewe haukuweza kuanza: {reason}",
+  "local_searching": "Inatafuta katika folda hii na folda zake ndogo…",
+  "local_search_count": "Zimepatikana {n} katika folda hii na folda zake ndogo",
+  "local_search_none": "Hakuna kilichopatikana katika folda hii wala folda zake ndogo.",
+  "local_search_more": "Ni {n} za kwanza pekee zinazoonyeshwa - andika zaidi ili kupunguza.",
+  "local_search_partial": "Si folda zote ndogo zilizotafutwa - fungua moja ili kutafuta ndani yake."
 }

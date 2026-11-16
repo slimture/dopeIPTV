@@ -152,6 +152,11 @@ _STRINGS: dict[str, dict[str, str]] = {
     "vis_style_scope": {"en": "Vectorscope"},
     "vis_style_freqs": {"en": "Frequencies"},
     "local_tracks": {"en": "{n} tracks"},
+    "local_searching": {"en": "Searching this folder and its subfolders…"},
+    "local_search_count": {"en": "{n} found in this folder and its subfolders"},
+    "local_search_none": {"en": "Nothing found in this folder or its subfolders."},
+    "local_search_more": {"en": "Only the first {n} are shown - type more to narrow it down."},
+    "local_search_partial": {"en": "Not every subfolder was searched - open one to search it."},
     "sidebar_categories": {"en": "CATEGORIES"},
 
     "sidebar_library": {"en": "LIBRARY"},

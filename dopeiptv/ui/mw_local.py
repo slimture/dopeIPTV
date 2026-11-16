@@ -67,6 +67,38 @@ def episode_info(stem: str) -> tuple[int, int, int, int] | None:
     return int(m.group(3)), int(m.group(4)), m.start(), m.end()
 
 
+def _file_row(p: str, audio_exts: tuple, size: int = 0,
+              mtime: int = 0) -> dict:
+    """A file's row as its folder's listing shows it, without touching the
+    disk: a track named from its file until the enrich pass reads its tags,
+    a video from its cleaned title."""
+    stem = os.path.splitext(os.path.basename(p))[0]
+    if p.lower().endswith(audio_exts):
+        row = {"name": stem, "_kind": "local", "_clean_title": "",
+               "_year": "", "_needs_tags": True}
+    else:
+        title, year = clean_title(stem)
+        row = {"name": f"{title} ({year})" if year else title,
+               "_kind": "local", "_clean_title": title, "_year": year}
+    row.update({"_cast_url": p, "_path": p, "_key": p, "_size": size,
+                "added": str(int(mtime)), "stream_icon": "",
+                "_filename": stem})
+    return row
+
+
+def _dir_row(p: str) -> dict:
+    """A folder's row: one to open. "12 Years a Slave (2013)" or a
+    release-tagged folder is a film, and gets a poster like one - a wall of
+    identical folder glyphs is not a library."""
+    n = os.path.basename(p.rstrip(os.sep)) or p
+    row = {"name": n, "_kind": "localdir", "_path": p, "_key": p,
+           "stream_icon": ""}
+    t, y = clean_title(n)
+    if y or _TAG.search(n):
+        row.update({"_clean_title": t, "_year": y})
+    return row
+
+
 def _pretty_gvfs(name: str) -> str:
     """A gvfs mount dir is named "smb-share:server=nas,share=video" - label it
     "nas/video". Unknown schemes keep their raw mount name."""
@@ -237,6 +269,8 @@ class _LocalFilesMixin:
     # -- the middle list (directory browsing) --------------------------------
 
     def _load_local_items(self, root) -> None:
+        # Whatever was searched before is not what is wanted now.
+        self._local_cancel_walk()
         if self._local_view() == "series" and isinstance(root, str) \
                 and not getattr(self, "_local_ctx", None):
             if getattr(self, "_local_series", None):
@@ -255,6 +289,13 @@ class _LocalFilesMixin:
         # worker pool and the rows arrive when they are ready.
         self._local_list_token = getattr(self, "_local_list_token", 0) + 1
         token = self._local_list_token
+        q = self._local_search_text()
+        self._local_query = q
+        if q:
+            # A search looks through this folder and every subfolder under
+            # it (#33), on the pool too.
+            self._local_search_walk(base, q)
+            return
         exts, aexts = self.MEDIA_EXTS, self.AUDIO_EXTS
 
         def job():
@@ -272,37 +313,16 @@ class _LocalFilesMixin:
                     continue
                 p = os.path.join(base, n)
                 if os.path.isdir(p):
-                    row = {"name": n, "_kind": "localdir",
-                           "_path": p, "_key": p, "stream_icon": ""}
-                    # "12 Years a Slave (2013)" or a release-tagged folder
-                    # is a film, and gets a poster like one - a wall of
-                    # identical folder glyphs is not a library.
-                    t, y = clean_title(n)
-                    if y or _TAG.search(n):
-                        row.update({"_clean_title": t, "_year": y})
-                    dirs.append(row)
+                    dirs.append(_dir_row(p))
                 elif n.lower().endswith(exts):
                     try:
                         st = os.stat(p)
                     except OSError:
                         continue
-                    stem = os.path.splitext(n)[0]
-                    if n.lower().endswith(aexts):
-                        # The tags name it properly; that read happens in
-                        # the enrich pass so the list can appear first.
-                        row = {"name": stem, "_kind": "local",
-                               "_clean_title": "", "_year": "",
-                               "_needs_tags": True}
-                    else:
-                        title, year = clean_title(stem)
-                        row = {"name": f"{title} ({year})" if year else title,
-                               "_kind": "local", "_clean_title": title,
-                               "_year": year}
-                    row.update({"_cast_url": p, "_path": p, "_key": p,
-                                "_size": st.st_size,
-                                "added": str(int(st.st_mtime)),
-                                "stream_icon": "", "_filename": stem})
-                    files.append(row)
+                    # A track's tags name it properly; that read happens
+                    # in the enrich pass so the list can appear first.
+                    files.append(_file_row(p, aexts, st.st_size,
+                                           int(st.st_mtime)))
             return dirs + files
 
         def done(rows):
@@ -398,6 +418,210 @@ class _LocalFilesMixin:
              if r.get("_kind") == "local"
              or (r.get("_kind") == "localdir"
                  and (r.get("_year") or r.get("_clean_title")))])
+
+    # -- the search: a folder and its subfolders (#33) ------------------------
+
+    # A slice of the walk per pool job: a slow share never holds a thread
+    # for long, and the matches show as they are found - at most this often,
+    # so the list is not reset under the user at every slice.
+    _SEARCH_SLICE = 0.5
+    _SEARCH_PAINT = 1.5
+
+    def _local_walk_mode(self) -> bool:
+        """Is the list a folder's listing - folder view, or a folder opened
+        from the library? There the search walks the subfolders too; the
+        library's own rows (series, films, shelves) are filtered by name as
+        before, and so is a series' episode list."""
+        if self.mode != "local" or getattr(self, "_local_series", None):
+            return False
+        if getattr(self, "_local_ctx", None):
+            return True
+        cat = getattr(self, "_current_cat", None)
+        return (self._local_view() == "folders" and isinstance(cat, str)
+                and cat != "__add__")
+
+    def _local_search_hook(self) -> bool:
+        """The search box in a folder (main_window._apply_filter): a new
+        query walks the folder and its subfolders, an emptied one lists the
+        folder again. True when it took the filter over."""
+        if not self._local_walk_mode():
+            return False
+        q = self._local_search_text()
+        if q != getattr(self, "_local_query", ""):
+            self._load_local_items(self._current_cat)
+            return True
+        if q:
+            # The same matches again (a sort or a view change): the name
+            # filter would drop one found by its file name.
+            walk = getattr(self, "_local_walk", None)
+            if walk is None:
+                rows = [r for r in (self.all_items or [])
+                        if not r.get("_header")]
+                self._render_rows(self._sorted(rows), "rec",
+                                  tr("local_search_none"))
+                self._set_list_status(
+                    getattr(self, "_local_search_said", "")
+                    or tr("local_search_none"))
+            return True
+        return False
+
+    def _local_cancel_walk(self) -> None:
+        walk = getattr(self, "_local_walk", None)
+        if walk is None:
+            return
+        self._local_walk = None
+        walk.cancel()
+        self._hide_busy()
+
+    def _local_search_walk(self, base: str, q: str) -> None:
+        from ..core.local_search import TreeSearch
+        search = TreeSearch(base, q, self.MEDIA_EXTS, skip=self._SCAN_JUNK)
+        self._local_walk = search
+        self._local_hit_dirs = {}
+        self._local_search_said = ""
+        self._show_busy(tr("local_searching"))
+        self._local_search_step(search, {}, {"painted": None, "n": -1})
+
+    def _local_search_step(self, search, rows: dict, state: dict) -> None:
+        def job():
+            return search.step(self._SEARCH_SLICE)
+
+        def done(finished):
+            if search is not getattr(self, "_local_walk", None):
+                return          # a newer query, another folder, or Stop
+            if self.mode != "local":
+                self._local_cancel_walk()
+                return
+            now = time.monotonic()
+            if finished or state["painted"] is None or (
+                    len(search.hits) != state["n"]
+                    and now - state["painted"] >= self._SEARCH_PAINT):
+                state["painted"], state["n"] = now, len(search.hits)
+                self._local_search_paint(search, rows)
+            if not finished:
+                # The rows put in place took the strip down; the walk goes on.
+                self._show_busy(tr("local_searching"))
+                self._local_search_step(search, rows, state)
+                return
+            self._local_walk = None
+            self._hide_busy()
+            log.info("local search: %d matches in %d folders (%d entries)%s",
+                     len(search.hits), search.folders, search.entries,
+                     " - capped" if search.capped
+                     else " - not every folder" if search.partial else "")
+
+        def fail(e):
+            if search is getattr(self, "_local_walk", None):
+                log.warning("local search failed: %r", e)
+                search.done = True
+                done(True)
+
+        run_async(getattr(self, "pool", None), job, done, fail)
+
+    def _local_search_paint(self, search, rows: dict) -> None:
+        """The matches found so far. A row made once keeps what the enrich
+        pass gave it (a track's tags, art), so only new ones are enriched."""
+        new = []
+        for h in search.hits:
+            if h.path not in rows:
+                rows[h.path] = self._local_hit_row(h)
+                new.append(rows[h.path])
+        self._local_hit_dirs = dict(search.siblings)
+        shown = [rows[h.path] for h in search.hits]
+        said = self._local_search_note(search, len(shown))
+        self._local_search_said = said
+        key = self._local_current_key()
+        self._render_rows(self._sorted(shown), "rec", said)
+        self._local_select_key(key)
+        self._set_list_status(said)
+        if new:
+            self._local_enrich(new)
+            self._local_fetch_album_art(new)
+
+    def _local_hit_row(self, h) -> dict:
+        row = _dir_row(h.path) if h.is_dir else _file_row(
+            h.path, self.AUDIO_EXTS, h.size, h.mtime)
+        # Where it is, muted under its name: the subfolder relative to the
+        # folder searched (nothing for that folder itself).
+        row["_sub"] = h.folder
+        row["_tip"] = os.path.join(h.folder, os.path.basename(h.path)) \
+            if h.folder else os.path.basename(h.path)
+        row["_hit"] = True
+        return row
+
+    @staticmethod
+    def _local_search_note(search, n: int) -> str:
+        if not search.done:
+            return tr("local_search_count", n=n) if n \
+                else tr("local_searching")
+        said = tr("local_search_count", n=n) if n \
+            else tr("local_search_none")
+        if search.capped:
+            said += "  ·  " + tr("local_search_more", n=search.max_hits)
+        elif search.partial:
+            said += "  ·  " + tr("local_search_partial")
+        return said
+
+    def _local_current_key(self):
+        try:
+            it = self.list_model.item_at(self.listw.currentIndex().row())
+            return it.get("_key") if it else None
+        except Exception:
+            return None
+
+    def _local_hit_folder(self, url: str, item: dict) -> list[dict] | None:
+        """What a search match plays on into (main_window._place_in_queue):
+        its own folder's files, as that folder's listing has them - never
+        the other matches. None when the walk did not keep the folder."""
+        d = os.path.dirname(url)
+        names = (getattr(self, "_local_hit_dirs", None) or {}).get(d)
+        if not names or os.path.basename(url) not in names:
+            return None
+        rows = []
+        at = 0
+        for n in names:
+            p = os.path.join(d, n)
+            if p == url:
+                at = len(rows)
+                rows.append(item)
+            else:
+                rows.append(_file_row(p, self.AUDIO_EXTS))
+        self._local_tag_rows(rows, at)
+        return rows
+
+    def _local_tag_rows(self, rows: list[dict], first: int = 0) -> None:
+        """Name a queue's tracks from their tags off the window's thread,
+        the ones from *first* on before those ahead of it, as the enrich
+        pass names a listing's."""
+        order = rows[first:] + rows[:first]
+        todo = [r for r in order if r.get("_needs_tags")][:self._ENRICH_BATCH]
+        if not todo or getattr(self, "pool", None) is None:
+            return
+        paths = [r["_path"] for r in todo]
+
+        def job():
+            cover = self._cover_in(os.path.dirname(paths[0]))
+            out = []
+            for p in paths:
+                tags = read_tags(p)[0]
+                out.append({"name": display_name(p, tags),
+                            "_artist": tags.get("artist")
+                            or tags.get("albumartist", ""),
+                            "_album": tags.get("album", ""),
+                            "_year": tags.get("date", "")[:4],
+                            "stream_icon": cover})
+            return out
+
+        def done(out):
+            for r, info in zip(todo, out or [], strict=False):
+                if not r.get("_needs_tags"):
+                    continue    # the listing's own pass got there first
+                for k, v in info.items():
+                    if v and not (k == "stream_icon" and r.get(k)):
+                        r[k] = v
+                r.pop("_needs_tags", None)
+
+        run_async(self.pool, job, done, lambda _e: None)
 
     def _local_remember_place(self) -> None:
         """Where we are right now, so leaving for TV and coming back lands

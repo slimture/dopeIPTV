@@ -2599,6 +2599,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # Not on the collapsed icon rail (see _apply_sidebar_chrome).
             self.cat_search_btn.setVisible(
                 show and not getattr(self, "_sidebar_collapsed", False))
+        # A Local files search still walking a folder: not what is wanted now.
+        self._local_cancel_walk()
         self.cat_list.clear()
         self.list_model.set_items([], self.mode)
         if self.mode == "local":
@@ -3624,6 +3626,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Radio's Search row asks the whole directory instead (mw_radio).
         if self.mode == "radio" and self._radio_search_hook():
             return
+        # In a folder of Local files it looks through the subfolders too.
+        if self.mode == "local" and self._local_search_hook():
+            return
         text = self.search.text().lower().strip()
         kind = self._content_kind()
         if self.channel_ov.anything_hidden():
@@ -4262,7 +4267,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # Same media family only: a folder holding both an album and a
             # film must not roll from the last track into the film.
             same = self._is_audio if self._is_audio(url) else self._is_video
-            q = [r for r in (self.all_items or [])
+            # A search match plays on through its own folder, as it would
+            # from there - not through the other matches (mw_local).
+            listing = (self._local_hit_folder(url, item)
+                       if isinstance(item, dict) and item.get("_hit")
+                       else None)
+            q = [r for r in (listing or self.all_items or [])
                  if not r.get("_header") and same(r.get("_path") or "")]
             here = next((n for n, t in enumerate(q)
                          if t.get("_path") == url), -1)

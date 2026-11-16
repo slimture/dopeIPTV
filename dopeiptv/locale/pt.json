@@ -2911,5 +2911,10 @@
   "video_path_thread": "Thread própria",
   "video_path_window": "Thread da janela",
   "video_path_off": "Thread da janela - desativada",
-  "video_path_fallback": "Thread da janela - a thread própria não pôde iniciar: {reason}"
+  "video_path_fallback": "Thread da janela - a thread própria não pôde iniciar: {reason}",
+  "local_searching": "Pesquisando nesta pasta e nas subpastas…",
+  "local_search_count": "{n} encontrados nesta pasta e nas subpastas",
+  "local_search_none": "Nada encontrado nesta pasta nem nas subpastas.",
+  "local_search_more": "Apenas os {n} primeiros são mostrados - digite mais para refinar.",
+  "local_search_partial": "Nem todas as subpastas foram pesquisadas - abra uma para pesquisar nela."
 }

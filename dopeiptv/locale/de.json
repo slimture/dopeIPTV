@@ -2911,5 +2911,10 @@
   "video_path_thread": "Eigener Thread",
   "video_path_window": "Fenster-Thread",
   "video_path_off": "Fenster-Thread – ausgeschaltet",
-  "video_path_fallback": "Fenster-Thread – der eigene Thread konnte nicht starten: {reason}"
+  "video_path_fallback": "Fenster-Thread – der eigene Thread konnte nicht starten: {reason}",
+  "local_searching": "Dieser Ordner und seine Unterordner werden durchsucht…",
+  "local_search_count": "{n} gefunden in diesem Ordner und seinen Unterordnern",
+  "local_search_none": "In diesem Ordner und seinen Unterordnern wurde nichts gefunden.",
+  "local_search_more": "Nur die ersten {n} werden gezeigt - tipp weiter, um einzugrenzen.",
+  "local_search_partial": "Nicht alle Unterordner wurden durchsucht - öffne einen, um ihn zu durchsuchen."
 }

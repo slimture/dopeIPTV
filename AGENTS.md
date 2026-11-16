@@ -118,6 +118,7 @@ map and the one-way import rule.
 | `core/channel_prefs.py` | Nerd: settings of a channel's own (`nerd_channel_prefs`, by source + stream id): audio/subtitle language, deinterlace, aspect, audio delay (the old `nerd_adelay/` keys move in on read); what each sets in mpv; applied only while Nerd is on |
 | `core/shortcut_keys.py` | Keyboard shortcuts: the rebindable actions and the app's keys, the user's over them always (`keyboard_shortcuts`, portable text), never two actions on one key, the keys the app keeps, the old editor's keys carried over |
 | `core/palette_match.py` | The command palette's matching: folded text (case, accents, punctuation left out), word starts weigh more, an `Index` folded once for tens of thousands of channels (`scored`: the matches with their scores) |
+| `core/local_search.py` | Local files' search through a folder and every subfolder (`TreeSearch`): breadth first, in slices on the pool (`step`), cancelable from any thread; every word typed in a file's or folder's name, folded as the palette folds; bounded (`MAX_DEPTH`, `MAX_ENTRIES`, `MAX_HITS`) and saying which bound it met (`capped`, `partial`); hidden folders and files, a NAS's housekeeping and a link back into the walk left out; each match's subfolder, and its folder's media files for the queue (`siblings`); no disk touched before the first step |
 | `core/search_all.py` | One search across every source, pure: a source's rows as its lists show them (`visible`: what `Shown` leaves out and, for a kids profile, nothing for adults - `adult_ids`), folded once (`Catalogue`); a week of its guide from now, one airing per programme and schedule, compact, at most `MAX_AIRINGS`, the soonest (`GuideTable`); `search`: four groups ranked (score, then on now and sooner or the shorter name, the source in use, the sources' order), capped (`CAP`) with their totals, the sources searched only in part (`PAGED`, `FAILED`, `GUIDE_CUT`), given up once a newer query came (`Latest`) |
 | `core/guide_rows.py` | The guide's rows read from channel names, pure: a "channel" that is only a heading in the provider's list (`section_heading`: "-= Sweden =-", "#### SE ####"; conservative - a word or a few between runs of decoration, never "SE\| SVT1" or "#1 Hits"), a name's short form for a cell with room for its logo alone (`short_name`: "SVT1", "K5") |
 | `core/doh.py` | Nerd's own DNS: names looked up over HTTPS (RFC 8484 wire format, or the JSON API), the presets by IP (Cloudflare, Quad9, Google), answers kept for their TTL |
@@ -452,6 +453,9 @@ QT_QPA_PLATFORM=offscreen pytest -q
   conn_test, health, home_net, nerd, nerd_lists, channel_numbers, video_mode,
   shortcut_keys, palette_match, search_all, guide_rows, channel_prefs,
   http_login, commands,
+  conn_test, health, home_net, nerd, nerd_lists, channel_numbers,
+  shortcut_keys, palette_match, local_search, search_all, guide_rows,
+  channel_prefs, http_login, commands,
   instance, nerd_check, privacy, rec_extras, series_rules, series_view,
   night_mode, rec_mp4, viewing_stats, donate_rhythm, profiles, catchup,
   url_rewrite, hls_cap, ts_scramble, teletext, teletext_subs, ts_analysis,

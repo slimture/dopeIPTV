@@ -2911,5 +2911,10 @@
   "video_path_thread": "Luồng riêng",
   "video_path_window": "Luồng của cửa sổ",
   "video_path_off": "Luồng của cửa sổ - đã tắt",
-  "video_path_fallback": "Luồng của cửa sổ - không khởi động được luồng riêng: {reason}"
+  "video_path_fallback": "Luồng của cửa sổ - không khởi động được luồng riêng: {reason}",
+  "local_searching": "Đang tìm trong thư mục này và các thư mục con…",
+  "local_search_count": "Tìm thấy {n} trong thư mục này và các thư mục con",
+  "local_search_none": "Không tìm thấy gì trong thư mục này hoặc các thư mục con.",
+  "local_search_more": "Chỉ hiện {n} kết quả đầu tiên - gõ thêm để thu hẹp.",
+  "local_search_partial": "Chưa tìm hết mọi thư mục con - mở một thư mục để tìm trong đó."
 }

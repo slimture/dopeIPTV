@@ -2911,5 +2911,10 @@
   "video_path_thread": "Vlastita nit",
   "video_path_window": "Nit prozora",
   "video_path_off": "Nit prozora - isključeno",
-  "video_path_fallback": "Nit prozora - vlastita nit nije se mogla pokrenuti: {reason}"
+  "video_path_fallback": "Nit prozora - vlastita nit nije se mogla pokrenuti: {reason}",
+  "local_searching": "Pretraživanje ove mape i njezinih podmapa…",
+  "local_search_count": "Pronađeno u ovoj mapi i podmapama: {n}",
+  "local_search_none": "Ništa nije pronađeno u ovoj mapi ni u njezinim podmapama.",
+  "local_search_more": "Prikazano je samo prvih {n} - upiši više da suziš izbor.",
+  "local_search_partial": "Nisu pretražene sve podmape - otvori jednu da je pretražiš."
 }

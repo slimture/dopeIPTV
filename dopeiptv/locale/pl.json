@@ -2911,5 +2911,10 @@
   "video_path_thread": "Własny wątek",
   "video_path_window": "Wątek okna",
   "video_path_off": "Wątek okna - wyłączone",
-  "video_path_fallback": "Wątek okna - własny wątek nie mógł się uruchomić: {reason}"
+  "video_path_fallback": "Wątek okna - własny wątek nie mógł się uruchomić: {reason}",
+  "local_searching": "Przeszukiwanie tego folderu i jego podfolderów…",
+  "local_search_count": "Znaleziono w tym folderze i podfolderach: {n}",
+  "local_search_none": "Nic nie znaleziono w tym folderze ani w jego podfolderach.",
+  "local_search_more": "Pokazano tylko pierwsze {n} - wpisz więcej, aby zawęzić.",
+  "local_search_partial": "Nie przeszukano wszystkich podfolderów - otwórz jeden, aby go przeszukać."
 }

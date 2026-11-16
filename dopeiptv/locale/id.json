@@ -2911,5 +2911,10 @@
   "video_path_thread": "Thread tersendiri",
   "video_path_window": "Thread jendela",
   "video_path_off": "Thread jendela - dimatikan",
-  "video_path_fallback": "Thread jendela - thread tersendiri tidak bisa dimulai: {reason}"
+  "video_path_fallback": "Thread jendela - thread tersendiri tidak bisa dimulai: {reason}",
+  "local_searching": "Mencari di folder ini dan subfoldernya…",
+  "local_search_count": "{n} ditemukan di folder ini dan subfoldernya",
+  "local_search_none": "Tidak ada yang ditemukan di folder ini atau subfoldernya.",
+  "local_search_more": "Hanya {n} pertama yang ditampilkan - ketik lebih banyak untuk mempersempit.",
+  "local_search_partial": "Tidak semua subfolder dicari - buka salah satunya untuk mencari di sana."
 }

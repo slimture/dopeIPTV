@@ -2911,5 +2911,10 @@
   "video_path_thread": "Thread dedicato",
   "video_path_window": "Thread della finestra",
   "video_path_off": "Thread della finestra - disattivato",
-  "video_path_fallback": "Thread della finestra - il thread dedicato non è partito: {reason}"
+  "video_path_fallback": "Thread della finestra - il thread dedicato non è partito: {reason}",
+  "local_searching": "Ricerca in questa cartella e nelle sue sottocartelle…",
+  "local_search_count": "Risultati in questa cartella e nelle sottocartelle: {n}",
+  "local_search_none": "Nessun risultato in questa cartella o nelle sue sottocartelle.",
+  "local_search_more": "Sono mostrati solo i primi {n}: scrivi di più per restringere.",
+  "local_search_partial": "Non tutte le sottocartelle sono state cercate: aprine una per cercarvi."
 }
