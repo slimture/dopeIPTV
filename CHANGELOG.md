@@ -198,7 +198,9 @@ radio and web streams, Watch together, and sync for everyone.
   into a rewind buffer session and shared by everyone watching it, the
   app's own player included; never more channels at once than the
   account allows, the app's own viewing and recordings first, and a
-  device that would need one more is told all tuners are in use. Home
+  device that would need one more is told all tuners are in use. The
+  guides it hands out are kept fresh: each served source's downloaded
+  again once it is six hours old, with or without the window. Home
   addresses only, a token on all but the tuner's endpoints; a page in the
   browser shows who watches what and holds its settings (port, tuners,
   which sources and categories - never a hidden, locked or adult one).

@@ -164,6 +164,7 @@ map and the one-way import rule.
 | `core/report.py` | Error reports and feedback: scrubbed of anything identifying, shown in full, sent only on Send (never from a modified build: copied instead); the report's `Build:` line; the native crash file |
 | `services/share.py` | dopeIPTV as a server: every source's channels as one M3U, the downloaded guides as one XMLTV (streamed) |
 | `services/failover.py` | Failover: a live channel that will not play found in another source (guide id, else name); never what that source's lists leave out (`Shown`: its hidden categories, locked ones while locked, channels hidden by hand) nor, for a kids profile, one for adults |
+| `services/guide_keeper.py` | Server mode's guides kept fresh (`GuideKeeper`): each served source's guide downloaded again once its copy on disk is six hours old (`XmltvGuide.CACHE_TTL`), one source at a time on a thread of its own, one try an hour per source, never the one the window keeps itself (a host's `guides_kept`); only the file (`XmltvGuide.refresh_file`: an answer that is no XMLTV keeps the copy there is), never a stream |
 | `services/home_server.py` | Server mode: dopeIPTV as the home's server (`HomeServer`): the restream at `/stream/<source>/<stream>` and the tuner's `/auto/v<n>`, the HDHomeRun API (`discover.json`, `lineup.json`, `lineup_status.json`, `device.xml`, `lineup.post`) and its UDP discovery, `/playlist.m3u`, `/xmltv.xml`, the page in a browser and its `api/` (status, settings, categories); the lineup (sources and categories chosen, never hidden, locked or adult, numbers of the app's own first), the tuners (`limit`, `total`: the account's, else one, else the setting), a box's tuners asked (`_check`), home addresses only, a token on all but the tuner's endpoints - those and its discovery only for this computer's own networks and Nerd's other networks (`local`: `home_net.LocalNetworks`); its settings (`Config`, `read_config`, `changes_from_page`); the window or `headless.py` is its `Host` |
 | `services/together.py` | Watch together, the catalogue side: what plays here as a `Media`, the same title (TMDB id, else title and year; an episode by its season and number; a channel as failover matches it), what the room plays found in this source (`locate`, off the window's thread) |
 | `core/platform_macos.py` | macOS-specific helpers |
@@ -446,7 +447,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   phone_page, qr, ical, report, supporter, sync, chacha20poly1305,
   discord_rpc, together, backup, doh, cert_pin, net_route, net_adapter,
   net_bridge, live_latency, ytdlp, tv_input, tv_nav, restream, hdhr,
-  server_page) and `services/` (failover, together, share, home_server, resume,
+  server_page) and `services/` (failover, together, share, home_server, guide_keeper, resume,
   coverart, reminders, mpris, media_session, media_macos, media_windows,
   airplay_macos, notify, popular), `media/subtitle_text.py`, `headless.py`
   and `launcher.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt

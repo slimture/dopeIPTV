@@ -515,8 +515,10 @@ Server for the home, off by default; `dopeiptv --server` without a window,
 - **Without a window**: `dopeiptv --server` (`--port N`,
   `--no-discovery`) imports no widget, nothing that draws and no mpv - only
   QtCore for the settings, plain threads for the rest; the household's
-  sources, settings and downloaded guides (never a profile's own), the
-  usual log; Ctrl+C / SIGTERM stop it cleanly. The page in a browser shows
+  sources, settings and guides (never a profile's own) - each served
+  source's guide downloaded again once it is six hours old, one try an
+  hour (`services/guide_keeper.py`; in the window, the sources other than
+  the active one, whose guide the window keeps) -, the usual log; Ctrl+C / SIGTERM stop it cleanly. The page in a browser shows
   the command to start it with the computer. Run it or the window's
   server, not both: two processes cannot count each other's connections.
 - **Restream** (`core/restream.py`): `/stream/<source id>/<stream id>`
@@ -566,8 +568,7 @@ and the loopback only):
 - **Channels DVR**, VLC and Kodi on the playlist, a TV's IPTV app.
 - A Raspberry Pi or NAS without a desktop: the headless start with no
   libGL or X libraries installed, and systemd's stop.
-- Not yet: the headless server refreshing the guide by itself (it serves
-  the one the app last downloaded), running series rules and scheduled
+- Not yet: running series rules and scheduled
   recordings without the window, SSDP announcing (only the HDHomeRun UDP
   discovery), and a Docker image.
 

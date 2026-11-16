@@ -188,6 +188,7 @@ files = [
     "dopeiptv/core/hdhr.py",
     "dopeiptv/core/server_page.py",
     "dopeiptv/services/home_server.py",
+    "dopeiptv/services/guide_keeper.py",
     "dopeiptv/headless.py",
     "dopeiptv/launcher.py",
     "dopeiptv/services/failover.py",
