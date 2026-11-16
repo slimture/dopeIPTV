@@ -145,6 +145,7 @@ map and the one-way import rule.
 | `core/restream.py` | Server mode's restream (`Restreamer`): a channel fetched once into a rewind buffer session and read by every viewer from a few seconds behind live (`watch`, `stream`), one too far behind dropped (`LAG_MAX`), the last one gone let go after `GRACE` (at once for another channel), never more channels than a source's limit next to `others` nor the server's total (`Busy` - 503), the app's own use first (`make_room`), the app's own session joined (`app_session`) and handed to the player (`session_of`); an HLS channel copied into TS by ffmpeg (`ffmpeg_opener`) |
 | `core/hdhr.py` | Server mode as an HDHomeRun tuner: `discover`, `lineup`, `lineup_status`, `device_xml`; libhdhomerun's packets (frame, tags, CRC32), a discover request answered (`wants`, `reply`) by the UDP 65001 `Responder` (home addresses only); the device id with its checksum (`new_device_id`, `valid_device_id`) |
 | `core/server_page.py` | Server mode's page in a browser: HTML/CSS/JS in one, nothing from elsewhere, the app's palettes (#rrggbb only), its words; status (tuners in use, who watches what, each channel's provider connection), the addresses for Plex, VLC and Kodi, port, tuners, sources and categories, the command to start it with the computer; a CSP of its own script and style hashes |
+| `core/exclusive_bind.py` | How the app's own servers bind: a port another program holds stays its own on Windows too (`SO_EXCLUSIVEADDRUSE`), no name lookup of the computer before a server starts, an idle client let go (`ExclusiveBindMixin`, `IdleTimeoutMixin`) |
 | `core/remote_api.py` | The remote API and shared lists' small HTTP server (token on every request, this computer only unless chosen - then every private range, never a public address: `client_ok`; the calendar at `/calendar.ics` with remote control on; TV mode on/off/toggle and its keys at `/api/tv`, `/api/tv_key`) |
 | `core/events.py` | Nerd: events pushed out - webhooks (POST JSON, token header, retries) and MQTT (event, retained state, last will, Home Assistant discovery); a queue and a thread per receiver; private viewing sends what happened, not what; the recordings' statuses as events; its checks |
 | `core/mqtt.py` | A small MQTT 3.1.1 client in the standard library (CONNECT with login and will, PUBLISH QoS 0, SUBSCRIBE, PINGREQ, TLS; `take()` reads what the broker sent without waiting) |
@@ -428,8 +429,28 @@ QT_QPA_PLATFORM=offscreen pytest -q
   `DOPEIPTV_LOG=debug` shows debug traces; `DOPEIPTV_LOG_FILE=/path` tees
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
-  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, cast_feed, stalker, boxes, enigma2, autotimer, bouquets, tvheadend, hdhomerun, vdr, dvbviewer, nextpvr, mythtv, satip, lan_scan, cast_devices, radio_browser, airplay_bridge), mediaserver, jellyfin, plex), kodi, mdns, simkl), lan_scan), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log, player_exec, wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys, build_check, gcguard, contest, connections, tuners, rtsp, mirrors, conn_test, health, home_net, nerd, nerd_lists, channel_numbers, shortcut_keys, palette_match, channel_prefs, http_login, commands, instance, nerd_check, privacy, rec_extras, series_rules, series_view, night_mode, rec_mp4, viewing_stats, donate_rhythm, profiles, catchup, url_rewrite, hls_cap, ts_scramble, teletext, teletext_subs, ts_analysis, remote_api, events, mqtt, mqtt_control, phone_remote, phone_page, qr, ical, report, supporter, sync, chacha20poly1305, discord_rpc, together, backup, doh, cert_pin, net_route, net_adapter, net_bridge, live_latency, ytdlp, tv_input, tv_nav, restream, hdhr, server_page) and `services/` (failover, tv_nav) and `services/` (failover, share, home_server, resume,
-  coverart, reminders, mpris, media_session, media_macos, media_windows, notify, popular), `media/subtitle_text.py`, `headless.py` and `launcher.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
+  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna,
+  cast_feed, stalker, boxes, enigma2, autotimer, bouquets, tvheadend,
+  hdhomerun, vdr, dvbviewer, nextpvr, mythtv, satip, lan_scan,
+  cast_devices, radio_browser, airplay_bridge, mediaserver, jellyfin, plex,
+  kodi, mdns, simkl), `core/` (stores, local_buffer, stream_info,
+  dvr_store/ingest/server/session/pool/record, updates, log, player_exec,
+  wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys,
+  build_check, gcguard, contest, connections, tuners, rtsp, mirrors,
+  conn_test, health, home_net, nerd, nerd_lists, channel_numbers,
+  shortcut_keys, palette_match, channel_prefs, http_login, commands,
+  instance, nerd_check, privacy, rec_extras, series_rules, series_view,
+  night_mode, rec_mp4, viewing_stats, donate_rhythm, profiles, catchup,
+  url_rewrite, hls_cap, ts_scramble, teletext, teletext_subs, ts_analysis,
+  remote_api, exclusive_bind, events, mqtt, mqtt_control, phone_remote,
+  phone_page, qr, ical, report, supporter, sync, chacha20poly1305,
+  discord_rpc, together, backup, doh, cert_pin, net_route, net_adapter,
+  net_bridge, live_latency, ytdlp, tv_input, tv_nav, restream, hdhr,
+  server_page) and `services/` (failover, together, share, home_server, resume,
+  coverart, reminders, mpris, media_session, media_macos, media_windows,
+  airplay_macos, notify, popular), `media/subtitle_text.py`, `headless.py`
+  and `launcher.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt
+  UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list
   as more non-UI modules gain type hints.
