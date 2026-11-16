@@ -53,6 +53,7 @@ from ..core.workers import run_async
 from ..i18n import tr
 from ..services import search_sources as ss
 from ..services.failover import Shown
+from .mw_pane_follow import from_pane
 from .search_page import SearchPage
 
 #: Why a source was searched only in part, as the page says it.
@@ -484,6 +485,7 @@ class _SearchAllMixin:
         elif hit.group == "series":
             self._sa_open_series(hit)
 
+    @from_pane
     def _sa_play_channel(self, hit: sa.Hit) -> None:
         """The channel live in the docked player; the page stays."""
         if self._sa_is_active(hit.source):
@@ -509,6 +511,7 @@ class _SearchAllMixin:
                   partial(self._sa_address_in, gen, pl, row),
                   partial(self._sa_address_failed, gen, row))
 
+    @from_pane
     def _sa_address_in(self, gen: tuple, pl: dict, row: dict, url: str) -> None:
         if gen != (self._sa_play_gen, self._failover_gen):
             return                      # something else was chosen meanwhile
@@ -564,6 +567,7 @@ class _SearchAllMixin:
         if started == self._failover_gen:
             self._sa_movie_here(row)
 
+    @from_pane
     def _sa_movie_here(self, row: dict) -> None:
         """A film of the source in use, in the docked player - with the
         usual resume question; the page stays."""

@@ -199,6 +199,7 @@ map and the one-way import rule.
 | `ui/subtitle_search.py` | OpenSubtitles search dialog |
 | `ui/widgets.py` | Small standalone widgets |
 | `ui/nav_widgets.py` | The sidebar's `NavButton` (leading bar when selected, a dot / pill / muted count painted over it), `SideRule`, the hairline between its groups, `SourceAvatar` at its foot (the active source's initials on the accent, `source_initials`) and `SourceLabel` over the categories (the active source's name, its kind in a muted chip, a chevron; painted, cut with an ellipsis, mirrored right to left) |
+| `ui/mw_pane_follow.py` | The middle pane follows what plays (`_PaneFollowMixin`): one function the playback path calls (`_pane_follow_soon` from `_start_playback`, a moment after the stream started): what started from outside the pane and is not what it shows - a channel to TV and its category, an episode to its series' page marked, a film to Movies and its category, a local file to its folder, a station to Radio, a recording to Recordings (`_jump_to_now_playing`), the pages left as their Back to the list does; never a web stream, the same title again (reconnect, archive), another source's channel, a play from the pane itself (`from_pane`: the Search and Guide pages; `_keep_origin` carries it past `_links_later`), while typing in a field that holds text, with a dialog or menu open, or in TV mode |
 | `ui/mw_source_label.py` | The active source in plain sight: its name and kind over the categories (the chip only with two sources or more; hidden on the rail; a click opens the avatar's menu under it), the list's source in the status line (`_set_list_status`: "Pirat · 120 channels"), what plays from another source said there (`_note_playing_source`, `_status_playing`: "Playing: X - from Pirat"; failover's title names its own), the list's line back on Stop, its name in TV mode's header; every change through `_update_playlist_btn` |
 | `ui/box_finder.py` | Box and media-server kinds in the add-a-source forms and the "Find on my network" button (the form's own kinds first; pressed again it stops; with nothing found, why a network split in VLANs hides a box and what fixes it, `nothing_found_text`) |
 | `ui/media_signin.py` | Signing in to a media server in the source dialog and the welcome: Jellyfin/Emby name and password (sent once, never kept) or Quick Connect, Plex's PIN in the browser and the server picked; the network off the window's thread |
@@ -296,7 +297,8 @@ row in the table above; in short:
   source over the categories, in the status line and TV mode's header),
   `mw_favorites` (several favorites at
   once, move between folders, drag-and-drop), `mw_context`, `mw_sort`,
-  `mw_follow` (followed series, new-episode news), `mw_reminders`,
+  `mw_follow` (followed series, new-episode news), `mw_pane_follow` (the
+  middle pane follows what plays), `mw_reminders`,
   `mw_calendar` (reminders and recordings as a calendar), `mw_stats`
   (your viewing statistics), `mw_donate` (the heart and Home's card one
   week a month, About's link), `mw_onboarding` (the welcome; its Bring step

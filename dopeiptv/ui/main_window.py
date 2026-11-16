@@ -93,6 +93,7 @@ from .mw_donate import _DonateMixin
 from .mw_context import _ContextMenuMixin
 from .mw_favorites import _FavoritesMixin
 from .mw_follow import _FollowMixin
+from .mw_pane_follow import _PaneFollowMixin, from_pane
 from .mw_detail import _DetailMixin
 from .mw_nav import _NavMixin
 from .mw_source_label import _SourceLabelMixin
@@ -147,7 +148,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _LocalFilesMixin, _RadioMixin, _WebStreamsMixin,
                  _PopoutMixin, _MultiviewMixin, _HomeMixin, _GuideMixin,
                  _SeriesPageMixin, _SearchAllMixin, _MprisMixin,
-                 _FollowMixin, _SubtitlesMixin, _CastMixin, _AirPlayMixin, _DonateMixin,
+                 _FollowMixin, _PaneFollowMixin, _SubtitlesMixin, _CastMixin, _AirPlayMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
                  _HealthMixin, _TsAnalysisMixin, _StreamInfoMixin, _ChannelPrefsMixin, _RemoteMixin, _PhoneMixin, _ServerMixin, _CalendarMixin,
                  _EventsMixin, _ReportMixin,
@@ -3540,6 +3541,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         """Reveal a live channel in the TV list (see _reveal_item_in_list)."""
         self._reveal_item_in_list(it, "live")
 
+    @from_pane
     def tune_from_guide(self, ch) -> None:
         """Play a channel picked from the EPG guide, then jump the middle
         column to it and select its category in the sidebar so the guide
@@ -3855,6 +3857,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return False
         client = self.client
         name, a, k = waits
+        # A play from the middle pane stays one once its address is in
+        # (mw_pane_follow).
+        keep = getattr(self, "_keep_origin", None)
+        if keep is not None:
+            again = keep(again)
         gens = getattr(self, "_link_gens", None)
         if gens is None:
             gens = self._link_gens = {}
@@ -5189,6 +5196,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # a fresh start.
         reconnect = key is not None and getattr(self, "_reconnect_key", None) == key
         self._reconnect_key = None
+        # The same title again (a reconnect, a backup address, the archive):
+        # the middle pane is left where it is (mw_pane_follow).
+        restart = reconnect or catchup or (
+            key is not None and str(key) == str(getattr(self, "_playing_key", None))
+            and getattr(self, "_playing_group", None) is not None)
         if not self._guard_stream_switch(url, title):
             return
         # The guard is about streams: the user's own files always play.
@@ -5312,6 +5324,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                                "web": "web"}.get(kind)
         # A series' page marks what plays and goes to it (autoplay's next).
         self._sp_playback_started(key, kind)
+        # The middle pane goes to what plays, when it came from elsewhere.
+        follow = getattr(self, "_pane_follow_soon", None)
+        if follow is not None:
+            follow(kind, key, restart)
         self.listw.viewport().update()
         self.setWindowTitle(title or self._base_title)
         self._set_status(self._status_playing(title))
@@ -6133,6 +6149,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Music: the buttons step the play queue, not the browsing list -
         # what a listener means by previous/next track.
         if self._queue_step(direction):
+            return
+        # A channel plays while the list shows no channels (Series, Movies):
+        # channel up and down go through the source's channels as a remote's
+        # do (mw_commands), and the middle pane follows (mw_pane_follow).
+        lp = getattr(self, "_last_playback", None) or {}
+        if (lp.get("kind") == "live" and self._playing_group == "live"
+                and (self.mode not in ("live", "fav") or self.series_ctx)
+                and self._play_channel_step(direction)):
             return
         if self.mode not in ("live", "fav", "vod", "series",
                              "history", "rec", "local"):
