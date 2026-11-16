@@ -2877,5 +2877,7 @@
   "nerd_server_use_port": "Usar el puerto {port}",
   "nerd_server_use_port_click": "Haz clic aquí para usar el puerto {port} en su lugar.",
   "set_about_version": "Versión {version}",
-  "epg_no_guide_any": "No hay guía de programación para estos canales."
+  "epg_no_guide_any": "No hay guía de programación para estos canales.",
+  "set_guide_now_front": "Línea de ahora sobre los programas",
+  "set_guide_now_front_hint": "Desactivada, la línea que marca la hora actual pasa por detrás de los programas y se ve entre ellos. Activada, los cruza."
 }

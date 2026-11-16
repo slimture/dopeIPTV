@@ -2877,5 +2877,7 @@
   "nerd_server_use_port": "ポート {port} を使う",
   "nerd_server_use_port_click": "ここをクリックすると、代わりにポート {port} を使います。",
   "set_about_version": "バージョン {version}",
-  "epg_no_guide_any": "これらのチャンネルには番組表がありません。"
+  "epg_no_guide_any": "これらのチャンネルには番組表がありません。",
+  "set_guide_now_front": "現在時刻の線を番組の上に表示",
+  "set_guide_now_front_hint": "オフでは現在時刻を示す線は番組の後ろを通り、番組の間に見えます。オンでは番組の上を横切ります。"
 }

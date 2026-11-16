@@ -517,3 +517,26 @@ def test_recording_from_the_guide_takes_the_detail_panels_path():
     EpgGrid._record(SimpleNamespace(window=win, info=info), ch, p)
     win._record_programme.assert_called_once_with(
         ch, {"title": "News"}, 100.0, 200.0)
+
+
+def test_the_now_line_sits_behind_the_cards_unless_chosen_in_front():
+    """Behind the cards by default (seen between them, never through a
+    title); over them with Settings > Guide's switch on."""
+    from PyQt6.QtCore import QSettings
+    from PyQt6.QtWidgets import QApplication
+
+    from dopeiptv.ui.epg_grid import EpgGrid
+
+    QApplication.instance() or QApplication([])
+    s = QSettings("dopeIPTV-test", "now-line")
+    s.clear()
+
+    class _W:
+        settings = s
+
+    grid = EpgGrid.__new__(EpgGrid)
+    grid.window = _W()
+    assert grid._now_z() < 5 < 7 <= 8                 # under the cards (z 5)
+    s.setValue(EpgGrid.NOW_FRONT_KEY, "true")
+    assert 5 < grid._now_z() < 8                       # over them, under the titles
+    s.clear()

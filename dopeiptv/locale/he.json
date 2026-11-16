@@ -2877,5 +2877,7 @@
   "nerd_server_use_port": "להשתמש בפורט {port}",
   "nerd_server_use_port_click": "לחצו כאן כדי להשתמש בפורט {port} במקום.",
   "set_about_version": "גרסה {version}",
-  "epg_no_guide_any": "אין מדריך תוכניות עבור הערוצים האלה."
+  "epg_no_guide_any": "אין מדריך תוכניות עבור הערוצים האלה.",
+  "set_guide_now_front": "קו העכשיו מעל התוכניות",
+  "set_guide_now_front_hint": "כבוי: הקו שמסמן את השעה הנוכחית עובר מאחורי התוכניות ונראה ביניהן. מופעל: הוא עובר מעליהן."
 }

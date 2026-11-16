@@ -2877,5 +2877,7 @@
   "nerd_server_use_port": "{port} bağlantı noktasını kullan",
   "nerd_server_use_port_click": "Bunun yerine {port} bağlantı noktasını kullanmak için buraya tıkla.",
   "set_about_version": "Sürüm {version}",
-  "epg_no_guide_any": "Bu kanallar için program kılavuzu yok."
+  "epg_no_guide_any": "Bu kanallar için program kılavuzu yok.",
+  "set_guide_now_front": "Şimdi çizgisi programların üstünde",
+  "set_guide_now_front_hint": "Kapalıyken şu anki saati gösteren çizgi programların arkasından geçer ve aralarında görünür. Açıkken üzerlerinden geçer."
 }

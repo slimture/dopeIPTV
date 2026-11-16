@@ -2877,5 +2877,7 @@
   "nerd_server_use_port": "Pakai port {port}",
   "nerd_server_use_port_click": "Klik di sini untuk memakai port {port} sebagai gantinya.",
   "set_about_version": "Versi {version}",
-  "epg_no_guide_any": "Tidak ada panduan program untuk saluran-saluran ini."
+  "epg_no_guide_any": "Tidak ada panduan program untuk saluran-saluran ini.",
+  "set_guide_now_front": "Garis sekarang di atas acara",
+  "set_guide_now_front_hint": "Mati: garis penanda waktu sekarang lewat di belakang acara dan terlihat di antaranya. Nyala: garis melintasi acara."
 }

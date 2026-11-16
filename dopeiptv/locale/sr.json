@@ -2877,5 +2877,7 @@
   "nerd_server_use_port": "Koristi port {port}",
   "nerd_server_use_port_click": "Klikni ovde da umesto toga koristiš port {port}.",
   "set_about_version": "Verzija {version}",
-  "epg_no_guide_any": "Nema programskog vodiča za ove kanale."
+  "epg_no_guide_any": "Nema programskog vodiča za ove kanale.",
+  "set_guide_now_front": "Linija „sada” preko emisija",
+  "set_guide_now_front_hint": "Isključeno: linija koja označava trenutno vreme prolazi iza emisija i vidi se između njih. Uključeno: prelazi preko njih."
 }

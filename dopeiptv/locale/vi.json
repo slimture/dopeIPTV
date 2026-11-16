@@ -2877,5 +2877,7 @@
   "nerd_server_use_port": "Dùng cổng {port}",
   "nerd_server_use_port_click": "Nhấp vào đây để dùng cổng {port} thay thế.",
   "set_about_version": "Phiên bản {version}",
-  "epg_no_guide_any": "Không có lịch phát chương trình cho các kênh này."
+  "epg_no_guide_any": "Không có lịch phát chương trình cho các kênh này.",
+  "set_guide_now_front": "Vạch hiện tại phía trên chương trình",
+  "set_guide_now_front_hint": "Tắt: vạch đánh dấu thời điểm hiện tại chạy phía sau các chương trình và hiện giữa chúng. Bật: vạch chạy đè lên chúng."
 }

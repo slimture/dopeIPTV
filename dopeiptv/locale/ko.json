@@ -2877,5 +2877,7 @@
   "nerd_server_use_port": "{port} 포트 사용",
   "nerd_server_use_port_click": "대신 {port} 포트를 쓰려면 여기를 클릭하세요.",
   "set_about_version": "버전 {version}",
-  "epg_no_guide_any": "이 채널들에는 프로그램 가이드가 없습니다."
+  "epg_no_guide_any": "이 채널들에는 프로그램 가이드가 없습니다.",
+  "set_guide_now_front": "현재 시각 선을 프로그램 위에",
+  "set_guide_now_front_hint": "끄면 현재 시각을 표시하는 선이 프로그램 뒤로 지나가 프로그램 사이에서 보입니다. 켜면 프로그램 위를 가로지릅니다."
 }

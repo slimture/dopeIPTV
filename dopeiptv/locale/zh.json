@@ -2877,5 +2877,7 @@
   "nerd_server_use_port": "使用端口 {port}",
   "nerd_server_use_port_click": "点击这里改用端口 {port}。",
   "set_about_version": "版本 {version}",
-  "epg_no_guide_any": "这些频道暂无节目指南。"
+  "epg_no_guide_any": "这些频道暂无节目指南。",
+  "set_guide_now_front": "当前时间线显示在节目上方",
+  "set_guide_now_front_hint": "关闭时，标示当前时间的线从节目后面经过，只在节目之间露出。开启时，它从节目上方穿过。"
 }

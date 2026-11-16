@@ -1492,6 +1492,10 @@ class _SettingsMixin:
         epg_delay_box = delay_box("epg_delay_min")
         c = guide.card()
         c.row(tr("setting_upcoming_count"), epg_count_box)
+        now_front_box = c.toggle(
+            tr("set_guide_now_front"),
+            self.settings.value("guide_now_line_front", "false") == "true",
+            tr("set_guide_now_front_hint"))
         c = guide.card(tr("set_card_offsets"))
         c.row(tr("setting_replay_delay"), replay_delay_box,
               tr("set_replay_delay_hint"))
@@ -2605,6 +2609,16 @@ class _SettingsMixin:
                 "false" if upcoming_box.isChecked() else "true")
             put("show_stream_info", flag(stream_info_box))
             put("autoplay_preview", flag(autoplay_box))
+            # Stored once it is chosen: OK with nothing touched writes nothing.
+            if (flag(now_front_box) == "true"
+                    or self.settings.value("guide_now_line_front") is not None):
+                put("guide_now_line_front", flag(now_front_box))
+            if "guide_now_line_front" in changed:
+                import time as _time
+
+                from .epg_grid import EpgGrid
+                for grid in self.findChildren(EpgGrid):
+                    grid._place_now_line(_time.time())
             put("autoplay_next_episode", flag(autoplay_next_box))
             put("nextup_lead_secs", nextup_box.currentData())
             put("auto_reconnect_live", flag(autorecon_box))

@@ -2877,5 +2877,7 @@
   "nerd_server_use_port": "Poort {port} gebruiken",
   "nerd_server_use_port_click": "Klik hier om in plaats daarvan poort {port} te gebruiken.",
   "set_about_version": "Versie {version}",
-  "epg_no_guide_any": "Geen programmagids voor deze kanalen."
+  "epg_no_guide_any": "Geen programmagids voor deze kanalen.",
+  "set_guide_now_front": "Nu-lijn over de programma's",
+  "set_guide_now_front_hint": "Uit loopt de lijn die de huidige tijd aangeeft achter de programma's en is tussen ze te zien. Aan loopt hij eroverheen."
 }

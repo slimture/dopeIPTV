@@ -2877,5 +2877,7 @@
   "nerd_server_use_port": "Använd port {port}",
   "nerd_server_use_port_click": "Klicka här för att använda port {port} i stället.",
   "set_about_version": "Version {version}",
-  "epg_no_guide_any": "Ingen programguide för de här kanalerna."
+  "epg_no_guide_any": "Ingen programguide för de här kanalerna.",
+  "set_guide_now_front": "Nu-linjen över programmen",
+  "set_guide_now_front_hint": "Av går linjen som visar tiden just nu bakom programmen och syns mellan dem. På går den över dem."
 }

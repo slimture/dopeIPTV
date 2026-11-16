@@ -2877,5 +2877,7 @@
   "nerd_server_use_port": "Tumia mlango {port}",
   "nerd_server_use_port_click": "Bofya hapa kutumia mlango {port} badala yake.",
   "set_about_version": "Toleo {version}",
-  "epg_no_guide_any": "Hakuna mwongozo wa vipindi kwa vituo hivi."
+  "epg_no_guide_any": "Hakuna mwongozo wa vipindi kwa vituo hivi.",
+  "set_guide_now_front": "Mstari wa sasa juu ya vipindi",
+  "set_guide_now_front_hint": "Ukizimwa, mstari unaoonyesha saa ya sasa hupita nyuma ya vipindi na huonekana kati yake. Ukiwashwa, hupita juu yake."
 }
