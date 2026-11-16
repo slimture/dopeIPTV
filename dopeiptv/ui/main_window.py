@@ -1428,6 +1428,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self.settings.value("vis_on", "true") == "true",
                 self.settings.value("vis_style", "bars"))
             self.player.vis_choose = self._vis_choose
+            # A stream that turns out to be sound alone (an iHeart channel
+            # in an M3U) gets the visualiser too, once mpv lists its tracks.
+            self.player.audio_only_changed.connect(self._on_audio_only)
             # Night mode's key in the player's menu (the window's keys), and
             # one notice however it was switched (mw_shortcuts).
             self.player.night_key = self._night_key_text
@@ -4357,10 +4360,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         player; the auto-preview, which never came through here, played
         fine and that is what gave the bug away. A stale visualiser graph
         from previous music is cleared inside player.play() instead, which
-        only writes when one is actually set."""
+        only writes when one is actually set.
+
+        A stream with no audio extension that turns out to be sound alone
+        gets its visualiser later, once mpv has listed its tracks
+        (_on_audio_only) - never here, before anything is known of it."""
         pl = getattr(self, "player", None)
         if pl is None:
             return
+        self._vis_tracks = False
         if not audio and not str(url or "").lower().endswith(self.AUDIO_EXTS):
             # Video. The ONLY thing allowed here is taking down a
             # visualiser we ourselves put up for a previous track - and
@@ -4384,15 +4392,60 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             log.debug("audio visuals failed: %s", e)
 
     def _vis_choose(self, on: bool, style: str) -> None:
-        """Remember the visualiser choice and apply it to what is playing."""
+        """Remember the visualiser choice and apply it to what is playing:
+        music, a radio station, or a stream mpv found to be sound alone."""
         self.settings.setValue("vis_on", "true" if on else "false")
         self.settings.setValue("vis_style", style)
         pl = getattr(self, "player", None)
         lp = getattr(self, "_last_playback", None) or {}
         url = lp.get("url", "")
-        if pl is not None and (str(url).lower().endswith(self.AUDIO_EXTS)
-                               or lp.get("kind") == "radio"):
-            pl.set_visualiser(on, style)
+        if pl is None:
+            return
+        music = (str(url).lower().endswith(self.AUDIO_EXTS)
+                 or lp.get("kind") == "radio")
+        tracks = not music and self._playing_audio_only()
+        if music or tracks:
+            pl.set_visualiser(on, style, playing=True)
+            # Whatever is up now is what the next video takes down.
+            self._vis_active = on
+            self._vis_tracks = tracks and on
+
+    def _playing_audio_only(self) -> bool:
+        pl = getattr(self, "player", None)
+        try:
+            return bool(pl is not None and pl.audio_only())
+        except Exception:
+            return False
+
+    def _on_audio_only(self, audio_only: bool) -> None:
+        """The stream playing turned out to be sound with no picture - an
+        iHeart channel in an M3U, a film that is only a soundtrack: the
+        visualiser the user chose in place of the black pane, as for music.
+        Or it has a picture after all: the visualiser goes again.
+
+        Only ever after mpv has opened the stream and listed its tracks, so
+        a stream with video never gets a filter graph written; the next
+        stream takes this one down as it does music's (_vis_active)."""
+        pl = getattr(self, "player", None)
+        if pl is None:
+            return
+        try:
+            if audio_only:
+                if getattr(self, "_vis_active", False):
+                    return          # music or radio: up before it loaded
+                if self.settings.value("vis_on", "true") != "true":
+                    return          # turned off: nothing written
+                pl.set_visualiser(True, self.settings.value("vis_style", "bars"),
+                                  playing=True)
+                self._vis_active = True
+                self._vis_tracks = True
+            elif getattr(self, "_vis_tracks", False):
+                self._vis_tracks = False
+                if getattr(self, "_vis_active", False):
+                    self._vis_active = False
+                    pl.set_visualiser(False)
+        except Exception as e:
+            log.debug("visualiser for a stream without a picture: %s", e)
 
     def open_equaliser(self) -> None:
         """A ten-band graphic equaliser with the usual presets. Applies live

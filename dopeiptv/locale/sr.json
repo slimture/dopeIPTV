@@ -2893,5 +2893,7 @@
   "onb_sync_err_net": "dopeiptv.org nije dostupan. Proveri vezu i pokušaj ponovo.",
   "onb_sync_err_none": "Pod tim kodom ništa nije sinhronizovano. Proveri ga na drugom računaru i pokušaj ponovo.",
   "onb_sync_err_other": "To sada nije uspelo. Pokušaj ponovo za trenutak.",
-  "onb_bring_private": "Šifruje se na ovom računaru pre slanja - dopeiptv.org čuva samo podatke koje ne može da pročita. Bez naloga i e-pošte."
+  "onb_bring_private": "Šifruje se na ovom računaru pre slanja - dopeiptv.org čuva samo podatke koje ne može da pročita. Bez naloga i e-pošte.",
+  "vis_style_scope": "Vektorskop",
+  "vis_style_freqs": "Frekvencije"
 }

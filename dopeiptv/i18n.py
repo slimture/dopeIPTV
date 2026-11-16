@@ -149,6 +149,8 @@ _STRINGS: dict[str, dict[str, str]] = {
     "vis_style_bars": {"en": "Bars"},
     "vis_style_spectrum": {"en": "Spectrum"},
     "vis_style_wave": {"en": "Waveform"},
+    "vis_style_scope": {"en": "Vectorscope"},
+    "vis_style_freqs": {"en": "Frequencies"},
     "local_tracks": {"en": "{n} tracks"},
     "sidebar_categories": {"en": "CATEGORIES"},
 

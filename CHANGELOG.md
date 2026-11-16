@@ -115,6 +115,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   =-", "#### SE ####") is drawn as a heading over the channels below it,
   with nothing to click.
 - The welcome's connect step showed the MAC address, the media server sign-in and Find on my network for Xtream until another kind or a language was picked.
+- An audio-only stream from a source (an iHeart channel in an M3U, a DVB
+  radio channel, a film that is only sound) shows the visualiser instead
+  of a black picture, decided once mpv has listed its tracks - a stream
+  with video is never touched; two more styles, Vectorscope and
+  Frequencies, and Waveform no longer draws over a checkerboard.
 
 ## [1.6.0]
 

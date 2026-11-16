@@ -2893,5 +2893,7 @@
   "onb_sync_err_net": "dopeiptv.org is niet bereikbaar. Controleer je verbinding en probeer het opnieuw.",
   "onb_sync_err_none": "Onder die code is niets gesynchroniseerd. Controleer hem op je andere computer en probeer het opnieuw.",
   "onb_sync_err_other": "Dat lukte nu niet. Probeer het zo opnieuw.",
-  "onb_bring_private": "Versleuteld op deze computer voordat er iets wordt verstuurd - dopeiptv.org bewaart alleen gegevens die het niet kan lezen. Geen account, geen e-mail."
+  "onb_bring_private": "Versleuteld op deze computer voordat er iets wordt verstuurd - dopeiptv.org bewaart alleen gegevens die het niet kan lezen. Geen account, geen e-mail.",
+  "vis_style_scope": "Vectorscoop",
+  "vis_style_freqs": "Frequenties"
 }

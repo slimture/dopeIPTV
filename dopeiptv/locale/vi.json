@@ -2893,5 +2893,7 @@
   "onb_sync_err_net": "Không kết nối được dopeiptv.org. Hãy kiểm tra kết nối rồi thử lại.",
   "onb_sync_err_none": "Không có gì được đồng bộ dưới mã đó. Hãy kiểm tra trên máy kia rồi thử lại.",
   "onb_sync_err_other": "Lần này chưa được. Hãy thử lại sau giây lát.",
-  "onb_bring_private": "Được mã hóa trên máy này trước khi gửi - dopeiptv.org chỉ giữ dữ liệu mà nó không đọc được. Không tài khoản, không email."
+  "onb_bring_private": "Được mã hóa trên máy này trước khi gửi - dopeiptv.org chỉ giữ dữ liệu mà nó không đọc được. Không tài khoản, không email.",
+  "vis_style_scope": "Vectorscope",
+  "vis_style_freqs": "Tần số"
 }

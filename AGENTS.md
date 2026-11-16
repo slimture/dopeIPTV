@@ -179,7 +179,8 @@ map and the one-way import rule.
 | `media/rewind_bar.py` | The DVR row and timeshift timeline over the video, and their switch (`RewindBarMixin`) |
 | `media/loading_overlay.py` | The loading indicator over the video (issue #27): `LoadingOverlay` (a spinner, the logo or poster the window holds - no download for it -, the name and a muted line on a plate in `P`'s colours; compact for a multiview cell; mouse-transparent, no focus, animated only while on screen) and the player's side, `LoadingMixin`: from play() after 0.3 s to mpv's `playback-restart`, "Still loading" after 8 s, "Reconnecting…" for the app's reconnect (`set_loading_art`), "Buffering… 45%" after 1 s of `paused-for-cache` / a seek / the rewind buffer reopened; mpv's events forwarded from its thread by `_ld_event`, the position poll the net; gone on stop, error (`hide_loading`) and pause; every way in `quiet` |
 | `media/stream_info.py` | Channel-change technical banner, reading the current mpv track |
-| `core/stream_info.py` | Validated stream metadata and bounded per-source/channel cache |
+| `media/audio_only.py` | Sound with no picture (`AudioOnlyMixin`): whether the stream play() opened is audio alone, read on mpv's file-loaded for that file and its later track-list changes (never an earlier stream's), said once per change (`audio_only_changed`); it only reads - the window's `_on_audio_only` puts the visualiser up, never on a stream with video |
+| `core/stream_info.py` | Validated stream metadata and bounded per-source/channel cache; whether a track list has a real picture (`has_picture`: cover art and still images are none) or is sound alone (`audio_only`) |
 | `media/seek_slider.py` | The seek bar slider (`_SeekSlider`): click, drag, hover time |
 | `media/video_surface.py` | The video surface mpv draws into (`_MpvGLWidget`) and the Linux pop-out's raster mirror |
 | `media/subtitle_text.py` | Stray right-to-left marks out of subtitle files before mpv reads them |

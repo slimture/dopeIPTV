@@ -2893,5 +2893,7 @@
   "onb_sync_err_net": "无法连接 dopeiptv.org。请检查网络连接后重试。",
   "onb_sync_err_none": "此代码下没有同步内容。请在另一台电脑上核对后重试。",
   "onb_sync_err_other": "这次没有成功。请稍后再试。",
-  "onb_bring_private": "发送前在这台电脑上加密 - dopeiptv.org 只保存它无法读取的数据。无需账户，无需邮箱。"
+  "onb_bring_private": "发送前在这台电脑上加密 - dopeiptv.org 只保存它无法读取的数据。无需账户，无需邮箱。",
+  "vis_style_scope": "矢量示波器",
+  "vis_style_freqs": "频率"
 }

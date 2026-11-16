@@ -2893,5 +2893,7 @@
   "onb_sync_err_net": "dopeiptv.org에 연결할 수 없습니다. 연결을 확인하고 다시 시도하세요.",
   "onb_sync_err_none": "이 코드로 동기화된 것이 없습니다. 다른 컴퓨터에서 확인하고 다시 시도하세요.",
   "onb_sync_err_other": "지금은 되지 않았습니다. 잠시 후 다시 시도하세요.",
-  "onb_bring_private": "보내기 전에 이 컴퓨터에서 암호화됩니다. dopeiptv.org는 읽을 수 없는 데이터만 보관합니다. 계정도 이메일도 없습니다."
+  "onb_bring_private": "보내기 전에 이 컴퓨터에서 암호화됩니다. dopeiptv.org는 읽을 수 없는 데이터만 보관합니다. 계정도 이메일도 없습니다.",
+  "vis_style_scope": "벡터스코프",
+  "vis_style_freqs": "주파수"
 }

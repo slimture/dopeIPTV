@@ -2893,5 +2893,7 @@
   "onb_sync_err_net": "Kom inte fram till dopeiptv.org. Kontrollera anslutningen och försök igen.",
   "onb_sync_err_none": "Inget är synkat under den koden. Kontrollera den på din andra dator och försök igen.",
   "onb_sync_err_other": "Det gick inte just nu. Försök igen om en stund.",
-  "onb_bring_private": "Krypteras på den här datorn innan något skickas - dopeiptv.org sparar bara data som den inte kan läsa. Inget konto, ingen e-post."
+  "onb_bring_private": "Krypteras på den här datorn innan något skickas - dopeiptv.org sparar bara data som den inte kan läsa. Inget konto, ingen e-post.",
+  "vis_style_scope": "Vektorskop",
+  "vis_style_freqs": "Frekvenser"
 }

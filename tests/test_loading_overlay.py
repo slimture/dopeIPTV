@@ -293,8 +293,12 @@ url = "http://x/live/1.ts"
 # A quick start never shows it.
 p.set_loading_art(logo)
 assert p.play(url, "Kanal 1", local_buffer=True)
-assert set(m.events) == {"start-file", "playback-restart", "seek", "end-file"}, m.events
-assert set(m.props) == {"paused-for-cache", "cache-buffering-state"}, m.props
+# The loading indicator's own; beside them only the audio-only check's
+# (media/audio_only.py), which follows the same core.
+LD_EVENTS = {"start-file", "playback-restart", "seek", "end-file"}
+LD_PROPS = {"paused-for-cache", "cache-buffering-state"}
+assert set(m.events) - {"file-loaded"} == LD_EVENTS, m.events
+assert set(m.props) - {"track-list"} == LD_PROPS, m.props
 assert not shown() and p._ld_phase == "start"
 from_mpv("start-file")
 from_mpv("playback-restart")
@@ -302,7 +306,7 @@ wait(100)
 assert not shown() and p._ld_phase is None
 # One core is followed once.
 assert p.play(url, "Kanal 1", local_buffer=True)
-assert len(m.events) == 4
+assert set(m.events) - {"file-loaded"} == LD_EVENTS
 from_mpv("start-file"); from_mpv("playback-restart")
 
 # A slow one: after the delay, with its logo, its name and "Connecting…".

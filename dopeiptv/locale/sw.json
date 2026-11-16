@@ -2893,5 +2893,7 @@
   "onb_sync_err_net": "Haikuweza kufikia dopeiptv.org. Kagua muunganisho wako kisha ujaribu tena.",
   "onb_sync_err_none": "Hakuna kilichosawazishwa chini ya msimbo huo. Ukague kwenye kompyuta yako nyingine kisha ujaribu tena.",
   "onb_sync_err_other": "Hilo halikufaulu sasa hivi. Jaribu tena baada ya muda mfupi.",
-  "onb_bring_private": "Husimbwa kwenye kompyuta hii kabla ya kutumwa - dopeiptv.org huhifadhi tu data isiyoweza kuisoma. Hakuna akaunti, hakuna barua pepe."
+  "onb_bring_private": "Husimbwa kwenye kompyuta hii kabla ya kutumwa - dopeiptv.org huhifadhi tu data isiyoweza kuisoma. Hakuna akaunti, hakuna barua pepe.",
+  "vis_style_scope": "Vekta skopu",
+  "vis_style_freqs": "Masafa"
 }

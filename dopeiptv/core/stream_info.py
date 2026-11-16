@@ -42,6 +42,28 @@ def observed(tracks: Any) -> dict:
     return {}
 
 
+def _tracks(tracks: Any) -> list[dict]:
+    return [t for t in tracks if isinstance(t, dict)] \
+        if isinstance(tracks, list) else []
+
+
+def has_picture(tracks: Any) -> bool:
+    """Whether mpv's track-list has a real picture: a video track that is
+    not cover art (``albumart``) or a still image (``image``)."""
+    return any(t.get("type") == "video"
+               and not (t.get("albumart") is True or t.get("image") is True)
+               for t in _tracks(tracks))
+
+
+def audio_only(tracks: Any) -> bool:
+    """Whether mpv's track-list is sound with no picture: an audio track
+    and no real picture (has_picture). An iHeart channel in an M3U is one;
+    a TV channel, even one whose picture mpv cannot decode, is not."""
+    listed = _tracks(tracks)
+    return (any(t.get("type") == "audio" for t in listed)
+            and not has_picture(listed))
+
+
 def summary(value: Any) -> str:
     v = clean(value)
     parts = []

@@ -25,6 +25,7 @@ from ..core import channel_prefs, night_mode
 from ..core.log import log, redact_url
 from ..core.local_buffer import rewind_bytes
 from ..i18n import current_language, tr
+from .audio_only import AudioOnlyMixin
 from .dvr_player import DvrPlayerMixin
 from .loading_overlay import LoadingMixin
 from .rewind_bar import RewindBarMixin
@@ -512,6 +513,18 @@ def _delay_key(channel: str) -> str:
     return channel_prefs.legacy_key(channel)
 
 
+def _hex_rgb(colour: str) -> tuple[int, int, int] | None:
+    """A palette colour ("#rrggbb") as its three channels, else None."""
+    value = str(colour or "").lstrip("#")
+    if len(value) != 6:
+        return None
+    try:
+        n = int(value, 16)
+    except ValueError:
+        return None
+    return (n >> 16) & 255, (n >> 8) & 255, n & 255
+
+
 #: A web page through yt-dlp (YouTube, Twitch...) opens as mpv itself opens
 #: it. The reconnect, short probe and buffer tuned for IPTV providers broke
 #: YouTube's HLS - blocks and smears on its live streams, which played
@@ -584,7 +597,8 @@ def end_file_options(m, wait: float = FILE_END_WAIT) -> bool:
 
 
 class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
-                     RewindBarMixin, DvrPlayerMixin, QWidget):
+                     AudioOnlyMixin, RewindBarMixin, DvrPlayerMixin,
+                     QWidget):
     """Video pane with libmpv OpenGL rendering, control bar, and fullscreen overlay."""
 
     _info_loaded = pyqtSignal(str)
@@ -594,6 +608,12 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
     # (mpv's event thread) what the loading indicator follows, and its value:
     # media/loading_overlay.py.
     _ld_event = pyqtSignal(str, object)
+    # (mpv's event thread) file-loaded with its path, or the track list
+    # changed: media/audio_only.py.
+    _ao_event = pyqtSignal(str, str)
+    # The stream play() opened turned out to be sound with no picture
+    # (True), or to have one after all (False): once per change.
+    audio_only_changed = pyqtSignal(bool)
     stream_info_changed = pyqtSignal(str, object)
     double_clicked = pyqtSignal()
     playback_error = pyqtSignal(str)
@@ -696,6 +716,8 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         self._chan_store = None
         # Teletext and DVB subtitle tracks (media/teletext_subs.py).
         self._ttx_streams_ready.connect(self._ttx_streams_got)
+        # Sound with no picture (media/audio_only.py).
+        self._ao_init()
         # Where the playing stream's audio delay is kept, if it is: its
         # channel's settings or (anything else) a key of its own.
         self._delay_chan: str | None = None
@@ -2603,20 +2625,47 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         "vocal":  (-2, -1, 0, 2, 4, 4, 3, 1, 0, -1),
         "rock":   (4, 3, 1, -1, -2, 0, 2, 3, 4, 4),
     }
-    VIS_STYLES = ("bars", "spectrum", "wave")
+    VIS_STYLES = ("bars", "spectrum", "wave", "scope", "freqs")
 
     def _vis_filter(self, style: str, w: int = 640, h: int = 360) -> str:
         """An mpv lavfi-complex graph that turns the audio into a picture -
-        what a music player shows instead of a black rectangle."""
+        what a music player shows instead of a black rectangle.
+
+        The filters that draw on a transparent canvas (wave, scope, freqs)
+        end in an opaque format: mpv shows what is transparent over a
+        checkerboard. Scope and freqs draw in the theme's accent.
+
+        The drawing only sees audio that has a timestamp (aselect; the
+        sound itself goes out untouched). Put up on a stream already
+        playing, mpv seeks to where it is, and a seekable HLS then hands
+        on a first frame without one: showcqt turned that into a picture
+        dated thousands of years ahead, and the clock stuck on it."""
+        accent = _hex_rgb(P.get("accent", ""))
         if style == "spectrum":
             draw = (f"showspectrum=s={w}x{h}:slide=scroll:mode=combined:"
                     "color=intensity:scale=cbrt:legend=0")
         elif style == "wave":
-            draw = (f"showwaves=s={w}x{h}:mode=cline:rate=30:colors=white")
+            draw = (f"showwaves=s={w}x{h}:mode=cline:rate=30:colors=white,"
+                    "format=rgb24")
+        elif style == "scope":
+            # A stereo vectorscope; the accent is how much each line adds,
+            # so where they cross it runs to white. Fades leave a short
+            # trail.
+            tint = (":rc={}:gc={}:bc={}".format(*accent) if accent else "")
+            draw = (f"avectorscope=s={w}x{h}:r=30:draw=line:scale=sqrt:"
+                    f"zoom=1.3{tint}:rf=15:gf=10:bf=6,format=rgb24")
+        elif style == "freqs":
+            hi = _hex_rgb(P.get("accent_hi", "")) or accent
+            colours = ("|".join("0x{:02X}{:02X}{:02X}".format(*c)
+                                for c in (accent, hi))
+                       if accent and hi else "white|white")
+            draw = (f"showfreqs=s={w}x{h}:r=30:mode=bar:ascale=cbrt:"
+                    f"fscale=log:win_size=2048:averaging=2:colors={colours},"
+                    "format=rgb24")
         else:
             draw = (f"showcqt=s={w}x{h}:fps=30:count=2:bar_g=4:sono_g=4:"
                     "axis=0:sono_h=0")
-        return f"[aid1]asplit=2[ao][a];[a]{draw}[vo]"
+        return f"[aid1]asplit=2[ao][a];[a]aselect=not(isnan(pts)),{draw}[vo]"
 
     # Filled in by the window: reading/writing the user's choices lives
     # there, the drawing lives here.
@@ -2696,14 +2745,25 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         title = meta.get("icy-title") or meta.get("title") or ""
         return " ".join(str(title).split())[:200]
 
-    def set_visualiser(self, on: bool, style: str = "bars") -> None:
+    def set_visualiser(self, on: bool, style: str = "bars", *,
+                       playing: bool = False) -> None:
         """Show/hide the audio visualiser. A file with real video never gets
         one; mpv builds the graph from the audio track itself.
 
         The filter graph is only ever touched when it actually has to
         change: rewriting lavfi-complex on every ordinary video play is a
         needless poke at mpv's pipeline, and the video path must stay
-        exactly as it was before any of this existed."""
+        exactly as it was before any of this existed.
+
+        *playing*: put up on the stream playing now (one mpv found to be
+        sound alone, or a style picked from the menu), not before the next
+        one loads. mpv then starts the sound and the drawing again
+        together, and by default holds the sound back until it reaches the
+        first picture's time - on a live stream whose timestamps went back
+        in what was already read (an ad break's discontinuity) it never
+        did, and sound and picture stood still. So for this file alone
+        (a file-local option: the next file has the user's again) the
+        sound starts where it is."""
         m = self.video.mpv
         if m is None:
             return
@@ -2712,6 +2772,12 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
             return
         try:
             if on:
+                if playing:
+                    try:
+                        # m[...] is options/<name>; this is the file's own.
+                        m.file_local["initial-audio-sync"] = False
+                    except Exception as e:
+                        log.debug("visualiser: initial-audio-sync: %s", e)
                 m["lavfi-complex"] = self._vis_filter(style)
             else:
                 m["lavfi-complex"] = ""
@@ -3158,6 +3224,12 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
                 self._arm_stream_info(m, source or url)
             except Exception as e:
                 log.debug("Stream info unavailable: %s", e)
+            # Whether it is sound alone - known once mpv lists its tracks.
+            # Only read here: the window draws the visualiser for it.
+            try:
+                self._ao_arm(m, source or url)
+            except Exception as e:
+                log.debug("audio-only check unavailable: %s", e)
             # The loading indicator: from this load's start-file to its
             # playback-restart (media/loading_overlay.py). Never raises.
             self._ld_hook(m)
@@ -3198,6 +3270,7 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
             log.error("Embedded playback failed: %s: %s", type(e).__name__, e)
             self.current_url = None
             self._reset_stream_info()
+            self._ao_reset()
             self._ld_clear()
             self._end_dvr()
             return False
@@ -4276,6 +4349,7 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
 
     def stop(self) -> None:
         self._reset_stream_info()
+        self._ao_reset()
         self._ld_clear()
         self._ld_armed = (None, False)
         self._ttx_reset()

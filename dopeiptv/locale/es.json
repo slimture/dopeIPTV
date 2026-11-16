@@ -2893,5 +2893,7 @@
   "onb_sync_err_net": "No se pudo conectar con dopeiptv.org. Comprueba tu conexión e inténtalo de nuevo.",
   "onb_sync_err_none": "No hay nada sincronizado con ese código. Compruébalo en tu otro ordenador e inténtalo de nuevo.",
   "onb_sync_err_other": "No ha funcionado esta vez. Inténtalo de nuevo en un momento.",
-  "onb_bring_private": "Se cifra en este ordenador antes de enviarse: dopeiptv.org solo guarda datos que no puede leer. Sin cuenta ni correo."
+  "onb_bring_private": "Se cifra en este ordenador antes de enviarse: dopeiptv.org solo guarda datos que no puede leer. Sin cuenta ni correo.",
+  "vis_style_scope": "Vectorscopio",
+  "vis_style_freqs": "Frecuencias"
 }
