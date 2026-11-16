@@ -18,6 +18,7 @@
         "satip",
         "media",
         "demo",
+        "newpc",
         "update"
     ],
     "watch": [
@@ -30,6 +31,7 @@
         "tracks",
         "teletext",
         "night",
+        "audio",
         "keys",
         "search",
         "palette",
