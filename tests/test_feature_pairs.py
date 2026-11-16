@@ -1273,3 +1273,124 @@ def test_what_plays_stays_its_own_sources_after_the_source_in_use_changes():
     assert w._conn_player_source() == "b"
     w._note_playing_source("http://b.invalid/live/u/p/7.ts", "k7", "live")
     assert w._conn_player_source() == "b"
+
+
+# -- one count after 1.6.0: each connection against its own source -----------------------
+
+class _Sources:
+    """Two sources, a and b; *active_id* the one in use."""
+
+    def __init__(self, active="a"):
+        self.active_id = active
+
+    def get(self, pid):
+        return {"id": pid, "name": pid.upper(), "kind": "xtream"} if pid in ("a", "b") else None
+
+    def active(self):
+        return self.get(self.active_id)
+
+    def playlists(self):
+        return [self.get("a"), self.get("b")]
+
+
+def test_a_cast_is_counted_against_the_source_it_is_from(monkeypatch):
+    """A's channel plays; the person switches to B and casts what plays: the
+    TV fetches A's stream - A's own address, not B's channel of the same
+    number - and the cast is A's connection: asked about against A's limit,
+    counted there (server mode sees it on A), none on B. A row of B's list
+    cast is B's."""
+    from dopeiptv.ui import mw_cast
+    from dopeiptv.ui.mw_cast import _CastMixin
+    from dopeiptv.ui.mw_connections import _ConnectionsMixin
+    from dopeiptv.ui.mw_source_label import _SourceLabelMixin
+
+    url = "http://a.invalid/live/u/p/7.ts"
+    row = {"stream_id": 7, "name": "News", "_kind": "live"}
+    opened: list[str] = []
+
+    class Dialog:
+        def __init__(self, win, address, title, *a, **k):
+            opened.append(address)
+
+        def exec(self):
+            return 0
+
+    monkeypatch.setattr(mw_cast, "CastDialog", Dialog)
+
+    class W(_CastMixin, _ConnectionsMixin, _SourceLabelMixin):
+        mode, _fav_section, series_ctx = "live", None, None
+
+        def __init__(self):
+            self.client = SimpleNamespace(
+                max_connections=None,
+                live_url=lambda sid, fmt="ts": f"http://b.invalid/live/u/p/{sid}.{fmt}")
+            self.player = SimpleNamespace(current_url=url, _dvr=None, _dvr_pool=None)
+            # A recording of A's own over a connection of its own.
+            self.rec = SimpleNamespace(jobs=[{"status": "recording", "source": "a",
+                                              "url": "http://a.invalid/live/u/p/9.ts"}])
+            self._multiview_win = None
+            self.playlist_store = _Sources("a")
+            self._failover_source = self._failover_key = None
+            self._last_playback = None
+            self.cast = SimpleNamespace(active=None)
+            self._cast_ctx = None
+            self._cast_device = None
+            self._playing_key = self._playing_item = None
+            self.settings = _S()
+            self.asked: list[str] = []
+            self.answer = 1
+
+        def _item_key(self, it):
+            return (it or {}).get("stream_id") or (it or {}).get("_key")
+
+        def _content_kind(self):
+            return "live"
+
+        def _stream_for(self, it):
+            sid = it.get("stream_id")
+            return (self.client.live_url(sid) if sid is not None else None), it.get("name")
+
+        def _play_kind_for(self, it):
+            return "live" if it.get("_kind") == "live" else "other"
+
+        def _vpn_guard_blocks(self, _url):
+            return False
+
+        def _local_codecs(self):
+            return []
+
+        def _local_audio_index(self):
+            return 0
+
+        def _local_tracks(self, _it):
+            return {}
+
+        def _choice_dialog(self, title, message, options, dont_ask_setting=None):
+            self.asked.append(message)
+            return self.answer
+
+    w = W()
+    w._note_playing_source(url, 7, "live")              # as _start_playback does
+    w._last_playback = {"url": url, "title": "News", "kind": "live", "item": row}
+    w._playing_key, w._playing_item = 7, row
+    w._conn_ledger().report("a", 1, None, 2)            # A's provider said: one
+    w.playlist_store.active_id = "b"                    # the stream goes on
+
+    w.cast_playing()                                    # A's second connection
+    assert len(w.asked) == 1 and tr("conn_what_cast") in w.asked[0], w.asked
+    assert tr("conn_over", max=1, n=1) in w.asked[0] and not opened
+    w.answer = 0                                        # Go ahead anyway
+    w.cast_playing()
+    assert opened == [url], "A's own address - not B's channel 7"
+    assert w._cast_ctx["source_id"] == "a"
+    w.cast.active = object()                            # the TV plays it
+    uses = w._conn_uses()
+    assert ("cast", "a") in [(u.kind, u.source) for u in uses]
+    assert connections.own_count(uses, "b") == 0
+    # A row of B's own list: B's.
+    w.cast.active, w.player.current_url, w.rec.jobs = None, None, []
+    w._open_cast_dialog({"stream_id": 3, "name": "Sport", "_kind": "live"})
+    assert opened[-1] == "http://b.invalid/live/u/p/3.m3u8"
+    assert w._cast_ctx["source_id"] == "b"
+    w.cast.active = object()
+    assert [(u.kind, u.source) for u in w._conn_uses()] == [("cast", "b")]

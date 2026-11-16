@@ -74,7 +74,18 @@ def _live_hls(win, sid) -> str:
 class _CastMixin:
     """MainWindow mixin: casting to a Chromecast or a DLNA TV."""
 
-    def _open_cast_dialog(self, it) -> None:
+    def _cast_source_of(self, source_id: str | None = None) -> str:
+        """The source (id) a cast is from - whose account its connection
+        is: *source_id* when given (what plays, started from another
+        source), else the one in use."""
+        if source_id:
+            return str(source_id)
+        active = getattr(self, "_conn_source", None)
+        return str(active() or "") if callable(active) else ""
+
+    def _open_cast_dialog(self, it, source_id: str | None = None) -> None:
+        # source_id: the source *it* is from when not the one in use (what
+        # plays, cast_playing) - the account the cast is counted on.
         # No refusal here when pychromecast is missing: a DLNA TV needs
         # nothing installed, and the panel says what is missing for a
         # Chromecast when it finds nothing at all (CastDialog._scan).
@@ -99,9 +110,10 @@ class _CastMixin:
         # create_link: off the window's thread first, as the player's.
         later = getattr(self, "_links_later", None)
         if live and sid is not None and later is not None and later(
-                partial(_live_cast_address, self, sid), partial(self._open_cast_dialog, it),
-                key="cast"):
+                partial(_live_cast_address, self, sid),
+                partial(self._open_cast_dialog, it, source_id), key="cast"):
             return
+        src = self._cast_source_of(source_id)
         url, title = self._stream_for(it)
         if not url:
             url = it.get("_url")
@@ -142,7 +154,7 @@ class _CastMixin:
         # The way in every stream takes: Nerd's VPN guard, and the account's
         # connections - the TV, Kodi or the converter here holds one.
         if (self._vpn_guard_blocks(source) or not self._cast_pin_ok(url, source)
-                or not self._conn_ok_cast(source)):
+                or not self._conn_ok_cast(source, source_id=src)):
             return
         # Remember what is being cast, not just where to. Pausing a live
         # channel is answered from the provider's archive, and that needs the
@@ -177,9 +189,11 @@ class _CastMixin:
         # the TV plays live, so the strip can go back in it - held before the
         # player stops (which would freeze it). A second connection, so
         # never by itself.
-        buffer, hold = (self._cast_keep_buffer(it, feed, source) if live
+        buffer, hold = (self._cast_keep_buffer(it, feed, source, src) if live
                         else (None, None))
         self._cast_ctx = {
+            # Whose account the TV's connection is on (mw_connections).
+            "source_id": src,
             "sid": it.get("stream_id") if live else None,
             # Not a portal's: it is asked for by programme, which only the
             # player does (mw_portal_archive).
@@ -274,21 +288,23 @@ class _CastMixin:
         except Exception:
             return False
 
-    def _cast_keep_buffer(self, it, feed=None, url: str = "") -> tuple:
+    def _cast_keep_buffer(self, it, feed=None, url: str = "",
+                          source_id: str = "") -> tuple:
         """(session, hold): the rewind buffer of *it* - the channel the player
         plays from its buffer, or the one *feed* reads - held streaming for
-        a live cast of *url*, so the strip can go back in it while the TV
-        plays live. Only with Settings > Casting's switch on: it is one more
-        connection to the provider next to the cast's, and over a full or
-        unknown limit the person is asked first. (None, None) when not kept -
-        it freezes as the player stops (a feed holds it only while it reads
-        it), so no second connection is ever opened by itself."""
+        a live cast of *url* (from source *source_id*), so the strip can go
+        back in it while the TV plays live. Only with Settings > Casting's
+        switch on: it is one more connection to the provider next to the
+        cast's, and over a full or unknown limit the person is asked first.
+        (None, None) when not kept - it freezes as the player stops (a feed
+        holds it only while it reads it), so no second connection is ever
+        opened by itself."""
         session = feed.source if feed is not None else self._playing_buffer(it)
         if (session is None or not getattr(session, "streaming", False)
                 or not self._cast_keeps_buffer()):
             return None, None
         ask = getattr(self, "_conn_ok_cast_buffer", None)
-        if not callable(ask) or not ask(url):
+        if not callable(ask) or not ask(url, source_id=source_id):
             log.info("cast: the rewind buffer is not kept beside the cast")
             return None, None
         who = self._cast_hold_name("cast-live", session)
@@ -519,6 +535,15 @@ class _CastMixin:
         it = getattr(self, "_playing_item", None)
         if not it:
             it = (getattr(self, "_last_playback", None) or {}).get("item")
+        # The source it plays from - not the one in use when it was started
+        # before a switch, by failover or from the Search page.
+        mine = getattr(self, "_conn_player_source", None)
+        src = str(mine() or "") if callable(mine) else ""
+        if it and src and src != self._cast_source_of():
+            # Its row would be built into an address by the source in use
+            # (another channel of the same number): it goes by the address it
+            # plays from, as failover's channel does.
+            it = None
         if not it:
             # Not every way into the player leaves the row behind - a play
             # from Home, a resumed title. The address on screen is enough to
@@ -526,7 +551,7 @@ class _CastMixin:
             # wrong half of the feature.
             it = {"name": getattr(self, "_detail_name", "") or "dopeIPTV",
                   "_url": p.current_url, "_cast_url": p.current_url}
-        self._open_cast_dialog(it)
+        self._open_cast_dialog(it, src or None)
 
     def can_cast_playing(self) -> bool:
         p = getattr(self, "player", None)
@@ -731,7 +756,10 @@ class _CastMixin:
         except Exception as e:
             log.debug("cast: no HLS address for the channel (%s)", e)
             hls = url
-        if not self._cast_pin_ok(hls, url) or not self._conn_ok_cast(url):
+        # A row of the lists: the source in use's (another source's channel
+        # has no row here, and plays in the player).
+        src = self._cast_source_of()
+        if not self._cast_pin_ok(hls, url) or not self._conn_ok_cast(url, source_id=src):
             return True
         # The one on the TV ends as it would here: a film keeps its point,
         # its scrobbles end, failover may try again.
@@ -745,6 +773,7 @@ class _CastMixin:
         self._cast_drop_feed()
         self._cast_release_buffer()         # the last channel's buffer
         self._cast_ctx = {
+            "source_id": src,
             "sid": sid,
             "archive": bool(item.get("tv_archive")
                             and not getattr(self.client,
@@ -777,7 +806,8 @@ class _CastMixin:
         if timer is not None:
             timer.stop()
         device = self._cast_device
-        if not self._cast_pin_ok(url) or not self._conn_ok_cast(url):
+        src = self._cast_source_of()
+        if not self._cast_pin_ok(url) or not self._conn_ok_cast(url, source_id=src):
             return True
         old = self._cast_ctx or {}
         if old.get("key") == key and old.get("kind") == kind:
@@ -796,6 +826,7 @@ class _CastMixin:
         start = self._resume_offset(key, kind, item)
         audio, subs = self._cast_title_tracks(kind, key, device)
         self._cast_ctx = {
+            "source_id": src,
             "sid": None, "archive": False, "title": title,
             "group": self._RESUME_GROUP.get(rkind or ""), "key": key,
             "resume": getattr(self, "resume", None),

@@ -45,6 +45,12 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   keys of its own. A computer leaves another system's keys as they are,
   and its first sync after the update takes the keys the other computers
   of its system already share.
+- A cast was counted against the source in use, whichever source it came
+  from: a cast of what plays from another source (started before a
+  switch, by failover or from the Search page) is now asked about and
+  counted on that source's account, and server mode sees it there. Cast
+  after a source switch, what plays went to the TV as the new source's
+  channel of the same number; it now goes by the address it plays from.
 
 ## [1.6.0]
 

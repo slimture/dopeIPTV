@@ -135,9 +135,15 @@ class _ConnectionsMixin:
                 uses.append(Use("multiview", str(getattr(c, "source_id", "") or ""), str(c.url)))
         if self._conn_casting():
             ctx = getattr(self, "_cast_ctx", None) or {}
-            uses.append(Use("cast", self._conn_source(),
+            uses.append(Use("cast", self._conn_cast_source(),
                             str(ctx.get("row_source") or ctx.get("row_url") or "")))
         return uses
+
+    def _conn_cast_source(self) -> str:
+        """The source the running cast is from (mw_cast keeps it: what plays,
+        failover's or the Search page's other source), else the one in use."""
+        ctx = getattr(self, "_cast_ctx", None) or {}
+        return str(ctx.get("source_id") or "") or self._conn_source()
 
     def _conn_casting(self) -> bool:
         """A cast of a stream runs: whether the TV or Kodi fetches it or the
@@ -312,32 +318,36 @@ class _ConnectionsMixin:
             self._conn_server_room(uses, source or None)
         return go
 
-    def _conn_ok_cast(self, url: str = "") -> bool:
+    def _conn_ok_cast(self, url: str = "", source_id: str = "") -> bool:
         """*url* cast to a TV: the player hands its stream over (it stops
         once the cast plays) and a cast running already gives way, so the
-        cast is one more next to the rest."""
+        cast is one more next to the rest - on *source_id*'s account (the
+        source in use when not given)."""
         if not connections.is_network(url):
             return True
+        src = str(source_id or self._conn_source())
         uses = [u for u in self._conn_uses(free_player=True) if u.kind != "cast"]
-        v = self._conn_verdict(uses)
+        v = self._conn_verdict(uses, source=src)
         t = self._tuner_verdict(url, uses)
         go = v is None and t is None or self._conn_ask(
             v, "conn_what_cast" if v is not None else "tuner_what", t)
         if go:
-            self._conn_server_room(uses)
+            self._conn_server_room(uses, src)
         return go
 
-    def _conn_ok_cast_buffer(self, url: str = "") -> bool:
+    def _conn_ok_cast_buffer(self, url: str = "", source_id: str = "") -> bool:
         """The rewind buffer kept recording beside a cast of *url* (Settings >
         Casting's switch asks for it): one more connection to the provider
-        next to the cast's. Within a known limit with room for both it goes
-        ahead; over a known limit, or with none known - most accounts allow
-        one - it is asked first, never opened silently. True to keep it."""
-        src, cap, v = self._conn_source(), None, None
+        next to the cast's, both *source_id*'s (the source in use when not
+        given). Within a known limit with room for both it goes ahead; over
+        a known limit, or with none known - most accounts allow one - it is
+        asked first, never opened silently. True to keep it."""
+        active = self._conn_source()
+        src, cap, v = str(source_id or active), None, None
         uses: list[Use] | None = None
         try:
             self._conn_seen()
-            cap = self._conn_limit() or self._conn_ledger().limit(src)
+            cap = (self._conn_limit() if src == active else None) or self._conn_ledger().limit(src)
             if cap:
                 uses = [u for u in self._conn_uses(free_player=True) if u.kind != "cast"]
                 uses.append(Use("cast", src, url))
@@ -346,7 +356,7 @@ class _ConnectionsMixin:
             log.debug("connections: the buffer beside the cast not counted: %s", e)
             cap, v, uses = None, None, None
         if cap and v is None:
-            self._conn_server_room(uses)
+            self._conn_server_room(uses, src)
             return True
         parts = [tr("conn_what_cast_buffer"),
                  self._conn_warning(v) if v is not None else tr("conn_limit_unknown")]
@@ -358,7 +368,7 @@ class _ConnectionsMixin:
                  f"{v.in_use} of {v.limit} in use" if v is not None else "limit unknown",
                  "kept anyway" if go else "not kept")
         if go and uses is not None:
-            self._conn_server_room(uses)     # only once the person said so
+            self._conn_server_room(uses, src)    # only once the person said so
         return go
 
     def _conn_ok_test(self, source_id: str = "") -> bool:
