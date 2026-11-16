@@ -1076,10 +1076,15 @@ def _server_card(page: SettingsPage, n: nerd.Nerd, settings: Any, lines: list[Ch
                                        int(st.get("port") or 0), str(st.get("error") or ""),
                                        st.get("status"), st.get("addresses"))
     line = CheckLine(job, tr("nerd_card_server"), test=True)
+    line.auto = True            # it only reads how the server stands
     lines.append(line)
-    c.row(tr("srv_addresses"), _fitted(open_btn, copy_tuner, copy_m3u),
-          tr("srv_addr_tuner_hint"), search="address URL copy browser tuner playlist token",
-          below=line)
+    # The three buttons on a line of their own: in a row's control column
+    # their words were cut off.
+    c.layout_row(_hbox(open_btn, copy_tuner, copy_m3u),
+                 " ".join((tr("srv_addresses"), open_btn.text(), copy_tuner.text(), copy_m3u.text(),
+                           "address URL copy browser tuner playlist token")))
+    c.widget(line, tr("nerd_card_server"))
+    c.note(tr("srv_addr_tuner_hint"))
 
     def values() -> dict[str, str]:
         picked = {pid: chosen.get(pid, []) for pid, chip in chips if chip.isChecked()}
