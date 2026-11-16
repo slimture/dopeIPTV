@@ -9,10 +9,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [1.6.0]
 
-Profiles for the household, TV mode with the phone as its remote,
-Jellyfin, Emby and Plex and four more home backends as sources, the
-Enigma2 extras, casting to Kodi and an Apple TV, teletext, the command
-palette, radio and web streams, Watch together, and sync for everyone.
+Profiles for the household, TV mode with the phone as its remote, a page
+for every series, Jellyfin, Emby and Plex, SAT>IP and four more home
+backends as sources, the Enigma2 extras and its channel lists, server
+mode, casting to Kodi and an Apple TV, teletext, the command palette,
+radio and web streams, Watch together, and sync for everyone.
 
 ### Added
 
@@ -156,6 +157,51 @@ palette, radio and web streams, Watch together, and sync for everyone.
   from the rewind buffer; Home Assistant's commands over MQTT (buttons,
   volume, favourites, play by name or number, TV mode); Other networks
   (VLANs) searched by unicast.
+- A page for every series: opening a series - from its list, Favorites,
+  Watch later, Home's shelves, Continue watching, New episodes, the
+  command palette (series are found there now) or an actor's titles -
+  shows its own page where the list is, as on Plex or Jellyfin: the
+  backdrop (or poster), title, year, rating, genres and plot, one button
+  that plays on (Continue S2 E5 with its progress, or Play S1 E1),
+  Favorite, Follow and Watch later, the seasons in one row of chips
+  (Specials last; the one picked kept per series, a profile's own) and
+  the season's episodes as cards with their still, length, plot, watched
+  check and progress, the next one marked. Back (the arrow, Esc, the
+  mouse's back button) shows the list exactly as it was. Episodes from
+  the source's own series info (Xtream, Stalker, Jellyfin/Emby/Plex) or a
+  local library, off the window's thread; TMDB fills a missing backdrop
+  and stills. TV mode's series screen gets season tabs the same way.
+- SAT>IP servers as a source kind (Fritz!Box Cable, Octopus NET,
+  Digibit, Kathrein EXIP, minisatip, Tvheadend's SAT>IP server): found by
+  SSDP with Find on my network (the other networks by unicast), the
+  tuners from `X_SATIPCAP`, the channels from the server's own list, a
+  Fritz!Box's lists or an M3U given as a file or an address; stable ids
+  from the tuning, RTSP over TCP by default (UDP, or HTTP where the
+  server wants it), each stream counted as one of the server's tuners -
+  a multiview cell, a recording or a cast that would need one more asks
+  first. No guide from SAT>IP: the source's XMLTV address gives one.
+- An Enigma2 box's channel lists edited from the app (the box's menu ->
+  "Edit the box's channel lists…", through OpenWebif's bouquet editor):
+  TV and radio bouquets made, renamed, moved and removed, channels
+  dragged into order, renamed and removed, markers and spacers, channels
+  added from all, a satellite's or a provider's, with a search. Each
+  change goes to the box in the order made, off the window's thread; the
+  box takes a backup of its lists first, offered to save, and Undo puts
+  it back; the source reads its channels again when the window closes.
+  Never for a kids profile, never touching what plays.
+- Server mode (Nerd > Remote and automation, off by default, or
+  `dopeiptv --server` without a window, for a NAS or a Raspberry Pi):
+  dopeIPTV as the home's server - a playlist and the guide for VLC, Kodi
+  and a TV's IPTV app, and an HDHomeRun tuner Plex, Jellyfin and Emby
+  find by themselves (`discover.json`, `lineup.json`, UDP 65001), the
+  guide under the tuner's channel numbers. Each channel is fetched once
+  into a rewind buffer session and shared by everyone watching it, the
+  app's own player included; never more channels at once than the
+  account allows, the app's own viewing and recordings first, and a
+  device that would need one more is told all tuners are in use. Home
+  addresses only, a token on all but the tuner's endpoints; a page in the
+  browser shows who watches what and holds its settings (port, tuners,
+  which sources and categories - never a hidden, locked or adult one).
 - Official builds: each package carries a signed manifest of its own
   files (`tools/build_manifest.py`, release.yml); a modified build leaves
   dopeiptv.org's services alone (Watch together, sync, the update check
@@ -173,6 +219,14 @@ palette, radio and web streams, Watch together, and sync for everyone.
 - A page of its own for each source in Settings (Connection, Network,
   Streams, Guide, Advanced), each row marked own or shared and where;
   adding keeps the quick form, then opens the new source's page.
+- The active source's name over the categories, with its kind in a chip
+  when there are two sources or more, a click opening the source menu;
+  the status line says the list's source, and what plays from another
+  source says so.
+- Settings opens in about half the time, and the video beside it
+  stutters less: the app-wide event filters let what they do not handle
+  through at once, hidden pages are not laid out, cache sizes are counted
+  off the window's thread and Nerd's checks run after the window shows.
 - Sync between computers is for everyone, not only supporters: no
   supporter key is needed or sent. The Sync page says in plain words what
   dopeiptv.org gets - bytes encrypted on the computer with a key from the
@@ -234,6 +288,21 @@ palette, radio and web streams, Watch together, and sync for everyone.
   take the focus while Settings was built.
 - A source's options all set back to their defaults kept the old ones.
 - Text boxes of a source's Nerd options were light text on white.
+- Open address with a web page in place of a stream asked for it twice
+  a second through the rewind buffer: the buffer takes only a stream
+  (a page, a playlist or a message ends at once), a few KB is a failed
+  try, and a channel whose provider sent no stream is played without the
+  buffer for a while.
+- Test connection called a source with no live channel failed, and a
+  media server not a server.
+- Failover could pick a channel the other source's lists hide or lock.
+- A source with a trusted certificate: another host the stream went to
+  (a redirect, a segment elsewhere) is checked against the system's
+  authorities.
+- The stream played after a web page kept that page's options.
+- Trakt and Simkl: a sign-in renewed on a worker was written to the
+  settings from that thread.
+- Sync: Start and Join one over the other cut each other short.
 
 ## [1.5.0]
 
