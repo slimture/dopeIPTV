@@ -34,6 +34,7 @@ from PyQt6.QtWidgets import (
 
 from ..core.log import log
 from ..i18n import tr
+from ..media.loading_overlay import LoadingOverlay, quiet
 from ..media.seek_slider import _SeekSlider
 from ..media.video_surface import _MpvGLWidget
 from ..media import players
@@ -245,6 +246,16 @@ class _MultiviewCell(QWidget):
         for w in (self._title, self._pl, self._empty, self._num, self._pause):
             w.setAttribute(
                 Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        # A small spinner while the cell's stream starts (it lets clicks
+        # through too), after a moment so a quick start never flashes it;
+        # the state poll ends it once mpv plays. The cell's number shows
+        # inside its ring on hover.
+        self._loading = LoadingOverlay(self.video, compact=True)
+        self._loading_on = False
+        self._loading_timer = QTimer(self)
+        self._loading_timer.setSingleShot(True)
+        self._loading_timer.setInterval(300)
+        self._loading_timer.timeout.connect(self._loading_due)
         # Bottom controls, as DIRECT children of the GL widget - the one
         # arrangement macOS reliably composites over the video (a nested
         # container bar did not paint there): pause/play, the docked player's
@@ -371,6 +382,8 @@ class _MultiviewCell(QWidget):
         self._empty.setGeometry(r)
         self._num.setGeometry(r)
         self._pause.setGeometry(r)
+        if not self._loading.isHidden():
+            self._loading.place(r)
         self._layout_controls()
 
     # -- playback ------------------------------------------------------------
@@ -470,11 +483,54 @@ class _MultiviewCell(QWidget):
                 load_with_options(m, url, opts)
             else:
                 m.play(url)
-            return True
         except Exception as e:
             log.warning("multiview cell play failed: %s: %s",
                         type(e).__name__, e)
+            self._loading_end()
             return False
+        self._loading_begin()
+        return True
+
+    # -- the spinner while a stream starts (never in the stream's way) -------
+
+    @quiet
+    def _loading_begin(self) -> None:
+        self._loading_on = True
+        self._loading_timer.start()
+
+    @quiet
+    def _loading_end(self) -> None:
+        self._loading_on = False
+        self._loading_timer.stop()
+        if not self._loading.isHidden():
+            self._loading.hide()
+
+    @quiet
+    def _loading_due(self) -> None:
+        if self._loading_on and self.url is not None and self._loading.isHidden():
+            self._loading.place(self.video.rect())
+            self._loading.show()
+            self._loading.raise_()
+            if self._num.isVisible():
+                self._num.raise_()
+
+    @quiet
+    def _loading_check(self, m, paused: bool) -> None:
+        """The state poll, while the stream starts: it plays (mpv is no
+        longer idle), so the spinner goes; paused, the pause mark has the
+        middle."""
+        try:
+            playing = (not paused and not m.core_idle
+                       and m.time_pos is not None)
+        except Exception:
+            playing = False
+        if playing:
+            self._loading_end()
+        elif paused:
+            if not self._loading.isHidden():
+                self._loading.hide()
+        elif not self._loading_timer.isActive():
+            self._loading_due()
 
     # -- timeshift (provider archive) ---------------------------------------
 
@@ -517,6 +573,7 @@ class _MultiviewCell(QWidget):
         self._mpv_play(self._ts_candidates[0])
 
     def _on_error(self, _msg: str) -> None:
+        self._loading_end()
         # Mid-timeshift: walk to the next candidate URL scheme, then fall back
         # to live if none serve the archive.
         if self._ts_seg_start is not None:
@@ -763,6 +820,8 @@ class _MultiviewCell(QWidget):
         if paused:
             self._pause.raise_()
         self._sync_pause_btn()
+        if getattr(self, "_loading_on", False):
+            self._loading_check(m, paused)
         # Controls (pause + timeline + offset + LIVE) follow the overlay
         # auto-hide: revealed on hover, gone 2 s after the mouse rests - same
         # rhythm as the docked player's floating bars.
@@ -839,6 +898,7 @@ class _MultiviewCell(QWidget):
             self._raise_controls()
 
     def clear(self) -> None:
+        self._loading_end()
         if self.video.mpv is not None:
             try:
                 self.video.mpv.command("stop")
