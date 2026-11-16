@@ -90,6 +90,9 @@ class _SeriesPageMixin:
         page = self._series_page
         if page is None:
             page = SeriesPage(self.logos)
+            # One click plays only with "Auto-play preview on selection" on,
+            # as in the lists; else a double click or Enter.
+            page.view.click_plays = self._autoplay_preview
             page.back_requested.connect(self._leave_series_page)
             page.play_requested.connect(self._sp_play)
             page.menu_requested.connect(self._sp_episode_menu)

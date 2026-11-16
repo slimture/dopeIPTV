@@ -420,12 +420,18 @@ n = len(w.history.items()) if hasattr(w.history, "items") else 0
 page.play_requested.emit(page.shown_episodes()[1])
 assert str(w._last_playback["key"]) == "2002"
 
-# -- an episode clicked: it plays, the page stays; autoplay's next is followed ---------
+# -- an episode clicked once: picked, nothing plays ("Auto-play preview on selection"
+# is off, as in the lists); double-clicked: it plays, the page stays; autoplay's next is
+# followed ---------
 w._choice_dialog = lambda *a, **k: 0
 page.season_bar.chips[0].click()
 app.processEvents()
 r = page.view.visualRect(page.model.index(2, 0))
 QTest.mouseClick(page.view.viewport(), Qt.MouseButton.LeftButton, pos=r.center())
+app.processEvents()
+assert str(w._last_playback["key"]) == "2002", w._last_playback["key"]
+assert page.view.currentIndex().row() == 2
+QTest.mouseDClick(page.view.viewport(), Qt.MouseButton.LeftButton, pos=r.center())
 app.processEvents()
 assert str(w._last_playback["key"]) == "1003" and w._series_page_showing()
 assert page.playing_key == "1003" and page.current == 0
@@ -435,6 +441,17 @@ app.processEvents()
 assert str(w._last_playback["key"]) == "2001", w._last_playback["key"]
 assert page.playing_key == "2001" and page.current == 1, (page.playing_key, page.current)
 assert page.view.currentIndex().row() == 0
+# With "Auto-play preview on selection" on, one click plays.
+settings.setValue("autoplay_preview", "true")
+r = page.view.visualRect(page.model.index(1, 0))
+QTest.mouseClick(page.view.viewport(), Qt.MouseButton.LeftButton, pos=r.center())
+app.processEvents()
+assert str(w._last_playback["key"]) == "2002", w._last_playback["key"]
+settings.setValue("autoplay_preview", "false")
+r = page.view.visualRect(page.model.index(0, 0))
+QTest.mouseDClick(page.view.viewport(), Qt.MouseButton.LeftButton, pos=r.center())
+app.processEvents()
+assert str(w._last_playback["key"]) == "2001", w._last_playback["key"]
 
 # -- the episode's menu: what the list offered ------------------------------------------
 from PyQt6.QtWidgets import QMenu

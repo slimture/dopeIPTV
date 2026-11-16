@@ -13,7 +13,7 @@ threads and painted when they come.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from PyQt6.QtCore import (
     QAbstractListModel, QModelIndex, QPoint, QRect, QRectF, QSize, Qt, pyqtSignal,
@@ -424,10 +424,22 @@ class EpisodeView(QListView):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.DefaultContextMenu)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._width_key = -1
+        #: Whether one click plays an episode - the window's "Auto-play
+        #: preview on selection", as in its lists. Off (the default), one
+        #: click picks the card and a double click or Enter plays it.
+        self.click_plays: Callable[[], bool] | None = None
         self.clicked.connect(self._clicked)
         self.restyle()
 
+    def _one_click(self) -> bool:
+        try:
+            return bool(self.click_plays()) if self.click_plays else False
+        except Exception:
+            return False
+
     def _clicked(self, idx) -> None:
+        if not self._one_click():
+            return
         it = self._row(idx)
         if it is not None:
             self.play.emit(it)
@@ -478,8 +490,12 @@ class EpisodeView(QListView):
         super().mousePressEvent(e)
 
     def mouseDoubleClickEvent(self, e) -> None:
-        # The first click of the two played it already.
         e.accept()
+        if self._one_click() or e.button() != Qt.MouseButton.LeftButton:
+            return                      # the first click of the two played it
+        it = self._row(self.indexAt(e.position().toPoint()))
+        if it is not None:
+            self.play.emit(it)
 
     def contextMenuEvent(self, e) -> None:
         idx = self.indexAt(e.pos())
