@@ -12,7 +12,8 @@ tried too (a box often has the channel the provider lost).
 from __future__ import annotations
 
 import re
-from typing import Any, Callable
+from dataclasses import dataclass, field
+from typing import Any, Callable, Mapping
 
 from ..core.log import log
 from ..core.privacy import for_log
@@ -51,10 +52,42 @@ def candidates(playlists: list[dict], active_id: str | None) -> list[dict]:
     return [p for p in playlists if p.get("id") != active_id and p.get("kind") != "local"]
 
 
-def kids_rows(client: Any, rows: list[dict]) -> list[dict]:
+@dataclass(frozen=True)
+class Shown:
+    """What one source's lists leave out of its channels, as the window has
+    it for that source: a hidden category, a locked one while it is locked,
+    a channel hidden by hand - and the names given to its categories (what a
+    kids profile's test reads them by). Made on the window's thread (of()),
+    used on a worker."""
+    excluded: frozenset[str] = frozenset()
+    hidden: frozenset[str] = frozenset()
+    names: Mapping[str, str] = field(default_factory=dict)
+
+    @classmethod
+    def of(cls, cats: Any, chans: Any, locked: bool = True) -> Shown:
+        """From that source's CategoryOverrides and ChannelOverrides
+        (core/stores.py); *locked*: its locked categories are left out too."""
+        live = cats.data.get("live") if isinstance(getattr(cats, "data", None), dict) else None
+        names = {str(cid): str(e["name"]) for cid, e in (live or {}).items()
+                 if isinstance(e, dict) and e.get("name")}
+        own = chans.data.get("live") if isinstance(getattr(chans, "data", None), dict) else None
+        hidden = frozenset(str(k) for k, e in (own or {}).items()
+                           if isinstance(e, dict) and e.get("hidden"))
+        return cls(frozenset(str(c) for c in cats.excluded_ids("live", include_locked=locked)),
+                   hidden, names)
+
+    def keep(self, row: dict) -> bool:
+        if str(row.get("category_id")) in self.excluded:
+            return False
+        key = row.get("stream_id") or row.get("series_id") or row.get("id") or row.get("_key")
+        return key is None or str(key) not in self.hidden
+
+
+def kids_rows(client: Any, rows: list[dict], names: Mapping[str, str] | None = None) -> list[dict]:
     """*rows* of another source as a kids profile may see them: none the
-    provider marks for adults, none in a category named for them. A source
-    whose categories cannot be read gives none of its categorised rows."""
+    provider marks for adults, none in a category named for them (by the
+    name the user gave it, *names*, else the provider's). A source whose
+    categories cannot be read gives none of its categorised rows."""
     from ..core.profiles import adult_category, adult_item
     rows = [r for r in rows if not adult_item(r)]
     try:
@@ -62,18 +95,22 @@ def kids_rows(client: Any, rows: list[dict]) -> list[dict]:
     except Exception as e:
         log.info("failover: no categories to check for a kids profile: %s", type(e).__name__)
         return [r for r in rows if r.get("category_id") in (None, "")]
+    given = names or {}
     adult = {str(c.get("category_id")) for c in cats
-             if isinstance(c, dict) and adult_category(str(c.get("category_name") or ""))}
+             if isinstance(c, dict) and adult_category(
+                 given.get(str(c.get("category_id"))) or str(c.get("category_name") or ""))}
     return [r for r in rows if str(r.get("category_id")) not in adult]
 
 
 def find_elsewhere(playlists: list[dict], active_id: str | None, item: dict,
                    make_client: Callable[[dict], Any] | None = None,
-                   kids: bool = False) -> tuple[dict, dict, str] | None:
+                   kids: bool = False,
+                   shown: Mapping[str, Shown] | None = None) -> tuple[dict, dict, str] | None:
     """(source, row, play address) of *item*'s channel in the first other
     source that has it, or None. Runs off the window's thread (it asks
-    each source for its channel list). *kids*: a kids profile asks - none
-    of a source's rows for adults (kids_rows)."""
+    each source for its channel list). *shown*: per source id, what its
+    lists leave out (Shown) - never a choice here either. *kids*: a kids
+    profile asks - none of a source's rows for adults (kids_rows)."""
     if make_client is None:
         from ..providers.client import make_client as _make
         make_client = _make
@@ -85,8 +122,11 @@ def find_elsewhere(playlists: list[dict], active_id: str | None, item: dict,
         except Exception as e:
             log.info("failover: %s has no channel list now: %s", name, e)
             continue
+        limits = (shown or {}).get(str(pl.get("id")))
+        if limits is not None:
+            rows = [r for r in rows if limits.keep(r)]
         if kids:
-            rows = kids_rows(client, rows)
+            rows = kids_rows(client, rows, limits.names if limits is not None else None)
         row = same_channel(rows, item)
         if row is None:
             continue

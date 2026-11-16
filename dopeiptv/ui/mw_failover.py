@@ -52,6 +52,9 @@ class _FailoverMixin:
         playlists, active, wanted = store.playlists(), store.active_id, dict(item)
         # A kids profile: the other source's channel for adults is no choice.
         kids = bool(getattr(self, "_profile_kids", lambda: False)())
+        # Nor is one the other source's lists leave out: a hidden category,
+        # a locked one while it is locked, a channel hidden by hand.
+        shown = self._failover_shown(others, kids)
         gen = self._failover_gen
 
         def done(found) -> None:
@@ -69,9 +72,27 @@ class _FailoverMixin:
             if gen == self._failover_gen:
                 fallback()
 
-        run_async(self.pool, lambda: failover.find_elsewhere(playlists, active, wanted, kids=kids),
+        run_async(self.pool, lambda: failover.find_elsewhere(playlists, active, wanted, kids=kids,
+                                                             shown=shown),
                   done, failed)
         return True
+
+    def _failover_shown(self, others: list[dict], kids: bool) -> dict[str, failover.Shown]:
+        """Per other source, what its lists leave out - read here, on the
+        window's thread, from that source's own hide and lock rules (as the
+        window keeps them under its id)."""
+        from ..core.stores import CategoryOverrides, ChannelOverrides
+        parental = getattr(self, "parental", None)
+        locked = kids or not getattr(parental, "session_unlocked", False)
+        out: dict[str, failover.Shown] = {}
+        for pl in others:
+            pid = pl.get("id")
+            if not pid:
+                continue
+            out[str(pid)] = failover.Shown.of(
+                CategoryOverrides(self.settings, f"category_overrides_{pid}"),
+                ChannelOverrides(self.settings, f"channel_overrides_{pid}"), locked)
+        return out
 
     def _failover_play(self, pl: dict, row: dict, url: str, name: str) -> None:
         nerd.set_source(pl)

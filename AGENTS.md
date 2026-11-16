@@ -152,7 +152,7 @@ map and the one-way import rule.
 | `core/discord_rpc.py` | Discord status over Discord's local IPC (Unix socket / named pipe `discord-ipc-N`): frames, where Discord listens, the activity, `Presence` on its own thread (reconnects quietly); `DISCORD_APP_ID` (empty: not offered) |
 | `core/report.py` | Error reports and feedback: scrubbed of anything identifying, shown in full, sent only on Send (never from a modified build: copied instead); the report's `Build:` line; the native crash file |
 | `services/share.py` | dopeIPTV as a server: every source's channels as one M3U, the downloaded guides as one XMLTV (streamed) |
-| `services/failover.py` | Failover: a live channel that will not play found in another source (guide id, else name) |
+| `services/failover.py` | Failover: a live channel that will not play found in another source (guide id, else name); never what that source's lists leave out (`Shown`: its hidden categories, locked ones while locked, channels hidden by hand) nor, for a kids profile, one for adults |
 | `services/together.py` | Watch together, the catalogue side: what plays here as a `Media`, the same title (TMDB id, else title and year; an episode by its season and number; a channel as failover matches it), what the room plays found in this source (`locate`, off the window's thread) |
 | `core/platform_macos.py` | macOS-specific helpers |
 | `core/platform_windows.py` | Windows-specific helpers |

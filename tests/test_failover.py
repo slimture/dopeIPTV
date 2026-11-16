@@ -4,6 +4,7 @@ played from there in a real mpv; once per channel, the active source's
 options back for whatever plays next."""
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -45,6 +46,69 @@ def test_which_sources_are_tried():
     c = failover.check_sources(pls, "a")
     assert (c.state, c.params["n"], c.params["names"]) == (OK, 2, "B, Vu+")
     assert failover.check_sources(pls[:1], "a").state == WARN
+
+
+class _Settings(dict):
+    def value(self, key, default=None):
+        return self.get(key, default)
+
+    def setValue(self, key, value):  # noqa: N802 - Qt's name
+        self[key] = value
+
+
+class _Other:
+    """Another source: the channel in its category "1", a second copy in "2"."""
+
+    def live_streams(self, _cat):
+        return [{"stream_id": 401, "name": "TV4 HD", "epg_channel_id": "tv4.se", "category_id": "1"},
+                {"stream_id": 402, "name": "TV4", "category_id": "2"}]
+
+    def live_categories(self):
+        return [{"category_id": "1", "category_name": "Sverige"},
+                {"category_id": "2", "category_name": "Reserv"}]
+
+    def live_url(self, sid, ext):
+        return f"http://other.example/live/{sid}.{ext}"
+
+
+def _limits(cats=None, chans=None, locked=True):
+    from dopeiptv.core.stores import CategoryOverrides, ChannelOverrides
+    s = _Settings(category_overrides_b=json.dumps(cats or {}),
+                  channel_overrides_b=json.dumps(chans or {}))
+    return {"b": failover.Shown.of(CategoryOverrides(s, "category_overrides_b"),
+                                   ChannelOverrides(s, "channel_overrides_b"), locked)}
+
+
+def _found(shown, kids=False, item=None):
+    pls = [{"id": "a", "name": "A"}, {"id": "b", "name": "B"}]
+    got = failover.find_elsewhere(pls, "a", item or {"name": "TV4", "epg_channel_id": "tv4.se"},
+                                  make_client=lambda _p: _Other(), kids=kids, shown=shown)
+    return None if got is None else got[1]["stream_id"]
+
+
+def test_the_other_sources_own_hide_and_lock_rules_hold_there_too():
+    assert _found(None) == 401 and _found(_limits()) == 401
+    # Its category hidden: the copy in a category it shows.
+    assert _found(_limits({"live": {"1": {"hidden": True}}})) == 402
+    assert _found(_limits({"live": {"1": {"hidden": True}, "2": {"hidden": True}}})) is None
+    # Locked: left out while locked, there once unlocked.
+    locked = {"live": {"1": {"locked": True}, "2": {"locked": True}}}
+    assert _found(_limits(locked)) is None
+    assert _found(_limits(locked, locked=False)) == 401
+    # A channel hidden by hand.
+    assert _found(_limits(chans={"live": {"401": {"hidden": True}}})) == 402
+    assert _found(_limits(chans={"live": {"401": {"hidden": True}, "402": {"hidden": True}}})) is None
+    # Another source's rules are not this one's.
+    assert _found({"c": _limits(locked)["b"]}) == 401
+
+
+def test_a_kids_profile_reads_the_other_sources_categories_by_the_names_given_them():
+    renamed = {"live": {"1": {"name": "XXX Adults"}}}
+    assert _found(_limits(renamed)) == 401                  # anyone else: a name, no more
+    assert _found(_limits(renamed), kids=True) == 402       # a kid: not from "XXX Adults"
+    both = {"live": {"1": {"name": "Adults"}, "2": {"name": "18+"}}}
+    assert _found(_limits(both), kids=True) is None
+    assert _found(None, kids=True) == 401                   # the provider's names say nothing
 
 
 def test_found_in_another_source_and_it_plays():
@@ -108,6 +172,26 @@ w._start_playback = lambda url, title, icon, key, kind, record=True, item=None, 
 w._show_toast = lambda text, ms=0: toasts.append(text)
 w._last_playback = {"kind": "live", "key": 7, "url": "http://127.0.0.1:9/dead.ts",
                     "item": {"name": "TV4 HD", "epg_channel_id": "tv4.se", "stream_id": 7}}
+# The other source's own rules hold there too: its category hidden, or
+# locked while it is locked, or the channel hidden by hand - no failover to it.
+for rules in ({"category_overrides_b": {"live": {"1": {"hidden": True}}}},
+              {"category_overrides_b": {"live": {"1": {"locked": True}}}},
+              {"channel_overrides_b": {"live": {"401": {"hidden": True}}}}):
+    for key, value in rules.items():
+        s.setValue(key, json.dumps(value))
+    fell_back.clear()
+    w._failover_tried = None
+    assert w._try_failover(lambda: fell_back.append(1))
+    for _ in range(400):
+        app.processEvents()
+        w.pool.waitForDone(10)
+        if calls or fell_back:
+            break
+    assert fell_back and not calls, (rules, calls)
+    for key in rules:
+        s.remove(key)
+fell_back.clear()
+w._failover_tried = None
 assert w._try_failover(lambda: fell_back.append(1))
 for _ in range(400):
     app.processEvents()
