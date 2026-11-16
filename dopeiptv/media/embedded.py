@@ -3761,16 +3761,28 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
             "QLabel#NumberEntry { background: rgba(0,0,0,170); color: white;"
             f" border: 2px solid {P['accent']}; border-radius: 10px;"
             " padding: 4px 14px; font-size: 22px; font-weight: 700; }")
-        b.adjustSize()
         self._place_number_badge()
         b.show()
         b.raise_()
         self._number_badge_timer.start(max(500, ms))
 
+    def _fit_number_badge(self, width: int) -> None:
+        """One line as wide as its text, or - a line wider than the picture
+        (why nothing played, night mode refused) in a narrow docked player -
+        wrapped to the picture's width rather than cut off."""
+        b = self.number_badge
+        b.setWordWrap(False)
+        b.adjustSize()
+        cap = max(80, width - 24)
+        if b.width() > cap:
+            b.setWordWrap(True)
+            b.resize(cap, b.heightForWidth(cap))
+
     def _place_number_badge(self) -> None:
         # Under the sleep-timer pill when that one is up.
         g = self._ov_surface.geometry()
         b = self.number_badge
+        self._fit_number_badge(g.width())
         top = g.top() + 12
         if self.sleep_badge.isVisible() and self.sleep_badge.parent() is b.parent():
             top = self.sleep_badge.geometry().bottom() + 8

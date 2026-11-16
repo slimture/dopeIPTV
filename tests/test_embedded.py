@@ -948,3 +948,51 @@ def test_a_display_without_opengl_disables_the_embedded_player(monkeypatch):
         if disabled:
             assert "OpenGL" in (players.embedded_playback_reason() or "")
             assert not players.embedded_playback_supported()
+
+
+_NOTICE_CHILD = r"""
+import os
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from PyQt6.QtCore import QRect
+from PyQt6.QtWidgets import QApplication, QWidget
+from dopeiptv.i18n import tr
+from dopeiptv.media.embedded import EmbeddedPlayer
+
+app = QApplication.instance() or QApplication([])
+p = EmbeddedPlayer()
+surface = QWidget(p)
+p._ov_surface = surface
+b = p.number_badge
+for width in (300, 420, 1280):
+    surface.setGeometry(QRect(0, 0, width, width * 9 // 16))
+    # Typed digits: one line, hugging them, in the top-right corner.
+    p.show_number_entry("12", 4000)
+    assert not b.wordWrap() and b.width() < 120, (width, b.geometry())
+    one_line = b.height()
+    # A long notice: never past the picture's edges, never cut.
+    p.show_number_entry(tr("night_refused"), 4000)
+    g = b.geometry()
+    assert g.left() >= 8 and g.right() <= width - 8, (width, g)
+    assert g.height() >= b.heightForWidth(g.width()) >= one_line, (width, g)
+    assert b.wordWrap() == (width < 800), (width, g)
+    if b.wordWrap():
+        assert g.height() > one_line, (width, g)
+    # The player grows (full screen): it fits again, on one line.
+    surface.setGeometry(QRect(0, 0, 1600, 900))
+    p._place_number_badge()
+    assert not b.wordWrap() and b.height() == one_line, (width, b.geometry())
+    assert 1600 - 16 <= b.geometry().right() <= 1600 - 8, b.geometry()
+print("NOTICE_OK", flush=True)
+"""
+
+
+def test_a_long_notice_in_the_corner_wraps_in_a_narrow_player():
+    """"Night mode could not be turned on for this stream" (and why a typed
+    channel number did not play) shows in the picture's corner, where the
+    channel number being typed shows. In a narrow docked player it ran off
+    the picture's edge, cut; it wraps to the picture's width now, and stays
+    one line where there is room."""
+    proc = subprocess.run([sys.executable, "-c", _NOTICE_CHILD], capture_output=True,
+                          text=True, cwd=_REPO_ROOT, timeout=180,
+                          env=dict(os.environ, QT_QPA_PLATFORM="offscreen"))
+    assert "NOTICE_OK" in proc.stdout, proc.stdout[-2000:] + proc.stderr[-3000:]

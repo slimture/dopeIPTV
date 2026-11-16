@@ -7,6 +7,12 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Fixed
+
+- "Night mode could not be turned on for this stream" - and why a typed
+  channel number did not play - wraps in the picture's corner instead of
+  running off the edge of a narrow docked player.
+
 ## [1.6.1]
 
 A calmer guide, a night mode that tames loud adverts and bangs without
