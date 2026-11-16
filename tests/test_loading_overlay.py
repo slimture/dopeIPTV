@@ -499,6 +499,103 @@ def test_the_player_shows_it_from_play_to_the_first_picture():
     _run(_PLAYER_CHILD, "LOADING_PLAYER_OK")
 
 
+_POPOUT_CHILD = r"""
+import os, tempfile, time
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from PyQt6.QtCore import QPoint, QRect, QSettings
+QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, tempfile.mkdtemp())
+from PyQt6.QtWidgets import QApplication, QVBoxLayout, QWidget
+from dopeiptv.media.embedded import EmbeddedPlayer
+
+app = QApplication.instance() or QApplication([])
+settings = QSettings(os.path.join(tempfile.mkdtemp(), "s.ini"), QSettings.Format.IniFormat)
+p = EmbeddedPlayer(settings=settings)
+p.LOADING_SHOW_MS = 20
+ov = p._ld_overlay
+
+
+class FakeMpv(dict):
+    pause = False
+    core_idle = True
+    playback_time = None
+
+    def event_callback(self, name):
+        return lambda cb: cb
+
+    def observe_property(self, name, cb):
+        pass
+
+    def command(self, *args):
+        pass
+
+    def play(self, url):
+        pass
+
+    def __getattr__(self, n):
+        return None
+
+
+def wait(ms):
+    end = time.monotonic() + ms / 1000
+    while time.monotonic() < end:
+        app.processEvents()
+        time.sleep(0.003)
+
+
+def over(surface):
+    # Centred across the picture, its middle a little above the centre.
+    area = QRect(surface.mapTo(ov.parentWidget(), QPoint(0, 0)), surface.size())
+    g = ov.geometry()
+    assert abs(g.center().x() - area.center().x()) <= 2, (g, area)
+    assert abs(g.center().y() - (area.top() + area.height() * ov.MIDDLE)) <= 3, (g, area)
+
+
+p.resize(640, 420)
+p.show()
+p.video.mpv = FakeMpv()
+assert p.play("http://x/live/1.ts", "Kanal 1", local_buffer=True)
+wait(80)
+assert not ov.isHidden()
+over(p.video)
+
+# The pop-out's mirror, in the order the window builds it (_popout_macos):
+# the indicator is up before the window is shown and the mirror laid out.
+win = QWidget()
+QVBoxLayout(win).setContentsMargins(0, 0, 0, 0)
+mirror = p.start_mirror(win)
+win.layout().addWidget(mirror, 1)
+win.setGeometry(100, 100, 960, 540)
+win.show()
+mirror.show()
+wait(60)
+assert ov.parentWidget() is win and not ov.isHidden()
+over(mirror)
+p.stop_mirror()
+wait(60)
+over(p.video)
+win.close()
+
+# Windows' pop-out moves the player itself into a window of its own.
+win2 = QWidget()
+QVBoxLayout(win2).setContentsMargins(0, 0, 0, 0)
+win2.layout().addWidget(p)
+p.show()
+win2.setGeometry(100, 100, 1280, 760)
+win2.show()
+wait(60)
+assert not ov.isHidden()
+over(p.video)
+print("LOADING_POPOUT_OK", flush=True)
+os._exit(0)
+"""
+
+
+def test_the_pop_out_puts_it_over_the_picture():
+    # Shown before the pop-out window is: placed once the window lays the
+    # picture out, not where the mirror sat before it had a size.
+    _run(_POPOUT_CHILD, "LOADING_POPOUT_OK")
+
+
 # -- a multiview cell: a small spinner while it starts --------------------------------
 
 _CELL_CHILD = r"""

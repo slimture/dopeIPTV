@@ -2328,7 +2328,11 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         The timeline first: the DVR row goes above it when both show."""
         if self.stream_info_badge.isVisible():
             self._place_stream_info()
-        if self._ld_overlay is not None and self._ld_overlay.isVisible():
+        # Not isVisible(): the loading indicator is shown before the pop-out
+        # window is, and the picture's resize there (the mirror laid out, or
+        # on Windows the player moved in) comes before the indicator is
+        # visible - it stayed where the picture had been.
+        if self._ld_overlay is not None and not self._ld_overlay.isHidden():
             self._place_loading()
         if self.seek_overlay is not None and self.seek_overlay.isVisible():
             self._place_seek_overlay()
