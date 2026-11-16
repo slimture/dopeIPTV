@@ -37,6 +37,7 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
+from . import privacy
 from .dvr_ingest import NotAStream
 from .dvr_pool import DvrPool
 from .dvr_session import DvrSession, IngestFactory
@@ -91,6 +92,16 @@ class Channel:
 
 def channel_key(source: str, stream: str) -> str:
     return f"{source}\x1f{stream}"
+
+
+def _private(stream: str) -> bool:
+    """Whether the person's own viewing of channel *stream* is private
+    (core/privacy.py): private viewing on, or a playback that began in it -
+    the window keys it by the row's stream id, a number or its text."""
+    keys: list[object] = [stream]
+    if stream.isdigit():
+        keys.append(int(stream))
+    return any(privacy.playback_private("live", k) for k in keys)
 
 
 # -- an adaptive (HLS) channel: copied into MPEG-TS by ffmpeg -----------------------------
@@ -283,7 +294,8 @@ class Restreamer:
             ch = Channel(key, source, stream, name, url, app, self._pool(), self._clock(),
                          joined_app=True)
             self._channels[key] = ch
-            log.info("restream: %s joins the app's own connection", name or "a channel")
+            log.info("restream: %s joins the app's own connection",
+                     "<private>" if _private(stream) else name or "a channel")
         if ch is None:
             if not self._room_for(source, others):
                 return None
@@ -462,10 +474,15 @@ class Restreamer:
             chans = []
             for ch in self._channels.values():
                 s = ch.session
+                shared = self._app_uses(ch)
+                # The channel the person watches privately is not named:
+                # the page, In use now and the Nerd line read this.
+                hidden = shared and _private(ch.stream)
                 chans.append({
-                    "source": ch.source, "stream": ch.stream, "name": ch.name,
+                    "source": ch.source, "stream": "" if hidden else ch.stream,
+                    "name": "" if hidden else ch.name, "private": hidden,
                     "state": s.state, "connections": s.connections + getattr(s.ingest, "connections", 0),
-                    "shared": self._app_uses(ch), "since": round(now - ch.opened),
+                    "shared": shared, "since": round(now - ch.opened),
                     "viewers": [{"client": v.client, "since": round(now - v.since),
                                  "mb": round(v.sent / 1e6, 1)} for v in ch.viewers]})
             return {"in_use": len(self._own()), "tuners": self._total(), "channels": chans}

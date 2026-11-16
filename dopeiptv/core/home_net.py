@@ -16,15 +16,25 @@ why (``REASONS``). Only while Nerd is on.
 
 ``is_home_client`` is what the remote API and the phone remote let in: this
 computer and every private range - not only the part this computer is on.
+What needs no token - server mode's HDHomeRun tuner - lets in less
+(``LocalNetworks``): this computer, the networks of its own addresses
+(``own_networks``) and, while Nerd is on, the other networks listed here;
+not every private range (a VPN's other customers, carrier NAT).
 """
 
 from __future__ import annotations
 
 import ipaddress
 import re
+import socket
+import sys
+import threading
+import time
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
+from .log import log
 from .nerd_check import FAIL, INFO, OK, Check
 
 KEY = "nerd_other_networks"
@@ -255,3 +265,172 @@ def is_home_client(address: str, own: str = "") -> bool:
     if own and _ip(own) == ip:
         return True
     return any(ip.version == net.version and ip in net for net in CLIENT_NETS)
+
+
+# -- this computer's own networks (what needs no token) ----------------------------------
+
+Network = ipaddress.IPv4Network | ipaddress.IPv6Network
+#: Seconds this computer's own networks are kept; an address outside them has
+#: them read again, at most every LOCAL_RETRY (a network that changed: another
+#: Wi-Fi, a cable plugged in).
+LOCAL_TTL = 60.0
+LOCAL_RETRY = 5.0
+# Linux's interface ioctls (linux/sockios.h) and IFF_UP.
+_SIOCGIFFLAGS, _SIOCGIFADDR, _SIOCGIFNETMASK, _IFF_UP = 0x8913, 0x8915, 0x891B, 0x1
+
+
+def _network(address: str, prefix: int | str) -> Network | None:
+    text = (address or "").split("%", 1)[0]
+    try:
+        return ipaddress.ip_network(f"{text}/{prefix}", strict=False)
+    except ValueError:
+        return None
+
+
+def _qt_networks(qt: Any) -> list[Network]:
+    """Every address of every interface that is up, with its prefix, as Qt
+    reads them (QNetworkInterface: Linux, macOS and Windows alike)."""
+    out: list[Network] = []
+    iface_cls = qt.QNetworkInterface
+    up = iface_cls.InterfaceFlag.IsUp
+    for iface in iface_cls.allInterfaces():
+        if not iface.flags() & up:
+            continue
+        for entry in iface.addressEntries():
+            if entry.prefixLength() >= 0:
+                net = _network(entry.ip().toString(), entry.prefixLength())
+                if net is not None:
+                    out.append(net)
+    return out
+
+
+def _linux_networks() -> list[Network]:
+    """The same from Linux itself, without Qt: each interface's IPv4 address
+    and netmask (ioctl), and /proc/net/if_inet6's IPv6 ones."""
+    import fcntl
+    import struct
+    out: list[Network] = []
+    for _index, name in socket.if_nameindex():
+        req = struct.pack("256s", name.encode("utf-8", "replace")[:15])
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            try:
+                flags = struct.unpack("H", fcntl.ioctl(s.fileno(), _SIOCGIFFLAGS, req)[16:18])[0]
+                if not flags & _IFF_UP:
+                    continue
+                addr = socket.inet_ntoa(fcntl.ioctl(s.fileno(), _SIOCGIFADDR, req)[20:24])
+                mask = socket.inet_ntoa(fcntl.ioctl(s.fileno(), _SIOCGIFNETMASK, req)[20:24])
+            except OSError:
+                continue            # no IPv4 address on it
+        net = _network(addr, mask)
+        if net is not None:
+            out.append(net)
+    try:
+        with open("/proc/net/if_inet6", encoding="ascii") as fh:
+            for line in fh:
+                f = line.split()
+                if len(f) >= 6 and len(f[0]) == 32:
+                    text = ":".join(f[0][i:i + 4] for i in range(0, 32, 4))
+                    net = _network(text, int(f[2], 16))
+                    if net is not None:
+                        out.append(net)
+    except (OSError, ValueError):
+        pass                        # no IPv6 here
+    return out
+
+
+def _routed_networks() -> list[Network]:
+    """The last resort: the address each route leaves from (nothing is
+    sent), as its /24 or /64."""
+    out: list[Network] = []
+    for family, probe, prefix in ((socket.AF_INET, "10.255.255.255", 24),
+                                  (socket.AF_INET, "172.31.255.255", 24),
+                                  (socket.AF_INET, "192.168.255.255", 24),
+                                  (socket.AF_INET, "192.0.2.1", 24),
+                                  (socket.AF_INET6, "fd00::1", 64),
+                                  (socket.AF_INET6, "2001:db8::1", 64)):
+        try:
+            with socket.socket(family, socket.SOCK_DGRAM) as s:
+                s.connect((probe, 9))
+                net = _network(str(s.getsockname()[0]), prefix)
+        except OSError:
+            continue
+        if net is not None and net not in out:
+            out.append(net)
+    return out
+
+
+def own_networks() -> list[Network]:
+    """The networks of this computer's own addresses, IPv4 and IPv6,
+    link-local too. Qt's QNetworkInterface where the window has loaded
+    QtNetwork already - never imported here: the server without a window
+    has no Qt but QtCore - else Linux's own lists, else the /24 or /64 of
+    each address a route leaves from. Local calls only; never raises."""
+    qt = sys.modules.get("PyQt6.QtNetwork")
+    if qt is not None:
+        try:
+            return _qt_networks(qt)
+        except Exception as e:
+            log.debug("own networks: Qt cannot list them (%s)", e)
+    if sys.platform.startswith("linux"):
+        try:
+            found = _linux_networks()
+            if found:
+                return found
+        except Exception as e:
+            log.debug("own networks: Linux cannot list them (%s)", e)
+    return _routed_networks()
+
+
+class LocalNetworks:
+    """Who may use what needs no token (server mode's HDHomeRun tuner and
+    its discovery): this computer, the networks of its own addresses and,
+    while Nerd is on, the other networks Nerd lists (``configured``) -
+    never every private range. Kept LOCAL_TTL seconds; an address outside
+    them has them read again, at most every LOCAL_RETRY. Asked on the
+    server's threads, never the window's."""
+
+    def __init__(self, networks: Callable[[], Iterable[Network]] | None = None,
+                 others: Callable[[], Iterable[str]] | None = None,
+                 clock: Callable[[], float] = time.monotonic) -> None:
+        self._networks = networks or own_networks
+        self._others = others or configured
+        self._clock = clock
+        self._lock = threading.Lock()
+        self._nets: list[Network] = []
+        self._extra: frozenset[str] = frozenset()
+        self._at: float | None = None
+
+    def _read(self, now: float) -> None:
+        try:
+            nets = list(self._networks())
+        except Exception as e:
+            log.debug("own networks not read: %s", e)
+            nets = []
+        try:
+            extra = frozenset(str(a) for a in self._others())
+        except Exception as e:
+            log.debug("Nerd's other networks not read: %s", e)
+            extra = frozenset()
+        with self._lock:
+            self._nets, self._extra, self._at = nets, extra, now
+
+    def _holds(self, ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+        with self._lock:
+            nets, extra = self._nets, self._extra
+        return str(ip) in extra or any(ip.version == n.version and ip in n for n in nets)
+
+    def allows(self, address: str, own: str = "") -> bool:
+        """Whether a client at *address* (*own*: the address it reached this
+        computer at) may."""
+        ip = _ip(address)
+        if ip is None:
+            return False
+        if ip.is_loopback or (own and _ip(own) == ip):
+            return True
+        now = self._clock()
+        at = self._at
+        if at is None or now - at >= LOCAL_TTL:
+            self._read(now)
+        elif now - at >= LOCAL_RETRY and not self._holds(ip):
+            self._read(now)
+        return self._holds(ip)

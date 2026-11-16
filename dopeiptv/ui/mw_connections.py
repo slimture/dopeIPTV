@@ -267,7 +267,8 @@ class _ConnectionsMixin:
     def _conn_server_room(self, uses: list[Use] | None = None, source: str | None = None) -> None:
         """Server mode, while it runs, lets go of a channel it streams to
         other devices when the app's own new connection needs its room: the
-        app's own use wins (mw_server)."""
+        app's own use wins (mw_server). Asked only once the connection is
+        going to open - after the person's go ahead, never before a Cancel."""
         room = getattr(self, "_server_make_room", None)
         if callable(room):
             room(uses, source)
@@ -290,12 +291,13 @@ class _ConnectionsMixin:
                 target = next((c for c in cells if c.url is None),
                               getattr(win, "_focused", None) or cells[0])
         uses = self._conn_uses(free_player=free_player, free_cell=target)
-        self._conn_server_room(uses)
         v = self._conn_verdict(uses)
         t = self._tuner_verdict(url, uses)
-        if v is None and t is None:
-            return True
-        return self._conn_ask(v, "conn_what_multiview" if v is not None else "tuner_what", t)
+        go = v is None and t is None or self._conn_ask(
+            v, "conn_what_multiview" if v is not None else "tuner_what", t)
+        if go:
+            self._conn_server_room(uses)
+        return go
 
     def _conn_ok_cast(self, url: str = "") -> bool:
         """*url* cast to a TV: the player hands its stream over (it stops
@@ -304,12 +306,13 @@ class _ConnectionsMixin:
         if not connections.is_network(url):
             return True
         uses = [u for u in self._conn_uses(free_player=True) if u.kind != "cast"]
-        self._conn_server_room(uses)
         v = self._conn_verdict(uses)
         t = self._tuner_verdict(url, uses)
-        if v is None and t is None:
-            return True
-        return self._conn_ask(v, "conn_what_cast" if v is not None else "tuner_what", t)
+        go = v is None and t is None or self._conn_ask(
+            v, "conn_what_cast" if v is not None else "tuner_what", t)
+        if go:
+            self._conn_server_room(uses)
+        return go
 
     def _conn_ok_cast_buffer(self, url: str = "") -> bool:
         """The rewind buffer kept recording beside a cast of *url* (Settings >
@@ -318,18 +321,19 @@ class _ConnectionsMixin:
         ahead; over a known limit, or with none known - most accounts allow
         one - it is asked first, never opened silently. True to keep it."""
         src, cap, v = self._conn_source(), None, None
+        uses: list[Use] | None = None
         try:
             self._conn_seen()
             cap = self._conn_limit() or self._conn_ledger().limit(src)
             if cap:
                 uses = [u for u in self._conn_uses(free_player=True) if u.kind != "cast"]
                 uses.append(Use("cast", src, url))
-                self._conn_server_room(uses)
                 v = self._conn_ledger().check(src, uses, 1, limit=cap)
         except Exception as e:
             log.debug("connections: the buffer beside the cast not counted: %s", e)
-            cap, v = None, None
+            cap, v, uses = None, None, None
         if cap and v is None:
+            self._conn_server_room(uses)
             return True
         parts = [tr("conn_what_cast_buffer"),
                  self._conn_warning(v) if v is not None else tr("conn_limit_unknown")]
@@ -340,6 +344,8 @@ class _ConnectionsMixin:
         log.info("connections: the rewind buffer beside the cast (%s) - %s",
                  f"{v.in_use} of {v.limit} in use" if v is not None else "limit unknown",
                  "kept anyway" if go else "not kept")
+        if go and uses is not None:
+            self._conn_server_room(uses)     # only once the person said so
         return go
 
     def _conn_ok_test(self, source_id: str = "") -> bool:
@@ -352,10 +358,10 @@ class _ConnectionsMixin:
         active = self._conn_source()
         src = str(source_id or active)
         own, cap, v = 1, None, None
+        uses: list[Use] | None = None
         try:
             self._conn_seen()
             uses = self._conn_uses()
-            self._conn_server_room(uses, src)
             own = connections.own_count(uses, src)
             cap = (self._conn_limit() if src == active else None) or self._conn_ledger().limit(src)
             v = self._conn_ledger().check(src, uses, 1, limit=cap) if cap else None
@@ -363,6 +369,7 @@ class _ConnectionsMixin:
             log.debug("connections: the test not counted: %s", e)
             own, cap, v = 1, None, None
         if v is None and (cap or not own):
+            self._conn_server_room(uses, src)
             return True
         parts = [tr("conn_what_test"),
                  self._conn_warning(v) if v is not None else tr("conn_test_unknown")]
@@ -373,6 +380,8 @@ class _ConnectionsMixin:
         log.info("connections: a test's stream (%s) - %s",
                  f"{v.in_use} of {v.limit} in use" if v is not None else "limit unknown",
                  "read anyway" if go else "not read")
+        if go:
+            self._conn_server_room(uses, src)     # only once the person said so
         return go
 
     # -- a box's tuners (core/tuners.py) -------------------------------------------------

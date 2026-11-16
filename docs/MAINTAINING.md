@@ -545,7 +545,10 @@ Server for the home, off by default; `dopeiptv --server` without a window,
   guide at `/xmltv.xml` carries the lineup's numbers as its channel ids
   (`services/share.lineup_guide`).
 - **Who and what**: home addresses only; a token on everything but the
-  tuner's endpoints (Plex cannot send one - the settings say so); the
+  tuner's endpoints (Plex cannot send one - the settings say so), which
+  with the UDP discovery answer only this computer's own networks and
+  Nerd's other networks - not every private range (`home_net.LocalNetworks`:
+  a VPN's other customers, carrier NAT and Tailscale's 100.64/10 get 403); the
   sources and categories chosen, never a hidden, locked or adult one nor a
   channel hidden by hand; nothing a device watches enters history,
   statistics, Trakt or Simkl.

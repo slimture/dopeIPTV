@@ -29,7 +29,8 @@ WORDS = ("srv_page_title", "srv_in_use", "srv_watching", "srv_nobody", "srv_shar
          "srv_addr_playlist", "problem_copy", "problem_copied", "settings_title",
          "nerd_remote_port", "srv_port_hint", "srv_tuners", "srv_tuners_hint", "srv_sources",
          "srv_sources_hint", "srv_all_categories", "common_save", "srv_saved", "srv_start",
-         "srv_start_hint", "srv_offline", "srv_no_sources", "common_loading", "srv_minutes")
+         "srv_start_hint", "srv_offline", "srv_no_sources", "common_loading", "srv_minutes",
+         "private_menu")
 _HEX = re.compile(r"#[0-9A-Fa-f]{6}")
 
 
@@ -180,7 +181,7 @@ function showStatus(st) {
   if (!st.channels.length) { box.appendChild(el("div", "empty", W.srv_nobody)); }
   for (const ch of st.channels) {
     const d = el("div", "chan");
-    d.appendChild(el("b", "", ch.name || ch.stream));
+    d.appendChild(el("b", "", ch.private ? W.private_menu : (ch.name || ch.stream)));
     const state = W["srv_state_" + ch.state] || ch.state;
     const meta = [ch.source_name || ch.source, state, mins(ch.since)];
     if (ch.shared) meta.push(W.srv_shared);

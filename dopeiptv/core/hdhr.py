@@ -22,8 +22,10 @@ hdhomeruntc_atsc - are the ones every HDHomeRun emulator (Threadfin, xTeVe,
 Telly) gives: a client shows a model it knows as a network tuner it can
 stream from over HTTP. Nothing here is fetched from SiliconDust.
 
-Only home addresses get an answer (core/home_net.py); none of these needs
-a token - Plex cannot send one - which the settings say.
+None of these needs a token - Plex cannot send one - which the settings
+say. So only this computer's own networks get an answer, and while Nerd is
+on the other networks it lists (core/home_net.LocalNetworks) - not every
+private range: a VPN's other customers or carrier NAT's never.
 """
 from __future__ import annotations
 
@@ -225,11 +227,14 @@ def address_towards(ip: str) -> str:
 class Responder:
     """Answers discover broadcasts on UDP 65001 while it runs. *answer(ip)*
     gives (device id, tuners, base address) for the asker at *ip* - None
-    to stay quiet."""
+    to stay quiet. *allowed(ip)*: whether the asker may hear of the tuner
+    at all (this computer's own networks, home_net.LocalNetworks)."""
 
     def __init__(self, answer: Callable[[str], tuple[str, int, str] | None],
-                 port: int = DISCOVER_PORT, host: str = "") -> None:
+                 port: int = DISCOVER_PORT, host: str = "",
+                 allowed: Callable[[str], bool] | None = None) -> None:
         self._answer = answer
+        self._allowed = allowed or home_net.LocalNetworks().allows
         self.port, self.host = port, host
         self._sock: socket.socket | None = None
         self._thread: threading.Thread | None = None
@@ -272,7 +277,7 @@ class Responder:
                 log.debug("hdhomerun discovery: %s", e)
 
     def _one(self, s: socket.socket, data: bytes, ip: str, port: int) -> None:
-        if not home_net.is_home_client(ip):
+        if not self._allowed(ip):
             return
         got = self._answer(ip)
         if got is None:

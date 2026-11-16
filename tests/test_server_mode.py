@@ -561,6 +561,12 @@ def test_an_hls_channel_is_restreamed_as_ts_over_one_connection(tmp_path):
                     "-t", "2", "-c:v", "mpeg2video", "-f", "mpegts", str(seg)], check=True, timeout=60)
     data = seg.read_bytes()
     asked: list[str] = []
+    # Long enough to be a run that streamed (over the ingest's GOOD_BYTES),
+    # and sent as a server sends it, a segment at a time: three short
+    # segments ended within a second as a failed try, and the playlist was
+    # asked for again while the test still counted.
+    from dopeiptv.core.dvr_ingest import Ingest
+    segments = Ingest.GOOD_BYTES // len(data) * 4 + 4
 
     class Hls(BaseHTTPRequestHandler):
         def log_message(self, *a) -> None:
@@ -570,10 +576,11 @@ def test_an_hls_channel_is_restreamed_as_ts_over_one_connection(tmp_path):
             asked.append(self.path)
             if self.path.endswith(".m3u8"):
                 body = ("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:2\n#EXT-X-MEDIA-SEQUENCE:0\n"
-                        + "".join(f"#EXTINF:2.0,\nseg{i}.ts\n" for i in range(3))
+                        + "".join(f"#EXTINF:2.0,\nseg{i}.ts\n" for i in range(segments))
                         + "#EXT-X-ENDLIST\n").encode()
                 ctype = "application/vnd.apple.mpegurl"
             else:
+                time.sleep(0.1)
                 body, ctype = data, "video/mp2t"
             self.send_response(200)
             self.send_header("Content-Type", ctype)
@@ -824,3 +831,200 @@ def test_a_zap_under_way_never_gives_a_device_the_channel_before():
     assert asked({"stream_id": 2}, two) is two
     adopted = Session("srv:p1\x1f2")
     assert asked({"stream_id": 2}, adopted) is adopted, "the server's own, played by the player"
+
+
+# -- the tuner's endpoints: this computer's own networks only --------------------------------------
+
+def test_the_tuner_answers_only_this_computer_s_own_networks():
+    from ipaddress import ip_network
+
+    from dopeiptv.core import home_net
+
+    reads: list[int] = []
+    now = [100.0]
+
+    def networks():
+        reads.append(1)
+        return [ip_network("192.168.1.0/24"), ip_network("fe80::/64"),
+                ip_network("2001:db8:5::/64")]
+
+    local = home_net.LocalNetworks(networks, lambda: ["192.168.20.7"], clock=lambda: now[0])
+    for ok in ("127.0.0.1", "::1", "192.168.1.77", "::ffff:192.168.1.9", "fe80::1%eth0",
+               "2001:db8:5::42", "192.168.20.7"):
+        assert local.allows(ok), ok
+    for refused in ("192.168.2.5", "10.0.0.5", "172.16.3.4", "100.64.1.2", "8.8.8.8",
+                    "2001:db8:6::1", "fd00::5", "", "nonsense"):
+        assert not local.allows(refused), refused
+    assert local.allows("10.1.2.3", own="10.1.2.3"), "this computer, at an address of its own"
+    assert len(reads) == 1, "kept, not read for every request"
+    now[0] += home_net.LOCAL_RETRY + 1
+    assert not local.allows("10.0.0.5") and len(reads) == 2, "an address outside: read again"
+    assert not local.allows("10.0.0.6") and len(reads) == 2, "but not for every one"
+    now[0] += home_net.LOCAL_TTL + 1
+    assert local.allows("192.168.1.5") and len(reads) == 3, "kept only a while"
+
+
+def test_this_computer_s_own_networks_are_read_without_qt():
+    from dopeiptv.core import home_net
+    from dopeiptv.core.remote_api import lan_addresses
+
+    import ipaddress
+    nets = home_net.own_networks()
+    for a in lan_addresses():
+        assert any(ipaddress.ip_address(a) in n for n in nets), (a, nets)
+    code = ("import sys; from dopeiptv.core import home_net; home_net.own_networks(); "
+            "print('PyQt6.QtNetwork' in sys.modules, 'PyQt6.QtGui' in sys.modules)")
+    r = subprocess.run([sys.executable, "-c", code], cwd=str(ROOT), capture_output=True,
+                       text=True, timeout=60)
+    assert r.stdout.split() == ["False", "False"], r.stdout + r.stderr
+    if sys.platform.startswith("linux"):
+        from PyQt6 import QtNetwork
+        v4 = {n for n in home_net._linux_networks() if n.version == 4}
+        assert v4 == {n for n in home_net._qt_networks(QtNetwork) if n.version == 4}
+
+
+def test_the_tuner_s_endpoints_are_refused_beyond_its_own_networks(server, monkeypatch):
+    srv = server[0]
+
+    class Elsewhere:
+        def allows(self, _address, _own=""):
+            return False
+
+    monkeypatch.setattr(srv, "local", Elsewhere())
+    for path in ("/discover.json", "/lineup.json", "/lineup_status.json", "/device.xml",
+                 "/lineup.post", "/auto/v5"):
+        with pytest.raises(urllib.error.HTTPError) as e:
+            _get(srv, path)
+        assert e.value.code == 403, path
+    assert _get(srv, f"/playlist.m3u?token={TOKEN}").status == 200, "the token's routes as before"
+
+
+def test_the_discovery_is_not_answered_beyond_its_own_networks():
+    from dopeiptv.providers.hdhomerun import discover_packet
+    dev = hdhr.new_device_id()
+    r = hdhr.Responder(lambda ip: (dev, 2, f"http://{ip}:3675"), port=0, host="127.0.0.1",
+                       allowed=lambda _ip: False)
+    assert r.start()
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.settimeout(1.5)
+        s.sendto(discover_packet(), ("127.0.0.1", r.port))
+        with pytest.raises(socket.timeout):
+            s.recvfrom(2048)
+    finally:
+        s.close()
+        r.stop()
+
+
+# -- the person's own choice first, and private viewing ----------------------------------------------
+
+def _asking(answer: bool):
+    from dopeiptv.core import connections
+    from dopeiptv.ui.mw_connections import _ConnectionsMixin
+
+    full = connections.Verdict(1, 1, 2, 1, 0)
+
+    class Ledger:
+        def check(self, *_a, **_k):
+            return full
+
+        def limit(self, _src):
+            return 1
+
+        def others(self, _src):
+            return 0
+
+    class Window(_ConnectionsMixin):
+        settings = type("S", (), {"value": staticmethod(lambda _k, d=None: d)})()
+        client = None
+
+        def __init__(self) -> None:
+            self.room: list = []
+
+        def _server_make_room(self, uses=None, source=None):
+            self.room.append(source)
+
+        def _conn_uses(self, free_player=False, free_cell=None):
+            return [connections.Use("player", "p1", "http://p.invalid/live/1.ts")]
+
+        def _conn_verdict(self, _uses):
+            return full
+
+        def _tuner_verdict(self, _url, _uses):
+            return None
+
+        def _conn_ask(self, _v, _what, _tuner=None):
+            return answer
+
+        def _choice_dialog(self, *_a, **_k):
+            return 0 if answer else 1
+
+        def _conn_seen(self, *_a, **_k):
+            return None
+
+        def _conn_source(self):
+            return "p1"
+
+        def _conn_limit(self):
+            return 1
+
+        def _conn_ledger(self):
+            return Ledger()
+
+        def _conn_warning(self, _v):
+            return "full"
+    return Window()
+
+
+@pytest.mark.parametrize("answer", [False, True])
+def test_a_device_is_cut_only_once_the_person_said_go_ahead(answer):
+    url = "http://p.invalid/live/2.ts"
+    for ask in ("_conn_ok_multiview", "_conn_ok_cast", "_conn_ok_cast_buffer", "_conn_ok_test"):
+        w = _asking(answer)
+        method = getattr(w, ask)
+        got = method(None, url) if ask == "_conn_ok_multiview" else (
+            method("p1") if ask == "_conn_ok_test" else method(url))
+        assert got is answer, ask
+        assert bool(w.room) is answer, f"{ask}: a device cut {'only after' if answer else 'on'} the answer"
+
+
+def test_private_viewing_never_names_the_person_s_channel(server):
+    import logging
+
+    from dopeiptv.core import privacy
+    from dopeiptv.ui import mw_server
+
+    srv, host, provider, pool = server
+    url = f"http://127.0.0.1:{provider.server_address[1]}/live/1.ts"
+    lines: list[str] = []
+
+    class Keep(logging.Handler):
+        def emit(self, record) -> None:
+            lines.append(record.getMessage())
+
+    keep = Keep()
+    logger = logging.getLogger("dopeiptv")
+    level = logger.level
+    logger.addHandler(keep)
+    logger.setLevel(logging.INFO)
+    privacy.set_private(True)
+    try:
+        mine = pool.open(url, "live:1")
+        host.app_sess, host.app = mine, 1
+        assert mine.store.wait_for_data(10)
+        a = _watch(srv, f"/stream/p1/1?token={TOKEN}")
+        try:
+            joined = [m for m in lines if "joins the app's own connection" in m]
+            assert joined and not any("One" in m for m in joined), joined
+            ch = srv.restream.status()["channels"][0]
+            assert ch["shared"] and ch["private"] and "One" not in (ch["name"], ch["stream"])
+            w = type("W", (mw_server._ServerMixin,), {})()
+            w._home = srv
+            told = " ".join(text for _kind, text in w._server_in_use_lines())
+            assert "One" not in told and "127.0.0.1" in told, told
+        finally:
+            a.close()
+    finally:
+        privacy.set_private(False)
+        logger.removeHandler(keep)
+        logger.setLevel(level)

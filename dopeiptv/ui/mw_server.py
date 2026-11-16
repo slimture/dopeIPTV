@@ -306,5 +306,6 @@ class _ServerMixin:
         lines = [("head", tr("inuse_server", n=st["in_use"], total=srv.total()))]
         for ch in st["channels"]:
             who = ", ".join(v["client"] for v in ch["viewers"]) or "-"
-            lines.append(("item", f"• {ch['name']} → {who}"))
+            name = tr("private_menu") if ch.get("private") else ch["name"]
+            lines.append(("item", f"• {name} → {who}"))
         return lines

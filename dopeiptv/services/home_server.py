@@ -17,9 +17,12 @@ household's sources and settings, never a profile's own. What it serves:
 the sources chosen, and in each the categories chosen - never a hidden,
 locked or adult one, nor a channel hidden by hand. Who: an address on the
 home network only (core/home_net.py). The HDHomeRun endpoints need no token
-(Plex cannot send one); everything else does - the settings page in a
-browser (``/?token=…``, core/server_page.py), the playlist, the guide and
-the stream addresses (``/stream/<source id>/<stream id>?token=…``).
+(Plex cannot send one), so they and the UDP discovery answer only this
+computer's own networks and, while Nerd is on, the other networks it lists
+(home_net.LocalNetworks) - never every private range. Everything else needs
+the token - the settings page in a browser (``/?token=…``,
+core/server_page.py), the playlist, the guide and the stream addresses
+(``/stream/<source id>/<stream id>?token=…``).
 
 The server knows the app only through its *host* (Host below): the window
 (ui/mw_server.py) or the headless runner.
@@ -210,6 +213,8 @@ class HomeServer:
         self._guide_path = guide_path
         self.share = Share(self.served, make_client=make_client, guide_path=guide_path)
         self.limiter = RateLimiter()
+        #: Who may use the endpoints that need no token.
+        self.local = home_net.LocalNetworks()
         self.ledger = connections.Ledger()
         self._lineup: tuple[float, list[LineupChannel]] | None = None
         self._lineup_lock = threading.Lock()
@@ -236,7 +241,8 @@ class HomeServer:
                                         daemon=True)
         self._thread.start()
         if self.discovery_port:
-            udp = hdhr.Responder(self._discovery_answer, self.discovery_port)
+            udp = hdhr.Responder(self._discovery_answer, self.discovery_port,
+                                 allowed=self._may_discover)
             if udp.start():
                 self._udp = udp
         threading.Thread(target=self._learn_limits, name="home-server-limits",
@@ -478,6 +484,9 @@ class HomeServer:
         return {"tuner": base, "playlist": f"{base}/playlist.m3u{q}",
                 "guide": f"{base}/xmltv.xml{q}", "page": f"{base}/{q}"}
 
+    def _may_discover(self, ip: str) -> bool:
+        return self.local.allows(ip)
+
     def _discovery_answer(self, ip: str) -> tuple[str, int, str] | None:
         if not self.running:
             return None
@@ -634,6 +643,10 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
             reading = method in ("GET", "HEAD")
             try:
                 if path in HDHR_PATHS or _AUTO.match(path):
+                    if not server.local.allows(who, _own(self)):
+                        # No token here: this computer's own networks only.
+                        self._text(403, "only this computer's own network")
+                        return
                     self._hdhomerun(path, method)
                     return
                 given = self._token(query)
