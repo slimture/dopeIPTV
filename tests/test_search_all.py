@@ -191,9 +191,16 @@ def test_a_catalogue_is_read_once_and_filtered_before_matching(tmp_path):
     assert cat.titles["channels"] == ["My own"]
     assert store.catalogue(plan) is cat and made == ["b"]
     assert client.asked.count("live") == 1                 # once a session
-    # Another key (a profile, the lock opened): made anew, the same client.
-    store.catalogue(_plan(shown=shown, key=("other",)))
-    assert made == ["b"] and client.asked.count("live") == 2
+    # Another key (a profile, the lock opened): the same rows filtered anew -
+    # nothing asked of the source again (its list cache lasts minutes, so
+    # asking would download its whole catalogue once more).
+    other = store.catalogue(_plan(key=("other",)))          # nothing left out
+    assert made == ["b"] and client.asked.count("live") == 1
+    assert sorted(r["stream_id"] for r in other.channels) == [1, 4]
+    # Its lists refreshed: asked again.
+    store.drop("b")
+    store.catalogue(plan)
+    assert client.asked.count("live") == 2
     # Nothing looked up opens a stream.
     assert not any(a.startswith("url:") for a in client.asked)
 

@@ -24,6 +24,7 @@ import threading
 import time
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Any
 
 from ..core import search_all as sa
@@ -106,15 +107,19 @@ def _read(client: Any, mode: str, list_fn: str, cats_fn: str
     return rows, cats, ""
 
 
-def build_catalogue(plan: Plan, client: Any) -> sa.Catalogue:
+def build_catalogue(plan: Plan, client: Any,
+                    read: Callable[[Any, str, str, str], tuple[list, list | None, str]]
+                    | None = None) -> sa.Catalogue:
     """(worker) The source's channels, films and series as its lists show
-    them - and, for a kids profile, without what is for adults."""
+    them - and, for a kids profile, without what is for adults. *read*: one
+    kind of its lists (``_read`` by default)."""
+    read = read or _read
     found: dict[str, list[dict]] = {}
     names: dict[str, dict[str, str]] = {}
     renamed: dict[str, dict[str, str]] = {}
     partial = ""
     for group, mode, list_fn, cats_fn, ident in _LISTS:
-        rows, cats, why = _read(client, mode, list_fn, cats_fn)
+        rows, cats, why = read(client, mode, list_fn, cats_fn)
         partial = partial or why
         shown = plan.shown.get(mode) or Shown()
         given = dict(shown.names)
@@ -176,6 +181,10 @@ class Sources:
         self._busy: dict[str, threading.Lock] = {}
         self._clients: dict[str, tuple[str, Any]] = {}
         self._cats: dict[str, tuple[tuple, sa.Catalogue]] = {}
+        # A source's lists as read, per kind, while it is as it was: a
+        # catalogue made for another key (a profile, the lock) filters
+        # these again instead of asking the source once more.
+        self._rows: dict[str, tuple[str, dict[str, tuple[list, list | None, str]]]] = {}
         # A source's guide week (None: it has none here), under the key it
         # was read for, and when.
         self._guides: dict[str, tuple[tuple, sa.GuideTable | None, float]] = {}
@@ -219,7 +228,7 @@ class Sources:
                 return have
             try:
                 client = plan.client if plan.client is not None else self.client(plan.playlist)
-                cat = build_catalogue(plan, client)
+                cat = build_catalogue(plan, client, partial(self._read_kept, plan))
             except Exception as e:
                 log.info("search: a source could not be read (%s)", type(e).__name__)
                 cat = sa.Catalogue(plan.source, partial=sa.FAILED)
@@ -229,6 +238,30 @@ class Sources:
                      len(cat.channels), len(cat.movies), len(cat.series),
                      f" (only in part: {cat.partial})" if cat.partial else "")
             return cat
+
+    def _read_kept(self, plan: Plan, client: Any, mode: str, list_fn: str, cats_fn: str
+                   ) -> tuple[list, list | None, str]:
+        """(worker) One kind of the source's lists: asked of it once while
+        the source is as it was (its client's list cache lasts minutes - asked
+        again, a big catalogue came down once more). A portal's is read anew
+        each time: only what it holds, nothing asked. A read that failed is
+        not kept."""
+        if getattr(client, "paged_lists", False):
+            return _read(client, mode, list_fn, cats_fn)
+        pid, sig = plan.source.id, signature(plan.playlist)
+        with self._lock:
+            have = self._rows.get(pid)
+            kept = have[1].get(mode) if have is not None and have[0] == sig else None
+        if kept is not None:
+            return kept
+        got = _read(client, mode, list_fn, cats_fn)
+        if got[2] != sa.FAILED:
+            with self._lock:
+                have = self._rows.get(pid)
+                if have is None or have[0] != sig:
+                    have = self._rows[pid] = (sig, {})
+                have[1][mode] = got
+        return got
 
     # -- guides ---------------------------------------------------------------------
 
@@ -310,7 +343,7 @@ class Sources:
         """Everything of the sources not in *keep* let go (removed ones)."""
         ids = set(keep)
         with self._lock:
-            for store in (self._clients, self._cats, self._guides):
+            for store in (self._clients, self._cats, self._guides, self._rows):
                 for pid in [p for p in store if p not in ids]:
                     store.pop(pid, None)
 
@@ -320,3 +353,4 @@ class Sources:
         with self._lock:
             self._cats.pop(pid, None)
             self._guides.pop(pid, None)
+            self._rows.pop(pid, None)
