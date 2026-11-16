@@ -1084,6 +1084,7 @@ class _HomeMixin:
         self._hide_busy()
         self._close_guide_page()      # a place of its own: the Guide page goes
         self._close_series_page()     # ...and a series' page
+        self._close_search_page()     # ...and the Search page
         page = self._ensure_home_page()
         page.refresh()
         self._center_stack.setCurrentWidget(page)

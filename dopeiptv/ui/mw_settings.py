@@ -179,13 +179,6 @@ class _SettingsMixin:
 
     # -- EPG guide -----------------------------------------------------------------
 
-    def _open_epg_search(self) -> None:
-        """Open the guide search (Ctrl+Shift+F): find a programme by name across
-        every live channel this week and tune in or set a reminder."""
-        self._ensure_xmltv_loaded()
-        from .epg_search import EpgSearchDialog
-        EpgSearchDialog(self).exec()
-
     def _favorite_channels_for_guide(self) -> list:
         """The favorite live channels the EPG guide should cover, honoring the
         currently selected Favorites sub-category (a channel folder, or all)."""
@@ -289,6 +282,7 @@ class _SettingsMixin:
             self._home_page.refresh()
         self._guide_restyle()        # the Guide page's board, in the new colours
         self._sp_restyle()           # a series' page
+        self._search_restyle()       # the Search page
         if getattr(self, "_tv_page", None) is not None:
             self._tv_page.restyle()  # TV mode's page (its tiles paint from P)
 
@@ -467,7 +461,7 @@ class _SettingsMixin:
         for action, getter in getattr(self, "_i18n_actions", {}).items():
             action.setText(getter())
         nav_labels = {
-            "home": "nav_home", "live": "nav_tv", "guide": "nav_guide",
+            "home": "nav_home", "search": "nav_search", "live": "nav_tv", "guide": "nav_guide",
             "vod": "nav_movies", "series": "nav_series",
             "rec": "nav_recordings", "local": "nav_local",
             "radio": "nav_radio", "fav": "nav_favorites", "watchlist": "nav_watchlist",
@@ -513,6 +507,7 @@ class _SettingsMixin:
             strip.retranslate()
         self._guide_restyle()        # the Guide page, in the new language
         self._sp_restyle()           # a series' page
+        self._search_restyle()       # the Search page
         self._palette_retranslate()
 
     def _inline_view_changed(self, *_) -> None:

@@ -53,19 +53,24 @@ class _NavMixin:
             b.setChecked(k == key)
 
     def _on_nav_clicked(self, key: str) -> None:
-        """A nav entry clicked. Home swaps the central stack, the Guide shows
-        its page in the middle pane (the same call its shortcut makes),
-        History comes back to the filter last chosen; the rest are modes.
+        """A nav entry clicked. Home swaps the central stack, the Guide and
+        Search show their pages in the middle pane (the same calls their
+        shortcuts make), History comes back to the filter last chosen; the
+        rest are modes.
         The entry of the list under the Guide page just takes the page away:
         that list is still there, as it was left."""
         if key == "home":
             self._show_home_page()
         elif key == "guide":
             self._open_epg_guide()
-        elif ((self._guide_page_showing() or self._series_page_showing())
+        elif key == "search":
+            self._open_search_page()
+        elif ((self._guide_page_showing() or self._series_page_showing()
+               or self._search_page_showing())
                 and key == self._nav_key_for_mode(self.mode)):
             self._close_guide_page()
             self._close_series_page()
+            self._close_search_page()
             self._check_nav(key)
             self.listw.setFocus()
         elif key == "history":

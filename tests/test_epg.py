@@ -1,5 +1,6 @@
 """Unit tests for dopeiptv.providers.epg utilities and the guide index."""
 
+import time
 from datetime import datetime, timedelta, timezone
 
 from dopeiptv.providers.epg import XmltvGuide, normalize_name, parse_xmltv_time
@@ -87,25 +88,36 @@ def test_guide_queries():
     assert [e["title"] for e in past] == ["Earlier Show"]
 
 
+def _programmes(g, items, query):
+    """What the Search page finds in guide *g* (core/search_all.py over
+    the guide's schedule), from now on."""
+    from dopeiptv.core import search_all as sa
+    now = datetime.now(timezone.utc).timestamp()
+    src = sa.Source("p", "Pirat")
+    table = sa.GuideTable(src, items, g.schedule, now)
+    res = sa.search(query, [sa.Catalogue(src)], [table], now)
+    return res.hits["programmes"]
+
+
 def test_guide_search():
     g = _make_guide()
     items = [{"epg_channel_id": "c1", "name": "Alpha TV", "stream_id": 1}]
-    now = datetime.now(timezone.utc).timestamp()
-    win_start, win_stop = now - 3 * 3600, now + 4 * 3600
     # title match, carries the channel item, only the one hit
-    res = g.search(items, "up next", win_start, win_stop)
-    assert [e["title"] for e in res] == ["Up Next"]
-    assert res[0]["_channel"] is items[0]
+    res = _programmes(g, items, "up next")
+    assert [h.title for h in res] == ["Up Next"]
+    assert res[0].row is items[0] and res[0].category == "Alpha TV"
     # description match, case-insensitive
-    res2 = g.search(items, "CURRENTLY", win_start, win_stop)
-    assert [e["title"] for e in res2] == ["Airing Now"]
-    # results are sorted by start time
-    res3 = g.search(items, "on", win_start, win_stop)
-    starts = [e["start_timestamp"] for e in res3]
-    assert starts == sorted(starts) and len(starts) >= 2
-    # empty / too-short query and no match return nothing
-    assert g.search(items, "  ", win_start, win_stop) == []
-    assert g.search(items, "cricket", win_start, win_stop) == []
+    res2 = _programmes(g, items, "CURRENTLY")
+    assert [h.title for h in res2] == ["Airing Now"]
+    # the one on now first, then by start; the one that ended is not there
+    res3 = _programmes(g, items, "o")
+    assert res3 == []                               # one letter finds nothing
+    res3 = _programmes(g, items, "on")
+    assert [h.title for h in res3] == ["Later On", "Airing Now"]
+    assert all(h.programme["stop_timestamp"] > time.time() for h in res3)
+    # empty query and no match return nothing
+    assert _programmes(g, items, "  ") == []
+    assert _programmes(g, items, "cricket") == []
 
 
 def test_guide_search_dedupes_duplicate_channels():
@@ -114,9 +126,7 @@ def test_guide_search_dedupes_duplicate_channels():
     # up the same airing.
     items = [{"epg_channel_id": "c1", "name": "Alpha TV"},
              {"epg_channel_id": "c1", "name": "Alpha TV"}]
-    now = datetime.now(timezone.utc).timestamp()
-    res = g.search(items, "up next", now - 3 * 3600, now + 4 * 3600)
-    assert len(res) == 1
+    assert len(_programmes(g, items, "up next")) == 1
 
 
 def test_guide_name_fallback():

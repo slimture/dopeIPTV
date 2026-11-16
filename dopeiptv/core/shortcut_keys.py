@@ -38,7 +38,9 @@ ACTIONS: tuple[tuple[str, str, str], ...] = (
     ("record", "R", "sc_record"),
     ("stats", "I", "sc_stats"),
     ("epg_guide", "Ctrl+G", "sc_epg_guide"),
-    ("epg_search", "Ctrl+Shift+F", "sc_epg_search"),
+    # The Search page, across every source (it was the guide's search: the
+    # id is kept, so a key of the user's for it carries over).
+    ("epg_search", "Ctrl+Shift+F", "sc_search_all"),
     ("reminders", "Ctrl+Shift+R", "sc_reminders"),
     ("sidebar", "Ctrl+B", "sc_sidebar"),
     ("focus_mode", "Ctrl+Shift+M", "sc_focus_mode"),
