@@ -146,7 +146,15 @@ w.switch_mode("live")
 assert until(lambda: w.cat_list.count() >= 4)
 assert any("Late night" in w.cat_list.item(i).text() for i in range(w.cat_list.count()))
 old_favs = w.favs
+# A week of asking for a donation under way: the heart shows for the grown-up...
+from dopeiptv.core import donate_rhythm
+s.setValue(donate_rhythm.K_FIRST, time.time() - 60 * 86400)
+s.setValue(donate_rhythm.K_PERIOD, time.time() - 60)
+w._donate_minute()
+assert not w._donate_btn.isHidden()
 assert w.switch_profile(kid.id)
+# ...and never for a kids profile - gone with the switch, not a minute later.
+assert w._donate_btn.isHidden()
 assert player.stop_btn.clicks == 1 and saved
 w.player = real_player
 del w._save_resume_position

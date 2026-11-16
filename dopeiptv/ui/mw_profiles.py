@@ -387,6 +387,10 @@ class _ProfilesMixin:
                 if hasattr(scr, "rebuild"):
                     scr.rebuild()
         self._events_profile()
+        if hasattr(self, "_donate_show"):
+            # A kids profile is never asked (mw_donate): the heart goes now,
+            # not at the next minute's look.
+            self._donate_show()
 
     def _profile_room_name(self) -> str:
         """The name Watch together offers: the profile's, with two or more."""
