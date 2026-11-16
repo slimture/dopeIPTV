@@ -18,6 +18,14 @@ computer, the supporter key, the sync code, logins of other services),
 playlists with their logins (off by default), and watch history with resume
 points (off by default).
 
+Keyboard shortcuts sync only between computers of the same system - macOS
+with macOS, Linux with Linux, Windows with Windows: ⌘ is not Ctrl, and each
+system keeps keys of its own. Kept here as they always were
+(``keyboard_shortcuts``), they are sent as "keyboard_shortcuts@<system>"
+(entry_of); a computer applies its own system's and leaves another's as it
+is, neither applied nor removed (setting_of). An entry naming no system is
+nobody's here: no version sent one, and what it was for cannot be told.
+
 Profiles (core/profiles.py). Every profile's own syncs: the first profile's
 under the entries it always had (so a computer with an older app syncs on
 with it), each other one's under its id - a source's fingerprint as
@@ -50,9 +58,11 @@ import hmac
 import json
 import os
 import secrets
+import sys
 import threading
 import time
 import zlib
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -61,6 +71,7 @@ from typing import Any
 from . import build_check
 from . import chacha20poly1305 as aead
 from . import profiles as _profiles
+from . import shortcut_keys
 from .log import log
 from .stores import FavoriteStore, HistoryStore
 
@@ -232,10 +243,14 @@ SETTINGS_ALLOW = frozenset({
     "mv_new_unmuted", "mv_conflict_mode", "mv_autohide_secs", "mv_seek_step_min",
     "mv_cells",
     "metadata_source", "music_art_online", "check_updates", "radio_report_clicks",
+    # Under this system's name, between computers of one system (entry_of).
+    shortcut_keys.SETTING,
 })
-#: Families of settings that sync: Home's shelves, the sidebar's colours,
-#: keyboard shortcuts (stored per operating system, so they never cross).
-SETTINGS_ALLOW_PREFIX = ("home_sh_", "nav_color_", "nav_bg_", "shortcut/")
+#: Families of settings that sync: Home's shelves, the sidebar's colours.
+#: (Not the old editor's "shortcut/<platform>/<action>": moved into
+#: keyboard_shortcuts at the first start since 1.5.0, and one left in a file
+#: is another system's.)
+SETTINGS_ALLOW_PREFIX = ("home_sh_", "nav_color_", "nav_bg_")
 #: Never, whatever the lists above say: what belongs to this computer, a
 #: secret, or the sync itself.
 SETTINGS_DENY = frozenset({
@@ -267,6 +282,7 @@ PROFILE_ENTRY = "profile/"
 
 
 def syncable(key: str) -> bool:
+    """Whether settings key *key*, as this computer keeps it, syncs."""
     key = str(key)
     if key.startswith(PROFILE_ENTRY):
         return len(key) > len(PROFILE_ENTRY)
@@ -279,6 +295,77 @@ def syncable(key: str) -> bool:
     if any(part in key.lower() for part in _DENY_PARTS):
         return False
     return key in SETTINGS_ALLOW or key.startswith(SETTINGS_ALLOW_PREFIX)
+
+
+# -- keyboard shortcuts, per system ----------------------------------------------
+
+#: In a State's *seen*: this computer has synced its keyboard shortcuts. One
+#: that synced before 1.6.1 never sent them, and its first round with them
+#: is a newcomer's for them (newcomer()).
+SEEN_SHORTCUTS = "settings:" + shortcut_keys.SETTING
+
+
+def system_of(platform: str = sys.platform) -> str:
+    """The operating system as an entry names it: macos, windows, linux, or
+    another's own name (freebsd)."""
+    if platform == "darwin":
+        return "macos"
+    if platform.startswith(("win32", "cygwin", "msys")):
+        return "windows"
+    if platform.startswith("linux"):
+        return "linux"
+    return platform.rstrip("0123456789") or "other"
+
+
+def is_shortcuts(key: str) -> bool:
+    """Whether settings key *key* (a profile's too) holds keyboard shortcuts."""
+    own = _profiles.split_key(key)
+    return (own[1] if own is not None else str(key)) == shortcut_keys.SETTING
+
+
+def entry_of(key: str, platform: str = sys.platform) -> str:
+    """The id a setting syncs under: its own name, the shortcuts' with this
+    system's ("keyboard_shortcuts@macos")."""
+    key = str(key)
+    return f"{key}@{system_of(platform)}" if is_shortcuts(key) else key
+
+
+def setting_of(ident: str, platform: str = sys.platform) -> str | None:
+    """The setting a settings entry is here - or None for one this computer
+    leaves as it is: what does not sync, another system's shortcuts, and
+    shortcuts that name no system (no version sent them; which system they
+    were for cannot be told, and applied on another they would be wrong)."""
+    ident = str(ident)
+    base, at, system = ident.rpartition("@")
+    if at and is_shortcuts(base):
+        return base if system == system_of(platform) and syncable(base) else None
+    if is_shortcuts(ident):
+        return None
+    return ident if syncable(ident) else None
+
+
+def newcomer(seen: Collection[str] | None, there: dict[str, Any],
+             platform: str = sys.platform) -> set[str]:
+    """This system's shortcut entries in *there* (the copy on the site, or
+    this computer's own of it) while this computer has not synced its
+    shortcuts yet (*seen*: State.seen; None counts as synced): its own then
+    lose to what is there, as a joining computer's do, and none it lacks
+    counts as removed. Without this the first round after the update
+    overrode the other computers' keys with its own at the time now - or
+    removed them, with no keys of its own."""
+    if seen is None or SEEN_SHORTCUTS in seen:
+        return set()
+    entries = there.get("c", {}).get("settings") or {}
+    return {ident for ident in entries
+            if (key := setting_of(ident, platform)) is not None and is_shortcuts(key)}
+
+
+def seen_after(cats: Collection[str], applied: Applied) -> set[str]:
+    """What a round synced here, for State.seen: its categories but one
+    changed meanwhile (the next round takes it), and with the settings this
+    system's shortcuts."""
+    done = set(cats) - applied.skipped
+    return done | {SEEN_SHORTCUTS} if "settings" in done else done
 
 
 def _scalar(value: Any) -> str | None:
@@ -360,6 +447,8 @@ class Context:
     #: (settings, resume settings) of a profile by its id: for one that a
     #: round brings (its own arrive in the same round).
     pin: Any = None
+    #: This computer's system (sys.platform): whose keyboard shortcuts.
+    platform: str = sys.platform
 
     def refresh_others(self) -> None:
         """The other profiles as the registry has them now."""
@@ -411,6 +500,8 @@ class Snapshot:
     fps: dict[str, str] = field(default_factory=dict)
     #: The profiles this computer has (their own settings are in domain).
     profiles: set[str] = field(default_factory=set)
+    #: This computer's system (Context.platform).
+    platform: str = sys.platform
 
 
 def _collect_settings(ctx: Context) -> dict[str, Any]:
@@ -420,13 +511,13 @@ def _collect_settings(ctx: Context) -> dict[str, Any]:
         if syncable(key):
             value = _scalar(settings.value(key))
             if value is not None:
-                out[str(key)] = value
+                out[entry_of(key, ctx.platform)] = value
     for label, view, _rs in ctx.others:
         for key in view.allKeys():
             if _profiles.is_own(key) and syncable(key):
                 value = _scalar(view.value(key))
                 if value is not None:
-                    out[f"{_profiles.ROOT}/{label}/{key}"] = value
+                    out[entry_of(f"{_profiles.ROOT}/{label}/{key}", ctx.platform)] = value
     reg = ctx.registry
     for p in (reg.profiles() if reg is not None else []):
         out[PROFILE_ENTRY + p.id] = _canon(
@@ -498,7 +589,7 @@ def collect(ctx: Context, cats: tuple[str, ...] | list[str]) -> Snapshot:
     """What syncs of *cats*, read from the settings (the window's thread)."""
     fps = ctx.fps()
     snap = Snapshot(fps={k: v[0] for k, v in ctx.places().items()},
-                    profiles=ctx.profile_ids())
+                    profiles=ctx.profile_ids(), platform=ctx.platform)
     if "settings" in cats:
         snap.values["settings"] = _collect_settings(ctx)
     if "favorites" in cats:
@@ -579,11 +670,11 @@ def _in_domain(cat: str, ident: str, entry: dict, snap: Snapshot) -> bool:
     if cat == "settings":
         if ident.startswith(PROFILE_ENTRY):
             return False        # a profile is never taken out by sync
+        if setting_of(ident, snap.platform) is None:
+            return False        # not synced here: another system's shortcuts too
         own = _profiles.split_key(ident)
-        if own is not None:
-            # Another profile's own: only one this computer has.
-            return own[0] in snap.profiles and syncable(ident)
-        return syncable(ident)
+        # Another profile's own: only one this computer has.
+        return own is None or own[0] in snap.profiles
     parts = _parts(ident)
     if cat == "favorites" and parts[:1] == [GLOBAL_FP]:
         return True
@@ -599,14 +690,16 @@ def _in_domain(cat: str, ident: str, entry: dict, snap: Snapshot) -> bool:
 
 
 def stamp(doc: dict[str, Any], snap: Snapshot, cats: tuple[str, ...] | list[str],
-          now: int, fresh: bool | set[str] | frozenset[str] = False) -> bool:
+          now: int, fresh: bool | set[str] | frozenset[str] = False,
+          new: Collection[str] = ()) -> bool:
     """Bring this computer's copy *doc* up to *snap*: a value that is new or
     changed gets the time *now*; one that went gets a tombstone. History
     keeps the time it was watched. *fresh* (True, or the categories): this
     computer is new to them - joining, or a category just turned on that
     others sync already - so its own get the time 0 and lose where the
-    others differ, and nothing it lacks counts as removed. True when
-    anything changed."""
+    others differ, and nothing it lacks counts as removed. *new*: entries
+    it is new to in the same way (newcomer()). True when anything
+    changed."""
     new_here = set(cats) if fresh is True else set(fresh or ())
     changed = False
     for cat in cats:
@@ -624,7 +717,7 @@ def stamp(doc: dict[str, Any], snap: Snapshot, cats: tuple[str, ...] | list[str]
                 t = _own_time(ident, value)
                 if e is not None and int(e["t"]) > t:
                     continue        # removed or newer elsewhere: apply catches up
-            elif fresh_cat:
+            elif fresh_cat or ident in new:
                 t = 0
             else:
                 t = max(now, int(e["t"]) + 1) if e is not None else now
@@ -633,7 +726,8 @@ def stamp(doc: dict[str, Any], snap: Snapshot, cats: tuple[str, ...] | list[str]
         if fresh_cat:
             continue
         for ident, e in list(entries.items()):
-            if "v" in e and ident not in local and _in_domain(cat, ident, e, snap):
+            if "v" in e and ident not in local and ident not in new \
+                    and _in_domain(cat, ident, e, snap):
                 entries[ident] = {"t": max(now, int(e["t"]) + 1), "d": 1}
                 changed = True
     return changed
@@ -802,7 +896,8 @@ def round_trip(remote: Remote, key: bytes, doc: dict[str, Any], snap: Snapshot,
     back if it is any different - on a conflict (another computer was
     quicker) merged again with what it put there. *fresh*: joining; *seen*:
     the categories this computer has synced before (one it has not, that
-    the site has already, starts fresh). *doc* itself is not changed."""
+    the site has already, starts fresh), and whether its shortcuts
+    (newcomer()). *doc* itself is not changed."""
     now = int(time.time()) if now is None else now
     got = remote.get()
     if got is None and joining:
@@ -811,7 +906,7 @@ def round_trip(remote: Remote, key: bytes, doc: dict[str, Any], snap: Snapshot,
     new_here: bool | set[str] = True if fresh else {
         c for c in cats if seen is not None and c not in seen and theirs["c"].get(c)}
     stamped = _copy(doc)
-    stamp(stamped, snap, cats, now, new_here)
+    stamp(stamped, snap, cats, now, new_here, newcomer(seen, theirs, snap.platform))
     for attempt in range(4):
         if attempt:
             theirs = unseal(key, got[1]) if got else empty_doc()
@@ -868,14 +963,18 @@ def _apply_settings(settings: Any, new: dict[str, Any], old: dict[str, Any],
     if ctx is not None:
         _apply_profiles(ctx, new, old, out)
     here = ctx.profile_ids() if ctx is not None else set()
-    for key in set(new) | set(old):
-        if not syncable(key) or key.startswith(PROFILE_ENTRY):
+    platform = ctx.platform if ctx is not None else sys.platform
+    for ident in set(new) | set(old):
+        if ident.startswith(PROFILE_ENTRY):
             continue
+        key = setting_of(ident, platform)
+        if key is None:
+            continue            # not synced here, or another system's shortcuts
         own = _profiles.split_key(key)
         if own is not None and own[0] not in here:
             continue            # a profile this computer does not have
-        value = new.get(key)
-        if value == old.get(key):
+        value = new.get(ident)
+        if value == old.get(ident):
             continue
         if value is None:
             settings.remove(key)

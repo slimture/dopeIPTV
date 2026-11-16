@@ -275,7 +275,7 @@ class _SyncMixin:
             return
         state.doc, state.version = keep, result.version
         state.fresh = state.joining = False
-        state.seen |= set(cats) - applied.skipped
+        state.seen |= sync.seen_after(cats, applied)
         self._sync_write_state(state)
         self.settings.setValue(sync.K_LAST, int(time.time()))
         self._sync_fails = 0
@@ -332,7 +332,8 @@ class _SyncMixin:
             self._update_playlist_btn()
         if applied.settings & _LIVE_KEYS and hasattr(self, "_apply_theme_now"):
             self._apply_theme_now()
-        keys = {k for k in applied.settings if k.startswith("shortcut/")}
+        # This system's keyboard shortcuts (another system's never come).
+        keys = {k for k in applied.settings if sync.is_shortcuts(k)}
         if keys and hasattr(self, "apply_shortcuts"):
             self.apply_shortcuts()
         later = applied.settings - _LIVE_KEYS - keys
@@ -454,7 +455,9 @@ class _SyncMixin:
             # which knows whether the others have it already.
             cats = [c for c in sync.chosen(self.settings) if c in state.seen]
             snap = sync.collect(self._sync_ctx(), cats)
-            if sync.stamp(state.doc, snap, cats, int(time.time())):
+            # Shortcuts never synced here yet: as the first round will.
+            new = sync.newcomer(state.seen, state.doc, snap.platform)
+            if sync.stamp(state.doc, snap, cats, int(time.time()), new=new):
                 self._sync_write_state(state, wait=True)
         except Exception:
             log.debug("sync: nothing kept on close", exc_info=True)

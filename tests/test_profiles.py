@@ -14,13 +14,16 @@
 from __future__ import annotations
 
 import json
+import sys
 
 import pytest
 
 pytest.importorskip("PyQt6.QtCore")
 from PyQt6.QtCore import QSettings  # noqa: E402
 
-from dopeiptv.core import backup, mqtt_control, privacy, profiles, sync  # noqa: E402
+from dopeiptv.core import (  # noqa: E402
+    backup, mqtt_control, privacy, profiles, shortcut_keys, sync,
+)
 from dopeiptv.core.profiles import MAIN_ID, ProfileSettings, ProfileStore  # noqa: E402
 from dopeiptv.core.stores import (  # noqa: E402
     FavoriteStore, HistoryStore, PlaylistStore, WatchedStore, WatchlistStore,
@@ -518,11 +521,12 @@ def _computer(tmp_path, name, with_profiles=True):
     return main, resume, playlists, reg
 
 
-def _ctx(main, resume, playlists, reg):
+def _ctx(main, resume, playlists, reg, platform=sys.platform):
     """As the window makes it (mw_sync._sync_ctx)."""
     ctx = sync.Context(profiles.pinned(main, MAIN_ID), profiles.pinned(resume, MAIN_ID),
                        playlists, registry=reg,
-                       pin=lambda pid: (profiles.pinned(main, pid), profiles.pinned(resume, pid)))
+                       pin=lambda pid: (profiles.pinned(main, pid), profiles.pinned(resume, pid)),
+                       platform=platform)
     ctx.refresh_others()
     return ctx
 
@@ -626,6 +630,57 @@ def test_an_older_computer_syncs_on_with_the_first_profile(tmp_path):
     sync.apply(old_ctx, result, before, before, ("settings",))
     assert old.value("theme") == "nord"
     assert not [k for k in old.allKeys() if k.startswith(("profiles/", "profile/"))]
+
+
+def _round_to(tmp_path, name, platform, doc):
+    """Another computer of *platform* taking *doc* (the code's copy)."""
+    c = _computer(tmp_path, name)
+    ctx = _ctx(*c, platform=platform)
+    before = sync.collect(ctx, ("settings",))
+    result = sync.RoundResult(merged=doc, stamped=doc, version=1, uploaded=True, size=0)
+    sync.apply(ctx, result, before, before, ("settings",))
+    return c
+
+
+def test_keyboard_shortcuts_sync_as_the_households_per_system(tmp_path):
+    # The household's keys: one entry per system, whoever set them, and
+    # every profile on a computer of that system has them.
+    assert not profiles.is_own(shortcut_keys.SETTING)
+    a = _computer(tmp_path, "a")
+    kid = a[3].add("Lisa")
+    profiles.activate(kid.id)
+    a[0].setValue(shortcut_keys.SETTING, shortcut_keys.dump({"pause": "K"}))
+    s = sync.collect(_ctx(*a, platform="darwin"), ("settings",)).values["settings"]
+    assert [k for k in s if "keyboard_shortcuts" in k] == ["keyboard_shortcuts@macos"]
+    doc = sync.empty_doc()
+    sync.stamp(doc, sync.collect(_ctx(*a, platform="darwin"), ("settings",)), ("settings",), 1000)
+    for name, platform, want in (("mac", "darwin", {"pause": "K"}), ("lin", "linux", {})):
+        c = _round_to(tmp_path, name, platform, doc)
+        assert c[3].get(kid.id) is not None
+        for pid in (MAIN_ID, kid.id):
+            profiles.activate(pid)
+            assert shortcut_keys.parse(c[0].value(shortcut_keys.SETTING) or "") == want, (name, pid)
+        assert not [k for k in profiles.raw(c[0]).allKeys() if "/keyboard_shortcuts" in k]
+
+
+def test_were_shortcuts_a_profiles_own_each_would_sync_its_own_per_system(tmp_path, monkeypatch):
+    monkeypatch.setattr(profiles, "OWN_KEYS", profiles.OWN_KEYS | {shortcut_keys.SETTING})
+    a = _computer(tmp_path, "a")
+    kid = a[3].add("Lisa")
+    profiles.pinned(a[0], kid.id).setValue(shortcut_keys.SETTING, shortcut_keys.dump({"pause": "K"}))
+    profiles.pinned(a[0], MAIN_ID).setValue(shortcut_keys.SETTING, shortcut_keys.dump({"mute": "J"}))
+    snap = sync.collect(_ctx(*a, platform="darwin"), ("settings",))
+    s = snap.values["settings"]
+    assert json.loads(s[f"profiles/{kid.id}/keyboard_shortcuts@macos"]) == {"pause": "K"}
+    assert json.loads(s["keyboard_shortcuts@macos"]) == {"mute": "J"}
+    doc = sync.empty_doc()
+    sync.stamp(doc, snap, ("settings",), 1000)
+    mac = _round_to(tmp_path, "mac", "darwin", doc)
+    lin = _round_to(tmp_path, "lin", "linux", doc)
+    for c, kid_keys, my_keys in ((mac, {"pause": "K"}, {"mute": "J"}), (lin, {}, {})):
+        got = {pid: shortcut_keys.parse(profiles.pinned(c[0], pid).value(shortcut_keys.SETTING) or "")
+               for pid in (kid.id, MAIN_ID)}
+        assert got == {kid.id: kid_keys, MAIN_ID: my_keys}
 
 
 def test_a_full_backup_holds_every_profile(tmp_path):

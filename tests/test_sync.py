@@ -16,7 +16,7 @@ import pytest
 from PyQt6.QtCore import QSettings
 
 from dopeiptv.core import chacha20poly1305 as aead
-from dopeiptv.core import supporter, sync
+from dopeiptv.core import shortcut_keys, supporter, sync
 from dopeiptv.core.stores import FavoriteStore, HistoryStore, PlaylistStore
 from dopeiptv.i18n import tr
 
@@ -159,11 +159,11 @@ class Computer:
     """Settings, resume positions and playlists of their own, and the sync's
     copy - the core flow the window runs, without a window."""
 
-    def __init__(self, tmp, name, slot):
+    def __init__(self, tmp, name, slot, platform="linux"):
         self.settings = QSettings(str(tmp / f"{name}.ini"), QSettings.Format.IniFormat)
         self.resume = QSettings(str(tmp / f"{name}-resume.ini"), QSettings.Format.IniFormat)
         self.playlists = PlaylistStore(self.settings)
-        self.ctx = sync.Context(self.settings, self.resume, self.playlists)
+        self.ctx = sync.Context(self.settings, self.resume, self.playlists, platform=platform)
         self.state = sync.State(tmp / f"{name}-state.json", slot)
 
     def round(self, remote, key, cats=ALL, now=None):
@@ -175,7 +175,7 @@ class Computer:
         applied, keep = sync.apply(self.ctx, result, snap, here, cats)
         self.state.doc, self.state.version = keep, result.version
         self.state.fresh = self.state.joining = False
-        self.state.seen |= set(cats) - applied.skipped
+        self.state.seen |= sync.seen_after(cats, applied)
         return result, applied
 
     def favs(self, pid, kind="favorites", id_key="stream_id"):
@@ -277,8 +277,11 @@ def test_collect_and_apply_take_the_allowed_settings_and_never_the_rest(tmp_path
     a = Computer(tmp_path, "a", "s")
     allowed = {"theme": "nord", "accent": "green", "language": "sv", "sub_lang": "swe",
                "home_sh_hero": "false", "nav_color_live": "#112233",
-               "shortcut/linux/play_pause": "Space", "epg_upcoming_count": 5}
-    never = {"window_geometry": "geo", "supporter_key": _key(), "sync_code": sync.new_code(),
+               "keyboard_shortcuts": json.dumps({"mute": "J"}), "epg_upcoming_count": 5}
+    # The old editor's keys (moved into keyboard_shortcuts at the first
+    # start since 1.5.0): one left in a file is another system's.
+    never = {"shortcut/linux/play_pause": "Space", "shortcut/darwin/mute": "J",
+             "window_geometry": "geo", "supporter_key": _key(), "sync_code": sync.new_code(),
              "sync_cats": "settings", "recordings_dir": "/home/anna/rec", "local_dirs": "[]",
              "nerd_proxy": "socks5://x", "nerd_mpv_config_dir": "/x", "parental_pin_hash": "h",
              "trakt_access_token": "t", "simkl_access_token": "t",
@@ -290,7 +293,8 @@ def test_collect_and_apply_take_the_allowed_settings_and_never_the_rest(tmp_path
     for k, v in {**allowed, **never}.items():
         a.settings.setValue(k, v)
     got = sync.collect(a.ctx, ["settings"]).values["settings"]
-    assert got == {k: str(v) for k, v in allowed.items()}
+    assert got == {sync.entry_of(k, "linux"): str(v) for k, v in allowed.items()}
+    assert "keyboard_shortcuts@linux" in got
     for k in never:
         assert not sync.syncable(k), k
 
@@ -531,6 +535,185 @@ def test_a_category_turned_on_later_takes_what_the_others_have(tmp_path, site):
     assert a.playlists.get("bb") is not None and a.playlists.get(pid)["password"] == "new"
 
 
+# -- keyboard shortcuts, per system ---------------------------------------------------------
+
+def _keys(computer):
+    return shortcut_keys.parse(computer.settings.value(shortcut_keys.SETTING, "") or "")
+
+
+def _site_doc(site, slot, key):
+    return sync.unseal(key, base64.b64decode(site.slots[slot][1]))
+
+
+def test_shortcuts_sync_between_computers_of_one_system_only(tmp_path, site):
+    """⌘ is not Ctrl, and each system keeps keys of its own: a Mac's keys
+    reach the other Mac, never the Linux computer, and each keeps its own."""
+    slot, key = sync.derive(os.urandom(32))
+    remote = sync.Remote(slot, site.url, timeout=5)
+    mac = Computer(tmp_path, "mac", slot, "darwin")
+    mac2 = Computer(tmp_path, "mac2", slot, "darwin")
+    lin = Computer(tmp_path, "lin", slot, "linux")
+    mac.settings.setValue(shortcut_keys.SETTING, shortcut_keys.dump({"palette": "Ctrl+Shift+P"}))
+    lin.settings.setValue(shortcut_keys.SETTING, shortcut_keys.dump({"mute": "J"}))
+    mac.round(remote, key, now=100)
+    lin.state.fresh = lin.state.joining = True
+    _result, applied = lin.round(remote, key, now=200)
+    assert _keys(lin) == {"mute": "J"} and shortcut_keys.SETTING not in applied.settings
+    mac2.state.fresh = mac2.state.joining = True
+    _result, applied = mac2.round(remote, key, now=300)
+    assert _keys(mac2) == {"palette": "Ctrl+Shift+P"} and shortcut_keys.SETTING in applied.settings
+    mac.round(remote, key, now=400)
+    lin.round(remote, key, now=500)
+    assert _keys(mac) == {"palette": "Ctrl+Shift+P"} and _keys(lin) == {"mute": "J"}
+    there = sync.live(_site_doc(site, slot, key), "settings")
+    assert json.loads(there["keyboard_shortcuts@macos"]) == {"palette": "Ctrl+Shift+P"}
+    assert json.loads(there["keyboard_shortcuts@linux"]) == {"mute": "J"}
+    assert shortcut_keys.SETTING not in there                   # never a system's name left out
+
+    # Two Macs share: a change on the second reaches the first; Linux keeps its own.
+    mac2.settings.setValue(shortcut_keys.SETTING, shortcut_keys.dump({"pause": "K"}))
+    mac2.round(remote, key, now=600)
+    lin.round(remote, key, now=700)
+    mac.round(remote, key, now=800)
+    assert _keys(mac) == {"pause": "K"} and _keys(lin) == {"mute": "J"}
+    # And Linux's change stays with Linux.
+    lin.settings.setValue(shortcut_keys.SETTING, shortcut_keys.dump({"mute": "U"}))
+    lin.round(remote, key, now=900)
+    for c in (mac, mac2):
+        c.round(remote, key, now=1000)
+        assert _keys(c) == {"pause": "K"}
+
+
+def test_a_reset_or_a_removal_on_one_mac_reaches_the_other_mac_only(tmp_path, site):
+    slot, key = sync.derive(os.urandom(32))
+    remote = sync.Remote(slot, site.url, timeout=5)
+    mac = Computer(tmp_path, "mac", slot, "darwin")
+    mac2 = Computer(tmp_path, "mac2", slot, "darwin")
+    lin = Computer(tmp_path, "lin", slot, "linux")
+    mac.settings.setValue(shortcut_keys.SETTING, shortcut_keys.dump({"pause": "K"}))
+    lin.settings.setValue(shortcut_keys.SETTING, shortcut_keys.dump({"pause": "L"}))
+    mac.round(remote, key, now=100)
+    for c, t in ((mac2, 200), (lin, 300)):
+        c.state.fresh = c.state.joining = True
+        c.round(remote, key, now=t)
+    assert _keys(mac2) == {"pause": "K"}
+
+    # Reset all (Settings stores nothing over the app's own: "").
+    mac.settings.setValue(shortcut_keys.SETTING, shortcut_keys.dump({}))
+    mac.round(remote, key, now=400)
+    mac2.round(remote, key, now=500)
+    lin.round(remote, key, now=600)
+    assert shortcut_keys.from_settings(mac2.settings) == shortcut_keys.DEFAULTS
+    assert _keys(lin) == {"pause": "L"}
+
+    # Given keys again on the second Mac, then the setting taken out on the first.
+    mac2.settings.setValue(shortcut_keys.SETTING, shortcut_keys.dump({"stats": "F9"}))
+    mac2.round(remote, key, now=700)
+    mac.round(remote, key, now=800)
+    assert _keys(mac) == {"stats": "F9"}
+    mac.settings.remove(shortcut_keys.SETTING)
+    mac.round(remote, key, now=900)
+    mac2.round(remote, key, now=1000)
+    lin.round(remote, key, now=1100)
+    assert mac2.settings.value(shortcut_keys.SETTING) is None
+    assert _keys(lin) == {"pause": "L"}
+    entries = _site_doc(site, slot, key)["c"]["settings"]
+    assert entries["keyboard_shortcuts@macos"].get("d") == 1
+    assert json.loads(entries["keyboard_shortcuts@linux"]["v"]) == {"pause": "L"}
+
+
+def test_shortcuts_of_no_system_and_the_old_editors_keys_are_left_as_they_are(tmp_path, site):
+    """No version sent shortcuts without a system (1.5.0 and 1.6.0 sent
+    none at all) and which system such an entry was for cannot be told: on
+    any computer it is neither applied nor removed - and so are the old
+    editor's per-platform keys, which no longer sync."""
+    slot, key = sync.derive(os.urandom(32))
+    remote = sync.Remote(slot, site.url, timeout=5)
+    old = {"keyboard_shortcuts": {"t": 50, "v": json.dumps({"mute": "Ctrl+M"})},
+           "shortcut/darwin/mute": {"t": 50, "v": "J"},
+           "theme": {"t": 50, "v": "nord"}}
+    site.slots[slot] = (1, base64.b64encode(
+        sync.seal(key, {"v": sync.FORMAT, "c": {"settings": old}})).decode("ascii"))
+    mac = Computer(tmp_path, "mac", slot, "darwin")
+    lin = Computer(tmp_path, "lin", slot, "linux")
+    lin.settings.setValue(shortcut_keys.SETTING, shortcut_keys.dump({"pause": "K"}))
+    for c, t in ((mac, 100), (lin, 200)):
+        c.state.fresh = c.state.joining = True
+        c.round(remote, key, now=t)
+        assert c.settings.value("theme") == "nord"
+        assert c.settings.value("shortcut/darwin/mute") is None
+    assert mac.settings.value(shortcut_keys.SETTING) is None
+    assert _keys(lin) == {"pause": "K"}
+    for c, t in ((mac, 300), (lin, 400)):
+        c.round(remote, key, now=t)
+    entries = _site_doc(site, slot, key)["c"]["settings"]
+    assert entries["keyboard_shortcuts"] == old["keyboard_shortcuts"]
+    assert entries["shortcut/darwin/mute"] == old["shortcut/darwin/mute"]
+
+
+def test_the_first_round_after_the_update_takes_this_systems_keys_and_overrides_nothing(
+        tmp_path, site):
+    """A Mac that synced on 1.6.0 holds the other Mac's keys in its copy but
+    never sent its own. Its first round on 1.6.1 is a newcomer's for them:
+    its own lose to what is there, and none of its own is no removal."""
+    slot, key = sync.derive(os.urandom(32))
+    remote = sync.Remote(slot, site.url, timeout=5)
+    mac = Computer(tmp_path, "mac", slot, "darwin")
+    mac.settings.setValue(shortcut_keys.SETTING, shortcut_keys.dump({"palette": "Ctrl+Shift+P"}))
+    mac.round(remote, key, now=100)
+    assert sync.SEEN_SHORTCUTS in mac.state.seen
+
+    def updated(name, keys):
+        # Synced on 1.6.0: every category seen, the copy holding the other's keys.
+        c = Computer(tmp_path, name, slot, "darwin")
+        c.state.seen = set(ALL)
+        c.state.doc = _site_doc(site, slot, key)
+        if keys:
+            c.settings.setValue(shortcut_keys.SETTING, shortcut_keys.dump(keys))
+        return c
+
+    plain = updated("plain", {})
+    plain.round(remote, key, now=200)
+    mac.round(remote, key, now=300)
+    assert _keys(plain) == _keys(mac) == {"palette": "Ctrl+Shift+P"}
+    assert sync.SEEN_SHORTCUTS in plain.state.seen
+
+    own = updated("own", {"pause": "K"})
+    own.round(remote, key, now=400)
+    mac.round(remote, key, now=500)
+    assert _keys(own) == _keys(mac) == {"palette": "Ctrl+Shift+P"}
+    # From then on its changes are anyone's.
+    own.settings.setValue(shortcut_keys.SETTING, shortcut_keys.dump({"pause": "K"}))
+    own.round(remote, key, now=600)
+    mac.round(remote, key, now=700)
+    assert _keys(mac) == {"pause": "K"}
+
+    # The first of its system to update: its keys are the start.
+    lin = Computer(tmp_path, "lin", slot, "linux")
+    lin.state.seen = set(ALL)
+    lin.state.doc = _site_doc(site, slot, key)
+    lin.settings.setValue(shortcut_keys.SETTING, shortcut_keys.dump({"mute": "J"}))
+    lin.round(remote, key, now=800)
+    there = _site_doc(site, slot, key)["c"]["settings"]["keyboard_shortcuts@linux"]
+    assert there["t"] == 800 and json.loads(there["v"]) == {"mute": "J"}
+
+
+def test_which_system_an_entry_is():
+    assert [sync.system_of(p) for p in ("darwin", "linux", "win32", "cygwin", "freebsd14")] \
+        == ["macos", "linux", "windows", "windows", "freebsd"]
+    assert sync.entry_of("keyboard_shortcuts", "darwin") == "keyboard_shortcuts@macos"
+    assert sync.entry_of("theme", "darwin") == "theme"
+    assert sync.setting_of("keyboard_shortcuts@macos", "darwin") == "keyboard_shortcuts"
+    for ident in ("keyboard_shortcuts@linux", "keyboard_shortcuts@windows",
+                  "keyboard_shortcuts", "keyboard_shortcuts@", "shortcut/darwin/mute",
+                  "window_geometry"):
+        assert sync.setting_of(ident, "darwin") is None, ident
+    assert sync.setting_of("theme", "darwin") == "theme"
+    # An entry 1.6.0 does not know: it syncs only what syncable() allows.
+    for p in ("darwin", "linux", "win32"):
+        assert not sync.syncable(sync.entry_of(shortcut_keys.SETTING, p))
+
+
 class Racing(sync.Remote):
     """A Remote that lets another computer sync between its GET and PUT."""
 
@@ -672,6 +855,7 @@ def _window(tmp_path, name, site):
             self._sync_state_file = tmp_path / f"{name}-sync.json"
             self.toasts = []
             self.themed = 0
+            self.keys_applied = 0
             self._init_sync()
 
         def _show_toast(self, text, ms=0):
@@ -679,6 +863,9 @@ def _window(tmp_path, name, site):
 
         def _apply_theme_now(self):
             self.themed += 1
+
+        def apply_shortcuts(self):
+            self.keys_applied += 1
 
     return Win()
 
@@ -837,5 +1024,40 @@ def test_closing_keeps_when_a_change_was_made(tmp_path, site, qapp):
     calls = len(site.calls)
     w._sync_on_close()                                   # nothing new: nothing written, no network
     assert len(site.calls) == calls
+    w._sync_forget()
+    w._sync_pool.waitForDone(2000)
+
+
+def test_shortcuts_from_the_other_computer_apply_at_once(tmp_path, site, qapp):
+    a = _window(tmp_path, "a", site)
+    b = _window(tmp_path, "b", site)
+    a.settings.setValue(shortcut_keys.SETTING, shortcut_keys.dump({"pause": "K"}))
+    code = a._sync_start_here()
+    assert _settle(a)
+    assert b._sync_join(code) and _settle(b)
+    assert _keys(b) == {"pause": "K"} and b.keys_applied == 1
+    assert b.toasts[-1] == tr("sync_applied")                    # no restart for keys
+    assert sync.SEEN_SHORTCUTS in json.loads(b._sync_state_file.read_text(encoding="utf-8"))["seen"]
+    for w in (a, b):
+        w._sync_forget()
+        w._sync_pool.waitForDone(2000)
+
+
+def test_closing_before_the_first_round_after_the_update_removes_no_ones_keys(
+        tmp_path, site, qapp):
+    """Updated from 1.6.0 and closed before a round: no keys of its own is
+    no removal of the other computer's, and its own wait to lose to them."""
+    w = _window(tmp_path, "w", site)
+    assert w._sync_start_here() and _settle(w)
+    state = w._sync_state
+    mine = sync.entry_of(shortcut_keys.SETTING)
+    other = {"t": 100, "v": shortcut_keys.dump({"pause": "K"})}
+    state.seen.discard(sync.SEEN_SHORTCUTS)
+    state.doc["c"].setdefault("settings", {})[mine] = other
+    w._sync_on_close()
+    assert state.doc["c"]["settings"][mine] == other
+    w.settings.setValue(shortcut_keys.SETTING, shortcut_keys.dump({"mute": "J"}))
+    w._sync_on_close()
+    assert state.doc["c"]["settings"][mine]["t"] == 0
     w._sync_forget()
     w._sync_pool.waitForDone(2000)
