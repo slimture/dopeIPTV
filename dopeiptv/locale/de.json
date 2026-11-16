@@ -2876,5 +2876,6 @@
   "nerd_ck_server_taken": "Port {port} wird von einem anderen Programm verwendet.",
   "nerd_server_use_port": "Port {port} verwenden",
   "nerd_server_use_port_click": "Hier klicken, um stattdessen Port {port} zu verwenden.",
-  "set_about_version": "Version {version}"
+  "set_about_version": "Version {version}",
+  "epg_no_guide_any": "Kein Programmführer für diese Kanäle."
 }

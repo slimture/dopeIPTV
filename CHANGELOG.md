@@ -92,6 +92,25 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   on Windows and Linux. macOS looks as before: Qt moves About, Settings,
   Quit and the supporter entries into the application menu.
 
+- The guide is calmer and denser: rows 44 px high instead of 60 (TV
+  mode's guide keeps its large ones), flat cards with a small gap instead
+  of borders and bevels, the programme on the air tinted with the accent
+  and a thin strip of how far it got instead of a thick accent frame, the
+  past dimmed, and one thin accent line at the current time through the
+  board and its header. A wide card says when it starts under its title;
+  a card too narrow for a readable title shows none ("Ny…" is gone), its
+  tooltip has the title and times.
+- The guide's channel column is narrower (160 px), its names in a quieter
+  normal weight, the catch-up mark small and after the name. Its edge can
+  be dragged wider or narrower (a double-click puts it back), remembered
+  on this computer; a narrow guide shows the logos alone, the name in the
+  tooltip and a short form of it where there is no logo.
+- A guide row with no programmes is an empty field, why in its tooltip -
+  said once over the board when no channel has a guide, not on every row.
+  A "channel" that is only a heading in the provider's list ("-= Sweden
+  =-", "#### SE ####") is drawn as a heading over the channels below it,
+  with nothing to click.
+
 ## [1.6.0]
 
 Profiles for the household, TV mode with the phone as its remote, a page

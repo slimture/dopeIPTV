@@ -2876,5 +2876,6 @@
   "nerd_ck_server_taken": "درگاه {port} در دست برنامهٔ دیگری است.",
   "nerd_server_use_port": "استفاده از درگاه {port}",
   "nerd_server_use_port_click": "برای استفاده از درگاه {port} به‌جای آن، اینجا کلیک کنید.",
-  "set_about_version": "نسخه {version}"
+  "set_about_version": "نسخه {version}",
+  "epg_no_guide_any": "راهنمای برنامه‌ای برای این کانال‌ها در دسترس نیست."
 }

@@ -125,12 +125,13 @@ now_cards = [rb for _c, blocks in g._rows for rb in blocks
              if rb.get("_state") == "now"]
 assert len(now_cards) == 1, len(now_cards)
 g._tick()
-# The theme's own text colour on the cards and the channel names: white
-# ones were all but invisible on a light theme's pale board.
+# The theme's own inks on the cards and the channel names: white ones were
+# all but invisible on a light theme's pale board. The names in its quieter
+# ink, the titles (what is read) in its text colour.
 assert now_cards[0]["label"].brush().color() == QColor(P["text"])
 names = [it for in_group, it in g._row_items[0]
          if in_group and isinstance(it, QGraphicsSimpleTextItem)]
-assert names and names[0].brush().color() == QColor(P["text"])
+assert names and names[0].brush().color() == QColor(P["text2"])
 
 g._scroll_hours(24); g._scroll_hours(-24); g._scroll_tonight()
 d.deleteLater(); app.processEvents()
@@ -314,6 +315,164 @@ assert left <= now_x <= right, (left, now_x, right)
 assert (g.day_back_btn.mapTo(g, g.day_back_btn.rect().topLeft()).x()
         < g.day_fwd_btn.mapTo(g, g.day_fwd_btn.rect().topLeft()).x())
 app.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
+d.deleteLater(); app.processEvents()
+
+# ---- 8. The calm look: headings, empty rows, now line, column -------------
+from PyQt6.QtWidgets import QGraphicsRectItem
+from dopeiptv.i18n import tr
+w.xmltv.is_loaded = lambda: True
+w.xmltv._failed = False
+def calm_progs(ch, a, b):
+    if ch.get("stream_id") not in (1, 5):
+        return []
+    return [
+        {"title": "Aired", "description": "",
+         "start_timestamp": now - 2400, "stop_timestamp": now - 1200},
+        {"title": "On Air", "description": "",
+         "start_timestamp": now - 1200, "stop_timestamp": now + 1800},
+        {"title": "Nyheter", "description": "",            # five minutes
+         "start_timestamp": now + 1800, "stop_timestamp": now + 2100},
+        {"title": "Later", "description": "",
+         "start_timestamp": now + 2100, "stop_timestamp": now + 9000},
+    ]
+w.xmltv.programmes_in = calm_progs
+calm = [
+    {"name": "-= Sweden =-", "stream_id": 100, "num": 1},
+    {"name": "SVT1 HD SE", "stream_id": 1, "num": 2},
+    {"name": "N1 Info & Updates SE", "stream_id": 2, "num": 3},
+    {"name": "#### SPORT ####", "stream_id": 101, "num": 4},
+    {"name": "--- With a guide ---", "stream_id": 5, "num": 5},
+]
+d = EpgGridDialog(w, calm)
+g = d.grid
+d.resize(1200, 600)
+d.show()
+app.processEvents()
+g.view.horizontalScrollBar().setValue(0)
+g.view.verticalScrollBar().setValue(0)
+app.processEvents()
+assert g.ROW_H == 44 and g.CH_COL_W == g.COL_W == 160
+# A heading row: nothing in it to pick, no card - unless it has a guide.
+assert g._rows[0][1] == [] and g._rows[3][1] == []
+assert len(g._rows[4][1]) == 4
+y0 = g.HEADER_H + 10
+assert g._hit(QPointF(40, y0)) == (None, None)
+assert g._hit(QPointF(g.CH_COL_W + 200, y0)) == (None, None)
+g._selected = None
+g._select_at(QPointF(40, y0))
+assert g._selected is None
+assert not any(isinstance(it.data(0), dict) for _in, it in g._row_items[0])
+words = [it.text() for _in, it in g._row_items[0]
+         if isinstance(it, QGraphicsSimpleTextItem)]
+assert words == ["Sweden"], words
+# Arrows step over a heading, and start below one at the top.
+g._focus = None
+g._nav(0, 0)
+assert g._focus[0] == 1
+g._nav(0, 1)
+assert g._focus[0] == 2
+g._nav(0, 1)
+assert g._focus[0] == 4, g._focus            # over "#### SPORT ####"
+g._nav(0, -1)
+assert g._focus[0] == 2
+assert g._step_row(1, -1) is None            # only a heading above
+# A row without a guide: an empty field, still playable, its text in the
+# tooltip - not on the row (another row has a guide: no line over the board).
+field = g._rows[2][1][0]
+assert field["data"]["prog"] is None and field["label"] is None
+assert field["item"].toolTip() == tr("epg_no_guide_available")
+assert not g._note.isVisible()
+# Flat cards, no border; the on-air one tinted, with a strip up to the "now"
+# line in the accent; the aired one dimmed.
+blocks = {rb["data"]["prog"]["title"]: rb for rb in g._rows[1][1]}
+on_air, aired = blocks["On Air"], blocks["Aired"]
+assert on_air["item"].pen().style() == Qt.PenStyle.NoPen
+assert on_air["item"].brush().color() == g._tone("block_now")
+assert aired["item"].brush().color() == g._tone("block_past")
+assert aired["label"].brush().color() == QColor(P["muted"])
+strip = on_air["strip"]
+assert strip is not None and strip.parentItem() is on_air["item"]
+assert strip.brush().color() == QColor(P["accent"])
+now_x = g._x(time.time())
+assert abs(strip.rect().right() - now_x) < 2, (strip.rect().right(), now_x)
+assert abs(g._now_line.pos().x() - now_x) < 2 and g._now_line.isVisible()
+assert abs(g._now_head.pos().x() - now_x) < 2
+assert g._now_head.parentItem() is g._header_group
+# The strip is paint: a click on it is the card's.
+r = strip.sceneBoundingRect()
+assert g._hit(r.center())[0] is on_air["item"]
+# A wide card says when it starts; a five-minute one shows no "Ny…".
+assert on_air["time"] is not None
+assert on_air["time"].text() == time.strftime(
+    "%H:%M", time.localtime(on_air["data"]["prog"]["start_timestamp"]))
+assert blocks["Nyheter"]["label"] is None
+assert "Nyheter" in blocks["Nyheter"]["item"].toolTip()
+# The on-air card rolls on with the clock: aired, it loses its strip.
+real_time = time.time
+time.time = lambda: now + 1900
+try:
+    g._mark_now()
+    assert on_air["_state"] == "past" and on_air["strip"] is None
+    assert strip.scene() is None
+    assert blocks["Nyheter"]["strip"] is not None
+finally:
+    time.time = real_time
+g._mark_now()
+# The channel column's edge is dragged (and remembered), narrower than names
+# need is the logos alone, a double-click puts it back.
+assert g._col_edge_at(g.CH_COL_W + 2) and not g._col_edge_at(g.CH_COL_W + 20)
+g._col_drag_start(g.CH_COL_W)
+g._col_drag_move(260)
+g._col_drag_end(260)
+app.processEvents()
+assert g.CH_COL_W == 260 and int(settings.value(g.COL_KEY)) == 260
+g._col_drag_start(g.CH_COL_W)
+g._col_drag_end(g.CH_COL_W + 1)               # a click, no drag: unchanged
+assert g.CH_COL_W == 260
+g._col_drag_start(g.CH_COL_W)
+g._col_drag_end(80)
+assert g.CH_COL_W == g.COL_LOGOS_W and int(settings.value(g.COL_KEY)) == g.COL_LOGOS_W
+g._col_reset()
+assert g.CH_COL_W == 160
+d.deleteLater(); app.processEvents()
+# A new guide opens with the width kept.
+settings.setValue("guide_channel_col", 220)
+d = EpgGridDialog(w, calm)
+g = d.grid
+d.resize(1200, 600)
+d.show()
+app.processEvents()
+assert g.CH_COL_W == 220
+# A narrow board: the logos alone, the name in the cell's tooltip, a short
+# form of it where there is no logo; the edge is not offered there.
+d.resize(700, 600)
+for _ in range(5):
+    app.processEvents()
+time.sleep(0.2)
+for _ in range(5):
+    app.processEvents()
+g._refit()
+assert g.view.viewport().width() < g.NARROW_VW
+assert g.CH_COL_W == g.COL_LOGOS_W
+cell = next(it for in_group, it in g._row_items[2]
+            if in_group and isinstance(it, QGraphicsRectItem)
+            and isinstance(it.data(0), dict))
+assert cell.toolTip() == "N1 Info & Updates SE"
+texts = [it.text() for in_group, it in g._row_items[2]
+         if in_group and isinstance(it, QGraphicsSimpleTextItem)]
+assert texts == ["N1"], texts
+assert not g._col_edge_at(g.CH_COL_W)
+settings.remove("guide_channel_col")
+d.deleteLater(); app.processEvents()
+# No row with a guide at all: said once, over the board, not on each row.
+w.xmltv.programmes_in = lambda ch, a, b: []
+d = EpgGridDialog(w, calm)
+g = d.grid
+d.resize(1200, 600)
+d.show()
+app.processEvents()
+assert g._note.isVisible() and g._note.text() == tr("epg_no_guide_any")
+assert all(rb["label"] is None for _c, bl in g._rows for rb in bl)
 d.deleteLater(); app.processEvents()
 
 print("EPG_GRID_OK")

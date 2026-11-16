@@ -2876,5 +2876,6 @@
   "nerd_ck_server_taken": "پورٹ {port} کوئی دوسرا پروگرام استعمال کر رہا ہے۔",
   "nerd_server_use_port": "پورٹ {port} استعمال کریں",
   "nerd_server_use_port_click": "اس کے بجائے پورٹ {port} استعمال کرنے کے لیے یہاں کلک کریں۔",
-  "set_about_version": "ورژن {version}"
+  "set_about_version": "ورژن {version}",
+  "epg_no_guide_any": "ان چینلز کے لیے کوئی پروگرام گائیڈ نہیں۔"
 }

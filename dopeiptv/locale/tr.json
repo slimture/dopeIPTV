@@ -2876,5 +2876,6 @@
   "nerd_ck_server_taken": "{port} bağlantı noktasını başka bir program kullanıyor.",
   "nerd_server_use_port": "{port} bağlantı noktasını kullan",
   "nerd_server_use_port_click": "Bunun yerine {port} bağlantı noktasını kullanmak için buraya tıkla.",
-  "set_about_version": "Sürüm {version}"
+  "set_about_version": "Sürüm {version}",
+  "epg_no_guide_any": "Bu kanallar için program kılavuzu yok."
 }

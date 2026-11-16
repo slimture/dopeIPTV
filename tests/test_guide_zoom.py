@@ -179,9 +179,13 @@ def wheel(g, dy, mods=Qt.KeyboardModifier.ControlModifier):
 chans = [{"name": f"Ch {i}", "stream_id": i + 1, "num": i + 1} for i in range(40)]
 
 # ---- 1. Fit by default: the span the room gives, stepped -----------------
+# BASE_W: a window where Fit gives fewer than the most hours, so − has a
+# step to take and a wider window more hours (with the narrow channel
+# column, 1200 px already shows the six).
+BASE_W = 1050
 d = EpgGridDialog(w, chans)
 g = d.grid
-d.resize(1200, 640)
+d.resize(BASE_W, 640)
 d.show()
 settle(g)
 assert g.fit_btn.isChecked() and g.fit_btn.isCheckable()
@@ -281,7 +285,7 @@ d2.deleteLater()
 app.processEvents()
 # Hidden mid-resize: the timer stops with the others, and the scale is
 # worked out as it shows again - before its first paint.
-d.resize(1200, 640)
+d.resize(BASE_W, 640)
 app.processEvents()
 assert g._fit_timer.isActive()
 d.hide()
@@ -326,7 +330,18 @@ assert g.span_hours() == SPANS[-1] and not g.zoom_out_btn.isEnabled()
 check_layout(g)
 d.resize(700, 640)
 settle(g)
+check_layout(g)
+# The window as narrow as it goes: with the channel column down to its logos
+# the board keeps room for every half hour's label in the app's own font - a
+# bigger one (a desktop's, TV mode's) leaves a half hour too narrow for it.
+g.LABEL_PX = 26
+g._relayout()
+g._pin()
 assert check_layout(g)                       # the hours alone in the header
+del g.LABEL_PX
+g._relayout()
+g._pin()
+check_layout(g)
 # Narrow cards: the title cut with "…", whole in the tooltip with its time -
 # at 900 px, or wider where a bigger font cuts every title to nothing there.
 for width in (900, 1100, 1400, 1800):
@@ -432,7 +447,7 @@ many = [{"name": f"Channel {i}", "stream_id": 10_000 + i, "num": i}
         for i in range(10_000)]
 d = EpgGridDialog(w, many)
 g = d.grid
-d.resize(1200, 700)
+d.resize(BASE_W, 700)
 d.show()
 settle(g)
 vbar = g.view.verticalScrollBar()

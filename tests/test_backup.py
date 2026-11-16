@@ -45,6 +45,7 @@ SOURCES = [
 KEPT_OUT = {
     "window_geometry": QByteArray(b"\x01\xd9\xd0\xcb"), "splitter_state": "x",
     "sidebar_collapsed": "true", "docked_video_height": "300",
+    "guide_channel_col": "220",
     "mv_geometry": "g", "popout_geometry": "g", "update_check_ts": "123",
     "update_channel": "nightly", "update_latest_tag": "v9", "feedback_tickets": "[1]",
     "feedback_last": "1", "desktop_entry": "true", "desktop_entry_asked": "true",

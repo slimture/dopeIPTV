@@ -84,6 +84,7 @@ _LEFT_OUT = frozenset({
     # Where the windows sit on this computer's screen.
     "window_geometry", "window_state", "splitter_state", "sidebar_collapsed",
     "docked_video_height", "mv_geometry", "popout_geometry",
+    "guide_channel_col",
     # This computer's graphics and desktop: on another one X11 or a decoder
     # chosen here can cost the picture.
     "force_x11", "hwdec_mode", "desktop_entry", "desktop_entry_asked",

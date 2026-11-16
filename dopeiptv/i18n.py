@@ -831,6 +831,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     # ── EPG guide ─────────────────────────────────────────────────────────
 
     "epg_no_guide_available": {"en": "No programme guide available for this channel."},
+    "epg_no_guide_any": {"en": "No programme guide for these channels."},
 
     # ── Context menu ──────────────────────────────────────────────────────
 

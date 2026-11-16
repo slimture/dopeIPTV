@@ -36,15 +36,18 @@ from .tv_widgets import TvGrid, TvKeyboard, TvList, TvShelf, TvTile, colour, fon
 
 class TvGuide(EpgGrid):
     """The app's guide in large: taller rows, larger names and titles, its
-    bar left out (the remote has the keys for it)."""
+    bar left out (the remote has the keys for it). Its channel column keeps
+    its own width, names and all: read from the sofa, never dragged."""
 
     NAME_PT = 18
+    NAME_INK = "text"
+    COL_ADAPTS = False
 
     def __init__(self, window, channels, title, on_play) -> None:
         # On the class: the scale's fit (auto_span) reads them there.
         cls = type(self)
         cls.ROW_H, cls.HEADER_H, cls.CH_COL_W = px(96), px(56), px(380)
-        cls.MIN_HALF_HOUR_W, cls.LABEL_DY, cls.LABEL_PX = px(170), px(32), px(26)
+        cls.MIN_HALF_HOUR_W, cls.LABEL_PX = px(170), px(26)
         self._on_play = on_play
         super().__init__(window, channels, title)
         self._hide_chrome()
@@ -190,7 +193,9 @@ class GuideScreen(TvScreen):
         if g._focus is None:
             g._nav(0, 0)
             return True
-        if direction == "up" and g.row() == 0:
+        # Up from the top row - or from the first row under a heading, which
+        # has nothing to pick - leaves the guide for the tabs.
+        if direction == "up" and g._step_row(g.row(), -1) in (None, g.row()):
             return False
         dc, dr = {"left": (-1, 0), "right": (1, 0), "up": (0, -1), "down": (0, 1)}[direction]
         g._nav(dc, dr)

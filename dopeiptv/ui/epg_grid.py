@@ -16,6 +16,14 @@ while a half hour stays wide enough for a short title, in steady steps
 (``ZOOM_SPANS``). − and + fix the span instead, remembered for the page
 and the window apart; a new scale lays out the axis and the rows on screen
 again, never the channel list.
+
+The look is kept calm: flat cards with a small gap, the programme on the
+air tinted with the accent and a thin strip of how far it got, the past
+dimmed, one accent line at the current time. The channel column is narrow
+and can be dragged wider (remembered); a narrow board shows the logos
+alone. A row with no guide is an empty field, a "channel" that is only a
+heading in the provider's list ("-= Sweden =-") a heading
+(core/guide_rows.py).
 """
 
 from __future__ import annotations
@@ -25,16 +33,18 @@ from datetime import datetime
 
 from PyQt6.QtCore import QEvent, QPointF, QRectF, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (
-    QBrush, QColor, QFont, QFontMetrics, QFontMetricsF, QGradient, QIcon,
-    QLinearGradient, QPainter, QPainterPath, QPen, QPixmap,
+    QBrush, QColor, QFont, QFontInfo, QFontMetrics, QFontMetricsF, QIcon,
+    QPainter, QPainterPath, QPen, QPixmap,
 )
 from PyQt6.QtWidgets import (
-    QApplication, QDialog, QGraphicsItemGroup, QGraphicsPathItem,
-    QGraphicsPixmapItem, QGraphicsRectItem, QGraphicsScene,
-    QGraphicsSimpleTextItem, QGraphicsView, QHBoxLayout, QLabel, QLineEdit,
-    QMenu, QPushButton, QVBoxLayout, QWidget,
+    QApplication, QDialog, QGraphicsItem, QGraphicsItemGroup,
+    QGraphicsLineItem, QGraphicsPathItem, QGraphicsPixmapItem,
+    QGraphicsRectItem, QGraphicsScene, QGraphicsSimpleTextItem,
+    QGraphicsView, QHBoxLayout, QLabel, QLineEdit, QMenu, QPushButton,
+    QVBoxLayout, QWidget,
 )
 
+from ..core.guide_rows import section_heading, short_name
 from ..core.log import log
 from ..i18n import tr
 from .qt_i18n import format_when
@@ -48,6 +58,7 @@ class _GridView(QGraphicsView):
     def __init__(self, scene, grid) -> None:
         super().__init__(scene)
         self._grid = grid
+        self.viewport().setMouseTracking(True)
 
     def mousePressEvent(self, e) -> None:
         if e.button() == Qt.MouseButton.RightButton:
@@ -56,10 +67,45 @@ class _GridView(QGraphicsView):
             e.accept()
             return
         if e.button() == Qt.MouseButton.LeftButton:
+            # The channel column's edge: dragged wider or narrower.
+            if self._grid._col_edge_at(e.pos().x()):
+                self._grid._col_drag_start(e.pos().x())
+                e.accept()
+                return
             self._grid._select_at(self.mapToScene(e.pos()))
         super().mousePressEvent(e)
 
+    def mouseMoveEvent(self, e) -> None:
+        g = self._grid
+        if g._col_drag is not None:
+            g._col_drag_move(e.pos().x())
+            e.accept()
+            return
+        if g._col_edge_at(e.pos().x()):
+            self.viewport().setCursor(Qt.CursorShape.SplitHCursor)
+        else:
+            self.viewport().unsetCursor()
+        super().mouseMoveEvent(e)
+
+    def mouseReleaseEvent(self, e) -> None:
+        if self._grid._col_drag is not None:
+            self._grid._col_drag_end(e.pos().x())
+            e.accept()
+            return
+        super().mouseReleaseEvent(e)
+
+    def leaveEvent(self, e) -> None:
+        if self._grid._col_drag is None:
+            self.viewport().unsetCursor()
+        super().leaveEvent(e)
+
     def mouseDoubleClickEvent(self, e) -> None:
+        # On the column's edge: back to its own width.
+        if (e.button() == Qt.MouseButton.LeftButton
+                and self._grid._col_edge_at(e.pos().x())):
+            self._grid._col_reset()
+            e.accept()
+            return
         self._grid._play_at(self.mapToScene(e.pos()))
         super().mouseDoubleClickEvent(e)
 
@@ -106,9 +152,23 @@ class _GridView(QGraphicsView):
 
 class EpgGrid(QWidget):
     """The full EPG guide: a scrollable channel x time grid with now/next, day jumps, search and playable rows."""
-    ROW_H = 60
+    ROW_H = 44
     HEADER_H = 34
-    CH_COL_W = 224
+    # The channel column: its own width (CH_COL_W on a guide is the width
+    # it has now), dragged anywhere from logos alone up to COL_MAX - and
+    # narrower than COL_MIN_NAMES is the logos alone. A board narrower
+    # than NARROW_VW shows the logos alone, the names in the tooltips; a
+    # column dragged wide gives way to leave the board BOARD_MIN_W.
+    COL_W = 160
+    CH_COL_W = COL_W
+    COL_LOGOS_W = 56
+    COL_MIN_NAMES = 110
+    COL_MAX = 420
+    NARROW_VW = 760
+    BOARD_MIN_W = 600
+    COL_GRIP = 4             # how near its edge the column can be taken
+    COL_KEY = "guide_channel_col"
+    COL_ADAPTS = True        # TV mode's guide keeps its own, large column
     # The scale before the guide knows its room, and what its window is
     # sized by: 420 px per hour. Once on screen the board fits its width.
     PX_PER_MIN = 7
@@ -123,11 +183,17 @@ class EpgGrid(QWidget):
     # by a few pixels) keeps the scale: the board was drawn anew - every
     # row on screen - for a span a minute or two different.
     REFIT_TOLERANCE = 0.03
-    LABEL_DY = 21            # vertical inset of a card's title text
     # The channel names' size, and the titles' and times' (0: the app's
-    # own font) - TV mode's guide (ui/tv_mode.py) draws them larger.
-    NAME_PT = 11
+    # own font) - TV mode's guide (ui/tv_mode.py) draws them larger. The
+    # names in a quieter ink than the titles, which are what is read.
+    NAME_PT = 10
+    NAME_INK = "text2"
     LABEL_PX = 0
+    # A card says its programme's start under the title from this many
+    # times the width of "00:00" (and its padding) on; narrower, the title
+    # alone. A title cut to fewer letters than this is not shown at all.
+    TIME_ROOM = 2.5
+    MIN_TITLE_CHARS = 4
     FUTURE_HOURS = 12       # how far ahead the board reaches
     MAX_PAST_HOURS = 48     # cap on how far back timeshift opens the board
     # A board kept to be shown again (the Guide page) is drawn afresh once
@@ -182,6 +248,23 @@ class EpgGrid(QWidget):
         self._painted = False
         self._wheel_acc = 0
         self._in_window = False
+        # The channel column: the width chosen (dragged), the one it has
+        # now (worked out with the scale, for the room there is), and a
+        # drag of its edge under way (its start and where it is now).
+        self._user_col = self._read_col()
+        self.CH_COL_W = self._col_for(None)
+        self._col_drag: float | None = None
+        self._col_drag_from = 0.0
+        self._col_line: QGraphicsLineItem | None = None
+        # The board's "now" line, its piece in the header, the line said
+        # once over a board with no guide at all, and whether any drawn row
+        # had a guide or lacked one (since the board was built).
+        self._now_line: QGraphicsLineItem | None = None
+        self._now_head: QGraphicsLineItem | None = None
+        self._note: QGraphicsSimpleTextItem | None = None
+        self._guide_seen = False
+        self._no_guide_seen = False
+        self._tones: dict[str, QColor] | None = None
         # A resize (window, sidebar, the player's column, popping out)
         # settles before the time scale follows it. Stopped with the other
         # timers while the guide is off screen.
@@ -398,8 +481,8 @@ class EpgGrid(QWidget):
         self._preload_more.setSingleShot(True)
         self._preload_more.setInterval(0)
         self._preload_more.timeout.connect(self._preload_rows)
-        # The cards' bevelled brushes, one per fill colour (a theme makes a
-        # new guide; restyle starts this afresh all the same).
+        # The cards' brushes, one per fill colour (a theme makes a new
+        # guide; restyle starts this afresh all the same).
         self._brushes: dict[int, QBrush] = {}
         self._focus: tuple[int, int] | None = None
         # Keep the board alive while it is on screen: the on-air cards and
@@ -459,6 +542,7 @@ class EpgGrid(QWidget):
     def restyle(self) -> None:
         """Colours and drawn icons from the current theme (P)."""
         self._brushes = {}
+        self._tones = None
         self.title_lbl.setStyleSheet(
             f"color:{P['text']}; font-size:15px; font-weight:700;")
         self.scope_lbl.setStyleSheet(f"color:{P['muted']}; font-size:13px;")
@@ -784,18 +868,19 @@ class EpgGrid(QWidget):
         gives this room, or the one picked; then the board at that scale."""
         self._fit_timer.stop()
         vw = self.view.viewport().width()
-        area = max(2 * self.MIN_HALF_HOUR_W, vw - self.CH_COL_W)
+        col = self._col_for(vw)
+        area = max(2 * self.MIN_HALF_HOUR_W, vw - col)
         span = self.auto_span(area) if self._zoom_auto else self._zoom_span
         ppm = area / (span * 60)
         self._fitted_vw = vw
-        if (span == self._span
+        if (span == self._span and col == self.CH_COL_W
                 and abs(ppm - self._ppm) <= self._ppm * self.REFIT_TOLERANCE):
             self._sync_zoom_buttons()
             self._pin()                         # the rows in view, drawn
             return
         self._span = span
         self._sync_zoom_buttons()
-        self._apply_scale(ppm)
+        self._apply_scale(ppm, col)
 
     def left_time(self) -> float:
         """The time at the board's left visible edge, beside the channels."""
@@ -807,28 +892,128 @@ class EpgGrid(QWidget):
         self.view.horizontalScrollBar().setValue(
             max(0, round((ts - self._start) / 60 * self._ppm)))
 
-    def _apply_scale(self, ppm: float) -> None:
-        """The board at *ppm* px per minute, the time at its left edge kept
-        - and "now" kept in view when it was."""
-        if abs(ppm - self._ppm) < 1e-6:
+    def _apply_scale(self, ppm: float, col: int | None = None) -> None:
+        """The board at *ppm* px per minute (and a channel column *col*
+        wide), the time at its left edge kept - and "now" kept in view when
+        it was."""
+        col = self.CH_COL_W if col is None else col
+        if abs(ppm - self._ppm) < 1e-6 and col == self.CH_COL_W:
             self._pin()                         # the rows in view, drawn
             return
-        area = self.view.viewport().width() - self.CH_COL_W
+        vw = self.view.viewport().width()
         left = self.left_time()
         now = time.time()
-        now_seen = left <= now <= left + area / self._ppm * 60
+        now_seen = left <= now <= left + (vw - self.CH_COL_W) / self._ppm * 60
         self._ppm = ppm
+        self.CH_COL_W = col
         self._grid_w = int((self._stop - self._start) / 60 * ppm)
         if getattr(self, "_header_group", None) is None:
             return                              # not drawn yet
         sel, focus = self._selected, self._focus
         self._relayout()
         self.scroll_to_time(left)
-        if now_seen and not left <= now <= left + area / ppm * 60:
+        if now_seen and not left <= now <= left + (vw - col) / ppm * 60:
             self._scroll_to_now()
         self._pin()
         if sel:
             self._reselect(sel, focus)
+
+    # -- the channel column ----------------------------------------------------
+
+    def _norm_col(self, w: float) -> int:
+        """A width chosen for the column, as it is kept: narrower than names
+        need is the logos alone."""
+        w = int(round(w))
+        if w < self.COL_MIN_NAMES:
+            return self.COL_LOGOS_W
+        return min(self.COL_MAX, w)
+
+    def _read_col(self) -> int:
+        """The column's width chosen on this computer (window layout: never
+        synced, never in a backup), else its own."""
+        st = getattr(self.window, "settings", None)
+        try:
+            raw = st.value(self.COL_KEY, None) if st is not None else None
+            return self._norm_col(float(raw)) if raw not in (None, "") else self.COL_W
+        except (TypeError, ValueError):
+            return self.COL_W
+
+    def _col_for(self, vw: int | None) -> int:
+        """The column's width on a board *vw* px wide (None: not on screen
+        yet, the width chosen)."""
+        if not self.COL_ADAPTS:
+            return type(self).CH_COL_W
+        user = self._user_col
+        if user <= self.COL_LOGOS_W or (vw is not None and vw < self.NARROW_VW):
+            return self.COL_LOGOS_W
+        if vw is None:
+            return user
+        return max(min(user, self.COL_W), min(user, vw - self.BOARD_MIN_W))
+
+    def _logos_only(self) -> bool:
+        return self.COL_ADAPTS and self.CH_COL_W <= self.COL_LOGOS_W
+
+    def _col_edge_at(self, x: float) -> bool:
+        """Is viewport x on the column's edge, where it can be dragged? Not
+        while the board is too narrow for names (the logos alone)."""
+        return (self.COL_ADAPTS
+                and getattr(self, "_header_group", None) is not None
+                and (self._fitted_vw or 0) >= self.NARROW_VW
+                and abs(x - self.CH_COL_W) <= self.COL_GRIP)
+
+    def _col_bounds(self) -> tuple[int, int]:
+        vw = self.view.viewport().width()
+        return self.COL_LOGOS_W, max(self.COL_W, min(self.COL_MAX,
+                                                     vw - self.BOARD_MIN_W))
+
+    def _col_drag_start(self, x: float) -> None:
+        self._col_drag = self._col_drag_from = float(x)
+        self._show_col_line(x)
+
+    def _col_drag_move(self, x: float) -> None:
+        lo, hi = self._col_bounds()
+        self._col_drag = float(max(lo, min(hi, x)))
+        self._show_col_line(self._col_drag)
+
+    def _col_drag_end(self, x: float) -> None:
+        moved = abs(x - self._col_drag_from) >= 3
+        self._col_drag_move(x)
+        w = self._col_drag
+        self._col_drag = None
+        if self._col_line is not None:
+            self.scene.removeItem(self._col_line)
+            self._col_line = None
+        self.view.viewport().unsetCursor()
+        if moved and w is not None:
+            self._set_user_col(self._norm_col(w))
+
+    def _col_reset(self) -> None:
+        self._set_user_col(self.COL_W)
+
+    def _set_user_col(self, w: int) -> None:
+        """The column *w* wide from now on (kept), the board laid out again
+        for it."""
+        self._user_col = w
+        st = getattr(self.window, "settings", None)
+        if st is not None:
+            try:
+                if str(st.value(self.COL_KEY, "")) != str(w):
+                    st.setValue(self.COL_KEY, w)
+            except Exception as e:
+                log.debug("guide: column width not kept: %s", e)
+        self._refit()
+
+    def _show_col_line(self, x: float) -> None:
+        """Where the column's edge goes, while it is dragged."""
+        tl = self.view.mapToScene(0, 0)
+        sx = tl.x() + x
+        h = self.view.viewport().height()
+        if self._col_line is None or self._col_line.scene() is None:
+            pen = QPen(QColor(P["accent"]), 2)
+            self._col_line = self.scene.addLine(0, 0, 0, 1, pen)
+            self._col_line.setZValue(40)
+            self._col_line.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+        self._col_line.setLine(sx, tl.y(), sx, tl.y() + h)
 
     # -- geometry ------------------------------------------------------------
 
@@ -1046,6 +1231,7 @@ class EpgGrid(QWidget):
         # Drawn while the guide still loads: drawn again once it is in, also
         # when that happened while the guide was off screen.
         self._built_unready = not self._epg_ready()
+        self._guide_seen = self._no_guide_seen = False
         self.play_btn.setEnabled(False)
         self.desc.hide()
         text = self.filter.text().lower().strip()
@@ -1092,6 +1278,7 @@ class EpgGrid(QWidget):
             hbar.blockSignals(was_h)
             vbar.blockSignals(was_v)
         self._sel_outline = None   # dropped by scene.clear(); recreated on pick
+        self._now_line = self._now_head = self._note = self._col_line = None
         self._row_items = {}
 
     def _lay_out_board(self) -> None:
@@ -1109,14 +1296,46 @@ class EpgGrid(QWidget):
         self.scene.addItem(self._header_group)
         self.scene.addItem(self._chan_group)
 
+        self._measure()
         self._draw_grid_lines(grid_h)
         self._draw_time_header()
+        self._draw_now_line(grid_h)
 
-        head_bg = QColor(P["pane"])
         self._corner = self.scene.addRect(
             0, 0, self.CH_COL_W, self.HEADER_H,
-            QPen(QColor(P["border"])), QBrush(head_bg))
+            QPen(Qt.PenStyle.NoPen), QBrush(self._tone("cell")))
         self._corner.setZValue(30)
+        # Said once, over the middle of the board, when no row drawn has a
+        # guide (the rows' own fields are left empty).
+        self._note = QGraphicsSimpleTextItem("")
+        self._note.setFont(self._label_font())
+        self._note.setBrush(QColor(P["muted"]))
+        self._note.setZValue(9)
+        self._note.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+        self._note.hide()
+        self.scene.addItem(self._note)
+
+    def _measure(self) -> None:
+        """Where a card's title (and start time) sit in a row, and from
+        which width a card has room for its start time - in the fonts the
+        board draws with now."""
+        inset = self._card_inset()
+        card_h = self.ROW_H - 2 * inset
+        self._lf, self._tf = self._label_font(), self._time_font()
+        lfm, tfm = QFontMetricsF(self._lf), QFontMetricsF(self._tf)
+        lh, th = lfm.height(), tfm.height()
+        self._ly1 = inset + (card_h - lh) / 2
+        gap = max(1.0, self.ROW_H / 44)
+        pair = lh + gap + th
+        self._two_lines = card_h - pair >= 4
+        self._ly2 = inset + (card_h - pair) / 2
+        self._ty2 = self._ly2 + lh + gap
+        self._time_w = tfm.horizontalAdvance("00:00")
+        self._time_min_w = self.TIME_ROOM * self._time_w + 16
+
+    def _card_inset(self) -> int:
+        """The gap above and below a card in its row."""
+        return max(2, round(self.ROW_H * 0.05))
 
     def _reselect(self, sel: dict, focus: tuple[int, int] | None) -> None:
         """The selection again after a new scale: the same programme (or
@@ -1249,14 +1468,48 @@ class EpgGrid(QWidget):
             first = 1 if (not self._on_hour(marks[0])
                           and self._on_hour(marks[1])) else 0
             marks = marks[first::2]
+        ly = (self.HEADER_H
+              - QFontMetricsF(self._label_font()).height()) / 2
         for t in marks:
             lbl = QGraphicsSimpleTextItem(
                 datetime.fromtimestamp(t).strftime("%H:%M"))
             lbl.setFont(self._label_font())
             lbl.setBrush(QColor(P["text"] if self._on_hour(t)
                                 else P["muted"]))
-            lbl.setPos(self._x(t) + 4, 7)
+            lbl.setPos(self._x(t) + 4, ly)
             self._header_group.addToGroup(lbl)
+
+    def _now_pen(self) -> QPen:
+        pen = QPen(QColor(P["accent"]), max(2, round(self.ROW_H / 30)))
+        pen.setCapStyle(Qt.PenCapStyle.FlatCap)
+        return pen
+
+    def _draw_now_line(self, grid_h: int) -> None:
+        """One thin accent line at the current time, through the rows and
+        the header; the timers that keep the board up to date move it (and
+        only run while the guide is on screen). Under the titles and the
+        pinned column, over the cards."""
+        pen = self._now_pen()
+        self._now_line = self.scene.addLine(
+            0, self.HEADER_H, 0, self.HEADER_H + grid_h, pen)
+        self._now_line.setZValue(7)
+        self._now_line.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+        # The header's piece is pinned with it: group first, then position
+        # (group-local, as every other item of a pinned group).
+        self._now_head = QGraphicsLineItem(0, 0, 0, self.HEADER_H)
+        self._now_head.setPen(pen)
+        self._now_head.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+        self._header_group.addToGroup(self._now_head)
+        self._place_now_line(time.time())
+
+    def _place_now_line(self, now: float) -> None:
+        if self._now_line is None or self._now_head is None:
+            return
+        on = self._start <= now <= self._stop
+        x = self._x(now)
+        for item in (self._now_line, self._now_head):
+            item.setVisible(on)
+            item.setPos(x, 0)
 
     def _is_playing(self, ch: dict) -> bool:
         """True if this channel is the one currently playing live, so the row
@@ -1273,31 +1526,83 @@ class EpgGrid(QWidget):
             return False
         return key is not None and key == getattr(w, "_playing_key", None)
 
+    @staticmethod
+    def _mix(a: QColor, b: QColor, t: float) -> QColor:
+        """*t* of *a* over *b*, opaque."""
+        return QColor(round(a.red() * t + b.red() * (1 - t)),
+                      round(a.green() * t + b.green() * (1 - t)),
+                      round(a.blue() * t + b.blue() * (1 - t)))
+
     def _tone(self, key: str) -> QColor:
-        """Monochrome guide palette, all derived from the theme's pane colour
-        so the board reads as one tonal surface - logos and the accent (now /
-        playing / selected) are the only colour. Replaces the old per-row
-        rainbow, which read as noisy."""
-        pane = QColor(P["pane"])
-        return {
-            "row_a": pane.darker(112),           # recessed bg, so cards float
-            "row_b": pane.darker(106),           # subtle zebra
-            "cell": pane.darker(108),            # channel-name column
-            "block": pane.lighter(126),          # a programme card
-            "block_now": pane.lighter(150),      # on-air card, brighter
-            "block_past": pane.lighter(104),     # already aired, recedes
-            "edge": pane.darker(125),            # thin card border
-        }[key]
+        """Monochrome guide palette, all derived from the theme so the board
+        reads as one tonal surface - logos and the accent (now / playing /
+        selected) are the only colour. On a dark theme the cards are a step
+        lighter than the board; on a light one the board is the grey and the
+        cards are the page's own white. Flat: no bevel, no border."""
+        if self._tones is None:
+            pane, text = QColor(P["pane"]), QColor(P["text"])
+            accent = QColor(P["accent"])
+            light = QColor(P["bg"]).lightness() > 128
+            if light:
+                board, block = self._mix(text, pane, 0.09), pane
+            else:
+                board, block = pane.darker(112), self._mix(text, pane, 0.08)
+            self._tones = {
+                "row": board,                    # recessed bg, so cards float
+                "cell": pane,                    # channel column and header
+                "block": block,                  # a programme card
+                # On the air: the accent's tint (and its progress strip).
+                "block_now": self._mix(accent, block, 0.16 if light else 0.22),
+                "block_past": self._mix(block, board, 0.45),  # aired: recedes
+                "empty": self._mix(block, board, 0.38),       # no guide
+            }
+        return self._tones[key]
+
+    def _spans(self, ch: dict) -> list[tuple[dict, float, float]]:
+        """The channel's programmes on the board, each with the x it starts
+        and ends at; overlapping duplicates left out."""
+        out: list[tuple[dict, float, float]] = []
+        left, right = self.CH_COL_W, self.CH_COL_W + self._grid_w
+        prev_x2, prev_title = -1.0, None
+        for p in self.window.xmltv.programmes_in(ch, self._start, self._stop):
+            x1 = max(left, self._x(p["start_timestamp"]))
+            x2 = min(right, self._x(p["stop_timestamp"]))
+            if x2 - x1 < 2:
+                continue
+            if x1 < prev_x2 - 1:
+                # Overlaps what's already drawn. Provider EPGs routinely list
+                # the same programme twice a minute apart (merged sources) -
+                # since titles became top-level items, BOTH copies rendered
+                # and interleaved into garbage text. Same title or fully
+                # covered -> a duplicate, drop it; a genuinely different
+                # overlapping entry is clipped to start where the previous
+                # card ends.
+                if p.get("title") == prev_title or x2 <= prev_x2 + 2:
+                    continue
+                x1 = prev_x2
+                if x2 - x1 < 2:
+                    continue
+            prev_x2, prev_title = x2, p.get("title")
+            out.append((p, x1, x2))
+        return out
+
+    def _cell_pad(self) -> int:
+        return round(self.ROW_H * 0.18)
 
     def _draw_channel_row(self, row: int, ch: dict) -> None:
         y = self.HEADER_H + row * self.ROW_H
-        tones = {k: self._tone(k) for k in
-                 ("row_a", "row_b", "cell", "block", "block_now",
-                  "block_past", "edge")}
         # Every item of the row, (in the pinned column group?, item), so
         # _drop_row can take the row down again.
         items: list = []
         self._row_items[row] = items
+        spans = self._spans(ch)
+        # A "channel" that is only a heading in the provider's list, with
+        # nothing behind it: drawn as the heading it is, nothing to pick.
+        heading = None if spans else section_heading(ch.get("name"))
+        if heading is not None:
+            self._draw_heading(y, heading, items)
+            self._rows[row] = (ch, [])
+            return
         playing = self._is_playing(ch)
         if playing:
             self._playing_row = row
@@ -1305,94 +1610,16 @@ class EpgGrid(QWidget):
             has_ts = self.window._timeshift_days(ch) > 0
         except Exception:
             has_ts = False
-        # Faint zebra band behind the whole row for readability across the
-        # wide timeline (subtle, since the cards already separate programmes).
-        zebra = QGraphicsRectItem(self.CH_COL_W, y, self._grid_w, self.ROW_H)
-        zebra.setBrush(QBrush(tones["row_a"] if row % 2 == 0
-                              else tones["row_b"]))
-        zebra.setPen(QPen(Qt.PenStyle.NoPen))
-        zebra.setZValue(2)
-        zebra.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
-        self.scene.addItem(zebra)
-        items.append((False, zebra))
-        cell = QGraphicsRectItem(0, y, self.CH_COL_W, self.ROW_H)
-        if playing:
-            cell.setBrush(QBrush(QColor(P["accent"])))
-            cell.setPen(QPen(QColor(P["on_accent"]), 2))
-        else:
-            cell.setBrush(QBrush(tones["cell"]))
-            cell.setPen(QPen(QColor(P["bg"]), 1))
-        # The channel-name cell is clickable too (prog=None -> tune live).
-        # Hit-testing keys off data(0), which only programme blocks used to
-        # carry - a channel without EPG rows had no clickable surface at all,
-        # so it simply couldn't be played from the guide.
-        cell.setData(0, {"channel": ch, "prog": None})
-        # Group first, then position (see the logo below): a row drawn after
-        # the board scrolled sideways joins a column group that is already
-        # shifted, and addToGroup keeps the item's scene position - which put
-        # a late row's name hundreds of px left of the visible column.
-        self._chan_group.addToGroup(cell)
-        cell.setPos(0, 0)
-        items.append((True, cell))
-        # Channel logo (async, like the main list): reserve a fixed slot so
-        # names align whether the logo has arrived or not. The callback is
-        # generation-guarded - a rebuild (filter typing) clears the scene and
-        # a late pixmap must not be added to the dead one.
-        logo_url = ch.get("stream_icon")
-        text_x = 54 if logo_url else 10
-        if logo_url and getattr(self.window, "logos", None) is not None:
-            gen = self._build_gen
-
-            def _logo_cb(pm, y=y, gen=gen, row=row, items=items):
-                # The row may have been taken down (and drawn again, with a
-                # logo request of its own) since this one was asked for.
-                if (gen != self._build_gen or pm is None or pm.isNull()
-                        or self._row_items.get(row) is not items):
-                    return
-                scaled = pm.scaled(
-                    38, self.ROW_H - 18,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation)
-                it_pm = QGraphicsPixmapItem(scaled)
-                # Group FIRST, then position. addToGroup preserves the item's
-                # SCENE position, and the channel column is pinned by shifting
-                # the group by the horizontal scroll offset (_pin) - which the
-                # guide applies right after building, to open on "now". A logo
-                # that arrived after that (i.e. every logo not already cached)
-                # was therefore pinned at scene x=10, hundreds to thousands of
-                # px left of the visible column: the reason logos only showed
-                # up the *second* time the guide was opened, when the cache
-                # made the callback run during the build. Positioning after the
-                # add makes the coordinates group-local, like every other item
-                # in the column, so the logo lands in its row whenever it
-                # arrives. No data(0): clicks fall through to the channel cell.
-                self._chan_group.addToGroup(it_pm)
-                it_pm.setPos(10 + (38 - scaled.width()) / 2,
-                             y + (self.ROW_H - scaled.height()) / 2)
-                items.append((True, it_pm))
-
-            self.window.logos.get(logo_url, _logo_cb)
-        # ⏪ marks a channel with catch-up (timeshift), matching the main list.
-        label_text = (("▶  " if playing else "")
-                      + ("⏪ " if has_ts else "")
-                      + (ch.get("name") or "?"))
-        name = QGraphicsSimpleTextItem(label_text)
-        f = QFont()
-        f.setBold(True)
-        f.setPointSize(self.NAME_PT)
-        name.setFont(f)
-        # The theme's text, not white: on a light theme's pale column white
-        # names were all but invisible (the accent cell takes its own ink).
-        name.setBrush(QColor(P["on_accent"] if playing else P["text"]))
-        self._elide(name, self.CH_COL_W - text_x - 8)
-        # No data(0) on the text: hit-testing takes the topmost item carrying a
-        # payload, so a click on the name would select via the *text* item and
-        # the selection outline would be drawn tight around the letters instead
-        # of around the cell. Without a payload the click falls through to the
-        # cell underneath, which covers the whole row of the column.
-        self._chan_group.addToGroup(name)
-        name.setPos(text_x, y + (self.ROW_H - name.boundingRect().height()) / 2)
-        items.append((True, name))
+        # The board behind the row's cards: one tone, the cards and the
+        # gaps between them are the rhythm (no zebra).
+        back = QGraphicsRectItem(self.CH_COL_W, y, self._grid_w, self.ROW_H)
+        back.setBrush(QBrush(self._tone("row")))
+        back.setPen(QPen(Qt.PenStyle.NoPen))
+        back.setZValue(2)
+        back.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+        self.scene.addItem(back)
+        items.append((False, back))
+        self._draw_channel_cell(row, y, ch, playing, has_ts, items)
         if playing:
             # Tint the whole row across the timeline so the playing channel
             # is obvious even when the programme area is what you're looking
@@ -1409,34 +1636,15 @@ class EpgGrid(QWidget):
             items.append((False, band))
 
         row_blocks: list = []
-        drew_any = False
         now = time.time()
+        inset = self._card_inset()
+        card_h = self.ROW_H - 2 * inset
         rec_spans = self._rec_spans(ch)
-        prev_x2, prev_title = -1.0, None
-        for p in self.window.xmltv.programmes_in(ch, self._start, self._stop):
-            x1 = max(self.CH_COL_W, self._x(p["start_timestamp"]))
-            x2 = min(self.CH_COL_W + self._grid_w, self._x(p["stop_timestamp"]))
-            if x2 - x1 < 2:
-                continue
-            if x1 < prev_x2 - 1:
-                # Overlaps what's already drawn. Provider EPGs routinely list
-                # the same programme twice a minute apart (merged sources) -
-                # since titles became top-level items, BOTH copies rendered
-                # and interleaved into garbage text. Same title or fully
-                # covered -> a duplicate, drop it; a genuinely different
-                # overlapping entry is clipped to start where the previous
-                # card ends.
-                if p.get("title") == prev_title or x2 <= prev_x2 + 2:
-                    continue
-                x1 = prev_x2
-                if x2 - x1 < 2:
-                    continue
-            drew_any = True
-            prev_x2, prev_title = x2, p.get("title")
+        for p, x1, x2 in spans:
             state = self._prog_state(p, now)
             data = {"channel": ch, "prog": p}
-            block = self._card(x1 + 1, y + 4, x2 - x1 - 3, self.ROW_H - 8,
-                               state, tones, data)
+            block = self._card(x1 + 1, y + inset, x2 - x1 - 3, card_h,
+                               state, data)
             # The whole title and its time, however narrow the card is
             # drawn (zoomed out, its title is cut short or left out).
             block.setToolTip(
@@ -1456,38 +1664,239 @@ class EpgGrid(QWidget):
                                                   p["start_timestamp"])):
                 prefix += "🔔 "
             text = prefix + (p.get("title") or "?")
-            faded = p["stop_timestamp"] <= now
+            # A card wide enough has its start time under the title; a
+            # narrower one the title alone, centred.
+            wide = self._two_lines and x2 - x1 >= self._time_min_w
+            ly = y + (self._ly2 if wide else self._ly1)
             # No label on sliver cards (clipped overlaps): "…" alone is noise.
-            label = (self._block_label(text, x1, x2, y,
-                                       QColor(P["muted"]) if faded
+            label = (self._block_label(text, x1, x2, ly,
+                                       QColor(P["muted"]) if state == "past"
                                        else QColor(P["text"]))
                      if x2 - x1 >= 26 else None)
+            tm = (self._time_label(p, x1, y + self._ty2)
+                  if wide and label is not None else None)
+            strip = self._progress(block, now) if state == "now" else None
             row_blocks.append({"item": block, "data": data, "label": label,
-                               "x1": x1, "x2": x2, "y": y, "text": text,
+                               "time": tm, "strip": strip,
+                               "x1": x1, "x2": x2, "y": y, "ly": ly,
+                               "ty": y + self._ty2, "text": text,
                                "_state": state})
             items.append((False, block))
             if label is not None:
                 items.append((False, label))
-        if not drew_any:
-            # No EPG for this channel: fill the row so the whole timeline is
-            # still clickable and plays the channel live - and says why it's
-            # empty (or that the guide is still loading).
+            if tm is not None:
+                items.append((False, tm))
+        if spans:
+            self._guide_seen = True
+        else:
+            # No EPG for this channel: an empty field across the timeline,
+            # so the whole row is still clickable and plays the channel live.
+            # Why it is empty (or that the guide is still loading) is in its
+            # tooltip - and said once over the board when no row has a guide.
             data = {"channel": ch, "prog": None}
-            block = self._card(self.CH_COL_W + 1, y + 4, self._grid_w - 3,
-                               self.ROW_H - 8, "past", tones, data)
+            block = self._card(self.CH_COL_W + 1, y + inset, self._grid_w - 3,
+                               card_h, "empty", data)
             text = (tr("epg_no_guide_available") if self._epg_ready()
                     else tr("status_loading_programme_guide"))
-            label = self._block_label(text, self.CH_COL_W, self.CH_COL_W
-                                      + self._grid_w, y,
-                                      QColor(P["muted"]))
-            row_blocks.append({"item": block, "data": data, "label": label,
+            block.setToolTip(text)
+            row_blocks.append({"item": block, "data": data, "label": None,
+                               "time": None, "strip": None,
                                "x1": self.CH_COL_W,
                                "x2": self.CH_COL_W + self._grid_w,
-                               "y": y, "text": text, "_state": "past"})
+                               "y": y, "ly": y + self._ly1,
+                               "ty": y + self._ty2, "text": text,
+                               "_state": "empty"})
             items.append((False, block))
-            if label is not None:
-                items.append((False, label))
+            self._no_guide_seen = True
         self._rows[row] = (ch, row_blocks)
+
+    def _draw_channel_cell(self, row: int, y: float, ch: dict, playing: bool,
+                           has_ts: bool, items: list) -> None:
+        """The row's piece of the pinned channel column: its logo, its name
+        (or, logos alone, the name's short form until the logo is in) and
+        a quiet catch-up mark."""
+        cell = QGraphicsRectItem(0, y, self.CH_COL_W, self.ROW_H)
+        cell.setBrush(QBrush(QColor(P["accent"]) if playing
+                             else self._tone("cell")))
+        cell.setPen(QPen(Qt.PenStyle.NoPen))
+        # The channel-name cell is clickable too (prog=None -> tune live).
+        # Hit-testing keys off data(0), which only programme blocks used to
+        # carry - a channel without EPG rows had no clickable surface at all,
+        # so it simply couldn't be played from the guide.
+        cell.setData(0, {"channel": ch, "prog": None})
+        name = ch.get("name") or "?"
+        # The whole name, however it is cut (or left out, logos alone).
+        cell.setToolTip(name)
+        # Group first, then position (see the logo below): a row drawn after
+        # the board scrolled sideways joins a column group that is already
+        # shifted, and addToGroup keeps the item's scene position - which put
+        # a late row's name hundreds of px left of the visible column.
+        self._chan_group.addToGroup(cell)
+        cell.setPos(0, 0)
+        items.append((True, cell))
+        ink = QColor(P["on_accent"] if playing else P[self.NAME_INK])
+        quiet = QColor(P["on_accent"] if playing else P["muted"])
+        logos_only = self._logos_only()
+        pad = self._cell_pad()
+        logo_h, logo_dy = self.ROW_H - 2 * pad, 0.0
+        if logos_only:
+            logo_x, logo_w = 6, self.CH_COL_W - 12
+            if has_ts:
+                # Room under the logo for the catch-up mark.
+                logo_h, logo_dy = logo_h - 4, -2.0
+        else:
+            logo_x, logo_w = pad, round(logo_h * 1.3)
+        stand_in = None
+        if logos_only:
+            # The name's short form, until (or without) a logo.
+            stand_in = QGraphicsSimpleTextItem(short_name(name))
+            f = QFont()
+            f.setPointSizeF(self.NAME_PT * 0.85)
+            f.setWeight(QFont.Weight.DemiBold)
+            stand_in.setFont(f)
+            stand_in.setBrush(ink)
+            self._elide(stand_in, self.CH_COL_W - 8)
+            self._chan_group.addToGroup(stand_in)
+            br = stand_in.boundingRect()
+            stand_in.setPos((self.CH_COL_W - br.width()) / 2,
+                            y + (self.ROW_H - br.height()) / 2)
+            items.append((True, stand_in))
+        # Channel logo (async, like the main list): reserve a fixed slot so
+        # names align whether the logo has arrived or not. The callback is
+        # generation-guarded - a rebuild (filter typing) clears the scene and
+        # a late pixmap must not be added to the dead one.
+        logo_url = ch.get("stream_icon")
+        if logo_url and getattr(self.window, "logos", None) is not None:
+            gen = self._build_gen
+            dpr = max(1.0, self.devicePixelRatioF())
+
+            def _logo_cb(pm, y=y + logo_dy, gen=gen, row=row, items=items,
+                         box=(logo_x, logo_w, logo_h), stand_in=stand_in):
+                # The row may have been taken down (and drawn again, with a
+                # logo request of its own) since this one was asked for.
+                if (gen != self._build_gen or pm is None or pm.isNull()
+                        or self._row_items.get(row) is not items):
+                    return
+                bx, bw, bh = box
+                # At the screen's own pixels, so a small logo stays sharp.
+                scaled = pm.scaled(
+                    round(bw * dpr), round(bh * dpr),
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation)
+                scaled.setDevicePixelRatio(dpr)
+                size = scaled.deviceIndependentSize()
+                it_pm = QGraphicsPixmapItem(scaled)
+                it_pm.setTransformationMode(
+                    Qt.TransformationMode.SmoothTransformation)
+                # Group FIRST, then position. addToGroup preserves the item's
+                # SCENE position, and the channel column is pinned by shifting
+                # the group by the horizontal scroll offset (_pin) - which the
+                # guide applies right after building, to open on "now". A logo
+                # that arrived after that (i.e. every logo not already cached)
+                # was therefore pinned at scene x=10, hundreds to thousands of
+                # px left of the visible column: the reason logos only showed
+                # up the *second* time the guide was opened, when the cache
+                # made the callback run during the build. Positioning after the
+                # add makes the coordinates group-local, like every other item
+                # in the column, so the logo lands in its row whenever it
+                # arrives. No data(0): clicks fall through to the channel cell.
+                self._chan_group.addToGroup(it_pm)
+                it_pm.setPos(bx + (bw - size.width()) / 2,
+                             y + (self.ROW_H - size.height()) / 2)
+                items.append((True, it_pm))
+                if stand_in is not None:
+                    stand_in.hide()
+
+            self.window.logos.get(logo_url, _logo_cb)
+        if logos_only:
+            if has_ts:
+                h = self._rewind_h() * 0.8
+                self._rewind_mark(self.CH_COL_W - 4 - h * 1.25,
+                                  y + self.ROW_H - 4 - h / 2, h, quiet, items)
+            return
+        text_x = logo_x + logo_w + pad if logo_url else pad + 2
+        nm = QGraphicsSimpleTextItem(("▶ " if playing else "") + name)
+        f = QFont()
+        f.setPointSize(self.NAME_PT)
+        nm.setFont(f)
+        # The theme's ink, not white: on a light theme's pale column white
+        # names were all but invisible (the accent cell takes its own ink).
+        nm.setBrush(ink)
+        mark_w = self._rewind_h() * 1.25 + 6 if has_ts else 0.0
+        self._elide(nm, self.CH_COL_W - text_x - 6 - mark_w)
+        # No data(0) on the text: hit-testing takes the topmost item carrying a
+        # payload, so a click on the name would select via the *text* item and
+        # the selection outline would be drawn tight around the letters instead
+        # of around the cell. Without a payload the click falls through to the
+        # cell underneath, which covers the whole row of the column.
+        self._chan_group.addToGroup(nm)
+        br = nm.boundingRect()
+        nm.setPos(text_x, y + (self.ROW_H - br.height()) / 2)
+        items.append((True, nm))
+        if has_ts:
+            # Catch-up (timeshift), as the main list marks it: a small,
+            # quiet mark after the name.
+            self._rewind_mark(text_x + br.width() + 6, y + self.ROW_H / 2,
+                              self._rewind_h(), quiet, items)
+
+    def _rewind_h(self) -> float:
+        return max(6.0, self.ROW_H * 0.17)
+
+    def _rewind_mark(self, x: float, cy: float, h: float, color: QColor,
+                     items: list) -> None:
+        """The catch-up mark (two small triangles pointing back), drawn: the
+        "⏪" glyph came out a colour emoji, louder than the name."""
+        w = h * 0.62
+        path = QPainterPath()
+        for dx in (0.0, w):
+            path.moveTo(x + dx + w, cy - h / 2)
+            path.lineTo(x + dx, cy)
+            path.lineTo(x + dx + w, cy + h / 2)
+            path.closeSubpath()
+        mark = QGraphicsPathItem(path)
+        mark.setBrush(QBrush(color))
+        mark.setPen(QPen(Qt.PenStyle.NoPen))
+        mark.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+        self._chan_group.addToGroup(mark)
+        mark.setPos(0, 0)
+        items.append((True, mark))
+
+    def _draw_heading(self, y: float, word: str, items: list) -> None:
+        """A heading row ("-= Sweden =-" in the provider's list): the word
+        alone, quiet capitals, across the board in its own tone - no logo,
+        no card, nothing to click (no data(0) anywhere in it)."""
+        tone = QBrush(self._tone("row"))
+        band = QGraphicsRectItem(self.CH_COL_W, y, self._grid_w, self.ROW_H)
+        band.setBrush(tone)
+        band.setPen(QPen(Qt.PenStyle.NoPen))
+        band.setZValue(2)
+        band.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+        self.scene.addItem(band)
+        items.append((False, band))
+        # Its piece of the column in the board's tone too, so the heading
+        # runs across - and its word may run on past a narrow column.
+        cell = QGraphicsRectItem(0, y, self.CH_COL_W, self.ROW_H)
+        cell.setBrush(tone)
+        cell.setPen(QPen(Qt.PenStyle.NoPen))
+        self._chan_group.addToGroup(cell)
+        cell.setPos(0, 0)
+        items.append((True, cell))
+        if not word:
+            return
+        t = QGraphicsSimpleTextItem(word)
+        f = QFont()
+        f.setPointSizeF(self.NAME_PT * 0.86)
+        f.setWeight(QFont.Weight.DemiBold)
+        f.setCapitalization(QFont.Capitalization.AllUppercase)
+        f.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing,
+                           max(1.0, self.ROW_H / 44))
+        t.setFont(f)
+        t.setBrush(QColor(P["muted"]))
+        self._elide(t, max(self.CH_COL_W, 360) - 2 * self._cell_pad())
+        self._chan_group.addToGroup(t)
+        t.setPos(self._cell_pad() + 2,
+                 y + (self.ROW_H - t.boundingRect().height()) / 2)
+        items.append((True, t))
 
     @staticmethod
     def _prog_state(p: dict, now: float) -> str:
@@ -1496,54 +1905,69 @@ class EpgGrid(QWidget):
         return "past" if p["stop_timestamp"] <= now else "future"
 
     def _card_brush(self, fill: QColor) -> QBrush:
-        """Subtle top-to-bottom bevel so cards read as raised, not flat -
-        the 'more depth' look, done as one gradient brush (no extra shadow
-        items, which 300 channels x several programmes couldn't afford)."""
+        """A flat brush per fill colour, made once."""
         brush = self._brushes.get(fill.rgba())
         if brush is None:
-            g = QLinearGradient(0.0, 0.0, 0.0, 1.0)
-            g.setCoordinateMode(QGradient.CoordinateMode.ObjectBoundingMode)
-            g.setColorAt(0.0, fill.lighter(112))
-            g.setColorAt(1.0, fill.darker(112))
-            brush = self._brushes[fill.rgba()] = QBrush(g)
+            brush = self._brushes[fill.rgba()] = QBrush(fill)
         return brush
 
-    def _style_card(self, item: QGraphicsPathItem, state: str,
-                    tones: dict) -> None:
-        fill = {"now": tones["block_now"], "past": tones["block_past"]}.get(
-            state, tones["block"])
-        item.setBrush(self._card_brush(fill))
-        # The on-air card is the marker now (no progress line): a brighter
-        # fill plus a 2px accent border.
-        if state == "now":
-            item.setPen(QPen(QColor(P["accent"]), 2))
-        else:
-            item.setPen(QPen(tones["edge"], 1))
+    def _style_card(self, item: QGraphicsPathItem, state: str) -> None:
+        # Flat and borderless: the on-air card is told by its accent tint
+        # (and its progress strip), an aired one recedes toward the board.
+        key = {"now": "block_now", "past": "block_past",
+               "empty": "empty"}.get(state, "block")
+        item.setBrush(self._card_brush(self._tone(key)))
+        item.setPen(QPen(Qt.PenStyle.NoPen))
 
-    def _card(self, x, y, w, h, state, tones, data) -> QGraphicsPathItem:
-        """A rounded, bevelled programme card. Rounded (a path item, not a
+    def _card(self, x, y, w, h, state, data) -> QGraphicsPathItem:
+        """A rounded, flat programme card. Rounded (a path item, not a
         plain rect) for the softer look; carries the click payload."""
         path = QPainterPath()
-        path.addRoundedRect(QRectF(x, y, w, h), corner_radius(8), corner_radius(8))
+        r = corner_radius(6)
+        path.addRoundedRect(QRectF(x, y, w, h), r, r)
         item = QGraphicsPathItem(path)
-        self._style_card(item, state, tones)
+        self._style_card(item, state)
         item.setZValue(5)
         item.setData(0, data)
         self.scene.addItem(item)
         return item
 
-    @staticmethod
-    def _cut_to_nothing(shown: str, full: str) -> bool:
-        """A title cut to less than two letters ("S…"): noise on a narrow
-        card, which shows none instead (its tooltip has the title)."""
-        return shown != full and len(shown.rstrip("…").strip()) < 2
+    def _progress(self, card: QGraphicsPathItem,
+                  now: float) -> QGraphicsRectItem:
+        """The on-air card's thin strip along its bottom edge: the part
+        aired, in the accent, up to the "now" line. A child of the card,
+        clipped to its rounded shape; it carries no payload, so a click on
+        it is the card's."""
+        card.setFlag(QGraphicsItem.GraphicsItemFlag.ItemClipsChildrenToShape,
+                     True)
+        strip = QGraphicsRectItem(card)
+        strip.setPen(QPen(Qt.PenStyle.NoPen))
+        strip.setBrush(QBrush(QColor(P["accent"])))
+        strip.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+        self._set_progress(card, strip, now)
+        return strip
 
-    def _block_label(self, text, x1, x2, y, color) -> \
+    def _set_progress(self, card: QGraphicsPathItem,
+                      strip: QGraphicsRectItem, now: float) -> None:
+        r = card.path().boundingRect()
+        h = max(3, round(self.ROW_H * 0.07))
+        w = max(0.0, min(r.width(), self._x(now) - r.x()))
+        strip.setRect(r.x(), r.bottom() - h, w, h)
+
+    @classmethod
+    def _cut_to_nothing(cls, shown: str, full: str) -> bool:
+        """A title cut to fewer than MIN_TITLE_CHARS letters ("Ny…", "Ti…"):
+        noise on a narrow card, which shows none instead (its tooltip has
+        the title and its times)."""
+        return (shown != full
+                and len(shown.rstrip("…").strip()) < cls.MIN_TITLE_CHARS)
+
+    def _block_label(self, text, x1, x2, ly, color) -> \
             QGraphicsSimpleTextItem | None:
         """A top-level (not block-child) programme title, so it can be
         re-anchored to the left visible edge as the timeline scrolls
         (_reflow_labels) - the title stays readable while the card slides
-        under the channel column.
+        under the channel column. *ly* is where its top goes.
 
         Deliberately carries no data(0) payload: the title floats above its
         card, and when it answered hit-tests itself a click on the text
@@ -1551,21 +1975,42 @@ class EpgGrid(QWidget):
         letters rather than the card. Only the card is clickable; the title is
         just paint on top of it."""
         label = QGraphicsSimpleTextItem(text)
-        label.setFont(self._label_font())
+        label.setFont(self._lf)
         self._elide(label, x2 - x1 - 14)
         if self._cut_to_nothing(label.text(), text):
             return None
         label.setBrush(color)
         label.setZValue(8)
         label.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
-        label.setPos(x1 + 8, y + self.LABEL_DY)
+        label.setPos(x1 + 8, ly)
         self.scene.addItem(label)
         return label
+
+    def _time_label(self, p: dict, x1: float,
+                    ty: float) -> QGraphicsSimpleTextItem:
+        """A wide card's start time, small and muted under its title; paint
+        only, like the title."""
+        t = QGraphicsSimpleTextItem(
+            datetime.fromtimestamp(p["start_timestamp"]).strftime("%H:%M"))
+        t.setFont(self._tf)
+        t.setBrush(QColor(P["muted"]))
+        t.setZValue(8)
+        t.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+        t.setPos(x1 + 8, ty)
+        self.scene.addItem(t)
+        return t
 
     def _label_font(self) -> QFont:
         f = QFont()
         if self.LABEL_PX:
             f.setPixelSize(self.LABEL_PX)
+        return f
+
+    def _time_font(self) -> QFont:
+        """The start times' font: a step smaller than the titles'."""
+        f = self._label_font()
+        size = f.pixelSize() if f.pixelSize() > 0 else QFontInfo(f).pixelSize()
+        f.setPixelSize(max(8, round(size * 0.82)))
         return f
 
     def _rec_spans(self, ch: dict) -> list[tuple[float, float]]:
@@ -1591,26 +2036,35 @@ class EpgGrid(QWidget):
 
     def _mark_now(self) -> None:
         """Re-mark which card is on air (and dim the ones that just ended),
-        so the highlight rolls onto the next programme when one finishes -
-        replaces the old progress-bar redraw. Cheap: only cards whose state
-        actually changed are restyled."""
+        so the highlight rolls onto the next programme when one finishes;
+        the on-air cards' strips and the "now" line follow the clock. Cheap:
+        only cards whose state changed are restyled, only the on-air ones'
+        strips moved."""
         now = time.time()
-        tones = {k: self._tone(k) for k in
-                 ("block", "block_now", "block_past", "edge")}
         for _ch, blocks in self._rows:
             for rb in blocks:
                 p = rb["data"]["prog"]
                 if not p:
                     continue
                 state = self._prog_state(p, now)
+                strip = rb.get("strip")
                 if state == rb.get("_state"):
+                    if strip is not None:
+                        self._set_progress(rb["item"], strip, now)
                     continue
                 rb["_state"] = state
-                self._style_card(rb["item"], state, tones)
+                self._style_card(rb["item"], state)
                 lbl = rb.get("label")
                 if lbl is not None:
                     lbl.setBrush(QColor(P["muted"]) if state == "past"
                                  else QColor(P["text"]))
+                if state == "now" and strip is None:
+                    rb["strip"] = self._progress(rb["item"], now)
+                elif state != "now" and strip is not None:
+                    strip.setParentItem(None)
+                    self.scene.removeItem(strip)
+                    rb["strip"] = None
+        self._place_now_line(now)
 
     def _tick(self) -> None:
         """30 s live refresh: roll the on-air card highlight forward, and
@@ -1662,6 +2116,32 @@ class EpgGrid(QWidget):
         self._chan_group.setX(tl.x())
         self._corner.setPos(tl.x(), tl.y())
         self._reflow_labels(tl.x() + self.CH_COL_W)
+        self._update_note(tl)
+
+    def _update_note(self, tl: QPointF) -> None:
+        """No row drawn has a guide (it is still loading, or there is none
+        for these channels): said once, muted, over the middle of the board
+        - not on every row."""
+        note = self._note
+        if note is None:
+            return
+        if self._guide_seen or not self._no_guide_seen:
+            if note.isVisible():
+                note.hide()
+            return
+        text = (tr("epg_no_guide_any") if self._epg_ready()
+                else tr("status_loading_programme_guide"))
+        board_w = self.view.viewport().width() - self.CH_COL_W
+        if note.data(1) != (text, board_w):
+            note.setData(1, (text, board_w))
+            self._set_label(note, text, board_w - 24)
+        br = note.boundingRect()
+        top = tl.y() + self.HEADER_H
+        bottom = min(tl.y() + self.view.viewport().height(),
+                     self.HEADER_H + len(self._rows) * self.ROW_H)
+        note.setPos(tl.x() + self.CH_COL_W + max(12.0, (board_w - br.width()) / 2),
+                    top + max(0.0, (bottom - top - br.height()) / 2))
+        note.show()
 
     def _set_label(self, item, full: str, max_w: float) -> None:
         item.setText(full)
@@ -1687,32 +2167,43 @@ class EpgGrid(QWidget):
                 lbl = rb.get("label")
                 if lbl is None:
                     continue
-                x1, x2, y = rb["x1"], rb["x2"], rb["y"]
+                tm = rb.get("time")
+                x1, x2 = rb["x1"], rb["x2"]
                 if x2 <= left + 2:                    # card scrolled off left
-                    if not rb.get("_hidden"):
-                        lbl.setVisible(False)
-                        rb["_hidden"] = True
+                    self._show_label(rb, False, False)
                     continue
-                if rb.get("_hidden"):
-                    lbl.setVisible(True)
-                    rb["_hidden"] = False
                 if x1 >= left:                        # fully in view: static
                     if rb.get("_stuck"):
-                        lbl.setPos(x1 + pad, y + self.LABEL_DY)
+                        lbl.setPos(x1 + pad, rb["ly"])
                         self._set_label(lbl, rb["text"], x2 - x1 - 2 * pad)
+                        if tm is not None:
+                            tm.setPos(x1 + pad, rb["ty"])
                         rb["_stuck"] = False
+                    self._show_label(rb, True, True)
                 else:                                 # straddles: stick to edge
                     avail = x2 - left - 2 * pad
                     if avail < 18:                    # only a sliver left: hide
-                        lbl.setVisible(False)          # rather than show "…"
-                        rb["_hidden"] = True
+                        self._show_label(rb, False, False)  # rather than "…"
                         continue
-                    lbl.setPos(left + pad, y + self.LABEL_DY)
+                    lbl.setPos(left + pad, rb["ly"])
                     self._set_label(lbl, rb["text"], avail)
+                    if tm is not None:
+                        tm.setPos(left + pad, rb["ty"])
                     rb["_stuck"] = True
-                    if self._cut_to_nothing(lbl.text(), rb["text"]):
-                        lbl.setVisible(False)
-                        rb["_hidden"] = True
+                    title = not self._cut_to_nothing(lbl.text(), rb["text"])
+                    self._show_label(rb, title, title and tm is not None
+                                     and avail >= tm.boundingRect().width())
+
+    @staticmethod
+    def _show_label(rb: dict, title: bool, start: bool) -> None:
+        """A card's title (and start time) shown or hidden, touched only when
+        that changes; ``_hidden`` says the title is."""
+        lbl, tm = rb["label"], rb.get("time")
+        if lbl.isVisible() != title:
+            lbl.setVisible(title)
+        if tm is not None and tm.isVisible() != start:
+            tm.setVisible(start)
+        rb["_hidden"] = not title
 
     # -- interaction ---------------------------------------------------------
 
@@ -1820,9 +2311,11 @@ class EpgGrid(QWidget):
         if self._focus is None:
             row = self._playing_row if self._playing_row is not None else 0
             self._ensure_row(row)
+            if not self._rows[row][1]:          # a heading: the next row
+                row = self._step_row(row, 1)
+                if row is None:
+                    return
             blocks = self._rows[row][1]
-            if not blocks:
-                return
             self._select_block(row, self._col_for_time(blocks, time.time()))
             return
         row, col = self._focus
@@ -1833,11 +2326,11 @@ class EpgGrid(QWidget):
                 if col < len(self._rows[row][1]) else None
             ref = ((cur["start_timestamp"] + cur["stop_timestamp"]) / 2
                    if cur else time.time())
-            row = max(0, min(len(self._rows) - 1, row + dr))
-            self._ensure_row(row)
-            blocks = self._rows[row][1]
-            if not blocks:
+            new = self._step_row(row, dr)
+            if new is None:
                 return
+            row = new
+            blocks = self._rows[row][1]
             col = self._col_for_time(blocks, ref)
         else:
             blocks = self._rows[row][1]
@@ -1845,6 +2338,30 @@ class EpgGrid(QWidget):
                 return
             col = max(0, min(len(blocks) - 1, col + dc))
         self._select_block(row, col)
+
+    def _step_row(self, row: int, dr: int) -> int | None:
+        """The row *dr* rows from *row* - or, when that is a heading (with
+        nothing to pick), the nearest one past it that has something, else
+        the nearest before it; None when there is none between. At the
+        board's edge, the edge row itself."""
+        n = len(self._rows)
+        if not n or not dr:
+            return None
+        step = 1 if dr > 0 else -1
+        target = max(0, min(n - 1, row + dr))
+        r = target
+        while 0 <= r < n:
+            self._ensure_row(r)
+            if self._rows[r][1]:
+                return r
+            r += step
+        r = target - step
+        while r != row and 0 <= r < n:
+            self._ensure_row(r)
+            if self._rows[r][1]:
+                return r
+            r -= step
+        return None
 
     def _select_block(self, row: int, col: int) -> None:
         self._ensure_row(row)
