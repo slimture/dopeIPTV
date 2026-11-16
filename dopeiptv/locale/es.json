@@ -2895,5 +2895,12 @@
   "vis_style_scope": "Vectorscopio",
   "vis_style_freqs": "Frecuencias",
   "set_guide_now_line": "Línea en la hora actual",
-  "set_guide_now_line_hint": "Una línea fina en la guía a la hora actual, sobre los programas. Desactivada, la barra del programa en emisión muestra cuánto lleva."
+  "set_guide_now_line_hint": "Una línea fina en la guía a la hora actual, sobre los programas. Desactivada, la barra del programa en emisión muestra cuánto lleva.",
+  "rec_held": "Es la hora de «{title}», pero grabarlo abriría una conexión más con tu proveedor. Espera y empieza sola en cuanto la conexión quede libre, o pon su canal y se graba desde ahí.",
+  "rec_held_click": "Haz clic para grabarlo de todos modos.",
+  "rec_held_what": "Grabar «{title}» ahora abre una conexión más con tu proveedor, además de lo que ya se reproduce desde tu cuenta.",
+  "rec_held_wait": "Seguir esperando",
+  "rec_waiting_room": "esperando una conexión libre",
+  "rec_record_anyway": "Grabar de todos modos",
+  "rec_reason_no_room": "no había ninguna conexión libre a tu cuenta"
 }

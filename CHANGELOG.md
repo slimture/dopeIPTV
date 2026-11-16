@@ -44,6 +44,16 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   that source's user agent, headers and proxy. It now asks about the pin
   of the source the stream comes from, and the receiver gets that
   source's own options.
+- A scheduled recording that came due while something played from the
+  same account opened a second connection without a word. It is now
+  counted as one started by hand: its channel playing, it is recorded from
+  the player's rewind buffer (from its start, as far back as the buffer
+  holds) or the player's stream, with no connection of its own; with room
+  on the account it opens its own; over a full limit, or one the provider
+  does not say while the app already holds a connection to it, it waits -
+  nothing opened - with a note offering "Record anyway", starts by itself
+  once there is room (Stop, or play its channel), and fails at its stop
+  time saying no connection was free.
 - The same provider account added twice (another name, other categories,
   or as Xtream and as its M3U) counted each source against a limit of its
   own. Sources with the same server and user name now share one count and

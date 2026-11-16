@@ -2895,5 +2895,12 @@
   "vis_style_scope": "矢量示波器",
   "vis_style_freqs": "频率",
   "set_guide_now_line": "当前时间线",
-  "set_guide_now_line_hint": "在节目指南的当前时间处、节目上方显示一条细线。关闭时，正在播出节目的进度条会显示播放进度。"
+  "set_guide_now_line_hint": "在节目指南的当前时间处、节目上方显示一条细线。关闭时，正在播出节目的进度条会显示播放进度。",
+  "rec_held": "“{title}”到时间了，但录制会再打开一个到提供商的连接。它会等待，连接空闲后自动开始——或者播放它的频道，就从那里录制。",
+  "rec_held_click": "点击仍然录制。",
+  "rec_held_what": "现在录制“{title}”会在你账户已在播放的内容之外，再打开一个到提供商的连接。",
+  "rec_held_wait": "继续等待",
+  "rec_waiting_room": "正在等待空闲连接",
+  "rec_record_anyway": "仍然录制",
+  "rec_reason_no_room": "你的账户没有空闲连接"
 }

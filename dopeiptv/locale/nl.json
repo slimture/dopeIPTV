@@ -2895,5 +2895,12 @@
   "vis_style_scope": "Vectorscoop",
   "vis_style_freqs": "Frequenties",
   "set_guide_now_line": "Lijn bij de huidige tijd",
-  "set_guide_now_line_hint": "Een dunne lijn door de gids bij de huidige tijd, over de programma's. Uit toont de balk van wat nu speelt hoe ver het is."
+  "set_guide_now_line_hint": "Een dunne lijn door de gids bij de huidige tijd, over de programma's. Uit toont de balk van wat nu speelt hoe ver het is.",
+  "rec_held": "Het is tijd voor ‘{title}’, maar opnemen zou nog een verbinding met je provider openen. De opname wacht en start vanzelf zodra de verbinding vrij is - of speel het kanaal af, dan wordt het daarvandaan opgenomen.",
+  "rec_held_click": "Klik om het toch op te nemen.",
+  "rec_held_what": "‘{title}’ nu opnemen opent nog een verbinding met je provider, naast wat al vanaf je account speelt.",
+  "rec_held_wait": "Blijven wachten",
+  "rec_waiting_room": "wacht op een vrije verbinding",
+  "rec_record_anyway": "Toch opnemen",
+  "rec_reason_no_room": "er was geen verbinding met je account vrij"
 }

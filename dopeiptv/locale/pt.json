@@ -2895,5 +2895,12 @@
   "vis_style_scope": "Vetorscópio",
   "vis_style_freqs": "Frequências",
   "set_guide_now_line": "Linha na hora atual",
-  "set_guide_now_line_hint": "Uma linha fina no guia na hora atual, por cima dos programas. Desligada, a barra do que está passando mostra quanto já foi."
+  "set_guide_now_line_hint": "Uma linha fina no guia na hora atual, por cima dos programas. Desligada, a barra do que está passando mostra quanto já foi.",
+  "rec_held": "Chegou a hora de “{title}”, mas gravar abriria mais uma conexão com o seu provedor. A gravação espera e começa sozinha assim que a conexão ficar livre - ou reproduza o canal para gravar a partir dele.",
+  "rec_held_click": "Clique para gravar mesmo assim.",
+  "rec_held_what": "Gravar “{title}” agora abre mais uma conexão com o seu provedor, além do que já está tocando da sua conta.",
+  "rec_held_wait": "Continuar esperando",
+  "rec_waiting_room": "aguardando uma conexão livre",
+  "rec_record_anyway": "Gravar mesmo assim",
+  "rec_reason_no_room": "nenhuma conexão com a sua conta estava livre"
 }

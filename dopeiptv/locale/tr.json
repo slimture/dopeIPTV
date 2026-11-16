@@ -2895,5 +2895,12 @@
   "vis_style_scope": "Vektörskop",
   "vis_style_freqs": "Frekanslar",
   "set_guide_now_line": "Şu anki saat çizgisi",
-  "set_guide_now_line_hint": "Rehberde şu anki saatte, programların üstünde ince bir çizgi. Kapalıyken yayındaki programın çubuğu ne kadar ilerlediğini gösterir."
+  "set_guide_now_line_hint": "Rehberde şu anki saatte, programların üstünde ince bir çizgi. Kapalıyken yayındaki programın çubuğu ne kadar ilerlediğini gösterir.",
+  "rec_held": "“{title}” zamanı geldi, ancak kaydetmek sağlayıcına bir bağlantı daha açar. Kayıt bekler ve bağlantı boşalınca kendiliğinden başlar - ya da kanalını oynat, oradan kaydedilsin.",
+  "rec_held_click": "Yine de kaydetmek için tıkla.",
+  "rec_held_what": "“{title}” şimdi kaydedilirse, hesabından zaten oynatılanın yanında sağlayıcına bir bağlantı daha açılır.",
+  "rec_held_wait": "Beklemeye devam et",
+  "rec_waiting_room": "boş bir bağlantı bekleniyor",
+  "rec_record_anyway": "Yine de kaydet",
+  "rec_reason_no_room": "hesabına boş bağlantı yoktu"
 }

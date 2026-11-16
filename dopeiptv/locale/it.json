@@ -2895,5 +2895,12 @@
   "vis_style_scope": "Vettorscopio",
   "vis_style_freqs": "Frequenze",
   "set_guide_now_line": "Linea all'ora attuale",
-  "set_guide_now_line_hint": "Una linea sottile nella guida all'ora attuale, sopra i programmi. Disattivata, la barra del programma in onda mostra a che punto è."
+  "set_guide_now_line_hint": "Una linea sottile nella guida all'ora attuale, sopra i programmi. Disattivata, la barra del programma in onda mostra a che punto è.",
+  "rec_held": "È l'ora di «{title}», ma registrarlo aprirebbe un'altra connessione verso il tuo provider. Resta in attesa e parte da sola appena la connessione è libera - oppure riproduci il suo canale e viene registrato da lì.",
+  "rec_held_click": "Fai clic per registrarlo comunque.",
+  "rec_held_what": "Registrare «{title}» ora apre un'altra connessione verso il tuo provider, oltre a ciò che è già in riproduzione dal tuo account.",
+  "rec_held_wait": "Continua ad aspettare",
+  "rec_waiting_room": "in attesa di una connessione libera",
+  "rec_record_anyway": "Registra comunque",
+  "rec_reason_no_room": "nessuna connessione al tuo account era libera"
 }

@@ -2895,5 +2895,12 @@
   "vis_style_scope": "Vektorskop",
   "vis_style_freqs": "Frekvencije",
   "set_guide_now_line": "Linija trenutnog vremena",
-  "set_guide_now_line_hint": "Tanka linija kroz vodič na trenutnom vremenu, preko emisija. Isključeno: traka emisije koja traje pokazuje koliko je odmakla."
+  "set_guide_now_line_hint": "Tanka linija kroz vodič na trenutnom vremenu, preko emisija. Isključeno: traka emisije koja traje pokazuje koliko je odmakla.",
+  "rec_held": "Vreme je za „{title}”, ali snimanje bi otvorilo još jednu vezu ka tvom provajderu. Čeka i samo počinje čim se veza oslobodi - ili pusti njegov kanal pa će se snimati odatle.",
+  "rec_held_click": "Klikni da ipak snimiš.",
+  "rec_held_what": "Snimanje „{title}” sada otvara još jednu vezu ka tvom provajderu, pored onoga što se već reprodukuje sa tvog naloga.",
+  "rec_held_wait": "Nastavi da čekaš",
+  "rec_waiting_room": "čeka slobodnu vezu",
+  "rec_record_anyway": "Ipak snimi",
+  "rec_reason_no_room": "nijedna veza ka tvom nalogu nije bila slobodna"
 }

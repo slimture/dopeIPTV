@@ -2895,5 +2895,12 @@
   "vis_style_scope": "Vektorskop",
   "vis_style_freqs": "Frekvenser",
   "set_guide_now_line": "Linje vid tiden just nu",
-  "set_guide_now_line_hint": "En tunn linje genom guiden vid tiden just nu, ovanpå programmen. Av visar remsan på det som sänds hur långt det har kommit."
+  "set_guide_now_line_hint": "En tunn linje genom guiden vid tiden just nu, ovanpå programmen. Av visar remsan på det som sänds hur långt det har kommit.",
+  "rec_held": "Det är dags för ”{title}”, men att spela in den skulle öppna ytterligare en anslutning till din leverantör. Inspelningen väntar och startar av sig själv när anslutningen är ledig - eller spela kanalen, så spelas den in därifrån.",
+  "rec_held_click": "Klicka för att spela in ändå.",
+  "rec_held_what": "Att spela in ”{title}” nu öppnar ytterligare en anslutning till din leverantör, utöver det som redan spelas från ditt konto.",
+  "rec_held_wait": "Fortsätt vänta",
+  "rec_waiting_room": "väntar på en ledig anslutning",
+  "rec_record_anyway": "Spela in ändå",
+  "rec_reason_no_room": "ingen anslutning till ditt konto var ledig"
 }

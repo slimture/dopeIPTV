@@ -2895,5 +2895,12 @@
   "vis_style_scope": "Vekta skopu",
   "vis_style_freqs": "Masafa",
   "set_guide_now_line": "Mstari wa saa ya sasa",
-  "set_guide_now_line_hint": "Mstari mwembamba kwenye mwongozo kwenye saa ya sasa, juu ya vipindi. Ukizimwa, upau wa kipindi kinachoonyeshwa sasa huonyesha kimefika wapi."
+  "set_guide_now_line_hint": "Mstari mwembamba kwenye mwongozo kwenye saa ya sasa, juu ya vipindi. Ukizimwa, upau wa kipindi kinachoonyeshwa sasa huonyesha kimefika wapi.",
+  "rec_held": "Muda wa “{title}” umefika, lakini kuirekodi kungefungua muunganisho mmoja zaidi kwa mtoa huduma wako. Inasubiri na itaanza yenyewe mara muunganisho utakapokuwa huru - au cheza chaneli yake ili irekodiwe kutoka hapo.",
+  "rec_held_click": "Bofya ili uirekodi hata hivyo.",
+  "rec_held_what": "Kurekodi “{title}” sasa kunafungua muunganisho mmoja zaidi kwa mtoa huduma wako, kando ya kinachocheza tayari kutoka kwenye akaunti yako.",
+  "rec_held_wait": "Endelea kusubiri",
+  "rec_waiting_room": "inasubiri muunganisho huru",
+  "rec_record_anyway": "Rekodi hata hivyo",
+  "rec_reason_no_room": "hakukuwa na muunganisho huru kwa akaunti yako"
 }

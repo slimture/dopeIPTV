@@ -112,6 +112,15 @@ class RecordingManager(QObject):
     ADDRESS_TIMEOUT_S = 30.0
     NO_ADDRESS = "could not get the stream address"
 
+    #: What the window says of a recording due now (may_open): OPEN its
+    #: own connection; RIDE - it made it a recording of what the player
+    #: plays already (ride_player), no connection of its own; HOLD - one
+    #: more connection would go over the account's limit, or one not known
+    #: while the app holds one to it: it waits, nothing opened, until there
+    #: is room or the person says go ahead.
+    OPEN, RIDE, HOLD = "open", "ride", "hold"
+    NO_ROOM = "no free connection to the account"
+
     VIDEO_EXTS: set[str] = {".ts", ".mp4", ".mkv", ".avi", ".mov",
                              ".webm", ".m2ts"}
 
@@ -136,6 +145,10 @@ class RecordingManager(QObject):
         # devices when the account has no room for both. Set by the window
         # while server mode runs.
         self.before_spawn: Callable[[dict], None] | None = None
+        # (window's thread) Asked as a recording comes due, before it opens
+        # a connection of its own - OPEN, RIDE or HOLD. None: it opens, as
+        # before (no window to count the account's connections).
+        self.may_open: Callable[[dict], str] | None = None
         self._address_in.connect(self._address_came,
                                  Qt.ConnectionType.QueuedConnection)
         # Recordings saved as MP4 (rec_mp4): the .ts files being copied now,
@@ -298,7 +311,7 @@ class RecordingManager(QObject):
 
     def _save(self) -> None:
         keep = [{k: v for k, v in j.items()
-                 if k not in ("proc", "recorder", "_asking")}
+                 if k not in ("proc", "recorder", "_asking", "_held", "_go_ahead")}
                 for j in self.jobs if j.get("status") == "scheduled"]
         self.settings.setValue("recording_jobs", json.dumps(keep))
 
@@ -331,6 +344,7 @@ class RecordingManager(QObject):
             if j["id"] == job_id and j["status"] == "scheduled":
                 j["start"] = start_ts
                 j["stop"] = stop_ts
+                j.pop("_held", None)        # looked at again when it is due
                 for k, v in (extra or {}).items():
                     if k not in ("id", "url", "start", "stop", "status",
                                  "path", "proc", "recorder"):
@@ -363,6 +377,26 @@ class RecordingManager(QObject):
             self.write_info(path, "", "", icon=icon)
         self.jobs_changed.emit()
         return job
+
+    def ride_player(self, j: dict, path: str, recorder: Any = None,
+                    url: str = "") -> None:
+        """Scheduled recording *j*, due now, made from what the player plays
+        already - its rewind buffer through *recorder* (a BufferRecorder),
+        else its own stream: from now on one in the player, as
+        add_inplayer_job's, with no connection of its own. *url*: the
+        address it keeps where it had none (a portal's, asked at the start).
+        The tick that asked (may_open) says the jobs changed."""
+        j.pop("_held", None)
+        j.pop("_go_ahead", None)
+        j.update(status="recording", inplayer=True, path=path, recorder=recorder,
+                 proc=None, error="")
+        if url and not j.get("url"):
+            j["url"] = url
+        if j.get("stream_icon") and path:
+            self.write_info(path, "", "", icon=j["stream_icon"])
+        log.info("record: %s from what the player plays (%s) - no connection of its own",
+                 for_log(j.get("title")), "its rewind buffer" if recorder is not None
+                 else "its stream")
 
     def finish_inplayer(self, job_id: str, reason: str = "") -> None:
         for j in self.jobs:
@@ -608,6 +642,21 @@ class RecordingManager(QObject):
             except OSError:
                 pass
             self._remux(ts, str(e.get("title") or ""), str(e.get("channel") or ""))
+
+    def _way_in(self, j: dict) -> str:
+        """How recording *j*, due now, starts (may_open): OPEN, RIDE or
+        HOLD - OPEN with no window to ask, or when asking failed (as
+        before: counting never stands in a recording's way)."""
+        if self.may_open is None:
+            return self.OPEN
+        try:
+            way = self.may_open(j)
+        except Exception as e:
+            log.debug("record: the account's connections not asked: %s", e)
+            return self.OPEN
+        if way == self.RIDE and j.get("status") != "recording":
+            return self.HOLD                # said so, but not made one: never a second
+        return way if way in (self.RIDE, self.HOLD) else self.OPEN
 
     @classmethod
     def address_later(cls, j: dict) -> bool:
@@ -857,11 +906,28 @@ class RecordingManager(QObject):
             elif j["status"] == "scheduled" and j["start"] <= now:
                 if j.get("stop") is not None and j["stop"] <= now:
                     j["status"] = "failed"
-                    j["error"] = "stop time passed before the app could start it"
-                elif self.address_later(j):
-                    self._ask_address(j)
+                    if j.pop("_held", None):
+                        j["error"] = self.NO_ROOM
+                        log.info("record: %s not started - %s", for_log(j.get("title")),
+                                 self.NO_ROOM)
+                    else:
+                        j["error"] = "stop time passed before the app could start it"
                 else:
-                    self._spawn(j)
+                    way = self._way_in(j)
+                    if way == self.HOLD:
+                        if j.get("_held"):
+                            continue        # still waiting: nothing new
+                        j["_held"] = True
+                        log.info("record: %s waits for a free connection to the account",
+                                 for_log(j.get("title")))
+                    elif way == self.RIDE:
+                        pass                # the window made it one in the player
+                    elif self.address_later(j):
+                        j.pop("_held", None)
+                        self._ask_address(j)
+                    else:
+                        j.pop("_held", None)
+                        self._spawn(j)
                 self._save()
                 changed = True
             elif j["status"] == "recording" and j.get("inplayer"):

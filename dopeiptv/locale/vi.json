@@ -2895,5 +2895,12 @@
   "vis_style_scope": "Vectorscope",
   "vis_style_freqs": "Tần số",
   "set_guide_now_line": "Vạch thời điểm hiện tại",
-  "set_guide_now_line_hint": "Một vạch mảnh trong lịch tại thời điểm hiện tại, nằm trên các chương trình. Tắt: thanh của chương trình đang phát cho biết đã phát đến đâu."
+  "set_guide_now_line_hint": "Một vạch mảnh trong lịch tại thời điểm hiện tại, nằm trên các chương trình. Tắt: thanh của chương trình đang phát cho biết đã phát đến đâu.",
+  "rec_held": "Đã đến giờ “{title}”, nhưng ghi nó sẽ mở thêm một kết nối đến nhà cung cấp của bạn. Bản ghi sẽ chờ và tự bắt đầu ngay khi kết nối rảnh - hoặc phát kênh đó để ghi từ đó.",
+  "rec_held_click": "Bấm để vẫn ghi.",
+  "rec_held_what": "Ghi “{title}” bây giờ sẽ mở thêm một kết nối đến nhà cung cấp của bạn, bên cạnh những gì đang phát từ tài khoản của bạn.",
+  "rec_held_wait": "Tiếp tục chờ",
+  "rec_waiting_room": "đang chờ kết nối rảnh",
+  "rec_record_anyway": "Vẫn ghi",
+  "rec_reason_no_room": "không có kết nối nào đến tài khoản của bạn còn rảnh"
 }

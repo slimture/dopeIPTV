@@ -2895,5 +2895,12 @@
   "vis_style_scope": "Vektorskop",
   "vis_style_freqs": "Frekuensi",
   "set_guide_now_line": "Garis waktu sekarang",
-  "set_guide_now_line_hint": "Garis tipis di panduan pada waktu sekarang, di atas acara. Mati: bilah acara yang sedang tayang menunjukkan sejauh mana acaranya."
+  "set_guide_now_line_hint": "Garis tipis di panduan pada waktu sekarang, di atas acara. Mati: bilah acara yang sedang tayang menunjukkan sejauh mana acaranya.",
+  "rec_held": "Saatnya “{title}”, tetapi merekamnya akan membuka satu koneksi lagi ke penyediamu. Rekaman menunggu dan mulai sendiri begitu koneksinya kosong - atau putar salurannya agar direkam dari sana.",
+  "rec_held_click": "Klik untuk tetap merekamnya.",
+  "rec_held_what": "Merekam “{title}” sekarang membuka satu koneksi lagi ke penyediamu, di samping yang sudah diputar dari akunmu.",
+  "rec_held_wait": "Tetap menunggu",
+  "rec_waiting_room": "menunggu koneksi kosong",
+  "rec_record_anyway": "Tetap rekam",
+  "rec_reason_no_room": "tidak ada koneksi ke akunmu yang kosong"
 }

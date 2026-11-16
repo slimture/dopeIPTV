@@ -2895,5 +2895,12 @@
   "vis_style_scope": "Vektorskop",
   "vis_style_freqs": "Frequenzen",
   "set_guide_now_line": "Linie bei der aktuellen Zeit",
-  "set_guide_now_line_hint": "Eine dünne Linie durch den Guide bei der aktuellen Zeit, über den Sendungen. Aus zeigt der Balken der laufenden Sendung, wie weit sie ist."
+  "set_guide_now_line_hint": "Eine dünne Linie durch den Guide bei der aktuellen Zeit, über den Sendungen. Aus zeigt der Balken der laufenden Sendung, wie weit sie ist.",
+  "rec_held": "„{title}“ steht an, aber die Aufnahme würde eine weitere Verbindung zu deinem Anbieter öffnen. Sie wartet und startet von selbst, sobald die Verbindung frei ist - oder spiel den Sender ab, dann wird von dort aufgenommen.",
+  "rec_held_click": "Klicke, um trotzdem aufzunehmen.",
+  "rec_held_what": "„{title}“ jetzt aufzunehmen öffnet eine weitere Verbindung zu deinem Anbieter, neben dem, was schon von deinem Konto läuft.",
+  "rec_held_wait": "Weiter warten",
+  "rec_waiting_room": "wartet auf eine freie Verbindung",
+  "rec_record_anyway": "Trotzdem aufnehmen",
+  "rec_reason_no_room": "keine Verbindung zu deinem Konto war frei"
 }

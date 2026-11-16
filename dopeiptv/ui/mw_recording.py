@@ -11,6 +11,8 @@ import time
 from functools import partial
 from ..providers.client import b64, epg_times
 from ..i18n import tr
+from ..core import connections
+from ..core.connections import Use
 from ..core.log import log, redact_url
 from ..core.privacy import for_log
 from ..core.recording import SCRAMBLED, RecordingManager, format_size, free_path, safe_filename
@@ -41,6 +43,7 @@ _REC_REASONS = {
     "neither ffmpeg nor mpv found": "rec_reason_no_recorder",
     "stop time passed before the app could start it": "rec_reason_too_late",
     RecordingManager.NO_ADDRESS: "rec_reason_no_address",
+    RecordingManager.NO_ROOM: "rec_reason_no_room",
     SCRAMBLED: "rec_reason_scrambled",
 }
 
@@ -89,6 +92,9 @@ class _RecordingMixin:
         # Why it failed, where it failed - a bare [Failed] said nothing.
         if j["status"] == "failed" and j.get("error"):
             name += f"  —  {rec_reason(j['error'])}"
+        # Due, and waiting for room on the account (_rec_may_open).
+        if j["status"] == "scheduled" and j.get("_held"):
+            name += f"  —  {tr('rec_waiting_room')}"
         # Saved as MP4 (Settings > Recording): while it is copied, and when
         # the .ts had to be kept.
         if j.get("remux") == "running":
@@ -101,6 +107,7 @@ class _RecordingMixin:
         return {"name": name,
                 "_job": j["id"], "_key": f"job:{j['id']}",
                 "_kind": "recjob", "_status": j["status"],
+                "_held": bool(j.get("_held")),
                 "_error": j.get("error") or "",
                 "_path": j.get("path") or "",
                 # The recorded channel's logo, so the row isn't iconless.
@@ -572,6 +579,173 @@ class _RecordingMixin:
             return None
         return partial(_source_address, dict(pl), sid)
 
+    # -- a scheduled recording comes due (RecordingManager.may_open) --------------------
+
+    def _rec_may_open(self, j: dict) -> str:
+        """A scheduled recording is due and about to open a connection of
+        its own: counted as one started by hand is. Its channel playing in
+        the player: recorded from it - the rewind buffer, else the player's
+        stream - no second connection. Room on the account (a known limit
+        with room, or nothing of the app's on it) or the person's go ahead:
+        opened. Otherwise held - never a second connection silently: it
+        waits for room, and a note says so, with Record anyway."""
+        if self._rec_plays(j) and self._rec_ride(j):
+            return RecordingManager.RIDE
+        if j.get("_go_ahead"):
+            return RecordingManager.OPEN
+        why = self._rec_held_why(j)
+        if why is None:
+            return RecordingManager.OPEN
+        if not j.get("_held"):
+            self._rec_note_held(j)
+        return RecordingManager.HOLD
+
+    def _rec_plays(self, j: dict) -> bool:
+        """Whether recording *j*'s channel is what the docked player plays
+        now: live, from the same source, not given up on - by its stream id
+        there, or its address."""
+        p = getattr(self, "player", None)
+        if (p is None or not getattr(p, "current_url", None)
+                or getattr(self, "_playing_group", None) != "live"
+                or getattr(self, "_playing_catchup", False)):
+            return False                # an archive's stream is not what airs now
+        dead = getattr(self, "_conn_player_dead", None)
+        if callable(dead) and dead(p):
+            return False
+        mine = str(self._rec_player_source().get("source") or "")
+        theirs = str(j.get("source") or "")
+        if mine and theirs and mine != theirs:
+            return False                # one stream id names another channel there
+        lp = getattr(self, "_last_playback", None) or {}
+        url = str(j.get("url") or "")
+        if url and url in (str(lp.get("url") or ""), str(p.current_url or "")):
+            return True
+        sid = j.get("stream_key") or (j.get(RecordingManager.LATER) or {}).get("stream_id")
+        row_of = getattr(self, "_failover_row_for", None)
+        row = (row_of(getattr(self, "_playing_key", None)) if callable(row_of) else None) \
+            or getattr(self, "_playing_item", None) or {}
+        playing = row.get("stream_id")
+        return sid not in (None, "") and playing is not None and str(playing) == str(sid)
+
+    def _rec_ride(self, j: dict) -> bool:
+        """Record *j* from what the player plays (as a recording started by
+        hand on the channel watched is): its rewind buffer from the
+        recording's start, as far back as the buffer holds - else the
+        player's own stream. True when it does."""
+        p = self.player
+        session = getattr(p, "_dvr", None)
+        buffered = session is not None and bool(getattr(session, "streaming", False))
+        if not buffered and any(k.get("inplayer") and k.get("status") == "recording"
+                                and k.get("recorder") is None for k in self.rec.jobs):
+            return False                # the player records one file of its stream at a time
+        try:
+            path = self.rec.build_path(str(j.get("title") or ""), j.get("folder") or "",
+                                       j.get("channel") or "")
+        except OSError as e:
+            log.info("record: %s not from the player: %s", for_log(j.get("title")), e)
+            return False
+        recorder = None
+        if buffered:
+            try:
+                span = session.span()
+                lead = float(getattr(session, "KEY_LEAD", 0.0))
+                since = (max(float(j.get("start") or 0.0), float(span[0]) + lead)
+                         if span else None)
+                recorder = session.record(path, since)
+            except Exception as e:
+                log.info("record: not from the rewind buffer (%s)", e)
+                recorder = None
+        if recorder is None:
+            if not p.start_stream_record(path):
+                return False
+            take = getattr(p, "take_buffer_recorder", None)
+            recorder = take() if callable(take) else None
+        lp = getattr(self, "_last_playback", None) or {}
+        self.rec.ride_player(j, path, recorder, url=str(lp.get("url") or ""))
+        stop = j.get("stop")
+        length = (tr("rec_until_stopped") if stop is None
+                  else tr("rec_for_minutes", n=max(1, int((float(stop) - time.time()) // 60))))
+        self._set_status("● " + tr("rec_started_inplayer", title=j.get("title") or "",
+                                   length=length))
+        self._warn_pause_while_recording()
+        return True
+
+    def _rec_held_why(self, j: dict) -> tuple | None:
+        """Why recording *j* over a connection of its own would be one too
+        many now - (the account's Verdict or None, the box's tuners' Verdict
+        or None, whether the account's limit is unknown while the app holds
+        a connection to it already) - or None when there is room."""
+        uses_of = getattr(self, "_conn_uses", None)
+        by_account = getattr(self, "_conn_by_account", None)
+        if not callable(uses_of) or not callable(by_account):
+            return None
+        url = str(j.get("url") or "")
+        if url and not connections.is_network(url):
+            return None                 # a file of this computer's
+        src = str(j.get("source") or "") or self._conn_source()
+        try:
+            self._conn_seen()
+            uses = list(uses_of())
+            # Recordings being given their address open theirs a moment later.
+            uses += [Use("recording", str(k.get("source") or ""))
+                     for k in self.rec.jobs if k is not j
+                     and k.get("status") == "scheduled" and k.get("_asking") is not None]
+            listed, key = by_account(uses, src)
+            own = connections.own_count(listed, key)
+            cap = self._conn_cap(key)
+            v = self._conn_ledger().check(key, listed, 1, limit=cap) if cap else None
+        except Exception as e:          # counting must never stand in the way
+            log.debug("record: the connections not counted: %s", e)
+            return None
+        tuner = getattr(self, "_tuner_verdict", None)
+        t = tuner(url, uses) if url and callable(tuner) else None
+        unknown = not cap and own > 0
+        if v is None and t is None and not unknown:
+            return None
+        return v, t, unknown
+
+    def _rec_note_held(self, j: dict) -> None:
+        """Said once as recording *j* starts to wait: a note that offers to
+        record anyway (_rec_go_ahead), the status line, the picture's corner
+        in full screen; the Recordings list says it on its row."""
+        title = str(j.get("title") or "")
+        self._flash_status("● " + title + "  —  " + tr("rec_waiting_room"), 8000)
+        toast = getattr(self, "_show_action_toast", None)
+        if callable(toast):
+            toast(tr("rec_held", title=title) + "\n" + tr("rec_held_click"), 15000,
+                  partial(self._rec_go_ahead, str(j.get("id") or "")))
+        if getattr(self, "_player_fs", False) and self.player:
+            self.player.set_overlay_info(title + "  —  " + tr("rec_waiting_room"))
+
+    def _rec_go_ahead(self, job_id: str) -> None:
+        """Record anyway (the note, the row's menu): asked with what is in
+        use; a yes opens the recording's own connection now."""
+        j = next((k for k in self.rec.jobs if k.get("id") == job_id), None)
+        if j is None or j.get("status") != "scheduled" or not j.get("_held"):
+            return                      # started, cancelled or over meanwhile
+        why = self._rec_held_why(j)
+        if why is None:
+            self.rec.tick()             # room now: it starts as it is
+            return
+        v, t, unknown = why
+        parts = [tr("rec_held_what", title=str(j.get("title") or ""))]
+        if v is not None:
+            parts.append(self._conn_warning(v))
+        elif unknown:
+            parts.append(tr("conn_test_unknown"))
+        if t is not None:
+            parts.append(self._tuner_warning(t))
+        idx = self._choice_dialog(
+            tr("conn_title" if v is not None or unknown else "tuner_title"),
+            "\n\n".join(parts),
+            [(tr("conn_anyway"), "normal"), (tr("rec_held_wait"), "primary")])
+        go = idx == 0 and j.get("status") == "scheduled"
+        log.info("record: %s - %s", for_log(j.get("title")),
+                 "over one more connection: the person said so" if go else "it waits")
+        if go:
+            j["_go_ahead"] = True
+            self.rec.tick()
+
     def _record_now(self, it, minutes, title_override=None) -> None:
         if it.get("stream_id") is None:
             return
@@ -758,6 +932,9 @@ class _RecordingMixin:
                 tr("msg_stop_time_future"))
             return
         url, extra = self._scheduled_address(it)
+        # Its channel, as a programme's recording keeps it: what plays is
+        # recorded from the player when it is this channel (_rec_plays).
+        extra.setdefault("stream_key", str(it["stream_id"]))
         title = (name_edit.text().strip()
                  or self.channel_display_name(it))
         self.rec.add_job(url, title, start_ts, stop_ts,
@@ -1653,6 +1830,9 @@ class _RecordingMixin:
                 m.addAction(tr("rec_stop_recording"),
                             lambda: self.rec.cancel(it["_job"]))
             elif status == "scheduled":
+                if it.get("_held"):
+                    m.addAction(tr("rec_record_anyway"),
+                                partial(self._rec_go_ahead, it["_job"]))
                 m.addAction(tr("rec_edit_times"),
                             lambda: self._edit_job_times(it["_job"]))
                 m.addAction(tr("rec_cancel_scheduled"),

@@ -263,6 +263,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.rec = RecordingManager(settings, self)
         # A portal's recording asks for its address as it starts.
         self.rec.address_for = self._rec_address_for
+        # A scheduled one, as it comes due: counted on its account as one
+        # started by hand - recorded from the player when it plays that
+        # channel, held (never a second connection silently) when no room.
+        self.rec.may_open = self._rec_may_open
         self.rec.jobs_changed.connect(self._recordings_changed)
         self.rec.recording_stopped.connect(self._on_recording_stopped)
         # A box's channel it cannot decrypt, said as the recording's reason.

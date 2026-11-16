@@ -2895,5 +2895,12 @@
   "vis_style_scope": "Wektoroskop",
   "vis_style_freqs": "Częstotliwości",
   "set_guide_now_line": "Linia aktualnej godziny",
-  "set_guide_now_line_hint": "Cienka linia w przewodniku w miejscu bieżącej godziny, nad programami. Wyłączona: pasek trwającego programu pokazuje, ile już minęło."
+  "set_guide_now_line_hint": "Cienka linia w przewodniku w miejscu bieżącej godziny, nad programami. Wyłączona: pasek trwającego programu pokazuje, ile już minęło.",
+  "rec_held": "Czas na „{title}”, ale nagrywanie otworzyłoby kolejne połączenie z twoim dostawcą. Nagranie czeka i zacznie się samo, gdy połączenie się zwolni - albo włącz jego kanał, a zostanie nagrane z odtwarzania.",
+  "rec_held_click": "Kliknij, aby mimo to nagrać.",
+  "rec_held_what": "Nagrywanie „{title}” teraz otwiera kolejne połączenie z twoim dostawcą, obok tego, co już odtwarzasz z konta.",
+  "rec_held_wait": "Czekaj dalej",
+  "rec_waiting_room": "czeka na wolne połączenie",
+  "rec_record_anyway": "Mimo to nagraj",
+  "rec_reason_no_room": "żadne połączenie z twoim kontem nie było wolne"
 }

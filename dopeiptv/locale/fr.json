@@ -2895,5 +2895,12 @@
   "vis_style_scope": "Vectorscope",
   "vis_style_freqs": "Fréquences",
   "set_guide_now_line": "Ligne à l'heure actuelle",
-  "set_guide_now_line_hint": "Une fine ligne dans le guide à l'heure actuelle, par-dessus les programmes. Désactivée, la barre du programme en cours montre où il en est."
+  "set_guide_now_line_hint": "Une fine ligne dans le guide à l'heure actuelle, par-dessus les programmes. Désactivée, la barre du programme en cours montre où il en est.",
+  "rec_held": "C'est l'heure de « {title} », mais l'enregistrer ouvrirait une connexion de plus vers ton fournisseur. L'enregistrement attend et démarre tout seul dès que la connexion est libre - ou lance sa chaîne pour l'enregistrer depuis la lecture.",
+  "rec_held_click": "Clique pour l'enregistrer quand même.",
+  "rec_held_what": "Enregistrer « {title} » maintenant ouvre une connexion de plus vers ton fournisseur, en plus de ce qui est déjà en lecture sur ton compte.",
+  "rec_held_wait": "Continuer d'attendre",
+  "rec_waiting_room": "en attente d'une connexion libre",
+  "rec_record_anyway": "Enregistrer quand même",
+  "rec_reason_no_room": "aucune connexion à ton compte n'était libre"
 }
