@@ -34,6 +34,7 @@ body:
         - Flatpak
         - macOS .dmg (Apple Silicon)
         - macOS .dmg (Intel)
+        - Windows installer (.exe)
         - Windows portable .zip
         - From source (git)
         - pip / pipx
