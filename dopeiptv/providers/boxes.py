@@ -266,10 +266,12 @@ class BoxClient(OfflineClient):
         return r
 
     def post(self, path: str, data: dict,
-             timeout: tuple[float, float] | None = None) -> Any:
-        """POST a form to the box, logging in as get() does."""
+             timeout: tuple[float, float] | None = None,
+             files: dict | None = None) -> Any:
+        """POST a form to the box (with *files*, as multipart), logging in
+        as get() does."""
         url = self.url(path)
-        r = self.session.post(url, data=data, auth=self._auth,
+        r = self.session.post(url, data=data, files=files, auth=self._auth,
                               timeout=timeout or self.TIMEOUT)
         if r.status_code == 401 and self.username and self._auth is None:
             challenge = r.headers.get("WWW-Authenticate", "").lower()
@@ -277,7 +279,7 @@ class BoxClient(OfflineClient):
             self._auth = (auth_mod.HTTPDigestAuth(self.username, self.password)
                           if "digest" in challenge
                           else auth_mod.HTTPBasicAuth(self.username, self.password))
-            r = self.session.post(url, data=data, auth=self._auth,
+            r = self.session.post(url, data=data, files=files, auth=self._auth,
                                   timeout=timeout or self.TIMEOUT)
         if r.status_code == 401:
             raise LocalizedError("err_wrong_login" if self.username else "err_box_login_needed")

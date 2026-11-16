@@ -20,7 +20,9 @@ first packets of its stream, core/ts_scramble.py). For the transponder
 check (core/tuners.py): its tuners, what it records and what its TV shows
 (``tuner_state``, off the window's thread), and the transponder a channel
 is on (``tuner_key``, from the list as loaded). Its AutoTimer plugin's
-rules: providers/autotimer.py (``autotimer()``).
+rules: providers/autotimer.py (``autotimer()``); its channel lists edited
+through OpenWebif's bouquet editor: providers/bouquets.py
+(``bouquet_editor()``).
 """
 
 from __future__ import annotations
@@ -38,6 +40,7 @@ from .boxes import BoxClient, build_xmltv, child_text, clean_text
 
 if TYPE_CHECKING:
     from .autotimer import AutoTimer
+    from .bouquets import BouquetEditor
 
 TV_BOUQUETS = '1:7:1:0:0:0:0:0:0:0:FROM BOUQUET "bouquets.tv" ORDER BY bouquet'
 RADIO_BOUQUETS = '1:7:2:0:0:0:0:0:0:0:FROM BOUQUET "bouquets.radio" ORDER BY bouquet'
@@ -153,6 +156,7 @@ class Enigma2Client(BoxClient):
         # Each bouquet's reference, name and services, as the list has them.
         self._bouquet_list: list[tuple[str, str, list[tuple[str, str]]]] = []
         self._autotimer: AutoTimer | None = None
+        self._bouquet_editor: BouquetEditor | None = None
 
     @property
     def openwebif(self) -> bool:
@@ -374,6 +378,13 @@ class Enigma2Client(BoxClient):
             from .autotimer import AutoTimer
             self._autotimer = AutoTimer(self)
         return self._autotimer
+
+    def bouquet_editor(self) -> BouquetEditor:
+        """OpenWebif's bouquet editor on the box (providers/bouquets.py)."""
+        if self._bouquet_editor is None:
+            from .bouquets import BouquetEditor
+            self._bouquet_editor = BouquetEditor(self)
+        return self._bouquet_editor
 
     # -- the box itself (Nerd: zap along, wake, standby) ----------------------
 

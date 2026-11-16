@@ -7,7 +7,9 @@ Copy stream address. A channel a source lists without a play address
 (MythTV's, for the guide) says why it does not play.
 
 An Enigma2 box also has: its info, a screenshot of its TV and its remote
-(ui/box_tools.py); its recordings renamed, moved and deleted from the
+(ui/box_tools.py); its channel lists edited (ui/bouquet_editor.py - the
+source reads its channels again once the window is gone, never for a kids
+profile); its recordings renamed, moved and deleted from the
 films' menu; its tuner's signal in the stream stats (I), asked every 2 s
 while they show; its transcoding for the player (and, if its source says
 so, casting and multiview); and a channel it cannot decrypt said so - in
@@ -185,13 +187,18 @@ class _BoxMixin:
     # -- the box's own windows -------------------------------------------------
 
     def _box_windows_menu(self, sub: QMenu, c: Any) -> None:
-        """Info, a screenshot and the remote, for a box that has them."""
+        """Info, a screenshot, the remote and the channel lists' editor,
+        for a box that has them (the editor: not for a kids profile - it
+        changes the household's box and lists every channel it has)."""
         if not hasattr(c, "remote"):
             return
         sub.addSeparator()
         sub.addAction(tr("box_info"), self._box_open_info)
         sub.addAction(tr("box_screenshot"), self._box_open_screenshot)
         sub.addAction(tr("box_remote"), self._box_open_remote)
+        kids = getattr(self, "_profile_kids", None)
+        if hasattr(c, "bouquet_editor") and not (callable(kids) and kids()):
+            sub.addAction(tr("box_bouquets"), self._box_open_bouquets)
 
     def _box_window(self, make: Callable[[], Any]) -> None:
         """One of each window per box: an open one comes forward."""
@@ -233,6 +240,41 @@ class _BoxMixin:
         def remote() -> Any:
             return BoxRemoteDialog(self, self.client, self.pool, self._box_name())
         self._box_window(remote)
+
+    def _box_open_bouquets(self) -> None:
+        """The box's channel lists. One window per box: an open one - or one
+        closed while its changes are still on their way - comes forward."""
+        from PyQt6 import sip
+
+        from .bouquet_editor import BouquetEditorDialog
+        open_ = getattr(self, "_box_open", None)
+        if open_ is None:
+            open_ = self._box_open = {}
+        key = ("bouquets", id(self.client))
+        w = open_.get(key)
+        if w is not None and not sip.isdeleted(w) and not getattr(w, "_finished", False):
+            w._finishing = False
+            w.show()
+            w.raise_()
+            w.activateWindow()
+            return
+        w = BouquetEditorDialog(self, self.client, self.pool, self._box_name())
+        w.edited.connect(self._box_bouquets_edited)
+        open_[key] = w
+        w.show()
+
+    def _box_bouquets_edited(self, client: Any) -> None:
+        """The box's lists changed and the window is gone: its channels
+        read again (the guide stays as it is), so the app shows the new
+        order - only while that box is still the source."""
+        if client is not self.client:
+            return
+        log.info("enigma2: the box's lists changed - its channels read again")
+        self._show_toast(tr("bq_reloading"), 4000)
+        clear = getattr(self.client, "clear_list_cache", None)
+        if callable(clear):
+            clear()
+        self.refresh_playlist(force=False)
 
     # -- the box's recordings ----------------------------------------------------
 

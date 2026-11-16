@@ -457,9 +457,28 @@ builds on that count instead of a second one:
 
 Then the rest of what an Enigma2 box can do from a computer:
 
-- **Bouquet editor** (as Dreamboxedit does): bouquets and their channels
-  reordered, renamed, added and removed, markers, written back to the box
-  and the box told to reload them.
+- **Bouquet editor**: built, through OpenWebif's own bouquet editor
+  (`providers/bouquets.py`, `ui/bouquet_editor.py`; "Edit the box's
+  channel lists…" in the box's menu, beside its info, screenshot and
+  remote; not for a kids profile). TV and radio bouquets made, renamed,
+  moved and deleted; a bouquet's channels dragged into order, renamed,
+  removed, markers and spacers, channels added from every channel the box
+  knows, a satellite's or a provider's (searched). Each change goes to the
+  box at once (the box writes and reloads the lists itself), one after
+  another in the order made; a refused one stops the rest and the lists
+  are read back. The editor's backup (a tar in the box's /tmp) is taken
+  before the first change of a window, copied here to save, and "Undo"
+  puts it back; the source reads its channels again once the window is
+  gone. Checked against OpenWebif's `controllers/BQE.py`,
+  `BouquetEditor.py`, `models/services.py` and the editor's page
+  (`public/js/bqe.min.js`), against a fake box. Needs a real box: a backup
+  and a restore on a large lamedb (time, and the upload's file opened
+  without truncating), a move in a bouquet with hidden (flag 512) entries
+  (the editor's positions leave them out), a renamed IPTV entry, names with
+  non-ASCII letters, and whether the box's own channel list on the TV
+  follows at once. An older OpenWebif and the Dreambox WebInterface have
+  no `/bouqueteditor` and are told so; the WebInterface's own
+  WebBouquetEditor plugin is not used.
 - **AutoTimer**: built - the box's own rules read, made, changed, turned
   on and off and deleted beside dopeIPTV's series rules (Settings >
   Recording > Series recordings, each row "Recorded by the box" or
