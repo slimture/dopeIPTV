@@ -935,16 +935,31 @@ jobs:
         # Some PyObjC extensions (CoreMedia on the Intel build) load
         # @rpath/libswift*.dylib, which macOS keeps in /usr/lib/swift;
         # PyInstaller rewrites their rpath to the bundle, so add that one
-        # back before the app is signed.
+        # back before the app is signed. A module with no room left in its
+        # load commands for one more (CoreMedia's _inlines on the Intel
+        # build) finds it through the app's executable instead - dyld looks
+        # in the main executable's run paths too. The smoke test's
+        # --self-check imports AVFoundation, and with it CoreMedia, from
+        # the mounted .app, so a module that still cannot load fails there.
         run: |
-          find dist/dopeIPTV.app/Contents/Frameworks -name '*.so' -print0 |
-            while IFS= read -r -d '' so; do
-              if otool -L "$so" | grep -q '@rpath/libswift'; then
-                otool -l "$so" | grep -q 'path /usr/lib/swift ' \
-                  || install_name_tool -add_rpath /usr/lib/swift "$so"
-                echo "rpath /usr/lib/swift: ${so#dist/dopeIPTV.app/}"
-              fi
-            done
+          APP=dist/dopeIPTV.app
+          EXE="$APP/Contents/MacOS/dopeiptv"
+          need_exe=0
+          while IFS= read -r -d '' so; do
+            otool -L "$so" | grep -q '@rpath/libswift' || continue
+            if otool -l "$so" | grep -q 'path /usr/lib/swift '; then
+              echo "rpath /usr/lib/swift already: ${so#"$APP"/}"
+            elif install_name_tool -add_rpath /usr/lib/swift "$so" 2>/dev/null; then
+              echo "rpath /usr/lib/swift: ${so#"$APP"/}"
+            else
+              echo "no room for an rpath in ${so#"$APP"/}: the executable carries it"
+              need_exe=1
+            fi
+          done < <(find "$APP/Contents/Frameworks" -name '*.so' -print0)
+          if [ "$need_exe" = 1 ] && ! otool -l "$EXE" | grep -q 'path /usr/lib/swift '; then
+            install_name_tool -add_rpath /usr/lib/swift "$EXE"
+            echo "rpath /usr/lib/swift: ${EXE#"$APP"/}"
+          fi
       - name: Build manifest - the bundle's own files, signed
         # As on Linux (dopeiptv/core/build_check.py), before the app is
         # signed: the list lies in Contents/Resources, linked from where
