@@ -59,6 +59,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   player moved on counted as a connection on every source; it now counts
   only on the source its channel is from, so server mode no longer
   refuses another source's devices for it.
+- A web stream (YouTube, Twitch through yt-dlp) or a radio station
+  counted as a connection of the source in use; it is no provider's and
+  is no longer counted, so it brings no question and no refusal from
+  server mode.
 
 ## [1.6.0]
 

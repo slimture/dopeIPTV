@@ -33,6 +33,7 @@ from ..core.connections import Use
 from ..core.log import log
 from ..core.workers import run_async
 from ..i18n import tr
+from .mw_source_label import NO_SOURCE_KINDS
 
 #: How long after the provider answered its count of connections in use
 #: still stands next to the app's own count now.
@@ -113,6 +114,13 @@ class _ConnectionsMixin:
             self._conn_dead = (str(url), getattr(p, "_play_gen", None))
             log.info("connections: the player gave up on its stream - not counted")
 
+    def _conn_no_source(self, url: str) -> bool:
+        """*url*, what the docked player plays, is no source's - a station,
+        a web page through yt-dlp (mw_source_label): no provider's
+        connection, on no account."""
+        lp = getattr(self, "_last_playback", None) or {}
+        return bool(url) and lp.get("url") == url and lp.get("kind") in NO_SOURCE_KINDS
+
     def _conn_player_dead(self, p: Any) -> bool:
         """The player still shows the stream it gave up on (_conn_gave_up)."""
         dead = self._conn_dead
@@ -138,7 +146,7 @@ class _ConnectionsMixin:
                     uses.append(Use("buffer", src, str(getattr(dvr, "url", "") or "")))
             elif (p is not None and getattr(p, "current_url", None)
                   and connections.is_network(p.current_url) and not free_player
-                  and not dead):
+                  and not dead and not self._conn_no_source(p.current_url)):
                 uses.append(Use("player", src, str(p.current_url)))
             pool = getattr(p, "_dvr_pool", None) if p is not None else None
             for s in (pool.sessions if pool is not None else []):

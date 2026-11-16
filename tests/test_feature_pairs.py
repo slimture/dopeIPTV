@@ -1562,3 +1562,24 @@ def test_a_buffer_a_recording_or_a_cast_keeps_is_its_own_source_s(tmp_path):
         assert srv.source == "b"
     finally:
         pool.close_all()
+
+
+def test_a_web_stream_or_a_station_is_no_provider_s_connection():
+    """YouTube or Twitch through yt-dlp, or an internet radio station, is no
+    source's: not counted against the source in use - a test of its stream
+    or server mode's device is not refused for it. A channel is counted."""
+    w = _source_window()()
+    w.client.max_connections = 1
+    for kind, url in (("web", "ytdl://https://www.youtube.com/watch?v=x"),
+                      ("web", "https://rr1.googlevideo.example/videoplayback?id=1"),
+                      ("radio", "http://ice.example.org/stream.mp3")):
+        w.player.current_url = url
+        w._note_playing_source(url, url, kind)
+        w._last_playback = {"url": url, "kind": kind}
+        assert w._conn_uses() == [], kind
+        assert w._conn_ok_test("a") and not w.asked, kind
+    url = "http://a.invalid/live/u/p/7.ts"
+    w.player.current_url = url
+    w._note_playing_source(url, 7, "live")
+    w._last_playback = {"url": url, "kind": "live"}
+    assert [(u.kind, u.source) for u in w._conn_uses()] == [("player", "a")]
