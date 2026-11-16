@@ -8,14 +8,72 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 import time
 import uuid
+from collections.abc import Iterable, Mapping
 from datetime import datetime
 from typing import Any
 
 from PyQt6.QtCore import QSettings
 
 from . import privacy
+
+
+class KeptValues:
+    """A few keys of a settings object held in memory, for a client whose
+    workers read and renew them (Trakt's and Simkl's sign-in). Read once,
+    where the client is made (the window's thread); changed here at once,
+    so a worker reads what it has just renewed; written to the settings on
+    the window's thread (core/workers.on_gui_thread) - one QSettings object
+    is not safe to use from two threads. *settings* may be a profile's
+    pinned view (core/profiles.py): written to that profile, whichever is
+    in use by then."""
+
+    def __init__(self, settings: Any, keys: Iterable[str]) -> None:
+        self.settings = settings
+        self._lock = threading.Lock()
+        self._values: dict[str, Any] = {}
+        for key in keys:
+            try:
+                value = settings.value(key, None)
+            except Exception:
+                value = None
+            if value is not None and value != "":
+                self._values[key] = value
+
+    def value(self, key: str, default: Any = None) -> Any:
+        with self._lock:
+            return self._values.get(key, default)
+
+    def put(self, values: Mapping[str, Any]) -> None:
+        """*values* in memory now, in the settings on the window's thread."""
+        with self._lock:
+            self._values.update(values)
+        self._flush(tuple(values))
+
+    def drop(self, *keys: str) -> None:
+        """*keys* gone from memory now, from the settings on the window's thread."""
+        with self._lock:
+            for key in keys:
+                self._values.pop(key, None)
+        self._flush(keys)
+
+    def _flush(self, keys: tuple[str, ...]) -> None:
+        from .workers import on_gui_thread
+        on_gui_thread(self._sync, keys)
+
+    def _sync(self, keys: tuple[str, ...]) -> None:
+        """(the window's thread) The settings made what memory holds now -
+        so a write queued from a worker that lands after a sign-out on the
+        window's thread brings nothing back."""
+        with self._lock:
+            now = {k: self._values[k] for k in keys if k in self._values}
+        for key in keys:
+            if key in now:
+                self.settings.setValue(key, now[key])
+            else:
+                self.settings.remove(key)
 
 
 # The implicit "just add it here" bucket every category has. Items land

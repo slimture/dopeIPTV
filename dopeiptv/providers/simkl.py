@@ -16,7 +16,9 @@ access token for 7 days and a refresh token for 180 days that slides on
 every use (non-rotating); the access token is renewed shortly before it runs
 out, or once on a 401. Signing out revokes the grant. The tokens live in the
 "simkl_access_token", "simkl_refresh_token" and "simkl_token_expires"
-settings - never logged, never synced.
+settings - never logged, never synced - read once by the client, which
+keeps them in memory (a renewal on a worker is written to the settings on
+the window's thread).
 
 Titles are found by their TMDB id (what the app resolves its posters with),
 with the title and year beside it: Simkl takes the first id it knows and
@@ -33,6 +35,7 @@ from typing import Any, Protocol
 from .. import VERSION
 from ..core._lazy_requests import requests
 from ..core.log import log
+from ..core.stores import KeptValues
 from ..i18n import LocalizedError
 
 API = "https://api.simkl.com"
@@ -254,6 +257,10 @@ class SimklClient:
     def __init__(self, settings: Settings, session: Any = None,
                  client_id: str | None = None) -> None:
         self.settings = settings
+        # The sign-in, read once here (the window's thread): renewed in
+        # memory on a worker, written to the settings on the window's
+        # thread (KeptValues) - never a settings write from a worker.
+        self._kept = KeptValues(settings, (TOKEN_KEY, REFRESH_KEY, EXPIRES_KEY))
         self.session = session
         self._client_id = client_id
         self._items: tuple[float, Any] | None = None
@@ -275,7 +282,7 @@ class SimklClient:
 
     @property
     def access_token(self) -> str:
-        return str(self.settings.value(TOKEN_KEY, "") or "")
+        return str(self._kept.value(TOKEN_KEY, "") or "")
 
     def is_connected(self) -> bool:
         return bool(self.available() and self.access_token)
@@ -283,15 +290,14 @@ class SimklClient:
     def disconnect(self) -> None:
         """Signed out here, and the grant revoked at Simkl (on a thread of
         its own, best effort: revoke always answers 200)."""
-        token = str(self.settings.value(REFRESH_KEY, "") or "") or self.access_token
+        token = str(self._kept.value(REFRESH_KEY, "") or "") or self.access_token
         self._forget()
         if token and self.client_id:
             threading.Thread(target=self._revoke, args=(token,), daemon=True,
                              name="simkl-revoke").start()
 
     def _forget(self) -> None:
-        for key in (TOKEN_KEY, REFRESH_KEY, EXPIRES_KEY):
-            self.settings.remove(key)
+        self._kept.drop(TOKEN_KEY, REFRESH_KEY, EXPIRES_KEY)
         self._items = None
 
     def _revoke(self, token: str) -> None:
@@ -309,15 +315,16 @@ class SimklClient:
         token = str(data.get("access_token") or "")
         if not token:
             return False
-        self.settings.setValue(TOKEN_KEY, token)
+        kept: dict[str, Any] = {TOKEN_KEY: token}
         refresh = str(data.get("refresh_token") or "")
         if refresh:
-            self.settings.setValue(REFRESH_KEY, refresh)
+            kept[REFRESH_KEY] = refresh
         try:
             life = int(data.get("expires_in") or 0)
         except (TypeError, ValueError):
             life = 0
-        self.settings.setValue(EXPIRES_KEY, int(time.time()) + life if life > 0 else 0)
+        kept[EXPIRES_KEY] = int(time.time()) + life if life > 0 else 0
+        self._kept.put(kept)
         scope = str(data.get("scope") or "")
         if scope and "media:write" not in scope.split():
             # An unknown scope is downgraded to read-only, never refused.
@@ -327,7 +334,7 @@ class SimklClient:
 
     def _due(self) -> bool:
         try:
-            until = int(self.settings.value(EXPIRES_KEY, 0) or 0)
+            until = int(self._kept.value(EXPIRES_KEY, 0) or 0)
         except (TypeError, ValueError):
             until = 0
         return bool(until) and time.time() > until - REFRESH_EARLY_S
@@ -337,7 +344,7 @@ class SimklClient:
         none, or Simkl refused it - then the sign-in is gone (revoked from
         Simkl's Connected Apps, or 180 days unused) and is forgotten here."""
         with self._token_lock:
-            rt = str(self.settings.value(REFRESH_KEY, "") or "")
+            rt = str(self._kept.value(REFRESH_KEY, "") or "")
             if not rt or not self.client_id:
                 return False
             try:

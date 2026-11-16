@@ -15,11 +15,15 @@ from dopeiptv.providers import trakt as T
 from dopeiptv.providers.oauth_loopback import capture_oauth_redirect
 
 
-def _client(tmp_name):
+def _client(tmp_name, **stored):
+    """A client over settings that hold *stored* already: it reads its
+    sign-in once, when it is made."""
     s = QSettings("dopeIPTV-test", tmp_name)
     s.clear()
     s.setValue("trakt_client_id", "CID")
     s.setValue("trakt_client_secret", "SECRET")
+    for key, value in stored.items():
+        s.setValue(key, value)
     return T.TraktClient(s)
 
 
@@ -251,10 +255,10 @@ def test_an_expiring_token_is_refreshed_before_the_call(monkeypatch):
                                 "expires_in": 86400})
 
     monkeypatch.setattr(T.requests, "post", fake_post)
-    tc = _client("refresh_due")
-    tc.settings.setValue("trakt_access_token", "AT1")
-    tc.settings.setValue("trakt_refresh_token", "RT1")
-    tc.settings.setValue("trakt_expires_at", int(time.time()) + 60)
+    tc = _client("refresh_due",
+                 trakt_access_token="AT1",
+                 trakt_refresh_token="RT1",
+                 trakt_expires_at=int(time.time()) + 60)
     h = tc._headers()
     assert h["Authorization"] == "Bearer AT2"
     assert posts[0]["grant_type"] == "refresh_token"
@@ -269,10 +273,10 @@ def test_a_valid_token_is_left_alone(monkeypatch):
         raise AssertionError("refreshed a token that is still valid")
 
     monkeypatch.setattr(T.requests, "post", no_post)
-    tc = _client("refresh_not_due")
-    tc.settings.setValue("trakt_access_token", "AT1")
-    tc.settings.setValue("trakt_refresh_token", "RT1")
-    tc.settings.setValue("trakt_expires_at", int(time.time()) + 86400)
+    tc = _client("refresh_not_due",
+                 trakt_access_token="AT1",
+                 trakt_refresh_token="RT1",
+                 trakt_expires_at=int(time.time()) + 86400)
     assert tc._headers()["Authorization"] == "Bearer AT1"
 
 
@@ -284,10 +288,10 @@ def test_a_refused_refresh_tries_the_oob_uri_then_backs_off(monkeypatch):
         return _TokenResp(401)
 
     monkeypatch.setattr(T.requests, "post", fake_post)
-    tc = _client("refresh_refused")
-    tc.settings.setValue("trakt_access_token", "AT1")
-    tc.settings.setValue("trakt_refresh_token", "RT1")
-    tc.settings.setValue("trakt_expires_at", int(time.time()) - 5)
+    tc = _client("refresh_refused",
+                 trakt_access_token="AT1",
+                 trakt_refresh_token="RT1",
+                 trakt_expires_at=int(time.time()) - 5)
     assert tc._headers()["Authorization"] == "Bearer AT1"
     assert posts == [T.REDIRECT_URI, T.OOB_REDIRECT_URI]
     tc._headers()
@@ -303,22 +307,89 @@ def test_a_retired_refresh_token_disconnects(monkeypatch):
                                 "error_description": "session not found"})
 
     monkeypatch.setattr(T.requests, "post", fake_post)
-    tc = _client("refresh_retired")
-    tc.settings.setValue("trakt_access_token", "AT1")
-    tc.settings.setValue("trakt_refresh_token", "RT1")
-    tc.settings.setValue("trakt_expires_at", int(time.time()) - 5)
+    tc = _client("refresh_retired",
+                 trakt_access_token="AT1",
+                 trakt_refresh_token="RT1",
+                 trakt_expires_at=int(time.time()) - 5)
     assert tc.is_connected()
     assert tc.refresh_tokens() is False
     assert not tc.is_connected() and tc.refresh_token == ""
 
 
+class _ThreadSettings(dict):
+    """A settings file that notes every read and write of the sign-in made
+    off the main thread (the window's)."""
+
+    def __init__(self, **stored):
+        super().__init__(**stored)
+        self.off_main = []
+
+    def _note(self, what, key):
+        if key in T.TOKEN_KEYS and threading.current_thread() is not threading.main_thread():
+            self.off_main.append((what, key))
+
+    def value(self, key, default=None):
+        self._note("read", key)
+        return self.get(key, default)
+
+    def setValue(self, key, value):  # noqa: N802
+        self._note("write", key)
+        self[key] = value
+
+    def remove(self, key):
+        self._note("remove", key)
+        self.pop(key, None)
+
+
+def _on_a_worker(fn):
+    out = {}
+
+    def run():
+        try:
+            out["result"] = fn()
+        except Exception as e:  # noqa: BLE001 - handed back to the test
+            out["error"] = e
+    t = threading.Thread(target=run)
+    t.start()
+    t.join(10)
+    if "error" in out:
+        raise out["error"]
+    return out.get("result")
+
+
+def test_a_refresh_on_a_worker_is_used_at_once_and_stored_on_the_windows_thread(monkeypatch):
+    widgets = pytest.importorskip("PyQt6.QtWidgets")
+    app = widgets.QApplication.instance() or widgets.QApplication([])
+    answers = [_TokenResp(200, {"access_token": "AT2", "refresh_token": "RT2",
+                                "expires_in": 86400})]
+    monkeypatch.setattr(T.requests, "post", lambda *a, **k: answers.pop(0))
+    s = _ThreadSettings(trakt_client_id="CID", trakt_access_token="AT1",
+                        trakt_refresh_token="RT1", trakt_expires_at=int(time.time()) + 60)
+    tc = T.TraktClient(s)
+    assert _on_a_worker(tc._headers)["Authorization"] == "Bearer AT2"   # at once
+    assert tc.refresh_token == "RT2" and s["trakt_access_token"] == "AT1"
+    app.processEvents()                                    # the window's thread stores it
+    assert (s["trakt_access_token"], s["trakt_refresh_token"]) == ("AT2", "RT2")
+    assert int(s["trakt_expires_at"]) > time.time() + 80000
+    # Retired on a worker: signed out at once, and in the settings on the
+    # window's thread - the account's favorites list with it.
+    s["trakt_fav_list_slug"] = "mine"
+    tc = T.TraktClient(s)
+    answers[:] = [_TokenResp(400, {"error": "invalid_grant"})] * 2
+    assert _on_a_worker(tc.refresh_tokens) is False
+    assert not tc.is_connected() and s["trakt_access_token"] == "AT2"
+    app.processEvents()
+    assert not any(k in s for k in T.TOKEN_KEYS)
+    assert s.off_main == []                                # never read or written there
+
+
 def test_a_server_error_keeps_the_sign_in(monkeypatch):
     monkeypatch.setattr(T.requests, "post",
                         lambda *a, **k: _TokenResp(503))
-    tc = _client("refresh_503")
-    tc.settings.setValue("trakt_access_token", "AT1")
-    tc.settings.setValue("trakt_refresh_token", "RT1")
-    tc.settings.setValue("trakt_expires_at", int(time.time()) - 5)
+    tc = _client("refresh_503",
+                 trakt_access_token="AT1",
+                 trakt_refresh_token="RT1",
+                 trakt_expires_at=int(time.time()) - 5)
     assert tc.refresh_tokens() is False
     assert tc.is_connected() and tc.refresh_token == "RT1"
 
@@ -365,9 +436,9 @@ def test_device_poll_names_an_unknown_oauth_error(monkeypatch):
 
 
 def test_disconnect_forgets_the_accounts_favorites_list():
-    tc = _client("disconnect")
-    tc.settings.setValue("trakt_access_token", "AT")
-    tc.settings.setValue("trakt_fav_list_slug", "someone-elses-list")
+    tc = _client("disconnect",
+                 trakt_access_token="AT",
+                 trakt_fav_list_slug="someone-elses-list")
     tc.disconnect()
     assert not tc.is_connected()
     assert not tc.settings.value("trakt_fav_list_slug", "")

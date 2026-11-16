@@ -10,6 +10,7 @@ import time
 
 from ..core._lazy_requests import requests
 from ..core.log import log
+from ..core.stores import KeptValues
 from ..i18n import LocalizedError
 from PyQt6.QtCore import QSettings
 
@@ -42,6 +43,10 @@ ACTIVATE_URL = "https://trakt.tv/activate"
 REFRESH_MARGIN = 600
 # After a failed refresh, wait this long before trying again.
 REFRESH_BACKOFF = 300
+#: The sign-in and what belongs to the account (its favorites list), kept
+#: in memory by the client (KeptValues).
+TOKEN_KEYS = ("trakt_access_token", "trakt_refresh_token", "trakt_expires_at",
+              "trakt_fav_list_slug")
 
 # dopeIPTV's own registered Trakt application, bundled so users get a true
 # one-click "Sign in with Trakt" with zero setup. A user who prefers their own
@@ -94,6 +99,10 @@ class TraktClient:
 
     def __init__(self, settings: QSettings) -> None:
         self.settings = settings
+        # The sign-in, read once here (the window's thread): renewed in
+        # memory on a worker, written to the settings on the window's
+        # thread (KeptValues) - never a QSettings write from a worker.
+        self._kept = KeptValues(settings, TOKEN_KEYS)
         # A refresh token is single-use: two workers refreshing at once would
         # leave one of them holding a token Trakt has already retired.
         self._refresh_lock = threading.Lock()
@@ -130,11 +139,11 @@ class TraktClient:
 
     @property
     def access_token(self) -> str:
-        return self.settings.value("trakt_access_token", "") or ""
+        return str(self._kept.value("trakt_access_token", "") or "")
 
     @property
     def refresh_token(self) -> str:
-        return self.settings.value("trakt_refresh_token", "") or ""
+        return str(self._kept.value("trakt_refresh_token", "") or "")
 
     def is_connected(self) -> bool:
         return bool(self.access_token and self.client_id)
@@ -142,16 +151,13 @@ class TraktClient:
     def disconnect(self) -> None:
         # The favorites list belongs to the account: signing in to another
         # one must not go on writing to a list slug that is not theirs.
-        for k in ("trakt_access_token", "trakt_refresh_token",
-                  "trakt_expires_at", "trakt_fav_list_slug"):
-            self.settings.remove(k)
+        self._kept.drop(*TOKEN_KEYS)
 
     def _store_tokens(self, data: dict) -> None:
-        self.settings.setValue("trakt_access_token", data.get("access_token", ""))
-        self.settings.setValue("trakt_refresh_token", data.get("refresh_token", ""))
-        self.settings.setValue(
-            "trakt_expires_at",
-            int(time.time()) + int(data.get("expires_in", 0)))
+        self._kept.put({
+            "trakt_access_token": data.get("access_token", ""),
+            "trakt_refresh_token": data.get("refresh_token", ""),
+            "trakt_expires_at": int(time.time()) + int(data.get("expires_in", 0))})
 
     # -- device-code OAuth flow ----------------------------------------------
 
@@ -247,7 +253,7 @@ class TraktClient:
 
     def _expires_at(self) -> int:
         try:
-            return int(self.settings.value("trakt_expires_at", 0) or 0)
+            return int(self._kept.value("trakt_expires_at", 0) or 0)
         except (TypeError, ValueError):
             return 0
 
@@ -522,7 +528,7 @@ class TraktClient:
     def _ensure_fav_list(self) -> str | None:
         """Return the slug of the personal 'dopeIPTV Favorites' list,
         creating it (and caching the slug) on first use."""
-        slug = self.settings.value("trakt_fav_list_slug", "") or ""
+        slug = str(self._kept.value("trakt_fav_list_slug", "") or "")
         if slug:
             return slug
         try:
@@ -533,7 +539,7 @@ class TraktClient:
                 if lst.get("name") == self.FAV_LIST_NAME:
                     slug = (lst.get("ids") or {}).get("slug") or ""
                     if slug:
-                        self.settings.setValue("trakt_fav_list_slug", slug)
+                        self._kept.put({"trakt_fav_list_slug": slug})
                         return slug
             r = requests.post(
                 f"{API}/users/me/lists",
@@ -544,7 +550,7 @@ class TraktClient:
             r.raise_for_status()
             slug = (r.json().get("ids") or {}).get("slug") or ""
             if slug:
-                self.settings.setValue("trakt_fav_list_slug", slug)
+                self._kept.put({"trakt_fav_list_slug": slug})
             return slug or None
         except Exception:
             return None

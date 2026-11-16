@@ -271,12 +271,16 @@ def on_gui_thread(fn: Callable[..., Any], *args: Any) -> None:
         fn(*args)
         return
     global _gui_calls
+    from PyQt6 import sip
     with _gui_lock:
-        if _gui_calls is None:
+        calls = _gui_calls
+        # Made again when the application it was made for has gone (a
+        # test's, before another's): Qt deleted it with that one.
+        if calls is None or sip.isdeleted(calls) or calls.thread() is not app.thread():
             calls = _GuiCalls()
             calls.moveToThread(app.thread())
             _gui_calls = calls
-    _gui_calls.call.emit((fn, args))
+    calls.call.emit((fn, args))
 
 
 def _image_get(url: str) -> Callable[..., Any]:

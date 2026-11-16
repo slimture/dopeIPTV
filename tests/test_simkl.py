@@ -3,6 +3,7 @@ says about the app, the bodies of scrobbles, marks and the watchlist, and
 the account's lists read back - against a stand-in for Simkl's API that
 answers the way its documentation shows."""
 import json
+import threading
 import time
 import logging
 
@@ -12,8 +13,11 @@ from dopeiptv.providers import simkl
 
 
 class FakeSettings:
-    def __init__(self):
-        self.d = {}
+    """A settings file holding *stored* already (the client reads its
+    sign-in once, when it is made)."""
+
+    def __init__(self, **stored):
+        self.d = dict(stored)
 
     def value(self, key, default=None):
         return self.d.get(key, default)
@@ -104,12 +108,15 @@ class FakeSimkl:
         return [(c[1].split("api.simkl.com", 1)[1], c[4]) for c in self.calls if c[0] == "POST"]
 
 
+def _signed_in(fake, **stored):
+    return simkl.SimklClient(FakeSettings(**{simkl.TOKEN_KEY: "TOKEN-123", **stored}),
+                             session=fake, client_id="CID")
+
+
 @pytest.fixture
 def client():
     fake = FakeSimkl()
-    c = simkl.SimklClient(FakeSettings(), session=fake, client_id="CID")
-    c.settings.setValue(simkl.TOKEN_KEY, "TOKEN-123")
-    return c, fake
+    return _signed_in(fake), fake
 
 
 def test_the_client_id_comes_with_the_build(monkeypatch):
@@ -120,7 +127,7 @@ def test_the_client_id_comes_with_the_build(monkeypatch):
     monkeypatch.setenv("DOPEIPTV_SIMKL_CLIENT_ID", " abc ")
     assert simkl.bundled_client_id() == "abc" and c.available()
     assert not c.is_connected()
-    c.settings.setValue(simkl.TOKEN_KEY, "t")
+    c = simkl.SimklClient(FakeSettings(**{simkl.TOKEN_KEY: "t"}))
     assert c.is_connected()
     c.disconnect()
     assert not c.is_connected() and simkl.TOKEN_KEY not in c.settings.d
@@ -171,10 +178,10 @@ def test_the_pin_sign_in_is_auth_v2s_device_flow(monkeypatch):
     assert "not enabled for OAuth 2.0" in str(e.value)
 
 
-def test_the_access_token_is_renewed_before_it_runs_out_and_on_a_401(client):
-    c, fake = client
-    c.settings.setValue(simkl.REFRESH_KEY, "simkl_rt_R")
-    c.settings.setValue(simkl.EXPIRES_KEY, int(time.time()) + 60)   # nearly out
+def test_the_access_token_is_renewed_before_it_runs_out_and_on_a_401():
+    fake = FakeSimkl()
+    c = _signed_in(fake, **{simkl.REFRESH_KEY: "simkl_rt_R",
+                            simkl.EXPIRES_KEY: int(time.time()) + 60})   # nearly out
     fake.token_answers = [Resp(200, dict(TOKENS, access_token="FRESH"))]
     c.watched_movies()
     refresh = [x for x in fake.calls if x[1].endswith("/oauth2/token")]
@@ -184,15 +191,89 @@ def test_the_access_token_is_renewed_before_it_runs_out_and_on_a_401(client):
     gets = [x for x in fake.calls if x[0] == "GET"]
     assert gets[-1][3]["Authorization"] == "Bearer FRESH"
     # Refused (revoked from Simkl, or 180 days unused): forgotten, connect again.
-    c.settings.setValue(simkl.EXPIRES_KEY, int(time.time()) + 60)
     fake.token_answers = [Resp(400, {"error": "invalid_grant"})]
     assert c.refresh() is False and not c.is_connected()
     assert c.settings.value(simkl.REFRESH_KEY) is None
 
 
-def test_signing_out_revokes_the_grant(client):
-    c, fake = client
-    c.settings.setValue(simkl.REFRESH_KEY, "simkl_rt_R")
+class _ThreadSettings(FakeSettings):
+    """Notes every read and write of the sign-in made off the main thread
+    (the window's)."""
+
+    def __init__(self, **stored):
+        super().__init__(**stored)
+        self.off_main = []
+
+    def _note(self, what, key):
+        if key.startswith("simkl_") and threading.current_thread() is not threading.main_thread():
+            self.off_main.append((what, key))
+
+    def value(self, key, default=None):
+        self._note("read", key)
+        return super().value(key, default)
+
+    def setValue(self, key, value):  # noqa: N802
+        self._note("write", key)
+        super().setValue(key, value)
+
+    def remove(self, key):
+        self._note("remove", key)
+        super().remove(key)
+
+
+def _on_a_worker(fn):
+    out = {}
+
+    def run():
+        try:
+            out["result"] = fn()
+        except Exception as e:  # noqa: BLE001 - handed back to the test
+            out["error"] = e
+    t = threading.Thread(target=run)
+    t.start()
+    t.join(10)
+    if "error" in out:
+        raise out["error"]
+    return out.get("result")
+
+
+def test_a_renewal_on_a_worker_is_used_at_once_and_written_on_the_windows_thread():
+    widgets = pytest.importorskip("PyQt6.QtWidgets")
+    app = widgets.QApplication.instance() or widgets.QApplication([])
+    keys = (simkl.TOKEN_KEY, simkl.REFRESH_KEY, simkl.EXPIRES_KEY)
+    fake = FakeSimkl()
+    s = _ThreadSettings(**{simkl.TOKEN_KEY: "OLD", simkl.REFRESH_KEY: "simkl_rt_R",
+                           simkl.EXPIRES_KEY: int(time.time()) + 60})
+    c = simkl.SimklClient(s, session=fake, client_id="CID")
+    fake.token_answers = [Resp(200, dict(TOKENS, access_token="FRESH"))]
+    _on_a_worker(c.watched_movies)
+    gets = [x for x in fake.calls if x[0] == "GET"]
+    assert gets[-1][3]["Authorization"] == "Bearer FRESH"        # the new one, at once
+    assert c.access_token == "FRESH" and s.d[simkl.TOKEN_KEY] == "OLD"
+    app.processEvents()                                           # the window's thread writes it
+    assert s.d[simkl.TOKEN_KEY] == "FRESH" and s.d[simkl.REFRESH_KEY] == "simkl_rt_R"
+    assert int(s.d[simkl.EXPIRES_KEY]) > time.time() + 6 * 86400
+    # Refused on a worker: forgotten at once, and in the settings on the window's thread.
+    fake.token_answers = [Resp(400, {"error": "invalid_grant"})]
+    assert _on_a_worker(c.refresh) is False
+    assert not c.is_connected() and simkl.TOKEN_KEY in s.d
+    app.processEvents()
+    assert not any(k in s.d for k in keys)
+    assert s.off_main == []                                       # never read or written there
+    # Signed out here while a renewal's write is still on its way: it brings nothing back.
+    s = _ThreadSettings(**{simkl.TOKEN_KEY: "OLD", simkl.REFRESH_KEY: "simkl_rt_R"})
+    c = simkl.SimklClient(s, session=fake, client_id="CID")
+    fake.token_answers = [Resp(200, dict(TOKENS, access_token="LATE"))]
+    assert _on_a_worker(c.refresh) is True
+    c.disconnect()
+    assert not c.is_connected() and not any(k in s.d for k in keys)
+    app.processEvents()
+    assert not any(k in s.d for k in keys) and s.off_main == []
+
+
+def test_signing_out_revokes_the_grant():
+    fake = FakeSimkl()
+    c = _signed_in(fake, **{simkl.REFRESH_KEY: "simkl_rt_R"})
     c.disconnect()
     assert not c.is_connected() and c.settings.value(simkl.REFRESH_KEY) is None
     for _ in range(50):

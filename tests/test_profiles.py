@@ -242,6 +242,42 @@ def test_a_trakt_sign_in_is_the_profiles_own(tmp_path):
         "simkl_access_token", "") == ""
 
 
+def test_a_renewal_on_a_worker_after_a_switch_is_kept_by_its_own_profile(tmp_path, monkeypatch):
+    """The sign-in is in the client's memory, renewed there on a worker and
+    written on the window's thread - through the profile's pinned view, so
+    into the profile that signed in, whoever is in use by then."""
+    import threading
+    import time
+    widgets = pytest.importorskip("PyQt6.QtWidgets")
+    app = widgets.QApplication.instance() or widgets.QApplication([])
+    from dopeiptv.providers import trakt as T
+
+    class Answer:
+        status_code = 200
+
+        def json(self):
+            return {"access_token": "me-new", "refresh_token": "me-ref2", "expires_in": 86400}
+    monkeypatch.setattr(T.requests, "post", lambda *a, **k: Answer())
+    views, store, kid = _two(tmp_path)
+    me = T.TraktClient(profiles.pinned(views["main"], MAIN_ID))     # "tok", due long ago
+    profiles.activate(kid.id)                                       # Lisa's turn now
+    got = {}
+    t = threading.Thread(target=lambda: got.update(me._headers()))
+    t.start()
+    t.join(10)
+    assert got["Authorization"] == "Bearer me-new" and me.refresh_token == "me-ref2"
+    assert profiles.pinned(views["main"], MAIN_ID).value("trakt_access_token") == "tok"
+    end = time.monotonic() + 5
+    while (profiles.pinned(views["main"], MAIN_ID).value("trakt_access_token") == "tok"
+           and time.monotonic() < end):
+        app.processEvents()
+        time.sleep(0.01)
+    mine = profiles.pinned(views["main"], MAIN_ID)
+    assert (mine.value("trakt_access_token"), mine.value("trakt_refresh_token")) == ("me-new", "me-ref2")
+    assert views["main"].value("trakt_access_token", "") == ""       # Lisa's is still none
+    assert T.TraktClient(mine).access_token == "me-new"              # a client made later reads it
+
+
 def test_a_simkl_sign_in_is_the_profiles_own_with_its_refresh_token(tmp_path):
     # The access token alone was a profile's own: the refresh token and its
     # expiry were the household's, so a second sign-in took the first
