@@ -41,6 +41,189 @@ def test_the_search_key_is_the_guide_searchs_and_a_users_key_carries_over():
     assert shortcut_keys.from_settings(S())["epg_search"] == "Ctrl+Alt+S"
 
 
+# -- what a hit does, on a window of stubs (no Qt window, no thread) ------------------
+
+class _Settings:
+    def __init__(self):
+        self.d = {}
+
+    def value(self, key, default=None):
+        return self.d.get(key, default)
+
+    def setValue(self, key, value):
+        self.d[key] = value
+
+
+class _Playlists:
+    def __init__(self, playlists, active):
+        self.items = {p["id"]: p for p in playlists}
+        self.active_id = active
+
+    def get(self, pid):
+        return self.items.get(pid)
+
+    def active(self):
+        return self.items.get(self.active_id)
+
+    def playlists(self):
+        return list(self.items.values())
+
+
+class _Nordic:
+    def live_url(self, sid, fmt="ts"):
+        return f"http://nordic/live/{sid}.{fmt}"
+
+
+def _stub_window(monkeypatch):
+    from dopeiptv.core.stores import CategoryOverrides, ChannelOverrides
+    from dopeiptv.services import search_sources as ss
+    from dopeiptv.ui import mw_failover, mw_search_all
+
+    class Parental:
+        session_unlocked = False
+
+    class W(mw_search_all._SearchAllMixin, mw_failover._FailoverMixin):
+        def __init__(self):
+            self.settings = _Settings()
+            self.playlist_store = _Playlists(
+                [{"id": "a", "name": "Pirat", "kind": "xtream", "options": {"ua": "a"}},
+                 {"id": "b", "name": "Nordic", "kind": "xtream", "options": {"ua": "b"}}], "a")
+            self.overrides = CategoryOverrides(self.settings, "category_overrides_a")
+            self.channel_ov = ChannelOverrides(self.settings, "channel_overrides_a")
+            self.parental = Parental()
+            self.client = self.xmltv = self.pool = None
+            self._sa_sources = ss.Sources(make_client=lambda pl: _Nordic())
+            self.here, self.toasts, self.status, self.queries = [], [], [], []
+            self.refuse = False
+            self._last_playback = None
+
+        def _show_toast(self, text, ms=0):
+            self.toasts.append(text)
+
+        def _own(self, settings):
+            return settings
+
+        def _set_status(self, text, error=False, emphasis=False):
+            self.status.append(text)
+
+        def play_live_channel(self, row):
+            self.here.append(row["stream_id"])
+
+        def _start_playback(self, url, title, icon, key, kind, record=True, **kw):
+            if self.refuse:         # a recording's question answered Keep watching
+                return
+            self._failover_leave(url, key)
+            self._last_playback = {"url": url, "key": key, "kind": kind}
+
+    jobs = []
+    monkeypatch.setattr(mw_search_all, "run_async",
+                        lambda pool, fn, ok, fail=None, *a: jobs.append((fn, ok)))
+    return W(), jobs
+
+
+def _hit(source_id, sid=8):
+    from dopeiptv.core import search_all as sa
+    return sa.Hit("channels", sa.Source(source_id, source_id.upper()),
+                  {"stream_id": sid, "name": "Vegas"}, "Vegas")
+
+
+def test_a_hit_of_a_source_removed_since_is_never_played_from_the_one_in_use(monkeypatch):
+    from dopeiptv.i18n import tr
+    w, jobs = _stub_window(monkeypatch)
+    w.playlist_store.items.pop("b")                 # removed while its results show
+    w._sa_play_channel(_hit("b"))
+    assert w.here == [] and jobs == []
+    assert w.toasts == [tr("sa_source_gone", source="B")]
+    later = _hit("b")                                 # nor a reminder kept for it
+    later.group, later.programme = "programmes", {
+        "title": "Vegas Report", "start_timestamp": 4_000_000_000,
+        "stop_timestamp": 4_000_003_600}
+    w._sa_remind(later)
+    assert "epg_reminders_b" not in w.settings.d
+    # The one in use plays here; with no source of the user's (the demo),
+    # its channels are the client's in use.
+    w._sa_play_channel(_hit("a", 1))
+    assert w.here == [1]
+    w.playlist_store = _Playlists([], None)
+    w._sa_play_channel(_hit("-", 2))
+    assert w.here == [1, 2]
+
+
+def test_another_sources_address_that_comes_late_never_takes_over(monkeypatch):
+    from dopeiptv.core import nerd
+    w, jobs = _stub_window(monkeypatch)
+    try:
+        w._sa_play_channel(_hit("b"))
+        fn, ok = jobs.pop()
+        w._start_playback("http://pirat/live/1.ts", "Pirat 1", None, 1, "live")  # picked meanwhile
+        ok(fn())
+        assert w._last_playback["key"] == 1 and w._failover_source is None
+        # Nothing else meanwhile: it plays, from Nordic.
+        w._sa_play_channel(_hit("b"))
+        fn, ok = jobs.pop()
+        ok(fn())
+        assert w._last_playback == {"url": "http://nordic/live/8.ts", "key": "failover:b:8",
+                                    "kind": "live"}
+        # A film of Nordic's: switched to first - and something played while
+        # that source answers is not taken over either.
+        switched = []
+        w.switch_playlist = lambda pid, then=None: switched.append(then)
+        w._links_later = lambda *a: False
+        w._item_key = lambda row: f"m{row['stream_id']}"
+        w.client = _Nordic()
+        w.client.vod_url = lambda sid, ext=None: f"http://nordic/movie/{sid}.mp4"
+        film = _hit("b", 60)
+        film.group = "movies"
+        w._sa_play_movie(film)
+        w._start_playback("http://pirat/live/3.ts", "Pirat 3", None, 3, "live")
+        switched.pop()()
+        assert w._last_playback["key"] == 3
+    finally:
+        nerd.set_source(None)
+
+
+def test_another_sources_channel_not_played_leaves_what_plays_as_it_was(monkeypatch):
+    from dopeiptv.core import nerd
+    w, jobs = _stub_window(monkeypatch)
+    try:
+        nerd.set_source(w.playlist_store.active())
+        w._start_playback("http://pirat/live/1.ts", "Pirat 1", None, 1, "live")
+        w.refuse = True
+        w._sa_play_channel(_hit("b"))
+        fn, ok = jobs.pop()
+        ok(fn())
+        # Pirat's channel goes on: its own options, counted as Pirat's.
+        assert w._last_playback["key"] == 1
+        assert w._failover_source is None and w._failover_key is None
+        assert nerd.source() == {"ua": "a", "_kind": "xtream"}
+    finally:
+        nerd.set_source(None)
+
+
+def test_results_found_before_a_sources_rules_changed_are_not_acted_on(monkeypatch):
+    w, _jobs = _stub_window(monkeypatch)
+
+    class Page:
+        shown = "results"
+
+        def show_results(self, results, keep_place=True):
+            self.shown = results
+
+        def query(self):
+            return "vegas"
+
+    w._search_page = Page()
+    w._sa_query = lambda text, keep_place=False: w.queries.append(text)
+    w._sa_made_for = w._sa_made_key()
+    assert w._sa_still_allowed()
+    w.overrides.update("live", "sp", hidden=True)    # Sport hidden since
+    assert not w._sa_still_allowed()
+    assert w._search_page.shown is None and w.queries == ["vegas"]
+    w._sa_made_for = w._sa_made_key()
+    w.settings.setValue("channel_overrides_b", '{"live": {"8": {"hidden": true}}}')
+    assert not w._sa_still_allowed()                 # a channel of Nordic's hidden by hand
+
+
 _CHILD = r"""
 import os, sys, tempfile, time
 from array import array
@@ -361,6 +544,16 @@ w._open_search_page()
 pump()
 assert page.query() == "" and page.results is None
 privacy.set_private(False)
+
+# -- its key while the video fills the screen: the page in the window, shown ------------
+w.switch_mode("live")
+pump()
+w._enter_docked_fullscreen()
+pump()
+assert w._player_fs
+w._shortcut_run("epg_search")
+settle(lambda: page.isVisible())
+assert not w._player_fs and w._search_page_showing()
 print("SEARCH_PAGE_OK", flush=True)
 os._exit(0)
 """

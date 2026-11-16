@@ -43,7 +43,7 @@ from PyQt6 import sip
 from PyQt6.QtCore import QObject, QPoint, QThreadPool
 from PyQt6.QtWidgets import QApplication, QMenu
 
-from ..core import privacy, profiles
+from ..core import nerd, privacy, profiles
 from ..core import search_all as sa
 from ..core.log import log
 from ..core.palette_match import words
@@ -124,6 +124,11 @@ class _SearchAllMixin:
         *text* in it and looked up when given (the palette's row)."""
         if getattr(self, "_tv_on", False):
             return                      # TV mode has a search of its own
+        if getattr(self, "_player_fs", False):
+            # The video fills the screen and the pane is folded away: back
+            # to the window, the video playing on docked - else the page
+            # went into the hidden pane and nothing showed.
+            self._exit_player_fullscreen()
         active = QApplication.activeWindow()
         if active is not None and active is not self:
             # From the guide's window: the page is the main window's.
@@ -143,9 +148,10 @@ class _SearchAllMixin:
         self._mid_stack.setCurrentWidget(page)
         self._sa_return_home = back_home
         self._check_nav("search")
-        made_for = self._sa_who()
+        made_for = self._sa_made_key()
         if self._sa_made_for is not None and self._sa_made_for != made_for:
-            # Found for another profile, or with the lock open: not shown.
+            # Found for another profile, with the lock open, or before a
+            # source's rules changed: not shown.
             page.show_results(None, keep_place=False)
             self._sa_made_for = None
         self._sa_prepare()
@@ -211,6 +217,13 @@ class _SearchAllMixin:
         kids = bool(getattr(self, "_profile_kids", lambda: False)())
         locked = kids or not getattr(self.parental, "session_unlocked", False)
         return (profiles.active_id(), kids, locked)
+
+    def _sa_made_key(self, plans: list[ss.Plan] | None = None) -> tuple:
+        """What results are found for: whoever uses the window and every
+        source's rules (a category hidden or locked since, a channel hidden
+        by hand) - results made for another are not shown or acted on."""
+        plans = self._sa_plans() if plans is None else plans
+        return (self._sa_who(), tuple(p.key for p in plans))
 
     def _sa_plans(self) -> list[ss.Plan]:
         """Every source searched, as the window has it now (its thread):
@@ -334,7 +347,7 @@ class _SearchAllMixin:
         page.set_busy(bool(self._sa_loading))
         active = next((p.source.id for p in plans if p.client is not None), "")
         latest = self._sa_latest
-        made_for = self._sa_who()
+        made_for = self._sa_made_key(plans)
         run_async(self._sa_pool(1),
                   partial(sa.search, text, cats, guides, time.time(), latest, gen, sa.CAP, active),
                   partial(self._sa_found, gen, keep_place, made_for),
@@ -373,10 +386,14 @@ class _SearchAllMixin:
 
     def _sa_is_active(self, source: sa.Source) -> bool:
         store = getattr(self, "playlist_store", None)
-        active = str(getattr(store, "active_id", "") or "") if store is not None else ""
-        if store is None or store.get(source.id) is None:
-            return True                 # the demo's channels: the client in use
-        return source.id == active
+        if store is None:
+            return True
+        # With no source of the user's in use (the demo's channels) the
+        # page searched the client in use under the active id, or "-"
+        # (_sa_plans). A source removed since is none of them: its rows are
+        # never played, reminded or recorded from the source in use.
+        active = str(getattr(store, "active_id", "") or "")
+        return source.id == (active or "-")
 
     def _sa_playlist(self, source: sa.Source) -> dict | None:
         store = getattr(self, "playlist_store", None)
@@ -386,9 +403,10 @@ class _SearchAllMixin:
         return pl
 
     def _sa_still_allowed(self) -> bool:
-        """The results were found for whoever uses the window now (a profile
-        switched or the lock shut since: found again, nothing acted on)."""
-        if self._sa_made_for is not None and self._sa_made_for != self._sa_who():
+        """The results were found for whoever uses the window now and the
+        sources' rules as they are (a profile switched, the lock shut, a
+        category hidden since: found again, nothing acted on)."""
+        if self._sa_made_for is not None and self._sa_made_for != self._sa_made_key():
             page = self._search_page
             if page is not None:
                 page.show_results(None, keep_place=False)
@@ -424,7 +442,9 @@ class _SearchAllMixin:
         switching to it: its address asked for off the window's thread (a
         portal's create_link, a box's lists), then the window's path."""
         self._sa_play_gen += 1
-        gen = self._sa_play_gen
+        # (The two generations: another hit asked for since, or anything
+        # started or stopped since - failover's moves on with each.)
+        gen = (self._sa_play_gen, self._failover_gen)
         client = self._sa_store().client(pl)
         fmt = self.settings.value("stream_format", "ts")
         self._set_status(tr("status_loading_content"))
@@ -432,17 +452,29 @@ class _SearchAllMixin:
                   partial(self._sa_address_in, gen, pl, row),
                   partial(self._sa_address_failed, gen, row))
 
-    def _sa_address_in(self, gen: int, pl: dict, row: dict, url: str) -> None:
-        if gen != self._sa_play_gen:
+    def _sa_address_in(self, gen: tuple, pl: dict, row: dict, url: str) -> None:
+        if gen != (self._sa_play_gen, self._failover_gen):
             return                      # something else was chosen meanwhile
         if not url:
             self._sa_address_failed(gen, row, "no address")
             return
         log.info("search: %s from another source", for_log(row.get("name")))
+        before = getattr(self, "_last_playback", None)
+        kept = (self._failover_source, self._failover_url, self._failover_named,
+                self._failover_row, self._failover_key)
         self._play_other_source(pl, row, url)
+        if getattr(self, "_last_playback", None) is before:
+            # Not played (a recording's question answered Keep watching,
+            # the VPN guard, a box's tuners): what plays keeps its own
+            # source's options and is counted against its own account.
+            (self._failover_source, self._failover_url, self._failover_named,
+             self._failover_row, self._failover_key) = kept
+            store = getattr(self, "playlist_store", None)
+            nerd.set_source(kept[0] if kept[0] is not None
+                            else store.active() if store is not None else None)
 
-    def _sa_address_failed(self, gen: int, row: dict, err: Any = None) -> None:
-        if gen != self._sa_play_gen:
+    def _sa_address_failed(self, gen: tuple, row: dict, err: Any = None) -> None:
+        if gen != (self._sa_play_gen, self._failover_gen):
             return
         log.info("search: no address for %s: %s", for_log(row.get("name")), err)
         self._set_status(tr("sa_no_address", name=str(row.get("name") or "")), error=True)
@@ -466,7 +498,14 @@ class _SearchAllMixin:
             then()
 
     def _sa_play_movie(self, hit: sa.Hit) -> None:
-        self._sa_on_source(hit.source, partial(self._sa_movie_here, hit.row))
+        self._sa_on_source(hit.source, partial(self._sa_movie_if_still, self._failover_gen,
+                                               hit.row))
+
+    def _sa_movie_if_still(self, started: int, row: dict) -> None:
+        """The film, unless something was played or stopped while its
+        source was switched to (failover's generation moved on)."""
+        if started == self._failover_gen:
+            self._sa_movie_here(row)
 
     def _sa_movie_here(self, row: dict) -> None:
         """A film of the source in use, in the docked player - with the
@@ -510,8 +549,12 @@ class _SearchAllMixin:
         """A reminder for the programme - said so; given again (*toggle*),
         taken away."""
         p, ch = hit.programme, hit.row
+        if p is None or ch.get("stream_id") is None:
+            return
+        if not self._sa_is_active(hit.source) and self._sa_playlist(hit.source) is None:
+            return                      # its source was removed since
         rem = self._sa_reminder_store(hit.source)
-        if p is None or rem is None or ch.get("stream_id") is None:
+        if rem is None:
             return
         title = str(p.get("title") or ch.get("name") or "")
         if rem.has(ch.get("stream_id"), p["start_timestamp"]):
