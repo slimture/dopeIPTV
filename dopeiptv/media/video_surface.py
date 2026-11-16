@@ -17,6 +17,30 @@ from ..i18n import tr
 from .players import _libmpv, _register_error_callback
 
 
+def gui_render_tuned() -> bool:
+    """DOPEIPTV_GUI_RENDER=tuned: the window-thread surface (_MpvGLWidget)
+    without the waits it puts on the window's thread - mpv's render does not
+    block until the frame's display time (and mpv hands the frame over at
+    that time instead of 50 ms early, so sound and picture stay together),
+    the window's swap does not wait for vsync, and a repaint is asked only
+    when mpv has a new frame. Off unless asked for: without it this surface
+    is exactly what it always was."""
+    return os.environ.get("DOPEIPTV_GUI_RENDER", "").strip().lower() == "tuned"
+
+
+def prepare_gui_render() -> None:
+    """Before the first window: no vsync wait for the windows' own GL
+    composition while DOPEIPTV_GUI_RENDER=tuned (nothing otherwise)."""
+    if not gui_render_tuned():
+        return
+    from PyQt6.QtGui import QSurfaceFormat
+    fmt = QSurfaceFormat.defaultFormat()
+    fmt.setSwapInterval(0)
+    QSurfaceFormat.setDefaultFormat(fmt)
+    log.info("video: window-thread render tuned (no target-time block, "
+             "swap interval 0)")
+
+
 def _env_num(name: str, default, cast):
     """Read a numeric override from the environment, falling back to *default*
     when unset or malformed (so a stray value can never abort player start)."""
@@ -60,6 +84,131 @@ def _create_core():
                 k[5:].replace("_", "-") for k in extra))
         return core
     raise last or RuntimeError("mpv could not be created")
+
+def build_core(owner, tuned: bool = False):
+    """The player's mpv core with the app's options: what every video
+    surface plays with (owner: its hwdec_pref, EXTRA_OPTS and
+    variant_picker; tuned: DOPEIPTV_GUI_RENDER=tuned's timing)."""
+    # libmpv hard-requires LC_NUMERIC="C" and segfaults inside
+    # mpv_create() on anything else ("Non-C locale detected"). Qt's
+    # QApplication constructor calls setlocale(LC_ALL, "") on Unix, so on
+    # any system whose locale uses a decimal comma (de_DE, fr_FR, ...)
+    # the process arrives here with the wrong numeric locale - the env
+    # vars set at startup don't help when the user's LC_ALL overrides
+    # them, and native file dialogs can re-run setlocale long after
+    # startup. Resetting the one category libmpv cares about, right
+    # before the instance is created, is the fix python-mpv's own README
+    # prescribes; Qt and Python formatting don't read the C locale, so
+    # nothing else changes.
+    import locale
+    try:
+        locale.setlocale(locale.LC_NUMERIC, "C")
+    except locale.Error as e:
+        log.warning("could not set LC_NUMERIC=C: %s", e)
+    # vo=libmpv is mandatory for the render API and exists in every
+    # libmpv build - create the instance with just that (plus a quiet
+    # terminal), then apply the rest tolerantly below.
+    log.info("Creating mpv instance...")
+    core = _create_core()
+    # Best-effort options. Some minimal libmpv builds (notably the one
+    # compiled inside our Flatpak) don't implement every option - e.g.
+    # 'osc'. Passing them all to the constructor makes ONE unknown
+    # option abort the whole player ("mpv option does not exist"), so
+    # set them one at a time and skip any this build rejects.
+    soft = {"user_agent": "dopeIPTV/1.0", "keep_open": "yes",
+            "input_default_bindings": False, "input_vo_keyboard": False,
+            # Video decoding. Default is 'no' (software) - the same default
+            # mpv itself ships. Modern CPUs decode even 4K 10-bit HEVC/HDR
+            # comfortably, and software decode is completely immune to the
+            # GPU/driver hazards of the libmpv OpenGL render API (e.g. the
+            # nvidia-open stack turning hardware-decoded video black once a
+            # subtitle composites). Users who want hardware decoding can opt
+            # in from Settings > Playback (or DOPEIPTV_HWDEC). When enabled,
+            # 'auto-copy-safe' decodes on the GPU and copies the frame back
+            # to RAM for upload as a normal texture, which works with any GL
+            # context and any GPU that has a decoder.
+            # Priority: env override > user setting > software default.
+            "hwdec": (os.environ.get("DOPEIPTV_HWDEC")
+                      or getattr(owner, "hwdec_pref", None)
+                      or "no"),
+            # Safety net for those who opt into hardware decoding: if the
+            # hardware DECODER fails (unsupported codec on this GPU, a
+            # corrupt stream, a driver hiccup), drop to software after a
+            # single failed frame instead of showing garbage. Note this only
+            # catches decoder failures - it does NOT catch render-path GL
+            # errors (e.g. the nvidia-open INVALID_ENUM where the decoder
+            # succeeds but the texture upload corrupts), which is why
+            # software stays the default rather than hardware+fallback.
+            "hwdec_software_fallback": "1",
+            # (No 'osc' option: the on-screen controller is a feature of
+            # the standalone mpv GUI and doesn't exist in the libmpv/render
+            # build we use - setting it only logged a harmless skip.)
+            # Network resilience for live streams: abort a dead connection
+            # instead of hanging forever (that then surfaces as an error we
+            # auto-reconnect from), and let ffmpeg transparently reconnect
+            # dropped HTTP streams. Any option a minimal libmpv build
+            # rejects is skipped by the per-key loop below.
+            "network-timeout": 30,
+            "demuxer-lavf-o": "reconnect=1,reconnect_streamed=1,"
+                              "reconnect_on_network_error=1,"
+                              "reconnect_delay_max=5",
+            # Faster channel switching: ffmpeg otherwise probes up to ~5 s /
+            # 5 MB of a live MPEG-TS stream before it shows the first frame.
+            # A live TS declares its codecs up front, so a shorter probe
+            # reaches the picture much sooner with no practical downside.
+            # Tunable/disable-able via env (seconds / bytes; 0 = ffmpeg's
+            # own default) for streams that need deeper probing.
+            "demuxer-lavf-analyzeduration": _env_num(
+                "DOPEIPTV_ANALYZEDURATION", 1.0, float),
+            "demuxer-lavf-probesize": _env_num(
+                "DOPEIPTV_PROBESIZE", 2_000_000, int),
+            # Never let mpv open its own window, and keep its OSD silent -
+            # otherwise it draws the media title centred on black while a
+            # stream buffers, which can surface as a stray frame.
+            "force-window": "no", "osd-level": 0}
+    if sys.platform == "darwin":
+        from ..core.platform_macos import extra_mpv_opts
+        soft.update(extra_mpv_opts())
+    # Demuxer cache: default to mpv's own buffering (what standalone mpv
+    # uses). A hard byte cap here bounds RAM but also removes the cushion a
+    # high-bitrate VBR 4K stream needs - too small a cap starves the
+    # decoder on bitrate spikes and shows up as a periodic ~10s hitch that
+    # external mpv (bigger default cache) never has. Only cap when the user
+    # explicitly opts in via DOPEIPTV_DEMUX_MAX / DOPEIPTV_DEMUX_MAX_BACK
+    # (e.g. "192MiB"), trading a little smoothness headroom for less RAM.
+    _dmax = os.environ.get("DOPEIPTV_DEMUX_MAX")
+    _dback = os.environ.get("DOPEIPTV_DEMUX_MAX_BACK")
+    if _dmax:
+        soft["demuxer-max-bytes"] = _dmax
+    if _dback:
+        soft["demuxer-max-back-bytes"] = _dback
+    # Video timing. Default is mpv's own (audio) sync - the most tested,
+    # timing-tolerant mode, which suits our QOpenGLWidget surface (Qt
+    # composites the frame, so we can't guarantee the exact display timing
+    # that video-sync=display-resample needs). Enthusiasts can opt into a
+    # display-sync mode with DOPEIPTV_VIDEO_SYNC=display-resample.
+    _vsync = os.environ.get("DOPEIPTV_VIDEO_SYNC")
+    if _vsync:
+        soft["video-sync"] = _vsync
+    if tuned:
+        # The render no longer waits for the frame's display time, so
+        # mpv must not hand the frame over early either.
+        soft["video-timing-offset"] = 0
+    soft.update(owner.EXTRA_OPTS)
+    for key, val in soft.items():
+        try:
+            core[key.replace("_", "-")] = val
+        except Exception as e:
+            log.debug("mpv option %r skipped: %s", key, e)
+    # The Nerd page's options last (nothing while Nerd is off); one this
+    # libmpv rejects is skipped, never fatal.
+    try:
+        from ..core import nerd
+        nerd.apply_core(core, picker=owner.variant_picker)
+    except Exception as e:
+        log.warning("nerd options not applied: %s", e)
+    return core
+
 
 class _MpvGLWidget(QOpenGLWidget):
     """Video surface that owns the mpv render context."""
@@ -111,6 +260,12 @@ class _MpvGLWidget(QOpenGLWidget):
         self._render_suspended = False
         self._gl_init_error: str | None = None
         self._blank = False
+        # DOPEIPTV_GUI_RENDER=tuned (gui_render_tuned): read once per surface.
+        self._tuned = gui_render_tuned()
+        if self._tuned:
+            fmt = self.format()
+            fmt.setSwapInterval(0)
+            self.setFormat(fmt)
         self.frame_ready.connect(self._on_frame_ready)
 
     def _on_frame_ready(self) -> None:
@@ -120,6 +275,25 @@ class _MpvGLWidget(QOpenGLWidget):
         # only clears to black - the pop-out lag that didn't depend on the
         # pop-out's size. The mirror tick is the render loop then.
         if not self._render_suspended:
+            if self._tuned and not self._has_new_frame():
+                return
+            self.update()
+
+    def _has_new_frame(self) -> bool:
+        """Tuned: whether mpv has a frame to show (or one to draw again) -
+        its update callback also comes for things that need no repaint.
+        When in doubt, yes."""
+        ctx = self._ctx
+        if ctx is None:
+            return True
+        try:
+            return bool(ctx.update())
+        except Exception:
+            return True
+
+    def _poll_frame(self) -> None:
+        """Tuned, Windows: the 60 Hz timer repaints only for a new frame."""
+        if self._has_new_frame():
             self.update()
 
     def set_blank(self, blank: bool) -> None:
@@ -276,120 +450,7 @@ class _MpvGLWidget(QOpenGLWidget):
                 tr("embedded_gl_failed")))
 
     def _build_mpv_render(self) -> None:
-        # libmpv hard-requires LC_NUMERIC="C" and segfaults inside
-        # mpv_create() on anything else ("Non-C locale detected"). Qt's
-        # QApplication constructor calls setlocale(LC_ALL, "") on Unix, so on
-        # any system whose locale uses a decimal comma (de_DE, fr_FR, ...)
-        # the process arrives here with the wrong numeric locale - the env
-        # vars set at startup don't help when the user's LC_ALL overrides
-        # them, and native file dialogs can re-run setlocale long after
-        # startup. Resetting the one category libmpv cares about, right
-        # before the instance is created, is the fix python-mpv's own README
-        # prescribes; Qt and Python formatting don't read the C locale, so
-        # nothing else changes.
-        import locale
-        try:
-            locale.setlocale(locale.LC_NUMERIC, "C")
-        except locale.Error as e:
-            log.warning("could not set LC_NUMERIC=C: %s", e)
-        # vo=libmpv is mandatory for the render API and exists in every
-        # libmpv build - create the instance with just that (plus a quiet
-        # terminal), then apply the rest tolerantly below.
-        log.info("Creating mpv instance...")
-        self.mpv = _create_core()
-        # Best-effort options. Some minimal libmpv builds (notably the one
-        # compiled inside our Flatpak) don't implement every option - e.g.
-        # 'osc'. Passing them all to the constructor makes ONE unknown
-        # option abort the whole player ("mpv option does not exist"), so
-        # set them one at a time and skip any this build rejects.
-        soft = {"user_agent": "dopeIPTV/1.0", "keep_open": "yes",
-                "input_default_bindings": False, "input_vo_keyboard": False,
-                # Video decoding. Default is 'no' (software) - the same default
-                # mpv itself ships. Modern CPUs decode even 4K 10-bit HEVC/HDR
-                # comfortably, and software decode is completely immune to the
-                # GPU/driver hazards of the libmpv OpenGL render API (e.g. the
-                # nvidia-open stack turning hardware-decoded video black once a
-                # subtitle composites). Users who want hardware decoding can opt
-                # in from Settings > Playback (or DOPEIPTV_HWDEC). When enabled,
-                # 'auto-copy-safe' decodes on the GPU and copies the frame back
-                # to RAM for upload as a normal texture, which works with any GL
-                # context and any GPU that has a decoder.
-                # Priority: env override > user setting > software default.
-                "hwdec": (os.environ.get("DOPEIPTV_HWDEC")
-                          or getattr(self, "hwdec_pref", None)
-                          or "no"),
-                # Safety net for those who opt into hardware decoding: if the
-                # hardware DECODER fails (unsupported codec on this GPU, a
-                # corrupt stream, a driver hiccup), drop to software after a
-                # single failed frame instead of showing garbage. Note this only
-                # catches decoder failures - it does NOT catch render-path GL
-                # errors (e.g. the nvidia-open INVALID_ENUM where the decoder
-                # succeeds but the texture upload corrupts), which is why
-                # software stays the default rather than hardware+fallback.
-                "hwdec_software_fallback": "1",
-                # (No 'osc' option: the on-screen controller is a feature of
-                # the standalone mpv GUI and doesn't exist in the libmpv/render
-                # build we use - setting it only logged a harmless skip.)
-                # Network resilience for live streams: abort a dead connection
-                # instead of hanging forever (that then surfaces as an error we
-                # auto-reconnect from), and let ffmpeg transparently reconnect
-                # dropped HTTP streams. Any option a minimal libmpv build
-                # rejects is skipped by the per-key loop below.
-                "network-timeout": 30,
-                "demuxer-lavf-o": "reconnect=1,reconnect_streamed=1,"
-                                  "reconnect_on_network_error=1,"
-                                  "reconnect_delay_max=5",
-                # Faster channel switching: ffmpeg otherwise probes up to ~5 s /
-                # 5 MB of a live MPEG-TS stream before it shows the first frame.
-                # A live TS declares its codecs up front, so a shorter probe
-                # reaches the picture much sooner with no practical downside.
-                # Tunable/disable-able via env (seconds / bytes; 0 = ffmpeg's
-                # own default) for streams that need deeper probing.
-                "demuxer-lavf-analyzeduration": _env_num(
-                    "DOPEIPTV_ANALYZEDURATION", 1.0, float),
-                "demuxer-lavf-probesize": _env_num(
-                    "DOPEIPTV_PROBESIZE", 2_000_000, int),
-                # Never let mpv open its own window, and keep its OSD silent -
-                # otherwise it draws the media title centred on black while a
-                # stream buffers, which can surface as a stray frame.
-                "force-window": "no", "osd-level": 0}
-        if sys.platform == "darwin":
-            from ..core.platform_macos import extra_mpv_opts
-            soft.update(extra_mpv_opts())
-        # Demuxer cache: default to mpv's own buffering (what standalone mpv
-        # uses). A hard byte cap here bounds RAM but also removes the cushion a
-        # high-bitrate VBR 4K stream needs - too small a cap starves the
-        # decoder on bitrate spikes and shows up as a periodic ~10s hitch that
-        # external mpv (bigger default cache) never has. Only cap when the user
-        # explicitly opts in via DOPEIPTV_DEMUX_MAX / DOPEIPTV_DEMUX_MAX_BACK
-        # (e.g. "192MiB"), trading a little smoothness headroom for less RAM.
-        _dmax = os.environ.get("DOPEIPTV_DEMUX_MAX")
-        _dback = os.environ.get("DOPEIPTV_DEMUX_MAX_BACK")
-        if _dmax:
-            soft["demuxer-max-bytes"] = _dmax
-        if _dback:
-            soft["demuxer-max-back-bytes"] = _dback
-        # Video timing. Default is mpv's own (audio) sync - the most tested,
-        # timing-tolerant mode, which suits our QOpenGLWidget surface (Qt
-        # composites the frame, so we can't guarantee the exact display timing
-        # that video-sync=display-resample needs). Enthusiasts can opt into a
-        # display-sync mode with DOPEIPTV_VIDEO_SYNC=display-resample.
-        _vsync = os.environ.get("DOPEIPTV_VIDEO_SYNC")
-        if _vsync:
-            soft["video-sync"] = _vsync
-        soft.update(self.EXTRA_OPTS)
-        for key, val in soft.items():
-            try:
-                self.mpv[key.replace("_", "-")] = val
-            except Exception as e:
-                log.debug("mpv option %r skipped: %s", key, e)
-        # The Nerd page's options last (nothing while Nerd is off); one this
-        # libmpv rejects is skipped, never fatal.
-        try:
-            from ..core import nerd
-            nerd.apply_core(self.mpv, picker=self.variant_picker)
-        except Exception as e:
-            log.warning("nerd options not applied: %s", e)
+        self.mpv = build_core(self, tuned=self._tuned)
         log.info("mpv created, creating render context...")
         self._create_render_context()
         _register_error_callback(self.mpv, self.playback_error, self.eof_event)
@@ -414,7 +475,8 @@ class _MpvGLWidget(QOpenGLWidget):
         if sys.platform == "win32":
             if getattr(self, "_render_timer", None) is None:
                 self._render_timer = QTimer(self)
-                self._render_timer.timeout.connect(self.update)
+                self._render_timer.timeout.connect(
+                    self._poll_frame if self._tuned else self.update)
             self._render_timer.start(16)          # ~60 fps
         else:
             self._ctx.update_cb = lambda: self.frame_ready.emit()
@@ -460,11 +522,14 @@ class _MpvGLWidget(QOpenGLWidget):
         try:
             ratio = (self.devicePixelRatioF()
                      if hasattr(self, "devicePixelRatioF") else 1)
-            ctx.render(flip_y=True, opengl_fbo={
-                "w": int(self.width() * ratio),
-                "h": int(self.height() * ratio),
-                "fbo": self.defaultFramebufferObject(),
-            })
+            fbo = {"w": int(self.width() * ratio),
+                   "h": int(self.height() * ratio),
+                   "fbo": self.defaultFramebufferObject()}
+            if self._tuned:
+                ctx.render(flip_y=True, block_for_target_time=False,
+                           opengl_fbo=fbo)
+            else:
+                ctx.render(flip_y=True, opengl_fbo=fbo)
             # The mirror is the SOLE renderer while popped out (the docked
             # surface is suspended), so it reports frame timing to mpv. Its
             # poll-render timer calls this at the display refresh, the standard
@@ -629,11 +694,14 @@ class _MpvGLWidget(QOpenGLWidget):
         try:
             ratio = (self.devicePixelRatioF()
                      if hasattr(self, "devicePixelRatioF") else 1)
-            self._ctx.render(flip_y=True, opengl_fbo={
-                "w": int(self.width() * ratio),
-                "h": int(self.height() * ratio),
-                "fbo": self.defaultFramebufferObject(),
-            })
+            fbo = {"w": int(self.width() * ratio),
+                   "h": int(self.height() * ratio),
+                   "fbo": self.defaultFramebufferObject()}
+            if self._tuned:
+                self._ctx.render(flip_y=True, block_for_target_time=False,
+                                 opengl_fbo=fbo)
+            else:
+                self._ctx.render(flip_y=True, opengl_fbo=fbo)
             if getattr(self, "_paint_state", "") != "render":
                 # First successful mpv render after blank/failure/startup:
                 # the glctx + fbo identities here are the trace's ground

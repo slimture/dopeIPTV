@@ -503,6 +503,9 @@ def main() -> int:
         # X11 aborts outright on a GL widget without GLX; see probe_opengl.
         from .media.players import probe_opengl
         probe_opengl(app.platformName())
+        # DOPEIPTV_GUI_RENDER=tuned only; nothing otherwise.
+        from .media.video_surface import prepare_gui_render
+        prepare_gui_render()
     if _libmpv is not None:
         reason = embedded_playback_reason()
         if reason:
