@@ -73,10 +73,10 @@ map and the one-way import rule.
 | `core/workers.py` | Thread pool helpers, LogoLoader, image caches; `fetch_file`, one image into the disk cache on the caller's thread (the phone remote's logos: timeout, size cap, image types, the same cooldowns) |
 | `core/local_buffer.py` | The seekable window of a live channel's rewind buffer (DVR row) |
 | `core/dvr_store.py` | The app-kept rewind buffer's rolling segment store (retention, readers) |
-| `core/dvr_ingest.py` | Its one provider connection (reconnects as runs, gives up cleanly) |
+| `core/dvr_ingest.py` | Its one provider connection (reconnects as runs, gives up cleanly; a few KB and over is a failed try, a page or a message instead of a stream given up at once, `NotAStream`) |
 | `core/dvr_server.py` | Its loopback server mpv plays from (token, live TS) |
 | `core/dvr_session.py` | `DvrSession`: ingest, store and server for one live channel |
-| `core/dvr_pool.py` | `DvrPool`: every channel's buffer this session (frozen history, one space budget) |
+| `core/dvr_pool.py` | `DvrPool`: every channel's buffer this session (frozen history, one space budget; a channel whose provider sent no stream played without it for a while, `REFUSED_FOR`) |
 | `core/dvr_record.py` | `BufferRecorder`: a recording read from a buffer, no connection of its own |
 | `core/recording.py` | Recording manager; a finished recording saved as MP4 off the window's thread (`_remux`, the command after it with the final file) |
 | `core/rec_mp4.py` | Recordings as MP4: the remux (stream copy, faststart, `.mp4.part` until it passed), what ffmpeg says of a file, when the MP4 is plausibly whole (streams, length, size), the .ts deleted only then (a recording with teletext or subtitles left a .ts on request, `rec_mp4_keep_subs`); the journal of remuxes left for the next start |

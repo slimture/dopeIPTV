@@ -13,6 +13,8 @@ import secrets
 import socket
 import sys
 import threading
+import time
+from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from .dvr_store import SegmentStore
@@ -53,7 +55,7 @@ class _Handler(BaseHTTPRequestHandler):
             return
         store = owner.store
         if m.group(3):
-            store.wait_for_data(FIRST_DATA_WAIT)
+            owner.wait_for_first()
             seg = store.live_segment(LIVE_LEAD)
             if seg is None:
                 self._not_found()
@@ -102,8 +104,12 @@ class _Server(ExclusiveBindMixin, ThreadingHTTPServer):
 
 
 class LocalServer:
-    def __init__(self, store: SegmentStore) -> None:
+    def __init__(self, store: SegmentStore,
+                 gave_up: Callable[[], bool] | None = None) -> None:
         self.store = store
+        # The provider connection gave up: nothing more is coming, so a
+        # live request is answered at once instead of after FIRST_DATA_WAIT.
+        self._gave_up = gave_up or (lambda: False)
         self.token = secrets.token_urlsafe(18)
         self.stopping = False
         self.last_opened: int | None = None
@@ -120,6 +126,14 @@ class LocalServer:
 
     def live_url(self) -> str:
         return f"http://127.0.0.1:{self.port}/{self.token}/live.ts"
+
+    def wait_for_first(self, timeout: float = FIRST_DATA_WAIT) -> None:
+        """Until the provider's first bytes, or until nothing more can come
+        (its connection gave up, the store closed)."""
+        end = time.monotonic() + timeout
+        while not self.store.wait_for_data(max(0.0, min(0.25, end - time.monotonic()))):
+            if self.store.closed or time.monotonic() >= end or self._gave_up():
+                return
 
     def opened(self, seq: int, t0: float | None) -> None:
         self.last_opened = seq

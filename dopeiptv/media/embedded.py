@@ -2847,9 +2847,12 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
 
     def play(self, url: str, title: str, start: float = 0.0,
              *, local_buffer: bool = False,
-             buffer_key: str | None = None, web: bool = False) -> bool:
+             buffer_key: str | None = None, web: bool = False,
+             own_buffer: bool = True) -> bool:
         # local_buffer: a live channel, which gets the rewind buffer unless
-        # Settings turned it off.
+        # Settings turned it off. own_buffer False: never dopeIPTV's own
+        # (an address opened by hand, which need not be a stream at all) -
+        # mpv opens it, with mpv's own rewind.
         live = local_buffer
         # Nerd: the channel this is (set_channel, one-shot) and the settings
         # of its own it plays with - none for anything else.
@@ -2866,7 +2869,8 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, RewindBarMixin,
         self._end_dvr()
         # buffer_key: the channel, whatever its address - a portal hands
         # out a new one each time - so its history is found again.
-        source = self._dvr_start(url, buffer_key) if local_buffer else None
+        source = self._dvr_start(url, buffer_key) \
+            if local_buffer and own_buffer else None
         self._local_buffer_enabled = local_buffer
         self._local_buffer_ready = False
         self._bar_view = self._chosen_bar()

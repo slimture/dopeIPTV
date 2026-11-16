@@ -273,8 +273,8 @@ app = QApplication.instance() or QApplication([])
 s = QSettings(os.path.join(tempfile.mkdtemp(), "s.ini"), QSettings.Format.IniFormat)
 w = MainWindow(DemoClient(), s, PlaylistStore(s))
 calls = []
-w._start_playback = lambda url, title, icon, key, kind, record=True, item=None, catchup=False: \
-    calls.append(["stream", url, title, kind, record])
+w._start_playback = lambda url, title, icon, key, kind, record=True, item=None, catchup=False, \
+    own_buffer=True: calls.append(["stream", url, title, kind, record, own_buffer])
 w._play_local_path = lambda path: calls.append(["file", path])
 w.play_live_channel = lambda it: calls.append(["channel", it["name"]])
 w._show_toast = lambda text, ms=0: calls.append(["toast", text])
@@ -305,8 +305,9 @@ def test_the_window_carries_out_each_command():
     streams = [c for c in calls if c[0] == "stream"]
     files = [c for c in calls if c[0] == "file"]
     # An address plays as a stream named by its last part, kept out of
-    # Recently viewed; a file as one opened from Local files.
-    assert streams == [["stream", "http://h/live/ch.ts?x=1", "ch.ts", "live", False]]
+    # Recently viewed and out of dopeIPTV's own rewind buffer (mpv opens
+    # it: it need not be a stream); a file as one opened from Local files.
+    assert streams == [["stream", "http://h/live/ch.ts?x=1", "ch.ts", "live", False, False]]
     assert len(files) == 2 and files[0][1] == files[1][1] and files[0][1].endswith("Film.mkv")
     assert ["channel", "Sintel"] in calls
     assert any(c[0] == "toast" and "No such channel" in c[1] for c in calls)

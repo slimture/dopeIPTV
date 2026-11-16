@@ -102,8 +102,14 @@ class DvrPlayerMixin:
             self._dvr_pool.configure(minutes * 60, self._dvr_space_bytes())
             session = self._dvr_pool.open(url, key)
         except Exception as e:
-            log.warning("DVR: own buffer unavailable (%s) - playing as before",
-                        e)
+            from ..core.dvr_ingest import NotAStream
+            if isinstance(e, NotAStream):
+                # Its provider sent a page or a message, not a stream: mpv
+                # opens the address itself and says what it found.
+                log.info("DVR: %s, not a stream - playing as before", e)
+            else:
+                log.warning("DVR: own buffer unavailable (%s) - playing as "
+                            "before", e)
             return None
         self._dvr = session
         self._dvr_origin = session.origin

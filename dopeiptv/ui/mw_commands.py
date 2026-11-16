@@ -90,8 +90,11 @@ class _CommandsMixin:
     def _play_address(self, url: str, title: str | None = None) -> None:
         """A file plays as one opened from Local files (resume, its name);
         a page of YouTube, Twitch and the like through yt-dlp
-        (mw_webstreams); any other address as a stream. Kept out of
-        Recently viewed - it is no channel or title of a source."""
+        (mw_webstreams); any other address as a stream - opened by mpv
+        itself, never through dopeIPTV's own rewind buffer: it is no
+        provider's channel and need not be a stream at all (a web page),
+        which mpv then says at once. Kept out of Recently viewed - it is
+        no channel or title of a source."""
         if url.startswith("file://"):
             # file:///C:/Films/a.mkv is C:\Films\a.mkv on Windows.
             from ..core.commands import file_url_path
@@ -104,7 +107,8 @@ class _CommandsMixin:
             self._play_web(url, title)
             return
         title = title or os.path.basename(url.split("?")[0].rstrip("/")) or url
-        self._start_playback(url, title, None, url, "live", record=False)
+        self._start_playback(url, title, None, url, "live", record=False,
+                             own_buffer=False)
 
     def _play_channel_named(self, name: str) -> None:
         client = self.client

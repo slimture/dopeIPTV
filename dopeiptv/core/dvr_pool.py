@@ -21,6 +21,7 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
+from .dvr_ingest import NotAStream
 from .dvr_session import DvrSession, IngestFactory
 from .dvr_store import SegmentStore
 from .log import log, redact_url
@@ -29,6 +30,9 @@ from .log import log, redact_url
 class DvrPool:
     MAX_FROZEN = 8
     TICK = 5.0              # seconds between checks of time and space
+    # How long a channel whose provider sent a page or a message instead of
+    # a stream plays without the buffer (mpv opens it, as before the buffer).
+    REFUSED_FOR = 600.0
 
     def __init__(self, base: Path, keep_seconds: float, max_bytes: int,
                  ingest_factory: IngestFactory | None = None,
@@ -42,6 +46,9 @@ class DvrPool:
         self._factory = ingest_factory
         self._clock = clock
         self._sessions: dict[str, DvrSession] = {}
+        # Channels whose provider sent no stream (NotAStream): what it was,
+        # and when.
+        self._refused: dict[str, tuple[str, float]] = {}
         self.active: DvrSession | None = None
         self._lock = threading.RLock()
         self._stop = threading.Event()
@@ -51,12 +58,24 @@ class DvrPool:
 
     def open(self, url: str, key: str | None = None) -> DvrSession:
         """The session for a channel about to be watched: its own again if
-        it was watched before (or is being recorded), else a new one."""
+        it was watched before (or is being recorded), else a new one.
+        NotAStream for one whose provider sent a page or a message instead
+        of a stream: this session it plays as it did before the buffer
+        (mpv opens the address and says what it found)."""
         key = key or url
         with self._lock:
             s = self._sessions.get(key)
             if s is not None and s.closed:
                 s = None
+            said = self._refused.get(key)
+            if said is not None and time.monotonic() - said[1] > self.REFUSED_FOR:
+                del self._refused[key]  # maybe an outage's page: tried again
+            elif s is not None:
+                self._note_refused(s)
+            if key in self._refused:
+                # Its history (if it streamed before) stays, as any
+                # channel left's, until time or space lets it go.
+                raise NotAStream(self._refused[key][0])
             if s is None:
                 s = DvrSession(url, self.base, self.keep_seconds,
                                self.max_bytes, key=key,
@@ -81,6 +100,7 @@ class DvrPool:
             if self.active is s:
                 self.active = None
             s.last_used = self._clock()
+            self._note_refused(s)
             if s.closed:
                 return
             if s.recording or s.held:
@@ -89,6 +109,16 @@ class DvrPool:
             else:
                 s.freeze()
             self._enforce()
+
+    def _note_refused(self, s: DvrSession) -> None:
+        """Remember a channel whose provider sent no stream - before its
+        session, holding nothing, is let go."""
+        why = s.refused
+        if not why or s.key in self._refused:
+            return
+        self._refused[s.key] = (why, time.monotonic())
+        log.info("DVR pool: %s sent %s - played without the buffer for "
+                 "%.0f min", redact_url(s.url), why, self.REFUSED_FOR / 60)
 
     def _recording_done(self, s: DvrSession) -> None:
         with self._lock:

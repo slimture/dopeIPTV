@@ -265,8 +265,13 @@ for player-overlay colours, which is why `ui/__init__` exposes
    channel: `dvr_ingest` holds the one provider connection, `dvr_store`
    keeps rolling TS segments on disk within the space budget, and
    `dvr_server` serves them to mpv over loopback - so pausing never stalls
-   the download and LIVE never reconnects.  `media/dvr_player.py` is the
-   player's side of it, `media/rewind_bar.py` the bar over the video.
+   the download and LIVE never reconnects.  Only a stream is kept: a
+   connection that brings a few kilobytes and ends is a failed try, and an
+   answer that is plainly no stream (a web page, JSON, a playlist) is given
+   up at once - the pool then plays that channel without the buffer for a
+   while.  An address opened by hand (Open address…) never gets the
+   buffer: mpv opens it.  `media/dvr_player.py` is the player's side of
+   it, `media/rewind_bar.py` the bar over the video.
 
 6. **Recording** uses `RecordingManager`: ffmpeg stream-copy subprocess
    for standalone recordings, mpv's `--stream-record` for in-player

@@ -43,7 +43,7 @@ class DvrSession:
         self.origin = time.time()
         self.last_used = self.origin
         self._factory = ingest_factory or Ingest
-        self.server: LocalServer | None = LocalServer(self.store)
+        self.server: LocalServer | None = LocalServer(self.store, self._gave_up)
         self.ingest = ingest or self._factory(url, self.store)
         self.recorders: list[BufferRecorder] = []
         self.on_recording_done: Callable[["DvrSession"], None] | None = None
@@ -106,6 +106,16 @@ class DvrSession:
         if self._frozen:
             return "frozen"
         return self.ingest.state
+
+    def _gave_up(self) -> bool:
+        ingest = getattr(self, "ingest", None)
+        return ingest is not None and ingest.state == "failed"
+
+    @property
+    def refused(self) -> str | None:
+        """What its provider sent instead of a stream ("a web page"), when
+        that ended its connection (core/dvr_ingest.py's NotAStream)."""
+        return getattr(self.ingest, "refused", None)
 
     @property
     def frozen(self) -> bool:
@@ -214,7 +224,7 @@ class DvrSession:
             self._freezing.join(6.0)
             self._freezing = None
         self.url = url or self.url
-        self.server = LocalServer(self.store)
+        self.server = LocalServer(self.store, self._gave_up)
         self.ingest = self._factory(self.url, self.store)
         self._frozen = False
         self.ingest.start()

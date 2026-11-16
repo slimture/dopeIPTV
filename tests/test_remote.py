@@ -481,7 +481,8 @@ nerd.install(s)
 store = PlaylistStore(s)
 w = MainWindow(make_client(pls[0]), s, store)
 played, media, toasts = [], [], []
-w._start_playback = lambda url, title, icon, key, kind, record=True, item=None, catchup=False: played.append((url, title, kind))
+w._start_playback = lambda url, title, icon, key, kind, record=True, item=None, catchup=False, **_kw: \
+    played.append((url, title, kind))
 w.mpris_command = lambda name, arg=None: media.append((name, arg))
 w._show_toast = lambda text, ms=0: toasts.append(text)
 

@@ -5024,15 +5024,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Play after a Stop plays here, as it always has - not on a cast.
         self._start_playback(last["url"], last["title"], last["icon_url"],
                              last["key"], last["kind"], record=False,
-                             item=last["item"], to_cast=False)
+                             item=last["item"], to_cast=False,
+                             own_buffer=last.get("own_buffer", True))
 
     def _start_playback(self, url: str, title: str, icon_url,
                         key, kind: str, record: bool = True,
                         item=None, catchup: bool = False,
-                        start_at: float = 0.0, to_cast: bool = True) -> None:
+                        start_at: float = 0.0, to_cast: bool = True,
+                        own_buffer: bool = True) -> None:
         # start_at: how far into a catch-up link to start (a portal's
         # archive link plays a programme from its own start).
         # to_cast: a live channel may go to a running cast (False: here).
+        # own_buffer False: an address opened by hand - mpv opens it, never
+        # dopeIPTV's own rewind buffer (it need not be a stream at all).
         if not self._guard_stream_switch(url, title):
             return
         # The guard is about streams: the user's own files always play.
@@ -5113,7 +5117,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._last_playback = {"url": url, "title": title, "icon_url": icon_url,
                                "key": key, "kind": kind, "item": item,
                                "series_ctx": (self.series_ctx
-                                              if kind == "episode" else None)}
+                                              if kind == "episode" else None),
+                               "own_buffer": own_buffer}
         privacy.playback_started(kind, key)
         # Snapshot the ordered episode queue + current index so a natural
         # end-of-episode can autoplay the next one, even if the user browses
@@ -5202,7 +5207,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if self.player.play(url, title, start=resume_at,
                                 local_buffer=kind == "live" and not catchup,
                                 buffer_key=f"{kind}:{key}" if key else None,
-                                web=kind == "web"):
+                                web=kind == "web", own_buffer=own_buffer):
                 self.wake.acquire(tr("wake_playing", title=title))
                 self._health_begin(key, title, item, kind, catchup)
                 self._events_started(key, title, item, kind, catchup)
@@ -5836,6 +5841,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if forget is not None:
                 forget(it["stream_id"])
             self.play_live_channel(it)
+        elif lp.get("url") and not lp.get("own_buffer", True):
+            # An address opened by hand, again as it was opened: as it is,
+            # and out of Recently viewed.
+            self._start_playback(lp["url"], lp["title"], lp.get("icon_url"),
+                                 lp.get("key"), "live", record=False,
+                                 own_buffer=False)
         elif lp.get("url"):
             self._start_playback(lp["url"], lp["title"], lp.get("icon_url"),
                                  lp.get("key"), "live")

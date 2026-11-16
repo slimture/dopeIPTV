@@ -15,13 +15,20 @@ its own, which playback does not cross.
 
 Bytes are moved in large blocks - socket reads and file writes, which leave
 the interpreter lock free while they wait - so the window does not feel it.
+
+Only a stream is kept. A connection that brings a few kilobytes and ends (a
+web page, an error message) is a failed try, not a run: such an address was
+opened again twice a second for ever. And an answer that is plainly no
+stream - a web page, JSON, a playlist, a line of text - is given up at
+once (``NotAStream``), with no try after it; the window then plays the
+address as it did before the buffer (core/dvr_pool.py remembers it).
 """
 from __future__ import annotations
 
 import socket
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from typing import TYPE_CHECKING, Any
 
 from .dvr_store import SegmentStore
@@ -59,14 +66,70 @@ def _hard_close(resp: "requests.Response") -> None:
         pass
 
 
+class NotAStream(Exception):
+    """The provider answered with something that is plainly no stream: what
+    it is ("a web page") is the message."""
+
+
+TS_PACKET = 188
+
+
+def ts_synced(head: bytes) -> bool:
+    """Whether *head* holds MPEG-TS packets: 0x47 every 188 bytes, from any
+    of its first 188 (a relay need not start on a packet)."""
+    n = len(head)
+    for i in range(min(TS_PACKET, n - TS_PACKET)):
+        if (head[i] == 0x47 and head[i + TS_PACKET] == 0x47
+                and (i + 2 * TS_PACKET >= n or head[i + 2 * TS_PACKET] == 0x47)):
+            return True
+    return False
+
+
+def _texty(head: bytes) -> bool:
+    """Printable text all through, as a page or a message is - never a
+    picture or sound, whose bytes are mostly not."""
+    if b"\x00" in head:
+        return False
+    text = head.decode("utf-8", "replace").lstrip("﻿")
+    plain = sum(1 for c in text if c.isprintable() or c in "\r\n\t")
+    return plain >= 0.97 * len(text)
+
+
+def not_a_stream(head: bytes, content_type: str = "") -> str | None:
+    """What *head*, the first bytes of a connection, is when it is plainly
+    no stream - "a web page", "JSON", "a playlist", "text" - else None. A
+    transport stream never is, nor anything binary: an MP3 radio or an FLV
+    channel plays through the buffer as well."""
+    if not head or ts_synced(head) or not _texty(head):
+        return None
+    start = head.lstrip(b"\xef\xbb\xbf \t\r\n")[:8]
+    kind = (content_type or "").split(";", 1)[0].strip().lower()
+    if start.upper().startswith(b"#EXTM3U") or "mpegurl" in kind:
+        return "a playlist"
+    if start.startswith(b"<") or "html" in kind:
+        return "a web page"
+    if start[:1] in (b"{", b"[") or "json" in kind:
+        return "JSON"
+    return "text"
+
+
 class Ingest:
     CHUNK = 64 * 1024
-    MAX_FAILURES = 5            # in a row, without a byte in between
+    MAX_FAILURES = 5            # in a row, without a run that streamed between
     TIMEOUT = (10.0, 20.0)      # connect, and silence while reading
     BACKOFF = 0.5               # doubled per failure, at most 8 s
     # A connection shorter than this that ended is retried after BACKOFF,
     # not at once, so a provider that hangs up straight away is not hammered.
     SHORT_RUN = 2.0
+    # A connection streamed when it brought this much, or went on for
+    # SHORT_RUN once the provider answered; less is a failed try. A web
+    # page or an error message is a few kilobytes and over: counted as
+    # streamed, the failures never added up and it was asked again twice
+    # a second.
+    GOOD_BYTES = 256 * 1024
+    # A connection's first bytes, held back until they show they are no
+    # page or message (not_a_stream).
+    SNIFF = 1024
     # The dropped connection's last bytes, looked for in the next one's start.
     NEEDLE = 10 * 188
     # How long the next connection's start is held back while they are looked
@@ -95,6 +158,9 @@ class Ingest:
         self._resp: Any = None
         self._lock = threading.Lock()
         self.state = "connecting"   # streaming / reconnecting / failed / stopped
+        # What the provider sent instead of a stream, when that was why it
+        # failed ("a web page"): nothing is tried after it.
+        self.refused: str | None = None
         self.connections = 0
         self.merged = 0             # reconnects that went on in the same run
         self._tail = b""            # the current run's last bytes
@@ -148,12 +214,41 @@ class Ingest:
         self.store.new_run()
         self._tail = b""
 
+    @staticmethod
+    def _content_type(resp: Any) -> str:
+        try:
+            return str((getattr(resp, "headers", None) or {}).get("Content-Type") or "")
+        except Exception:
+            return ""
+
+    def _checked(self, resp: Any) -> Iterator[bytes]:
+        """*resp*'s bytes, its first SNIFF held back until they show they
+        are no page or message - else NotAStream."""
+        chunks = resp.iter_content(self.CHUNK)
+        held = bytearray()
+        for chunk in chunks:
+            if self._stop.is_set():
+                return
+            held += chunk
+            if len(held) >= self.SNIFF:
+                break
+        what = not_a_stream(bytes(held[:4 * self.SNIFF]), self._content_type(resp))
+        if what:
+            raise NotAStream(what)
+        if held:
+            yield bytes(held)
+        yield from chunks
+
     def _run(self) -> None:
         failures = 0
         resume = False      # the run before ended; this one may carry it on
         while not self._stop.is_set():
             got = 0
             began = time.monotonic()
+            # When the provider answered: how long it streamed is counted
+            # from there, not from a slow connect (bytes come in CHUNKs, so
+            # the first may only arrive when the connection ends).
+            answered: float | None = None
             head: bytearray | None = None
             block = bytearray()
             try:
@@ -167,18 +262,18 @@ class Ingest:
                         break
                     self._resp = resp
                 resp.raise_for_status()
+                answered = time.monotonic()
                 self.state = "streaming"
                 if resume:
                     head = bytearray()
                 block = bytearray()
                 flushed = time.monotonic()
-                for chunk in resp.iter_content(self.CHUNK):
+                for chunk in self._checked(resp):
                     if self._stop.is_set():
                         break
                     if not chunk:
                         continue
                     got += len(chunk)
-                    failures = 0
                     if head is None:
                         block += chunk
                         now = time.monotonic()
@@ -217,6 +312,12 @@ class Ingest:
                     log.info("DVR ingest: the provider ended the stream "
                              "after %.0f s and %.1f MB",
                              time.monotonic() - began, got / 1e6)
+            except NotAStream as e:
+                if not self._stop.is_set():
+                    self.refused = str(e)
+                    log.info("DVR ingest: the provider sent %s (%s), not a "
+                             "stream - given up, not asked again", e,
+                             self._content_type(resp) or "no type")
             except Exception as e:
                 if not self._stop.is_set():
                     detail = str(e).strip().replace("\n", " ")[:160]
@@ -235,20 +336,33 @@ class Ingest:
                 self._append(bytes(block))      # what came before the drop
             if self._stop.is_set():
                 break
+            if self.refused:
+                if resume:
+                    self._end_run()
+                self.state = "failed"
+                return
             if head is not None:
                 # Ended while its start was still being looked through.
                 self._end_run()
                 resume = False
                 self._append(bytes(head))
-            if got:
+            streamed = got >= self.GOOD_BYTES or (
+                got > 0 and answered is not None
+                and time.monotonic() - answered >= self.SHORT_RUN)
+            if streamed:
                 # Gone on from where it was, or begun anew: either way the
                 # next connection may carry this run on.
+                failures = 0
                 resume = True
                 self._drops = [*self._drops[-9:], time.monotonic()]
             else:
                 failures += 1
-                if resume:
-                    # Nothing came: the run is over for whoever reads it.
+                if got:
+                    log.info("DVR ingest: %.0f KB and over - no stream, try "
+                             "%d of %d", got / 1024, failures, self.MAX_FAILURES)
+                if resume or got:
+                    # The run is over for whoever reads it; what little
+                    # came is one of its own, carried on by nothing.
                     self._end_run()
                     resume = False
             if failures >= self.MAX_FAILURES:
@@ -256,7 +370,7 @@ class Ingest:
                 log.info("DVR ingest: gave up after %d tries", failures)
                 return
             self.state = "reconnecting"
-            if got and time.monotonic() - began >= self.SHORT_RUN:
+            if streamed and time.monotonic() - began >= self.SHORT_RUN:
                 continue            # a long run dropped: straight back
             self._stop.wait(min(8.0, self.BACKOFF * (2 ** failures)))
         self.state = "stopped"
