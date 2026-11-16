@@ -703,3 +703,44 @@ def test_series_page_review_regressions_in_the_window(tmp_path):
     assert "SERIES_REVIEW_OK" in proc.stdout, (
         f"stdout={proc.stdout[-3000:]!r}\nstderr={proc.stderr[-4000:]!r}")
 
+
+def test_the_header_buttons_read_over_a_backdrop_on_a_light_theme(app):
+    """Favorite, Follow, Watch later and ⋯ stand out from the backdrop washed
+    toward a light page - a dark, a mid and a light one - and from the plain
+    surface: their usual fill was nearly the colour under them."""
+    from PyQt6.QtCore import QPoint
+    from PyQt6.QtGui import QColor, QPixmap
+    from dopeiptv.ui import theme
+    from dopeiptv.ui.series_page import SeriesHeader
+    light = [k for k, t in theme.THEMES.items() if t.get("light")]
+    assert len(light) >= 3
+    try:
+        for key in light:
+            theme.apply_theme(theme=key)
+            app.setStyleSheet(theme.build_style())
+            for colour in (QColor(20, 20, 30), QColor(90, 70, 50), QColor(220, 200, 180), None):
+                h = SeriesHeader()
+                h.resize(760, 240)
+                h.set_text("Show", "2020", "A plot.")
+                h.set_actions(True)
+                h.set_primary("Play S1 E1", None, "")
+                if colour is not None:
+                    backdrop = QPixmap(640, 360)
+                    backdrop.fill(colour)
+                    h.set_backdrop(backdrop)
+                h.show()
+                app.processEvents()
+                img = h.grab().toImage()
+                for b in (h.fav_btn, h.later_btn, h.more_btn):
+                    inside = b.mapTo(h, QPoint(4, b.height() // 2))
+                    beside = b.mapTo(h, QPoint(-3, b.height() // 2))
+                    fill = img.pixelColor(inside).name()
+                    ground = img.pixelColor(beside).name()
+                    ratio = theme.contrast(fill, ground)
+                    assert ratio >= 1.2, (key, colour and colour.name(), b.text() or "more",
+                                          fill, ground, ratio)
+                h.close()
+                h.deleteLater()
+    finally:
+        theme.apply_theme(theme="graphite")
+        app.setStyleSheet("")
