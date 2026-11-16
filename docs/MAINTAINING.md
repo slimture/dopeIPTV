@@ -298,9 +298,11 @@ preview, SEO) and `DEPLOY.md` (the server). In short:
 - Texts: `site/lang/<code>.json` (27 languages; English is the fallback),
   the help page's topics in `site/help.json`, templates in
   `site/templates/`. A new string needs its key in every language file.
-- The help shows six settings pages as the app draws them, in each of the
-  27 languages: `public/help-shots/<lang>/<id>.webp`, listed in
-  `site/i18n.json` (`help_shots`). When the settings change, take them
+- The help shows the settings page an answer is about as the app draws
+  it, scrolled to the row it names, in each of the 27 languages:
+  `public/help-shots/<lang>/<id>.webp`, listed in `site/i18n.json`
+  (`help_shots`); which page and row for each answer is `SHOTS` in
+  `tools/help_screenshots.py`. When the settings change, take them
   again with `QT_QPA_PLATFORM=offscreen python tools/help_screenshots.py
   OUT` (this repository) and copy `OUT/` over `public/help-shots/`.
 - The front page's four pictures of the app are
