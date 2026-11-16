@@ -1313,10 +1313,12 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
 
     def _video_single_click(self) -> None:
         """A confirmed single click on the video (no double-click followed):
-        toggle pause, like the centre button."""
+        the controls come up - it pauses nothing. Pausing is the centre
+        button's, the play/pause button's and the keys' (Space, K, the
+        media keys): a click meant to bring the controls back, or to give
+        the window focus, stopped the picture."""
         if self.current_url is None:
             return
-        self.toggle_pause()
         self._reveal_center()
 
     # -- centre play/pause button ---------------------------------------------

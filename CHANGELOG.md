@@ -72,6 +72,9 @@ how connections to the account are counted.
   and its subfolders…"), the one by Categories "Find categories by name
   or channel…" (or movie, or series), and the Search page "Search
   everything in all your sources".
+- A click on the picture brings the controls up and pauses nothing; the
+  centre button, the play/pause button and the keys pause. A click meant
+  to bring the controls back or give the window focus stopped the picture.
 
 ### Fixed
 
