@@ -76,6 +76,8 @@
           <li>Profiles with their own favorites, history, watched marks and theme, a PIN if wanted, and kids profiles</li>
           <li>TV mode: a full-screen layout run from a remote, a game controller, LIRC or the phone</li>
           <li>The phone as a remote over the home network, also from its home screen, with nothing to install</li>
+          <li>One search across all your sources: channels, the guides, movies and series</li>
+          <li>A loading indicator while a channel starts or buffers</li>
           <li>A page for every series: its seasons in a row, its episodes as cards with their progress, and one button that plays on</li>
           <li>Jellyfin, Emby and Plex as sources, and SAT&gt;IP servers, VDR, DVBViewer, NextPVR and MythTV beside Enigma2, Tvheadend and HDHomeRun</li>
           <li>Enigma2: the box's signal, screenshot, remote control and recordings, its channel lists edited, its AutoTimer rules, and a question before a stream would cut off a recording</li>

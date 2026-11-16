@@ -1,11 +1,12 @@
 ## dopeIPTV 1.6.0
 
-**A profile for everyone at home, a TV mode for the sofa with your phone as its remote, a page for every series, and Jellyfin, Emby and Plex as sources.**
+**A profile for everyone at home, a TV mode for the sofa with your phone as its remote, one search across all your sources, and Jellyfin, Emby and Plex as sources.**
 
 ### The big ones
 
 - **Profiles.** One per person in the household, each with their own favorites, history, Continue watching, watched marks, Trakt or Simkl, and theme. "Who's watching?" when the app starts, a PIN if you like, and kids profiles that never see a locked or adult category. Switch from your avatar - no restart. **Settings → Profiles.**
 - **A page for every series.** Open a series and it gets a page of its own, as on Plex or Jellyfin: the artwork, one button that plays on from where you stopped, the seasons in a row and the episodes as cards with their picture, plot and progress. Back takes you to the list exactly where you were.
+- **Search everything at once.** One search across all your sources - channels, what's on in every guide this week, movies and series - with each hit marked with its source. The results stay while you watch, so you can try the next one without searching again. **Search** in the sidebar, or `Ctrl`+`Shift`+`F`.
 - **TV mode.** A full-screen layout made for the sofa, run from a remote, a game controller or LIRC: Home, channels with what is on, the guide, movies and series in posters, and search with a keyboard on screen. **TV mode** in the menu, or `Ctrl`+`Shift`+`T`.
 - **Your phone as a remote.** Scan a code, and your phone's browser shows your channels and favorites, what is on now and next, the volume and channel up and down - and in TV mode it becomes a remote with a d-pad or a touchpad. Add it to the home screen and it opens as *dopeIPTV Remote*. Nothing to install, and only your home network reaches it. **Phone remote…** in the menu.
 - **Jellyfin, Emby and Plex.** Your own films and series as a source, with the server's artwork, where you stopped and what you have watched - and what you watch here goes back to the server. Live TV too, where the server has it.
@@ -21,6 +22,7 @@
 
 ### Also new
 
+- **You can see a channel loading**: a spinner with the channel's name while it starts, "Still loading" when the provider is slow, and how far a stalled stream has buffered.
 - **Night mode** for the sound: loud adverts down, quiet dialogue up - press `N`.
 - **Recordings saved as MP4**, if you like: nothing re-encoded, and the original kept if anything goes wrong.
 - **Series rules that remind you** of every airing instead of recording it.
@@ -36,6 +38,7 @@
 ### Better
 
 - **Settings in groups** - Watch, Content, Accounts and integrations, System and Nerd - each setting in one place, and **a page of its own for each source**. Keyboard shortcuts have a page of their own too. Settings also opens in about half the time, and the video beside it no longer stutters.
+- **Server mode keeps its guides fresh** by itself, with or without the window.
 - **The source you are in, in plain sight**: its name over the categories and in the status line.
 - **Asking for a donation, more calmly**: the heart shows one week a month once you use the app for real, and goes by itself. "Not right now" puts it away for three months, "I've donated" for a year.
 - Casting, multiview and the phone remote follow the same rules as the player: the VPN guard, the account's connection limit, and private viewing to the end.
