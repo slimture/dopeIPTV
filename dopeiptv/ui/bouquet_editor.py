@@ -91,6 +91,8 @@ class Session(QObject):
         self._dirty_entries = False
         self._known: set[str] | None = None
         self._final = ""
+        # A restore waiting for the backup taken before it.
+        self._restore_next: bytes | None = None
 
     # -- state ----------------------------------------------------------------
 
@@ -271,7 +273,15 @@ class Session(QObject):
         tar, data = got if isinstance(got, tuple) else (str(got or ""), b"")
         self.backup, self.backup_tar, self.backup_data = "taken", tar, bytes(data or b"")
         self.view.backup_taken()
-        self.pump()
+        self._go_on()
+
+    def _go_on(self) -> None:
+        """After the backup: the restore it was taken for, else the changes."""
+        data, self._restore_next = self._restore_next, None
+        if data is not None:
+            self._put_back(data)
+        else:
+            self.pump()
 
     def _backup_failed(self, err: Any = None) -> None:
         if self.closed:
@@ -279,14 +289,16 @@ class Session(QObject):
         self.busy = False
         if isinstance(err, bq.NoEditor):
             self.backup = ""
+            self._restore_next = None
             self._no_editor(err)
             return
         if self.view.go_on_without_backup(why(err)):
             log.warning("enigma2: the bouquets changed without a backup (%s)", err)
             self.backup = "skipped"
-            self.pump()
+            self._go_on()
             return
         self.backup = ""
+        self._restore_next = None
         self._stop(tr("bq_nothing_changed"), plain=True)
 
     def _answered(self, result: Any) -> None:
@@ -487,9 +499,18 @@ class Session(QObject):
         run_async(self.pool, self.editor.take_backup, self._backed_up, self._backup_failed)
 
     def restore(self, data: bytes) -> None:
-        """A backup put back on the box: every list replaced."""
+        """A backup put back on the box: every list replaced - the lists it
+        replaces backed up first, as before any change, when this window
+        has no backup yet (so Undo can put them back)."""
         if not self.idle or not self.present or self.closed:
             return
+        if not self.backup:
+            self._restore_next = bytes(data)
+            self.take_backup_now()
+            return
+        self._put_back(data)
+
+    def _put_back(self, data: bytes) -> None:
         self.busy = True
         self.gen += 1
         self.view.say(tr("bq_restoring"))
@@ -502,8 +523,14 @@ class Session(QObject):
         ok, text = result if isinstance(result, tuple) else (bool(result), "")
         self.changed = self.changed or ok
         self._dirty_bouquets = self._dirty_entries = True
-        self._final = tr("bq_restored") if ok else tr("box_failed", why=text)
-        self._refresh()
+        if not ok:
+            # Not put back: a change made meanwhile is not sent either.
+            self._stop(tr("box_failed", why=text))
+            return
+        self._final = tr("bq_restored")
+        # A change made while it was put back goes next, then the lists are
+        # read again (with nothing queued, pump reads them at once).
+        self.pump()
 
 
 class _List(QListWidget):

@@ -679,6 +679,53 @@ def test_a_backup_that_fails_is_asked_about_first(app, monkeypatch, fake):
     assert box.changes() == ["backup", "backup", "removeservice"] and s.backup == "skipped"
 
 
+def test_a_restore_from_a_file_keeps_the_lists_it_replaces_first(app, monkeypatch, fake):
+    box = fake()
+    old = _editor(box).take_backup()[1]           # a file kept from an earlier day
+    _editor(box).remove_bouquet(SPORT)
+    box.calls.clear()
+    s, run = _session(app, monkeypatch, box)
+    s.restore(old)
+    run.drain()
+    # The lists it replaced were backed up first, so Undo can put them back.
+    assert box.changes() == ["backup", "restore"]
+    assert s.backup == "taken" and bq.is_backup(s.backup_data)
+    assert box.files["bouquets.tv"] == [FAV, SPORT] and s.view.said[-1] == tr("bq_restored")
+    s.restore(s.backup_data)                      # Undo: no second backup
+    run.drain()
+    assert box.changes() == ["backup", "restore", "restore"]
+    assert box.files["bouquets.tv"] == [FAV]
+    # No backup to be had: asked first; told no, nothing is replaced.
+    view = View(backup_answer=False)
+    s, run = _session(app, monkeypatch, box, view)
+    box.refuse["backup"] = "Error while preparing backup file"
+    box.calls.clear()
+    s.restore(old)
+    run.drain()
+    assert view.asked_backup == 1 and box.changes() == ["backup"]
+    assert box.files["bouquets.tv"] == [FAV] and not s.changed
+
+
+def test_a_change_made_while_a_backup_is_put_back_goes_after_it(app, monkeypatch, fake):
+    box = fake()
+    s, run = _session(app, monkeypatch, box)
+    s.take_backup_now()
+    run.drain()
+    s.restore(s.backup_data)
+    s.remove_entries([0])                         # made while it is on its way
+    run.drain()
+    assert box.changes() == ["backup", "restore", "removeservice"]
+    assert s.idle and SVT1 not in box.files["userbouquet.favourites.tv"]
+    assert [e.ref for e in s.entries] == box.files["userbouquet.favourites.tv"]
+    # Not put back: what was made meanwhile is not sent.
+    box.refuse["restore"] = "Error, not created with WebBouquetEditor..."
+    s.restore(s.backup_data)
+    s.remove_entries([0])
+    run.drain()
+    assert box.changes()[-1] == "restore" and s.idle
+    assert s.view.said[-1].startswith(tr("box_failed", why="Error, not created with WebBouquetEditor..."))
+
+
 def test_a_box_gone_after_the_last_change_still_ends_the_round(app, monkeypatch, fake):
     box = fake()
     s, run = _session(app, monkeypatch, box)
