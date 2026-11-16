@@ -25,6 +25,7 @@ from typing import Any
 
 from ..core import connections
 from ..core.log import log
+from ..core.restream import channel_key
 from ..i18n import tr
 from .mw_remote import _Bridge
 
@@ -61,7 +62,13 @@ class _WindowHost:
         dvr = getattr(p, "_dvr", None) if p is not None else None
         item = getattr(w, "_playing_item", None) or {}
         try:
+            # The session must be this channel's own, not only the item's: a
+            # zap sets the item some way before the player leaves the session
+            # of the channel before it - a device asking then was given that
+            # one, and the player then played it under the new channel's name.
+            own = (f"live:{w._item_key(item)}", "srv:" + channel_key(pid, sid))
             if (dvr is not None and dvr.streaming and str(item.get("stream_id")) == sid
+                    and getattr(dvr, "key", None) in own
                     and w._conn_player_source() == pid):
                 return dvr
         except Exception:

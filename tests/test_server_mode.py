@@ -792,3 +792,35 @@ def test_a_port_already_taken_leaves_no_thread_running(tmp_path):
         assert wait_until(lambda: ticking() == before, 5), "the failed server's restream stopped"
     finally:
         blocker.close()
+
+
+def test_a_zap_under_way_never_gives_a_device_the_channel_before():
+    """The window sets the item it plays some way before the player leaves
+    the session of the channel before it: the restream must not take that
+    session for the new channel (a device, then the player, saw the old
+    channel under the new one's name)."""
+    from dopeiptv.ui import mw_server
+
+    class Session:
+        streaming = True
+
+        def __init__(self, key: str) -> None:
+            self.key = key
+
+    class Window:
+        def __init__(self, item: dict, dvr: Session) -> None:
+            self._playing_item, self.player = item, type("P", (), {"_dvr": dvr})()
+
+        _item_key = staticmethod(lambda it: it.get("stream_id"))
+
+        def _conn_player_source(self) -> str:
+            return "p1"
+
+    def asked(item: dict, dvr: Session):
+        return mw_server._WindowHost(Window(item, dvr), None).app_session("p1", "2")
+
+    one, two = Session("live:1"), Session("live:2")
+    assert asked({"stream_id": 2}, one) is None, "channel 1's session, while the zap to 2 is under way"
+    assert asked({"stream_id": 2}, two) is two
+    adopted = Session("srv:p1\x1f2")
+    assert asked({"stream_id": 2}, adopted) is adopted, "the server's own, played by the player"
