@@ -24,6 +24,7 @@ from PyQt6 import sip
 from PyQt6.QtCore import QObject, QSettings, Qt, QThreadPool, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication, QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton,
+    QVBoxLayout,
 )
 
 from .. import ORG
@@ -512,8 +513,14 @@ class _SyncCard(QObject):
         self.official = build_check.allowed()
         start_btn.setEnabled(self.official)
         join_btn.setEnabled(self.official)
-        card.shown_if(card.row(tr("sync_title"), hbox(start_btn, join_btn, stretch=False),
-                               tr("sync_off_hint"),
+        # One over the other: side by side in the column of one control
+        # (320 px at most) they cut "Start on this computer" short, and
+        # most translations more.
+        both = QVBoxLayout()
+        both.setSpacing(8)
+        both.addWidget(start_btn)
+        both.addWidget(join_btn)
+        card.shown_if(card.row(tr("sync_title"), both, tr("sync_off_hint"),
                                search="sync computers code encrypted privacy"),
                       self.is_off)
 
