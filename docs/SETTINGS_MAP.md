@@ -21,7 +21,7 @@ has two profiles or more.
 ## WATCH
 
 **Playback** (`playback`)
-- Behaviour: `autoplay_preview`, `autoplay_next_episode`, `nextup_lead_secs`,
+- Behaviour: `show_stream_info`, `autoplay_preview`, `autoplay_next_episode`, `nextup_lead_secs`,
   `auto_reconnect_live`, `hide_upcoming_prompt` (inverted), `night_mode`
 - Stream and buffer: `stream_format`, `cache_secs`; link → Nerd › Player
   (channel start, buffer memory, HLS, low latency)
