@@ -76,8 +76,9 @@
           <li>Profiles with their own favorites, history, watched marks and theme, a PIN if wanted, and kids profiles</li>
           <li>TV mode: a full-screen layout run from a remote, a game controller, LIRC or the phone</li>
           <li>The phone as a remote over the home network, also from its home screen, with nothing to install</li>
-          <li>Jellyfin, Emby and Plex as sources, and VDR, DVBViewer, NextPVR and MythTV beside Enigma2, Tvheadend and HDHomeRun</li>
-          <li>Enigma2: the box's signal, screenshot, remote control and recordings, its AutoTimer rules, and a question before a stream would cut off a recording</li>
+          <li>A page for every series: its seasons in a row, its episodes as cards with their progress, and one button that plays on</li>
+          <li>Jellyfin, Emby and Plex as sources, and SAT&gt;IP servers, VDR, DVBViewer, NextPVR and MythTV beside Enigma2, Tvheadend and HDHomeRun</li>
+          <li>Enigma2: the box's signal, screenshot, remote control and recordings, its channel lists edited, its AutoTimer rules, and a question before a stream would cut off a recording</li>
           <li>Casting to Kodi, and to an Apple TV through AirPlay on macOS; a channel picked while casting goes to the same TV</li>
           <li>DVB subtitles and teletext subtitles in the subtitle menu, and a teletext viewer</li>
           <li>A command palette (Ctrl+K), internet radio, and YouTube Live, Twitch and similar sites through yt-dlp</li>
@@ -85,7 +86,7 @@
           <li>Night mode for the sound, recordings saved as MP4, series reminders, viewing statistics and an export to calendar</li>
           <li>Simkl beside Trakt, Discord status, and the system's media controls on macOS and Windows</li>
           <li>Settings grouped by what you are doing, with a page for each source</li>
-          <li>For tinkerers: Test connection, backup addresses, own DNS, trusted certificates, stream analysis and Home Assistant commands</li>
+          <li>For tinkerers: Test connection, backup addresses, own DNS, trusted certificates, stream analysis, Home Assistant commands, and a server for the home that Plex, Jellyfin and Emby see as an HDHomeRun tuner</li>
         </ul>
       </description>
     </release>
