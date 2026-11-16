@@ -793,3 +793,204 @@ def test_new_strings_are_in_every_language():
                 "player_loading_buffering", "player_loading_buffering_pct"):
         assert set(i18n._STRINGS[key]) == set(i18n.LANGUAGES), key
         assert all(i18n._STRINGS[key].values()), key
+
+
+# -- after 1.6.0's review --------------------------------------------------------------
+
+def _bare_player(url="http://x/live/1.ts"):
+    """The player's side of it alone, no mpv and no GL surface."""
+    from PyQt6.QtCore import pyqtSignal
+
+    from dopeiptv.media.loading_overlay import LoadingMixin
+
+    class Player(LoadingMixin, QWidget):
+        _ld_event = pyqtSignal(str, object)
+
+    p = Player()
+    p.current_url = url
+    p._paused = False
+    p.video = SimpleNamespace(mpv=None)
+    p._ov_surface = QWidget(p)
+    p._ov_surface.resize(640, 360)
+    p._init_loading()
+    return p
+
+
+def _lines(text, font, width) -> list[int]:
+    """Where each line of *text* wrapped at *width* ends."""
+    from PyQt6.QtGui import QTextLayout, QTextOption
+    layout = QTextLayout(text, font)
+    option = QTextOption()
+    option.setWrapMode(QTextOption.WrapMode.WordWrap)
+    layout.setTextOption(option)
+    layout.beginLayout()
+    ends = []
+    while (line := layout.createLine()).isValid():
+        line.setLineWidth(width)
+        ends.append(line.textStart() + line.textLength())
+    layout.endLayout()
+    return ends
+
+
+@pytest.mark.parametrize("lang", ["en", "fr", "ja", "ru", "zh"])
+def test_the_muted_line_is_never_cut_at_the_bottom(app, lang):
+    """Two line spacings of the note's font cut the bottom of a wrapped
+    second line when a glyph comes from a fallback font (CJK, the
+    ellipsis): its rect holds what is drawn of it now - all of it up to two
+    lines, the first two of a longer one."""
+    from PyQt6.QtGui import QFontMetrics
+
+    from dopeiptv import i18n
+    host = QWidget()
+    ov = LoadingOverlay(host)
+    wrap = int(Qt.AlignmentFlag.AlignHCenter) | int(Qt.TextFlag.TextWordWrap)
+    i18n.set_language(lang)
+    try:
+        notes = [i18n.tr("player_loading_slow"), i18n.tr("player_loading_connecting"),
+                 i18n.tr("player_loading_buffering_pct", n=45), "Still loading… " * 12]
+        for note in notes:
+            for w, h in ((1920, 1080), (900, 506), (560, 326), (420, 240)):
+                ov.set_content(_logo(), "Kanal 1 HD", note)
+                ov.place(QRect(0, 0, w, h))
+                g = ov._geo
+                fm, rw = QFontMetrics(g.note_font), int(g.note.width())
+                drawn = fm.boundingRect(QRect(0, 0, rw, 10_000), wrap, note).height()
+                ends = _lines(note, g.note_font, rw)
+                if len(ends) <= 2:
+                    assert g.note.height() >= drawn, (note, w, h, g.note, drawn)
+                else:
+                    two = fm.boundingRect(QRect(0, 0, rw, 10_000), wrap, note[:ends[1]])
+                    assert two.height() <= g.note.height() < drawn, (note, w, h, g.note)
+                assert QRect(0, 0, w, h).contains(ov.geometry()), (note, w, h)
+    finally:
+        i18n.set_language("en")
+        host.deleteLater()
+
+
+def test_a_playlists_address_giving_way_to_its_entry_is_the_same_start(app):
+    """A .m3u or .pls address (a station, a yt-dlp playlist): mpv ends it
+    with REDIRECT and starts its entry. That is the same start - still
+    "Connecting…", then "Still loading…" - not a stream that ended and a
+    wait while playing."""
+    from dopeiptv.i18n import tr
+    from dopeiptv.media.loading_overlay import END_REDIRECT, _end_reason
+    p = _bare_player("http://radio.example/station.pls")
+    waits: list[str] = []
+    p._ld_wait = lambda: waits.append(p._ld_phase)
+    p._ld_begin("Radio", (None, False))
+    p._ld_show_due()
+    assert p.loading_shown()
+    p._ld_on_event("start-file", None)                 # the playlist
+    p._ld_on_event("end-file", END_REDIRECT)           # gives way to its entry
+    assert p._ld_phase == "start" and p.loading_shown()
+    p._ld_on_event("start-file", None)                 # the entry
+    assert p._ld_phase == "start" and waits == []
+    p._ld_slow_due()
+    assert p._ld_note() == (tr("player_loading_slow"), "")
+    p._ld_on_event("playback-restart", None)
+    assert p._ld_phase is None and not p.loading_shown()
+    # Any other end still ends it: the entry failed.
+    p._ld_begin("Radio", (None, False))
+    p._ld_on_event("start-file", None)
+    p._ld_on_event("end-file", 4)
+    assert p._ld_phase is None and not p.loading_shown()
+    # How the reason is read from python-mpv's event, on mpv's thread.
+    assert _end_reason(SimpleNamespace(data=SimpleNamespace(reason=5))) == 5
+    for odd in (None, SimpleNamespace(data=None), SimpleNamespace(data=SimpleNamespace(reason="5"))):
+        assert _end_reason(odd) is None
+    p.deleteLater()
+
+
+def test_a_core_is_followed_once_whatever_fails_on_the_way(app):
+    """Its callbacks go on a core once. A registration that fails is not
+    tried again at every play - each would add the ones before it once
+    more - and end-file carries mpv's reason."""
+    class Core:
+        def __init__(self):
+            self.events: dict = {}
+
+        def event_callback(self, name):
+            def register(cb):
+                self.events.setdefault(name, []).append(cb)
+                return cb
+            return register
+
+        def observe_property(self, name, cb):
+            raise RuntimeError(f"no property {name}")
+
+    p = _bare_player()
+    core = Core()
+    for _ in range(3):
+        p._ld_hook(core)
+    assert set(core.events) == {"start-file", "playback-restart", "seek", "end-file"}
+    assert all(len(cbs) == 1 for cbs in core.events.values()), core.events
+    said: list = []
+    p._ld_event.connect(lambda name, value: said.append((name, value)))
+    core.events["end-file"][0](SimpleNamespace(data=SimpleNamespace(reason=5)))
+    core.events["start-file"][0](SimpleNamespace(data=SimpleNamespace(playlist_entry_id=2)))
+    core.events["seek"][0](None)
+    app.processEvents()
+    assert said == [("end-file", 5), ("start-file", None), ("seek", None)]
+    p.deleteLater()
+
+
+def test_the_pop_outs_own_centre_disc_gives_way_to_it(app):
+    """In the mirror pop-out the window has a centre play/pause disc of its
+    own beside the indicator: it went on taking clicks under the plate for
+    a few seconds. It goes as the indicator comes, as the player's does."""
+    from PyQt6.QtWidgets import QPushButton
+    p = _bare_player()
+    win = QWidget()
+    win.resize(800, 500)
+    mirror = QWidget(win)
+    mirror.setGeometry(0, 0, 800, 450)
+    disc = QPushButton(win)
+    disc.setObjectName("CenterPlay")
+    disc.show()
+    bar = QPushButton(win)
+    bar.show()
+    p._ld_overlay.setParent(win)
+    p._ov_surface = mirror
+    p._ld_begin("Kanal 1", (None, False))
+    p._ld_show_due()
+    assert p.loading_shown() and disc.isHidden() and not bar.isHidden()
+    assert QRect(0, 0, 800, 450).contains(p._ld_overlay.geometry())
+    p.deleteLater()
+    win.deleteLater()
+
+
+def test_real_mpv_a_playlist_is_one_start(app, tmp_path):
+    """With a real libmpv: a playlist file's REDIRECT and its entry's start
+    keep the start going until the entry's picture."""
+    from pathlib import Path
+
+    from tests.test_nerd import _libmpv
+
+    core = _libmpv()
+    entry = str(Path(__file__).parent / "data" / "tiny.ts")
+    playlist = tmp_path / "list.m3u"
+    playlist.write_text(f"#EXTM3U\n#EXTINF:-1,tiny\n{entry}\n", encoding="utf-8")
+    p = _bare_player(str(playlist))
+    p.video = SimpleNamespace(mpv=core)
+    said: list = []
+    phases: list = []
+    p._ld_event.connect(lambda name, value: said.append((name, value)))
+    p._ld_event.connect(lambda _n, _v: phases.append(p._ld_phase))
+    try:
+        p._ld_hook(core)
+        p._ld_begin("tiny", (None, False))
+        core.play(str(playlist))
+        deadline = time.monotonic() + 10
+        while p._ld_phase == "start" and time.monotonic() < deadline:
+            app.processEvents()
+            time.sleep(0.01)
+        names = [n for n, _v in said]
+        assert ("end-file", 5) in said, said
+        assert names.count("start-file") >= 2, said
+        assert p._ld_phase is None and "wait" not in phases, (said, phases)
+        assert names.index("playback-restart") > names.index("end-file"), said
+    finally:
+        p._ld_clear()
+        core.terminate()
+        p.close()
+        app.processEvents()

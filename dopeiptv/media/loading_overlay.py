@@ -27,7 +27,9 @@ import weakref
 from dataclasses import dataclass
 
 from PyQt6.QtCore import QElapsedTimer, QPoint, QPointF, QRect, QRectF, QSize, Qt, QTimer
-from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen, QPixmap
+from PyQt6.QtGui import (
+    QColor, QFont, QFontMetrics, QPainter, QPen, QPixmap, QTextLayout, QTextOption,
+)
 from PyQt6.QtWidgets import QWidget
 
 from ..core.log import log
@@ -37,6 +39,22 @@ from ..ui.theme import P, corner_radius
 
 def _clamp(v: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, v))
+
+
+#: Why mpv ended a file when a playlist's address gave way to its entry
+#: (MPV_END_FILE_REASON_REDIRECT): the same start goes on.
+END_REDIRECT = 5
+
+
+def _end_reason(event) -> int | None:
+    """Why mpv ended a file (python-mpv's MpvEventEndFile), read on mpv's
+    event thread while the event is still its own; None when it cannot
+    say."""
+    try:
+        reason = event.data.reason
+    except Exception:
+        return None
+    return reason if isinstance(reason, int) else None
 
 
 def quiet(fn):
@@ -201,7 +219,7 @@ class LoadingOverlay(QWidget):
         wrap = int(Qt.AlignmentFlag.AlignHCenter) | int(Qt.TextFlag.TextWordWrap)
         nb = nfm.boundingRect(QRect(0, 0, text_w, 10_000), wrap, self._note) \
             if self._note else QRect()
-        note_h = min(nb.height(), nfm.lineSpacing() * 2)
+        note_h = self._note_height(nf, nfm, text_w, wrap, nb.height()) if self._note else 0
         note_w = min(text_w, max(nb.width(), nfm.horizontalAdvance(self._reserve)
                                  if self._reserve else 0))
         logo = QSize()
@@ -244,6 +262,30 @@ class LoadingOverlay(QWidget):
         radius = corner_radius(round(_clamp(16 * s, 10, 22)))
         return _Layout(QSize(int(width), int(math.ceil(height))), radius, spin, stroke,
                        logo_r, title_r, title, tf, note_r, nf)
+
+    def _note_height(self, font: QFont, fm: QFontMetrics, width: int, flags: int,
+                     whole: int) -> int:
+        """The muted line's height at *width*: all of it (*whole*, as it is
+        drawn) up to two lines, the first two of a longer one - measured as
+        drawn too, so a fallback font's taller glyphs (CJK, the ellipsis)
+        are not cut off at the bottom as two line spacings cut them."""
+        layout = QTextLayout(self._note, font)
+        option = QTextOption()
+        option.setWrapMode(QTextOption.WrapMode.WordWrap)
+        layout.setTextOption(option)
+        layout.beginLayout()
+        ends: list[int] = []
+        while len(ends) < 3:
+            line = layout.createLine()
+            if not line.isValid():
+                break
+            line.setLineWidth(width)
+            ends.append(line.textStart() + line.textLength())
+        layout.endLayout()
+        if len(ends) <= 2:
+            return whole
+        two = fm.boundingRect(QRect(0, 0, width, 10_000), flags, self._note[:ends[1]])
+        return min(two.height(), whole)
 
     # -- the animation: only while on screen -------------------------------------
 
@@ -448,14 +490,18 @@ class LoadingMixin:
         ref = getattr(self, "_ld_core", None)
         if ref is not None and ref() is core:
             return
+        # Marked first: a registration that failed is not tried again at
+        # every play, each adding the ones before it once more.
+        self._ld_core = weakref.ref(core)
         me = weakref.ref(self)
 
         def forward(name: str):
-            def on_event(_event) -> None:              # mpv's event thread
+            def on_event(event) -> None:               # mpv's event thread
                 player = me()
                 if player is not None:
                     try:
-                        player._ld_event.emit(name, None)
+                        player._ld_event.emit(
+                            name, _end_reason(event) if name == "end-file" else None)
                     except (RuntimeError, AttributeError):
                         pass
             return on_event
@@ -472,7 +518,6 @@ class LoadingMixin:
             core.event_callback(name)(forward(name))
         core.observe_property("paused-for-cache", on_change)
         core.observe_property("cache-buffering-state", on_change)
-        self._ld_core = weakref.ref(core)
 
     @quiet
     def _ld_on_event(self, name: str, value) -> None:
@@ -493,6 +538,8 @@ class LoadingMixin:
             if self._ld_phase is None and self.current_url is not None:
                 self._ld_wait()
         elif name == "end-file":
+            if self._ld_phase == "start" and value == END_REDIRECT:
+                return      # a playlist's address gave way to its entry
             # Before this play()'s start-file it is the last stream's.
             if not (self._ld_phase == "start" and not self._ld_seen_start):
                 self._ld_clear()
@@ -650,13 +697,20 @@ class LoadingMixin:
             self._place_loading()
             ov.show()
             ov.raise_()
-            # The centre play/pause disc would sit right on it.
+            # The centre play/pause disc would sit right under it, taking
+            # its clicks: the player's, and the pop-out window's own beside
+            # the mirror (a sibling of the indicator there).
             timer = getattr(self, "_center_hide_timer", None)
             if timer is not None:
                 timer.stop()
             btn = getattr(self, "center_btn", None)
             if btn is not None:
                 btn.hide()
+            par = ov.parentWidget()
+            if par is not None:
+                for other in par.findChildren(QWidget, "CenterPlay",
+                                              Qt.FindChildOption.FindDirectChildrenOnly):
+                    other.hide()
 
     @quiet
     def _place_loading(self) -> None:

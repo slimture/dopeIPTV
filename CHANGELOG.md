@@ -31,6 +31,12 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   key for good when an earlier version's shortcuts gave N or T to
   another action: nothing is stored for them, so once the key is free
   again they have it.
+- The loading indicator: a playlist address (a .m3u or .pls station, a
+  yt-dlp playlist) says "Connecting…" and then "Still loading…" until
+  its entry plays, not "Buffering…" after a second; the second line of a
+  wrapped note is no longer cut at the bottom (Chinese, Japanese, the
+  ellipsis); the pop-out's own play/pause disc no longer sits under it
+  taking clicks.
 
 ## [1.6.1]
 
