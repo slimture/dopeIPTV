@@ -676,6 +676,15 @@ class OfflineClient(Mirrored):
         # serves nothing, so there is nothing to drop.
         return None
 
+    def held(self, key: tuple) -> Any:
+        # Interface parity with XtreamClient's list cache: nothing is held.
+        return None
+
+    def held_series(self) -> tuple[list[dict], list[dict]] | None:
+        """Interface parity: no list held ahead of a request - the command
+        palette asks series_list as before (not a slow source)."""
+        return None
+
     def live_categories(self) -> list[dict]:
         return []
 
