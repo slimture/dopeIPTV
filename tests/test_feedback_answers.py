@@ -274,6 +274,23 @@ w.open_answers(); app.processEvents()
 assert not any("answered" in t for t in w.notices.texts())
 w._answers_window().close(); app.processEvents()
 
+# ... and said at a start from what is kept here, at once - not only once the
+# site is asked again, hours away for a report already answered. Once a run.
+items = report.tickets(s)
+items[1]["seen"] = 0
+report.save_tickets(s, items)
+toasts.clear()
+w._answers_told = False
+n = len(inbox.asked)
+w._answers_tell_unread()
+w._answers_tell_unread()
+assert toasts == [tr("fbr_new")] and len(inbox.asked) == n, toasts
+assert [m for m in w.notices.messages() if "answered" in m.title]
+assert w.ANSWERS_TELL_AT <= 1.0
+w.open_answers(); app.processEvents()
+assert not any("answered" in t for t in w.notices.texts())
+w._answers_window().close(); app.processEvents()
+
 # After a report with a code goes (the real Send): asked two minutes on, then
 # every five minutes.
 del w.open_report

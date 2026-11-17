@@ -132,6 +132,10 @@ same new look.
 
 ### Fixed
 
+- An answer to your feedback not yet read is said again as soon as the app
+  starts: the message was kept only while the app ran, and after a restart
+  it came back only once the site was asked again - for a report already
+  answered, up to two hours later.
 - Mine played a title, a channel or a station on one click whatever the
   autoplay setting said: its lists now follow Settings > Playback as the
   others do - with autoplay off one click picks and a double click or

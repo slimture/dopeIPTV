@@ -71,6 +71,10 @@ class _ReportMixin:
         if app is not None:
             app.applicationStateChanged.connect(self._answers_front)
         self._show_unread()
+        # Answers still unread from before: said again from what is kept
+        # here, a moment after the start - not only once the site was asked
+        # again, which for a report already answered can be hours away.
+        QTimer.singleShot(int(self.ANSWERS_TELL_AT * 1000), self._answers_tell_unread)
         self._report_crash = report.pending_crash()
         if self._report_crash:
             QTimer.singleShot(4000, self._offer_crash_report)
@@ -139,8 +143,10 @@ class _ReportMixin:
 
     #: Seconds after the start before the first ask; the least time between
     #: two asks the person starts (Check now, opening the window); the least
-    #: since the last ask when the app comes to the front.
+    #: since the last ask when the app comes to the front; when a start says
+    #: the answers still unread from before.
     ANSWERS_AT_START, ANSWERS_GAP, ANSWERS_FRONT_GAP = 45.0, 20.0, 60.0
+    ANSWERS_TELL_AT = 1.0
     _answers_timer: QTimer | None = None
     _answers_action: QAction | None = None
     _answers_menu = None
@@ -228,13 +234,23 @@ class _ReportMixin:
                 dlg.set_tickets(report.tickets(settings))
                 self._answers_mark_seen()
             dlg.show_result(self._answers_ok, fresh, self._answers_last)
-        elif fresh or (self.answers_unread() and not self._answers_told):
-            # A message that stays in the activity panel until read - also
-            # for answers that came before this start and wait unread.
-            self._answers_told = True
-            self._show_action_toast(tr("fbr_new"), 12_000, self._answers_from_menu, key=ANSWERS_KEY)
+        elif fresh:
+            self._answers_tell()
+        else:
+            self._answers_tell_unread()
         self._show_unread()
         self._schedule_answers()
+
+    def _answers_tell_unread(self) -> None:
+        """Answers that came before this start and wait unread: said once
+        this run (the message is in memory only, so a restart had lost it)."""
+        if not self._answers_told and self._answers_window() is None and self.answers_unread():
+            self._answers_tell()
+
+    def _answers_tell(self) -> None:
+        """A message that stays in the activity panel until read."""
+        self._answers_told = True
+        self._show_action_toast(tr("fbr_new"), 12_000, self._answers_from_menu, key=ANSWERS_KEY)
 
     def check_answers_now(self) -> None:
         """Check now (and the window opening): asked at once - unless a
