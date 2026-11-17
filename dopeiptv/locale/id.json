@@ -3079,5 +3079,13 @@
   "sort_az": "A→Z",
   "sort_za": "Z→A",
   "sort_as_all": "Seperti di semua kategori ({order})",
-  "sort_scope_tip": "Urutan kategori ini. “Seperti di semua kategori” mengikuti urutan yang dipilih di Pengaturan."
+  "sort_scope_tip": "Urutan kategori ini. “Seperti di semua kategori” mengikuti urutan yang dipilih di Pengaturan.",
+  "rec_sort_newest": "Terbaru dulu",
+  "rec_sort_oldest": "Terlama dulu",
+  "rec_sort_channel": "Per saluran",
+  "rec_sort_longest": "Terpanjang dulu",
+  "rec_sort_largest": "Terbesar dulu",
+  "rec_unwatched_only": "Hanya yang belum ditonton",
+  "rec_unwatched": "Belum ditonton",
+  "rec_no_channel": "Tanpa saluran"
 }

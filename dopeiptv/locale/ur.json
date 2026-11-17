@@ -3079,5 +3079,13 @@
   "sort_az": "ا→ی",
   "sort_za": "ی→ا",
   "sort_as_all": "تمام زمروں کی طرح ({order})",
-  "sort_scope_tip": "اس زمرے کی ترتیب۔ “تمام زمروں کی طرح” ترتیبات میں چنی گئی ترتیب کے مطابق ہے۔"
+  "sort_scope_tip": "اس زمرے کی ترتیب۔ “تمام زمروں کی طرح” ترتیبات میں چنی گئی ترتیب کے مطابق ہے۔",
+  "rec_sort_newest": "نئی پہلے",
+  "rec_sort_oldest": "پرانی پہلے",
+  "rec_sort_channel": "چینل کے لحاظ سے",
+  "rec_sort_longest": "سب سے لمبی پہلے",
+  "rec_sort_largest": "سب سے بڑی پہلے",
+  "rec_unwatched_only": "صرف نہ دیکھی گئی",
+  "rec_unwatched": "نہ دیکھی گئی",
+  "rec_no_channel": "کوئی چینل نہیں"
 }

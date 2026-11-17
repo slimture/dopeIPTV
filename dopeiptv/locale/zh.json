@@ -3079,5 +3079,13 @@
   "sort_az": "A→Z",
   "sort_za": "Z→A",
   "sort_as_all": "与所有分类相同（{order}）",
-  "sort_scope_tip": "此分类的排序。“与所有分类相同”沿用设置中选择的排序。"
+  "sort_scope_tip": "此分类的排序。“与所有分类相同”沿用设置中选择的排序。",
+  "rec_sort_newest": "最新优先",
+  "rec_sort_oldest": "最早优先",
+  "rec_sort_channel": "按频道",
+  "rec_sort_longest": "最长优先",
+  "rec_sort_largest": "最大优先",
+  "rec_unwatched_only": "仅未观看",
+  "rec_unwatched": "未观看",
+  "rec_no_channel": "无频道"
 }

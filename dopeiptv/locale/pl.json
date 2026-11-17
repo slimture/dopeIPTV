@@ -3079,5 +3079,13 @@
   "sort_az": "A→Ż",
   "sort_za": "Ż→A",
   "sort_as_all": "Jak we wszystkich kategoriach ({order})",
-  "sort_scope_tip": "Kolejność tej kategorii. „Jak we wszystkich kategoriach” idzie za kolejnością wybraną w Ustawieniach."
+  "sort_scope_tip": "Kolejność tej kategorii. „Jak we wszystkich kategoriach” idzie za kolejnością wybraną w Ustawieniach.",
+  "rec_sort_newest": "Najnowsze najpierw",
+  "rec_sort_oldest": "Najstarsze najpierw",
+  "rec_sort_channel": "Według kanału",
+  "rec_sort_longest": "Najdłuższe najpierw",
+  "rec_sort_largest": "Największe najpierw",
+  "rec_unwatched_only": "Tylko nieobejrzane",
+  "rec_unwatched": "Nieobejrzane",
+  "rec_no_channel": "Bez kanału"
 }

@@ -18,6 +18,7 @@
 - **A recording stays in sight** at the foot of the sidebar for as long as it runs. Click it to stop - the app asks first, and what has been recorded so far is kept. With two at once you pick which one.
 - **The sort button says the order** the list is in - Provider's order, A→Z, Recently added - and its menu says what all categories follow.
 - **A calmer header** in every place: no big title, one quiet line with the category and how many - and Back first where there is a way back - beside the filter, the sort and Grid / List. Long category names no longer push anything around.
+- **Recordings in order**: grouped by day - Today, Yesterday, Earlier this week, Last week, then by month - and the sort button puts them oldest first, by name, by channel, longest or largest first. **Unwatched only** hides what you have seen.
 - **Phone remote:** More opens on three even tiles - Subtitles and sound, Sleep timer, Record. Record turns red with the time while it records, in TV mode's remote too.
 
 ### Fixed

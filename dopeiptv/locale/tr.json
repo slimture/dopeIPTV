@@ -3079,5 +3079,13 @@
   "sort_az": "A→Z",
   "sort_za": "Z→A",
   "sort_as_all": "Tüm kategorilerdeki gibi ({order})",
-  "sort_scope_tip": "Bu kategorinin sırası. “Tüm kategorilerdeki gibi”, Ayarlar'da seçilen sırayı izler."
+  "sort_scope_tip": "Bu kategorinin sırası. “Tüm kategorilerdeki gibi”, Ayarlar'da seçilen sırayı izler.",
+  "rec_sort_newest": "Önce en yeni",
+  "rec_sort_oldest": "Önce en eski",
+  "rec_sort_channel": "Kanala göre",
+  "rec_sort_longest": "Önce en uzun",
+  "rec_sort_largest": "Önce en büyük",
+  "rec_unwatched_only": "Yalnızca izlenmemiş",
+  "rec_unwatched": "İzlenmemiş",
+  "rec_no_channel": "Kanal yok"
 }

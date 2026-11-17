@@ -3079,5 +3079,13 @@
   "sort_az": "A→Z",
   "sort_za": "Z→A",
   "sort_as_all": "すべてのカテゴリと同じ（{order}）",
-  "sort_scope_tip": "このカテゴリの並び順。「すべてのカテゴリと同じ」は設定で選んだ順序に従います。"
+  "sort_scope_tip": "このカテゴリの並び順。「すべてのカテゴリと同じ」は設定で選んだ順序に従います。",
+  "rec_sort_newest": "新しい順",
+  "rec_sort_oldest": "古い順",
+  "rec_sort_channel": "チャンネル別",
+  "rec_sort_longest": "長い順",
+  "rec_sort_largest": "大きい順",
+  "rec_unwatched_only": "未視聴のみ",
+  "rec_unwatched": "未視聴",
+  "rec_no_channel": "チャンネルなし"
 }

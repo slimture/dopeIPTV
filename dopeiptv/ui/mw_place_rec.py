@@ -54,6 +54,7 @@ from ..core.workers import run_async
 from ..i18n import tr
 from .list_mirror import ListMirror
 from .list_place import PlaceCard, line_of
+from .media_cards import is_heading
 from .qt_i18n import format_when
 from .rec_place import RecPlace
 from .series_cards import minutes_text
@@ -66,6 +67,10 @@ VIEWS = ("wide", "list")
 JOBS, UPCOMING = "__jobs__", "__upcoming__"
 #: How many recordings are probed at once (one after the other).
 PROBE_BATCH = 4
+#: The sort menu's words for each order (core/rec_view.ORDERS).
+ORDER_WORDS = {rec_view.NEWEST: "rec_sort_newest", rec_view.OLDEST: "rec_sort_oldest",
+               rec_view.NAME: "sort_az", rec_view.CHANNEL: "rec_sort_channel",
+               rec_view.LONGEST: "rec_sort_longest", rec_view.LARGEST: "rec_sort_largest"}
 
 
 def size_text(n) -> str:
@@ -198,6 +203,8 @@ class _PlaceRecMixin:
         place.now.hide_requested.connect(self._place_row_hide)
         self._place_look_adopt(place)
         place.layout_changed.connect(self._rp_layout_picked)
+        place.header.sort_changed.connect(self._rec_sort_picked)
+        place.header.sort_toggled.connect(self._rec_unwatched_picked)
         more = QMenu(place.more)
         more.aboutToShow.connect(partial(self._rp_fill_more, more))
         place.more.setMenu(more)
@@ -237,10 +244,14 @@ class _PlaceRecMixin:
         return (self._rp_cat(), self.search.text().strip())
 
     def _rp_card_of(self, it: dict) -> PlaceCard | None:
-        """A list row's card: none for a heading, nor for a recording to
-        come over All recordings (it stands in "Recording now and next")."""
+        """A list row's card: a heading's line of its own (a day, a
+        channel), none for a recording to come over All recordings (it
+        stands in "Recording now and next")."""
         if it.get("_header"):
-            return None
+            if it.get("_pending") and not self._rp_jobs_view():
+                return None                 # its rows stand in "Recording now and next"
+            title = str(it["_header"])
+            return PlaceCard(key="head:" + title, title=title, heading=True)
         if it.get("_kind") == "recjob" and not self._rp_jobs_view():
             return None
         title = str(it.get("name") or "")
@@ -443,6 +454,11 @@ class _PlaceRecMixin:
     def _rp_probed_in(self, out) -> None:
         self._rp_probing = False
         self._rp_probed().update(out or {})
+        if self.__dict__.get("_rp_resort") and not self.__dict__.get("_rp_wanted"):
+            # Every length asked for the longest first is in: in order again.
+            self.__dict__["_rp_resort"] = False
+            if rec_view.order_of(self.settings) == rec_view.LONGEST:
+                QTimer.singleShot(0, self._rec_reload)
         place = self._rp_page
         if place is not None and not sip.isdeleted(place) and self._place_rec_active():
             place.view.redress()
@@ -463,7 +479,8 @@ class _PlaceRecMixin:
 
     def _rp_count(self) -> str:
         place = self._rp_page
-        cards = place.view.items() if place is not None else []
+        cards = [c for c in (place.view.items() if place is not None else [])
+                 if not is_heading(c)]
         n = len(cards)
         if not n:
             return ""
@@ -486,6 +503,18 @@ class _PlaceRecMixin:
         h.set_title(self._rp_title())
         h.set_count(self._rp_count())
         files = not self._rp_jobs_view()
+        # The order the recordings are in, its button naming it; Unwatched
+        # only at the foot of its menu (before the layout's switch: the
+        # place weighs the sort's room too).
+        opts = [(k, tr(ORDER_WORDS[k])) for k in rec_view.ORDERS] if files else []
+        order = rec_view.order_of(self.settings)
+        only = rec_view.unwatched_only(self.settings)
+        shown = tr(ORDER_WORDS[order]) + (" · " + tr("rec_unwatched") if only else "")
+        if opts != h._sort_opts:
+            h.set_sort(opts, order, shown)
+        else:
+            h.set_sort_key(order, shown)
+        h.set_sort_toggle(tr("rec_unwatched_only") if files else "", only)
         place.show_layout_switch(files, self._rp_layout()[0] if files else "")
         mirror = self._rp_mirror
         if mirror is not None and place.filter.text() != self.search.text():
@@ -501,6 +530,48 @@ class _PlaceRecMixin:
             place.set_note(tr("rec_no_upcoming"))
         else:
             place.set_note(tr("rec_place_empty"))
+
+    # -- the order, and Unwatched only -----------------------------------------------------
+
+    def _rec_sort_picked(self, order: str) -> None:
+        """An order picked: kept, and the recordings put in it. The longest
+        first asks every recording's length, the list put in order again
+        once they are known."""
+        if order not in rec_view.ORDERS:
+            return
+        self.settings.setValue(rec_view.ORDER_KEY, order)
+        if order == rec_view.LONGEST:
+            found = self._rp_probed()
+            todo = [str(it.get("_path") or "") for it in self.list_model.items()
+                    if isinstance(it, dict) and it.get("_path")]
+            todo = [p for p in todo if p not in found and not self._rec_length(p)]
+            self.__dict__["_rp_resort"] = bool(todo)
+            for p in todo:
+                self._rp_want_probe(p)
+        self._rec_reload()
+
+    def _rec_unwatched_picked(self, on: bool) -> None:
+        self.settings.setValue(rec_view.UNWATCHED_KEY, "true" if on else "false")
+        self._rec_reload()
+
+    def _rec_reload(self) -> None:
+        if getattr(self, "mode", "") == "rec":
+            self._load_items(self._rp_cat())
+
+    def _rec_length(self, path: str) -> float:
+        """A recording's length as far as it is known - its probe, the
+        length kept beside its frame, where it was played to - else 0."""
+        probe = self._rp_probed().get(path)
+        probed = float(getattr(probe, "length", 0) or 0) if probe is not None else 0.0
+        if not probed:
+            from ..core.workers import default_image_cache_dir
+            probed = rec_view.known_length(str(default_image_cache_dir("thumbs")), path)
+        return rec_view.length_of(probed, self._rp_resume(path)[1])
+
+    def _rec_group_title(self, key: tuple) -> str:
+        if key and key[0] == rec_view.BY_CHANNEL:
+            return str(key[1]) or tr("rec_no_channel")
+        return self._mitt_group_title(key)
 
     def _rp_layout_picked(self, key: str) -> None:
         if key not in VIEWS:

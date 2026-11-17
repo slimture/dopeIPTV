@@ -3079,5 +3079,13 @@
   "sort_az": "A→Z",
   "sort_za": "Z→A",
   "sort_as_all": "모든 카테고리와 같이 ({order})",
-  "sort_scope_tip": "이 카테고리의 순서입니다. '모든 카테고리와 같이'는 설정에서 고른 순서를 따릅니다."
+  "sort_scope_tip": "이 카테고리의 순서입니다. '모든 카테고리와 같이'는 설정에서 고른 순서를 따릅니다.",
+  "rec_sort_newest": "최신순",
+  "rec_sort_oldest": "오래된순",
+  "rec_sort_channel": "채널별",
+  "rec_sort_longest": "긴 순서",
+  "rec_sort_largest": "큰 순서",
+  "rec_unwatched_only": "안 본 것만",
+  "rec_unwatched": "안 봄",
+  "rec_no_channel": "채널 없음"
 }

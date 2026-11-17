@@ -14,6 +14,11 @@
 * Watched marks (``WatchedMarks``, the profile's own ``rec_watched``): a
   recording played to its end, or marked by hand; renamed, moved and
   deleted with its file; at most ``WATCHED_MAX``, the newest kept.
+* The recordings in the order picked (``arrange``, ``ORDERS``): the newest
+  or the oldest first in their days' groups - today, yesterday, earlier
+  this week, last week, then by month (core/mitt.py's ``day_group``) -, by
+  name, under their channels, the longest or the largest first; only those
+  not watched yet where asked (``rec_sort``, ``rec_unwatched_only``).
 """
 
 from __future__ import annotations
@@ -29,6 +34,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from .mitt import EARLIER, day_group
 from .rec_mp4 import parse_probe
 
 __all__ = ["Probe", "WatchedMarks", "day_of", "elapsed_text", "frame_path", "length_of",
@@ -167,6 +173,12 @@ def _run(argv: list[str], timeout: float) -> tuple[int, str]:
     return done.returncode, done.stderr.decode("utf-8", "replace")
 
 
+def known_length(thumbs_dir: str, path: str) -> float:
+    """The length kept beside a recording's frame by an earlier probe (0:
+    none yet) - a few bytes read, no ffmpeg."""
+    return _read_length(length_path(thumbs_dir, path))
+
+
 def _read_length(p: str) -> float:
     try:
         with open(p, encoding="utf-8") as fh:
@@ -281,3 +293,80 @@ def bounded(marks: dict[str, int], cap: int = WATCHED_MAX) -> dict[str, int]:
         return marks
     keep = sorted(marks.items(), key=lambda kv: kv[1], reverse=True)[:cap]
     return dict(keep)
+
+
+# -- the order picked -------------------------------------------------------------------
+
+#: The orders Recordings can be in, the first the default: the newest first,
+#: the oldest first, by name, under their channels, the longest, the largest.
+NEWEST, OLDEST, NAME, CHANNEL, LONGEST, LARGEST = (
+    "newest", "oldest", "name", "channel", "longest", "largest")
+ORDERS = (NEWEST, OLDEST, NAME, CHANNEL, LONGEST, LARGEST)
+ORDER_KEY, UNWATCHED_KEY = "rec_sort", "rec_unwatched_only"
+
+#: A group's key for the recordings under one channel ("": none said).
+BY_CHANNEL = "channel"
+
+Group = tuple[tuple[Any, ...] | None, list[dict]]
+
+
+def order_of(settings: Settings) -> str:
+    order = str(settings.value(ORDER_KEY, NEWEST) or NEWEST)
+    return order if order in ORDERS else NEWEST
+
+
+def unwatched_only(settings: Settings) -> bool:
+    return str(settings.value(UNWATCHED_KEY, "false")).lower() in ("true", "1")
+
+
+def _added(f: dict) -> float:
+    return _num(f.get("added"))
+
+
+def _fold(text: Any) -> str:
+    return str(text or "").casefold()
+
+
+def arrange(files: Iterable[dict], order: str, now: Any, week_start: int = 0,
+            length: Callable[[str], float] | None = None,
+            watched: Callable[[str], bool] | None = None,
+            only_unwatched: bool = False) -> list[Group]:
+    """*files* (Recordings' rows) in *order*, as groups (key, rows): the
+    newest or the oldest first under their days (``day_group``'s keys;
+    one that does not say when last), under their channels ((BY_CHANNEL,
+    name), A-Z, the newest first in each; none said last), else one group
+    (None) - by name, the longest (*length(path)*, unknown last) or the
+    largest first. *only_unwatched*: what *watched(path)* says was
+    watched left out."""
+    rows = [f for f in files if isinstance(f, dict)]
+    if only_unwatched and watched is not None:
+        rows = [f for f in rows if not watched(str(f.get("_path") or ""))]
+    newest = sorted(rows, key=_added, reverse=True)
+    if order in (NEWEST, OLDEST):
+        ordered = newest if order == NEWEST else sorted(rows, key=_added)
+        groups: dict[tuple[Any, ...], list[dict]] = {}
+        for f in ordered:
+            groups.setdefault(day_group(_added(f), now, week_start), []).append(f)
+        tail = groups.pop((EARLIER,), None)
+        out: list[Group] = list(groups.items())
+        if tail:
+            out.append(((EARLIER,), tail))
+        return out
+    if order == CHANNEL:
+        chans: dict[str, list[dict]] = {}
+        for f in newest:
+            chans.setdefault(str(f.get("_channel") or "").strip(), []).append(f)
+        names = sorted((n for n in chans if n), key=_fold)
+        if "" in chans:
+            names.append("")
+        return [((BY_CHANNEL, n), chans[n]) for n in names]
+    if order == NAME:
+        return [(None, sorted(rows, key=lambda f: (_fold(f.get("name")), -_added(f))))]
+    if order == LONGEST:
+        def long_key(f: dict) -> tuple[int, float, float]:
+            n = length(str(f.get("_path") or "")) if length is not None else 0.0
+            return (0 if n > 0 else 1, -n, -_added(f))
+        return [(None, sorted(rows, key=long_key))]
+    if order == LARGEST:
+        return [(None, sorted(rows, key=lambda f: (-_num(f.get("_size")), -_added(f))))]
+    return [(None, newest)]

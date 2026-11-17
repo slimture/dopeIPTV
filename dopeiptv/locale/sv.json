@@ -3079,5 +3079,13 @@
   "sort_az": "A→Ö",
   "sort_za": "Ö→A",
   "sort_as_all": "Som i alla kategorier ({order})",
-  "sort_scope_tip": "Den här kategorins ordning. ”Som i alla kategorier” följer ordningen som valts i Inställningar."
+  "sort_scope_tip": "Den här kategorins ordning. ”Som i alla kategorier” följer ordningen som valts i Inställningar.",
+  "rec_sort_newest": "Nyast först",
+  "rec_sort_oldest": "Äldst först",
+  "rec_sort_channel": "Per kanal",
+  "rec_sort_longest": "Längst först",
+  "rec_sort_largest": "Störst först",
+  "rec_unwatched_only": "Bara osedda",
+  "rec_unwatched": "Osedda",
+  "rec_no_channel": "Ingen kanal"
 }

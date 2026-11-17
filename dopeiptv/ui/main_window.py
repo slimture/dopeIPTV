@@ -3349,7 +3349,8 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         a clean, uniform poster wall (sections stay grouped in order, just
         without the labels); the section labels live in list mode."""
         n = sum(1 for r in rows if not r.get("_header"))
-        if self._grid_on():
+        # (Recordings keep theirs: the place shows them over its grid too.)
+        if self._grid_on() and model_kind != "rec":
             rows = [r for r in rows if not r.get("_header")]
         self.all_items = rows
         self.list_model.set_items(rows, model_kind)
@@ -3374,29 +3375,20 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _load_recordings_grouped(self, files: list,
                                  show_pending: bool = False) -> None:
-        """Recordings grouped by when they were made: Today / Yesterday /
-        This week / Earlier, newest first. Rows keep their recording nature
-        (no _ekind/_kind retag) so they still play via the rec path."""
+        """Recordings in the order picked (core/rec_view.arrange): the
+        newest first by default, under their days - today, yesterday,
+        earlier this week, last week, then by month -, else the oldest
+        first, by name, under their channels, the longest or the largest
+        first; Unwatched only leaves out what this profile watched. Rows
+        keep their recording nature (no _ekind/_kind retag) so they still
+        play via the rec path."""
         import datetime
-        files = sorted(self._search_filter(files),
-                       key=lambda f: int(f.get("added") or 0), reverse=True)
-        today = datetime.date.today()
-        buckets = {"today": [], "yesterday": [], "week": [], "earlier": []}
-        for f in files:
-            try:
-                ts = int(f.get("added") or 0)
-            except (TypeError, ValueError):
-                ts = 0
-            d = datetime.date.fromtimestamp(ts) if ts else today
-            delta = (today - d).days
-            if delta <= 0:
-                buckets["today"].append(f)
-            elif delta == 1:
-                buckets["yesterday"].append(f)
-            elif delta < 7:
-                buckets["week"].append(f)
-            else:
-                buckets["earlier"].append(f)
+        from ..core import rec_view
+        marks = self._rec_watched()
+        groups = rec_view.arrange(
+            self._search_filter(files), rec_view.order_of(self.settings),
+            datetime.datetime.now(), self._mitt_week_start(), length=self._rec_length,
+            watched=marks.has, only_unwatched=rec_view.unwatched_only(self.settings))
         grouped: list[dict] = []
         # Surface the pending recordings (recording now + scheduled) at the very
         # top of the default "All recordings" view, soonest first, so upcoming
@@ -3409,13 +3401,12 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                  if j["status"] in ("recording", "scheduled")),
                 key=lambda j: j.get("start") or 0)
             if pending:
-                grouped.append({"_header": tr("rec_upcoming")})
+                grouped.append({"_header": tr("rec_upcoming"), "_pending": True})
                 grouped += [self._job_item(j) for j in pending]
-        for key, hk in (("today", "rec_today"), ("yesterday", "rec_yesterday"),
-                        ("week", "rec_this_week"), ("earlier", "rec_earlier")):
-            if buckets[key]:
-                grouped.append({"_header": tr(hk)})
-                grouped += buckets[key]
+        for key, rows in groups:
+            if key is not None:
+                grouped.append({"_header": self._rec_group_title(key)})
+            grouped += rows
         self._render_rows(grouped, "rec")
 
     def _load_favorites_all(self) -> None:

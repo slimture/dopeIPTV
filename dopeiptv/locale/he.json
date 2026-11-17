@@ -3079,5 +3079,13 @@
   "sort_az": "א→ת",
   "sort_za": "ת→א",
   "sort_as_all": "כמו בכל הקטגוריות ({order})",
-  "sort_scope_tip": "הסדר של הקטגוריה הזו. „כמו בכל הקטגוריות” הולך לפי הסדר שנבחר בהגדרות."
+  "sort_scope_tip": "הסדר של הקטגוריה הזו. „כמו בכל הקטגוריות” הולך לפי הסדר שנבחר בהגדרות.",
+  "rec_sort_newest": "החדשות קודם",
+  "rec_sort_oldest": "הישנות קודם",
+  "rec_sort_channel": "לפי ערוץ",
+  "rec_sort_longest": "הארוכות קודם",
+  "rec_sort_largest": "הגדולות קודם",
+  "rec_unwatched_only": "רק כאלה שלא נצפו",
+  "rec_unwatched": "לא נצפו",
+  "rec_no_channel": "ללא ערוץ"
 }

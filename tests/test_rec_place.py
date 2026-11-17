@@ -207,13 +207,17 @@ def settle(cond, secs=20, what=""):
     assert cond(), "timed out: " + what
 
 settle(lambda: w.list_model.rowCount() > 0, what="first list")
+from dopeiptv.ui.media_cards import is_heading
+def recs():
+    return [c for c in w._rp_page.view.items() if not is_heading(c)]
+def heads():
+    return [c.title for c in w._rp_page.view.items() if is_heading(c)]
 now = time.time()
 w.rec.add_job("http://x/2", "Evening News", now + 3 * 3600, now + 4 * 3600, channel="SVT1")
 
 # -- the place where the list was ----------------------------------------------------
 assert w._show_place("rec") is True
-settle(lambda: w._place_rec_showing() and w._rp_page.view.model_.rowCount() == 3,
-       what="the place")
+settle(lambda: w._place_rec_showing() and len(recs()) == 3, what="the place")
 place = w._rp_page
 view = place.view
 assert not w.listw.isVisible() and place.isVisible() and w.nav_btns["rec"].isChecked()
@@ -221,7 +225,14 @@ h = place.header
 assert h.title.text() == tr("nav_recordings"), h.title.text()
 assert h.count.text().startswith(tr("rec_n_recordings", n=3) + " · "), h.count.text()
 files = [r["_key"] for r in w.list_model.items() if r.get("_kind") == "recording"]
-assert [c.key for c in view.items()] == files
+assert [c.key for c in recs()] == files
+# Grouped by day, the newest first: made just now, all of them today - a
+# heading's line of its own, never picked; the order named on the sort.
+assert heads() == [tr("rec_today")], heads()
+assert view.items()[0].heading and not view.model_.flags(view.model_.index(0, 0))
+assert h.sort_btn.isVisible() and h.sort_key() == "newest"
+assert h.sort_btn.text() == tr("rec_sort_newest")
+assert [k for k, _w in h._sort_opts] == list(rec_view.ORDERS)
 assert place.now.isVisible() and [c.title for c in place.now.cards()] == ["Evening News"]
 assert place.now.cards()[0].line == "SVT1"
 assert place.more.isVisible() and place.layout_switch.isVisible()
@@ -253,16 +264,33 @@ w._rec_toggle_watched(news.data)
 view.dress(news)
 assert "seen" not in news.pills
 
+# Under their channels, A-Z, none said last; then only those not watched.
+h._sort_picked("channel")
+settle(lambda: heads() == ["SVT1", "TV4", tr("rec_no_channel")], what="by channel")
+assert settings.value(rec_view.ORDER_KEY) == "channel"
+assert h.sort_btn.text() == tr("rec_sort_channel")
+h._sort_picked("name")
+settle(lambda: heads() == [] and [c.title for c in recs()][0] == "Docs", what="by name")
+w._rec_watched().mark(news.key)
+h._toggle_acts[-1].trigger()                # Unwatched only
+settle(lambda: len(recs()) == 2 and news.key not in [c.key for c in recs()], what="unwatched")
+assert settings.value(rec_view.UNWATCHED_KEY) == "true"
+assert h.sort_btn.text() == tr("sort_az") + " · " + tr("rec_unwatched")
+h._toggle_acts[-1].trigger()
+w._rec_watched().unmark(news.key)
+h._sort_picked("newest")
+settle(lambda: len(recs()) == 3 and heads() == [tr("rec_today")], what="newest again")
+
 # Grid / List remembered.
 place.layout_switch.buttons[0].click()
 assert view.layout_kind == "wide" and settings.value(mw_place_rec.VIEW_KEY) == "wide"
 
 # The filter is the list's: typed in the place, the list filters.
 place.filter.setText("Football")
-settle(lambda: view.model_.rowCount() == 1, what="filtered")
+settle(lambda: len(recs()) == 1, what="filtered")
 assert w.search.text() == "Football" and not place.now.isVisible()
 place.filter.clear()
-settle(lambda: view.model_.rowCount() == 3, what="unfiltered")
+settle(lambda: len(recs()) == 3, what="unfiltered")
 
 # -- recordings to come, with their state ------------------------------------------------
 for i in range(w.cat_list.count()):

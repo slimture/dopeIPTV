@@ -3079,5 +3079,13 @@
   "sort_az": "A→Z",
   "sort_za": "Z→A",
   "sort_as_all": "Kama katika kategoria zote ({order})",
-  "sort_scope_tip": "Mpangilio wa kategoria hii. “Kama katika kategoria zote” hufuata mpangilio uliochaguliwa kwenye Mipangilio."
+  "sort_scope_tip": "Mpangilio wa kategoria hii. “Kama katika kategoria zote” hufuata mpangilio uliochaguliwa kwenye Mipangilio.",
+  "rec_sort_newest": "Mpya kwanza",
+  "rec_sort_oldest": "Za zamani kwanza",
+  "rec_sort_channel": "Kwa chaneli",
+  "rec_sort_longest": "Ndefu zaidi kwanza",
+  "rec_sort_largest": "Kubwa zaidi kwanza",
+  "rec_unwatched_only": "Ambazo hazijatazamwa tu",
+  "rec_unwatched": "Hazijatazamwa",
+  "rec_no_channel": "Hakuna chaneli"
 }

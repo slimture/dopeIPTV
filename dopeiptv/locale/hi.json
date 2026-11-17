@@ -3079,5 +3079,13 @@
   "sort_az": "A→Z",
   "sort_za": "Z→A",
   "sort_as_all": "सभी श्रेणियों की तरह ({order})",
-  "sort_scope_tip": "इस श्रेणी का क्रम। “सभी श्रेणियों की तरह” सेटिंग्स में चुने गए क्रम का पालन करता है।"
+  "sort_scope_tip": "इस श्रेणी का क्रम। “सभी श्रेणियों की तरह” सेटिंग्स में चुने गए क्रम का पालन करता है।",
+  "rec_sort_newest": "नई पहले",
+  "rec_sort_oldest": "पुरानी पहले",
+  "rec_sort_channel": "चैनल के अनुसार",
+  "rec_sort_longest": "सबसे लंबी पहले",
+  "rec_sort_largest": "सबसे बड़ी पहले",
+  "rec_unwatched_only": "सिर्फ़ न देखी गईं",
+  "rec_unwatched": "न देखी गईं",
+  "rec_no_channel": "कोई चैनल नहीं"
 }

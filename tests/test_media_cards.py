@@ -422,3 +422,47 @@ def test_rtl_grid_starts_at_the_right(app):
     assert col == m.cols - 1
     view.grab()                                     # paints without error
     view.close()
+
+
+def test_a_heading_among_cards_is_a_line_of_its_own_never_picked(app):
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import QAbstractItemView
+    from dopeiptv.ui import media_cards as mc
+    v = mc.CardView(None, "wide")
+    v.resize(900, 600)
+    v.show()
+    cards = [mc.Card(key="h:today", title="Today", heading=True)]
+    cards += [mc.Card(key=f"a{i}", title=f"A {i}") for i in range(5)]
+    cards += [mc.Card(key="h:yesterday", title="Yesterday", heading=True)]
+    cards += [mc.Card(key=f"b{i}", title=f"B {i}") for i in range(2)]
+    v.set_items(cards)
+    _spin(app)
+    m = v.metrics
+    assert v._headed and m.cols >= 2
+    lines = v._lines()
+    # Today, its cards from the start of the next line, then Yesterday's.
+    assert lines[0][1] == v.HEAD_H and lines[0][2] == lines[0][3] == 0
+    assert lines[1][2] == 1
+    head2 = next(k for k, ln in enumerate(lines) if ln[2] == 6)
+    assert lines[head2][1] == v.HEAD_H and lines[head2 + 1][2] == 7
+    assert v.content_height() == sum(ln[1] for ln in lines) + 2
+    # Laid out as counted: the second heading's line where the lines say.
+    r = v.visualRect(v.model_.index(6, 0))
+    assert r.top() == lines[head2][0] and r.left() == 0, (r, lines[head2])
+    first = v.visualRect(v.model_.index(7, 0))
+    assert first.top() == lines[head2 + 1][0] and first.left() == 0
+    # Never picked, never played; the arrows step over it.
+    assert v.model_.flags(v.model_.index(0, 0)) == Qt.ItemFlag.NoItemFlags
+    got = []
+    v.activated.connect(got.append)
+    v._clicked(v.model_.index(0, 0))
+    assert got == []
+    v.setCurrentIndex(v.model_.index(5, 0))
+    nxt = v.moveCursor(QAbstractItemView.CursorAction.MoveRight, Qt.KeyboardModifier.NoModifier)
+    assert nxt.row() == 7
+    assert 0 in v.rows_on_screen() and 7 in v.rows_on_screen()
+    # No heading: back to cells, uniform.
+    v.set_items([mc.Card(key=f"c{i}", title=f"C {i}") for i in range(4)])
+    _spin(app)
+    assert not v._headed and v.uniformItemSizes() and v.gridSize().width() == v.metrics.slot_w
+    v.deleteLater()

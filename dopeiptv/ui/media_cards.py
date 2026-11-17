@@ -85,6 +85,8 @@ def px_font(px: int, weight: QFont.Weight = QFont.Weight.Normal) -> QFont:
 
 #: The type every card uses: a title, its muted line, the small print.
 TITLE_PX, LINE_PX, SMALL_PX = 13, 11, 12
+#: A heading's words among cards (``Card.heading``).
+HEAD_PX = 15
 BOLD = QFont.Weight.Bold
 
 
@@ -263,6 +265,13 @@ class Card:
     rank: int = 0
     data: Any = None
     marks: tuple = ()
+    #: A heading over the cards after it ("Today", a channel's name): a
+    #: ``CardView`` gives it a line of its own; never picked or played.
+    heading: bool = False
+
+
+def is_heading(item: Any) -> bool:
+    return bool(getattr(item, "heading", False))
 
 
 #: The marks after a card's title, as the TV place's rows have them after a
@@ -754,6 +763,12 @@ class CardModel(QAbstractListModel):
     def rowCount(self, parent=QModelIndex()) -> int:
         return 0 if parent.isValid() else len(self._items)
 
+    def flags(self, index):
+        if index.isValid() and 0 <= index.row() < len(self._items) \
+                and is_heading(self._items[index.row()]):
+            return Qt.ItemFlag.NoItemFlags      # a heading is never picked
+        return super().flags(index)
+
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         if not index.isValid() or not 0 <= index.row() < len(self._items):
             return None
@@ -1100,7 +1115,7 @@ class _PaintedView(QListView):
     def _clicked(self, idx) -> None:
         if self._one_click():
             it = self.model_.item_at(idx.row())
-            if it is not None:
+            if it is not None and not is_heading(it):
                 self.activated.emit(it)
 
     def _current_moved(self, cur, _prev) -> None:
@@ -1116,13 +1131,13 @@ class _PaintedView(QListView):
                                       | Qt.KeyboardModifier.MetaModifier))
         if k in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and plain:
             it = self.current_item()
-            if it is not None:
+            if it is not None and not is_heading(it):
                 self.activated.emit(it)
             return
         if k == Qt.Key.Key_Menu:
             idx = self.currentIndex()
             it = self.model_.item_at(idx.row()) if idx.isValid() else None
-            if it is not None:
+            if it is not None and not is_heading(it):
                 r = self.visualRect(idx)
                 self.menu.emit(it, self.viewport().mapToGlobal(r.center()))
             return
@@ -1140,13 +1155,13 @@ class _PaintedView(QListView):
         if self._one_click() or e.button() != Qt.MouseButton.LeftButton:
             return                      # the first click of the two did it
         it = self.model_.item_at(self.indexAt(e.position().toPoint()).row())
-        if it is not None:
+        if it is not None and not is_heading(it):
             self.activated.emit(it)
 
     def contextMenuEvent(self, e) -> None:
         idx = self.indexAt(e.pos())
         it = self.model_.item_at(idx.row()) if idx.isValid() else None
-        if it is None:
+        if it is None or is_heading(it):
             return
         self.setCurrentIndex(idx)
         self.menu.emit(it, e.globalPos())
@@ -1196,9 +1211,12 @@ class CardDelegate(QStyledItemDelegate):
 
     def sizeHint(self, option, index) -> QSize:
         v = self._view
+        head = is_heading(v.model_.item_at(index.row()))
         if v.layout_kind == "list":
-            return QSize(1, LIST_ROW_H)     # Qt makes a list's rows as wide as it
+            return QSize(1, v.HEAD_H if head else LIST_ROW_H)   # Qt makes a list's rows as wide as it
         m = v.metrics
+        if head:
+            return QSize(m.cols * m.slot_w, v.HEAD_H)       # a line of its own
         return QSize(m.slot_w, m.cell_h)
 
     def paint(self, p: QPainter, option, index) -> None:
@@ -1207,6 +1225,9 @@ class CardDelegate(QStyledItemDelegate):
         if card is None:
             return
         rtl = option.direction == Qt.LayoutDirection.RightToLeft
+        if is_heading(card):
+            self._paint_heading(p, option.rect, card, rtl)
+            return
         playing = bool(card.key) and card.key == v.playing_key
         hover = bool(option.state & QStyle.StateFlag.State_MouseOver)
         selected = bool(option.state & QStyle.StateFlag.State_Selected)
@@ -1216,6 +1237,20 @@ class CardDelegate(QStyledItemDelegate):
             self._paint_row(p, option.rect, index.row(), card, rtl, playing, hover, selected)
         else:
             self._paint_card(p, option.rect, card, rtl, playing, hover, selected, focus)
+        p.restore()
+
+    def _paint_heading(self, p: QPainter, rect: QRect, card: Card, rtl: bool) -> None:
+        """A heading's words at its line's foot, where the cards begin."""
+        begin_paint(p)
+        f = px_font(HEAD_PX, QFont.Weight.DemiBold)
+        p.setFont(f)
+        p.setPen(QColor(P["text"]))
+        pad = 4 if self._view.layout_kind != "list" else CH_PAD_X
+        box = rect.adjusted(pad, 0, -pad, -8)
+        text = QFontMetrics(f).elidedText(card.title, Qt.TextElideMode.ElideRight, max(1, box.width()))
+        align = (Qt.AlignmentFlag.AlignRight if rtl else Qt.AlignmentFlag.AlignLeft) \
+            | Qt.AlignmentFlag.AlignBottom
+        p.drawText(box, int(align), text)
         p.restore()
 
     def picture_fits(self, card: Card, pm: QPixmap | None) -> bool:
@@ -1369,6 +1404,9 @@ class CardView(_PaintedView):
     click, Enter) and ``menu(card, global_pos)``."""
 
     OBJECT_NAME = "MediaCardView"
+    #: A heading's line (``Card.heading``): words over the cards after it,
+    #: across the grid's width, never picked.
+    HEAD_H = 44
 
     def __init__(self, loader=None, layout: str = "poster", parent=None) -> None:
         self.layout_kind = "poster"
@@ -1376,6 +1414,9 @@ class CardView(_PaintedView):
         self.metrics = grid_metrics(600, "poster")
         self._reflow_timer: QTimer | None = None
         self._reflow_pending = False
+        #: Whether a heading is among the cards: the grid then lays out by
+        #: each card's size (a heading a line of its own), else by cells.
+        self._headed = False
         super().__init__(loader, parent)
         self.setItemDelegate(CardDelegate(self))
         self.setAccessibleName(tr("card_view_a11y"))
@@ -1419,14 +1460,66 @@ class CardView(_PaintedView):
         m = grid_metrics(self.layout_width(), self.layout_kind, th, lh)
         if m != self.metrics or force:
             self.metrics = m
-            self.setGridSize(QSize(m.slot_w, m.cell_h))
+            self.setGridSize(QSize() if self._headed else QSize(m.slot_w, m.cell_h))
             self._relayout()
+
+    def _contents_changed(self, *a) -> None:
+        headed = any(is_heading(it) for it in self.model_.items())
+        if headed != self._headed:
+            self._headed = headed
+            self.setUniformItemSizes(not headed)
+            self._remeasure(force=True)
+        super()._contents_changed(*a)
+
+    def _lines(self) -> list[tuple[int, int, int, int]]:
+        """(top, height, first row, last row) of each line of a view with
+        headings: a heading a line of its own, the cards after it from the
+        start of the next."""
+        items = self.model_.items()
+        listed = self.layout_kind == "list"
+        cols = 1 if listed else max(1, self.metrics.cols)
+        cell = LIST_ROW_H if listed else self.metrics.cell_h
+        out: list[tuple[int, int, int, int]] = []
+        y = i = 0
+        n = len(items)
+        while i < n:
+            if is_heading(items[i]):
+                out.append((y, self.HEAD_H, i, i))
+                y += self.HEAD_H
+                i += 1
+                continue
+            j = i
+            while j < n and j - i < cols and not is_heading(items[j]):
+                j += 1
+            out.append((y, cell, i, j - 1))
+            y += cell
+            i = j
+        return out
 
     def content_height(self) -> int:
         n = self.model_.rowCount()
+        if self._headed:
+            lines = self._lines()
+            return (lines[-1][0] + lines[-1][1] if lines else 0) + 2
         if self.layout_kind == "list":
             return n * LIST_ROW_H + 2
         return self.metrics.height(n) + 2
+
+    def moveCursor(self, action, modifiers):  # noqa: N802 - Qt's name
+        """The arrows step over a heading to the card beyond it."""
+        idx = super().moveCursor(action, modifiers)
+        if not (self._headed and idx.isValid() and is_heading(self.model_.item_at(idx.row()))):
+            return idx
+        A = QAbstractItemView.CursorAction
+        back = action in (A.MoveUp, A.MoveLeft, A.MovePrevious, A.MovePageUp, A.MoveHome)
+        n = self.model_.rowCount()
+        for step in ((-1, 1) if back else (1, -1)):
+            row = idx.row() + step
+            while 0 <= row < n and is_heading(self.model_.item_at(row)):
+                row += step
+            if 0 <= row < n:
+                return self.model_.index(row, 0)
+        return self.currentIndex()
 
     def rows_on_screen(self, margin: int = 0) -> range:
         n = self.model_.rowCount()
@@ -1437,6 +1530,14 @@ class CardView(_PaintedView):
         top, bottom = top + off, bottom + off
         if bottom < 0:
             return range(0)
+        if self._headed:
+            lines = self._lines()
+            shown = [k for k, (y, h, _a, _b) in enumerate(lines) if y + h > top and y <= bottom]
+            if not shown:
+                return range(0)
+            first = max(0, shown[0] - margin)
+            last = min(len(lines) - 1, shown[-1] + margin)
+            return range(lines[first][2], lines[last][3] + 1)
         if self.layout_kind == "list":
             a = max(0, top // LIST_ROW_H - margin)
             b = min(n - 1, bottom // LIST_ROW_H + margin)
@@ -2104,6 +2205,8 @@ class PageHeader(QWidget):
 
     sort_changed = pyqtSignal(str)
     view_changed = pyqtSignal(str)
+    #: The switch at the foot of the sort's menu (``set_sort_toggle``).
+    sort_toggled = pyqtSignal(bool)
 
     #: The line's words in pixels: what is shown, its count.
     TITLE_PX = 13
@@ -2175,6 +2278,8 @@ class PageHeader(QWidget):
         self._sort_group.setExclusive(True)
         self._sort_opts: list[tuple[str, str]] = []
         self._sort_key = ""
+        self._toggle: tuple[str, bool] = ("", False)
+        self._toggle_acts: list[QAction] = []
         self.sort_btn.hide()
         self.sort_btn.setFixedHeight(self.CONTROL_H)
         lay.addWidget(self.sort_btn, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -2256,7 +2361,7 @@ class PageHeader(QWidget):
         cw = fm_c.horizontalAdvance(count) + 2 if count else 0
         dot = fm_c.horizontalAdvance("·") + 2
         dw = dot + 2 * self.GAP if both else 0
-        self._give_room(min(tw, self.TITLE_MIN) + dw + cw)
+        self._give_room(tw + dw + cw)
         room = self._line.width() if self._line.isVisible() else 0
         full_t, full_c = tw, cw
         if room > 0 and tw + dw + cw > room:
@@ -2288,8 +2393,8 @@ class PageHeader(QWidget):
 
     def _give_room(self, need: int) -> None:
         """A filter beside the line gives up its room first - down to its
-        least - so a little of the name and the whole count stay; it never
-        asks the header for more than the pane gives it."""
+        least - so the whole line stays where it can; it never asks the
+        header for more than the pane gives it."""
         if not self._line.isVisible():
             return
         filters = [w for w in (self._extra.itemAt(i).widget() for i in range(self._extra.count()))
@@ -2334,8 +2439,33 @@ class PageHeader(QWidget):
             act.triggered.connect(lambda _c=False, k=key: self._sort_picked(k))
             self._sort_group.addAction(act)
             self._sort_menu.addAction(act)
+        self._toggle_acts = []              # cleared with the menu
+        self._put_toggle()
         self.sort_btn.setVisible(bool(self._sort_opts))
         self._set_sort_key(current or (self._sort_opts[0][0] if self._sort_opts else ""), shown)
+
+    def set_sort_toggle(self, text: str, on: bool = False) -> None:
+        """A switch at the foot of the sort's menu, under a line ("Unwatched
+        only"); "" takes it away. Said as ``sort_toggled``."""
+        if (text, bool(on)) == self._toggle and (bool(self._toggle_acts) == bool(text)):
+            return
+        self._toggle = (text, bool(on))
+        self._put_toggle()
+
+    def _put_toggle(self) -> None:
+        for act in self._toggle_acts:
+            self._sort_menu.removeAction(act)
+        self._toggle_acts = []
+        text, on = self._toggle
+        if not text or not self._sort_opts:
+            return
+        sep = self._sort_menu.addSeparator()
+        act = QAction(text, self._sort_menu)
+        act.setCheckable(True)
+        act.setChecked(on)
+        act.toggled.connect(self.sort_toggled)
+        self._sort_menu.addAction(act)
+        self._toggle_acts = [sep, act]
 
     def sort_key(self) -> str:
         return self._sort_key

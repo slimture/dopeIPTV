@@ -3079,5 +3079,13 @@
   "sort_az": "A→Ž",
   "sort_za": "Ž→A",
   "sort_as_all": "Kao u svim kategorijama ({order})",
-  "sort_scope_tip": "Redoslijed ove kategorije. „Kao u svim kategorijama” prati redoslijed odabran u Postavkama."
+  "sort_scope_tip": "Redoslijed ove kategorije. „Kao u svim kategorijama” prati redoslijed odabran u Postavkama.",
+  "rec_sort_newest": "Najnovije prvo",
+  "rec_sort_oldest": "Najstarije prvo",
+  "rec_sort_channel": "Po kanalu",
+  "rec_sort_longest": "Najdulje prvo",
+  "rec_sort_largest": "Najveće prvo",
+  "rec_unwatched_only": "Samo nepogledane",
+  "rec_unwatched": "Nepogledane",
+  "rec_no_channel": "Bez kanala"
 }

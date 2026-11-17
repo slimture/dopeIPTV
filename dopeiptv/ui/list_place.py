@@ -36,7 +36,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..i18n import tr
-from .media_cards import Card, CardDelegate, CardView, PageHeader, PlacePage, Segmented
+from .media_cards import Card, CardDelegate, CardView, PageHeader, PlacePage, Segmented, is_heading
 from .series_page import drawn_icon
 from .theme import P, corner_radius
 
@@ -130,7 +130,7 @@ class PlaceCardView(CardView):
         self.click_plays = lambda: False
 
     def dress(self, card: Card) -> None:
-        if not isinstance(card, PlaceCard) or card.gen == self._gen:
+        if not isinstance(card, PlaceCard) or card.gen == self._gen or is_heading(card):
             return
         card.gen = self._gen
         fn = self.dress_fn
@@ -167,7 +167,7 @@ class PlaceCardView(CardView):
         on all of them), else picks the card under it."""
         idx = self.indexAt(e.pos())
         it = self.model_.item_at(idx.row()) if idx.isValid() else None
-        if it is None:
+        if it is None or is_heading(it):
             return
         sm = self.selectionModel()
         if sm.isSelected(idx) and len(sm.selectedRows()) > 1:
@@ -178,7 +178,7 @@ class PlaceCardView(CardView):
 
     def selected_items(self) -> list:
         rows = sorted(ix.row() for ix in self.selectionModel().selectedIndexes())
-        return [c for c in (self.item_at(r) for r in rows) if c is not None]
+        return [c for c in (self.item_at(r) for r in rows) if c is not None and not is_heading(c)]
 
 
 def layout_icon(kind: str, ink: str, size: int = 14, dpr: float = 1.0) -> QPixmap:
@@ -239,9 +239,12 @@ class ListPlace(PlacePage):
 
     MARGIN_TOP = 6
     FILTER_W = 240
-    #: The room the title keeps beside the controls; with less, the controls
-    #: take rows of their own under it.
-    TITLE_ROOM = 220
+    #: The room the header's line keeps beside the controls; with less, the
+    #: controls take rows of their own under it.
+    TITLE_ROOM = 180
+    #: The least the filter is given beside the line before the controls
+    #: take rows of their own (the header narrows it that far for the line).
+    FILTER_MIN = 140
     #: The stem of the parts' object names ("LocalBack", "RecNote", ...).
     NAME = "Place"
     VIEW: type[PlaceCardView] = PlaceCardView
@@ -471,12 +474,14 @@ class ListPlace(PlacePage):
         title in the header: the title's room, each control shown, the
         spacing and the page's margins."""
         h = self.header
-        ws = [self.filter.sizeHint().width(),
+        ws = [max(self.filter.minimumWidth(), self.FILTER_MIN),
               *(t.width() for t in self.tools if self._tool_wanted(t)),
               h.switch.sizeHint().width() if h.switch.keys() else 0,
               self.layout_switch.sizeHint().width() if self._layout_shown else 0]
         if not self.back.isHidden():
             ws.append(self.back.sizeHint().width())
+        if not h.sort_btn.isHidden():
+            ws.append(h.sort_btn.sizeHint().width())
         shown = [w for w in ws if w]
         return (2 * self.MARGIN_X + self.TITLE_ROOM + sum(shown)
                 + 8 * max(0, len(shown) - 1) + 12)

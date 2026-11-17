@@ -3079,5 +3079,13 @@
   "sort_az": "A→Z",
   "sort_za": "Z→A",
   "sort_as_all": "Như mọi danh mục ({order})",
-  "sort_scope_tip": "Thứ tự của danh mục này. “Như mọi danh mục” theo thứ tự đã chọn trong Cài đặt."
+  "sort_scope_tip": "Thứ tự của danh mục này. “Như mọi danh mục” theo thứ tự đã chọn trong Cài đặt.",
+  "rec_sort_newest": "Mới nhất trước",
+  "rec_sort_oldest": "Cũ nhất trước",
+  "rec_sort_channel": "Theo kênh",
+  "rec_sort_longest": "Dài nhất trước",
+  "rec_sort_largest": "Lớn nhất trước",
+  "rec_unwatched_only": "Chỉ chưa xem",
+  "rec_unwatched": "Chưa xem",
+  "rec_no_channel": "Không có kênh"
 }

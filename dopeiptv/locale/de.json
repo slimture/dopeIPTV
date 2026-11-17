@@ -3079,5 +3079,13 @@
   "sort_az": "A→Z",
   "sort_za": "Z→A",
   "sort_as_all": "Wie in allen Kategorien ({order})",
-  "sort_scope_tip": "Die Reihenfolge dieser Kategorie. „Wie in allen Kategorien“ folgt der Reihenfolge aus den Einstellungen."
+  "sort_scope_tip": "Die Reihenfolge dieser Kategorie. „Wie in allen Kategorien“ folgt der Reihenfolge aus den Einstellungen.",
+  "rec_sort_newest": "Neueste zuerst",
+  "rec_sort_oldest": "Älteste zuerst",
+  "rec_sort_channel": "Nach Sender",
+  "rec_sort_longest": "Längste zuerst",
+  "rec_sort_largest": "Größte zuerst",
+  "rec_unwatched_only": "Nur ungesehene",
+  "rec_unwatched": "Ungesehen",
+  "rec_no_channel": "Kein Sender"
 }

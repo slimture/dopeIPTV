@@ -3079,5 +3079,13 @@
   "sort_az": "A→Z",
   "sort_za": "Z→A",
   "sort_as_all": "Zoals in alle categorieën ({order})",
-  "sort_scope_tip": "De volgorde van deze categorie. ‘Zoals in alle categorieën’ volgt de volgorde uit Instellingen."
+  "sort_scope_tip": "De volgorde van deze categorie. ‘Zoals in alle categorieën’ volgt de volgorde uit Instellingen.",
+  "rec_sort_newest": "Nieuwste eerst",
+  "rec_sort_oldest": "Oudste eerst",
+  "rec_sort_channel": "Per zender",
+  "rec_sort_longest": "Langste eerst",
+  "rec_sort_largest": "Grootste eerst",
+  "rec_unwatched_only": "Alleen ongezien",
+  "rec_unwatched": "Ongezien",
+  "rec_no_channel": "Geen zender"
 }

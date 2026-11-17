@@ -102,6 +102,11 @@ same new look.
   title is gone; a long category is cut with "…" (whole in its tooltip)
   and the count stays whole, the filter giving up room first. The count
   no longer repeats the order - the sort's button names it.
+- Recordings: grouped by day, the newest first - Today, Yesterday,
+  Earlier this week, Last week, then by month - under headings over the
+  grid and the list alike. The sort's menu puts them oldest first, by
+  name, under their channels, the longest or the largest first, and has
+  Unwatched only at its foot; the choice is kept.
 - Phone remote: More opens on an even row of three tiles - Subtitles and
   sound, Sleep timer, Record - each its icon over its words, the next
   programme under them; Record turns red with its time while a recording
