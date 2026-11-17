@@ -3356,6 +3356,12 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         self.list_model.set_items(rows, model_kind)
         self._set_list_status(self._count_text(model_kind, n) if n
                               else (empty_msg or self._count_text(model_kind, 0)))
+        if getattr(self, "_pending_jump_key", None) is not None:
+            # A jump to what plays (Recordings is built here, not through
+            # _apply_filter): its row picked once it is in.
+            if self._try_select_key(self._pending_jump_key):
+                self._pending_jump_key = None
+                return
         # On the very first populated list, select the first playable row (not a
         # section header) so the detail pane shows something straight away -
         # selecting only, never auto-playing.
@@ -3639,6 +3645,9 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         if self._playing_key is None or playing is None:
             self._show_toast(tr("toast_nothing_playing"))
             return
+        # Wherever it lands, its card is picked and on screen once the
+        # place's rows are in (a folder is read in slices, a list loads).
+        self._np_reveal_soon()
         # A playing episode is on its series' page, marked there. Before the
         # list is looked through: an episode's id can be a series' id too.
         if self._playing_group == "episode" and lp.get("series_ctx"):

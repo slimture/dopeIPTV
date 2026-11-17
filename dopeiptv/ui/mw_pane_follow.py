@@ -37,6 +37,7 @@ import functools
 from contextlib import contextmanager
 from typing import Any
 
+from PyQt6 import sip
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import (
     QAbstractSpinBox, QApplication, QComboBox, QDialog, QLineEdit, QPlainTextEdit, QTextEdit,
@@ -241,3 +242,65 @@ class _PaneFollowMixin:
         self._close_search_page()
         getattr(self, "_close_mitt_page", lambda: None)()
         self._check_nav(self._nav_key_for_mode(self.mode))
+
+    # -- the jump to what plays: its card on screen ---------------------------------
+
+    #: How often, and how long, the jump looks for the playing card while
+    #: the place's rows come in (a folder read in slices, a list loading).
+    _NP_STEP_MS = 150
+    _NP_TRIES = 60
+
+    def _np_cards(self) -> tuple[Any, Any] | None:
+        """The place on screen that draws its list as cards, and its view:
+        (page, view) - None for the TV place and the pages over the list,
+        whose list scrolls itself."""
+        place = getattr(self, "_place", "")
+        if place == "local":
+            page = getattr(self, "_lp_page", None)
+            view = getattr(page, "view", None)
+        elif place == "rec":
+            page = getattr(self, "_rp_page", None)
+            view = getattr(page, "view", None)
+        elif place == "radio":
+            page = getattr(self, "_rap_page", None)
+            view = getattr(page, "view", None)
+        elif place == "films":
+            page = getattr(self, "_films_place", None)
+            view = getattr(self, "_pf_view", None)
+        elif place == "series":
+            page = getattr(self, "_place_series", None)
+            view = getattr(page, "grid", None)
+        else:
+            return None
+        if page is None or view is None or sip.isdeleted(page) or not page.isVisible():
+            return None
+        return page, view
+
+    def _np_reveal_soon(self) -> None:
+        """Start looking for the playing card (the jump to what plays)."""
+        self._np_gen = getattr(self, "_np_gen", 0) + 1
+        QTimer.singleShot(self._NP_STEP_MS, functools.partial(
+            self._np_reveal, self._np_gen, self._playing_key, self._NP_TRIES))
+
+    def _np_reveal(self, gen: int, key: Any, tries: int) -> None:
+        """The playing card picked and scrolled into sight - once the rows
+        are in and laid out: a card revealed while a folder was still being
+        read was scrolled to where it was, and the rows after it moved it
+        far out of sight. Given up on another jump, another title, or after
+        a few seconds."""
+        if gen != getattr(self, "_np_gen", 0) or key is None or key != self._playing_key:
+            return
+        found = self._np_cards()
+        busy = getattr(self, "_local_listing", None) is not None
+        row = found[1].row_of(str(key)) if found is not None else -1
+        if found is None or row < 0 or busy:
+            if tries > 0:
+                QTimer.singleShot(self._NP_STEP_MS, functools.partial(
+                    self._np_reveal, gen, key, tries - 1))
+            return
+        page, view = found
+        view.doItemsLayout()
+        lay = getattr(page, "body", None) and page.body.layout()
+        if lay is not None:
+            lay.activate()
+        view.focus_key(str(key), take_focus=False)
