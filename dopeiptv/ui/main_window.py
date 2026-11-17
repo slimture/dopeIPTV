@@ -116,7 +116,6 @@ from .mw_reminders import _RemindersMixin
 from .mw_series import _SeriesMixin
 from .mw_series_page import _SeriesPageMixin
 from .mw_place_films import _PlaceFilmsMixin
-from .mw_film_page import _FilmPageMixin
 from .mw_place_local import _PlaceLocalMixin
 from .mw_place_rec import _PlaceRecMixin
 from .mw_place_radio import _PlaceRadioMixin
@@ -171,7 +170,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                  _PlaceRecMixin, _PlaceRadioMixin,
                  _PopoutMixin, _MultiviewMixin, _PlacesMixin, _PlaceLookMixin, _PopularMixin,
                  _GuideMixin,
-                 _SeriesPageMixin, _PlaceFilmsMixin, _FilmPageMixin, _PlaceSeriesMixin, _SearchAllMixin, _MittMixin,
+                 _SeriesPageMixin, _PlaceFilmsMixin, _PlaceSeriesMixin, _SearchAllMixin, _MittMixin,
                  _MprisMixin,
                  _FollowMixin, _PaneFollowMixin, _PlaceTvMixin, _SubtitlesMixin, _CastMixin, _AirPlayMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
@@ -866,7 +865,6 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cat_list.itemClicked.connect(self._guide_category_clicked)
         self.cat_list.itemDoubleClicked.connect(self._guide_category_double_clicked)
         self.cat_list.itemClicked.connect(self._sp_category_clicked)
-        self.cat_list.itemClicked.connect(self._fp_category_clicked)
         self.cat_list.itemClicked.connect(self._search_category_clicked)
         self.cat_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.cat_list.customContextMenuRequested.connect(self._cat_menu)
@@ -1630,6 +1628,29 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         header_row.setAlignment(Qt.AlignmentFlag.AlignTop)
         il.addLayout(header_row)
 
+        # A film under way: Continue from where it stopped, how far it got
+        # and the time left (mw_detail._detail_film_continue).
+        self.d_continue = QWidget(objectName="DetailContinue")
+        dc = QHBoxLayout(self.d_continue)
+        dc.setContentsMargins(0, 0, 0, 0)
+        dc.setSpacing(12)
+        self.d_continue_btn = QPushButton(objectName="Primary")
+        self.d_continue_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.d_continue_btn.clicked.connect(self._detail_film_go_on)
+        dc.addWidget(self.d_continue_btn)
+        dcol = QVBoxLayout()
+        dcol.setSpacing(4)
+        self.d_continue_left = QLabel("", objectName="DetailMeta")
+        self.d_continue_bar = QProgressBar(objectName="EpgBar")
+        self.d_continue_bar.setTextVisible(False)
+        self.d_continue_bar.setRange(0, 1000)
+        self.d_continue_bar.setFixedHeight(4)
+        dcol.addWidget(self.d_continue_left)
+        dcol.addWidget(self.d_continue_bar)
+        dc.addLayout(dcol, 1)
+        self.d_continue.hide()
+        il.addWidget(self.d_continue)
+
         self.cast_scroll = QScrollArea()
         self.cast_scroll.setWidgetResizable(True)
         self.cast_scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -2220,10 +2241,6 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         if self._series_page_visible():
             self._leave_series_page()
             return
-        # ...and a film's page to the Movies place as it was.
-        if self._film_page_visible():
-            self._leave_film_page()
-            return
         # The Search page: its field emptied first, then back where you were.
         if self._search_page_visible():
             self._search_escape()
@@ -2570,7 +2587,6 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         if not getattr(self, "_guide_hold", False):
             self._close_guide_page()
         self._close_series_page()       # a series' page gives way to the list
-        self._close_film_page()         # ...and a film's page to its place
         getattr(self, "_close_mitt_page", lambda: None)()    # ...and Mine's page
         # ...and the Search page, unless the window moves on by itself (a
         # source switched to from it has no list of the mode shown).
@@ -3023,8 +3039,6 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             # Arrowed through the sidebar's categories: their list, in the
             # series page's place (a click does the same, _sp_category_clicked).
             self._sp_category_clicked()
-        if self._film_page_showing() and self.cat_list.hasFocus():
-            self._fp_category_clicked()
         if self._search_page_showing() and self.cat_list.hasFocus():
             self._search_category_clicked()
         self.series_ctx = None
@@ -3643,13 +3657,6 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         if self._playing_group == "episode" and lp.get("series_ctx"):
             self._open_series_page(lp["series_ctx"], focus=self._playing_key)
             return
-        # A film: its own page stays when it shows that film; another's gives
-        # way to the Movies place, where the film's card is picked.
-        if self._film_page_showing():
-            if self._playing_group == "vod" and self._film_page_shows(self._playing_key):
-                return
-            self._close_film_page()
-            self._check_nav(self._nav_key_for_mode(self.mode))
         if self._try_select_playing():
             return
         # A station: the list it was played from in Radio (mw_radio).

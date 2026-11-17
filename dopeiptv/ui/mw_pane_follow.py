@@ -16,7 +16,7 @@ in the way of the stream itself. It does nothing when:
 
 - the play came from the middle pane itself: the list (what it plays is
   its own row: selected, nothing else), a series' page showing that
-  series, a film's page and the Movies place (ui/mw_film_page.py), the
+  series, the Movies place (ui/mw_place_films.py), the
   Search page or the Guide page (``from_pane``: their plays
   keep the page; ``_links_later`` carries that on to a play that waits
   for its address);
@@ -182,9 +182,6 @@ class _PaneFollowMixin:
         if (self._search_page_showing() or self._guide_page_showing()
                 or getattr(self, "_mitt_showing", lambda: False)()):
             return False
-        if self._film_page_showing():
-            # A film's page shows that film, or the place under it follows.
-            return kind == "movie" and self._fp_key() == key
         if self._series_page_showing():
             if kind != "episode":
                 return False
@@ -241,7 +238,6 @@ class _PaneFollowMixin:
         their Back to it does."""
         self._close_guide_page()
         self._close_series_page()
-        self._close_film_page()
         self._close_search_page()
         getattr(self, "_close_mitt_page", lambda: None)()
         self._check_nav(self._nav_key_for_mode(self.mode))

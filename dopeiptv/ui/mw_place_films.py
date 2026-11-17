@@ -4,8 +4,10 @@ as before; in the middle pane the header (the category's name, "48 movies
 · order", the filter, the sort, Grid / List - remembered), "Popular right
 now" (TMDB's chart of the week matched to this source's catalogue,
 services/popular.py, ranked), "Continue" (this source's films in
-progress), then the category's films as posters or rows. A film opens its
-page (ui/mw_film_page.py).
+progress), then the category's films as posters or rows. A click picks a
+film and the detail column shows it - Continue with how far it got among
+it (ui/mw_detail.py); a double click or Enter plays it, as the list's
+double click does; a card in Continue goes on from where it stopped.
 
 The place is a view of the list the window always had: the category's rows
 are the list model's (MainWindow._apply_filter fills it - hidden categories
@@ -32,6 +34,7 @@ asked again when a new chart comes (``popular_watch``).
 
 from __future__ import annotations
 
+from functools import partial
 from typing import Any
 
 from PyQt6 import sip
@@ -42,8 +45,10 @@ from PyQt6.QtWidgets import QApplication, QLineEdit, QSizePolicy
 from ..core import film_view as fv
 from ..core import series_view as sv
 from ..core.log import log
+from ..core.profiles import adult_item
 from ..i18n import tr
 from .media_cards import Card, CardDelegate, CardRow, CardView, PlacePage, item_marks
+from .mw_pane_follow import from_pane
 from .series_cards import minutes_text
 from .theme import corner_radius
 
@@ -190,7 +195,6 @@ class _PlaceFilmsMixin:
             self._close_guide_page()
             self._close_series_page()
             self._close_search_page()
-            self._close_film_page()
         made = self._films_place is None
         place = self._ensure_films_place()
         if made:
@@ -252,10 +256,13 @@ class _PlaceFilmsMixin:
         h.view_changed.connect(self._pf_view_changed)
         loader = self.logos
         pop = CardRow(tr("card_popular"), loader, picture="poster")
-        pop.activated.connect(self._pf_activated)
+        # A click picks (the detail column shows it), a double click plays.
+        pop.strip.click_plays = lambda: False
+        pop.strip.current_item_changed.connect(self._pf_strip_picked)
+        pop.activated.connect(self._pf_play_card)
         pop.menu.connect(self._pf_row_menu)
         cont = CardRow(tr("card_continue"), loader, picture="poster")
-        cont.activated.connect(self._pf_activated)
+        cont.activated.connect(self._pf_continue_card)
         cont.menu.connect(self._pf_row_menu)
         # Each hidden from its heading (mw_place_look; Popular right now in
         # its own key on Posters & info).
@@ -269,7 +276,8 @@ class _PlaceFilmsMixin:
         view.tint = self._pf_tint
         view.marks = lambda card: item_marks(
             self, card.data if isinstance(card.data, dict) else {}, "vod")
-        view.activated.connect(self._pf_activated)
+        view.click_plays = lambda: False
+        view.activated.connect(self._pf_play_card)
         view.menu.connect(self._pf_menu)
         view.current_item_changed.connect(self._pf_current_changed)
         view.selectionModel().selectionChanged.connect(self._pf_selection_changed)
@@ -341,8 +349,6 @@ class _PlaceFilmsMixin:
             if stack.currentIndex() == 0 and self._pf_takes_over():
                 stack.setCurrentWidget(place)
             return
-        if self._film_page_showing():
-            self._close_film_page()
         if stack.currentWidget() is place:
             stack.setCurrentIndex(0)
 
@@ -694,10 +700,90 @@ class _PlaceFilmsMixin:
 
     # -- what a card does -------------------------------------------------------------
 
-    def _pf_activated(self, card) -> None:
+    def _pf_play_card(self, card) -> None:
+        """A double click or Enter on a film: it plays, as the list's
+        double click plays it (the resume question where it is under way);
+        the place stays as it is."""
         row = card.data if isinstance(card, Card) else None
-        if isinstance(row, dict):
-            self._open_film_page(row, back=self._pf_cat_name())
+        if isinstance(row, dict) and self._pf_allowed(row):
+            self._film_play(row)
+
+    def _pf_continue_card(self, card) -> None:
+        """Continue's card: on from where it stopped, without the question."""
+        row = card.data if isinstance(card, Card) else None
+        if isinstance(row, dict) and self._pf_allowed(row):
+            pos, _dur = self._film_progress(row)
+            self._film_play(row, pos if pos > 0 else None)
+
+    def _pf_strip_picked(self, card) -> None:
+        """A card picked in Popular right now: its film in the detail
+        column (it may be of another category than the list's)."""
+        row = card.data if isinstance(card, Card) else None
+        if isinstance(row, dict) and not self._pf_syncing:
+            self._current_key = self._item_key(row)
+            self._show_detail(row)
+
+    def _pf_allowed(self, row: dict) -> bool:
+        """The parental lock and a kids profile, as the lists have them."""
+        kids = getattr(self, "_profile_kids", lambda: False)()
+        if kids and (adult_item(row)
+                     or not getattr(self, "_kids_allows", lambda _r, _m: True)(row, "vod")):
+            return False
+        cat = row.get("category_id")
+        if (cat is not None and self.overrides.is_locked("vod", cat)
+                and not self.parental.session_unlocked):
+            if kids or not self._request_unlock():
+                return False
+        return True
+
+    def _film_progress(self, row: dict) -> tuple[float, float]:
+        """(where it stopped, its length) in seconds - this computer's
+        resume point or a media server's newer one."""
+        key = self._item_key(row) if isinstance(row, dict) else None
+        if key is None:
+            return 0.0, 0.0
+        pos, dur, _at = self.resume.progress(key, "movie")
+        srv = self._ms_resume_at(key, "movie", row, pos)
+        if srv != pos:
+            pos = srv
+        if pos <= 0 and row.get("_resume_pos"):
+            pos = float(row.get("_resume_pos") or 0)
+            dur = dur or float(row.get("_resume_dur") or 0)
+        return float(pos or 0.0), float(dur or 0.0)
+
+    @from_pane
+    def _film_play(self, row: dict, at: float | None = None) -> bool:
+        """A film in the docked player, the middle pane left as it is,
+        through the window's own path (resume points, marks, Trakt and
+        Simkl, History, subtitles remembered, a media server's reports).
+        *at*: where it starts, without the resume question (0: from the
+        start; None: the question, as the list's double click asks it).
+        False when nothing could start."""
+        if not isinstance(row, dict):
+            return False
+        sid, ext = row.get("stream_id"), row.get("container_extension")
+        key = self._item_key(row)
+        p = getattr(self, "player", None)
+        if (key is not None and str(key) == str(getattr(self, "_playing_key", None))
+                and getattr(self, "_playing_group", None) == "vod"
+                and p is not None and getattr(p, "current_url", None)):
+            return True                 # it plays already: nothing to start over
+        if sid is not None and self._links_later(
+                lambda: self.client.vod_url(sid, ext), partial(self._film_play, row, at)):
+            return True
+        url = (self.client.vod_url(sid, ext) if sid is not None else "") or row.get("_url") or ""
+        if not url:
+            self._set_status(tr("fp_no_address"), error=True)
+            return False
+        if at is not None:
+            self._sp_start_once = (key, float(at))
+        try:
+            self._start_playback(url, row.get("name") or row.get("title") or "dopeIPTV",
+                                 row.get("stream_icon") or row.get("cover"), key, "movie",
+                                 record=True, item=row)
+        finally:
+            self._sp_start_once = None
+        return True
 
     def _pf_menu(self, card, pos: QPoint) -> None:
         """A film's right click: the list's own menu, for the card (and the
@@ -722,12 +808,6 @@ class _PlaceFilmsMixin:
             self._pf_rows_refresh()
             self._pf_refresh_soon()
 
-    def _pf_back_from_page(self) -> None:
-        """Back from a film's page: the place as it was, the card picked."""
-        view = self._pf_view
-        if view is not None and self._films_place_showing():
-            view.setFocus(Qt.FocusReason.OtherFocusReason)
-
     # -- drawn again ------------------------------------------------------------------
 
     def _pf_marks_changed(self, *_a) -> None:
@@ -740,7 +820,7 @@ class _PlaceFilmsMixin:
         if self._pf_refresh_timer is not None:
             self._pf_refresh_timer.start()
         else:
-            self._fp_refresh_soon()
+            QTimer.singleShot(0, self._detail_film_refresh)
 
     def _pf_refresh(self) -> None:
         view = self._pf_view
@@ -748,16 +828,15 @@ class _PlaceFilmsMixin:
             return
         view.redress()
         self._pf_rows_refresh()
-        self._fp_refresh()
+        self._detail_film_refresh()
 
     def _pf_playback_started(self, key, kind: str) -> None:
         """_start_playback: what plays marked; Continue with the film
-        before it; a film's page drawn again."""
+        before it; the detail column's Continue drawn again."""
         try:
             if self._films_place is not None:
                 self._pf_mark_playing()
                 self._pf_refresh_soon()
-            self._fp_playback_started(key, kind)
         except Exception:
             log.exception("movies: what plays was not marked")
 
@@ -766,7 +845,6 @@ class _PlaceFilmsMixin:
         self._pf_popular = None
         self._pf_popular_gen += 1
         self._pf_keys = None
-        self._fp_source_changed()
 
     def _pf_restyle(self) -> None:
         place = self._films_place
@@ -784,7 +862,6 @@ class _PlaceFilmsMixin:
             if self._pf_view is not None:
                 self._pf_view.redress()
             self._pf_rows_refresh()
-        self._fp_restyle()
 
     def _pf_state(self) -> dict:
         """What the place shows, for a test and the log."""

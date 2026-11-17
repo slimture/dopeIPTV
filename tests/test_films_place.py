@@ -1,15 +1,15 @@
-"""The Movies place and a film's page (core/film_view.py,
-ui/mw_place_films.py, ui/film_page.py, ui/mw_film_page.py): what a film's
-card and page say (year, length, rating, New, how far, Play or Continue,
-who is in it); a category of 20,000 films made at once and dressed only as
-it comes on screen; the page's look; and in the window - Popular right now
-matched to the source and ranked, Continue, both hidden when empty or
-while filtering, Grid / List remembered, the sort, a film's page (its
-button by progress, Favorite and Watch later, Back to the grid exactly as
-it was), the list's menu and several cards at once, a kids profile, a
-locked category, private viewing, the pane following a film played from
-elsewhere - and a film played from the grid, from Continue, from Popular
-and from its page, each through the window's own path."""
+"""The Movies place (core/film_view.py, ui/mw_place_films.py, the detail
+column's Continue in ui/mw_detail.py): what a film's card says (year,
+length, rating, New, how far, Play or Continue, who is in it); a category
+of 20,000 films made at once and dressed only as it comes on screen; and in
+the window - Popular right now matched to the source and ranked, Continue,
+both hidden when empty or while filtering, Grid / List remembered, the
+sort, a click that picks a film for the detail column (Continue there for
+one under way) and never plays, a double click or Enter that plays, the
+list's menu and several cards at once, a kids profile, a locked category,
+private viewing, the pane following a film played from elsewhere - and a
+film played from the grid, from Continue, from Popular and from the detail
+column, each through the window's own path."""
 import os
 import subprocess
 import sys
@@ -139,48 +139,6 @@ def test_twenty_thousand_films_made_at_once_and_dressed_as_they_show(app):
     view.set_layout("list")
     _spin(app)
     page.grab()
-    page.close()
-
-
-def test_the_film_page_is_the_series_page_header_without_follow(app):
-    from PyQt6.QtCore import Qt
-    from PyQt6.QtTest import QTest
-    from dopeiptv.i18n import tr
-    from dopeiptv.ui.film_page import FilmPage
-    page = FilmPage()
-    page.resize(800, 700)
-    page.header.set_text("Dune", "2021 · 2 h 35 min", "A plot.")
-    page.header.set_primary(tr("btn_play"), None, "")
-    page.header.set_actions(True, fav=True, follow=True, later=False)
-    page.set_back_text("Action")
-    page.cast.set_cast([("Ann Actor", "", 1), ("Bo Builder", "", None)], True)
-    page.show()
-    _spin(app)
-    h = page.header
-    assert h.follow_btn.isHidden() and not h.fav_btn.isHidden() and h.fav_btn.isChecked()
-    assert page.back_btn.text() == tr("fp_back_to", name="Action")
-    page.set_back_text("")
-    assert page.back_btn.text() == tr("btn_back")
-    assert page.cast.isVisibleTo(page) and page.cast.names() == ["Ann Actor", "Bo Builder"]
-    got = []
-    page.cast.member_clicked.connect(lambda n, pid: got.append((n, pid)))
-    QTest.mouseClick(page.cast.chips[0], Qt.MouseButton.LeftButton)
-    assert got == [("Ann Actor", 1)]
-    backs = []
-    page.back_requested.connect(lambda: backs.append(1))
-    QTest.mouseClick(page.header.title, Qt.MouseButton.BackButton)
-    assert backs == [1]
-    page.cast.set_cast([], False)
-    assert page.cast.isHidden()
-    page.reset()
-    assert h.play_btn.isHidden()
-    page.grab()
-    # Mirrored in a right-to-left language: the poster at the right.
-    page.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-    _spin(app)
-    poster = h.poster.mapTo(page, h.poster.rect().topLeft()).x()
-    title = h.title.mapTo(page, h.title.rect().topLeft()).x()
-    assert poster > title
     page.close()
 
 
@@ -362,7 +320,7 @@ place.header.switch.buttons[0].click()
 assert view.layout_kind == "poster" and settings.value("films_view") == "poster"
 assert w._pf_layout() == "poster"
 
-# -- a card opens its page; Back: the grid exactly as it was ---------------------------
+# -- a click picks a film: the detail column shows it, nothing plays --------------------
 w.cat_list.setCurrentRow(cat_row("11"))
 settle(lambda: view.model_.rowCount() == 20, what="Action again")
 place.resize(place.size())
@@ -373,87 +331,65 @@ app.processEvents()
 row9 = view.model_.index(9, 0)
 QTest.mouseClick(view.viewport(), Qt.MouseButton.LeftButton, pos=view.visualRect(row9).center())
 app.processEvents()
-page = w._film_page
-assert w._film_page_showing(), "the page did not open"
-assert w._fp_key() == "319"
+assert w._films_place_showing()                               # the place stays
 assert w.list_model.item_at(w.listw.currentIndex().row())["stream_id"] == 319   # the list follows
-before = (bar.value(), view.currentIndex().row(), w.cat_list.currentRow())
-settle(lambda: (w._fp_head or {}).get("info_in"), what="the page's information")
-h = page.header
-assert h.title.text() == "Film 19"
-assert "2019" in h.meta.text() and tr("sp_hours_minutes", h=1, m=40) in h.meta.text()
-assert h.play_btn.text().strip() == tr("btn_play") and h.progress.isHidden()
-assert page.cast.names() == ["Ann Actor"]                  # TMDB's, before the source's
-assert page.back_btn.text() == tr("fp_back_to", name="Action")
-assert str((getattr(w, "_last_playback", None) or {}).get("key")) != "319"   # never plays by opening
-# Favorite and Watch later, from the page.
-h.fav_btn.click()
-assert w.movie_favs.is_favorite(319) and h.fav_btn.isChecked()
-h.later_btn.click()
-assert w.is_on_watchlist(films[19], "vod") and h.later_btn.isChecked()
-h.later_btn.click()
-assert not w.is_on_watchlist(films[19], "vod")
-w._on_escape()
-app.processEvents()
-assert w._films_place_showing() and not w._film_page_showing()
-after = (bar.value(), view.currentIndex().row(), w.cat_list.currentRow())
-assert after == before, (before, after)
-assert w.nav_btns[w._nav_key_for_mode("vod")].isChecked()
-# ...and by the mouse's back button, and by its arrow.
-w._pf_activated(view.item_at(9))
-assert w._film_page_showing()
-QTest.mouseClick(page.header.title, Qt.MouseButton.BackButton)
-app.processEvents()
-assert w._films_place_showing() and bar.value() == before[0]
-w._pf_activated(view.item_at(9))
-page.back_btn.click()
-app.processEvents()
-assert w._films_place_showing() and view.currentIndex().row() == 9
-# A category picked while it shows: that category's films in its place.
-w._pf_activated(view.item_at(9))
-w._fp_category_clicked(w.cat_list.item(cat_row("10")))
-assert not w._film_page_showing() and w._films_place_showing()
+assert "Film 19" in w._detail_name, w._detail_name           # the detail column shows it
+assert str((getattr(w, "_last_playback", None) or {}).get("key")) != "319"   # a click never plays
+assert w.d_continue.isHidden()                                # not under way: no Continue
+assert not hasattr(w, "_film_page") and not hasattr(w, "_open_film_page")   # no page of its own
 
-# -- played from its page, through the window's path ------------------------------------
-w._pf_activated(view.item_at(9))
-h.play_btn.click()
+# -- a double click plays it, through the window's path; Enter too ------------------------
+QTest.mouseDClick(view.viewport(), Qt.MouseButton.LeftButton, pos=view.visualRect(row9).center())
 app.processEvents()
 lp = w._last_playback
 assert lp["kind"] == "movie" and str(lp["key"]) == "319", lp
 assert asked_resume == []
-assert w._film_page_showing()                               # the page stays
 assert any(str(it.get("_key")) == "319" for it in w.history.items())
-if w.player is not None:
-    assert starts and starts[-1][1] == 0
 idle(0.3)
-assert w._film_page_showing()                               # the pane did not move
-w._leave_film_page()
-
-# -- from Continue: its page says Continue, and it starts where it stopped ----------------
-QTest.mouseClick(cont.strip.viewport(), Qt.MouseButton.LeftButton,
-                 pos=cont.strip.visualRect(cont.strip.model_.index(0, 0)).center())
+assert w._films_place_showing()                               # the pane did not move
+view.setCurrentIndex(view.model_.index(8, 0))
+view.setFocus()
+QTest.keyClick(view, Qt.Key.Key_Return)
 app.processEvents()
-assert w._film_page_showing() and w._fp_key() == "303"
-assert h.play_btn.text().strip() == tr("card_continue")
-assert not h.progress.isHidden() and abs(h.progress.value() - 250) <= 2
-assert h.left.text() == tr("home_min_left", n=75)
-h.play_btn.click()
+assert str(w._last_playback["key"]) == "317", w._last_playback["key"]
+
+# -- a film under way: Continue in the detail column, from where it stopped ---------------
+QTest.mouseClick(view.viewport(), Qt.MouseButton.LeftButton,
+                 pos=view.visualRect(view.model_.index(view.row_of("303"), 0)).center())
+app.processEvents()
+assert not w.d_continue.isHidden()
+assert w.d_continue_btn.text().strip() == tr("card_continue")
+assert abs(w.d_continue_bar.value() - 250) <= 2
+assert w.d_continue_left.text() == tr("home_min_left", n=75)
+w.d_continue_btn.click()
 app.processEvents()
 assert str(w._last_playback["key"]) == "303" and asked_resume == []
 if w.player is not None:
     assert starts[-1][1] == 1500, starts
-w._leave_film_page()
+# Another film picked: its own detail, no Continue.
+QTest.mouseClick(view.viewport(), Qt.MouseButton.LeftButton,
+                 pos=view.visualRect(view.model_.index(view.row_of("311"), 0)).center())
+app.processEvents()
+assert w.d_continue.isHidden()
+
+# -- from Continue: one click goes on from where it stopped --------------------------------
+w._pf_play_card(view.item_at(view.row_of("311")))             # something else plays first
+QTest.mouseClick(cont.strip.viewport(), Qt.MouseButton.LeftButton,
+                 pos=cont.strip.visualRect(cont.strip.model_.index(0, 0)).center())
+app.processEvents()
+assert str(w._last_playback["key"]) == "303" and asked_resume == []
+if w.player is not None:
+    assert starts[-1][1] == 1500, starts
 assert w._films_place_showing()
 
-# -- from Popular -------------------------------------------------------------------------
-QTest.mouseClick(pop.strip.viewport(), Qt.MouseButton.LeftButton,
-                 pos=pop.strip.visualRect(pop.strip.model_.index(0, 0)).center())
+# -- from Popular: a click shows it in the detail column, a double click plays ------------
+pop_at = pop.strip.visualRect(pop.strip.model_.index(0, 0)).center()
+QTest.mouseClick(pop.strip.viewport(), Qt.MouseButton.LeftButton, pos=pop_at)
 app.processEvents()
-assert w._film_page_showing() and w._fp_key() == "307"
-h.play_btn.click()
+assert "Film 07" in w._detail_name and str(w._last_playback["key"]) == "303"
+QTest.mouseDClick(pop.strip.viewport(), Qt.MouseButton.LeftButton, pos=pop_at)
 app.processEvents()
 assert str(w._last_playback["key"]) == "307"
-w._leave_film_page()
 
 # -- from the grid: the list's own menu, its Play ------------------------------------------
 seen = []
@@ -481,23 +417,19 @@ assert tr("ctx_hide") in texts and tr("ctx_mark_watched") in texts
 assert w._films_place_showing() and view.current_item().key == "311"
 idle(0.3)
 assert w._films_place_showing()
-# Several cards at once: Ctrl-click gathers them (nothing opens), the menu
+# Several cards at once: Ctrl-click gathers them (nothing plays), the menu
 # acts on all of them, as the list's did.
 want_action = None
+played = w._last_playback["key"]
 QTest.mouseClick(view.viewport(), Qt.MouseButton.LeftButton, Qt.KeyboardModifier.ControlModifier,
                  view.visualRect(view.model_.index(6, 0)).center())
 app.processEvents()
-assert not w._film_page_showing()
+assert w._last_playback["key"] == played
 assert len(view.selectionModel().selectedRows()) == 2
 assert len(w.listw.selectionModel().selectedRows()) == 2
 menu_at(6)
 assert any(t.startswith(tr("ctx_add_to_favorites")) and "(2)" in t for t in seen[-1]), seen[-1]
-# The film page's ⋯ is the same menu.
-w._pf_activated(view.item_at(5))
-h.more.emit(h.mapToGlobal(h.rect().center()))
-assert tr("ctx_play_in_mpv") in seen[-1] and tr("ctx_watchlist_add") in seen[-1]
 QMenu.exec = orig_exec
-w._leave_film_page()
 
 # -- the pane follows a film played from elsewhere (the phone's path) ---------------------
 w._pb_play_movie(films[8])                                   # Drama's
@@ -505,41 +437,31 @@ settle(lambda: w._films_place_showing() and w.cat_list.currentItem().data(Qt.Ite
        and view.current_item() is not None and view.current_item().key == "308",
        what="followed to its category")
 assert view.playing_key == "308"
-# A film's page showing that film stays.
-w._pf_activated(view.item_at(view.row_of("304")))
-w._pb_play_movie(films[4])
-idle(0.5)
-assert w._film_page_showing() and w._fp_key() == "304"
-w._leave_film_page()
 
 # -- a kids profile, a locked category, private viewing ---------------------------------
 w._profile_kids = lambda: True
-assert not w._open_film_page(films[-1])                      # for adults
-assert not w._film_page_showing()
+assert not w._pf_allowed(films[-1]) and w._pf_allowed(films[0])   # never the one for adults
 w._profile_kids = lambda: False
 w.overrides.update("vod", "10", locked=True)
 w.parental.session_unlocked = False
 asks = []
 w._request_unlock = lambda: asks.append(1) or False
-assert not w._open_film_page(films[0]) and asks == [1]
+assert not w._pf_allowed(films[0]) and asks == [1]
 w._request_unlock = lambda: asks.append(2) or True
-assert w._open_film_page(films[0]) and asks == [1, 2]
-w._leave_film_page()
+assert w._pf_allowed(films[0]) and asks == [1, 2]
 w._profile_kids = lambda: True
-assert not w._open_film_page(films[0]) and asks == [1, 2]   # never asks a child
+assert not w._pf_allowed(films[0]) and asks == [1, 2]       # never asks a child
 w._profile_kids = lambda: False
 w.overrides.update("vod", "10", locked=False)
 n_hist = len(w.history.items())
 privacy.set_private(True)
 try:
-    w._pf_activated(view.item_at(view.row_of("306")))
-    w._film_page.header.play_btn.click()
+    w._pf_play_card(view.item_at(view.row_of("306")))
     app.processEvents()
     assert str(w._last_playback["key"]) == "306"
     assert len(w.history.items()) == n_hist                   # nothing kept
 finally:
     privacy.set_private(False)
-w._leave_film_page()
 
 # -- another place and back: as it was --------------------------------------------------
 cat_before = w.cat_list.currentItem().data(Qt.ItemDataRole.UserRole)
@@ -578,7 +500,7 @@ os._exit(0)
 """
 
 
-def test_the_movies_place_and_a_films_page_in_the_window(tmp_path):
+def test_the_movies_place_and_the_detail_column_in_the_window(tmp_path):
     pytest.importorskip("PyQt6")
     env = dict(os.environ, QT_QPA_PLATFORM="offscreen", XDG_CONFIG_HOME=str(tmp_path),
                XDG_DATA_HOME=str(tmp_path / "data"), XDG_CACHE_HOME=str(tmp_path / "cache"))

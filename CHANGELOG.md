@@ -58,6 +58,12 @@ same new look.
 
 ### Changed
 
+- Movies: a film no longer opens a page of its own in the middle pane,
+  which said again what the detail column says. A click picks the film
+  and the detail column shows it - with Continue, how far it got and the
+  time left for one under way; a double click or Enter plays it, as in the
+  lists; a card in Continue goes on from where it stopped. Popular right
+  now's cards are picked and played the same way.
 - A long name over TV, Movies and Series is no longer cut short at once:
   the sort gives way to its mark first (its order in the tooltip), then the
   name takes a second line; "…" only at the end of that one, the whole name

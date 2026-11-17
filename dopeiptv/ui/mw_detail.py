@@ -11,6 +11,7 @@ from ..providers.client import b64, epg_times
 from ..i18n import tr
 from .theme import ACCENT, P
 from .widgets import _ClickableWidget
+from ..core import film_view as fv
 from ..core.log import log, redact_url
 from ..core.privacy import for_log
 from ..core.workers import run_async, tmdb_url_from_provider
@@ -41,6 +42,7 @@ class _DetailMixin:
     POSTER_SIZE_MEDIA = (170, 255)
 
     def _show_detail(self, it) -> None:
+        self._detail_film_continue(None)
         self.now_card.hide()
         self.media_info.hide()
         self.media_rating_lbl.hide()
@@ -228,6 +230,8 @@ class _DetailMixin:
                 sid = it.get("_key")
             if sid is not None:
                 self._request_media_info("vod", sid, self._current_key)
+            if ckind == "vod":
+                self._detail_film_continue(it)
         elif (ckind == "series"
               or (self.mode in ("watchlist", "history", "watched")
                   and snap_kind == "series")):
@@ -236,6 +240,51 @@ class _DetailMixin:
                 sid = it.get("_key")
             if sid is not None:
                 self._request_media_info("series", sid, self._current_key)
+
+    # -- a film under way: Continue -------------------------------------------------
+
+    def _detail_film_continue(self, it) -> None:
+        """A film of the Movies list under way: Continue, how far it got and
+        the time left, under its poster and plot; nothing else shows it."""
+        box = getattr(self, "d_continue", None)
+        if box is None:
+            return
+        state = None
+        if isinstance(it, dict) and it.get("stream_id") is not None:
+            pos, dur = self._film_progress(it)
+            state = fv.primary(pos, dur, fv.minutes_of(it, dur_secs=dur))
+        if state is None or not state.resume:
+            self._detail_film = None
+            box.hide()
+            return
+        self._detail_film = it
+        left = state.progress.minutes_left
+        self.d_continue_btn.setText("  " + tr("card_continue"))
+        self.d_continue_btn.setIcon(self.play_mpv.icon())
+        self.d_continue_left.setText(tr("home_min_left", n=left) if left else "")
+        self.d_continue_left.setVisible(bool(left))
+        self.d_continue_bar.setValue(round(max(0.0, min(1.0, state.progress.fraction)) * 1000))
+        box.show()
+
+    def _detail_film_refresh(self) -> None:
+        """The film shown again: a resume point kept or a film played to its end."""
+        it = getattr(self, "_detail_film", None)
+        if it is None and self._content_kind() == "vod":
+            idx = self.listw.currentIndex()
+            it = self.list_model.item_at(idx.row()) if idx.isValid() else None
+        if it is not None:
+            try:
+                self._detail_film_continue(it)
+            except Exception:
+                log.exception("detail: Continue not drawn again")
+
+    def _detail_film_go_on(self) -> None:
+        """Continue: on from where it stopped, without the question."""
+        it = getattr(self, "_detail_film", None)
+        if not isinstance(it, dict):
+            return
+        pos, _dur = self._film_progress(it)
+        self._film_play(it, pos if pos > 0 else None)
 
     def _show_continue_episode_detail(self, it) -> None:
         """Continue-watching episode row: show the series' poster + info (plot,

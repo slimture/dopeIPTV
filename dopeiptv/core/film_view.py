@@ -1,9 +1,8 @@
-"""A film as the Movies place and a film's page show it, no Qt (the
-window's side is ui/mw_place_films.py and ui/mw_film_page.py): its year,
+"""A film as the Movies place and the detail column show it, no Qt (the
+window's side is ui/mw_place_films.py and ui/mw_detail.py): its year,
 length and rating from what the source says - its list row, its vod_info,
 TMDB where those say nothing - whether it came in lately (New), how far it
-got, and what the page's one button does: Play, or Continue from where it
-stopped.
+got, and whether it goes on from where it stopped (Continue).
 
 Pure: nothing here plays, fetches or stores.
 """

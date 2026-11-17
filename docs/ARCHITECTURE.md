@@ -239,10 +239,8 @@ dopeiptv/
     mw_series_page.py  A series' page in the middle pane: opened from anywhere,
                        played through the window's path, Back to the list as it was
     mw_place_films.py  The Movies place: the list's films as posters or rows,
-                       Popular right now and Continue over them
-    mw_film_page.py    A film's page over the place: played through the
-                       window's path, Back to the grid as it was
-    film_page.py       The film page itself: the series page's header, the cast
+                       Popular right now and Continue over them; a click picks a
+                       film for the detail column, a double click plays it
     mw_place_series.py The Series place where the list was: header, Popular right
                        now, Continue, the category's series - drawn from the list
     mw_search_all.py   The Search page in the middle pane: one search across
