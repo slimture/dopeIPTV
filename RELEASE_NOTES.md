@@ -16,6 +16,7 @@
 
 ### Fixed
 
+- The phone remote's **Radio** shows the most voted stations, under your own - it was empty when you had kept none.
 - **macOS**: the app no longer hangs for good going into or out of TV mode - or full screen - while something plays.
 - Muted, the player no longer makes another program's sound (Spotify) crackle at every channel change.
 - Enter plays the row picked in TV, Movies and Series.

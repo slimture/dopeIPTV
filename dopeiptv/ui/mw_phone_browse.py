@@ -46,6 +46,8 @@ THUMBS_MAX = 400
 #: How long a folder's listing, a station search and the recordings are kept.
 FOLDER_SECS = 30
 RADIO_SECS = 300
+#: The most voted stations the radio section shows under My stations.
+RADIO_TOP = 60
 REC_SECS = 30
 #: How long a folder search may walk for one answer.
 SEARCH_BUDGET = 3.0
@@ -336,9 +338,28 @@ class _PhoneBrowseMixin:
                             "name": str(st.get("name") or ""), "sub": station_sub(st),
                             "img": 1 if _image(st) else 0})
             return out
-        if not query:
-            return rows_of(snap["favs"])
         client = snap["radio"]
+        if not query:
+            # My stations first, then the most voted - never an empty
+            # section for someone who has kept no station yet.
+            mine = rows_of(snap["favs"])
+
+            def top() -> list[dict]:
+                if client is None:
+                    return []
+                try:
+                    from ..providers.radio_browser import TOP_VOTED
+                    return rows_of(list(client.top(TOP_VOTED, RADIO_TOP) or []))
+                except Exception as e:
+                    log.info("phone remote: the radio stations failed: %s", type(e).__name__)
+                    return []
+            popular, _b = lists.get(("radio", ""), _bucket(RADIO_SECS), top)
+            if not mine:
+                return popular
+            if not popular:
+                return mine
+            return ([{"k": "head", "name": tr("radio_cat_favorites")}] + mine
+                    + [{"k": "head", "name": tr("radio_cat_top_voted")}] + popular)
 
         def search() -> list[dict]:
             try:

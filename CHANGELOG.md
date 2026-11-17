@@ -146,6 +146,9 @@ same new look.
 
 ### Fixed
 
+- The phone remote's Radio was empty for anyone who had kept no station:
+  it showed My stations alone. Now the most voted stations show under
+  them (alone when none is kept), asked once and kept five minutes.
 - macOS: the app hung for good going into or out of TV mode (from the
   window or the phone remote), and could going into or out of full screen,
   while something played. AppKit draws the picture's view itself during

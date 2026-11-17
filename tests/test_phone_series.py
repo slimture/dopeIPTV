@@ -624,3 +624,29 @@ def test_the_page_keeps_its_own_hashes_and_offers_episodes_and_sections():
         assert "overflow" not in style.split(rule, 1)[1].split("}", 1)[0]
     for w in ("ep_prev", "ep_next", "episodes", "find"):
         assert w in phone_page.WORDS
+
+
+def test_the_radio_section_is_never_empty_my_stations_first_then_the_most_voted():
+    from dopeiptv.i18n import tr
+    w = _window()
+    st = lambda n: {"stationuuid": f"u{n}", "name": f"Station {n}", "url": f"http://r/{n}"}  # noqa: E731
+    asked = []
+
+    class Radio:
+        def top(self, which, limit):
+            asked.append((which, limit))
+            return [st(1), st(2)]
+    # Nothing kept: the most voted alone, asked once and kept a while.
+    rows = w._pb_radio({"favs": [], "radio": Radio()}, "")
+    assert [r["name"] for r in rows] == ["Station 1", "Station 2"]
+    assert all(r["k"] == "play" and r["ref"] for r in rows)
+    w._pb_radio({"favs": [], "radio": Radio()}, "")
+    assert len(asked) == 1 and asked[0][0] == "topvote"
+    # Stations kept: they come first, each list under its heading.
+    rows = w._pb_radio({"favs": [st(9)], "radio": Radio()}, "")
+    assert [(r["k"], r["name"]) for r in rows] == [
+        ("head", tr("radio_cat_favorites")), ("play", "Station 9"),
+        ("head", tr("radio_cat_top_voted")), ("play", "Station 1"), ("play", "Station 2")]
+    # The directory not reachable: what is kept, no heading.
+    w2 = _window()
+    assert [r["name"] for r in w2._pb_radio({"favs": [st(9)], "radio": None}, "")] == ["Station 9"]
