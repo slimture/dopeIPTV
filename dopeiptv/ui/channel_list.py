@@ -514,6 +514,11 @@ class ChannelListModel(QAbstractListModel):
             return self._items[row]
         return None
 
+    def items(self) -> list:
+        """The rows as the model holds them (not a copy: read, never
+        changed in place - the Series place draws them)."""
+        return self._items
+
     def flags(self, index):
         # Section headers are not content: not selectable, not clickable.
         it = self.item_at(index.row())

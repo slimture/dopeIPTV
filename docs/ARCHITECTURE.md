@@ -69,6 +69,8 @@ dopeiptv/
                        a rule that reminds instead, its reminders' plan
     series_view.py     A series as its page shows it: seasons (Specials last),
                        the next episode, the season it opens on and the one kept
+    series_continue.py The Series place's Continue row from what the app keeps
+                       (the page's cache, resume points, History): no request
     night_mode.py      Night mode for the sound: one labelled audio filter
     viewing_stats.py   Your statistics: seconds watched per title and hour, the
                        sums (this computer only, never synced)
@@ -224,12 +226,16 @@ dopeiptv/
     mw_film_page.py    A film's page over the place: played through the
                        window's path, Back to the grid as it was
     film_page.py       The film page itself: the series page's header, the cast
+    mw_place_series.py The Series place where the list was: header, Popular right
+                       now, Continue, the category's series - drawn from the list
     mw_search_all.py   The Search page in the middle pane: one search across
                        every source, a hit played or opened through the
                        window's path (another source's channel without a switch)
     search_page.py     The Search page itself: field, chips, grouped results
     series_page.py     The series page itself: header, season chips, the list
     series_cards.py    Its episode cards: model, painted card, keys, lazy pictures
+    series_place.py    The Series place itself: header and filter, the rows, the
+                       grid whose cards are filled only as they paint
     media_cards.py     The cards every place shares: pills, poster/wide/list cards,
                        channel rows, the sideways Continue row, the page header
                        and the shared page form (PlacePage)

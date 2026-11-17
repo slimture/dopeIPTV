@@ -28,6 +28,29 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   their news are on Settings > Mine.
 - The donate heart asks alone, one week a month as before; Home's card is
   gone with Home.
+- Series is a place of the new look: the source's series categories in the
+  left column as before, and where the list was the category's name with its
+  count and order, a filter, the sort (recently updated first where the
+  source says when, else its own order; each category keeps its own) and a
+  Grid / List switch that is remembered. Over the series: "Popular right
+  now" - this week's TMDB chart matched to the source's series, ranked, a
+  category's own in a category; hidden when nothing matches or TMDB is off -
+  and "Continue": each series under way with its next episode ("S2 E5 · 18
+  min left") and how far it got; Enter or a click continues it from there
+  without the resume question, as the series page's Continue does, and the
+  place stays. Continue is worked out from what the app keeps (the resume
+  points, the series page's episodes it holds) - never a request per series;
+  a series whose next episode is not known shows its last watched one, and
+  its page works out what is next. The series as posters (a followed series
+  with news says "New episode") or as a list; a click opens the series' page,
+  and Back comes to the grid exactly as it was. Everything the list did stays:
+  its menu - for every card selected with Ctrl or Shift -, favourites and
+  folders, Watch later, Follow, hidden and locked categories and the PIN, a
+  kids profile, renamed and hidden series, posters from TMDB, the phone
+  remote's Series, and the middle pane following what plays. A "Following"
+  category lists the series followed, the ones with news first. Fast with
+  tens of thousands of series: painted cards, pictures only for what is on
+  screen.
 
 ### Added
 

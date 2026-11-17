@@ -41,19 +41,27 @@ class _SortMixin:
         override, or the global default when it is set to follow global."""
         raw = self._current_sort_raw()
         if raw == "global":
+            # The Series place: recently updated first while no order of
+            # the app's own was chosen (where the source says when - rows
+            # that say nothing keep their order).
+            if (getattr(self, "mode", "") == "series" and not getattr(self, "series_ctx", None)
+                    and not self.settings.contains("sort_order")):
+                return "recent"
             return self.settings.value("sort_order", "default")
         return raw
 
     @staticmethod
     def _recency_key(it) -> int:
-        # Newest-first key that works across views: provider "added", else the
+        # Newest-first key that works across views: provider "added" (a
+        # series' "last_modified": when it was last updated), else the
         # history "_watched_at" ISO timestamp.
-        a = it.get("added")
-        if a:
-            try:
-                return int(a)
-            except (TypeError, ValueError):
-                pass
+        for field in ("added", "last_modified"):
+            a = it.get(field)
+            if a:
+                try:
+                    return int(a)
+                except (TypeError, ValueError):
+                    pass
         wa = it.get("_watched_at")
         if wa:
             try:

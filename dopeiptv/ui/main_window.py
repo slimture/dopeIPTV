@@ -112,6 +112,7 @@ from .mw_series import _SeriesMixin
 from .mw_series_page import _SeriesPageMixin
 from .mw_place_films import _PlaceFilmsMixin
 from .mw_film_page import _FilmPageMixin
+from .mw_place_series import _PlaceSeriesMixin
 from .mw_search_all import _SearchAllMixin
 from .mw_stats import _StatsMixin
 from .mw_search import _SearchMixin
@@ -160,7 +161,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _NavMixin, _SourceLabelMixin, _ShortcutsMixin, _PaletteMixin, _OnboardingMixin, _SortMixin,
                  _LocalFilesMixin, _RadioMixin, _WebStreamsMixin,
                  _PopoutMixin, _MultiviewMixin, _PlacesMixin, _PopularMixin, _GuideMixin,
-                 _SeriesPageMixin, _PlaceFilmsMixin, _FilmPageMixin, _SearchAllMixin,
+                 _SeriesPageMixin, _PlaceFilmsMixin, _FilmPageMixin, _PlaceSeriesMixin, _SearchAllMixin,
                  _MprisMixin,
                  _FollowMixin, _PaneFollowMixin, _SubtitlesMixin, _CastMixin, _AirPlayMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
@@ -925,13 +926,23 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         _mid_l.addWidget(self._mid_stack)
         self._list_page = QWidget(objectName="ListPage")
         self._mid_stack.addWidget(self._list_page)
-        ml = QVBoxLayout(self._list_page)
+        lp = QVBoxLayout(self._list_page)
         # No horizontal margins on the middle pane. Qt's IconMode reserves
         # ~16 px at the end of each row for its internal wrap check, and any
         # extra inset on either side compounds with that - even 6-8 px of
         # margin was enough to push the last column onto the next row,
         # leaving a huge gap on the right (see channel_list._justify_grid).
-        ml.setContentsMargins(0, 14, 0, 10)
+        lp.setContentsMargins(0, 14, 0, 10)
+        lp.setSpacing(10)
+        # The list and its bar, or in their place a place of the unified
+        # look (the Series place, ui/mw_place_series.py) - the status row
+        # under both.
+        self._list_stack = QStackedWidget()
+        lp.addWidget(self._list_stack, 1)
+        self._list_body = QWidget(objectName="ListBody")
+        self._list_stack.addWidget(self._list_body)
+        ml = QVBoxLayout(self._list_body)
+        ml.setContentsMargins(0, 0, 0, 0)
         ml.setSpacing(10)
         # The place's header over its list: its name, its count, Mine's tabs
         # (mw_places, media_cards.PageHeader) - the form every place shares.
@@ -1167,7 +1178,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.rec_indicator.clicked.connect(self._rec_indicator_menu)
         self.rec_indicator.hide()
         status_row.addWidget(self.rec_indicator)
-        ml.addLayout(status_row)
+        lp.addLayout(status_row)
 
         # Detail panel
         det = QWidget(objectName="DetailPane")
@@ -2480,6 +2491,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._guide_source_changed()    # the old source's guide goes
             self._sp_source_changed()       # and a series' page of it
             self._pf_source_changed()       # the Movies place and a film's page
+            self._place_series_source_changed()   # the Series place's rows
             self._popular_changed()         # popular right now: this source's
             self._refresh_places("source")  # the places' own pages
             # Switching rebuilds the list but loads the guide from cache when
@@ -2546,6 +2558,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.search.clear()
         self._sync_search_hint()
         self._load_categories()
+        # Series is a place of the unified look where the list was.
+        self._place_series_sync()
         self._update_sync_btn()
         # Its place is the one shown now (mw_places) - under a page that
         # stays over it, the place it goes back to.
@@ -2826,6 +2840,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 rc = QListWidgetItem("🆕  " + tr("cat_recent"))
                 rc.setData(Qt.ItemDataRole.UserRole, "__recent__")
                 self.cat_list.addItem(rc)
+            # The series followed (mw_follow), with their news first.
+            if self.mode == "series" and self.followed.ids():
+                fw = QListWidgetItem("🔔  " + tr("cat_following"))
+                fw.setData(Qt.ItemDataRole.UserRole, "__followed__")
+                self.cat_list.addItem(fw)
             # A kids profile sees only what the parental lock leaves open,
             # and is never asked for the PIN of the rest (mw_profiles).
             kids = self._profile_kids()
@@ -3131,6 +3150,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # store (no network fetch).
             kind = "vod" if self.mode == "vod" else "episode"
             self.all_items = self._continue_items(kind)
+            self._apply_filter()
+            return
+        if category_id == "__followed__" and self.mode == "series":
+            # Synthetic category: the series followed, the ones with new
+            # episodes first - from the follow store's snapshots (no network
+            # fetch); what is hidden, locked or not for this profile left out.
+            store = self.followed
+            keep = self._catalog_filter("series")
+            rows = [store.snapshot(sid) for sid in store.ids()]
+            rows = [r for r in rows if r.get("series_id") is not None and keep(r)]
+            rows.sort(key=lambda r: not store.new_ids(r.get("series_id")))
+            self.all_items = rows
             self._apply_filter()
             return
         if category_id == "__recent__" and self.mode in ("vod", "series",
@@ -5147,6 +5178,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         pf = getattr(self, "_pf_refresh_soon", None)
         if pf is not None:
             pf()                       # ...and on the Movies place, a film's page
+        place = getattr(self, "_place_series_playing", None)
+        if place is not None:
+            place()                    # ...and on the Series place's Continue
 
     def _autoplay_next_episode(self) -> bool:
         return self.settings.value("autoplay_next_episode", "true") == "true"
@@ -5434,6 +5468,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         pf = getattr(self, "_pf_playback_started", None)
         if pf is not None:
             pf(key, kind)
+        # ...the Series place its series (and Continue, a moment later).
+        place = getattr(self, "_place_series_playing", None)
+        if place is not None:
+            place()
         # The middle pane goes to what plays, when it came from elsewhere.
         follow = getattr(self, "_pane_follow_soon", None)
         if follow is not None:

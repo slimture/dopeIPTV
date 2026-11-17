@@ -145,8 +145,11 @@ settle(lambda: w.mode == "series" and w.list_model.rowCount() > 0, what="series 
 real_active = w.isActiveWindow
 w.isActiveWindow = lambda: True
 real_focus = QApplication.focusWidget
-QApplication.focusWidget = staticmethod(lambda: w.search)
-w.search.setText("Show 0")
+# Series is a place of its own: its filter is the field typed into there.
+field = w._place_series.filter if w._place_series_active() else w.search
+QApplication.focusWidget = staticmethod(lambda: field)
+field.setText("Show 0")
+assert w.search.text() == "Show 0"
 w.play_live_channel(c.live_streams()[1])
 idle(1.0)
 assert w.mode == "series", "followed while typing"

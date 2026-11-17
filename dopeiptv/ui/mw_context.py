@@ -62,6 +62,12 @@ class _ContextMenuMixin:
                 or (it.get("_kind") or it.get("_ekind")) in ("radio", "web")):
             self._radio_context_menu(pos, it)
             return
+        self._list_item_menu(row, it, at)
+
+    def _list_item_menu(self, row: int, it: dict, at) -> None:
+        """The menu of the list's row *row* (*it*; -1: a row of the list's
+        kind shown elsewhere - the Series place's rows), at the screen's
+        point *at*. Its favourite actions take every row selected with it."""
         m = QMenu(self)
         m.addAction(tr("ctx_play_in_mpv"), lambda: self.play_item(it, "mpv"))
         # Continue-watching rows carry a resume point; offer to forget it.

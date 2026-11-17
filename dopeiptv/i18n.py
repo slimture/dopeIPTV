@@ -1207,6 +1207,10 @@ _STRINGS: dict[str, dict[str, str]] = {
     "cat_all": {"en": "All"},
     "cat_continue": {"en": "Continue watching"},
     "cat_recent": {"en": "Recently added"},
+    "cat_following": {"en": "Following"},
+    "pill_new_episode": {"en": "New episode"},
+    "place_sort_updated": {"en": "Recently updated"},
+    "place_sort_source": {"en": "Source's order"},
     "ctx_continue_remove": {"en": "Remove from Continue watching"},
 
     # ── Durations (reused by record + timeshift menus) ────────────────────
