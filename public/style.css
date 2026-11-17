@@ -1533,7 +1533,9 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
    place one after another, specks of the accent drifting down behind them
    (nav.js animates the height). */
 #built { padding: 0 0 88px; margin-top: -8px; }
-.is-phone #built { background: var(--surface); }
+/* On a phone the strip has a surface of its own, from the line under the
+   donate band: room above the card, not on the line. */
+.is-phone #built { background: var(--surface); padding-top: 32px; }
 @media (max-width: 720px) { #built { padding-bottom: 48px; margin-top: 4px; } }
 /* The heading in a card of its own, near square - the donate card's
    corners and surface, a soft glow of the accent instead of its pink. */
