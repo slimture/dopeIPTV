@@ -95,6 +95,7 @@
   "btn_settings": "Configurações",
   "btn_refresh": "Atualizar",
   "btn_epg_guide": "Guia EPG",
+  "cat_show_in_guide": "Mostrar no guia",
   "epg_filter_channels": "Filtrar canais…",
   "epg_select_channel": "Selecione um canal",
   "epg_jump_now": "Agora",

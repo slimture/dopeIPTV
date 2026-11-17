@@ -95,6 +95,7 @@
   "btn_settings": "Настройки",
   "btn_refresh": "Обновить",
   "btn_epg_guide": "Программа передач",
+  "cat_show_in_guide": "Показать в телегиде",
   "epg_filter_channels": "Фильтр каналов…",
   "epg_select_channel": "Выберите канал",
   "epg_jump_now": "Сейчас",

@@ -333,6 +333,15 @@ app.processEvents()
 assert w._guide_grid is grid and w._guide_page_showing()
 assert w._show_place("tv") is True
 assert not w._guide_page_showing() and top.isVisible()
+# A category double-clicked in the list: the guide opens on it.
+item = cat_item("2")
+w.cat_list.setCurrentItem(item)
+w.cat_list.itemDoubleClicked.emit(item)
+settle(lambda: w._guide_page_showing() and w._guide_grid is not None
+       and len(w._guide_grid.channels) == 2, what="the guide of a double-clicked category")
+assert w._guide_grid.category_name == item.text()
+assert w._show_place("tv") is True
+assert not w._guide_page_showing() and top.isVisible()
 w._place_tv_refresh()                                # a profile, a source, sync
 assert top.isVisible() and top.title_text()
 

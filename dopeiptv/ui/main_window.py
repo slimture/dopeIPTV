@@ -839,8 +839,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cat_list.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.cat_list.currentItemChanged.connect(self._category_changed)
-        # A category clicked while the Guide shows: that category's list.
+        # A category clicked while the Guide shows: over TV the guide follows
+        # it, else that category's list; double-clicked: its guide.
         self.cat_list.itemClicked.connect(self._guide_category_clicked)
+        self.cat_list.itemDoubleClicked.connect(self._guide_for_category)
         self.cat_list.itemClicked.connect(self._sp_category_clicked)
         self.cat_list.itemClicked.connect(self._fp_category_clicked)
         self.cat_list.itemClicked.connect(self._search_category_clicked)

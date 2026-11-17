@@ -672,6 +672,9 @@ class _ContextMenuMixin:
                 # A section header row: make a new folder under it.
                 m.addAction(tr("ctx_new_folder"),
                             lambda: self._new_fav_folder(store))
+            if section == "chan":
+                m.addSeparator()
+                m.addAction(tr("cat_show_in_guide"), lambda: self._guide_for_category(it))
             m.exec(self.cat_list.mapToGlobal(pos))
             return
 
@@ -718,7 +721,10 @@ class _ContextMenuMixin:
                             lambda: self._lock_category(cid))
             m.addSeparator()
         if self.mode == "live":
-            m.addAction(tr("btn_epg_guide"), self._open_epg_guide)
+            if it is not None:
+                m.addAction(tr("cat_show_in_guide"), lambda: self._guide_for_category(it))
+            else:
+                m.addAction(tr("btn_epg_guide"), self._open_epg_guide)
             m.addAction(tr("btn_refresh_epg"), self._refresh_epg_now)
             m.addSeparator()
         m.addAction(tr("ctx_manage_categories"), self._open_content_manager)

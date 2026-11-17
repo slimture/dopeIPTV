@@ -95,6 +95,7 @@
   "btn_settings": "设置",
   "btn_refresh": "刷新",
   "btn_epg_guide": "节目指南",
+  "cat_show_in_guide": "在节目指南中显示",
   "epg_filter_channels": "筛选频道…",
   "epg_select_channel": "选择一个频道",
   "epg_jump_now": "现在",

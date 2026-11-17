@@ -245,6 +245,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "btn_settings": {"en": "Settings"},
     "btn_refresh": {"en": "Refresh"},
     "btn_epg_guide": {"en": "EPG Guide"},
+    "cat_show_in_guide": {"en": "Show in the guide"},
     "epg_filter_channels": {"en": "Filter channels…"},
     "epg_select_channel": {"en": "Select a channel"},
     "epg_jump_now": {"en": "Now"},

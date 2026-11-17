@@ -95,6 +95,7 @@
   "btn_settings": "Instellingen",
   "btn_refresh": "Vernieuwen",
   "btn_epg_guide": "EPG-gids",
+  "cat_show_in_guide": "Tonen in de gids",
   "epg_filter_channels": "Kanalen filteren…",
   "epg_select_channel": "Selecteer een kanaal",
   "epg_jump_now": "Nu",

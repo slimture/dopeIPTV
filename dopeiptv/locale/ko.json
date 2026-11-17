@@ -95,6 +95,7 @@
   "btn_settings": "설정",
   "btn_refresh": "새로 고침",
   "btn_epg_guide": "EPG 가이드",
+  "cat_show_in_guide": "편성표에서 보기",
   "epg_filter_channels": "채널 필터…",
   "epg_select_channel": "채널 선택",
   "epg_jump_now": "지금",

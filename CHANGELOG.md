@@ -24,6 +24,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   open over TV, picking Movies, News or any other category (or arrowing
   through them) shows that category's channels in the guide, which stays
   open - before, it closed and the category's channel list came instead.
+  A folder of favourite channels works the same.
+- A double click on a TV category (or a folder of favourite channels)
+  opens the guide on it, and its menu has Show in the guide: one click for
+  the channels and what is on now, two for the whole guide.
 
 - Local files is a place of the new look, like Mine, TV, Movies and
   Series: the folder's name ("Local files" at the top) with how many

@@ -95,6 +95,7 @@
   "btn_settings": "การตั้งค่า",
   "btn_refresh": "รีเฟรช",
   "btn_epg_guide": "คู่มือ EPG",
+  "cat_show_in_guide": "แสดงในผังรายการ",
   "epg_filter_channels": "กรองช่อง…",
   "epg_select_channel": "เลือกช่อง",
   "epg_jump_now": "ตอนนี้",

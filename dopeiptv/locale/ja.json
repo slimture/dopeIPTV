@@ -95,6 +95,7 @@
   "btn_settings": "設定",
   "btn_refresh": "更新",
   "btn_epg_guide": "EPG番組表",
+  "cat_show_in_guide": "番組表で表示",
   "epg_filter_channels": "チャンネルを絞り込み…",
   "epg_select_channel": "チャンネルを選択",
   "epg_jump_now": "現在",

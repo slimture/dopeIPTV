@@ -95,6 +95,7 @@
   "btn_settings": "Inställningar",
   "btn_refresh": "Uppdatera",
   "btn_epg_guide": "EPG-guide",
+  "cat_show_in_guide": "Visa i guiden",
   "epg_filter_channels": "Filtrera kanaler…",
   "epg_select_channel": "Välj en kanal",
   "epg_jump_now": "Nu",

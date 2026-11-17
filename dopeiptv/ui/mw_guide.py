@@ -7,7 +7,9 @@ category, the Favorites folder shown, else the favourite channels, else
 the whole line-up (fetched on a worker). Over TV it follows the list: a
 category picked or arrowed to in the sidebar while it shows puts that
 category's channels in it, and it stays (_guide_follow_list, as the list's
-rows come in). The guide is kept while the app
+rows come in) - a folder of favourite channels the same. A category
+double-clicked, or Show in the guide in its menu, opens the guide on it
+(_guide_for_category). The guide is kept while the app
 runs and shown again as it was - same source, same channels, the same day
 - and drawn afresh otherwise. Showing or leaving it never touches the
 player.
@@ -126,11 +128,36 @@ class _GuideMixin:
         stays; elsewhere its list, the way a nav entry leads to its own."""
         if not self._guide_page_showing():
             return
-        if self.mode == "live":
+        if self._guide_covers(self.cat_list.currentItem()):
             self._guide_follow_list()
             return
         self._close_guide_page()
         self._place_entered(self._list_place)
+
+    def _guide_covers(self, item) -> bool:
+        """Whether *item* of the sidebar is channels a guide can show: a TV
+        category, or a folder of favourite channels (or all of them) -
+        never films or series."""
+        if item is None or self.series_ctx:
+            return False
+        data = item.data(Qt.ItemDataRole.UserRole)
+        if self.mode == "live":
+            return True
+        if self.mode == "fav":
+            return data is None or (isinstance(data, tuple) and data[0] in ("chan", "all"))
+        return False
+
+    def _guide_for_category(self, item=None) -> None:
+        """A category double-clicked, or Show in the guide in its menu: that
+        category picked and the guide opened on it. Its channels may still
+        be on their way: the guide takes them when they come
+        (_guide_follow_list). A guide popped out is brought forward as it
+        is."""
+        if item is None or not self._guide_covers(item):
+            return
+        if self.cat_list.currentItem() is not item:
+            self.cat_list.setCurrentItem(item)
+        self._open_epg_guide()
 
     def _guide_follow_list(self) -> None:
         """The Guide page over TV covers the list's category: called each
@@ -138,8 +165,8 @@ class _GuideMixin:
         picked, or arrowed to, while the guide shows puts its channels in
         it. The same channels again change nothing (a search typed, a
         refresh); the focus stays in the sidebar while it is there."""
-        if self.mode != "live" or self.series_ctx or not self.all_items \
-                or not self._guide_page_showing():
+        if not self.all_items or not self._guide_page_showing() \
+                or not self._guide_covers(self.cat_list.currentItem()):
             return
         key, title, channels = self._guide_scope(False)
         grid = self._guide_grid
