@@ -81,12 +81,15 @@
   }
 })();
 
-/* Screenshot lightbox: click a screenshot to open it full-size. Built with DOM
-   APIs (no inline handlers) so it stays inside a strict same-origin CSP. */
+/* The pictures of the app open large on a click: the first one and the
+   feature explorer's (whichever shows). Built with DOM APIs (no inline
+   handlers) so it stays inside a strict same-origin CSP. */
 (function () {
   "use strict";
-  var shots = document.querySelectorAll(".shot img");
-  if (!shots.length) { return; }
+  var hero = document.querySelector(".heroshow");
+  var stage = document.querySelector(".fxp-stage");
+  var hasFx = stage && stage.querySelector(".fx-pic img");
+  if (!hero && !hasFx) { return; }
 
   var overlay = document.createElement("div");
   overlay.className = "lb-overlay";
@@ -99,30 +102,33 @@
   var close = document.createElement("button");
   close.className = "lb-close";
   close.type = "button";
-  var box = document.querySelector(".shots");
   close.setAttribute("aria-label",
-                     (box && box.getAttribute("data-close")) || "Close");
-  close.textContent = "×";              // ×
+                     ((hero || stage).getAttribute("data-close")) || "Close");
+  close.textContent = "\u00d7";
   overlay.appendChild(big);
   overlay.appendChild(close);
   document.body.appendChild(overlay);
 
-  function open(src, alt) {
-    big.src = src;
-    big.alt = alt || "";
+  function open(im) {
+    if (!im) { return; }
+    // The full-size picture, not the small copy a phone was given.
+    big.src = im.getAttribute("src") || im.currentSrc;
+    big.alt = im.alt || "";
     overlay.setAttribute("aria-hidden", "false");
     overlay.classList.add("open");
+    close.focus();
   }
   function hide() {
     overlay.classList.remove("open");
     overlay.setAttribute("aria-hidden", "true");
   }
 
-  shots.forEach(function (im) {
-    im.addEventListener("click", function () {
-      open(im.currentSrc || im.src, im.alt);
-    });
-  });
+  if (hero) {
+    hero.addEventListener("click", function () { open(hero.querySelector("img.on")); });
+  }
+  if (hasFx) {
+    stage.addEventListener("click", function () { open(stage.querySelector(".sc.on .fx-pic img")); });
+  }
   overlay.addEventListener("click", hide);   // backdrop, image, or the × button
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && overlay.classList.contains("open")) { hide(); }
@@ -147,6 +153,18 @@
   var tabsBox = fxp.querySelector(".fxp-tabs"), panel = fxp.querySelector(".fxp-main");
   var cap = fxp.querySelector(".fxp-cap"), scenes = fxp.querySelectorAll(".sc");
   if (!feats.length || !tabsBox || !cap) { return; }
+  // Where each picture shows its feature (render.jq writes it as data-x, -y,
+  // -w, -h, parts of the picture): the point it zooms to and the ring's box.
+  // A small spot is zoomed to more than a large one.
+  [].forEach.call(fxp.querySelectorAll(".fx-pic[data-x]"), function (p) {
+    var n = function (k) { var v = parseFloat(p.getAttribute("data-" + k)); return isFinite(v) ? v : 0; };
+    var x = n("x"), y = n("y"), w = n("w"), h = n("h");
+    p.style.setProperty("--fx", (x * 100).toFixed(2) + "%");
+    p.style.setProperty("--fy", (y * 100).toFixed(2) + "%");
+    p.style.setProperty("--fw", (w * 100).toFixed(2) + "%");
+    p.style.setProperty("--fh", (h * 100).toFixed(2) + "%");
+    p.style.setProperty("--fz", (1.06 + 0.1 * (1 - Math.min(1, Math.max(w, h) * 2))).toFixed(3));
+  });
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var DUR = reduce ? 8000 : 6000, cur = -1, timer = null, auto = true, inView = false, held = false;
   // It steps on by itself on a computer only: on a phone that was too much
@@ -313,6 +331,48 @@
     chans[i].classList.add("active");
     if (screen) { screen.style.setProperty("--tint", tints[i % tints.length]); }
   }, 3200);
+})();
+
+/* The first picture: the app in five of its themes, one fading into the next
+   every few seconds while it is on screen (slower, and without the drift,
+   for reduced motion). The others are fetched once the first has loaded. */
+(function () {
+  "use strict";
+  var box = document.querySelector(".heroshow");
+  var pics = box ? [].slice.call(box.querySelectorAll("img.hs")) : [];
+  if (pics.length < 2) { return; }
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var cur = 0, seen = true, timer = null;
+  function fetchRest() {
+    pics.forEach(function (im) {
+      var src = im.getAttribute("data-src");
+      if (!src) { return; }
+      var set = im.getAttribute("data-srcset");
+      if (set) { im.srcset = set; }
+      im.src = src;
+      im.removeAttribute("data-src");
+      im.removeAttribute("data-srcset");
+    });
+  }
+  function step() {
+    if (!seen || document.hidden) { return; }
+    var next = (cur + 1) % pics.length;
+    if (!pics[next].complete || !pics[next].naturalWidth) { return; }   // not loaded yet
+    pics[cur].classList.remove("on");
+    pics[next].classList.add("on");
+    cur = next;
+  }
+  function start() {
+    fetchRest();
+    box.classList.add("alive");
+    timer = setInterval(step, reduce ? 9000 : 5200);
+  }
+  if (pics[0].complete) { setTimeout(start, 1200); }
+  else { pics[0].addEventListener("load", function () { setTimeout(start, 1200); }, { once: true }); }
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver(function (en) { seen = en[0].isIntersecting; }).observe(box);
+  }
+  window.addEventListener("pagehide", function () { clearInterval(timer); });
 })();
 
 /* Living details: the download count counts up - for reduced motion too,

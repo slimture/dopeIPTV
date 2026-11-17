@@ -22,7 +22,9 @@
         "update"
     ],
     "watch": [
+        "places",
         "play",
+        "mine",
         "series",
         "seek",
         "rewind",
@@ -89,7 +91,7 @@
         "hide",
         "bouquets",
         "playlists",
-        "home",
+        "room",
         "testbuilds"
     ],
     "fix": [

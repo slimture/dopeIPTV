@@ -21,6 +21,8 @@
 
 $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 | ($rel[0] // {}) as $R | ($dl[0] // {}) as $D | $helpfile[0] as $HELP
+# Where each feature picture shows its feature, per language (site/spots.json).
+| ($spots[0] // {}) as $SP
 # The legal pages (site/legal.json): their titles, and the languages they are
 # written in - Swedish, which governs, and English. Every other language
 # shows the English text inside its own header and footer.
@@ -192,7 +194,6 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
        elif ($L.pages | index($current)) != null then "/\($current)/"
        else "/" end) as $self
     | [[$base + "#features", t("nav_features"), ""],
-       [$base + "#shots", t("nav_screenshots"), ""],
        [$base + "#download", t("nav_download"), ""],
        ["/help/", t("nav_help"), "help"]] as $links
     # No GitHub here: a word most visitors do not know, in the one row every
@@ -200,8 +201,8 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     | def cur($key): $key != "" and $key == $current;
     # The bar's links are only what a visitor leaves the page for: Help, then
     # Donate, gathered at the end with the language and the blue Download
-    # button - one group, the logo alone on the other side. Features and
-    # Screenshots are further down this same page, where everyone scrolls
+    # button - one group, the logo alone on the other side. The features
+    # are further down this same page, where everyone scrolls
     # anyway. The narrow-window menu keeps every link - it is all there is
     # where the row folds away.
     ([$links[] | select(.[2] == "help") | . as [$href, $label, $key]
@@ -378,27 +379,65 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
       + "    </div>\n"
       + "  </section>\n\n"
     end;
-  # The four pictures of the app (tools/site_screenshots.py in its
-  # repository): public/screenshots/<lang>/<name>.webp, the reader's language
-  # or else English; $screenshots lists what is there as "<lang>/<name>".
-  def shot_src($name):
-    if ($screenshots | index("\($lang)/\($name)")) then "/screenshots/\($lang)/\($name).webp"
-    elif ($screenshots | index("en/\($name)")) then "/screenshots/en/\($name).webp"
+  # The app's own pictures (tools/site_screenshots.py in its repository):
+  # public/screenshots/<lang>/<name>.webp, in the reader's language or else
+  # English; $screenshots lists what is there as "<lang>/<name>". A smaller
+  # copy of a picture, "<name>-<width>", is offered beside it for phones.
+  def pic_lang($name):
+    if ($screenshots | index("\($lang)/\($name)")) then $lang
+    elif ($screenshots | index("en/\($name)")) then "en"
+    else null end;
+  def pic_src($l; $name; $version):
+    "/screenshots/\($l)/\($name).webp?v=\($version)";
+  def pic_set($l; $name; $small; $full; $version):
+    if ($screenshots | index("\($l)/\($name)-\($small)")) then
+      "\(pic_src($l; "\($name)-\($small)"; $version)) \($small)w, \(pic_src($l; $name; $version)) \($full)w"
     else "" end;
-  def shots:
-    [["main", "shot_main_alt", "shot_main_t", "shot_main_c"],
-     ["guide", "shot_epg_alt", "shot_epg_t", "shot_epg_c"],
-     ["multiview", "shot_mv_alt", "shot_mv_t", "shot_mv_c"],
-     ["timeshift", "shot_ts_alt", "shot_ts_t", "shot_ts_c"]]
-    | map(. as [$name, $alt, $title, $cap]
-      | shot_src($name) as $src
-      | "        <div class=\"shot\">\n"
-        + (if $src != "" then
-             "          <img src=\"\($src | h)\" alt=\"\(t($alt) | h)\" width=\"1280\" height=\"800\" loading=\"lazy\" decoding=\"async\">\n"
-           else "          <div class=\"ph\">\(t("shot_ph") | h) · \(t($title))</div>\n" end)
-        + "          <div class=\"cap\"><b>\(t($title))</b> — \(t($cap))</div>\n"
-        + "        </div>\n")
-    | add;
+  # The first picture: the app with a channel playing, in five of its themes,
+  # one fading into the next (app.js). Only the first is fetched with the
+  # page; the script fetches the others once it starts the slideshow.
+  # Without them the drawn mock-up after it stays.
+  def heroshow($version):
+    [range(1; 6) as $n | "hero-\($n)" as $name | pic_lang($name) as $l
+     | select($l != null) | [$l, $name]] as $pics
+    | if ($pics | length) == 0 then "" else
+        "      <div class=\"heroshow\" data-close=\"\(t("lb_close") | h)\">\n"
+        + ($pics | to_entries | map(.key as $i | .value as [$l, $name]
+            | pic_set($l; $name; 1280; 2560; $version) as $set
+            | if $i == 0 then
+                "        <img class=\"hs on\" src=\"\(pic_src($l; $name; $version) | h)\""
+                + (if $set != "" then " srcset=\"\($set | h)\" sizes=\"(max-width: 1100px) 94vw, 1040px\"" else "" end)
+                + " width=\"2560\" height=\"1600\" alt=\"\(t("hero_alt") | h)\" fetchpriority=\"high\" decoding=\"async\">\n"
+              else
+                "        <img class=\"hs\" data-src=\"\(pic_src($l; $name; $version) | h)\""
+                + (if $set != "" then " data-srcset=\"\($set | h)\" sizes=\"(max-width: 1100px) 94vw, 1040px\"" else "" end)
+                + " width=\"2560\" height=\"1600\" alt=\"\" decoding=\"async\">\n"
+              end)
+          | add)
+        + "      </div>\n" end;
+  # A feature's picture in the explorer, over its drawn scene; the spot it
+  # zooms to and rings (data-x, -y: its centre, -w, -h: its size, all as
+  # parts of the picture) - app.js turns them into the picture's style.
+  def fx($k; $version):
+    "feat-\($k)" as $name
+    | pic_lang($name) as $l
+    | if $l == null then "" else
+        ($SP[$l][$k] // null) as $sp
+        | pic_set($l; $name; 960; 1600; $version) as $set
+        | "<div class=\"fx-pic\""
+          + (if $sp != null then
+               " data-x=\"\($sp.x)\" data-y=\"\($sp.y)\" data-w=\"\($sp.w // 0)\" data-h=\"\($sp.h // 0)\""
+             else "" end)
+          + "><img src=\"\(pic_src($l; $name; $version) | h)\""
+          + (if $set != "" then " srcset=\"\($set | h)\" sizes=\"(max-width: 860px) 94vw, 860px\"" else "" end)
+          + " width=\"1600\" height=\"1000\" alt=\"\" loading=\"lazy\" decoding=\"async\">"
+          + (if $sp != null then "<i class=\"fx-spot\"></i>" else "" end)
+          + "</div>"
+      end;
+  def fx_blocks($version):
+    reduce ("c1", "c2", "c3", "mv", "c4", "mine", "tv", "room", "c5", "lf",
+            "cast", "subs", "keys", "c6") as $k
+      ({}; .["fx_\($k)"] = fx($k; $version));
   # json_encode(..., JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), which
   # still writes U+2028 and U+2029 escaped.
   def php_json: tojson | gsub(" "; "\\u2028") | gsub(" "; "\\u2029");
@@ -410,18 +449,21 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
       "applicationSubCategory": "IPTV player", "description": t("meta_desc"),
       "softwareVersion": $version, "url": "\($SITE)/",
       "downloadUrl": "\($SITE)/#download", "installUrl": "\($SITE)/#download",
-      "featureList": ["Xtream Codes and M3U playlists", "Full XMLTV EPG guide",
-        "Live timeshift and catch-up TV", "One-click recording",
+      "featureList": ["Xtream Codes, M3U and Stalker portals", "Enigma2, Tvheadend, Jellyfin, Emby and Plex",
+        "Full XMLTV EPG guide", "Live timeshift and catch-up TV", "One-click recording",
         "Multiview — up to nine channels at once", "Built-in mpv player",
-        "Casting to Chromecast and DLNA smart TVs", "Subtitles from OpenSubtitles",
-        "Desktop media controls (MPRIS) and media keys",
-        "New-episode alerts for followed series", "Trakt sync",
+        "Mine: continue watching, favourites and a watch-later list",
+        "TV mode with a remote, a game controller or the phone",
+        "Casting to Chromecast, DLNA smart TVs, Kodi and Apple TV", "Subtitles from OpenSubtitles",
+        "Desktop media controls and media keys", "One search across every source",
+        "New-episode alerts for followed series", "Trakt and Simkl sync",
         "Your own local video and music files"],
       "license": "\($REPO)/blob/main/LICENSE", "isAccessibleForFree": true,
       "author": {"@id": "\($SITE)/#org"}, "publisher": {"@id": "\($SITE)/#org"},
       "sameAs": [$REPO, "https://www.wikidata.org/wiki/Q142109783"],
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}
-     + (if ($screenshots | index("en/main")) then {"screenshot": "\($SITE)/screenshots/en/main.webp"} else {} end)) as $app
+     + (if ($screenshots | index("en/hero-1")) then {"screenshot": "\($SITE)/screenshots/en/hero-1.webp"}
+        elif ($screenshots | index("en/main")) then {"screenshot": "\($SITE)/screenshots/en/main.webp"} else {} end)) as $app
     | {"@context": "https://schema.org",
        "@graph": [
          {"@type": "Organization", "@id": "\($SITE)/#org", "name": "dopeIPTV",
@@ -440,8 +482,8 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     | dl_total as $total
     | $tpl
     | expand(common + {version: ($version | h), canonical: (url("/"; $lang) | h)};
-        {hreflang: hreflang("/"), jsonld: jsonld($version), nav: nav("home"),
-         shots: shots,
+        ({hreflang: hreflang("/"), jsonld: jsonld($version), nav: nav("home"),
+         heroshow: heroshow($version),
          release_tag: ((if ($reldate | truthy) then " · " + ($reldate | h) else " · " + (t("dl_latest") | h) end)
            + (if $total > 0 then " · <span class=\"dl-count\" title=\"\(t("dl_tip_total") | h)\">↓ \(fmt_count($total) | h)</span>" else "" end)
            + (if $notes == "" then "" else
@@ -455,7 +497,8 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
          # link beside the version (app.js) - no section of their own.
          whatsnew: (if $notes == "" then "" else
            "  <template id=\"wn-notes\" data-title=\"\(t("wn_h2") | h) · v\($version | h)\""
-           + " data-more=\"\(t("wn_full") | h)\" data-close=\"\(t("lb_close") | h)\">\($notes)</template>\n" end)});
+           + " data-more=\"\(t("wn_full") | h)\" data-close=\"\(t("lb_close") | h)\">\($notes)</template>\n" end)}
+         + fx_blocks($version)));
 
 # -- help/index.php --------------------------------------------------------------
 

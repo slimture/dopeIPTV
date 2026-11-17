@@ -175,6 +175,21 @@ h1 .h1-brand { position: absolute; width: 1px; height: 1px; overflow: hidden;
 .mock.alive.still .scan { animation-play-state: paused; }
 @keyframes pic { 50% { transform: translate(7%, -5%) scale(1.08); } to { transform: translate(-6%, 4%) scale(1.02); } }
 .mock.alive .screen::after { content: none; }
+/* The app itself, a channel playing, in five of its themes - one fading
+   into the next with a slow drift (app.js). It takes the drawn mock-up's
+   place; without its pictures the mock-up stays. A click opens it large. */
+.heroshow + .mock { display: none; }
+.heroshow { position: relative; width: min(1040px, 100%); aspect-ratio: 16 / 10; border-radius: 14px; overflow: hidden;
+  background: #0b0b0e; box-shadow: 0 50px 100px -50px rgba(0, 0, 0, .55), 0 0 0 1px var(--line); cursor: zoom-in; }
+.heroshow img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0;
+  transition: opacity 1.6s ease; }
+.heroshow img.on { opacity: 1; }
+.heroshow.alive img.on { animation: hs-drift 7s ease-out both; }
+@keyframes hs-drift { from { transform: scale(1.04); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .heroshow img { transition-duration: 2.4s; }
+  .heroshow.alive img.on { animation: none; }
+}
 .timeline { margin: 0 12px 12px; }
 .tl-track { height: 8px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); position: relative; }
 .tl-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 62%; background: var(--accent); border-radius: 6px 0 0 6px; }
@@ -1152,11 +1167,12 @@ dialog.howdlg::backdrop { background: rgba(5, 7, 10, .66); }
 /* ---- the feature explorer (app.js) --------------------------------------- */
 /* The titles as tabs, a small screen that shows each feature at work, one
    line of text at a time. It steps on by itself every few seconds (a thin
-   bar fills under the current tab) until the visitor picks one. The screen
-   is always dark - it is a TV - and its scenes are drawn with CSS, words
-   kept out of them so no language is needed. */
+   bar fills under the current tab) until the visitor picks one. Each scene
+   is a picture of the app in the reader's language (render.jq fx), which
+   zooms slowly to where the feature shows while a soft ring marks it; the
+   scene drawn with CSS under it is what shows without the picture. */
 .fxp { --dur: 6s; display: grid; grid-template-columns: minmax(220px, 290px) minmax(0, 1fr); gap: 44px;
-  align-items: start; max-width: 1060px; margin: 8px auto 0; }
+  align-items: start; max-width: 1180px; margin: 8px auto 0; }
 .fxp[hidden] { display: none; }
 .fxp-tabs { display: flex; flex-direction: column; gap: 2px; }
 .fxp-tab { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 14px;
@@ -1183,6 +1199,28 @@ dialog.howdlg::backdrop { background: rgba(5, 7, 10, .66); }
 /* scenes */
 .sc { position: absolute; inset: 0; opacity: 0; visibility: hidden; transition: opacity .55s ease, visibility 0s .55s; }
 .sc.on { opacity: 1; visibility: visible; transition: opacity .55s ease; }
+.sc > .fx-pic { position: absolute; inset: 0; z-index: 1; background: #0b0b0e;
+  transform-origin: var(--fx, 50%) var(--fy, 50%); }
+.sc > .fx-pic ~ * { display: none; }
+.fx-pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.fxp.in-view .sc.on > .fx-pic { animation: fx-zoom var(--dur) cubic-bezier(.25, .6, .25, 1) both; }
+@keyframes fx-zoom { to { transform: scale(var(--fz, 1.1)); } }
+.fx-spot { position: absolute; left: var(--fx, 50%); top: var(--fy, 50%); width: calc(var(--fw, 0%) + 18px);
+  height: calc(var(--fh, 0%) + 14px); min-width: 48px; min-height: 34px; border-radius: 14px; pointer-events: none;
+  transform: translate(-50%, -50%); opacity: 0;
+  box-shadow: 0 0 0 2px var(--accent), 0 0 0 8px color-mix(in srgb, var(--accent) 26%, transparent); }
+.fxp.in-view .sc.on .fx-spot { animation: fx-ring 2.4s ease-out .8s infinite; }
+@keyframes fx-ring {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
+  22% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.fxp-stage:has(.fx-pic) { cursor: zoom-in; }
+@media (prefers-reduced-motion: reduce) {
+  .fxp.in-view .sc.on > .fx-pic { animation: none; }
+  .fxp.in-view .sc.on .fx-spot { animation: none; opacity: 1; }
+}
 .sc .h1 { background: linear-gradient(135deg, #3b6fd8, #17244a); }
 .sc .h2 { background: linear-gradient(135deg, #d0573f, #43191a); }
 .sc .h3 { background: linear-gradient(135deg, #2fa66a, #11331f); }
@@ -1661,10 +1699,11 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
 /* ---- phones: still, not sliding ------------------------------------------ */
 /* Nothing moves sideways by itself on a phone: the drifting format line is
    left out, the explorer does not step on by itself (app.js), and its tabs
-   are a fixed grid of twelve icons - tap one, the screen changes - instead
-   of a row of pills that scrolled along. A swipe on the screen still works. */
+   are a fixed grid of icons, two even rows of seven - tap one, the screen
+   changes - instead of a row of pills that scrolled along. A swipe on the
+   screen still works. */
 @media (max-width: 860px) {
-  .fxp-tabs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; overflow: visible;
+  .fxp-tabs { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; overflow: visible;
     margin: 0; padding: 0; }
   .fxp-tab { justify-content: center; width: auto; height: 46px; padding: 0; border-radius: 14px; }
   .fxp-tab .ic { width: 22px; height: 22px; }

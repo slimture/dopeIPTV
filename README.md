@@ -25,7 +25,8 @@ website/
 │   ├── i18n/               every page in every language, rendered by the sync (git-ignored)
 │   ├── releases.json       written by the sync (never committed)
 │   ├── files/              mirrored release assets land here (git-ignored)
-│   └── screenshots/        the app's pictures, <lang>/<name>.webp (from the app's tools/site_screenshots.py)
+│   └── screenshots/        the app's pictures, <lang>/<name>.webp (from the app's tools/site_screenshots.py):
+│                           hero-1..5 (the first picture's slideshow), feat-<key> (the feature explorer)
 ├── site/                   what the pages are made from - not web-served
 │   ├── templates/          index.html, help.html, legal.html, 404.html and nav.html
 │   ├── lang/*.json         the texts, one file per language (en.json is the source)
@@ -34,6 +35,7 @@ website/
 │   ├── legal.json          the legal pages: their titles, the date, the languages
 │   ├── legal/{sv,en}/      their texts - Swedish governs, English is a translation
 │   ├── formats.json        dates and numbers per language, as ICU 76.1 writes them
+│   ├── spots.json          where each feature picture shows its feature, per language (the same tool)
 │   └── render.jq           the renderer
 ├── sync-releases.sh        cron: latest release → files/ + releases.json + i18n/
 ├── DEPLOY.md               moving the live site from the PHP version, step by step

@@ -435,6 +435,10 @@ rel=$REL
 [ -s "$rel" ] && jq -e 'type == "object"' "$rel" >/dev/null 2>&1 || rel=/dev/null
 counts=$COUNTS
 [ -s "$counts" ] && jq -e 'type == "object"' "$counts" >/dev/null 2>&1 || counts=/dev/null
+# Where each feature picture shows its feature, per language (tools/
+# site_screenshots.py measures it in the app): the spot the picture zooms to.
+spots=$SITE/spots.json
+[ -s "$spots" ] && jq -e 'type == "object"' "$spots" >/dev/null 2>&1 || spots=/dev/null
 
 render() {  # render PAGE LANG TEMPLATE OUTFILE [BODY]
     mkdir -p "${4%/*}"
@@ -446,7 +450,7 @@ render() {  # render PAGE LANG TEMPLATE OUTFILE [BODY]
         --slurpfile site "$SITE/i18n.json" --slurpfile helpfile "$SITE/help.json" \
         --slurpfile fmt "$SITE/formats.json" --slurpfile legal "$SITE/legal.json" \
         --slurpfile en "$SITE/lang/en.json" --slurpfile tr "$tr" \
-        --slurpfile rel "$rel" --slurpfile dl "$counts" \
+        --slurpfile rel "$rel" --slurpfile dl "$counts" --slurpfile spots "$spots" \
         --rawfile tpl "$3" --rawfile navtpl "$SITE/templates/nav.html" \
         --rawfile body "${5:-/dev/null}" > "$4"
 }
