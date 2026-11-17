@@ -43,10 +43,24 @@ class _AirPlayMixin:
             log.debug("airplay: off (%s: %s)", type(e).__name__, e)
             return
         rx.context = self._airplay_context
+        rx.anchor = self._airplay_anchor
         rx.ended.connect(self._airplay_ended)
         rx.problem.connect(self._airplay_problem)
         self.cast.add_receiver(rx)
         self._airplay = rx
+
+    def _airplay_anchor(self) -> tuple[int, int, int, int] | None:
+        """The cast card's rectangle on the screen - else the player's,
+        else the window's: where the AirPlay window opens (its top right)."""
+        for w in (getattr(self, "cast_bar", None), getattr(self, "player", None), self):
+            try:
+                if w is None or not w.isVisible() or w.width() < 200:
+                    continue
+                at = w.mapToGlobal(w.rect().topLeft())
+                return at.x(), at.y(), w.width(), w.height()
+            except (AttributeError, RuntimeError):
+                continue
+        return None
 
     def _airplay_context(self) -> dict:
         return getattr(self, "_cast_ctx", None) or {}

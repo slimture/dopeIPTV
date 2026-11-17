@@ -22,11 +22,14 @@ inside a Qt widget (there the two toolkits painted over each other, and
 each refresh of the cast dialog's list made the button again); it is made
 once per cast and nothing in the dialog touches it. The app never clicks
 Apple's button for the user - AppKit offers no way to open its menu - but
-puts it within one click: the panel opens with the button under the pointer
-(the click that cast to AirPlay, ``_Panel.place``; else beside the window in
-front), as the key window with the button focused, Apple TVs first in
-Apple's menu (prioritizesVideoDevices) - each step only where AppKit takes
-it, logged, the panel shown as before where it does not.
+puts it within one click: the panel opens at the top right of the cast card
+in the window (``_Panel.place``, the receiver's *anchor*; else with the
+button under the pointer, else beside the window in front), as the key
+window with the button focused, Apple TVs first in Apple's menu
+(prioritizesVideoDevices) - each step only where AppKit takes it, logged,
+the panel shown as before where it does not. It floats over the app's own
+windows only while the app is in front: it hides with the app
+(hidesOnDeactivate), never over other programs.
 
 The player never plays on this Mac: it is paused and muted until
 externalPlaybackActive has stayed on for ROUTE_SETTLE_S, muted the moment
@@ -332,6 +335,45 @@ def place_at_pointer(pointer: tuple[float, float], room: tuple[float, float, flo
     return float(left), float(primary_h - top)
 
 
+def place_in(anchor: tuple[float, float, float, float],
+             room: tuple[float, float, float, float], primary_h: float,
+             width: float, height: float, inset: float = 16.0) -> tuple[float, float]:
+    """The panel's top-left corner, in AppKit's screen points, at the top
+    right inside *anchor* (the cast card: x, y, width, height in Qt's
+    coordinates), *inset* in from its corner - kept inside *room* (the
+    screen's free area)."""
+    ax, ay, aw, _ah = anchor
+    rx, ry, rw, rh = room
+    left = min(max(ax + aw - inset - width, rx), rx + rw - width)
+    top = min(max(ay + inset, ry), ry + rh - height)
+    return float(left), float(primary_h - top)
+
+
+def _in_anchor(anchor: tuple[int, int, int, int] | None, width: float,
+               height: float) -> tuple[float, float] | None:
+    """place_in for the window's cast card, or None when there is none."""
+    if anchor is None:
+        return None
+    try:
+        from PyQt6.QtCore import QPoint
+        from PyQt6.QtGui import QGuiApplication
+        x, y, w, h = anchor
+        if w < width or h < 60:
+            return None
+        primary = QGuiApplication.primaryScreen()
+        screen = QGuiApplication.screenAt(QPoint(x + w // 2, y + h // 2)) or primary
+        if primary is None or screen is None:
+            return None
+        room = screen.availableGeometry()
+        return place_in((float(x), float(y), float(w), float(h)),
+                        (float(room.x()), float(room.y()),
+                         float(room.width()), float(room.height())),
+                        float(primary.geometry().height()), width, height)
+    except Exception as e:
+        log.debug("airplay: the cast card's place was not told: %s", e)
+        return None
+
+
 def _at_pointer(width: float, height: float,
                 button: tuple[float, float]) -> tuple[float, float] | None:
     """place_at_pointer for where the pointer is now (the click that cast
@@ -364,10 +406,15 @@ class _Panel:
     TITLE = 22.0
 
     @classmethod
-    def place(cls) -> tuple[float, float] | None:
-        """Where the panel opens: with Apple's button under the pointer - the
-        click that cast to AirPlay is one move from Apple's menu -, else
+    def place(cls, anchor: tuple[int, int, int, int] | None = None
+              ) -> tuple[float, float] | None:
+        """Where the panel opens: at the top right of the cast card in the
+        window (*anchor*), else with Apple's button under the pointer, else
         beside the window in front, else (None) centred."""
+        at = _in_anchor(anchor, cls.W, cls.H + cls.TITLE)
+        if at is not None:
+            log.info("airplay: the AirPlay window opens at the top right of the cast card")
+            return at
         at = _at_pointer(cls.W, cls.H + cls.TITLE,
                          (cls.W / 2, cls.TITLE + cls.H - cls.PAD - cls.BUTTON / 2))
         if at is not None:
@@ -401,7 +448,9 @@ class _Panel:
         panel.setFloatingPanel_(True)
         panel.setWorksWhenModal_(True)
         panel.setBecomesKeyOnlyIfNeeded_(True)
-        panel.setHidesOnDeactivate_(False)
+        # Gone while another program is in front, back with the app: a
+        # floating panel otherwise stays over every program's windows.
+        panel.setHidesOnDeactivate_(True)
         panel.setCollectionBehavior_(getattr(
             ak, "NSWindowCollectionBehaviorFullScreenAuxiliary", 1 << 8))
         content = panel.contentView()
@@ -500,6 +549,9 @@ class AirPlayReceiver(QObject):
         #: The window's cast context (ui/mw_airplay.py): says whether a
         #: channel or a film is cast, which an address cannot always tell.
         self.context: Callable[[], dict] | None = None
+        #: Where the AirPlay window goes: the cast card's rectangle on the
+        #: screen (Qt's coordinates), or None.
+        self.anchor: Callable[[], tuple[int, int, int, int] | None] | None = None
         self.active: str | None = None
         self.state = "IDLE/NONE"
         self.duration = 0.0
@@ -864,6 +916,11 @@ class AirPlayReceiver(QObject):
                 self._lost_at = now
             if self._ever_external:
                 self._swapped_at = now
+            # A new bridge the TV has yet to ask: its time to reach it
+            # starts now, not when the route first came up (a seek in the
+            # archive said "not reached" at once).
+            if self._external:
+                self._external_since = now
             log.info("airplay: a new stream in the same player - the route "
                      "and the AirPlay window stay")
         self._offset, self._pos, self._note, self._note_error = (
@@ -893,11 +950,18 @@ class AirPlayReceiver(QObject):
         self._timer.start()
         self._show_row()
 
+    def _anchor_rect(self) -> tuple[int, int, int, int] | None:
+        try:
+            return self.anchor() if callable(self.anchor) else None
+        except Exception as e:
+            log.debug("airplay: the window did not say where the cast card is: %s", e)
+            return None
+
     def _make_panel(self, player: Any) -> None:
         """The AirPlay window, once per cast: Apple's button for this
         player, which the user clicks."""
         try:
-            panel = _Panel(player, self._observer(), _Panel.place())
+            panel = _Panel(player, self._observer(), _Panel.place(self._anchor_rect()))
         except Exception as e:
             log.info("airplay: the AirPlay window could not be made (%s: %s)",
                      type(e).__name__, e)

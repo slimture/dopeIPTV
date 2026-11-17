@@ -275,6 +275,19 @@ def test_a_live_playlist_waits_for_three_segments(fake_ffmpeg):
         b.stop()
 
 
+def test_a_moment_gone_back_to_starts_on_one_segment(monkeypatch):
+    """Pieces read here (the archive or the rewind buffer while casting) are
+    served with EXT-X-START at their first segment: there is no live edge to
+    keep three segments from, so one is enough to hand the TV."""
+    b = ab.AirPlayBridge()
+    b.plan = ab.plan("", "http://p/live/1.ts", [], live=True)
+    one = b"#EXTM3U\n#EXT-X-TARGETDURATION:6\n#EXTINF:6.000,\ns00000.m4s\n"
+    monkeypatch.setattr(b, "_playlist", lambda: one)
+    assert not b.ready()                              # live: three from the edge
+    b.feed = object()                                 # type: ignore[assignment]
+    assert b.ready()
+
+
 def test_ffmpeg_s_own_words_say_why_it_failed(fake_ffmpeg):
     fake_ffmpeg(0, "fail")
     b = ab.AirPlayBridge()
@@ -853,6 +866,35 @@ def test_a_zap_swaps_the_item_and_keeps_the_player_route_and_window(qapp, macos)
     assert ended == ["airplay_route_lost"] and rx.active is None
 
 
+def test_a_new_stream_gives_the_apple_tv_its_own_time_to_reach_it(qapp, macos):
+    """A seek in the archive is a new stream in the same player: the time
+    the Apple TV has to reach it starts then, not when the route came up -
+    or "has not reached this Mac" came at once, a false alarm."""
+    am, _ = macos
+    rx = am.AirPlayReceiver()
+    rx.context = lambda: {"kind": "live"}
+    rx.cast(am.NAME, "http://p/live/u/pw/1.m3u8", "SVT1")
+    p = _Player.made[-1]
+    p.route(True)
+    _pump(qapp)
+    _settle(am, rx)
+    assert rx._external
+    rx._external_since = time.monotonic() - 10 * am.UNREACHED_S
+    rx.cast(am.NAME, "http://p/live/u/pw/2.m3u8", "SVT1")
+    assert time.monotonic() - rx._external_since < 5
+    assert not rx._said_unreached
+    rx.stop()
+
+
+def test_the_airplay_window_floats_over_the_app_only_while_it_is_in_front(qapp, macos):
+    am, _ = macos
+    rx = am.AirPlayReceiver()
+    rx.context = lambda: {"kind": "live"}
+    rx.cast(am.NAME, "http://p/live/u/pw/1.m3u8", "SVT1")
+    assert _NSPanel.made[-1].settings.get("setHidesOnDeactivate_") is True
+    rx.stop()
+
+
 def test_a_zap_through_the_bridge_stops_the_old_ffmpeg_first(
         qapp, macos, fake_ffmpeg, monkeypatch):
     am, _ = macos
@@ -1012,6 +1054,15 @@ def test_where_the_pointer_is_decides_where_apple_s_button_opens(monkeypatch):
                                (90, 120)) == (0.0, 160.0)
     assert am.place_at_pointer((1435, 30), (0, 25, 1440, 875), 900, 180, 160,
                                (90, 120)) == (1260.0, 875.0)
+    # The cast card first: its top right, 16 points in from its corner.
+    assert am.place_in((300, 100, 700, 400), (0, 25, 1440, 875), 900,
+                       180, 160) == (804.0, 784.0)
+    assert am.place_in((1300, 100, 700, 400), (0, 25, 1440, 875), 900,
+                       180, 160) == (1260.0, 784.0)       # kept on the screen
+    assert am._in_anchor(None, 180, 160) is None
+    assert am._in_anchor((0, 0, 100, 400), 180, 160) is None   # too narrow
+    monkeypatch.setattr(am, "_in_anchor", lambda a, w, h: ("card", a) if a else None)
+    assert am._Panel.place((1, 2, 700, 400)) == ("card", (1, 2, 700, 400))
     # Nothing known of the pointer: beside the window in front, as before.
     monkeypatch.setattr(am, "_at_pointer", lambda *_a: None)
     monkeypatch.setattr(am, "_beside_front_window", lambda w: ("beside", w))

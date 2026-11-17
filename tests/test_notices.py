@@ -414,6 +414,40 @@ def test_the_panel_lists_the_work_and_the_messages_and_marks_them_read(app):
     host.close()
 
 
+def test_a_long_message_fits_the_panel_whole(app):
+    """A message of five lines and a count was cut off at the top and the
+    foot: the panel was laid out for a wider line than its own width."""
+    host = _host(app)
+    hub = _hub()
+    line = ActivityLine(hub, host)
+    line.setGeometry(16, 540, 240, ActivityLine.H)
+    panel = ActivityPanel(hub, host)
+    words = ("Error: The Apple TV has not reached this Mac. If macOS asked whether "
+             "dopeIPTV may accept incoming connections, allow it (System Settings -> "
+             "Network -> Firewall -> Options), and check that the Apple TV is on the "
+             "same network.")
+    hub.post(words, level="error")
+    hub.post(words, level="error")                                   # counted: x2
+    panel.open_at(line)
+    app.processEvents()
+    from PyQt6.QtWidgets import QLabel
+    [row] = [panel._msgs.itemAt(i).widget() for i in range(panel._msgs.count())]
+    label = row.findChildren(QLabel)[0]
+    assert label.text().endswith("×2")
+    assert panel.width() == ActivityPanel.W
+    need = label.heightForWidth(label.width())
+    assert label.height() >= need, (label.height(), need)
+    assert row.mapTo(panel, row.rect().bottomLeft()).y() <= panel.height()
+    hub.post("Another one", level="error")                           # added while open
+    app.processEvents()
+    rows = [panel._msgs.itemAt(i).widget() for i in range(panel._msgs.count())]
+    tops = [r.geometry().top() for r in rows]
+    assert len(rows) == 2 and tops[1] >= rows[0].geometry().bottom(), tops   # never over each other
+    assert all(r.findChildren(QLabel)[0].height() >= 14 for r in rows)
+    panel.close_panel()
+    host.close()
+
+
 def test_the_decision_card_one_action_two_lines_the_rest_counted(app):
     host = _host(app)
     lay = QVBoxLayout(host)

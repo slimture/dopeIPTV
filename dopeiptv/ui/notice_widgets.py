@@ -668,24 +668,42 @@ class ActivityPanel(QFrame):
         self._clear(self._msgs)
         entries = self._hub.entries()
         for e in entries:
-            self._rows.addWidget(_PanelRow(self, e))
+            self._add(self._rows, _PanelRow(self, e))
         self._work_head.setVisible(bool(entries))
         msgs = self._hub.messages()
         for m in msgs[:self.MAX_ROWS]:
-            self._msgs.addWidget(_MessageRow(self, m, fresh=m.id in self._fresh))
+            self._add(self._msgs, _MessageRow(self, m, fresh=m.id in self._fresh))
         if len(msgs) > self.MAX_ROWS:
             more = QLabel("+" + tr("notice_more", n=len(msgs) - self.MAX_ROWS))
             more.setObjectName("NoticeRowPct")
-            self._msgs.addWidget(more)
+            self._add(self._msgs, more)
         self._msg_head_row.setVisible(bool(msgs))
+        self._fit()
+
+    @staticmethod
+    def _add(lay: QVBoxLayout, w: QWidget) -> None:
+        """A row in its place and shown at once: Qt shows a row added to a
+        panel on screen only a moment later, and the panel's height, worked
+        out before that, left it out - the rows were squeezed over each
+        other into a panel a line tall."""
+        lay.addWidget(w)
+        w.show()
+
+    def _fit(self) -> None:
+        """As tall as its rows are at its own width: adjustSize alone sizes a
+        wrapped line for the width it would like, wider than W, and a long
+        message was cut off at the top and the foot."""
         self.adjustSize()
+        lay = self.layout()
+        if lay is not None and lay.hasHeightForWidth():
+            self.resize(self.W, max(self.height(), lay.totalHeightForWidth(self.W)))
 
     def _place(self) -> None:
         a = self._anchor
         if a is None:
             return
         parent = self.parentWidget()
-        self.adjustSize()
+        self._fit()
         top_left = a.mapTo(parent, QPoint(0, 0))
         rtl = self.layoutDirection() == Qt.LayoutDirection.RightToLeft
         if self._beside is not False and self._beside is not None:

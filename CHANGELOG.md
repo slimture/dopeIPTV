@@ -29,6 +29,17 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- AirPlay: going back in a channel while it is cast starts sooner - the
+  moment gone back to is handed to the Apple TV once its first segment is
+  ready, not three (there is no live edge to keep back from). "The Apple TV
+  has not reached this Mac" no longer comes after every seek: the time the
+  Apple TV has to reach a new stream starts with that stream. The AirPlay
+  window opens at the top right of the cast card, and floats over the app
+  only while it is in front - not over other programs.
+- The messages panel was laid out before its new rows were shown: a long
+  message was cut off at the top and the foot, and two were squeezed over
+  each other. Each row is now shown as it is added and the panel is as tall
+  as they are.
 - macOS: the pointer hides again over the video after two seconds, in the
   window and in full screen. With the picture drawn on its own thread
   (1.6.3) macOS put the arrow back over it; it is now hidden the way a
