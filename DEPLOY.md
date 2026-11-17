@@ -710,6 +710,61 @@ cp ~/dopeiptv/deploy/content-iptv.dope.rs.conf /usr/local/etc/nginx/conf.d/iptv.
 nginx -t && service nginx reload
 ```
 
+### A reply to an answer, archive and delete, new feedback by itself
+
+**A reply, still anonymous.** Each answer to one report has a switch, *Let
+them reply* - on by default for "Need more details", off for the others,
+flipped by hand per answer; never on a group's answer. While the latest
+answer to a report has it on, the app (from the version after 1.6.3) shows
+a reply box under that answer; the reply goes to the same
+`/feedback/report` with `"thread"` = the report's code hash, and is taken
+only then - one reply, then closed until the next answer with the switch on
+(otherwise 409 `{"error": "closed"}`, nothing kept). The same limits and
+scrubbing as feedback, at most 2000 characters, and the same push ("A
+reply to your answer"). It is a row of its own in feedback.jsonl, tied to
+the report by its id (`thread_of`), never by the hash; the app is told only
+whether the latest answer lets them reply (`"open"` in
+`/feedback/replies`), never its own words back. On the Feedback tab the
+report opens as its conversation - report, answer, reply, answer…, each
+with its time and each reply with its own Copy; a reply makes the report
+unread again ("Replied" on its row) and brings it to the top. Copy and
+Copy all shown give the whole conversation as plain text.
+
+**Archive** (a report, or a problem): out of the lists and the unread
+count, under *Archived* (the feedback list's chip, the problems' list) and
+back with *Unarchive*; a reply takes an archived report out, unread. Kept
+beside the marks in feedback-state.json. **Delete…** asks first and names
+what goes: one report with its answers, replies and code hash (the app
+then finds nothing for it), or every report of a problem and its answers.
+The file is rewritten whole and swapped in, as the daily cleanup's prune
+does - and prune now takes a report's replies with it (a thread never
+outlives its report's 12 months), and the answers and marks of what it
+removes. Both are POSTs for the signed-in admin from the page
+itself (`/admin/feedback-archive`, `/admin/feedback-delete`), under
+`location ^~ /admin/` like the other admin routes.
+
+**New feedback by itself.** While the admin page is in front it asks every
+45 s - `/admin/feedback?rev=…` answers `{"same": true}` without reading a
+report when nothing changed (the files' times and sizes) - and draws what
+is new in place: the report open stays open with what is typed in it, the
+filters and the scroll stay, a new row lights up, the tab's count follows.
+It waits while an answer is being typed. Paused while the tab is hidden.
+
+Deploy (jail) - only `donate/` changed, both nginx files stay as they are:
+
+    cd ~/dopeiptv; git checkout website; git pull origin website
+    cp -R donate /usr/local/www/iptv/
+    service iptv_donate restart
+
+Check: `python3 -m pytest donate` - all pass. Older apps are served as
+before (an answer's `"open"` is a field they do not read).
+
+The privacy policy's item on error reports and feedback says the app asks
+for answers "for 30 days": the app now counts those 30 days from the
+person's latest reply, and a reply carries the same code hash as its
+report. Worth a sentence in `site/legal/sv/` and `site/legal/en/privacy.html`
+(the Swedish governs) with this deploy.
+
 ## Settings sync
 
 Anyone's app can keep favorites, settings, playlists and watch history the

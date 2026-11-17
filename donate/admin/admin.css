@@ -804,7 +804,8 @@ tr:last-child td { border-bottom: 0; }
   background: var(--page); padding: 8px 10px; border-radius: 8px; user-select: all; }
 .chip.from-site { color: var(--text-2); background: color-mix(in srgb, var(--text) 9%, transparent); }
 .chip.sup { color: var(--heart); background: color-mix(in srgb, var(--heart) 12%, transparent); font-weight: 650; }
-/* Answering feedback (feedback.js): a quiet block above the report. */
+/* Answering feedback (feedback.js): a quiet block under a report's
+   conversation, above a problem's latest report. */
 .fb-answer { margin: 10px 0; padding: 12px; border-radius: 10px; background: var(--page);
   display: flex; flex-direction: column; gap: 8px; }
 .fb-answer-head { margin: 0; font-size: 13px; color: var(--text-2); }
@@ -812,6 +813,26 @@ tr:last-child td { border-bottom: 0; }
 .fb-version, .fb-words-in { font: inherit; font-size: 14px; color: var(--text); background: var(--surface);
   border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: min(100%, 560px); box-sizing: border-box; }
 .chip.answered { color: var(--up); background: color-mix(in srgb, var(--up) 12%, transparent); }
+/* A report's conversation (feedback.js thread()): the report, each answer
+   and each reply in order; their replies set off by a line in the accent.
+   "Let them reply" under the answer's words; a report or a reply that came
+   in while the page was open lights up for a moment. */
+.fb-thread { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 10px; }
+.fb-entry { display: flex; flex-direction: column; gap: 6px; }
+.fb-entry-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 12.5px; color: var(--muted); }
+.fb-entry-who { font-weight: 650; color: var(--text-2); }
+.fb-entry.answer, .fb-entry.reply { padding: 8px 12px; border-radius: 10px; background: var(--page); }
+.fb-entry.reply { border-inline-start: 3px solid var(--accent); }
+.fb-reply-text { margin: 0; font-size: 14px; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+.chip.reply-waiting { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.chip.can { color: var(--s1); background: color-mix(in srgb, var(--s1) 12%, transparent); }
+.chip.archived { color: var(--muted); background: color-mix(in srgb, var(--text) 7%, transparent); }
+.fb-open { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13.5px; color: var(--text); cursor: pointer; }
+.fb-open input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+.fb-open .muted { font-size: 12.5px; }
+.btn.quiet.danger { color: var(--down); }
+.fb-row.fresh { animation: visit-fresh 6s ease-out; }
+@media (prefers-reduced-motion: reduce) { .fb-row.fresh { animation: none; } }
 /* Copying a report (feedback.js): a quiet pill at the end of its line, a
    word when it is done; the textarea the fallback copies from, out of sight
    (16px, or iOS zooms in on it). Which build sent it: "source" marked. */
