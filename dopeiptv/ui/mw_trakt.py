@@ -653,6 +653,8 @@ class _TraktMixin:
             except (TypeError, ValueError):
                 return
         self.watched.add_local_item(item, "vod", tid)
+        # Watched: off Mine's queue (Watch later), if it is on it.
+        getattr(self, "_mitt_watched", lambda *_a: None)(item, "vod")
         if push_to_trakt and self._watch_accounts():
             if tid is not None:
                 self._accounts_push("add_movie_history", tid)
@@ -791,6 +793,7 @@ class _TraktMixin:
             return
         tid = self._tmdb_id_for_item(item, "series")
         self.watched.add_local_item(item, "series", tid)
+        getattr(self, "_mitt_watched", lambda *_a: None)(item, "series")   # the whole show
         if isinstance(tid, int):
             # Record the whole-show mark (tmdb-keyed) so the periodic sync
             # can push it to Trakt even if the user chose the local-only

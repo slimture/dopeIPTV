@@ -181,6 +181,22 @@ class ResumeStore:
         except (TypeError, ValueError):
             return 0.0, 0.0, 0
 
+    def positions(self, group: str) -> list[tuple[str, float, float, int]]:
+        """(key, position, length, when kept) of every resume point filed
+        under *group* ("local": the files' own) - Mine's Continue lists
+        them beside the films and episodes."""
+        out: list[tuple[str, float, float, int]] = []
+        head = f"{group}:"
+        for rkey, v in self._data.items():
+            if not str(rkey).startswith(head) or not isinstance(v, dict):
+                continue
+            try:
+                out.append((str(rkey)[len(head):], float(v.get("pos") or 0),
+                            float(v.get("dur") or 0), int(v.get("ts") or 0)))
+            except (TypeError, ValueError):
+                continue
+        return out
+
     def saved_at(self, key, kind: str) -> int:
         """When a title's resume point was kept here (Unix time), 0 for none:
         a media server's own point wins when it is newer."""

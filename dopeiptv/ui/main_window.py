@@ -104,6 +104,7 @@ from .mw_mpris import _MprisMixin
 from .mw_multiview import _MultiviewMixin
 from .mw_guide import _GuideMixin
 from .mw_places import _PlacesMixin
+from .mw_mitt import _MittMixin
 from .mw_popular import _PopularMixin
 from .mw_local import _LocalFilesMixin
 from .mw_onboarding import _OnboardingMixin
@@ -162,7 +163,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _NavMixin, _SourceLabelMixin, _ShortcutsMixin, _PaletteMixin, _OnboardingMixin, _SortMixin,
                  _LocalFilesMixin, _RadioMixin, _WebStreamsMixin,
                  _PopoutMixin, _MultiviewMixin, _PlacesMixin, _PopularMixin, _GuideMixin,
-                 _SeriesPageMixin, _PlaceFilmsMixin, _FilmPageMixin, _PlaceSeriesMixin, _SearchAllMixin,
+                 _SeriesPageMixin, _PlaceFilmsMixin, _FilmPageMixin, _PlaceSeriesMixin, _SearchAllMixin, _MittMixin,
                  _MprisMixin,
                  _FollowMixin, _PaneFollowMixin, _PlaceTvMixin, _SubtitlesMixin, _CastMixin, _AirPlayMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
@@ -2201,6 +2202,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self._search_page_visible():
             self._search_escape()
             return
+        # Mine the same: its search emptied first, then back where you were.
+        if getattr(self, "_mitt_page_visible", lambda: False)():
+            self._mitt_escape()
+            return
         self._exit_player_fullscreen()
 
     def _exit_player_fullscreen(self) -> None:
@@ -2540,6 +2545,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._close_guide_page()
         self._close_series_page()       # a series' page gives way to the list
         self._close_film_page()         # ...and a film's page to its place
+        getattr(self, "_close_mitt_page", lambda: None)()    # ...and Mine's page
         # ...and the Search page, unless the window moves on by itself (a
         # source switched to from it has no list of the mode shown).
         if not getattr(self, "_search_hold", False):

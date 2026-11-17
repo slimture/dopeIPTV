@@ -71,6 +71,19 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   and its menu can take it off; a channel played in private viewing never
   gets there, nor one hidden or of a locked category, nor one for adults in
   a kids profile. A grid of channel tiles keeps working as before.
+- Mine is a page of its own: what you were watching (films, episodes and
+  local files, any source), your favourite channels live now - in the
+  order you usually watch at this hour and weekday, "Usually watched now"
+  on the top ones, a heart that takes one out and puts it back where it
+  was -, your favourite films and series, Watch later as a queue you
+  order yourself (move up, down or drag; how many and how long; a title
+  you watched leaves it by itself), new episodes of the series you follow
+  and History as a timeline by day with Play, Continue or Play again. One
+  search and a row of chips (All, Channels, Movies, Series, Radio, Local
+  files) filter all of it; your favourite folders are a tab of their own,
+  dragged into order or from one folder to another. Another source's
+  titles say so and play as the Search page plays them; a kids profile,
+  locked folders and private viewing behave as the lists do.
 
 ### Added
 

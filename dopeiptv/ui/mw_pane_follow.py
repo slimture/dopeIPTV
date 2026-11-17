@@ -179,7 +179,8 @@ class _PaneFollowMixin:
     def _pane_shows(self, kind: str, key: str, lp: dict) -> bool:
         """Whether the pane shows what plays now - the list holding its row
         (then selected), or the series' page of its series."""
-        if self._search_page_showing() or self._guide_page_showing():
+        if (self._search_page_showing() or self._guide_page_showing()
+                or getattr(self, "_mitt_showing", lambda: False)()):
             return False
         if self._film_page_showing():
             # A film's page shows that film, or the place under it follows.
@@ -242,4 +243,5 @@ class _PaneFollowMixin:
         self._close_series_page()
         self._close_film_page()
         self._close_search_page()
+        getattr(self, "_close_mitt_page", lambda: None)()
         self._check_nav(self._nav_key_for_mode(self.mode))

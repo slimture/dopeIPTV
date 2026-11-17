@@ -103,6 +103,8 @@ dopeiptv/
     ical.py            Reminders and recordings as iCalendar (RFC 5545)
     search_all.py      One search across every source: rows as the lists show
                        them, a guide's week compact, four groups ranked
+    mitt.py            Mine's content: entries out of the stores, the filter,
+                       favourites by habit, the queue's order, History by day
     places.py          The app's places (Mine, TV, Movies, Series, Guide,
                        Search, Local files, Radio, Recordings): entries, modes,
                        where the app opens, Home's settings retired
@@ -216,6 +218,10 @@ dopeiptv/
     mw_places.py       The places and the way to each (no Home): a place's
                        own page through its hook, else its list under the
                        shared header; the start where the person left off
+    mw_mitt.py         Mine's own page in the window: the stores read on a
+                       worker, everything played through the window's paths
+    mitt_page.py       Mine's page itself: tiles, the queue, the timeline,
+                       the folders - painted views on media_cards' PlacePage
     mw_popular.py      Popular right now for Movies and Series, matched to
                        the source on a worker
     mw_guide.py        The Guide page in the middle pane, and its pop-out

@@ -283,6 +283,7 @@ class _SettingsMixin:
         self._place_series_restyle()   # the Series place
         self._search_restyle()       # the Search page
         self._place_tv_restyle()     # the TV place's header and row
+        getattr(self, "_mitt_restyle", lambda: None)()   # Mine
         if getattr(self, "_tv_page", None) is not None:
             self._tv_page.restyle()  # TV mode's page (its tiles paint from P)
 
@@ -498,6 +499,7 @@ class _SettingsMixin:
         self._place_series_restyle()   # the Series place
         self._search_restyle()       # the Search page
         self._place_tv_restyle()     # the TV place, in the new language
+        getattr(self, "_mitt_restyle", lambda: None)()   # Mine
         self._palette_retranslate()
 
     def _inline_view_changed(self, *_) -> None:

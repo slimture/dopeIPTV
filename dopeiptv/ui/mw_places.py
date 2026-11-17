@@ -169,6 +169,12 @@ class _PlacesMixin:
         self._close_guide_page()
         self._close_series_page()
         self._close_search_page()
+        # A place's own pages close through their own way out, so what they
+        # forget on leaving (Mine's search while viewing privately) is forgotten.
+        for close in ("_close_film_page", "_close_mitt_page"):
+            fn = getattr(self, close, None)
+            if callable(fn):
+                fn()
         mid = getattr(self, "_mid_stack", None)
         if mid is not None and mid.currentIndex() != 0:
             mid.setCurrentIndex(0)
