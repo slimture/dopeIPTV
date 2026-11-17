@@ -275,17 +275,17 @@ def test_a_live_playlist_waits_for_three_segments(fake_ffmpeg):
         b.stop()
 
 
-def test_a_moment_gone_back_to_starts_on_one_segment(monkeypatch):
-    """Pieces read here (the archive or the rewind buffer while casting) are
-    served with EXT-X-START at their first segment: there is no live edge to
-    keep three segments from, so one is enough to hand the TV."""
+def test_a_moment_gone_back_to_waits_for_three_segments_too(monkeypatch):
+    """Pieces read here (the archive or the rewind buffer while casting):
+    handed the Apple TV at one segment, it played on where it was (1.6.4) -
+    a channel's three, as live."""
     b = ab.AirPlayBridge()
     b.plan = ab.plan("", "http://p/live/1.ts", [], live=True)
     one = b"#EXTM3U\n#EXT-X-TARGETDURATION:6\n#EXTINF:6.000,\ns00000.m4s\n"
     monkeypatch.setattr(b, "_playlist", lambda: one)
     assert not b.ready()                              # live: three from the edge
     b.feed = object()                                 # type: ignore[assignment]
-    assert b.ready()
+    assert not b.ready()
 
 
 def test_ffmpeg_s_own_words_say_why_it_failed(fake_ffmpeg):

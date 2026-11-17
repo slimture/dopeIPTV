@@ -611,16 +611,14 @@ class AirPlayBridge:
 
     def ready(self) -> bool:
         """The playlist has enough to start: LEAD segments of a channel (an
-        Apple TV starts three segments from the live edge), one of a film or
-        of pieces read here (a moment gone back to: the playlist says to
-        start at its first segment, EXT-X-START, so there is no live edge to
-        keep back from) - or all there is of something shorter."""
+        Apple TV starts three segments from the live edge - pieces read here
+        too: handed one, the Apple TV played on where it was), one of a film
+        - or all there is of something shorter."""
         body = self._playlist()
         n = segments_in(body)
         if b"#EXT-X-ENDLIST" in body:
             return n > 0
-        live = self.plan is not None and self.plan.live and self.feed is None
-        return n >= (LEAD if live else 1)
+        return n >= (LEAD if self.plan is not None and self.plan.live else 1)
 
     def wait_ready(self, timeout: float = READY_WAIT_S,
                    stopping: Callable[[], bool] | None = None) -> bool:

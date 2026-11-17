@@ -7,6 +7,13 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Fixed
+
+- AirPlay: going back in a channel while it is cast moves the Apple TV
+  there again. Since 1.6.4 the moment was handed over at its first segment
+  and the Apple TV played on where it was; it waits for three again, as
+  before.
+
 ## [1.6.4]
 
 ### Changed
