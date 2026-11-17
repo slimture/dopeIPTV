@@ -2093,10 +2093,31 @@ class Segmented(QWidget):
         super().keyPressEvent(e)
 
 
+def title_lines(fm: QFontMetrics, text: str, room: int, lines: int = 2) -> str:
+    """*text* in at most *lines* lines of *room* pixels: broken between
+    words, the last line cut with "…" where the rest does not fit (a word
+    wider than a line is cut there, never broken)."""
+    if room <= 0 or lines < 1 or fm.horizontalAdvance(text) <= room:
+        return text
+    out: list[str] = []
+    words = text.split(" ")
+    while words and len(out) < lines - 1:
+        line, i = words[0], 1
+        if fm.horizontalAdvance(line) > room:
+            break
+        while i < len(words) and fm.horizontalAdvance(f"{line} {words[i]}") <= room:
+            line, i = f"{line} {words[i]}", i + 1
+        out.append(line)
+        words = words[i:]
+    if words:
+        out.append(fm.elidedText(" ".join(words), Qt.TextElideMode.ElideRight, room))
+    return "\n".join(out)
+
+
 class _TitleLabel(QLabel):
-    """A header's title: it asks for the room of its whole text (*full*),
-    not of the text cut to fit - else once cut short it never asked for
-    more again."""
+    """A header's title: it asks for the room of its whole text (*full*) on
+    one line, not of the text cut or broken to fit - else once cut short it
+    never asked for more again."""
 
     def __init__(self, text: str = "") -> None:
         super().__init__(text)
@@ -2107,8 +2128,8 @@ class _TitleLabel(QLabel):
         text = self.text()
         if self.full and self.full != text:
             fm = self.fontMetrics()
-            hint.setWidth(hint.width() - fm.horizontalAdvance(text)
-                          + fm.horizontalAdvance(self.full))
+            widest = max(fm.horizontalAdvance(line) for line in text.split("\n"))
+            hint.setWidth(hint.width() - widest + fm.horizontalAdvance(self.full))
         return hint
 
 
@@ -2117,7 +2138,12 @@ class PageHeader(QWidget):
     channels · by number"), and at the end a sort control (a menu of the
     orders) and a segmented switch. Empty choices hide their control.
     Compact (``set_compact``: Just the list) the name is smaller and, where
-    there is room, on one line with the count - the list starts higher."""
+    there is room, on one line with the count - the list starts higher.
+
+    A name too long for its room gets the room the sort's words take first
+    (the sort its mark alone, its order in the tooltip), then a second line
+    (`title_lines`); "…" only at the end of that one, the whole name in the
+    tooltip. Compact keeps it to one line."""
 
     sort_changed = pyqtSignal(str)
     view_changed = pyqtSignal(str)
@@ -2138,6 +2164,8 @@ class PageHeader(QWidget):
     #: *fit_sort* False: its owner fits it (the TV place's header).
     SORT_TEXT_FROM = 470
     fit_sort = True
+    #: The lines a name may take, in full (compact: one).
+    TITLE_LINES = 2
 
     def __init__(self, title: str = "", parent=None) -> None:
         super().__init__(parent)
@@ -2213,6 +2241,8 @@ class PageHeader(QWidget):
         self.title.full = text
         self.title.setAccessibleName(text)
         self.title.updateGeometry()
+        if self.fit_sort:
+            self._fit_sort()
         self._fit_title()
         self._arrange_title()
 
@@ -2285,29 +2315,50 @@ class PageHeader(QWidget):
 
     def eventFilter(self, obj, e) -> bool:  # noqa: N802 - Qt's name
         if obj is self.title and e.type() == QEvent.Type.Resize:
+            if self.fit_sort:
+                self._fit_sort()
             self._fit_title()
         return super().eventFilter(obj, e)
 
     def _fit_title(self) -> None:
-        """The title cut to its room with an ellipsis (and whole in its
-        tooltip) - never cut off mid-letter where the filter begins."""
+        """The title fitted to its room: two lines where one is too short
+        (compact one), "…" at the end of the last and the whole name in its
+        tooltip - never cut off mid-letter where the filter begins."""
         full = self._title_full
         room = self.title.width() if self.title.isVisible() else 0
-        text = full
-        if room > 0 and self.title.fontMetrics().horizontalAdvance(full) > room:
-            text = self.title.fontMetrics().elidedText(full, Qt.TextElideMode.ElideRight, room)
+        lines = 1 if self._compact else self.TITLE_LINES
+        text = title_lines(self.title.fontMetrics(), full, room, lines)
         if self.title.text() != text:
             self.title.setText(text)
-        self.title.setToolTip(full if text != full else "")
+            self.updateGeometry()
+        self.title.setToolTip(full if text.replace("\n", " ") != full else "")
+
+    def sort_style_for(self, width: int, text_from: int) -> Qt.ToolButtonStyle:
+        """The sort's words beside its mark where the header is *text_from*
+        wide and the name fits on one line beside them; else its mark alone
+        (its order in the tooltip) - the name's room comes first."""
+        icon = Qt.ToolButtonStyle.ToolButtonIconOnly
+        btn = self.sort_btn
+        if width < text_from or not btn.text():
+            return icon
+        title = self.title
+        room = title.width()
+        if room <= 0:
+            return btn.toolButtonStyle()
+        if btn.toolButtonStyle() == icon:
+            room -= btn.fontMetrics().horizontalAdvance(btn.text()) + 6
+        name = title.fontMetrics().horizontalAdvance(self._title_full)
+        return Qt.ToolButtonStyle.ToolButtonTextBesideIcon if name <= room else icon
+
+    def _fit_sort(self) -> None:
+        style = self.sort_style_for(self.width(), self.SORT_TEXT_FROM)
+        if self.sort_btn.toolButtonStyle() != style:
+            self.sort_btn.setToolButtonStyle(style)
 
     def resizeEvent(self, e) -> None:
         super().resizeEvent(e)
         if self.fit_sort:
-            style = (Qt.ToolButtonStyle.ToolButtonTextBesideIcon
-                     if self.width() >= self.SORT_TEXT_FROM
-                     else Qt.ToolButtonStyle.ToolButtonIconOnly)
-            if self.sort_btn.toolButtonStyle() != style:
-                self.sort_btn.setToolButtonStyle(style)
+            self._fit_sort()
         self._fit_title()
         self._arrange_title()
 
