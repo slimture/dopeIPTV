@@ -113,6 +113,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- macOS: hovering the timeline over the video, the time under the pointer
+  went behind the bar while the picture had its own thread (the picture's
+  own view is over the window's widgets there); the time is now a small
+  window of its own, always on top. Linux and Windows are unchanged.
+
 - An answer to your feedback could take hours to show: the app asked for
   answers every quarter of an hour on the first day and every six hours
   after. It now asks every five minutes on the first day, every two hours

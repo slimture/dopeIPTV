@@ -4,9 +4,18 @@ the programme - under the pointer. Used by the player's bars, the cast
 strip and multiview."""
 from __future__ import annotations
 
+import sys
+
 from PyQt6.QtCore import QPoint, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import QLabel, QSlider, QStyle, QStyleOptionSlider, QWidget
+
+#: On macOS the picture can be a native view over the window's own widgets
+#: (media/video_macos.PictureView, the picture's own thread): a label among
+#: them is drawn under it - the timeline's time went behind the bar. There
+#: the tip is a small window of its own, always on top; elsewhere a label in
+#: the window, as it always was.
+TIP_WINDOW = sys.platform == "darwin"
 
 
 def _format_time(seconds: float | None) -> str:
@@ -138,7 +147,14 @@ class _SeekSlider(QSlider):
         if stale:
             if lbl is not None:
                 lbl.deleteLater()
-            lbl = QLabel(win)
+            if TIP_WINDOW:
+                lbl = QLabel(win, Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint
+                             | Qt.WindowType.WindowTransparentForInput)
+                lbl.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+                lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+                lbl.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+            else:
+                lbl = QLabel(win)
             lbl.setObjectName("SeekHoverTip")
             lbl.setStyleSheet(
                 "#SeekHoverTip { background: rgba(24,24,30,235);"
@@ -198,7 +214,8 @@ class _SeekSlider(QSlider):
         x = max(4, min(base.x() - lbl.width() // 2,
                        win.width() - lbl.width() - 4))
         y = min(base.y() + 6, win.height() - lbl.height() - 4)
-        lbl.move(x, y)
+        at = QPoint(x, y)
+        lbl.move(win.mapToGlobal(at) if lbl.isWindow() else at)
         lbl.show()
         lbl.raise_()
 
