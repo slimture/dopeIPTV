@@ -68,7 +68,7 @@ def test_pill_ink_reads_on_its_fill_in_every_theme(app, theme):
     try:
         for kind in mc.PILL_KINDS:
             fill, ink = mc.pill_colours(kind)
-            need = 3.0 if kind in ("new", "playing") else 4.5   # bold, as on_accent
+            need = 3.0 if kind in ("new", "playing", "tv") else 4.5   # bold, as on_accent
             assert th.contrast(fill.name(), ink.name()) >= need, (theme, kind)
     finally:
         th.apply_theme(theme="graphite")

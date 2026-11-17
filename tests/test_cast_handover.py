@@ -56,7 +56,8 @@ _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_cast_hold_name", "_cast_buffer_feed", "_cast_back_steps",
             "_cast_timeshift_entries", "_open_cast_dialog", "_cast_converts",
             "_cast_keeps_buffer", "_cast_source_of", "_cast_route_from",
-            "_cast_playlist")
+            "_cast_playlist", "_cast_send", "_cast_send_failed",
+            "_show_cast_position")
 
 
 class _Resume0:
@@ -94,7 +95,8 @@ def _window():
                             "CAST_TIMELINE_MIN", "_cast_zap_gen",
                             "CAST_BUFFER_BEHIND_S", "CAST_BUFFER_STEPS",
                             "_cast_hooked",
-                            "_CAST_RESUME_KIND", "_RESUME_GROUP")})
+                            "_CAST_RESUME_KIND", "_RESUME_GROUP",
+                            "_CAST_GROUP_OF")})
     cls = type("_StubWindow", (), ns)
     return cls()
 
@@ -182,6 +184,10 @@ class _Lbl:
         # The strip's buttons carry drawn icons, not characters: a font
         # without a glyph draws an empty box, which is what they became.
         self.icon = i
+
+    def set_glyph(self, kind) -> None:
+        # The card's round buttons draw their glyph themselves.
+        self.icon = kind
 
     def setVisible(self, v) -> None:
         self.visible = bool(v)
@@ -319,13 +325,19 @@ def test_the_picture_setting_can_be_put_back_from_the_strip():
     assert w._cast_quality() == "oldest"
 
 
-def test_every_strip_icon_actually_draws_something():
+def test_every_cast_glyph_actually_draws_something():
     """They were characters - a gear, a pause bar, a minus sign - and a font
     without the glyph draws an empty box, which is what the volume buttons
-    turned into on macOS."""
-    from dopeiptv.ui.widgets import cast_strip_icon
-    for kind in ("minus", "plus", "tracks", "pause", "play", "rewind"):
-        img = cast_strip_icon(kind, "#ffffff").pixmap(42, 42).toImage()
+    turned into on macOS. The cast card's buttons draw them."""
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtGui import QColor, QImage, QPainter
+    from dopeiptv.ui.widgets import STRIP_GLYPHS, paint_strip_glyph
+    for kind in STRIP_GLYPHS:
+        img = QImage(42, 42, QImage.Format.Format_ARGB32_Premultiplied)
+        img.fill(Qt.GlobalColor.transparent)
+        p = QPainter(img)
+        paint_strip_glyph(p, kind, 42.0, QColor("#ffffff"), "30")
+        p.end()
         ink = sum(1 for x in range(img.width()) for y in range(img.height())
                   if img.pixelColor(x, y).alpha() > 20)
         assert ink > 60, f"{kind} drew almost nothing ({ink} px)"
@@ -1470,13 +1482,15 @@ def test_the_cast_bars_take_a_click_like_every_other_bar_of_their_kind():
     assert "setMouseTracking(True)" in src, "hover needs move events"
     assert "set_time_provider" in src
 
-    # And the strip installs one for each, with something to say on hover.
+    # And the cast card has one for each, with something to say on hover.
+    import dopeiptv.ui.cast_card as card_mod
     import dopeiptv.ui.main_window as mwmod
+    card = inspect.getsource(card_mod)
+    assert "self.seek = _SeekSlider()" in card
+    assert "self.vol = _SeekSlider()" in card
     build = inspect.getsource(mwmod)
-    assert "self.cast_bar_seek = _SeekSlider()" in build
-    assert "self.cast_bar_vol = _SeekSlider()" in build
-    assert "self.cast_bar_seek.set_time_provider" in build
-    assert "self.cast_bar_vol.set_time_provider" in build
+    assert "card.seek.set_time_provider" in build
+    assert "card.vol.set_time_provider" in build
 
 
 def test_the_time_under_the_cursor_is_named():

@@ -970,6 +970,54 @@ def am_hud(am):
     return 1 << 13          # NSWindowStyleMaskHUDWindow
 
 
+def test_apple_s_button_opens_under_the_pointer_and_takes_the_keyboard(qapp, macos,
+                                                                       monkeypatch):
+    """Fewer steps: the window opens with Apple's button where the click
+    that cast to AirPlay was, as the key window with the button focused,
+    Apple TVs first in Apple's menu - each step only where AppKit offers it
+    (nothing reached into: the menu is still Apple's to open)."""
+    am, _center = macos
+    calls = []
+    monkeypatch.setattr(_NSPanel, "makeKeyAndOrderFront_",
+                        lambda self, _s: (calls.append("key"), setattr(self, "visible", True)),
+                        raising=False)
+    monkeypatch.setattr(_NSPanel, "makeFirstResponder_",
+                        lambda self, v: (calls.append(("first", v)), True)[1], raising=False)
+    monkeypatch.setattr(_Picker, "setPrioritizesVideoDevices_",
+                        lambda self, on: setattr(self, "videos_first", on), raising=False)
+    monkeypatch.setattr(am, "_at_pointer", lambda w, h, b: (400.0, 700.0))
+    rx = am.AirPlayReceiver()
+    rx.context = lambda: {"kind": "live"}
+    rx.cast(am.NAME, "http://p/live/u/pw/1.m3u8", "SVT1", ["h264", "aac"])
+    panel, picker = _NSPanel.made[-1], _Picker.made[-1]
+    assert panel.visible and calls == ["key", ("first", picker)]
+    assert panel.settings["setFrameTopLeftPoint_"] == (400.0, 700.0)
+    assert picker.videos_first is True
+    # Shown again from the card: in front as it always was.
+    calls.clear()
+    panel.visible = False
+    rx.show_window()
+    _pump(qapp)
+    assert panel.visible and calls == []
+    rx.stop()
+
+
+def test_where_the_pointer_is_decides_where_apple_s_button_opens(monkeypatch):
+    from dopeiptv.services import airplay_macos as am
+    # Qt counts down from the primary screen's top, AppKit up from its foot.
+    assert am.place_at_pointer((500, 300), (0, 0, 1440, 900), 900, 180, 160,
+                               (90, 120)) == (410.0, 720.0)
+    # Near an edge it stays on the screen, the button as near as it can be.
+    assert am.place_at_pointer((10, 890), (0, 25, 1440, 875), 900, 180, 160,
+                               (90, 120)) == (0.0, 160.0)
+    assert am.place_at_pointer((1435, 30), (0, 25, 1440, 875), 900, 180, 160,
+                               (90, 120)) == (1260.0, 875.0)
+    # Nothing known of the pointer: beside the window in front, as before.
+    monkeypatch.setattr(am, "_at_pointer", lambda *_a: None)
+    monkeypatch.setattr(am, "_beside_front_window", lambda w: ("beside", w))
+    assert am._Panel.place() == ("beside", am._Panel.W)
+
+
 def test_the_window_steps_aside_once_the_apple_tv_holds_the_stream(qapp, macos):
     """A few seconds on the Apple TV and the AirPlay window is ordered out -
     not closed: the player keeps its layer, so the TV keeps the picture.

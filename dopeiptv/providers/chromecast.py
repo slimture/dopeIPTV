@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import threading
 import time
 
@@ -1187,6 +1188,53 @@ class ChromecastManager:
             self._tear_down()  # devices before browser - see _tear_down
 
 
+#: The TV cast to last, for a channel and for a title (a film, an episode, a
+#: recording...): the household's, a device's name and nothing more.
+LAST_DEVICE_KEY = "cast_last_device"
+
+
+def _last_devices(settings) -> dict:
+    try:
+        got = json.loads(str(settings.value(LAST_DEVICE_KEY, "") or "{}"))
+    except (TypeError, ValueError):
+        return {}
+    return got if isinstance(got, dict) else {}
+
+
+def last_device(settings, live: bool) -> str:
+    """The TV cast to last for a channel (*live*) or a title - else the one
+    cast to last at all; "" for none."""
+    got = _last_devices(settings)
+    return str(got.get("live" if live else "title") or got.get("any") or "")
+
+
+def remember_device(settings, live: bool, name: str) -> None:
+    """*name* is the TV cast to last (for this kind of thing, and at all)."""
+    if not name:
+        return
+    got = _last_devices(settings)
+    got["live" if live else "title"] = name
+    got["any"] = name
+    settings.setValue(LAST_DEVICE_KEY, json.dumps(got))
+
+
+def last_first(names: list[str], last: str) -> list[str]:
+    """*names* with *last* at the top - when it is there: a TV that is gone
+    is just not offered first."""
+    if last and last in names:
+        return [last] + [n for n in names if n != last]
+    return list(names)
+
+
+def cast_button_text(name: str | None) -> str:
+    """The cast window's button for the device picked: "Cast to Living room
+    TV" (a long name cut), or plain "Cast"."""
+    if not name:
+        return tr("cast_cast")
+    short = name if len(name) <= 30 else name[:29] + "…"
+    return tr("cast_cast_to", name=short)
+
+
 def none_found_text() -> str:
     """What the cast window says when the search found nothing: and why a
     home network split in parts (VLANs) may hide a device, what fixes that
@@ -1371,6 +1419,12 @@ class CastDialog(QDialog):
             btns.addWidget(b)
         lay.addLayout(btns)
 
+        # The TV picked is named on the button, and Enter casts to it: with
+        # the one used last on top and picked, one press.
+        self.cast_btn.setDefault(True)
+        self.list.currentItemChanged.connect(
+            lambda item, *_a: self.cast_btn.setText(
+                cast_button_text(item.text() if item is not None else None)))
         self.rescan_btn.clicked.connect(self._scan)
         self.cast_btn.clicked.connect(self._cast)
         self.stop_btn.clicked.connect(self._stop)
@@ -1564,7 +1618,8 @@ class CastDialog(QDialog):
         if self.list.count():
             return
         remembered = self.window.settings.value("cast_devices", "") or ""
-        for name in [n for n in remembered.split("\n") if n]:
+        last = last_device(self.window.settings, self.live)
+        for name in last_first([n for n in remembered.split("\n") if n], last):
             self.list.addItem(name)
         # Land on the one that is playing, when there is one.
         active = getattr(self.window, "_cast_device", None)
@@ -1590,7 +1645,9 @@ class CastDialog(QDialog):
                 self.window.settings.setValue(
                     "cast_devices", "\n".join(names or []))
                 self.list.clear()
-                for name in names or []:
+                # The TV used last on top, picked: one press casts to it.
+                for name in last_first(list(names or []),
+                                       last_device(self.window.settings, self.live)):
                     self.list.addItem(name)
                 status = (tr("cast_devices_found", n=len(names)) if names
                           else none_found_text())
@@ -1637,6 +1694,7 @@ class CastDialog(QDialog):
         # is running once this dialog is closed - local playback has stopped,
         # so the player pane is just black.
         def done(n):
+            remember_device(self.window.settings, self.live, n)
             self._set_status(tr("airplay_pick_window") if self._is_airplay(n)
                              else tr("cast_casting_to", name=n))
             self._banner(n, self.stream_title)

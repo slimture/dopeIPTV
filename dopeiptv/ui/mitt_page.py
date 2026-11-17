@@ -296,6 +296,11 @@ def _text(p: QPainter, r: QRect, text: str, font: QFont, ink: QColor, rtl: bool,
         text, Qt.TextElideMode.ElideRight, max(4, r.width())))
 
 
+def _on_tv_line(line: str, playing: bool) -> str:
+    """A row's line, with "On TV" first while it plays on a TV (a cast)."""
+    return f"{tr('pill_on_tv')} · {line}" if playing and mc.on_tv() else line
+
+
 # -- the live tiles --------------------------------------------------------------------
 
 class TileDelegate(QStyledItemDelegate):
@@ -341,7 +346,9 @@ class TileDelegate(QStyledItemDelegate):
         nn = v.now_next(row)
         line = v.line_of(row, nn)
         frac = nn.fraction() if nn is not None else None
-        habit = row.key in v.habit and not off
+        # What plays on a TV (a cast) says so where "Usually watched now" goes.
+        on_tv = playing and mc.on_tv()
+        habit = (row.key in v.habit and not off) or on_tv
         block = nfm.height() + (2 + sfm.height() if line else 0) \
             + (6 + 3 if frac is not None else 0) + (3 + xfm.height() if habit else 0)
         y = text.y() + (text.height() - block) // 2
@@ -359,8 +366,8 @@ class TileDelegate(QStyledItemDelegate):
             y += 3
         if habit:
             y += 3
-            _text(p, QRect(text.x(), y, text.width(), xfm.height()), tr("mitt_habit"), note_f,
-                  mc.playing_ink(), rtl)
+            _text(p, QRect(text.x(), y, text.width(), xfm.height()),
+                  tr("pill_on_tv") if on_tv else tr("mitt_habit"), note_f, mc.playing_ink(), rtl)
         p.setOpacity(1.0)
         paint_heart(p, parts["heart"], not off, v.hover_heart == row.key)
         p.restore()
@@ -560,7 +567,7 @@ class QueueDelegate(_RowDelegate):
               mc.playing_ink() if playing else mc.colour("text"), rtl)
         if card.line:
             _text(p, QRect(text.x(), y + tfm.height() + 2, text.width(), lfm.height()),
-                  card.line, lf, mc.colour("muted"), rtl)
+                  _on_tv_line(card.line, playing), lf, mc.colour("muted"), rtl)
         hot = v.hover_button if v.hover_button[0] == card.key else ("", "")
         ink = mc.colour("text2")
         first, last = index.row() == 0, index.row() == n - 1
@@ -725,7 +732,11 @@ class TimelineDelegate(_RowDelegate):
         kind_w = cfm.horizontalAdvance(kind) + 20 if kind else 0
         action_w = max(72, afm.horizontalAdvance(action) + 26)
         parts = timeline_parts(rect, action_w, kind_w, rtl)
-        _text(p, parts["when"], when, mc.px_font(mc.SMALL_PX), mc.colour("muted"), rtl)
+        if playing and mc.on_tv():
+            _text(p, parts["when"], tr("pill_on_tv"), mc.px_font(mc.SMALL_PX, mc.BOLD),
+                  mc.playing_ink(), rtl)
+        else:
+            _text(p, parts["when"], when, mc.px_font(mc.SMALL_PX), mc.colour("muted"), rtl)
         _text(p, parts["title"], item.title, mc.px_font(mc.TITLE_PX, QFont.Weight.Medium),
               mc.playing_ink() if playing else mc.colour("text"), rtl)
         if kind:
@@ -993,7 +1004,7 @@ class FolderItemDelegate(_RowDelegate):
               mc.playing_ink() if playing else mc.colour("text"), rtl)
         if card.line:
             _text(p, QRect(text.x(), y + tfm.height() + 2, text.width(), lfm.height()),
-                  card.line, lf, mc.colour("muted"), rtl)
+                  _on_tv_line(card.line, playing), lf, mc.colour("muted"), rtl)
         if v.drop_at is not None and v.drop_at in (index.row(), index.row() + 1):
             y = rect.top() if v.drop_at == index.row() else rect.bottom() - 1
             p.setPen(Qt.PenStyle.NoPen)

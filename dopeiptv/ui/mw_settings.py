@@ -273,6 +273,9 @@ class _SettingsMixin:
             # The drawn control icons are baked with the old text colour;
             # redraw them for the new theme.
             self.player.refresh_icons()
+        card = getattr(self, "cast_bar", None)
+        if card is not None and hasattr(card, "restyle"):
+            card.restyle()           # the cast card, in the new colours
         self._places_restyle()       # the places' header, in the new colours
         self._guide_restyle()        # the Guide page's board, in the new colours
         self._sp_restyle()           # a series' page

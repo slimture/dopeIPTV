@@ -167,10 +167,7 @@ class _PlaceRadioMixin:
     # -- what a card says ---------------------------------------------------------------------
 
     def _rap_playing_key(self) -> str:
-        if getattr(self, "_playing_group", None) == "radio" \
-                and getattr(self, "_playing_key", None) is not None:
-            return str(self._playing_key)
-        return ""
+        return self._now_key("radio")       # here or on a TV
 
     def _rap_dress(self, card: PlaceCard) -> None:
         it = card.data if isinstance(card.data, dict) else {}

@@ -2,7 +2,9 @@
 card picked in Recordings (its list is built from headed rows, which once
 never looked for the jump), and a local file's card picked AND on screen in
 a folder far longer than the window (a card revealed while the folder was
-still being read was scrolled to where it was, then pushed out of sight)."""
+still being read was scrolled to where it was, then pushed out of sight).
+While a cast runs and nothing plays here, the jump goes to what the TV
+plays, and the place marks it "On TV"."""
 
 from __future__ import annotations
 
@@ -94,6 +96,30 @@ settle(lambda: w._place == "tv", what="tv")
 w._jump_to_now_playing()
 settle(lambda: w._place == "local" and list_row() == path and card_on_screen(w._lp_page, path),
        secs=30, what="the file on screen")
+# -- a cast: the player stopped here, the recording on a TV ------------------------
+from types import SimpleNamespace
+from dopeiptv.ui import media_cards
+w._playing_key = w._playing_group = w._playing_item = None
+w._last_playback = {}
+w.cast = SimpleNamespace(active=object(), duration=0.0, state="PLAYING/None",
+                         position=lambda: 0.0, bridged=lambda: False)
+w._cast_device = "Living room TV"
+w._cast_ctx = {"sid": None, "key": target["_key"], "kind": "recording", "group": "rec",
+               "title": "Football", "item": {"name": "Football", "_key": target["_key"]},
+               "row_url": target["_key"]}
+now = w._now_playing()
+assert now is not None and now.on_tv and now.group == "rec", now
+w._show_place("tv")
+settle(lambda: w._place == "tv", what="tv")
+w._jump_to_now_playing()
+settle(lambda: w._place == "rec" and list_row() == target["_key"]
+       and card_on_screen(w._rp_page, target["_key"]), what="the cast recording")
+w._cast_marks_changed()
+assert media_cards.on_tv() and w._rp_page.view.playing_key == str(target["_key"])
+# Ended: nothing plays anywhere, and the jump says so.
+w._cast_device = None
+w._cast_marks_changed()
+assert not media_cards.on_tv() and w._now_playing() is None
 print("NOW_PLAYING_OK", flush=True)
 os._exit(0)
 """

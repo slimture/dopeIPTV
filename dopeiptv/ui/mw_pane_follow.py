@@ -29,13 +29,18 @@ in the way of the stream itself. It does nothing when:
 Leaving a page goes as its Back would to the list (the series page's
 timer stops, its way back is forgotten), and then as the sidebar logo's
 jump to what plays does (``_jump_to_now_playing``).
+
+What plays is one thing, here or on a TV: ``_now_playing`` says which and
+where - the player's title, else what a running cast shows (ui/mw_cast.py's
+context) - for the jump, and for every list and place that marks it
+(``on_tv``: their mark says "On TV").
 """
 
 from __future__ import annotations
 
 import functools
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, NamedTuple
 
 from PyQt6 import sip
 from PyQt6.QtCore import QTimer
@@ -55,6 +60,27 @@ _ROW_KIND = {"live": "live", "fav": "live", "vod": "movie", "movie": "movie",
 #: are); Favourites, History, Watch later and Watched mix them.
 _ONE_KIND = {"live": "live", "vod": "movie", "series": "series", "episode": "episode",
              "local": "local", "radio": "radio", "rec": "recording"}
+
+
+#: A play kind as the lists' group of what plays (as _start_playback keeps it).
+GROUP_OF = {"live": "live", "movie": "vod", "episode": "episode", "recording": "rec",
+            "local": "local", "radio": "radio", "web": "web"}
+
+
+class NowPlaying(NamedTuple):
+    """What plays now: its key (``_item_key``'s), the lists' group of it
+    (live, vod, episode, rec, local, radio, web), its play kind, its row, an
+    episode's series, a local file's path, how far it got (0-1), and
+    whether it plays on a TV (*device*) rather than here."""
+    key: Any
+    group: str
+    kind: str
+    item: dict
+    series_ctx: dict | None
+    path: str
+    fraction: float
+    on_tv: bool
+    device: str
 
 
 def _typing(w: Any) -> bool:
@@ -114,6 +140,55 @@ class _PaneFollowMixin:
             return fn(*args)
         finally:
             self._play_origin = before
+
+    # -- what plays -------------------------------------------------------------------
+
+    def _now_playing(self) -> NowPlaying | None:
+        """What plays now - in the player here, else on a TV (a cast) - or
+        None while nothing does. Every place asks this one."""
+        lp = getattr(self, "_last_playback", None) or {}
+        key = getattr(self, "_playing_key", None)
+        if key is not None:
+            item = getattr(self, "_playing_item", None) or lp.get("item") or {}
+            frac = 0.0
+            p = getattr(self, "player", None)
+            try:
+                if p is not None and p.playback_duration() > 0:
+                    frac = p.playback_position() / p.playback_duration()
+            except Exception:
+                frac = 0.0
+            return NowPlaying(key, str(getattr(self, "_playing_group", None) or ""),
+                              str(lp.get("kind") or ""), item, lp.get("series_ctx"),
+                              str(lp.get("url") or item.get("_path") or ""),
+                              max(0.0, min(1.0, frac)), False, "")
+        runs = getattr(self, "_cast_runs", None)
+        ctx = getattr(self, "_cast_ctx", None) or {}
+        if not callable(runs) or not runs() or ctx.get("key") is None:
+            return None
+        kind = str(ctx.get("kind") or "")
+        group = ("live" if ctx.get("sid") is not None else str(ctx.get("group") or "")
+                 or GROUP_OF.get(kind, ""))
+        item = ctx.get("item") or {}
+        frac = 0.0
+        cast = getattr(self, "cast", None)
+        try:
+            dur = float(getattr(cast, "duration", 0.0) or 0.0)
+            if dur > 0:
+                frac = float(cast.position() or 0.0) / dur
+        except Exception:
+            frac = 0.0
+        return NowPlaying(ctx.get("key"), group, kind, item, ctx.get("series_ctx"),
+                          str(item.get("_path") or ctx.get("row_url") or ""),
+                          max(0.0, min(1.0, frac)), True,
+                          str(getattr(self, "_cast_device", None) or ""))
+
+    def _now_key(self, *groups: str) -> str:
+        """The key of what plays (here or on a TV) when it is of *groups*,
+        else ""."""
+        now = self._now_playing()
+        if now is None or now.group not in groups:
+            return ""
+        return str(now.key)
 
     # -- the playback path's call ---------------------------------------------------
 
@@ -276,11 +351,15 @@ class _PaneFollowMixin:
             return None
         return page, view
 
-    def _np_reveal_soon(self) -> None:
-        """Start looking for the playing card (the jump to what plays)."""
+    def _np_reveal_soon(self, key: Any = None) -> None:
+        """Start looking for the playing card (the jump to what plays) -
+        *key*'s, what plays here or on a TV when not given."""
+        if key is None:
+            now = self._now_playing()
+            key = now.key if now is not None else None
         self._np_gen = getattr(self, "_np_gen", 0) + 1
         QTimer.singleShot(self._NP_STEP_MS, functools.partial(
-            self._np_reveal, self._np_gen, self._playing_key, self._NP_TRIES))
+            self._np_reveal, self._np_gen, key, self._NP_TRIES))
 
     def _np_reveal(self, gen: int, key: Any, tries: int) -> None:
         """The playing card picked and scrolled into sight - once the rows
@@ -288,7 +367,9 @@ class _PaneFollowMixin:
         read was scrolled to where it was, and the rows after it moved it
         far out of sight. Given up on another jump, another title, or after
         a few seconds."""
-        if gen != getattr(self, "_np_gen", 0) or key is None or key != self._playing_key:
+        now = self._now_playing()
+        if (gen != getattr(self, "_np_gen", 0) or key is None or now is None
+                or now.key != key):
             return
         found = self._np_cards()
         busy = getattr(self, "_local_listing", None) is not None

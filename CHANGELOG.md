@@ -7,10 +7,37 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Changed
+
+- Casting has a new look. While a cast runs, a card stands where the video
+  was: the channel's logo or the film's poster, what is on or which episode,
+  the TV it plays on, and how it goes there - Playing, Paused, Buffering…,
+  Reconnecting… or Not playing with Try again. Big round buttons for
+  play/pause, 30 seconds back and forward (on a channel where going back
+  works) and Stop, the timeline with LIVE, the volume, and the tracks,
+  timeshift and cast window as small buttons. It fits a narrow column and
+  sits centred in a wide one, in every theme.
+- The player has a cast button of its own, and the cast window opens with
+  the TV used last on top and picked: one more click, or Enter, casts to it
+  ("Cast to Living room TV").
+- What plays on the TV is marked "On TV" in every list and place - TV,
+  Movies, Series and a series' page, Local files, Recordings, Radio and
+  Mine - and the sidebar logo's jump to what plays goes to it while a cast
+  runs.
+- AirPlay (macOS): the AirPlay window opens with Apple's button right under
+  the pointer, ready to click, and lists Apple TVs first.
+
 ### Fixed
 
 - A right click (or the menu key) on a result on the Search page opened no
   menu and sent an error report instead; the menu is back.
+- A cast that gets stuck buffering recovers by itself: after ten seconds
+  that nobody paused, the TV is sent the stream again from where it was -
+  the channel at the live edge, or where the rewind buffer or archive had
+  it, a film from its position - at most twice, then the card says so with
+  Try again. It goes the way the cast's own controls go, so it never opens
+  a second connection to the account, and it does not try by itself while
+  something else uses the connection. Every stall and try is in the log.
 - The phone remote while casting (Chromecast, a TV, Kodi or AirPlay) shows
   what plays on the TV, says "Casting to …" and drives the TV: play and
   pause, stop, seeking a film, channel up and down, and the TV's volume and

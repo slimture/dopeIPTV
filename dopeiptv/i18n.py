@@ -1129,6 +1129,25 @@ _STRINGS: dict[str, dict[str, str]] = {
               "what is beyond it is adapted - everything smaller is sent "
               "untouched."},
     "cast_seek": {"en": "Move to another point"},
+    # The card in the video's place while a cast runs (ui/cast_card.py).
+    "cast_state_starting": {"en": "Starting…"},
+    "cast_state_playing": {"en": "Playing"},
+    "cast_state_paused": {"en": "Paused"},
+    "cast_state_buffering": {"en": "Buffering…"},
+    "cast_state_reconnecting": {"en": "Reconnecting… {n}/{of}"},
+    "cast_state_waiting": {"en": "Waiting for the Apple TV"},
+    "cast_state_failed": {"en": "Not playing"},
+    "cast_state_ended": {"en": "Ended"},
+    "cast_try_again": {"en": "Try again"},
+    "cast_cast_to": {"en": "Cast to {name}"},
+    "tooltip_cast": {"en": "Cast to a TV"},
+    "cast_back_30": {"en": "Back 30 seconds"},
+    "cast_forward_30": {"en": "Forward 30 seconds"},
+    "cast_note_reconnecting": {"en": "The TV got stuck loading - sending the stream again."},
+    "cast_note_failed": {"en": "The TV got stuck loading. Sending it again twice did not help."},
+    "cast_note_no_room": {"en": "Not sent again by itself: something else uses your account's connection. Try again asks first."},
+    "cast_note_send_failed": {"en": "It could not be sent again: {msg}"},
+    "cast_stuck_notice": {"en": "{name} got stuck loading {title} and did not recover."},
     "cast_pause_label": {"en": "Room for pausing a cast channel"},
     "cast_pause_hint": {
         "en": "Pausing a channel on the TV records it here until you press "
@@ -3218,6 +3237,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "pill_live": {"en": "Live"},
     "pill_new": {"en": "New"},
     "pill_playing": {"en": "Playing"},
+    "pill_on_tv": {"en": "On TV"},
     "pill_seen": {"en": "Watched"},
     "card_then": {"en": "Then {time} {title}"},
     "card_rank": {"en": "No. {n}"},

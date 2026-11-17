@@ -12,7 +12,7 @@ from PyQt6.QtCore import (
     QStandardPaths, Qt, QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QColor, QCursor, QIcon, QKeyEvent, QMouseEvent, QPainter, QPen, QPixmap,
+    QColor, QCursor, QIcon, QKeyEvent, QMouseEvent, QPainter, QPainterPath, QPen, QPixmap,
     QPolygonF,
 )
 from PyQt6.QtOpenGL import QOpenGLFramebufferObject
@@ -143,6 +143,28 @@ def _control_icon(name: str, color: str, px: int = 28) -> QIcon:
         # Back square (lower-left), then the detached one (upper-right).
         p.drawRoundedRect(QRectF(pl, pt + off, side, side), rad, rad)
         p.drawRoundedRect(QRectF(pl + off, pt, side, side), rad, rad)
+    elif name == "cast":
+        # A screen with the cast waves in its corner, in the wider box the
+        # outline glyphs use (as "popout").
+        cl = S * 0.20
+        span = S - 2 * cl
+        stroke(S * 0.065)
+        rad = S * 0.05
+        frame = QPainterPath()
+        frame.moveTo(cl, cl + span * 0.30)
+        frame.lineTo(cl, cl + span * 0.06 + rad)
+        frame.quadTo(cl, cl + span * 0.06, cl + rad, cl + span * 0.06)
+        frame.lineTo(cl + span - rad, cl + span * 0.06)
+        frame.quadTo(cl + span, cl + span * 0.06, cl + span, cl + span * 0.06 + rad)
+        frame.lineTo(cl + span, cl + span * 0.94 - rad)
+        frame.quadTo(cl + span, cl + span * 0.94, cl + span - rad, cl + span * 0.94)
+        frame.lineTo(cl + span * 0.56, cl + span * 0.94)
+        p.drawPath(frame)
+        ox, oy = cl, cl + span * 0.94
+        for r in (span * 0.20, span * 0.38):
+            p.drawArc(QRectF(ox - r, oy - r, 2 * r, 2 * r), 0, 90 * 16)
+        fill()
+        p.drawEllipse(QPointF(ox + span * 0.03, oy - span * 0.03), S * 0.04, S * 0.04)
     elif name == "options":
         rows = (T, midy, B)
         knobs = (R - w * 0.18, L + w * 0.22, R - w * 0.34)
@@ -641,6 +663,9 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
     timeshift_menu = pyqtSignal(object)
     record_menu = pyqtSignal(object)
     popout_requested = pyqtSignal()
+    #: The bar's cast button: what plays, to a TV (the window opens its cast
+    #: window).
+    cast_requested = pyqtSignal()
     popout_context_menu = pyqtSignal(object)
     docked_context_menu = pyqtSignal(object)   # right-click on the docked video
     stopped = pyqtSignal()
@@ -876,6 +901,12 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         self.pop_btn = QPushButton("⧉", objectName="MiniBtn")
         self.pop_btn.setToolTip(tr("tooltip_popout"))
         self.pop_btn.clicked.connect(self.popout_requested)
+        # What plays, to a TV: the cast window, the TV used last ready in it
+        # (no right click needed - the options menu keeps its entry too).
+        self.cast_btn = QPushButton("", objectName="MiniBtn")
+        self.cast_btn.setToolTip(tr("tooltip_cast"))
+        self.cast_btn.setAccessibleName(tr("tooltip_cast"))
+        self.cast_btn.clicked.connect(self.cast_requested)
         self.fs_btn = QPushButton("⛶", objectName="MiniBtn")
         self.fs_btn.setToolTip(tr("tooltip_fullscreen"))
         # Group by function: prev/next are the "channel zap" pair (same
@@ -892,6 +923,7 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         bl.addWidget(self.ts_btn)
         bl.addWidget(self.rec_btn)
         bl.addWidget(self.opts_btn)
+        bl.addWidget(self.cast_btn)
         bl.addWidget(self.pop_btn)
         bl.addWidget(self.fs_btn)
         bl.addSpacing(6)
@@ -1080,6 +1112,7 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         for b in all_icon_btns:
             b.setFixedSize(m, m)
         self.pop_btn.setFixedSize(m, m)
+        self.cast_btn.setFixedSize(m, m)
         for s in (self.vol, self.fs_vol):
             s.setFixedHeight(m)
 
@@ -1092,7 +1125,7 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
             self.rec_btn: "record", self.opts_btn: "options",
             self.stop_btn: "stop", self.fs_btn: "fullscreen",
             self.mute_btn: "volume", self.nextep_btn: "nextep",
-            self.pop_btn: "popout",
+            self.pop_btn: "popout", self.cast_btn: "cast",
             self.fs_prev_btn: "prev", self.fs_next_btn: "next",
             self.fs_pause_btn: "pause", self.fs_ts_btn: "rewind",
             self.fs_rec_btn: "record", self.fs_opts_btn: "options",

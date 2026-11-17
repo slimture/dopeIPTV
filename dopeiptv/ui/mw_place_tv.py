@@ -349,14 +349,15 @@ class _PlaceTvMixin:
         return out[:RECENT_MAX]
 
     def _place_tv_playing_key(self) -> str:
-        """The channel of this source that plays, here or on a TV."""
+        """The channel of this source that plays, here or on a TV
+        (_now_playing)."""
+        now = self._now_playing()
+        if now is None or now.group != "live":
+            return ""
         elsewhere = getattr(self, "_playing_elsewhere", None)
-        if getattr(self, "_playing_group", None) == "live" and self._playing_key is not None:
-            if not (callable(elsewhere) and elsewhere()):
-                return str(self._playing_key)
-        if getattr(self, "_cast_group", None) == "live" and getattr(self, "_cast_key", None) is not None:
-            return str(self._cast_key)
-        return ""
+        if not now.on_tv and callable(elsewhere) and elsewhere():
+            return ""                   # another source's channel
+        return str(now.key)
 
     def _place_tv_recent(self) -> None:
         top = self._place_tv_top

@@ -180,3 +180,68 @@ def test_a_single_audio_track_is_no_choice():
     assert dlg.audio_box.isEnabled() is False
     assert dlg.subs_box.isEnabled() is False
     win.deleteLater()
+
+
+def test_the_tv_used_last_is_on_top_picked_and_named_on_the_button():
+    """One click opens the window, one more (or Enter) casts to the TV used
+    last - for a channel and for a film each, a TV that is gone just not
+    offered first."""
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtGui import QKeyEvent
+    from PyQt6.QtWidgets import QApplication
+
+    import dopeiptv.providers.chromecast as cc
+    win = _window()
+    win.settings.setValue("cast_devices", "Living room\nBedroom\nKitchen")
+    cc.remember_device(win.settings, True, "Bedroom")
+    cc.remember_device(win.settings, False, "Kitchen")
+    win._cast_device = None
+    live = cc.CastDialog(win, "http://p/live/u/pw/1.m3u8", "SVT1", probe=False,
+                         managing=True, live=True)
+    assert [live.list.item(i).text() for i in range(live.list.count())][0] == "Bedroom"
+    assert live.list.currentItem().text() == "Bedroom"
+    assert live.cast_btn.text() == cc.tr("cast_cast_to", name="Bedroom")
+    assert live.cast_btn.isDefault()
+    film = cc.CastDialog(win, "http://p/movie/u/pw/2.mkv", "Sintel", probe=False,
+                         managing=True)
+    assert film.list.currentItem().text() == "Kitchen"
+    # Enter on the list goes to the default button: the cast to that TV.
+    went = []
+    film._cast = lambda: went.append(film.list.currentItem().text())
+    film.cast_btn.clicked.disconnect()
+    film.cast_btn.clicked.connect(film._cast)
+    film.show()
+    film.list.setFocus()
+    QApplication.sendEvent(film.list, QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Return,
+                                                Qt.KeyboardModifier.NoModifier))
+    assert went == ["Kitchen"]
+    film.hide()
+    # A TV that is gone is just not first; another picked is named instead.
+    cc.remember_device(win.settings, True, "Attic")
+    gone = cc.CastDialog(win, "http://p/live/u/pw/1.m3u8", "SVT1", probe=False,
+                         managing=True, live=True)
+    assert gone.list.item(0).text() == "Living room"
+    gone.list.setCurrentRow(2)
+    assert gone.cast_btn.text() == cc.tr("cast_cast_to", name="Kitchen")
+    win.deleteLater()
+
+
+def test_what_is_kept_of_the_tv_used_last():
+    from PyQt6.QtCore import QSettings
+
+    import dopeiptv.providers.chromecast as cc
+    s = QSettings("dopeiptv-test", "cast-last")
+    s.clear()
+    assert cc.last_device(s, True) == "" and cc.last_device(s, False) == ""
+    cc.remember_device(s, False, "Kodi (Kodi)")
+    # A channel never cast yet goes to the TV used last at all.
+    assert cc.last_device(s, True) == "Kodi (Kodi)"
+    cc.remember_device(s, True, "Living room")
+    assert cc.last_device(s, True) == "Living room" and cc.last_device(s, False) == "Kodi (Kodi)"
+    s.setValue(cc.LAST_DEVICE_KEY, "not json")
+    assert cc.last_device(s, True) == ""
+    assert cc.last_first(["A", "B", "C"], "C") == ["C", "A", "B"]
+    assert cc.last_first(["A", "B"], "Z") == ["A", "B"]
+    assert cc.cast_button_text(None) == cc.tr("cast_cast")
+    assert "…" in cc.cast_button_text("x" * 60)
+    s.clear()

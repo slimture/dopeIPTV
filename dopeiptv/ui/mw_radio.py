@@ -275,7 +275,7 @@ class _RadioMixin:
                       self._radio_clicked)
         log.info("radio: playing %s", for_log(title))
 
-    def _radio_jump(self) -> bool:
+    def _radio_jump(self, key=None) -> bool:
         """The jump to what plays (the sidebar's logo, Now playing) for a
         station: Radio, the list it was played from - a country, language
         or genre opened again - else My stations, the station picked there
@@ -287,7 +287,7 @@ class _RadioMixin:
             cat, grp = FAVS, None
         if cat is None:
             return False
-        self._pending_jump_key = self._playing_key
+        self._pending_jump_key = self._playing_key if key is None else key
         QTimer.singleShot(8000, self._clear_pending_jump)
         self._radio_group = grp if grp and grp[0] == cat else None
         self._last_cat["radio"] = cat

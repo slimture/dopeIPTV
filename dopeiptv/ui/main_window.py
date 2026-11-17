@@ -38,7 +38,7 @@ from ..providers.kodi import KodiManager
 from ..providers.client import (
     DemoClient, OfflineClient, XtreamClient, dropped_playlist, make_client,
 )
-from ..media.embedded import EmbeddedPlayer, _SeekSlider
+from ..media.embedded import EmbeddedPlayer
 from ..media.video_thread import WindowChanges
 from ..providers.epg import XmltvGuide, epg_cache_path, prune_epg_caches
 from ..services.coverart import CoverArtService
@@ -54,13 +54,14 @@ from ..core.stores import (
 )
 from .theme import P, rounded
 from .player_resize import PlayerResizeHandle
+from .cast_card import CastCard
 from ..core.wakelock import WakeLock
 from .dialogs import PlaylistDialog
 from .nav_widgets import NavButton, PlacesFold, PlacesLayout, SideRule, SourceAvatar, SourceLabel
 from .app_menu import MENUS, lay_out, open_website
 from .widgets import (
-    FlowRow, HeartButton, _SidebarLogo,
-    cast_strip_icon, confirm, file_dialog_options,
+    HeartButton, _SidebarLogo,
+    confirm, file_dialog_options,
 )
 from .mw_settings import _SettingsMixin
 from .mw_trakt import _TraktMixin
@@ -69,6 +70,7 @@ from .mw_busy import _BusyMixin
 from .notices import hub_of
 from .mw_airplay import _AirPlayMixin
 from .mw_cast import _CastMixin
+from .mw_cast_watch import _CastWatchMixin
 from .mw_chanprefs import _ChannelPrefsMixin
 from .mw_failover import _FailoverMixin
 from .mw_connections import _ConnectionsMixin
@@ -172,7 +174,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                  _GuideMixin,
                  _SeriesPageMixin, _PlaceFilmsMixin, _PlaceSeriesMixin, _SearchAllMixin, _MittMixin,
                  _MprisMixin,
-                 _FollowMixin, _PaneFollowMixin, _PlaceTvMixin, _SubtitlesMixin, _CastMixin, _AirPlayMixin, _DonateMixin,
+                 _FollowMixin, _PaneFollowMixin, _PlaceTvMixin, _SubtitlesMixin, _CastMixin, _CastWatchMixin, _AirPlayMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
                  _HealthMixin, _TsAnalysisMixin, _StreamInfoMixin, _ChannelPrefsMixin, _RemoteMixin, _PhoneMixin, _ServerMixin, _CalendarMixin,
                  _EventsMixin, _ReportMixin,
@@ -1231,150 +1233,53 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         self._reopen_btn.hide()
 
         # Casting takes the stream to the TV and stops local playback, which
-        # leaves the player pane black with nothing anywhere saying why. This
-        # strip sits directly above the video for as long as a cast runs: what
-        # is playing, which device it went to, and a way to end it.
-        self.cast_bar = QWidget(objectName="CastBar")
-        self.cast_bar.setStyleSheet(
-            f"QWidget#CastBar {{ background:{P['sel']}; border-radius:10px; }}")
-        # Two rows: the controls, and under them the position across the
-        # whole width. Sharing a line with the buttons and the volume left the
-        # seek bar a few pixels wide, squeezed into what the wrapped labels
-        # did not take.
-        #
-        # Both rows wrap. This strip lives in the right-hand column, which is
-        # draggable and is narrow to begin with on a laptop - and a plain row
-        # handed less width than its contents need does not stop at their
-        # minimum, it goes on until the buttons sit on top of one another.
-        self.cast_bar.setSizePolicy(QSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred))
-        pol = self.cast_bar.sizePolicy()
-        pol.setHeightForWidth(True)      # or the extra lines get no room
-        self.cast_bar.setSizePolicy(pol)
-        _cast_outer = QVBoxLayout(self.cast_bar)
-        _cast_outer.setContentsMargins(12, 8, 8, 8)
-        _cast_outer.setSpacing(6)
-        _cast_row = FlowRow(spacing=10)
-        _cast_outer.addLayout(_cast_row)
-        # The labels are a block of their own so they can wrap as one, and so
-        # the controls can drop below them rather than into them.
-        _cast_names = QWidget()
-        _cast_col = QVBoxLayout(_cast_names)
-        _cast_col.setContentsMargins(0, 0, 0, 0)
-        _cast_col.setSpacing(1)
-        self.cast_bar_lbl = QLabel("")
-        self.cast_bar_lbl.setWordWrap(True)
-        self.cast_bar_lbl.setStyleSheet(
-            f"color:{P['accent']}; font-size:12px; font-weight:700;")
-        _cast_col.addWidget(self.cast_bar_lbl)
-        self.cast_bar_title = QLabel("")
-        self.cast_bar_title.setWordWrap(True)
-        self.cast_bar_title.setStyleSheet(
-            f"color:{P['muted3']}; font-size:11px;")
-        _cast_col.addWidget(self.cast_bar_title)
-        # It takes the slack, so with room to spare the strip still reads as
-        # the row it was: the name on the left, the controls at the far edge.
-        _cast_names.setMinimumWidth(90)
-        _cast_row.add(_cast_names, grow=True)
-        # Drawn, not typed. A gear, a pause bar and a minus sign are all
-        # characters a font stack can be missing, and a missing glyph is an
-        # empty box - which is what these buttons became.
-        def strip_button(kind, tip, slot):
-            b = QPushButton()
-            b.setIcon(cast_strip_icon(kind, P["text"]))
-            b.setToolTip(tip)
-            b.setCursor(Qt.CursorShape.PointingHandCursor)
-            b.setFixedWidth(36)
-            b.clicked.connect(slot)
-            _cast_row.add(b)
-            return b
-
-        self.cast_bar_mute = strip_button(
-            "volume", tr("tooltip_mute_unmute"), self._toggle_cast_mute)
-        # The player's own bar: a click lands where you clicked, and hovering
-        # says what is under the cursor before you commit to it.
-        self.cast_bar_vol = _SeekSlider()
-        self.cast_bar_vol.setRange(0, 100)
-        self.cast_bar_vol.setValue(50)
-        # Wide enough to be draggable, narrow enough to wrap as one piece.
-        self.cast_bar_vol.setFixedWidth(110)
-        self.cast_bar_vol.setToolTip(tr("tooltip_volume"))
-        self.cast_bar_vol.set_time_provider(lambda f: f"{round(f * 100)} %")
+        # leaves the player pane black with nothing anywhere saying why. For
+        # as long as a cast runs the card stands in the video's place: what
+        # plays on the TV, on which TV, how it goes, and every control the
+        # cast has (ui/cast_card.py; mw_cast fills it, mw_cast_watch says its
+        # state and gets a stuck cast going again).
+        card = self.cast_bar = CastCard()
+        # Its parts by the names the cast code has always used.
+        self.cast_bar_title, self.cast_bar_line = card.title, card.line
+        self.cast_bar_lbl = card.device
+        self.cast_bar_back, self.cast_bar_pause = card.back, card.pause
+        self.cast_bar_fwd, self.cast_bar_stop = card.forward, card.stop
+        self.cast_bar_seek, self.cast_bar_time = card.seek, card.time
+        self.cast_bar_live = card.live
+        self.cast_bar_mute, self.cast_bar_vol = card.mute, card.vol
+        self.cast_bar_tracks, self.cast_bar_ts = card.tracks, card.ts
+        self.cast_bar_airplay = card.airplay
+        card.mute.clicked.connect(self._toggle_cast_mute)
         # While the handle is being dragged the TV would get a message per
         # pixel; it only needs the one that says where the drag ended.
-        self.cast_bar_vol.seek_requested.connect(
-            lambda v: self._cast_volume(v / 100))
-        self.cast_bar_vol.valueChanged.connect(
-            lambda v: (self.cast_bar_vol.dragging or
-                       self._cast_volume(v / 100)))
-        _cast_row.add(self.cast_bar_vol)
-        # The same timeshift the player has, for the same channels. A cast
+        card.vol.set_time_provider(lambda f: f"{round(f * 100)} %")
+        card.vol.seek_requested.connect(lambda v: self._cast_volume(v / 100))
+        card.vol.valueChanged.connect(
+            lambda v: (self.cast_bar_vol.dragging or self._cast_volume(v / 100)))
+        # The same timeshift the player has, for the same channels: a cast
         # channel with an archive can be paused, wound back and pointed at an
-        # earlier programme exactly as it can here - it is the same archive,
-        # asked the same way.
-        self.cast_bar_ts = strip_button(
-            "rewind", tr("tooltip_timeshift"), self._cast_timeshift_menu)
-        self.cast_bar_tracks = strip_button(
-            "tracks", tr("cast_audio") + " / " + tr("cast_subtitles"),
-            self._cast_tracks_menu)
-        # AirPlay's own way in: the AirPlay window (Apple's button, the
-        # video output) back while an Apple TV is cast to (mw_cast).
-        self.cast_bar_airplay = strip_button(
-            "airplay", tr("airplay_show_window"), self._cast_airplay_window)
-        self.cast_bar_airplay.hide()
-        # Pause is only shown where pausing means something. A Chromecast
-        # cannot pause live television - there is nothing buffered ahead to
-        # come back to - and the app answers that from the provider's archive.
-        # On a channel with no archive there is no answer, and a button that
-        # does nothing is worse than no button.
-        self.cast_bar_pause = strip_button(
-            "pause", tr("tooltip_pause_resume"), self._toggle_cast_pause)
-        self.cast_bar_stop = QPushButton(tr("cast_stop"))
-        self.cast_bar_stop.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.cast_bar_stop.clicked.connect(
-            lambda: self._end_cast("stopped from the cast strip"))
-        _cast_row.add(self.cast_bar_stop)
-        # Where the film has got to, and a way to move it - its own row, the
-        # full width of the strip. Only films, episodes and recordings have a
-        # length to move within; a broadcast has no end to measure against,
-        # and its own way back is the archive.
-        _seek_row = FlowRow(spacing=10)
-        _seek_row.setContentsMargins(2, 0, 2, 0)
-        self.cast_bar_seek = _SeekSlider()
-        self.cast_bar_seek.setRange(0, 1000)
-        # Narrow enough that the strip can still be pulled in past it: below
-        # this the clock and the LIVE button go to a line of their own rather
-        # than climbing on top of the bar.
-        self.cast_bar_seek.setMinimumWidth(120)
-        self.cast_bar_seek.setToolTip(tr("cast_seek"))
+        # earlier programme exactly as it can here.
+        card.ts.clicked.connect(self._cast_timeshift_menu)
+        card.tracks.clicked.connect(self._cast_tracks_menu)
+        # AirPlay's own way in: the AirPlay window (Apple's button) back.
+        card.airplay.clicked.connect(self._cast_airplay_window)
+        # The cast window on the running cast: another TV, a setting.
+        self.cast_bar_devices = card.devices
+        card.devices.clicked.connect(self.manage_cast)
+        # Pause is only shown where pausing means something (show_cast_strip).
+        card.pause.clicked.connect(self._toggle_cast_pause)
+        card.back.clicked.connect(lambda: self._cast_skip(-self.CAST_SKIP_S))
+        card.forward.clicked.connect(lambda: self._cast_skip(self.CAST_SKIP_S))
+        card.stop.clicked.connect(lambda: self._end_cast("stopped from the cast card"))
         # What the point under the cursor is, before clicking it.
-        self.cast_bar_seek.set_time_provider(self._cast_time_at)
-        self.cast_bar_seek.seek_requested.connect(
-            lambda _v: self._cast_seek_released())
-        _seek_row.add(self.cast_bar_seek, grow=True)
-        self.cast_bar_time = QLabel("")
-        self.cast_bar_time.setStyleSheet(
-            "font-size:11px; font-weight:700;")
-        _seek_row.add(self.cast_bar_time)
-        # The same red button the player has, and it means the same thing:
-        # you are not at the live edge, and this is the way back. It is the
-        # only thing on the strip that is ever red, so it reads as a state
-        # rather than as decoration.
-        self.cast_bar_live = QPushButton("⏭ " + tr("mv_live"))
-        self.cast_bar_live.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.cast_bar_live.setStyleSheet(
-            "QPushButton{background:#FF5C5C; color:#fff; border:none;"
-            "border-radius:8px; padding:2px 10px; font-size:11px;"
-            "font-weight:700;}"
-            "QPushButton:hover{background:#e14b4b;}")
-        self.cast_bar_live.clicked.connect(self._cast_go_live)
-        self.cast_bar_live.hide()
-        _seek_row.add(self.cast_bar_live)
-        _cast_outer.addLayout(_seek_row)
+        card.seek.set_time_provider(self._cast_time_at)
+        card.seek.seek_requested.connect(lambda _v: self._cast_seek_released())
+        card.live.clicked.connect(self._cast_go_live)
+        card.action_clicked.connect(self._cast_card_action)
 
         # The receiver is the only thing that knows where the film is, and it
-        # only says so when asked - so ask, once a second, and only while
-        # something with a length is actually playing there.
+        # only says so when asked - so ask, once a second, for the whole of
+        # a cast: its position, its state, and whether it is stuck.
         self._cast_tick = QTimer(self)
         self._cast_tick.setInterval(1000)
         self._cast_tick.timeout.connect(self._show_cast_progress)
@@ -1401,6 +1306,9 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.playback_error.connect(self._playback_error)
             self.player.zap.connect(self._zap)
             self.player.popout_requested.connect(self._toggle_popout)
+            # The bar's cast button: the cast window on what plays, the TV
+            # used last ready in it (mw_cast).
+            self.player.cast_requested.connect(self.cast_playing)
             self.player.popout_context_menu.connect(self._popout_context_menu)
             self.player.docked_context_menu.connect(self._docked_context_menu)
             self.player.stop_btn.clicked.connect(self._exit_popout_if_active)
@@ -3607,10 +3515,6 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             return iov.get("color", "") or "", iov.get("bgcolor", "") or ""
         return "", ""
 
-    def _try_select_playing(self) -> bool:
-        """Select + scroll to the playing item if it's in the current list."""
-        return self._try_select_key(self._playing_key)
-
     def _try_select_key(self, key) -> bool:
         """Select + scroll to the row with this item key, if it's in the
         current list. The playing-item jump and the back-from-episodes landing
@@ -3635,33 +3539,35 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _jump_to_now_playing(self) -> None:
         """Clicking the sidebar logo jumps the middle column to whatever's
-        playing: select and scroll to its row, switching to its section and
-        opening the 'All' category first so the row is actually in the list.
-        Works for every kind - live channels, movies, series episodes and
-        recordings (_playing_item is live-only by design, so movies and
-        episodes read their snapshot from _last_playback instead)."""
-        lp = getattr(self, "_last_playback", None) or {}
-        playing = getattr(self, "_playing_item", None) or lp.get("item")
-        if self._playing_key is None or playing is None:
+        playing - here, or on a TV while a cast runs (_now_playing): select
+        and scroll to its row, switching to its section and opening the
+        'All' category first so the row is actually in the list. Works for
+        every kind - live channels, movies, series episodes and recordings
+        (_playing_item is live-only by design, so movies and episodes read
+        their snapshot from _last_playback, a cast's from its context)."""
+        now = self._now_playing()
+        playing = now.item if now is not None else None
+        if now is None or playing is None:
             self._show_toast(tr("toast_nothing_playing"))
             return
+        key, group = now.key, now.group
         # Wherever it lands, its card is picked and on screen once the
         # place's rows are in (a folder is read in slices, a list loads).
-        self._np_reveal_soon()
+        self._np_reveal_soon(key)
         # A playing episode is on its series' page, marked there. Before the
         # list is looked through: an episode's id can be a series' id too.
-        if self._playing_group == "episode" and lp.get("series_ctx"):
-            self._open_series_page(lp["series_ctx"], focus=self._playing_key)
+        if group == "episode" and now.series_ctx:
+            self._open_series_page(now.series_ctx, focus=key)
             return
-        if self._try_select_playing():
+        if self._try_select_key(key):
             return
         # A station: the list it was played from in Radio (mw_radio).
-        if self._playing_group == "radio" and self._radio_jump():
+        if group == "radio" and self._radio_jump(key):
             return
         # A local file lives in its own folder - go to the Local files
         # section and browse to the folder the file is in, then select it.
-        if self._playing_group == "local":
-            path = lp.get("url") or (playing or {}).get("_path")
+        if group == "local":
+            path = now.path
             if path and os.path.isfile(path):
                 self._pending_jump_key = path
                 QTimer.singleShot(8000, self._clear_pending_jump)
@@ -3673,12 +3579,11 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         # target and navigate to a view that contains it, then select once it
         # has loaded (see _load_categories / _apply_filter). Land on the item's
         # own category so the sidebar reflects what's playing, not just "All".
-        self._pending_jump_key = self._playing_key
+        self._pending_jump_key = key
         self._pending_jump_cat = playing.get("category_id")
         QTimer.singleShot(8000, self._clear_pending_jump)   # safety net
         target = {"live": "live", "vod": "vod", "episode": "series",
-                  "rec": "rec", "radio": "radio"}.get(self._playing_group,
-                                                      self.mode)
+                  "rec": "rec", "radio": "radio"}.get(group, self.mode)
         if self.mode != target:
             self.switch_mode(target)     # done() honours _pending_jump_cat
         elif self.cat_list.count():

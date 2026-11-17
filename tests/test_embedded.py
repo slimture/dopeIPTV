@@ -196,6 +196,16 @@ player._start_sleep_timer(0)                  # cancel
 assert player.sleep_badge.isHidden(), "cancel hides the pill"
 assert not player._sleep_tick.isActive() and not player._sleep_badge_timer.isActive()
 
+# The bar's cast button: drawn like the others, its words in its tooltip,
+# one click asks for the cast window - no right click needed.
+from dopeiptv.i18n import tr
+assert player.cast_btn.toolTip() == tr("tooltip_cast") and not player.cast_btn.icon().isNull()
+assert player.cast_btn.size() == player.pop_btn.size()
+asked = []
+player.cast_requested.connect(lambda: asked.append(True))
+player.cast_btn.click()
+assert asked == [True]
+
 print("EMBEDDED_OK", flush=True)
 """
 

@@ -756,10 +756,7 @@ class _PlaceRecMixin:
         place = self._rp_page
         if place is None or sip.isdeleted(place):
             return
-        key = ""
-        if getattr(self, "_playing_group", None) == "rec" \
-                and getattr(self, "_playing_key", None) is not None:
-            key = str(self._playing_key)
+        key = self._now_key("rec")          # here or on a TV
         place.view.set_playing(key)
 
     def _place_rec_playing(self) -> None:

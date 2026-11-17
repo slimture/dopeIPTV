@@ -824,14 +824,17 @@ class _MittMixin:
     # -- what plays, marked -----------------------------------------------------------
 
     def _mitt_keys(self) -> frozenset:
-        """The page's keys of what plays now (none while nothing does)."""
-        p = getattr(self, "player", None)
-        key = getattr(self, "_playing_key", None)
-        if p is None or not getattr(p, "current_url", None) or key is None:
+        """The page's keys of what plays now, here or on a TV (none while
+        nothing does)."""
+        now = self._now_playing()
+        if now is None:
             return frozenset()
-        lp = getattr(self, "_last_playback", None) or {}
-        series = (lp.get("series_ctx") or {}).get("series_id")
-        return frozenset(mitt.playing_keys(getattr(self, "_playing_group", None), key,
+        if not now.on_tv:
+            p = getattr(self, "player", None)
+            if p is None or not getattr(p, "current_url", None):
+                return frozenset()
+        series = (now.series_ctx or {}).get("series_id")
+        return frozenset(mitt.playing_keys(now.group or None, now.key,
                                            self._mitt_active(), series))
 
     def _mitt_mark(self) -> None:

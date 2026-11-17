@@ -397,7 +397,9 @@ class EpisodeDelegate(QStyledItemDelegate):
         used = 0
         pill_r = QRect(title_r)
         if playing:
-            used = self._pill(p, tr("sp_playing"), pill_r, rtl, True)
+            from .media_cards import on_tv      # media_cards imports this module
+            used = self._pill(p, tr("pill_on_tv") if on_tv() else tr("sp_playing"),
+                              pill_r, rtl, True)
         elif nxt:
             used = self._pill(p, tr("sp_up_next"), pill_r, rtl, False)
         elif state.new:

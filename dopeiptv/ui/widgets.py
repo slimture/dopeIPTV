@@ -9,11 +9,11 @@ from PyQt6.QtCore import (
     QEvent, QPointF, QRect, QRectF, QSize, Qt, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QColor, QIcon, QImage, QImageReader, QLinearGradient, QPainter, QPainterPath,
+    QColor, QFont, QIcon, QImage, QImageReader, QLinearGradient, QPainter, QPainterPath,
     QPen, QPixmap,
 )
 from PyQt6.QtWidgets import (
-    QLayout, QLayoutItem, QMessageBox, QPushButton, QWidget,
+    QMessageBox, QPushButton, QWidget,
 )
 
 from .. import APP_NAME
@@ -683,27 +683,76 @@ class _SidebarLogo(QWidget):
             painter.fillPath(arrow, QColor(on_accent(badge_color.name())))
         painter.end()
 
-def cast_strip_icon(kind: str, colour: str) -> QIcon:
-    """Drawn icons for the cast strip's buttons.
+#: The glyphs ``paint_strip_glyph`` draws.
+STRIP_GLYPHS = ("minus", "plus", "pause", "play", "stop", "volume", "muted", "airplay",
+                "rewind", "back", "forward", "cast", "tracks")
 
-    They were characters - a gear, a pause bar, a minus sign - and a font
-    stack that has no glyph for one of them draws an empty box instead. Which
-    is what the volume buttons turned into. Drawn in a 14 px box they look the
-    same on every machine and cannot go missing.
-    """
-    size, scale = 14, 3
-    pm = QPixmap(size * scale, size * scale)
-    pm.setDevicePixelRatio(float(scale))
-    pm.fill(Qt.GlobalColor.transparent)
-    pr = QPainter(pm)
+
+def paint_strip_glyph(pr: QPainter, kind: str, s: float, col: QColor,
+                      label: str = "") -> None:
+    """One of the cast controls' glyphs (``STRIP_GLYPHS``) in an *s* px
+    box at the painter's origin, in *col*. "back" and "forward" carry
+    *label* (the seconds a skip takes) inside their arrow."""
+    pr.save()
     pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-    col = QColor(colour)
     pen = QPen(col)
-    pen.setWidthF(size * 0.13)
+    pen.setWidthF(s * 0.13)
     pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
     pr.setPen(pen)
-    s = float(size)
-    if kind in ("minus", "plus"):
+    if kind == "stop":
+        pr.setPen(Qt.PenStyle.NoPen)
+        pr.setBrush(col)
+        pr.drawRoundedRect(QRectF(s * 0.24, s * 0.24, s * 0.52, s * 0.52), s * 0.09, s * 0.09)
+    elif kind in ("back", "forward"):
+        # A circle wound back (or on), its arrowhead where the gap is, and
+        # the seconds inside - the shape every remote uses for a skip.
+        pen.setWidthF(s * 0.08)
+        pr.setPen(pen)
+        pr.setBrush(Qt.BrushStyle.NoBrush)
+        cx, cy, r = s * 0.5, s * 0.55, s * 0.37
+        ring = QRectF(cx - r, cy - r, 2 * r, 2 * r)
+        fwd = kind == "forward"
+        # From the top round to just short of it again, open where the
+        # arrow points: to the left going back, to the right going on.
+        pr.drawArc(ring, 90 * 16, (320 if fwd else -320) * 16)
+        pr.setPen(Qt.PenStyle.NoPen)
+        pr.setBrush(col)
+        way = 1.0 if fwd else -1.0
+        head = QPainterPath()
+        head.moveTo(cx + way * s * 0.20, cy - r)
+        head.lineTo(cx - way * s * 0.01, cy - r - s * 0.14)
+        head.lineTo(cx - way * s * 0.01, cy - r + s * 0.14)
+        head.closeSubpath()
+        pr.drawPath(head)
+        if label:
+            f = QFont()
+            f.setPixelSize(max(6, round(s * 0.32)))
+            f.setWeight(QFont.Weight.Bold)
+            pr.setFont(f)
+            pr.setPen(col)
+            pr.drawText(ring, int(Qt.AlignmentFlag.AlignCenter), label)
+    elif kind == "cast":                    # a screen, the cast waves in its corner
+        pen.setWidthF(s * 0.09)
+        pr.setPen(pen)
+        pr.setBrush(Qt.BrushStyle.NoBrush)
+        frame = QPainterPath()
+        frame.moveTo(s * 0.08, s * 0.38)
+        frame.lineTo(s * 0.08, s * 0.24)
+        frame.quadTo(s * 0.08, s * 0.16, s * 0.16, s * 0.16)
+        frame.lineTo(s * 0.84, s * 0.16)
+        frame.quadTo(s * 0.92, s * 0.16, s * 0.92, s * 0.24)
+        frame.lineTo(s * 0.92, s * 0.76)
+        frame.quadTo(s * 0.92, s * 0.84, s * 0.84, s * 0.84)
+        frame.lineTo(s * 0.58, s * 0.84)
+        pr.drawPath(frame)
+        for r in (0.18, 0.34):
+            pr.drawArc(QRectF(s * (0.08 - r), s * (0.84 - r), s * r * 2, s * r * 2),
+                       0, 90 * 16)
+        pr.setPen(Qt.PenStyle.NoPen)
+        pr.setBrush(col)
+        pr.drawEllipse(QPointF(s * 0.10, s * 0.82), s * 0.06, s * 0.06)
+    elif kind in ("minus", "plus"):
         pr.drawLine(QPointF(s * 0.22, s * 0.5), QPointF(s * 0.78, s * 0.5))
         if kind == "plus":
             pr.drawLine(QPointF(s * 0.5, s * 0.22), QPointF(s * 0.5, s * 0.78))
@@ -796,156 +845,4 @@ def cast_strip_icon(kind: str, colour: str) -> QIcon:
             x = (0.62, 0.34, 0.70)[i]
             pr.setBrush(col)
             pr.drawEllipse(QPointF(s * x, s * y), s * 0.11, s * 0.11)
-    pr.end()
-    return QIcon(pm)
-
-
-class FlowRow(QLayout):
-    """A row that wraps onto the next line instead of squashing.
-
-    A QHBoxLayout given less width than its contents need does not stop at
-    their minimum: it goes on taking pixels away until the buttons sit on top
-    of one another. The cast strip is where that shows, because it is in the
-    right-hand column and that column is draggable - pull it in and the mute
-    button, the volume slider and the timeshift, tracks, pause and stop
-    controls pile up in the same forty pixels. Which is exactly the width
-    that column has on a small laptop to begin with.
-
-    So: fill a line, and when the next thing will not fit, start another one.
-    The narrowest this can be asked to be is the widest single item in it,
-    and everything stays reachable all the way down to that.
-
-    One item per row may be marked as taking the slack, so with room to spare
-    the layout still looks like the row it was: the label on the left, the
-    controls out at the right edge.
-    """
-
-    def __init__(self, parent=None, spacing: int = 10,
-                 line_spacing: int = 6) -> None:
-        super().__init__(parent)
-        self._items: list[QLayoutItem] = []
-        self._grow: set[int] = set()
-        self._line_spacing = line_spacing
-        self.setSpacing(spacing)
-        self.setContentsMargins(0, 0, 0, 0)
-
-    # -- QLayout plumbing --------------------------------------------------
-
-    def addItem(self, item) -> None:            # noqa: N802 (Qt)
-        self._items.append(item)
-
-    def add(self, widget, grow: bool = False):
-        """Add *widget*; *grow* gives it whatever is left over on its line."""
-        if grow:
-            self._grow.add(len(self._items))
-        self.addWidget(widget)
-        return widget
-
-    def count(self) -> int:
-        return len(self._items)
-
-    def itemAt(self, i: int):                   # noqa: N802 (Qt)
-        return self._items[i] if 0 <= i < len(self._items) else None
-
-    def takeAt(self, i: int):                   # noqa: N802 (Qt)
-        if 0 <= i < len(self._items):
-            self._grow = {g - 1 if g > i else g for g in self._grow if g != i}
-            return self._items.pop(i)
-        return None
-
-    def expandingDirections(self):              # noqa: N802 (Qt)
-        return Qt.Orientation(0)
-
-    def hasHeightForWidth(self) -> bool:        # noqa: N802 (Qt)
-        return True
-
-    def heightForWidth(self, width: int) -> int:   # noqa: N802 (Qt)
-        return self._lay(QRect(0, 0, width, 0), apply=False)
-
-    def setGeometry(self, rect) -> None:        # noqa: N802 (Qt)
-        super().setGeometry(rect)
-        self._lay(rect, apply=True)
-
-    def _shown(self):
-        """The items that are actually there. A hidden widget takes no room -
-        the timeshift, pause and LIVE controls come and go with what is being
-        cast, and reserving a gap for one that is not shown would break the
-        line early and leave a hole where it used to be."""
-        return [(i, it) for i, it in enumerate(self._items) if not it.isEmpty()]
-
-    def sizeHint(self):                         # noqa: N802 (Qt)
-        # Everything on one line: what the strip looks like when there is room
-        # for it, which is what the column should be given if it can have it.
-        left, top, right, bottom = self.getContentsMargins()
-        w = h = 0
-        for n, (_i, item) in enumerate(self._shown()):
-            s = item.sizeHint()
-            w += s.width() + (self.spacing() if n else 0)
-            h = max(h, s.height())
-        return QSize(w + left + right, h + top + bottom)
-
-    def minimumSize(self):                      # noqa: N802 (Qt)
-        # One item per line. Below this there is nothing left to give, and
-        # this is the number that stops a parent from squashing us into an
-        # overlap - a QHBoxLayout's minimum is the sum of them all, which is
-        # far more than the column has and so gets ignored.
-        left, top, right, bottom = self.getContentsMargins()
-        w = max((item.minimumSize().width() for _i, item in self._shown()),
-                default=0)
-        return QSize(w + left + right,
-                     self.heightForWidth(w + left + right) + top + bottom)
-
-    # -- the one pass both the measuring and the placing use ---------------
-
-    def _lay(self, rect, apply: bool) -> int:
-        """Walk the items, breaking lines to fit *rect*'s width. Returns the
-        height it took. With *apply*, the items are moved there too."""
-        left, top, right, bottom = self.getContentsMargins()
-        inner = rect.adjusted(left, top, -right, -bottom)
-        x, y, line_h, gap = inner.x(), inner.y(), 0, self.spacing()
-        line: list[tuple[int, QLayoutItem, int]] = []
-
-        def flush() -> None:
-            """Place the line that has been gathered, and hand any space left
-            over on it to the item that was marked to take it."""
-            nonlocal x, y, line_h
-            if apply and line:
-                used = sum(w for _i, _it, w in line) + gap * (len(line) - 1)
-                slack = max(0, inner.width() - used)
-                grower = next((n for n, (i, _it, _w) in enumerate(line)
-                               if i in self._grow), None)
-                at = inner.x()
-                for n, (_i, item, w) in enumerate(line):
-                    if n == grower:
-                        w += slack
-                    h = item.sizeHint().height()
-                    if item.hasHeightForWidth():
-                        h = max(h, item.heightForWidth(w))
-                    # Centred on the line: a 36-pixel button next to a
-                    # two-line label reads as a row, not as a staircase.
-                    item.setGeometry(QRect(at, y + (line_h - h) // 2, w, h))
-                    at += w + gap
-            x, y = inner.x(), y + line_h + self._line_spacing
-            line_h = 0
-            line.clear()
-
-        for i, item in self._shown():
-            w = item.sizeHint().width()
-            if i in self._grow:
-                w = max(w, item.minimumSize().width())
-            w = min(w, inner.width())           # never wider than the strip
-            if line and x + w > inner.right() + 1:
-                flush()
-            h = item.sizeHint().height()
-            if item.hasHeightForWidth():
-                h = max(h, item.heightForWidth(w))
-            line.append((i, item, w))
-            line_h = max(line_h, h)
-            x += w + gap
-        empty = not line
-        flush()
-        if empty and y == inner.y() + self._line_spacing:
-            return top + bottom             # nothing shown, so no lines
-        # flush() left y past the line it placed, plus the gap that would
-        # have gone before the next one - and there is no next one.
-        return (y - self._line_spacing) - inner.y() + top + bottom
+    pr.restore()

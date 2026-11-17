@@ -470,11 +470,7 @@ class _PlaceFilmsMixin:
         return bg or fg or ""
 
     def _pf_mark_playing(self) -> None:
-        key = ""
-        if getattr(self, "_playing_group", None) == "vod" and self._playing_key is not None:
-            key = str(self._playing_key)
-        elif getattr(self, "_cast_group", None) == "vod" and getattr(self, "_cast_key", None):
-            key = str(self._cast_key)
+        key = self._now_key("vod")          # here or on a TV
         for w in (self._pf_view, self._pf_popular_row, self._pf_continue_row):
             if w is not None:
                 w.set_playing(key)

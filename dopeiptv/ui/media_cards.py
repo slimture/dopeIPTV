@@ -123,11 +123,26 @@ def playing_ink() -> QColor:
 # -- the pills ------------------------------------------------------------------------
 
 #: The pills, the same everywhere: what is on the air, a new title or
-#: episode, what plays here now, one already watched, the one up next, one
-#: that failed (a recording).
-PILL_KINDS = ("live", "new", "playing", "seen", "next", "fail")
+#: episode, what plays here now, what plays on a TV now (a cast), one already
+#: watched, the one up next, one that failed (a recording).
+PILL_KINDS = ("live", "new", "playing", "tv", "seen", "next", "fail")
 _PILL_WORDS = {"live": "pill_live", "new": "pill_new", "playing": "pill_playing",
-               "seen": "pill_seen", "next": "sp_up_next", "fail": "rec_status_failed"}
+               "tv": "pill_on_tv", "seen": "pill_seen", "next": "sp_up_next",
+               "fail": "rec_status_failed"}
+
+#: Whether what plays plays on a TV (a cast) rather than here - one thing
+#: plays at a time, so every view's mark says the same (the window sets it:
+#: mw_cast_watch._cast_marks_changed).
+_ON_TV = [False]
+
+
+def set_on_tv(on: bool) -> None:
+    _ON_TV[0] = bool(on)
+
+
+def on_tv() -> bool:
+    """What plays, plays on a TV: its mark says "On TV", not "Playing"."""
+    return _ON_TV[0]
 PILL_PX = 10
 #: Room round the glyphs: on each side, and above and below their ink.
 PILL_PAD_X, PILL_PAD_Y = 9, 3
@@ -172,7 +187,7 @@ def pill_colours(kind: str) -> tuple[QColor, QColor]:
     ink made to read on its fill."""
     if kind == "live":
         return QColor(P["rec"]), QColor(ink_on(P["rec"]))
-    if kind in ("new", "playing"):
+    if kind in ("new", "playing", "tv"):
         return QColor(P["accent"]), QColor(P["on_accent"])
     base = P["ok"] if kind == "seen" else P["error"] if kind == "fail" else P["accent"]
     wash, ink = _wash(base, 0.24)
@@ -358,9 +373,11 @@ def initials_of(text: str, n: int = 2) -> str:
 
 
 def card_pills(card: Card, playing: bool) -> list[Pill]:
+    """A card's pills, the one that plays first - "Playing", or "On TV"
+    while it plays on a TV."""
     pills = pills_of(card.pills)
-    if playing and all(k != "playing" for k, _t in pills):
-        pills.insert(0, ("playing", ""))
+    if playing and all(k not in ("playing", "tv") for k, _t in pills):
+        pills.insert(0, ("tv" if on_tv() else "playing", ""))
     return pills
 
 
@@ -960,10 +977,12 @@ class _PaintedView(QListView):
         return self.model_.row_of(key)
 
     def set_playing(self, key: str | None) -> None:
-        """The item that plays now (marked; "" for none)."""
+        """The item that plays now (marked; "" for none) - here, or on a TV
+        (``on_tv``: its mark says so)."""
         key = key or ""
-        if key == self.playing_key:
+        if key == self.playing_key and on_tv() == getattr(self, "_marked_tv", False):
             return
+        self._marked_tv = on_tv()
         old, self.playing_key = self.playing_key, key
         self.model_.playing_key = key
         for k in (old, key):

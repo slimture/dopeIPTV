@@ -792,14 +792,13 @@ class _PlaceSeriesMixin:
         place = self._place_series
         if place is None or sip.isdeleted(place):
             return
-        key = getattr(self, "_playing_key", None)
-        lp = getattr(self, "_last_playback", None) or {}
+        now = self._now_playing()           # here or on a TV
         sid_key = ep_key = ""
-        if key is not None and lp.get("kind") == "episode":
-            sid = (lp.get("series_ctx") or {}).get("series_id")
+        if now is not None and now.group == "episode":
+            sid = (now.series_ctx or {}).get("series_id")
             if sid is not None:
                 sid_key = f"s:{sid}"
-            ep_key = f"e:{key}"
+            ep_key = f"e:{now.key}"
         grid = place.grid
         grid.set_playing(ep_key if ep_key and grid.row_of(ep_key) >= 0 else sid_key)
         place.popular.set_playing(sid_key)

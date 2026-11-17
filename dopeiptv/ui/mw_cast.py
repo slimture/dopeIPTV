@@ -1,8 +1,10 @@
 """MainWindow mixin: casting - a Chromecast, a DLNA TV or a Kodi plays what
 the window would.
 
-The cast dialog; the strip under the list while a cast runs (pause, volume,
-tracks, quality, the timeshift menu and the progress timeline); a live
+The cast dialog; the card in the video's place while a cast runs
+(ui/cast_card.py: pause, skips, volume, tracks, quality, the timeshift menu
+and the progress timeline - its state and the recovery of a stuck cast in
+ui/mw_cast_watch.py); a live
 channel handed over from the provider's archive at the moment it was
 paused; and the position a film reached on the TV, kept for resume. The
 devices themselves are providers/casting.py's CastHub. Kept out of
@@ -58,7 +60,6 @@ from ..providers import cast_feed
 from ..providers.chromecast import CastDialog
 from ..providers.kodi import DEFAULT_PORT, parse_address
 from .theme import P
-from .widgets import cast_strip_icon
 
 
 def _live_cast_address(win, sid) -> str:
@@ -537,6 +538,10 @@ class _CastMixin:
                          "local": "local"}
     _RESUME_GROUP = {"movie": "vod", "episode": "episode", "recording": "rec",
                      "local": "local"}
+    #: A cast's play kind as the lists' group of what plays (the player's).
+    _CAST_GROUP_OF = {"live": "live", "movie": "vod", "episode": "episode",
+                      "recording": "rec", "local": "local", "radio": "radio",
+                      "web": "web"}
 
     def _busy_elsewhere(self, it) -> bool:
         """Is the app holding a provider connection for something else?
@@ -1139,8 +1144,10 @@ class _CastMixin:
         self._cast_key = ctx.get("key") if device else None
         self._cast_group = ctx.get("group") if device else None
         if self._cast_group is None and device:
-            # A live channel has no resume group, but it still has a row.
-            self._cast_group = "live" if ctx.get("sid") else None
+            # A live channel has no resume group, but it still has a row -
+            # and a station its own.
+            self._cast_group = ("live" if ctx.get("sid") is not None
+                                else self._CAST_GROUP_OF.get(ctx.get("kind") or ""))
             self._cast_key = ctx.get("key")
         for name in ("listw", "grid"):
             view = getattr(self, name, None)
@@ -1148,10 +1155,13 @@ class _CastMixin:
                 view.viewport().update()
             except AttributeError:
                 pass
+        # Every list and place marks what the TV plays, as "On TV".
+        marks = getattr(self, "_cast_marks_changed", None)
+        if callable(marks):
+            marks()
         bar = getattr(self, "cast_bar", None)
         if bar is None:
             return
-        self.cast_bar_pause.setIcon(cast_strip_icon("pause", P["text"]))
         # Shown only where pausing works. A film the receiver fetched itself
         # holds its place; a broadcast can be held only while the converter
         # is recording it. A channel that ended up going straight to the
@@ -1167,6 +1177,9 @@ class _CastMixin:
             self._cast_tick.stop()
             bar.hide()
             return
+        skips = getattr(self, "_cast_skips_shown", None)
+        if callable(skips):
+            skips()
         # A different thing is being cast now: how far behind live the last
         # one was is not about this one. Left standing, a channel paused for
         # ten minutes made the next cast open ten minutes behind itself.
@@ -1180,6 +1193,8 @@ class _CastMixin:
             self._cast_behind = 0.0
             self._cast_paused_at = None
             self._cast_began(ctx)
+        self.cast_bar_pause.set_glyph(
+            "play" if getattr(self, "_cast_paused_at", None) is not None else "pause")
         # The player pane goes with it. Casting stops local playback - the
         # receiver pulls the stream itself, and on a one-connection account
         # two readers is one too many - so what is left behind is a black
@@ -1193,24 +1208,30 @@ class _CastMixin:
         if pl is not None and pl.isVisible():
             pl.hide()
         self._record_cast_history()
-        self._show_cast_progress()
-        self._show_cast_label()
         self.cast_bar_title.setText(title or "")
         self.cast_bar_title.setVisible(bool(title))
+        # The picture, what is on, the TV's name (mw_cast_watch).
+        fill = getattr(self, "_cast_card_fill", None)
+        if callable(fill):
+            fill(title)
+        self._show_cast_progress()
+        self._show_cast_label()
         self._show_cast_volume()
         bar.show()
+        sync = getattr(bar, "sync", None)
+        if callable(sync):
+            sync()
 
     def _show_cast_label(self) -> None:
-        """What the cast is doing, on the strip: "Casting to X" - and for
-        AirPlay, until the Apple TV has the stream, what to click."""
+        """Which TV it plays on, on the card - and how it goes there: the
+        receiver's state, an Apple TV still to be picked (mw_cast_watch)."""
         device = self._cast_device
         if not device:
             return
-        waiting = getattr(self.cast, "waiting_for_route", None)
-        text = (tr("airplay_pick_window")
-                if self._cast_on_airplay() and callable(waiting) and waiting()
-                else tr("cast_casting_to", name=device))
-        self.cast_bar_lbl.setText(text)
+        self.cast_bar_lbl.setText(device)
+        state = getattr(self, "_cast_card_state", None)
+        if callable(state):
+            state()
 
     def _cast_airplay_window(self) -> None:
         """The strip's AirPlay button: the AirPlay window back."""
@@ -1350,8 +1371,7 @@ class _CastMixin:
         self._cast_muted = not getattr(self, "_cast_muted", False)
         if self._cast_muted:
             self._cast_level = self.cast_bar_vol.value()
-        self.cast_bar_mute.setIcon(cast_strip_icon(
-            "muted" if self._cast_muted else "volume", P["text"]))
+        self.cast_bar_mute.set_glyph("muted" if self._cast_muted else "volume")
         # Without the guard the move would be read as someone setting the
         # volume to zero, which is a different thing and would lose the level.
         self.cast_bar_vol.blockSignals(True)
@@ -1382,8 +1402,7 @@ class _CastMixin:
         self.cast_bar_vol.blockSignals(True)
         self.cast_bar_vol.setValue(0 if muted else self._cast_level)
         self.cast_bar_vol.blockSignals(False)
-        self.cast_bar_mute.setIcon(cast_strip_icon(
-            "muted" if muted else "volume", P["text"]))
+        self.cast_bar_mute.set_glyph("muted" if muted else "volume")
 
     def _cast_tracks_menu(self) -> None:
         """Offer another audio track or subtitle while the cast runs.
@@ -1609,7 +1628,7 @@ class _CastMixin:
         else:
             return
         self._cast_paused_at = None
-        self.cast_bar_pause.setIcon(cast_strip_icon("pause", P["text"]))
+        self.cast_bar_pause.set_glyph("pause")
         feed = self._cast_feed()
         if feed is not None and self.cast.bridged():
             # Within what the playlist holds: the TV moves there itself.
@@ -1622,8 +1641,11 @@ class _CastMixin:
                 return
         self._cast_from_moment(when)
 
-    def _cast_go_live(self) -> None:
-        """Back to the live edge, off the archive."""
+    def _cast_go_live(self, settle: bool = False) -> None:
+        """Back to the live edge, off the archive. *settle*: whatever feeds
+        the TV now lets go of the provider first, and the provider is given
+        a moment, before the channel is asked for again (a stuck cast sent
+        again, mw_cast_watch)."""
         ctx, device = self._cast_ctx or {}, self._cast_device
         url = ctx.get("row_url")
         if not device or not url:
@@ -1633,17 +1655,16 @@ class _CastMixin:
         # beside it): its feed ends first, and the provider is given a
         # moment, before the TV asks for the channel - never two at once.
         feed = self._cast_feed()
-        settle = bool(feed is not None and feed.source is not None
-                      and ctx.get("buffer") is None and self.cast.bridged())
+        settle = settle or bool(feed is not None and feed.source is not None
+                                and ctx.get("buffer") is None and self.cast.bridged())
         self._cast_drop_feed()
         ctx.update(url=url, source=ctx.get("row_source") or url,
                    archive_from=None)
         self._cast_paused_at = None
         self._cast_behind = 0.0
-        self.cast_bar_pause.setIcon(cast_strip_icon("pause", P["text"]))
+        self.cast_bar_pause.set_glyph("pause")
         title = ctx.get("title") or "dopeIPTV"
-        run_async(
-            self.pool,
+        self._cast_send(
             lambda: self.cast.cast(device, url, title, self._local_codecs(),
                                    settle=settle,
                                    source=ctx.get("row_source") or url,
@@ -1656,7 +1677,29 @@ class _CastMixin:
                                    # and the pause button quietly vanished.
                                    dvr=bool(ctx.get("archive"))),
             lambda _n: self.show_cast_strip(device, title),
-            lambda msg: self._error(tr("cast_failed", msg=msg)))
+            self._cast_send_failed)
+
+    def _cast_send(self, work, done, failed) -> None:
+        """*work* (a receiver's cast call) on the pool, counted as on its way
+        while it runs: the watchdog judges nothing meanwhile (mw_cast_watch),
+        and a stuck cast is never sent again beside it."""
+        self._cast_inflight = getattr(self, "_cast_inflight", 0) + 1
+        ctx = getattr(self, "_cast_ctx", None)
+
+        def over(fn, ok, *a):
+            self._cast_inflight = max(0, getattr(self, "_cast_inflight", 1) - 1)
+            if ok and isinstance(ctx, dict):
+                ctx.pop("_recovering", None)      # it went: the watchdog judges it
+            fn(*a)
+        run_async(self.pool, work, partial(over, done, True), partial(over, failed, False))
+
+    def _cast_send_failed(self, msg: str) -> None:
+        """A cast call that did not go: said - or, a stuck cast sent again,
+        the watchdog's to answer (mw_cast_watch)."""
+        again = getattr(self, "_cast_recover_failed", None)
+        if callable(again) and again(msg):
+            return
+        self._error(tr("cast_failed", msg=msg))
 
     def _cast_continue_archive(self) -> None:
         """Keep a timeshifted cast going past the end of its playlist.
@@ -1747,7 +1790,16 @@ class _CastMixin:
         return True
 
     def _show_cast_progress(self) -> None:
-        """Put the receiver's own position on the strip.
+        """The cast's tick (and the card shown again): where the TV is, then
+        how it goes - its state, a stall, the rows that show
+        (mw_cast_watch)."""
+        self._show_cast_position()
+        after = getattr(self, "_cast_card_tick", None)
+        if callable(after) and getattr(self, "_cast_device", None):
+            after()
+
+    def _show_cast_position(self) -> None:
+        """Put the receiver's own position on the card.
 
         Hidden for a broadcast: there is no end to measure against, so a bar
         showing how far through it you are would be showing nothing.
@@ -1804,6 +1856,7 @@ class _CastMixin:
         # holding it until it is let go.
         if not bar.isSliderDown():
             bar.setValue(int(pos / dur * 1000))
+        self.cast_bar_time.setStyleSheet("")
         self.cast_bar_time.setText(
             f"{self._fmt_hms(pos)} / {self._fmt_hms(dur)}")
 
@@ -1917,9 +1970,10 @@ class _CastMixin:
             edge = f"{held}−{self._fmt_hms(behind)}"
         prog = self._cast_programme_at(at)
         self.cast_bar_time.setText(f"{edge} · {prog}" if prog else edge)
+        # The card's own colours at the live edge; behind it the recording
+        # red the player says it in.
         self.cast_bar_time.setStyleSheet(
-            "font-size:11px; font-weight:700;" if live else
-            f"font-size:11px; font-weight:700; color:{P['rec']};")
+            "" if live else f"color:{P['rec']}; font-weight:600;")
         self.cast_bar_live.setVisible(not live)
 
     def _cast_seek_released(self) -> None:
@@ -1989,9 +2043,12 @@ class _CastMixin:
         bits.append(t.get("codec") or "?")
         return " · ".join(bits)
 
-    def _recast_with(self, audio, subs, start: float | None = None) -> None:
+    def _recast_with(self, audio, subs, start: float | None = None,
+                     settle: bool = False) -> None:
         """Cast the same title again with different tracks, from where the TV
-        is now - or from *start*, when it is being moved somewhere else."""
+        is now - or from *start*, when it is being moved somewhere else.
+        *settle*: the converter of the stream on the TV goes first, and the
+        provider is given a moment (a stuck cast sent again)."""
         ctx, device = self._cast_ctx or {}, self._cast_device
         url = ctx.get("url")
         if not device or not url:
@@ -2004,12 +2061,11 @@ class _CastMixin:
             return
         log.info("cast: switching tracks and picking up at %d s", at)
         title = ctx.get("title") or "dopeIPTV"
-        run_async(
-            self.pool,
+        self._cast_send(
             lambda: self.cast.cast(device, url, title, self._local_codecs(),
                                    audio, subs, at,
                                    ctx.get("duration") or 0.0,
-                                   False, ctx.get("source"),
+                                   settle, ctx.get("source"),
                                    self._cast_quality(),
                                    ctx.get("height") or 0,
                                    ctx.get("fps") or 0.0,
@@ -2018,7 +2074,7 @@ class _CastMixin:
                                    # is no reason to lose the pause button.
                                    dvr=bool(ctx.get("archive"))),
             lambda _n: self.show_cast_strip(device, title),
-            lambda msg: self._error(tr("cast_failed", msg=msg)))
+            self._cast_send_failed)
 
     # How close to live the archive can be read from. Only the timeshift
     # menu comes through here now - going back an hour, picking a programme
@@ -2046,11 +2102,13 @@ class _CastMixin:
             self._cast_behind = getattr(self, "_cast_behind", 0.0) + (
                 datetime.now() - self._cast_paused_at).total_seconds()
             self._cast_paused_at = None
-            self.cast_bar_pause.setIcon(cast_strip_icon("pause", P["text"]))
+            self.cast_bar_pause.set_glyph("pause")
             threading.Thread(target=self.cast.resume, daemon=True).start()
+            getattr(self, "_cast_card_state", lambda: None)()
             return
         self._cast_paused_at = datetime.now()
-        self.cast_bar_pause.setIcon(cast_strip_icon("play", P["text"]))
+        self.cast_bar_pause.set_glyph("play")
+        getattr(self, "_cast_card_state", lambda: None)()
         # However much room the user has allowed for it.
         try:
             gb = float(self.settings.value("cast_pause_gb", 4.5) or 4.5)
@@ -2096,8 +2154,7 @@ class _CastMixin:
         log.info("cast: %s from %s, in pieces as one playlist",
                  for_log(title),
                  datetime.fromtimestamp(feed.first_wall).strftime("%H:%M:%S"))
-        run_async(
-            self.pool,
+        self._cast_send(
             lambda: self.cast.cast(device, ctx.get("url") or "", title,
                                    self._local_codecs(), ctx.get("audio"),
                                    None, start=0.0, source=ctx.get("source"),
@@ -2106,7 +2163,7 @@ class _CastMixin:
                                    fps=ctx.get("fps") or 0.0, dvr=True,
                                    feed=feed),
             lambda _n: self.show_cast_strip(device, title),
-            lambda msg: self._error(tr("cast_failed", msg=msg)))
+            self._cast_send_failed)
 
     def _cast_from_archive(self, paused_at) -> None:
         """Cast this channel from a moment in the provider's catch-up.
@@ -2180,8 +2237,7 @@ class _CastMixin:
         # the chosen tracks and the known codecs all still apply - dropping
         # them here handed an older receiver the full-size picture it had just
         # been spared, halfway through watching.
-        run_async(
-            self.pool,
+        self._cast_send(
             lambda: self.cast.cast(device, url, title, self._local_codecs(),
                                    ctx.get("audio"), ctx.get("subs"),
                                    start=offset, source=source,
@@ -2192,7 +2248,7 @@ class _CastMixin:
                                    # of the archive can be held too.
                                    dvr=True),
             lambda _n: self.show_cast_strip(device, title),
-            lambda msg: self._error(tr("cast_failed", msg=msg)))
+            self._cast_send_failed)
 
     def _save_cast_position(self) -> None:
         """Keep the point the TV reached, so it resumes there next time.

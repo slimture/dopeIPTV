@@ -81,6 +81,8 @@ dopeiptv/
     wakelock.py        Screensaver/suspend inhibitor (DBus + caffeinate)
     gcguard.py         Cyclic garbage collection on the GUI thread only
     contest.py         ContestWatch: another device taking the account's connection
+    cast_watch.py      A running cast watched: the receiver's state as one word,
+                       the watchdog for a TV stuck buffering (pure)
     connections.py     Connections to the account: the app's own counted, the
                        limit, a warning before one more would go over it
     mirrors.py         Nerd: a source's backup addresses - the next when the
@@ -204,7 +206,10 @@ dopeiptv/
     mw_source_label.py The active source in plain sight: over the
                        categories, in the status line, TV mode's header
     mw_shortcuts.py    Keyboard shortcuts + registry
-    mw_cast.py         Casting: the cast dialog, the strip, archive hand-over
+    mw_cast.py         Casting: the cast dialog, the card's controls, archive hand-over
+    mw_cast_watch.py   The cast card's picture, words and state; a stuck cast
+                       sent again (twice, then Try again); "On TV" marks
+    cast_card.py       The cast card in the video's place (pure presentation)
     mw_airplay.py      AirPlay (macOS): the receiver added, its own endings
     mw_popout.py       Detached-window ("pop out") player mixin
     mw_multiview.py    Multiview: 2/4/6/9 live streams (own mpv per cell)

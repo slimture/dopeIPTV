@@ -21,7 +21,12 @@ would play on this Mac. The panel is a window of its own, never an NSView
 inside a Qt widget (there the two toolkits painted over each other, and
 each refresh of the cast dialog's list made the button again); it is made
 once per cast and nothing in the dialog touches it. The app never clicks
-Apple's button for the user.
+Apple's button for the user - AppKit offers no way to open its menu - but
+puts it within one click: the panel opens with the button under the pointer
+(the click that cast to AirPlay, ``_Panel.place``; else beside the window in
+front), as the key window with the button focused, Apple TVs first in
+Apple's menu (prioritizesVideoDevices) - each step only where AppKit takes
+it, logged, the panel shown as before where it does not.
 
 The player never plays on this Mac: it is paused and muted until
 externalPlaybackActive has stayed on for ROUTE_SETTLE_S, muted the moment
@@ -311,6 +316,43 @@ def _beside_front_window(width: float) -> tuple[float, float] | None:
         return None
 
 
+def place_at_pointer(pointer: tuple[float, float], room: tuple[float, float, float, float],
+                     primary_h: float, width: float, height: float,
+                     button: tuple[float, float]) -> tuple[float, float]:
+    """The panel's top-left corner, in AppKit's screen points, that puts
+    Apple's button (*button*: its middle from the panel's top-left, y down)
+    under the pointer (*pointer*, Qt's coordinates) - kept inside *room*
+    (the screen's free area: x, y, width, height). Qt counts down from the
+    top of the primary screen (*primary_h* tall), AppKit up from its
+    bottom."""
+    px, py = pointer
+    rx, ry, rw, rh = room
+    left = min(max(px - button[0], rx), rx + rw - width)
+    top = min(max(py - button[1], ry), ry + rh - height)
+    return float(left), float(primary_h - top)
+
+
+def _at_pointer(width: float, height: float,
+                button: tuple[float, float]) -> tuple[float, float] | None:
+    """place_at_pointer for where the pointer is now (the click that cast
+    to AirPlay), or None when Qt cannot say."""
+    try:
+        from PyQt6.QtGui import QCursor, QGuiApplication
+        primary = QGuiApplication.primaryScreen()
+        pos = QCursor.pos()
+        screen = QGuiApplication.screenAt(pos) or primary
+        if primary is None or screen is None:
+            return None
+        room = screen.availableGeometry()
+        return place_at_pointer((float(pos.x()), float(pos.y())),
+                                (float(room.x()), float(room.y()),
+                                 float(room.width()), float(room.height())),
+                                float(primary.geometry().height()), width, height, button)
+    except Exception as e:
+        log.debug("airplay: where the pointer is was not told: %s", e)
+        return None
+
+
 class _Panel:
     """Apple's AirPlay button and a small video output, in a dark HUD panel
     of their own (the module's docstring says why)."""
@@ -318,6 +360,20 @@ class _Panel:
     VIDEO_W, VIDEO_H, BUTTON, PAD = 160.0, 90.0, 32.0, 10.0
     W = VIDEO_W + 2 * PAD
     H = PAD + VIDEO_H + 6.0 + BUTTON + PAD
+    #: About what a HUD panel's title bar takes above its content.
+    TITLE = 22.0
+
+    @classmethod
+    def place(cls) -> tuple[float, float] | None:
+        """Where the panel opens: with Apple's button under the pointer - the
+        click that cast to AirPlay is one move from Apple's menu -, else
+        beside the window in front, else (None) centred."""
+        at = _at_pointer(cls.W, cls.H + cls.TITLE,
+                         (cls.W / 2, cls.TITLE + cls.H - cls.PAD - cls.BUTTON / 2))
+        if at is not None:
+            log.info("airplay: the AirPlay window opens with Apple's button under the pointer")
+            return at
+        return _beside_front_window(cls.W)
 
     def __init__(self, player: Any, delegate: Any,
                  top_left: tuple[float, float] | None) -> None:
@@ -371,7 +427,10 @@ class _Panel:
         picker.setPlayer_(player)
         if delegate is not None:
             picker.setDelegate_(delegate)
+        # Apple TVs first in Apple's menu (macOS 10.15 on; older ones have
+        # no such setter, and the menu is as it was).
         for setter, value in (("setRoutePickerButtonBordered_", False),
+                              ("setPrioritizesVideoDevices_", True),
                               ("setToolTip_", tr("airplay_button"))):
             try:
                 getattr(picker, setter)(value)
@@ -384,7 +443,21 @@ class _Panel:
             panel.center()
         self.panel, self.layer, self.picker = panel, layer, picker
 
-    def show(self) -> None:
+    def show(self, focus: bool = False) -> None:
+        """In front. *focus* (the first time, as a cast to AirPlay begins):
+        made the key window with Apple's button as what the keyboard is on,
+        so nothing else is in its way - and where AppKit will not, shown as
+        it always was."""
+        if focus:
+            try:
+                self.panel.makeKeyAndOrderFront_(None)
+                took = bool(self.panel.makeFirstResponder_(self.picker))
+                log.info("airplay: the AirPlay window is the key window, Apple's button %s",
+                         "has the keyboard" if took else "did not take the keyboard")
+                return
+            except Exception as e:
+                log.info("airplay: the AirPlay window did not take the focus (%s: %s) - "
+                         "shown as before", type(e).__name__, e)
         self.panel.orderFront_(None)
 
     def hide(self) -> None:
@@ -824,8 +897,7 @@ class AirPlayReceiver(QObject):
         """The AirPlay window, once per cast: Apple's button for this
         player, which the user clicks."""
         try:
-            panel = _Panel(player, self._observer(),
-                           _beside_front_window(_Panel.W))
+            panel = _Panel(player, self._observer(), _Panel.place())
         except Exception as e:
             log.info("airplay: the AirPlay window could not be made (%s: %s)",
                      type(e).__name__, e)
@@ -842,7 +914,7 @@ class AirPlayReceiver(QObject):
                     _note_block(self, "window_closed")))
         except Exception as e:
             log.debug("airplay: not told when the window closes (%s)", e)
-        panel.show()
+        panel.show(focus=True)
         log.info("airplay: the AirPlay window is open - waiting for an Apple "
                  "TV to be picked with its AirPlay button")
 

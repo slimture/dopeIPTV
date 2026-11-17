@@ -389,27 +389,35 @@ class LoadingOverlay(QWidget):
                              r.y() + (r.height() - sh) / 2), scaled)
 
     def _paint_spinner(self, p: QPainter, g: _Layout) -> None:
-        r = g.spin
-        pen = QPen()
-        pen.setWidthF(g.stroke)
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        track = QColor(P["text"])
-        track.setAlphaF(0.18 if self.compact else 0.16)
-        pen.setColor(track)
-        p.setPen(pen)
-        p.setBrush(Qt.BrushStyle.NoBrush)
-        p.drawEllipse(r)
-        t = self.elapsed()
-        turn = (t % self.TURN_MS) * 360.0 / self.TURN_MS
-        breath = (t % self.BREATH_MS) / self.BREATH_MS
-        sweep = 40.0 + 230.0 * (0.5 - 0.5 * math.cos(2 * math.pi * breath))
-        pen.setColor(QColor(P["accent"]))
-        p.setPen(pen)
-        # Clockwise, its tail behind it; mirrored right to left.
-        if self.layoutDirection() == Qt.LayoutDirection.RightToLeft:
-            p.drawArc(r, round((90 + turn) * 16), round(-sweep * 16))
-        else:
-            p.drawArc(r, round((90 - turn) * 16), round(sweep * 16))
+        paint_spinner(p, g.spin, g.stroke, self.elapsed(),
+                      self.layoutDirection() == Qt.LayoutDirection.RightToLeft,
+                      0.18 if self.compact else 0.16)
+
+
+def paint_spinner(p: QPainter, r: QRectF, stroke: float, t: int, rtl: bool = False,
+                  track_alpha: float = 0.16, colour: QColor | None = None) -> None:
+    """The loading arc in *r*: a faint track and the accent's arc turning
+    (*t*: milliseconds), growing and shrinking as it goes - the same spinner
+    wherever the app waits (the cast card's Buffering too)."""
+    pen = QPen()
+    pen.setWidthF(stroke)
+    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    track = QColor(P["text"])
+    track.setAlphaF(track_alpha)
+    pen.setColor(track)
+    p.setPen(pen)
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawEllipse(r)
+    turn = (t % LoadingOverlay.TURN_MS) * 360.0 / LoadingOverlay.TURN_MS
+    breath = (t % LoadingOverlay.BREATH_MS) / LoadingOverlay.BREATH_MS
+    sweep = 40.0 + 230.0 * (0.5 - 0.5 * math.cos(2 * math.pi * breath))
+    pen.setColor(QColor(colour) if colour is not None else QColor(P["accent"]))
+    p.setPen(pen)
+    # Clockwise, its tail behind it; mirrored right to left.
+    if rtl:
+        p.drawArc(r, round((90 + turn) * 16), round(-sweep * 16))
+    else:
+        p.drawArc(r, round((90 - turn) * 16), round(sweep * 16))
 
 
 class LoadingMixin:

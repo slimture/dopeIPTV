@@ -265,6 +265,7 @@ SETTINGS_DENY = frozenset({
     "local_open_dir", "playlists", "active_playlist", "server", "username",
     "password", "parental_pin_hash", "parental_salt", "hwdec_mode", "volume",
     "live_rewind_space_gb", "cast_pause_gb", "recording_jobs", "cast_devices",
+    "cast_last_device",
     "tmdb_api_key", "os_api_key", "os_username", "os_password",
     "feedback_tickets", "force_x11", "desktop_entry", "mpris",
     # The viewing statistics stay on the computer that counted them; the

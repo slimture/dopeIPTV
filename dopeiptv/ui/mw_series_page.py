@@ -516,6 +516,23 @@ class _SeriesPageMixin:
             frac = 0.0
         return str(key), max(0.0, min(1.0, frac))
 
+    def _sp_marked(self) -> tuple[str, float]:
+        """(key, how far) of what plays when it is one of this page's - here
+        (``_sp_playing``) or on a TV (a cast: its mark says "On TV")."""
+        here = self._sp_playing()
+        if here[0]:
+            return here
+        now = getattr(self, "_now_playing", lambda: None)()
+        if now is None or not now.on_tv:
+            return "", 0.0
+        if self._sp_local is not None:
+            if now.group != "local":
+                return "", 0.0
+        elif (now.group != "episode" or str((now.series_ctx or {}).get("series_id"))
+              != str((self._sp_ctx or {}).get("series_id"))):
+            return "", 0.0
+        return str(now.key), now.fraction
+
     def _sp_compute(self) -> tuple[dict[str, EpisodeState], sv.NextUp]:
         """Every episode's state and the one to watch next."""
         local = self._sp_local is not None
@@ -540,7 +557,7 @@ class _SeriesPageMixin:
         finally:
             self.series_ctx = saved
         order = sv.flow(self._sp_seasons)
-        pk = self._sp_playing()[0]
+        pk = self._sp_marked()[0]
         nxt = sv.next_up(order, lambda e: bool(states[sv.episode_key(e)].watched),
                          lambda e: states[sv.episode_key(e)].progress,
                          playing=(lambda e: self._item_key(e) == pk or sv.episode_key(e) == pk)
@@ -552,7 +569,7 @@ class _SeriesPageMixin:
         page = self._series_page
         if page is None:
             return
-        playing, frac = self._sp_playing()
+        playing, frac = self._sp_marked()
         next_key = sv.episode_key(nxt.episode) if nxt.episode is not None else ""
         page.set_states(states, next_key, playing, frac)
         ep = nxt.episode
@@ -601,7 +618,7 @@ class _SeriesPageMixin:
             if self._sp_timer is not None and not self._series_page_showing():
                 self._sp_timer.stop()
             return
-        if self._sp_playing()[0]:
+        if self._sp_marked()[0]:
             self._sp_refresh()
 
     def _sp_playback_started(self, key, kind: str) -> None:
