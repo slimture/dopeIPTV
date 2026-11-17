@@ -9,6 +9,14 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Changed
 
+- macOS draws the picture on a thread of its own too, as Linux and Windows
+  do: Qt cannot hand its OpenGL to another thread there (AppKit stops the
+  app), so the render thread draws with an NSOpenGLContext of the app's own
+  - attached to the window and kept up to date on the main thread, drawn and
+  flushed on the render thread under its lock (media/video_macos.py). Any
+  fault falls back to the window's thread as before; the release build's
+  self-check draws through it on the macOS runners.
+
 - Settings' group "Accounts and integrations" is "Services" - one word like
   the others, so it fits the sidebar in every language (it was cut off).
 - Movies' and Series' cards show a favourite's star and Watch later's clock

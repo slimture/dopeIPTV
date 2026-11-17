@@ -19,6 +19,15 @@ drawn again only when it changes. While mpv has no picture to show (before
 the first frame, sound alone, stopped) the native window is not shown and
 everything is plain Qt.
 
+The render thread's GL context is a strategy of its own: Qt's
+QOpenGLContext, made and current on that thread (`_QtGL`, Linux and
+Windows), or on macOS an NSOpenGLContext of the app's own
+(media/video_macos.py's `MacGL`) - there Qt's context cannot be made
+current on another thread (AppKit's main-thread rule), so that one is put
+on its view by the window's thread (`attach`) and only drawn with and
+flushed on the render thread. The renderer and the surface are the same
+for both.
+
 The window's own thread (media/video_surface.py's _MpvGLWidget, exactly as
 it always was) is used when this is switched off (core/video_mode.py) or
 could not start; then the reason is logged and kept for Nerd > Diagnostics
@@ -27,6 +36,7 @@ and the error report.
 
 from __future__ import annotations
 
+import contextlib
 import ctypes
 import os
 import sys
@@ -66,8 +76,16 @@ BIG_OVERLAY_PX = 400_000
 BIG_OVERLAY_MS = 100
 #: mpv's overlay ids; mpv draws them in this order (lowest underneath).
 OVERLAY_IDS = 64
+#: macOS: a change to the context's view the window's thread could not make
+#: (the render thread was in a frame) is tried again this soon, at most
+#: this many times in a row before the surface gives up.
+ATTACH_RETRY_MS = 4
+ATTACH_TRIES = 500
 #: Platforms where Qt cannot hand a window's GL to another thread.
 _NO_THREAD_PLATFORMS = frozenset({"offscreen", "minimal", "vnc", "linuxfb"})
+#: The render thread's GL context: Qt's own, or macOS's NSOpenGLContext.
+QT_GL, NSGL = "qt", "nsgl"
+_MAC = sys.platform == "darwin"
 _GL_COLOR_BUFFER_BIT = 0x00004000
 #: A window moved to a screen with another pixel ratio: its size in pixels
 #: changed too (Qt 6.6 names the event; older ones send a screen change).
@@ -87,6 +105,16 @@ def _surface_format() -> QSurfaceFormat:
     return fmt
 
 
+def gl_kind(platform: str) -> str:
+    """Which GL context the render thread draws with on *platform*
+    (sys.platform): macOS's own NSOpenGLContext there, Qt's elsewhere."""
+    return NSGL if platform == "darwin" else QT_GL
+
+
+def _kind() -> str:
+    return gl_kind(sys.platform)
+
+
 def can_start() -> str:
     """Why this system cannot draw the picture on a thread of its own ("":
     it can try)."""
@@ -95,11 +123,19 @@ def can_start() -> str:
     name = QGuiApplication.platformName()
     if name in _NO_THREAD_PLATFORMS:
         return f"the {name} platform"
-    try:
-        if not QOpenGLContext.supportsThreadedOpenGL():
-            return f"{name}: no OpenGL on other threads"
-    except Exception as e:
-        return f"{type(e).__name__}: {e}"
+    if _kind() == NSGL:
+        # Qt says cocoa has no OpenGL on other threads - true of its own
+        # context, not of the one media/video_macos.py makes for it.
+        from . import video_macos
+        why = video_macos.unavailable()
+        if why:
+            return f"{name}: {why}"
+    else:
+        try:
+            if not QOpenGLContext.supportsThreadedOpenGL():
+                return f"{name}: no OpenGL on other threads"
+        except Exception as e:
+            return f"{type(e).__name__}: {e}"
     if video_mode.failed():
         return video_mode.failed()
     return ""
@@ -209,6 +245,12 @@ class _VideoWindow(QWindow):
     def resizeEvent(self, e) -> None:
         self._tell()
 
+    def moveEvent(self, e) -> None:
+        # macOS: the view moved within its window - its context is brought
+        # up to date on this thread (media/video_macos.py).
+        if _MAC:
+            self._tell()
+
     def event(self, e) -> bool:
         t = int(e.type())
         if t in _DPR_EVENTS:
@@ -278,21 +320,118 @@ def _target_of(win: QWindow | None, shown: bool) -> _Target:
                                    and _on_screen(win)))
 
 
+# -- the render thread's GL context -------------------------------------------------
+
+_NO_LOCK = contextlib.nullcontext()
+
+
+class _QtGL:
+    """Qt's own QOpenGLContext, made and current on the render thread -
+    current on the offscreen surface while there is no window to draw into
+    (Linux, Windows). The strategy the renderer draws through; macOS's is
+    media/video_macos.py's MacGL, with the same calls.
+
+    The render thread: create, get_proc_address, idle (current with no
+    window), keep (current somewhere), section (a GL call outside a frame:
+    nothing to hold here), begin (current on a window), fbo, present
+    (swap), end, free, abandon. The window's thread: attach (the target as
+    it is), detach, close - nothing to do for Qt's."""
+
+    render_args: dict = {}
+
+    def __init__(self, offscreen: QOffscreenSurface | None, fmt: QSurfaceFormat | None) -> None:
+        self._off = offscreen
+        self._fmt = fmt
+        self._ctx: QOpenGLContext | None = None
+        self.info = ""
+
+    def create(self) -> str:
+        ctx = QOpenGLContext()
+        ctx.setFormat(self._fmt)
+        if not ctx.create():
+            return "the OpenGL context could not be made"
+        if not ctx.makeCurrent(self._off):
+            return "the OpenGL context could not be made current"
+        self._ctx = ctx
+        return ""
+
+    def get_proc_address(self, name: bytes) -> int:
+        ctx = self._ctx
+        if ctx is None:
+            return 0
+        try:
+            addr = ctx.getProcAddress(name)
+            return int(addr) if addr else 0
+        except Exception:
+            return 0
+
+    def idle(self) -> None:
+        self._ctx.makeCurrent(self._off)
+
+    def keep(self) -> None:
+        if QOpenGLContext.currentContext() is not self._ctx:
+            self._ctx.makeCurrent(self._off)
+
+    def section(self):
+        return _NO_LOCK
+
+    def begin(self, window: QWindow, again: bool) -> bool:
+        ctx = self._ctx
+        if again or QOpenGLContext.currentContext() is not ctx:
+            return bool(ctx.makeCurrent(window))
+        return True
+
+    def fbo(self) -> int:
+        return int(self._ctx.defaultFramebufferObject())
+
+    def present(self, window: QWindow) -> None:
+        self._ctx.swapBuffers(window)
+
+    def end(self, ok) -> None:
+        pass
+
+    def free(self, rctx) -> None:
+        ctx = self._ctx
+        try:
+            ctx.makeCurrent(self._off)
+            rctx.free()
+        except Exception as e:
+            log.info("video thread: render context free: %s", e)
+        try:
+            ctx.doneCurrent()
+        except Exception:
+            pass
+        self._ctx = None
+
+    def abandon(self) -> None:
+        self._ctx.doneCurrent()
+        self._ctx = None
+
+    def attach(self, target: "_Target") -> "_Target":
+        return target
+
+    def detach(self, window) -> None:
+        pass
+
+    def close(self) -> None:
+        pass
+
+
 # -- the render thread ------------------------------------------------------------
 
 
 class _Renderer(QThread):
-    """Owns the GL context and mpv's render context; renders each frame mpv
-    has into the target window and swaps. Only *wake*, *set_target*,
-    *set_blank* and *stop* are called from other threads."""
+    """Owns mpv's render context and draws through its GL context (*gl*:
+    Qt's, else macOS's); renders each frame mpv has into the target window
+    and presents it. Only *wake*, *set_target*, *set_blank*, *redraw*,
+    *release* and *stop* are called from other threads."""
 
-    def __init__(self, core, offscreen: QOffscreenSurface, fmt: QSurfaceFormat, name: str,
-                 told: "_Told") -> None:
+    def __init__(self, core, offscreen: QOffscreenSurface | None, fmt: QSurfaceFormat | None,
+                 name: str, told: "_Told", gl: Any = None) -> None:
         super().__init__()
         self.setObjectName(name)
         self._core = core
-        self._off = offscreen
-        self._fmt = fmt
+        self._gl = gl if gl is not None else _QtGL(offscreen, fmt)
         self._told = told
         self._wake = threading.Event()
         self._lock = threading.Lock()
@@ -302,11 +441,8 @@ class _Renderer(QThread):
         self._quit = False
         self._release: QWindow | None = None     # a window to let go of
         # makeCurrent again before the next frame: the GL context takes a
-        # resize, a move or another screen there (on macOS Qt updates the
-        # NSOpenGLContext's drawable in makeCurrent - so there it is made
-        # current every frame, as Qt's own threaded render loop does).
+        # resize, a move or another screen there.
         self._remake = True
-        self._every_frame = sys.platform == "darwin"
         self._released = threading.Event()
         # Windows: mpv's update callback from its own thread crashed there
         # (see _MpvGLWidget._create_render_context), so this thread asks
@@ -321,7 +457,6 @@ class _Renderer(QThread):
         self._glClear: Any = None
         self._glClearColor: Any = None
         self._proc_fn: Any = None
-        self._ctx: QOpenGLContext | None = None
         self.rctx: Any = None
 
     # -- other threads ------------------------------------------------------------
@@ -352,7 +487,7 @@ class _Renderer(QThread):
 
     def release(self, window: QWindow, timeout: float = 1.0) -> bool:
         """The window's thread: *window*'s native surface is about to go.
-        The render thread stops drawing into it and lets it go (its context
+        The render thread stops drawing into it and lets it go (Qt's context
         moves to the offscreen surface) before this returns."""
         if not self.isRunning():
             return True
@@ -380,18 +515,10 @@ class _Renderer(QThread):
 
     # -- this thread --------------------------------------------------------------
     def _get_proc_address(self, _ctx, name: bytes) -> int:
-        ctx = self._ctx
-        if ctx is None:
-            return 0
         try:
-            addr = ctx.getProcAddress(name)
-            v = int(addr) if addr else 0
+            return self._gl.get_proc_address(name)
         except Exception:
-            v = 0
-        if not v and sys.platform == "darwin":
-            from ..core.platform_macos import gl_get_proc_address_fallback
-            return gl_get_proc_address_fallback(name)
-        return v
+            return 0
 
     def _fn(self, name: bytes, restype, *argtypes):
         addr = self._get_proc_address(None, name)
@@ -400,25 +527,20 @@ class _Renderer(QThread):
         return ctypes.CFUNCTYPE(restype, *argtypes)(addr)
 
     def run(self) -> None:
-        ctx = QOpenGLContext()
-        ctx.setFormat(self._fmt)
-        if not ctx.create():
-            self.error = "the OpenGL context could not be made"
+        gl = self._gl
+        error = gl.create()
+        if error:
+            self.error = error
             self.ready.set()
             return
-        if not ctx.makeCurrent(self._off):
-            self.error = "the OpenGL context could not be made current"
-            self.ready.set()
-            return
-        self._ctx = ctx
         try:
             self._proc_fn = _libmpv.MpvGlGetProcAddressFn(self._get_proc_address)
-            rctx = _libmpv.MpvRenderContext(
-                self._core, "opengl", opengl_init_params={"get_proc_address": self._proc_fn})
+            with gl.section():
+                rctx = _libmpv.MpvRenderContext(
+                    self._core, "opengl", opengl_init_params={"get_proc_address": self._proc_fn})
         except Exception as e:
             self.error = f"mpv render context: {type(e).__name__}: {e}"
-            ctx.doneCurrent()
-            self._ctx = None
+            gl.abandon()
             self.ready.set()
             return
         self._glClearColor = self._fn(b"glClearColor", None, ctypes.c_float, ctypes.c_float,
@@ -432,7 +554,7 @@ class _Renderer(QThread):
         # do GL work in any render API call, update() included.
         self.ready.set()
         try:
-            self._loop(ctx, rctx)
+            self._loop(gl, rctx)
         except Exception as e:
             log.error("video thread: stopped by %s: %s", type(e).__name__, e)
             self._told.failed.emit(f"{type(e).__name__}: {e}")
@@ -441,25 +563,24 @@ class _Renderer(QThread):
             # holds before it hands mpv the new one, so mpv's thread could
             # still call the freed one - a crash on closing multiview. free()
             # ends the callbacks itself; rctx keeps ours alive until then.
-            try:
-                ctx.makeCurrent(self._off)
-                rctx.free()
-            except Exception as e:
-                log.info("video thread: render context free: %s", e)
+            gl.free(rctx)
             self.rctx = None
-            try:
-                ctx.doneCurrent()
-            except Exception:
-                pass
-            self._ctx = None
 
     def _clear_black(self) -> None:
         if self._glClearColor is not None and self._glClear is not None:
             self._glClearColor(0.0, 0.0, 0.0, 1.0)
             self._glClear(_GL_COLOR_BUFFER_BIT)
 
-    def _loop(self, ctx: QOpenGLContext, rctx) -> None:
-        current = None              # the window made current last
+    def _skip(self, gl, rctx) -> None:
+        # Nothing on screen to draw into: the frame is taken all the same,
+        # so mpv's clock never waits on us.
+        with gl.section():
+            rctx.render(skip_rendering=True)
+        rctx.report_swap()
+        self.pending_since = 0.0
+
+    def _loop(self, gl, rctx) -> None:
+        current = None              # the window drawn into last
         failed_makes = 0
         while not self._quit:
             if self._poll:
@@ -471,34 +592,31 @@ class _Renderer(QThread):
                 break
             with self._lock:
                 target, blank, redraw = self._target, self._blank, self._redraw
-                remake, self._remake = self._remake or self._every_frame, False
+                remake, self._remake = self._remake, False
                 self._redraw = False
                 release, self._release = self._release, None
             if release is not None:
                 if current is release:
-                    ctx.makeCurrent(self._off)
+                    gl.idle()
                     current = None
                 self._released.set()
                 if target.window is release:
                     continue
-            if current is None and QOpenGLContext.currentContext() is not ctx:
-                ctx.makeCurrent(self._off)
-            try:
-                frame = bool(rctx.update())
-            except Exception:
-                frame = True
+            if current is None:
+                gl.keep()
+            with gl.section():
+                try:
+                    frame = bool(rctx.update())
+                except Exception:
+                    frame = True
             if frame and not self.pending_since:
                 self.pending_since = time.monotonic()
             if target.window is None or not target.exposed:
                 if current is not None:
-                    ctx.makeCurrent(self._off)
+                    gl.idle()
                     current = None
                 if frame:
-                    # Nothing on screen to draw into: the frame is taken all
-                    # the same, so mpv's clock never waits on us.
-                    rctx.render(skip_rendering=True)
-                    rctx.report_swap()
-                    self.pending_since = 0.0
+                    self._skip(gl, rctx)
                 continue
             if not (frame or redraw):
                 continue
@@ -507,39 +625,45 @@ class _Renderer(QThread):
                 # said so: nothing to draw into, an ordinary state.
                 self._drop_target(target.window)
                 if current is not None:
-                    ctx.makeCurrent(self._off)
+                    gl.idle()
                     current = None
                 if frame:
-                    rctx.render(skip_rendering=True)
-                    rctx.report_swap()
-                    self.pending_since = 0.0
+                    self._skip(gl, rctx)
                 continue
             t0 = time.monotonic()
             try:
-                if (remake or current is not target.window
-                        or QOpenGLContext.currentContext() is not ctx):
-                    if not ctx.makeCurrent(target.window):
-                        failed_makes += 1
-                        if failed_makes in (1, 50):
-                            log.warning("video thread: the window could not be drawn into (%d)",
-                                        failed_makes)
-                        ctx.makeCurrent(self._off)
-                        current = None
-                        continue
-                    current = target.window
-                failed_makes = 0
-                if blank:
-                    self._clear_black()
-                else:
-                    rctx.render(flip_y=True, opengl_fbo={
-                        "fbo": int(ctx.defaultFramebufferObject()), "w": target.w, "h": target.h})
-                ctx.swapBuffers(target.window)
+                ok = gl.begin(target.window, remake or current is not target.window)
+                if ok is None:
+                    # macOS: the window's thread is putting the context on
+                    # this window's view - drawn once it is there.
+                    continue
+                try:
+                    if ok:
+                        current = target.window
+                        failed_makes = 0
+                        if blank:
+                            self._clear_black()
+                        else:
+                            rctx.render(flip_y=True, opengl_fbo={
+                                "fbo": gl.fbo(), "w": target.w, "h": target.h},
+                                **gl.render_args)
+                        gl.present(target.window)
+                finally:
+                    gl.end(ok)
+                if not ok:
+                    failed_makes += 1
+                    if failed_makes in (1, 50):
+                        log.warning("video thread: the window could not be drawn into (%d)",
+                                    failed_makes)
+                    gl.idle()
+                    current = None
+                    continue
             except RuntimeError as e:
                 # sip: the window's wrapper was deleted under us. Not a
                 # failure of the render thread - the window is gone.
                 log.info("video thread: its window went (%s)", e)
                 self._drop_target(target.window)
-                ctx.makeCurrent(self._off)
+                gl.idle()
                 current = None
                 continue
             if not blank:
@@ -858,19 +982,27 @@ class _Overlays(QObject):
 
 
 class _Ending:
-    """What a surface leaves running - its render thread, its mpv core -
-    ended if the surface is destroyed without shutdown() (its destroyed
-    signal: nothing is asked of the surface itself then, it is gone). The
-    thread first: mpv's render context goes before its core."""
+    """What a surface leaves running - its render thread, its GL context,
+    its mpv core - ended if the surface is destroyed without shutdown() (its
+    destroyed signal: nothing is asked of the surface itself then, it is
+    gone). The thread first (mpv's render context goes with it), then the
+    context (macOS: off its view, on this thread), then the core."""
 
     def __init__(self) -> None:
         self.renderer: _Renderer | None = None
+        self.gl: Any = None
         self.core: Any = None
 
     def end(self, *_args) -> None:
         r, self.renderer = self.renderer, None
         if r is not None:
             r.finish()
+        g, self.gl = self.gl, None
+        if g is not None:
+            try:
+                g.close()
+            except Exception as e:
+                log.warning("video thread: the GL context did not close: %s", e)
         m, self.core = self.core, None
         if m is not None:
             try:
@@ -947,7 +1079,11 @@ class ThreadedVideoSurface(QWidget):
         self._vo = False                 # mpv has a picture to show
         self._failed = ""
         self._renderer: _Renderer | None = None
+        self._gl: Any = None                 # the render thread's GL context
         self._offscreen: QOffscreenSurface | None = None
+        self._attach_timer: QTimer | None = None
+        self._attach_tries = 0
+        self._fail_why = ""
         self._told = _Told()
         self._told.shown.connect(self._first_frame)
         self._told.failed.connect(self._render_failed)
@@ -1022,23 +1158,26 @@ class ThreadedVideoSurface(QWidget):
             self._give_up(why)
             return
         t0 = time.monotonic()
+        mac = _kind() == NSGL
         try:
-            self.mpv = build_core(self)
+            # macOS: mpv's render does not wait for the frame's display time
+            # there (media/video_macos.py), so mpv hands each frame over at
+            # that time instead of 50 ms early - DOPEIPTV_GUI_RENDER=tuned's
+            # timing.
+            self.mpv = build_core(self, tuned=True) if mac else build_core(self)
         except Exception as e:
             self.mpv = None
             self._give_up(f"mpv: {type(e).__name__}: {e}")
             return
         self._ending.core = self.mpv
-        fmt = _surface_format()
-        off = QOffscreenSurface(self.screen())
-        off.setFormat(fmt)
-        off.create()
-        if not off.isValid():
+        gl, why = self._make_gl(mac)
+        if gl is None:
             self._kill_core()
-            self._give_up("no offscreen GL surface")
+            self._give_up(why)
             return
-        self._offscreen = off
-        r = _Renderer(self.mpv, off, fmt, self._name, self._told)
+        self._gl = gl
+        self._ending.gl = gl
+        r = _Renderer(self.mpv, self._offscreen, None, self._name, self._told, gl=gl)
         self._renderer = r
         self._ending.renderer = r
         r.start()
@@ -1066,8 +1205,39 @@ class ThreadedVideoSurface(QWidget):
         video_mode.note(video_mode.THREAD)
         log.info("video: drawn on a thread of its own (%s, %s, ready in %.0f ms)",
                  self._name, QGuiApplication.platformName(), (time.monotonic() - t0) * 1000)
+        if mac:
+            log.info("video thread: NSOpenGLContext, %s (%s)", gl.info or "renderer unknown",
+                     gl.format)
         self._sync_box()
         self._window_changed()
+
+    def _make_gl(self, mac: bool) -> tuple[Any, str]:
+        """The render thread's GL context: (the strategy, "") or (None,
+        why not). macOS's NSOpenGLContext is made here, on the main thread;
+        Qt's is made on the render thread, with the offscreen surface made
+        here for it."""
+        if mac:
+            from . import video_macos
+            gl = video_macos.MacGL()
+            try:
+                why = gl.prepare()
+            except Exception as e:
+                why = f"NSOpenGLContext: {type(e).__name__}: {e}"
+            return (None, why) if why else (gl, "")
+        fmt = _surface_format()
+        off = QOffscreenSurface(self.screen())
+        off.setFormat(fmt)
+        off.create()
+        if not off.isValid():
+            return None, "no offscreen GL surface"
+        self._offscreen = off
+        return _QtGL(off, fmt), ""
+
+    @property
+    def gl_info(self) -> str:
+        """What the render thread draws with, for the log ("" for Qt's)."""
+        gl = self._gl
+        return f"NSOpenGLContext, {gl.info}" if gl is not None and gl.info else ""
 
     def _give_up(self, reason: str) -> None:
         self._failed = reason
@@ -1090,6 +1260,14 @@ class ThreadedVideoSurface(QWidget):
         r, self._renderer = self._renderer, None
         if r is not None:
             r.finish()
+        # Once its thread has ended: macOS's context off its view, here.
+        self._ending.gl = None
+        gl, self._gl = self._gl, None
+        if gl is not None:
+            try:
+                gl.close()
+            except Exception as e:
+                log.warning("video thread: the GL context did not close: %s", e)
 
     # -- the picture: where it goes, whether it shows ---------------------------------
     def _live_mirror(self) -> "ThreadedMirror | None":
@@ -1113,7 +1291,61 @@ class ThreadedVideoSurface(QWidget):
                 t = _target_of(self._win, self.isVisible() and self._box.isVisible())
         except RuntimeError:            # a window on its way out
             t = _Target(None, 0, 0, False)
+        gl = self._gl
+        if gl is not None:
+            t = self._attach(gl, t)
+            if t is None:
+                return
         r.set_target(t)
+
+    def _attach(self, gl: Any, t: _Target) -> _Target | None:
+        """The GL context on the target's window, on this thread (macOS:
+        its NSView; Qt's: nothing to do). None: not now - the render thread
+        draws on where it was, and this is tried again in a moment."""
+        try:
+            got = gl.attach(t)
+        except Exception as e:
+            self._fail_soon(f"the picture's window: {type(e).__name__}: {e}")
+            return None
+        if got is not None:
+            self._attach_tries = 0
+            return got
+        self._attach_tries += 1
+        if self._attach_tries > ATTACH_TRIES:
+            self._fail_soon("the picture's window stayed busy")
+            return None
+        if self._attach_timer is None:
+            self._attach_timer = QTimer(self)
+            self._attach_timer.setSingleShot(True)
+            self._attach_timer.setInterval(ATTACH_RETRY_MS)
+            self._attach_timer.timeout.connect(self._window_changed)
+        if not self._attach_timer.isActive():
+            self._attach_timer.start()
+        return None
+
+    def _fail_soon(self, reason: str) -> None:
+        # Not inside the event that found it: the owner replaces this
+        # surface on its fallback signal.
+        if not self._fail_why:
+            self._fail_why = reason
+            QTimer.singleShot(0, self._fail_now)
+
+    def _fail_now(self) -> None:
+        if self._fail_why:
+            self._render_failed(self._fail_why)
+
+    def _let_go(self, win: QWindow) -> None:
+        """*win*'s native window is going: the render thread lets go of it,
+        then (macOS) the context is taken off its view, on this thread."""
+        r = self._renderer
+        if r is not None:
+            r.release(win)
+        gl = self._gl
+        if gl is not None:
+            try:
+                gl.detach(win)
+            except Exception as e:
+                log.warning("video thread: the GL context did not let go of its window: %s", e)
 
     def _window_going(self, win: QWindow) -> None:
         if not _alive(self):
@@ -1121,9 +1353,7 @@ class ThreadedVideoSurface(QWidget):
             # its thread and core end here, before the window does.
             self._ending.end()
             return
-        r = self._renderer
-        if r is not None:
-            r.release(win)
+        self._let_go(win)
         QTimer.singleShot(0, self._window_changed)
 
     def _vo_changed(self, on: bool) -> None:
@@ -1160,6 +1390,8 @@ class ThreadedVideoSurface(QWidget):
             return
         log.error("video thread: %s", reason)
         self._watchdog.stop()
+        if self._attach_timer is not None:
+            self._attach_timer.stop()
         self._overlays.stop()
         self._stop_renderer()
         self._kill_core()
@@ -1182,7 +1414,8 @@ class ThreadedVideoSurface(QWidget):
     def make_mirror(self, parent: QWidget) -> "ThreadedMirror":
         """The pop-out's surface: its own native window, which this
         surface's render thread draws into instead of its own while it is
-        there. Nothing GL is moved between windows."""
+        there. Nothing GL is moved between windows (on macOS the one
+        context is put on its view instead, on this thread)."""
         m = ThreadedMirror(self, parent)
         self._mirror = m
         self._overlays.place_over(m)
@@ -1197,9 +1430,8 @@ class ThreadedVideoSurface(QWidget):
             m._owner = None
             # Let go of its window now, not when it is deleted: the thread
             # may still be drawing the frame it began there.
-            r = self._renderer
-            if r is not None and _alive(m):
-                r.release(m._win)
+            if _alive(m):
+                self._let_go(m._win)
             if _alive(m):
                 m.hide()
                 m.deleteLater()
@@ -1237,6 +1469,8 @@ class ThreadedVideoSurface(QWidget):
     # -- end ------------------------------------------------------------------------
     def shutdown(self) -> None:
         self._watchdog.stop()
+        if self._attach_timer is not None:
+            self._attach_timer.stop()
         self._overlays.uninstall()
         self._stop_renderer()
         self._kill_core()
@@ -1323,9 +1557,11 @@ CHECK_SOURCE = "av://lavfi:testsrc=size=320x240:rate=25"
 def video_check(seconds: float = 20.0) -> int:
     """`--video-check`: can this machine draw the picture on a thread of its
     own? A small window plays a generated test picture until the render
-    thread has shown frames. CHECK_SKIPPED when it cannot try (no OpenGL on
-    other threads, no window on screen), CHECK_FAILED when it could and drew
-    nothing - the app would fall back to the window's thread there."""
+    thread has shown frames - on macOS with the app's own NSOpenGLContext
+    (media/video_macos.py), the way the app draws there. CHECK_SKIPPED when
+    it cannot try (no OpenGL on other threads or no PyObjC, no pixel format,
+    no window on screen), CHECK_FAILED when it could and drew nothing - the
+    app would fall back to the window's thread there."""
     import tempfile
 
     from PyQt6.QtWidgets import QApplication
@@ -1377,8 +1613,10 @@ def video_check(seconds: float = 20.0) -> int:
             spin(lambda: surface.frames_shown >= 1 or bool(errors) or bool(gave_up))
         shown = surface.frames_shown
         if shown >= 1 and not gave_up:
-            log.info("video-check: OK (%d frames drawn on the render thread, %s)",
-                     shown, QGuiApplication.platformName())
+            where = QGuiApplication.platformName()
+            if surface.gl_info:
+                where = f"{where}, {surface.gl_info}"
+            log.info("video-check: OK (%d frames drawn on the render thread, %s)", shown, where)
             return CHECK_OK
         if not surface._win.isExposed():
             log.info("video-check: skipped (the window was never on screen)")

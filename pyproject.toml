@@ -218,6 +218,7 @@ files = [
     "dopeiptv/services/notify.py",
     "dopeiptv/services/popular.py",
     "dopeiptv/media/subtitle_text.py",
+    "dopeiptv/media/video_macos.py",
 ]
 
 [tool.pytest.ini_options]

@@ -135,6 +135,9 @@ dopeiptv/
     video_thread.py    ThreadedVideoSurface (the default): a native window
                        a render thread of its own draws mpv's frames into;
                        the overlays drawn into the picture by mpv
+    video_macos.py     macOS's GL context for that thread: an NSOpenGLContext
+                       put on its view on the main thread, drawn into and
+                       flushed on the render thread (PyObjC, CGL)
     video_surface.py   _MpvGLWidget(QOpenGLWidget), the window-thread surface
                        (fallback and switch); the Linux pop-out's raster mirror
     rewind_bar.py      DVR row + timeshift timeline over the video

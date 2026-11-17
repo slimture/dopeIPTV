@@ -1243,21 +1243,28 @@ jobs:
             hdiutil detach "$MOUNT" || true; exit 1
           fi
           echo "::endgroup::"
-          # The picture drawn on a thread of its own (media/video_thread.py):
-          # its GL context made on the render thread and a generated test
-          # picture shown in a small window. A runner whose OpenGL cannot try
-          # (no threaded GL, no window on screen) exits 3 - skipped, said so.
-          # Drawing nothing where it could, or a crash, fails the build: the
-          # app falls back to the window's thread on such a Mac, but a crash
-          # on the render thread is not caught by that.
+          # The picture drawn on a thread of its own (media/video_thread.py),
+          # on macOS with the app's own NSOpenGLContext (media/video_macos.py:
+          # put on its view on the main thread, drawn into and flushed on the
+          # render thread) and a generated test picture shown in a small
+          # window. A runner that cannot try (no PyObjC or OpenGL framework,
+          # no pixel format, no window on screen) exits 3 - skipped, said so.
+          # Drawing nothing where it could, a crash (AppKit stops a process
+          # that touches a view off the main thread) or a hang (the alarm)
+          # fails the build: the app falls back to the window's thread on
+          # such a Mac, but a crash on the render thread is not caught by that.
           echo "::group::--video-check (the video's own render thread)"
           VRC=0
-          perl -e 'alarm shift; exec @ARGV' 120 "$BIN" --video-check || VRC=$?
+          VLOG="${RUNNER_TEMP}/video-check.log"
+          perl -e 'alarm shift; exec @ARGV' 120 "$BIN" --video-check > "$VLOG" 2>&1 || VRC=$?
+          cat "$VLOG"
           echo "::endgroup::"
+          # What it drew with and how it ended, in the run's annotations.
+          VLINE=$(grep -E 'video-check: |video thread: NSOpenGLContext' "$VLOG" | sed 's/^\[dopeIPTV\] //' | tr '\n' ' ' || true)
           case "$VRC" in
-            0) echo "video check: frames drawn on the render thread" ;;
-            3) echo "::notice::--video-check skipped: this runner's OpenGL cannot try the threaded video surface (see the log above)" ;;
-            *) echo "::error::--video-check failed (exit $VRC): the threaded video surface did not draw on the mounted .app"
+            0) echo "::notice::video check (${{ matrix.arch }}): ${VLINE:-frames drawn on the render thread}" ;;
+            3) echo "::notice::--video-check skipped (${{ matrix.arch }}): ${VLINE:-this runner cannot try the threaded video surface} (see the log above)" ;;
+            *) echo "::error::--video-check failed (exit $VRC): the threaded video surface did not draw on the mounted .app. ${VLINE}"
                hdiutil detach "$MOUNT" || true; exit 1 ;;
           esac
           # Signed and notarised, the app still holds what its build manifest

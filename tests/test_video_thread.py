@@ -142,6 +142,255 @@ def test_after_a_failure_every_surface_uses_the_window_thread(monkeypatch):
     assert video_thread.can_start() == "no frame could be shown"
 
 
+def test_macos_draws_with_its_own_context_and_elsewhere_with_qts():
+    assert video_thread.gl_kind("darwin") == video_thread.NSGL
+    assert video_thread.gl_kind("linux") == video_thread.QT_GL
+    assert video_thread.gl_kind("win32") == video_thread.QT_GL
+
+
+def test_on_macos_can_start_asks_its_own_context_not_qt(monkeypatch):
+    """Qt's "no OpenGL on other threads" on cocoa is about its own context:
+    on macOS what counts is whether the app's own can be made (PyObjC's
+    AppKit, the OpenGL framework)."""
+    from dopeiptv.media import video_macos
+    monkeypatch.setattr(video_thread, "_kind", lambda: video_thread.NSGL)
+    monkeypatch.setattr(video_thread.QGuiApplication, "platformName", staticmethod(lambda: "cocoa"))
+    monkeypatch.setattr(video_thread.QOpenGLContext, "supportsThreadedOpenGL",
+                        staticmethod(lambda: False))
+    monkeypatch.setattr(video_thread, "_libmpv", object())
+    monkeypatch.setattr(video_macos, "unavailable", lambda: "")
+    assert video_thread.can_start() == ""
+    monkeypatch.setattr(video_macos, "unavailable",
+                        lambda: "PyObjC's AppKit: ImportError: no AppKit")
+    assert video_thread.can_start() == "cocoa: PyObjC's AppKit: ImportError: no AppKit"
+    monkeypatch.setattr(video_macos, "unavailable", lambda: "")
+    video_mode.note_failed("no frame could be shown")
+    assert video_thread.can_start() == "no frame could be shown"
+    # The platforms nothing can draw on another thread on are still refused.
+    monkeypatch.setattr(video_thread.QGuiApplication, "platformName",
+                        staticmethod(lambda: "offscreen"))
+    assert video_thread.can_start() == "the offscreen platform"
+
+
+def test_a_mac_context_that_cannot_be_made_is_a_reason(monkeypatch):
+    from dopeiptv.media import video_macos
+
+    class _NoContext:
+        def prepare(self):
+            return "no OpenGL pixel format (4.1 or 3.2 core)"
+
+    class _Broken:
+        def prepare(self):
+            raise OSError("boom")
+    host = QWidget()
+    s = video_thread.ThreadedVideoSurface(host)
+    monkeypatch.setattr(video_macos, "MacGL", _NoContext)
+    assert s._make_gl(True) == (None, "no OpenGL pixel format (4.1 or 3.2 core)")
+    monkeypatch.setattr(video_macos, "MacGL", _Broken)
+    assert s._make_gl(True) == (None, "NSOpenGLContext: OSError: boom")
+    s.shutdown()
+
+
+class _FakeRenderer:
+    def __init__(self, log):
+        self.log, self.frames, self.pending_since = log, 0, 0.0
+
+    def set_target(self, t):
+        self.log.append(("set_target", t))
+
+    def release(self, win):
+        self.log.append(("release", win))
+
+    def finish(self):
+        self.log.append(("finish",))
+
+
+class _FakeGL:
+    def __init__(self, log, answer):
+        self.log, self.answer, self.info = log, answer, ""
+
+    def attach(self, t):
+        self.log.append(("attach",))
+        if isinstance(self.answer, Exception):
+            raise self.answer
+        return t if self.answer == "now" else None
+
+    def detach(self, win):
+        self.log.append(("detach", win))
+
+    def close(self):
+        self.log.append(("close",))
+
+
+_HOSTS: list = []
+
+
+def _surface_with(answer):
+    log = []
+    host = QWidget()
+    _HOSTS.append(host)                  # its surface lives as long as it does
+    s = video_thread.ThreadedVideoSurface(host)
+    s._renderer = _FakeRenderer(log)
+    s._gl = _FakeGL(log, answer)
+    return s, log
+
+
+def test_a_busy_context_is_put_on_its_view_a_moment_later():
+    s, log = _surface_with("later")
+    s._window_changed()
+    assert log == [("attach",)]                    # the old target stays meanwhile
+    assert s._attach_timer.isActive()
+    assert s._attach_timer.interval() == video_thread.ATTACH_RETRY_MS
+    s._gl.answer = "now"
+    s._window_changed()
+    assert [e[0] for e in log] == ["attach", "attach", "set_target"]
+    assert s._attach_tries == 0
+    s.shutdown()
+
+
+def test_a_context_that_stays_busy_or_fails_falls_back(monkeypatch):
+    for answer, reason in (
+            (video_thread.ATTACH_TRIES + 1, "the picture's window stayed busy"),
+            (RuntimeError("setView"), "the picture's window: RuntimeError: setView")):
+        s, log = _surface_with("later" if isinstance(answer, int) else answer)
+        gave_up = []
+        s.fallback.connect(gave_up.append)
+        for _ in range(answer if isinstance(answer, int) else 1):
+            s._window_changed()
+        assert not gave_up                         # never inside the event itself
+        app.processEvents()
+        assert gave_up == [reason] and s._failed == reason
+        assert ("finish",) in log and ("close",) in log
+        assert log.index(("finish",)) < log.index(("close",))
+        assert s._attach_timer is None or not s._attach_timer.isActive()
+        video_mode.reset()
+
+
+def test_a_window_that_goes_is_let_go_by_the_thread_then_the_context():
+    s, log = _surface_with("now")
+    win = s._win
+    s._window_going(win)
+    assert log[:2] == [("release", win), ("detach", win)]
+    s.shutdown()
+    assert log[-2:] == [("finish",), ("close",)]
+
+
+class _QtCtx:
+    """Qt's QOpenGLContext as the render thread sees it."""
+    current = None
+    log: list = []
+    fail: set = set()
+
+    def setFormat(self, fmt):
+        pass
+
+    def create(self):
+        return True
+
+    def makeCurrent(self, surface):
+        ok = surface not in _QtCtx.fail
+        _QtCtx.log.append(("makeCurrent", surface, ok))
+        _QtCtx.current = self if ok else None
+        return ok
+
+    def doneCurrent(self):
+        _QtCtx.log.append(("doneCurrent",))
+        _QtCtx.current = None
+
+    def swapBuffers(self, win):
+        _QtCtx.log.append(("swap", win))
+
+    def defaultFramebufferObject(self):
+        return 7
+
+    def getProcAddress(self, name):
+        return 0
+
+    @staticmethod
+    def currentContext():
+        return _QtCtx.current
+
+
+def test_qts_context_is_driven_on_linux_and_windows_as_it_always_was(monkeypatch):
+    """The render loop with Qt's context, call for call what it made before
+    the context became a strategy: current on the offscreen surface, on a
+    window for its frames (again after a change), swapped; off it when the
+    window is not shown or could not be made current; freed on the
+    offscreen surface."""
+    from PyQt6.QtGui import QWindow
+    a, b = QWindow(), QWindow()
+    _QtCtx.log, _QtCtx.fail, _QtCtx.current = [], set(), None
+    log = _QtCtx.log
+    box = []
+
+    def target(win, shown=True):
+        return video_thread._Target(win, 640, 360, shown)
+    script = [
+        (lambda r: r.set_target(target(a)), True),
+        (None, True), (None, True),
+        (lambda r: r.set_target(target(a, False)), True),
+        (None, True),
+        (lambda r: r.set_target(target(b)), True),
+        (None, True),
+        (lambda r: (_QtCtx.fail.add(a), r.set_target(target(a))), True),
+        (None, True),
+    ]
+
+    class _Rctx:
+        update_cb = None
+
+        def __init__(self):
+            self.i = 0
+
+        def update(self):
+            r = box[0]
+            if self.i >= len(script):
+                r.stop()
+                return False
+            act, frame = script[self.i]
+            self.i += 1
+            log.append(("update",))
+            if act:
+                act(r)
+            r._wake.set()
+            return frame
+
+        def render(self, **kw):
+            log.append(("render", "skip" if kw.get("skip_rendering") else kw["opengl_fbo"]["fbo"],
+                        kw.get("block_for_target_time")))
+
+        def report_swap(self):
+            pass
+
+        def free(self):
+            log.append(("free",))
+
+    class _Libmpv:
+        MpvGlGetProcAddressFn = staticmethod(lambda fn: fn)
+        MpvRenderContext = staticmethod(lambda *a, **kw: _Rctx())
+    monkeypatch.setattr(video_thread, "QOpenGLContext", _QtCtx)
+    monkeypatch.setattr(video_thread, "_libmpv", _Libmpv)
+    off = object()
+    r = video_thread._Renderer(object(), off, None, "qt-test", video_thread._Told())
+    box.append(r)
+    r.run()                         # this thread is the render thread here
+    up, mc, sw = ("update",), "makeCurrent", "swap"
+    assert log == [
+        (mc, off, True),
+        up, ("render", "skip", None),                          # no window yet
+        up, (mc, a, True), ("render", 7, None), (sw, a),       # current on it
+        up, ("render", 7, None), (sw, a),                      # stays current
+        up, ("render", 7, None), (sw, a),
+        up, (mc, off, True), ("render", "skip", None),         # not shown
+        up, ("render", "skip", None),
+        up, (mc, b, True), ("render", 7, None), (sw, b),       # another window
+        up, ("render", 7, None), (sw, b),
+        up, (mc, a, False), (mc, off, True),                   # could not be
+        (mc, off, True), ("free",), ("doneCurrent",),          # freed off-window
+    ]
+    assert r.frames == 5 and r.error == ""
+
+
 # -- the fallback swap ------------------------------------------------------------------
 
 def test_the_window_thread_surface_takes_the_place_of_one_that_could_not_draw():

@@ -131,17 +131,38 @@ on the calling thread. Never set `update_cb = None` on a live render
 context: python-mpv drops the old callback before handing mpv the new one,
 and mpv's thread may still be calling it.
 
-macOS: the render thread makes its context current on the window before
-every frame. Qt's Cocoa context marks itself for an update when the view's
-frame or screen changes (on the main thread) and applies it - the
-`NSOpenGLContext` update - in `makeCurrent`, which is how Qt's own threaded
-render loop keeps it right. A window macOS reports occluded or minimized is
-not exposed and gets no frames (mpv is told they were skipped), so a
-hidden window never swaps into a surface vsync would hold. Only on Wayland
-does a covered window still count as seen (the compositor stops its frame
-callbacks, as under the fullscreen window). The release build's mac smoke
-test runs `--video-check`: a generated test picture drawn on the render
-thread, or skipped (exit 3) where the runner's OpenGL cannot try.
+macOS: Qt's own context cannot be used on the render thread there - its
+`makeCurrent` puts the context on the window's view
+(`-[NSOpenGLContext setView:]`), which AppKit allows on the main thread
+only; on the render thread it stopped the process (SIGTRAP, tried on an M1
+Pro with Qt 6.12). So the render thread draws with an `NSOpenGLContext` of
+the app's own (`media/video_macos.py`), as Apple documents multithreaded
+OpenGL and as SDL's context does: made on the main thread (OpenGL 4.1 core,
+double-buffered, a hardware renderer first), put on the native window's
+`NSView` there (`setView`, Retina's backing pixels asked for) and brought up
+to date there (`update`) after every change of the view's size, place,
+window, screen or scale; on the render thread only made current, drawn into
+at the view's size in backing pixels and flushed. Both sides hold the
+context's CGL lock; the window's thread only tries the context's gate and
+makes a change a moment later when a frame is being drawn, so it never
+waits for the picture. Every flush and update of every context is made one
+at a time (NSOpenGLContext is not re-entrant even across contexts - Qt's
+own does the same), so the flush does not wait for vsync (swap interval 0,
+or one multiview cell would hold up the others) and mpv's render does not
+wait for the frame's display time under the lock: the core gets mpv's
+timing offset 0 instead (`build_core`'s *tuned*), so each frame is handed
+over and flushed at its time. Anything that fails there - no PyObjC, no
+pixel format, a view that would not take the context, an error while
+drawing - is a reason, and the window's thread takes over.
+
+A window macOS reports occluded or minimized is not exposed and gets no
+frames (mpv is told they were skipped), so a hidden window never swaps
+into a surface vsync would hold. Only on Wayland does a covered window
+still count as seen (the compositor stops its frame callbacks, as under the
+fullscreen window). The release build's mac smoke test runs
+`--video-check`: a generated test picture drawn on the render thread
+through that context (its renderer and the result in the run's
+annotations), or skipped (exit 3) where the runner cannot try.
 
 Requirements: `python-mpv` pip package + `libmpv.so` / `libmpv.dylib`
 system library.
