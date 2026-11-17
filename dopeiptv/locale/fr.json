@@ -2985,5 +2985,7 @@
   "start_place_last": "Là où vous vous êtes arrêté",
   "start_place_mine": "Toujours sur Mes listes",
   "set_popular_where": "En haut de",
-  "set_popular_note": "Les films et séries les plus populaires de la semaine sur TMDB - ceux que votre source propose."
+  "set_popular_note": "Les films et séries les plus populaires de la semaine sur TMDB - ceux que votre source propose.",
+  "fp_back_to": "Retour à {name}",
+  "fp_no_address": "La source n'a donné aucune adresse pour ce film."
 }

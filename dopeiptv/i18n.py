@@ -3209,6 +3209,8 @@ _STRINGS: dict[str, dict[str, str]] = {
     "start_place_mine": {"en": "Always on Mine"},
     "set_popular_where": {"en": "At the top of"},
     "set_popular_note": {"en": "This week's most popular movies and series on TMDB - the ones your source has."},
+    "fp_back_to": {"en": "Back to {name}"},
+    "fp_no_address": {"en": "The source gave no address for this film."},
 }
 
 

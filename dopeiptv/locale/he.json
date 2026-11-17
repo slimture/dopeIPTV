@@ -2985,5 +2985,7 @@
   "start_place_last": "איפה שהפסקת",
   "start_place_mine": "תמיד ב'שלי'",
   "set_popular_where": "בראש",
-  "set_popular_note": "הסרטים והסדרות הפופולריים ביותר השבוע ב-TMDB - אלה שיש במקור שלך."
+  "set_popular_note": "הסרטים והסדרות הפופולריים ביותר השבוע ב-TMDB - אלה שיש במקור שלך.",
+  "fp_back_to": "חזרה אל {name}",
+  "fp_no_address": "המקור לא נתן כתובת לסרט הזה."
 }

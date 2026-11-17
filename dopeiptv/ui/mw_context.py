@@ -13,32 +13,44 @@ from ..i18n import tr
 from .tmdb_match import TmdbMatchDialog
 from .widgets import confirm
 from PyQt6.QtCore import QItemSelectionModel, Qt
+from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import QApplication, QInputDialog, QLineEdit, QMenu, QMessageBox
 
 
 class _ContextMenuMixin:
     """MainWindow mixin: the right-click context menus for the channel/category lists."""
-    def _context_menu(self, pos) -> None:
-        idx = self.listw.indexAt(pos)
-        if not idx.isValid():
-            return
-        it = self.list_model.item_at(idx.row())
-        if not it:
-            return
-        # Select (highlight) the right-clicked row so it's clear which
-        # item the menu acts on. The _rmb_selecting guard stops the
-        # live-channel autoplay preview from firing, so right-clicking a
-        # channel highlights it without starting playback or interrupting
-        # whatever is already playing.
-        # A row inside a multi-selection keeps the selection: the menu then
-        # acts on all of it.
-        sm = self.listw.selectionModel()
-        self._rmb_selecting = True
-        if sm.isSelected(idx) and len(sm.selectedRows()) > 1:
-            sm.setCurrentIndex(idx, QItemSelectionModel.SelectionFlag.NoUpdate)
+    def _context_menu(self, pos, item=None, row: int = -1, at=None) -> None:
+        """The list's right click at *pos*. With *item*: the same menu for a
+        row shown elsewhere - a card of the Movies place, a film page's ⋯ -
+        at the global point *at*; *row* is its row in the list (a selection
+        there is what the favourite actions take), -1 for none."""
+        if item is None:
+            idx = self.listw.indexAt(pos)
+            if not idx.isValid():
+                return
+            it = self.list_model.item_at(idx.row())
+            if not it:
+                return
+            # Select (highlight) the right-clicked row so it's clear which
+            # item the menu acts on. The _rmb_selecting guard stops the
+            # live-channel autoplay preview from firing, so right-clicking a
+            # channel highlights it without starting playback or interrupting
+            # whatever is already playing.
+            # A row inside a multi-selection keeps the selection: the menu then
+            # acts on all of it.
+            sm = self.listw.selectionModel()
+            self._rmb_selecting = True
+            if sm.isSelected(idx) and len(sm.selectedRows()) > 1:
+                sm.setCurrentIndex(idx, QItemSelectionModel.SelectionFlag.NoUpdate)
+            else:
+                self.listw.setCurrentIndex(idx)
+            self._rmb_selecting = False
+            row = idx.row()
         else:
-            self.listw.setCurrentIndex(idx)
-        self._rmb_selecting = False
+            it = item
+        if at is None:
+            at = (self.listw.viewport().mapToGlobal(pos) if pos is not None
+                  else QCursor.pos())
         if self.mode == "rec":
             self._rec_context_menu(pos, it)
             return
@@ -71,7 +83,7 @@ class _ContextMenuMixin:
         # which actions they get.
         content_kind, it = self._row_content_kind(it)
         # Favorite actions cover every selected row of this kind.
-        batch = self._fav_batch(idx.row(), it, content_kind)
+        batch = self._fav_batch(row, it, content_kind)
         many = f" ({len(batch)})" if len(batch) > 1 else ""
         if (content_kind in ("live", "fav")
                 and it.get("stream_id") is not None):
@@ -318,7 +330,7 @@ class _ContextMenuMixin:
                     m.addAction(
                         tr("ctx_copy_stream_url"),
                         lambda: QApplication.clipboard().setText(url))
-        m.exec(self.listw.viewport().mapToGlobal(pos))
+        m.exec(at)
 
     # -- channel customizations ----------------------------------------------------
 

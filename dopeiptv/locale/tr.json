@@ -2985,5 +2985,7 @@
   "start_place_last": "Kaldığın yer",
   "start_place_mine": "Her zaman Benim",
   "set_popular_where": "Şunun en üstünde",
-  "set_popular_note": "TMDB'de bu haftanın en popüler filmleri ve dizileri - kaynağında olanlar."
+  "set_popular_note": "TMDB'de bu haftanın en popüler filmleri ve dizileri - kaynağında olanlar.",
+  "fp_back_to": "{name} bölümüne dön",
+  "fp_no_address": "Kaynak bu film için bir adres vermedi."
 }

@@ -2985,5 +2985,7 @@
   "start_place_last": "Tempat terakhir",
   "start_place_mine": "Selalu di Milikku",
   "set_popular_where": "Di bagian atas",
-  "set_popular_note": "Film dan serial terpopuler minggu ini di TMDB - yang dimiliki sumber Anda."
+  "set_popular_note": "Film dan serial terpopuler minggu ini di TMDB - yang dimiliki sumber Anda.",
+  "fp_back_to": "Kembali ke {name}",
+  "fp_no_address": "Sumber tidak memberikan alamat untuk film ini."
 }

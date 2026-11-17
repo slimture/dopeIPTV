@@ -2985,5 +2985,7 @@
   "start_place_last": "上次停留的位置",
   "start_place_mine": "总是“我的”",
   "set_popular_where": "显示在顶部",
-  "set_popular_note": "本周 TMDB 上最热门的电影和剧集中，你的来源里有的那些。"
+  "set_popular_note": "本周 TMDB 上最热门的电影和剧集中，你的来源里有的那些。",
+  "fp_back_to": "返回{name}",
+  "fp_no_address": "来源没有提供这部电影的地址。"
 }

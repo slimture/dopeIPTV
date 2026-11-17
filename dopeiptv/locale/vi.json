@@ -2985,5 +2985,7 @@
   "start_place_last": "Nơi bạn dừng lại",
   "start_place_mine": "Luôn ở Của tôi",
   "set_popular_where": "Ở đầu",
-  "set_popular_note": "Phim và loạt phim thịnh hành nhất tuần trên TMDB mà nguồn của bạn có."
+  "set_popular_note": "Phim và loạt phim thịnh hành nhất tuần trên TMDB mà nguồn của bạn có.",
+  "fp_back_to": "Quay lại {name}",
+  "fp_no_address": "Nguồn không cung cấp địa chỉ cho phim này."
 }

@@ -2985,5 +2985,7 @@
   "start_place_last": "Ulipoishia",
   "start_place_mine": "Daima kwenye Vyangu",
   "set_popular_where": "Juu ya",
-  "set_popular_note": "Filamu na mfululizo maarufu zaidi wiki hii kwenye TMDB - zile ambazo chanzo chako kina."
+  "set_popular_note": "Filamu na mfululizo maarufu zaidi wiki hii kwenye TMDB - zile ambazo chanzo chako kina.",
+  "fp_back_to": "Rudi kwa {name}",
+  "fp_no_address": "Chanzo hakikutoa anwani ya filamu hii."
 }

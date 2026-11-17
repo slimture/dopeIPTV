@@ -378,6 +378,7 @@ class _ProfilesMixin:
         self._search_index_cache = {}     # the sidebar search's, made for the profile before
         self._guide_source_changed()      # its reminders' marks: drawn anew
         self._sp_source_changed()         # a series' page: the profile's own marks
+        self._pf_source_changed()         # the Movies place and a film's page too
         self._search_profile_changed()    # the Search page: found for the one before
         self._update_playlist_btn()
         self._refresh_nav_status()

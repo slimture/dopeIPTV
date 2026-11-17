@@ -5,7 +5,8 @@ the remote API and Home Assistant, the media keys, channel or episode up
 and down, Home's shelves, the command palette, autoplay - and is not what
 the pane shows already, the pane goes to it: a live channel to TV, its
 category, the channel selected and scrolled to; an episode to its series'
-page with the episode marked; a film to Movies, its category, selected; a
+page with the episode marked; a film to the Movies place, its category,
+its card picked (a film's page showing it stays); a
 local file to Local files, its folder; a station to Radio; a recording to
 Recordings. A web stream leaves the pane as it is.
 
@@ -15,7 +16,8 @@ in the way of the stream itself. It does nothing when:
 
 - the play came from the middle pane itself: the list (what it plays is
   its own row: selected, nothing else), a series' page showing that
-  series, the Search page or the Guide page (``from_pane``: their plays
+  series, a film's page and the Movies place (ui/mw_film_page.py), the
+  Search page or the Guide page (``from_pane``: their plays
   keep the page; ``_links_later`` carries that on to a play that waits
   for its address);
 - the same title started again (the app's reconnect, a backup address, a
@@ -179,6 +181,9 @@ class _PaneFollowMixin:
         (then selected), or the series' page of its series."""
         if self._search_page_showing() or self._guide_page_showing():
             return False
+        if self._film_page_showing():
+            # A film's page shows that film, or the place under it follows.
+            return kind == "movie" and self._fp_key() == key
         if self._series_page_showing():
             if kind != "episode":
                 return False
@@ -235,5 +240,6 @@ class _PaneFollowMixin:
         their Back to it does."""
         self._close_guide_page()
         self._close_series_page()
+        self._close_film_page()
         self._close_search_page()
         self._check_nav(self._nav_key_for_mode(self.mode))

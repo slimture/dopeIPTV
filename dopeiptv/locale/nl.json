@@ -2985,5 +2985,7 @@
   "start_place_last": "Waar je was gebleven",
   "start_place_mine": "Altijd op Van mij",
   "set_popular_where": "Bovenaan bij",
-  "set_popular_note": "De populairste films en series van deze week op TMDB - die je bron heeft."
+  "set_popular_note": "De populairste films en series van deze week op TMDB - die je bron heeft.",
+  "fp_back_to": "Terug naar {name}",
+  "fp_no_address": "De bron gaf geen adres voor deze film."
 }

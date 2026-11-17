@@ -110,6 +110,8 @@ from .mw_popout import _PopoutMixin
 from .mw_reminders import _RemindersMixin
 from .mw_series import _SeriesMixin
 from .mw_series_page import _SeriesPageMixin
+from .mw_place_films import _PlaceFilmsMixin
+from .mw_film_page import _FilmPageMixin
 from .mw_search_all import _SearchAllMixin
 from .mw_stats import _StatsMixin
 from .mw_search import _SearchMixin
@@ -158,7 +160,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _NavMixin, _SourceLabelMixin, _ShortcutsMixin, _PaletteMixin, _OnboardingMixin, _SortMixin,
                  _LocalFilesMixin, _RadioMixin, _WebStreamsMixin,
                  _PopoutMixin, _MultiviewMixin, _PlacesMixin, _PopularMixin, _GuideMixin,
-                 _SeriesPageMixin, _SearchAllMixin, _MprisMixin,
+                 _SeriesPageMixin, _PlaceFilmsMixin, _FilmPageMixin, _SearchAllMixin,
+                 _MprisMixin,
                  _FollowMixin, _PaneFollowMixin, _SubtitlesMixin, _CastMixin, _AirPlayMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
                  _HealthMixin, _TsAnalysisMixin, _StreamInfoMixin, _ChannelPrefsMixin, _RemoteMixin, _PhoneMixin, _ServerMixin, _CalendarMixin,
@@ -834,6 +837,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # A category clicked while the Guide shows: that category's list.
         self.cat_list.itemClicked.connect(self._guide_category_clicked)
         self.cat_list.itemClicked.connect(self._sp_category_clicked)
+        self.cat_list.itemClicked.connect(self._fp_category_clicked)
         self.cat_list.itemClicked.connect(self._search_category_clicked)
         self.cat_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.cat_list.customContextMenuRequested.connect(self._cat_menu)
@@ -1100,6 +1104,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # inactive, jumping Home->TV - don't run through _apply_filter, so the
         # hint could otherwise linger under a fully populated list.
         self.list_model.modelReset.connect(self._on_list_populated)
+        # The Movies place shows the list's films as cards (mw_place_films).
+        self.list_model.modelReset.connect(self._pf_model_reset)
         self.delegate = ChannelDelegate(
             self, self.settings.value("view_density", "medium"))
         self.listw.setItemDelegate(self.delegate)
@@ -2164,6 +2170,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self._series_page_visible():
             self._leave_series_page()
             return
+        # ...and a film's page to the Movies place as it was.
+        if self._film_page_visible():
+            self._leave_film_page()
+            return
         # The Search page: its field emptied first, then back where you were.
         if self._search_page_visible():
             self._search_escape()
@@ -2469,6 +2479,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._recent_cache = {}
             self._guide_source_changed()    # the old source's guide goes
             self._sp_source_changed()       # and a series' page of it
+            self._pf_source_changed()       # the Movies place and a film's page
             self._popular_changed()         # popular right now: this source's
             self._refresh_places("source")  # the places' own pages
             # Switching rebuilds the list but loads the guide from cache when
@@ -2504,6 +2515,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not getattr(self, "_guide_hold", False):
             self._close_guide_page()
         self._close_series_page()       # a series' page gives way to the list
+        self._close_film_page()         # ...and a film's page to its place
         # ...and the Search page, unless the window moves on by itself (a
         # source switched to from it has no list of the mode shown).
         if not getattr(self, "_search_hold", False):
@@ -2938,6 +2950,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # Arrowed through the sidebar's categories: their list, in the
             # series page's place (a click does the same, _sp_category_clicked).
             self._sp_category_clicked()
+        if self._film_page_showing() and self.cat_list.hasFocus():
+            self._fp_category_clicked()
         if self._search_page_showing() and self.cat_list.hasFocus():
             self._search_category_clicked()
         self.series_ctx = None
@@ -3535,6 +3549,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self._playing_group == "episode" and lp.get("series_ctx"):
             self._open_series_page(lp["series_ctx"], focus=self._playing_key)
             return
+        # A film: its own page stays when it shows that film; another's gives
+        # way to the Movies place, where the film's card is picked.
+        if self._film_page_showing():
+            if self._playing_group == "vod" and self._film_page_shows(self._playing_key):
+                return
+            self._close_film_page()
+            self._check_nav(self._nav_key_for_mode(self.mode))
         if self._try_select_playing():
             return
         # A local file lives in its own folder - go to the Local files
@@ -5123,6 +5144,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.setWindowTitle(self._base_title)
         self._source_status_stopped()     # the list's line again, its source with it
         self._sp_refresh_soon()        # where it stopped, on a series' page
+        pf = getattr(self, "_pf_refresh_soon", None)
+        if pf is not None:
+            pf()                       # ...and on the Movies place, a film's page
 
     def _autoplay_next_episode(self) -> bool:
         return self.settings.value("autoplay_next_episode", "true") == "true"
@@ -5406,6 +5430,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                                "web": "web"}.get(kind)
         # A series' page marks what plays and goes to it (autoplay's next).
         self._sp_playback_started(key, kind)
+        # ...and the Movies place and a film's page mark it (mw_place_films).
+        pf = getattr(self, "_pf_playback_started", None)
+        if pf is not None:
+            pf(key, kind)
         # The middle pane goes to what plays, when it came from elsewhere.
         follow = getattr(self, "_pane_follow_soon", None)
         if follow is not None:

@@ -2985,5 +2985,7 @@
   "start_place_last": "Dove eri rimasto",
   "start_place_mine": "Sempre su Miei",
   "set_popular_where": "In cima a",
-  "set_popular_note": "I film e le serie più popolari della settimana su TMDB, quelli che ha la tua fonte."
+  "set_popular_note": "I film e le serie più popolari della settimana su TMDB, quelli che ha la tua fonte.",
+  "fp_back_to": "Torna a {name}",
+  "fp_no_address": "La sorgente non ha fornito un indirizzo per questo film."
 }

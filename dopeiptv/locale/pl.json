@@ -2985,5 +2985,7 @@
   "start_place_last": "Tam, gdzie skończyłeś",
   "start_place_mine": "Zawsze na Moje",
   "set_popular_where": "Na górze",
-  "set_popular_note": "Najpopularniejsze filmy i seriale tygodnia na TMDB - te, które ma twoje źródło."
+  "set_popular_note": "Najpopularniejsze filmy i seriale tygodnia na TMDB - te, które ma twoje źródło.",
+  "fp_back_to": "Wróć do: {name}",
+  "fp_no_address": "Źródło nie podało adresu tego filmu."
 }

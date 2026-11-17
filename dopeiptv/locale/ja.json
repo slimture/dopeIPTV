@@ -2985,5 +2985,7 @@
   "start_place_last": "前回の場所",
   "start_place_mine": "常にマイリスト",
   "set_popular_where": "上部に表示",
-  "set_popular_note": "今週TMDBで人気の映画とシリーズのうち、ソースにあるもの。"
+  "set_popular_note": "今週TMDBで人気の映画とシリーズのうち、ソースにあるもの。",
+  "fp_back_to": "{name} に戻る",
+  "fp_no_address": "ソースはこの映画のアドレスを返しませんでした。"
 }

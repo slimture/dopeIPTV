@@ -2985,5 +2985,7 @@
   "start_place_last": "Där du slutade",
   "start_place_mine": "Alltid på Mitt",
   "set_popular_where": "Överst i",
-  "set_popular_note": "Veckans populäraste filmer och serier på TMDB - de som din källa har."
+  "set_popular_note": "Veckans populäraste filmer och serier på TMDB - de som din källa har.",
+  "fp_back_to": "Tillbaka till {name}",
+  "fp_no_address": "Källan gav ingen adress till den här filmen."
 }

@@ -36,6 +36,27 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   Watched), channel rows with what is on and next, a sideways Continue
   row, the shared page header - one view per list, pictures only for what
   is on screen, mirrored right to left, named for screen readers.
+- Movies is a place of its own, in the look every place now shares: the
+  source's film categories in the left column as before, and beside them
+  the category's name and count, a filter, the sort and Grid / List
+  (remembered); "Popular right now" - this week's chart matched to the
+  source's own films, ranked - and "Continue" with the
+  films in progress; then the films as posters or rows with their year,
+  length and rating, New for one added lately, Watched and how far it got.
+  A category of 20,000 films opens at once: a card works out its picture
+  and words only as it comes on screen.
+- A film opens its own page, built as a series' page is: the backdrop,
+  the poster, year · length · genres · rating, the plot with More, one
+  button - Play, or Continue from where it stopped, with how far -
+  Favorite, Watch later, the film's menu on ⋯, and the cast when the
+  source or TMDB names it (a click finds their other films). Back, Esc or
+  the mouse's back button go back to the grid exactly as it was. It plays
+  as the list played it - resume points, watched marks, Trakt and Simkl,
+  History, subtitles remembered - and opening it never starts anything.
+  Everything the film list did stays: the right-click menu, several films
+  at once with Ctrl or Shift, favourites and folders, Watch later, hidden
+  and locked categories, kids profiles, private viewing, TMDB matches, and
+  the middle pane following a film played from elsewhere.
 
 ## [1.6.1]
 

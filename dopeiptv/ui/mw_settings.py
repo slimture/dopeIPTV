@@ -279,6 +279,7 @@ class _SettingsMixin:
         self._places_restyle()       # the places' header, in the new colours
         self._guide_restyle()        # the Guide page's board, in the new colours
         self._sp_restyle()           # a series' page
+        self._pf_restyle()           # the Movies place and a film's page
         self._search_restyle()       # the Search page
         if getattr(self, "_tv_page", None) is not None:
             self._tv_page.restyle()  # TV mode's page (its tiles paint from P)
@@ -491,6 +492,7 @@ class _SettingsMixin:
             strip.retranslate()
         self._guide_restyle()        # the Guide page, in the new language
         self._sp_restyle()           # a series' page
+        self._pf_restyle()           # the Movies place and a film's page
         self._search_restyle()       # the Search page
         self._palette_retranslate()
 

@@ -232,6 +232,8 @@ SETTINGS_ALLOW = frozenset({
     "theme", "accent", "accent_custom", "theme_follow_system", "theme_light",
     "corner_style", "ui_scale", "view_density", "view_grid", "sort_order",
     "start_place", "popular_movies", "popular_series", "follow_notify",
+    # The Movies place's grid or list (ui/mw_place_films.py).
+    "films_view",
     "stream_format", "cache_secs", "autoplay_preview", "autoplay_next_episode",
     "nextup_lead_secs", "auto_reconnect_live", "hide_upcoming_prompt",
     "live_rewind_minutes", "live_rewind_disk", "live_rewind_kept",

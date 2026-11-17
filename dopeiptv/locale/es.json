@@ -2985,5 +2985,7 @@
   "start_place_last": "Donde lo dejaste",
   "start_place_mine": "Siempre en Lo mío",
   "set_popular_where": "Arriba en",
-  "set_popular_note": "Las películas y series más populares de la semana en TMDB, las que tiene tu fuente."
+  "set_popular_note": "Las películas y series más populares de la semana en TMDB, las que tiene tu fuente.",
+  "fp_back_to": "Volver a {name}",
+  "fp_no_address": "La fuente no dio ninguna dirección para esta película."
 }
