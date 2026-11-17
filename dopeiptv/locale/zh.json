@@ -2897,6 +2897,7 @@
   "video_path_window": "窗口线程",
   "video_path_pending": "独立线程 – 随第一个视频启动",
   "video_path_off": "窗口线程 - 已关闭",
+  "video_path_mac_default": "窗口线程 - macOS 上的默认设置",
   "video_path_fallback": "窗口线程 - 独立线程无法启动：{reason}",
   "local_searching": "正在搜索此文件夹及其子文件夹…",
   "local_search_count": "在此文件夹及其子文件夹中找到 {n} 个",

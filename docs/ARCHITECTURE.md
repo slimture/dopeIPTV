@@ -139,7 +139,8 @@ dopeiptv/
                        the overlays drawn into the picture by mpv
     video_macos.py     macOS's GL context for that thread: an NSOpenGLContext
                        put on its view on the main thread, drawn into and
-                       flushed on the render thread (PyObjC, CGL)
+                       flushed on the render thread (PyObjC, CGL); the
+                       picture's own NSView, never the mouse's
     video_surface.py   _MpvGLWidget(QOpenGLWidget), the window-thread surface
                        (fallback and switch); the Linux pop-out's raster mirror
     rewind_bar.py      DVR row + timeshift timeline over the video

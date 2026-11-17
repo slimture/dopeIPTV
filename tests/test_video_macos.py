@@ -522,3 +522,139 @@ def test_the_render_loop_draws_through_the_mac_context(monkeypatch):
     tail = [e[1] for e in log if e[1] in ("rctx.free", "clearCurrent", "clearDrawable")]
     assert tail == ["rctx.free", "clearCurrent", "clearDrawable"]
     assert _held(log, "rctx.free") == 1
+
+
+# -- the picture's own view ------------------------------------------------------------
+
+class NSView:
+    """AppKit's NSView as the picture's view uses it: a superview, its
+    subviews in order (the last on top), a frame, hidden."""
+    _next = [0x5000]
+
+    def __init__(self, ptr=None):
+        if ptr is None:
+            ptr = NSView._next[0] = NSView._next[0] + 0x10
+        self.ptr, self.sup, self.subs = ptr, None, []
+        self.frame_, self.hidden, self.layer = None, False, False
+
+    @classmethod
+    def alloc(cls):
+        return cls()
+
+    def initWithFrame_(self, frame):
+        self.frame_ = frame
+        return self
+
+    def setWantsLayer_(self, on):
+        self.layer = on
+
+    def setHidden_(self, hidden):
+        self.hidden = hidden
+
+    def isHidden(self):
+        return self.hidden
+
+    def superview(self):
+        return self.sup
+
+    def removeFromSuperview(self):
+        if self.sup is not None:
+            self.sup.subs.remove(self)
+            self.sup = None
+
+    def setFrame_(self, frame):
+        self.frame_ = frame
+
+    def subviews(self):
+        return list(self.subs)
+
+    def addSubview_positioned_relativeTo_(self, view, where, other):
+        assert where == vm.NS_WINDOW_ABOVE and other is None
+        if view.sup is not None:
+            view.sup.subs.remove(view)
+        self.subs.append(view)
+        view.sup = self
+
+    # What MacGL asks of the view it goes on.
+    def window(self):
+        return NS(ptr=0x1001, backingScaleFactor=lambda: 2.0, screen=lambda: NS(ptr=0x2001))
+
+    def bounds(self):
+        (_x, _y), (w, h) = self.frame_
+        return NS(size=NS(width=w, height=h))
+
+    def frame(self):
+        (x, y), _size = self.frame_
+        return NS(origin=NS(x=x, y=y))
+
+    def setWantsBestResolutionOpenGLSurface_(self, on):
+        pass
+
+
+class ViewKit:
+    """AppKit and PyObjC for the picture's view: NSView, the host views by
+    their pointer."""
+
+    def __init__(self):
+        self.NSView = NSView
+        self.hosts = {}
+        kit = self
+
+        class _O:
+            @staticmethod
+            def objc_object(c_void_p=None):
+                return kit.hosts.setdefault(int(c_void_p), NSView(int(c_void_p)))
+
+            @staticmethod
+            def pyobjc_id(obj):
+                return obj.ptr
+        self.objc = _O
+
+
+def test_the_mouse_is_never_the_picture_views():
+    kit = ViewKit()
+    cls = vm.view_class(kit)
+    assert issubclass(cls, NSView) and vm.view_class(kit) is cls       # made once
+    v = cls.alloc().initWithFrame_(((0, 0), (1, 1)))
+    assert v.hitTest_((10, 10)) is None                                 # clicks go under it
+    assert v.acceptsFirstMouse_(None) is False and v.isOpaque() is True
+
+
+def test_the_picture_view_is_made_when_shown_and_kept_on_top():
+    kit = ViewKit()
+    pv = vm.PictureView(appkit=kit, objc_mod=kit.objc)
+    assert pv.place(0x10, (0, 0, 640, 360), False) == [] and pv.nsview is None
+    assert pv.place(0x10, (5, 6, 640, 360), True) == ["made", "host", "frame", "shown"]
+    v, host = pv.nsview, kit.hosts[0x10]
+    assert v.sup is host and host.subs[-1] is v and v.layer and not v.hidden
+    assert v.frame_ == ((5, 6), (640, 360)) and pv.shown and pv.winId() == v.ptr
+    assert pv.place(0x10, (5, 6, 640, 360), True) == []                 # nothing changed
+    host.addSubview_positioned_relativeTo_(NSView(), vm.NS_WINDOW_ABOVE, None)
+    assert pv.place(0x10, (5, 6, 640, 360), True) == ["raised"]          # back on top
+    assert host.subs[-1] is v
+    # Into the view of a widget made native since.
+    assert pv.place(0x20, (1, 2, 640, 360), True) == ["host", "frame"]
+    assert v.sup is kit.hosts[0x20] and v not in host.subs
+    assert pv.place(0x20, (1, 2, 640, 360), False) == ["hidden"] and v.hidden and not pv.shown
+    pv.unhost()                                                          # its window's view goes
+    assert v.sup is None and pv.nsview is v
+    assert pv.place(0x20, (1, 2, 640, 360), True) == ["host", "frame", "shown"]
+    pv.remove()
+    assert pv.gone and v.sup is None and pv.nsview is None
+    assert pv.place(0x20, (1, 2, 640, 360), True) == []
+
+
+def test_the_context_goes_on_the_picture_view_itself():
+    gl, log, appkit, views = _ready()
+    kit = ViewKit()
+    pv = vm.PictureView(appkit=kit, objc_mod=kit.objc)
+    gl._objc = kit.objc
+    assert gl.attach(_Target(pv, 1, 1, True)).exposed is False          # not made yet
+    pv.place(0x10, (0, 0, 640, 360), True)
+    out = gl.attach(_Target(pv, 1280, 720, True))
+    assert (out.window, out.w, out.h, out.exposed) == (pv, 1280, 720, True)
+    assert appkit.ctx.view() is pv.nsview
+    log.clear()
+    gl.forget()                                                          # raised: on it again
+    gl.attach(_Target(pv, 1280, 720, True))
+    assert "setView" in log.names()

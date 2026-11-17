@@ -38,10 +38,12 @@ def popup_menu_over_video(menu, global_pos) -> None:
     the GL surface keeps repainting behind the non-native popup, so the video
     shows through the menu. Forcing the menu to a native window (winId
     materialises its own NSWindow surface) makes it composite above the GL
-    layer. A no-op cost elsewhere, so it's unconditional apart from darwin."""
+    layer. A no-op cost elsewhere, so it's unconditional apart from darwin
+    (media/video_thread.native_menu: never its siblings with it while the
+    picture may have a thread of its own)."""
     if sys.platform == "darwin":
-        menu.setAttribute(Qt.WidgetAttribute.WA_NativeWindow, True)
-        menu.winId()
+        from ..media.video_thread import native_menu
+        native_menu(menu)
     menu.popup(global_pos)
 
 

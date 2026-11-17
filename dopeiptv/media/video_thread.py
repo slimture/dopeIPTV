@@ -28,6 +28,15 @@ on its view by the window's thread (`attach`) and only drawn with and
 flushed on the render thread. The renderer and the surface are the same
 for both.
 
+On macOS the native window is not a Qt child window either but a view of
+the app's own (video_macos.PictureView) kept over a plain placeholder box
+(`_Placement`): Qt's cocoa plugin drops every mouse move over a child
+window, transparent for input or not, so the widgets got no hover there,
+and a widget made native later (a menu makes its siblings native) put its
+own view over the picture for good. The app's own view is never the
+mouse's, follows its box into whichever native view holds it, and stays
+on top there.
+
 The window's own thread (media/video_surface.py's _MpvGLWidget, exactly as
 it always was) is used when this is switched off (core/video_mode.py) or
 could not start; then the reason is logged and kept for Nerd > Diagnostics
@@ -38,6 +47,7 @@ from __future__ import annotations
 
 import contextlib
 import ctypes
+import functools
 import os
 import sys
 import threading
@@ -85,7 +95,6 @@ ATTACH_TRIES = 500
 _NO_THREAD_PLATFORMS = frozenset({"offscreen", "minimal", "vnc", "linuxfb"})
 #: The render thread's GL context: Qt's own, or macOS's NSOpenGLContext.
 QT_GL, NSGL = "qt", "nsgl"
-_MAC = sys.platform == "darwin"
 _GL_COLOR_BUFFER_BIT = 0x00004000
 #: A window moved to a screen with another pixel ratio: its size in pixels
 #: changed too (Qt 6.6 names the event; older ones send a screen change).
@@ -157,6 +166,30 @@ def make_video_surface(parent: QWidget | None = None, settings: Any | None = Non
         log.info("video: drawn on the window's thread (%s)", why)
         video_mode.note(video_mode.WINDOW, why)
     return _MpvGLWidget(parent)
+
+
+def native_menu(menu: QWidget, platform: str | None = None) -> None:
+    """macOS: *menu* made a native window before it shows (the menus over
+    the video: ui/widgets.popup_menu_over_video, the player's options). A
+    widget made native makes every other child of its parent native with it
+    - for a menu of the main window, its central widget, whose native view
+    then lay over the picture's own for good: the picture black after a
+    right-click. So while the picture may be drawn on a thread of its own,
+    the menu goes native alone; with the window's thread, as it always did.
+    (*platform*: sys.platform; tests.)"""
+    if (platform or sys.platform) != "darwin":
+        return
+    alone = video_mode.wanted(None)[0] and not video_mode.failed()
+    attr = Qt.ApplicationAttribute.AA_DontCreateNativeWidgetSiblings
+    was = QCoreApplication.testAttribute(attr)
+    if alone and not was:
+        QCoreApplication.setAttribute(attr, True)
+    try:
+        menu.setAttribute(Qt.WidgetAttribute.WA_NativeWindow, True)
+        menu.winId()
+    finally:
+        if alone and not was:
+            QCoreApplication.setAttribute(attr, False)
 
 
 def swap_for_fallback(old: QWidget, wire: Callable[[QWidget], None]) -> QWidget:
@@ -245,12 +278,6 @@ class _VideoWindow(QWindow):
     def resizeEvent(self, e) -> None:
         self._tell()
 
-    def moveEvent(self, e) -> None:
-        # macOS: the view moved within its window - its context is brought
-        # up to date on this thread (media/video_macos.py).
-        if _MAC:
-            self._tell()
-
     def event(self, e) -> bool:
         t = int(e.type())
         if t in _DPR_EVENTS:
@@ -308,6 +335,8 @@ def _on_screen(win: QWindow) -> bool:
 
 
 def _usable(win: Any) -> bool:
+    if getattr(type(win), "native_picture", False):  # macOS's own view
+        return not win.gone
     return _alive(win) and not getattr(win, "gone", False)
 
 
@@ -318,6 +347,240 @@ def _target_of(win: QWindow | None, shown: bool) -> _Target:
     w, h = max(1, round(win.width() * dpr)), max(1, round(win.height() * dpr))
     return _Target(win, w, h, bool(shown and win.width() > 0 and win.height() > 0
                                    and _on_screen(win)))
+
+
+def _picture_window(owner: QWidget, changed: Callable[[], None], going: Callable[[Any], None],
+                    failed: Callable[[str], None]) -> tuple[Any, QWidget, "_Placement | None"]:
+    """(what the picture is drawn into, the box holding its place in
+    *owner*, the placement keeping it there or None). Linux and Windows: a
+    native child window in a window container. macOS: a view of the app's
+    own that no mouse event is for, kept over a plain box (_Placement)."""
+    if _kind() == NSGL:
+        from . import video_macos
+        view = video_macos.PictureView()
+        box = QWidget(owner)
+        place: _Placement | None = _Placement(box, view, changed, going, failed)
+        win: Any = view
+    else:
+        win = _VideoWindow(changed, going)
+        box = QWidget.createWindowContainer(win, owner)
+        place = None
+    box.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+    box.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+    box.hide()
+    return win, box, place
+
+
+def _owner_target(owner: QWidget) -> _Target:
+    """Where *owner* (the surface, or the pop-out's mirror) has the picture
+    drawn now: its native window (Linux, Windows) or, on macOS, its own
+    view as its placement has it."""
+    shown = owner.isVisible() and owner._box.isVisible()
+    p = getattr(owner, "_place", None)
+    if p is None:
+        return _target_of(owner._win, shown)
+    p.sync(tell=False)
+    return p.target(shown)
+
+
+# -- macOS: the picture's own view kept in place ----------------------------------
+
+_E = QEvent.Type
+_MOVED = frozenset(int(t) for t in (_E.Move, _E.Resize))
+_ANCESTOR_EVENTS = _MOVED | frozenset(int(t) for t in (
+    _E.Show, _E.Hide, _E.ParentChange, _E.WinIdChange))
+_REWATCH = frozenset(int(t) for t in (_E.ParentChange, _E.WinIdChange))
+_EXPOSE = int(_E.Expose)
+_TOP_EVENTS = _DPR_EVENTS | frozenset(int(t) for t in (
+    _E.Expose, _E.WindowStateChange, _E.Show, _E.Hide, _E.PlatformSurface))
+#: Looked at again this often while shown, whatever was said.
+PLACE_CHECK_MS = 1000
+
+
+class _Placement(QObject):
+    """macOS: the picture's own view (media/video_macos.PictureView) kept
+    over *box*, the surface's placeholder: in the NSView of the box's
+    nearest native ancestor - the window's, or a widget made native since
+    (a menu made native makes its siblings native, and a native view put
+    over the picture left it black for good) -, at the box's place there, on
+    top, hidden while the box is. Followed through the events of the box
+    and of its ancestors below the window (moved, resized, shown, hidden,
+    reparented, made native) and of the top-level window (exposed - macOS
+    says covered or uncovered there -, minimized, another screen, its
+    native window going), and looked at again once a second while shown.
+    Each change ends in *changed* (the surface's _window_changed); *going*
+    is told before the window's native view goes, *failed* of an error."""
+
+    def __init__(self, box: QWidget, view: Any, changed: Callable[[], None],
+                 going: Callable[[Any], None], failed: Callable[[str], None]) -> None:
+        super().__init__(box)
+        self._box = box
+        self.view = view
+        self._changed = changed
+        self._going = going
+        self._failed = failed
+        self._widgets: list[QWidget] = []
+        self._top: QWindow | None = None
+        self._top_exposed: bool | None = None
+        self._stale = True              # the watched widgets to be looked up again
+        self._closed = False
+        self.moved = False              # put on another view or raised: attach again
+        self._soon = QTimer(self)
+        self._soon.setSingleShot(True)
+        self._soon.setInterval(0)
+        self._soon.timeout.connect(self._sync_and_tell)
+        self._tick = QTimer(self)
+        self._tick.setInterval(PLACE_CHECK_MS)
+        self._tick.timeout.connect(self._sync_and_tell)
+
+    # -- what it watches ----------------------------------------------------------
+    def _rewatch(self) -> None:
+        self._stale = False
+        for w in self._widgets:
+            if _alive(w):
+                w.removeEventFilter(self)
+        self._widgets = []
+        box = self._box
+        top_w = box.window()
+        w: QWidget | None = box
+        while w is not None and w is not top_w:
+            w.installEventFilter(self)
+            self._widgets.append(w)
+            w = w.parentWidget()
+        top = top_w.windowHandle() if top_w is not None else None
+        if top is not self._top:
+            if self._top is not None and _alive(self._top):
+                self._top.removeEventFilter(self)
+            self._top = top
+            if top is not None:
+                top.installEventFilter(self)
+
+    def eventFilter(self, obj, event) -> bool:
+        # Never raises (every widget here can go at any moment), never
+        # takes an event.
+        if getattr(self, "_closed", True):
+            return False
+        try:
+            t = int(event.type())
+            if obj is self._top:
+                if t not in _TOP_EVENTS:
+                    return False
+                if t == _PLATFORM_SURFACE:
+                    kind = event.surfaceEventType()
+                    if kind == event.SurfaceEventType.SurfaceAboutToBeDestroyed:
+                        self._host_going()
+                        return False
+                elif t == _EXPOSE:
+                    # A window's repaint can say it too: only covered or
+                    # uncovered counts.
+                    now = bool(obj.isExposed())
+                    if now == self._top_exposed:
+                        return False
+                    self._top_exposed = now
+                self._soon.start()
+            elif t in _ANCESTOR_EVENTS:
+                if t in _REWATCH:
+                    self._stale = True
+                if t in _MOVED:
+                    self.sync(tell=False)       # follows a resize step by step
+                self._soon.start()
+        except Exception as e:
+            log.debug("video: the picture's place: %s", e)
+        return False
+
+    def _host_going(self) -> None:
+        """The window's native view goes (a window made again): the context
+        and the render thread let go of the picture's view, which leaves it
+        - placed again once the window is back."""
+        try:
+            self._going(self.view)
+        except Exception as e:
+            log.debug("video: letting go of the picture's view: %s", e)
+        self.view.unhost()
+        self._stale = True
+        log.info("video: the picture's view left its window (that window's view goes)")
+        self._soon.start()
+
+    # -- where it goes --------------------------------------------------------------
+    def _sync_and_tell(self) -> None:
+        self.sync(tell=True)
+
+    def sync(self, tell: bool = True) -> None:
+        if self._closed or not _alive(self._box):
+            return
+        if self._stale or self._top is None:
+            self._rewatch()
+        box = self._box
+        try:
+            visible = box.isVisible() and box.width() > 0 and box.height() > 0
+            host = box.nativeParentWidget() if visible else None
+            ptr = int(host.winId()) if host is not None else 0
+            pos = box.mapTo(host, QPoint(0, 0)) if host is not None else QPoint()
+            self.view.scale = box.devicePixelRatioF() or 1.0
+            changes = self.view.place(ptr, (pos.x(), pos.y(), box.width(), box.height()),
+                                      visible)
+        except Exception as e:
+            self._closed = True
+            self._failed(f"the picture's view: {type(e).__name__}: {e}")
+            return
+        if changes:
+            self._say(changes, host, ptr)
+        if self.view.shown:
+            if not self._tick.isActive():
+                self._tick.start()
+        elif self._tick.isActive():
+            self._tick.stop()
+        if tell:
+            self._changed()
+
+    def _say(self, changes: list[str], host: QWidget | None, ptr: int) -> None:
+        if "host" in changes or "raised" in changes:
+            self.moved = True
+        if "host" in changes and host is not None:
+            what = "the window" if host is self._box.window() else (
+                f"{type(host).__name__} {host.objectName()!r}, a widget made native")
+            log.info("video: the picture's view on NSView %#x (%s)", ptr, what)
+        if "raised" in changes:
+            log.info("video: the picture's view raised over a native view put on top of it")
+        for word in ("shown", "hidden"):
+            if word in changes:
+                log.info("video: the picture's view %s", word)
+
+    def target(self, shown: bool) -> _Target:
+        v = self.view
+        if v.gone or self._closed:
+            return _Target(None, 0, 0, False)
+        box, top = self._box, self._top
+        on = bool(shown and v.shown and top is not None and top.isExposed()
+                  and not top.windowStates() & Qt.WindowState.WindowMinimized)
+        v.on_screen = on
+        dpr = v.scale or 1.0
+        return _Target(v, max(1, round(box.width() * dpr)), max(1, round(box.height() * dpr)), on)
+
+    def covered(self) -> str:
+        """Why the picture is not on screen, in the log's words."""
+        top = self._top
+        if not self.view.shown:
+            return "its view is hidden"
+        if top is None or not top.isExposed():
+            return "its window is covered, hidden or on no screen"
+        return "its window is minimized"
+
+    def close(self) -> None:
+        """For good: nothing watched, the view out of its window."""
+        if self._closed and self.view.gone:
+            return
+        self._closed = True
+        self._soon.stop()
+        self._tick.stop()
+        for w in [*self._widgets, self._top]:
+            if w is not None and _alive(w):
+                try:
+                    w.removeEventFilter(self)
+                except RuntimeError:
+                    pass
+        self._widgets, self._top = [], None
+        self.view.remove()
 
 
 # -- the render thread's GL context -------------------------------------------------
@@ -409,6 +672,9 @@ class _QtGL:
 
     def attach(self, target: "_Target") -> "_Target":
         return target
+
+    def forget(self) -> None:
+        pass
 
     def detach(self, window) -> None:
         pass
@@ -991,6 +1257,7 @@ class _Ending:
     def __init__(self) -> None:
         self.renderer: _Renderer | None = None
         self.gl: Any = None
+        self.view: Any = None            # macOS: the picture's own view
         self.core: Any = None
 
     def end(self, *_args) -> None:
@@ -1003,6 +1270,12 @@ class _Ending:
                 g.close()
             except Exception as e:
                 log.warning("video thread: the GL context did not close: %s", e)
+        v, self.view = self.view, None
+        if v is not None:
+            try:
+                v.remove()
+            except Exception as e:
+                log.warning("video: the picture's view did not go: %s", e)
         m, self.core = self.core, None
         if m is not None:
             try:
@@ -1089,11 +1362,15 @@ class ThreadedVideoSurface(QWidget):
         self._told.failed.connect(self._render_failed)
         self._told.vo.connect(self._vo_changed)
         # Where the picture goes: this surface's own window, or the pop-out's.
-        self._win = _VideoWindow(self._window_changed, self._window_going)
-        self._box = QWidget.createWindowContainer(self._win, self)
-        self._box.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self._box.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self._box.hide()
+        self._ending = _Ending()
+        self._win, self._box, self._place = _picture_window(
+            self, self._window_changed, self._window_going, self._fail_soon)
+        if self._place is not None:
+            self._ending.view = self._win
+            # The box goes before the surface says so: what draws into its
+            # view ends first (the window-thread surface's container does
+            # the same for its window).
+            self._box.destroyed.connect(self._ending.end)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(self._box)
@@ -1104,7 +1381,8 @@ class ThreadedVideoSurface(QWidget):
         self._watchdog.setInterval(1000)
         self._watchdog.timeout.connect(self._check_stuck)
         self._started_at = 0.0
-        self._ending = _Ending()
+        self._drawn: bool | None = None      # the picture drawn, as last said
+        self._sent: tuple | None = None      # macOS: the target last handed over
         self.destroyed.connect(self._ending.end)
 
     # -- what the player reads ----------------------------------------------------
@@ -1242,6 +1520,10 @@ class ThreadedVideoSurface(QWidget):
     def _give_up(self, reason: str) -> None:
         self._failed = reason
         self._overlays.uninstall()
+        if self._place is not None:
+            # macOS: the view of its own leaves the window at once - never a
+            # last frame left over the surface that takes its place.
+            self._place.close()
         video_mode.note_failed(reason)
         log.warning("video: drawn on the window's thread (fallback: %s)", reason)
         self.fallback.emit(reason)
@@ -1283,20 +1565,46 @@ class ThreadedVideoSurface(QWidget):
         r = self._renderer
         if r is None or not _alive(self):
             return
+        owner: QWidget = self
         try:
             m = self._live_mirror()
-            if m is not None:
-                t = _target_of(m._win, m.isVisible() and m._box.isVisible())
-            else:
-                t = _target_of(self._win, self.isVisible() and self._box.isVisible())
+            owner = m if m is not None else self
+            t = _owner_target(owner)
         except RuntimeError:            # a window on its way out
             t = _Target(None, 0, 0, False)
         gl = self._gl
+        p = getattr(owner, "_place", None)
+        if p is not None and p.moved and gl is not None:
+            # On another view, or raised: AppKit may have let go of the
+            # context's drawable - put on the view again.
+            p.moved = False
+            gl.forget()
         if gl is not None:
             t = self._attach(gl, t)
             if t is None:
                 return
+        self._say_drawn(t, p)
+        if p is not None:
+            # macOS looks again on its own (events, once a second): the same
+            # target with the same drawable is no new frame to draw.
+            key = (id(t.window), t.w, t.h, t.exposed, getattr(gl, "changes", 0))
+            if key == self._sent:
+                return
+            self._sent = key
         r.set_target(t)
+
+    def _say_drawn(self, t: _Target, place: "_Placement | None") -> None:
+        """Whether the picture is drawn, in the log once per change (macOS:
+        why not - its view hidden, its window covered or minimized)."""
+        drawn = t.window is not None and t.exposed
+        if drawn == self._drawn:
+            return
+        first, self._drawn = self._drawn is None, drawn
+        if drawn:
+            log.info("video: the picture is drawn (%s)", self._name)
+        elif not first:
+            why = place.covered() if place is not None else "its window is hidden or covered"
+            log.info("video: the picture is not drawn now - %s (%s)", why, self._name)
 
     def _attach(self, gl: Any, t: _Target) -> _Target | None:
         """The GL context on the target's window, on this thread (macOS:
@@ -1337,6 +1645,7 @@ class ThreadedVideoSurface(QWidget):
     def _let_go(self, win: QWindow) -> None:
         """*win*'s native window is going: the render thread lets go of it,
         then (macOS) the context is taken off its view, on this thread."""
+        self._sent = None                # handed over again when it is back
         r = self._renderer
         if r is not None:
             r.release(win)
@@ -1473,10 +1782,24 @@ class ThreadedVideoSurface(QWidget):
             self._attach_timer.stop()
         self._overlays.uninstall()
         self._stop_renderer()
+        if self._place is not None:
+            self._place.close()           # after the context let go of it
         self._kill_core()
         off, self._offscreen = self._offscreen, None
         if off is not None:
             off.destroy()
+
+
+def _mirror_gone(owner_ref: Any, view: Any, *_args) -> None:
+    """macOS: a mirror's box went - its owner's render thread and context
+    let go of its view (if its owner is still there), then the view goes."""
+    o = owner_ref()
+    try:
+        if o is not None and _alive(o):
+            o._let_go(view)
+    except Exception as e:
+        log.debug("video: the pop-out's view: %s", e)
+    view.remove()
 
 
 class ThreadedMirror(QWidget):
@@ -1501,11 +1824,12 @@ class ThreadedMirror(QWidget):
         pal.setColor(self.backgroundRole(), QColor(0, 0, 0))
         self.setPalette(pal)
         self.setMouseTracking(True)
-        self._win = _VideoWindow(self._changed, self._going)
-        self._box = QWidget.createWindowContainer(self._win, self)
-        self._box.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self._box.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self._box.hide()
+        self._win, self._box, self._place = _picture_window(
+            self, self._changed, self._going, self._failed)
+        if self._place is not None:
+            # Its view goes with it - its owner's thread let go of it first.
+            self._box.destroyed.connect(functools.partial(_mirror_gone, weakref.ref(owner),
+                                                          self._win))
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(self._box)
@@ -1515,10 +1839,15 @@ class ThreadedMirror(QWidget):
         if o is not None:
             o._window_changed()
 
-    def _going(self, win: QWindow) -> None:
+    def _going(self, win: Any) -> None:
         o = self._owner
         if o is not None:
             o._window_going(win)
+
+    def _failed(self, reason: str) -> None:
+        o = self._owner
+        if o is not None:
+            o._fail_soon(reason)
 
     def showEvent(self, e) -> None:
         super().showEvent(e)

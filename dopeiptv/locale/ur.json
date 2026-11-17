@@ -2897,6 +2897,7 @@
   "video_path_window": "ونڈو کا تھریڈ",
   "video_path_pending": "اپنا تھریڈ – پہلی ویڈیو کے ساتھ شروع ہوتا ہے",
   "video_path_off": "ونڈو کا تھریڈ - بند",
+  "video_path_mac_default": "ونڈو کا تھریڈ - macOS پر طے شدہ",
   "video_path_fallback": "ونڈو کا تھریڈ - اپنا تھریڈ شروع نہیں ہو سکا: {reason}",
   "local_searching": "اس فولڈر اور اس کے ذیلی فولڈرز میں تلاش جاری ہے…",
   "local_search_count": "اس فولڈر اور اس کے ذیلی فولڈرز میں ملے: {n}",

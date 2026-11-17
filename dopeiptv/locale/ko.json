@@ -2897,6 +2897,7 @@
   "video_path_window": "창 스레드",
   "video_path_pending": "전용 스레드 – 첫 동영상과 함께 시작됩니다",
   "video_path_off": "창 스레드 - 꺼짐",
+  "video_path_mac_default": "창 스레드 - macOS의 기본값",
   "video_path_fallback": "창 스레드 - 전용 스레드를 시작할 수 없었습니다: {reason}",
   "local_searching": "이 폴더와 하위 폴더 검색 중…",
   "local_search_count": "이 폴더와 하위 폴더에서 {n}개 찾음",

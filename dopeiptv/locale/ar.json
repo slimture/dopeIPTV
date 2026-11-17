@@ -2897,6 +2897,7 @@
   "video_path_window": "مسار النافذة",
   "video_path_pending": "خيط خاص – يبدأ مع أول فيديو",
   "video_path_off": "مسار النافذة - متوقف",
+  "video_path_mac_default": "مسار النافذة - الافتراضي على macOS",
   "video_path_fallback": "مسار النافذة - تعذّر بدء المسار الخاص: {reason}",
   "local_searching": "جارٍ البحث في هذا المجلد ومجلداته الفرعية…",
   "local_search_count": "النتائج في هذا المجلد ومجلداته الفرعية: {n}",

@@ -3548,10 +3548,10 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         self.populate_options_menu(menu)
         # On macOS a menu shown over the layer-backed GL video bleeds through
         # (the video keeps repainting behind the non-native popup); force it to
-        # its own native window so it composites above the GL surface.
-        if sys.platform == "darwin":
-            menu.setAttribute(Qt.WidgetAttribute.WA_NativeWindow, True)
-            menu.winId()
+        # its own native window so it composites above the GL surface - alone,
+        # never its siblings with it (video_thread.native_menu).
+        from .video_thread import native_menu
+        native_menu(menu)
         menu.exec(anchor.mapToGlobal(anchor.rect().bottomLeft()))
 
     def populate_options_menu(self, menu, extras: bool = True) -> None:

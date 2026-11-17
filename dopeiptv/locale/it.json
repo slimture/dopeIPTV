@@ -2897,6 +2897,7 @@
   "video_path_window": "Thread della finestra",
   "video_path_pending": "Thread dedicato: parte con il primo video",
   "video_path_off": "Thread della finestra - disattivato",
+  "video_path_mac_default": "Thread della finestra - predefinito su macOS",
   "video_path_fallback": "Thread della finestra - il thread dedicato non è partito: {reason}",
   "local_searching": "Ricerca in questa cartella e nelle sue sottocartelle…",
   "local_search_count": "Risultati in questa cartella e nelle sottocartelle: {n}",

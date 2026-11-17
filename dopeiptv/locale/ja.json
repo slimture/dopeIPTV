@@ -2897,6 +2897,7 @@
   "video_path_window": "ウィンドウのスレッド",
   "video_path_pending": "専用スレッド – 最初の動画で開始します",
   "video_path_off": "ウィンドウのスレッド - オフ",
+  "video_path_mac_default": "ウィンドウのスレッド - macOS での既定",
   "video_path_fallback": "ウィンドウのスレッド - 専用スレッドを開始できませんでした: {reason}",
   "local_searching": "このフォルダーとサブフォルダーを検索中…",
   "local_search_count": "このフォルダーとサブフォルダーで {n} 件見つかりました",

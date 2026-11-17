@@ -2897,6 +2897,7 @@
   "video_path_window": "Uzi wa dirisha",
   "video_path_pending": "Uzi wake mwenyewe – huanza na video ya kwanza",
   "video_path_off": "Uzi wa dirisha - imezimwa",
+  "video_path_mac_default": "Uzi wa dirisha - chaguo-msingi kwenye macOS",
   "video_path_fallback": "Uzi wa dirisha - uzi wake yenyewe haukuweza kuanza: {reason}",
   "local_searching": "Inatafuta katika folda hii na folda zake ndogo…",
   "local_search_count": "Zimepatikana {n} katika folda hii na folda zake ndogo",

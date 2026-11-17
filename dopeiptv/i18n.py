@@ -3168,6 +3168,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "video_path_window": {"en": "Window thread"},
     "video_path_pending": {"en": "Own thread - it starts with the first video"},
     "video_path_off": {"en": "Window thread - switched off"},
+    "video_path_mac_default": {"en": "Window thread - the default on macOS"},
     "video_path_fallback": {"en": "Window thread - its own thread could not start: {reason}"},
     "pill_live": {"en": "Live"},
     "pill_new": {"en": "New"},

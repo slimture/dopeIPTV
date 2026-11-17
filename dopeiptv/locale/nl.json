@@ -2897,6 +2897,7 @@
   "video_path_window": "Thread van het venster",
   "video_path_pending": "Eigen thread – start bij de eerste video",
   "video_path_off": "Thread van het venster - uitgezet",
+  "video_path_mac_default": "Thread van het venster - de standaard op macOS",
   "video_path_fallback": "Thread van het venster - de eigen thread kon niet starten: {reason}",
   "local_searching": "Bezig met zoeken in deze map en de submappen…",
   "local_search_count": "{n} gevonden in deze map en de submappen",

@@ -2897,6 +2897,7 @@
   "video_path_window": "Luồng của cửa sổ",
   "video_path_pending": "Luồng riêng – khởi động cùng video đầu tiên",
   "video_path_off": "Luồng của cửa sổ - đã tắt",
+  "video_path_mac_default": "Luồng của cửa sổ - mặc định trên macOS",
   "video_path_fallback": "Luồng của cửa sổ - không khởi động được luồng riêng: {reason}",
   "local_searching": "Đang tìm trong thư mục này và các thư mục con…",
   "local_search_count": "Tìm thấy {n} trong thư mục này và các thư mục con",

@@ -2897,6 +2897,7 @@
   "video_path_window": "Hilo de la ventana",
   "video_path_pending": "Hilo propio: se inicia con el primer vídeo",
   "video_path_off": "Hilo de la ventana - desactivado",
+  "video_path_mac_default": "Hilo de la ventana - el predeterminado en macOS",
   "video_path_fallback": "Hilo de la ventana - su propio hilo no pudo iniciarse: {reason}",
   "local_searching": "Buscando en esta carpeta y sus subcarpetas…",
   "local_search_count": "{n} encontrados en esta carpeta y sus subcarpetas",

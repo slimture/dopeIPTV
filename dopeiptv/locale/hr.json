@@ -2897,6 +2897,7 @@
   "video_path_window": "Nit prozora",
   "video_path_pending": "Vlastita nit – pokreće se s prvim videom",
   "video_path_off": "Nit prozora - isključeno",
+  "video_path_mac_default": "Nit prozora - zadano na macOS-u",
   "video_path_fallback": "Nit prozora - vlastita nit nije se mogla pokrenuti: {reason}",
   "local_searching": "Pretraživanje ove mape i njezinih podmapa…",
   "local_search_count": "Pronađeno u ovoj mapi i podmapama: {n}",

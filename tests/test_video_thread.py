@@ -218,6 +218,9 @@ class _FakeGL:
     def detach(self, win):
         self.log.append(("detach", win))
 
+    def forget(self):
+        self.log.append(("forget",))
+
     def close(self):
         self.log.append(("close",))
 
@@ -389,6 +392,212 @@ def test_qts_context_is_driven_on_linux_and_windows_as_it_always_was(monkeypatch
         (mc, off, True), ("free",), ("doneCurrent",),          # freed off-window
     ]
     assert r.frames == 5 and r.error == ""
+
+
+# -- the default: on, but not in a release on a Mac ---------------------------------
+
+def test_a_test_build_is_a_nightly_or_a_checkout():
+    from dopeiptv.core import updates
+    assert video_mode.is_test_build("1.6.2.191", frozen=True, checkout=False)
+    assert not video_mode.is_test_build("1.6.2", frozen=True, checkout=False)
+    assert video_mode.is_test_build("1.6.2", frozen=False, checkout=True)      # from source
+    assert not video_mode.is_test_build("1.6.2", frozen=False, checkout=False)  # pip's release
+    for v in ("1.6.2", "1.6.2.191", "v1.4.0.12", "2.0"):
+        assert video_mode.is_test_build(v, True, False) == updates.is_nightly(v)
+
+
+def test_on_everywhere_but_in_a_release_on_macos():
+    assert video_mode.default_on("linux", False) and video_mode.default_on("win32", False)
+    assert video_mode.default_on("linux", True) and video_mode.default_on("darwin", True)
+    assert not video_mode.default_on("darwin", False)
+
+
+def test_a_mac_release_draws_on_the_windows_thread_unless_asked(monkeypatch):
+    monkeypatch.setattr(video_mode, "_here", lambda: ("darwin", False))
+    assert video_mode.wanted(_Settings()) == (False, video_mode.MAC_DEFAULT)
+    assert video_mode.wanted(None) == (False, video_mode.MAC_DEFAULT)       # a multiview cell
+    assert not video_mode.default_on_here()
+    # A choice made in Settings counts, either way.
+    assert video_mode.wanted(_Settings(video_own_thread="true")) == (True, "")
+    assert video_mode.wanted(None) == (True, "")
+    assert video_mode.wanted(_Settings(video_own_thread="false")) == (False, "switched off in Settings")
+    # The environment wins over both.
+    monkeypatch.setenv(video_mode.ENV, "1")
+    assert video_mode.wanted(_Settings()) == (True, "")
+    monkeypatch.setenv(video_mode.ENV, "0")
+    assert video_mode.wanted(_Settings(video_own_thread="true"))[0] is False
+    monkeypatch.delenv(video_mode.ENV)
+    # A nightly on a Mac, and Linux and Windows: on.
+    for here in (("darwin", True), ("linux", False), ("win32", False)):
+        monkeypatch.setattr(video_mode, "_here", lambda here=here: here)
+        assert video_mode.wanted(_Settings()) == (True, "")
+        assert video_mode.wanted(_Settings(video_own_thread="false"))[0] is False
+
+
+def test_a_macs_default_is_said_neutrally():
+    from dopeiptv.i18n import tr
+    from dopeiptv.ui.nerd_settings import video_path_chip, video_path_text
+    from dopeiptv.ui.theme import P
+    video_mode.note(video_mode.WINDOW, video_mode.MAC_DEFAULT)
+    assert video_path_text() == tr("video_path_mac_default")
+    assert video_mode.line() == "Video: window thread (the default on macOS)"
+    chip, why = video_path_chip()
+    assert P["muted"] in chip.text() and P["warn"] not in chip.text()
+    assert why is not None and why.text() == tr("video_path_mac_default")
+    video_mode.note_failed("no frame could be shown")                    # a fallback: amber
+    chip, _why = video_path_chip()
+    assert P["warn"] in chip.text()
+
+
+# -- the right-click: a menu made native, never its siblings with it ----------------
+
+def test_a_menu_made_native_on_macos_leaves_its_siblings_alone(monkeypatch):
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import QMenu
+
+    from dopeiptv.media.video_thread import native_menu
+    native = Qt.WidgetAttribute.WA_NativeWindow
+
+    def window():
+        top = QWidget()
+        central = QWidget(top)
+        top.show()
+        return top, central
+    video_mode.wanted(_Settings())                     # the own thread: wanted
+    top, central = window()
+    m = QMenu(top)
+    native_menu(m, platform="darwin")
+    assert m.testAttribute(native) and not central.testAttribute(native)
+    # With the window's thread, as it always was: its siblings native too.
+    video_mode.wanted(_Settings(video_own_thread="false"))
+    top2, central2 = window()
+    m2 = QMenu(top2)
+    native_menu(m2, platform="darwin")
+    assert m2.testAttribute(native) and central2.testAttribute(native)
+    # Elsewhere nothing is made native.
+    m3 = QMenu(top)
+    native_menu(m3, platform="linux")
+    assert not m3.testAttribute(native)
+    for w in (top, top2):
+        w.close()
+
+
+# -- macOS: the picture's own view kept over its box ---------------------------------
+
+def _mac_surface(monkeypatch):
+    """A surface as macOS makes it - its picture in a view of its own, kept
+    by its placement - with stand-ins for AppKit's views."""
+    from dopeiptv.media import video_macos
+    from tests.test_video_macos import ViewKit
+    kit = ViewKit()
+    monkeypatch.setattr(video_thread, "_kind", lambda: video_thread.NSGL)
+    real = video_macos.PictureView
+    monkeypatch.setattr(video_macos, "PictureView",
+                        lambda: real(appkit=kit, objc_mod=kit.objc))
+    # Its render thread and core are the real player's (not started here).
+    monkeypatch.setattr(video_thread.ThreadedVideoSurface, "_start", lambda self: None)
+    top = QWidget()
+    top.resize(500, 320)
+    central = QWidget(top)
+    central.setGeometry(10, 20, 480, 290)
+    lay = QVBoxLayout(central)
+    lay.setContentsMargins(0, 0, 0, 0)
+    s = video_thread.ThreadedVideoSurface(central)
+    lay.addWidget(s)
+    top.show()
+    app.processEvents()
+    log = []
+    s._renderer = _FakeRenderer(log)
+    _HOSTS.append(top)
+    return s, top, central, kit, log
+
+
+def test_on_macos_the_picture_view_follows_its_box(monkeypatch):
+    s, top, central, kit, log = _mac_surface(monkeypatch)
+    pv = s._win
+    assert isinstance(s._place, video_thread._Placement)
+    s._window_changed()
+    assert pv.nsview is None                         # nothing native before a picture
+    s._box.show()
+    s._window_changed()
+    v, host = pv.nsview, kit.hosts[int(top.winId())]
+    assert v.sup is host and host.subs[-1] is v and not v.hidden
+    assert v.frame_ == ((10, 20), (480, 290))        # in the window's view, at its place
+    t = log[-1][1]
+    assert t.window is pv and t.exposed and (t.w, t.h) == (480, 290)
+    # Moved with an ancestor, at once.
+    central.move(30, 40)
+    assert v.frame_ == ((30, 40), (480, 290))
+    # An ancestor made native (a menu's siblings, before the fix): the view
+    # goes into that widget's own view, at its place there, on top.
+    s._gl = _FakeGL(log, "now")
+    central.winId()
+    app.processEvents()
+    assert v.sup is kit.hosts[int(central.winId())] and v.frame_ == ((0, 0), (480, 290))
+    assert ("forget",) in log and not s._place.moved     # the context put on it again
+    s._gl = None
+    # Hidden with its box; the picture not drawn.
+    s._box.hide()
+    app.processEvents()
+    assert v.hidden and not log[-1][1].exposed
+    s.shutdown()
+    assert pv.gone and v.sup is None
+
+
+def test_on_macos_the_same_target_is_handed_over_once(monkeypatch):
+    s, top, central, kit, log = _mac_surface(monkeypatch)
+    s._box.show()
+    s._window_changed()
+    n = len(log)
+    for _ in range(3):                               # the 1 s look, a repaint's expose
+        s._window_changed()
+        s._place._sync_and_tell()
+    assert len(log) == n                             # no redraw asked for nothing
+    central.resize(400, 250)
+    app.processEvents()
+    assert len(log) > n and (log[-1][1].w, log[-1][1].h) == (400, 250)
+    s._let_go(s._win)                                # let go: handed over again after
+    s._window_changed()
+    assert log[-1][0] == "set_target"
+    s.shutdown()
+
+
+def test_on_macos_a_view_given_up_leaves_at_once(monkeypatch):
+    s, top, central, kit, log = _mac_surface(monkeypatch)
+    s._box.show()
+    s._window_changed()
+    v = s._win.nsview
+    gave_up = []
+    s.fallback.connect(gave_up.append)
+    s._render_failed("no frame could be shown")
+    assert gave_up == ["no frame could be shown"]
+    assert s._win.gone and v.sup is None             # never a last frame over the new one
+
+
+def test_on_macos_the_windows_view_going_lets_go_first(monkeypatch):
+    from PyQt6.QtGui import QPlatformSurfaceEvent
+    s, top, central, kit, log = _mac_surface(monkeypatch)
+    s._box.show()
+    s._window_changed()
+    pv = s._win
+    going = QPlatformSurfaceEvent(QPlatformSurfaceEvent.SurfaceEventType.SurfaceAboutToBeDestroyed)
+    s._place.eventFilter(s._place._top, going)
+    assert ("release", pv) in log and pv.nsview.sup is None and not pv.shown
+    app.processEvents()
+    s._window_changed()                              # back once its window is
+    assert pv.nsview.sup is kit.hosts[int(top.winId())]
+    s.shutdown()
+
+
+def test_on_macos_the_mouse_reaches_the_player_as_before(monkeypatch):
+    from dopeiptv.media import video_macos
+    from tests.test_video_macos import ViewKit
+    kit = ViewKit()
+    monkeypatch.setattr(video_thread, "_kind", lambda: video_thread.NSGL)
+    real = video_macos.PictureView
+    monkeypatch.setattr(video_macos, "PictureView",
+                        lambda: real(appkit=kit, objc_mod=kit.objc))
+    assert _mouse_log(video_thread.ThreadedVideoSurface) == _mouse_log(video_surface._MpvGLWidget)
 
 
 # -- the fallback swap ------------------------------------------------------------------

@@ -1458,7 +1458,9 @@ def video_path_chip() -> tuple[QLabel, QLabel | None]:
     from .theme import P, tinted
     own = video_mode.mode() == video_mode.THREAD or video_mode.pending()
     short = tr("video_path_thread") if own else tr("video_path_window")
-    tone = P["ok"] if own else P["warn"]
+    # The window's thread as a Mac's default is how it should be: neutral.
+    usual = not own and video_mode.why() == video_mode.MAC_DEFAULT
+    tone = P["ok"] if own else P["muted"] if usual else P["warn"]
     wash, _ink = tinted(tone, P["pane"], 0.16, P["text"])
     chip = QLabel(f"<span style='color:{tone}'>\u25cf</span>&nbsp;&nbsp;{short}")
     chip.setTextFormat(Qt.TextFormat.RichText)
@@ -1489,6 +1491,8 @@ def video_path_text() -> str:
         return tr("video_path_fallback", reason=why[len("fallback: "):])
     if why.startswith("switched off"):
         return tr("video_path_off")
+    if why == video_mode.MAC_DEFAULT:
+        return tr("video_path_mac_default")
     return tr("video_path_window")
 
 

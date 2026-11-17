@@ -36,6 +36,14 @@ is held either: the core is built with mpv's timing offset 0 instead
 time and it is flushed then. A window on screen is composited whole, so
 there is no tearing.
 
+The view it draws into is the app's own as well (`PictureView`), not a Qt
+child window: Qt's cocoa plugin takes a child window under the pointer for
+the one a mouse move is for and drops the move (no hover reached the
+widgets over the picture), and a view of the app's own can follow its
+placeholder into whichever native view holds it (media/video_thread's
+_Placement). Its hitTest: says nil and it has no tracking area: the mouse
+is Qt's, as with no native window at all.
+
 Anything that fails - no PyObjC, no OpenGL framework, no pixel format or
 context, a view that would not take the context, an error while drawing -
 is a reason (`unavailable`, `MacGLError`, `prepare`'s answer), and the
@@ -52,6 +60,7 @@ import ctypes
 import math
 import sys
 import threading
+import time
 from typing import Any, NamedTuple
 
 from ..core.log import log
@@ -84,6 +93,10 @@ WAIT_S = 2.0
 #: How long the window's thread waits to take the context off a view that
 #: is going, or off its view as it goes itself.
 LET_GO_S = 1.0
+#: The context's updates in the log at most this often (a resize is many).
+UPDATE_SAY_S = 2.0
+#: NSWindowOrderingMode's NSWindowAbove: a subview put over the others.
+NS_WINDOW_ABOVE = 1
 
 SET, UPDATE = "set", "update"
 
@@ -265,6 +278,9 @@ class MacGL:
         self._seen = False             # that view was on screen at the last attach
         self._running = False          # the render thread holds it (create .. free)
         self._open: Any = None         # the frame's autorelease pool
+        self._said_update = 0.0
+        self._updates = 0
+        self.changes = 0               # setViews and updates made (a new drawable)
         self.info = ""                 # the renderer, for the log
         self.format = ""
 
@@ -316,9 +332,18 @@ class MacGL:
         if ctx is None:
             raise MacGLError("no OpenGL context")
         view, place = self._place_of(target)
+        if view is None:               # the picture's own view not made yet
+            return type(target)(win, target.w, target.h, False)
         out = type(target)(win, place.w, place.h, True)
         change = (change_for(self._place, place, not self._seen)
                   if win is self._window else SET)
+        why = "" if change != SET else (
+            "first" if self._place is None else "another view"
+            if self._place.view != place.view else "again")
+        if not change and self._id(ctx.view()) != place.view:
+            # AppKit let go of it (the view left its window a moment): on
+            # it again.
+            change, why = SET, "lost"
         if not change:
             return out
         if not self._gate.acquire(timeout=TRY_S):
@@ -342,10 +367,37 @@ class MacGL:
                     _FLUSH.release()
             finally:
                 self._unlock()
-            self._place, self._window, self._seen = place, win, True
+            was, self._place, self._window, self._seen = self._place, place, win, True
+            self.changes += 1
         finally:
             self._gate.release()
+        self._say(change, why, was, place)
         return out
+
+    def forget(self) -> None:
+        """Put on the view again at the next attach (its view was moved or
+        raised: AppKit may have let go of the drawable)."""
+        self._place = None
+
+    def _say(self, change: str, why: str, was: Place | None, now: Place) -> None:
+        """Each attach in the log, an update at most every UPDATE_SAY_S (a
+        window being resized updates on every step)."""
+        size = f"{now.w}x{now.h} px"
+        if change == SET:
+            log.info("video thread: the context on view %#x (%s; window %#x, %s)",
+                     now.view, why, now.window, size)
+            self._said_update = 0.0
+            return
+        what = ("shown again" if was is None or was == now else
+                "another window" if was.window != now.window else
+                "another screen" if was.screen != now.screen else
+                "resized" if (was.w, was.h) != (now.w, now.h) else "moved")
+        self._updates += 1
+        t = time.monotonic()
+        if t - self._said_update >= UPDATE_SAY_S:
+            log.info("video thread: the context updated (%s, %s; %d since)", what, size,
+                     self._updates)
+            self._said_update, self._updates = t, 0
 
     def detach(self, window: Any) -> None:
         """*window*'s view is going: the context lets go of it first (the
@@ -393,14 +445,22 @@ class MacGL:
                     _FLUSH.release()
             finally:
                 self._unlock()
+            was = self._place
             self._place, self._window, self._seen = None, None, False
         finally:
             self._gate.release()
+        if was is not None:
+            log.info("video thread: the context let go of view %#x (%s)", was.view, what)
         return True
 
     def _place_of(self, target: Any) -> tuple[Any, Place]:
-        ptr = int(target.window.winId())
-        view = self._proxy(ptr)
+        win = target.window
+        view = getattr(win, "nsview", None)
+        if view is None and hasattr(win, "nsview"):
+            return None, Place(0, 0, 0, 0.0, 0.0, target.w, target.h)
+        ptr = self._id(view) if view is not None else int(win.winId())
+        if view is None:
+            view = self._proxy(ptr)
         nswin = view.window()
         bounds = view.bounds().size
         frame = view.frame().origin
@@ -572,3 +632,167 @@ class MacGL:
         except Exception:
             return ""
         return f"{name}, OpenGL {version}" if name else ""
+
+
+# -- the picture's own view ------------------------------------------------------------
+
+_VIEW_CLASS: dict[int, Any] = {}
+
+
+def view_class(appkit: Any) -> Any:
+    """The NSView class of the picture's own view (made once per process -
+    an Objective-C class name is the process's): it is never the mouse's.
+    hitTest: says nil, so clicks, the wheel and drags go to the view under
+    it - Qt's - and it has no tracking area, so Qt's own sees every mouse
+    move and enter/leave over the picture. A child QWindow could not do
+    that: Qt's cocoa plugin takes the child window under the pointer for
+    the one the move is for (QCocoaWindow::childWindowAt), transparent for
+    input or not, and drops it."""
+    cls = _VIEW_CLASS.get(id(appkit))
+    if cls is None:
+        class DopeIPTVPictureView(appkit.NSView):  # type: ignore[misc, name-defined]
+            def hitTest_(self, _point):
+                return None
+
+            def acceptsFirstMouse_(self, _event):
+                return False
+
+            def isOpaque(self):
+                return True
+        cls = _VIEW_CLASS[id(appkit)] = DopeIPTVPictureView
+    return cls
+
+
+class PictureView:
+    """macOS: the native view the picture is drawn into, the app's own -
+    made the first time it is shown, put into the NSView of its nearest
+    native ancestor at the place its placeholder widget has there
+    (media/video_thread._Placement says where), on top of that view's other
+    subviews, hidden while the placeholder is. The window's thread only.
+
+    What the render thread and MacGL ask of a window (`winId`,
+    `devicePixelRatio`, `isExposed`, `gone`) it answers; `nsview` is the
+    view itself."""
+
+    native_picture = True
+
+    def __init__(self, appkit: Any = None, objc_mod: Any = None) -> None:
+        self._appkit = appkit
+        self._objc = objc_mod
+        self.nsview: Any = None
+        self.gone = False
+        self.shown = False             # on a host view and not hidden
+        self.on_screen = False         # and its window on screen (the last target)
+        self.scale = 1.0
+        self._host = 0
+        self._host_view: Any = None
+        self._frame: tuple[int, int, int, int] | None = None
+
+    def winId(self) -> int:
+        return self._id(self.nsview) if self.nsview is not None else 0
+
+    def devicePixelRatio(self) -> float:
+        return self.scale
+
+    def isExposed(self) -> bool:
+        return self.on_screen
+
+    def place(self, host: int, rect: tuple[int, int, int, int], visible: bool) -> list[str]:
+        """Over *rect* (points, in the host view's flipped coordinates) of
+        the NSView *host* (a pointer; 0: none), shown or hidden. What
+        changed: "made", "host", "raised", "frame", "shown", "hidden"."""
+        _main_only("the picture's view")
+        changes: list[str] = []
+        if self.gone:
+            return changes
+        if not host:
+            visible = False
+        if self.nsview is None:
+            if not visible:
+                return changes         # made the first time it shows
+            self._make()
+            changes.append("made")
+        v = self.nsview
+        with self._pool():
+            if host and host != self._host:
+                hv = self._proxy(host)
+                if v.superview() is not None:
+                    v.removeFromSuperview()
+                hv.addSubview_positioned_relativeTo_(v, NS_WINDOW_ABOVE, None)
+                self._host, self._host_view, self._frame = host, hv, None
+                changes.append("host")
+            elif host and self._host_view is not None:
+                subs = self._host_view.subviews()
+                n = len(subs) if subs is not None else 0
+                if n and self._id(subs[n - 1]) != self._id(v):
+                    # A view put over it since (a widget made native): the
+                    # picture would be under it, black.
+                    self._host_view.addSubview_positioned_relativeTo_(v, NS_WINDOW_ABOVE, None)
+                    changes.append("raised")
+            if host and rect != self._frame:
+                x, y, w, h = rect
+                v.setFrame_(((x, y), (w, h)))
+                self._frame = rect
+                changes.append("frame")
+            hide = not visible
+            if bool(v.isHidden()) != hide:
+                v.setHidden_(hide)
+                changes.append("hidden" if hide else "shown")
+        self.shown = bool(visible and self._host)
+        return changes
+
+    def unhost(self) -> None:
+        """Out of its host view (that view is going); placed again later."""
+        v = self.nsview
+        if v is not None and threading.current_thread() is threading.main_thread():
+            with self._pool():
+                if v.superview() is not None:
+                    v.removeFromSuperview()
+        self._host, self._host_view, self._frame = 0, None, None
+        self.shown = self.on_screen = False
+
+    def remove(self) -> None:
+        """For good (its surface goes or falls back): out of its window."""
+        if self.gone:
+            return
+        self.unhost()
+        self.gone = True
+        if threading.current_thread() is threading.main_thread():
+            self.nsview = None
+
+    def _make(self) -> None:
+        if self._appkit is None or self._objc is None:
+            import AppKit
+            import objc
+            self._appkit, self._objc = AppKit, objc
+        cls = view_class(self._appkit)
+        v = cls.alloc().initWithFrame_(((0, 0), (1, 1)))
+        if v is None:
+            raise MacGLError("the picture's view could not be made")
+        v.setWantsLayer_(True)
+        v.setHidden_(True)
+        self.nsview = v
+        log.info("video: the picture's own view %#x - the mouse goes through it to the widgets "
+                 "(hitTest: nil, no tracking area)", self._id(v))
+
+    def _pool(self) -> Any:
+        make = getattr(self._objc, "autorelease_pool", None)
+        return make() if make is not None else contextlib.nullcontext()
+
+    def _proxy(self, ptr: int) -> Any:
+        if self._objc is None:
+            import objc as _objc
+            self._objc = _objc
+        bridge = self._objc
+        try:
+            return bridge.objc_object(c_void_p=ptr)
+        except TypeError:
+            return bridge.objc_object(c_void_p=ctypes.c_void_p(ptr))
+
+    def _id(self, obj: Any) -> int:
+        if obj is None:
+            return 0
+        try:
+            return int(self._objc.pyobjc_id(obj))
+        except Exception:
+            return id(obj)

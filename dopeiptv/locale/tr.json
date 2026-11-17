@@ -2897,6 +2897,7 @@
   "video_path_window": "Pencerenin iş parçacığı",
   "video_path_pending": "Kendi iş parçacığı – ilk videoyla başlar",
   "video_path_off": "Pencerenin iş parçacığı - kapalı",
+  "video_path_mac_default": "Pencerenin iş parçacığı - macOS'ta varsayılan",
   "video_path_fallback": "Pencerenin iş parçacığı - kendi iş parçacığı başlatılamadı: {reason}",
   "local_searching": "Bu klasörde ve alt klasörlerinde aranıyor…",
   "local_search_count": "Bu klasörde ve alt klasörlerinde {n} sonuç bulundu",

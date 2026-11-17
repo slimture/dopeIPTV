@@ -2897,6 +2897,7 @@
   "video_path_window": "Потік вікна",
   "video_path_pending": "Власний потік – запускається з першим відео",
   "video_path_off": "Потік вікна — вимкнено",
+  "video_path_mac_default": "Потік вікна — типово в macOS",
   "video_path_fallback": "Потік вікна — окремий потік не вдалося запустити: {reason}",
   "local_searching": "Триває пошук у цій теці та її підтеках…",
   "local_search_count": "Знайдено в цій теці та її підтеках: {n}",

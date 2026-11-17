@@ -2897,6 +2897,7 @@
   "video_path_window": "Thread da janela",
   "video_path_pending": "Thread própria – começa com o primeiro vídeo",
   "video_path_off": "Thread da janela - desativada",
+  "video_path_mac_default": "Thread da janela - o padrão no macOS",
   "video_path_fallback": "Thread da janela - a thread própria não pôde iniciar: {reason}",
   "local_searching": "Pesquisando nesta pasta e nas subpastas…",
   "local_search_count": "{n} encontrados nesta pasta e nas subpastas",

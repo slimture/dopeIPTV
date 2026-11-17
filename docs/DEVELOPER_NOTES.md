@@ -155,11 +155,36 @@ over and flushed at its time. Anything that fails there - no PyObjC, no
 pixel format, a view that would not take the context, an error while
 drawing - is a reason, and the window's thread takes over.
 
+On macOS the picture's native window is not a Qt child window but an
+NSView of the app's own (`video_macos.PictureView`) over a plain
+placeholder widget, kept in place by `video_thread._Placement`. Two things
+a child QWindow did wrong there, both seen on a Mac: Qt's cocoa plugin
+takes the child window under the pointer for the one a mouse move is for
+(`QCocoaWindow::childWindowAt` looks at exposure, not at
+`WindowTransparentForInput`) and drops the move, so nothing over the
+picture saw hover - the controls only came up on a click; and a right-click
+menu made native (`popup_menu_over_video`, against a QOpenGLWidget's bleed)
+made its siblings native too - the main window's central widget got a
+native view of its own, stacked over the picture's: black until the app
+closed, while the render thread drew on underneath. The app's own view says
+nil to `hitTest:` and has no tracking area (the mouse is Qt's alone), is
+put into the NSView of its placeholder's nearest native ancestor at its
+place there and on top of that view's subviews, moved with each ancestor's
+move or resize, re-homed when an ancestor is made native, hidden with its
+placeholder, taken out before the window's own view goes; and a menu over
+the video goes native alone while the picture may have its own thread
+(`video_thread.native_menu`, Qt's `AA_DontCreateNativeWidgetSiblings` around
+it). On by default there only in a test build (a nightly, or run from a
+checkout): a release on a Mac draws on the window's thread unless the
+person turns the own thread on (`video_mode.default_on`); Diagnostics says
+so in a neutral grey.
+
 A window macOS reports occluded or minimized is not exposed and gets no
 frames (mpv is told they were skipped), so a hidden window never swaps
-into a surface vsync would hold. Only on Wayland does a covered window
-still count as seen (the compositor stops its frame callbacks, as under the
-fullscreen window). The release build's mac smoke test runs
+into a surface vsync would hold; on macOS that is the top-level window's
+exposure (Qt follows the NSWindow's occlusion there). Only on Wayland does
+a covered window still count as seen (the compositor stops its frame
+callbacks, as under the fullscreen window). The release build's mac smoke test runs
 `--video-check`: a generated test picture drawn on the render thread
 through that context (its renderer and the result in the run's
 annotations), or skipped (exit 3) where the runner cannot try.

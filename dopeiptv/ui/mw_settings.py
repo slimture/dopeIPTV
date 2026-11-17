@@ -1636,12 +1636,15 @@ class _SettingsMixin:
             c = audio.card(tr("set_card_decoding"))
             c.row(tr("setting_hwdec"), hwdec_box, tr("setting_hwdec_hint"))
             c.note(tr("set_next_stream_note"))
-            # How the picture is drawn (media/video_thread.py): on its own
-            # thread unless switched off here; read when the player is made.
+            # How the picture is drawn (media/video_thread.py): this copy's
+            # default (off in a release on macOS) until the person chooses;
+            # read when the player is made.
             from ..core import video_mode
+            chose = video_mode.choice(self.settings)
+            video_thread_default = video_mode.default_on_here()
             video_thread_box = c.toggle(
                 tr("setting_video_thread"),
-                str(self.settings.value(video_mode.SETTING, "true")) != "false",
+                chose == "on" if chose else video_thread_default,
                 tr("setting_video_thread_hint"))
             nerd_link(c, "set_link_picture",
                       [tr("nerd_spdif"), tr("nerd_sync"), tr("nerd_interpolation"),
@@ -1657,8 +1660,8 @@ class _SettingsMixin:
                 put("sub_background", flag(sub_box_box))
                 put("aspect_mode", aspect_box.currentData())
                 # Stored once it is chosen: OK with nothing touched writes
-                # nothing.
-                if (flag(video_thread_box) == "false"
+                # nothing, and the default stays this copy's.
+                if (video_thread_box.isChecked() != video_thread_default
                         or self.settings.value(video_mode.SETTING) is not None):
                     put(video_mode.SETTING, flag(video_thread_box))
                 put("hwdec_mode", hwdec_box.currentData())

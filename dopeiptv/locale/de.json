@@ -2897,6 +2897,7 @@
   "video_path_window": "Fenster-Thread",
   "video_path_pending": "Eigener Thread – startet mit dem ersten Video",
   "video_path_off": "Fenster-Thread – ausgeschaltet",
+  "video_path_mac_default": "Fenster-Thread – Standard unter macOS",
   "video_path_fallback": "Fenster-Thread – der eigene Thread konnte nicht starten: {reason}",
   "local_searching": "Dieser Ordner und seine Unterordner werden durchsucht…",
   "local_search_count": "{n} gefunden in diesem Ordner und seinen Unterordnern",

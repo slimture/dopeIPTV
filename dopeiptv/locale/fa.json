@@ -2897,6 +2897,7 @@
   "video_path_window": "رشته‌ی پنجره",
   "video_path_pending": "رشتهٔ اختصاصی – با اولین ویدیو شروع می‌شود",
   "video_path_off": "رشته‌ی پنجره - خاموش",
+  "video_path_mac_default": "رشته‌ی پنجره - پیش‌فرض در macOS",
   "video_path_fallback": "رشته‌ی پنجره - رشته‌ی جداگانه شروع نشد: {reason}",
   "local_searching": "در حال جستجو در این پوشه و زیرپوشه‌هایش…",
   "local_search_count": "{n} مورد در این پوشه و زیرپوشه‌هایش پیدا شد",

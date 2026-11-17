@@ -37,7 +37,8 @@ has two profiles or more.
 - Video: `aspect_mode`, `video_deinterlace`, `video_sharpen`, `video_tonemapping`
 - Decoding: `hwdec_mode`; `video_own_thread` (the picture drawn on a thread
   of its own; off falls back to the window's thread, also
-  `DOPEIPTV_VIDEO_THREAD=0`); link → Nerd › Player (passthrough, video sync,
+  `DOPEIPTV_VIDEO_THREAD=0`; stored only once chosen - off by default in a
+  release on macOS, on everywhere else); link → Nerd › Player (passthrough, video sync,
   interpolation, audio delay per channel, mpv)
 
 **Guide** (`guide`)

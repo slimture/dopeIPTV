@@ -2897,6 +2897,7 @@
   "video_path_window": "Fönstrets tråd",
   "video_path_pending": "Egen tråd – startar med första videon",
   "video_path_off": "Fönstrets tråd - avstängd",
+  "video_path_mac_default": "Fönstrets tråd - standard på macOS",
   "video_path_fallback": "Fönstrets tråd - den egna tråden kunde inte starta: {reason}",
   "local_searching": "Söker i mappen och dess undermappar…",
   "local_search_count": "{n} hittade i mappen och dess undermappar",

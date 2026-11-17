@@ -2897,6 +2897,7 @@
   "video_path_window": "विंडो का थ्रेड",
   "video_path_pending": "अपना थ्रेड – पहले वीडियो के साथ शुरू होता है",
   "video_path_off": "विंडो का थ्रेड - बंद",
+  "video_path_mac_default": "विंडो का थ्रेड - macOS पर डिफ़ॉल्ट",
   "video_path_fallback": "विंडो का थ्रेड - अपना थ्रेड शुरू नहीं हो सका: {reason}",
   "local_searching": "इस फ़ोल्डर और इसके सब-फ़ोल्डरों में खोजा जा रहा है…",
   "local_search_count": "इस फ़ोल्डर और इसके सब-फ़ोल्डरों में {n} मिले",

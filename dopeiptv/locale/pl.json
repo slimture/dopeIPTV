@@ -2897,6 +2897,7 @@
   "video_path_window": "Wątek okna",
   "video_path_pending": "Własny wątek – uruchamia się przy pierwszym filmie",
   "video_path_off": "Wątek okna - wyłączone",
+  "video_path_mac_default": "Wątek okna - domyślnie w macOS",
   "video_path_fallback": "Wątek okna - własny wątek nie mógł się uruchomić: {reason}",
   "local_searching": "Przeszukiwanie tego folderu i jego podfolderów…",
   "local_search_count": "Znaleziono w tym folderze i podfolderach: {n}",

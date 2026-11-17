@@ -2897,6 +2897,7 @@
   "video_path_window": "Nit prozora",
   "video_path_pending": "Sopstvena nit – pokreće se sa prvim videom",
   "video_path_off": "Nit prozora - isključeno",
+  "video_path_mac_default": "Nit prozora - podrazumevano na macOS-u",
   "video_path_fallback": "Nit prozora - sopstvena nit nije mogla da se pokrene: {reason}",
   "local_searching": "Pretraga ove fascikle i njenih podfascikli…",
   "local_search_count": "Pronađeno u ovoj fascikli i podfasciklama: {n}",
