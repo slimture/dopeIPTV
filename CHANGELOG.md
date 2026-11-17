@@ -29,6 +29,12 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- Casting: the card says Playing as soon as the TV plays, also while a seek
+  is still on its way (it stayed on Starting…); going live during a seek no
+  longer says "Cast failed: Casting stopped." - the newer send simply takes
+  its place. The tracks button shows only for a Chromecast: on an Apple TV,
+  a DLNA TV or a Kodi its menu held only the cast window, which has its own
+  button.
 - AirPlay: going back in a channel while it is cast starts sooner - the
   moment gone back to is handed to the Apple TV once its first segment is
   ready, not three (there is no live edge to keep back from). "The Apple TV

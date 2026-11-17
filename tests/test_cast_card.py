@@ -322,6 +322,46 @@ def test_the_state_follows_the_receiver_and_the_pause(sync_runs, clock):
     assert live.cast_bar_back.isHidden() and live.cast_bar_fwd.isHidden()
 
 
+def test_a_send_on_its_way_beside_a_tv_that_plays_says_playing(sync_runs, clock):
+    """A seek's send can still be on its way while the TV plays: the pill
+    is the TV's - it said Starting... until the send came back."""
+    from dopeiptv.ui import cast_card as cc
+    w = _window("live")
+    w._cast_inflight = 1
+    _tick(w, clock, 1, "PLAYING/None")
+    assert w.cast_bar.pill.state == cc.PLAYING
+    _tick(w, clock, 1, "BUFFERING/None")
+    assert w.cast_bar.pill.state == cc.STARTING
+
+
+def test_a_send_a_newer_one_replaced_is_no_error(monkeypatch):
+    """Live while a seek was on its way: the seek's send stops ("Casting
+    stopped.") and the newer one goes - nothing to tell."""
+    from dopeiptv.i18n import tr
+    w = _window("live")
+    said = []
+    monkeypatch.setattr(w, "_error", said.append, raising=False)
+    w._cast_send_failed(tr("cast_stopped"))
+    assert said == []
+    w._cast_send_failed("no route")
+    assert said == [tr("cast_failed", msg="no route")]
+
+
+def test_the_tracks_button_is_a_chromecast_s_alone():
+    """Its menu on an Apple TV, a DLNA TV or a Kodi held only the cast
+    window, which has its own button."""
+    w = _window("live")
+    w.cast_bar_tracks = w.cast_bar.tracks
+    for airplay, as_is, shown in ((False, False, True), (True, False, False),
+                                  (False, True, False)):
+        w._cast_on_airplay = lambda a=airplay: a
+        w._cast_plays_as_is = lambda _n, x=as_is: x
+        w._cast_tracks_shown("Living room TV")
+        assert w.cast_bar.tracks.isVisibleTo(w.cast_bar) is shown, (airplay, as_is)
+    w._cast_tracks_shown(None)
+    assert not w.cast_bar.tracks.isVisibleTo(w.cast_bar)
+
+
 # -- the watchdog in the window --------------------------------------------------------
 
 def test_a_stuck_channel_is_sent_again_twice_then_the_card_says_try_again(sync_runs, clock):

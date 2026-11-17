@@ -1173,6 +1173,7 @@ class _CastMixin:
         airplay_btn = getattr(self, "cast_bar_airplay", None)
         if airplay_btn is not None:
             airplay_btn.setVisible(bool(device) and self._cast_on_airplay())
+        self._cast_tracks_shown(device)
         if not device:
             self._cast_tick.stop()
             bar.hide()
@@ -1699,6 +1700,11 @@ class _CastMixin:
         again = getattr(self, "_cast_recover_failed", None)
         if callable(again) and again(msg):
             return
+        if msg == tr("cast_stopped"):
+            # A newer send took its place (Live while a seek was on its
+            # way): nothing failed, the newer one is what the TV gets.
+            log.info("cast: a send was replaced by a newer one")
+            return
         self._error(tr("cast_failed", msg=msg))
 
     def _cast_continue_archive(self) -> None:
@@ -1766,6 +1772,15 @@ class _CastMixin:
         if not (self._autoplay_next_episode() and self._has_next_episode()):
             return False
         return bool(self._advance_to_next_episode())
+
+    def _cast_tracks_shown(self, device: str | None) -> None:
+        """Tracks and picture are the converter's, a Chromecast's alone: on
+        an Apple TV, a DLNA TV or a Kodi the button's menu held only the
+        cast window, which has its own button beside it."""
+        tracks = getattr(self, "cast_bar_tracks", None)
+        if tracks is not None:
+            tracks.setVisible(bool(device) and not self._cast_on_airplay()
+                              and not self._cast_plays_as_is(device))
 
     def _cast_plays_as_is(self, name: str | None) -> bool:
         """A DLNA TV or a Kodi: it plays the stream as it is."""

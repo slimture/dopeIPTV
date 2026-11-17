@@ -253,7 +253,9 @@ class _CastWatchMixin:
                            note=tr("cast_note_reconnecting"))
         elif self._cast_waiting_route():
             card.set_state(cast_card.WAITING, note=tr("airplay_pick_window"), action="airplay")
-        elif self._cast_busy():
+        elif self._cast_busy() and ph != cast_watch.PLAYING:
+            # A send on its way while the TV says it plays (it plays on
+            # until the new stream replaces it): the pill is the TV's.
             card.set_state(cast_card.STARTING)
         elif getattr(self, "_cast_paused_at", None) is not None or ph == cast_watch.PAUSED:
             card.set_state(cast_card.PAUSED)
