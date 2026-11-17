@@ -808,7 +808,8 @@ ADMIN_FEEDBACK = ("/admin/feedback", "/admin/feedback-item", "/admin/feedback-co
 ADMIN_GET = ("/admin/admin.js", "/admin/analysis.js", "/admin/logtools.js", "/admin/account.js",
              "/admin/builds.js", "/admin/feedback.js", *ADMIN_DATA, *ADMIN_FEEDBACK)
 ADMIN_POST = ("/admin/notify-test", "/admin/push-subscribe", "/admin/push-unsubscribe", "/admin/pick",
-              "/admin/feedback-mark", "/admin/feedback-reply", "/admin/supporter-key")
+              "/admin/feedback-mark", "/admin/feedback-reply", "/admin/feedback-archive",
+              "/admin/feedback-delete", "/admin/supporter-key")
 # From the app: an error report or feedback, sent when its user pressed Send.
 FEEDBACK_POST = "/feedback/report"
 # The app asking whether its reports have answers (with the hashes of its codes).
@@ -951,6 +952,11 @@ class Handler(BaseHTTPRequestHandler):
                 fb_days = int(query.get("days", "30"))
             except ValueError:
                 fb_days = 30
+            # The page asks again now and then with the revision it has:
+            # nothing changed, nothing read.
+            rev = feedback.revision(fb_dir)
+            if query.get("rev") == rev:
+                return self._send(200, {"rev": rev, "same": True})
             return self._send(200, feedback.summary(fb_dir, fb_days))
         if path in ADMIN_DATA:
             query = {k: v[0] for k, v in urllib.parse.parse_qs(self.path.partition("?")[2]).items()}
@@ -1150,8 +1156,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def _admin_post(self, path: str) -> None:
         """Turning a device's notifications on or off, a test, a group of the
-        Analysis tab's visits in full, and the Account tab - the signed-in
-        admin only, from the site's own page."""
+        Analysis tab's visits in full, the Account tab, and the Feedback
+        tab's marks, answers, archive and delete - the signed-in admin only,
+        from the site's own page."""
         user = self._user()
         if not user:
             return self._send(401, {"error": "signed out"})
@@ -1171,16 +1178,40 @@ class Handler(BaseHTTPRequestHandler):
             import admin
             import feedback
             fb_dir = CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats"))
-            ok = feedback.mark(fb_dir, str(data.get("key") or ""), str(data.get("state") or ""))
+            # One key, or several (a report's unread replies, read at once).
+            keys = data.get("keys") if isinstance(data.get("keys"), list) else str(data.get("key") or "")
+            ok = feedback.mark(fb_dir, keys, str(data.get("state") or ""), data.get("threads") is True)
             return self._send(200 if ok else 400, {"ok": ok})
         if path == "/admin/feedback-reply":
             import admin
             import feedback
+            let = data.get("open")
             ok = feedback.add_reply(CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats")),
                                     str(data.get("target") or ""), str(data.get("key") or ""),
                                     str(data.get("code") or ""), str(data.get("text") or ""),
-                                    str(data.get("version") or ""))
+                                    str(data.get("version") or ""), let if isinstance(let, bool) else None)
             return self._send(200 if ok else 400, {"ok": ok})
+        if path == "/admin/feedback-archive":
+            import admin
+            import feedback
+            # One key, or several picked in the list.
+            keys = data.get("keys") if isinstance(data.get("keys"), list) else str(data.get("key") or "")
+            ok = feedback.archive(CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats")),
+                                  keys, data.get("archived") is not False)
+            return self._send(200 if ok else 400, {"ok": ok})
+        if path == "/admin/feedback-delete":
+            import admin
+            import feedback
+            fb_dir = CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats"))
+            many = [data.get(k) for k in ("keys", "groups")]
+            if any(isinstance(v, list) for v in many):
+                # Several picked in the list, reports and problems, in one pass.
+                gone = feedback.delete_many(fb_dir, *[v if isinstance(v, list) else [] for v in many])
+            else:
+                gone = feedback.delete(fb_dir, str(data.get("key") or ""), data.get("group") is True)
+            if gone < 0:
+                return self._send(400, {"ok": False})
+            return self._send(200, {"ok": True, "gone": gone})
         if path == "/admin/supporter-key":
             return self._send(*self._supporter_key(data))
         if path == "/admin/notify-test":
@@ -1270,7 +1301,8 @@ class Handler(BaseHTTPRequestHandler):
         if status == 200 and not body.get("duplicate") and push_ready():
             kind = str(data.get("kind") or "feedback")
             threading.Thread(target=push, args=(
-                {"error": "An error report", "crash": "A crash report"}.get(kind, "Feedback")
+                ("A reply to your answer" if data.get("thread")
+                 else {"error": "An error report", "crash": "A crash report"}.get(kind, "Feedback"))
                 + (" from the website" if data.get("from") == "site"
                    else " from a supporter" if data.get("supporter") == "yes" else " from the app"),
                 f"dopeIPTV {str(data.get('version') or '?')[:20]} · {str(data.get('os') or '?')[:20]}",

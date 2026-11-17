@@ -804,7 +804,8 @@ tr:last-child td { border-bottom: 0; }
   background: var(--page); padding: 8px 10px; border-radius: 8px; user-select: all; }
 .chip.from-site { color: var(--text-2); background: color-mix(in srgb, var(--text) 9%, transparent); }
 .chip.sup { color: var(--heart); background: color-mix(in srgb, var(--heart) 12%, transparent); font-weight: 650; }
-/* Answering feedback (feedback.js): a quiet block above the report. */
+/* Answering feedback (feedback.js): a quiet block under a report's
+   conversation, above a problem's latest report. */
 .fb-answer { margin: 10px 0; padding: 12px; border-radius: 10px; background: var(--page);
   display: flex; flex-direction: column; gap: 8px; }
 .fb-answer-head { margin: 0; font-size: 13px; color: var(--text-2); }
@@ -812,6 +813,30 @@ tr:last-child td { border-bottom: 0; }
 .fb-version, .fb-words-in { font: inherit; font-size: 14px; color: var(--text); background: var(--surface);
   border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: min(100%, 560px); box-sizing: border-box; }
 .chip.answered { color: var(--up); background: color-mix(in srgb, var(--up) 12%, transparent); }
+/* A report's conversation (feedback.js thread()): the report, each answer
+   and each reply in order; their replies set off by a line in the accent.
+   "Let them reply" under the answer's words; a report or a reply that came
+   in while the page was open lights up for a moment. */
+.fb-thread { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 10px; }
+.fb-entry { display: flex; flex-direction: column; gap: 6px; }
+.fb-entry-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 12.5px; color: var(--muted); }
+.fb-entry-who { font-weight: 650; color: var(--text-2); }
+.fb-entry.answer, .fb-entry.reply { padding: 8px 12px; border-radius: 10px; background: var(--page); }
+.fb-entry.reply { border-inline-start: 3px solid var(--accent); }
+.fb-reply-text { margin: 0; font-size: 14px; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+.chip.reply-waiting { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.chip.can { color: var(--s1); background: color-mix(in srgb, var(--s1) 12%, transparent); }
+.chip.archived { color: var(--muted); background: color-mix(in srgb, var(--text) 7%, transparent); }
+.fb-open { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13.5px; color: var(--text); cursor: pointer; }
+.fb-open input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+.fb-open .muted { font-size: 12.5px; }
+/* A card's muted line keeps 10px above it (.card .muted): not in the answer
+   box, where it sits beside a switch or a button, on their line. */
+.fb-answer .muted { margin: 0; }
+.fb-answer .fb-actions { align-items: center; }
+.btn.quiet.danger { color: var(--down); }
+.fb-row.fresh { animation: visit-fresh 6s ease-out; }
+@media (prefers-reduced-motion: reduce) { .fb-row.fresh { animation: none; } }
 /* Copying a report (feedback.js): a quiet pill at the end of its line, a
    word when it is done; the textarea the fallback copies from, out of sight
    (16px, or iOS zooms in on it). Which build sent it: "source" marked. */
@@ -826,6 +851,27 @@ tr:last-child td { border-bottom: 0; }
 .fb-copy.again, .fb-copy-all.again, .fb-actions .btn.again { color: var(--text);
   background: color-mix(in srgb, var(--accent) 22%, transparent); }
 @media (hover: none) { .fb-copy { padding: 6px 13px; } }
+/* Picking several (feedback.js): a box before each row (Shift for a run),
+   the bar over the list saying how many and acting on them all - held under
+   the page's top while something is picked (--fb-top: its height). */
+.fb-line { display: flex; align-items: center; gap: 2px; }
+.fb-line .fb-head { flex: 1; min-width: 0; }
+.fb-pick { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 30px; height: 32px;
+  cursor: pointer; }
+.fb-pick input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.fb-line + .fb-meta { padding-inline-start: 38px; }
+.fb-row.picked .fb-line { background: color-mix(in srgb, var(--accent) 9%, transparent); border-radius: 8px; }
+.fb-pick-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0 0 4px; padding: 2px 0; }
+.fb-pick-bar.on { position: sticky; top: var(--fb-top, 64px); z-index: 3; background: var(--surface); padding: 6px 0;
+  box-shadow: 0 1px 0 var(--line); }
+.fb-pick-all { display: inline-flex; align-items: center; gap: 4px; margin-inline-end: auto; font-size: 13px;
+  color: var(--muted); cursor: pointer; }
+.fb-pick-bar.on .fb-pick-all { color: var(--text); font-weight: 650; }
+@media (hover: none) {
+  .fb-pick { width: 40px; height: 40px; }
+  .fb-pick input { width: 20px; height: 20px; }
+  .fb-line + .fb-meta { padding-inline-start: 48px; }
+}
 .chip.b-source { color: color-mix(in srgb, var(--s2) 78%, var(--text)); background: color-mix(in srgb, var(--s2) 14%, transparent); }
 .copy-buffer { position: fixed; top: 0; left: 0; width: 1px; height: 1px; margin: 0; padding: 0; border: 0;
   opacity: 0; font-size: 16px; pointer-events: none; }
