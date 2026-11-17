@@ -12,6 +12,7 @@
 - **Every film has its own page**, like a series: the backdrop, the plot, the cast, and one button - Play, or Continue from where you stopped. Opening it never starts anything.
 - **Popular right now** can be switched off for Movies or Series in **Settings → Posters & info**.
 - **The phone remote's TV mode remote fits your phone**: the d-pad fills the room below Now playing, nothing scrolls, and every key is big enough for a thumb. Subtitles and sound, the sleep timer and recording fold away behind **More**, and the phone remembers how you left it.
+- **Rewind live TV from your phone.** While a live channel plays, Now playing on the phone remote shows how far back the rewind buffer reaches: drag the bar to go back (it shows how far behind live you will be), skip back or forward, and tap **Live** to catch up - it lights up when you are watching live and otherwise shows how far behind you are.
 
 ### Fixed
 

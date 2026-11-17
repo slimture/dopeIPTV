@@ -15,6 +15,13 @@ Episodes view), and the phone's previous and next are the episode before
 and after it in its queue - the media keys' and autoplay's path, where it
 got to without the resume question.
 
+While a live channel plays in the player's rewind buffer, the state says how
+far back the buffer reaches and how far behind live it plays (the DVR row's
+reading from the player's own position poll), and the phone goes back, skips
+and returns to live through the row's own paths - in the buffer alone, never
+a second connection (far behind with mpv's own buffer, LIVE opens the
+channel again in place of the stream, as the row's LIVE does).
+
 The window's thread does as little as it can for a poll: what plays is read
 there, while what is on now and next is looked up on the server's thread from
 a guide already in memory (never loaded for a poll: that was a download and
@@ -35,7 +42,7 @@ from typing import Any
 from ..core import channel_numbers
 from ..core.log import log
 from ..core.phone_remote import (
-    DEFAULT_PORT, LOGO_MAX, LOGO_TIMEOUT, PORT_KEY, PhoneServer, new_token, page_url,
+    DEFAULT_PORT, LOGO_MAX, LOGO_TIMEOUT, PORT_KEY, BufferTold, PhoneServer, new_token, page_url,
 )
 from ..core.remote_api import lan_addresses
 from ..i18n import tr
@@ -99,8 +106,10 @@ PHONE_NOTE_S = 20.0
 #: (a watched mark made on the computer meanwhile).
 EPISODES_FRESH_S = 300
 #: What the phone asks that may start a stream or a recording: the app's
-#: questions while it runs are the phone's (mw_phone_rec).
-_ASKING = frozenset({"_play", "_pb_play", "next", "previous", "toggle", "rec", "_rec_next", "rec_go"})
+#: questions while it runs are the phone's (mw_phone_rec). A seek may: Live
+#: far behind opens the channel again, as the DVR row's LIVE does.
+_ASKING = frozenset({"_play", "_pb_play", "next", "previous", "toggle", "rec", "_rec_next", "rec_go",
+                     "seek"})
 #: Ports tried after the one used last: the default and the next few, then
 #: any the system gives.
 _PORTS = tuple(range(DEFAULT_PORT, DEFAULT_PORT + 10)) + (0,)
@@ -192,6 +201,8 @@ def page_words() -> dict[str, str]:
             "rec_anyway": tr("rec_record_anyway"), "rec_cancel": tr("rec_cancel_scheduled"),
             "rec_ask": tr("phone_rec_ask"), "rec_stop_ask": tr("phone_rec_stop_ask"),
             "more": tr("phone_page_more"), "less": tr("phone_page_less"),
+            "live": tr("phone_page_live"), "go_live": tr("phone_page_go_live"),
+            "behind": tr("phone_page_behind"),
             **tv_words()}
 
 
@@ -676,6 +687,7 @@ class _PhoneMixin(_PhoneBrowseMixin, _PhoneRecMixin):
         if late is not None:
             out["ask"] = late
         if st["state"] == "stopped" or locked:
+            self._phone_dvr(p, False, False)        # what was told of a buffer goes
             return out, None
         last = getattr(self, "_last_playback", None) or {}
         kind = st.get("kind") or ""
@@ -692,6 +704,11 @@ class _PhoneMixin(_PhoneBrowseMixin, _PhoneRecMixin):
         if left > 0:
             out["sleep_at"] = int(round(time.time() - time.monotonic() + p._sleep_deadline))
         item = last.get("item") or {}
+        # A live channel in the player's rewind buffer: how far back it
+        # reaches and how far behind live it plays, as the DVR row has it.
+        dvr = self._phone_dvr(p, kind == "live", st["state"] == "playing")
+        if dvr is not None:
+            out["dvr"] = dvr
         if kind == "live" and item.get("stream_id") is not None:
             out["channel"] = self._phone_channel(item, st.get("title") or "")
             if self._phone_rec_item() is not None:
@@ -701,13 +718,38 @@ class _PhoneMixin(_PhoneBrowseMixin, _PhoneRecMixin):
             out["episode"] = self._phone_episode(last)
         return out, None
 
+    def _phone_dvr(self, p: Any, live: bool, playing: bool) -> dict[str, Any] | None:
+        """A live channel in the player's rewind buffer as Now playing shows
+        it: how far behind live, how far back the buffer reaches, whether it
+        follows live - the DVR row's reading from the player's own position
+        poll (nothing asked of mpv), told so that the state keeps its tag
+        while only the clock moves (core/phone_remote.BufferTold). None for
+        anything else: no buffer (turned off, an HLS channel), not live."""
+        reading = p.dvr_reading() if live and p is not None and hasattr(p, "dvr_reading") else None
+        told = self.__dict__.get("_phone_buffer")
+        if reading is None:
+            if told is not None:
+                told.forget()
+            return None
+        if told is None:
+            told = self.__dict__["_phone_buffer"] = BufferTold()
+        behind, reach, at_live = reading
+        return told.tell(getattr(p, "current_url", None), behind, reach, at_live, playing, time.time())
+
     def _phone_seek(self, params: dict) -> dict[str, Any]:
         """A place in what plays, from the phone - ``to`` seconds from its
         start (the bar let go), or ``by`` seconds from where it is (the skip
         keys): through the media keys' own seek (``set_position``, the
         player's _do_seek, as its seek bar does), clamped to the title's
-        length. Nothing for a stream that cannot seek: a live channel, a
-        stream with no length."""
+        length. A live channel in the player's rewind buffer is sought in
+        the buffer (_phone_seek_buffer); nothing for a stream that cannot
+        seek: a live channel without one, a stream with no length."""
+        p = self.player
+        reading = p.dvr_reading() if p is not None and hasattr(p, "dvr_reading") else None
+        if reading is not None and (getattr(self, "_last_playback", None) or {}).get("kind") == "live":
+            return self._phone_seek_buffer(p, reading, params)
+        if params.get("live") or params.get("behind") is not None:
+            return {"ok": False}            # the buffer went meanwhile
         given = "to" if params.get("to") is not None else "by"
         try:
             value = float(params.get(given))
@@ -723,6 +765,34 @@ class _PhoneMixin(_PhoneBrowseMixin, _PhoneRecMixin):
         target = max(0.0, min(length, target))
         self._remote_media("set_position", target)
         return {"ok": True, "position": round(target, 1)}
+
+    def _phone_seek_buffer(self, p: Any, reading: tuple, params: dict) -> dict[str, Any]:
+        """A live channel's place in the player's rewind buffer, from the
+        phone, through the DVR row's own paths - never a connection of its
+        own: ``behind`` seconds behind live (the bar let go: the row's
+        slider, the live point at most), ``by`` seconds from where it plays
+        (the skip keys: the player's arrows through the media keys' seek,
+        forward no further than live), or ``live`` (the row's LIVE: the end
+        of the buffer, or - the channel run on past mpv's own buffer - the
+        channel opened again in place of the stream, as a reconnect does)."""
+        behind, reach, _at_live = reading
+        if params.get("live"):
+            p._local_go_live()
+            return {"ok": True, "behind": 0.0}
+        given = "behind" if params.get("behind") is not None else "by"
+        try:
+            value = float(params.get(given))
+        except (TypeError, ValueError):
+            raise ValueError('give "behind" (seconds behind live), "by" (seconds, + or -) or "live"') from None
+        if not math.isfinite(value):
+            raise ValueError('give "behind" (seconds behind live), "by" (seconds, + or -) or "live"')
+        if given == "behind":
+            target = max(0.0, min(reach, value))
+            return {"ok": p.seek_behind_live(target), "behind": round(target, 1)}
+        step = min(value, behind)
+        if step:
+            self._remote_media("seek", step)
+        return {"ok": True, "behind": round(max(0.0, min(reach, behind - step)), 1)}
 
     def _phone_tracks(self) -> dict[str, Any]:
         """The sheet of tracks: what plays' audio tracks and subtitles as the

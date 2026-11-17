@@ -25,7 +25,9 @@ does the work (the window hands it to its own thread). Reading is GET,
 anything that changes something is POST. The state carries an ETag that
 leaves its clock out (``state_tag``): the page asks with it, and the same
 state again is a 304 with nothing to read - a page of a list and a series'
-episodes too.
+episodes too. A live channel's rewind buffer is told the same way: how far
+behind live and how far back, which the page reckons on by the clock
+(``BufferTold``), so a channel played behind live keeps its tag too.
 """
 
 from __future__ import annotations
@@ -128,6 +130,68 @@ def state_tag(state: dict[str, Any]) -> str:
     rest = {k: v for k, v in state.items() if k != "time"}
     raw = json.dumps(rest, sort_keys=True, ensure_ascii=False, default=str)
     return '"' + hashlib.sha1(raw.encode("utf-8")).hexdigest()[:20] + '"'
+
+
+def buffer_reckoned(told: dict[str, Any], now: float, playing: bool) -> tuple[float, float]:
+    """(seconds behind live, how far back the buffer reaches) at *now*, as
+    the page reckons them on from what it was told (``BufferTold``) - the
+    page's script does the same: behind live grows only while paused, the
+    reach only while the buffer still fills, and never behind past it."""
+    elapsed = max(0.0, now - float(told.get("t") or 0.0))
+    reach = max(0.0, float(told.get("reach") or 0.0) + (elapsed if told.get("grows") else 0.0))
+    behind = float(told.get("behind") or 0.0) + (0.0 if playing else elapsed)
+    return min(max(0.0, behind), reach), reach
+
+
+class BufferTold:
+    """A live channel's rewind buffer as the phone is told it (the state's
+    ``dvr``): how far behind live it plays, how far back the buffer reaches,
+    whether it follows live, whether the buffer still fills, and when that
+    was (``t``). The page reckons on from it by the clock
+    (``buffer_reckoned``), so the same dict is told again - the same tag, a
+    304 - while that reckoning stays within SLACK seconds of the player's;
+    a pause or play, a seek, LIVE, a buffer full or filling again, another
+    channel tell it anew."""
+
+    SLACK = 3.0
+    #: Whether the buffer still fills is looked at again this often (its end
+    #: moves by whole segments, so a shorter look says little).
+    EVERY = 10.0
+
+    def __init__(self) -> None:
+        self.told: dict[str, Any] | None = None
+        self._key: Any = None
+        self._playing = False
+        self._mark: tuple[float, float] | None = None
+        self._grows = True
+
+    def forget(self) -> None:
+        self.told, self._key, self._mark, self._grows = None, None, None, True
+
+    def tell(self, key: Any, behind: float, reach: float, live: bool, playing: bool,
+             now: float) -> dict[str, Any]:
+        """The ``dvr`` for the player's reading (*behind*, *reach*, *live*)
+        of the stream *key* at *now*: the last one told while it still holds."""
+        if key != self._key:
+            self.forget()
+            self._key = key
+        reach = max(0.0, reach)
+        behind = min(max(0.0, behind), reach)
+        mark = self._mark
+        if mark is None or now < mark[0]:
+            self._mark = (now, reach)
+        elif now - mark[0] >= self.EVERY:
+            self._grows = reach - mark[1] > 0.5 * (now - mark[0])
+            self._mark = (now, reach)
+        told = self.told
+        if told is not None and told["live"] == bool(live) and self._playing == playing:
+            then_behind, then_reach = buffer_reckoned(told, now, playing)
+            if abs(then_behind - behind) <= self.SLACK and abs(then_reach - reach) <= self.SLACK:
+                return told
+        self.told = {"behind": round(behind, 1), "reach": round(reach, 1), "live": bool(live),
+                     "grows": self._grows, "t": round(now, 1)}
+        self._playing = playing
+        return self.told
 
 
 def gesture(dx: float, dy: float, ms: float) -> str | None:

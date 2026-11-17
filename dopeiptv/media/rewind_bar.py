@@ -141,6 +141,7 @@ class RewindBarMixin:
         self._dvr_live = True
         self._live_ahead = 0.0
         self._dvr_span = 0.0
+        self._local_at_live = False
         self._local_fs_window: BufferWindow | None = None
         # The DVR row floats over the bottom of the video, like the hover
         # scrubber of a film: shown on pointer movement, gone when idle. In
@@ -472,6 +473,7 @@ class RewindBarMixin:
         self._local_buffer_ready = window is not None
         shared = self._sync_bar_switch()
         self._local_behind = None
+        self._local_at_live = False
         if window is None:
             self._local_buffer_hide_timer.stop()
             self._set_local_buffer_visible(False)
@@ -491,6 +493,7 @@ class RewindBarMixin:
             behind += lag   # the time to live, not just to the buffer's end
         at_live = self._dvr_live and behind < 1
         self._local_behind = 0.0 if at_live else behind
+        self._local_at_live = at_live
         self._label_live_button()
         if self.local_buffer_live.property("atLive") != at_live:
             self.local_buffer_live.setProperty("atLive", at_live)
@@ -526,6 +529,37 @@ class RewindBarMixin:
     def local_behind(self) -> float | None:
         """Seconds behind live in the rewind buffer; None without one."""
         return getattr(self, "_local_behind", None)
+
+    def dvr_reading(self) -> tuple[float, float, bool] | None:
+        """The DVR row as the position poll last worked it out, for a remote
+        (the phone's Now playing): (seconds behind live, how far back from
+        live the buffer reaches, at the live edge) - or None without the
+        row. Nothing is asked of mpv here."""
+        behind = getattr(self, "_local_behind", None)
+        if (behind is None or self.current_url is None
+                or not getattr(self, "_local_buffer_ready", False)):
+            return None
+        reach = max(0.0, float(self._dvr_span)) + self._lag_counted()
+        return max(0.0, min(float(behind), reach)), reach, bool(self._local_at_live)
+
+    def _lag_counted(self) -> float:
+        """How far the buffer's end is behind the channel, where the row
+        counts it in the time to live (paused or rewound past mpv's own
+        network buffer)."""
+        lag = self._live_lag.lag
+        return lag if lag >= LIVE_REOPEN_LAG else 0.0
+
+    def seek_behind_live(self, behind: float) -> bool:
+        """The DVR row's slider let go *behind* seconds behind live - for a
+        remote (the phone's bar): the slider's own seek, in the buffer alone
+        and no further than the live point. False without the row."""
+        window = self._local_slider_window
+        reading = self.dvr_reading()
+        if window is None or reading is None:
+            return False
+        seconds = max(0.0, min(float(self._dvr_span), reading[1] - max(0.0, behind)))
+        self._seek_local_buffer(int(round(seconds)), window)
+        return True
 
     def _seek_local_target(self, target: float, window: BufferWindow) -> None:
         # Up to the live point is following live again; anything before it

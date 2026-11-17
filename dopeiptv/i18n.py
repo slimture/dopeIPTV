@@ -3068,6 +3068,9 @@ _STRINGS: dict[str, dict[str, str]] = {
     "phone_rec_stop_ask": {"en": "Stop recording {title}?"},
     "phone_page_more": {"en": "More"},
     "phone_page_less": {"en": "Less"},
+    "phone_page_live": {"en": "Live"},
+    "phone_page_go_live": {"en": "Back to live"},
+    "phone_page_behind": {"en": "{t} behind live"},
     "backup_kind_profiles": {"en": "Profiles"},
     # -- a home network split in VLANs (core/home_net.py, providers/lan_scan.py,
     #    providers/cast_devices.py) --
