@@ -3032,5 +3032,13 @@
   "local_place_library": "Библиотека",
   "local_n_folders": "Папок: {n}",
   "local_gone": "Этой папки больше нет.",
-  "local_show_folder": "Показать в папке"
+  "local_show_folder": "Показать в папке",
+  "rec_place_now": "Записывается сейчас и далее",
+  "rec_place_empty": "Записей пока нет. Щёлкните правой кнопкой по каналу или по передаче в телегиде и выберите «Записать».",
+  "rec_when_today": "Сегодня {time}",
+  "rec_when_yesterday": "Вчера {time}",
+  "rec_until": "до {time}",
+  "rec_series_rules": "Записи сериалов…",
+  "rec_mark_watched": "Отметить как просмотренное",
+  "rec_mark_unwatched": "Отметить как непросмотренное"
 }

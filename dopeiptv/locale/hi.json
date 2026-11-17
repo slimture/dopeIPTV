@@ -3032,5 +3032,13 @@
   "local_place_library": "लाइब्रेरी",
   "local_n_folders": "{n} फ़ोल्डर",
   "local_gone": "यह फ़ोल्डर अब मौजूद नहीं है।",
-  "local_show_folder": "इसके फ़ोल्डर में दिखाएँ"
+  "local_show_folder": "इसके फ़ोल्डर में दिखाएँ",
+  "rec_place_now": "अभी रिकॉर्ड हो रहा है और आगे",
+  "rec_place_empty": "अभी कोई रिकॉर्डिंग नहीं। किसी चैनल पर, या गाइड में किसी कार्यक्रम पर राइट-क्लिक करें और \"रिकॉर्ड करें\" चुनें।",
+  "rec_when_today": "आज {time}",
+  "rec_when_yesterday": "कल {time}",
+  "rec_until": "{time} तक",
+  "rec_series_rules": "सीरीज़ रिकॉर्डिंग…",
+  "rec_mark_watched": "देखा गया के रूप में चिह्नित करें",
+  "rec_mark_unwatched": "नहीं देखा के रूप में चिह्नित करें"
 }

@@ -3032,5 +3032,13 @@
   "local_place_library": "ספרייה",
   "local_n_folders": "תיקיות: {n}",
   "local_gone": "התיקייה הזו כבר לא קיימת.",
-  "local_show_folder": "הצגה בתיקייה שלו"
+  "local_show_folder": "הצגה בתיקייה שלו",
+  "rec_place_now": "מוקלט עכשיו ובהמשך",
+  "rec_place_empty": "עדיין אין הקלטות. לחצו לחיצה ימנית על ערוץ, או על תוכנית במדריך, ובחרו „הקלט”.",
+  "rec_when_today": "היום {time}",
+  "rec_when_yesterday": "אתמול {time}",
+  "rec_until": "עד {time}",
+  "rec_series_rules": "הקלטות סדרות…",
+  "rec_mark_watched": "סמן כנצפה",
+  "rec_mark_unwatched": "סמן כלא נצפה"
 }

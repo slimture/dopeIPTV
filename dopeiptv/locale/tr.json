@@ -3032,5 +3032,13 @@
   "local_place_library": "Kitaplık",
   "local_n_folders": "{n} klasör",
   "local_gone": "Bu klasör artık yok.",
-  "local_show_folder": "Klasöründe göster"
+  "local_show_folder": "Klasöründe göster",
+  "rec_place_now": "Şimdi kaydediliyor ve sıradakiler",
+  "rec_place_empty": "Henüz kayıt yok. Bir kanala ya da rehberdeki bir programa sağ tıklayıp \"Kaydet\"i seçin.",
+  "rec_when_today": "Bugün {time}",
+  "rec_when_yesterday": "Dün {time}",
+  "rec_until": "{time} saatine kadar",
+  "rec_series_rules": "Dizi kayıtları…",
+  "rec_mark_watched": "İzlendi olarak işaretle",
+  "rec_mark_unwatched": "İzlenmedi olarak işaretle"
 }

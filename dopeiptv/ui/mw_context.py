@@ -52,7 +52,7 @@ class _ContextMenuMixin:
             at = (self.listw.viewport().mapToGlobal(pos) if pos is not None
                   else QCursor.pos())
         if self.mode == "rec":
-            self._rec_context_menu(pos, it)
+            self._rec_context_menu(pos, it, at=at)
             return
         if self.mode == "local":
             self._local_context_menu(pos, it, at=at)

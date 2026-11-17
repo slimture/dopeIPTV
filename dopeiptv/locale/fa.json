@@ -3032,5 +3032,13 @@
   "local_place_library": "کتابخانه",
   "local_n_folders": "{n} پوشه",
   "local_gone": "این پوشه دیگر وجود ندارد.",
-  "local_show_folder": "نمایش در پوشه‌اش"
+  "local_show_folder": "نمایش در پوشه‌اش",
+  "rec_place_now": "در حال ضبط و بعدی",
+  "rec_place_empty": "هنوز ضبطی نیست. روی یک کانال، یا برنامه‌ای در راهنما، کلیک راست کنید و «ضبط» را انتخاب کنید.",
+  "rec_when_today": "امروز {time}",
+  "rec_when_yesterday": "دیروز {time}",
+  "rec_until": "تا {time}",
+  "rec_series_rules": "ضبط سریال‌ها…",
+  "rec_mark_watched": "علامت‌گذاری به‌عنوان دیده‌شده",
+  "rec_mark_unwatched": "علامت‌گذاری به‌عنوان دیده‌نشده"
 }

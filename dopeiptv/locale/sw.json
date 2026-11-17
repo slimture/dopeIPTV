@@ -3032,5 +3032,13 @@
   "local_place_library": "Maktaba",
   "local_n_folders": "Folda {n}",
   "local_gone": "Folda hii haipo tena.",
-  "local_show_folder": "Onyesha kwenye folda yake"
+  "local_show_folder": "Onyesha kwenye folda yake",
+  "rec_place_now": "Inarekodiwa sasa na inayofuata",
+  "rec_place_empty": "Bado hakuna rekodi. Bofya kulia chaneli, au kipindi kwenye mwongozo, kisha uchague \"Rekodi\".",
+  "rec_when_today": "Leo {time}",
+  "rec_when_yesterday": "Jana {time}",
+  "rec_until": "hadi {time}",
+  "rec_series_rules": "Rekodi za misururu…",
+  "rec_mark_watched": "Weka alama kuwa imetazamwa",
+  "rec_mark_unwatched": "Weka alama kuwa haijatazamwa"
 }

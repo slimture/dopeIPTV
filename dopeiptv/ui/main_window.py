@@ -116,6 +116,7 @@ from .mw_series_page import _SeriesPageMixin
 from .mw_place_films import _PlaceFilmsMixin
 from .mw_film_page import _FilmPageMixin
 from .mw_place_local import _PlaceLocalMixin
+from .mw_place_rec import _PlaceRecMixin
 from .mw_place_series import _PlaceSeriesMixin
 from .mw_search_all import _SearchAllMixin
 from .mw_stats import _StatsMixin
@@ -164,6 +165,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _BusyMixin, _UpdatesMixin, _SearchMixin, _SidebarMixin,
                  _NavMixin, _SourceLabelMixin, _ShortcutsMixin, _PaletteMixin, _OnboardingMixin, _SortMixin,
                  _LocalFilesMixin, _PlaceLocalMixin, _LocalWatchMixin, _RadioMixin, _WebStreamsMixin,
+                 _PlaceRecMixin,
                  _PopoutMixin, _MultiviewMixin, _PlacesMixin, _PopularMixin, _GuideMixin,
                  _SeriesPageMixin, _PlaceFilmsMixin, _FilmPageMixin, _PlaceSeriesMixin, _SearchAllMixin, _MittMixin,
                  _MprisMixin,
@@ -2581,9 +2583,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._sync_search_hint()
         self._load_categories()
         # Series is a place of the unified look where the list was, and so
-        # is Local files (mw_place_local; what it shows watched on disk).
+        # are Local files (mw_place_local; what it shows watched on disk)
+        # and Recordings (mw_place_rec).
         self._place_series_sync()
         self._place_local_sync()
+        self._place_rec_sync()
         # The TV place's header over the live list only (mw_place_tv).
         sync = getattr(self, "_place_tv_sync", None)
         if sync is not None:
@@ -5159,7 +5163,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if privacy.private():
             return                     # private viewing marks nothing
         last = getattr(self, "_last_playback", None)
-        if not last or last.get("kind") not in ("movie", "episode"):
+        if not last or last.get("kind") not in ("movie", "episode", "recording"):
             return
         if privacy.playback_private(last.get("kind") or "", last.get("key")):
             # Watched privately and private viewing ended before it did: the
@@ -5172,6 +5176,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if pct < self._AUTO_WATCHED_PCT:
             return
         last["_auto_marked"] = True
+        if last["kind"] == "recording":
+            # A recording watched to its end: Watched on its card
+            # (mw_place_rec) - this computer's file, nothing sent anywhere.
+            getattr(self, "_rec_auto_watched", lambda _k: None)(last.get("key"))
+            return
         item = last.get("item") or {}
         if last["kind"] == "movie":
             self._mark_movie_watched(item, push_to_trakt=False)
@@ -5233,6 +5242,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         local = getattr(self, "_place_local_playing", None)
         if local is not None:
             local()                    # ...and Local files' Continue and mark
+        rec = getattr(self, "_place_rec_playing", None)
+        if rec is not None:
+            rec()                      # ...and the Recordings place's mark
 
     def _autoplay_next_episode(self) -> bool:
         return self.settings.value("autoplay_next_episode", "true") == "true"
@@ -5345,6 +5357,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                      "(%d entries, index %d)", went,
                      len(getattr(self, "_track_queue", []) or []),
                      getattr(self, "_track_index", -1))
+            return
+        if last and last.get("kind") == "recording":
+            # A recording played to its end: where it stopped dropped, and
+            # Watched on its card.
+            self._save_resume_position()
+            self._maybe_auto_mark_watched()
             return
         if not last or last.get("kind") != "episode":
             return
@@ -5524,10 +5542,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         place = getattr(self, "_place_series_playing", None)
         if place is not None:
             place()
-        # ...and Local files its file.
+        # ...and Local files its file, Recordings its recording.
         local = getattr(self, "_place_local_playing", None)
         if local is not None:
             local()
+        rec = getattr(self, "_place_rec_playing", None)
+        if rec is not None:
+            rec()
         # The middle pane goes to what plays, when it came from elsewhere.
         follow = getattr(self, "_pane_follow_soon", None)
         if follow is not None:

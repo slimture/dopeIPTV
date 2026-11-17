@@ -65,6 +65,8 @@ dopeiptv/
     recording.py       RecordingManager - ffmpeg/mpv stream-copy, timers
     rec_mp4.py         Recordings as MP4: the remux (stream copy, faststart),
                        the plausibility check, the .ts kept unless it passed
+    rec_view.py        Recordings as their place shows them: now and next,
+                       a frame and the length found once, watched marks
     series_rules.py    Series recordings: rules, airings found, the plan, padding;
                        a rule that reminds instead, its reminders' plan
     series_view.py     A series as its page shows it: seasons (Specials last),
@@ -184,6 +186,9 @@ dopeiptv/
     mw_simkl.py        Simkl: scrobbles, its Settings card, PIN sign-in
     mw_discord.py      Discord status ("Watching ...") from the player
     mw_recording.py    Recording / timeshift mixin
+    mw_place_rec.py    The Recordings place where the list was: header, ⋯,
+                       recording now and next, the recordings as rows or cards
+    rec_place.py       The Recordings place itself, dressed as it paints
     mw_portal_archive.py A Stalker portal's archive: by programme, its link
                        asked for off the window's thread
     mw_media.py        Media servers: what plays reported, their resume
@@ -254,6 +259,9 @@ dopeiptv/
     tv_place.py        The TV place's rows (painted by channel_list's delegate),
                        Recently watched and the header over the list
     mw_place_tv.py     The TV place in the window (_place_tv_show)
+    list_place.py      The form a place over the window's list shares: Back,
+                       header, filter, Grid / List, rows, cards as they paint
+    list_mirror.py     Such a place kept to the list, its source of truth
     mw_local.py        Local files: folders, library view, music queue
     mw_place_local.py  The Local files place where the list was: Back, header,
                        Continue, the folder's rows or the library's posters

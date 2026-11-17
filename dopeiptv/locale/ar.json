@@ -3032,5 +3032,13 @@
   "local_place_library": "المكتبة",
   "local_n_folders": "المجلدات: {n}",
   "local_gone": "لم يعد هذا المجلد موجودًا.",
-  "local_show_folder": "إظهار في مجلده"
+  "local_show_folder": "إظهار في مجلده",
+  "rec_place_now": "يُسجَّل الآن وما يليه",
+  "rec_place_empty": "لا توجد تسجيلات بعد. انقر بزر الفأرة الأيمن على قناة، أو على برنامج في الدليل، واختر «تسجيل».",
+  "rec_when_today": "اليوم {time}",
+  "rec_when_yesterday": "أمس {time}",
+  "rec_until": "حتى {time}",
+  "rec_series_rules": "تسجيلات المسلسلات…",
+  "rec_mark_watched": "تعليم كمُشاهَد",
+  "rec_mark_unwatched": "تعليم كغير مُشاهَد"
 }

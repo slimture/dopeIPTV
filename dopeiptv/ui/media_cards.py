@@ -119,10 +119,11 @@ def playing_ink() -> QColor:
 # -- the pills ------------------------------------------------------------------------
 
 #: The pills, the same everywhere: what is on the air, a new title or
-#: episode, what plays here now, one already watched, the one up next.
-PILL_KINDS = ("live", "new", "playing", "seen", "next")
+#: episode, what plays here now, one already watched, the one up next, one
+#: that failed (a recording).
+PILL_KINDS = ("live", "new", "playing", "seen", "next", "fail")
 _PILL_WORDS = {"live": "pill_live", "new": "pill_new", "playing": "pill_playing",
-               "seen": "pill_seen", "next": "sp_up_next"}
+               "seen": "pill_seen", "next": "sp_up_next", "fail": "rec_status_failed"}
 PILL_PX = 10
 #: Room round the glyphs: on each side, and above and below their ink.
 PILL_PAD_X, PILL_PAD_Y = 9, 3
@@ -162,13 +163,14 @@ def pill_size(text: str, fm: QFontMetrics | None = None) -> QSize:
 
 def pill_colours(kind: str) -> tuple[QColor, QColor]:
     """(fill, ink) of a pill of *kind*: Live in the recording red, New and
-    Playing in the accent, Watched a soft wash of the theme's "ok" green, Up
-    next a soft wash of the accent - each ink made to read on its fill."""
+    Playing in the accent, Watched a soft wash of the theme's "ok" green,
+    Failed one of its "error" red, Up next a soft wash of the accent - each
+    ink made to read on its fill."""
     if kind == "live":
         return QColor(P["rec"]), QColor(ink_on(P["rec"]))
     if kind in ("new", "playing"):
         return QColor(P["accent"]), QColor(P["on_accent"])
-    base = P["ok"] if kind == "seen" else P["accent"]
+    base = P["ok"] if kind == "seen" else P["error"] if kind == "fail" else P["accent"]
     wash, ink = _wash(base, 0.24)
     return QColor(wash), QColor(ink)
 
@@ -1702,8 +1704,10 @@ class StripDelegate(QStyledItemDelegate):
         own = pm is not None
         if pm is None and card.fallback:
             pm = s.images.get(card.fallback)
+        # A card may ask for its picture fitted inside the box (a logo).
         paint_picture(p, parts["picture"], pm, s.pictures, corner_radius(6),
-                      card.initials or initials_of(card.title), dim=bool(pm) and not own)
+                      card.initials or initials_of(card.title),
+                      fit=getattr(card, "fit", None) is True, dim=bool(pm) and not own)
         text = parts["text"]
         tf, lf = px_font(TITLE_PX, BOLD), px_font(LINE_PX)
         tfm, lfm = QFontMetrics(tf), QFontMetrics(lf)

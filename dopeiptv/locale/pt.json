@@ -3032,5 +3032,13 @@
   "local_place_library": "Biblioteca",
   "local_n_folders": "{n} pastas",
   "local_gone": "Esta pasta não existe mais.",
-  "local_show_folder": "Mostrar na pasta"
+  "local_show_folder": "Mostrar na pasta",
+  "rec_place_now": "Gravando agora e a seguir",
+  "rec_place_empty": "Ainda não há gravações. Clique com o botão direito em um canal, ou em um programa no guia, e escolha \"Gravar\".",
+  "rec_when_today": "Hoje {time}",
+  "rec_when_yesterday": "Ontem {time}",
+  "rec_until": "até {time}",
+  "rec_series_rules": "Gravações de séries…",
+  "rec_mark_watched": "Marcar como visto",
+  "rec_mark_unwatched": "Marcar como não visto"
 }

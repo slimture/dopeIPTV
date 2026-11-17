@@ -3032,5 +3032,13 @@
   "local_place_library": "Bibliothek",
   "local_n_folders": "{n} Ordner",
   "local_gone": "Diesen Ordner gibt es nicht mehr.",
-  "local_show_folder": "Im Ordner zeigen"
+  "local_show_folder": "Im Ordner zeigen",
+  "rec_place_now": "Läuft jetzt und als Nächstes",
+  "rec_place_empty": "Noch keine Aufnahmen. Klicke mit der rechten Maustaste auf einen Sender oder eine Sendung im Programmführer und wähle „Aufnehmen“.",
+  "rec_when_today": "Heute {time}",
+  "rec_when_yesterday": "Gestern {time}",
+  "rec_until": "bis {time}",
+  "rec_series_rules": "Serienaufnahmen…",
+  "rec_mark_watched": "Als gesehen markieren",
+  "rec_mark_unwatched": "Als nicht gesehen markieren"
 }

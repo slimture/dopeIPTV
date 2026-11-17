@@ -3032,5 +3032,13 @@
   "local_place_library": "Biblioteca",
   "local_n_folders": "{n} carpetas",
   "local_gone": "Esta carpeta ya no existe.",
-  "local_show_folder": "Mostrar en su carpeta"
+  "local_show_folder": "Mostrar en su carpeta",
+  "rec_place_now": "Grabando ahora y a continuación",
+  "rec_place_empty": "Aún no hay grabaciones. Haz clic derecho en un canal, o en un programa de la guía, y elige «Grabar».",
+  "rec_when_today": "Hoy {time}",
+  "rec_when_yesterday": "Ayer {time}",
+  "rec_until": "hasta las {time}",
+  "rec_series_rules": "Grabaciones de series…",
+  "rec_mark_watched": "Marcar como visto",
+  "rec_mark_unwatched": "Marcar como no visto"
 }

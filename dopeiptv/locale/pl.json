@@ -3032,5 +3032,13 @@
   "local_place_library": "Biblioteka",
   "local_n_folders": "Foldery: {n}",
   "local_gone": "Tego folderu już nie ma.",
-  "local_show_folder": "Pokaż w folderze"
+  "local_show_folder": "Pokaż w folderze",
+  "rec_place_now": "Nagrywane teraz i następne",
+  "rec_place_empty": "Nie ma jeszcze nagrań. Kliknij prawym przyciskiem kanał lub program w przewodniku i wybierz „Nagrywaj”.",
+  "rec_when_today": "Dziś {time}",
+  "rec_when_yesterday": "Wczoraj {time}",
+  "rec_until": "do {time}",
+  "rec_series_rules": "Nagrania seriali…",
+  "rec_mark_watched": "Oznacz jako obejrzane",
+  "rec_mark_unwatched": "Oznacz jako nieobejrzane"
 }

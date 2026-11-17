@@ -3032,5 +3032,13 @@
   "local_place_library": "Bibliothèque",
   "local_n_folders": "{n} dossiers",
   "local_gone": "Ce dossier n'existe plus.",
-  "local_show_folder": "Afficher dans son dossier"
+  "local_show_folder": "Afficher dans son dossier",
+  "rec_place_now": "En cours d'enregistrement et à venir",
+  "rec_place_empty": "Aucun enregistrement pour l'instant. Faites un clic droit sur une chaîne, ou sur un programme du guide, et choisissez « Enregistrer ».",
+  "rec_when_today": "Aujourd'hui {time}",
+  "rec_when_yesterday": "Hier {time}",
+  "rec_until": "jusqu'à {time}",
+  "rec_series_rules": "Enregistrements de séries…",
+  "rec_mark_watched": "Marquer comme vu",
+  "rec_mark_unwatched": "Marquer comme non vu"
 }

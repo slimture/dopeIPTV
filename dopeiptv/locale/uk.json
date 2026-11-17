@@ -3032,5 +3032,13 @@
   "local_place_library": "Бібліотека",
   "local_n_folders": "Тек: {n}",
   "local_gone": "Цієї теки більше немає.",
-  "local_show_folder": "Показати в теці"
+  "local_show_folder": "Показати в теці",
+  "rec_place_now": "Записується зараз і далі",
+  "rec_place_empty": "Записів поки немає. Клацніть правою кнопкою на каналі або на передачі в телегіді й виберіть «Записати».",
+  "rec_when_today": "Сьогодні {time}",
+  "rec_when_yesterday": "Вчора {time}",
+  "rec_until": "до {time}",
+  "rec_series_rules": "Записи серіалів…",
+  "rec_mark_watched": "Позначити як переглянуте",
+  "rec_mark_unwatched": "Позначити як непереглянуте"
 }

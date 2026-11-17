@@ -3032,5 +3032,13 @@
   "local_place_library": "ライブラリ",
   "local_n_folders": "{n}フォルダー",
   "local_gone": "このフォルダーはもうありません。",
-  "local_show_folder": "フォルダーで表示"
+  "local_show_folder": "フォルダーで表示",
+  "rec_place_now": "録画中と次の予定",
+  "rec_place_empty": "録画はまだありません。チャンネル、または番組表の番組を右クリックして「録画」を選んでください。",
+  "rec_when_today": "今日 {time}",
+  "rec_when_yesterday": "昨日 {time}",
+  "rec_until": "{time}まで",
+  "rec_series_rules": "シリーズ録画…",
+  "rec_mark_watched": "視聴済みにする",
+  "rec_mark_unwatched": "未視聴にする"
 }

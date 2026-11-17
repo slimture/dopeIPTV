@@ -207,6 +207,8 @@ class RecordingManager(QObject):
                         "_size": st.st_size, "added": str(int(st.st_mtime)),
                         "_desc": info.get("description", ""),
                         "stream_icon": info.get("icon", ""),
+                        "_channel": str(info.get("channel") or ""),
+                        "_start": info.get("start") or 0,
                         "_filename": os.path.splitext(n)[0]})
         out.sort(key=lambda f: f["added"], reverse=True)
         return out
@@ -226,30 +228,52 @@ class RecordingManager(QObject):
             return {}
 
     def write_info(self, video_path: str, title: str, description: str,
-                   icon: str | None = None) -> None:
+                   icon: str | None = None, channel: str | None = None,
+                   start: float | None = None) -> None:
         """Save a title/description/icon sidecar next to the recording.
 
         *icon* is the channel logo URL, kept so the Recordings list can show
         the same badge as live TV even after a restart (the running job's
         in-memory icon is gone by then). Passing ``icon=None`` leaves any
         existing icon untouched (so editing the title doesn't wipe the logo);
-        pass ``icon=""`` to clear it. When title, description and icon are all
-        empty the sidecar is removed so the filename is used again."""
+        pass ``icon=""`` to clear it. *channel* (its name) and *start* (when
+        it began) likewise: None keeps what is there - the Recordings place
+        says them. When title, description, icon and channel are all empty
+        the sidecar is removed so the filename is used again."""
         sidecar = self.info_path(video_path)
+        old = self.read_info(video_path) if None in (icon, channel, start) else {}
         if icon is None:
-            icon = self.read_info(video_path).get("icon", "")
-        title, description, icon = (title.strip(), description.strip(),
-                                    (icon or "").strip())
-        if not title and not description and not icon:
+            icon = old.get("icon", "")
+        if channel is None:
+            channel = str(old.get("channel") or "")
+        if start is None:
+            try:
+                start = float(old.get("start") or 0)
+            except (TypeError, ValueError):
+                start = 0.0
+        title, description, icon, channel = (title.strip(), description.strip(),
+                                             (icon or "").strip(), channel.strip())
+        if not title and not description and not icon and not channel:
             try:
                 os.remove(sidecar)
             except OSError:
                 pass
             return
+        data: dict[str, Any] = {"title": title, "description": description, "icon": icon}
+        if channel:
+            data["channel"] = channel
+        if start:
+            data["start"] = int(start)
         try:
             with open(sidecar, "w", encoding="utf-8") as fh:
-                json.dump({"title": title, "description": description,
-                           "icon": icon}, fh)
+                json.dump(data, fh)
+        except OSError:
+            pass
+
+    def drop_info(self, video_path: str) -> None:
+        """The sidecar of a recording that was deleted, gone with it."""
+        try:
+            os.remove(self.info_path(video_path))
         except OSError:
             pass
 
@@ -373,8 +397,9 @@ class RecordingManager(QObject):
         for k, v in (extra or {}).items():
             job.setdefault(k, v)
         self.jobs.append(job)
-        if icon and path:
-            self.write_info(path, "", "", icon=icon)
+        if path and (icon or channel):
+            self.write_info(path, "", "", icon=icon or "", channel=channel or "",
+                            start=job["start"])
         self.jobs_changed.emit()
         return job
 
@@ -392,8 +417,9 @@ class RecordingManager(QObject):
                  proc=None, error="")
         if url and not j.get("url"):
             j["url"] = url
-        if j.get("stream_icon") and path:
-            self.write_info(path, "", "", icon=j["stream_icon"])
+        if path and (j.get("stream_icon") or j.get("channel")):
+            self.write_info(path, "", "", icon=j.get("stream_icon") or "",
+                            channel=j.get("channel") or "", start=time.time())
         log.info("record: %s from what the player plays (%s) - no connection of its own",
                  for_log(j.get("title")), "its rewind buffer" if recorder is not None
                  else "its stream")
@@ -768,8 +794,9 @@ class RecordingManager(QObject):
                 creationflags=NO_WINDOW)
             j["path"] = path
             j["status"] = "recording"
-            if j.get("stream_icon"):
-                self.write_info(path, "", "", icon=j["stream_icon"])
+            if j.get("stream_icon") or j.get("channel"):
+                self.write_info(path, "", "", icon=j.get("stream_icon") or "",
+                                channel=j.get("channel") or "", start=time.time())
         except Exception as e:
             j["status"] = "failed"
             j["error"] = str(e)

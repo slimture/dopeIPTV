@@ -3032,5 +3032,13 @@
   "local_place_library": "Libreria",
   "local_n_folders": "{n} cartelle",
   "local_gone": "Questa cartella non esiste più.",
-  "local_show_folder": "Mostra nella sua cartella"
+  "local_show_folder": "Mostra nella sua cartella",
+  "rec_place_now": "In registrazione ora e a seguire",
+  "rec_place_empty": "Ancora nessuna registrazione. Fai clic destro su un canale, o su un programma nella guida, e scegli «Registra».",
+  "rec_when_today": "Oggi {time}",
+  "rec_when_yesterday": "Ieri {time}",
+  "rec_until": "fino alle {time}",
+  "rec_series_rules": "Registrazioni di serie…",
+  "rec_mark_watched": "Segna come visto",
+  "rec_mark_unwatched": "Segna come non visto"
 }

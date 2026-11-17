@@ -94,6 +94,8 @@ OWN_KEYS = frozenset({
     "watch_later_order",
     # Where each person left off: the app opens there (core/places.py).
     "last_place", "last_list_place",
+    # The recordings each person watched to their end (core/rec_view.py).
+    "rec_watched",
 })
 #: Families: the name itself or the name + "_<source id>" (and the
 #: favourites' "_locked" / "_colors" beside it).

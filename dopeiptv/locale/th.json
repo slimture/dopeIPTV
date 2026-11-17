@@ -3032,5 +3032,13 @@
   "local_place_library": "คลัง",
   "local_n_folders": "{n} โฟลเดอร์",
   "local_gone": "โฟลเดอร์นี้ไม่มีอยู่แล้ว",
-  "local_show_folder": "แสดงในโฟลเดอร์"
+  "local_show_folder": "แสดงในโฟลเดอร์",
+  "rec_place_now": "กำลังบันทึกและรายการถัดไป",
+  "rec_place_empty": "ยังไม่มีการบันทึก คลิกขวาที่ช่อง หรือรายการในผังรายการ แล้วเลือก \"บันทึก\"",
+  "rec_when_today": "วันนี้ {time}",
+  "rec_when_yesterday": "เมื่อวาน {time}",
+  "rec_until": "ถึง {time}",
+  "rec_series_rules": "การบันทึกซีรีส์…",
+  "rec_mark_watched": "ทำเครื่องหมายว่าดูแล้ว",
+  "rec_mark_unwatched": "ทำเครื่องหมายว่ายังไม่ได้ดู"
 }

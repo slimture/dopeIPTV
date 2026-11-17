@@ -3032,5 +3032,13 @@
   "local_place_library": "Thư viện",
   "local_n_folders": "{n} thư mục",
   "local_gone": "Thư mục này không còn nữa.",
-  "local_show_folder": "Hiện trong thư mục"
+  "local_show_folder": "Hiện trong thư mục",
+  "rec_place_now": "Đang ghi và sắp ghi",
+  "rec_place_empty": "Chưa có bản ghi nào. Nhấp chuột phải vào một kênh, hoặc một chương trình trong lịch phát sóng, rồi chọn \"Ghi hình\".",
+  "rec_when_today": "Hôm nay {time}",
+  "rec_when_yesterday": "Hôm qua {time}",
+  "rec_until": "đến {time}",
+  "rec_series_rules": "Ghi hình theo loạt…",
+  "rec_mark_watched": "Đánh dấu đã xem",
+  "rec_mark_unwatched": "Đánh dấu chưa xem"
 }

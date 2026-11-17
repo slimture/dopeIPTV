@@ -18,6 +18,12 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   lightly every few minutes while Local files is on screen. Rescan and F5
   stay for "now".
 
+- A recording you watched to its end says so in Recordings (Watched), and
+  its menu marks one watched or not watched by hand - each profile its
+  own, kept on this computer. A recording made from now on keeps its
+  channel and when it began beside it, so Recordings can say them; its
+  menu also opens the folder it is in.
+
 ### Changed
 
 - The Guide follows the category you pick in the sidebar: with the guide
@@ -43,6 +49,22 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   series page, the phone remote's Local files. On a narrow pane the
   controls take rows of their own under the title.
 
+- Recordings is a place of the new look too: the folder's name with how
+  many recordings and what they take on the disk, the filter, ⋯
+  (Scheduled recordings, Series recordings - Settings > Recording -, a new
+  folder, the folder itself, another recordings folder, clear the finished
+  ones) and Grid / List in its header; "Recording now and next" at the top
+  - what records, with its red mark and how long it has run, and what is
+  to come, soonest first, each with its stop, edit and cancel in its menu;
+  then the recordings as rows or 16:9 cards: a frame of each (found once,
+  never of one still recording), else its channel's logo, with its
+  channel, day, length and size and how far you watched it. A recording's
+  name no longer repeats the date its file was named with. Active &
+  scheduled and Upcoming show their recordings with their state (REC with
+  its time, Scheduled, Done, Failed and why). Everything the list did
+  stays: play, play in mpv or VLC, rename, edit info, move, delete, the
+  scheduled recordings' own actions, the detail panel.
+
 - macOS draws the picture on a thread of its own too, as Linux and Windows
   do: Qt cannot hand its OpenGL to another thread there (AppKit stops the
   app), so the render thread draws with an NSOpenGLContext of the app's own
@@ -67,6 +89,14 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   app starts says so again in the activity panel (it stays there until
   read), not only by the count in the menu; read however the window was
   opened, the message goes.
+
+- Recordings: the Delete key did nothing in Upcoming; it cancels and
+  removes the recordings to come picked there, as in Active & scheduled.
+
+- In a right-to-left language, the muted line under a Local files card
+  that began with a Latin name (an artist, an album) was laid out left to
+  right, its parts in the wrong order; it reads from the right now, each
+  part whole.
 
 - Local files: a folder holding only video files got no posters or frames
   (only one with subfolders did), and a clip shorter than two minutes never

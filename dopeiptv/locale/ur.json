@@ -3032,5 +3032,13 @@
   "local_place_library": "لائبریری",
   "local_n_folders": "فولڈرز: {n}",
   "local_gone": "یہ فولڈر اب موجود نہیں۔",
-  "local_show_folder": "اس کے فولڈر میں دکھائیں"
+  "local_show_folder": "اس کے فولڈر میں دکھائیں",
+  "rec_place_now": "ابھی ریکارڈ ہو رہا ہے اور اگلا",
+  "rec_place_empty": "ابھی کوئی ریکارڈنگ نہیں۔ کسی چینل، یا گائیڈ میں کسی پروگرام پر رائٹ کلک کریں اور \"ریکارڈ کریں\" چنیں۔",
+  "rec_when_today": "آج {time}",
+  "rec_when_yesterday": "کل {time}",
+  "rec_until": "{time} تک",
+  "rec_series_rules": "سیریز ریکارڈنگز…",
+  "rec_mark_watched": "دیکھا گیا کے طور پر نشان لگائیں",
+  "rec_mark_unwatched": "نہیں دیکھا کے طور پر نشان لگائیں"
 }

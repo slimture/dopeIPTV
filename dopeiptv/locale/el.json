@@ -3032,5 +3032,13 @@
   "local_place_library": "Βιβλιοθήκη",
   "local_n_folders": "{n} φάκελοι",
   "local_gone": "Αυτός ο φάκελος δεν υπάρχει πια.",
-  "local_show_folder": "Εμφάνιση στον φάκελό του"
+  "local_show_folder": "Εμφάνιση στον φάκελό του",
+  "rec_place_now": "Εγγράφεται τώρα και ακολουθεί",
+  "rec_place_empty": "Δεν υπάρχουν ακόμη εγγραφές. Κάντε δεξί κλικ σε ένα κανάλι ή σε μια εκπομπή στον οδηγό και επιλέξτε «Εγγραφή».",
+  "rec_when_today": "Σήμερα {time}",
+  "rec_when_yesterday": "Χθες {time}",
+  "rec_until": "έως {time}",
+  "rec_series_rules": "Εγγραφές σειρών…",
+  "rec_mark_watched": "Σήμανση ως προβληθέν",
+  "rec_mark_unwatched": "Σήμανση ως μη προβληθέν"
 }

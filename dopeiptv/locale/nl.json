@@ -3032,5 +3032,13 @@
   "local_place_library": "Bibliotheek",
   "local_n_folders": "{n} mappen",
   "local_gone": "Deze map bestaat niet meer.",
-  "local_show_folder": "Tonen in de map"
+  "local_show_folder": "Tonen in de map",
+  "rec_place_now": "Nu bezig en hierna",
+  "rec_place_empty": "Nog geen opnames. Klik met de rechtermuisknop op een zender, of op een programma in de gids, en kies ‘Opnemen’.",
+  "rec_when_today": "Vandaag {time}",
+  "rec_when_yesterday": "Gisteren {time}",
+  "rec_until": "tot {time}",
+  "rec_series_rules": "Serie-opnames…",
+  "rec_mark_watched": "Markeren als gezien",
+  "rec_mark_unwatched": "Markeren als niet gezien"
 }

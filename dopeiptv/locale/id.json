@@ -3032,5 +3032,13 @@
   "local_place_library": "Pustaka",
   "local_n_folders": "{n} folder",
   "local_gone": "Folder ini sudah tidak ada.",
-  "local_show_folder": "Tampilkan di foldernya"
+  "local_show_folder": "Tampilkan di foldernya",
+  "rec_place_now": "Sedang direkam dan berikutnya",
+  "rec_place_empty": "Belum ada rekaman. Klik kanan sebuah saluran, atau acara di panduan, lalu pilih \"Rekam\".",
+  "rec_when_today": "Hari ini {time}",
+  "rec_when_yesterday": "Kemarin {time}",
+  "rec_until": "sampai {time}",
+  "rec_series_rules": "Rekaman serial…",
+  "rec_mark_watched": "Tandai sudah ditonton",
+  "rec_mark_unwatched": "Tandai belum ditonton"
 }

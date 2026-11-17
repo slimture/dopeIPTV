@@ -48,6 +48,7 @@ from PyQt6.QtWidgets import QMenu
 from ..core import film_view as fv
 from ..core.log import log
 from ..i18n import tr
+from .list_place import line_of
 from .local_place import LocalCard, LocalPlace
 from .series_cards import minutes_text
 from .theme import P
@@ -417,7 +418,7 @@ class _PlaceLocalMixin:
                 parts.append(size_text(int(it.get("_size") or 0)))
             except (TypeError, ValueError):
                 pass
-        return " · ".join(p for p in parts if p)
+        return line_of(parts)
 
     # -- the header ----------------------------------------------------------------------
 

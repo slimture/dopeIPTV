@@ -131,6 +131,7 @@ files = [
     "dopeiptv/core/mitt.py",
     "dopeiptv/core/night_mode.py",
     "dopeiptv/core/rec_mp4.py",
+    "dopeiptv/core/rec_view.py",
     "dopeiptv/core/viewing_stats.py",
     "dopeiptv/core/donate_rhythm.py",
     "dopeiptv/core/profiles.py",

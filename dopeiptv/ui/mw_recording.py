@@ -1128,8 +1128,14 @@ class _RecordingMixin:
         d.exec()
 
     def _delete_recordings_selected(self, clicked_item=None) -> None:
+        # The cards just picked on the Recordings place are the list's now.
+        mirror = getattr(self, "_rp_mirror", None)
+        if mirror is not None and self._place_rec_active():
+            mirror.settle()
         cur = self.cat_list.currentItem()
-        if cur and cur.data(Qt.ItemDataRole.UserRole) == "__jobs__":
+        # Upcoming lists recordings to come as Active & scheduled does: the
+        # Delete key cancels and removes them there too (it did nothing).
+        if cur and cur.data(Qt.ItemDataRole.UserRole) in ("__jobs__", "__upcoming__"):
             self._remove_jobs_selected(clicked_item)
             return
         items = self._selected_recordings(clicked_item)
@@ -1143,7 +1149,8 @@ class _RecordingMixin:
         for it in items:
             try:
                 os.remove(it["_path"])
-                self.rec.write_info(it["_path"], "", "", icon="")  # drop sidecar
+                self.rec.drop_info(it["_path"])
+                self._rec_watched().unmark(it["_path"])
                 self.rec.prune_path(it["_path"])
             except OSError as e:
                 self._set_status(tr("rec_delete_failed", error=e),
@@ -1171,7 +1178,8 @@ class _RecordingMixin:
         for it in items:
             try:
                 os.remove(it["_path"])
-                self.rec.write_info(it["_path"], "", "", icon="")
+                self.rec.drop_info(it["_path"])
+                self._rec_watched().unmark(it["_path"])
                 self.rec.prune_path(it["_path"])
             except OSError as e:
                 self._set_status(tr("rec_delete_failed", error=e),
@@ -1195,6 +1203,7 @@ class _RecordingMixin:
         try:
             os.rename(path, new_path)
             self.rec.move_info(path, new_path)   # keep the info sidecar attached
+            self._rec_watched().moved(path, new_path)
         except OSError as e:
             QMessageBox.warning(self, tr("msg_rename_rec_title"), str(e))
         cur = self.cat_list.currentItem()
@@ -1247,6 +1256,7 @@ class _RecordingMixin:
                     current=it["_path"])
                 shutil.move(it["_path"], dest)
                 self.rec.move_info(it["_path"], dest)
+                self._rec_watched().moved(it["_path"], dest)
         except OSError as e:
             QMessageBox.warning(self, tr("msg_move_rec_title"), str(e))
         self._load_categories()
@@ -1857,7 +1867,10 @@ class _RecordingMixin:
 
     # -- recording context menu ----------------------------------------------------
 
-    def _rec_context_menu(self, pos, it) -> None:
+    def _rec_context_menu(self, pos, it, at=None) -> None:
+        """A recording's menu, or a recording to come's - at the list's
+        *pos*, or at the screen's point *at* (a card of the Recordings
+        place)."""
         m = QMenu(self)
         if it.get("_kind") == "recjob":
             status = it.get("_status")
@@ -1888,6 +1901,13 @@ class _RecordingMixin:
             m.addAction(tr("ctx_play_in_vlc"),
                         lambda: self.play_item(it, "vlc"))
             m.addSeparator()
+            # Watched, as its card says (core/rec_view.WatchedMarks).
+            m.addAction(tr("rec_mark_unwatched") if self._rec_watched().has(it.get("_path") or "")
+                        else tr("rec_mark_watched"),
+                        partial(self._rec_toggle_watched, it))
+            m.addAction(tr("btn_open_folder"),
+                        partial(self._rec_open_folder_of, it))
+            m.addSeparator()
             m.addAction(tr("ctx_rename"),
                         lambda: self._rename_recording(it))
             m.addAction(tr("rec_edit_info"),
@@ -1915,4 +1935,12 @@ class _RecordingMixin:
         m.addAction(tr("ctx_new_folder"), lambda: self._new_rec_folder())
         m.addAction(tr("rec_change_folder"),
                     lambda: self._choose_rec_dir())
-        m.exec(self.listw.viewport().mapToGlobal(pos))
+        m.exec(at if at is not None else self.listw.viewport().mapToGlobal(pos))
+
+    def _rec_open_folder_of(self, it) -> None:
+        """The folder a recording is in, in the system's file manager."""
+        from pathlib import Path
+        from ..core.xdg import open_url
+        folder = os.path.dirname(str(it.get("_path") or "")) or self.rec.directory()
+        if os.path.isdir(folder):
+            open_url(Path(folder).as_uri())
