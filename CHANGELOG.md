@@ -7,6 +7,20 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Fixed
+
+- The phone remote while casting (Chromecast, a TV, Kodi or AirPlay) shows
+  what plays on the TV, says "Casting to …" and drives the TV: play and
+  pause, stop, seeking a film, channel up and down, and the TV's volume and
+  mute (an Apple TV keeps its volume to its own remote, so the slider is not
+  shown). It said "Nothing is playing" before - and Play started the player
+  on this computer beside the cast, a second connection to the account. The
+  system's media controls and keys, Home Assistant and the remote API follow
+  the cast the same way.
+- The sidebar logo's jump to what plays lands on it exactly: a recording is
+  picked in Recordings (it picked the first one), and a local file deep in a
+  long folder is scrolled into sight (it was picked far below the window).
+
 ## [1.6.3]
 
 Room for the list, a guide that follows the category, and every place in the
