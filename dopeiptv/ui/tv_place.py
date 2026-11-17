@@ -550,7 +550,9 @@ class TvPlaceTop(QWidget):
     activated = pyqtSignal(object)
     menu = pyqtSignal(object, QPoint)
 
-    MARGIN_X, MARGIN_TOP, MARGIN_BOTTOM, SPACING = 6, 6, 2, 16
+    # No inset of its own: the title and the cards line up with the filter
+    # and the rows under them (6 px set them apart from everything below).
+    MARGIN_X, MARGIN_TOP, MARGIN_BOTTOM, SPACING = 0, 6, 2, 16
 
     def __init__(self, loader=None, parent=None) -> None:
         super().__init__(parent)
@@ -560,6 +562,7 @@ class TvPlaceTop(QWidget):
                                self.MARGIN_BOTTOM)
         lay.setSpacing(self.SPACING)
         self.header = PageHeader("")
+        self.header.fit_sort = False        # _fit does it, with the switch
         self.header.sort_changed.connect(self.sort_changed)
         self.header.view_changed.connect(self.density_changed)
         lay.addWidget(self.header)

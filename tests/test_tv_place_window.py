@@ -284,9 +284,18 @@ w.grid_btn.setChecked(True)
 settle(lambda: not w.delegate.tv_rows(w.list_model), what="a grid")
 assert w._size_ctl.isVisible() and not w._sort_ctl.isVisible()
 assert not top.header.switch.isVisible()
+assert w.listw.viewportMargins().left() > 0         # the grid's balancing inset
 w.grid_btn.setChecked(False)
 settle(lambda: w.delegate.tv_rows(w.list_model), what="rows again")
 assert top.header.switch.isVisible() and not w._size_ctl.isVisible()
+# The inset goes with the grid: no empty strip left of the rows (it stayed
+# until the app was started again).
+assert w.listw.viewportMargins().left() == 0
+assert w.listw.visualRect(w.list_model.index(0)).x() == 0
+mid = w._list_page
+def left_of(widget):
+    return widget.mapTo(mid, widget.rect().topLeft()).x()
+assert left_of(top.header.title) == left_of(w.search) == left_of(top.recent.strip)
 
 # 15. Another place: the header goes, the strip's controls and the places'
 #     shared header come back; TV again from its entry, and Back from the

@@ -366,6 +366,43 @@ def test_header_sort_and_switch(app):
     h.close()
 
 
+def test_header_controls_in_one_line_and_title_cut_with_an_ellipsis(app):
+    """A filter beside the sort and the switch: one height, one foot (it
+    stood taller and higher on macOS); a long title cut with "…" and whole
+    in its tooltip; a narrow header's sort its mark alone."""
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import QLineEdit, QSizePolicy
+    from dopeiptv.ui import media_cards as mc
+    title = "Premiere Cinema Collection 2026 and much more"
+    h = mc.PageHeader(title)
+    h.title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+    h.title.setMinimumWidth(0)
+    filt = QLineEdit(objectName="Search")
+    filt.setMaximumWidth(240)
+    h.add_widget(filt)
+    h.set_count("6443 movies")
+    h.set_sort([("global", "Global default"), ("az", "A-Z")], "global")
+    h.set_views([("poster", "Grid"), ("list", "List")], "poster")
+    h.resize(640, 80)
+    h.show()
+    _spin(app)
+    parts = (filt, h.sort_btn, h.switch)
+    assert {w.height() for w in parts} == {mc.PageHeader.CONTROL_H}
+    feet = {w.mapTo(h, w.rect().bottomLeft()).y() for w in parts}
+    assert len(feet) == 1, feet
+    shown = h.title.text()
+    assert shown != title and shown.endswith("…"), shown
+    assert h.title.toolTip() == title
+    assert h.sort_btn.toolButtonStyle() == Qt.ToolButtonStyle.ToolButtonTextBesideIcon
+    h.resize(400, 80)
+    _spin(app)
+    assert h.sort_btn.toolButtonStyle() == Qt.ToolButtonStyle.ToolButtonIconOnly
+    h.resize(1600, 80)
+    _spin(app)
+    assert h.title.text() == title and h.title.toolTip() == ""
+    h.close()
+
+
 def test_rtl_grid_starts_at_the_right(app):
     from PyQt6.QtCore import Qt
     from dopeiptv.ui import media_cards as mc

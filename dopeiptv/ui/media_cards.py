@@ -44,11 +44,11 @@ from PyQt6.QtCore import (
     QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QAction, QActionGroup, QColor, QFont, QFontMetrics, QIcon, QPainter, QPainterPath, QPen,
-    QPixmap,
+    QAction, QActionGroup, QColor, QFont, QFontMetrics, QIcon, QLinearGradient, QPainter,
+    QPainterPath, QPen, QPixmap,
 )
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QButtonGroup, QFrame, QHBoxLayout, QLabel, QListView, QMenu,
+    QAbstractItemView, QButtonGroup, QFrame, QHBoxLayout, QLabel, QLineEdit, QListView, QMenu,
     QPushButton, QScrollArea, QSizePolicy, QStyle, QStyledItemDelegate, QToolButton,
     QVBoxLayout, QWidget,
 )
@@ -1679,6 +1679,42 @@ class CardStrip(_PaintedView):
         self._ahead = None
         self._ask_ahead()
 
+    #: How far the page's colour fades in over a card cut at an end.
+    FADE = 56
+
+    def paintEvent(self, e) -> None:
+        super().paintEvent(e)
+        bar = self.horizontalScrollBar()
+        more_back, more_on = bar.value() > bar.minimum(), bar.value() < bar.maximum()
+        if not (more_back or more_on):
+            return
+        vp = self.viewport()
+        w, h = vp.width(), vp.height()
+        fade = min(self.FADE, w // 4)
+        if fade <= 0:
+            return
+        rtl = self.isRightToLeft()
+        ground = QColor(P["bg"])
+        clear = QColor(ground)
+        clear.setAlpha(0)
+        p = QPainter(vp)
+        for more, ahead in ((more_on, True), (more_back, False)):
+            if not more:
+                continue
+            right = ahead != rtl        # what comes next lies to the right in LTR
+            x0 = w - fade if right else 0
+            g = QLinearGradient(float(x0), 0.0, float(x0 + fade), 0.0)
+            g.setColorAt(0.0, clear if right else ground)
+            g.setColorAt(1.0, ground if right else clear)
+            p.fillRect(QRect(x0, 0, fade, h), g)
+        p.end()
+
+    def scrollContentsBy(self, dx: int, dy: int) -> None:
+        super().scrollContentsBy(dx, dy)
+        if dx:
+            # The fades stay at the ends: what was moved is drawn again.
+            self.viewport().update()
+
 
 class CardRow(QWidget):
     """A heading ("Continue", "Popular right now") over a ``CardStrip``,
@@ -1841,6 +1877,7 @@ class Segmented(QWidget):
         for i, (key, label) in enumerate(options):
             b = QPushButton(label)
             b.setObjectName("MediaSegment")
+            b.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
             b.setCheckable(True)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setAccessibleName(label)
@@ -1901,9 +1938,20 @@ class PageHeader(QWidget):
     sort_changed = pyqtSignal(str)
     view_changed = pyqtSignal(str)
 
+    #: Every control at the header's end is this tall (the sort, the
+    #: switch, a filter): one line, whatever the system's font makes of
+    #: each - a filter field stood taller and higher than the buttons.
+    CONTROL_H = 32
+    #: Below this width the sort shows its mark alone (its order in the
+    #: tooltip), so the header never holds its page wider than the pane.
+    #: *fit_sort* False: its owner fits it (the TV place's header).
+    SORT_TEXT_FROM = 470
+    fit_sort = True
+
     def __init__(self, title: str = "", parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("MediaPageHeader")
+        self._title_full = title
         lay = QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(12)
@@ -1936,8 +1984,10 @@ class PageHeader(QWidget):
         self._sort_opts: list[tuple[str, str]] = []
         self._sort_key = ""
         self.sort_btn.hide()
+        self.sort_btn.setFixedHeight(self.CONTROL_H)
         lay.addWidget(self.sort_btn, 0, Qt.AlignmentFlag.AlignBottom)
         self.switch = Segmented(name=tr("card_view_switch_a11y"))
+        self.switch.setFixedHeight(self.CONTROL_H)
         self.switch.changed.connect(self.view_changed)
         lay.addWidget(self.switch, 0, Qt.AlignmentFlag.AlignBottom)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -1958,8 +2008,35 @@ class PageHeader(QWidget):
         self.switch.restyle()
 
     def set_title(self, text: str) -> None:
-        self.title.setText(text)
+        self._title_full = text
         self.title.setAccessibleName(text)
+        self._fit_title()
+
+    def _fit_title(self) -> None:
+        """The title cut to its room with an ellipsis (and whole in its
+        tooltip) - never cut off mid-letter where the filter begins."""
+        full = self._title_full
+        room = self.title.width() if self.title.isVisible() else 0
+        text = full
+        if room > 0 and self.title.fontMetrics().horizontalAdvance(full) > room:
+            text = self.title.fontMetrics().elidedText(full, Qt.TextElideMode.ElideRight, room)
+        if self.title.text() != text:
+            self.title.setText(text)
+        self.title.setToolTip(full if text != full else "")
+
+    def resizeEvent(self, e) -> None:
+        super().resizeEvent(e)
+        if self.fit_sort:
+            style = (Qt.ToolButtonStyle.ToolButtonTextBesideIcon
+                     if self.width() >= self.SORT_TEXT_FROM
+                     else Qt.ToolButtonStyle.ToolButtonIconOnly)
+            if self.sort_btn.toolButtonStyle() != style:
+                self.sort_btn.setToolButtonStyle(style)
+        self._fit_title()
+
+    def showEvent(self, e) -> None:
+        super().showEvent(e)
+        QTimer.singleShot(0, lambda: None if sip.isdeleted(self) else self._fit_title())
 
     def set_count(self, text: str) -> None:
         self.count.setText(text)
@@ -2017,8 +2094,14 @@ class PageHeader(QWidget):
 
     def add_widget(self, w: QWidget) -> None:
         """Something of the page's own beside the controls (a filter, a
-        button)."""
-        self._extra.addWidget(w)
+        button): as tall as they are and at the foot with them."""
+        if isinstance(w, QLineEdit):
+            w.setFixedHeight(self.CONTROL_H)
+            # The app's filter field pads for a taller box; this one's room.
+            name = w.objectName()
+            if name:
+                w.setStyleSheet(f"QLineEdit#{name} {{ padding: 4px 10px; }}")
+        self._extra.addWidget(w, 0, Qt.AlignmentFlag.AlignBottom)
 
 
 # -- the shared form ---------------------------------------------------------------

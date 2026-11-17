@@ -363,6 +363,13 @@ class ChannelListView(QListView):
         """Remember the delegate's base grid cell (or None for list mode) and
         re-justify. Called whenever the view mode / density changes."""
         self._grid_cell = cell
+        if cell is None:
+            # Rows again: the grid's balancing inset goes with it (Movies'
+            # posters left it on TV's rows as an empty strip on their left).
+            self._justify_applied = None
+            if self.viewportMargins().left():
+                self.setViewportMargins(0, 0, 0, 0)
+            return
         self._justify_grid()
 
     def resizeEvent(self, e) -> None:
