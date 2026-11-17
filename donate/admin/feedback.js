@@ -485,7 +485,10 @@
       });
     }
     if (!can && !group) { return box; }
-    let code = "thanks", touched = false;
+    // Nothing picked at first: often the answer is words of one's own. A
+    // picked one picked again goes back to none; none with words sends them
+    // as they are ("note").
+    let code = "", touched = false;
     const chips = mk("div", "fb-chips");
     const version = mk("input", "fb-version");
     Object.assign(version, { placeholder: "1.5.1 (empty: the next version)", autocomplete: "off", spellcheck: false });
@@ -500,12 +503,17 @@
                     mk("span", "muted", "once, in the app - then it waits for your next answer"));
     letReply.hidden = !!group;
     const byCode = () => { if (!touched) { tick.checked = code === "needinfo"; } };
-    REPLY.forEach(([k, label]) => {
-      const b = mk("button", "chip-f" + (k === code ? " on" : ""), label);
+    REPLY.filter(([k]) => k !== "note").forEach(([k, label]) => {
+      const b = mk("button", "chip-f", label);
       b.type = "button";
+      b.setAttribute("aria-pressed", "false");
       b.addEventListener("click", () => {
-        code = k;
-        [].forEach.call(chips.children, (c) => c.classList.toggle("on", c === b));
+        code = code === k ? "" : k;
+        [].forEach.call(chips.children, (c) => {
+          const on = c === b && code === k;
+          c.classList.toggle("on", on);
+          c.setAttribute("aria-pressed", on ? "true" : "false");
+        });
         version.hidden = code !== "fixed";
         byCode();
       });
@@ -513,14 +521,15 @@
     });
     byCode();
     const words = mk("textarea", "fb-words-in");
-    Object.assign(words, { rows: 3, maxLength: 1500, placeholder: "Words of your own (optional) - shown as written" });
+    Object.assign(words, { rows: 3, maxLength: 1500,
+                           placeholder: "Your own words - shown as written (after the answer picked above, if any)" });
     const send = mk("button", "btn", group ? "Send to all of them" : "Send answer");
     send.type = "button";
     const said = mk("span", "muted");
     send.addEventListener("click", () => {
-      if (code === "note" && !words.value.trim()) { said.textContent = "Write something first."; return; }
+      if (!code && !words.value.trim()) { said.textContent = "Pick an answer or write something first."; return; }
       send.disabled = true;
-      const body = { target: group ? "group" : "report", key: key, code: code, text: words.value,
+      const body = { target: group ? "group" : "report", key: key, code: code || "note", text: words.value,
                      version: version.value.trim() };
       if (!group) { body.open = tick.checked; }
       post("/admin/feedback-reply", body).then((ok) => {
