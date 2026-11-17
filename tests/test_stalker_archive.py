@@ -441,9 +441,13 @@ def test_create_link_keeps_to_its_time_budget(portal, monkeypatch):
 def test_the_archive_list_reads_the_days_back_and_keeps_the_archived(portal):
     p = portal()
     c = client(p)
+    # The client reads the days back from the clock now, not from NOW: a
+    # suite that runs past midnight UTC would otherwise see tomorrow's days.
+    before = int(time.time())
     got = c.archive_table(11, 2)
+    after = int(time.time())
     dates = sorted({q["date"] for q in p.of("get_simple_data_table")})
-    assert dates == sorted({day_of(NOW - d * 86400) for d in range(3)})
+    assert dates in (sorted({day_of(t - d * 86400) for d in range(3)}) for t in (before, after))
     starts = [int(epg_times(e)[0].timestamp()) for e in got]
     assert starts == sorted(starts) and len(set(starts)) == len(starts)
     # Only what the portal marks as in the archive: nothing still to come.
