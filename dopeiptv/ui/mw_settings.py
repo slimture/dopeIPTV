@@ -281,6 +281,7 @@ class _SettingsMixin:
         self._sp_restyle()           # a series' page
         self._pf_restyle()           # the Movies place and a film's page
         self._place_series_restyle()   # the Series place
+        self._place_local_restyle()  # the Local files place
         self._search_restyle()       # the Search page
         self._place_tv_restyle()     # the TV place's header and row
         getattr(self, "_mitt_restyle", lambda: None)()   # Mine
@@ -497,6 +498,7 @@ class _SettingsMixin:
         self._sp_restyle()           # a series' page
         self._pf_restyle()           # the Movies place and a film's page
         self._place_series_restyle()   # the Series place
+        self._place_local_restyle()  # the Local files place
         self._search_restyle()       # the Search page
         self._place_tv_restyle()     # the TV place, in the new language
         getattr(self, "_mitt_restyle", lambda: None)()   # Mine

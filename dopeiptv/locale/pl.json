@@ -3025,5 +3025,10 @@
   "mitt_n_channels": "Kanały: {n}",
   "mitt_n_station": "Stacje: {n}",
   "mitt_n_stations": "Stacje: {n}",
-  "mitt_n_web_one": "Transmisje z sieci: {n}"
+  "mitt_n_web_one": "Transmisje z sieci: {n}",
+  "local_place_folders": "Foldery",
+  "local_place_library": "Biblioteka",
+  "local_n_folders": "Foldery: {n}",
+  "local_gone": "Tego folderu już nie ma.",
+  "local_show_folder": "Pokaż w folderze"
 }

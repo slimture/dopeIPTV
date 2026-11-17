@@ -3025,5 +3025,10 @@
   "mitt_n_channels": "چینلز: {n}",
   "mitt_n_station": "اسٹیشنز: {n}",
   "mitt_n_stations": "اسٹیشنز: {n}",
-  "mitt_n_web_one": "ویب اسٹریمز: {n}"
+  "mitt_n_web_one": "ویب اسٹریمز: {n}",
+  "local_place_folders": "فولڈرز",
+  "local_place_library": "لائبریری",
+  "local_n_folders": "فولڈرز: {n}",
+  "local_gone": "یہ فولڈر اب موجود نہیں۔",
+  "local_show_folder": "اس کے فولڈر میں دکھائیں"
 }

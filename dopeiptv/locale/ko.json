@@ -3025,5 +3025,10 @@
   "mitt_n_channels": "채널 {n}개",
   "mitt_n_station": "방송국 {n}개",
   "mitt_n_stations": "방송국 {n}개",
-  "mitt_n_web_one": "웹 스트림 {n}개"
+  "mitt_n_web_one": "웹 스트림 {n}개",
+  "local_place_folders": "폴더",
+  "local_place_library": "라이브러리",
+  "local_n_folders": "폴더 {n}개",
+  "local_gone": "이 폴더는 더 이상 없습니다.",
+  "local_show_folder": "폴더에서 보기"
 }

@@ -3025,5 +3025,10 @@
   "mitt_n_channels": "{n} ช่อง",
   "mitt_n_station": "{n} สถานี",
   "mitt_n_stations": "{n} สถานี",
-  "mitt_n_web_one": "สตรีมจากเว็บ {n} รายการ"
+  "mitt_n_web_one": "สตรีมจากเว็บ {n} รายการ",
+  "local_place_folders": "โฟลเดอร์",
+  "local_place_library": "คลัง",
+  "local_n_folders": "{n} โฟลเดอร์",
+  "local_gone": "โฟลเดอร์นี้ไม่มีอยู่แล้ว",
+  "local_show_folder": "แสดงในโฟลเดอร์"
 }

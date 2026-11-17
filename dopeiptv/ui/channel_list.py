@@ -534,6 +534,22 @@ class ChannelListModel(QAbstractListModel):
         self._items[at:at] = items
         self.endInsertRows()
 
+    def remove_rows(self, rows) -> None:
+        """The rows *rows* (their numbers now) taken out without a reset,
+        a run at a time from the last: the selection, the current row and
+        the scroll stay (Local files' folder changed on disk). From the
+        list the model holds - the window's all_items is the same list."""
+        runs: list[list[int]] = []
+        for r in sorted({int(r) for r in rows if 0 <= int(r) < len(self._items)}):
+            if runs and r == runs[-1][1] + 1:
+                runs[-1][1] = r
+            else:
+                runs.append([r, r])
+        for a, b in reversed(runs):
+            self.beginRemoveRows(QModelIndex(), a, b)
+            del self._items[a:b + 1]
+            self.endRemoveRows()
+
     def item_at(self, row: int):
         if 0 <= row < len(self._items):
             return self._items[row]

@@ -3025,5 +3025,10 @@
   "mitt_n_channels": "{n} kanaler",
   "mitt_n_station": "{n} station",
   "mitt_n_stations": "{n} stationer",
-  "mitt_n_web_one": "{n} webbström"
+  "mitt_n_web_one": "{n} webbström",
+  "local_place_folders": "Mappar",
+  "local_place_library": "Bibliotek",
+  "local_n_folders": "{n} mappar",
+  "local_gone": "Den här mappen finns inte längre.",
+  "local_show_folder": "Visa i sin mapp"
 }

@@ -3025,5 +3025,10 @@
   "mitt_n_channels": "ערוצים: {n}",
   "mitt_n_station": "תחנות: {n}",
   "mitt_n_stations": "תחנות: {n}",
-  "mitt_n_web_one": "שידורי רשת: {n}"
+  "mitt_n_web_one": "שידורי רשת: {n}",
+  "local_place_folders": "תיקיות",
+  "local_place_library": "ספרייה",
+  "local_n_folders": "תיקיות: {n}",
+  "local_gone": "התיקייה הזו כבר לא קיימת.",
+  "local_show_folder": "הצגה בתיקייה שלו"
 }

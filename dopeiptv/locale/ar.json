@@ -3025,5 +3025,10 @@
   "mitt_n_channels": "القنوات: {n}",
   "mitt_n_station": "المحطات: {n}",
   "mitt_n_stations": "المحطات: {n}",
-  "mitt_n_web_one": "بث الويب: {n}"
+  "mitt_n_web_one": "بث الويب: {n}",
+  "local_place_folders": "مجلدات",
+  "local_place_library": "المكتبة",
+  "local_n_folders": "المجلدات: {n}",
+  "local_gone": "لم يعد هذا المجلد موجودًا.",
+  "local_show_folder": "إظهار في مجلده"
 }

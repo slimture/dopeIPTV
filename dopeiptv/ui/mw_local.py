@@ -6,6 +6,10 @@ an ordinary path - the same reasoning as open_local_video, so there is no
 in-app SMB client to go wrong). Modeled on the Recordings section: roots in
 the category column, files in the middle list, playback through the proven
 local-file path with resume keyed on the file path.
+
+The list here is the source of truth; the place of the new look draws it
+(ui/mw_place_local.py), and what changes on disk is read again by itself
+(ui/mw_local_watch.py).
 """
 from __future__ import annotations
 
@@ -21,6 +25,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QListWidgetItem
 
 from ..core.audiotags import cover_bytes, display_name, read_tags
+from ..core.local_watch import CAP as WATCH_CAP
 from ..core.log import log
 from ..core.workers import run_async
 from ..i18n import tr
@@ -264,8 +269,10 @@ class _LocalFilesMixin:
     # -- Rescan ------------------------------------------------------------------
 
     def _local_rescan(self) -> None:
-        """Rescan (the bar's button, F5): what Local files shows read from
-        the disk again, now - there is no watcher. A folder (Folders view,
+        """Rescan (the place's button, F5): what Local files shows read
+        from the disk again, now - changes show by themselves too, a moment
+        after they happen (mw_local_watch), but a share sends no word of
+        what another computer did there. A folder (Folders view,
         or one opened from the library) is listed again, the row that was
         selected selected again as it comes back; a search in it walks
         again. The library walks its folder again at once, the list as it
@@ -414,7 +421,9 @@ class _LocalFilesMixin:
         self._local_list_names = None
         self._local_want_key = None
         state: dict = {"shown": None, "fresh": [], "painted": None,
-                       "named": False, "dirs": [], "files": []}
+                       "named": False, "dirs": [], "files": [],
+                       "t0": time.monotonic()}
+        self._local_folder_gone = False
         self._local_list_step(listing, token, state, self._LIST_FIRST)
 
     def _local_list_step(self, listing, token: int, state: dict,
@@ -444,6 +453,7 @@ class _LocalFilesMixin:
                                           names)
                 state["named"] = told
             state["fresh"].extend(r for r in rows if self._search_filter([r]))
+            state["gone"] = listing.missing
             now = time.monotonic()
             if finished or (state["fresh"] and (
                     state["painted"] is None
@@ -454,7 +464,16 @@ class _LocalFilesMixin:
                 self._local_listing = None
                 self._local_list_names = None
                 self._local_want_key = None
+                self._local_folder_gone = listing.missing
                 self._hide_busy()
+                # What changed on disk meanwhile is read once this is done
+                # (mw_local_watch).
+                ended = getattr(self, "_lw_walk_ended", None)
+                if callable(ended):
+                    ended(time.monotonic() - state.get("t0", now))
+                head = getattr(self, "_lw_place_head", None)
+                if callable(head):
+                    head()
                 return
             self._show_busy()
             self._local_list_step(listing, token, state, self._SEARCH_SLICE)
@@ -486,7 +505,8 @@ class _LocalFilesMixin:
         else:
             self._render_rows(state["dirs"] + new_dirs
                               + state["files"] + new_files,
-                              "rec", tr("local_empty"))
+                              "rec", tr("local_gone") if state.get("gone")
+                              else tr("local_empty"))
             state["shown"] = self.all_items
         state["dirs"] += new_dirs
         state["files"] += new_files
@@ -538,8 +558,25 @@ class _LocalFilesMixin:
                                             and not r.get("stream_icon"))]
         todo = cand[:self._ENRICH_BATCH]
         more = len(cand) > len(todo)
-        if not todo or getattr(self, "pool", None) is None:
-            return
+        if todo and getattr(self, "pool", None) is not None:
+            self._local_enrich_tags(rows, todo, more, _round)
+        if _round:
+            return          # the poster chain was started by round 0
+        # Film-named FOLDERS get posters too, not just files: a library
+        # laid out as "Movies/12 Years a Slave (2013)/movie.mkv" showed
+        # nothing but grey folder glyphs before. A folder of video files
+        # alone has nothing for the tag pass, and its files still get theirs
+        # (a poster, else a frame).
+        self._local_resolve_posters(
+            [r for r in rows
+             if r.get("_kind") == "local"
+             or (r.get("_kind") == "localdir"
+                 and (r.get("_year") or r.get("_clean_title")))])
+
+    def _local_enrich_tags(self, rows: list[dict], todo: list[dict], more: bool,
+                           _round: int) -> None:
+        """_local_enrich's file reads - tags, a folder's cover - on the pool,
+        a batch at a time, chained."""
         token = getattr(self, "_local_list_token", 0)
         paths = [(r["_key"], r.get("_path", ""), bool(r.get("_needs_tags")),
                   r.get("_kind")) for r in todo]
@@ -601,16 +638,6 @@ class _LocalFilesMixin:
                 self._local_enrich(rows, _round + 1)
 
         run_async(self.pool, job, done, lambda _e: None)
-        if _round:
-            return          # the poster chain was started by round 0
-        # Film-named FOLDERS get posters too, not just files: a library
-        # laid out as "Movies/12 Years a Slave (2013)/movie.mkv" showed
-        # nothing but grey folder glyphs before.
-        self._local_resolve_posters(
-            [r for r in rows
-             if r.get("_kind") == "local"
-             or (r.get("_kind") == "localdir"
-                 and (r.get("_year") or r.get("_clean_title")))])
 
     # -- the search: a folder and its subfolders (#33) ------------------------
 
@@ -1010,19 +1037,29 @@ class _LocalFilesMixin:
     _SCAN_JUNK = {"@eadir", "#recycle", "$recycle.bin", "lost+found",
                   "system volume information", "@__thumb", ".appledouble"}
 
-    def _load_local_library(self, root: str, show_cache: bool = True) -> None:
+    def _load_local_library(self, root: str, show_cache: bool = True,
+                            quiet: bool = False) -> None:
         """The library, built progressively: the walk runs in ~4 s slices on
         the worker pool and every slice renders what has been found so far,
         so a big SMB share fills the view as it goes instead of all at the
         end. Bounded by directory/file caps rather than wall time - the
         slices make time limits unnecessary. *show_cache* False (Rescan):
         the list on screen is the library already, the walk's first slice
-        renders over it."""
+        renders over it. *quiet* (a change on disk, mw_local_watch): no
+        notice and nothing laid out until the walk ends - then only what
+        changed, the row chosen kept."""
         if getattr(self, "_local_scan_active", False) \
                 and getattr(self, "_local_scan_root", None) == root:
             # This very root is mid-walk: show what it has and let it keep
             # going. Restarting on every category click threw the progress
-            # away each time.
+            # away each time. A quiet walk asked for by the person says
+            # what it does from now on.
+            if quiet:
+                return
+            if getattr(self, "_local_scan_quiet", False):
+                self._local_scan_quiet = False
+                self._show_busy(tr("local_scanning"), kind="folder")
+                self._local_pulse_start()
             if not getattr(self, "_local_series", None):
                 self._apply_library(
                     getattr(self, "_local_series_index", {}),
@@ -1055,12 +1092,16 @@ class _LocalFilesMixin:
             if time.monotonic() - last < 120.0:
                 return   # scanned moments ago: the cache render is current
         self._local_scan_active = True
-        self._show_busy(tr("local_scanning"), kind="folder")
-        self._local_pulse_start()
-        log.info("library scan starting: %s", root)
+        self._local_scan_quiet = quiet
+        if not quiet:
+            self._show_busy(tr("local_scanning"), kind="folder")
+            self._local_pulse_start()
+        log.info("library scan starting%s: %s", " (a change on disk)" if quiet else "",
+                 root)
         state = {"walker": os.walk(root), "series": {}, "collections": {},
                  "movies": [], "albums": {}, "dirs": 0, "files": 0,
-                 "root": os.path.normpath(root)}
+                 "root": os.path.normpath(root), "t0": time.monotonic(),
+                 "dirlist": []}
         self._local_scan_step(root, state, token, cached)
 
     def _local_scan_step(self, root: str, state: dict, token: int,
@@ -1084,6 +1125,8 @@ class _LocalFilesMixin:
                     return True, False
                 state["dirs"] += 1
                 state["at"] = dirpath
+                if len(state["dirlist"]) <= WATCH_CAP:
+                    state["dirlist"].append(dirpath)    # what is watched after
                 dirnames[:] = [d for d in dirnames
                                if not d.startswith(".")
                                and d.lower() not in self._SCAN_JUNK]
@@ -1115,15 +1158,23 @@ class _LocalFilesMixin:
                 self._local_scan_active = False
                 self._local_scan_state = None
                 self._hide_busy()
+                ended = getattr(self, "_lw_walk_ended", None)
+                if callable(ended):
+                    ended()
                 return
             finished, cut = result
+            quiet = getattr(self, "_local_scan_quiet", False)
             self._local_cover_index = state.get("covers", {})
             self._local_dircover = state.get("dircover_map",
                                              state.get("dircover", {}))
             series = state["series"]
             self._local_album_index = state.get("albums", {})
+            # Drilled in - or the list is not this library's any more (the
+            # Folders view, another root): the list is not ours to touch.
             drilled = (getattr(self, "_local_series", None)
-                       or getattr(self, "_local_ctx", None))
+                       or getattr(self, "_local_ctx", None)
+                       or self._local_view() != "series"
+                       or getattr(self, "_current_cat", None) != root)
             collections = state["collections"]
             movies = state["movies"]
             if not finished:
@@ -1161,14 +1212,16 @@ class _LocalFilesMixin:
                 self._local_movies_rows = mm
                 self._local_album_index = ma
                 self._local_scan_state = state
-                if not getattr(self, "_local_series", None) \
-                        and not getattr(self, "_local_ctx", None):
+                if quiet:
+                    pass            # a change on disk: laid out once it ends
+                elif not drilled:
                     self._apply_library(ms, mm, mc)
                 else:
                     # Drilled in: the list is not ours to touch, but the
                     # progress note still is.
                     self._busy_say(self._local_scan_note(state))
-                self._show_busy(self._local_scan_note(state), kind="folder")
+                if not quiet:
+                    self._show_busy(self._local_scan_note(state), kind="folder")
                 # Persist the merged partial view every ~15 s, so quitting
                 # or switching away mid-walk keeps everything found so far
                 # instead of starting over from nothing.
@@ -1182,7 +1235,8 @@ class _LocalFilesMixin:
             self._local_pulse_stop()
             self._local_scan_active = False
             self._local_scan_state = None
-            self._hide_busy()
+            if not quiet:
+                self._hide_busy()
             # The shelves' covers are looked for once more, in the whole
             # library this time.
             self._local_shelf_art = {}
@@ -1196,6 +1250,11 @@ class _LocalFilesMixin:
             self._save_library_cache(root, series, movies, collections)
             self._local_series_index = series
             self._local_collection_index = collections
+            # What is watched on disk: the folders this walk went through.
+            walked = getattr(self, "_local_walk_done", None)
+            if callable(walked):
+                walked(root, state.get("dirlist") or [],
+                       time.monotonic() - state.get("t0", time.monotonic()))
             if drilled:
                 return     # drilled in: the fresh index serves the way back
             if cached is not None \
@@ -1203,7 +1262,10 @@ class _LocalFilesMixin:
                     and cached.get("collections") == collections \
                     and cached.get("movies") == movies:
                 return     # nothing changed: the cache render stands
+            key = self._local_current_key() if quiet else None
             self._apply_library(series, movies, collections)
+            if key:
+                self._local_select_key(key)
 
         def fail(e):
             if token == getattr(self, "_local_scan_token", 0):
@@ -1211,6 +1273,9 @@ class _LocalFilesMixin:
                 self._local_scan_active = False
                 self._hide_busy()
                 log.warning("library scan FAILED for %s: %r", root, e)
+                ended = getattr(self, "_lw_walk_ended", None)
+                if callable(ended):
+                    ended()
                 if cached is None:
                     self._render_rows([], "rec", tr("local_empty"))
 
@@ -1584,6 +1649,15 @@ class _LocalFilesMixin:
             if getattr(self, "_local_scan_active", False):
                 self._set_status(self._local_scan_note())
             return
+        # A row walked again keeps the picture it shows until its own is
+        # found again: no flash of initials over a library walked anew.
+        icons = {r.get("_key"): r.get("stream_icon")
+                 for r in (getattr(self, "all_items", None) or [])
+                 if isinstance(r, dict) and r.get("_key") and r.get("stream_icon")}
+        if icons:
+            for r in rows:
+                if not r.get("stream_icon") and r.get("_key") in icons:
+                    r["stream_icon"] = icons[r["_key"]]
         self._render_rows(rows, "rec", tr("local_empty"))
         self._local_lib_shown = (self.all_items, sig)
         if getattr(self, "_local_scan_active", False):
@@ -1974,9 +2048,12 @@ class _LocalFilesMixin:
                                 stdout=subprocess.DEVNULL,
                                 stderr=subprocess.DEVNULL,
                                 creationflags=NO_WINDOW)
-                            break
                         except Exception:
                             continue
+                        # A seek past a short clip's end succeeds with no
+                        # frame at all: from its start then.
+                        if os.path.isfile(tp) and os.path.getsize(tp) > 0:
+                            break
                 if os.path.isfile(tp) and os.path.getsize(tp) > 0:
                     out[key] = tp
             return out
@@ -2258,7 +2335,9 @@ class _LocalFilesMixin:
                     return out
         return out
 
-    def _local_context_menu(self, pos, it) -> None:
+    def _local_context_menu(self, pos, it, at=None) -> None:
+        """A row's menu at the list's *pos* - or, from the place's cards,
+        at the global point *at*."""
         from PyQt6.QtWidgets import QMenu
         m = QMenu(self)
         if it.get("_kind") == "localdir":
@@ -2304,4 +2383,4 @@ class _LocalFilesMixin:
                 mv.addAction(tr("mv_cell", n=n + 1) + occupant,
                              lambda it=it, n=n:
                              self._local_add_to_multiview(it, n))
-        m.exec(self.listw.viewport().mapToGlobal(pos))
+        m.exec(at if at is not None else self.listw.viewport().mapToGlobal(pos))

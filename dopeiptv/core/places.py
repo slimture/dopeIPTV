@@ -40,11 +40,13 @@ MITT_TABS = ("fav", "watchlist", "history")
 #: The window's methods the places' own pages answer to: each returns True
 #: once it showed its page (ui/mw_places.py calls them when they exist).
 SHOW_HOOKS = {"mitt": "_mitt_show", "tv": "_place_tv_show",
-              "films": "_place_films_show", "series": "_place_series_show"}
+              "films": "_place_films_show", "series": "_place_series_show",
+              "local": "_place_local_show"}
 #: ...and the ones asked to show their place's content again (a profile,
 #: a source, followed series or sync changed what they show).
 REFRESH_HOOKS = {"mitt": "_mitt_refresh", "tv": "_place_tv_refresh",
-                 "films": "_place_films_refresh", "series": "_place_series_refresh"}
+                 "films": "_place_films_refresh", "series": "_place_series_refresh",
+                 "local": "_place_local_refresh"}
 
 START_KEY = "start_place"
 LAST_KEY = "last_place"

@@ -55,7 +55,7 @@ class _ContextMenuMixin:
             self._rec_context_menu(pos, it)
             return
         if self.mode == "local":
-            self._local_context_menu(pos, it)
+            self._local_context_menu(pos, it, at=at)
             return
         # A station or a web stream, in Radio, Favourites or History.
         if (self.mode == "radio"

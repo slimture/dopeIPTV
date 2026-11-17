@@ -51,7 +51,8 @@ def test_the_places_their_entries_and_modes():
     for place, mode in places.MODE_OF.items():
         assert places.place_of_mode(mode) == place
     assert places.place_of_mode("bogus") == places.DEFAULT_PLACE
-    assert set(places.SHOW_HOOKS) == set(places.REFRESH_HOOKS) == {"mitt", "tv", "films", "series"}
+    assert set(places.SHOW_HOOKS) == set(places.REFRESH_HOOKS) == {"mitt", "tv", "films", "series",
+                                                                  "local"}
 
 
 def test_where_the_app_opens():

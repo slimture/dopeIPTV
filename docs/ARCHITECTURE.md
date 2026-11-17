@@ -108,6 +108,8 @@ dopeiptv/
     places.py          The app's places (Mine, TV, Movies, Series, Guide,
                        Search, Local files, Radio, Recordings): entries, modes,
                        where the app opens, Home's settings retired
+    local_watch.py     What Local files watches on disk, when it reads again,
+                       what changed between two listings
     shortcut_keys.py   Keyboard shortcuts: the actions, the app's keys, the
                        user's over them, never two on one key
     log.py             Central logging (configure_logging, DOPEIPTV_LOG)
@@ -252,6 +254,11 @@ dopeiptv/
                        Recently watched and the header over the list
     mw_place_tv.py     The TV place in the window (_place_tv_show)
     mw_local.py        Local files: folders, library view, music queue
+    mw_place_local.py  The Local files place where the list was: Back, header,
+                       Continue, the folder's rows or the library's posters
+    local_place.py     The Local files place itself, dressed as it paints
+    mw_local_watch.py  Changes on disk read again by themselves (#34)
+    local_watcher.py   The folders watched on a thread of their own
     mw_radio.py        Radio: radio-browser.info's stations, played as music
     mw_webstreams.py   Open address, YouTube/Twitch through yt-dlp, saved
                        addresses

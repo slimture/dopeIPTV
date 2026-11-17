@@ -7,7 +7,32 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Added
+
+- Local files notices changes on disk by itself (#34): a file renamed,
+  added or removed shows a moment later without Rescan, in place - the
+  scroll and the row you were on stay where they were, and a folder that
+  went away says so quietly. The folder shown and the library's folders
+  are watched (up to 2000); a share over the network, where no word comes
+  of what another computer did there, or a bigger library, is read again
+  lightly every few minutes while Local files is on screen. Rescan and F5
+  stay for "now".
+
 ### Changed
+
+- Local files is a place of the new look, like Mine, TV, Movies and
+  Series: the folder's name ("Local files" at the top) with how many
+  folders and files it holds, a way back to the folder above ("Back to
+  Films" - and the mouse's back button, Backspace), the filter, Rescan and
+  the Folders / Library switch in its header, then "Continue" - the files
+  in progress under the folder, from where you stopped, without the resume
+  question - and the folder's folders and files as rows with their
+  pictures, size and, once played, length. The library shows its series,
+  films, folders and music as posters or rows (Grid / List, remembered).
+  Everything the list did stays: a file plays on through its folder, the
+  menus and the queue, the search through the subfolders, a library's
+  series page, the phone remote's Local files. On a narrow pane the
+  controls take rows of their own under the title.
 
 - macOS draws the picture on a thread of its own too, as Linux and Windows
   do: Qt cannot hand its OpenGL to another thread there (AppKit stops the
@@ -24,6 +49,12 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   the same marks everywhere; a star given from the menu shows at once.
 
 ### Fixed
+
+- Local files: a folder holding only video files got no posters or frames
+  (only one with subfolders did), and a clip shorter than two minutes never
+  got its frame; Folders picked while the library was still being read
+  could end up showing the library; the status line called a folder's
+  files "recordings".
 
 - Enter in a list (TV's channels, Movies' and Series' rows) plays the row
   picked, as a double click does; it did nothing unless a channel number

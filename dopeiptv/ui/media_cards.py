@@ -790,6 +790,41 @@ class CardModel(QAbstractListModel):
                 self._rows[it.key] = i
         self.endInsertRows()
 
+    def insert(self, at: int, items: Iterable) -> None:
+        """*items* put in before row *at* without a reset (the selection,
+        the current item and the scroll stay)."""
+        new = list(items)
+        if not new:
+            return
+        at = max(0, min(int(at), len(self._items)))
+        self.beginInsertRows(QModelIndex(), at, at + len(new) - 1)
+        self._items[at:at] = new
+        self._index_keys()
+        self.endInsertRows()
+
+    def remove(self, rows: Iterable[int]) -> None:
+        """The items at *rows* taken out without a reset, a run of them at
+        a time from the last."""
+        runs: list[list[int]] = []
+        for r in sorted({int(r) for r in rows if 0 <= int(r) < len(self._items)}):
+            if runs and r == runs[-1][1] + 1:
+                runs[-1][1] = r
+            else:
+                runs.append([r, r])
+        if not runs:
+            return
+        for a, b in reversed(runs):
+            self.beginRemoveRows(QModelIndex(), a, b)
+            del self._items[a:b + 1]
+            self._index_keys()
+            self.endRemoveRows()
+
+    def _index_keys(self) -> None:
+        self._rows = {}
+        for i, it in enumerate(self._items):
+            if it.key and it.key not in self._rows:
+                self._rows[it.key] = i
+
     def items(self) -> list:
         return list(self._items)
 
@@ -857,6 +892,7 @@ class _PaintedView(QListView):
         self.selectionModel().currentChanged.connect(self._current_moved)
         self.model_.modelReset.connect(self._contents_changed)
         self.model_.rowsInserted.connect(self._contents_changed)
+        self.model_.rowsRemoved.connect(self._contents_changed)
         self.restyle()
 
     # -- look --------------------------------------------------------------------
@@ -882,6 +918,14 @@ class _PaintedView(QListView):
 
     def append_items(self, items: Iterable) -> None:
         self.model_.append(items)
+
+    def insert_items(self, at: int, items: Iterable) -> None:
+        """*items* put in before row *at*, the selection and scroll kept."""
+        self.model_.insert(at, items)
+
+    def remove_rows(self, rows: Iterable[int]) -> None:
+        """The items at *rows* taken out, the selection and scroll kept."""
+        self.model_.remove(rows)
 
     def items(self) -> list:
         return self.model_.items()
@@ -1170,6 +1214,12 @@ class CardDelegate(QStyledItemDelegate):
             self._paint_card(p, option.rect, card, rtl, playing, hover, selected, focus)
         p.restore()
 
+    def picture_fits(self, card: Card, pm: QPixmap | None) -> bool:
+        """Whether *card*'s picture is fitted inside its box rather than
+        covering it - posters and stills cover; a page's own delegate may
+        fit a folder's glyph or a square cover instead."""
+        return False
+
     def _picture(self, card: Card) -> tuple[QPixmap | None, bool]:
         images = self._view.images
         pm = images.get(card.image) if card.image else None
@@ -1195,7 +1245,8 @@ class CardDelegate(QStyledItemDelegate):
         radius = corner_radius(10)
         pm, own = self._picture(card)
         paint_picture(p, pic, pm, v.pictures, radius,
-                      card.initials or initials_of(card.title), dim=bool(pm) and not own)
+                      card.initials or initials_of(card.title),
+                      fit=self.picture_fits(card, pm), dim=bool(pm) and not own)
         pills = card_pills(card, playing)
         start = [pl for pl in pills if pl[0] != "seen"]
         end = [pl for pl in pills if pl[0] == "seen"]
@@ -1231,7 +1282,8 @@ class CardDelegate(QStyledItemDelegate):
         parts = list_parts(rect, v.list_picture, pills_width(pills) if pills else 0, rtl)
         pm, own = self._picture(card)
         paint_picture(p, parts["picture"], pm, v.pictures, corner_radius(6),
-                      card.initials or initials_of(card.title), dim=bool(pm) and not own)
+                      card.initials or initials_of(card.title),
+                      fit=self.picture_fits(card, pm), dim=bool(pm) and not own)
         if pills:
             paint_pills(p, pills, parts["pills"], rtl)
         text = parts["text"]

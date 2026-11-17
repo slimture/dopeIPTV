@@ -3025,5 +3025,10 @@
   "mitt_n_channels": "{n} canais",
   "mitt_n_station": "{n} rádio",
   "mitt_n_stations": "{n} rádios",
-  "mitt_n_web_one": "{n} transmissão da web"
+  "mitt_n_web_one": "{n} transmissão da web",
+  "local_place_folders": "Pastas",
+  "local_place_library": "Biblioteca",
+  "local_n_folders": "{n} pastas",
+  "local_gone": "Esta pasta não existe mais.",
+  "local_show_folder": "Mostrar na pasta"
 }

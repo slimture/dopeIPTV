@@ -3025,5 +3025,10 @@
   "mitt_n_channels": "Kanali: {n}",
   "mitt_n_station": "Stanice: {n}",
   "mitt_n_stations": "Stanice: {n}",
-  "mitt_n_web_one": "Veb prenosi: {n}"
+  "mitt_n_web_one": "Veb prenosi: {n}",
+  "local_place_folders": "Fascikle",
+  "local_place_library": "Biblioteka",
+  "local_n_folders": "Fascikle: {n}",
+  "local_gone": "Ova fascikla više ne postoji.",
+  "local_show_folder": "Prikaži u njenoj fascikli"
 }

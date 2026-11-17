@@ -3025,5 +3025,10 @@
   "mitt_n_channels": "{n} 个频道",
   "mitt_n_station": "{n} 个电台",
   "mitt_n_stations": "{n} 个电台",
-  "mitt_n_web_one": "{n} 个网络直播"
+  "mitt_n_web_one": "{n} 个网络直播",
+  "local_place_folders": "文件夹",
+  "local_place_library": "媒体库",
+  "local_n_folders": "{n} 个文件夹",
+  "local_gone": "此文件夹已不存在。",
+  "local_show_folder": "在所在文件夹中显示"
 }

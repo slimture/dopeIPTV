@@ -1,8 +1,9 @@
-"""Rescan in Local files (1.6.1): the button in its bar and F5 - a key of the
-rebindable kind - read what it shows from the disk again, now. Folders view
-lists the folder again, the selected row kept; the library walks its folder
-again at once (though one ended moments ago), the list as it is meanwhile;
-a walk under way goes on. No watcher."""
+"""Rescan in Local files (1.6.1): the button in its header and F5 - a key of
+the rebindable kind - read what it shows from the disk again, now. Folders
+view lists the folder again, the selected row kept; the library walks its
+folder again at once (though one ended moments ago), the list as it is
+meanwhile; a walk under way goes on. (What changes on disk also shows by
+itself a moment later: tests/test_local_watch.py, tests/test_local_place.py.)"""
 from __future__ import annotations
 
 import os

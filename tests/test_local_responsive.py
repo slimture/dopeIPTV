@@ -473,7 +473,11 @@ def listed():
 
 settle(lambda: w.list_model.rowCount() > 0, what="first list")
 w.switch_mode("local")
-assert w.local_rescan_btn.isVisibleTo(w) and w.local_view_btn.isVisibleTo(w)
+# The place of the new look, where the list was: Rescan and the Folders /
+# Library switch in its header (mw_place_local).
+settle(lambda: w._place_local_showing(), what="the place")
+assert w._lp_page.rescan.isVisibleTo(w) and w._lp_page.header.switch.isVisibleTo(w)
+assert w._lp_page.header.view_key() == "series"
 settle(walked, what="the library walked")
 settle(lambda: "Music" in names(), what="the music shelf")
 idle(0.5)

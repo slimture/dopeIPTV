@@ -52,6 +52,8 @@ class FolderListing:
         self.base = base
         self.exts = tuple(e.lower() for e in exts)
         self.done = False
+        #: The folder was not there (gone, or not a folder) when read.
+        self.missing = False
         self._entries: list[os.DirEntry] | None = None
         self._at = 0                      # the next entry to tell
         self._files: list[os.DirEntry] = []
@@ -122,6 +124,7 @@ class FolderListing:
             with os.scandir(self.base) as it:
                 return sorted(it, key=lambda e: e.name.lower())
         except (FileNotFoundError, NotADirectoryError):
+            self.missing = True
             return []                     # gone, or not a folder: nothing
         except OSError as err:
             log.warning("local browse failed for %s: %s", self.base, err)

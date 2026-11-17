@@ -3025,5 +3025,10 @@
   "mitt_n_channels": "Vituo {n}",
   "mitt_n_station": "Stesheni {n}",
   "mitt_n_stations": "Stesheni {n}",
-  "mitt_n_web_one": "Mitiririko ya wavuti {n}"
+  "mitt_n_web_one": "Mitiririko ya wavuti {n}",
+  "local_place_folders": "Folda",
+  "local_place_library": "Maktaba",
+  "local_n_folders": "Folda {n}",
+  "local_gone": "Folda hii haipo tena.",
+  "local_show_folder": "Onyesha kwenye folda yake"
 }

@@ -3025,5 +3025,10 @@
   "mitt_n_channels": "{n} canales",
   "mitt_n_station": "{n} emisora",
   "mitt_n_stations": "{n} emisoras",
-  "mitt_n_web_one": "{n} stream web"
+  "mitt_n_web_one": "{n} stream web",
+  "local_place_folders": "Carpetas",
+  "local_place_library": "Biblioteca",
+  "local_n_folders": "{n} carpetas",
+  "local_gone": "Esta carpeta ya no existe.",
+  "local_show_folder": "Mostrar en su carpeta"
 }

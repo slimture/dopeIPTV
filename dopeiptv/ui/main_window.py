@@ -107,6 +107,7 @@ from .mw_places import _PlacesMixin
 from .mw_mitt import _MittMixin
 from .mw_popular import _PopularMixin
 from .mw_local import _LocalFilesMixin
+from .mw_local_watch import _LocalWatchMixin
 from .mw_onboarding import _OnboardingMixin
 from .mw_popout import _PopoutMixin
 from .mw_reminders import _RemindersMixin
@@ -114,6 +115,7 @@ from .mw_series import _SeriesMixin
 from .mw_series_page import _SeriesPageMixin
 from .mw_place_films import _PlaceFilmsMixin
 from .mw_film_page import _FilmPageMixin
+from .mw_place_local import _PlaceLocalMixin
 from .mw_place_series import _PlaceSeriesMixin
 from .mw_search_all import _SearchAllMixin
 from .mw_stats import _StatsMixin
@@ -161,7 +163,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _ContextMenuMixin, _FavoritesMixin, _DetailMixin, _RemindersMixin,
                  _BusyMixin, _UpdatesMixin, _SearchMixin, _SidebarMixin,
                  _NavMixin, _SourceLabelMixin, _ShortcutsMixin, _PaletteMixin, _OnboardingMixin, _SortMixin,
-                 _LocalFilesMixin, _RadioMixin, _WebStreamsMixin,
+                 _LocalFilesMixin, _PlaceLocalMixin, _LocalWatchMixin, _RadioMixin, _WebStreamsMixin,
                  _PopoutMixin, _MultiviewMixin, _PlacesMixin, _PopularMixin, _GuideMixin,
                  _SeriesPageMixin, _PlaceFilmsMixin, _FilmPageMixin, _PlaceSeriesMixin, _SearchAllMixin, _MittMixin,
                  _MprisMixin,
@@ -2576,8 +2578,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.search.clear()
         self._sync_search_hint()
         self._load_categories()
-        # Series is a place of the unified look where the list was.
+        # Series is a place of the unified look where the list was, and so
+        # is Local files (mw_place_local; what it shows watched on disk).
         self._place_series_sync()
+        self._place_local_sync()
         # The TV place's header over the live list only (mw_place_tv).
         sync = getattr(self, "_place_tv_sync", None)
         if sync is not None:
@@ -3518,6 +3522,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _count_text(self, kind: str, n: int) -> str:
         """"123 channels" for the status row, for each kind of list."""
+        if kind == "rec" and getattr(self, "mode", "") == "local":
+            kind = "local"          # Local files' rows ride the recordings' kind
         key = _COUNT_KEYS.get(kind)
         return tr(key, n=n) if key else str(n)
 
@@ -5218,6 +5224,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         place = getattr(self, "_place_series_playing", None)
         if place is not None:
             place()                    # ...and on the Series place's Continue
+        local = getattr(self, "_place_local_playing", None)
+        if local is not None:
+            local()                    # ...and Local files' Continue and mark
 
     def _autoplay_next_episode(self) -> bool:
         return self.settings.value("autoplay_next_episode", "true") == "true"
@@ -5509,6 +5518,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         place = getattr(self, "_place_series_playing", None)
         if place is not None:
             place()
+        # ...and Local files its file.
+        local = getattr(self, "_place_local_playing", None)
+        if local is not None:
+            local()
         # The middle pane goes to what plays, when it came from elsewhere.
         follow = getattr(self, "_pane_follow_soon", None)
         if follow is not None:
@@ -6530,10 +6543,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Wayland handles and file descriptors have a chance to
         # release cleanly - a hard exit while any of those are mid-
         # teardown leaves stale state that can crash the NEXT startup.
-        # A Local files search ends its folder and stops (mw_local).
+        # A Local files search ends its folder and stops (mw_local); what it
+        # watched on disk is let go, the watcher's thread ended.
         walk = getattr(self, "_local_walk", None)
         if walk is not None:
             walk.cancel()
+        getattr(self, "_lw_shutdown", lambda: None)()
         for pool in (self.pool, self._logo_pool, self._art_pool,
                      getattr(self, "_local_walk_threads", None)):
             if pool is None:

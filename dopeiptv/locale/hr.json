@@ -3025,5 +3025,10 @@
   "mitt_n_channels": "Kanali: {n}",
   "mitt_n_station": "Postaje: {n}",
   "mitt_n_stations": "Postaje: {n}",
-  "mitt_n_web_one": "Web prijenosi: {n}"
+  "mitt_n_web_one": "Web prijenosi: {n}",
+  "local_place_folders": "Mape",
+  "local_place_library": "Biblioteka",
+  "local_n_folders": "Mape: {n}",
+  "local_gone": "Ova mapa više ne postoji.",
+  "local_show_folder": "Prikaži u njegovoj mapi"
 }

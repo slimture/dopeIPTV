@@ -3025,5 +3025,10 @@
   "mitt_n_channels": "Каналів: {n}",
   "mitt_n_station": "Станцій: {n}",
   "mitt_n_stations": "Станцій: {n}",
-  "mitt_n_web_one": "Веб-трансляцій: {n}"
+  "mitt_n_web_one": "Веб-трансляцій: {n}",
+  "local_place_folders": "Теки",
+  "local_place_library": "Бібліотека",
+  "local_n_folders": "Тек: {n}",
+  "local_gone": "Цієї теки більше немає.",
+  "local_show_folder": "Показати в теці"
 }

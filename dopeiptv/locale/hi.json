@@ -3025,5 +3025,10 @@
   "mitt_n_channels": "{n} चैनल",
   "mitt_n_station": "{n} स्टेशन",
   "mitt_n_stations": "{n} स्टेशन",
-  "mitt_n_web_one": "{n} वेब स्ट्रीम"
+  "mitt_n_web_one": "{n} वेब स्ट्रीम",
+  "local_place_folders": "फ़ोल्डर",
+  "local_place_library": "लाइब्रेरी",
+  "local_n_folders": "{n} फ़ोल्डर",
+  "local_gone": "यह फ़ोल्डर अब मौजूद नहीं है।",
+  "local_show_folder": "इसके फ़ोल्डर में दिखाएँ"
 }

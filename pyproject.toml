@@ -115,6 +115,7 @@ files = [
     "dopeiptv/core/palette_match.py",
     "dopeiptv/core/local_search.py",
     "dopeiptv/core/local_listing.py",
+    "dopeiptv/core/local_watch.py",
     "dopeiptv/core/search_all.py",
     "dopeiptv/core/places.py",
     "dopeiptv/core/guide_rows.py",
