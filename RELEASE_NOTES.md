@@ -17,6 +17,7 @@
 - **Rewind live TV from your phone.** While a live channel plays, Now playing on the phone remote shows how far back the rewind buffer reaches: drag the bar to go back (it shows how far behind live you will be), skip back or forward, and tap **Live** to catch up - it lights up when you are watching live and otherwise shows how far behind you are.
 - **A recording stays in sight** at the foot of the sidebar for as long as it runs. Click it to stop - the app asks first, and what has been recorded so far is kept. With two at once you pick which one.
 - **A calmer header** in every place: the category's name small at the left, then the filter, the sort and Grid / List on the same line - no big title, nothing on top of anything. The count is in the status line.
+- **One way to your sources**: the source picker over the categories is gone - the button at the foot of the sidebar opens the same menu.
 - **Recordings in order**: grouped by day - Today, Yesterday, Earlier this week, Last week, then by month - and the sort button puts them oldest first, by name, by channel, longest or largest first. **Unwatched only** hides what you have seen.
 - **Local files can be sorted**: by name A–Z or Z–A, last changed, oldest, largest or type - folders always first, and the choice holds for every folder.
 - **Phone remote:** More opens on three even tiles - Subtitles and sound, Sleep timer, Record. Record turns red with the time while it records, in TV mode's remote too.

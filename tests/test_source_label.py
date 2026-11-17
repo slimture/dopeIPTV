@@ -157,16 +157,9 @@ def switch_to(pl):
     pump(2)
 
 
-# -- over the categories: the name, its kind in a chip ------------------------------
-assert lbl.isVisible()
+# -- the source's menu: the avatar at the foot alone, nothing over the categories ----
+assert not lbl.isVisible() and w._playlist_btn.isVisible()
 assert (lbl.name(), lbl.kind()) == ("Pirat", "Xtream"), (lbl.name(), lbl.kind())
-assert "Pirat · Xtream" in lbl.toolTip() and tr("source_label_hint") in lbl.toolTip()
-assert lbl.accessibleName() == tr("source_label_name", name="Pirat · Xtream")
-cats = w._cat_section_label
-assert lbl.mapTo(w, lbl.rect().bottomLeft()).y() <= cats.mapTo(w, cats.rect().topLeft()).y()
-last = w.nav_btns["rec"]                     # the places, then the source
-assert lbl.mapTo(w, lbl.rect().topLeft()).y() >= \
-    last.mapTo(w, last.rect().bottomLeft()).y()
 
 # -- the status line: the list's source, nothing playing ----------------------------
 assert w.list_model.rowCount() > 0
@@ -257,22 +250,14 @@ pump(20)
 assert not lbl.isVisible() and w._playlist_btn.isVisible()
 w._set_sidebar_collapsed(False)
 pump(20)
-assert lbl.isVisible()
-
-# -- right to left: the row mirrored -------------------------------------------------
-app.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-pump(10)
-name_box, chip_box, chevron, _text = lbl.boxes()
-assert chip_box is not None and chevron.right() < chip_box.left() < name_box.left()
-app.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
-pump(10)
+assert not lbl.isVisible() and w._playlist_btn.isVisible()
 
 # -- removals: one source left is its name alone; none hides it ----------------------
 store.remove(pappa["id"])
 store.remove(jelly["id"])
 w._update_playlist_btn()
 w._apply_filter()
-assert (lbl.name(), lbl.kind()) == ("Pirat", "") and lbl.isVisible()
+assert (lbl.name(), lbl.kind()) == ("Pirat", "") and not lbl.isVisible()
 assert w.count_lbl.text() == count_line(), w.count_lbl.text()
 store.remove(pirat["id"])
 w._update_playlist_btn()

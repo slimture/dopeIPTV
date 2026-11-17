@@ -99,6 +99,9 @@ same new look.
   Recordings, Radio), then the filter, the sort - its mark alone, the
   order in its tooltip - and Grid / List. The big title is gone; the count
   is in the status line.
+- The source's name over the categories is gone: the avatar at the
+  sidebar's foot opens the same menu, and the status line names the
+  source.
 - Recordings: grouped by day, the newest first - Today, Yesterday,
   Earlier this week, Last week, then by month - under headings over the
   grid and the list alike. The sort's menu puts them oldest first, by

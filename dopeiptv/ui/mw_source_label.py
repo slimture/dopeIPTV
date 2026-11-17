@@ -75,7 +75,9 @@ class _SourceLabelMixin:
             hint = tr("source_label_hint")
             said = tr("source_label_name", name=full)
             lbl.set_source(name, chip, tip=f"{said}\n{hint}", accessible=said, hint=hint)
-            lbl.setVisible(pl is not None and not self._chrome_rail)
+            # Not shown: the avatar at the sidebar's foot opens the same menu,
+            # and two ways to one menu were one too many over the categories.
+            lbl.setVisible(False)
         tv = getattr(self, "_tv_page", None)
         if tv is not None and not sip.isdeleted(tv) and hasattr(tv, "refresh_source"):
             tv.refresh_source()
