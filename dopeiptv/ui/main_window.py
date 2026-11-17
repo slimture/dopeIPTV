@@ -3651,6 +3651,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._check_nav(self._nav_key_for_mode(self.mode))
         if self._try_select_playing():
             return
+        # A station: the list it was played from in Radio (mw_radio).
+        if self._playing_group == "radio" and self._radio_jump():
+            return
         # A local file lives in its own folder - go to the Local files
         # section and browse to the folder the file is in, then select it.
         if self._playing_group == "local":

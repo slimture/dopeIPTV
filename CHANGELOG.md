@@ -132,6 +132,11 @@ same new look.
 
 ### Fixed
 
+- The jump to what plays (the sidebar's logo, Now playing) found a radio
+  station only when it was in the list on screen: it now goes to Radio and
+  the list it was played from - a country, language or genre opened again -
+  or My stations, and picks the station there.
+
 - Mine > History: several rows can be picked (Ctrl or Shift and a click -
   nothing plays then) and taken out at once with Delete (a Mac's delete
   key) or Remove in the menu of one of them; a click on its own plays as

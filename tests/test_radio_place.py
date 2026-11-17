@@ -197,6 +197,26 @@ assert sorted(set(asked)) == sorted(asked), asked
 assert {a[0] for a in asked} == {"top", "lists", "group"}, asked
 w.switch_mode("live")
 settle(lambda: not w._place_radio_active() and w.listw.isVisible(), what="TV's list")
+
+# The jump to what plays, from elsewhere: Radio, the country it was played
+# from opened again, the station picked there.
+w.switch_mode("radio")
+pick(rb.COUNTRY)
+settle(lambda: view.model_.rowCount() == 2, what="countries again")
+view.activated.emit(next(c for c in view.items() if c.title == "Sweden"))
+settle(lambda: h.title.text() == "Sweden" and view.model_.rowCount() == 2, what="Sweden again")
+station = view.items()[1]
+view.activated.emit(station)
+key = played[-1][1]
+w._playing_group, w._playing_key = "radio", key
+w._last_playback = {"kind": "radio", "key": key, "item": dict(station.data)}
+w.switch_mode("live")
+settle(lambda: not w._place_radio_active(), what="TV again")
+w._jump_to_now_playing()
+settle(lambda: w._place_radio_active() and h.title.text() == "Sweden"
+       and w.listw.currentIndex().isValid()
+       and w.list_model.item_at(w.listw.currentIndex().row()).get("_key") == key,
+       what="the jump to the station playing")
 print("RADIO_PLACE_OK", flush=True)
 os._exit(0)
 """

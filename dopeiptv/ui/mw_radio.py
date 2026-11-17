@@ -255,6 +255,12 @@ class _RadioMixin:
         if external or player == "vlc":
             launch_player(player or "mpv", url, title, self)
         else:
+            # Where it was played from, for the jump to what plays: Radio's
+            # list (and a country, language or genre open there), else My
+            # stations when it is one of them.
+            cur = self.cat_list.currentItem() if self.mode == "radio" else None
+            self._radio_from = ((cur.data(Qt.ItemDataRole.UserRole), self._radio_group)
+                                if cur is not None else (None, None))
             self._radio_icy_now = ""
             self._start_playback(url, title, it.get("stream_icon"),
                                  "radio:" + uuid, "radio", record=True,
@@ -268,6 +274,36 @@ class _RadioMixin:
             run_async(self.pool, partial(client.click, uuid), self._radio_clicked,
                       self._radio_clicked)
         log.info("radio: playing %s", for_log(title))
+
+    def _radio_jump(self) -> bool:
+        """The jump to what plays (the sidebar's logo, Now playing) for a
+        station: Radio, the list it was played from - a country, language
+        or genre opened again - else My stations, the station picked there
+        once its list is in (_pending_jump_key). False when there is
+        nowhere to go."""
+        cat, grp = getattr(self, "_radio_from", (None, None))
+        lp = getattr(self, "_last_playback", None) or {}
+        if cat is None and self._radio_is_fav(lp.get("item") or {}):
+            cat, grp = FAVS, None
+        if cat is None:
+            return False
+        self._pending_jump_key = self._playing_key
+        QTimer.singleShot(8000, self._clear_pending_jump)
+        self._radio_group = grp if grp and grp[0] == cat else None
+        self._last_cat["radio"] = cat
+        if self.mode != "radio":
+            self.switch_mode("radio")       # its categories restore cat and the group
+            return True
+        row = next((i for i in range(self.cat_list.count())
+                    if self.cat_list.item(i).data(Qt.ItemDataRole.UserRole) == cat), -1)
+        if row < 0:
+            return False
+        self._radio_restoring = True
+        if self.cat_list.currentRow() == row:
+            self._load_radio_items(cat)
+        else:
+            self.cat_list.setCurrentRow(row)
+        return True
 
     def _radio_clicked(self, _result=None) -> None:
         pass
