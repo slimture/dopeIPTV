@@ -1,3 +1,25 @@
+## dopeIPTV 1.6.3
+
+**Room for the list, a guide that follows the category, and every place in the same new look - with the picture on its own thread on a Mac too.**
+
+### New and better
+
+- **Room for your categories.** The places at the top of the sidebar fold into a row of icons with the little arrow under them, so the categories get the whole height. Places you never use - Guide, Search, Local files, Radio, Recordings - can be taken out of the sidebar.
+- **Just the list.** One switch in **Settings → Appearance → What the places show**: no rows over the lists, a lower header, Movies and Series as rows. Rows you do not want - Recently watched, Continue, Popular right now - can also be hidden one by one: right-click their heading.
+- **The guide follows the category.** With the guide open, pick Movies, News or Sport in the sidebar and the guide shows that category. A double click on a category opens its guide, and a double click again goes back to the channels; **Show in the guide** is in the category's menu too.
+- **Local files, Recordings and Radio in the new look.** Local files shows a renamed, added or removed file by itself, without Rescan. Recordings shows what records now and next at the top, a picture from each recording and what you have watched. Radio has My stations on top and every station with its logo.
+- **The picture on its own thread on a Mac** as on Linux and Windows: the window stays smooth while video plays, the controls come up when you move the mouse over the picture, and a right-click never leaves it black.
+- **Closing multiview**, the window you were listening to goes on in the main window - a film where it was.
+- **Answers to your feedback** show within minutes, and when you come back to the app, with a message that stays until you read it.
+
+### Fixed
+
+- Muted, the player no longer makes another program's sound (Spotify) crackle at every channel change.
+- Enter plays the row picked in TV, Movies and Series.
+- Movies' and Series' cards show a favourite's star and Watch later's clock.
+
+On the AppImage from 1.2.15 or later, or the Windows or Mac app from 1.4.5? Click **Update now** in the banner - or download 1.6.3 from [dopeiptv.org](https://dopeiptv.org).
+
 ## dopeIPTV 1.6.2
 
 **A new look that hangs together: the sidebar is the app - Mine, TV, Movies and Series are places of their own with the same calm header - and dopeIPTV opens where you left off.**

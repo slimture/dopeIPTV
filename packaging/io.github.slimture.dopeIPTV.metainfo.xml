@@ -69,6 +69,18 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.6.3" date="2026-11-17">
+      <description>
+        <p>Room for the list, a guide that follows the category, and every place in the same new look.</p>
+        <ul>
+          <li>The places in the sidebar fold into a row of icons, entries you never use can be hidden, and Just the list shows a plain list with nothing above it</li>
+          <li>The guide follows the category picked in the sidebar; a double click on a category opens its guide, and again goes back</li>
+          <li>Local files, Recordings and Radio in the new look; Local files shows changes on disk by itself</li>
+          <li>On macOS the picture is drawn on its own thread too, as on Linux and Windows</li>
+          <li>Closing multiview, the cell you were listening to goes on in the window</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.6.2" date="2026-11-17">
       <description>
         <p>A new look: the sidebar is the app's structure, with Mine, TV, Movies and Series as places of their own, and the app opens where you left off.</p>

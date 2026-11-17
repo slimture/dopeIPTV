@@ -1361,7 +1361,7 @@ class _MultiviewWindow(QWidget):
 
     def closeEvent(self, event) -> None:
         event.ignore()
-        self._owner._close_multiview()
+        self._owner._close_multiview(hand_back=True)
 
 
 class _MultiviewMixin:
@@ -1489,7 +1489,7 @@ class _MultiviewMixin:
         if any(c.url for c in w.cells) and not self._confirm_close_multiview():
             self._ensure_multiview_window()
             return
-        self._close_multiview()
+        self._close_multiview(hand_back=True)
 
     def _confirm_close_multiview(self) -> bool:
         box = QMessageBox(self)
@@ -1698,18 +1698,80 @@ class _MultiviewMixin:
         win.apply_settings()
         win._apply_flags()
 
-    def _close_multiview(self) -> None:
+    def _close_multiview(self, hand_back: bool = False) -> None:
+        """Multiview closed. *hand_back* (the person closed it - its window,
+        or the Multiview entry again): the cell they were following goes on
+        in the window (`_mv_hand_back_pick`). Never when multiview made way
+        for something played in the window, nor while the window plays."""
         win = self._multiview_win
         if win is None:
             return
         if self.settings.value("mv_remember_geo", "true") == "true":
             self.settings.setValue("mv_geometry", win.saveGeometry())
+        back = self._mv_hand_back_pick(win) if hand_back else None
         self._multiview_win = None
         for c in win.cells:
             c.shutdown()
         win.deleteLater()
         if not getattr(getattr(self, "player", None), "current_url", None):
             self.wake.release()
+        if back is not None:
+            # Every cell's connection let go first, so the window's stream
+            # is never one more than the account allows.
+            self._mv_back = back
+            QTimer.singleShot(400, self._mv_hand_back_due)
+
+    def _mv_hand_back_pick(self, win) -> dict | None:
+        """What the cell being followed plays, and where: the one heard (the
+        focused cell, else the first not muted), else the focused, else the
+        first that plays. None while the window's own player plays."""
+        if getattr(getattr(self, "player", None), "current_url", None):
+            return None
+        cells = [c for c in win.cells if c.url]
+        if not cells:
+            return None
+        foc = win._focused if win._focused in cells else None
+        heard = [c for c in cells if not c.is_muted()]
+        cell = (foc if foc is not None and not foc.is_muted() else None) \
+            or (heard[0] if heard else None) or foc or cells[0]
+        finite = False
+        m = cell.video.mpv
+        try:
+            finite = bool(m is not None and m.duration and float(m.duration) > 1) \
+                and not cell._ts_capable
+        except Exception:
+            finite = False
+        return {"url": getattr(cell, "_live_url", None) or cell.url,
+                "title": cell.title or "", "item": dict(cell._item or {}),
+                "client": cell._client, "finite": finite,
+                "pos": cell.resume_pos() if finite else 0.0}
+
+    def _mv_hand_back_due(self) -> None:
+        back, self._mv_back = getattr(self, "_mv_back", None), None
+        player = getattr(self, "player", None)
+        # The app closing (its window hidden), or something started meanwhile.
+        if back is None or not self.isVisible() or player is None \
+                or getattr(player, "current_url", None):
+            return
+        it = back["item"]
+        log.info("multiview: closed - the cell followed goes on in the window")
+        if not back["finite"]:
+            if back["client"] is self.client and it.get("stream_id") is not None:
+                self.play_live_channel(it)       # a fresh address, as a zap
+            else:
+                self._start_playback(back["url"], back["title"] or it.get("name") or "",
+                                     it.get("stream_icon"), self._item_key(it) if it else back["url"],
+                                     "live", item=it or None)
+            return
+        kind = self._play_kind_for(it) if (it.get("_kind") or it.get("_ekind")) else "movie"
+        key = self._item_key(it) if it else back["url"]
+        # Where the cell got to, without the resume question (as Continue).
+        self._sp_start_once = (key, back["pos"]) if back["pos"] > 0 else None
+        try:
+            self._start_playback(back["url"], back["title"], it.get("stream_icon") or it.get("cover"),
+                                 key, kind, item=it or None)
+        finally:
+            self._sp_start_once = None
 
     def _close_multiview_if_active(self) -> None:
         if self._multiview_win is not None:

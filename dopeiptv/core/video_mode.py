@@ -46,10 +46,11 @@ def is_test_build(version: str, frozen: bool, checkout: bool) -> bool:
 
 
 def default_on(platform: str, test: bool) -> bool:
-    """The own thread with nothing switched: on everywhere - on macOS
-    (*platform* "darwin") only in a test build, until it draws as well as
-    the window's thread there."""
-    return platform != "darwin" or test
+    """The own thread with nothing switched: on everywhere. A release on
+    macOS (*platform* "darwin", not *test*) drew on the window's thread
+    until 1.6.3, while the own thread was tried there in test builds; it
+    draws as well there now."""
+    return True
 
 
 def _here() -> tuple[str, bool]:

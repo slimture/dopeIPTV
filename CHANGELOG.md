@@ -7,6 +7,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.6.3]
+
+Room for the list, a guide that follows the category, and every place in the
+same new look.
+
 ### Added
 
 - Local files notices changes on disk by itself (#34): a file renamed,
@@ -44,6 +49,16 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   Settings > Appearance holds all of it, each profile its own.
 
 ### Changed
+
+- macOS draws the picture on its own thread by default in a release too,
+  as Linux and Windows do (a release there drew on the window's thread
+  while the own thread was tried in test builds). Settings > Picture & sound and
+  DOPEIPTV_VIDEO_THREAD=0 still turn it off.
+- Closing multiview yourself (its window, or the Multiview entry again),
+  the cell you were following - the one you hear - goes on in the window:
+  a live channel as a zap, a film or an episode where the cell got to,
+  every cell's connection let go first. Not when multiview made way for
+  something you played in the window.
 
 - The Guide follows the category you pick in the sidebar: with the guide
   open over TV, picking Movies, News or any other category (or arrowing

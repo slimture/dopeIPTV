@@ -406,17 +406,17 @@ def test_a_test_build_is_a_nightly_or_a_checkout():
         assert video_mode.is_test_build(v, True, False) == updates.is_nightly(v)
 
 
-def test_on_everywhere_but_in_a_release_on_macos():
+def test_on_everywhere_a_release_on_macos_too():
     assert video_mode.default_on("linux", False) and video_mode.default_on("win32", False)
     assert video_mode.default_on("linux", True) and video_mode.default_on("darwin", True)
-    assert not video_mode.default_on("darwin", False)
+    assert video_mode.default_on("darwin", False)
 
 
-def test_a_mac_release_draws_on_the_windows_thread_unless_asked(monkeypatch):
+def test_a_mac_release_draws_on_its_own_thread_unless_asked(monkeypatch):
     monkeypatch.setattr(video_mode, "_here", lambda: ("darwin", False))
-    assert video_mode.wanted(_Settings()) == (False, video_mode.MAC_DEFAULT)
-    assert video_mode.wanted(None) == (False, video_mode.MAC_DEFAULT)       # a multiview cell
-    assert not video_mode.default_on_here()
+    assert video_mode.wanted(_Settings()) == (True, "")
+    assert video_mode.wanted(None) == (True, "")                             # a multiview cell
+    assert video_mode.default_on_here()
     # A choice made in Settings counts, either way.
     assert video_mode.wanted(_Settings(video_own_thread="true")) == (True, "")
     assert video_mode.wanted(None) == (True, "")
