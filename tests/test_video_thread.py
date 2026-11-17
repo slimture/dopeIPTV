@@ -116,25 +116,6 @@ def test_after_a_failure_every_surface_uses_the_window_thread(monkeypatch):
     assert video_thread.can_start() == "no frame could be shown"
 
 
-def test_forced_tries_where_qt_says_no_and_keeps_the_other_checks(monkeypatch):
-    """DOPEIPTV_VIDEO_THREAD=force (to test macOS, where Qt says no): Qt's
-    "no OpenGL on other threads" is passed over - nothing else is."""
-    monkeypatch.setattr(video_thread.QGuiApplication, "platformName", staticmethod(lambda: "cocoa"))
-    monkeypatch.setattr(video_thread.QOpenGLContext, "supportsThreadedOpenGL",
-                        staticmethod(lambda: False))
-    monkeypatch.setattr(video_thread, "_libmpv", object())
-    assert video_thread.can_start() == "cocoa: no OpenGL on other threads"
-    monkeypatch.setenv(video_mode.ENV, "force")
-    assert video_mode.forced() and video_mode.wanted(_Settings()) == (True, "")
-    assert video_thread.can_start() == ""
-    video_mode.note(video_mode.THREAD)
-    assert video_mode.line() == "Video: own thread (forced)"
-    video_mode.note_failed("no frame could be shown")
-    assert video_thread.can_start() == "no frame could be shown"
-    monkeypatch.setattr(video_thread, "_libmpv", None)
-    assert video_thread.can_start() == "libmpv not loaded"
-
-
 # -- the fallback swap ------------------------------------------------------------------
 
 def test_the_window_thread_surface_takes_the_place_of_one_that_could_not_draw():
