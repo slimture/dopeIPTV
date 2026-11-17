@@ -5,7 +5,6 @@
 ### New and better
 
 - **Movies**: a click shows the film in the right-hand column - with **Continue** for one you have started - and a double click plays it. No more page of its own in the middle saying the same thing again.
-- A long category name over **TV**, **Movies** and **Series** takes a second line instead of being cut short.
 - **Room for your categories.** The places at the top of the sidebar fold into a row of icons with the little arrow under them, so the categories get the whole height. Places you never use - Guide, Search, Local files, Radio, Recordings - can be taken out of the sidebar.
 - **Just the list.** One switch in **Settings → Appearance → What the places show**: no rows over the lists, a lower header, Movies and Series as rows. Rows you do not want - Recently watched, Continue, Popular right now - can also be hidden one by one: right-click their heading.
 - **The guide follows the category.** With the guide open, pick Movies, News or Sport in the sidebar and the guide shows that category. A double click on a category opens its guide, and a double click again goes back to the channels; **Show in the guide** is in the category's menu too.

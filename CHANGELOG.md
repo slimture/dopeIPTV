@@ -64,10 +64,6 @@ same new look.
   time left for one under way; a double click or Enter plays it, as in the
   lists; a card in Continue goes on from where it stopped. Popular right
   now's cards are picked and played the same way.
-- A long name over TV, Movies and Series is no longer cut short at once:
-  the sort gives way to its mark first (its order in the tooltip), then the
-  name takes a second line; "…" only at the end of that one, the whole name
-  in the tooltip. Just the list keeps it to one line.
 - The Phone remote window closes by itself once a phone has connected,
   and a note says so - its job is done; open it again for another phone.
 - When the Next episode card comes can be set in seconds too - 10, 20, 30

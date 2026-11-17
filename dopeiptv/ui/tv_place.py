@@ -605,11 +605,17 @@ class TvPlaceTop(QWidget):
 
     def _fit(self) -> None:
         w = self.width()
-        style = self.header.sort_style_for(w, self.SORT_TEXT_FROM)
+        style = (Qt.ToolButtonStyle.ToolButtonTextBesideIcon if w >= self.SORT_TEXT_FROM
+                 else Qt.ToolButtonStyle.ToolButtonIconOnly)
         if self.header.sort_btn.toolButtonStyle() != style:
             self.header.sort_btn.setToolButtonStyle(style)
         self.header.switch.setVisible(self._density_shown and w >= self.SWITCH_FROM)
-        self.header._fit_title()
+        title = self.header.title
+        room = max(1, title.width())
+        text = title.fontMetrics().elidedText(self._title, Qt.TextElideMode.ElideRight, room)
+        if title.text() != text:
+            title.setText(text)
+        title.setToolTip(self._title if text != self._title else "")
 
     def retranslate(self) -> None:
         self.recent.set_title(tr("tv_recent"))

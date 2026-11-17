@@ -391,51 +391,16 @@ def test_header_controls_in_one_line_and_title_cut_with_an_ellipsis(app):
     feet = {w.mapTo(h, w.rect().bottomLeft()).y() for w in parts}
     assert len(feet) == 1, feet
     shown = h.title.text()
-    # The sort's words gave way first, then a second line, "…" at its end.
-    assert h.sort_btn.toolButtonStyle() == Qt.ToolButtonStyle.ToolButtonIconOnly
-    assert shown.count("\n") == 1 and shown.endswith("…"), shown
+    assert shown != title and shown.endswith("…"), shown
     assert h.title.toolTip() == title
-    # A name that fits once the sort shows its mark alone: whole, one line.
-    h.set_title("Premiere Cinemas")
-    _spin(app)
-    fm = h.title.fontMetrics()
-    if fm.horizontalAdvance("Premiere Cinemas") <= h.title.width():
-        assert h.title.text() == "Premiere Cinemas" and h.title.toolTip() == ""
-    # Wide enough for it all: the sort's words back.
-    h.resize(1400, 80)
-    _spin(app)
     assert h.sort_btn.toolButtonStyle() == Qt.ToolButtonStyle.ToolButtonTextBesideIcon
-    assert h.title.text() == "Premiere Cinemas"
-    h.resize(400, 80)                            # narrow: its mark alone
+    h.resize(400, 80)
     _spin(app)
     assert h.sort_btn.toolButtonStyle() == Qt.ToolButtonStyle.ToolButtonIconOnly
-    h.set_title(title)
     h.resize(1600, 80)
     _spin(app)
     assert h.title.text() == title and h.title.toolTip() == ""
     h.close()
-
-
-def test_title_lines_breaks_between_words_and_cuts_only_the_last_line():
-    from PyQt6.QtCore import Qt
-    from dopeiptv.ui.media_cards import title_lines
-
-    class FM:
-        def horizontalAdvance(self, text):
-            return 10 * len(text)
-
-        def elidedText(self, text, mode, room):
-            assert mode == Qt.TextElideMode.ElideRight
-            return text if len(text) * 10 <= room else text[:room // 10 - 1] + "…"
-    fm = FM()
-    assert title_lines(fm, "Premiere Cinemas", 300) == "Premiere Cinemas"
-    assert title_lines(fm, "Premiere Cinemas 2026", 120) == "Premiere\nCinemas 2026"
-    assert title_lines(fm, "Premiere Cinemas Collection 2026", 120) == \
-        "Premiere\nCinemas Col…"
-    assert title_lines(fm, "Premiere Cinemas 2026", 120, lines=1) == "Premiere Ci…"
-    # A word wider than a line: cut there, never broken.
-    assert title_lines(fm, "Supercalifragilistic film", 100) == "Supercali…"
-    assert title_lines(fm, "Anything", 0) == "Anything"
 
 
 def test_rtl_grid_starts_at_the_right(app):
