@@ -239,6 +239,9 @@ dopeiptv/
     media_cards.py     The cards every place shares: pills, poster/wide/list cards,
                        channel rows, the sideways Continue row, the page header
                        and the shared page form (PlacePage)
+    tv_place.py        The TV place's rows (painted by channel_list's delegate),
+                       Recently watched and the header over the list
+    mw_place_tv.py     The TV place in the window (_place_tv_show)
     mw_local.py        Local files: folders, library view, music queue
     mw_radio.py        Radio: radio-browser.info's stations, played as music
     mw_webstreams.py   Open address, YouTube/Twitch through yt-dlp, saved

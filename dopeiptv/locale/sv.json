@@ -2991,5 +2991,11 @@
   "set_popular_where": "Överst i",
   "set_popular_note": "Veckans populäraste filmer och serier på TMDB - de som din källa har.",
   "fp_back_to": "Tillbaka till {name}",
-  "fp_no_address": "Källan gav ingen adress till den här filmen."
+  "fp_no_address": "Källan gav ingen adress till den här filmen.",
+  "tv_recent": "Senast sedda",
+  "tv_recent_remove": "Ta bort från Senast sedda",
+  "tv_by_number": "ordnade efter nummer",
+  "tv_by_name": "A till Ö",
+  "tv_by_name_desc": "Ö till A",
+  "tv_by_added": "nyaste först"
 }

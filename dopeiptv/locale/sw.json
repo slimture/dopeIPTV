@@ -2991,5 +2991,11 @@
   "set_popular_where": "Juu ya",
   "set_popular_note": "Filamu na mfululizo maarufu zaidi wiki hii kwenye TMDB - zile ambazo chanzo chako kina.",
   "fp_back_to": "Rudi kwa {name}",
-  "fp_no_address": "Chanzo hakikutoa anwani ya filamu hii."
+  "fp_no_address": "Chanzo hakikutoa anwani ya filamu hii.",
+  "tv_recent": "Vilivyotazamwa hivi karibuni",
+  "tv_recent_remove": "Ondoa kwenye Vilivyotazamwa hivi karibuni",
+  "tv_by_number": "kwa nambari",
+  "tv_by_name": "A hadi Z",
+  "tv_by_name_desc": "Z hadi A",
+  "tv_by_added": "vipya kwanza"
 }

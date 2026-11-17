@@ -2991,5 +2991,11 @@
   "set_popular_where": "上部に表示",
   "set_popular_note": "今週TMDBで人気の映画とシリーズのうち、ソースにあるもの。",
   "fp_back_to": "{name} に戻る",
-  "fp_no_address": "ソースはこの映画のアドレスを返しませんでした。"
+  "fp_no_address": "ソースはこの映画のアドレスを返しませんでした。",
+  "tv_recent": "最近見たチャンネル",
+  "tv_recent_remove": "「最近見たチャンネル」から削除",
+  "tv_by_number": "番号順",
+  "tv_by_name": "A→Z",
+  "tv_by_name_desc": "Z→A",
+  "tv_by_added": "新しい順"
 }

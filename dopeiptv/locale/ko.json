@@ -2991,5 +2991,11 @@
   "set_popular_where": "맨 위에 표시",
   "set_popular_note": "이번 주 TMDB에서 가장 인기 있는 영화와 시리즈 중 소스에 있는 것.",
   "fp_back_to": "{name}(으)로 돌아가기",
-  "fp_no_address": "소스가 이 영화의 주소를 주지 않았습니다."
+  "fp_no_address": "소스가 이 영화의 주소를 주지 않았습니다.",
+  "tv_recent": "최근 시청",
+  "tv_recent_remove": "최근 시청에서 제거",
+  "tv_by_number": "번호순",
+  "tv_by_name": "가나다순",
+  "tv_by_name_desc": "가나다 역순",
+  "tv_by_added": "최신순"
 }

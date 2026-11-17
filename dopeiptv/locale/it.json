@@ -2991,5 +2991,11 @@
   "set_popular_where": "In cima a",
   "set_popular_note": "I film e le serie più popolari della settimana su TMDB, quelli che ha la tua fonte.",
   "fp_back_to": "Torna a {name}",
-  "fp_no_address": "La sorgente non ha fornito un indirizzo per questo film."
+  "fp_no_address": "La sorgente non ha fornito un indirizzo per questo film.",
+  "tv_recent": "Visti di recente",
+  "tv_recent_remove": "Rimuovi da Visti di recente",
+  "tv_by_number": "per numero",
+  "tv_by_name": "dalla A alla Z",
+  "tv_by_name_desc": "dalla Z alla A",
+  "tv_by_added": "più recenti prima"
 }

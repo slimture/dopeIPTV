@@ -96,6 +96,7 @@ from .mw_context import _ContextMenuMixin
 from .mw_favorites import _FavoritesMixin
 from .mw_follow import _FollowMixin
 from .mw_pane_follow import _PaneFollowMixin, from_pane
+from .mw_place_tv import _PlaceTvMixin
 from .mw_detail import _DetailMixin
 from .mw_nav import _NavMixin
 from .mw_source_label import _SourceLabelMixin
@@ -163,7 +164,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _PopoutMixin, _MultiviewMixin, _PlacesMixin, _PopularMixin, _GuideMixin,
                  _SeriesPageMixin, _PlaceFilmsMixin, _FilmPageMixin, _PlaceSeriesMixin, _SearchAllMixin,
                  _MprisMixin,
-                 _FollowMixin, _PaneFollowMixin, _SubtitlesMixin, _CastMixin, _AirPlayMixin, _DonateMixin,
+                 _FollowMixin, _PaneFollowMixin, _PlaceTvMixin, _SubtitlesMixin, _CastMixin, _AirPlayMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
                  _HealthMixin, _TsAnalysisMixin, _StreamInfoMixin, _ChannelPrefsMixin, _RemoteMixin, _PhoneMixin, _ServerMixin, _CalendarMixin,
                  _EventsMixin, _ReportMixin,
@@ -1042,12 +1043,21 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.focus_btn.clicked.connect(lambda: self._set_focus_mode(True))
         ctl.addWidget(self.side_btn)
         ctl.addWidget(self.focus_btn)
-        ctl.addWidget(self._size_label)
-        ctl.addWidget(self.size_box)
-        ctl.addWidget(self._size_menu_btn)
-        ctl.addWidget(self._sort_label)
-        ctl.addWidget(self.sort_box)
-        ctl.addWidget(self._sort_menu_btn)
+        # The size and the sort each in a box of their own: the TV place's
+        # header has its own sort and Compact / Airy, and hides these boxes
+        # (mw_place_tv) whatever the narrow pane shows of them inside.
+        self._size_ctl = QWidget()
+        self._sort_ctl = QWidget()
+        for box, widgets in ((self._size_ctl, (self._size_label, self.size_box,
+                                               self._size_menu_btn)),
+                             (self._sort_ctl, (self._sort_label, self.sort_box,
+                                               self._sort_menu_btn))):
+            box_lay = QHBoxLayout(box)
+            box_lay.setContentsMargins(0, 0, 0, 0)
+            box_lay.setSpacing(6)
+            for widget in widgets:
+                box_lay.addWidget(widget)
+            ctl.addWidget(box)
         ctl.addStretch()
         # Folder/library switch for the Local files section - lives up here
         # with the other view controls (it sat as a fake row in the category
@@ -1750,6 +1760,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._chan_timer.setSingleShot(True)
         self._chan_timer.timeout.connect(self._channel_jump)
 
+        # The TV place's header and Recently watched over the list.
+        self._place_tv_init()
         self._apply_view_settings()
 
     def eventFilter(self, obj, event):
@@ -2560,6 +2572,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._load_categories()
         # Series is a place of the unified look where the list was.
         self._place_series_sync()
+        # The TV place's header over the live list only (mw_place_tv).
+        sync = getattr(self, "_place_tv_sync", None)
+        if sync is not None:
+            sync()
         self._update_sync_btn()
         # Its place is the one shown now (mw_places) - under a page that
         # stays over it, the place it goes back to.
@@ -3394,6 +3410,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.listw.setWrapping(True)
             self.listw.setResizeMode(QListView.ResizeMode.Adjust)
             self.listw.set_grid_cell(self.delegate.grid_size())
+        # The TV place's header follows a grid or rows (mw_place_tv).
+        sync = getattr(self, "_place_tv_sync", None)
+        if sync is not None:
+            sync()
 
     def _ensure_xmltv_loaded(self) -> None:
         x = self.xmltv
@@ -3450,6 +3470,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 token, None if ok or x is not self.xmltv
                 else tr("detail_epg_failed"))
             if ok and x is self.xmltv:
+                # The TV place's rows and cards: what is on asked again.
+                if hasattr(self, "_place_tv_guide_in"):
+                    self._place_tv_guide_in()
                 self.list_model.refresh_all()
                 if hasattr(self, "_request_epg"):
                     # The detail panel asked while the guide was still on its
@@ -3799,6 +3822,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._set_list_status(tr("history_empty"))
         else:
             self._set_list_status(self._count_text(kind, len(filtered)))
+        # The TV place's header and Recently watched (mw_place_tv).
+        shown = getattr(self, "_place_tv_list_shown", None)
+        if shown is not None:
+            shown()
 
     # -- item identity -------------------------------------------------------------
 
@@ -5476,6 +5503,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         follow = getattr(self, "_pane_follow_soon", None)
         if follow is not None:
             follow(kind, key, restart)
+        # The TV place's Recently watched: History's new title, its mark.
+        played = getattr(self, "_place_tv_played", None)
+        if played is not None:
+            played()
         self.listw.viewport().update()
         self.setWindowTitle(title or self._base_title)
         self._set_status(self._status_playing(title))

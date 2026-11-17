@@ -2991,5 +2991,11 @@
   "set_popular_where": "Na vrhu",
   "set_popular_note": "Najpopularniji filmovi i serije tjedna na TMDB-u - oni koje tvoj izvor ima.",
   "fp_back_to": "Natrag na {name}",
-  "fp_no_address": "Izvor nije dao adresu za ovaj film."
+  "fp_no_address": "Izvor nije dao adresu za ovaj film.",
+  "tv_recent": "Nedavno gledano",
+  "tv_recent_remove": "Ukloni iz Nedavno gledano",
+  "tv_by_number": "po broju",
+  "tv_by_name": "od A do Ž",
+  "tv_by_name_desc": "od Ž do A",
+  "tv_by_added": "najnoviji prvi"
 }

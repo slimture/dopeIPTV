@@ -282,6 +282,7 @@ class _SettingsMixin:
         self._pf_restyle()           # the Movies place and a film's page
         self._place_series_restyle()   # the Series place
         self._search_restyle()       # the Search page
+        self._place_tv_restyle()     # the TV place's header and row
         if getattr(self, "_tv_page", None) is not None:
             self._tv_page.restyle()  # TV mode's page (its tiles paint from P)
 
@@ -496,6 +497,7 @@ class _SettingsMixin:
         self._pf_restyle()           # the Movies place and a film's page
         self._place_series_restyle()   # the Series place
         self._search_restyle()       # the Search page
+        self._place_tv_restyle()     # the TV place, in the new language
         self._palette_retranslate()
 
     def _inline_view_changed(self, *_) -> None:

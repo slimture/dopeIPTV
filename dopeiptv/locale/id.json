@@ -2991,5 +2991,11 @@
   "set_popular_where": "Di bagian atas",
   "set_popular_note": "Film dan serial terpopuler minggu ini di TMDB - yang dimiliki sumber Anda.",
   "fp_back_to": "Kembali ke {name}",
-  "fp_no_address": "Sumber tidak memberikan alamat untuk film ini."
+  "fp_no_address": "Sumber tidak memberikan alamat untuk film ini.",
+  "tv_recent": "Baru saja ditonton",
+  "tv_recent_remove": "Hapus dari Baru saja ditonton",
+  "tv_by_number": "menurut nomor",
+  "tv_by_name": "A sampai Z",
+  "tv_by_name_desc": "Z sampai A",
+  "tv_by_added": "terbaru dahulu"
 }

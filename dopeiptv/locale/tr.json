@@ -2991,5 +2991,11 @@
   "set_popular_where": "Şunun en üstünde",
   "set_popular_note": "TMDB'de bu haftanın en popüler filmleri ve dizileri - kaynağında olanlar.",
   "fp_back_to": "{name} bölümüne dön",
-  "fp_no_address": "Kaynak bu film için bir adres vermedi."
+  "fp_no_address": "Kaynak bu film için bir adres vermedi.",
+  "tv_recent": "Son izlenenler",
+  "tv_recent_remove": "Son izlenenlerden kaldır",
+  "tv_by_number": "numaraya göre",
+  "tv_by_name": "A'dan Z'ye",
+  "tv_by_name_desc": "Z'den A'ya",
+  "tv_by_added": "önce en yeniler"
 }

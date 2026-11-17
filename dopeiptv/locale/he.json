@@ -2991,5 +2991,11 @@
   "set_popular_where": "בראש",
   "set_popular_note": "הסרטים והסדרות הפופולריים ביותר השבוע ב-TMDB - אלה שיש במקור שלך.",
   "fp_back_to": "חזרה אל {name}",
-  "fp_no_address": "המקור לא נתן כתובת לסרט הזה."
+  "fp_no_address": "המקור לא נתן כתובת לסרט הזה.",
+  "tv_recent": "נצפו לאחרונה",
+  "tv_recent_remove": "הסר מ„נצפו לאחרונה”",
+  "tv_by_number": "לפי מספר",
+  "tv_by_name": "א עד ת",
+  "tv_by_name_desc": "ת עד א",
+  "tv_by_added": "החדשים קודם"
 }

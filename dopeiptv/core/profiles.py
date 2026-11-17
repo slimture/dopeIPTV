@@ -82,8 +82,9 @@ OWN_KEYS = frozenset({
     "simkl_token_expires",
     # Recently searched (kept here when a search remembers them).
     "recent_searches",
-    # How the app looks.
+    # How the app looks; the TV place's rows, compact or airy (ui/mw_place_tv.py).
     "theme", "accent", "accent_custom", "theme_follow_system", "theme_light",
+    "tv_density",
     # The languages to hear and read, and the tracks picked per title.
     "audio_lang", "sub_mode", "sub_lang", "sub_lang2", "sub_last_lang",
     "track_prefs",

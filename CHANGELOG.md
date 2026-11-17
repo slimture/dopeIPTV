@@ -51,6 +51,26 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   category lists the series followed, the ones with news first. Fast with
   tens of thousands of series: painted cards, pictures only for what is on
   screen.
+- TV is a place of its own in the new look: over the channels a header
+  with the category's name, how many channels and in which order ("48
+  channels · by number"), the sort and a Compact / Airy switch (kept per
+  profile); under it Recently watched, this source's channels played last
+  as small cards with what is on now (hidden while there are none). The
+  channels are rows: number, logo, name, what is on with the time it began
+  and a bar of how far, and "Then 21:30 Debatten" - on the same line when
+  compact (in a column of its own on a wide pane), under the bar when airy,
+  with a bigger logo. The one playing, here or on a TV, sits on the
+  accent's wash with its bar and Playing; a narrow pane puts the name over
+  what is on. It is the same list as before: zapping, numbers typed,
+  channel up and down, the channel's menu, favourites and their folders,
+  stream health, a box's tuners, Nerd's numbers and technical line, the
+  filter and multiselect all work on it as they did, and the guide is read
+  from memory only. A "channel" that is only a heading in the provider's
+  list ("-= Sweden =-") is painted as a heading, as in the guide. A card of
+  Recently watched plays the channel - as its row when the list shows it -
+  and its menu can take it off; a channel played in private viewing never
+  gets there, nor one hidden or of a locked category, nor one for adults in
+  a kids profile. A grid of channel tiles keeps working as before.
 
 ### Added
 

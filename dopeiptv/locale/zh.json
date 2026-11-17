@@ -2991,5 +2991,11 @@
   "set_popular_where": "显示在顶部",
   "set_popular_note": "本周 TMDB 上最热门的电影和剧集中，你的来源里有的那些。",
   "fp_back_to": "返回{name}",
-  "fp_no_address": "来源没有提供这部电影的地址。"
+  "fp_no_address": "来源没有提供这部电影的地址。",
+  "tv_recent": "最近观看",
+  "tv_recent_remove": "从“最近观看”中移除",
+  "tv_by_number": "按编号",
+  "tv_by_name": "A 到 Z",
+  "tv_by_name_desc": "Z 到 A",
+  "tv_by_added": "最新的在前"
 }

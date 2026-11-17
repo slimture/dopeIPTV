@@ -3215,6 +3215,12 @@ _STRINGS: dict[str, dict[str, str]] = {
     "set_popular_note": {"en": "This week's most popular movies and series on TMDB - the ones your source has."},
     "fp_back_to": {"en": "Back to {name}"},
     "fp_no_address": {"en": "The source gave no address for this film."},
+    "tv_recent": {"en": "Recently watched"},
+    "tv_recent_remove": {"en": "Remove from Recently watched"},
+    "tv_by_number": {"en": "by number"},
+    "tv_by_name": {"en": "A to Z"},
+    "tv_by_name_desc": {"en": "Z to A"},
+    "tv_by_added": {"en": "newest first"},
 }
 
 

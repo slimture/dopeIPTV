@@ -2991,5 +2991,11 @@
   "set_popular_where": "Ở đầu",
   "set_popular_note": "Phim và loạt phim thịnh hành nhất tuần trên TMDB mà nguồn của bạn có.",
   "fp_back_to": "Quay lại {name}",
-  "fp_no_address": "Nguồn không cung cấp địa chỉ cho phim này."
+  "fp_no_address": "Nguồn không cung cấp địa chỉ cho phim này.",
+  "tv_recent": "Đã xem gần đây",
+  "tv_recent_remove": "Xóa khỏi Đã xem gần đây",
+  "tv_by_number": "theo số",
+  "tv_by_name": "A đến Z",
+  "tv_by_name_desc": "Z đến A",
+  "tv_by_added": "mới nhất trước"
 }

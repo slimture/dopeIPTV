@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 from PyQt6.QtCore import (
     QAbstractListModel, QItemSelectionModel, QLocale, QMimeData, QModelIndex,
     QPointF, QRect, QRectF, QSize, Qt, QTimer,
@@ -14,9 +16,15 @@ from PyQt6.QtWidgets import (
     QAbstractItemView, QListView, QListWidget, QStyle, QStyledItemDelegate,
 )
 
+from ..core.log import log
 from ..i18n import tr
 from .theme import P, corner_radius, on_accent
 from .category_flags import category_flag, flag_icon
+from .media_cards import Pictures
+from .tv_place import (
+    DENSITIES as TV_DENSITIES, TvRow, guide_now, guide_now_next, heading_of, paint_tv_row,
+    tv_row_height,
+)
 
 # Marks a drag of favorites rows from the middle list. The rows themselves
 # stay on the window (_fav_drag_items) - the drag never leaves the app.
@@ -555,6 +563,15 @@ class ChannelDelegate(QStyledItemDelegate):
         super().__init__(window)
         self.window = window
         self.grid = grid
+        # The TV place's rows (ui/tv_place.py): their density, the logos
+        # scaled once per size, and the guide's now and next per channel
+        # for the minute - asked only for the rows that paint.
+        self.tv_density = "compact"
+        self._tv_info = False
+        self._tv_pics: Pictures | None = None
+        self._nn: dict = {}
+        self._nn_stamp: tuple | None = None
+        self._tv_failed = False
         self.set_density(density)
 
     def set_density(self, level: str) -> None:
@@ -562,13 +579,91 @@ class ChannelDelegate(QStyledItemDelegate):
         self.row_h, self.logo_sz, self.name_pt, self.sub_pt = \
             self.DENSITIES[self.level]
         from ..core.stream_info import enabled
-        if enabled(getattr(self.window, "settings", None)):
+        self._tv_info = bool(enabled(getattr(self.window, "settings", None)))
+        if self._tv_info:
             self.row_h += self.sub_pt + 10
         self.cell_w, self.cell_h, self.grid_logo, self.grid_name_pt = \
             self.GRID[self.level]
 
     def set_grid(self, grid: bool) -> None:
         self.grid = grid
+
+    # -- the TV place's rows ---------------------------------------------------
+
+    def set_tv_density(self, density: str) -> None:
+        """Compact or airy, the TV place's switch (its list relays out)."""
+        self.tv_density = density if density in TV_DENSITIES else "compact"
+
+    def tv_row_h(self) -> int:
+        return tv_row_height(self.tv_density, self._tv_info)
+
+    def tv_rows(self, model) -> bool:
+        """Whether *model*'s rows are the TV place's: a live channel list as
+        rows (a grid keeps its tiles)."""
+        return not self.grid and getattr(model, "kind", None) == "live"
+
+    def forget_guide(self) -> None:
+        """A guide came in or changed: what is on asked again."""
+        self._nn.clear()
+        self._nn_stamp = None
+
+    def _now_next(self, it: dict):
+        """(now and next, the guide's time) for *it*, from the guide in
+        memory only - kept per channel for the minute."""
+        x = getattr(self.window, "xmltv", None)
+        if x is None:
+            return None, 0.0
+        try:
+            loaded = bool(x.is_loaded()) if hasattr(x, "is_loaded") else True
+        except Exception:
+            loaded = False
+        stamp = (int(time.time() // 60), id(x), loaded)
+        if stamp != self._nn_stamp:
+            self._nn.clear()
+            self._nn_stamp = stamp
+        key = (it.get("stream_id"), it.get("epg_channel_id"), it.get("name"))
+        if key in self._nn:
+            nn = self._nn[key]
+        else:
+            nn = guide_now_next(x, it) if loaded else None
+            if len(self._nn) > 4000:
+                self._nn.clear()
+            self._nn[key] = nn
+        return nn, guide_now(x)
+
+    def _paint_tv(self, painter, option, index, it: dict) -> None:
+        w = self.window
+        kind = "live"
+        name = w.channel_display_name(it)
+        row = TvRow(name=name, playing=self._is_playing(it, kind), heading=heading_of(name))
+        if row.heading is None:
+            row.tint_fg, row.tint_bg = w.item_tint(it, kind)
+            num = it.get("num")
+            row.number = str(num) if num else ""
+            url = w.cover.cover_url(it, kind)
+            pm = w.logos.cache.get(url) if url else None
+            if pm is not None and not pm.isNull():
+                row.logo = pm
+            elif w.cover.should_fetch(url, it, kind):
+                w.logos.get(url, lambda _pm: w.listw.viewport().update())
+            row.favourite = bool(w.is_favorite_item(it, kind))
+            row.archive = w._timeshift_days(it) > 0
+            health_dot = getattr(w, "health_dot", None)
+            row.health = health_dot(it, kind) if health_dot is not None else None
+            tuner_mark = getattr(w, "tuner_mark", None)
+            row.tuner = bool(tuner_mark(it, kind)) if tuner_mark is not None else False
+            info_get = getattr(w, "channel_stream_info", None)
+            if self._tv_info and info_get is not None:
+                row.info = info_get(it, kind) or ""
+            row.now, row.now_at = self._now_next(it)
+        if self._tv_pics is None:
+            self._tv_pics = Pictures(16 * 1024 * 1024)
+        paint_tv_row(
+            painter, option.rect, index.row(), index.model().rowCount(), row,
+            self.tv_density, option.direction == Qt.LayoutDirection.RightToLeft,
+            hover=bool(option.state & QStyle.StateFlag.State_MouseOver),
+            selected=bool(option.state & QStyle.StateFlag.State_Selected),
+            pictures=self._tv_pics)
 
     @staticmethod
     def _scaled_logo(pm: QPixmap, url: str, size: int) -> QPixmap:
@@ -604,6 +699,8 @@ class ChannelDelegate(QStyledItemDelegate):
             return QSize(0, self._header_h())
         if self.grid:
             return QSize(self.cell_w, self.cell_h)
+        if self.tv_rows(index.model()):
+            return QSize(0, self.tv_row_h())
         return QSize(0, self.row_h)
 
     def paint(self, painter, option, index) -> None:
@@ -612,6 +709,16 @@ class ChannelDelegate(QStyledItemDelegate):
             self._paint_header(painter, option, it["_header"])
         elif self.grid:
             self._paint_grid(painter, option, index)
+        elif it and self.tv_rows(index.model()):
+            try:
+                self._paint_tv(painter, option, index, it)
+            except Exception:
+                # Never a row left blank (nor an exception out of a paint):
+                # the list's own row instead, said once.
+                if not self._tv_failed:
+                    self._tv_failed = True
+                    log.exception("channel list: a TV row could not be painted")
+                self._paint_list(painter, option, index)
         else:
             self._paint_list(painter, option, index)
 

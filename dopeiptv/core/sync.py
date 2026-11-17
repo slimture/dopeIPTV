@@ -230,7 +230,7 @@ def unseal(key: bytes, blob: bytes) -> dict[str, Any]:
 SETTINGS_ALLOW = frozenset({
     "language",
     "theme", "accent", "accent_custom", "theme_follow_system", "theme_light",
-    "corner_style", "ui_scale", "view_density", "view_grid", "sort_order",
+    "corner_style", "ui_scale", "view_density", "view_grid", "sort_order", "tv_density",
     "start_place", "popular_movies", "popular_series", "follow_notify",
     # The Movies place's grid or list (ui/mw_place_films.py).
     "films_view",
