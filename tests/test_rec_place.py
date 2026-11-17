@@ -236,6 +236,9 @@ assert news.line.startswith("SVT1 · ") and "KB" in news.line, news.line
 view.activated.emit(news)
 assert played[-1] == (news.key, "recording"), played
 assert w._place_rec_showing()
+# As a right click does first (contextMenuEvent): the card under it the
+# current one - on a slow machine the current card had moved meanwhile.
+view.setCurrentIndex(view.model_.index(view.row_of(news.key), 0))
 view.menu.emit(news, QPoint(5, 5))
 assert menus[-1] == (news.key, QPoint(5, 5))
 cur = w.list_model.item_at(w.listw.currentIndex().row())
