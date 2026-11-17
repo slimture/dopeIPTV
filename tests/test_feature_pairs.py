@@ -748,10 +748,12 @@ zapped(cc, 11, d, "Home Assistant's play")
 w._events_command("channel_down", None)
 zapped(cc, 12, c, "Home Assistant's channel down")
 
-# The media keys: next and previous, from the channel on the TV.
+# The media keys: next and previous, from the channel on the TV - what
+# they show is the cast (nothing plays here), its channel live on the TV.
 if w.player is not None:
     snap = w.mpris_snapshot()
-    assert snap["status"] == "Stopped" and snap["can_next"] and snap["can_prev"], snap
+    assert snap["status"] == "Playing" and snap.get("cast") == "Kitchen", snap
+    assert snap["live"] and snap["can_next"] and snap["can_prev"], snap
     w.mpris_command("next")
     zapped(cc, 13, d, "the media key next")
     w.mpris_command("previous")

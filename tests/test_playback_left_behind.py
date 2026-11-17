@@ -93,7 +93,7 @@ def _tv_host(watching: bool) -> tuple[SimpleNamespace, list]:
     h._tv_browse = lambda screen=None: calls.append("page")
     h._multiview_active = h._mpris_refresh_soon = lambda: None
     for name in ("_stoppable", "_tv_action", "_tv_watch_action", "_tv_stop", "_tv_off_key",
-                 "_remote_media", "mpris_command", "_media_active", "tv_command"):
+                 "_remote_media", "mpris_command", "_media_active", "_media_cast", "tv_command"):
         setattr(h, name, getattr(MainWindow, name).__get__(h))
     h._media_press_key = MainWindow._media_press_key       # a staticmethod
     h._tv_input = h._tv_action           # no dialog over the window (mw_tv._tv_input)
