@@ -11,8 +11,10 @@
 - **New computer? Bring your settings from the welcome.** Type the sync code from your other computer, or restore a backup: your profiles and settings come over, and your sources too when the other computer syncs them. Encrypted on your computer before it is sent - dopeiptv.org keeps only bytes it cannot read.
 - **The same menu bar everywhere.** File, View, History and Help on Windows, Linux and macOS - About is under Help (on a Mac in the dopeIPTV menu, as before). **Settings → General** now ends with About and the version too.
 - **Server mode tells you who has its port** - dopeIPTV's own server started earlier, or another program - and offers the next free one with one click.
+- **Local files never freeze the window.** Searching, switching to folders and opening a big folder on a network drive read the disk in the background - the window stays free and the rows fill in as they come. **Rescan** (the button beside the view switch, or `F5`) reads a folder again.
+- **Settings open at once** - about four times faster, and on GNOME without the spinning pointer that hung around for half a minute.
 - **Pictures load without slowing anything down.** Posters, logos and episode pictures are decoded once, away from the window, so lists, Home and above all a series' page scroll smoothly while they load.
-- **The phone remote plays everything the app plays.** Movies and series by category, Continue watching and History, Local files with their search, radio and recordings - and while an episode plays, its season's episodes with the one playing marked, previous and next episode on the buttons.
+- **The phone remote plays everything the app plays.** Movies and series by category, Continue watching and History, Local files with their search, radio and recordings - and while an episode plays, its season's episodes with the one playing marked, previous and next episode on the buttons. Seek in a film or an episode, pick subtitles and sound, set the sleep timer, and record what plays or the next programme - it asks first, and any question the app would ask comes to the phone. Searching opens the phone's own keyboard, in TV mode too.
 - **The phone remote fits small phones** - down to the smallest iPhone SE, upright or on its side - and **follows what plays**: change channel anywhere and the page marks it and scrolls to it.
 - **The middle of the window follows what plays.** Start a channel from the phone or the media keys while a series' page shows, and the channel list comes up with it marked - the same for a film, an episode, a file, a station or a recording. Not while you type, in a dialog or in TV mode.
 
@@ -23,7 +25,11 @@
 - Connections to your account are counted right: a cast on the source it comes from, a stream the player gave up on no longer, a rewind buffer kept by a recording or a cast only on its own source, and YouTube, Twitch and radio not at all. A cast or a recording after you switched source no longer picks the new source's channel with the same number.
 - Searching in a Local files folder finds files in its subfolders too.
 - The search boxes say what they search: the list, the categories, or everything.
+- TV mode: Back on its Home, twice, leaves it; leaving full screen any way really leaves TV mode, so the next channel no longer brings it back; it opens complete instead of folding in; View > TV mode is checked while it is on; and the window and the docked player come back exactly as they were.
+- Leaving full screen put the window back a little lower and smaller each time on Linux.
+- A choice in the player's or the guide's right-click menu no longer opens the menu of the row under it.
 - A click on the picture shows the controls instead of pausing; the pause button and `Space` pause.
+- On a series' page the "Playing" label had its text touching its edges.
 - The round pause button over the picture had a square box around it, and the rewind bar came up squeezed for a moment before its normal size.
 - On a series' page, the poster's play and pause button under the video now controls the episode that plays.
 - Home's back button stays at the top while the page scrolls.
