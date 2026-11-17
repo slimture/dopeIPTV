@@ -36,7 +36,7 @@ from ..core.log import log
 from ..i18n import tr
 from ..media.loading_overlay import LoadingOverlay, quiet
 from ..media.seek_slider import _SeekSlider
-from ..media.video_thread import make_video_surface, swap_for_fallback
+from ..media.video_thread import WindowChanges, make_video_surface, swap_for_fallback
 from ..media import players
 from .widgets import (
     drag_frameless_resize, frameless_resize_edges, popup_menu_over_video,
@@ -1026,7 +1026,7 @@ class _MultiviewCell(QWidget):
             grid.resizing = None
 
 
-class _MultiviewWindow(QWidget):
+class _MultiviewWindow(WindowChanges, QWidget):
     """Top-level 2x2 grid. Flags (frameless / always-on-top) come from the
     owner's settings; closing hands control back so every cell's mpv is torn
     down cleanly."""

@@ -39,6 +39,7 @@ from ..providers.client import (
     DemoClient, OfflineClient, XtreamClient, dropped_playlist, make_client,
 )
 from ..media.embedded import EmbeddedPlayer, _SeekSlider
+from ..media.video_thread import WindowChanges
 from ..providers.epg import XmltvGuide, epg_cache_path, prune_epg_caches
 from ..services.coverart import CoverArtService
 from ..core.series_rules import SeriesRuleStore
@@ -162,7 +163,7 @@ _COUNT_KEYS = {
 
 
 
-class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
+class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                  _ContextMenuMixin, _FavoritesMixin, _DetailMixin, _RemindersMixin,
                  _BusyMixin, _UpdatesMixin, _SearchMixin, _SidebarMixin,
                  _NavMixin, _SourceLabelMixin, _ShortcutsMixin, _PaletteMixin, _OnboardingMixin, _SortMixin,

@@ -47,7 +47,20 @@ is Qt's, as with no native window at all.
 Anything that fails - no PyObjC, no OpenGL framework, no pixel format or
 context, a view that would not take the context, an error while drawing -
 is a reason (`unavailable`, `MacGLError`, `prepare`'s answer), and the
-surface falls back to the window's thread with it. AppKit is imported only
+surface falls back to the window's thread with it.
+
+AppKit draws the view itself during some window changes - full screen on
+or off, maximized, a new size, a window made again - and takes the
+context's CGL lock for it there and then, on the main thread. The window's
+thread asks for such a change holding Python's lock; a render thread in a
+frame holds the CGL lock and wants Python's lock back after each call into
+C. Neither would ever go on (macOS hung for good entering and leaving TV
+mode). So every such change is made inside `window_change()`: each
+context's gate taken first, so no render thread is in a frame, and the CGL
+lock is AppKit's at once. The windows that hold a picture make their
+changes through media/video_thread's `WindowChanges`.
+
+AppKit is imported only
 when a context is made, and only on macOS; the pure parts (the pixel
 format's attributes, the backing size, what a change needs) and the whole
 order of calls are tested anywhere with stand-ins.
@@ -61,6 +74,8 @@ import math
 import sys
 import threading
 import time
+import weakref
+from collections.abc import Iterator
 from typing import Any, NamedTuple
 
 from ..core.log import log
@@ -93,6 +108,12 @@ WAIT_S = 2.0
 #: How long the window's thread waits to take the context off a view that
 #: is going, or off its view as it goes itself.
 LET_GO_S = 1.0
+#: How long the window's thread waits for a render thread's frame to end
+#: before a window change AppKit draws at once (`window_change`).
+STILL_S = 1.0
+#: The longest a render thread waits for its gate while the window's thread
+#: holds it for such a change.
+STILL_MAX_S = 10.0
 #: The context's updates in the log at most this often (a resize is many).
 UPDATE_SAY_S = 2.0
 #: NSWindowOrderingMode's NSWindowAbove: a subview put over the others.
@@ -105,6 +126,47 @@ SET, UPDATE = "set", "update"
 _FLUSH = threading.Lock()
 #: Contexts a render thread that never ended may still use: never freed.
 _KEPT: list[Any] = []
+#: Every context there is, for `window_change`.
+_LIVE: "weakref.WeakSet[MacGL]" = weakref.WeakSet()
+
+
+@contextlib.contextmanager
+def window_change() -> Iterator[None]:
+    """Around a window change AppKit may draw at once (full screen on or
+    off, maximized, minimized, a new size or place, a window made again):
+    every render thread's frame let end and the next held back until the
+    change is made, so AppKit has the CGL lock it takes for its own drawing
+    of the view at once (see the module's docstring).
+
+    The window's thread only; nothing anywhere else, and nothing where no
+    context is (every other system), and only for a context a render thread
+    draws with. Nested, the outer one holds. A frame that does not end
+    within STILL_S is left as it is, and that context is not waited for
+    again (its render thread is stuck: said once)."""
+    if threading.current_thread() is not threading.main_thread():
+        yield
+        return
+    held: list[MacGL] = []
+    try:
+        for gl in list(_LIVE):
+            if gl._still or gl._stuck or gl._ctx is None or not gl._running:
+                continue
+            gl._asked = True               # its next frame waits for this
+            try:
+                got = gl._gate.acquire(timeout=STILL_S)
+            finally:
+                gl._asked = False
+            if got:
+                gl._still = True
+                held.append(gl)
+            else:
+                gl._stuck = True
+                log.warning("video thread: a frame did not end before a window change")
+        yield
+    finally:
+        for gl in held:
+            gl._still = False
+            gl._gate.release()
 
 
 class MacGLError(Exception):
@@ -237,7 +299,7 @@ class _Held:
 
     def __enter__(self) -> None:
         gl = self._gl
-        if not gl._gate.acquire(timeout=WAIT_S):
+        if not gl._wait_gate():
             raise MacGLError("the OpenGL context stayed busy")
         try:
             gl._lock()
@@ -273,6 +335,9 @@ class MacGL:
         self._ctx: Any = None
         self._cgl: int | None = None
         self._gate = threading.Lock()
+        self._still = False            # window_change holds the gate (the window's thread)
+        self._stuck = False            # a frame never ended for window_change: not waited for
+        self._asked = False            # window_change waits for the gate: it goes first
         self._place: Place | None = None
         self._window: Any = None       # the QWindow whose view the context is on
         self._seen = False             # that view was on screen at the last attach
@@ -283,8 +348,16 @@ class MacGL:
         self.changes = 0               # setViews and updates made (a new drawable)
         self.info = ""                 # the renderer, for the log
         self.format = ""
+        _LIVE.add(self)
 
     # -- the window's thread ----------------------------------------------------------
+    def _take(self, timeout: float) -> bool | None:
+        """The gate for the window's thread: True taken (to be let go of),
+        None its own already (inside window_change), False busy."""
+        if self._still and threading.current_thread() is threading.main_thread():
+            return None
+        return self._gate.acquire(timeout=timeout)
+
     def prepare(self) -> str:
         """The pixel format and the context ("" when made, else why not)."""
         _main_only("the NSOpenGLContext")
@@ -346,7 +419,8 @@ class MacGL:
             change, why = SET, "lost"
         if not change:
             return out
-        if not self._gate.acquire(timeout=TRY_S):
+        took = self._take(TRY_S)
+        if took is False:
             return None
         try:
             self._lock()
@@ -370,7 +444,8 @@ class MacGL:
             was, self._place, self._window, self._seen = self._place, place, win, True
             self.changes += 1
         finally:
-            self._gate.release()
+            if took:
+                self._gate.release()
         self._say(change, why, was, place)
         return out
 
@@ -429,7 +504,8 @@ class MacGL:
         ctx = self._ctx
         if ctx is None:
             return True
-        if not self._gate.acquire(timeout=LET_GO_S):
+        took = self._take(LET_GO_S)
+        if took is False:
             log.warning("video thread: the OpenGL context stayed busy (%s)", what)
             return False
         try:
@@ -448,7 +524,8 @@ class MacGL:
             was = self._place
             self._place, self._window, self._seen = None, None, False
         finally:
-            self._gate.release()
+            if took:
+                self._gate.release()
         if was is not None:
             log.info("video thread: the context let go of view %#x (%s)", was.view, what)
         return True
@@ -520,7 +597,7 @@ class MacGL:
         frame now, and no failure."""
         if self._ctx is None or window is not self._window:
             return None
-        if not self._gate.acquire(timeout=WAIT_S):
+        if not self._wait_gate():
             return None
         if window is not self._window or self._ctx is None:
             self._gate.release()
@@ -557,7 +634,7 @@ class MacGL:
         context current, then nothing current on this thread. Its view is
         let go of on the window's thread (close). Freed even if the gate
         stayed busy: libmpv's core must not go before its render context."""
-        held = self._gate.acquire(timeout=WAIT_S)
+        held = self._wait_gate()
         try:
             if held:
                 self._lock()
@@ -583,6 +660,22 @@ class MacGL:
         self._running = False
 
     # -- the pieces -------------------------------------------------------------------
+    def _wait_gate(self) -> bool:
+        """The render thread's wait for the gate: WAIT_S, and on while the
+        window's thread holds it for a window change (it ends), up to
+        STILL_MAX_S in all. A window change waiting for it goes first: a
+        lock let go of is otherwise taken again by the thread that let go."""
+        first = time.monotonic() + WAIT_S
+        while self._asked and time.monotonic() < first:
+            time.sleep(0.001)
+        if self._gate.acquire(timeout=WAIT_S):
+            return True
+        end = time.monotonic() + STILL_MAX_S - WAIT_S
+        while self._still and time.monotonic() < end:
+            if self._gate.acquire(timeout=0.25):
+                return True
+        return False
+
     def _lock(self) -> None:
         if self._cgl:
             self._lib.CGLLockContext(self._cgl)

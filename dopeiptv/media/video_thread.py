@@ -226,6 +226,68 @@ def swap_for_fallback(old: QWidget, wire: Callable[[QWidget], None]) -> QWidget:
     return new
 
 
+def window_change() -> Any:
+    """media/video_macos's `window_change`: around a change of a window
+    that holds a picture which AppKit may draw at once. Nothing where no
+    macOS context is (every other system)."""
+    from . import video_macos
+    return video_macos.window_change()
+
+
+class WindowChanges:
+    """A top-level window that holds a picture, before its Qt class in the
+    bases: full screen on or off, maximized, minimized, normal, its state,
+    flags, size, brought forward - asked from Python inside `window_change`.
+
+    On macOS AppKit draws the picture's view itself during such a change
+    (the full screen transition flushes Core Animation there and then) and
+    waits for the context's CGL lock, holding Python's lock as it was asked;
+    a render thread in a frame holds that CGL lock and waits for Python's -
+    the app hung for good entering and leaving TV mode. Inside
+    `window_change` no render thread is in a frame. Everywhere else it is
+    nothing."""
+
+    def showFullScreen(self) -> None:
+        with window_change():
+            super().showFullScreen()  # type: ignore[misc]
+
+    def showMaximized(self) -> None:
+        with window_change():
+            super().showMaximized()  # type: ignore[misc]
+
+    def showMinimized(self) -> None:
+        with window_change():
+            super().showMinimized()  # type: ignore[misc]
+
+    def showNormal(self) -> None:
+        with window_change():
+            super().showNormal()  # type: ignore[misc]
+
+    def setWindowState(self, state: Any) -> None:
+        with window_change():
+            super().setWindowState(state)  # type: ignore[misc]
+
+    def setWindowFlags(self, flags: Any) -> None:
+        with window_change():
+            super().setWindowFlags(flags)  # type: ignore[misc]
+
+    def setGeometry(self, *args: Any) -> None:
+        with window_change():
+            super().setGeometry(*args)  # type: ignore[misc]
+
+    def resize(self, *args: Any) -> None:
+        with window_change():
+            super().resize(*args)  # type: ignore[misc]
+
+    def raise_(self) -> None:
+        with window_change():
+            super().raise_()  # type: ignore[misc]
+
+    def activateWindow(self) -> None:
+        with window_change():
+            super().activateWindow()  # type: ignore[misc]
+
+
 def _alive(obj: Any) -> bool:
     """A Qt object whose C++ side still exists (a widget over the picture
     can be deleted at any time - a notice, a dialog, the pop-out's button)."""

@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMenu, QPushButton, QVBoxLayout, QWidget)
 
 from ..i18n import tr
+from ..media.video_thread import WindowChanges
 from .widgets import (
     drag_frameless_resize, frameless_resize_edges, popup_menu_over_video,
     resize_edge_cursor, start_frameless_resize)
@@ -56,7 +57,7 @@ def _use_mirror_popout() -> bool:
     return sys.platform == "darwin" or sys.platform.startswith("linux")
 
 
-class _PopoutWindow(QWidget):
+class _PopoutWindow(WindowChanges, QWidget):
     """Top-level host for the detached player.
 
     Closing it (window X) doesn't destroy the shared player - it hands control

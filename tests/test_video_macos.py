@@ -390,6 +390,153 @@ def test_a_drawing_error_is_a_reason_not_a_window_gone():
     assert gl._gate.acquire(blocking=False)
 
 
+# -- a window change AppKit draws at once ----------------------------------------------------
+# AppKit takes the CGL lock itself to draw the view during a full screen
+# transition, on the main thread holding Python's lock; a render thread in
+# a frame holding the CGL lock and waiting for Python's lock hung macOS for
+# good (entering and leaving TV mode).
+
+def _only(gl):
+    """*gl* the only context window_change sees (earlier tests' ones may
+    still be about, their gates held by their own checks)."""
+    for other in list(vm._LIVE):
+        if other is not gl:
+            vm._LIVE.discard(other)
+    return gl
+
+
+def test_a_window_change_lets_the_frame_end_and_holds_the_next():
+    gl, log, appkit, views = _ready()
+    _only(gl)
+    win = _QWindow(0xA)
+    gl.attach(_Target(win, 640, 360, True))
+    log.clear()
+    in_frame = threading.Event()
+
+    def frames():
+        for n in (1, 2):
+            ok = gl.begin(win, False)
+            in_frame.set()
+            time.sleep(0.2 if n == 1 else 0)
+            log.add("frame", n)
+            gl.present(win)
+            gl.end(ok)
+    t = threading.Thread(target=frames)
+    t.start()
+    assert in_frame.wait(5)
+    t0 = time.monotonic()
+    with vm.window_change():
+        assert time.monotonic() - t0 > 0.1           # waited for the frame
+        assert gl._still
+        log.add("change")
+        time.sleep(0.2)                              # the next frame waits
+    t.join(5)
+    order = [e for e in log if e[1] in ("frame", "change", "lock", "unlock")]
+    assert order == [("render", "lock"), ("render", "frame", 1), ("render", "unlock"),
+                     ("main", "change"),
+                     ("render", "lock"), ("render", "frame", 2), ("render", "unlock")]
+    assert not gl._still and gl._gate.acquire(blocking=False)
+
+
+def test_inside_a_window_change_the_view_is_still_followed():
+    gl, log, appkit, views = _ready()
+    _only(gl)
+    gl.attach(_Target(_QWindow(0xA), 640, 360, True))
+    with vm.window_change():
+        with vm.window_change():                     # nested: the outer one holds
+            pass
+        assert gl._still
+        out = gl.attach(_Target(_QWindow(0xB), 640, 360, True))
+        assert out is not None and out.window.ptr == 0xB
+        assert ("main", "setView", 0xB) in log
+        gl.detach(out.window)                        # a view going, inside one too
+        assert "clearDrawable" in log.names("main")
+        assert not gl._gate.acquire(blocking=False)  # still held for the change
+    assert gl._gate.acquire(blocking=False)
+
+
+def test_a_window_change_is_nothing_off_the_main_thread_or_without_a_render_thread():
+    gl, log, appkit, views = _ready()
+    _only(gl)
+    _on_render_thread(lambda: vm.window_change().__enter__())
+    assert not gl._still and gl._gate.acquire(blocking=False)
+    gl._gate.release()
+    bare, *_ = _make()                               # no context made
+    made, *_ = _make()
+    assert made.prepare() == ""                      # made, no render thread yet
+    with vm.window_change():
+        assert gl._still and not bare._still and not made._still
+    assert gl._gate.acquire(blocking=False)
+
+
+def test_a_render_thread_stuck_in_a_frame_is_waited_for_once(monkeypatch):
+    monkeypatch.setattr(vm, "STILL_S", 0.05)
+    gl, log, appkit, views = _ready()
+    _only(gl)
+    assert gl._gate.acquire(blocking=False)          # a frame that never ends
+    t0 = time.monotonic()
+    with vm.window_change():
+        assert not gl._still
+    with vm.window_change():
+        pass
+    assert time.monotonic() - t0 < 0.5 and gl._stuck
+
+
+def test_a_render_thread_waits_past_its_usual_time_for_a_window_change(monkeypatch):
+    monkeypatch.setattr(vm, "WAIT_S", 0.05)
+    gl, log, appkit, views = _ready()
+    _only(gl)
+    win = _QWindow(0xA)
+    gl.attach(_Target(win, 640, 360, True))
+    got = []
+    with vm.window_change():
+        t = threading.Thread(target=lambda: got.append(gl.begin(win, False)))
+        t.start()
+        time.sleep(0.2)                              # past WAIT_S: still waiting
+        assert got == []
+    t.join(5)
+    assert got == [True]
+    gl.end(True)
+
+
+def test_the_windows_that_hold_a_picture_change_inside_window_change(monkeypatch):
+    from dopeiptv.media import video_thread as vt
+    from dopeiptv.ui.main_window import MainWindow
+    from dopeiptv.ui.mw_multiview import _MultiviewWindow
+    from dopeiptv.ui.mw_popout import _PopoutWindow
+    from PyQt6.QtWidgets import QWidget
+
+    calls: list = []
+
+    @contextmanager
+    def change():
+        calls.append("in")
+        yield
+        calls.append("out")
+    monkeypatch.setattr(vm, "window_change", change)
+
+    def said(name):
+        return lambda self, *a: calls.append((name, *a))
+    names = ("showFullScreen", "showMaximized", "showMinimized", "showNormal",
+             "setWindowState", "setWindowFlags", "setGeometry", "resize", "raise_",
+             "activateWindow")
+    Base = type("Base", (), {n: said(n) for n in names})
+
+    class Win(vt.WindowChanges, Base):
+        pass
+    w = Win()
+    for name, args in (("showFullScreen", ()), ("showMaximized", ()), ("showMinimized", ()),
+                       ("showNormal", ()), ("setWindowState", (2,)), ("setWindowFlags", (1,)),
+                       ("setGeometry", (1, 2, 3, 4)), ("resize", (5, 6)), ("raise_", ()),
+                       ("activateWindow", ())):
+        calls.clear()
+        getattr(w, name)(*args)
+        assert calls == ["in", (name, *args), "out"], name
+    for cls in (MainWindow, _PopoutWindow, _MultiviewWindow):
+        mro = cls.__mro__
+        assert mro.index(vt.WindowChanges) < mro.index(QWidget), cls.__name__
+
+
 # -- the end ---------------------------------------------------------------------------------
 
 def test_a_view_that_goes_is_let_go_of_on_the_main_thread():

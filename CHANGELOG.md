@@ -142,6 +142,16 @@ same new look.
 
 ### Fixed
 
+- macOS: the app hung for good going into or out of TV mode (from the
+  window or the phone remote), and could going into or out of full screen,
+  while something played. AppKit draws the picture's view itself during
+  the full screen transition and takes its OpenGL context's lock there and
+  then, on the main thread that held Python's lock as it asked; the
+  picture's render thread, in a frame, held that lock and waited for
+  Python's. Such window changes are now made with every picture's frame
+  ended first and the next held back until the change is made
+  (media/video_macos's `window_change`, `WindowChanges` on the main window,
+  the pop-out and multiview).
 - An answer to your feedback not yet read is said again as soon as the app
   starts: the message was kept only while the app ran, and after a restart
   it came back only once the site was asked again - for a report already
