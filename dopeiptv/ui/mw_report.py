@@ -21,13 +21,18 @@ from functools import partial
 
 from PyQt6 import sip
 from PyQt6.QtCore import QObject, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QAction
+from PyQt6.QtGui import QAction, QGuiApplication
 
 from ..core import build_check, report
 from ..core.log import log, log_dir
 from ..core.workers import run_async
 from ..i18n import tr
 from .mw_updates import build_known
+from .notices import hub_of
+
+#: The one message that says answers came, under its key: refreshed, and
+#: taken away once they are read however the window was opened.
+ANSWERS_KEY = "feedback-answers"
 
 
 class _Relay(QObject):
@@ -58,7 +63,13 @@ class _ReportMixin:
         self._answers_timer = QTimer(self)
         self._answers_timer.setSingleShot(True)
         self._answers_timer.timeout.connect(self._answers_due)
+        self._answers_since = time.monotonic()
         self._schedule_answers(self.ANSWERS_AT_START)
+        # The app back in front - an answer was just written on the site,
+        # say: asked then too, not only on the timer.
+        app = QGuiApplication.instance()
+        if app is not None:
+            app.applicationStateChanged.connect(self._answers_front)
         self._show_unread()
         self._report_crash = report.pending_crash()
         if self._report_crash:
@@ -127,8 +138,9 @@ class _ReportMixin:
     # -- answers to feedback ---------------------------------------------------
 
     #: Seconds after the start before the first ask; the least time between
-    #: two asks the person starts (Check now, opening the window).
-    ANSWERS_AT_START, ANSWERS_GAP = 45.0, 20.0
+    #: two asks the person starts (Check now, opening the window); the least
+    #: since the last ask when the app comes to the front.
+    ANSWERS_AT_START, ANSWERS_GAP, ANSWERS_FRONT_GAP = 45.0, 20.0, 60.0
     _answers_timer: QTimer | None = None
     _answers_action: QAction | None = None
     _answers_menu = None
@@ -137,6 +149,10 @@ class _ReportMixin:
     _answers_busy = False
     _answers_last = 0.0
     _answers_ok = True
+    _answers_since = 0.0
+    #: Answers not read yet said this run (a message), so a start with some
+    #: waiting says so once, not only the menu's count.
+    _answers_told = False
 
     def _schedule_answers(self, at_least: float = 0.0) -> None:
         """The one timer set to the next ask; stopped while no report is
@@ -154,6 +170,22 @@ class _ReportMixin:
     def _answers_due(self) -> None:
         """The timer's ask: once the build's verdict is in, never waiting
         for it on the window's thread (the first one comes at the start)."""
+        if build_known(self._answers_due):
+            self._ask_answers()
+
+    def _answers_front(self, state) -> None:
+        """The app came to the front: asked now when a report is asked about
+        and the last ask is a minute old - never in a start's first moments
+        (the timer's first ask comes then)."""
+        if state != Qt.ApplicationState.ApplicationActive or self._answers_busy:
+            return
+        now = time.time()
+        if now - self._answers_last < self.ANSWERS_FRONT_GAP \
+                or time.monotonic() - self._answers_since < self.ANSWERS_AT_START:
+            return
+        settings = getattr(self, "settings", None)
+        if settings is None or not report.open_codes(report.tickets(settings), now):
+            return
         if build_known(self._answers_due):
             self._ask_answers()
 
@@ -196,8 +228,11 @@ class _ReportMixin:
                 dlg.set_tickets(report.tickets(settings))
                 self._answers_mark_seen()
             dlg.show_result(self._answers_ok, fresh, self._answers_last)
-        elif fresh:
-            self._show_action_toast(tr("fbr_new"), 12_000, self._answers_from_menu)
+        elif fresh or (self.answers_unread() and not self._answers_told):
+            # A message that stays in the activity panel until read - also
+            # for answers that came before this start and wait unread.
+            self._answers_told = True
+            self._show_action_toast(tr("fbr_new"), 12_000, self._answers_from_menu, key=ANSWERS_KEY)
         self._show_unread()
         self._schedule_answers()
 
@@ -249,6 +284,8 @@ class _ReportMixin:
         items = report.tickets(settings)
         if report.mark_seen(items):
             report.save_tickets(settings, items)
+        if not report.unread(items):
+            hub_of(self).dismiss_key(ANSWERS_KEY)
         self._show_unread()
 
     def open_answers(self, parent=None):

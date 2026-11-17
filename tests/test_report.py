@@ -175,7 +175,7 @@ s.setValue("active_playlist", "a")
 w = MainWindow(DemoClient(), s, PlaylistStore(s))
 toasts = []
 w._show_toast = lambda text, ms=0: toasts.append(text)
-w._show_action_toast = lambda text, ms, act: toasts.append(text)
+w._show_action_toast = lambda text, ms, act, **k: toasts.append(text)
 inbox = Inbox()
 report.ENDPOINT = inbox.url
 report.REPLIES = inbox.url.replace("/report", "/replies")

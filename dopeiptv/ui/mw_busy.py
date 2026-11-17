@@ -422,11 +422,13 @@ class _BusyMixin:
         hub_of(self).note(text, ms=duration_ms or None)
 
     def _show_action_toast(self, text: str, duration_ms: int, on_click,
-                           label: str | None = None, decide: bool = False) -> None:
+                           label: str | None = None, decide: bool = False,
+                           key: str | None = None) -> None:
         """A message that does *on_click* (its button, *label*), counted on
         the activity line and listed in its panel; with *decide* it needs a
-        decision now - the card over the line."""
-        hub_of(self).post(text, action=on_click, action_label=label, decide=decide)
+        decision now - the card over the line. Under *key* one message,
+        refreshed, and taken away by that key (hub.dismiss_key)."""
+        hub_of(self).post(text, action=on_click, action_label=label, decide=decide, key=key)
 
     def _flash_status(self, text: str, ms: int = 4000) -> None:
         """A momentary word (guide refreshed, cache cleared, ...): a note."""

@@ -50,6 +50,15 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- An answer to your feedback could take hours to show: the app asked for
+  answers every quarter of an hour on the first day and every six hours
+  after. It now asks every five minutes on the first day, every two hours
+  after, and whenever the app comes to the front - an answer written a
+  moment ago shows when you switch back. An answer still unread when the
+  app starts says so again in the activity panel (it stays there until
+  read), not only by the count in the menu; read however the window was
+  opened, the message goes.
+
 - Local files: a folder holding only video files got no posters or frames
   (only one with subfolders did), and a clip shorter than two minutes never
   got its frame; Folders picked while the library was still being read

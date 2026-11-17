@@ -322,10 +322,12 @@ def fetch_replies(codes: list[str], timeout: float = 15.0, endpoint: str | None 
 REPLY_CODES = ("thanks", "known", "fixed", "needinfo", "note")
 
 #: When answers are asked (seconds): soon after a report that wants one,
-#: every quarter of an hour while one sent in the last day waits for its
-#: first answer, otherwise every six hours. The site takes 60 asks in ten
-#: minutes from one address; this is a handful a day.
-ASK_FIRST, ASK_SOON, ASK_SOON_FOR, ASK_LATER = 120.0, 900.0, 86400.0, 6 * 3600.0
+#: every five minutes while one sent in the last day waits for its first
+#: answer, otherwise every two hours - and when the app comes to the front
+#: (the window's own rule). Every six hours left an answer unseen for most
+#: of a day. The site takes 60 asks in ten minutes from one address; this is
+#: a few an hour at most.
+ASK_FIRST, ASK_SOON, ASK_SOON_FOR, ASK_LATER = 120.0, 300.0, 86400.0, 2 * 3600.0
 
 
 def _sent(t: dict) -> float:

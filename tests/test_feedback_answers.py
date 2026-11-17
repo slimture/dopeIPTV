@@ -18,21 +18,21 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # -- when answers are asked ----------------------------------------------------------
 
-def test_asked_two_minutes_after_a_report_then_every_quarter_hour_for_a_day():
+def test_asked_two_minutes_after_a_report_then_every_five_minutes_for_a_day():
     sent = 1_000_000.0
     items = [{"c": "a", "t": sent}]
     assert report.next_ask(items, sent) == report.ASK_FIRST == 120
     assert report.next_ask(items, sent + 60) == 60
     # Asked before the report went (the window was open, say): still two minutes.
     assert report.next_ask(items, sent + 1, last=sent - 10) == 119
-    # Then every fifteen minutes while it waits, for the first day.
-    assert report.next_ask(items, sent + 120, last=sent + 120) == report.ASK_SOON == 900
-    assert report.next_ask(items, sent + 5 * 3600, last=sent + 5 * 3600 - 100) == 800
-    # A day on, or answered: every six hours.
+    # Then every five minutes while it waits, for the first day.
+    assert report.next_ask(items, sent + 120, last=sent + 120) == report.ASK_SOON == 300
+    assert report.next_ask(items, sent + 5 * 3600, last=sent + 5 * 3600 - 100) == 200
+    # A day on, or answered: every two hours.
     later = sent + 25 * 3600
-    assert report.next_ask(items, later, last=later) == report.ASK_LATER == 6 * 3600
+    assert report.next_ask(items, later, last=later) == report.ASK_LATER == 2 * 3600
     answered = [{"c": "a", "t": sent, "r": [{"code": "thanks"}]}]
-    assert report.next_ask(answered, sent + 600, last=sent + 600) == 6 * 3600
+    assert report.next_ask(answered, sent + 600, last=sent + 600) == 2 * 3600
     # Never asked yet this run, old report: now.
     assert report.next_ask(items, later, last=0) == 0
 
@@ -200,9 +200,9 @@ assert len(inbox.asked) == 1 and set(inbox.asked[0]) == {report.code_hash(c) for
 assert any("Coming in 1.6" in t for t in labels(dlg.cards[0])) and dlg.cards[0].new == 1
 assert dlg.check_btn.isEnabled() and dlg.status.text(), dlg.status.text()
 assert report.unread(report.tickets(s)) == 0
-# Answered now: every six hours from here.
+# Answered now: every two hours from here.
 left = w._answers_timer.interval()
-assert 6 * 3600 * 1000 - 5000 < left <= 6 * 3600 * 1000, left
+assert 2 * 3600 * 1000 - 5000 < left <= 2 * 3600 * 1000, left
 # Again at once: the last word stands, nothing sent.
 dlg.check_btn.click()
 assert len(inbox.asked) == 1
@@ -211,9 +211,9 @@ dlg.close(); app.processEvents()
 # A new answer while the window is closed: the note says so and opens it.
 toasts = []
 real_toast = w._show_action_toast
-def spy(text, ms, act):
+def spy(text, ms, act, **k):
     toasts.append(text)
-    real_toast(text, ms, act)
+    real_toast(text, ms, act, **k)
 w._show_action_toast = spy
 inbox.answers[report.code_hash("mid")] = [{"t": int(now - 3600), "code": "fixed", "version": "1.5.1"},
                                           {"t": int(now), "code": "note", "text": "Out now"}]
@@ -237,8 +237,45 @@ assert report.unread(report.tickets(s)) == 0
 assert not any("answered" in t for t in w.notices.texts())
 w._answers_window().close(); app.processEvents()
 
+# Back in front (an answer just written on the site): asked at once - a
+# minute after the last ask at the earliest, never in a start's first moments.
+n = len(inbox.asked)
+active, inactive = Qt.ApplicationState.ApplicationActive, Qt.ApplicationState.ApplicationInactive
+w._answers_since = time.monotonic() - 3600
+w._answers_last = time.time()
+w._answers_front(active)
+assert not w._answers_busy
+w._answers_last = 0.0
+w._answers_since = time.monotonic()
+w._answers_front(active)
+assert not w._answers_busy
+w._answers_since = time.monotonic() - 3600
+w._answers_front(inactive)
+assert not w._answers_busy
+w._answers_front(active)
+assert w._answers_busy and wait(lambda: not w._answers_busy)
+assert len(inbox.asked) == n + 1
+
+# An answer still unread when the app starts again: a message says so, once.
+items = report.tickets(s)
+items[1]["seen"] = 0
+report.save_tickets(s, items)
+toasts.clear()
+w._answers_told = False
+w._answers_last = 0.0
+w._ask_answers()
+assert wait(lambda: toasts) and wait(lambda: not w._answers_busy)
+w._answers_last = 0.0
+w._ask_answers()
+assert wait(lambda: not w._answers_busy) and len(toasts) == 1, toasts
+assert [m for m in w.notices.messages() if "answered" in m.title]
+# Read from the menu, not the message: the message goes too.
+w.open_answers(); app.processEvents()
+assert not any("answered" in t for t in w.notices.texts())
+w._answers_window().close(); app.processEvents()
+
 # After a report with a code goes (the real Send): asked two minutes on, then
-# every quarter of an hour.
+# every five minutes.
 del w.open_report
 def fake_feedback(self):
     # The answers shown here link to their window, which opens over this one.
@@ -263,7 +300,7 @@ report.save_tickets(s, items)
 w._answers_last = time.time()
 w._schedule_answers()
 left = w._answers_timer.interval()
-assert 895_000 < left <= 900_000, left
+assert 295_000 < left <= 300_000, left
 
 # Settings: Feedback with both buttons; Answers opens over Settings itself.
 seen = {}
