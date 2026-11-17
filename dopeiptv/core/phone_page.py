@@ -37,10 +37,18 @@ under it and offers its Episodes view, and the dock's channel keys are the
 episode before and after it (api/previous, api/next). A title with a
 length - a film, an episode, a file, a recording - is sought there: the bar
 dragged (the time under the finger shown, one api/seek when it is let go)
-and the player's own skip steps, mirrored right to left. A tap on a search
-box focuses its field in the tap's own handler, so the phone's keyboard
-comes up at once; while TV mode shows its search, the remote has a field
-that types into it with the phone's own keyboard (api/tv_text).
+and the player's own skip steps, mirrored right to left. A live channel in
+the app's rewind buffer is sought on the same bar, from as far back as the
+buffer reaches to live: the finger's place said as how far behind live
+("−4:12"), one api/seek when let go, the same skip steps, and Live - lit at
+the live edge, else how far behind - back to live. The state tells where it
+plays as of a moment (state.dvr) and the page reckons on by the clock, so
+it changes only when that would drift (core/phone_remote.BufferTold).
+
+A tap on a search box focuses its field in the tap's own handler, so the
+phone's keyboard comes up at once; while TV mode shows its search, the
+remote has a field that types into it with the phone's own keyboard
+(api/tv_text).
 
 Now playing stays compact: what plays' sound and subtitles, the sleep
 timer, recording and the next programme are folded behind More (a small
@@ -107,7 +115,7 @@ WORDS = ("channels", "favorites", "search", "nothing", "next", "paused", "offlin
          "nothing_here", "find", "skip_back", "skip_fwd", "seek", "tv_type",
          "tracks", "audio", "subtitles", "no_audio", "sleep", "off", "minutes", "sleep_left",
          "close", "rec", "rec_stop", "rec_this", "remind", "dont_ask", "cancel", "rec_anyway",
-         "rec_cancel", "rec_ask", "rec_stop_ask", "more", "less")
+         "rec_cancel", "rec_ask", "rec_stop_ask", "more", "less", "live", "go_live", "behind")
 _HEX = re.compile(r"#[0-9A-Fa-f]{6}")
 
 
@@ -230,7 +238,7 @@ _HTML = """<!doctype html>
       <div class="nowTitle" id="nowTitle"></div>
       <div class="nowProg"><span class="chip" id="nowPaused" hidden></span><span id="nowProg"></span></div>
       <div class="seekbar" id="nowBarWrap" hidden><div class="bar"><i id="nowBar"></i></div><span class="knob" id="nowKnob"></span><span class="seekTip" id="seekTip" hidden></span></div>
-      <div class="nowTimes" id="nowTimes"><span id="nowStart"></span><span class="skips" id="skips" hidden><button class="skip" id="skipBack"><svg class="flip" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.6 8.6A7.6 7.6 0 1 1 4.4 12.5"/><path d="M5.3 3.9v4.9h4.9"/></svg><b></b></button><button class="skip" id="skipFwd"><svg class="flip" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.4 8.6A7.6 7.6 0 1 0 19.6 12.5"/><path d="M18.7 3.9v4.9h-4.9"/></svg><b></b></button></span><span id="nowEnd"></span></div>
+      <div class="nowTimes" id="nowTimes"><span id="nowStart"></span><span class="skips" id="skips" hidden><button class="skip" id="skipBack"><svg class="flip" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.6 8.6A7.6 7.6 0 1 1 4.4 12.5"/><path d="M5.3 3.9v4.9h4.9"/></svg><b></b></button><button class="skip" id="skipFwd"><svg class="flip" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.4 8.6A7.6 7.6 0 1 0 19.6 12.5"/><path d="M18.7 3.9v4.9h-4.9"/></svg><b></b></button></span><span id="nowEnd"></span><button class="liveBtn" id="liveBtn" hidden><svg class="dot" viewBox="0 0 24 24" aria-hidden="true"><circle class="fill" cx="12" cy="12" r="5"/></svg><svg class="toLive flip" viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M4.5 6v12l8-6zM12.5 6v12l8-6z"/></svg><span></span></button></div>
       <div class="next" id="nowNext"></div>
       <div class="nowActs" id="nowActs">
       <button class="showIn" id="showIn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M4 12h7M4 18h10"/><circle cx="17.5" cy="12" r="3"/></svg><span id="showInText"></span></button>
@@ -467,6 +475,16 @@ svg .fill{fill:currentColor;stroke:none}
 .skip svg{width:30px;height:30px;stroke-width:1.8}
 .skip b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding-top:2px;
   font-size:10px;font-weight:700;letter-spacing:-.2px}
+.nowTimes.dvr{flex-wrap:wrap;row-gap:6px}
+.nowTimes.dvr .skips{margin-inline:auto}
+.liveBtn{flex:none;margin-inline-start:auto;display:inline-flex;align-items:center;gap:4px;min-width:44px;height:44px;
+  padding:0 12px 0 9px;border-radius:999px;background:var(--btn);color:var(--text);font-size:13px;font-weight:700;
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.liveBtn:active{background:var(--btn-hover)}
+.liveBtn svg{width:16px;height:16px;flex:none}
+.liveBtn .dot,.liveBtn.on .toLive{display:none}
+.liveBtn.on .dot{display:block}
+.liveBtn.on{background:var(--rec);color:var(--on-error)}
 .next{color:var(--muted);font-size:13px;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .showIn{display:inline-flex;align-items:center;gap:7px;max-width:100%;min-height:44px;margin-top:10px;padding:0 14px 0 11px;
   border-radius:999px;background:var(--btn);color:var(--text);font-size:14px;font-weight:600}
@@ -819,18 +837,49 @@ function setBar(frac) {
 // let go) and the player's own skip steps; through the app's seek, which
 // clamps to the title's length. The bar stays where it was sent until the
 // app's position catches up.
-let drag = null, hold = null;
+//
+// A live channel in the app's rewind buffer (st.dvr) is the same bar, from
+// as far back as the buffer reaches to live: the finger's place as how far
+// behind live, the same skip steps, and Live. The state says how far behind
+// and how far back as of a moment (dvr.t); the page reckons on by the clock
+// as the app does (core/phone_remote.buffer_reckoned): behind live grows
+// only while paused, the reach only while the buffer fills.
+let drag = null, hold = null, dvrHold = null;
 
-function canSeek() { return !!st.seek && st.duration > 0 && st.state !== "stopped" && !tvOn; }
+function canSeek() { return ((!!st.seek && st.duration > 0) || !!st.dvr) && st.state !== "stopped" && !tvOn; }
 
 function playPos() {
   return (st.position || 0) + (st.state === "playing" ? (Date.now() - stAt) / 1000 : 0);
 }
 
+// The app's clock now, from the state's.
+function appNow() { return (st.time || Date.now() / 1000) + (Date.now() - stAt) / 1000; }
+
+// How far behind live it plays and how far back the buffer reaches, now.
+function dvrNow() {
+  const d = st.dvr || {}, playing = st.state === "playing";
+  const el = Math.max(0, appNow() - (d.t || 0));
+  const reach = Math.max(0, (d.reach || 0) + (d.grows ? el : 0));
+  const real = {behind: Math.min(reach, Math.max(0, (d.behind || 0) + (playing ? 0 : el))), reach,
+                live: !!d.live && playing};
+  const h = dvrHold;
+  if (!h) return real;
+  // Sent a moment ago: the bar stays where it was sent until the app is there too.
+  const want = Math.min(reach, h.behind + (playing ? 0 : (Date.now() - h.at) / 1000));
+  if (Date.now() > h.until || Math.abs(real.behind - want) <= 2) { dvrHold = null; return real; }
+  return {behind: want, reach, live: h.live && playing};
+}
+
+// How far behind live, "−4:12" - left to right in a right-to-left page too.
+function ago(secs) { return "\u2066\u2212" + hms(secs) + "\u2069"; }
+
 function seekable() {
-  const on = canSeek(), w = $("nowBarWrap");
+  const on = canSeek(), w = $("nowBarWrap"), dvr = on && !!st.dvr;
   w.classList.toggle("can", on);
   hide($("skips"), !on);
+  hide($("liveBtn"), !dvr); hide($("nowEnd"), dvr);
+  $("nowTimes").classList.toggle("dvr", dvr);
+  if (!st.dvr) dvrHold = null;
   if (on) {
     w.setAttribute("role", "slider"); w.setAttribute("tabindex", "0");
     w.setAttribute("aria-label", W.seek); w.setAttribute("aria-valuemin", "0");
@@ -848,10 +897,17 @@ function barFrac(e) {
 }
 
 function dragShow(frac) {
-  const t = frac * st.duration, tip = $("seekTip");
+  const tip = $("seekTip");
   setBar(frac);
-  $("nowStart").textContent = hms(t);
-  tip.textContent = hms(t);
+  if (st.dvr) {
+    // The buffer: the finger's place as how far behind live.
+    const b = (1 - frac) * dvrNow().reach;
+    tip.textContent = b < 1 ? W.live : ago(b);
+  } else {
+    const t = frac * st.duration;
+    $("nowStart").textContent = hms(t);
+    tip.textContent = hms(t);
+  }
   tip.style.setProperty("inset-inline-start", (frac * 100).toFixed(2) + "%");
   hide(tip, false);
 }
@@ -862,6 +918,11 @@ function seekEnd(frac) {
   $("nowBarWrap").classList.remove("drag");
   hide($("seekTip"), true);
   if (frac === null || !d || !canSeek()) { tick(); return; }
+  if (st.dvr) {
+    const b = (1 - frac) * dvrNow().reach;
+    dvrTo(b < 1 ? 0 : b, {behind: b < 1 ? 0 : Math.round(b)});
+    return;
+  }
   const t = frac * st.duration;
   seekTo(t, {to: Math.round(t * 10) / 10});
 }
@@ -870,11 +931,53 @@ function seekTo(t, body) {
   t = Math.max(0, Math.min(st.duration, t));
   hold = {to: t, at: Date.now(), until: Date.now() + 2500};
   st.position = t; stAt = Date.now();
+  sought(body);
+}
+
+// The buffer: *b* seconds behind live, where the bar stays until the app is there too.
+function dvrTo(b, body) {
+  b = Math.max(0, Math.min(dvrNow().reach, b));
+  dvrHold = {behind: b, at: Date.now(), until: Date.now() + 2500, live: b < 1};
+  sought(body);
+}
+
+// One seek; the state after it is asked for whole, whatever tag the page holds.
+function sought(body) {
+  etag = "";
   tick();
   send("api/seek", body);
 }
 
-function skip(by) { if (canSeek()) seekTo(playPos() + by, {by}); }
+function skip(by) {
+  if (!canSeek()) return;
+  if (!st.dvr) { seekTo(playPos() + by, {by}); return; }
+  const n = dvrNow();
+  if (by > 0 && n.behind < 1) return;                // at live: nothing ahead
+  dvrTo(n.behind - by, {by});
+}
+
+// Live: the DVR row's own LIVE in the app.
+function goLive() { if (canSeek() && st.dvr) dvrTo(0, {live: true}); }
+
+// The buffer's bar: from as far back as it reaches to live, where it plays;
+// Live lit at the live edge, else how far behind.
+function dvrTick() {
+  const n = dvrNow(), behind = n.live ? 0 : n.behind;
+  setBar(n.reach > 0 ? 1 - behind / n.reach : 1);
+  const text = n.live ? W.live : ago(behind);
+  $("nowStart").textContent = ago(n.reach);
+  $("nowEnd").textContent = text;
+  const b = $("liveBtn"), name = n.live ? W.live : W.go_live;
+  b.classList.toggle("on", n.live);
+  if (b.lastElementChild.textContent !== text) b.lastElementChild.textContent = text;
+  if (b.getAttribute("aria-label") !== name) label("liveBtn", name);
+  if (canSeek()) {
+    const w = $("nowBarWrap");
+    w.setAttribute("aria-valuemax", String(Math.round(n.reach)));
+    w.setAttribute("aria-valuenow", String(Math.round(n.reach - behind)));
+    w.setAttribute("aria-valuetext", n.live ? W.live : W.behind.replace("{t}", hms(behind)));
+  }
+}
 
 function seekBar() {
   const w = $("nowBarWrap");
@@ -902,6 +1005,8 @@ function seekBar() {
     label(id, W[w2]);
     $(id).addEventListener("click", () => skip(by));
   }
+  label("liveBtn", W.go_live);
+  $("liveBtn").addEventListener("click", goLive);
 }
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -1014,7 +1119,9 @@ function tick() {
   }
   if (drag) { epsTick(); return; }                  // the finger's place, not the clock's
   const now = (s.time || Date.now() / 1000) + (Date.now() - stAt) / 1000;
-  if (s.now && s.now.stop > s.now.start && !(s.seek && s.duration > 0)) {
+  if (s.dvr) {
+    dvrTick();
+  } else if (s.now && s.now.stop > s.now.start && !(s.seek && s.duration > 0)) {
     setBar((now - s.now.start) / (s.now.stop - s.now.start));
     $("nowStart").textContent = at(s.now.start); $("nowEnd").textContent = at(s.now.stop);
   } else if (s.duration > 0) {

@@ -14,6 +14,19 @@ same new look.
 
 ### Added
 
+- Phone remote: a live channel in the rewind buffer can be gone back in
+  from Now playing. Its bar runs from as far back as the buffer reaches to
+  live; dragged, the place under the finger shows as how far behind live
+  ("−4:12") and one seek goes when it is let go; the player's skip steps
+  work in the buffer (forward no further than live), and Live - lit at the
+  live edge, else showing how far behind - goes back to live. All of it
+  through the DVR row's own paths in the player's buffer, never a second
+  connection; with the buffer off, on an HLS channel or anything not live,
+  nothing new shows. The state carries it small (`dvr`: behind live, how
+  far back, at live, still filling, when), reckoned on by the clock on the
+  phone and told again only when that would drift, so the poll's 304 holds
+  while a channel plays behind live. Mirrored right to left; three new
+  words in all 27 languages.
 - Record in TV mode. Options has a Record tile: it records what plays
   through the player's record button's own path (from the rewind buffer or
   the player's stream, no connection of its own) - also while TV mode's
