@@ -100,9 +100,9 @@ def test_a_recording_stays_in_sight_on_the_folded_card():
     assert 'id="recLive"' not in _between(now, 'id="nowMore"', '<span class="nowPill"')
     # ...shown whenever a recording runs and the card is folded, its time each second.
     fold = _fn(script, "folds")
-    # (TV mode's remote: open or folded, its Record pill giving way to it.)
+    # (Open, the Record tile itself says it, red with its time - TV mode's too.)
     assert "recording = !!(st.rec && st.rec.id)" in fold
-    assert 'hide($(f.rec), !recording || (open && k === "now"))' in fold
+    assert 'hide($(f.rec), !recording || open)' in fold
     tick = _fn(script, "recTick")
     assert "FOLDS[k].rec" in tick and "hms(" in tick and 'setAttribute("aria-label", text)' in tick
     assert "recTick();" in _fn(script, "tick")
@@ -135,15 +135,18 @@ def test_tv_modes_remote_records_from_its_fold_as_now_playing_does():
     # hidden until the state says what plays can be recorded.
     acts = _between(html, '<div class="pair" id="tvActs" hidden>', "</div>")
     assert acts.index('id="tvTracks"') < acts.index('id="tvSleep"') < acts.index('id="tvRec"')
-    pill = re.search(r'<button class="pill" id="tvRec" hidden>.*?</button>', acts).group(0)
-    assert 'class="recIcon"' in pill and 'class="fill"' in pill and 'id="tvRecText"' in pill
+    pill = re.search(r'<button class="pill rec" id="tvRec" hidden>.*?</button>', acts).group(0)
+    assert 'class="recIcon" id="tvRecIcon"' in pill and 'class="fill"' in pill and 'id="tvRecText"' in pill
     assert "tvRec" not in _between(html, '<footer class="dock"', "</footer>")
-    # Shown for a live channel the app can record from what plays, gone while
-    # one records: the dot beside More shows it then, open or folded.
+    # Shown for a live channel the app can record from what plays, and while
+    # one records - red, Stop with its time; folded, the dot beside More says it.
     offer = _fn(script, "recOffer")
-    assert 'hide($("tvRec"), !(live && s.can_rec) || running);' in offer
+    assert 'hide($("tvRec"), !(live && s.can_rec) && !running);' in offer
+    assert 'for (const id of ["recBtn", "tvRec"]) $(id).classList.toggle("on", running);' in offer
+    assert 'for (const id of ["recText", "tvRecText"])' in _fn(script, "recTick")
+    assert ".pill.rec.on{background:var(--rec);color:var(--on-error)" in style.replace(".showIn.rec.on,", "")
     fold = _fn(script, "folds")
-    assert 'hide($(f.rec), !recording || (open && k === "now"))' in fold
+    assert 'hide($(f.rec), !recording || open)' in fold
     # The same press as Now playing's Record: asked first unless the household
     # turned that off, a long press asks anyway; the app's own words.
     init = _fn(script, "initRec")
@@ -324,8 +327,18 @@ def test_the_page_fits_each_phone_upright_and_on_its_side_in_a_browser():
     for tag, r in checks["recLive"].items():
         assert re.search(r"\d+:\d\d", r["text"]) and r["recBtnHidden"], (tag, r)
         assert r["label"].endswith(r["text"]), (tag, r)
-    # Record from TV mode's remote: its pill gives way to the dot and its
-    # time, the fold still open - one control for a recording, not two.
+    # Record from TV mode's remote: the tile red with Stop and its time, the
+    # fold still open - one control for a recording, not two.
     assert set(checks["tvRec"]) == set(checks["recLive"])
     for tag, r in checks["tvRec"].items():
         assert r["open"] == "true" and re.search(r"\d+:\d\d", r["text"]), (tag, r)
+        assert r["red"] not in ("", "rgba(0, 0, 0, 0)"), (tag, r)
+    # More open: three tiles of one width in one row across the card, icon
+    # over words, at every size.
+    assert len(checks["tiles"]) == len(runs)
+    for tag, tiles in checks["tiles"].items():
+        assert len({t["top"] for t in tiles}) == 1, (tag, tiles)
+        widths = [t["w"] for t in tiles]
+        assert max(widths) - min(widths) <= 1, (tag, widths)
+        assert sum(widths) + 16 >= tiles[0]["wide"] - 1, (tag, tiles)
+        assert all(t["iconAbove"] and t["h"] >= 44 for t in tiles), (tag, tiles)

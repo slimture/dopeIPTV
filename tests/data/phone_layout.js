@@ -45,7 +45,7 @@ const gone = (page, sel) => page.waitForFunction(
 
 (async () => {
   const browser = await chromium.launch();
-  const problems = [], checks = {fits: {}, folded: {}, recLive: {}, tvRec: {}, remembered: null, errors: []};
+  const problems = [], checks = {fits: {}, folded: {}, recLive: {}, tvRec: {}, tiles: {}, remembered: null, errors: []};
   try {
     for (const run of runs) {
       const tag = `${run.w}x${run.h}-${run.scheme}${run.lang === "en" ? "" : "-" + run.lang}`;
@@ -69,6 +69,15 @@ const gone = (page, sel) => page.waitForFunction(
       await look("normal-folded");
       await page.click("#moreBtn");
       await shown(page, "#tracksBtn");
+      await shown(page, "#recBtn");
+      // Open: Subtitles and sound, the Sleep timer and Record an even row of
+      // tiles across the card, each its icon over its words.
+      checks.tiles[tag] = await page.evaluate(() => ["tracksBtn", "sleepBtn", "recBtn"].map((id) => {
+        const b = document.getElementById(id), r = b.getBoundingClientRect();
+        const icon = b.querySelector("svg").getBoundingClientRect(), words = b.querySelector("span:last-child").getBoundingClientRect();
+        return {top: Math.round(r.top), w: r.width, h: r.height, iconAbove: icon.bottom <= words.top + 1,
+                wide: document.getElementById("nowMore").getBoundingClientRect().width};
+      }));
       await look("normal-open");
       if (run.full && checks.remembered === null) {
         await page.reload();
@@ -92,17 +101,20 @@ const gone = (page, sel) => page.waitForFunction(
           await look(what);
           await page.click(btn);
         }
-        // Record from the remote's fold: the pill gives way to the dot and its time, open or folded.
+        // Record from the remote's fold: the tile turns red with its time while
+        // it records; folded, the dot and its time say it.
         await page.click("#tvMoreBtn");
         await shown(page, "#tvRec");
         await page.click("#tvRec");
-        await shown(page, "#tvRecLive");
-        await gone(page, "#tvRec");
+        await page.waitForFunction(() => document.getElementById("tvRec").classList.contains("on"), null, {timeout: 8000});
+        await gone(page, "#tvRecLive");
         checks.tvRec[tag] = await page.evaluate(() => ({
           open: document.getElementById("tvMoreBtn").getAttribute("aria-expanded"),
-          text: document.getElementById("tvRecLive").textContent}));
+          text: document.getElementById("tvRecText").textContent,
+          red: getComputedStyle(document.getElementById("tvRec")).backgroundColor}));
         await look("tv-more-rec");
         await page.click("#tvMoreBtn");
+        await shown(page, "#tvRecLive");
         await page.evaluate(() => fetch("api/rec_stop", {method: "POST", headers: {"Content-Type": "application/json"},
                                                          body: "{}"}));
         await gone(page, "#tvRecLive");

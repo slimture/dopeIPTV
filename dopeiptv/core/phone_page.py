@@ -346,7 +346,7 @@ _HTML = """<!doctype html>
     <div class="pair" id="tvActs" hidden>
       <button class="pill" id="tvTracks"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M10.5 10.3a2.2 2.2 0 1 0 0 3.4M17 10.3a2.2 2.2 0 1 0 0 3.4"/></svg><span id="tvTracksText"></span></button>
       <button class="pill" id="tvSleep"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 14.5A7.5 7.5 0 0 1 9.5 4.5a7.5 7.5 0 1 0 10 10z"/></svg><span id="tvSleepText"></span></button>
-      <button class="pill" id="tvRec" hidden><span class="recIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle class="fill" cx="12" cy="12" r="6"/></svg></span><span id="tvRecText"></span></button>
+      <button class="pill rec" id="tvRec" hidden><span class="recIcon" id="tvRecIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle class="fill" cx="12" cy="12" r="6"/></svg></span><span id="tvRecText"></span></button>
     </div>
     <div class="digits" id="digits" hidden>
       <button data-a="digit_1">1</button><button data-a="digit_2">2</button><button data-a="digit_3">3</button>
@@ -504,14 +504,22 @@ svg .fill{fill:currentColor;stroke:none}
 .caret{transition:transform .2s}
 [aria-expanded=true] .caret{transform:rotate(180deg)}
 @media (prefers-reduced-motion: reduce){.caret{transition:none}}
-.nowMore{margin-top:10px}
-.nowSet{display:flex;flex-wrap:wrap;gap:8px}
-.nowRec{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:12px;box-shadow:inset 0 1px 0 var(--border)}
-.nowSet[hidden]+.nowRec{margin-top:0;padding-top:0;box-shadow:none}
+.nowMore{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px}
+.nowSet,.nowRec{display:contents}
+.nowMore .showIn{display:flex;flex:1 1 0;min-width:0;margin:0;min-height:64px;padding:8px 4px;flex-direction:column;
+  justify-content:center;gap:5px;border-radius:var(--radius);font-size:clamp(11.5px,3.5vw,13px)}
+.nowMore .showIn span{white-space:normal;overflow:visible;text-align:center;line-height:1.15;overflow-wrap:break-word;
+  -webkit-hyphens:auto;hyphens:auto}
+.nowMore .showIn svg{width:20px;height:20px}
+.nowMore #nextBtn{flex:1 1 100%;flex-direction:row;justify-content:flex-start;gap:7px;min-height:44px;
+  padding:0 14px 0 11px;border-radius:999px;font-size:14px}
+.nowMore #nextBtn span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:start}
 body.tv .nowMore{display:none}
 .recIcon{display:flex;color:var(--rec)}
 .recIcon svg,.showIn .recIcon svg{width:18px;height:18px;color:var(--rec)}
-.showIn.rec.on{background:var(--sel);color:var(--rec)}
+.nowMore .showIn .recIcon svg{width:20px;height:20px}
+.showIn.rec.on,.pill.rec.on{background:var(--rec);color:var(--on-error);font-variant-numeric:tabular-nums}
+.showIn.rec.on .recIcon,.showIn.rec.on .recIcon svg,.pill.rec.on .recIcon,.pill.rec.on .recIcon svg{color:var(--on-error)}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--dock) + 8px);z-index:4;max-width:min(92vw,520px);
   padding:10px 16px;border-radius:12px;background:var(--text);color:var(--bg);font-size:14px;font-weight:600;
   text-align:center;overflow-wrap:anywhere}
@@ -1720,12 +1728,12 @@ function actsOffer(s) {
 }
 
 // -- More: the card kept compact ------------------------------------------------------------
-// What plays' sound and subtitles, the sleep timer, recording and the next
-// programme folded behind one button under Now playing (in TV mode's remote:
-// the sound, the sleep timer and Record), open or folded as this phone left it.
+// What plays' sound and subtitles, the sleep timer and Record - an even row of
+// tiles - and the next programme folded behind one button under Now playing
+// (in TV mode's remote: the same three), open or folded as this phone left it.
 // Folded, nothing that runs is out of sight: a recording's red dot and time and
-// the sleep timer's minutes stay on the card, each a way to it. TV mode's fold
-// has no Stop of its own: its dot shows a recording, open or folded.
+// the sleep timer's minutes stay on the card, each a way to it; open, the tiles
+// themselves say them.
 const FOLDS = {
   now: {btn: "moreBtn", body: "nowMore", text: "moreText", key: "more", rec: "recLive", sleep: "sleepLive"},
   tv: {btn: "tvMoreBtn", body: "tvActs", text: "tvMoreText", key: "tv_more", rec: "tvRecLive", sleep: "tvSleepLive"},
@@ -1753,7 +1761,7 @@ function folds() {
     hide($(f.body), !open);
     $(f.btn).setAttribute("aria-expanded", String(open));
     $(f.text).textContent = open ? W.less : W.more;
-    hide($(f.rec), !recording || (open && k === "now"));
+    hide($(f.rec), !recording || open);
   }
   hide($("nowSet"), !isShown("tracksBtn") && !isShown("sleepBtn"));
   sleepTick(); recTick();
@@ -1893,17 +1901,19 @@ function jobSheet(id, state, title) {
   sheetButtons(b, buttons);
 }
 
-// Now playing's own row for it, apart from the others: Record or Stop with
-// its time, and the next programme. TV mode's remote: Record in its fold,
-// gone while a recording runs (its dot says it, and stops it).
+// Record beside Subtitles and sound and the Sleep timer, an even row of tiles
+// under More - red with its time while a recording runs, a tap asks to stop
+// it - and the next programme under them. TV mode's remote the same in its
+// fold; folded, the dot and the time say it.
 function recOffer(s) {
   const live = s.kind === "live" && s.state !== "stopped" && !!s.channel;
   const running = !!(s.rec && s.rec.id);
   hide($("recBtn"), !(live && s.can_rec) && !running);
-  hide($("tvRec"), !(live && s.can_rec) || running);
+  hide($("tvRec"), !(live && s.can_rec) && !running);
   hide($("nextBtn"), !live || !s.next);
-  $("recBtn").classList.toggle("on", running);
+  for (const id of ["recBtn", "tvRec"]) $(id).classList.toggle("on", running);
   $("recIcon").innerHTML = running ? STOPSQ : RECDOT;
+  $("tvRecIcon").innerHTML = running ? STOPSQ : RECDOT;
   hide($("nowRec"), $("recBtn").hasAttribute("hidden") && $("nextBtn").hasAttribute("hidden"));
   $("nextText").textContent = s.next ? W.next + " · " + (s.next.title || "") : "";
   recTick();
@@ -1918,7 +1928,7 @@ function recTick() {
     time = hms(Math.max(0, now - (r.start || now)));
     text = W.rec_stop + " · " + time;
   }
-  if ($("recText").textContent !== text) $("recText").textContent = text;
+  for (const id of ["recText", "tvRecText"]) if ($(id).textContent !== text) $(id).textContent = text;
   // Folded away, the red dot and the time stay on the card.
   for (const k of ["now", "tv"]) {
     const b = $(FOLDS[k].rec);

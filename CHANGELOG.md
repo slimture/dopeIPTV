@@ -102,6 +102,11 @@ same new look.
   title is gone; a long category is cut with "…" (whole in its tooltip)
   and the count stays whole, the filter giving up room first. The count
   no longer repeats the order - the sort's button names it.
+- Phone remote: More opens on an even row of three tiles - Subtitles and
+  sound, Sleep timer, Record - each its icon over its words, the next
+  programme under them; Record turns red with its time while a recording
+  runs (a tap asks to stop it) and the sleep timer shows its minutes. TV
+  mode's remote has the same three tiles in its fold.
 - Movies: a film no longer opens a page of its own in the middle pane,
   which said again what the detail column says. A click picks the film
   and the detail column shows it - with Continue, how far it got and the
