@@ -904,5 +904,5 @@ class _PlaceLocalMixin:
         return {"shown": self._place_local_showing(),
                 "cards": view.model_.rowCount() if view is not None else 0,
                 "layout": view.layout_kind if view is not None else "",
-                "title": place.header.title.text() if place is not None else "",
+                "title": place.header.title_text() if place is not None else "",
                 "continue": [c.key for c in place.cont.cards()] if place is not None else []}

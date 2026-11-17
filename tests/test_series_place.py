@@ -271,17 +271,17 @@ grid = place.grid
 settle(lambda: w.list_model.rowCount() == 30 and grid.model_.rowCount() == 30, what="cards")
 assert not w.listw.isVisible() and place.isVisible() and w.count_lbl.isVisible()
 assert w.nav_btns["series"].isChecked()
-assert place.header.title.text() == "Drama", place.header.title.text()
-# Recently updated first where the source says when; said in the count line.
+assert place.header.title_text() == "Drama", place.header.title_text()
+# Recently updated first where the source says when; named on the sort's button.
 order = [c.data["series_id"] for c in grid.items()]
 want = [s["series_id"] for s in sorted((s for s in shows if s["category_id"] == "5"),
                                         key=lambda s: int(s["last_modified"]), reverse=True)]
 assert order == want, (order[:5], want[:5])
-assert place.header.count.text() == tr("count_series", n=30) + " · " + tr("place_sort_updated")
+assert place.header.count.text() == tr("count_series", n=30), place.header.count.text()
 # The menu's first entry, "As in all categories (Recently updated)"; the
 # button names the order the cards are in.
-assert place.header.sort_key() == "global"
-assert place.header.sort_btn.text() == tr("place_sort_updated")
+assert place.header.sort_key() == "global", place.header.sort_key()
+assert place.header.sort_btn.text() == tr("place_sort_updated"), place.header.sort_btn.text()
 assert place.header._sort_opts[0] == ("global", tr("sort_as_all", order=tr("place_sort_updated")))
 # Nothing of Popular (no TMDB) and nothing to continue: the rows stay away.
 assert place.popular.isHidden() and place.cont.isHidden()
@@ -290,7 +290,6 @@ assert place.popular.isHidden() and place.cont.isHidden()
 place.header._sort_picked("alpha_asc")
 settle(lambda: [c.title for c in grid.items()][:2] == ["Show 00", "Show 02"], what="A-Z")
 assert settings.value(w._sort_setting_key()) == "alpha_asc"
-assert place.header.count.text().endswith(tr("sort_az"))
 assert place.header.sort_btn.text() == tr("sort_az")
 place.header._sort_picked("recent")
 settle(lambda: [c.data["series_id"] for c in grid.items()] == want, what="recent again")
@@ -310,7 +309,7 @@ assert grid.layout_kind == "poster" and settings.value(mw_place_series.VIEW_KEY)
 row = next(i for i in range(w.cat_list.count())
            if w.cat_list.item(i).data(Qt.ItemDataRole.UserRole) == "6")
 w.cat_list.setCurrentRow(row)
-settle(lambda: place.header.title.text() == "Comedy" and grid.model_.rowCount() == 30, what="Comedy")
+settle(lambda: place.header.title_text() == "Comedy" and grid.model_.rowCount() == 30, what="Comedy")
 
 # -- a series' page from the grid; Back: the grid exactly as it was ---------------------
 idle(0.3)
@@ -441,7 +440,7 @@ assert [c.title for c in pop] == ["Show 31", "Show 05", "Show 12"], [c.title for
 assert [c.rank for c in pop] == [1, 2, 3] and not place.cont.isHidden()
 # In a category: that category's.
 w.cat_list.setCurrentRow(row)                                   # Comedy (odd ids)
-settle(lambda: place.header.title.text() == "Comedy" and grid.model_.rowCount() == 30, what="Comedy 2")
+settle(lambda: place.header.title_text() == "Comedy" and grid.model_.rowCount() == 30, what="Comedy 2")
 settle(lambda: [c.title for c in place.popular.cards()] == ["Show 31", "Show 05"], what="Comedy's")
 # Opened from there: its page; Back to the place.
 place.popular.activated.emit(place.popular.cards()[1])
@@ -488,13 +487,13 @@ frow = next(i for i in range(w.cat_list.count())
             if w.cat_list.item(i).data(Qt.ItemDataRole.UserRole) == "__followed__")
 w.cat_list.setCurrentRow(frow)
 settle(lambda: [c.key for c in grid.items()] == ["s:133"], what="the followed")
-assert place.header.title.text() == tr("cat_following") and place.cont.isHidden()
+assert place.header.title_text() == tr("cat_following") and place.cont.isHidden()
 
 # -- the menu of a card: the list's own, for every card selected --------------------
 row = next(i for i in range(w.cat_list.count())
            if w.cat_list.item(i).data(Qt.ItemDataRole.UserRole) == "6")
 w.cat_list.setCurrentRow(row)
-settle(lambda: place.header.title.text() == "Comedy" and grid.model_.rowCount() == 30, what="Comedy 3")
+settle(lambda: place.header.title_text() == "Comedy" and grid.model_.rowCount() == 30, what="Comedy 3")
 seen = []
 orig_exec = QMenu.exec
 QMenu.exec = lambda self, *a, **k: seen.append([x.text() for x in self.actions()])

@@ -48,9 +48,6 @@ DENSITY_KEY = "tv_density"
 RECENT_MAX = 12
 #: How often what is on is looked at again (the rows' bars, the cards' lines).
 TICK_MS = 30_000
-#: The order the count line names, by the list's effective sort order.
-_ORDER_WORDS = {"default": "tv_by_number", "alpha_asc": "tv_by_name",
-                "alpha_desc": "tv_by_name_desc", "recent": "tv_by_added"}
 
 
 class _PlaceTvMixin:
@@ -260,8 +257,8 @@ class _PlaceTvMixin:
             model = self.list_model
             n = model.rowCount() if model.uniform else sum(
                 1 for r in range(model.rowCount()) if not (model.item_at(r) or {}).get("_header"))
-            order = _ORDER_WORDS.get(self._current_sort_order(), "tv_by_number")
-            top.set_count(f"{self._count_text('live', n)} · {tr(order)}")
+            # The count alone: the sort's button names the order.
+            top.set_count(self._count_text("live", n))
         box = self.sort_box
         top.set_sort([(box.itemData(i), box.itemText(i)) for i in range(box.count())],
                      self._current_sort_raw(), self._sort_button_words())

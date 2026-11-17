@@ -413,7 +413,7 @@ class _PlaceSeriesMixin:
         raw = self._current_sort_raw()
         count = tr("count_episodes" if cat == "__continue__" else "count_series", n=n)
         if n:
-            h.set_count(f"{count} · {order_words(order, True)}")
+            h.set_count(count)          # the sort's button names the order
         else:
             h.set_count("" if busy else count)
         h.set_sort(sorts, raw if raw in dict(sorts) else "global", order_words(order, True))

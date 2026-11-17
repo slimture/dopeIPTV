@@ -392,7 +392,9 @@ def test_header_controls_in_one_line_and_title_cut_with_an_ellipsis(app):
     assert len(feet) == 1, feet
     shown = h.title.text()
     assert shown != title and shown.endswith("…"), shown
-    assert h.title.toolTip() == title
+    assert h.title.toolTip() == title + " · 6443 movies" == h.line_text()
+    assert h.count.text() == "6443 movies"                     # the count kept whole
+    assert h.height() == mc.PageHeader.CONTROL_H               # one line, one height
     assert h.sort_btn.toolButtonStyle() == Qt.ToolButtonStyle.ToolButtonTextBesideIcon
     h.resize(400, 80)
     _spin(app)

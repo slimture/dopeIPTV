@@ -123,8 +123,9 @@ assert w._show_place("tv") is True and w._place == "tv"
 settle(lambda: top.isVisible(), what="the header")
 assert not w._place_header_holder.isVisible()      # the places' shared one gives way
 assert top.title_text() == "Sweden", top.title_text()
-count = top.header.count.text()
-assert tr("count_channels", n=12) in count and tr("tv_by_number") in count, count
+# The count alone; the sort's button names the order the list is in.
+assert top.header.count.text() == tr("count_channels", n=12), top.header.count.text()
+assert top.header.sort_key() == "global" and top.header.sort_btn.text() == tr("sort_provider")
 assert not top.recent.isVisible()                   # nothing watched yet
 assert not w._sort_ctl.isVisible() and not w._size_ctl.isVisible()
 assert w.delegate.tv_rows(w.list_model) and w.delegate.tv_density == "compact"
@@ -193,10 +194,10 @@ w.delegate.set_tv_density("compact")             # another profile's, say; read 
 w._place_tv_sync()
 assert w.delegate.tv_density == "airy" and top.header.view_key() == "airy"
 
-# 7. The header's sort: the category's own order, said in the count line.
+# 7. The header's sort: the category's own order, named on its button.
 top.header._sort_picked("alpha_desc")
 settle(lambda: w.list_model.item_at(0)["stream_id"] == 12, what="Z to A")
-assert tr("tv_by_name_desc") in top.header.count.text()
+assert top.header.sort_btn.text() == tr("sort_za")
 assert w.sort_box.currentData() == "alpha_desc"
 top.header._sort_picked("global")
 settle(lambda: w.list_model.item_at(0)["stream_id"] == 1, what="back to the default")

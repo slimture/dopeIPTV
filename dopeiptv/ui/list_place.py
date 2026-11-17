@@ -2,11 +2,11 @@
 the form Local files, Recordings and Radio share on ``media_cards``'
 ``PlacePage`` (their window sides keep the list as the source of truth).
 
-* A way back over the header ("‹ Back to Films"), cut to the page's width,
-  shown only below the top - the mouse's back button and Backspace too.
-* The header: the title, its count line, the filter (the list's own), the
-  page's own square buttons (``tool_button``), Grid / List as drawn marks
-  (``layout_icon``) and the header's switch.
+* The header's one quiet line: a way back at its start ("‹ Back to
+  Films", cut to its room - shown only below the top; the mouse's back
+  button and Backspace too), what it shows and its count, then the filter
+  (the list's own), the page's own square buttons (``tool_button``), Grid
+  / List as drawn marks (``layout_icon``) and the header's switch.
 * On a narrow pane the controls take rows of their own under the title -
   the switches and buttons, then the filter as wide as the page - so the
   title keeps its room and the page never runs wider than the pane.
@@ -224,7 +224,7 @@ class _Filter(QLineEdit):
 
 
 class ListPlace(PlacePage):
-    """The form: Back over the header; the header with the filter, the
+    """The form: the header - Back at its start - with the filter, the
     page's own buttons, Grid / List and the header's switch; the page's
     rows; a calm word; the cards. The window fills each part and listens
     to their signals. A page builds on it with ``_make_tools`` (its square
@@ -255,11 +255,8 @@ class ListPlace(PlacePage):
         self._title_words = title
         self.setAccessibleName(title)
         h = self.header
-        for label in (h.title, h.count):
-            label.setMinimumWidth(0)
-            label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        # Back, over the header: "‹ Back to Films" - a control that reads as
-        # one, shown only below the top.
+        # Back, at the start of the header's line: "‹ Back to Films" - a
+        # control that reads as one, shown only below the top.
         self.back = QPushButton(tr("btn_back"))
         self.back.setObjectName(f"{self.NAME}Back")
         self.back.setFlat(True)
@@ -267,15 +264,11 @@ class ListPlace(PlacePage):
         self.back.setIconSize(QSize(16, 16))
         self.back.setFocusPolicy(Qt.FocusPolicy.TabFocus)
         self.back.clicked.connect(self.back_requested)
-        self._back_row = QWidget()
-        self._back_row.setObjectName(f"{self.NAME}BackRow")
-        br = QHBoxLayout(self._back_row)
-        br.setContentsMargins(0, 0, 0, 0)
-        br.addWidget(self.back)
-        br.addStretch(1)
-        self._lay.insertWidget(0, self._back_row)
-        self._rows_at += 1
-        self._back_row.hide()
+        self.back.setFixedHeight(PageHeader.CONTROL_H)
+        h.add_lead(self.back)
+        #: Kept by its old name: the way back is its own row no more.
+        self._back_row = self.back
+        self.back.hide()
         # The header's own: the filter, the page's buttons, Grid / List.
         self.filter = _Filter(self.FILTER_W, objectName="Search")
         self.filter.setClearButtonEnabled(True)
@@ -434,13 +427,19 @@ class ListPlace(PlacePage):
             self.back.setToolTip(text)
             self.back.setAccessibleName(text)
             self._fit_back()
-        self._back_row.setVisible(bool(text))
+        if self.back.isHidden() == bool(text):
+            self.back.setVisible(bool(text))
+            self._fit_controls(force=True)
+
+    #: The most of the line the way back takes, in pixels.
+    BACK_MAX = 200
 
     def _fit_back(self) -> None:
-        """The way back's words cut with "…" to the page's width: a long
-        name never holds the page wider than the pane."""
+        """The way back's words cut with "…" to its share of the line: a
+        long name never holds the page wider than the pane, nor takes the
+        line from what is shown."""
         full = getattr(self, "_back_full", "") or self.back.text()
-        room = max(60, self.width() - 2 * self.MARGIN_X - 16 - 36)
+        room = max(60, min(self.BACK_MAX, (self.width() - 2 * self.MARGIN_X) // 3 - 36))
         text = self.back.fontMetrics().elidedText(full, Qt.TextElideMode.ElideMiddle, room)
         if self.back.text() != text:
             self.back.setText(text)
@@ -476,6 +475,8 @@ class ListPlace(PlacePage):
               *(t.width() for t in self.tools if self._tool_wanted(t)),
               h.switch.sizeHint().width() if h.switch.keys() else 0,
               self.layout_switch.sizeHint().width() if self._layout_shown else 0]
+        if not self.back.isHidden():
+            ws.append(self.back.sizeHint().width())
         shown = [w for w in ws if w]
         return (2 * self.MARGIN_X + self.TITLE_ROOM + sum(shown)
                 + 8 * max(0, len(shown) - 1) + 12)
@@ -492,7 +493,7 @@ class ListPlace(PlacePage):
     def resizeEvent(self, e) -> None:
         super().resizeEvent(e)
         self._fit_controls()
-        if self._back_row.isVisible():
+        if not self.back.isHidden():
             self._fit_back()
 
     def _fit_controls(self, force: bool = False) -> None:
@@ -529,8 +530,8 @@ class ListPlace(PlacePage):
             f.setMaximumWidth(self.FILTER_W)
             f.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
             for w in (f, *self.tools, ls):
-                extra.addWidget(w, 0, Qt.AlignmentFlag.AlignBottom)
-            row.addWidget(sw, 0, Qt.AlignmentFlag.AlignBottom)
+                extra.addWidget(w, 0, Qt.AlignmentFlag.AlignVCenter)
+            row.addWidget(sw, 0, Qt.AlignmentFlag.AlignVCenter)
             self._tools.hide()
         f.setVisible(True)
         for t in self.tools:

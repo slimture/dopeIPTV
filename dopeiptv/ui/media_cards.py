@@ -50,8 +50,8 @@ from PyQt6.QtGui import (
     QPainterPath, QPen, QPixmap,
 )
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QBoxLayout, QButtonGroup, QFrame, QHBoxLayout, QLabel, QLineEdit, QListView,
-    QMenu, QPushButton, QScrollArea, QSizePolicy, QSpacerItem, QStyle, QStyledItemDelegate,
+    QAbstractItemView, QButtonGroup, QFrame, QHBoxLayout, QLabel, QLayout, QLineEdit, QListView,
+    QMenu, QPushButton, QScrollArea, QSizePolicy, QStyle, QStyledItemDelegate,
     QToolButton, QVBoxLayout, QWidget,
 )
 
@@ -2093,81 +2093,73 @@ class Segmented(QWidget):
         super().keyPressEvent(e)
 
 
-class _TitleLabel(QLabel):
-    """A header's title: it asks for the room of its whole text (*full*),
-    not of the text cut to fit - else once cut short it never asked for
-    more again."""
-
-    def __init__(self, text: str = "") -> None:
-        super().__init__(text)
-        self.full = text
-
-    def sizeHint(self) -> QSize:
-        hint = super().sizeHint()
-        text = self.text()
-        if self.full and self.full != text:
-            fm = self.fontMetrics()
-            hint.setWidth(hint.width() - fm.horizontalAdvance(text)
-                          + fm.horizontalAdvance(self.full))
-        return hint
-
-
 class PageHeader(QWidget):
-    """A place's header: its name, a muted count line under it ("312
-    channels · by number"), and at the end a sort control (a menu of the
-    orders) and a segmented switch. Empty choices hide their control.
-    Compact (``set_compact``: Just the list) the name is smaller and, where
-    there is room, on one line with the count - the list starts higher."""
+    """A place's header, one quiet line at one height: what it shows - the
+    category, the folder - and its count in small muted words ("Drama ·
+    30 series"), a way back before them where there is one (`add_lead`),
+    and at the end the page's own controls, the sort (its button names the
+    order) and a segmented switch. Empty choices hide their control. A long
+    name is cut with "…" first, the count kept whole while the name keeps
+    a little room (`TITLE_MIN`); the whole line is in the tooltip."""
 
     sort_changed = pyqtSignal(str)
     view_changed = pyqtSignal(str)
 
-    #: The title's size in pixels, in full and compact.
-    TITLE_PX, COMPACT_TITLE_PX = 24, 17
-    #: Compact, the count goes on the title's line while the title keeps at
-    #: least this much room beside it.
-    INLINE_TITLE_MIN = 80
-    INLINE_GAP = 10
-
+    #: The line's words in pixels: what is shown, its count.
+    TITLE_PX = 13
     #: Every control at the header's end is this tall (the sort, the
-    #: switch, a filter): one line, whatever the system's font makes of
-    #: each - a filter field stood taller and higher than the buttons.
+    #: switch, a filter) - and so is the header: one line, whatever the
+    #: system's font makes of each.
     CONTROL_H = 32
     #: Below this width the sort shows its mark alone (its order in the
     #: tooltip), so the header never holds its page wider than the pane.
     #: *fit_sort* False: its owner fits it (the TV place's header).
     SORT_TEXT_FROM = 470
     fit_sort = True
+    #: The least of a long name shown before the count is cut too.
+    TITLE_MIN = 56
+    #: Between the name, the dot and the count.
+    GAP = 6
 
     def __init__(self, title: str = "", parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("MediaPageHeader")
         self._title_full = title
+        self._count_full = ""
         self._compact = False
-        self._inline = False
-        self._kept: dict[int, tuple] = {}
+        self._filter_max: dict[int, int] = {}
         lay = QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(12)
-        # The title over the count; compact and with room, side by side.
-        col = self._col = QBoxLayout(QBoxLayout.Direction.TopToBottom)
-        col.setSpacing(4)
-        self.title = _TitleLabel(title)
+        self._lead = QHBoxLayout()
+        self._lead.setSpacing(8)
+        lay.addLayout(self._lead)
+        # The line: its labels as wide as `_fit_line` makes them, the rest of
+        # its room left empty - it never holds the header wider than the pane.
+        self._line = QWidget()
+        self._line.setObjectName("MediaPageLine")
+        self._line.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self._line.setMinimumWidth(1)
+        line = QHBoxLayout(self._line)
+        line.setContentsMargins(0, 0, 0, 0)
+        line.setSpacing(self.GAP)
+        line.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+        self.title = QLabel(title)
         self.title.setObjectName("MediaPageTitle")
-        self.title.setTextFormat(Qt.TextFormat.PlainText)
         self.title.setAccessibleName(title)
-        # Its room can change without the header's own (the count coming
-        # onto its line): cut again whenever it does.
-        self.title.installEventFilter(self)
-        col.addWidget(self.title)
+        self._dot = QLabel("·")
+        self._dot.setObjectName("MediaPageDot")
+        self._dot.setAccessibleName("")
         self.count = QLabel("")
         self.count.setObjectName("MediaPageCount")
-        self.count.setTextFormat(Qt.TextFormat.PlainText)
         self.count.hide()
-        col.addWidget(self.count)
-        self._col_tail = QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
-        col.addItem(self._col_tail)
-        lay.addLayout(col, 1)
+        for lab in (self.title, self._dot, self.count):
+            lab.setTextFormat(Qt.TextFormat.PlainText)
+            lab.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+            line.addWidget(lab, 0, Qt.AlignmentFlag.AlignVCenter)
+        line.addStretch(1)
+        self._line.installEventFilter(self)
+        lay.addWidget(self._line, 1)
         self._extra = QHBoxLayout()
         self._extra.setSpacing(8)
         lay.addLayout(self._extra)
@@ -2185,19 +2177,22 @@ class PageHeader(QWidget):
         self._sort_key = ""
         self.sort_btn.hide()
         self.sort_btn.setFixedHeight(self.CONTROL_H)
-        lay.addWidget(self.sort_btn, 0, Qt.AlignmentFlag.AlignBottom)
+        lay.addWidget(self.sort_btn, 0, Qt.AlignmentFlag.AlignVCenter)
         self.switch = Segmented(name=tr("card_view_switch_a11y"))
         self.switch.setFixedHeight(self.CONTROL_H)
         self.switch.changed.connect(self.view_changed)
-        lay.addWidget(self.switch, 0, Qt.AlignmentFlag.AlignBottom)
+        lay.addWidget(self.switch, 0, Qt.AlignmentFlag.AlignVCenter)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setFixedHeight(self.CONTROL_H)
         self.restyle()
+        self._fit_line()
 
     def restyle(self) -> None:
-        px = self.COMPACT_TITLE_PX if self._compact else self.TITLE_PX
-        self.title.setStyleSheet(f"color:{P['text']}; font-size:{px}px; font-weight:700;"
+        px = self.TITLE_PX
+        self.title.setStyleSheet(f"color:{P['text2']}; font-size:{px}px; font-weight:600;"
                                  " background:transparent;")
-        self.count.setStyleSheet(f"color:{P['muted']}; font-size:12px; background:transparent;")
+        for lab in (self._dot, self.count):
+            lab.setStyleSheet(f"color:{P['muted']}; font-size:{px}px; background:transparent;")
         r = round(corner_radius(10))
         self.sort_btn.setStyleSheet(
             f"QToolButton#MediaSort {{ background:{P['input']}; color:{P['text2']};"
@@ -2207,98 +2202,107 @@ class PageHeader(QWidget):
             "QToolButton#MediaSort::menu-indicator { image:none; width:0; }")
         self.sort_btn.setIcon(sort_icon(P["text2"], 14, self.devicePixelRatioF() or 1.0))
         self.switch.restyle()
+        self._fit_line()
+
+    def add_lead(self, w: QWidget) -> None:
+        """Something before the line (the way back), as tall as the line."""
+        self._lead.addWidget(w, 0, Qt.AlignmentFlag.AlignVCenter)
 
     def set_title(self, text: str) -> None:
+        """What the place shows: the category, the folder, the list."""
         self._title_full = text
-        self.title.full = text
         self.title.setAccessibleName(text)
-        self.title.updateGeometry()
-        self._fit_title()
-        self._arrange_title()
+        self._fit_line()
+
+    def title_text(self) -> str:
+        """The name in full (the label may hold it cut)."""
+        return self._title_full
+
+    def set_count(self, text: str) -> None:
+        self._count_full = text
+        self._fit_line()
+
+    def line_text(self) -> str:
+        """The whole line as it would read with room: "Drama · 30 series"."""
+        return " · ".join(t for t in (self._title_full, self._count_full) if t)
 
     # -- compact ----------------------------------------------------------------
 
     def set_compact(self, on: bool) -> None:
-        """Compact (Just the list): the title smaller, on the count's line
-        where both fit; else as ever."""
-        on = bool(on)
-        if on == self._compact:
-            return
-        self._compact = on
-        self.restyle()
-        self._arrange_title()
-        QTimer.singleShot(0, lambda: None if sip.isdeleted(self) else self._fit_title())
+        """Just the list: kept for the page round the header (its room);
+        the line is the same."""
+        self._compact = bool(on)
 
     def is_compact(self) -> bool:
         return self._compact
 
     def is_inline(self) -> bool:
-        """Whether the count is on the title's line now."""
-        return self._inline
-
-    def _wants_inline(self) -> bool:
-        if not self._compact:
-            return False
-        if not self.count.text():
-            return True
-        room = self._col.geometry().width()
-        if room <= 0:
-            return False
-        fm = self.count.fontMetrics()
-        need = fm.horizontalAdvance(self.count.text()) + 4 + self.INLINE_GAP
-        title_w = self.title.fontMetrics().horizontalAdvance(self._title_full)
-        return room >= need + min(title_w, self.INLINE_TITLE_MIN)
-
-    def _arrange_title(self) -> None:
-        """The title and the count one over the other, or side by side."""
-        inline = self._wants_inline()
-        if inline == self._inline:
-            return
-        self._inline = inline
-        col = self._col
-        labels = (self.title, self.count)
-        if inline:
-            col.setDirection(QBoxLayout.Direction.LeftToRight)
-            col.setSpacing(self.INLINE_GAP)
-            for lab in labels:
-                # Each asks for its text's room and gives it up to 1 px -
-                # the title first - so the header never holds the pane wide.
-                self._kept[id(lab)] = (QSizePolicy(lab.sizePolicy()), lab.minimumWidth())
-                lab.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
-                lab.setMinimumWidth(max(1, lab.minimumWidth()))
-                col.setAlignment(lab, Qt.AlignmentFlag.AlignVCenter)
-            self._col_tail.changeSize(0, 0, QSizePolicy.Policy.Expanding,
-                                      QSizePolicy.Policy.Minimum)
-        else:
-            col.setDirection(QBoxLayout.Direction.TopToBottom)
-            col.setSpacing(4)
-            for lab in labels:
-                kept = self._kept.pop(id(lab), None)
-                if kept is not None:
-                    lab.setSizePolicy(kept[0])
-                    lab.setMinimumWidth(kept[1])
-                col.setAlignment(lab, Qt.AlignmentFlag(0))
-            self._col_tail.changeSize(0, 0, QSizePolicy.Policy.Minimum,
-                                      QSizePolicy.Policy.Minimum)
-        col.invalidate()
-        self.updateGeometry()
+        """The count is always on the name's line."""
+        return True
 
     def eventFilter(self, obj, e) -> bool:  # noqa: N802 - Qt's name
-        if obj is self.title and e.type() == QEvent.Type.Resize:
-            self._fit_title()
+        if obj is self._line and e.type() == QEvent.Type.Resize:
+            self._fit_line()
         return super().eventFilter(obj, e)
 
-    def _fit_title(self) -> None:
-        """The title cut to its room with an ellipsis (and whole in its
-        tooltip) - never cut off mid-letter where the filter begins."""
-        full = self._title_full
-        room = self.title.width() if self.title.isVisible() else 0
-        text = full
-        if room > 0 and self.title.fontMetrics().horizontalAdvance(full) > room:
-            text = self.title.fontMetrics().elidedText(full, Qt.TextElideMode.ElideRight, room)
-        if self.title.text() != text:
-            self.title.setText(text)
-        self.title.setToolTip(full if text != full else "")
+    def _fit_line(self) -> None:
+        """The name and the count in the line's room: the name cut with "…"
+        first, the count whole while the name keeps `TITLE_MIN`, then the
+        count cut too - never cut off mid-letter where the controls begin."""
+        title, count = self._title_full, self._count_full
+        both = bool(title and count)
+        fm_t, fm_c = self.title.fontMetrics(), self.count.fontMetrics()
+        tw = fm_t.horizontalAdvance(title) + 2 if title else 0
+        cw = fm_c.horizontalAdvance(count) + 2 if count else 0
+        dot = fm_c.horizontalAdvance("·") + 2
+        dw = dot + 2 * self.GAP if both else 0
+        self._give_room(min(tw, self.TITLE_MIN) + dw + cw)
+        room = self._line.width() if self._line.isVisible() else 0
+        full_t, full_c = tw, cw
+        if room > 0 and tw + dw + cw > room:
+            if not count:
+                tw = room
+            elif not title:
+                cw = room
+            elif room - dw - cw >= min(tw, self.TITLE_MIN):
+                tw = room - dw - cw
+            else:
+                tw = min(tw, self.TITLE_MIN)
+                cw = max(1, room - dw - tw)
+        shown_t = (fm_t.elidedText(title, Qt.TextElideMode.ElideRight, max(1, tw - 2))
+                   if tw < full_t else title)
+        shown_c = (fm_c.elidedText(count, Qt.TextElideMode.ElideRight, max(1, cw - 2))
+                   if cw < full_c else count)
+        for lab, text, width in ((self.title, shown_t, tw), (self.count, shown_c, cw)):
+            if lab.text() != text:
+                lab.setText(text)
+            lab.setFixedWidth(max(1, width))
+            lab.setVisible(bool(text))
+        self._dot.setFixedWidth(dot)
+        self._dot.setVisible(both)
+        cut = (shown_t != title) or (shown_c != count)
+        tip = self.line_text() if cut else ""
+        for lab in (self.title, self.count):
+            if lab.toolTip() != tip:
+                lab.setToolTip(tip)
+
+    def _give_room(self, need: int) -> None:
+        """A filter beside the line gives up its room first - down to its
+        least - so a little of the name and the whole count stay; it never
+        asks the header for more than the pane gives it."""
+        if not self._line.isVisible():
+            return
+        filters = [w for w in (self._extra.itemAt(i).widget() for i in range(self._extra.count()))
+                   if isinstance(w, QLineEdit) and not w.isHidden()]
+        if not filters:
+            return
+        avail = self._line.width() + sum(f.width() for f in filters)
+        share = (avail - need) // len(filters)
+        for f in filters:
+            base = self._filter_max.setdefault(id(f), f.maximumWidth())
+            width = max(f.minimumWidth(), min(base, share))
+            if f.maximumWidth() != width:
+                f.setMaximumWidth(width)
 
     def resizeEvent(self, e) -> None:
         super().resizeEvent(e)
@@ -2308,17 +2312,11 @@ class PageHeader(QWidget):
                      else Qt.ToolButtonStyle.ToolButtonIconOnly)
             if self.sort_btn.toolButtonStyle() != style:
                 self.sort_btn.setToolButtonStyle(style)
-        self._fit_title()
-        self._arrange_title()
+        self._fit_line()
 
     def showEvent(self, e) -> None:
         super().showEvent(e)
-        QTimer.singleShot(0, lambda: None if sip.isdeleted(self) else self._fit_title())
-
-    def set_count(self, text: str) -> None:
-        self.count.setText(text)
-        self.count.setVisible(bool(text))
-        self._arrange_title()
+        QTimer.singleShot(0, lambda: None if sip.isdeleted(self) else self._fit_line())
 
     def set_sort(self, options: Sequence[tuple[str, str]], current: str = "",
                  shown: str = "") -> None:
@@ -2376,14 +2374,16 @@ class PageHeader(QWidget):
 
     def add_widget(self, w: QWidget) -> None:
         """Something of the page's own beside the controls (a filter, a
-        button): as tall as they are and at the foot with them."""
+        button): as tall as they are, on their line."""
         if isinstance(w, QLineEdit):
             w.setFixedHeight(self.CONTROL_H)
+            # Its widest; `_give_room` narrows it for the line and back.
+            self._filter_max[id(w)] = w.maximumWidth()
             # The app's filter field pads for a taller box; this one's room.
             name = w.objectName()
             if name:
                 w.setStyleSheet(f"QLineEdit#{name} {{ padding: 4px 10px; }}")
-        self._extra.addWidget(w, 0, Qt.AlignmentFlag.AlignBottom)
+        self._extra.addWidget(w, 0, Qt.AlignmentFlag.AlignVCenter)
 
 
 # -- the shared form ---------------------------------------------------------------

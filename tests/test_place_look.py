@@ -289,60 +289,59 @@ def test_a_named_row_offers_hide_this_row_on_its_heading(app):
 
 # -- the compact header ------------------------------------------------------------------
 
-def test_compact_puts_the_count_on_the_title_line_where_it_fits(app):
+def test_the_header_is_one_line_at_one_height_compact_or_not(app):
     from dopeiptv.ui.media_cards import PageHeader, PlacePage
     page = PlacePage("Sweden")
     h = page.header
-    for label in (h.title, h.count):
-        label.setMinimumWidth(1)
-        label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-    h.set_count("14 channels · by number")
+    h.set_count("14 channels")
     h.set_views([("compact", "Compact"), ("airy", "Airy")])
     page.resize(800, 600)
     page.show()
     app.processEvents()
-    tall = h.sizeHint().height()
     top = page._lay.contentsMargins().top()
-    assert not h.is_inline()
+    assert h.height() == PageHeader.CONTROL_H and h.is_inline()
+    assert abs(h.title.geometry().center().y() - h.count.geometry().center().y()) <= 3
+    assert h.count.geometry().left() > h.title.geometry().left()
+    assert h.title.text() == "Sweden" and h.count.text() == "14 channels"
+    assert f"font-size:{PageHeader.TITLE_PX}px" in h.title.styleSheet()
+    # Just the list: less room round it; the line the same.
     page.set_compact(True)
     for _ in range(3):
         app.processEvents()
-    assert h.is_compact() and page.is_compact() and h.is_inline()
-    assert f"font-size:{PageHeader.COMPACT_TITLE_PX}px" in h.title.styleSheet()
-    assert page._lay.contentsMargins().top() < top
-    assert h.sizeHint().height() < tall
-    assert abs(h.title.geometry().center().y() - h.count.geometry().center().y()) <= 3
-    assert h.count.geometry().left() > h.title.geometry().left()
-    assert h.title.text() == "Sweden"                          # whole, with room
-    # Narrow: one over the other again, the header no wider than the page.
-    page.resize(330, 600)
-    for _ in range(3):
-        app.processEvents()
-    assert not h.is_inline() and h.width() <= 330
-    page.resize(800, 600)
-    for _ in range(3):
-        app.processEvents()
-    assert h.is_inline()
-    # Off: as it was - the size, the place's own policies.
+    assert h.is_compact() and page.is_compact() and page._lay.contentsMargins().top() < top
+    assert h.height() == PageHeader.CONTROL_H
     page.set_compact(False)
     for _ in range(3):
         app.processEvents()
-    assert not h.is_inline() and page._lay.contentsMargins().top() == top
-    assert h.title.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Ignored
-    assert h.count.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Ignored
-    assert f"font-size:{PageHeader.TITLE_PX}px" in h.title.styleSheet()
+    assert page._lay.contentsMargins().top() == top
+    # Narrow: the header no wider than the page, the name cut first.
+    page.resize(330, 600)
+    for _ in range(3):
+        app.processEvents()
+    assert h.width() <= 330
     page.deleteLater()
 
 
-def test_a_long_title_cut_short_asks_for_its_whole_room_again(app):
+def test_a_long_name_is_cut_first_and_the_count_kept_whole(app):
     from dopeiptv.ui.media_cards import PageHeader
-    h = PageHeader("A very long category name indeed, longer than any pane")
-    h.title.setMinimumWidth(1)                    # as the places set it
-    h.title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-    h.resize(260, 60)
+    name = "A very long category name indeed, longer than any pane"
+    h = PageHeader(name)
+    h.set_count("1 204 movies")
+    h.resize(300, 60)
     h.show()
-    app.processEvents()
-    full = h.title.fontMetrics().horizontalAdvance(h.title.full)
-    assert h.title.text() != h.title.full                      # cut to its room
-    assert h.title.sizeHint().width() >= full                  # but asks for all of it
+    for _ in range(3):
+        app.processEvents()
+    assert h.title.text() != name and h.title.text().endswith("…")
+    assert h.count.text() == "1 204 movies"
+    assert h.title.toolTip() == name + " · 1 204 movies"
+    assert h.title_text() == name
+    h.resize(1400, 60)
+    for _ in range(3):
+        app.processEvents()
+    assert h.title.text() == name and h.title.toolTip() == ""   # room again: whole
+    # Too little room even for a little of the name: the count is cut too.
+    h.resize(90, 60)
+    for _ in range(3):
+        app.processEvents()
+    assert h.count.text().endswith("…") and h.title.width() <= PageHeader.TITLE_MIN
     h.deleteLater()

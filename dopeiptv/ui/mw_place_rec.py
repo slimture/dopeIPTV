@@ -739,5 +739,5 @@ class _PlaceRecMixin:
         return {"shown": self._place_rec_showing(),
                 "cards": view.model_.rowCount() if view is not None else 0,
                 "layout": view.layout_kind if view is not None else "",
-                "title": place.header.title.text() if place is not None else "",
+                "title": place.header.title_text() if place is not None else "",
                 "now": [c.key for c in place.now.cards()] if place is not None else []}

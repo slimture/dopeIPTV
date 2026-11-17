@@ -305,7 +305,7 @@ acts = {a.data(): a for a in place.header._sort_group.actions()}
 acts["alpha_desc"].trigger()
 settle(lambda: view.item_at(0).key == "339", what="sorted Z-A")
 assert settings.value("sort::vod::'11'") == "alpha_desc"
-assert "Z→A" in place.header.count.text()
+assert place.header.sort_btn.text() == tr("sort_za")
 assert [c.key for c in view.items()] == [str(w._item_key(w.list_model.item_at(i)))
                                          for i in range(w.list_model.rowCount())]
 acts["global"].trigger()

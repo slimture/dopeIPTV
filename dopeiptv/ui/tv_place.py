@@ -34,7 +34,7 @@ from typing import Any, Callable, Sequence
 
 from PyQt6.QtCore import QPoint, QRect, QRectF, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen, QPixmap
-from PyQt6.QtWidgets import QSizePolicy, QStyle, QStyledItemDelegate, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QStyle, QStyledItemDelegate, QVBoxLayout, QWidget
 
 from ..core.guide_rows import section_heading
 from ..i18n import tr
@@ -583,11 +583,8 @@ class TvPlaceTop(QWidget):
         self._views: list[tuple[str, str]] = []
         self._title = ""
         # Nothing here holds the middle pane wider than it may go (240 px):
-        # the title and count are cut to the room, the sort shrinks to its
+        # the header's line is cut to its room, the sort shrinks to its
         # mark and the switch steps aside on a narrow pane (_fit).
-        for label in (self.header.title, self.header.count):
-            label.setMinimumWidth(1)
-            label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.setMinimumWidth(1)
         self.set_density(self._density)
 
@@ -610,12 +607,6 @@ class TvPlaceTop(QWidget):
         if self.header.sort_btn.toolButtonStyle() != style:
             self.header.sort_btn.setToolButtonStyle(style)
         self.header.switch.setVisible(self._density_shown and w >= self.SWITCH_FROM)
-        title = self.header.title
-        room = max(1, title.width())
-        text = title.fontMetrics().elidedText(self._title, Qt.TextElideMode.ElideRight, room)
-        if title.text() != text:
-            title.setText(text)
-        title.setToolTip(self._title if text != self._title else "")
 
     def retranslate(self) -> None:
         self.recent.set_title(tr("tv_recent"))

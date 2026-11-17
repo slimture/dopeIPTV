@@ -69,6 +69,13 @@ same new look.
   which that is: "As in all categories (Provider's order)". "Default" is
   called Provider's order, here and in Settings; A→Z is the language's own
   (A→Ö in Swedish).
+- Every place's header is one quiet line at one height: what it shows -
+  the category, the folder - and its count in small grey words ("Drama ·
+  30 series"), a way back at its start in Local files, Recordings and
+  Radio, and the filter, the sort and Grid / List at its end. The big
+  title is gone; a long category is cut with "…" (whole in its tooltip)
+  and the count stays whole, the filter giving up room first. The count
+  no longer repeats the order - the sort's button names it.
 - Movies: a film no longer opens a page of its own in the middle pane,
   which said again what the detail column says. A click picks the film
   and the detail column shows it - with Continue, how far it got and the

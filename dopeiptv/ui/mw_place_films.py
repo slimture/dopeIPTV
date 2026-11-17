@@ -501,11 +501,8 @@ class _PlaceFilmsMixin:
         h.set_title(self._pf_cat_name())
         n = self._pf_view.model_.rowCount() if self._pf_view is not None else 0
         box = self.sort_box
-        # The order the films are in, when it is not the source's own.
-        effective = self._current_sort_order()
-        i = box.findData(effective)
-        order = box.itemText(i) if effective != "default" and i >= 0 else ""
-        h.set_count(" · ".join(t for t in (tr("count_movies", n=n), order) if t) if n else "")
+        # The count alone: the sort's button names the order.
+        h.set_count(tr("count_movies", n=n) if n else "")
         opts = [(str(box.itemData(i)), box.itemText(i)) for i in range(box.count())]
         # The menu made again only when its words changed: an order picked
         # in it refills the list, and with it this header.
