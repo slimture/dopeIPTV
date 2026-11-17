@@ -2098,6 +2098,7 @@
   "ctx_watchlist_remove_on": "Hapus dari Tonton Nanti + {service}",
   "phone_menu": "Remote ponsel…",
   "phone_title": "Remote ponsel",
+  "phone_connected": "Ponsel terhubung - remote siap dipakai",
   "phone_intro": "Pakai ponselmu sebagai remote. Pindai kode dengan kameranya dan sebuah halaman terbuka di browsernya: saluran dan favoritmu, putar dan jeda, saluran berikut dan sebelumnya, volume, serta acara sekarang dan berikutnya.",
   "phone_same_network": "Ponsel harus berada di jaringan rumah yang sama dengan komputer ini. Tidak ada yang dipasang di ponsel, dan halaman ini bekerja tanpa internet.",
   "phone_turn_on": "Nyalakan",

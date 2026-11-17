@@ -2098,6 +2098,7 @@
   "ctx_watchlist_remove_on": "Ukloni iz Gledaj kasnije + {service}",
   "phone_menu": "Mobitel kao daljinski…",
   "phone_title": "Mobitel kao daljinski",
+  "phone_connected": "Mobitel je povezan - daljinski je spreman",
   "phone_intro": "Koristi mobitel kao daljinski upravljač. Skeniraj kôd kamerom i u pregledniku se otvori stranica: tvoji kanali i favoriti, reprodukcija i pauza, sljedeći i prethodni kanal, glasnoća te što je sada i poslije na programu.",
   "phone_same_network": "Mobitel mora biti na istoj kućnoj mreži kao ovo računalo. Na njega se ništa ne instalira, a stranica radi i bez interneta.",
   "phone_turn_on": "Uključi",

@@ -2098,6 +2098,7 @@
   "ctx_watchlist_remove_on": "Ondoa kwenye Tazama Baadaye + {service}",
   "phone_menu": "Rimoti ya simu…",
   "phone_title": "Rimoti ya simu",
+  "phone_connected": "Simu imeunganishwa - rimoti iko tayari",
   "phone_intro": "Tumia simu yako kama rimoti. Changanua msimbo kwa kamera yake na ukurasa utafunguka kwenye kivinjari chake: vituo na vipendwa vyako, cheza na sitisha, kituo kinachofuata na kilichotangulia, sauti, na kinachoonyeshwa sasa na baadaye.",
   "phone_same_network": "Simu inahitaji kuwa kwenye mtandao uleule wa nyumbani na kompyuta hii. Hakuna kinachosakinishwa kwenye simu, na ukurasa unafanya kazi bila intaneti.",
   "phone_turn_on": "Washa",

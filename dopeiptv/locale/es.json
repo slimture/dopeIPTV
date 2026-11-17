@@ -2098,6 +2098,7 @@
   "ctx_watchlist_remove_on": "Quitar de Ver más tarde + {service}",
   "phone_menu": "Mando en el móvil…",
   "phone_title": "Mando en el móvil",
+  "phone_connected": "Móvil conectado - el mando está listo",
   "phone_intro": "Usa tu móvil como mando a distancia. Escanea un código con la cámara y se abre una página en su navegador: tus canales y favoritos, reproducir y pausar, cambiar de canal, el volumen y lo que dan ahora y después.",
   "phone_same_network": "El móvil tiene que estar en la misma red de casa que este ordenador. No se le instala nada, y la página funciona sin internet.",
   "phone_turn_on": "Activar",

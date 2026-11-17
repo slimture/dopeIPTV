@@ -2098,6 +2098,7 @@
   "ctx_watchlist_remove_on": "Ta bort från Titta senare + {service}",
   "phone_menu": "Mobilen som fjärrkontroll…",
   "phone_title": "Mobilen som fjärrkontroll",
+  "phone_connected": "Mobilen är ansluten - fjärrkontrollen är redo",
   "phone_intro": "Använd mobilen som fjärrkontroll. Skanna en kod med kameran så öppnas en sida i webbläsaren: dina kanaler och favoriter, spela och pausa, kanal upp och ner, volym, och vad som går nu och sedan.",
   "phone_same_network": "Mobilen behöver vara på samma hemnätverk som den här datorn. Inget installeras på den, och sidan fungerar utan internet.",
   "phone_turn_on": "Slå på",

@@ -10,7 +10,8 @@
 - **Local files, Recordings and Radio in the new look.** Local files shows a renamed, added or removed file by itself, without Rescan. Recordings shows what records now and next at the top, a picture from each recording and what you have watched. Radio has My stations on top and every station with its logo.
 - **The picture on its own thread on a Mac** as on Linux and Windows: the window stays smooth while video plays, the controls come up when you move the mouse over the picture, and a right-click never leaves it black.
 - **Closing multiview**, the window you were listening to goes on in the main window - a film where it was.
-- **Answers to your feedback** show within minutes, and when you come back to the app, with a message that stays until you read it.
+- **Answers to your feedback** show within minutes, and when you come back to the app, with a message that stays until you read it - after a restart too. When an answer asks for more, you can reply right under it - still no account, no e-mail.
+- **Phone remote:** the window with the code closes by itself once your phone has connected, and a note says so.
 
 ### Fixed
 

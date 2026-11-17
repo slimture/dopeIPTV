@@ -7,6 +7,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.6.3]
+
+Room for the list, a guide that follows the category, and every place in the
+same new look.
+
 ### Added
 
 - Reply to an answer to your feedback. When dopeIPTV asks for more - an
@@ -17,14 +22,6 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   after, as after new feedback. The card reads as the conversation - what
   you wrote, each answer, your replies - and your own words stay on this
   computer. A conversation that is closed says so.
-
-## [1.6.3]
-
-Room for the list, a guide that follows the category, and every place in the
-same new look.
-
-### Added
-
 - Local files notices changes on disk by itself (#34): a file renamed,
   added or removed shows a moment later without Rescan, in place - the
   scroll and the row you were on stay where they were, and a folder that
@@ -61,6 +58,8 @@ same new look.
 
 ### Changed
 
+- The Phone remote window closes by itself once a phone has connected,
+  and a note says so - its job is done; open it again for another phone.
 - When the Next episode card comes can be set in seconds too - 10, 20, 30
   or 45 s before the end, besides 1 to 10 minutes (Settings > Playback).
 

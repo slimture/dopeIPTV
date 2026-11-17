@@ -2098,6 +2098,7 @@
   "ctx_watchlist_remove_on": "Aus 'Später ansehen' entfernen + {service}",
   "phone_menu": "Handy als Fernbedienung…",
   "phone_title": "Handy als Fernbedienung",
+  "phone_connected": "Handy verbunden - die Fernbedienung ist bereit",
   "phone_intro": "Nutze dein Handy als Fernbedienung. Scanne einen Code mit der Kamera, und im Browser öffnet sich eine Seite: deine Kanäle und Favoriten, Wiedergabe und Pause, Kanal hoch und runter, Lautstärke und was gerade und danach läuft.",
   "phone_same_network": "Das Handy muss im selben Heimnetz sein wie dieser Computer. Darauf wird nichts installiert, und die Seite funktioniert ohne Internet.",
   "phone_turn_on": "Einschalten",

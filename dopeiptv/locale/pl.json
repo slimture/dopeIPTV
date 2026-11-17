@@ -2098,6 +2098,7 @@
   "ctx_watchlist_remove_on": "Usuń z Do obejrzenia + {service}",
   "phone_menu": "Pilot w telefonie…",
   "phone_title": "Pilot w telefonie",
+  "phone_connected": "Telefon połączony - pilot jest gotowy",
   "phone_intro": "Używaj telefonu jak pilota. Zeskanuj kod aparatem, a w przeglądarce otworzy się strona: twoje kanały i ulubione, odtwarzanie i pauza, następny i poprzedni kanał, głośność oraz to, co leci teraz i za chwilę.",
   "phone_same_network": "Telefon musi być w tej samej sieci domowej co ten komputer. Nic się na nim nie instaluje, a strona działa bez internetu.",
   "phone_turn_on": "Włącz",

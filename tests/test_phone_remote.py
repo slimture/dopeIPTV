@@ -172,6 +172,23 @@ def test_the_token_opens_the_page_and_only_what_it_needs(served):
     assert len(w.calls) == n
 
 
+def test_a_phone_connecting_is_told_once_per_address():
+    told = []
+    srv = PhoneServer(0, TOKEN, Window(), page, host="127.0.0.1", on_client=told.append)
+    srv.start()
+    try:
+        assert ask(srv.port, "GET", "/favicon.ico")[0] == 403         # no token: not a phone
+        assert ask(srv.port, "GET", f"/{TOKEN}")[0] == 301             # the redirect: not yet
+        assert told == []
+        assert ask(srv.port, "GET", f"/{TOKEN}/")[0] == 200
+        assert ask(srv.port, "GET", f"/{TOKEN}/api/state")[0] == 200
+        assert told == ["127.0.0.1"]
+    finally:
+        srv.stop()
+    assert srv.note_client("192.168.1.9") and not srv.note_client("192.168.1.9")
+    assert told == ["127.0.0.1", "192.168.1.9"]
+
+
 def test_what_goes_wrong_in_the_window_comes_back_as_an_answer(served):
     w = Window()
     srv = served(w)
@@ -491,6 +508,23 @@ assert QApplication.clipboard().text() == d.address.text()
 d.stop_btn.click()
 assert not w.phone_remote_running() and d.on_btn.isVisibleTo(d)
 d.close()
+
+# A phone connecting (told on the server's thread): a note says so and the
+# window with the code goes - its job is done.
+from dopeiptv.i18n import tr
+notes = []
+w._show_toast = lambda text, *a, **k: notes.append(text)
+d = PhoneRemoteDialog(w)
+w._phone_dialog = d
+d.show(); app.processEvents()
+threading.Thread(target=w._phone_client, args=("192.168.1.9",)).start()
+for _ in range(300):
+    app.processEvents()
+    if notes and not d.isVisible():
+        break
+    time.sleep(0.01)
+assert notes == [tr("phone_connected")] and not d.isVisible(), notes
+w._phone_dialog = None
 xt.close()
 print("PHONE_WINDOW_OK", flush=True)
 os._exit(0)

@@ -2098,6 +2098,7 @@
   "ctx_watchlist_remove_on": "从稍后观看移除 + {service}",
   "phone_menu": "手机遥控…",
   "phone_title": "手机遥控",
+  "phone_connected": "手机已连接 - 遥控已就绪",
   "phone_intro": "把手机当遥控器用。用相机扫描二维码，浏览器里就会打开一个页面：你的频道和收藏、播放和暂停、上下切换频道、音量，以及正在播出和接下来的节目。",
   "phone_same_network": "手机需要和这台电脑在同一个家庭网络中。手机上无需安装任何东西，页面也不需要连接互联网。",
   "phone_turn_on": "开启",

@@ -2098,6 +2098,7 @@
   "ctx_watchlist_remove_on": "Remover de Assistir mais tarde + {service}",
   "phone_menu": "Controle pelo celular…",
   "phone_title": "Controle pelo celular",
+  "phone_connected": "Celular conectado - o controle está pronto",
   "phone_intro": "Use seu celular como controle remoto. Escaneie um código com a câmera e uma página abre no navegador: seus canais e favoritos, reproduzir e pausar, próximo e anterior canal, volume e o que está passando agora e depois.",
   "phone_same_network": "O celular precisa estar na mesma rede de casa que este computador. Nada é instalado nele, e a página funciona sem internet.",
   "phone_turn_on": "Ativar",

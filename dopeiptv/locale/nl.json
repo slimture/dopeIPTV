@@ -2098,6 +2098,7 @@
   "ctx_watchlist_remove_on": "Verwijderen uit Later kijken + {service}",
   "phone_menu": "Telefoon als afstandsbediening…",
   "phone_title": "Telefoon als afstandsbediening",
+  "phone_connected": "Telefoon verbonden - de afstandsbediening is klaar",
   "phone_intro": "Gebruik je telefoon als afstandsbediening. Scan een code met de camera en er opent een pagina in de browser: je kanalen en favorieten, afspelen en pauzeren, volgend en vorig kanaal, volume, en wat er nu en straks op is.",
   "phone_same_network": "De telefoon moet op hetzelfde thuisnetwerk zitten als deze computer. Er wordt niets op geïnstalleerd, en de pagina werkt zonder internet.",
   "phone_turn_on": "Aanzetten",

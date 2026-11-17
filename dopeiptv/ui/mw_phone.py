@@ -38,6 +38,7 @@ from ..core.phone_remote import (
     DEFAULT_PORT, LOGO_MAX, LOGO_TIMEOUT, PORT_KEY, PhoneServer, new_token, page_url,
 )
 from ..core.remote_api import lan_addresses
+from ..core.workers import on_gui_thread
 from ..i18n import tr
 from .mw_phone_browse import _PhoneBrowseMixin
 from .mw_phone_rec import _PhoneRecMixin
@@ -228,6 +229,7 @@ class _PhoneMixin(_PhoneBrowseMixin, _PhoneRecMixin):
     _phone: PhoneServer | None = None
     _phone_error: str = ""
     _phone_bridge: _Bridge | None = None
+    _phone_dialog = None                    # the Phone remote window while it is open
     _phone_icons: dict | None = None        # stream id -> its logo's address, as last listed
     #: (what the stamp depends on, the stamp) and (the playing item's key,
     #: what the page is told of it) - worked out again only on a change.
@@ -267,7 +269,7 @@ class _PhoneMixin(_PhoneBrowseMixin, _PhoneRecMixin):
         error = ""
         for port in ports:
             srv = PhoneServer(port, token, self._phone_call, self._phone_page,
-                              asset=assets.get)
+                              asset=assets.get, on_client=self._phone_client)
             try:
                 srv.start()
             except OSError as e:
@@ -309,7 +311,29 @@ class _PhoneMixin(_PhoneBrowseMixin, _PhoneRecMixin):
 
     def open_phone_remote(self) -> None:
         from .phone_remote import PhoneRemoteDialog
-        PhoneRemoteDialog(self).exec()
+        dlg = self._phone_dialog = PhoneRemoteDialog(self)
+        try:
+            dlg.exec()
+        finally:
+            self._phone_dialog = None
+
+    def _phone_client(self, _who: str) -> None:
+        """A phone's first request with the token while the server runs
+        (the server's thread): said on the window's."""
+        on_gui_thread(self._phone_connected)
+
+    def _phone_connected(self) -> None:
+        """A phone connected: a note says so, and the window with the code
+        goes - its job is done (open it again for another phone)."""
+        log.info("phone remote: a phone connected")
+        self._show_toast(tr("phone_connected"), 5000)
+        dlg = self._phone_dialog
+        if dlg is not None:
+            try:
+                if dlg.isVisible():
+                    dlg.accept()
+            except RuntimeError:
+                pass
 
     # -- a request (the server's thread) ----------------------------------------------
     def _phone_page(self) -> tuple[bytes, str]:

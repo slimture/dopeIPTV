@@ -2098,6 +2098,7 @@
   "ctx_watchlist_remove_on": "Ukloni iz Gledaj kasnije + {service}",
   "phone_menu": "Telefon kao daljinski…",
   "phone_title": "Telefon kao daljinski",
+  "phone_connected": "Telefon je povezan - daljinski je spreman",
   "phone_intro": "Koristi telefon kao daljinski upravljač. Skeniraj kôd kamerom i u pregledaču se otvara stranica: tvoji kanali i favoriti, puštanje i pauza, sledeći i prethodni kanal, jačina zvuka i šta je sada i posle na programu.",
   "phone_same_network": "Telefon mora da bude na istoj kućnoj mreži kao ovaj računar. Na njega se ništa ne instalira, a stranica radi i bez interneta.",
   "phone_turn_on": "Uključi",

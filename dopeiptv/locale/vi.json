@@ -2098,6 +2098,7 @@
   "ctx_watchlist_remove_on": "Xóa khỏi Xem sau + {service}",
   "phone_menu": "Điều khiển bằng điện thoại…",
   "phone_title": "Điều khiển bằng điện thoại",
+  "phone_connected": "Đã kết nối điện thoại - điều khiển đã sẵn sàng",
   "phone_intro": "Dùng điện thoại làm điều khiển từ xa. Quét mã bằng camera và một trang sẽ mở trong trình duyệt: kênh và mục yêu thích, phát và tạm dừng, chuyển kênh lên xuống, âm lượng, và chương trình hiện tại cùng tiếp theo.",
   "phone_same_network": "Điện thoại cần ở cùng mạng gia đình với máy tính này. Không cần cài gì lên điện thoại, và trang hoạt động cả khi không có internet.",
   "phone_turn_on": "Bật",

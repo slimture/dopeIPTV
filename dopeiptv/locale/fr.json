@@ -2098,6 +2098,7 @@
   "ctx_watchlist_remove_on": "Retirer de Regarder plus tard + {service}",
   "phone_menu": "Télécommande sur téléphone…",
   "phone_title": "Télécommande sur téléphone",
+  "phone_connected": "Téléphone connecté - la télécommande est prête",
   "phone_intro": "Utilise ton téléphone comme télécommande. Scanne un code avec son appareil photo et une page s'ouvre dans son navigateur : tes chaînes et favoris, lecture et pause, chaîne suivante et précédente, volume, et ce qui passe maintenant et ensuite.",
   "phone_same_network": "Le téléphone doit être sur le même réseau domestique que cet ordinateur. Rien n'y est installé, et la page fonctionne sans internet.",
   "phone_turn_on": "Activer",

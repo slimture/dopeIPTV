@@ -2098,6 +2098,7 @@
   "ctx_watchlist_remove_on": "Rimuovi da Guarda più tardi + {service}",
   "phone_menu": "Telecomando sul telefono…",
   "phone_title": "Telecomando sul telefono",
+  "phone_connected": "Telefono collegato - il telecomando è pronto",
   "phone_intro": "Usa il telefono come telecomando. Inquadra un codice con la fotocamera e nel browser si apre una pagina: i tuoi canali e preferiti, riproduci e pausa, canale successivo e precedente, volume e cosa c'è ora e dopo.",
   "phone_same_network": "Il telefono deve essere sulla stessa rete di casa di questo computer. Non vi si installa nulla e la pagina funziona anche senza internet.",
   "phone_turn_on": "Attiva",

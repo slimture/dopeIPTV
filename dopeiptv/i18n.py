@@ -2667,6 +2667,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     # calendar (ui/calendar_export.py) and MQTT's commands (Nerd).
     "phone_menu": {"en": "Phone remote…"},
     "phone_title": {"en": "Phone remote"},
+    "phone_connected": {"en": "Phone connected - the remote is ready"},
     "phone_intro": {"en": "Use your phone as a remote control. Scan a code with its camera and a page opens in its browser: your channels and favorites, play and pause, channel up and down, volume, and what is on now and next."},
     "phone_same_network": {"en": "The phone needs to be on the same home network as this computer. Nothing is installed on it, and the page works without the internet."},
     "phone_turn_on": {"en": "Turn on"},

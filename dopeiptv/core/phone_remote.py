@@ -214,10 +214,16 @@ class PhoneServer:
                  page: Callable[[], tuple[bytes, str]], host: str = "0.0.0.0",
                  limiter: RateLimiter | None = None,
                  asset: Callable[[str], tuple[bytes, str] | None] | None = None,
-                 pictures: RateLimiter | None = None) -> None:
+                 pictures: RateLimiter | None = None,
+                 on_client: Callable[[str], Any] | None = None) -> None:
         self.host, self.port, self.token = host, int(port), token
         self.call, self.page = call, page
         self.asset = asset
+        #: Told (on the server's thread) of the first request with the token
+        #: from each address while this server runs: a phone connected.
+        self.on_client = on_client
+        self._clients: set[str] = set()
+        self._clients_lock = threading.Lock()
         self.limiter = limiter or RateLimiter()
         self.pictures = pictures or RateLimiter(rate=PICTURES_RATE, burst=PICTURES_BURST)
         self._httpd: _Server | None = None
@@ -248,6 +254,23 @@ class PhoneServer:
     def authorized(self, given: str) -> bool:
         return bool(self.token) and hmac.compare_digest(given.encode("utf-8", "replace"),
                                                         self.token.encode("utf-8"))
+
+    #: Addresses remembered as connected, at most.
+    CLIENTS_MAX = 256
+
+    def note_client(self, who: str) -> bool:
+        """A request with the token from *who*: True (and on_client told)
+        the first time this server sees that address."""
+        with self._clients_lock:
+            if who in self._clients or len(self._clients) >= self.CLIENTS_MAX:
+                return False
+            self._clients.add(who)
+        if self.on_client is not None:
+            try:
+                self.on_client(who)
+            except Exception:
+                log.debug("phone remote: on_client failed", exc_info=True)
+        return True
 
     @staticmethod
     def client_ok(address: str, own: str = "") -> bool:
@@ -326,6 +349,7 @@ def _make_handler(server: PhoneServer) -> type[BaseHTTPRequestHandler]:
             if len(segs) == 2:
                 self._send(301, b"", "text/plain", {"Location": f"/{given}/"})
                 return
+            server.note_client(str(who))
             rest = "/".join(segs[2:])
             reading = method in ("GET", "HEAD")
             try:

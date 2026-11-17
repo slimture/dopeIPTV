@@ -2098,6 +2098,7 @@
   "ctx_watchlist_remove_on": "Sonra İzle'den kaldır + {service}",
   "phone_menu": "Telefondan kumanda…",
   "phone_title": "Telefondan kumanda",
+  "phone_connected": "Telefon bağlandı - kumanda hazır",
   "phone_intro": "Telefonunu uzaktan kumanda olarak kullan. Kamerasıyla bir kodu tara, tarayıcısında bir sayfa açılsın: kanalların ve favorilerin, oynat ve duraklat, sonraki ve önceki kanal, ses düzeyi, şimdi ve sonra ne olduğu.",
   "phone_same_network": "Telefonun bu bilgisayarla aynı ev ağında olması gerekir. Telefona hiçbir şey kurulmaz ve sayfa internet olmadan da çalışır.",
   "phone_turn_on": "Aç",
