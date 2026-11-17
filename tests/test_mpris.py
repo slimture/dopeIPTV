@@ -311,3 +311,52 @@ def test_window_does_what_the_desktop_asks(monkeypatch):
     live.mpris_command("next")
     live.mpris_command("previous")
     assert calls == [("zap", 1), ("zap", 1), ("zap", -1)]
+
+
+# -- a cast: the TV is what plays, and what the keys drive -----------------
+
+def _cast_window(kind="live", paused=False, can_pause=True, has_volume=True):
+    w, calls = _window(kind)
+    w.player.current_url = None             # nothing plays here
+    cast = {"device": "Living room TV", "title": "Rapport", "kind": kind,
+            "item": {"stream_id": 1}, "key": "k1", "icon_url": None,
+            "series_ctx": None, "paused": paused, "can_pause": can_pause,
+            "length": 0.0 if kind == "live" else 5400.0,
+            "position": 0.0 if kind == "live" else 600.0,
+            "has_volume": has_volume, "volume": 0.3, "muted": False}
+    w._cast_media = lambda: cast
+    w._cast_command = lambda name, arg, c: calls.append(("cast", name, arg))
+    w._cast_live_item = lambda: cast["item"] if kind == "live" else None
+    w._play_channel_step = lambda step: calls.append(("cast zap", step))
+    return w, calls
+
+
+def test_a_cast_is_what_the_controls_show():
+    w, _ = _cast_window("live")
+    s = w.mpris_snapshot()
+    assert s["status"] == "Playing" and s["title"] == "Rapport"
+    assert s["cast"] == "Living room TV" and s["artist"] == "Rapport"
+    assert s["live"] and s["can_next"] and s["can_prev"] and not s["can_seek"]
+    assert s["volume"] == 0.3
+    film, _ = _cast_window("movie", paused=True)
+    s = film.mpris_snapshot()
+    assert s["status"] == "Paused" and s["can_seek"] and s["length"] == 5400.0
+    assert film.mpris_position() == 600.0
+
+
+def test_the_keys_drive_the_cast_never_the_player_here(monkeypatch):
+    import time
+    monkeypatch.setattr(sys, "platform", "linux")
+    w, calls = _cast_window("live")
+    for name, arg in (("play", None), ("playpause", None), ("stop", None),
+                      ("volume", 0.5), ("seek", 10.0), ("set_position", 30.0)):
+        w.mpris_command(name, arg)
+    # Nothing went to the player here: no toggle (it would start the last
+    # title beside the cast), no stop button, no volume of its own.
+    assert all(isinstance(c, tuple) and c[0] == "cast" for c in calls), calls
+    assert [c[1] for c in calls] == ["play", "playpause", "stop", "volume", "seek",
+                                     "set_position"]
+    calls.clear()
+    time.sleep(0.4)
+    w.mpris_command("next")
+    assert calls == [("cast zap", 1)]       # the channel on the TV, as before

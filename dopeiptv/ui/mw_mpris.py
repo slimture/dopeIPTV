@@ -122,22 +122,70 @@ class _MprisMixin:
         casting = getattr(self, "_cast_live_item", None)
         return bool(callable(casting) and casting() is not None)
 
+    def _media_cast(self) -> dict[str, Any] | None:
+        """A cast running while nothing plays here (mw_cast's _cast_media):
+        what the controls show and drive then - the TV, not the player."""
+        if self._media_active():
+            return None
+        media = getattr(self, "_cast_media", None)
+        return media() if callable(media) else None
+
     def mpris_position(self) -> float:
         p = self.player
         if p is None or not self._media_active():
-            return 0.0
+            cast = self._media_cast()
+            return float(cast["position"]) if cast is not None else 0.0
         return p.playback_position()
+
+    def _cast_snapshot(self, cast: dict[str, Any]) -> dict[str, Any]:
+        """What plays on the TV as the controls show it: its title and what
+        it is showing, paused or playing there, its length and place, the
+        TV's volume - the same keys as a title playing here."""
+        kind = cast["kind"]
+        item = cast["item"] or {}
+        artist = ""
+        if kind == "live":
+            try:
+                prog = self.xmltv.current_programme(item) if item else None
+            except Exception:
+                prog = None
+            artist = (prog or {}).get("title") or ""
+        elif kind == "episode":
+            sctx = cast.get("series_ctx") or {}
+            artist = sctx.get("name") or sctx.get("title") or ""
+        live = kind == "live"
+        return {
+            "status": "Paused" if cast["paused"] else "Playing",
+            "track": f"cast:{kind}:{cast.get('key')}",
+            "title": cast["title"],
+            "artist": artist,
+            "album": "",
+            "art": self._media_art(cast.get("icon_url")),
+            "length": cast["length"],
+            "position": cast["position"],
+            "can_seek": cast["length"] > 0,
+            "can_next": live,
+            "can_prev": live,
+            "volume": cast["volume"],
+            "live": live,
+            "audio": False,
+            # Where it plays, and what the TV lets the app do there.
+            "cast": cast["device"],
+            "can_pause": cast["can_pause"],
+            "has_volume": cast["has_volume"],
+            "muted": cast["muted"],
+            "kind": kind,
+        }
 
     def mpris_snapshot(self) -> dict[str, Any]:
         p = self.player
         if p is None or not self._media_active():
-            snap: dict[str, Any] = {
-                "status": "Stopped",
-                "volume": (p.vol.value() / 100.0) if p is not None else 0}
-            if self._media_cast_channel():
-                # Nothing plays here, a channel plays on the TV.
-                snap.update(can_next=True, can_prev=True, live=True)
-            return snap
+            cast = self._media_cast()
+            if cast is not None:
+                # Nothing plays here; it plays on the TV.
+                return self._cast_snapshot(cast)
+            return {"status": "Stopped",
+                    "volume": (p.vol.value() / 100.0) if p is not None else 0}
         last = getattr(self, "_last_playback", None) or {}
         kind = last.get("kind") or ""
         title = last.get("title") or ""
@@ -251,6 +299,17 @@ class _MprisMixin:
         mv = self._multiview_active()
         if mv is not None and name in ("playpause", "play", "pause"):
             self._toggle_pause_shortcut()
+            return
+        cast = self._media_cast()
+        if cast is not None and name in ("playpause", "play", "pause", "stop", "seek",
+                                         "set_position", "volume", "mute"):
+            # A cast runs and nothing plays here: the TV is what the keys
+            # drive. Play must never start the player here beside it - a
+            # second connection to the account.
+            run = getattr(self, "_cast_command", None)
+            if callable(run):
+                run(name, arg, cast)
+            self._mpris_refresh_soon()
             return
         active = self._media_active()
         paused = getattr(p, "_paused", False)

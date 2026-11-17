@@ -558,6 +558,11 @@ class _PhoneMixin(_PhoneBrowseMixin, _PhoneRecMixin):
             # The profile chip: another profile (one with a PIN only with it).
             return self._profile_switch_remote(params)
         if action == "mute":
+            cast = self._media_cast()
+            if cast is not None:
+                # The TV's own mute, as the strip's button.
+                done = self._cast_command("mute", None, cast)
+                return {"ok": done, "muted": bool(getattr(self, "_cast_muted", False))}
             p = self.player
             if p is None:
                 return {"ok": False}
@@ -670,13 +675,24 @@ class _PhoneMixin(_PhoneBrowseMixin, _PhoneRecMixin):
         in - or None."""
         st = self._remote_status()
         p = self.player
-        muted = bool(getattr(p, "_muted", False)) if p is not None else False
-        volume = st.get("volume", 0)
-        if muted:
-            volume = int(getattr(p, "_vol_before_mute", volume) or 0)
+        casting = bool(st.get("cast"))
+        if casting:
+            # It plays on a TV: its own volume and mute, as the strip shows.
+            muted = bool(st.get("muted"))
+            volume = st.get("volume", 0)
+        else:
+            muted = bool(getattr(p, "_muted", False)) if p is not None else False
+            volume = st.get("volume", 0)
+            if muted:
+                volume = int(getattr(p, "_vol_before_mute", volume) or 0)
+        source = st.get("source") or ""
+        if casting:
+            source = tr("cast_casting_to", name=st["cast"]).rstrip(".。")
         out: dict[str, Any] = {"state": st["state"], "volume": volume, "muted": muted,
-                               "source": st.get("source") or "", "stamp": self._phone_stamp(),
+                               "source": source, "stamp": self._phone_stamp(),
                                "tv_mode": bool(st.get("tv_mode")), "sections": self._phone_sections()}
+        if casting and not st.get("has_volume"):
+            out["vol_off"] = True           # an Apple TV's volume is its own remote's
         if out["tv_mode"]:
             # A text entry on the TV (its search): the phone offers its own
             # keyboard for it. Its text changes only as it is typed.
@@ -730,7 +746,7 @@ class _PhoneMixin(_PhoneBrowseMixin, _PhoneRecMixin):
         item = last.get("item") or {}
         # A live channel in the player's rewind buffer: how far back it
         # reaches and how far behind live it plays, as the DVR row has it.
-        dvr = self._phone_dvr(p, kind == "live", st["state"] == "playing")
+        dvr = self._phone_dvr(p, kind == "live" and not casting, st["state"] == "playing")
         if dvr is not None:
             out["dvr"] = dvr
         if kind == "live" and item.get("stream_id") is not None:
@@ -769,7 +785,8 @@ class _PhoneMixin(_PhoneBrowseMixin, _PhoneRecMixin):
         the buffer (_phone_seek_buffer); nothing for a stream that cannot
         seek: a live channel without one, a stream with no length."""
         p = self.player
-        reading = p.dvr_reading() if p is not None and hasattr(p, "dvr_reading") else None
+        reading = (p.dvr_reading() if p is not None and hasattr(p, "dvr_reading")
+                   and self._media_cast() is None else None)
         if reading is not None and (getattr(self, "_last_playback", None) or {}).get("kind") == "live":
             return self._phone_seek_buffer(p, reading, params)
         if params.get("live") or params.get("behind") is not None:

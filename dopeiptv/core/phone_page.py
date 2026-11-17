@@ -368,7 +368,7 @@ _HTML = """<!doctype html>
 <footer class="dock" id="dock">
   <div class="dockIn">
   <div class="mini" id="mini" hidden></div>
-  <div class="vol">
+  <div class="vol" id="volRow">
     <button class="icon" id="mute">
       <svg viewBox="0 0 24 24" aria-hidden="true" id="icoVol"><path class="fill" d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 9.5a3.5 3.5 0 0 1 0 5M19 7a7 7 0 0 1 0 10"/></svg>
       <svg viewBox="0 0 24 24" aria-hidden="true" id="icoMute" hidden><path class="fill" d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
@@ -1095,6 +1095,9 @@ function show(s) {
   nowCard();
   tick();
   if (Date.now() > volUntil) setVol(s.volume || 0);
+  // Cast to a TV that keeps its volume to itself (an Apple TV): no slider
+  // that would do nothing.
+  hide($("volRow"), !!s.vol_off);
   hide($("icoVol"), s.muted); hide($("icoMute"), !s.muted);
   $("mute").classList.toggle("on", !!s.muted);
   const mini = $("mini");

@@ -41,6 +41,7 @@ import threading
 import time
 from datetime import datetime, timedelta
 from functools import partial
+from typing import Any
 
 from PyQt6 import sip
 from PyQt6.QtWidgets import (
@@ -744,6 +745,81 @@ class _CastMixin:
         if ctx.get("sid") is None or not self._cast_runs():
             return None
         return ctx.get("item") or None
+
+    def _cast_media(self) -> dict[str, Any] | None:
+        """A running cast as the media controls, the phone remote and the
+        remote API see what plays (mw_mpris): None while nothing is cast.
+        Nothing is asked of the receiver but what the strip's own tick asks
+        (its position); its volume is the one last read or set."""
+        if not self._cast_runs():
+            return None
+        ctx = getattr(self, "_cast_ctx", None) or {}
+        live = ctx.get("sid") is not None
+        last = getattr(self, "_last_playback", None) or {}
+        dur = 0.0 if live else float(getattr(self.cast, "duration", 0.0) or 0.0)
+        pos = 0.0
+        if dur > 0:
+            try:
+                pos = max(0.0, min(float(self.cast.position() or 0.0), dur))
+            except Exception:
+                pos = 0.0
+        airplay = self._cast_on_airplay()
+        return {
+            "device": str(self._cast_device or ""),
+            "title": ctx.get("title") or last.get("title") or "",
+            "kind": ctx.get("kind") or ("live" if live else last.get("kind") or ""),
+            "item": ctx.get("item") or {},
+            "key": ctx.get("key"),
+            "icon_url": last.get("icon_url"),
+            "series_ctx": ctx.get("series_ctx") or last.get("series_ctx"),
+            "paused": getattr(self, "_cast_paused_at", None) is not None,
+            # As the strip's pause button: a film holds its place on the
+            # receiver, a broadcast only while the converter records it.
+            "can_pause": not live or bool(self.cast.bridged()),
+            "length": dur, "position": pos,
+            # An Apple TV's volume is its own remote's (_show_cast_volume).
+            "has_volume": not airplay,
+            "volume": int(getattr(self, "_cast_level", 50) or 0) / 100.0,
+            "muted": bool(getattr(self, "_cast_muted", False)) and not airplay,
+        }
+
+    def _cast_command(self, name: str, arg: Any, cast: dict[str, Any]) -> bool:
+        """What a media key, the phone remote or the remote API asks of a
+        running cast, done as the strip's own buttons do it - never by
+        starting the player here (that would be a second connection to the
+        account). False for what a cast cannot do."""
+        if name in ("playpause", "play", "pause"):
+            if not cast["can_pause"]:
+                return False
+            if (name == "play" and not cast["paused"]) or (name == "pause" and cast["paused"]):
+                return True
+            self._toggle_cast_pause()
+            return True
+        if name == "stop":
+            self._end_cast("stopped from a remote")
+            return True
+        if name in ("seek", "set_position"):
+            dur = cast["length"]
+            if dur <= 0:
+                return False
+            to = cast["position"] + float(arg or 0.0) if name == "seek" else float(arg or 0.0)
+            self._cast_seek(max(0.0, min(dur, to)))
+            return True
+        if name in ("volume", "mute"):
+            if not cast["has_volume"]:
+                return False
+            if name == "mute":
+                self._toggle_cast_mute()
+                return True
+            level = max(0.0, min(1.0, float(arg or 0.0)))
+            self._cast_volume(level)
+            slider = getattr(self, "cast_bar_vol", None)
+            if slider is not None:
+                slider.blockSignals(True)
+                slider.setValue(int(round(level * 100)))
+                slider.blockSignals(False)
+            return True
+        return False
 
     def _cast_zap(self, url: str, title: str, icon_url, key, kind: str,
                   item, catchup: bool) -> bool:

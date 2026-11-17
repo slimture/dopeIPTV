@@ -254,8 +254,14 @@ class _RemoteMixin:
         prof = self._profile() if hasattr(self, "_profile") else None
         if prof is not None:
             out["profile"] = prof.name
+        if snap.get("cast"):
+            # It plays on a TV (mw_cast): its name, and what the TV lets the
+            # app do there - its volume is the TV's.
+            out.update(cast=snap["cast"], muted=bool(snap.get("muted")),
+                       can_pause=bool(snap.get("can_pause")),
+                       has_volume=bool(snap.get("has_volume")))
         if state != "stopped":
-            kind = last.get("kind") or ""
+            kind = snap.get("kind") or last.get("kind") or ""
             out.update(kind=kind, title=snap.get("title") or "",
                        position=round(float(snap.get("position") or 0), 1),
                        duration=round(float(snap.get("length") or 0), 1))
