@@ -2381,6 +2381,7 @@
   "tv_options": "Opties",
   "tv_exit": "Tv-modus verlaten",
   "tv_nothing_playing": "Geluid en ondertitels zodra er iets speelt.",
+  "tv_rec_live_only": "Alleen livezenders",
   "tv_key_fav": "Favoriet",
   "tv_hint": "OK opent · Terug gaat terug",
   "tv_fav_added": "{name} toegevoegd aan favorieten",

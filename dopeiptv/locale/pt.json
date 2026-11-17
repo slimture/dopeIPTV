@@ -2381,6 +2381,7 @@
   "tv_options": "Opções",
   "tv_exit": "Sair do modo TV",
   "tv_nothing_playing": "Áudio e legendas quando algo estiver tocando.",
+  "tv_rec_live_only": "Apenas canais ao vivo",
   "tv_key_fav": "Favorito",
   "tv_hint": "OK abre · Voltar volta",
   "tv_fav_added": "{name} adicionado aos favoritos",

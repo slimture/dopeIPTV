@@ -2873,6 +2873,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "tv_options": {"en": "Options"},
     "tv_exit": {"en": "Leave TV mode"},
     "tv_nothing_playing": {"en": "Sound and subtitles once something plays."},
+    "tv_rec_live_only": {"en": "Live channels only"},
     "tv_key_fav": {"en": "Favorite"},
     "tv_hint": {"en": "OK opens · Back goes back"},
     "tv_hint_playing": {"en": "OK opens · Play or Back: back to the picture"},

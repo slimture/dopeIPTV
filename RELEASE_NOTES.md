@@ -13,6 +13,7 @@
 - **Closing multiview**, the window you were listening to goes on in the main window - a film where it was.
 - **Answers to your feedback** show within minutes, and when you come back to the app, with a message that stays until you read it - after a restart too. When an answer asks for more, you can reply right under it - still no account, no e-mail.
 - **Phone remote:** the window with the code closes by itself once your phone has connected, and a note says so.
+- **Record in TV mode.** Press **Options**, then **Record**: what you are watching is recorded, without a second connection to your provider. While it records, a small **REC** sits in the corner of the picture and the tile says **Stop recording · 12 min** - it asks before it stops. Any question the app has is shown big on the TV and answered with your remote. On the phone remote's TV mode remote, **Record** is under **More**.
 - **A recording stays in sight** at the foot of the sidebar for as long as it runs. Click it to stop - the app asks first, and what has been recorded so far is kept. With two at once you pick which one.
 - **The sort button says the order** the list is in - Provider's order, A→Z, Recently added - and its menu says what all categories follow.
 - **A calmer header** in every place: no big title, one quiet line with the category and how many - and Back first where there is a way back - beside the filter, the sort and Grid / List. Long category names no longer push anything around.

@@ -118,6 +118,9 @@ class _RecordingMixin:
                 "stream_icon": j.get("stream_icon") or ""}
 
     def _recordings_changed(self) -> None:
+        tv = getattr(self, "_tv_rec_changed", None)
+        if callable(tv):
+            tv()                        # TV mode's Record and REC mark (mw_tv)
         n = self.rec.active_count()
         self.rec_indicator.setText(
             f"● REC ({n})" if n > 1 else "● REC")
@@ -216,10 +219,14 @@ class _RecordingMixin:
 
         While the phone remote does something (mw_phone), the question is
         the phone's: asked there in the same words with the same choices,
-        never left waiting on this screen with nobody at it."""
+        never left waiting on this screen with nobody at it. In TV mode it
+        is TV mode's (mw_tv's _tv_ask): large, answered with the remote."""
         ask = getattr(self, "_phone_ask_hook", None)
         if ask is not None:
             return ask(title, message, options, dont_ask_setting)
+        tv_ask = getattr(self, "_tv_ask", None)
+        if getattr(self, "_tv_on", False) and callable(tv_ask):
+            return tv_ask(title, message, options, dont_ask_setting)
         from PyQt6.QtWidgets import QCheckBox
         d = QDialog(self)
         d.setWindowTitle(title)
@@ -406,10 +413,15 @@ class _RecordingMixin:
 
     def _rec_warn(self, title: str, text: str) -> None:
         """A recording that cannot start, said - on the phone remote when it
-        asked (mw_phone), never a box left on this screen for nobody."""
+        asked (mw_phone), never a box left on this screen for nobody; in TV
+        mode as TV mode asks (mw_tv's _tv_tell)."""
         ask = getattr(self, "_phone_ask_hook", None)
         if ask is not None:
             ask.note(text)
+            return
+        tell = getattr(self, "_tv_tell", None)
+        if getattr(self, "_tv_on", False) and callable(tell):
+            tell(title, text)
             return
         QMessageBox.warning(self, title, text)
 
@@ -829,9 +841,12 @@ class _RecordingMixin:
         length = (tr("rec_until_stopped") if minutes is None
                   else tr("rec_for_minutes", n=minutes))
 
+        # The docked player shows what it plays - or TV mode's page is in
+        # front of it, its stream going on behind (mw_tv): its stream either way.
+        shows = self.player is not None and (
+            self.player.isVisible() or getattr(self, "_tv_holds_picture", lambda: False)())
         watching_this = (
-            self.player is not None
-            and self.player.isVisible()
+            shows
             and self.playback_mode() == "embedded"
             and self._playing_group == "live"
             and self._playing_key == self._item_key(it))
@@ -859,8 +874,7 @@ class _RecordingMixin:
         # connection to the provider (many accounts allow only one), so
         # ask - offer to switch to it and record instead, mirroring the
         # switch-while-recording prompt.
-        busy = (self.player is not None and self.player.isVisible()
-                and self.playback_mode() == "embedded"
+        busy = (shows and self.playback_mode() == "embedded"
                 and self._playing_key is not None)
         if busy:
             playing = (self._last_playback or {}).get("title") or ""

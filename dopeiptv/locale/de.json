@@ -2381,6 +2381,7 @@
   "tv_options": "Optionen",
   "tv_exit": "TV-Modus verlassen",
   "tv_nothing_playing": "Ton und Untertitel, sobald etwas läuft.",
+  "tv_rec_live_only": "Nur Live-Sender",
   "tv_key_fav": "Favorit",
   "tv_hint": "OK öffnet · Zurück geht zurück",
   "tv_fav_added": "{name} zu den Favoriten hinzugefügt",

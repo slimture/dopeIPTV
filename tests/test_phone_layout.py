@@ -100,7 +100,9 @@ def test_a_recording_stays_in_sight_on_the_folded_card():
     assert 'id="recLive"' not in _between(now, 'id="nowMore"', '<span class="nowPill"')
     # ...shown whenever a recording runs and the card is folded, its time each second.
     fold = _fn(script, "folds")
-    assert "recording = !!(st.rec && st.rec.id)" in fold and "hide($(f.rec), open || !recording)" in fold
+    # (TV mode's remote: open or folded, its Record pill giving way to it.)
+    assert "recording = !!(st.rec && st.rec.id)" in fold
+    assert 'hide($(f.rec), !recording || (open && k === "now"))' in fold
     tick = _fn(script, "recTick")
     assert "FOLDS[k].rec" in tick and "hms(" in tick and 'setAttribute("aria-label", text)' in tick
     assert "recTick();" in _fn(script, "tick")
@@ -122,6 +124,37 @@ def test_tv_modes_remote_folds_the_same_and_shows_a_recording():
     assert re.search(r'id="tvMoreBtn" aria-expanded="false" aria-controls="tvActs" hidden', folds)
     assert 'id="tvTracks"' in _between(remote, 'id="tvActs"', "</div>")
     assert "tvActs" not in _fn(script, "actsOffer")           # the fold shows it, nothing else
+
+
+def test_tv_modes_remote_records_from_its_fold_as_now_playing_does():
+    html, csp, script, style = _page()
+    # The page's policy still allows exactly its own script and style.
+    assert f"script-src {_sha(script)};" in csp and f"style-src {_sha(style)};" in csp
+    assert "'unsafe-inline'" not in csp
+    # A Record pill beside Subtitles and sound and the Sleep timer, in the fold,
+    # hidden until the state says what plays can be recorded.
+    acts = _between(html, '<div class="pair" id="tvActs" hidden>', "</div>")
+    assert acts.index('id="tvTracks"') < acts.index('id="tvSleep"') < acts.index('id="tvRec"')
+    pill = re.search(r'<button class="pill" id="tvRec" hidden>.*?</button>', acts).group(0)
+    assert 'class="recIcon"' in pill and 'class="fill"' in pill and 'id="tvRecText"' in pill
+    assert "tvRec" not in _between(html, '<footer class="dock"', "</footer>")
+    # Shown for a live channel the app can record from what plays, gone while
+    # one records: the dot beside More shows it then, open or folded.
+    offer = _fn(script, "recOffer")
+    assert 'hide($("tvRec"), !(live && s.can_rec) || running);' in offer
+    fold = _fn(script, "folds")
+    assert 'hide($(f.rec), !recording || (open && k === "now"))' in fold
+    # The same press as Now playing's Record: asked first unless the household
+    # turned that off, a long press asks anyway; the app's own words.
+    init = _fn(script, "initRec")
+    assert 'for (const id of ["recBtn", "tvRec"])' in init
+    assert "if (!(st.rec && st.rec.id)) recAsk();" in init and "recPressed();" in init
+    assert '$("tvRecText").textContent = W.rec;' in init
+    assert "if (st.rec_ask) recAsk(); else recNow(false);" in _fn(script, "recPressed")
+    # One way to start a recording (api/rec), never without that press.
+    assert script.count('send("api/rec"') == 1
+    # Still a key a thumb reaches: the fold's pills, 44 px and more.
+    assert "min-height:var(--key-h)" in style.split("\n.pill{", 1)[1].split("}", 1)[0]
 
 
 def test_tv_modes_remote_fills_the_room_left_and_stays_on_the_screen():
@@ -291,3 +324,8 @@ def test_the_page_fits_each_phone_upright_and_on_its_side_in_a_browser():
     for tag, r in checks["recLive"].items():
         assert re.search(r"\d+:\d\d", r["text"]) and r["recBtnHidden"], (tag, r)
         assert r["label"].endswith(r["text"]), (tag, r)
+    # Record from TV mode's remote: its pill gives way to the dot and its
+    # time, the fold still open - one control for a recording, not two.
+    assert set(checks["tvRec"]) == set(checks["recLive"])
+    for tag, r in checks["tvRec"].items():
+        assert r["open"] == "true" and re.search(r"\d+:\d\d", r["text"]), (tag, r)

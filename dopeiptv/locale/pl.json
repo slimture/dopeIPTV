@@ -2381,6 +2381,7 @@
   "tv_options": "Opcje",
   "tv_exit": "Wyjdź z trybu TV",
   "tv_nothing_playing": "Dźwięk i napisy, gdy coś jest odtwarzane.",
+  "tv_rec_live_only": "Tylko kanały na żywo",
   "tv_key_fav": "Ulubione",
   "tv_hint": "OK otwiera · Wstecz cofa",
   "tv_fav_added": "Dodano {name} do ulubionych",

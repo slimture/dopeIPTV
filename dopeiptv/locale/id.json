@@ -2381,6 +2381,7 @@
   "tv_options": "Opsi",
   "tv_exit": "Keluar dari mode TV",
   "tv_nothing_playing": "Suara dan subtitle saat ada yang diputar.",
+  "tv_rec_live_only": "Hanya saluran siaran langsung",
   "tv_key_fav": "Favorit",
   "tv_hint": "OK membuka · Kembali untuk kembali",
   "tv_fav_added": "{name} ditambahkan ke favorit",

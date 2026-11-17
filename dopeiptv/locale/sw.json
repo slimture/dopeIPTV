@@ -2381,6 +2381,7 @@
   "tv_options": "Chaguo",
   "tv_exit": "Toka kwenye hali ya TV",
   "tv_nothing_playing": "Sauti na manukuu kitu kinapocheza.",
+  "tv_rec_live_only": "Chaneli za mubashara pekee",
   "tv_key_fav": "Kipendwa",
   "tv_hint": "OK hufungua · Nyuma hurudi",
   "tv_fav_added": "{name} imeongezwa kwenye vipendwa",
