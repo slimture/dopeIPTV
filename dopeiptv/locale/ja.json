@@ -2934,6 +2934,8 @@
   "phone_page_sleep_left": "{n} 分後に停止",
   "phone_rec_ask": "{title} を録画しますか？",
   "phone_rec_stop_ask": "{title} の録画を停止しますか？",
+  "phone_page_more": "その他",
+  "phone_page_less": "閉じる",
   "status_guide_still_loading": "番組表の読み込みに時間がかかっています。準備ができ次第表示されます。",
   "notice_more": "他 {n} 件",
   "notice_working": "処理中",

@@ -2934,6 +2934,8 @@
   "phone_page_sleep_left": "يتوقف بعد {n} دقيقة",
   "phone_rec_ask": "تسجيل {title}؟",
   "phone_rec_stop_ask": "إيقاف تسجيل {title}؟",
+  "phone_page_more": "المزيد",
+  "phone_page_less": "أقل",
   "status_guide_still_loading": "يستغرق دليل البرامج بعض الوقت - سيظهر فور اكتماله.",
   "notice_more": "{n} أخرى",
   "notice_working": "قيد التنفيذ",

@@ -2934,6 +2934,8 @@
   "phone_page_sleep_left": "{n} 分钟后停止",
   "phone_rec_ask": "录制 {title}？",
   "phone_rec_stop_ask": "停止录制 {title}？",
+  "phone_page_more": "更多",
+  "phone_page_less": "收起",
   "status_guide_still_loading": "节目指南加载需要一些时间，准备好后会立即显示。",
   "notice_more": "另有 {n} 项",
   "notice_working": "正在进行",

@@ -143,7 +143,7 @@ def test_the_page_has_a_remote_for_tv_mode_and_its_policy_still_allows_only_it()
     touch = json.loads(re.search(r"const T = (\{.*?\});", script).group(1))
     assert touch == {"hold": phone_remote.HOLD_MS, "slop": phone_remote.TAP_SLOP}
     # Arrows stay where they point in a right-to-left language.
-    assert ".pad,.colours,.deck,.digits{direction:ltr}" in style
+    assert ".stage,.pad,.colours,.digits{direction:ltr}" in style
 
 
 def test_the_now_card_is_the_way_back_to_the_picture_only_in_tv_mode_while_something_plays():

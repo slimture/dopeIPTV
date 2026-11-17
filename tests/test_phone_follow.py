@@ -272,10 +272,12 @@ def test_the_page_asks_with_its_tag_and_less_often_while_nothing_changes():
 def test_the_page_fits_a_small_phone():
     html, csp, _script, style = _page()
     assert f"style-src {_sha(style)};" in csp
-    # Fluid, not one layout per phone: the bar, the dock and the remote wrap.
+    # Fluid, not one layout per phone: the bar, the dock and the remote's
+    # rows wrap; the remote is a grid that gives the d-pad the room left.
     assert style.count("clamp(") >= 20
-    for sel in (".sticky", ".dockIn", ".tvr"):
+    for sel in (".sticky", ".dockIn", ".folds", ".stage"):
         assert "flex-wrap:wrap" in _rule(style, sel), sel
+    assert "minmax(var(--pad-min),1fr)" in _rule(style, "\n.tvr")
     assert 'class="side"' in html and 'class="dockIn"' in html
     # The safe areas: the notch on either side, the home bar, the status bar.
     for edge in ("left", "right", "top", "bottom"):
@@ -285,7 +287,7 @@ def test_the_page_fits_a_small_phone():
     assert "height:44px" in _rule(style, ".tvBtn") and "min-width:44px" in _rule(style, ".tvBtn")
     assert "min-height:44px" in _rule(style, ".pchip") and "min-height:44px" in _rule(style, ".tab")
     assert "min-width:44px" in _rule(style, ".key") and "min-height:44px" in _rule(style, ".showIn")
-    assert "min-height:52px" in _rule(style, ".pill") and "min-height:46px" in _rule(style, ".fold")
+    assert "min-height:var(--key-h)" in _rule(style, ".pill") and "min-height:46px" in _rule(style, ".fold")
     assert "--key-h:clamp(46px," in style and "height:44px" in _rule(style, ".nowPill")
     assert "--pad:clamp(150px," in style                # 3 x 44 px and more across the d-pad
     # Nothing sideways, and the bar stays stuck (overflow on html/body would unstick it).

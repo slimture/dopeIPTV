@@ -7,6 +7,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Changed
+
+- Phone remote: TV mode's remote fits the phone it is on. The d-pad takes the room left below Now playing - bigger on a tall phone, with the volume and channel rockers under it, beside it on a small one - and on its side the keys sit next to it; from 320 x 568 up nothing scrolls as it opens, the safe areas stay clear and every key is 44 px or more. Play/pause and mute sit with Back and Options, the touchpad switch with the number keys.
+- Phone remote: Now playing stays compact. Subtitles and sound, the sleep timer, Record and the next programme fold behind More (TV mode's remote folds its sound and sleep timer the same way); the phone remembers whether it was open. While folded, a recording's red dot and time and the sleep timer's minutes stay on the card - a tap on the dot asks to stop the recording.
+
 ## [1.6.1]
 
 A calmer guide, a night mode that tames loud adverts and bangs without

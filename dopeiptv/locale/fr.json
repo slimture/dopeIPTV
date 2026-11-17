@@ -2934,6 +2934,8 @@
   "phone_page_sleep_left": "S'arrête dans {n} min",
   "phone_rec_ask": "Enregistrer {title} ?",
   "phone_rec_stop_ask": "Arrêter l'enregistrement de {title} ?",
+  "phone_page_more": "Plus",
+  "phone_page_less": "Moins",
   "status_guide_still_loading": "Le guide des programmes prend un peu de temps - il s'affichera dès qu'il sera prêt.",
   "notice_more": "{n} de plus",
   "notice_working": "En cours",

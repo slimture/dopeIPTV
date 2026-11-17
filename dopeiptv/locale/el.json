@@ -2934,6 +2934,8 @@
   "phone_page_sleep_left": "Σταματά σε {n} λεπτά",
   "phone_rec_ask": "Εγγραφή {title};",
   "phone_rec_stop_ask": "Διακοπή εγγραφής του {title};",
+  "phone_page_more": "Περισσότερα",
+  "phone_page_less": "Λιγότερα",
   "status_guide_still_loading": "Ο οδηγός προγράμματος αργεί λίγο - θα εμφανιστεί μόλις είναι έτοιμος.",
   "notice_more": "{n} ακόμη",
   "notice_working": "Σε εξέλιξη",

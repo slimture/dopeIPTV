@@ -2934,6 +2934,8 @@
   "phone_page_sleep_left": "נעצר בעוד {n} דק׳",
   "phone_rec_ask": "להקליט את {title}?",
   "phone_rec_stop_ask": "לעצור את ההקלטה של {title}?",
+  "phone_page_more": "עוד",
+  "phone_page_less": "פחות",
   "status_guide_still_loading": "מדריך התוכניות מתעכב מעט - הוא יופיע ברגע שיהיה מוכן.",
   "notice_more": "עוד {n}",
   "notice_working": "בתהליך",

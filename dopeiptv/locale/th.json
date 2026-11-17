@@ -2934,6 +2934,8 @@
   "phone_page_sleep_left": "หยุดในอีก {n} นาที",
   "phone_rec_ask": "บันทึก {title} หรือไม่?",
   "phone_rec_stop_ask": "หยุดบันทึก {title} หรือไม่?",
+  "phone_page_more": "เพิ่มเติม",
+  "phone_page_less": "ย่อ",
   "status_guide_still_loading": "ผังรายการใช้เวลาโหลดนานสักหน่อย - จะแสดงทันทีที่พร้อม",
   "notice_more": "อีก {n} รายการ",
   "notice_working": "กำลังดำเนินการ",

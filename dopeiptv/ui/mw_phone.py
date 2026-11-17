@@ -191,6 +191,7 @@ def page_words() -> dict[str, str]:
             "dont_ask": tr("dont_show_again"), "cancel": tr("common_cancel"),
             "rec_anyway": tr("rec_record_anyway"), "rec_cancel": tr("rec_cancel_scheduled"),
             "rec_ask": tr("phone_rec_ask"), "rec_stop_ask": tr("phone_rec_stop_ask"),
+            "more": tr("phone_page_more"), "less": tr("phone_page_less"),
             **tv_words()}
 
 

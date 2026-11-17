@@ -2934,6 +2934,8 @@
   "phone_page_sleep_left": "Stannar om {n} min",
   "phone_rec_ask": "Spela in {title}?",
   "phone_rec_stop_ask": "Stoppa inspelningen av {title}?",
+  "phone_page_more": "Mer",
+  "phone_page_less": "Mindre",
   "status_guide_still_loading": "Programguiden tar en stund - den dyker upp så fort den är klar.",
   "notice_more": "{n} till",
   "notice_working": "Pågår",

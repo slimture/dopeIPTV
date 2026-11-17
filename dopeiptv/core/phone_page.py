@@ -42,10 +42,17 @@ box focuses its field in the tap's own handler, so the phone's keyboard
 comes up at once; while TV mode shows its search, the remote has a field
 that types into it with the phone's own keyboard (api/tv_text).
 
+Now playing stays compact: what plays' sound and subtitles, the sleep
+timer, recording and the next programme are folded behind More (a small
+button with a chevron), open or folded as this phone left it. Folded,
+nothing that runs is out of sight - a recording's red dot and its time,
+the sleep timer's minutes - and each is a way to it (the dot asks to stop,
+as Stop always does).
+
 It fits a phone from 320 px wide up, upright or on its side: sizes are
 fluid (clamp, min, flex and grid that wrap - the bar's tabs and search, the
-dock's volume and keys, the remote's pad and keys sit side by side when
-there is room), every key at least 44 px, the safe areas kept clear.
+dock's volume and keys), every key at least 44 px, the safe areas kept
+clear.
 
 While TV mode is on (the state says so; the button in the header turns it
 on and off) the page is a remote instead: a d-pad with OK, Back and
@@ -54,9 +61,15 @@ channel and volume rockers, mute and number keys that fold out - each a
 TV key (api/tv_key). Or a touchpad (the page remembers the choice): a
 swipe is an arrow, a tap OK, a long press Back - the app reads the
 gesture (core/phone_remote.gesture), the page only says where the finger
-went and for how long. While something plays there, the whole Now playing
-card is a button - a pill at its trailing edge says what it does - that
-brings the picture back on the TV (api/tv_key "picture").
+went and for how long. The remote fills the screen below Now playing (the
+small viewport's height, so the browser's bars never cover a key): the
+d-pad takes the room left, sized by container query units - the rockers
+beside it, or under it when that room is tall - and on its side the keys
+sit beside it; nothing scrolls as it opens, on a phone from 320 x 568 up.
+Its sound and sleep timer fold behind a More of their own. While something
+plays there, the whole Now playing card is a button - a pill at its
+trailing edge says what it does - that brings the picture back on the TV
+(api/tv_key "picture").
 
 Styled as the app is - flat surfaces, hairlines, the accent colour - in the
 app's dark palette, or its light one when the phone asks for light. The
@@ -92,7 +105,7 @@ WORDS = ("channels", "favorites", "search", "nothing", "next", "paused", "offlin
          "nothing_here", "find", "skip_back", "skip_fwd", "seek", "tv_type",
          "tracks", "audio", "subtitles", "no_audio", "sleep", "off", "minutes", "sleep_left",
          "close", "rec", "rec_stop", "rec_this", "remind", "dont_ask", "cancel", "rec_anyway",
-         "rec_cancel", "rec_ask", "rec_stop_ask")
+         "rec_cancel", "rec_ask", "rec_stop_ask", "more", "less")
 _HEX = re.compile(r"#[0-9A-Fa-f]{6}")
 
 
@@ -220,12 +233,19 @@ _HTML = """<!doctype html>
       <div class="nowActs" id="nowActs">
       <button class="showIn" id="showIn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M4 12h7M4 18h10"/><circle cx="17.5" cy="12" r="3"/></svg><span id="showInText"></span></button>
       <button class="showIn" id="epsBtn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M7.5 9h9M7.5 12.5h9M7.5 16h5"/></svg><span id="epsBtnText"></span></button>
+      <button class="showIn live rec" id="recLive" hidden><span class="recIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle class="fill" cx="12" cy="12" r="6"/></svg></span><span></span></button>
+      <button class="showIn live" id="sleepLive" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 14.5A7.5 7.5 0 0 1 9.5 4.5a7.5 7.5 0 1 0 10 10z"/></svg><span></span></button>
+      <button class="more" id="moreBtn" aria-expanded="false" aria-controls="nowMore" hidden><span class="moreIn"><span id="moreText"></span><svg class="caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></button>
+      </div>
+      <div class="nowMore" id="nowMore" hidden>
+      <div class="nowSet" id="nowSet">
       <button class="showIn" id="tracksBtn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M10.5 10.3a2.2 2.2 0 1 0 0 3.4M17 10.3a2.2 2.2 0 1 0 0 3.4"/></svg><span id="tracksText"></span></button>
       <button class="showIn" id="sleepBtn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 14.5A7.5 7.5 0 0 1 9.5 4.5a7.5 7.5 0 1 0 10 10z"/></svg><span id="sleepText"></span></button>
       </div>
       <div class="nowRec" id="nowRec" hidden>
       <button class="showIn rec" id="recBtn" hidden><span class="recIcon" id="recIcon"></span><span id="recText"></span></button>
       <button class="showIn" id="nextBtn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/></svg><span id="nextText"></span></button>
+      </div>
       </div>
     </div>
     <span class="nowPill" id="nowPill" aria-hidden="true" hidden><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="12.5" rx="2"/><path d="M8.5 20.5h7"/><path class="fill" d="M10.2 8.2v4.6l4-2.3z"/></svg><span id="nowPillText"></span></span>
@@ -273,23 +293,32 @@ _HTML = """<!doctype html>
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01M8 14h8"/></svg>
       <input id="tvText" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
     </label>
-    <div class="pad" id="pad">
-      <button class="arr up" id="kUp" data-a="up"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
-      <button class="arr left" id="kLeft" data-a="left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
-      <button class="okk" id="kOk" data-a="ok"></button>
-      <button class="arr right" id="kRight" data-a="right"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
-      <button class="arr down" id="kDown" data-a="down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div class="stage" id="stage">
+      <div class="rock">
+        <button id="kVolUp" data-a="vol_up"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></button>
+        <span class="mid"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 9.5a3.5 3.5 0 0 1 0 5"/></svg></span>
+        <button id="kVolDown" data-a="vol_down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></button>
+      </div>
+      <div class="pad" id="pad">
+        <button class="arr up" id="kUp" data-a="up"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+        <button class="arr left" id="kLeft" data-a="left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <button class="okk" id="kOk" data-a="ok"></button>
+        <button class="arr right" id="kRight" data-a="right"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+        <button class="arr down" id="kDown" data-a="down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      </div>
+      <div class="touch" id="touch" hidden><span id="touchHint"></span></div>
+      <div class="rock">
+        <button id="kChUp" data-a="ch_up"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+        <span class="mid"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="12.5" rx="2"/><path d="M8.5 20.5h7"/></svg></span>
+        <button id="kChDown" data-a="ch_down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      </div>
     </div>
-    <div class="touch" id="touch" hidden><span id="touchHint"></span></div>
     <div class="side">
-    <div class="pair">
+    <div class="tvKeys">
       <button class="pill" id="kBack" data-a="back"><svg class="flip" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><span id="kBackText"></span></button>
-      <button class="pill" id="padMode" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle class="fill" cx="12" cy="15" r="2.6"/><path d="M7 15a5 5 0 0 1 10 0M3.8 15a8.2 8.2 0 0 1 16.4 0"/></svg><span id="padModeText"></span></button>
+      <button class="pill primary" id="kPlay" data-a="play_pause"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M3.5 5.5v13l8.5-6.5zM14 5.5h2.6v13H14zM18.4 5.5H21v13h-2.6z"/></svg></button>
+      <button class="pill" id="kMute" data-a="mute"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button>
       <button class="pill" id="kMenu" data-a="menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span id="kMenuText"></span></button>
-    </div>
-    <div class="pair" id="tvActs" hidden>
-      <button class="pill" id="tvTracks"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M10.5 10.3a2.2 2.2 0 1 0 0 3.4M17 10.3a2.2 2.2 0 1 0 0 3.4"/></svg><span id="tvTracksText"></span></button>
-      <button class="pill" id="tvSleep"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 14.5A7.5 7.5 0 0 1 9.5 4.5a7.5 7.5 0 1 0 10 10z"/></svg><span id="tvSleepText"></span></button>
     </div>
     <div class="colours">
       <button class="ck" id="k_red" data-a="red"><i class="r"></i><span dir="auto"></span></button>
@@ -297,23 +326,17 @@ _HTML = """<!doctype html>
       <button class="ck" id="k_yellow" data-a="yellow"><i class="y"></i><span dir="auto"></span></button>
       <button class="ck" id="k_blue" data-a="blue"><i class="b"></i><span dir="auto"></span></button>
     </div>
-    <div class="deck">
-      <div class="rock">
-        <button id="kVolUp" data-a="vol_up"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></button>
-        <span class="mid"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 9.5a3.5 3.5 0 0 1 0 5"/></svg></span>
-        <button id="kVolDown" data-a="vol_down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></button>
-      </div>
-      <div class="midc">
-        <button class="key primary" id="kPlay" data-a="play_pause"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M3.5 5.5v13l8.5-6.5zM14 5.5h2.6v13H14zM18.4 5.5H21v13h-2.6z"/></svg></button>
-        <button class="key" id="kMute" data-a="mute"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button>
-      </div>
-      <div class="rock">
-        <button id="kChUp" data-a="ch_up"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
-        <span class="mid"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="12.5" rx="2"/><path d="M8.5 20.5h7"/></svg></span>
-        <button id="kChDown" data-a="ch_down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
-      </div>
+    <div class="folds">
+      <button class="fold" id="padMode" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle class="fill" cx="12" cy="15" r="2.6"/><path d="M7 15a5 5 0 0 1 10 0M3.8 15a8.2 8.2 0 0 1 16.4 0"/></svg><span id="padModeText"></span></button>
+      <button class="fold" id="digitsBtn" aria-expanded="false" aria-controls="digits"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M5 4h3v3H5zM10.5 4h3v3h-3zM16 4h3v3h-3zM5 10.5h3v3H5zM10.5 10.5h3v3h-3zM16 10.5h3v3h-3zM5 17h3v3H5zM10.5 17h3v3h-3zM16 17h3v3h-3z"/></svg><span id="digitsText"></span></button>
+      <button class="fold live rec" id="tvRecLive" hidden><span class="recIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle class="fill" cx="12" cy="12" r="6"/></svg></span><span></span></button>
+      <button class="fold live" id="tvSleepLive" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 14.5A7.5 7.5 0 0 1 9.5 4.5a7.5 7.5 0 1 0 10 10z"/></svg><span></span></button>
+      <button class="fold" id="tvMoreBtn" aria-expanded="false" aria-controls="tvActs" hidden><svg class="caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg><span id="tvMoreText"></span></button>
     </div>
-    <button class="fold" id="digitsBtn" aria-expanded="false" aria-controls="digits"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M5 4h3v3H5zM10.5 4h3v3h-3zM16 4h3v3h-3zM5 10.5h3v3H5zM10.5 10.5h3v3h-3zM16 10.5h3v3h-3zM5 17h3v3H5zM10.5 17h3v3h-3zM16 17h3v3h-3z"/></svg><span id="digitsText"></span></button>
+    <div class="pair" id="tvActs" hidden>
+      <button class="pill" id="tvTracks"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M10.5 10.3a2.2 2.2 0 1 0 0 3.4M17 10.3a2.2 2.2 0 1 0 0 3.4"/></svg><span id="tvTracksText"></span></button>
+      <button class="pill" id="tvSleep"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 14.5A7.5 7.5 0 0 1 9.5 4.5a7.5 7.5 0 1 0 10 10z"/></svg><span id="tvSleepText"></span></button>
+    </div>
     <div class="digits" id="digits" hidden>
       <button data-a="digit_1">1</button><button data-a="digit_2">2</button><button data-a="digit_3">3</button>
       <button data-a="digit_4">4</button><button data-a="digit_5">5</button><button data-a="digit_6">6</button>
@@ -359,12 +382,15 @@ _HTML = """<!doctype html>
 """
 
 _CSS = """
-:root{@@DARK@@;color-scheme:dark;--on-error:var(--bg);--radius:12px;--dock:172px;--vh:1vh;
+:root{@@DARK@@;color-scheme:dark;--on-error:var(--bg);--radius:12px;--dock:172px;--vh:1vh;--svh:1vh;
   --safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);
   --gut-l:max(clamp(12px,4vw,16px),env(safe-area-inset-left,0px));
   --gut-r:max(clamp(12px,4vw,16px),env(safe-area-inset-right,0px));
-  --key-h:clamp(46px,calc(var(--vh)*8.5),54px)}
+  --key-h:clamp(46px,calc(var(--svh)*6.6),62px);--tg:clamp(6px,calc(var(--svh)*1.5),14px);--kg:clamp(6px,2vw,10px);
+  --rw:clamp(46px,13vmin,68px);--rg:clamp(8px,3vmin,16px);--pad-min:150px;
+  --pad:clamp(150px,min(52vw,calc(var(--svh)*30)),272px)}
 @supports (height:1dvh){:root{--vh:1dvh}}
+@supports (height:1svh){:root{--svh:1svh}}
 @media (prefers-color-scheme: light){:root{@@LIGHT@@;color-scheme:light;--on-error:var(--on-accent)}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--text);
@@ -443,11 +469,25 @@ svg .fill{fill:currentColor;stroke:none}
   border-radius:999px;background:var(--btn);color:var(--text);font-size:14px;font-weight:600}
 .showIn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .showIn svg{width:18px;height:18px;flex:none;color:var(--accent)}
-.nowActs{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
-.nowActs .showIn{margin-top:0}
+.nowActs{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+.nowActs .showIn,.nowSet .showIn{margin-top:0}
 .showIn.on{background:var(--sel)}
+.showIn.live{font-variant-numeric:tabular-nums}
+.showIn.live.rec{background:var(--sel);color:var(--rec)}
+.more{flex:none;margin-inline-start:auto;min-width:44px;min-height:44px;display:flex;align-items:center;
+  justify-content:center;color:var(--text2);font-size:13px;font-weight:600}
+.moreIn{display:flex;align-items:center;gap:4px;height:32px;padding:0 9px 0 12px;border-radius:999px;background:var(--btn)}
+.more svg{width:16px;height:16px;flex:none}
+.more:active .moreIn{background:var(--btn-hover)}
+.more[aria-expanded=true]{color:var(--text)}
+.caret{transition:transform .2s}
+[aria-expanded=true] .caret{transform:rotate(180deg)}
+@media (prefers-reduced-motion: reduce){.caret{transition:none}}
+.nowMore{margin-top:10px}
+.nowSet{display:flex;flex-wrap:wrap;gap:8px}
 .nowRec{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:12px;box-shadow:inset 0 1px 0 var(--border)}
-body.tv .nowRec{display:none}
+.nowSet[hidden]+.nowRec{margin-top:0;padding-top:0;box-shadow:none}
+body.tv .nowMore{display:none}
 .recIcon{display:flex;color:var(--rec)}
 .recIcon svg,.showIn .recIcon svg{width:18px;height:18px;color:var(--rec)}
 .showIn.rec.on{background:var(--sel);color:var(--rec)}
@@ -589,60 +629,96 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;bac
 .key.primary{background:var(--accent);color:var(--on-accent);flex:1.4}
 .key.primary:active{filter:brightness(1.1)}
 .key[disabled]{opacity:.45}
-body.tv{padding-bottom:0}
+body.tv{padding-bottom:0;min-height:0}
 body.tv .nowTimes,body.tv .next{display:none}
-.tvText{flex:1 1 100%}
-.tvr{--pad:clamp(150px,min(72vw,calc(var(--vh)*42)),272px);display:flex;flex-wrap:wrap;align-items:flex-start;
-  justify-content:center;gap:clamp(10px,calc(var(--vh)*2.2),16px) 20px;
-  padding:clamp(8px,calc(var(--vh)*2),14px) 0 calc(18px + var(--safe-b))}
-.pad,.colours,.deck,.digits{direction:ltr}
-.pad{flex:none;width:var(--pad);aspect-ratio:1;margin:0 auto;border-radius:50%;background:var(--pane);
+body.tv #app{display:flex;flex-direction:column;height:calc(var(--svh)*100)}
+body.tv #app>*{flex:none}
+body.tv #app>.tvr{flex:1 0 auto}
+.tvr{display:grid;grid-template:"text" auto "stage" minmax(var(--pad-min),1fr) "side" auto/minmax(0,1fr);
+  padding:var(--tg) 0 calc(var(--tg) + var(--safe-b))}
+.tvText{grid-area:text;margin-bottom:var(--tg)}
+.stage,.pad,.colours,.digits{direction:ltr}
+.stage{grid-area:stage;min-width:0;display:flex;flex-wrap:wrap;align-items:center;align-content:center;
+  justify-content:center;gap:var(--rg)}
+.stage>*{--P:var(--pad)}
+@supports (container-type:size){
+  .stage{container-type:size}
+  .stage>*{--P:clamp(var(--pad-min),min(calc(100cqw - 2*var(--rw) - 2*var(--rg) - 1px),100cqh),340px)}
+}
+.rock{flex:none;width:var(--rw);height:var(--P);display:flex;flex-direction:column;border-radius:var(--radius);
+  background:var(--btn);overflow:hidden}
+.rock button{flex:1 1 0;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center}
+.rock button:active{background:var(--btn-hover)}
+.rock .mid{flex:none;height:clamp(18px,calc(var(--P)*.12),32px);display:flex;align-items:center;justify-content:center;
+  color:var(--muted)}
+.rock .mid svg{width:17px;height:17px}
+.pad{flex:none;width:var(--P);height:var(--P);border-radius:50%;background:var(--pane);
   box-shadow:inset 0 0 0 1px var(--border);display:grid;grid-template:1fr 1.1fr 1fr/1fr 1.1fr 1fr}
 .arr{display:flex;align-items:center;justify-content:center;color:var(--text2);border-radius:50%}
 .arr:active{background:var(--hover);color:var(--text)}
-.arr svg{width:clamp(24px,calc(var(--pad)*.11),30px);height:clamp(24px,calc(var(--pad)*.11),30px)}
+.arr svg{width:clamp(24px,calc(var(--P)*.11),34px);height:clamp(24px,calc(var(--P)*.11),34px)}
 .up{grid-area:1/2}.left{grid-area:2/1}.right{grid-area:2/3}.down{grid-area:3/2}
 .okk{grid-area:2/2;margin:4px;border-radius:50%;background:var(--accent);color:var(--on-accent);font-weight:700;
-  font-size:clamp(16px,calc(var(--pad)*.07),19px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  font-size:clamp(16px,calc(var(--P)*.07),21px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .okk:active{filter:brightness(1.1)}
-.touch{flex:1 1 var(--pad);min-width:min(100%,var(--pad));height:var(--pad);border-radius:24px;background:var(--pane);
-  box-shadow:inset 0 0 0 1px var(--border);display:flex;align-items:center;justify-content:center;text-align:center;
-  padding:clamp(16px,6vw,28px);color:var(--muted);font-size:14px;
+.touch{flex:1 1 0;min-width:var(--pad-min);max-width:calc(var(--P)*1.6);height:var(--P);border-radius:24px;
+  background:var(--pane);box-shadow:inset 0 0 0 1px var(--border);display:flex;align-items:center;justify-content:center;
+  text-align:center;padding:clamp(14px,5vw,28px);color:var(--muted);font-size:14px;
   touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .touch.down{background:var(--hover)}
-.side{flex:1 1 280px;min-width:0;display:flex;flex-direction:column;gap:clamp(8px,calc(var(--vh)*1.8),12px)}
-.pair{display:flex;gap:clamp(6px,2.5vw,10px)}
-.pill{flex:1 1 0;min-width:0;min-height:52px;padding:6px 4px;border-radius:var(--radius);background:var(--btn);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12.5px;font-weight:600}
-.pill span{max-width:100%;line-height:1.15;text-align:center;overflow-wrap:break-word}
+@container (max-aspect-ratio: 6/5){
+  .stage>*{--P:clamp(var(--pad-min),min(calc(100cqw - 1px),calc(100cqh - var(--key-h) - var(--rg))),340px)}
+  .pad{order:-1;margin-inline:calc((100cqw - var(--P))/2)}
+  .touch{order:-1;flex:0 0 100%;max-width:none}
+  .rock{width:calc((100cqw - var(--rg))/2 - 1px);height:var(--key-h);flex-direction:row-reverse}
+  .rock .mid{height:auto;width:clamp(18px,8cqw,32px)}
+}
+.side{grid-area:side;min-width:0;display:flex;flex-direction:column;gap:var(--tg);margin-top:var(--tg)}
+.tvKeys{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(44px,1fr) minmax(44px,.8fr) minmax(0,1.25fr);
+  gap:var(--kg)}
+.pair{display:flex;gap:var(--kg)}
+.pill{flex:1 1 0;min-width:0;min-height:var(--key-h);padding:6px 3px;border-radius:var(--radius);background:var(--btn);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:clamp(11.5px,3.5vw,12.5px);
+  font-weight:600}
+.pill span,.fold span{max-width:100%;line-height:1.15;text-align:center;overflow-wrap:break-word;
+  -webkit-hyphens:auto;hyphens:auto}
 .pill svg{width:20px;height:20px;flex:none}
 .pill:active{background:var(--btn-hover)}
-.pill[aria-pressed=true]{background:var(--sel);color:var(--accent)}
-.colours{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:clamp(5px,2vw,8px)}
+.pill.primary{background:var(--accent);color:var(--on-accent)}
+.pill.primary svg{width:28px;height:28px}
+.pill.primary:active{filter:brightness(1.1)}
+.colours{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--kg)}
 .ck{min-width:0;min-height:var(--key-h);border-radius:var(--radius);background:var(--btn);display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:6px;padding:6px 3px;color:var(--text2);font-size:clamp(10.5px,3.3vw,11.5px);font-weight:600}
 .ck:active{background:var(--btn-hover)}
 .ck i{display:block;flex:none;width:min(30px,70%);height:6px;border-radius:3px}
 .ck span{max-width:100%;line-height:1.1;text-align:center;overflow:hidden;overflow-wrap:anywhere;
-  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+  -webkit-hyphens:auto;hyphens:auto;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
 .ck .r{background:var(--key-red)}.ck .g{background:var(--key-green)}.ck .y{background:var(--key-yellow)}.ck .b{background:var(--key-blue)}
-.deck{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:clamp(6px,2.5vw,10px)}
-.rock{display:flex;flex-direction:column;border-radius:var(--radius);background:var(--btn);overflow:hidden}
-.rock button{height:var(--key-h);display:flex;align-items:center;justify-content:center}
-.rock button:active{background:var(--btn-hover)}
-.rock .mid{height:clamp(18px,calc(var(--vh)*4),26px);display:flex;align-items:center;justify-content:center;color:var(--muted)}
-.rock .mid svg{width:17px;height:17px}
-.midc{display:flex;flex-direction:column;gap:clamp(6px,2.5vw,10px)}
-.midc .key{flex:1;height:auto;min-height:44px;margin:0}
-.fold{width:100%;min-height:46px;border-radius:var(--radius);background:var(--pane);display:flex;
-  align-items:center;justify-content:center;gap:8px;color:var(--text2);font-weight:600;font-size:14px}
-.fold svg{width:18px;height:18px}
+.folds{display:flex;flex-wrap:wrap;gap:var(--kg)}
+.fold{flex:1 1 64px;min-width:0;min-height:46px;padding:5px 4px;border-radius:var(--radius);background:var(--pane);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--text2);
+  font-size:clamp(11.5px,3.5vw,12.5px);font-weight:600}
+.fold svg{width:18px;height:18px;flex:none}
+.fold:active{background:var(--hover)}
 .fold[aria-expanded=true]{color:var(--text)}
-.digits{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(6px,2vw,8px)}
+.fold[aria-pressed=true]{background:var(--sel);color:var(--accent)}
+.fold.live{flex:0 1 auto;min-width:64px;padding-inline:12px;font-variant-numeric:tabular-nums}
+.fold.rec{color:var(--rec)}
+.digits{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--kg)}
 .digits button{height:var(--key-h);border-radius:var(--radius);background:var(--btn);font-size:22px;font-weight:600;
   font-variant-numeric:tabular-nums}
 .digits button:active{background:var(--btn-hover)}
 .digits .zero{grid-column:2}
+@media (orientation: landscape) and (min-width: 540px){
+  body.tv #app{max-width:920px}
+  .tvr{grid-template:"text text" auto "stage side" minmax(var(--pad-min),1fr)/
+    minmax(calc(2*var(--rw) + 2*var(--rg) + var(--pad-min) + 2px),1fr) minmax(0,clamp(260px,40%,380px));
+    column-gap:var(--rg)}
+  .side{margin-top:0;align-self:center}
+}
+@media (max-height: 440px){body.tv .now{padding-block:10px}body.tv .now.act .nowLabel{display:none}}
+@media (max-height: 360px){body.tv .now.act .seekbar{display:none}body.tv .now .logo{flex-basis:44px;height:44px}}
 """
 
 _JS = r"""
@@ -925,11 +1001,14 @@ function show(s) {
   epsOffer(ep);
   actsOffer(s);
   recOffer(s);
+  folds();
 }
 
 function tick() {
   const s = st;
-  if (!s || s.state === "stopped") { setBar(null); $("nowStart").textContent = $("nowEnd").textContent = ""; return; }
+  if (!s || s.state === "stopped") {
+    setBar(null); $("nowStart").textContent = $("nowEnd").textContent = ""; recTick(); return;
+  }
   if (drag) { epsTick(); return; }                  // the finger's place, not the clock's
   const now = (s.time || Date.now() / 1000) + (Date.now() - stAt) / 1000;
   if (s.now && s.now.stop > s.now.start && !(s.seek && s.duration > 0)) {
@@ -1075,6 +1154,7 @@ function playingRow() { return playingId && byId.has(playingId) ? byId.get(playi
 function offer() {
   const c = playingRow();
   hide($("showIn"), tvOn || isLib() || !c || rows.includes(c));
+  nowRow();
 }
 
 function followNow() {
@@ -1298,6 +1378,7 @@ function epsEmpty(text) { const e = $("epsEmpty"); e.textContent = text || ""; h
 // Now playing offers the view while an episode plays; an open one follows it.
 function epsOffer(ep) {
   hide($("epsBtn"), !!tvOn || !ep || !ep.sid);
+  nowRow();
   if (!eps.open || !ep || ep.sid !== eps.sid) return;
   if (ep.v !== eps.v || ep.key !== eps.playing) loadEps(false);
 }
@@ -1505,21 +1586,84 @@ function openSleep() {
 }
 
 function sleepTick() {
-  const text = sleepText(), on = sleepLeft() > 0;
+  const text = sleepText(), left = sleepLeft(), on = left > 0;
   for (const id of ["sleepText", "tvSleepText"]) if ($(id).textContent !== text) $(id).textContent = text;
   for (const id of ["sleepBtn", "tvSleep"]) $(id).classList.toggle("on", on);
+  // Folded away, its minutes stay on the card.
+  const mins = on ? W.minutes.replace("{n}", String(Math.max(1, Math.ceil(left / 60)))) : "";
+  for (const k of ["now", "tv"]) {
+    const b = $(FOLDS[k].sleep), was = !b.hasAttribute("hidden");
+    hide(b, !on || foldOpen(k));
+    if (b.lastElementChild.textContent !== mins) { b.lastElementChild.textContent = mins; b.setAttribute("aria-label", text); }
+    if (k === "now" && was === b.hasAttribute("hidden")) nowRow();
+  }
 }
 
 // Now playing's secondary row (and TV mode's remote): what plays' tracks and
 // the sleep timer while something plays.
 function actsOffer(s) {
   const playing = !!s.state && s.state !== "stopped";
-  hide($("tracksBtn"), !playing); hide($("sleepBtn"), !playing); hide($("tvActs"), !playing);
-  const row = $("nowActs");
-  hide(row, ![...row.children].some((b) => !b.hasAttribute("hidden")));
+  hide($("tracksBtn"), !playing); hide($("sleepBtn"), !playing);
   if (sheet && sheet.kind === "tracks" && s.tracks !== sheet.seen) loadTracks();
   if (sheet && !playing && (sheet.kind === "tracks" || sheet.kind === "sleep")) closeSheet();
   sleepTick();
+}
+
+// -- More: the card kept compact ------------------------------------------------------------
+// What plays' sound and subtitles, the sleep timer, recording and the next
+// programme folded behind one button under Now playing (in TV mode's remote:
+// the sound and the sleep timer), open or folded as this phone left it. Folded,
+// nothing that runs is out of sight: a recording's red dot and time and the
+// sleep timer's minutes stay on the card, each a way to it.
+const FOLDS = {
+  now: {btn: "moreBtn", body: "nowMore", text: "moreText", key: "more", rec: "recLive", sleep: "sleepLive"},
+  tv: {btn: "tvMoreBtn", body: "tvActs", text: "tvMoreText", key: "tv_more", rec: "tvRecLive", sleep: "tvSleepLive"},
+};
+const unfolded = {now: false, tv: false};
+for (const k of ["now", "tv"]) {
+  try { unfolded[k] = localStorage.getItem(FOLDS[k].key) === "1"; } catch (e) { /* private mode */ }
+}
+
+function isShown(id) { return !$(id).hasAttribute("hidden"); }
+function foldOpen(k) { return isShown(FOLDS[k].body); }
+
+// Now playing's row of buttons only while one of them shows.
+function nowRow() {
+  const row = $("nowActs");
+  hide(row, ![...row.children].some((b) => !b.hasAttribute("hidden")));
+}
+
+function folds() {
+  const playing = !!st.state && st.state !== "stopped", recording = !!(st.rec && st.rec.id);
+  const has = {now: ["tracksBtn", "sleepBtn", "recBtn", "nextBtn"].some(isShown), tv: playing};
+  for (const k of ["now", "tv"]) {
+    const f = FOLDS[k], open = has[k] && unfolded[k];
+    hide($(f.btn), !has[k]);
+    hide($(f.body), !open);
+    $(f.btn).setAttribute("aria-expanded", String(open));
+    $(f.text).textContent = open ? W.less : W.more;
+    hide($(f.rec), open || !recording);
+  }
+  hide($("nowSet"), !isShown("tracksBtn") && !isShown("sleepBtn"));
+  sleepTick(); recTick();
+  nowRow();
+}
+
+function foldToggle(k) {
+  unfolded[k] = !foldOpen(k);
+  try { localStorage.setItem(FOLDS[k].key, unfolded[k] ? "1" : "0"); } catch (e) { /* private mode */ }
+  folds();
+}
+
+function initFolds() {
+  for (const k of ["now", "tv"]) {
+    const f = FOLDS[k];
+    $(f.btn).addEventListener("click", () => foldToggle(k));
+    // The dot stops the recording, asked as always - it never starts one.
+    $(f.rec).addEventListener("click", () => { if (st.rec && st.rec.id) stopAsk(st.rec.id, st.rec.title); });
+    $(f.sleep).addEventListener("click", openSleep);
+  }
+  folds();
 }
 
 function initSheets() {
@@ -1655,12 +1799,18 @@ function recOffer(s) {
 
 function recTick() {
   const r = st.rec;
-  let text = W.rec;
+  let text = W.rec, time = "";
   if (r && r.id) {
     const now = (st.time || Date.now() / 1000) + (Date.now() - stAt) / 1000;
-    text = W.rec_stop + " · " + hms(Math.max(0, now - (r.start || now)));
+    time = hms(Math.max(0, now - (r.start || now)));
+    text = W.rec_stop + " · " + time;
   }
   if ($("recText").textContent !== text) $("recText").textContent = text;
+  // Folded away, the red dot and the time stay on the card.
+  for (const k of ["now", "tv"]) {
+    const b = $(FOLDS[k].rec);
+    if (b.lastElementChild.textContent !== time) { b.lastElementChild.textContent = time; b.setAttribute("aria-label", text); }
+  }
 }
 
 function initRec() {
@@ -1866,6 +2016,7 @@ function init() {
   $("epsBtnText").textContent = W.episodes;
   initSheets();
   initRec();
+  initFolds();
   label("toggle", W.play_pause); label("stop", W.stop); label("chUp", W.ch_up); label("chDown", W.ch_down);
   label("mute", W.mute); $("vol").setAttribute("aria-label", W.volume);
   $("nowTitle").textContent = W.loading;

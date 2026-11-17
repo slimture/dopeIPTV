@@ -2934,6 +2934,8 @@
   "phone_page_sleep_left": "Para em {n} min",
   "phone_rec_ask": "Gravar {title}?",
   "phone_rec_stop_ask": "Parar a gravação de {title}?",
+  "phone_page_more": "Mais",
+  "phone_page_less": "Menos",
   "status_guide_still_loading": "O guia de programação está demorando um pouco - ele aparece assim que estiver pronto.",
   "notice_more": "mais {n}",
   "notice_working": "Em andamento",

@@ -2934,6 +2934,8 @@
   "phone_page_sleep_left": "Zaustavlja se za {n} min",
   "phone_rec_ask": "Snimiti {title}?",
   "phone_rec_stop_ask": "Zaustaviti snimanje {title}?",
+  "phone_page_more": "Više",
+  "phone_page_less": "Manje",
   "status_guide_still_loading": "Programski vodič se malo duže učitava - pojavit će se čim bude spreman.",
   "notice_more": "još {n}",
   "notice_working": "U tijeku",

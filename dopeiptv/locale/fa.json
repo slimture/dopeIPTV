@@ -2934,6 +2934,8 @@
   "phone_page_sleep_left": "توقف تا {n} دقیقه دیگر",
   "phone_rec_ask": "{title} ضبط شود؟",
   "phone_rec_stop_ask": "ضبط {title} متوقف شود؟",
+  "phone_page_more": "بیشتر",
+  "phone_page_less": "کمتر",
   "status_guide_still_loading": "راهنمای برنامه کمی طول می‌کشد - به‌محض آماده شدن نمایش داده می‌شود.",
   "notice_more": "{n} مورد دیگر",
   "notice_working": "در حال انجام",
