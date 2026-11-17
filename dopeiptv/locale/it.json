@@ -3066,5 +3066,9 @@
   "set_popular_link_hint": "La classifica della settimana di TMDB, in cima a Film e Serie",
   "set_sidebar_entries": "Nella barra laterale",
   "set_sidebar_entries_note": "Una sezione tolta dalla barra laterale si apre comunque con la sua scorciatoia, la tavolozza dei comandi e i menu.",
-  "set_places_fold_hint": "Le sezioni come una fila di icone in cima alla barra laterale, per lasciare spazio alle categorie; la freccia sotto le sezioni fa lo stesso."
+  "set_places_fold_hint": "Le sezioni come una fila di icone in cima alla barra laterale, per lasciare spazio alle categorie; la freccia sotto le sezioni fa lo stesso.",
+  "notice_recording": "Registrazione: {title}",
+  "rec_stop_ask_title": "Fermare la registrazione?",
+  "rec_stop_ask": "Fermare la registrazione di {title}? Quanto registrato finora viene conservato.",
+  "rec_keep_recording": "Continua a registrare"
 }

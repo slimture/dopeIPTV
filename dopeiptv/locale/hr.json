@@ -3066,5 +3066,9 @@
   "set_popular_link_hint": "Ljestvica tjedna s TMDB-a, na vrhu Filmova i Serija",
   "set_sidebar_entries": "Na bočnoj traci",
   "set_sidebar_entries_note": "Odjeljak maknut s bočne trake i dalje se otvara svojim prečacem, paletom naredbi i iz izbornika.",
-  "set_places_fold_hint": "Odjeljci kao red ikona na vrhu bočne trake, da kategorije imaju mjesta – strelica ispod odjeljaka radi isto."
+  "set_places_fold_hint": "Odjeljci kao red ikona na vrhu bočne trake, da kategorije imaju mjesta – strelica ispod odjeljaka radi isto.",
+  "notice_recording": "Snimanje: {title}",
+  "rec_stop_ask_title": "Zaustaviti snimanje?",
+  "rec_stop_ask": "Zaustaviti snimanje {title}? Ono što je dosad snimljeno ostaje spremljeno.",
+  "rec_keep_recording": "Nastavi snimati"
 }

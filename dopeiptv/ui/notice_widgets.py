@@ -414,16 +414,28 @@ class ActivityLine(QWidget):
     def _opens(self) -> bool:
         return bool(self._entries) or bool(self._hub.messages())
 
+    def _activate(self) -> None:
+        """A click or Enter: the one job's own act (a recording asks to
+        stop), else the panel."""
+        act = self._hub.direct()
+        if act is not None:
+            try:
+                act()
+            except Exception:
+                log.debug("notices: a job's act failed", exc_info=True)
+            return
+        self.open_panel.emit()
+
     def mousePressEvent(self, e) -> None:    # noqa: N802 - Qt hook
         if e.button() == Qt.MouseButton.LeftButton and self._opens():
             e.accept()
-            self.open_panel.emit()
+            self._activate()
             return
         super().mousePressEvent(e)
 
     def keyPressEvent(self, e) -> None:      # noqa: N802 - Qt hook
         if e.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space) and self._opens():
-            self.open_panel.emit()
+            self._activate()
             return
         super().keyPressEvent(e)
 
@@ -741,11 +753,12 @@ class _PanelRow(QWidget):
             pct.setObjectName("NoticeRowPct")
             lay.addWidget(pct, 0, Qt.AlignmentFlag.AlignTop)
         if e.cancellable:
-            btn = QPushButton(tr("common_cancel"))
+            word = e.cancel_text or tr("common_cancel")
+            btn = QPushButton(word)
             btn.setObjectName("NoticeRowCancel")
             btn.setFlat(True)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.setAccessibleName(tr("common_cancel") + ": " + e.text)
+            btn.setAccessibleName(word + ": " + e.text)
             btn.clicked.connect(self._cancel)
             lay.addWidget(btn, 0, Qt.AlignmentFlag.AlignTop)
         self.setAccessibleName(e.text + (f" {round(e.progress * 100)}%"

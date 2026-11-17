@@ -3066,5 +3066,9 @@
   "set_popular_link_hint": "Tangga minggu ini dari TMDB, di bagian atas Film dan Serial",
   "set_sidebar_entries": "Di bilah samping",
   "set_sidebar_entries_note": "Bagian yang dikeluarkan dari bilah samping tetap terbuka lewat pintasannya, palet perintah, dan menu.",
-  "set_places_fold_hint": "Bagian-bagian sebagai deretan ikon di atas bilah samping, agar kategori mendapat ruang – panah di bawah bagian melakukan hal yang sama."
+  "set_places_fold_hint": "Bagian-bagian sebagai deretan ikon di atas bilah samping, agar kategori mendapat ruang – panah di bawah bagian melakukan hal yang sama.",
+  "notice_recording": "Merekam {title}",
+  "rec_stop_ask_title": "Hentikan perekaman?",
+  "rec_stop_ask": "Hentikan perekaman {title}? Yang sudah terekam tetap disimpan.",
+  "rec_keep_recording": "Lanjutkan merekam"
 }

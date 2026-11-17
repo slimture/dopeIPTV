@@ -3066,5 +3066,9 @@
   "set_popular_link_hint": "Ranking tygodnia z TMDB, na górze Filmów i Seriali",
   "set_sidebar_entries": "Na pasku bocznym",
   "set_sidebar_entries_note": "Sekcja usunięta z paska bocznego nadal otwiera się swoim skrótem, z palety poleceń i z menu.",
-  "set_places_fold_hint": "Sekcje jako rząd ikon na górze paska bocznego, by kategorie miały miejsce – strzałka pod sekcjami robi to samo."
+  "set_places_fold_hint": "Sekcje jako rząd ikon na górze paska bocznego, by kategorie miały miejsce – strzałka pod sekcjami robi to samo.",
+  "notice_recording": "Nagrywanie: {title}",
+  "rec_stop_ask_title": "Zatrzymać nagrywanie?",
+  "rec_stop_ask": "Zatrzymać nagrywanie {title}? To, co zostało dotąd nagrane, zostanie zachowane.",
+  "rec_keep_recording": "Nagrywaj dalej"
 }

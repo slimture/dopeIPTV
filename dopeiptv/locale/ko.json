@@ -3066,5 +3066,9 @@
   "set_popular_link_hint": "TMDB의 이번 주 차트, 영화와 시리즈 맨 위에 표시",
   "set_sidebar_entries": "사이드바에 표시",
   "set_sidebar_entries_note": "사이드바에서 뺀 섹션도 단축키, 명령 팔레트, 메뉴로 열 수 있습니다.",
-  "set_places_fold_hint": "섹션을 사이드바 위쪽의 아이콘 한 줄로 만들어 카테고리에 자리를 줍니다. 섹션 아래의 화살표도 같은 일을 합니다."
+  "set_places_fold_hint": "섹션을 사이드바 위쪽의 아이콘 한 줄로 만들어 카테고리에 자리를 줍니다. 섹션 아래의 화살표도 같은 일을 합니다.",
+  "notice_recording": "{title} 녹화 중",
+  "rec_stop_ask_title": "녹화를 정지할까요?",
+  "rec_stop_ask": "{title} 녹화를 정지할까요? 지금까지 녹화된 내용은 보존됩니다.",
+  "rec_keep_recording": "계속 녹화"
 }

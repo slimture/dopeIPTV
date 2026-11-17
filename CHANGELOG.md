@@ -58,6 +58,11 @@ same new look.
 
 ### Changed
 
+- A running recording stays on the activity line at the sidebar's foot
+  for as long as it runs, instead of a note for a few seconds. A click on
+  it asks "Stop recording ...? What has been recorded so far is kept." -
+  Stop recording or Keep recording - and nothing stops without that
+  answer; with several, the panel lists each with its own Stop recording.
 - Movies: a film no longer opens a page of its own in the middle pane,
   which said again what the detail column says. A click picks the film
   and the detail column shows it - with Continue, how far it got and the

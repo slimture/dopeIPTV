@@ -3066,5 +3066,9 @@
   "set_popular_link_hint": "De hitlijst van deze week van TMDB, bovenaan bij Films en Series",
   "set_sidebar_entries": "In de zijbalk",
   "set_sidebar_entries_note": "Een onderdeel dat uit de zijbalk is gehaald, opent nog steeds met zijn sneltoets, het opdrachtenpalet en de menu's.",
-  "set_places_fold_hint": "De onderdelen als een rij pictogrammen bovenaan de zijbalk, zodat de categorieën de ruimte krijgen – de pijl onder de onderdelen doet hetzelfde."
+  "set_places_fold_hint": "De onderdelen als een rij pictogrammen bovenaan de zijbalk, zodat de categorieën de ruimte krijgen – de pijl onder de onderdelen doet hetzelfde.",
+  "notice_recording": "{title} wordt opgenomen",
+  "rec_stop_ask_title": "Opname stoppen?",
+  "rec_stop_ask": "Opname van {title} stoppen? Wat tot nu toe is opgenomen, blijft bewaard.",
+  "rec_keep_recording": "Doorgaan met opnemen"
 }

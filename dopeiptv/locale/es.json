@@ -3066,5 +3066,9 @@
   "set_popular_link_hint": "La lista de la semana de TMDB, arriba en Películas y Series",
   "set_sidebar_entries": "En la barra lateral",
   "set_sidebar_entries_note": "Una sección quitada de la barra lateral se sigue abriendo con su atajo, la paleta de comandos y los menús.",
-  "set_places_fold_hint": "Las secciones como una fila de iconos arriba en la barra lateral, para dejar sitio a las categorías; la flecha bajo las secciones hace lo mismo."
+  "set_places_fold_hint": "Las secciones como una fila de iconos arriba en la barra lateral, para dejar sitio a las categorías; la flecha bajo las secciones hace lo mismo.",
+  "notice_recording": "Grabando {title}",
+  "rec_stop_ask_title": "¿Detener la grabación?",
+  "rec_stop_ask": "¿Detener la grabación de {title}? Lo grabado hasta ahora se conserva.",
+  "rec_keep_recording": "Seguir grabando"
 }

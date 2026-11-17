@@ -3066,5 +3066,9 @@
   "set_popular_link_hint": "TMDBの今週のランキング（映画とシリーズの上部）",
   "set_sidebar_entries": "サイドバーに表示",
   "set_sidebar_entries_note": "サイドバーから外したセクションも、ショートカット、コマンドパレット、メニューから開けます。",
-  "set_places_fold_hint": "セクションをサイドバー上部のアイコンの列にして、カテゴリーの場所を空けます。セクションの下の矢印でも同じことができます。"
+  "set_places_fold_hint": "セクションをサイドバー上部のアイコンの列にして、カテゴリーの場所を空けます。セクションの下の矢印でも同じことができます。",
+  "notice_recording": "{title}を録画中",
+  "rec_stop_ask_title": "録画を停止しますか？",
+  "rec_stop_ask": "{title}の録画を停止しますか？これまでに録画した分は保存されます。",
+  "rec_keep_recording": "録画を続ける"
 }

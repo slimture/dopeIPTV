@@ -3066,5 +3066,9 @@
   "set_popular_link_hint": "Le classement de la semaine de TMDB, en haut de Films et Séries",
   "set_sidebar_entries": "Dans la barre latérale",
   "set_sidebar_entries_note": "Une rubrique retirée de la barre latérale s'ouvre toujours par son raccourci, la palette de commandes et les menus.",
-  "set_places_fold_hint": "Les rubriques en une rangée d'icônes en haut de la barre latérale, pour laisser la place aux catégories – la flèche sous les rubriques fait de même."
+  "set_places_fold_hint": "Les rubriques en une rangée d'icônes en haut de la barre latérale, pour laisser la place aux catégories – la flèche sous les rubriques fait de même.",
+  "notice_recording": "Enregistrement : {title}",
+  "rec_stop_ask_title": "Arrêter l'enregistrement ?",
+  "rec_stop_ask": "Arrêter l'enregistrement de {title} ? Ce qui a déjà été enregistré est conservé.",
+  "rec_keep_recording": "Continuer l'enregistrement"
 }

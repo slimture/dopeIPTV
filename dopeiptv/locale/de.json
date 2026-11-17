@@ -3066,5 +3066,9 @@
   "set_popular_link_hint": "Die Charts der Woche von TMDB, oben bei Filmen und Serien",
   "set_sidebar_entries": "In der Seitenleiste",
   "set_sidebar_entries_note": "Ein aus der Seitenleiste genommener Bereich öffnet sich weiter über sein Tastenkürzel, die Befehlspalette und die Menüs.",
-  "set_places_fold_hint": "Die Bereiche als Reihe von Symbolen oben in der Seitenleiste, damit die Kategorien Platz haben – der Pfeil unter den Bereichen macht dasselbe."
+  "set_places_fold_hint": "Die Bereiche als Reihe von Symbolen oben in der Seitenleiste, damit die Kategorien Platz haben – der Pfeil unter den Bereichen macht dasselbe.",
+  "notice_recording": "Aufnahme: {title}",
+  "rec_stop_ask_title": "Aufnahme stoppen?",
+  "rec_stop_ask": "Aufnahme von {title} stoppen? Was bisher aufgenommen wurde, bleibt erhalten.",
+  "rec_keep_recording": "Weiter aufnehmen"
 }

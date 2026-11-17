@@ -70,6 +70,10 @@ class Job:
     group: str | None = None
     group_text: Callable[[int], str] | None = None
     shown_at: float | None = None
+    #: What a click on the line does while this job is all it shows.
+    act: Callable[[], Any] | None = None
+    #: The panel's word for its cancel ("Stop recording"), else Cancel.
+    cancel_text: str = ""
 
     def progress(self) -> float | None:
         if self.done is None or not self.total:
@@ -87,6 +91,8 @@ class Entry:
     mine: bool
     started: float
     cancellable: bool
+    act: Callable[[], Any] | None = None
+    cancel_text: str = ""
 
 
 @dataclass
@@ -157,11 +163,15 @@ class NoticeHub(QObject):
               on_expire: Callable[[], Any] | None = None,
               cancel: Callable[[], Any] | None = None, group: str | None = None,
               group_text: Callable[[int], str] | None = None,
-              done: float | None = None, total: float | None = None) -> int:
+              done: float | None = None, total: float | None = None,
+              act: Callable[[], Any] | None = None, cancel_text: str = "") -> int:
         """A job begins; its token is what ends it. *kind* picks its icon,
         *mine* says the person started it (it leads the line), *cancel* lets
-        the panel stop it, *group* merges it with others into one line
-        (*group_text(n)* its words). A job already running under *key* is
+        the panel stop it (*cancel_text* its button's word; a cancel that
+        returns False - the person said no to its question - leaves the job
+        running), *group* merges it with others into one line
+        (*group_text(n)* its words), *act* is what a click on the line does
+        while this job is all it shows. A job already running under *key* is
         replaced: its token is dead from now on, and a replacement already
         on screen stays on screen."""
         shown_at = None
@@ -174,7 +184,8 @@ class NoticeHub(QObject):
         token = self._seq
         self._jobs[token] = Job(token, str(text or ""), key,
                                 kind if kind in KINDS else "work", time.monotonic(),
-                                mine, done, total, cancel, group, group_text, shown_at)
+                                mine, done, total, cancel, group, group_text, shown_at,
+                                act, str(cancel_text or ""))
         self._on_expire[token] = on_expire
         t = QTimer(self)
         t.setSingleShot(True)
@@ -230,7 +241,8 @@ class NoticeHub(QObject):
             if job is None or job.cancel is None:
                 continue
             try:
-                job.cancel()
+                if job.cancel() is False:
+                    continue                # asked, and the person said no
             except Exception:
                 log.debug("notices: a job's cancel failed", exc_info=True)
             stopped = self._end(token, linger=False) or stopped
@@ -302,7 +314,16 @@ class NoticeHub(QObject):
                                     / sum(float(t or 0) for _d, t in totals)))
         return Entry([j.token for j in jobs], text, first.kind, progress,
                      any(j.mine for j in jobs), min(j.started for j in jobs),
-                     bool(live) and all(j.cancel is not None for j in live))
+                     bool(live) and all(j.cancel is not None for j in live),
+                     first.act if len(jobs) == 1 else None, first.cancel_text)
+
+    def direct(self) -> Callable[[], Any] | None:
+        """What a click on the line does at once instead of opening the
+        panel: the act of the one job it shows, with no message waiting."""
+        es = self.entries()
+        if len(es) != 1 or self.unread():
+            return None
+        return es[0].act
 
     def _end(self, token: int, emit: bool = True, linger: bool = True) -> bool:
         job = self._jobs.pop(token, None)

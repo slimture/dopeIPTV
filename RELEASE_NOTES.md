@@ -13,6 +13,7 @@
 - **Closing multiview**, the window you were listening to goes on in the main window - a film where it was.
 - **Answers to your feedback** show within minutes, and when you come back to the app, with a message that stays until you read it - after a restart too. When an answer asks for more, you can reply right under it - still no account, no e-mail.
 - **Phone remote:** the window with the code closes by itself once your phone has connected, and a note says so.
+- **A recording stays in sight** at the foot of the sidebar for as long as it runs. Click it to stop - the app asks first, and what has been recorded so far is kept. With two at once you pick which one.
 
 ### Fixed
 

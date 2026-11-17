@@ -3066,5 +3066,9 @@
   "set_popular_link_hint": "TMDB'nin bu haftaki listesi, Filmler ve Diziler'in en üstünde",
   "set_sidebar_entries": "Kenar çubuğunda",
   "set_sidebar_entries_note": "Kenar çubuğundan çıkarılan bir bölüm yine kısayolundan, komut paletinden ve menülerden açılır.",
-  "set_places_fold_hint": "Kategorilere yer kalsın diye bölümler kenar çubuğunun üstünde bir sıra simge olarak - bölümlerin altındaki ok da aynısını yapar."
+  "set_places_fold_hint": "Kategorilere yer kalsın diye bölümler kenar çubuğunun üstünde bir sıra simge olarak - bölümlerin altındaki ok da aynısını yapar.",
+  "notice_recording": "Kaydediliyor: {title}",
+  "rec_stop_ask_title": "Kayıt durdurulsun mu?",
+  "rec_stop_ask": "{title} kaydı durdurulsun mu? Şimdiye kadar kaydedilenler saklanır.",
+  "rec_keep_recording": "Kaydetmeye devam et"
 }

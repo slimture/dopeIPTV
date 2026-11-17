@@ -3066,5 +3066,9 @@
   "set_popular_link_hint": "Chati ya wiki hii kutoka TMDB, juu ya Filamu na Misururu",
   "set_sidebar_entries": "Kwenye upau wa kando",
   "set_sidebar_entries_note": "Sehemu iliyoondolewa kwenye upau wa kando bado hufunguka kwa mkato wake, paleti ya amri na menyu.",
-  "set_places_fold_hint": "Sehemu kama safu ya aikoni juu ya upau wa kando, ili aina zipate nafasi – mshale chini ya sehemu hufanya vivyo hivyo."
+  "set_places_fold_hint": "Sehemu kama safu ya aikoni juu ya upau wa kando, ili aina zipate nafasi – mshale chini ya sehemu hufanya vivyo hivyo.",
+  "notice_recording": "Inarekodi {title}",
+  "rec_stop_ask_title": "Kusimamisha kurekodi?",
+  "rec_stop_ask": "Kusimamisha kurekodi {title}? Kilichorekodiwa hadi sasa kinahifadhiwa.",
+  "rec_keep_recording": "Endelea kurekodi"
 }

@@ -3066,5 +3066,9 @@
   "set_popular_link_hint": "Veckans topplista från TMDB, överst i Filmer och Serier",
   "set_sidebar_entries": "I sidofältet",
   "set_sidebar_entries_note": "En plats som tagits bort ur sidofältet öppnas ändå med sitt kortkommando, kommandopaletten och menyerna.",
-  "set_places_fold_hint": "Platserna som en rad ikoner överst i sidofältet, så att kategorierna får plats - pilen under platserna gör samma sak."
+  "set_places_fold_hint": "Platserna som en rad ikoner överst i sidofältet, så att kategorierna får plats - pilen under platserna gör samma sak.",
+  "notice_recording": "Spelar in {title}",
+  "rec_stop_ask_title": "Stoppa inspelningen?",
+  "rec_stop_ask": "Stoppa inspelningen av {title}? Det som spelats in hittills sparas.",
+  "rec_keep_recording": "Fortsätt spela in"
 }

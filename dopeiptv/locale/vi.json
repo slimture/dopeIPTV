@@ -3066,5 +3066,9 @@
   "set_popular_link_hint": "Bảng xếp hạng tuần này của TMDB, ở đầu Phim và Loạt phim",
   "set_sidebar_entries": "Trên thanh bên",
   "set_sidebar_entries_note": "Một mục đã bỏ khỏi thanh bên vẫn mở được bằng phím tắt của nó, bảng lệnh và các menu.",
-  "set_places_fold_hint": "Các mục thành một hàng biểu tượng ở đầu thanh bên để danh mục có chỗ – mũi tên dưới các mục cũng làm như vậy."
+  "set_places_fold_hint": "Các mục thành một hàng biểu tượng ở đầu thanh bên để danh mục có chỗ – mũi tên dưới các mục cũng làm như vậy.",
+  "notice_recording": "Đang ghi {title}",
+  "rec_stop_ask_title": "Dừng ghi hình?",
+  "rec_stop_ask": "Dừng ghi hình {title}? Phần đã ghi đến giờ vẫn được giữ lại.",
+  "rec_keep_recording": "Tiếp tục ghi"
 }

@@ -777,3 +777,48 @@ def test_the_real_window_keeps_its_notices_in_the_sidebars_foot():
     out = subprocess.run([sys.executable, "-c", _CHILD], cwd=_REPO_ROOT, env=env,
                          capture_output=True, text=True, timeout=180)
     assert "NOTICES_WINDOW_OK" in out.stdout, out.stdout[-2000:] + out.stderr[-4000:]
+
+
+# -- a job's own act: the recording's line -------------------------------------
+
+def test_a_cancel_the_person_declines_leaves_the_job_running(app):
+    hub = _hub()
+    answers = [False, True]
+    a = hub.start("Recording News", cancel=lambda: answers.pop(0))
+    assert not hub.request_cancel([a]) and hub.alive(a)       # "Keep recording"
+    assert hub.request_cancel([a]) and not hub.alive(a)       # "Stop recording"
+
+
+def test_a_click_on_the_line_does_the_one_jobs_act_else_opens_the_panel(app):
+    host = _host(app)
+    hub = _hub()
+    line = ActivityLine(hub, host)
+    line.setGeometry(16, 540, 240, ActivityLine.H)
+    hub.changed.connect(line.refresh)
+    opened, asked = [], []
+    line.open_panel.connect(lambda: opened.append(1))
+    a = hub.start("Recording News", kind="record", mine=True,
+                  act=lambda: asked.append("news"), cancel=lambda: False,
+                  cancel_text=tr("rec_stop_recording"))
+    assert _spin(app, lambda: line.isVisible())
+    assert hub.direct() is not None
+    QTest.mouseClick(line, Qt.MouseButton.LeftButton)
+    assert asked == ["news"] and opened == []                 # asked, no panel
+    b = hub.start("Recording Sport", kind="record", act=lambda: asked.append("sport"))
+    _spin(app, secs=0.02)
+    assert hub.direct() is None                               # two: pick in the panel
+    QTest.mouseClick(line, Qt.MouseButton.LeftButton)
+    assert opened == [1] and asked == ["news"]
+    hub.finish(b)
+    hub.post("Could not delete", level="error")
+    assert hub.direct() is None                               # a message waits: the panel
+    hub.mark_read()
+    assert hub.direct() is not None
+    panel = ActivityPanel(hub, host)
+    panel.open_at(line)
+    [row] = [panel._rows.itemAt(i).widget() for i in range(panel._rows.count())]
+    [stop] = row.findChildren(QPushButton)
+    assert stop.text() == tr("rec_stop_recording")
+    stop.click()
+    assert hub.alive(a)                                       # declined: it records on
+    host.close()

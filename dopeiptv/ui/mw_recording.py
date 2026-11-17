@@ -29,6 +29,9 @@ from datetime import datetime, timedelta, timezone
 
 # Why a recording stopped or failed, as the recorder says it (English, and
 # also what the log shows) -> what the user reads.
+# A recording's line stays as long as it runs; the hub wants a bound.
+REC_NOTICE_MS = 7 * 24 * 3600 * 1000
+
 _REC_REASONS = {
     "stopped": "rec_reason_stopped",
     "finished": "rec_reason_finished",
@@ -130,12 +133,48 @@ class _RecordingMixin:
             cur = self.cat_list.currentItem()
             self._load_items(
                 cur.data(Qt.ItemDataRole.UserRole) if cur else None)
-        elif n:
-            # Transient only - the persistent "● REC" pill is the lasting
-            # indicator. One card, refreshed (not counted up) as the jobs
-            # change.
-            hub_of(self).post(tr("rec_running_n", n=n), key="rec_running", ms=4000)
+        self._rec_notices()
         self._remux_jobs()
+
+    def _rec_notices(self) -> None:
+        """Each running recording is work on the activity line for as long
+        as it runs: a click on it - or its Stop recording in the panel, with
+        several - asks before it stops (`_rec_ask_stop`); nothing stops
+        without that answer."""
+        hub = hub_of(self)
+        running = {str(j["id"]): j for j in getattr(self.rec, "jobs", [])
+                   if j.get("status") == "recording"}
+        shown = self.__dict__.setdefault("_rec_shown", set())
+        for jid in list(shown):
+            if jid not in running:
+                shown.discard(jid)
+                hub.end_key("rec:" + jid)
+        for jid, j in running.items():
+            if jid in shown:
+                continue
+            shown.add(jid)
+            ask = partial(self._rec_ask_stop, j["id"])
+            hub.start(tr("notice_recording", title=j.get("title") or ""),
+                      key="rec:" + jid, kind="record", mine=True,
+                      timeout_ms=REC_NOTICE_MS, cancel=ask, act=ask,
+                      cancel_text=tr("rec_stop_recording"))
+
+    def _rec_ask_stop(self, jid) -> bool:
+        """Stop the recording *jid*? Asked every time; what has been
+        recorded so far is kept. True once it is stopped."""
+        j = next((k for k in getattr(self.rec, "jobs", [])
+                  if k.get("id") == jid and k.get("status") == "recording"), None)
+        if j is None:
+            return True                     # it ended meanwhile
+        idx = self._choice_dialog(
+            tr("rec_stop_ask_title"),
+            tr("rec_stop_ask", title=j.get("title") or ""),
+            [(tr("rec_stop_recording"), "danger"),
+             (tr("rec_keep_recording"), "primary")])
+        if idx != 0:
+            return False
+        self.rec.cancel(jid)
+        return True
 
     def _remux_jobs(self) -> None:
         """A finished recording saved as MP4 (core/recording.py's remux, on
