@@ -3070,5 +3070,10 @@
   "notice_recording": "กำลังบันทึก {title}",
   "rec_stop_ask_title": "หยุดบันทึกไหม",
   "rec_stop_ask": "หยุดบันทึก {title} ไหม ส่วนที่บันทึกไว้แล้วจะยังเก็บไว้",
-  "rec_keep_recording": "บันทึกต่อ"
+  "rec_keep_recording": "บันทึกต่อ",
+  "sort_provider": "ลำดับของผู้ให้บริการ",
+  "sort_az": "A→Z",
+  "sort_za": "Z→A",
+  "sort_as_all": "เหมือนทุกหมวดหมู่ ({order})",
+  "sort_scope_tip": "ลำดับของหมวดหมู่นี้ “เหมือนทุกหมวดหมู่” จะใช้ลำดับที่เลือกไว้ในการตั้งค่า"
 }

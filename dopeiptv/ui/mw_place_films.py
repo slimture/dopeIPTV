@@ -509,10 +509,11 @@ class _PlaceFilmsMixin:
         opts = [(str(box.itemData(i)), box.itemText(i)) for i in range(box.count())]
         # The menu made again only when its words changed: an order picked
         # in it refills the list, and with it this header.
+        shown = self._sort_button_words()
         if opts != h._sort_opts:
-            h.set_sort(opts, str(box.currentData() or ""))
+            h.set_sort(opts, str(box.currentData() or ""), shown)
         else:
-            h.set_sort_key(str(box.currentData() or ""))
+            h.set_sort_key(str(box.currentData() or ""), shown)
         views = [("poster", tr("card_grid")), ("list", tr("card_list"))]
         if views != [(k, b.text()) for k, b in zip(h.switch.keys(), h.switch.buttons, strict=False)]:
             h.set_views(views, self._pf_layout())

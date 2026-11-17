@@ -643,13 +643,14 @@ class TvPlaceTop(QWidget):
     def set_count(self, text: str) -> None:
         self.header.set_count(text)
 
-    def set_sort(self, options: Sequence[tuple[str, str]], current: str) -> None:
+    def set_sort(self, options: Sequence[tuple[str, str]], current: str,
+                 shown: str = "") -> None:
         options = list(options)
         if options != self._sort_opts:
             self._sort_opts = options
-            self.header.set_sort(options, current)
+            self.header.set_sort(options, current, shown)
         else:
-            self.header.set_sort_key(current)
+            self.header.set_sort_key(current, shown)
 
     def set_density(self, density: str, shown: bool = True) -> None:
         """The switch on *density* - or hidden (a grid has no density of

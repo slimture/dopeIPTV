@@ -3070,5 +3070,10 @@
   "notice_recording": "جارٍ تسجيل {title}",
   "rec_stop_ask_title": "إيقاف التسجيل؟",
   "rec_stop_ask": "إيقاف تسجيل {title}؟ يُحتفظ بما سُجّل حتى الآن.",
-  "rec_keep_recording": "متابعة التسجيل"
+  "rec_keep_recording": "متابعة التسجيل",
+  "sort_provider": "ترتيب المزوّد",
+  "sort_az": "أ→ي",
+  "sort_za": "ي→أ",
+  "sort_as_all": "كما في كل الفئات ({order})",
+  "sort_scope_tip": "ترتيب هذه الفئة. «كما في كل الفئات» يتبع الترتيب المختار في الإعدادات."
 }

@@ -264,7 +264,7 @@ class _PlaceTvMixin:
             top.set_count(f"{self._count_text('live', n)} · {tr(order)}")
         box = self.sort_box
         top.set_sort([(box.itemData(i), box.itemText(i)) for i in range(box.count())],
-                     self._current_sort_raw())
+                     self._current_sort_raw(), self._sort_button_words())
 
     def _place_tv_sort(self, key: str) -> None:
         """The header's sort: the list's own per-category order, through the

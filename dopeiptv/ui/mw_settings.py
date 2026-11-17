@@ -206,15 +206,12 @@ class _SettingsMixin:
                 else self.delegate.row_h)
         self.listw.verticalScrollBar().setSingleStep(max(30, step))
         if hasattr(self, "size_box"):
-            for box, key in (
-                (self.size_box, density),
-                (self.sort_box, self._current_sort_raw()),
-            ):
-                box.blockSignals(True)
-                i = box.findData(key)
-                if i >= 0:
-                    box.setCurrentIndex(i)
-                box.blockSignals(False)
+            self.size_box.blockSignals(True)
+            i = self.size_box.findData(density)
+            if i >= 0:
+                self.size_box.setCurrentIndex(i)
+            self.size_box.blockSignals(False)
+            self._sync_sort_box()       # and the order "As in all categories" names
             self.grid_btn.blockSignals(True)
             self.grid_btn.setChecked(grid)
             self.grid_btn.blockSignals(False)
@@ -1317,7 +1314,7 @@ class _SettingsMixin:
                  ("large", tr("option_large")), ("xlarge", tr("option_xlarge"))],
                 self.settings.value("view_density", "medium"))
             sort_box = self._combo(
-                [("default", tr("option_sort_default")),
+                [("default", tr("sort_provider")),
                  ("alpha_asc", tr("option_sort_az")),
                  ("alpha_desc", tr("option_sort_za")),
                  ("recent", tr("option_sort_recent"))],

@@ -3070,5 +3070,10 @@
   "notice_recording": "Snimanje: {title}",
   "rec_stop_ask_title": "Zaustaviti snimanje?",
   "rec_stop_ask": "Zaustaviti snimanje {title}? Ono što je dosad snimljeno ostaje spremljeno.",
-  "rec_keep_recording": "Nastavi snimati"
+  "rec_keep_recording": "Nastavi snimati",
+  "sort_provider": "Redoslijed pružatelja",
+  "sort_az": "A→Ž",
+  "sort_za": "Ž→A",
+  "sort_as_all": "Kao u svim kategorijama ({order})",
+  "sort_scope_tip": "Redoslijed ove kategorije. „Kao u svim kategorijama” prati redoslijed odabran u Postavkama."
 }

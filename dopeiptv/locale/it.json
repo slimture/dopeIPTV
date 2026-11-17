@@ -3070,5 +3070,10 @@
   "notice_recording": "Registrazione: {title}",
   "rec_stop_ask_title": "Fermare la registrazione?",
   "rec_stop_ask": "Fermare la registrazione di {title}? Quanto registrato finora viene conservato.",
-  "rec_keep_recording": "Continua a registrare"
+  "rec_keep_recording": "Continua a registrare",
+  "sort_provider": "Ordine del fornitore",
+  "sort_az": "A→Z",
+  "sort_za": "Z→A",
+  "sort_as_all": "Come in tutte le categorie ({order})",
+  "sort_scope_tip": "L'ordine di questa categoria. «Come in tutte le categorie» segue l'ordine scelto nelle Impostazioni."
 }

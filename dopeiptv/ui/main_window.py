@@ -998,13 +998,9 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             self.settings.value("view_density", "medium"))
         self.size_box.setObjectName("InlineCombo")
         self.size_box.currentIndexChanged.connect(self._inline_view_changed)
-        self.sort_box = self._combo(
-            [("global", tr("sort_global")), ("default", tr("label_default")),
-             ("alpha_asc", "A→Z"), ("alpha_desc", "Z→A"),
-             ("recent", tr("label_recent"))],
-            "global")
+        self.sort_box = self._combo(self._sort_options(), "global")
         self.sort_box.setObjectName("InlineCombo")
-        self.sort_box.setToolTip(tr("sort_scope_hint"))
+        self.sort_box.setToolTip(tr("sort_scope_tip"))
         self.sort_box.currentIndexChanged.connect(self._inline_view_changed)
         self.grid_btn = QPushButton(tr("btn_grid"), objectName="InlineToggle")
         self.grid_btn.setIcon(self._nav_icon("gridview", 14))

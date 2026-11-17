@@ -3070,5 +3070,10 @@
   "notice_recording": "{title}を録画中",
   "rec_stop_ask_title": "録画を停止しますか？",
   "rec_stop_ask": "{title}の録画を停止しますか？これまでに録画した分は保存されます。",
-  "rec_keep_recording": "録画を続ける"
+  "rec_keep_recording": "録画を続ける",
+  "sort_provider": "プロバイダーの順序",
+  "sort_az": "A→Z",
+  "sort_za": "Z→A",
+  "sort_as_all": "すべてのカテゴリと同じ（{order}）",
+  "sort_scope_tip": "このカテゴリの並び順。「すべてのカテゴリと同じ」は設定で選んだ順序に従います。"
 }

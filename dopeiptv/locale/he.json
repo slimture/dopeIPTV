@@ -3070,5 +3070,10 @@
   "notice_recording": "מקליט את {title}",
   "rec_stop_ask_title": "לעצור את ההקלטה?",
   "rec_stop_ask": "לעצור את ההקלטה של {title}? מה שהוקלט עד עכשיו נשמר.",
-  "rec_keep_recording": "להמשיך להקליט"
+  "rec_keep_recording": "להמשיך להקליט",
+  "sort_provider": "סדר הספק",
+  "sort_az": "א→ת",
+  "sort_za": "ת→א",
+  "sort_as_all": "כמו בכל הקטגוריות ({order})",
+  "sort_scope_tip": "הסדר של הקטגוריה הזו. „כמו בכל הקטגוריות” הולך לפי הסדר שנבחר בהגדרות."
 }

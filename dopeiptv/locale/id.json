@@ -3070,5 +3070,10 @@
   "notice_recording": "Merekam {title}",
   "rec_stop_ask_title": "Hentikan perekaman?",
   "rec_stop_ask": "Hentikan perekaman {title}? Yang sudah terekam tetap disimpan.",
-  "rec_keep_recording": "Lanjutkan merekam"
+  "rec_keep_recording": "Lanjutkan merekam",
+  "sort_provider": "Urutan penyedia",
+  "sort_az": "A→Z",
+  "sort_za": "Z→A",
+  "sort_as_all": "Seperti di semua kategori ({order})",
+  "sort_scope_tip": "Urutan kategori ini. “Seperti di semua kategori” mengikuti urutan yang dipilih di Pengaturan."
 }

@@ -3070,5 +3070,10 @@
   "notice_recording": "正在录制 {title}",
   "rec_stop_ask_title": "停止录制？",
   "rec_stop_ask": "停止录制 {title}？已录制的内容会保留。",
-  "rec_keep_recording": "继续录制"
+  "rec_keep_recording": "继续录制",
+  "sort_provider": "提供商顺序",
+  "sort_az": "A→Z",
+  "sort_za": "Z→A",
+  "sort_as_all": "与所有分类相同（{order}）",
+  "sort_scope_tip": "此分类的排序。“与所有分类相同”沿用设置中选择的排序。"
 }

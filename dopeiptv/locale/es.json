@@ -3070,5 +3070,10 @@
   "notice_recording": "Grabando {title}",
   "rec_stop_ask_title": "¿Detener la grabación?",
   "rec_stop_ask": "¿Detener la grabación de {title}? Lo grabado hasta ahora se conserva.",
-  "rec_keep_recording": "Seguir grabando"
+  "rec_keep_recording": "Seguir grabando",
+  "sort_provider": "Orden del proveedor",
+  "sort_az": "A→Z",
+  "sort_za": "Z→A",
+  "sort_as_all": "Como en todas las categorías ({order})",
+  "sort_scope_tip": "El orden de esta categoría. «Como en todas las categorías» sigue el orden elegido en Ajustes."
 }

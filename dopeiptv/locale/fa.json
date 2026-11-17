@@ -3070,5 +3070,10 @@
   "notice_recording": "در حال ضبط {title}",
   "rec_stop_ask_title": "ضبط متوقف شود؟",
   "rec_stop_ask": "ضبط {title} متوقف شود؟ آنچه تا اکنون ضبط شده نگه داشته می‌شود.",
-  "rec_keep_recording": "ادامهٔ ضبط"
+  "rec_keep_recording": "ادامهٔ ضبط",
+  "sort_provider": "ترتیب ارائه‌دهنده",
+  "sort_az": "الف→ی",
+  "sort_za": "ی→الف",
+  "sort_as_all": "مانند همهٔ دسته‌ها ({order})",
+  "sort_scope_tip": "ترتیب این دسته. «مانند همهٔ دسته‌ها» از ترتیبی که در تنظیمات انتخاب شده پیروی می‌کند."
 }

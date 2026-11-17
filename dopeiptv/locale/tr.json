@@ -3070,5 +3070,10 @@
   "notice_recording": "Kaydediliyor: {title}",
   "rec_stop_ask_title": "Kayıt durdurulsun mu?",
   "rec_stop_ask": "{title} kaydı durdurulsun mu? Şimdiye kadar kaydedilenler saklanır.",
-  "rec_keep_recording": "Kaydetmeye devam et"
+  "rec_keep_recording": "Kaydetmeye devam et",
+  "sort_provider": "Sağlayıcı sırası",
+  "sort_az": "A→Z",
+  "sort_za": "Z→A",
+  "sort_as_all": "Tüm kategorilerdeki gibi ({order})",
+  "sort_scope_tip": "Bu kategorinin sırası. “Tüm kategorilerdeki gibi”, Ayarlar'da seçilen sırayı izler."
 }

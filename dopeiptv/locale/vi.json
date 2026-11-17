@@ -3070,5 +3070,10 @@
   "notice_recording": "Đang ghi {title}",
   "rec_stop_ask_title": "Dừng ghi hình?",
   "rec_stop_ask": "Dừng ghi hình {title}? Phần đã ghi đến giờ vẫn được giữ lại.",
-  "rec_keep_recording": "Tiếp tục ghi"
+  "rec_keep_recording": "Tiếp tục ghi",
+  "sort_provider": "Thứ tự của nhà cung cấp",
+  "sort_az": "A→Z",
+  "sort_za": "Z→A",
+  "sort_as_all": "Như mọi danh mục ({order})",
+  "sort_scope_tip": "Thứ tự của danh mục này. “Như mọi danh mục” theo thứ tự đã chọn trong Cài đặt."
 }

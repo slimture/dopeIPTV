@@ -3070,5 +3070,10 @@
   "notice_recording": "Inarekodi {title}",
   "rec_stop_ask_title": "Kusimamisha kurekodi?",
   "rec_stop_ask": "Kusimamisha kurekodi {title}? Kilichorekodiwa hadi sasa kinahifadhiwa.",
-  "rec_keep_recording": "Endelea kurekodi"
+  "rec_keep_recording": "Endelea kurekodi",
+  "sort_provider": "Mpangilio wa mtoa huduma",
+  "sort_az": "A→Z",
+  "sort_za": "Z→A",
+  "sort_as_all": "Kama katika kategoria zote ({order})",
+  "sort_scope_tip": "Mpangilio wa kategoria hii. “Kama katika kategoria zote” hufuata mpangilio uliochaguliwa kwenye Mipangilio."
 }

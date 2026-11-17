@@ -63,6 +63,12 @@ same new look.
   it asks "Stop recording ...? What has been recorded so far is kept." -
   Stop recording or Keep recording - and nothing stops without that
   answer; with several, the panel lists each with its own Stop recording.
+- The sort button names the order the list is in - Provider's order, A→Z,
+  Z→A, Recently added (Recently updated for series) - also when the
+  category follows the order set in Settings. The menu's first entry says
+  which that is: "As in all categories (Provider's order)". "Default" is
+  called Provider's order, here and in Settings; A→Z is the language's own
+  (A→Ö in Swedish).
 - Movies: a film no longer opens a page of its own in the middle pane,
   which said again what the detail column says. A click picks the film
   and the detail column shows it - with Continue, how far it got and the

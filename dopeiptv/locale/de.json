@@ -3070,5 +3070,10 @@
   "notice_recording": "Aufnahme: {title}",
   "rec_stop_ask_title": "Aufnahme stoppen?",
   "rec_stop_ask": "Aufnahme von {title} stoppen? Was bisher aufgenommen wurde, bleibt erhalten.",
-  "rec_keep_recording": "Weiter aufnehmen"
+  "rec_keep_recording": "Weiter aufnehmen",
+  "sort_provider": "Reihenfolge des Anbieters",
+  "sort_az": "A→Z",
+  "sort_za": "Z→A",
+  "sort_as_all": "Wie in allen Kategorien ({order})",
+  "sort_scope_tip": "Die Reihenfolge dieser Kategorie. „Wie in allen Kategorien“ folgt der Reihenfolge aus den Einstellungen."
 }

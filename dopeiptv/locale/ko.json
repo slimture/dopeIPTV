@@ -3070,5 +3070,10 @@
   "notice_recording": "{title} 녹화 중",
   "rec_stop_ask_title": "녹화를 정지할까요?",
   "rec_stop_ask": "{title} 녹화를 정지할까요? 지금까지 녹화된 내용은 보존됩니다.",
-  "rec_keep_recording": "계속 녹화"
+  "rec_keep_recording": "계속 녹화",
+  "sort_provider": "공급자 순서",
+  "sort_az": "A→Z",
+  "sort_za": "Z→A",
+  "sort_as_all": "모든 카테고리와 같이 ({order})",
+  "sort_scope_tip": "이 카테고리의 순서입니다. '모든 카테고리와 같이'는 설정에서 고른 순서를 따릅니다."
 }

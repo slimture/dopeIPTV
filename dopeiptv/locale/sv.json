@@ -3070,5 +3070,10 @@
   "notice_recording": "Spelar in {title}",
   "rec_stop_ask_title": "Stoppa inspelningen?",
   "rec_stop_ask": "Stoppa inspelningen av {title}? Det som spelats in hittills sparas.",
-  "rec_keep_recording": "Fortsätt spela in"
+  "rec_keep_recording": "Fortsätt spela in",
+  "sort_provider": "Leverantörens ordning",
+  "sort_az": "A→Ö",
+  "sort_za": "Ö→A",
+  "sort_as_all": "Som i alla kategorier ({order})",
+  "sort_scope_tip": "Den här kategorins ordning. ”Som i alla kategorier” följer ordningen som valts i Inställningar."
 }

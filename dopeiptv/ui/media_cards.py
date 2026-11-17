@@ -2320,8 +2320,11 @@ class PageHeader(QWidget):
         self.count.setVisible(bool(text))
         self._arrange_title()
 
-    def set_sort(self, options: Sequence[tuple[str, str]], current: str = "") -> None:
-        """The orders as (key, words); [] hides the control."""
+    def set_sort(self, options: Sequence[tuple[str, str]], current: str = "",
+                 shown: str = "") -> None:
+        """The orders as (key, words); [] hides the control. *shown* is what
+        the button says when it is not the picked entry's words (the order
+        "As in all categories" stands for)."""
         self._sort_menu.clear()
         for a in self._sort_group.actions():
             self._sort_group.removeAction(a)
@@ -2334,23 +2337,24 @@ class PageHeader(QWidget):
             self._sort_group.addAction(act)
             self._sort_menu.addAction(act)
         self.sort_btn.setVisible(bool(self._sort_opts))
-        self._set_sort_key(current or (self._sort_opts[0][0] if self._sort_opts else ""))
+        self._set_sort_key(current or (self._sort_opts[0][0] if self._sort_opts else ""), shown)
 
     def sort_key(self) -> str:
         return self._sort_key
 
-    def set_sort_key(self, key: str) -> None:
-        self._set_sort_key(key)
+    def set_sort_key(self, key: str, shown: str = "") -> None:
+        self._set_sort_key(key, shown)
 
-    def _set_sort_key(self, key: str) -> None:
+    def _set_sort_key(self, key: str, shown: str = "") -> None:
         labels = dict(self._sort_opts)
         if key not in labels:
             return
         self._sort_key = key
         for a in self._sort_group.actions():
             a.setChecked(a.data() == key)
-        self.sort_btn.setText(labels[key])
-        words = tr("card_sort_a11y", order=labels[key])
+        said = shown or labels[key]
+        self.sort_btn.setText(said)
+        words = tr("card_sort_a11y", order=said)
         self.sort_btn.setToolTip(words)
         self.sort_btn.setAccessibleName(words)
 

@@ -47,6 +47,7 @@ from ..core import series_view as sv
 from ..core.log import log
 from ..i18n import tr
 from .media_cards import item_marks
+from .mw_sort import ORDER_WORDS, order_words
 from .series_place import SeriesCard, SeriesPlace
 
 #: The grid or the list, remembered ("poster" / "list").
@@ -409,33 +410,42 @@ class _PlaceSeriesMixin:
         busy = bool(getattr(self, "_busy_main", None))
         sorts = self._place_series_sorts()
         order = self._place_series_order()
+        raw = self._current_sort_raw()
         count = tr("count_episodes" if cat == "__continue__" else "count_series", n=n)
         if n:
-            h.set_count(f"{count} · {dict(sorts).get(order, '')}")
+            h.set_count(f"{count} · {order_words(order, True)}")
         else:
             h.set_count("" if busy else count)
-        h.set_sort(sorts, order)
+        h.set_sort(sorts, raw if raw in dict(sorts) else "global", order_words(order, True))
         h.set_views([("poster", tr("card_grid")), ("list", tr("card_list"))],
                     place.grid.layout_kind)
         place.filter.setPlaceholderText(self.search.placeholderText()
                                         or tr("list_filter_placeholder"))
         place.set_note(str(self._busy_main) if busy and not n else "")
 
-    @staticmethod
-    def _place_series_sorts() -> list[tuple[str, str]]:
-        return [("recent", tr("place_sort_updated")), ("alpha_asc", "A→Z"),
-                ("alpha_desc", "Z→A"), ("default", tr("place_sort_source"))]
+    def _place_series_sorts(self) -> list[tuple[str, str]]:
+        """The sort menu: what every category follows, named with the order
+        that is here, then the orders a category can have of its own."""
+        return ([("global", tr("sort_as_all", order=order_words(self._place_series_global(), True)))]
+                + [(k, order_words(k, True)) for k in ("recent", "alpha_asc", "alpha_desc", "default")])
 
-    def _place_series_order(self) -> str:
-        """The order the cards are in: the category's own, else recently
+    def _place_series_global(self) -> str:
+        """The order a category without one of its own is in: recently
         updated first - where the source says when, its own order else."""
-        order = self._current_sort_order()
-        if order == "recent" and self._current_sort_raw() == "global":
+        order = self._global_sort_order()
+        if order == "recent":
             rows = self.list_model.items()[:200]
             if not any(r.get("last_modified") or r.get("added") for r in rows
                        if isinstance(r, dict)):
                 return "default"
-        return order if order in dict(self._place_series_sorts()) else "default"
+        return order
+
+    def _place_series_order(self) -> str:
+        """The order the cards are in: the category's own, else the one
+        every category follows."""
+        raw = self._current_sort_raw()
+        order = self._place_series_global() if raw == "global" else raw
+        return order if order in ORDER_WORDS else "default"
 
     def _place_series_sort(self, key: str) -> None:
         """An order picked: this category's own from now on, as the list's

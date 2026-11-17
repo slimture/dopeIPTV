@@ -3070,5 +3070,10 @@
   "notice_recording": "{title} wordt opgenomen",
   "rec_stop_ask_title": "Opname stoppen?",
   "rec_stop_ask": "Opname van {title} stoppen? Wat tot nu toe is opgenomen, blijft bewaard.",
-  "rec_keep_recording": "Doorgaan met opnemen"
+  "rec_keep_recording": "Doorgaan met opnemen",
+  "sort_provider": "Volgorde van de provider",
+  "sort_az": "A→Z",
+  "sort_za": "Z→A",
+  "sort_as_all": "Zoals in alle categorieën ({order})",
+  "sort_scope_tip": "De volgorde van deze categorie. ‘Zoals in alle categorieën’ volgt de volgorde uit Instellingen."
 }

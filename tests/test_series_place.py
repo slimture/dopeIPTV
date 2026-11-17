@@ -278,7 +278,11 @@ want = [s["series_id"] for s in sorted((s for s in shows if s["category_id"] == 
                                         key=lambda s: int(s["last_modified"]), reverse=True)]
 assert order == want, (order[:5], want[:5])
 assert place.header.count.text() == tr("count_series", n=30) + " · " + tr("place_sort_updated")
-assert place.header.sort_key() == "recent"
+# The menu's first entry, "As in all categories (Recently updated)"; the
+# button names the order the cards are in.
+assert place.header.sort_key() == "global"
+assert place.header.sort_btn.text() == tr("place_sort_updated")
+assert place.header._sort_opts[0] == ("global", tr("sort_as_all", order=tr("place_sort_updated")))
 # Nothing of Popular (no TMDB) and nothing to continue: the rows stay away.
 assert place.popular.isHidden() and place.cont.isHidden()
 
@@ -286,7 +290,8 @@ assert place.popular.isHidden() and place.cont.isHidden()
 place.header._sort_picked("alpha_asc")
 settle(lambda: [c.title for c in grid.items()][:2] == ["Show 00", "Show 02"], what="A-Z")
 assert settings.value(w._sort_setting_key()) == "alpha_asc"
-assert place.header.count.text().endswith("A→Z")
+assert place.header.count.text().endswith(tr("sort_az"))
+assert place.header.sort_btn.text() == tr("sort_az")
 place.header._sort_picked("recent")
 settle(lambda: [c.data["series_id"] for c in grid.items()] == want, what="recent again")
 
