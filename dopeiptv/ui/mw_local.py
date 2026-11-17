@@ -261,6 +261,56 @@ class _LocalFilesMixin:
         self.back_btn.hide()
         self._load_local_items(self._current_cat)
 
+    # -- Rescan ------------------------------------------------------------------
+
+    def _local_rescan(self) -> None:
+        """Rescan (the bar's button, F5): what Local files shows read from
+        the disk again, now - there is no watcher. A folder (Folders view,
+        or one opened from the library) is listed again, the row that was
+        selected selected again as it comes back; a search in it walks
+        again. The library walks its folder again at once, the list as it
+        is meanwhile and the progress as on a first visit; a walk of that
+        folder still under way goes on. Nothing else is forgotten: posters,
+        art and thumbnails stay."""
+        if self.mode != "local":
+            return
+        root = self._current_cat
+        if not isinstance(root, str) or root == "__add__":
+            return
+        if self._local_view() == "series" \
+                and not getattr(self, "_local_ctx", None):
+            done = dict(getattr(self, "_local_scan_done", {}) or {})
+            done.pop(root, None)
+            self._local_scan_done = done
+            self._local_shelf_art = {}     # a cover put in since is found
+            log.info("local files: rescan of the library %s", root)
+            self._load_local_library(root, show_cache=False)
+            return
+        key = self._local_current_key()
+        log.info("local files: rescan of a folder")
+        self._load_local_items(root)
+        self._local_select_key(key)
+
+    def _local_rescan_shown(self) -> bool:
+        """Is Local files' list what the window shows - the one Rescan's
+        key may act on? Not another place, not over Home, the Guide, the
+        Search page or a series' page, not in TV mode or full screen."""
+        if self.mode != "local" or getattr(self, "_tv_on", False) \
+                or getattr(self, "_player_fs", False):
+            return False
+        for name in ("_home_showing", "_guide_page_showing",
+                     "_search_page_showing", "_series_page_showing"):
+            shows = getattr(self, name, None)
+            if shows is not None and shows():
+                return False
+        return True
+
+    def _shortcut_local_rescan(self) -> None:
+        """Rescan's key (F5 unless the user gave it another): only for the
+        window that has the keys, and only while it shows Local files."""
+        if self.isActiveWindow() and self._local_rescan_shown():
+            self._local_rescan()
+
     def _sync_local_view_btn(self) -> None:
         btn = getattr(self, "local_view_btn", None)
         if btn is None:
@@ -896,7 +946,7 @@ class _LocalFilesMixin:
         """Select the row of *key*. While a folder is still being read its
         row may not be there yet, and the rows there are the old list's:
         it is selected again as the folder's rows come in (_local_list_paint)
-        - backing out of a folder, a file revealed."""
+        - backing out of a folder, Rescan, a file revealed."""
         if key and getattr(self, "_local_listing", None) is not None:
             self._local_want_key = key
         model = getattr(self, "list_model", None)
@@ -955,12 +1005,14 @@ class _LocalFilesMixin:
     _SCAN_JUNK = {"@eadir", "#recycle", "$recycle.bin", "lost+found",
                   "system volume information", "@__thumb", ".appledouble"}
 
-    def _load_local_library(self, root: str) -> None:
+    def _load_local_library(self, root: str, show_cache: bool = True) -> None:
         """The library, built progressively: the walk runs in ~4 s slices on
         the worker pool and every slice renders what has been found so far,
         so a big SMB share fills the view as it goes instead of all at the
         end. Bounded by directory/file caps rather than wall time - the
-        slices make time limits unnecessary."""
+        slices make time limits unnecessary. *show_cache* False (Rescan):
+        the list on screen is the library already, the walk's first slice
+        renders over it."""
         if getattr(self, "_local_scan_active", False) \
                 and getattr(self, "_local_scan_root", None) == root:
             # This very root is mid-walk: show what it has and let it keep
@@ -990,9 +1042,10 @@ class _LocalFilesMixin:
         if cached is not None:
             self._local_album_index = cached.get("albums") or {}
             self._local_cover_index = cached.get("covers") or {}
-            self._apply_library(cached.get("series") or {},
-                                cached.get("movies") or [],
-                                cached.get("collections") or {})
+            if show_cache and not getattr(self, "_local_series", None):
+                self._apply_library(cached.get("series") or {},
+                                    cached.get("movies") or [],
+                                    cached.get("collections") or {})
             last = getattr(self, "_local_scan_done", {}).get(root, 0.0)
             if time.monotonic() - last < 120.0:
                 return   # scanned moments ago: the cache render is current
@@ -1221,7 +1274,7 @@ class _LocalFilesMixin:
         music_tops = []
         tile = self._folder_tile()
         known = self._local_shelf_memo()
-        # A shelf looked for again (after a walk) keeps the cover
+        # A shelf looked for again (after a walk, on Rescan) keeps the cover
         # it shows until the new answer: no flash of the folder glyph.
         showing = {r.get("_path"): r.get("stream_icon")
                    for r in (getattr(self, "all_items", None) or [])
@@ -1253,7 +1306,7 @@ class _LocalFilesMixin:
 
     def _local_shelf_memo(self) -> dict[str, str]:
         """Each music shelf's cover as found ("" for none), for this walk:
-        forgotten when a walk ends and with the library cache."""
+        forgotten when a walk ends, on Rescan and with the library cache."""
         memo = getattr(self, "_local_shelf_art", None)
         if memo is None:
             memo = self._local_shelf_art = {}
@@ -1511,8 +1564,8 @@ class _LocalFilesMixin:
         else:
             rows = [r for r in rows if r.get("_header")
                     or self._search_filter([r])]
-        # The same rows as on screen (a slice of a walk that found nothing
-        # new): left as they are. A list with section headers is
+        # The same rows as on screen (a slice of a walk, Rescan, that found
+        # nothing new): left as they are. A list with section headers is
         # laid out row by row - a library of 19,000 films took the window
         # 0.45 s each time, at every slice of a walk.
         sig = (self._grid_on() if hasattr(self, "_grid_on") else None,

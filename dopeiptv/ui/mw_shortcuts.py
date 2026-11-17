@@ -223,6 +223,7 @@ class _ShortcutsMixin:
             "palette": self._open_palette,
             "tv_mode": self.toggle_tv_mode,
             "teletext": self.toggle_teletext,
+            "local_rescan": self._shortcut_local_rescan,
         }
 
     def _shortcut_run(self, sid: str) -> None:
@@ -284,7 +285,8 @@ class _ShortcutsMixin:
 
     # Buttons whose tooltip ends in their key, "(Ctrl+B)".
     _KEY_TIPS = (("sidebar", "side_btn", "tooltip_toggle_sidebar"),
-                 ("focus_mode", "focus_btn", "tooltip_hide_list"))
+                 ("focus_mode", "focus_btn", "tooltip_hide_list"),
+                 ("local_rescan", "local_rescan_btn", "local_rescan_tip"))
 
     def _shortcut_tips(self, keys: dict[str, str]) -> None:
         """The tooltips that name a key say the one in force, as this

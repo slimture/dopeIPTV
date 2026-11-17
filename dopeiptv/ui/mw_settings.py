@@ -471,6 +471,10 @@ class _SettingsMixin:
         # Settings at the foot: an icon, its name in the tooltip.
         self._settings_btn.setToolTip(tr("btn_settings"))
         self._settings_btn.setAccessibleName(tr("btn_settings"))
+        # The list bar's buttons whose tooltip names their key (Rescan's F5).
+        if hasattr(self, "local_rescan_btn"):
+            self.local_rescan_btn.setAccessibleName(tr("local_rescan"))
+            self._shortcut_tips(self.shortcut_keys())
         if hasattr(self, "_history_chip_btns"):
             self._history_chip_btns["all"].setText(tr("history_chip_all"))
             self._history_chip_btns["watched"].setText(

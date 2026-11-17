@@ -48,6 +48,8 @@ ACTIONS: tuple[tuple[str, str, str], ...] = (
     ("palette", "Ctrl+K", "sc_palette"),
     ("tv_mode", "Ctrl+Shift+T", "sc_tv_mode"),
     ("teletext", "T", "sc_teletext"),
+    # While Local files shows: its folder or library read again (mw_local).
+    ("local_rescan", "F5", "sc_local_rescan"),
 )
 DEFAULTS: dict[str, str] = {sid: key for sid, key, _label in ACTIONS}
 LABELS: dict[str, str] = {sid: label for sid, _key, label in ACTIONS}

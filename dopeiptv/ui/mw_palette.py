@@ -64,6 +64,8 @@ MATCH_HERE = 5000
 #: Rebindable actions that act on the player: offered while it is up.
 _PLAYER_ONLY = frozenset({"pause", "fullscreen", "mute", "popout", "record", "stats"})
 _PLAYER_KIND = _PLAYER_ONLY | {"zap_next", "zap_prev", "last_channel", "night_mode"}
+#: Rebindable actions of Local files: listed only while it shows.
+_LOCAL_ONLY = frozenset({"local_rescan"})
 _MENU_KIND = {"file": "menu_file", "view": "menu_view", "history": "nav_history",
               "help": "menu_help"}
 
@@ -233,8 +235,12 @@ class _PaletteMixin:
         for sid, _default, label in shortcut_keys.ACTIONS:
             if sid == "palette" or (sid in _PLAYER_ONLY and not up):
                 continue
+            if sid in _LOCAL_ONLY and getattr(self, "mode", None) != "local":
+                continue          # Rescan is Local files' own
             labels[fold(tr(label))] = sid
-            kind = tr("pal_kind_player") if sid in _PLAYER_KIND else tr("menu_view")
+            kind = (tr("pal_kind_player") if sid in _PLAYER_KIND
+                    else tr("nav_local") if sid in _LOCAL_ONLY
+                    else tr("menu_view"))
             out.append(Entry("actions", kind, tr(label), keys=keys.get(sid, ""),
                              payload=("call", cbs[sid])))
         acts = getattr(self, "_menu_actions", {})

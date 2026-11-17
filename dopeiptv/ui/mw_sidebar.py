@@ -236,11 +236,15 @@ class _SidebarMixin:
         # One uniform tile size for every compact control (the mixed 28/30/34
         # widths and free heights made the strip look like differently sized
         # boxes).
+        rescan = getattr(self, "local_rescan_btn", None)
         for b in (self.side_btn, self.focus_btn, self._size_menu_btn,
-                  self._sort_menu_btn, self.grid_btn):
-            b.setFixedHeight(28)
+                  self._sort_menu_btn, self.grid_btn, rescan):
+            if b is not None:
+                b.setFixedHeight(28)
         self.side_btn.setFixedWidth(30 if compact else 34)
         self.focus_btn.setFixedWidth(30 if compact else 34)
+        if rescan is not None:
+            rescan.setFixedWidth(30 if compact else 34)
         self._size_menu_btn.setFixedWidth(30)
         self._sort_menu_btn.setFixedWidth(30)
         self.grid_btn.setText("" if compact else tr("btn_grid"))

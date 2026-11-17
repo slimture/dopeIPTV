@@ -1076,6 +1076,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.local_view_btn.setCheckable(True)
         self.local_view_btn.hide()
         self.local_view_btn.clicked.connect(self._local_toggle_view)
+        # Rescan beside it: the folder or the library read from the disk
+        # again (mw_local; F5 too). Its tooltip names the key in force.
+        self.local_rescan_btn = QPushButton("", objectName="InlineToggle")
+        self.local_rescan_btn.setIcon(
+            QIcon(self._action_pixmap("refresh", 15, P["text2"])))
+        self.local_rescan_btn.setIconSize(QSize(15, 15))
+        self.local_rescan_btn.setFixedWidth(34)
+        self.local_rescan_btn.setToolTip(tr("local_rescan_tip"))
+        self.local_rescan_btn.setAccessibleName(tr("local_rescan"))
+        self.local_rescan_btn.hide()
+        self.local_rescan_btn.clicked.connect(self._local_rescan)
+        ctl.addWidget(self.local_rescan_btn)
         ctl.addWidget(self.local_view_btn)
         ctl.addWidget(self.grid_btn)
         ml.addLayout(ctl)
@@ -2553,6 +2565,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._refresh_nav_status()
         if hasattr(self, "local_view_btn"):
             self.local_view_btn.setVisible(mode == "local")
+            self.local_rescan_btn.setVisible(mode == "local")
             self._sync_local_view_btn()
         # Ctrl/Shift-click gathers rows wherever an action can take several
         # at once; in Favorites they can also be dragged to a folder.

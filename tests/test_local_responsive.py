@@ -263,8 +263,8 @@ def test_a_folders_rows_come_in_slices_in_its_order(tmp_path, monkeypatch,
 
 
 def test_the_selection_comes_back_as_the_folder_is_read(tmp_path, jobs):
-    """Backing out of a folder selects its row once the new listing
-    has it - not in the old list it replaces."""
+    """Backing out of a folder, or Rescan, selects its row once the new
+    listing has it - not in the old list it replaces."""
     root = tmp_path / "Back"
     for d in ("one", "two", "three"):
         (root / d).mkdir(parents=True)
@@ -360,7 +360,7 @@ def test_a_walk_that_finds_nothing_new_leaves_the_list_as_it_is(tmp_path,
                                                                 jobs):
     """A list with section headers is laid out row by row - a library of
     19,000 films took the window 0.45 s - so the same rows again (a slice
-    of a walk) are not put in again."""
+    of a walk, Rescan) are not put in again."""
     w = _Window()
     w._current_cat = str(tmp_path)
     movies = [{"name": f"Film {n}", "_kind": "local", "_key": f"/f{n}.mkv",
@@ -473,7 +473,7 @@ def listed():
 
 settle(lambda: w.list_model.rowCount() > 0, what="first list")
 w.switch_mode("local")
-assert w.local_view_btn.isVisibleTo(w)
+assert w.local_rescan_btn.isVisibleTo(w) and w.local_view_btn.isVisibleTo(w)
 settle(walked, what="the library walked")
 settle(lambda: "Music" in names(), what="the music shelf")
 idle(0.5)
@@ -489,10 +489,38 @@ w._local_descend(os.path.join(tree, "Clips"))             # a big folder
 settle(lambda: listed() and len(names()) == 128, what="the big folder")
 idle(0.5)
 
+# Rescan in Folders view: a file put in since shows, the row kept selected.
+key = os.path.join(tree, "Clips", "Clip 005.mkv")
+w._local_select_key(key)
+# (made on another thread: the test's own write is not the window's)
+with_new = os.path.join(tree, "Clips", "Clip 200.mkv")
+threading.Thread(target=lambda: open(with_new, "wb").close()).start()
+time.sleep(0.2)
+w.isActiveWindow = lambda: True                           # F5's way in
+w._shortcut_run("local_rescan")
+settle(lambda: listed() and len(names()) == 129, what="rescanned folder")
+cur = w.list_model.item_at(w.listw.currentIndex().row())
+assert cur is not None and cur.get("_key") == key, cur
+
 w._local_up()
 settle(lambda: listed() and "Clips" in names(), what="back up")
 w.local_view_btn.click()                                  # -> the library
 settle(lambda: "Music" in names(), what="the library again")
+# Rescan in the library: a walk at once, though one ended moments ago.
+film = os.path.join(tree, "Film Name 77 (1977)")
+threading.Thread(target=lambda: (os.makedirs(film),
+                                 open(os.path.join(film, "Film Name 77 (1977).mkv"), "wb").close())).start()
+time.sleep(0.2)
+w.local_rescan_btn.click()
+assert getattr(w, "_local_scan_active", False), "no walk started"
+settle(walked, what="the library walked again")
+settle(lambda: any("Film Name 77" in (n or "") for n in names()), what="the new film")
+
+keys = w.shortcut_keys()
+assert keys["local_rescan"] == "F5", keys
+assert w._shortcuts["local_rescan"].key().toString() == "F5"
+w.switch_mode("live")
+assert not w.local_rescan_btn.isVisibleTo(w)
 print("GUI_READS", json.dumps(gui_reads[:20]), len(gui_reads), flush=True)
 print("LOCAL_RESPONSIVE_OK", flush=True)
 os._exit(0)
@@ -501,7 +529,8 @@ os._exit(0)
 
 def test_the_window_reads_nothing_of_local_files_on_its_thread(tmp_path):
     """The real window: the library, "View: folders", a search, a big folder
-    and back - and not one read of the folders on the window's thread."""
+    and Rescan (its button and F5) in both views - and not one read of the
+    folders on the window's thread."""
     pytest.importorskip("PyQt6")
     import subprocess
     import sys

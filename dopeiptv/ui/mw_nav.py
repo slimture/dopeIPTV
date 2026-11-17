@@ -293,6 +293,10 @@ class _NavMixin:
         if hasattr(self, "grid_btn"):
             self.grid_btn.setIcon(self._nav_icon("gridview", 14))
             self.grid_btn.setIconSize(QSize(14, 14))
+        if hasattr(self, "local_rescan_btn"):
+            self.local_rescan_btn.setIcon(
+                QIcon(self._action_pixmap("refresh", 15, P["text2"])))
+            self.local_rescan_btn.setIconSize(QSize(15, 15))
         if hasattr(self, "_size_menu_btn"):
             self._size_menu_btn.setText("")
             self._size_menu_btn.setIcon(
@@ -530,6 +534,15 @@ class _NavMixin:
                                s * 0.08, s * 0.08)
             pr.drawLine(QPointF(s * 0.5, s * 0.32), QPointF(s * 0.5, s * 0.68))
             pr.drawLine(QPointF(s * 0.32, s * 0.5), QPointF(s * 0.68, s * 0.5))
+        elif kind == "refresh":
+            # A circular arrow, as the guide's bar draws its own (epg_grid).
+            stroke()
+            pr.drawArc(QRectF(s * 0.22, s * 0.22, s * 0.56, s * 0.56),
+                       70 * 16, 290 * 16)
+            fill()
+            pr.drawPolygon(QPolygonF([
+                QPointF(s * 0.50, s * 0.06), QPointF(s * 0.74, s * 0.21),
+                QPointF(s * 0.50, s * 0.36)]))
         elif kind == "sort":
             stroke()
             pr.drawLine(QPointF(s * 0.34, s * 0.24), QPointF(s * 0.34, s * 0.80))

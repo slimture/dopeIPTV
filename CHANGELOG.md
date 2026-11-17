@@ -22,6 +22,12 @@ how connections to the account are counted.
   of a black picture, decided once mpv has listed its tracks - a stream
   with video is never touched; two more styles, Vectorscope and
   Frequencies, and Waveform no longer draws over a checkerboard.
+- Local files can be read again on demand: Rescan, a small button in its
+  bar beside the view switch, or F5 while Local files shows (a key of its
+  own in Settings > Keyboard shortcuts). Folders view lists the folder
+  again, the selected row kept; the library walks its folder again at
+  once, the list as it is meanwhile and the progress as on a first visit.
+  No watcher: only when asked.
 
 ### Changed
 
