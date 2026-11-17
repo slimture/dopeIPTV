@@ -176,7 +176,7 @@ def lit():
 # -- opens where the person left off -------------------------------------------------
 w, s = window({"last_place": "films", "last_list_place": "films"})
 assert w.mode == "vod" and w._place == "films" and lit() == ["vod"], (w.mode, w._place, lit())
-assert w._place_header.title.text() == "Movies"
+assert w._place_header.title_text() == "Movies"
 w.close()
 w, s = window({"last_place": "guide", "last_list_place": "series"})
 assert until(lambda: w._guide_page_showing())

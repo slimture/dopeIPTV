@@ -299,11 +299,14 @@ def test_the_header_is_one_line_at_one_height_compact_or_not(app):
     page.show()
     app.processEvents()
     top = page._lay.contentsMargins().top()
+    # The name small at its start; how many is the status line's - kept,
+    # and a screen reader's description.
     assert h.height() == PageHeader.CONTROL_H and h.is_inline()
-    assert abs(h.title.geometry().center().y() - h.count.geometry().center().y()) <= 3
-    assert h.count.geometry().left() > h.title.geometry().left()
-    assert h.title.text() == "Sweden" and h.count.text() == "14 channels"
+    assert h.title.isVisible() and h.title.text() == "Sweden"
     assert f"font-size:{PageHeader.TITLE_PX}px" in h.title.styleSheet()
+    assert h.count.text() == "14 channels" and not h.count.isVisible()
+    assert h.accessibleName() == "Sweden" and h.accessibleDescription() == "14 channels"
+    assert h.line_text() == "Sweden"
     # Just the list: less room round it; the line the same.
     page.set_compact(True)
     for _ in range(3):
@@ -314,7 +317,6 @@ def test_the_header_is_one_line_at_one_height_compact_or_not(app):
     for _ in range(3):
         app.processEvents()
     assert page._lay.contentsMargins().top() == top
-    # Narrow: the header no wider than the page, the name cut first.
     page.resize(330, 600)
     for _ in range(3):
         app.processEvents()
@@ -322,10 +324,11 @@ def test_the_header_is_one_line_at_one_height_compact_or_not(app):
     page.deleteLater()
 
 
-def test_a_long_name_is_cut_first_and_the_count_kept_whole(app):
+def test_with_the_name_shown_it_is_cut_first_never_over_the_count(app):
     from dopeiptv.ui.media_cards import PageHeader
     name = "A very long category name indeed, longer than any pane"
     h = PageHeader(name)
+    h.show_title = h.show_count = True
     h.set_count("1 204 movies")
     h.resize(300, 60)
     h.show()
@@ -334,14 +337,15 @@ def test_a_long_name_is_cut_first_and_the_count_kept_whole(app):
     assert h.title.text() != name and h.title.text().endswith("…")
     assert h.count.text() == "1 204 movies"
     assert h.title.toolTip() == name + " · 1 204 movies"
-    assert h.title_text() == name
+    assert h.title.geometry().right() < h.count.geometry().left()      # never over it
     h.resize(1400, 60)
     for _ in range(3):
         app.processEvents()
     assert h.title.text() == name and h.title.toolTip() == ""   # room again: whole
-    # Too little room even for a little of the name: the count is cut too.
+    assert h.title.geometry().right() < h.count.geometry().left()
     h.resize(90, 60)
     for _ in range(3):
         app.processEvents()
     assert h.count.text().endswith("…") and h.title.width() <= PageHeader.TITLE_MIN
+    assert h.title.geometry().right() < h.count.geometry().left()
     h.deleteLater()

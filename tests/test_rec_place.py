@@ -133,7 +133,10 @@ def test_the_page_on_a_narrow_pane(app):
     place.show()
     app.processEvents()
     assert not place.is_narrow() and place.more.isVisible() and place.layout_switch.isVisible()
-    place.resize(480, 600)
+    place.resize(480, 600)                          # nothing written: they fit on the line
+    app.processEvents()
+    assert not place.is_narrow()
+    place.resize(320, 600)
     app.processEvents()
     assert place.is_narrow() and place._tools.isVisible() and place.more.isVisible()
     place.resize(150, 600)                          # the narrowest: Grid / List left out
@@ -222,7 +225,7 @@ place = w._rp_page
 view = place.view
 assert not w.listw.isVisible() and place.isVisible() and w.nav_btns["rec"].isChecked()
 h = place.header
-assert h.title.text() == tr("nav_recordings"), h.title.text()
+assert h.title_text() == tr("nav_recordings"), h.title_text()
 assert h.count.text().startswith(tr("rec_n_recordings", n=3) + " · "), h.count.text()
 files = [r["_key"] for r in w.list_model.items() if r.get("_kind") == "recording"]
 assert [c.key for c in recs()] == files
@@ -296,7 +299,7 @@ settle(lambda: len(recs()) == 3, what="unfiltered")
 for i in range(w.cat_list.count()):
     if w.cat_list.item(i).data(Qt.ItemDataRole.UserRole) == "__upcoming__":
         w.cat_list.setCurrentRow(i)
-settle(lambda: h.title.text() == tr("rec_upcoming"), what="upcoming")
+settle(lambda: h.title_text() == tr("rec_upcoming"), what="upcoming")
 settle(lambda: view.model_.rowCount() == 1, what="one to come")
 job = view.items()[0]
 view.dress(job)

@@ -120,7 +120,7 @@ assert not w.listw.isVisible() and w.nav_btns["radio"].isChecked()
 
 # -- a list of stations ---------------------------------------------------------------
 pick(rb.TOP_VOTED)
-settle(lambda: view.model_.rowCount() == 3 and h.title.text() == tr("radio_cat_top_voted"),
+settle(lambda: view.model_.rowCount() == 3 and h.title_text() == tr("radio_cat_top_voted"),
        what="most voted")
 assert h.count.text() == tr("count_stations", n=3), h.count.text()
 assert [c.key for c in view.items()] == [r["_key"] for r in w.list_model.items()]
@@ -159,7 +159,7 @@ assert view.layout_kind == "wide" and settings.value(mw_place_radio.VIEW_KEY) ==
 
 # -- countries, one opened, and Back --------------------------------------------------
 pick(rb.COUNTRY)
-settle(lambda: h.title.text() == tr("radio_cat_countries") and view.model_.rowCount() == 2,
+settle(lambda: h.title_text() == tr("radio_cat_countries") and view.model_.rowCount() == 2,
        what="countries")
 assert h.count.text() == tr("radio_n_countries", n=2)
 assert not place.layout_switch.isVisible() and view.layout_kind == "list"
@@ -168,7 +168,7 @@ sweden = next(c for c in view.items() if c.title == "Sweden")
 view.dress(sweden)
 assert sweden.image.endswith("se.svg") and sweden.line == tr("count_stations", n=3)
 view.activated.emit(sweden)
-settle(lambda: h.title.text() == "Sweden" and view.model_.rowCount() == 2, what="Sweden")
+settle(lambda: h.title_text() == "Sweden" and view.model_.rowCount() == 2, what="Sweden")
 assert place._back_row.isVisible()
 assert place.back.text() == tr("fp_back_to", name=tr("radio_cat_countries"))
 vp = view.viewport()
@@ -177,13 +177,13 @@ ev = QMouseEvent(QEvent.Type.MouseButtonPress, pos, vp.mapToGlobal(pos),
                  Qt.MouseButton.BackButton, Qt.MouseButton.BackButton,
                  Qt.KeyboardModifier.NoModifier)
 QApplication.sendEvent(vp, ev)
-settle(lambda: h.title.text() == tr("radio_cat_countries") and view.model_.rowCount() == 2,
+settle(lambda: h.title_text() == tr("radio_cat_countries") and view.model_.rowCount() == 2,
        what="back to the countries")
 assert not place._back_row.isVisible()
 
 # -- My stations: no row of them over themselves; the filter is the list's ------------------
 pick(FAVS)
-settle(lambda: h.title.text() == tr("radio_cat_favorites") and view.model_.rowCount() == 1,
+settle(lambda: h.title_text() == tr("radio_cat_favorites") and view.model_.rowCount() == 1,
        what="my stations")
 assert not place.favs.isVisible()
 place.filter.setText("zzz")
@@ -204,7 +204,7 @@ w.switch_mode("radio")
 pick(rb.COUNTRY)
 settle(lambda: view.model_.rowCount() == 2, what="countries again")
 view.activated.emit(next(c for c in view.items() if c.title == "Sweden"))
-settle(lambda: h.title.text() == "Sweden" and view.model_.rowCount() == 2, what="Sweden again")
+settle(lambda: h.title_text() == "Sweden" and view.model_.rowCount() == 2, what="Sweden again")
 station = view.items()[1]
 view.activated.emit(station)
 key = played[-1][1]
@@ -213,7 +213,7 @@ w._last_playback = {"kind": "radio", "key": key, "item": dict(station.data)}
 w.switch_mode("live")
 settle(lambda: not w._place_radio_active(), what="TV again")
 w._jump_to_now_playing()
-settle(lambda: w._place_radio_active() and h.title.text() == "Sweden"
+settle(lambda: w._place_radio_active() and h.title_text() == "Sweden"
        and w.listw.currentIndex().isValid()
        and w.list_model.item_at(w.listw.currentIndex().row()).get("_key") == key,
        what="the jump to the station playing")

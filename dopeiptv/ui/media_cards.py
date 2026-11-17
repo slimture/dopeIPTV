@@ -50,7 +50,7 @@ from PyQt6.QtGui import (
     QPainterPath, QPen, QPixmap,
 )
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QButtonGroup, QFrame, QHBoxLayout, QLabel, QLayout, QLineEdit, QListView,
+    QAbstractItemView, QButtonGroup, QFrame, QHBoxLayout, QLabel, QLineEdit, QListView,
     QMenu, QPushButton, QScrollArea, QSizePolicy, QStyle, QStyledItemDelegate,
     QToolButton, QVBoxLayout, QWidget,
 )
@@ -2195,13 +2195,17 @@ class Segmented(QWidget):
 
 
 class PageHeader(QWidget):
-    """A place's header, one quiet line at one height: what it shows - the
-    category, the folder - and its count in small muted words ("Drama ·
-    30 series"), a way back before them where there is one (`add_lead`),
-    and at the end the page's own controls, the sort (its button names the
-    order) and a segmented switch. Empty choices hide their control. A long
-    name is cut with "…" first, the count kept whole while the name keeps
-    a little room (`TITLE_MIN`); the whole line is in the tooltip."""
+    """A place's header, one line at one height: what the place shows (the
+    category, the folder: ``set_title``) small and calm at its start, cut
+    with "…" to its room, a way back before it where there is one
+    (`add_lead`), and at the end the page's own controls (a filter), the
+    sort (its mark alone - the order picked checked in its menu, named in
+    its tooltip) and a segmented switch. Empty choices hide their control.
+    How many (``set_count``) the status line says: kept (``count``) as a
+    screen reader's description, written only with ``show_count`` -
+    "Drama · 30 series", the name cut first, never over the count. Each
+    label is put in place by hand (`_fit_line`): one line, nothing over
+    anything."""
 
     sort_changed = pyqtSignal(str)
     view_changed = pyqtSignal(str)
@@ -2214,11 +2218,9 @@ class PageHeader(QWidget):
     #: switch, a filter) - and so is the header: one line, whatever the
     #: system's font makes of each.
     CONTROL_H = 32
-    #: Below this width the sort shows its mark alone (its order in the
-    #: tooltip), so the header never holds its page wider than the pane.
-    #: *fit_sort* False: its owner fits it (the TV place's header).
-    SORT_TEXT_FROM = 470
-    fit_sort = True
+    #: Whether what the place shows and how many are written on the line.
+    show_title = True
+    show_count = False
     #: The least of a long name shown before the count is cut too.
     TITLE_MIN = 56
     #: Between the name, the dot and the count.
@@ -2227,6 +2229,7 @@ class PageHeader(QWidget):
     def __init__(self, title: str = "", parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("MediaPageHeader")
+        self.setAccessibleName(title)
         self._title_full = title
         self._count_full = ""
         self._compact = False
@@ -2239,14 +2242,13 @@ class PageHeader(QWidget):
         lay.addLayout(self._lead)
         # The line: its labels as wide as `_fit_line` makes them, the rest of
         # its room left empty - it never holds the header wider than the pane.
+        # No layout of its own: `_fit_line` puts each label where it goes, so
+        # they can never be laid over one another (a box layout given less
+        # room than its fixed widths placed them so, on a Mac).
         self._line = QWidget()
         self._line.setObjectName("MediaPageLine")
         self._line.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self._line.setMinimumWidth(1)
-        line = QHBoxLayout(self._line)
-        line.setContentsMargins(0, 0, 0, 0)
-        line.setSpacing(self.GAP)
-        line.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
         self.title = QLabel(title)
         self.title.setObjectName("MediaPageTitle")
         self.title.setAccessibleName(title)
@@ -2257,10 +2259,8 @@ class PageHeader(QWidget):
         self.count.setObjectName("MediaPageCount")
         self.count.hide()
         for lab in (self.title, self._dot, self.count):
+            lab.setParent(self._line)
             lab.setTextFormat(Qt.TextFormat.PlainText)
-            lab.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
-            line.addWidget(lab, 0, Qt.AlignmentFlag.AlignVCenter)
-        line.addStretch(1)
         self._line.installEventFilter(self)
         lay.addWidget(self._line, 1)
         self._extra = QHBoxLayout()
@@ -2269,7 +2269,7 @@ class PageHeader(QWidget):
         self.sort_btn = QToolButton()
         self.sort_btn.setObjectName("MediaSort")
         self.sort_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.sort_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.sort_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.sort_btn.setIconSize(QSize(14, 14))
         self.sort_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._sort_menu = QMenu(self.sort_btn)
@@ -2281,7 +2281,7 @@ class PageHeader(QWidget):
         self._toggle: tuple[str, bool] = ("", False)
         self._toggle_acts: list[QAction] = []
         self.sort_btn.hide()
-        self.sort_btn.setFixedHeight(self.CONTROL_H)
+        self.sort_btn.setFixedSize(self.CONTROL_H, self.CONTROL_H)
         lay.addWidget(self.sort_btn, 0, Qt.AlignmentFlag.AlignVCenter)
         self.switch = Segmented(name=tr("card_view_switch_a11y"))
         self.switch.setFixedHeight(self.CONTROL_H)
@@ -2301,7 +2301,7 @@ class PageHeader(QWidget):
         r = round(corner_radius(10))
         self.sort_btn.setStyleSheet(
             f"QToolButton#MediaSort {{ background:{P['input']}; color:{P['text2']};"
-            f" border:none; border-radius:{r}px; padding:6px 12px; font-size:12px;"
+            f" border:none; border-radius:{r}px; padding:0; font-size:12px;"
             " font-weight:600; }"
             f"QToolButton#MediaSort:hover {{ color:{P['text']}; background:{P['btn']}; }}"
             "QToolButton#MediaSort::menu-indicator { image:none; width:0; }")
@@ -2317,6 +2317,7 @@ class PageHeader(QWidget):
         """What the place shows: the category, the folder, the list."""
         self._title_full = text
         self.title.setAccessibleName(text)
+        self.setAccessibleName(text)
         self._fit_line()
 
     def title_text(self) -> str:
@@ -2325,11 +2326,15 @@ class PageHeader(QWidget):
 
     def set_count(self, text: str) -> None:
         self._count_full = text
+        self.setAccessibleDescription(text)
         self._fit_line()
 
     def line_text(self) -> str:
-        """The whole line as it would read with room: "Drama · 30 series"."""
-        return " · ".join(t for t in (self._title_full, self._count_full) if t)
+        """The whole line as it would read with room: "30 series" (with
+        ``show_title``: "Drama · 30 series")."""
+        title = self._title_full if self.show_title else ""
+        count = self._count_full if self.show_count else ""
+        return " · ".join(t for t in (title, count) if t)
 
     # -- compact ----------------------------------------------------------------
 
@@ -2354,8 +2359,20 @@ class PageHeader(QWidget):
         """The name and the count in the line's room: the name cut with "…"
         first, the count whole while the name keeps `TITLE_MIN`, then the
         count cut too - never cut off mid-letter where the controls begin."""
-        title, count = self._title_full, self._count_full
+        if not (self.show_title or self.show_count):
+            # Nothing written: the words kept on the labels, out of sight.
+            for lab, text in ((self.title, self._title_full), (self.count, self._count_full)):
+                if lab.text() != text:
+                    lab.setText(text)
+            for lab in (self.title, self._dot, self.count):
+                lab.hide()
+            self._give_room(0)
+            return
+        title = self._title_full if self.show_title else ""
+        count = self._count_full if self.show_count else ""
         both = bool(title and count)
+        for lab in (self.title, self._dot, self.count):
+            lab.ensurePolished()            # measured in the font it draws with
         fm_t, fm_c = self.title.fontMetrics(), self.count.fontMetrics()
         tw = fm_t.horizontalAdvance(title) + 2 if title else 0
         cw = fm_c.horizontalAdvance(count) + 2 if count else 0
@@ -2378,13 +2395,27 @@ class PageHeader(QWidget):
                    if tw < full_t else title)
         shown_c = (fm_c.elidedText(count, Qt.TextElideMode.ElideRight, max(1, cw - 2))
                    if cw < full_c else count)
-        for lab, text, width in ((self.title, shown_t, tw), (self.count, shown_c, cw)):
+        # Each label at its own place along the line, one after the other
+        # (from the right in a right-to-left window), centred in its height.
+        line_w, line_h = self._line.width(), max(1, self._line.height())
+        rtl = self.layoutDirection() == Qt.LayoutDirection.RightToLeft
+        x = 0
+        for lab, text, width, shown in ((self.title, shown_t, tw, bool(shown_t)),
+                                        (self._dot, "·", dot, both),
+                                        (self.count, shown_c, cw, bool(shown_c))):
+            if not shown:
+                # Not written: its words kept on it all the same, out of sight.
+                text = {id(self.title): self._title_full,
+                        id(self.count): self._count_full}.get(id(lab), text)
             if lab.text() != text:
                 lab.setText(text)
-            lab.setFixedWidth(max(1, width))
-            lab.setVisible(bool(text))
-        self._dot.setFixedWidth(dot)
-        self._dot.setVisible(both)
+            lab.setVisible(shown)
+            if not shown:
+                continue
+            h = min(line_h, max(1, lab.sizeHint().height()))
+            left = (line_w - x - width) if rtl else x
+            lab.setGeometry(left, (line_h - h) // 2, max(1, width), h)
+            x += width + self.GAP
         cut = (shown_t != title) or (shown_c != count)
         tip = self.line_text() if cut else ""
         for lab in (self.title, self.count):
@@ -2411,12 +2442,6 @@ class PageHeader(QWidget):
 
     def resizeEvent(self, e) -> None:
         super().resizeEvent(e)
-        if self.fit_sort:
-            style = (Qt.ToolButtonStyle.ToolButtonTextBesideIcon
-                     if self.width() >= self.SORT_TEXT_FROM
-                     else Qt.ToolButtonStyle.ToolButtonIconOnly)
-            if self.sort_btn.toolButtonStyle() != style:
-                self.sort_btn.setToolButtonStyle(style)
         self._fit_line()
 
     def showEvent(self, e) -> None:

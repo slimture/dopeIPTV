@@ -208,7 +208,7 @@ w.nav_btns["mitt"].click()
 pump()
 assert w.mode == "fav" and w._place == "mitt" and w.nav_btns["mitt"].isChecked()
 head = w._place_header
-assert head.title.text() == tr("nav_mine")
+assert head.title_text() == tr("nav_mine")
 assert head.switch.keys() == ["fav", "watchlist", "history"] and head.view_key() == "fav"
 assert [b.text() for b in head.switch.buttons] == [tr("nav_favorites"), tr("nav_watchlist"),
                                                    tr("nav_history")]
@@ -228,7 +228,7 @@ assert chips["all"].text() == tr("history_chip_all") and chips["watched"].text()
 # Remembered while the app runs: Mine comes back to History's Watched.
 w.nav_btns["vod"].click()
 pump()
-assert w.mode == "vod" and w._place == "films" and head.title.text() == tr("nav_movies")
+assert w.mode == "vod" and w._place == "films" and head.title_text() == tr("nav_movies")
 assert head.switch.isHidden()
 w.nav_btns["mitt"].click()
 pump()
@@ -316,7 +316,7 @@ assert w.nav_btns["guide"].text() == "Guide" and w.nav_btns["mitt"].text() == "M
 assert w._settings_btn.toolTip() == "Settings" and chips["watched"].text() == "Watched"
 w.nav_btns["mitt"].click()
 pump()
-assert w._place_header.title.text() == "Mine"
+assert w._place_header.title_text() == "Mine"
 assert [b.text() for b in w._place_header.switch.buttons][0] == "Favorites"
 print("NAV_OK", flush=True)
 os._exit(0)

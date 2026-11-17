@@ -89,19 +89,16 @@ same new look.
   it asks "Stop recording ...? What has been recorded so far is kept." -
   Stop recording or Keep recording - and nothing stops without that
   answer; with several, the panel lists each with its own Stop recording.
-- The sort button names the order the list is in - Provider's order, A→Z,
-  Z→A, Recently added (Recently updated for series) - also when the
-  category follows the order set in Settings. The menu's first entry says
-  which that is: "As in all categories (Provider's order)". "Default" is
-  called Provider's order, here and in Settings; A→Z is the language's own
-  (A→Ö in Swedish).
-- Every place's header is one quiet line at one height: what it shows -
-  the category, the folder - and its count in small grey words ("Drama ·
-  30 series"), a way back at its start in Local files, Recordings and
-  Radio, and the filter, the sort and Grid / List at its end. The big
-  title is gone; a long category is cut with "…" (whole in its tooltip)
-  and the count stays whole, the filter giving up room first. The count
-  no longer repeats the order - the sort's button names it.
+- The sort's menu says what every category follows - "As in all
+  categories (Provider's order)" - and the order picked is checked in it;
+  "Default" is called Provider's order, here and in Settings; A→Z is the
+  language's own (A→Ö in Swedish).
+- Every place's header is one line at one height: the category's name
+  small and calm at its start (cut with "…" to its room, never over
+  anything), the way back before it where there is one (Local files,
+  Recordings, Radio), then the filter, the sort - its mark alone, the
+  order in its tooltip - and Grid / List. The big title is gone; the count
+  is in the status line.
 - Recordings: grouped by day, the newest first - Today, Yesterday,
   Earlier this week, Last week, then by month - under headings over the
   grid and the list alike. The sort's menu puts them oldest first, by

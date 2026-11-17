@@ -457,7 +457,8 @@ def test_the_header_its_switch_and_recently_watched(app):
     top.set_count("48 channels · by number")
     top.set_sort([("global", "Global default"), ("alpha_asc", "A→Z")], "alpha_asc")
     top.set_density("airy")
-    assert top.header.title.text() == "Sweden"
+    assert top.header.title.text() == "Sweden" and top.header.title.isVisible()
+    assert top.header.accessibleName() == "Sweden"
     assert top.header.count.text() == "48 channels · by number"
     assert top.header.sort_key() == "alpha_asc"
     assert top.header.view_key() == "airy" and top.header.switch.isVisible()

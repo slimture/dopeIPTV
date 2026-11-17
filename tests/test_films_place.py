@@ -257,7 +257,7 @@ def cat_row(cid):
 w.cat_list.setCurrentRow(cat_row("11"))
 settle(lambda: view.model_.rowCount() == 20, what="Action's films")
 assert [c.key for c in view.items()] == [str(f["stream_id"]) for f in films if f["category_id"] == "11"]
-assert place.header.title.text() == "Action"
+assert place.header.title_text() == "Action"
 assert place.header.count.text() == tr("count_movies", n=20), place.header.count.text()
 assert view.model_.rowCount() == w.list_model.rowCount()
 

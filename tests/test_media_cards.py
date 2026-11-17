@@ -368,20 +368,19 @@ def test_header_sort_and_switch(app):
 
 def test_header_controls_in_one_line_and_title_cut_with_an_ellipsis(app):
     """A filter beside the sort and the switch: one height, one foot (it
-    stood taller and higher on macOS); a long title cut with "…" and whole
-    in its tooltip; a narrow header's sort its mark alone."""
+    stood taller and higher on macOS); nothing written, the sort its mark
+    alone."""
     from PyQt6.QtCore import Qt
-    from PyQt6.QtWidgets import QLineEdit, QSizePolicy
+    from PyQt6.QtWidgets import QLineEdit
+    from dopeiptv.i18n import tr
     from dopeiptv.ui import media_cards as mc
     title = "Premiere Cinema Collection 2026 and much more"
     h = mc.PageHeader(title)
-    h.title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-    h.title.setMinimumWidth(0)
     filt = QLineEdit(objectName="Search")
     filt.setMaximumWidth(240)
     h.add_widget(filt)
     h.set_count("6443 movies")
-    h.set_sort([("global", "Global default"), ("az", "A-Z")], "global")
+    h.set_sort([("global", "Global default"), ("az", "A-Z")], "global", "Provider's order")
     h.set_views([("poster", "Grid"), ("list", "List")], "poster")
     h.resize(640, 80)
     h.show()
@@ -390,18 +389,24 @@ def test_header_controls_in_one_line_and_title_cut_with_an_ellipsis(app):
     assert {w.height() for w in parts} == {mc.PageHeader.CONTROL_H}
     feet = {w.mapTo(h, w.rect().bottomLeft()).y() for w in parts}
     assert len(feet) == 1, feet
-    shown = h.title.text()
-    assert shown != title and shown.endswith("…"), shown
-    assert h.title.toolTip() == title + " · 6443 movies" == h.line_text()
-    assert h.count.text() == "6443 movies"                     # the count kept whole
     assert h.height() == mc.PageHeader.CONTROL_H               # one line, one height
-    assert h.sort_btn.toolButtonStyle() == Qt.ToolButtonStyle.ToolButtonTextBesideIcon
+    # The name alone on the line, cut to its room, never under a control;
+    # the count kept, out of sight; the sort its mark alone, at every width.
+    assert h.title.isVisible() and not h.count.isVisible()
+    assert h.title_text() == title and h.count.text() == "6443 movies"
+    assert h.title.geometry().right() <= h._line.width()
+    assert h.title.text() == title or (h.title.text().endswith("…") and h.title.toolTip() == title)
+    assert h.sort_btn.toolButtonStyle() == Qt.ToolButtonStyle.ToolButtonIconOnly
+    assert h.sort_btn.toolTip() == tr("card_sort_a11y", order="Provider's order")
     h.resize(400, 80)
     _spin(app)
-    assert h.sort_btn.toolButtonStyle() == Qt.ToolButtonStyle.ToolButtonIconOnly
+    assert h.title.text().endswith("…") and h.title.toolTip() == title
+    assert h.title.geometry().right() <= h._line.width()
     h.resize(1600, 80)
     _spin(app)
+    assert h.sort_btn.toolButtonStyle() == Qt.ToolButtonStyle.ToolButtonIconOnly
     assert h.title.text() == title and h.title.toolTip() == ""
+    assert filt.width() <= 240
     h.close()
 
 

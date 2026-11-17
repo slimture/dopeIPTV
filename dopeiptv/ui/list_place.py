@@ -239,9 +239,9 @@ class ListPlace(PlacePage):
 
     MARGIN_TOP = 6
     FILTER_W = 240
-    #: The room the header's line keeps beside the controls; with less, the
+    #: The room the header's name keeps beside the controls; with less, the
     #: controls take rows of their own under it.
-    TITLE_ROOM = 180
+    TITLE_ROOM = 140
     #: The least the filter is given beside the line before the controls
     #: take rows of their own (the header narrows it that far for the line).
     FILTER_MIN = 140

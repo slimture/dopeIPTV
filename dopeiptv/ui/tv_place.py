@@ -566,7 +566,6 @@ class TvPlaceTop(QWidget):
                                self.MARGIN_BOTTOM)
         lay.setSpacing(self.SPACING)
         self.header = PageHeader("")
-        self.header.fit_sort = False        # _fit does it, with the switch
         self.header.sort_changed.connect(self.sort_changed)
         self.header.view_changed.connect(self.density_changed)
         lay.addWidget(self.header)
@@ -588,8 +587,8 @@ class TvPlaceTop(QWidget):
         self.setMinimumWidth(1)
         self.set_density(self._density)
 
-    #: Below these widths the sort shows its mark alone, and the switch goes.
-    SORT_TEXT_FROM, SWITCH_FROM = 470, 340
+    #: Below this width the switch goes.
+    SWITCH_FROM = 340
 
     def restyle(self) -> None:
         self.header.restyle()
@@ -602,10 +601,6 @@ class TvPlaceTop(QWidget):
 
     def _fit(self) -> None:
         w = self.width()
-        style = (Qt.ToolButtonStyle.ToolButtonTextBesideIcon if w >= self.SORT_TEXT_FROM
-                 else Qt.ToolButtonStyle.ToolButtonIconOnly)
-        if self.header.sort_btn.toolButtonStyle() != style:
-            self.header.sort_btn.setToolButtonStyle(style)
         self.header.switch.setVisible(self._density_shown and w >= self.SWITCH_FROM)
 
     def retranslate(self) -> None:

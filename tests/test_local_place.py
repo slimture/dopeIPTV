@@ -180,7 +180,7 @@ settle(lambda: view.model_.rowCount() == 5, what="cards")
 assert not w.listw.isVisible() and place.isVisible() and w.count_lbl.isVisible()
 assert w.nav_btns["local"].isChecked() and w._place == "local"
 h = place.header
-assert h.title.text() == tr("nav_local"), h.title.text()
+assert h.title_text() == tr("nav_local"), h.title_text()
 assert h.count.text() == " · ".join([os.path.basename(tree), tr("local_n_folders", n=2),
                                      tr("count_files", n=3)]), h.count.text()
 assert h.view_key() == "folders" and not place._back_row.isVisible()
@@ -199,7 +199,7 @@ card = next(c for c in view.items() if c.key == films)
 view.activated.emit(card)
 settle(lambda: listed() and w._local_ctx == films and view.model_.rowCount() == 30,
        what="the folder")
-assert h.title.text() == "Films" and place._back_row.isVisible()
+assert h.title_text() == "Films" and place._back_row.isVisible()
 assert place.back.text() == tr("fp_back_to", name=tr("nav_local"))
 settle(lambda: w._lw_status()["target"] == ("folder", films) and w._lw_status()["count"] == 1,
        what="watching the folder")
@@ -244,7 +244,7 @@ ev = QMouseEvent(QEvent.Type.MouseButtonPress, pos, vp.mapToGlobal(pos),
                  Qt.KeyboardModifier.NoModifier)
 QApplication.sendEvent(vp, ev)
 settle(lambda: listed() and w._local_ctx is None and view.model_.rowCount() == 5, what="up")
-assert h.title.text() == tr("nav_local") and not place._back_row.isVisible()
+assert h.title_text() == tr("nav_local") and not place._back_row.isVisible()
 assert view.current_item() is not None and view.current_item().key == films  # where it was
 
 # -- changes on disk, without Rescan ---------------------------------------------------
