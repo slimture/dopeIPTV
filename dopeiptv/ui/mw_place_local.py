@@ -428,8 +428,16 @@ class _PlaceLocalMixin:
     # -- the header ----------------------------------------------------------------------
 
     def _lp_root(self) -> str:
+        """The folder of Local files the sidebar has picked; "" for none -
+        no folder added yet, or another place's category still the window's
+        (a TV category "1" was shown as the folder, and no "Add folder")."""
         cat = getattr(self, "_current_cat", None)
-        return cat if isinstance(cat, str) and cat and cat != "__add__" else ""
+        if not isinstance(cat, str) or not cat or cat == "__add__":
+            return ""
+        cur = self.cat_list.currentItem() if hasattr(self, "cat_list") else None
+        if cur is None or cur.data(Qt.ItemDataRole.UserRole) != cat:
+            return ""
+        return cat
 
     def _lp_root_label(self) -> str:
         cur = self.cat_list.currentItem() if hasattr(self, "cat_list") else None

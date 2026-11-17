@@ -93,9 +93,19 @@ def set_cursor_hidden(hidden: bool) -> None:
         _cursor_hidden = False
 
 
+#: The sound output mpv tries first on macOS, CoreAudio after it (a libmpv
+#: without AVFoundation's output takes the next one). mpv's CoreAudio output
+#: listens to the system's device changes and is handed one more after it
+#: has gone - an AirPlay device found nearby crashed the app in libmpv
+#: (hotplug_cb on an output already freed); AVFoundation's listens to none.
+MAC_AO = "avfoundation,coreaudio"
+
+
 def extra_mpv_opts() -> dict:
-    """Extra mpv options for macOS (hardware decoding)."""
-    return {"hwdec": "videotoolbox-copy"}
+    """Extra mpv options for macOS: hardware decoding, and the sound output
+    that does not crash on a device change (MAC_AO). A Nerd mpv option of
+    the person's own still wins (applied after these)."""
+    return {"hwdec": "videotoolbox-copy", "ao": MAC_AO}
 
 
 def extra_player_candidates(player: str) -> list[str]:

@@ -345,3 +345,22 @@ def test_the_local_files_place_in_the_window(tmp_path):
                           timeout=240)
     assert "LOCAL_PLACE_OK" in proc.stdout, (
         f"stdout={proc.stdout[-3000:]!r}\nstderr={proc.stderr[-4000:]!r}")
+
+
+def test_the_root_is_only_a_folder_the_sidebar_has_picked():
+    """No folder added yet: another place's category (a TV category "1")
+    still the window's is no folder - it was shown as one, and "Add folder"
+    was not offered."""
+    from types import SimpleNamespace as NS
+    from PyQt6.QtCore import Qt
+    from dopeiptv.ui.mw_place_local import _PlaceLocalMixin
+
+    def win(cat, picked):
+        item = None if picked is None else NS(data=lambda role: picked if role == Qt.ItemDataRole.UserRole else None)
+        return NS(_current_cat=cat, cat_list=NS(currentItem=lambda: item))
+    root = _PlaceLocalMixin._lp_root
+    assert root(win("1", None)) == ""                       # TV's category, no folder
+    assert root(win("1", "__add__")) == ""                  # "+ Add folder…" picked
+    assert root(win("__add__", "__add__")) == ""
+    assert root(win("/media/films", "/media/films")) == "/media/films"
+    assert root(win("/media/films", "/media/other")) == ""  # changing over

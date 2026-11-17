@@ -152,6 +152,15 @@ same new look.
 
 ### Fixed
 
+- macOS: the app could crash when a sound device came or went - an AirPlay
+  device found nearby, headphones - inside libmpv: its CoreAudio output is
+  handed the system's device change after it has gone. The player now asks
+  mpv for its AVFoundation output first, which listens to no device change,
+  and CoreAudio after it (a libmpv without it, or a Nerd mpv option of the
+  person's own, as before).
+- Local files with no folder added said another place's category ("1") as
+  its folder, and offered no "Add folder": only a folder the sidebar has
+  picked is its folder now.
 - The phone remote's Radio was empty for anyone who had kept no station:
   it showed My stations alone. Now the most voted stations show under
   them (alone when none is kept), asked once and kept five minutes.

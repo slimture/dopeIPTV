@@ -17,6 +17,8 @@
 
 ### Fixed
 
+- **macOS**: no crash any more when a sound device comes or goes - an AirPlay speaker nearby, headphones.
+- **Local files** with no folder yet offers **Add folder** again, and no stray "1" in its header.
 - The phone remote's **Radio** shows the most voted stations, under your own - it was empty when you had kept none.
 - **macOS**: the app no longer hangs for good going into or out of TV mode - or full screen - while something plays.
 - Muted, the player no longer makes another program's sound (Spotify) crackle at every channel change.
