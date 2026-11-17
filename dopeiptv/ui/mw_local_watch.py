@@ -34,6 +34,7 @@ from functools import partial
 
 from PyQt6.QtCore import QTimer
 
+from ..core import local_listing as local_order
 from ..core import local_watch as lw
 from ..core.log import log
 from ..core.workers import run_async
@@ -339,6 +340,9 @@ class _LocalWatchMixin:
         filt = getattr(self, "_search_filter", None)
         if callable(filt):
             rows = [r for r in rows if filt([r])]
+        order = local_order.order_of(self.settings)
+        if order != local_order.NAME:
+            rows = local_order.order_rows(rows, order)      # as the list shows them
         by_key = {r.get("_key"): r for r in shown if isinstance(r, dict)}
         touched = False
         for r in rows:

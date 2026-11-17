@@ -18,6 +18,11 @@ grow at their end, and folders + files is the folder's order all along.
 
 Nothing here touches the disk before ``step``: the object is made on the
 window's thread and read on the pool's.
+
+The order a person picks for every folder (``order_rows``, ``ORDERS``,
+``local_sort``): by name A-Z (the listing's own) or Z-A, the last changed
+or the oldest first, the largest first, by type - folders always first,
+by name; between headings each part on its own.
 """
 
 from __future__ import annotations
@@ -155,3 +160,72 @@ class FolderListing:
         except OSError:
             return                        # gone, or a link to nothing
         self._out.append(Item(e.path, False, st.st_size, int(st.st_mtime)))
+
+
+# -- the order picked -------------------------------------------------------------------
+
+#: The orders Local files can be in, the first the default (the listing's).
+NAME, NAME_DESC, MODIFIED, OLDEST, LARGEST, TYPE = (
+    "name", "name_desc", "modified", "oldest", "largest", "type")
+ORDERS = (NAME, NAME_DESC, MODIFIED, OLDEST, LARGEST, TYPE)
+ORDER_KEY = "local_sort"
+
+
+def order_of(settings) -> str:
+    order = str(settings.value(ORDER_KEY, NAME) or NAME)
+    return order if order in ORDERS else NAME
+
+
+def _num(v) -> float:
+    try:
+        return float(v or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _name(row: dict) -> str:
+    return str(row.get("name") or os.path.basename(str(row.get("_path") or ""))).casefold()
+
+
+def _ext(row: dict) -> str:
+    return os.path.splitext(str(row.get("_path") or ""))[1].lower()
+
+
+def _ordered(part: list[dict], order: str) -> list[dict]:
+    folders = [r for r in part if r.get("_kind") != "local"]
+    files = [r for r in part if r.get("_kind") == "local"]
+    desc = order == NAME_DESC
+    folders.sort(key=_name, reverse=desc)
+    if order == NAME_DESC:
+        files.sort(key=_name, reverse=True)
+    elif order == MODIFIED:
+        files.sort(key=lambda r: (-_num(r.get("added")), _name(r)))
+    elif order == OLDEST:
+        files.sort(key=lambda r: (_num(r.get("added")) or float("inf"), _name(r)))
+    elif order == LARGEST:
+        files.sort(key=lambda r: (-_num(r.get("_size")), _name(r)))
+    elif order == TYPE:
+        files.sort(key=lambda r: (_ext(r), _name(r)))
+    else:
+        files.sort(key=_name)
+    return folders + files
+
+
+def order_rows(rows: list[dict], order: str) -> list[dict]:
+    """*rows* (a folder's, the library's) in *order*: folders and shelves
+    first by name (Z-A for Z-A), then the files - by name, the last changed
+    or the oldest first (a file's time; one that says none last), the
+    largest first, by type (its extension); each part between headings
+    ordered on its own, the headings where they were. A new list."""
+    if order not in ORDERS:
+        order = NAME
+    out: list[dict] = []
+    part: list[dict] = []
+    for r in rows:
+        if isinstance(r, dict) and r.get("_header"):
+            out += _ordered(part, order)
+            out.append(r)
+            part = []
+        elif isinstance(r, dict):
+            part.append(r)
+    return out + _ordered(part, order)

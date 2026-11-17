@@ -367,6 +367,8 @@ _STRINGS: dict[str, dict[str, str]] = {
     "notice_saving_mp4": {"en": "Saving {title} as MP4…"},
     "notice_recording": {"en": "Recording {title}"},
     "rec_stop_ask_title": {"en": "Stop recording?"},
+    "local_sort_modified": {"en": "Last modified"},
+    "local_sort_type": {"en": "By type"},
     "rec_sort_newest": {"en": "Newest first"},
     "rec_sort_oldest": {"en": "Oldest first"},
     "rec_sort_channel": {"en": "By channel"},

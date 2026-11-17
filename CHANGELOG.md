@@ -107,6 +107,11 @@ same new look.
   grid and the list alike. The sort's menu puts them oldest first, by
   name, under their channels, the longest or the largest first, and has
   Unwatched only at its foot; the choice is kept.
+- Local files: a sort for every folder - by name A-Z (as before) or Z-A,
+  the last changed or the oldest first, the largest first, by type -
+  folders always first, the choice kept; in the library the last changed
+  first is the newest added. A folder read bit by bit is put in order once
+  it is all there, and what changes on disk keeps that order.
 - Phone remote: More opens on an even row of three tiles - Subtitles and
   sound, Sleep timer, Record - each its icon over its words, the next
   programme under them; Record turns red with its time while a recording

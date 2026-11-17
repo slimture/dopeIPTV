@@ -3087,5 +3087,7 @@
   "rec_sort_largest": "اول بزرگ‌ترین",
   "rec_unwatched_only": "فقط دیده‌نشده‌ها",
   "rec_unwatched": "دیده‌نشده",
-  "rec_no_channel": "بدون شبکه"
+  "rec_no_channel": "بدون شبکه",
+  "local_sort_modified": "آخرین تغییر",
+  "local_sort_type": "بر اساس نوع"
 }

@@ -3087,5 +3087,7 @@
   "rec_sort_largest": "大きい順",
   "rec_unwatched_only": "未視聴のみ",
   "rec_unwatched": "未視聴",
-  "rec_no_channel": "チャンネルなし"
+  "rec_no_channel": "チャンネルなし",
+  "local_sort_modified": "更新日時順",
+  "local_sort_type": "種類別"
 }

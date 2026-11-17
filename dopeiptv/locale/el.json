@@ -3087,5 +3087,7 @@
   "rec_sort_largest": "Πρώτα οι μεγαλύτερες σε μέγεθος",
   "rec_unwatched_only": "Μόνο όσες δεν έχετε δει",
   "rec_unwatched": "Δεν έχετε δει",
-  "rec_no_channel": "Χωρίς κανάλι"
+  "rec_no_channel": "Χωρίς κανάλι",
+  "local_sort_modified": "Τελευταία αλλαγή",
+  "local_sort_type": "Ανά τύπο"
 }

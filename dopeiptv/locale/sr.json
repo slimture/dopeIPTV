@@ -3087,5 +3087,7 @@
   "rec_sort_largest": "Najveće prvo",
   "rec_unwatched_only": "Samo neodgledane",
   "rec_unwatched": "Neodgledane",
-  "rec_no_channel": "Bez kanala"
+  "rec_no_channel": "Bez kanala",
+  "local_sort_modified": "Poslednja izmena",
+  "local_sort_type": "Po tipu"
 }

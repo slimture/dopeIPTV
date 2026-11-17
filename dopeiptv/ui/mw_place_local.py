@@ -46,6 +46,7 @@ from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QMenu
 
 from ..core import film_view as fv
+from ..core import local_listing as local_order
 from ..core.log import log
 from ..i18n import tr
 from .list_place import line_of
@@ -68,6 +69,11 @@ def size_text(n: int) -> str:
     from ..core.recording import format_size
     return format_size(n) if n > 0 else ""
 
+
+#: The sort menu's words for each order (core/local_listing.ORDERS).
+ORDER_WORDS = {local_order.NAME: "sort_az", local_order.NAME_DESC: "sort_za",
+               local_order.MODIFIED: "local_sort_modified", local_order.OLDEST: "rec_sort_oldest",
+               local_order.LARGEST: "rec_sort_largest", local_order.TYPE: "local_sort_type"}
 
 class _PlaceLocalMixin:
     """MainWindow mixin: the Local files place."""
@@ -159,6 +165,7 @@ class _PlaceLocalMixin:
         place.add_requested.connect(self._local_add_folder)
         place.rescan.clicked.connect(self._local_rescan)
         place.header.view_changed.connect(self._lp_view_picked)
+        place.header.sort_changed.connect(self._lp_sort_picked)
         place.layout_changed.connect(self._lp_layout_picked)
         place.cont.activated.connect(self._lp_continue)
         place.cont.menu.connect(self._lp_continue_menu)
@@ -501,6 +508,10 @@ class _PlaceLocalMixin:
                 parts.append(tr("count_files", n=kinds["local"]))
         return " · ".join(p for p in parts if p)
 
+    def _lp_sort_picked(self, order: str) -> None:
+        self._local_sort_picked(order)
+        self._lp_head()
+
     def _lp_head(self) -> None:
         place = self._lp_page
         if place is None or sip.isdeleted(place):
@@ -518,6 +529,16 @@ class _PlaceLocalMixin:
         h.switch.setAccessibleName(tr("nav_local"))
         place.set_back(back)
         lib = self._lp_library_top()
+        # The order every folder is in, its button naming it (in the library
+        # the last changed first is the newest added); a search keeps its own.
+        opts = [] if self._local_search_text() else [
+            (k, tr(ORDER_WORDS[k] if not (lib and k == local_order.MODIFIED) else "option_sort_recent"))
+            for k in local_order.ORDERS]
+        order = self._local_order()
+        if opts != h._sort_opts:
+            h.set_sort(opts, order)
+        else:
+            h.set_sort_key(order)
         place.show_layout_switch(lib, self._lp_layout()[0] if lib else "")
         if place.filter.text() != self.search.text():
             self._lp_put_filter(self.search.text())

@@ -3087,5 +3087,7 @@
   "rec_sort_largest": "הגדולות קודם",
   "rec_unwatched_only": "רק כאלה שלא נצפו",
   "rec_unwatched": "לא נצפו",
-  "rec_no_channel": "ללא ערוץ"
+  "rec_no_channel": "ללא ערוץ",
+  "local_sort_modified": "שונו לאחרונה",
+  "local_sort_type": "לפי סוג"
 }

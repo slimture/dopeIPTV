@@ -3087,5 +3087,7 @@
   "rec_sort_largest": "Plus gros d'abord",
   "rec_unwatched_only": "Non vus seulement",
   "rec_unwatched": "Non vus",
-  "rec_no_channel": "Aucune chaîne"
+  "rec_no_channel": "Aucune chaîne",
+  "local_sort_modified": "Dernière modification",
+  "local_sort_type": "Par type"
 }

@@ -223,6 +223,19 @@ other = next(c for c in view.items() if c.key.endswith("Film 03.mkv"))
 view.activated.emit(other)
 assert played[-1][:2] == (other.key, "local")
 
+# The order for every folder, named on the sort's button: Z-A puts the
+# files the other way, folders still first; by name again reads the folder
+# in its own order; the choice kept.
+assert h.sort_btn.isVisible() and h.sort_key() == "name"
+assert [k for k, _w in h._sort_opts] == ["name", "name_desc", "modified", "oldest", "largest", "type"]
+names = [os.path.basename(c.key) for c in view.items()]
+h._sort_picked("name_desc")
+settle(lambda: [os.path.basename(c.key) for c in view.items()] == names[::-1], what="Z-A")
+assert settings.value("local_sort") == "name_desc" and h.sort_btn.text() == tr("sort_za")
+h._sort_picked("name")
+settle(lambda: listed() and [os.path.basename(c.key) for c in view.items()] == names, what="A-Z")
+assert w._local_ctx == films
+
 # The mouse's back button: one folder up.
 vp = view.viewport()
 pos = QPointF(10, 10)

@@ -3087,5 +3087,7 @@
   "rec_sort_largest": "Lớn nhất trước",
   "rec_unwatched_only": "Chỉ chưa xem",
   "rec_unwatched": "Chưa xem",
-  "rec_no_channel": "Không có kênh"
+  "rec_no_channel": "Không có kênh",
+  "local_sort_modified": "Sửa đổi gần nhất",
+  "local_sort_type": "Theo loại"
 }

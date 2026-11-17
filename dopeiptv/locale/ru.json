@@ -3087,5 +3087,7 @@
   "rec_sort_largest": "Сначала большие",
   "rec_unwatched_only": "Только непросмотренные",
   "rec_unwatched": "Непросмотренные",
-  "rec_no_channel": "Без канала"
+  "rec_no_channel": "Без канала",
+  "local_sort_modified": "Последнее изменение",
+  "local_sort_type": "По типу"
 }

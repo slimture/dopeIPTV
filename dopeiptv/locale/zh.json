@@ -3087,5 +3087,7 @@
   "rec_sort_largest": "最大优先",
   "rec_unwatched_only": "仅未观看",
   "rec_unwatched": "未观看",
-  "rec_no_channel": "无频道"
+  "rec_no_channel": "无频道",
+  "local_sort_modified": "最近修改",
+  "local_sort_type": "按类型"
 }

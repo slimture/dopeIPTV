@@ -3087,5 +3087,7 @@
   "rec_sort_largest": "Störst först",
   "rec_unwatched_only": "Bara osedda",
   "rec_unwatched": "Osedda",
-  "rec_no_channel": "Ingen kanal"
+  "rec_no_channel": "Ingen kanal",
+  "local_sort_modified": "Senast ändrad",
+  "local_sort_type": "Typ"
 }

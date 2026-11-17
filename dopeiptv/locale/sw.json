@@ -3087,5 +3087,7 @@
   "rec_sort_largest": "Kubwa zaidi kwanza",
   "rec_unwatched_only": "Ambazo hazijatazamwa tu",
   "rec_unwatched": "Hazijatazamwa",
-  "rec_no_channel": "Hakuna chaneli"
+  "rec_no_channel": "Hakuna chaneli",
+  "local_sort_modified": "Iliyobadilishwa mwisho",
+  "local_sort_type": "Kwa aina"
 }

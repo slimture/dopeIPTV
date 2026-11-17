@@ -25,6 +25,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QListWidgetItem
 
 from ..core.audiotags import cover_bytes, display_name, read_tags
+from ..core import local_listing as local_order
 from ..core.local_watch import CAP as WATCH_CAP
 from ..core.log import log
 from ..core.workers import run_async
@@ -466,6 +467,10 @@ class _LocalFilesMixin:
                 self._local_want_key = None
                 self._local_folder_gone = listing.missing
                 self._hide_busy()
+                # Read in the listing's order (by name, as it comes); any
+                # other order once it is all there - one layout.
+                if self._local_order() != local_order.NAME:
+                    self._local_resort()
                 # What changed on disk meanwhile is read once this is done
                 # (mw_local_watch).
                 ended = getattr(self, "_lw_walk_ended", None)
@@ -828,6 +833,42 @@ class _LocalFilesMixin:
         elif search.partial:
             said += "  ·  " + tr("local_search_partial")
         return said
+
+    # -- the order picked ---------------------------------------------------------
+
+    def _local_order(self) -> str:
+        return local_order.order_of(self.settings)
+
+    def _local_resort(self) -> None:
+        """What the list shows put in the order picked - folders first, a
+        heading's part on its own - the row picked kept; a search keeps its
+        own order."""
+        if self.mode != "local" or self._local_search_text():
+            return
+        rows = list(getattr(self, "all_items", None) or [])
+        ordered = local_order.order_rows(rows, self._local_order())
+        if [r.get("_key") for r in ordered] == [r.get("_key") for r in rows]:
+            return
+        key = self._local_current_key()
+        self._render_rows(ordered, "rec", tr("local_empty"))
+        if key:
+            self._local_select_key(key)
+
+    def _local_sort_picked(self, order: str) -> None:
+        """An order picked for every folder: kept, and what shows put in it
+        - by name read again in the listing's own order (the library from
+        what it holds)."""
+        if order not in local_order.ORDERS:
+            return
+        self.settings.setValue(local_order.ORDER_KEY, order)
+        if order != local_order.NAME:
+            self._local_resort()
+        elif self._local_view() == "series" and not getattr(self, "_local_ctx", None):
+            root = self._current_cat
+            if isinstance(root, str) and root and root != "__add__":
+                self._load_local_library(root)
+        else:
+            self._local_rescan()
 
     def _local_current_key(self):
         try:
@@ -1634,6 +1675,9 @@ class _LocalFilesMixin:
         else:
             rows = [r for r in rows if r.get("_header")
                     or self._search_filter([r])]
+            order = self._local_order()
+            if order != local_order.NAME:
+                rows = local_order.order_rows(rows, order)
         # The same rows as on screen (a slice of a walk, Rescan, that found
         # nothing new): left as they are. A list with section headers is
         # laid out row by row - a library of 19,000 films took the window

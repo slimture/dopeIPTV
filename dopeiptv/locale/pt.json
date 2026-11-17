@@ -3087,5 +3087,7 @@
   "rec_sort_largest": "Maiores primeiro",
   "rec_unwatched_only": "Só não assistidas",
   "rec_unwatched": "Não assistidas",
-  "rec_no_channel": "Sem canal"
+  "rec_no_channel": "Sem canal",
+  "local_sort_modified": "Última modificação",
+  "local_sort_type": "Por tipo"
 }

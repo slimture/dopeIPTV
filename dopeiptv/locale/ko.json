@@ -3087,5 +3087,7 @@
   "rec_sort_largest": "큰 순서",
   "rec_unwatched_only": "안 본 것만",
   "rec_unwatched": "안 봄",
-  "rec_no_channel": "채널 없음"
+  "rec_no_channel": "채널 없음",
+  "local_sort_modified": "최근 수정순",
+  "local_sort_type": "종류별"
 }

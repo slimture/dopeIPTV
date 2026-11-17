@@ -3087,5 +3087,7 @@
   "rec_sort_largest": "سب سے بڑی پہلے",
   "rec_unwatched_only": "صرف نہ دیکھی گئی",
   "rec_unwatched": "نہ دیکھی گئی",
-  "rec_no_channel": "کوئی چینل نہیں"
+  "rec_no_channel": "کوئی چینل نہیں",
+  "local_sort_modified": "آخری تبدیلی",
+  "local_sort_type": "قسم کے لحاظ سے"
 }

@@ -3087,5 +3087,7 @@
   "rec_sort_largest": "Grootste eerst",
   "rec_unwatched_only": "Alleen ongezien",
   "rec_unwatched": "Ongezien",
-  "rec_no_channel": "Geen zender"
+  "rec_no_channel": "Geen zender",
+  "local_sort_modified": "Laatst gewijzigd",
+  "local_sort_type": "Op type"
 }

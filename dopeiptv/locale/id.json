@@ -3087,5 +3087,7 @@
   "rec_sort_largest": "Terbesar dulu",
   "rec_unwatched_only": "Hanya yang belum ditonton",
   "rec_unwatched": "Belum ditonton",
-  "rec_no_channel": "Tanpa saluran"
+  "rec_no_channel": "Tanpa saluran",
+  "local_sort_modified": "Terakhir diubah",
+  "local_sort_type": "Menurut jenis"
 }

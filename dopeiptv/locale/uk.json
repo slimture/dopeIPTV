@@ -3087,5 +3087,7 @@
   "rec_sort_largest": "Спочатку великі",
   "rec_unwatched_only": "Лише непереглянуті",
   "rec_unwatched": "Непереглянуті",
-  "rec_no_channel": "Без каналу"
+  "rec_no_channel": "Без каналу",
+  "local_sort_modified": "Остання зміна",
+  "local_sort_type": "За типом"
 }

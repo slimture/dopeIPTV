@@ -3087,5 +3087,7 @@
   "rec_sort_largest": "Önce en büyük",
   "rec_unwatched_only": "Yalnızca izlenmemiş",
   "rec_unwatched": "İzlenmemiş",
-  "rec_no_channel": "Kanal yok"
+  "rec_no_channel": "Kanal yok",
+  "local_sort_modified": "Son değiştirilen",
+  "local_sort_type": "Türe göre"
 }

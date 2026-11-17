@@ -3087,5 +3087,7 @@
   "rec_sort_largest": "الأكبر أولًا",
   "rec_unwatched_only": "غير المُشاهَدة فقط",
   "rec_unwatched": "غير مُشاهَدة",
-  "rec_no_channel": "بلا قناة"
+  "rec_no_channel": "بلا قناة",
+  "local_sort_modified": "آخر تعديل",
+  "local_sort_type": "حسب النوع"
 }
