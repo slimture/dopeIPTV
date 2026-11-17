@@ -421,7 +421,20 @@ def test_a_pin_is_four_digits_kept_hashed(tmp_path):
     store.reload()
     me = store.get(MAIN_ID)
     assert me.has_pin and me.verify("2468") and not me.verify("1357")
-    assert "2468" not in (profiles.raw(views["main"]).value(profiles.K_LIST) or "")
+    # The PIN itself is no value of what is kept, only its salt and hash -
+    # whose hex holds "2468" now and then by chance, so whole values are
+    # looked at, not the text.
+    def values(o):
+        if isinstance(o, dict):
+            for v in o.values():
+                yield from values(v)
+        elif isinstance(o, list):
+            for v in o:
+                yield from values(v)
+        else:
+            yield str(o)
+    kept = json.loads(profiles.raw(views["main"]).value(profiles.K_LIST) or "[]")
+    assert "2468" not in list(values(kept))
     assert store.grown_up_pin("2468") and not store.grown_up_pin("0000")
     store.set_pin(kid.id, "1111")
     assert not store.grown_up_pin("1111")         # a kids profile's PIN opens no Settings
