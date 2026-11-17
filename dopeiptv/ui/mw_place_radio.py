@@ -115,6 +115,7 @@ class _PlaceRadioMixin:
         v.dress_fn = self._rap_dress
         v.activated.connect(self._rap_activate)
         v.menu.connect(self._rap_menu)
+        place.favs.strip.click_plays = self._autoplay_preview   # as the lists
         place.favs.activated.connect(self._rap_fav_activate)
         place.favs.menu.connect(self._rap_fav_menu)
         # My stations hidden from its heading (mw_place_look); the header

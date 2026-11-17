@@ -160,10 +160,14 @@ settle(lambda: top.recent.isVisible() and top.recent.keys()[:3] == ["6", "5", "2
 assert top.recent.strip.playing_key == "6"
 assert top.recent.cards()[0].line.startswith("Show 6-")
 
-# 4. A card plays: as its row when the list holds it.
+# 4. A card plays: as its row when the list holds it - on a double click
+# (one click only picks while autoplay is off, as in the list).
 strip = top.recent.strip
 idx = strip.model_.index(top.recent.keys().index("2"), 0)
 QTest.mouseClick(strip.viewport(), Qt.MouseButton.LeftButton, pos=strip.visualRect(idx).center())
+idle(0.3)
+assert playing() != "2"
+QTest.mouseDClick(strip.viewport(), Qt.MouseButton.LeftButton, pos=strip.visualRect(idx).center())
 settle(lambda: playing() == "2", what="a card played")
 assert w.listw.currentIndex().row() == row_of(2)
 settle(lambda: top.recent.strip.playing_key == "2", what="the card marked")

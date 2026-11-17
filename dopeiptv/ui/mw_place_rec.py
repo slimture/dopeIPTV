@@ -195,6 +195,7 @@ class _PlaceRecMixin:
         v.dress_fn = self._rp_dress
         v.activated.connect(self._rp_activate)
         v.menu.connect(self._rp_menu)
+        place.now.strip.click_plays = self._autoplay_preview    # as the lists
         place.now.activated.connect(self._rp_now_activate)
         place.now.menu.connect(self._rp_now_menu)
         # What records now hidden from its heading (mw_place_look); the

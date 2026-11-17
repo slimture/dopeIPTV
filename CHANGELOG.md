@@ -20,6 +20,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 - The sidebar logo's jump to what plays lands on it exactly: a recording is
   picked in Recordings (it picked the first one), and a local file deep in a
   long folder is scrolled into sight (it was picked far below the window).
+- The rows over the lists - Recently watched, Continue, My stations, what
+  records now - play on one click only with autoplay on (Settings ->
+  Playback), as the lists do; otherwise a click picks and a double click
+  plays. Popular right now in Series still opens a series' page on one.
 
 ## [1.6.3]
 

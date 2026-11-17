@@ -169,6 +169,9 @@ class _PlaceSeriesMixin:
         grid.current_item_changed.connect(self._place_series_current)
         place.popular.activated.connect(self._place_series_open)
         place.popular.menu.connect(self._place_series_popular_menu)
+        # Continue plays: one click only with autoplay on, as in the lists;
+        # Popular right now opens a series' page - one click, as a card does.
+        place.cont.strip.click_plays = self._autoplay_preview
         place.cont.activated.connect(self._place_series_continue)
         place.cont.menu.connect(self._place_series_continue_menu)
         # Each hidden from its heading (mw_place_look; Popular right now in

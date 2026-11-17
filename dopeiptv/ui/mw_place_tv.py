@@ -69,6 +69,9 @@ class _PlaceTvMixin:
         top.hide()
         top.sort_changed.connect(self._place_tv_sort)
         top.density_changed.connect(self._place_tv_density)
+        # Recently watched plays a channel: one click only with autoplay on
+        # (Settings > Playback), as in the list - else a click picks.
+        top.recent.strip.click_plays = self._autoplay_preview
         top.activated.connect(self._place_tv_play_card)
         top.menu.connect(self._place_tv_card_menu)
         top.recent.set_line_of(self._place_tv_card_line)

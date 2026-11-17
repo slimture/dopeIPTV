@@ -372,10 +372,16 @@ QTest.mouseClick(view.viewport(), Qt.MouseButton.LeftButton,
 app.processEvents()
 assert w.d_continue.isHidden()
 
-# -- from Continue: one click goes on from where it stopped --------------------------------
+# -- from Continue: a double click goes on from where it stopped (one click
+# only picks while autoplay is off, as in the lists) -----------------------------------
 w._pf_play_card(view.item_at(view.row_of("311")))             # something else plays first
+before = w._last_playback["key"]
 QTest.mouseClick(cont.strip.viewport(), Qt.MouseButton.LeftButton,
                  pos=cont.strip.visualRect(cont.strip.model_.index(0, 0)).center())
+app.processEvents()
+assert w._last_playback["key"] == before                       # a click picked it
+QTest.mouseDClick(cont.strip.viewport(), Qt.MouseButton.LeftButton,
+                  pos=cont.strip.visualRect(cont.strip.model_.index(0, 0)).center())
 app.processEvents()
 assert str(w._last_playback["key"]) == "303" and asked_resume == []
 if w.player is not None:

@@ -262,6 +262,9 @@ class _PlaceFilmsMixin:
         pop.activated.connect(self._pf_play_card)
         pop.menu.connect(self._pf_row_menu)
         cont = CardRow(tr("card_continue"), loader, picture="poster")
+        # One click plays only with autoplay on (Settings > Playback), as
+        # in the lists: else it picks and a double click plays.
+        cont.strip.click_plays = self._autoplay_preview
         cont.activated.connect(self._pf_continue_card)
         cont.menu.connect(self._pf_row_menu)
         # Each hidden from its heading (mw_place_look; Popular right now in

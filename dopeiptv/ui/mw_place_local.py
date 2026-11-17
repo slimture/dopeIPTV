@@ -167,6 +167,7 @@ class _PlaceLocalMixin:
         place.header.view_changed.connect(self._lp_view_picked)
         place.header.sort_changed.connect(self._lp_sort_picked)
         place.layout_changed.connect(self._lp_layout_picked)
+        place.cont.strip.click_plays = self._autoplay_preview   # as the lists
         place.cont.activated.connect(self._lp_continue)
         place.cont.menu.connect(self._lp_continue_menu)
         # Continue hidden from its heading (mw_place_look); the header
