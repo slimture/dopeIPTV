@@ -3040,5 +3040,8 @@
   "rec_until": "{time}까지",
   "rec_series_rules": "시리즈 녹화…",
   "rec_mark_watched": "시청함으로 표시",
-  "rec_mark_unwatched": "시청 안 함으로 표시"
+  "rec_mark_unwatched": "시청 안 함으로 표시",
+  "radio_n_countries": "국가 {n}개",
+  "radio_n_languages": "언어 {n}개",
+  "radio_n_genres": "장르 {n}개"
 }

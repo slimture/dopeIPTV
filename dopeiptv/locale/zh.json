@@ -3040,5 +3040,8 @@
   "rec_until": "至 {time}",
   "rec_series_rules": "系列录制…",
   "rec_mark_watched": "标为已看",
-  "rec_mark_unwatched": "标为未看"
+  "rec_mark_unwatched": "标为未看",
+  "radio_n_countries": "{n} 个国家和地区",
+  "radio_n_languages": "{n} 种语言",
+  "radio_n_genres": "{n} 个类型"
 }

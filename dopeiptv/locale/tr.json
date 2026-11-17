@@ -3040,5 +3040,8 @@
   "rec_until": "{time} saatine kadar",
   "rec_series_rules": "Dizi kayıtları…",
   "rec_mark_watched": "İzlendi olarak işaretle",
-  "rec_mark_unwatched": "İzlenmedi olarak işaretle"
+  "rec_mark_unwatched": "İzlenmedi olarak işaretle",
+  "radio_n_countries": "{n} ülke",
+  "radio_n_languages": "{n} dil",
+  "radio_n_genres": "{n} tür"
 }

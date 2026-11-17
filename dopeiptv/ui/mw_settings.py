@@ -283,6 +283,7 @@ class _SettingsMixin:
         self._place_series_restyle()   # the Series place
         self._place_local_restyle()  # the Local files place
         self._place_rec_restyle()    # the Recordings place
+        self._place_radio_restyle()  # the Radio place
         self._search_restyle()       # the Search page
         self._place_tv_restyle()     # the TV place's header and row
         getattr(self, "_mitt_restyle", lambda: None)()   # Mine
@@ -501,6 +502,7 @@ class _SettingsMixin:
         self._place_series_restyle()   # the Series place
         self._place_local_restyle()  # the Local files place
         self._place_rec_restyle()    # the Recordings place
+        self._place_radio_restyle()  # the Radio place
         self._search_restyle()       # the Search page
         self._place_tv_restyle()     # the TV place, in the new language
         getattr(self, "_mitt_restyle", lambda: None)()   # Mine

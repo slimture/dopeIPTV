@@ -65,6 +65,19 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   stays: play, play in mpv or VLC, rename, edit info, move, delete, the
   scheduled recordings' own actions, the detail panel.
 
+- Radio is a place of the new look as well: the list's name - Most voted,
+  a country - with how many stations (or countries, languages, genres) it
+  holds, a way back to the countries while one is open ("Back to
+  Countries" - the mouse's back button, Backspace), the filter (under
+  Search the whole directory's search, as before) and Grid / List in its
+  header; "My stations" as a row of small cards over every list of
+  stations, then the stations as rows or tiles with their logos, where
+  each is from and what it plays, a star on your favourites, the one
+  playing marked with what it says is on. The countries show their flags
+  and how many stations each has. Everything the list did stays - the
+  menus, favourites and their folders, the station's website, the detail
+  panel - and nothing more is asked of radio-browser.info than before.
+
 - macOS draws the picture on a thread of its own too, as Linux and Windows
   do: Qt cannot hand its OpenGL to another thread there (AppKit stops the
   app), so the render thread draws with an NSOpenGLContext of the app's own

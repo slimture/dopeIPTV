@@ -3040,5 +3040,8 @@
   "rec_until": "حتى {time}",
   "rec_series_rules": "تسجيلات المسلسلات…",
   "rec_mark_watched": "تعليم كمُشاهَد",
-  "rec_mark_unwatched": "تعليم كغير مُشاهَد"
+  "rec_mark_unwatched": "تعليم كغير مُشاهَد",
+  "radio_n_countries": "البلدان: {n}",
+  "radio_n_languages": "اللغات: {n}",
+  "radio_n_genres": "الأنواع: {n}"
 }

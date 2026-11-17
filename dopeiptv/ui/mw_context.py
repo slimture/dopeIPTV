@@ -60,7 +60,7 @@ class _ContextMenuMixin:
         # A station or a web stream, in Radio, Favourites or History.
         if (self.mode == "radio"
                 or (it.get("_kind") or it.get("_ekind")) in ("radio", "web")):
-            self._radio_context_menu(pos, it)
+            self._radio_context_menu(pos, it, at=at)
             return
         self._list_item_menu(row, it, at)
 

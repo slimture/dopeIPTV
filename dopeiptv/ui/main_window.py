@@ -117,6 +117,7 @@ from .mw_place_films import _PlaceFilmsMixin
 from .mw_film_page import _FilmPageMixin
 from .mw_place_local import _PlaceLocalMixin
 from .mw_place_rec import _PlaceRecMixin
+from .mw_place_radio import _PlaceRadioMixin
 from .mw_place_series import _PlaceSeriesMixin
 from .mw_search_all import _SearchAllMixin
 from .mw_stats import _StatsMixin
@@ -165,7 +166,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _BusyMixin, _UpdatesMixin, _SearchMixin, _SidebarMixin,
                  _NavMixin, _SourceLabelMixin, _ShortcutsMixin, _PaletteMixin, _OnboardingMixin, _SortMixin,
                  _LocalFilesMixin, _PlaceLocalMixin, _LocalWatchMixin, _RadioMixin, _WebStreamsMixin,
-                 _PlaceRecMixin,
+                 _PlaceRecMixin, _PlaceRadioMixin,
                  _PopoutMixin, _MultiviewMixin, _PlacesMixin, _PopularMixin, _GuideMixin,
                  _SeriesPageMixin, _PlaceFilmsMixin, _FilmPageMixin, _PlaceSeriesMixin, _SearchAllMixin, _MittMixin,
                  _MprisMixin,
@@ -2583,10 +2584,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._sync_search_hint()
         self._load_categories()
         # Series is a place of the unified look where the list was, and so
-        # are Local files (mw_place_local; what it shows watched on disk)
-        # and Recordings (mw_place_rec).
+        # are Local files (mw_place_local; what it shows watched on disk),
+        # Radio (mw_place_radio) and Recordings (mw_place_rec).
         self._place_series_sync()
         self._place_local_sync()
+        self._place_radio_sync()
         self._place_rec_sync()
         # The TV place's header over the live list only (mw_place_tv).
         sync = getattr(self, "_place_tv_sync", None)
@@ -5245,6 +5247,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         rec = getattr(self, "_place_rec_playing", None)
         if rec is not None:
             rec()                      # ...and the Recordings place's mark
+        radio = getattr(self, "_place_radio_playing", None)
+        if radio is not None:
+            radio()                    # ...and the Radio place's
 
     def _autoplay_next_episode(self) -> bool:
         return self.settings.value("autoplay_next_episode", "true") == "true"
@@ -5542,13 +5547,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         place = getattr(self, "_place_series_playing", None)
         if place is not None:
             place()
-        # ...and Local files its file, Recordings its recording.
+        # ...and Local files its file, Recordings its recording, Radio its
+        # station.
         local = getattr(self, "_place_local_playing", None)
         if local is not None:
             local()
         rec = getattr(self, "_place_rec_playing", None)
         if rec is not None:
             rec()
+        radio = getattr(self, "_place_radio_playing", None)
+        if radio is not None:
+            radio()
         # The middle pane goes to what plays, when it came from elsewhere.
         follow = getattr(self, "_pane_follow_soon", None)
         if follow is not None:

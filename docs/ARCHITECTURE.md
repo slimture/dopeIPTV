@@ -269,6 +269,9 @@ dopeiptv/
     mw_local_watch.py  Changes on disk read again by themselves (#34)
     local_watcher.py   The folders watched on a thread of their own
     mw_radio.py        Radio: radio-browser.info's stations, played as music
+    mw_place_radio.py  The Radio place where the list was: Back, header, My
+                       stations, the stations as rows or tiles, the countries
+    radio_place.py     The Radio place itself, dressed as it paints
     mw_webstreams.py   Open address, YouTube/Twitch through yt-dlp, saved
                        addresses
     mw_tv.py           TV mode: on/off, its keys and inputs, the picture with

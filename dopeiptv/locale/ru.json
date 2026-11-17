@@ -3040,5 +3040,8 @@
   "rec_until": "до {time}",
   "rec_series_rules": "Записи сериалов…",
   "rec_mark_watched": "Отметить как просмотренное",
-  "rec_mark_unwatched": "Отметить как непросмотренное"
+  "rec_mark_unwatched": "Отметить как непросмотренное",
+  "radio_n_countries": "Стран: {n}",
+  "radio_n_languages": "Языков: {n}",
+  "radio_n_genres": "Жанров: {n}"
 }

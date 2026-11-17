@@ -3040,5 +3040,8 @@
   "rec_until": "{time}まで",
   "rec_series_rules": "シリーズ録画…",
   "rec_mark_watched": "視聴済みにする",
-  "rec_mark_unwatched": "未視聴にする"
+  "rec_mark_unwatched": "未視聴にする",
+  "radio_n_countries": "{n} か国",
+  "radio_n_languages": "{n} 言語",
+  "radio_n_genres": "{n} ジャンル"
 }

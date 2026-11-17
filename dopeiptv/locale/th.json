@@ -3040,5 +3040,8 @@
   "rec_until": "ถึง {time}",
   "rec_series_rules": "การบันทึกซีรีส์…",
   "rec_mark_watched": "ทำเครื่องหมายว่าดูแล้ว",
-  "rec_mark_unwatched": "ทำเครื่องหมายว่ายังไม่ได้ดู"
+  "rec_mark_unwatched": "ทำเครื่องหมายว่ายังไม่ได้ดู",
+  "radio_n_countries": "{n} ประเทศ",
+  "radio_n_languages": "{n} ภาษา",
+  "radio_n_genres": "{n} แนวเพลง"
 }

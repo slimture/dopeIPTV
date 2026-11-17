@@ -123,6 +123,8 @@ class _RadioMixin:
             self._radio_show_groups(cat, gen)
             return
         self._radio_group = None
+        # Nothing asked of the directory for these (the Radio place's word).
+        self._radio_loading = self._radio_error = False
         if cat == FAVS:
             self.all_items = self._radio_fav_rows()
             self._apply_filter()
@@ -150,6 +152,7 @@ class _RadioMixin:
     def _radio_fetch(self, fn, gen: int, groups: bool = False,
                      empty: str | None = None, cache_as: str = "") -> None:
         self._show_busy(tr("radio_loading"))
+        self._radio_loading = True
         run_async(self.pool, fn,
                   partial(self._radio_fetched, gen, groups, empty, cache_as=cache_as),
                   partial(self._radio_failed, gen))
@@ -162,6 +165,7 @@ class _RadioMixin:
         if gen != self._radio_gen or self.mode != "radio":
             return
         self._hide_busy()
+        self._radio_loading = self._radio_error = False
         if groups:
             rows = [{**g, "_sub": tr("count_stations", n=g.get("_count", 0))}
                     for g in rows]
@@ -186,6 +190,7 @@ class _RadioMixin:
             return
         log.info("radio: list failed: %s", msg)
         self._hide_busy()
+        self._radio_loading, self._radio_error = False, True
         self.all_items = []
         self.list_model.set_items([], "radio")
         self._set_status(tr("radio_unreachable"), error=True)
@@ -200,6 +205,7 @@ class _RadioMixin:
         self._radio_gen += 1
         if len(text) < 2:
             self._hide_busy()
+            self._radio_loading = self._radio_error = False
             self._render_rows([], "radio", tr("radio_search_hint"))
             return True
         self._radio_fetch(partial(self._radio().search, text), self._radio_gen,
@@ -291,6 +297,8 @@ class _RadioMixin:
         lp = getattr(self, "_last_playback", None) or {}
         station = lp.get("title") or ""
         self.player.set_overlay_info(f"{station} — {now}" if now else station)
+        # ...and on the Radio place's cards (mw_place_radio).
+        getattr(self, "_place_radio_icy", lambda: None)()
         cur = self.listw.currentIndex()
         shown = self.list_model.item_at(cur.row()) if cur.isValid() else None
         if not shown or shown.get("_key") == lp.get("key"):
@@ -346,14 +354,18 @@ class _RadioMixin:
             self._load_categories()
         else:
             self.list_model.refresh_all()
+        # My stations and the stars on the Radio place (mw_place_radio).
+        getattr(self, "_place_radio_refresh", lambda: None)()
 
-    def _radio_context_menu(self, pos, it: dict) -> None:
+    def _radio_context_menu(self, pos, it: dict, at=None) -> None:
+        """A station's menu, or a country's - at the list's *pos*, or at the
+        screen's point *at* (a card of the Radio place)."""
         m = QMenu(self)
         if it.get("_kind") == "radiogroup":
             m.addAction(tr("ctx_open"), partial(self._radio_activate, it))
         else:
             self._stream_row_actions(m, it)
-        m.exec(self.listw.viewport().mapToGlobal(pos))
+        m.exec(at if at is not None else self.listw.viewport().mapToGlobal(pos))
 
     def _stream_row_actions(self, m: QMenu, it: dict) -> None:
         """Play, open elsewhere, favourite - for a station, and (from

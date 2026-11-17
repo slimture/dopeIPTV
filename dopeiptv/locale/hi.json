@@ -3040,5 +3040,8 @@
   "rec_until": "{time} तक",
   "rec_series_rules": "सीरीज़ रिकॉर्डिंग…",
   "rec_mark_watched": "देखा गया के रूप में चिह्नित करें",
-  "rec_mark_unwatched": "नहीं देखा के रूप में चिह्नित करें"
+  "rec_mark_unwatched": "नहीं देखा के रूप में चिह्नित करें",
+  "radio_n_countries": "{n} देश",
+  "radio_n_languages": "{n} भाषाएँ",
+  "radio_n_genres": "{n} शैलियाँ"
 }

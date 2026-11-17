@@ -3040,5 +3040,8 @@
   "rec_until": "do {time}",
   "rec_series_rules": "Snimanja serija…",
   "rec_mark_watched": "Označi kao odgledano",
-  "rec_mark_unwatched": "Označi kao neodgledano"
+  "rec_mark_unwatched": "Označi kao neodgledano",
+  "radio_n_countries": "Zemalja: {n}",
+  "radio_n_languages": "Jezika: {n}",
+  "radio_n_genres": "Žanrova: {n}"
 }

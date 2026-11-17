@@ -3040,5 +3040,8 @@
   "rec_until": "fino alle {time}",
   "rec_series_rules": "Registrazioni di serie…",
   "rec_mark_watched": "Segna come visto",
-  "rec_mark_unwatched": "Segna come non visto"
+  "rec_mark_unwatched": "Segna come non visto",
+  "radio_n_countries": "{n} paesi",
+  "radio_n_languages": "{n} lingue",
+  "radio_n_genres": "{n} generi"
 }

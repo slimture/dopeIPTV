@@ -3040,5 +3040,8 @@
   "rec_until": "till {time}",
   "rec_series_rules": "Serieinspelningar…",
   "rec_mark_watched": "Markera som sedd",
-  "rec_mark_unwatched": "Markera som osedd"
+  "rec_mark_unwatched": "Markera som osedd",
+  "radio_n_countries": "{n} länder",
+  "radio_n_languages": "{n} språk",
+  "radio_n_genres": "{n} genrer"
 }

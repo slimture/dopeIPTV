@@ -3040,5 +3040,8 @@
   "rec_until": "עד {time}",
   "rec_series_rules": "הקלטות סדרות…",
   "rec_mark_watched": "סמן כנצפה",
-  "rec_mark_unwatched": "סמן כלא נצפה"
+  "rec_mark_unwatched": "סמן כלא נצפה",
+  "radio_n_countries": "{n} מדינות",
+  "radio_n_languages": "{n} שפות",
+  "radio_n_genres": "{n} סוגות"
 }
