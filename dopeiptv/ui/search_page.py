@@ -481,7 +481,7 @@ class SearchPage(QWidget):
         self.delegate = ResultsDelegate(self.images, self.view)
         self.view.setItemDelegate(self.delegate)
         self.view.chosen.connect(self._chosen)
-        self.view.menu_wanted.connect(self.menu_requested)
+        self.view.menu_wanted.connect(self._menu_wanted)
         self.view.to_field.connect(self.focus_field)
         lay.addWidget(self.view, 1)
         self._debounce = QTimer(self)
@@ -673,6 +673,10 @@ class SearchPage(QWidget):
             return
         if row.kind == "hit" and row.hit is not None:
             self.activated.emit(row.hit)
+
+    def _menu_wanted(self, row: Row, pos: QPoint) -> None:
+        if row.kind == "hit" and row.hit is not None:
+            self.menu_requested.emit(row.hit, pos)
 
     def current_hit(self) -> sa.Hit | None:
         row = self.view.row_at(self.view.currentIndex())

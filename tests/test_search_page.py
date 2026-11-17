@@ -568,6 +568,21 @@ page.view.setCurrentIndex(page.model.index(page.view.first_row(), 0))
 QTest.keyClick(page.view, Qt.Key.Key_Up)
 assert page.field.hasFocus()
 
+# -- a hit's menu: the menu key and a right click open it on the hit itself -------------------
+from PyQt6.QtWidgets import QMenu
+menus = []
+_exec = QMenu.exec
+QMenu.exec = lambda self, *a: menus.append([x.text() for x in self.actions() if x.text()])
+page.view.setFocus()
+page.view.setCurrentIndex(page.model.index(page.view.first_row(), 0))
+QTest.keyClick(page.view, Qt.Key.Key_Menu)
+pump()
+assert menus and tr("epg_play_channel") in menus[-1], menus
+page.view._context(page.view.visualRect(page.view.currentIndex()).center())
+pump()
+assert len(menus) == 2 and tr("epg_play_channel") in menus[-1], menus
+QMenu.exec = _exec
+
 # -- a programme later: a reminder in its own source's reminders ---------------------------
 later = next(h for h in progs if h.source.name == "Nordic")
 page.activated.emit(later)

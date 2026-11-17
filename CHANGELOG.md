@@ -9,6 +9,8 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- A right click (or the menu key) on a result on the Search page opened no
+  menu and sent an error report instead; the menu is back.
 - The phone remote while casting (Chromecast, a TV, Kodi or AirPlay) shows
   what plays on the TV, says "Casting to …" and drives the TV: play and
   pause, stop, seeking a film, channel up and down, and the TV's volume and
