@@ -2576,8 +2576,10 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
             set_opt("sid", "auto")
             # A primary + optional fallback language: mpv's slang takes a
             # comma-separated priority list, so "swe,eng" means prefer
-            # Swedish subs but fall back to English when absent.
-            set_opt("slang", ",".join(langs) if mode == "lang" else "")
+            # Swedish subs but fall back to English when absent - each
+            # language every way a stream tags it ("swe", "sv").
+            set_opt("slang", ",".join(channel_prefs.all_spellings(langs))
+                    if mode == "lang" else "")
             _set_forced_only(m, mode == "forced")
             return
         set_opt("sid", "auto")
@@ -2590,7 +2592,7 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         _set_forced_only(m, False)
         set_opt("sub-visibility", False)
         if mode != "off":
-            self._sub_rule = (mode, [x.lower() for x in langs])
+            self._sub_rule = (mode, channel_prefs.all_spellings(langs))
 
     def _own_subtitles(self, own: dict, live: bool, set_opt) -> None:
         """Nerd: a channel's own subtitle choice, over what _sub_defaults
@@ -2618,9 +2620,9 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         for value in (*langs, last,
                       _SUB_LANG_TAGS.get(current_language(), "")):
             for tag in str(value).split(","):
-                tag = tag.strip().lower()
-                if tag and tag not in out:
-                    out.append(tag)
+                for spelled in channel_prefs.spellings(tag) or [tag.strip().lower()]:
+                    if spelled and spelled not in out:
+                        out.append(spelled)
         return out
 
     def _apply_sub_rule(self, m) -> None:
@@ -2656,9 +2658,8 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
             return
         if sel is None:
             return
-        lang = (sel.get("lang") or "").lower()
         if (sel.get("default") or sel.get("forced")
-                or (mode == "lang" and lang in langs)):
+                or (mode == "lang" and channel_prefs.same_language(sel.get("lang"), langs))):
             try:
                 m["sub-visibility"] = True
             except Exception:

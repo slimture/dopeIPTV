@@ -17,6 +17,7 @@
 
 ### Fixed
 
+- The **preferred subtitle language** shows by itself again - for every language, also when a stream writes it "sv" or "en-GB" instead of "swe" or "eng". The preferred audio language too.
 - **macOS**: no crash any more when a sound device comes or goes - an AirPlay speaker nearby, headphones.
 - **Local files** with no folder yet offers **Add folder** again, and no stray "1" in its header.
 - The phone remote's **Radio** shows the most voted stations, under your own - it was empty when you had kept none.

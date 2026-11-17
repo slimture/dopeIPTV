@@ -143,9 +143,9 @@ def test_a_language_and_the_ways_a_stream_tags_it():
 
 
 def test_audio_language_first_the_apps_after_it():
-    assert channel_prefs.audio_langs({}, "swe") == "swe"          # none: the app's, as it was
+    assert channel_prefs.audio_langs({}, "swe") == "swe,sv"       # none: the app's, each spelling
     assert channel_prefs.audio_langs({}, "") == ""
-    assert channel_prefs.audio_langs({"alang": "ger"}, "swe") == "ger,de,deu,swe"
+    assert channel_prefs.audio_langs({"alang": "ger"}, "swe") == "ger,de,deu,swe,sv"
     assert channel_prefs.audio_langs({"alang": "eng"}, "") == "eng,en"
 
 
@@ -276,7 +276,7 @@ class FakeMpv(dict):
 
 
 m = p.video.mpv = FakeMpv()
-GLOBAL = {"alang": "swe", "deinterlace": False, "keepaspect": True,
+GLOBAL = {"alang": "swe,sv", "deinterlace": False, "keepaspect": True,
           "video-aspect-override": "-1", "sid": "auto", "audio-delay": 0.0}
 
 
@@ -302,11 +302,11 @@ store = channel_prefs.ChannelPrefs(s)
 store.put("a:7", {"alang": "ger", "slang": "off", "deint": "on", "aspect": "4:3",
                   "adelay": 0.5})
 play("http://x/live/7.ts", "a:7", key="live:7")
-assert now(*GLOBAL) == {"alang": "ger,de,deu,swe", "deinterlace": True, "keepaspect": True,
+assert now(*GLOBAL) == {"alang": "ger,de,deu,swe,sv", "deinterlace": True, "keepaspect": True,
                         "video-aspect-override": "4:3", "sid": "no", "audio-delay": 0.5}, now(*GLOBAL)
 # A Settings save while it plays keeps the channel's own.
 p.apply_default_options()
-assert (m["alang"], m["deinterlace"], m["video-aspect-override"]) == ("ger,de,deu,swe", True, "4:3")
+assert (m["alang"], m["deinterlace"], m["video-aspect-override"]) == ("ger,de,deu,swe,sv", True, "4:3")
 # The next channel - none of its own - gets the app's back, the delay too.
 play("http://x/live/8.ts", "a:8", key="live:8")
 assert now(*GLOBAL) == GLOBAL, now(*GLOBAL)
@@ -314,7 +314,7 @@ assert now(*GLOBAL) == GLOBAL, now(*GLOBAL)
 play("http://x/live/7.ts", "a:7", key="live:7")
 play("http://x/movie/1.mkv", live=False, key="movie:1")
 assert (m["alang"], m["deinterlace"], m["video-aspect-override"], m["audio-delay"]) == (
-    "swe", False, "-1", 0.0)
+    "swe,sv", False, "-1", 0.0)
 
 # Its catch-up: the same picture and sound; subtitles as a film opens them.
 store.put("a:7", {"slang": "eng", "aspect": "stretch"})
@@ -483,18 +483,18 @@ assert toasts[-1] == tr("chanprefs_saved", name="TV4 HD")
 w._start_playback("http://127.0.0.1:9/7.ts", "TV4 HD", None, 7, "live", item=tv4)
 assert m.url == "http://127.0.0.1:9/7.ts"
 assert (m["alang"], m["deinterlace"], m["video-aspect-override"], m["audio-delay"]) == (
-    "ger,de,deu,swe", True, "21:9", 0.25), dict(m)
+    "ger,de,deu,swe,sv", True, "21:9", 0.25), dict(m)
 w._start_playback("http://127.0.0.1:9/8.ts", "Kanal 8", None, 8, "live", item=k8)
 assert (m["alang"], m["deinterlace"], m["video-aspect-override"], m["audio-delay"]) == (
-    "swe", False, "-1", 0.0), dict(m)
+    "swe,sv", False, "-1", 0.0), dict(m)
 # Its catch-up plays with them too.
 w._start_playback("http://127.0.0.1:9/timeshift/7.ts", "TV4 HD", None, 7, "live",
                   record=False, item=tv4, catchup=True)
-assert (m["alang"], m["deinterlace"], m["video-aspect-override"]) == ("ger,de,deu,swe", True, "21:9")
+assert (m["alang"], m["deinterlace"], m["video-aspect-override"]) == ("ger,de,deu,swe,sv", True, "21:9")
 # A film is no channel.
 w._start_playback("http://127.0.0.1:9/movie/1.mkv", "Film", None, 1, "movie",
                   item={"name": "Film", "stream_id": 1})
-assert (m["alang"], m["deinterlace"]) == ("swe", False)
+assert (m["alang"], m["deinterlace"]) == ("swe,sv", False)
 
 # Changed while it plays: in force at once.
 w._start_playback("http://127.0.0.1:9/7.ts", "TV4 HD", None, 7, "live", item=tv4)
@@ -506,7 +506,7 @@ s.setValue("nerd_enabled", "false")
 nerd.install(s)
 assert entry(tv4) is None
 w._start_playback("http://127.0.0.1:9/7.ts", "TV4 HD", None, 7, "live", item=tv4)
-assert (m["alang"], m["deinterlace"], m["video-aspect-override"]) == ("swe", False, "-1")
+assert (m["alang"], m["deinterlace"], m["video-aspect-override"]) == ("swe,sv", False, "-1")
 assert channel_prefs.ChannelPrefs(s).get("a:7")["alang"] == "ger"
 
 # On again: Reset puts the channel back to the app's settings.
@@ -530,3 +530,17 @@ def test_the_window_offers_saves_and_plays_a_channels_own(tmp_path):
     if "PREFS_SKIP" in out.stdout:
         pytest.skip(out.stdout.strip())
     assert "WINDOW_PREFS_OK" in out.stdout, out.stdout + out.stderr[-3000:]
+
+
+def test_the_apps_own_languages_match_every_spelling_of_them():
+    """Swedish kept as "swe" found no track tagged "sv" (or "sv-SE"): the
+    preferred subtitle was chosen but never shown. Every language, both
+    ways, its region left out."""
+    assert channel_prefs.all_spellings(["swe", "eng"]) == ["swe", "sv", "eng", "en"]
+    assert channel_prefs.all_spellings(["de"]) == ["de", "ger", "deu"]
+    for tag, codes in (("sv", ["swe"]), ("sv-SE", ["swe"]), ("SWE", ["swe"]), ("deu", ["ger"]),
+                       ("fr", ["fre"]), ("pt_BR", ["por"]), ("nob", ["nor"]), ("ar", ["ara"]),
+                       ("en", ["swe", "eng"])):
+        assert channel_prefs.same_language(tag, codes), (tag, codes)
+    for tag, codes in (("en", ["swe"]), ("", ["swe"]), (None, ["swe"]), ("sv", [])):
+        assert not channel_prefs.same_language(tag, codes), (tag, codes)

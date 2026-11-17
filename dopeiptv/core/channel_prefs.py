@@ -112,6 +112,23 @@ def spellings(code: str) -> list[str]:
     return _unique(out)
 
 
+def all_spellings(codes: Iterable[str]) -> list[str]:
+    """Every way a stream may tag each of *codes*, in their order - what
+    mpv's ``slang`` / ``alang`` is given: Swedish kept as "swe" finds a
+    track tagged "sv" too."""
+    out: list[str] = []
+    for code in codes:
+        out += spellings(str(code or ""))
+    return _unique(out)
+
+
+def same_language(tag: Any, codes: Iterable[str]) -> bool:
+    """Whether a track tagged *tag* ("sv", "swe", "sv-SE") is in one of the
+    languages *codes* (any of their spellings)."""
+    base = str(tag or "").strip().lower().replace("_", "-").split("-")[0]
+    return bool(base) and base in all_spellings(codes)
+
+
 def delay(value: Any) -> float:
     """*value* as an audio delay in seconds: within MAX_DELAY, to the
     millisecond; 0.0 for anything else."""
@@ -274,9 +291,10 @@ def audio_langs(own: dict[str, Any], default: str) -> str:
     """mpv's ``alang``: the channel's language first, each way it may be
     tagged, then the app's own as the fallback - or the app's alone."""
     code = lang(own.get("alang"))
+    mine = all_spellings(str(default or "").split(","))
     if not code:
-        return default
-    return ",".join(_unique([*spellings(code), *str(default or "").split(",")]))
+        return ",".join(mine)
+    return ",".join(_unique([*spellings(code), *mine]))
 
 
 def deinterlace(own: dict[str, Any], default: bool) -> bool:

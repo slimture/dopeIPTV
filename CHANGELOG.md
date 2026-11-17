@@ -152,6 +152,12 @@ same new look.
 
 ### Fixed
 
+- The preferred subtitle language was chosen but not shown when the
+  stream tagged its track another way than the setting keeps it - Swedish
+  is kept as "swe", many streams say "sv" or "sv-SE". The app's own
+  subtitle and audio languages now go to mpv every way a stream tags them,
+  and a track counts as in the language whichever it uses, for every
+  language the app knows (channel_prefs.all_spellings, same_language).
 - macOS: the app could crash when a sound device came or went - an AirPlay
   device found nearby, headphones - inside libmpv: its CoreAudio output is
   handed the system's device change after it has gone. The player now asks

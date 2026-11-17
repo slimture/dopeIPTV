@@ -77,7 +77,7 @@ settings.setValue("sub_lang", "swe")
 assert p.play("http://x/movie/1.mkv", "Film")
 assert m["sid"] == "auto" and m["subs-fallback"] == "yes"
 # The languages asked for first, then the app's own (English here).
-assert m["slang"] == "swe,eng,en" and m["sub-visibility"] is False
+assert m["slang"] == "swe,sv,eng,en" and m["sub-visibility"] is False
 m.track_list = subs(1)
 m.sid = 1
 assert menu()[tr("opt_off")] is True and menu()["swe"] is False
@@ -105,7 +105,7 @@ settings.setValue("sub_mode", "auto")
 settings.setValue("sub_last_lang", "swe")
 p.play("http://x/movie/2.mkv", "Film")
 # Hidden, chosen by the language turned on last, then the app's.
-assert m["sub-visibility"] is False and m["slang"] == "swe,eng,en"
+assert m["sub-visibility"] is False and m["slang"] == "swe,sv,eng,en"
 m.track_list = []
 p._poll_position()                       # not loaded yet: wait
 assert m["sub-visibility"] is False and p._sub_rule is not None
