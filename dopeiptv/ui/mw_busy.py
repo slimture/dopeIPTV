@@ -26,7 +26,8 @@ card are part of the sidebar's own layout, at its foot under the category
 list, just above the source avatar - the list only gets shorter while the
 card shows (the chosen category kept in view), nothing lies over a row.
 On the icon rail the line is a ring with the count and the card sits beside
-the rail; on a page with no sidebar (Home) both are at the same corner.
+the rail; on a page with no sidebar (one over the whole window) both are
+at the same corner.
 Nothing is drawn while the video fills the screen, TV mode shows or the
 picture is popped out.
 """
@@ -159,7 +160,8 @@ class _BusyMixin:
                 float_card.hide()
                 card.refresh()
         else:
-            # A page with no sidebar (Home): the same corner, its own pair.
+            # A page with no sidebar (over the whole window): the same
+            # corner, its own pair.
             cs = getattr(self, "_center_stack", None)
             area = (QRect(cs.mapTo(self, QPoint(0, 0)), cs.size()) if cs is not None
                     else self.rect())

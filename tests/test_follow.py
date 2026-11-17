@@ -1,5 +1,5 @@
 """Following a series: what counts as a new episode, and what the window
-does with one (toast, desktop notification, Home shelf, the badge and the
+does with one (toast, desktop notification, Mine asked to show it, the badge and the
 jump when the series is opened)."""
 import os
 import subprocess
@@ -185,22 +185,21 @@ answers["12"]["episodes"]["1"].append(
 mw_follow.MIN_AGE_S = 0
 toasts = []
 w._show_toast = lambda text, ms=0: toasts.append(text)
+refreshed = []
+w._mitt_refresh = lambda: refreshed.append("mitt")     # Mine's own page (its hook)
 w._check_followed()
 settle(lambda: not w._follow_running)
 want = tr("follow_new_episode", name="Fav Series", episode="S1 E3")
 assert toasts == [want], toasts
 assert notes and notes[0][0] == tr("home_new_episodes") and notes[0][1] == want
 
-# Home shows it on the New episodes shelf.
-w._show_home_page(); app.processEvents()
-texts = " | ".join(l.text() for l in w._home_page.findChildren(QLabel))
-assert tr("home_new_episodes") in texts and "Fav Series" in texts, texts
-assert "S1 E3" in texts, texts
+# Mine is asked to show it again (its New episodes), the store has it.
+assert "mitt" in refreshed, refreshed
+assert [r["snap"]["name"] for r in w.followed.with_new()] == ["Fav Series"]
 
 # Opening the series flags the new episode, says which (its page opens on
 # it - ui/mw_series_page.py), and it is seen. The list's pending jump is
 # not armed with an episode's id: that could select a series sharing it.
-w._leave_home()
 eps = [dict(e) for e in answers["12"]["episodes"]["1"]]
 w._pending_jump_key = None
 assert w._follow_entered(12, answers["12"], eps) == "103"
@@ -224,7 +223,7 @@ toasts.clear()
 w._check_followed(); settle(lambda: not w._follow_running)
 assert toasts == [tr("follow_new_series", n=2)], toasts
 
-# Announcements switched off under Settings -> Home: nothing is said, and
+# Announcements switched off under Settings -> Mine: nothing is said, and
 # the new episode is still noted for the shelf and the dots.
 settings.setValue("follow_notify", "false")
 answers["12"]["episodes"]["1"].append({"id": "105", "episode_num": 5})

@@ -2976,5 +2976,14 @@
   "card_grid": "Rutnät",
   "card_list": "Lista",
   "card_compact": "Kompakt",
-  "card_airy": "Luftig"
+  "card_airy": "Luftig",
+  "nav_mine": "Mitt",
+  "set_page_mine_sub": "Serierna du följer och deras nya avsnitt",
+  "set_card_start": "Start",
+  "set_start_place": "Öppna på",
+  "set_start_place_hint": "Var du slutade är varje profils egen.",
+  "start_place_last": "Där du slutade",
+  "start_place_mine": "Alltid på Mitt",
+  "set_popular_where": "Överst i",
+  "set_popular_note": "Veckans populäraste filmer och serier på TMDB - de som din källa har."
 }

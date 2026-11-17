@@ -174,8 +174,8 @@ class _UpdatesMixin:
         if getattr(self, "_update_shown_tag", None) == latest_tag:
             return
         self._update_shown_tag = latest_tag
-        # A clear, dismissible banner over the whole window (visible on Home
-        # too, unlike the sidebar badge) - the main "a new version is out"
+        # A clear, dismissible banner over the whole window (visible over any
+        # page, unlike the sidebar badge) - the main "a new version is out"
         # notice. The status-row link and logo badge stay as quiet reminders.
         self._show_update_banner(latest_tag)
         # Subtle, non-overlay link in the status row - shown for 30 s (as long
@@ -190,12 +190,12 @@ class _UpdatesMixin:
         QTimer.singleShot(30_000, lambda: logo.set_update(
             True, follow_accent=True))
 
-    # -- "new version" banner (visible over any view, Home included) ---------
+    # -- "new version" banner (visible over any view) ---------
 
     def _show_update_banner(self, tag: str) -> None:
         """A dismissible accent banner across the top of the window announcing a
         new release, with a Download button (to the website). Overlays the
-        central widget so it shows even on the full-window Home page. Once
+        central widget so it shows over any page of the window. Once
         dismissed for a given version it stays gone for that version."""
         if self.settings.value("update_banner_dismissed", "") == tag:
             return

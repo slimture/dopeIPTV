@@ -99,7 +99,7 @@ from dopeiptv.ui import dialogs
 app = QApplication.instance() or QApplication([])
 QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, tempfile.mkdtemp())
 s = QSettings(os.path.join(tempfile.mkdtemp(), "s.ini"), QSettings.Format.IniFormat)
-# Used for real, a month's asking going on: the heart and the card would show.
+# Used for real, a month's asking going on: the heart would show.
 s.setValue("donate_first_seen", time.time() - 60 * 86400)
 s.setValue("donate_period", time.time() - 60)
 w = MainWindow(DemoClient(), s, PlaylistStore(s))
@@ -121,7 +121,7 @@ w._donate_heart_refresh()
 # A supporter's mark is the logo itself; the heart is gone.
 assert w._sidebar_logo._supporter and "2026" in w._sidebar_logo.toolTip()
 assert w._donate_btn.isHidden()
-assert w._donate_phase() == "off" and w._donate_card() is None   # not asked any more
+assert w._donate_phase() == "off"                  # not asked any more
 # The heart now opens the thank-you, which still offers to donate.
 shown = []
 dialogs.SupporterDialog.exec = lambda self: shown.append(self.supporter) or 1

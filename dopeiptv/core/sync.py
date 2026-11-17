@@ -231,7 +231,7 @@ SETTINGS_ALLOW = frozenset({
     "language",
     "theme", "accent", "accent_custom", "theme_follow_system", "theme_light",
     "corner_style", "ui_scale", "view_density", "view_grid", "sort_order",
-    "home_enabled", "home_start", "follow_notify",
+    "start_place", "popular_movies", "popular_series", "follow_notify",
     "stream_format", "cache_secs", "autoplay_preview", "autoplay_next_episode",
     "nextup_lead_secs", "auto_reconnect_live", "hide_upcoming_prompt",
     "live_rewind_minutes", "live_rewind_disk", "live_rewind_kept",
@@ -246,11 +246,11 @@ SETTINGS_ALLOW = frozenset({
     # Under this system's name, between computers of one system (entry_of).
     shortcut_keys.SETTING,
 })
-#: Families of settings that sync: Home's shelves, the sidebar's colours.
+#: Families of settings that sync: the sidebar's colours.
 #: (Not the old editor's "shortcut/<platform>/<action>": moved into
 #: keyboard_shortcuts at the first start since 1.5.0, and one left in a file
 #: is another system's.)
-SETTINGS_ALLOW_PREFIX = ("home_sh_", "nav_color_", "nav_bg_")
+SETTINGS_ALLOW_PREFIX = ("nav_color_", "nav_bg_")
 #: Never, whatever the lists above say: what belongs to this computer, a
 #: secret, or the sync itself.
 SETTINGS_DENY = frozenset({

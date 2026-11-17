@@ -393,27 +393,24 @@ for name, way in WAYS:
     w.play_live_channel(CH[0])
     spin(0.2)
 
-# -- from Home, maximized, from the video's full screen, popped out ------------------------
-w._show_home_page()
+# -- from Mine, maximized, from the video's full screen, popped out ------------------------
+w._show_place("mitt")
 spin(0.2)
-home = snap()
 w.enter_tv_mode()
 spin(0.2)
 w._tv_browse()                              # the page, the stream behind it
 assert w._center_stack.currentWidget() is w._tv_page
 w.switch_mode("live")                       # TV mode holds the window meanwhile...
 assert w._center_stack.currentWidget() is w._tv_page
-w._show_home_page()
+w._show_place("films")
 assert w._center_stack.currentWidget() is w._tv_page
-w.exit_tv_mode()                            # ...and lands where it was sent
+w.exit_tv_mode()                            # ...and the window is back on the place last asked
 settle()
-# The lists' page is hidden behind Home: its panes and player are measured
-# once it is shown again.
-same("from Home", {k: v for k, v in home.items() if k not in ("split", "player")})
-assert snap()["page"] == home["page"]
-w._leave_home()
+same("from Mine, then Movies asked for", base)
+assert w._place == "films" and w.mode == "vod" and w.nav_btns["vod"].isChecked()
+w._show_place("tv")
 spin(0.3)
-same("from Home, the lists again", base)
+same("TV again", base)
 
 w.showMaximized()
 spin(0.3)

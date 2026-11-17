@@ -64,6 +64,7 @@ from ..providers.opensubtitles import bundled_key as bundled_os_key
 from ..providers.client import make_client
 from ..core import connections, mirrors
 from ..core import night_mode, rec_mp4
+from ..core import places as _places
 from ..core.local_buffer import MEMORY_MAX_MINUTES
 from ..core.log import log
 from ..core.xdg import open_url
@@ -275,11 +276,7 @@ class _SettingsMixin:
             # The drawn control icons are baked with the old text colour;
             # redraw them for the new theme.
             self.player.refresh_icons()
-        # The Home page bakes the accent into its pills and card borders at
-        # build time, so rebuild it if it's on screen to pick up the new accent.
-        if (getattr(self, "_home_page", None) is not None
-                and self._home_showing()):
-            self._home_page.refresh()
+        self._places_restyle()       # the places' header, in the new colours
         self._guide_restyle()        # the Guide page's board, in the new colours
         self._sp_restyle()           # a series' page
         self._search_restyle()       # the Search page
@@ -447,11 +444,9 @@ class _SettingsMixin:
         for action, getter in getattr(self, "_i18n_actions", {}).items():
             action.setText(getter())
         nav_labels = {
-            "home": "nav_home", "search": "nav_search", "live": "nav_tv", "guide": "nav_guide",
+            "mitt": "nav_mine", "search": "nav_search", "live": "nav_tv", "guide": "nav_guide",
             "vod": "nav_movies", "series": "nav_series",
-            "rec": "nav_recordings", "local": "nav_local",
-            "radio": "nav_radio", "fav": "nav_favorites", "watchlist": "nav_watchlist",
-            "history": "nav_history",
+            "rec": "nav_recordings", "local": "nav_local", "radio": "nav_radio",
         }
         rail = getattr(self, "_sidebar_collapsed", False)
         for key, btn in self.nav_btns.items():
@@ -465,9 +460,7 @@ class _SettingsMixin:
                     btn.setText(self._nav_texts[key])
         self._refresh_nav_status()      # the status's words in the tooltips
         self._cat_section_label.setText(tr("sidebar_categories"))
-        if hasattr(self, "_lib_section_label"):
-            self._lib_section_label.setText(tr("sidebar_mine"))
-            self._lib_toggle.setToolTip(tr("tooltip_toggle_mine"))
+        self._sync_place_header()       # the place's name and Mine's tabs
         # Settings at the foot: an icon, its name in the tooltip.
         self._settings_btn.setToolTip(tr("btn_settings"))
         self._settings_btn.setAccessibleName(tr("btn_settings"))
@@ -762,7 +755,9 @@ class _SettingsMixin:
                        tr("set_page_casting_sub"), "cast")
         playlists = page("playlists", tr("set_page_sources"),
                          tr("set_page_playlists_sub"), "stack")
-        home = page("home", tr("nav_home"), tr("set_page_home_sub"), "home")
+        # Mine's own (the place that holds favourites, Watch later and
+        # history): the series followed and how their news is said.
+        mine = page("mine", tr("nav_mine"), tr("set_page_mine_sub"), "star")
         loc = page("local", tr("nav_local"), tr("local_settings_hint"),
                    "folder")
         meta = page("metadata", tr("set_page_posters"),
@@ -984,6 +979,14 @@ class _SettingsMixin:
             c = general.card(tr("set_card_language"))
             c.row(tr("setting_language"), lang_box,
                   tr("setting_language_restart_hint"))
+            # Where the app opens: where you left off (each profile its own
+            # place), or always on Mine.
+            start_box = self._combo(
+                [("last", tr("start_place_last")), ("mitt", tr("start_place_mine"))],
+                _places.start_choice(self.settings))
+            c = general.card(tr("set_card_start"))
+            c.row(tr("set_start_place"), start_box, tr("set_start_place_hint"),
+                  search="start startup open launch home mine")
             # Privacy: private viewing lasts until the app closes, so it is
             # not stored (an untouched window still writes nothing).
             from ..core import privacy as _privacy
@@ -1132,6 +1135,9 @@ class _SettingsMixin:
 
             def commit_general(put, changed: set, final: bool) -> None:
                 put("check_updates", flag(updates_box))
+                # Written once chosen ("last" is the default).
+                if start_box.currentData() != _places.start_choice(self.settings):
+                    put(_places.START_KEY, start_box.currentData())
                 # Written once switched (on is the default).
                 if ask_box.isChecked() != donate_rhythm.asking(self.settings):
                     put(donate_rhythm.K_ASK, flag(ask_box))
@@ -1987,59 +1993,13 @@ class _SettingsMixin:
 
         playlists.set_builder(build_sources)
 
-        # -- Home -------------------------------------------------------------
-        # Eleven switches made a column of eleven rows; as chips they are
-        # two short groups, each read at a glance.
-        home_shelves = (
-            ("set_home_mine",
-             (("home_sh_resume", "home_resume"),
-              ("home_sh_new_eps", "home_new_episodes"),
-              ("home_sh_fav", "home_fav_now"),
-              ("home_sh_history", "home_recent"),
-              ("home_sh_watchlist", "nav_watchlist"))),
-            ("set_home_provider",
-             (("home_sh_hero", "home_hero"),
-              ("home_sh_pop_movies", "home_pop_movies"),
-              ("home_sh_pop_series", "home_pop_series"),
-              ("home_sh_movies", "home_new_movies"),
-              ("home_sh_series", "home_new_series"),
-              ("home_sh_channels", "home_new_channels"))))
-        home_keys = {"home_enabled", "home_start", "follow_notify"} | {
-            skey for _h, shelves in home_shelves for skey, _l in shelves}
-
-        def build_home() -> None:
-            c = home.card()
-            home_show_box = c.toggle(tr("set_home_show"),
-                                     is_on("home_enabled", "true"))
-            home_start_box = c.toggle(tr("set_home_start"),
-                                      is_on("home_start", "false"))
-            c = home.card(tr("set_home_shelves"))
-            home_shelf_boxes: dict[str, Chip] = {}
-            shelf_groups = []
-            for heading, shelves in home_shelves:
-                chips = []
-                for skey, slabel in shelves:
-                    chips.append(Chip(tr(slabel), is_on(skey, "true")))
-                    home_shelf_boxes[skey] = chips[-1]
-                shelf_groups.append((tr(heading), chips))
-            shelves_widget = ChipGroups(shelf_groups)
-            shelf_mark = own()
-            if shelf_mark is not None:
-                # Which shelves Home shows is the profile's own.
-                holder = QWidget()
-                hv = QVBoxLayout(holder)
-                hv.setContentsMargins(0, 0, 0, 0)
-                hv.addWidget(shelf_mark, 0, Qt.AlignmentFlag.AlignRight)
-                hv.addWidget(shelves_widget)
-                shelves_widget = holder
-            c.widget(shelves_widget,
-                     " ".join(ch.text() for _h, chs in shelf_groups for ch in chs))
-            c.note(tr("set_home_popular_note"))
-            # Following a series: whether new episodes are announced (the
-            # shelf and the episode dots show them either way), and the
+        # -- Mine -------------------------------------------------------------
+        def build_mine() -> None:
+            # Following a series: whether new episodes are announced (Mine
+            # and the episode dots show them either way), and the
             # series this playlist follows, to stop following one without
             # finding it again.
-            followed_card = home.card(tr("set_card_followed"))
+            followed_card = mine.card(tr("set_card_followed"))
             follow_notify_box = followed_card.toggle(
                 tr("set_follow_notify"), is_on("follow_notify", "true"),
                 tr("set_follow_notify_hint", shelf=tr("home_new_episodes")))
@@ -2084,15 +2044,11 @@ class _SettingsMixin:
 
             fol_stop.clicked.connect(fol_unfollow)
 
-            def commit_home(put, changed: set, final: bool) -> None:
-                put("home_enabled", flag(home_show_box))
-                put("home_start", flag(home_start_box))
-                for skey, box in home_shelf_boxes.items():
-                    put(skey, flag(box))
+            def commit_mine(put, changed: set, final: bool) -> None:
                 put("follow_notify", flag(follow_notify_box))
-            page_commits["home"] = commit_home
+            page_commits["mine"] = commit_mine
 
-        home.set_builder(build_home)
+        mine.set_builder(build_mine)
 
         # -- Multiview --------------------------------------------------------
         def build_multiview() -> None:
@@ -2519,10 +2475,22 @@ class _SettingsMixin:
             meta_source_box.currentIndexChanged.connect(
                 lambda _i: meta_card.refresh())
             tmdb_test_btn.clicked.connect(test_tmdb_key)
+            # TMDB's chart of the week, what the source has: a row at the top
+            # of Movies and of Series.
+            c = meta.card(tr("card_popular"))
+            pop_chips = {kind: Chip(tr(words), _places.popular_on(self.settings, kind))
+                         for kind, words in (("vod", "nav_movies"), ("series", "nav_series"))}
+            c.widget(ChipGroups([(tr("set_popular_where"), list(pop_chips.values()))]),
+                     " ".join([tr("card_popular")] + [ch.text() for ch in pop_chips.values()]))
+            c.note(tr("set_popular_note"))
 
             def commit_metadata(put, changed: set, final: bool) -> None:
                 put("metadata_source", meta_source_box.currentData())
                 put("tmdb_api_key", tmdb_key_edit.text().strip())
+                for kind, chip in pop_chips.items():
+                    # Written once switched (on is the default).
+                    if chip.isChecked() != _places.popular_on(self.settings, kind):
+                        put(_places.POPULAR_KEYS[kind], flag(chip))
             page_commits["metadata"] = commit_metadata
 
         meta.set_builder(build_metadata)
@@ -2875,7 +2843,7 @@ class _SettingsMixin:
         shell.arrange([
             (tr("set_grp_watch"), ["playback", "audio", "guide", "multiview",
                                    "recording", "casting"]),
-            (tr("set_grp_content"), ["playlists", "home", "local",
+            (tr("set_grp_content"), ["playlists", "mine", "local",
                                      "metadata"]),
             (tr("set_grp_accounts"), ["history", "sync", "integrations"]),
             (tr("set_sec_system"), ["general", "appearance", "shortcuts",
@@ -2943,8 +2911,8 @@ class _SettingsMixin:
 
             if any(k.startswith("mv_") for k in changed):
                 self._apply_multiview_settings()
-            if changed & home_keys:
-                self._apply_home_settings()
+            if changed & set(_places.POPULAR_KEYS.values()):
+                self._popular_changed()     # Movies' and Series' tops ask again
             if changed & {"metadata_source", "tmdb_api_key"}:
                 self.cover.reload()
             if changed & player_keys and self.player:

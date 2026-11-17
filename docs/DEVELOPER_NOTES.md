@@ -234,17 +234,28 @@ nothing - while Nerd is off or nothing is set.
   public DNS; a custom DoH server's own name is resolved by the system (the
   presets are addressed by IP).
 
-## Home
+## Places
 
-`ui/mw_home.py` builds the page; `ui/home_widgets.py` draws it (featured
-strip, shelves, cards - each card one composed, opaque pixmap, clicks
-taken on release, which is what keeps it smooth and avoided a macOS
-crash).  The popular shelves come from `services/popular.py`: TMDB's
-weekly chart matched against the provider's catalogue.  They need a TMDB
-key: release builds bundle one (`dopeiptv/_tmdb_key.py`, generated in CI
-and git-ignored); a source checkout uses the user's own key from
-Settings → Posters & info or `DOPEIPTV_TMDB_KEY`, and without any key those
-shelves are simply left out.
+Since 1.6.2 the sidebar is the app's structure and there is no Home: Mine,
+TV, Movies, Series, Guide, Search, then Local files, Radio, Recordings
+(`core/places.py`, `ui/mw_places.py`). `_show_place(name)` is the one way to
+a place; a place with a page of its own answers through its hook
+(`_mitt_show`, `_place_tv_show`, `_place_films_show`, `_place_series_show`,
+each True once shown), else the place shows its list under the shared
+header (`ui/media_cards.PageHeader`). Every place uses the same painted
+pieces (`ui/media_cards.py`): one view of uniform cells per list, pictures
+through the loaders only for what is on screen. The app opens where the
+person left off (`last_place`, each profile's own) or always on Mine
+(`start_place`); Home's settings were carried over once
+(`places.retire_home`).
+
+Popular right now (the top of Movies and of Series) comes from
+`services/popular.py` through `ui/mw_popular.py`: TMDB's weekly chart
+matched against the provider's catalogue on a worker. It needs a TMDB key:
+release builds bundle one (`dopeiptv/_tmdb_key.py`, generated in CI and
+git-ignored); a source checkout uses the user's own key from Settings →
+Posters & info or `DOPEIPTV_TMDB_KEY`, and without any key the rows are
+simply left out.
 
 ## EPG caching
 

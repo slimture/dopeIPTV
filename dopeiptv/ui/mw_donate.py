@@ -3,18 +3,16 @@
 "Support dopeIPTV…" is always in the app menu and in About. Beyond that
 the app asks in one rhythm (core/donate_rhythm.py): one week a month, once
 it is used for real - five hours watched in the last 30 days, two weeks
-after the first run - a small heart on the sidebar's logo (and at the top
-right of Home, which hides the sidebar). The first day of that week the
-heart has its colour, or Home has its card instead while Home is shown -
-never both; the other six days it is muted. Nothing beats, pulses or pops
-up. Left alone it goes after its week and comes back next month.
+after the first run - a small heart on the sidebar's logo. The first day of
+that week the heart has its colour; the other six days it is muted. Nothing
+beats, pulses or pops up. Left alone it goes after its week and comes back
+next month.
 
-What answers it answers both, the heart and the card: Donate opens the
-donate dialog on the website (with a ?ref= saying from where - the site's
-statistics read it) and ends the week; "Not right now" and the heart's
-right-click "Hide for three months" put it away for three months; "I've
-donated" for a year, taken at the person's word. A supporter key: never
-asked. Settings, General can switch the asking off altogether. It is not
+Donate (the heart, or its right-click menu) opens the donate dialog on the
+website (with a ?ref= saying from where - the site's statistics read it)
+and ends the week; the right-click's "Hide for three months" puts it away
+for three months; "I've donated" for a year, taken at the person's word. A
+supporter key: never asked. Settings, General can switch the asking off altogether. It is not
 drawn in full screen, in TV mode, in private viewing or for a kids
 profile - the week's days still count.
 
@@ -42,8 +40,7 @@ WATCH_MEMO_S = 600.0
 
 
 class _DonateMixin:
-    _donate_card_w = None          # Home's card while it is there
-    _donate_bright = True          # the hearts' ink: the colour, or muted
+    _donate_bright = True          # the heart's ink: the colour, or muted
 
     def _init_donate(self) -> None:
         try:
@@ -173,35 +170,13 @@ class _DonateMixin:
         btn.raise_()
 
     def _donate_ink(self) -> str:
-        """The hearts' colour at rest: the heart's own the first day of a
-        period, the theme's muted ink after it."""
+        """The heart's colour at rest: its own the first day of a period,
+        the theme's muted ink after it."""
         return HEART if self._donate_bright else P.get("muted", HEART)
 
-    def _donate_card_now(self):
-        card = self._donate_card_w
-        if card is None:
-            return None
-        from PyQt6 import sip
-        if sip.isdeleted(card):
-            self._donate_card_w = None
-            return None
-        return card
-
-    def _donate_card_shows(self, card) -> bool:
-        showing = getattr(self, "_home_showing", None)
-        return bool(showing()) if showing is not None else not card.isHidden()
-
-    def _donate_drop_card(self, card) -> None:
-        self._donate_card_w = None
-        try:
-            card.hide()
-            card.deleteLater()
-        except RuntimeError:
-            pass
-
     def _donate_show(self, sup=False) -> str:
-        """The hearts and Home's card as the rhythm says: one of them at a
-        time, none while it would be in the way."""
+        """The heart as the rhythm says: shown in its week, none while it
+        would be in the way."""
         try:
             return self._donate_place(sup)
         except Exception as e:                 # never in the way of anything
@@ -210,26 +185,12 @@ class _DonateMixin:
 
     def _donate_place(self, sup) -> str:
         ph = self._donate_phase(sup)
-        quiet = self._donate_quiet()
-        card = self._donate_card_now()
-        if card is not None and (ph != rhythm.BRIGHT or quiet):
-            self._donate_drop_card(card)        # its day is over, or answered
-            card = None
-        shown = ph != rhythm.OFF and not quiet
+        shown = ph != rhythm.OFF and not self._donate_quiet()
         self._donate_bright = ph == rhythm.BRIGHT
-        ink = self._donate_ink()
-        on_home = card is not None and self._donate_card_shows(card)
         btn = getattr(self, "_donate_btn", None)
         if btn is not None:
-            btn.set_rest(ink)
-            btn.setVisible(shown and not on_home)
-        home = getattr(self, "_home_heart", None)      # Home's, top right
-        if home is not None:
-            try:
-                home.set_rest(ink)
-                home.setVisible(shown and card is None)
-            except RuntimeError:                       # Home was rebuilt
-                self._home_heart = None
+            btn.set_rest(self._donate_ink())
+            btn.setVisible(shown)
         self._place_logo_marks()
         return ph
 
@@ -239,13 +200,7 @@ class _DonateMixin:
             return
         # A supporter's heart is gone: the logo itself says it instead.
         sup = self._supporter()
-        tip = tr("donate_support") + "\n" + tr("heart_tip_key")
-        for heart in (btn, getattr(self, "_home_heart", None)):
-            try:
-                if heart is not None:
-                    heart.setToolTip(tip)
-            except RuntimeError:
-                pass
+        btn.setToolTip(tr("donate_support") + "\n" + tr("heart_tip_key"))
         from .qt_i18n import format_month
         logo = getattr(self, "_sidebar_logo", None)
         if logo is not None and hasattr(logo, "set_supporter"):
@@ -293,12 +248,12 @@ class _DonateMixin:
 
     # -- the answers -------------------------------------------------------------
     def donated(self) -> None:
-        """"I've donated": not asked for a year - the heart and the card."""
+        """"I've donated": not asked for a year."""
         rhythm.put_away(self.settings, self._donate_time(), rhythm.DONATED_S)
         self._donate_heart_refresh()
 
     def hide_donate_heart(self) -> None:
-        """"Not right now", "Hide for three months": the heart and the card."""
+        """"Hide for three months"."""
         rhythm.put_away(self.settings, self._donate_time(), rhythm.LATER_S)
         self._donate_heart_refresh()
 
@@ -311,9 +266,6 @@ class _DonateMixin:
 
     def _donate_go_heart(self) -> None:
         self._donate_go("app-heart")
-
-    def _donate_go_home(self) -> None:
-        self._donate_go("app-home")
 
     def _donate_heart_menu(self, pos, btn=None) -> None:
         from PyQt6.QtWidgets import QMenu
@@ -346,19 +298,3 @@ class _DonateMixin:
 
     def open_donate(self, ref: str) -> None:
         open_url(DONATE_URL.format(ref=ref))
-
-    # -- Home's card ---------------------------------------------------------------
-    def _donate_card(self):
-        """Home's card, the first day of a period, or None (Home's heart
-        stands in for it the rest of the week)."""
-        if self._donate_phase() != rhythm.BRIGHT or self._donate_quiet():
-            return None
-        from .home_widgets import DonateCard
-        card = DonateCard(tr("home_donate_title"), tr("home_donate_body"),
-                          tr("home_donate_btn"), tr("donate_later"),
-                          tr("donate_did"))
-        card.donate.connect(self._donate_go_home)
-        card.later.connect(self.hide_donate_heart)
-        card.already.connect(self.donated)
-        self._donate_card_w = card
-        return card

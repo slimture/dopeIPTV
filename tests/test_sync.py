@@ -276,7 +276,7 @@ def _key():
 def test_collect_and_apply_take_the_allowed_settings_and_never_the_rest(tmp_path):
     a = Computer(tmp_path, "a", "s")
     allowed = {"theme": "nord", "accent": "green", "language": "sv", "sub_lang": "swe",
-               "home_sh_hero": "false", "nav_color_live": "#112233",
+               "start_place": "mitt", "popular_series": "false", "nav_color_live": "#112233",
                "keyboard_shortcuts": json.dumps({"mute": "J"}), "epg_upcoming_count": 5}
     # The old editor's keys (moved into keyboard_shortcuts at the first
     # start since 1.5.0): one left in a file is another system's.

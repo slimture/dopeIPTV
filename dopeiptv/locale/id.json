@@ -2976,5 +2976,14 @@
   "card_grid": "Kisi",
   "card_list": "Daftar",
   "card_compact": "Ringkas",
-  "card_airy": "Lapang"
+  "card_airy": "Lapang",
+  "nav_mine": "Milikku",
+  "set_page_mine_sub": "Serial yang Anda ikuti dan episode barunya",
+  "set_card_start": "Mulai",
+  "set_start_place": "Buka di",
+  "set_start_place_hint": "Tempat Anda berhenti disimpan per profil.",
+  "start_place_last": "Tempat terakhir",
+  "start_place_mine": "Selalu di Milikku",
+  "set_popular_where": "Di bagian atas",
+  "set_popular_note": "Film dan serial terpopuler minggu ini di TMDB - yang dimiliki sumber Anda."
 }

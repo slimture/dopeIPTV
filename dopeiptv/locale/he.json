@@ -2976,5 +2976,14 @@
   "card_grid": "רשת",
   "card_list": "רשימה",
   "card_compact": "קומפקטי",
-  "card_airy": "מרווח"
+  "card_airy": "מרווח",
+  "nav_mine": "שלי",
+  "set_page_mine_sub": "הסדרות שאתה עוקב אחריהן והפרקים החדשים שלהן",
+  "set_card_start": "הפעלה",
+  "set_start_place": "פתיחה ב",
+  "set_start_place_hint": "המקום שבו הפסקת שמור לכל פרופיל בנפרד.",
+  "start_place_last": "איפה שהפסקת",
+  "start_place_mine": "תמיד ב'שלי'",
+  "set_popular_where": "בראש",
+  "set_popular_note": "הסרטים והסדרות הפופולריים ביותר השבוע ב-TMDB - אלה שיש במקור שלך."
 }

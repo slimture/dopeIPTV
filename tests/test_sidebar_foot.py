@@ -129,8 +129,8 @@ mid = (ax + gx + gw) / 2
 side_mid = content.width() / 2
 assert abs(mid - side_mid) <= 3, (mid, side_mid)
 _lx, ly, _lw, lh = rect(w._sidebar_logo)
-_hx, hy, _hw, _hh = rect(w.nav_btns["home"])
-assert hy - (ly + lh) < 24, (ly + lh, hy)             # Home right under the logo
+_hx, hy, _hw, _hh = rect(w.nav_btns["mitt"])
+assert hy - (ly + lh) < 24, (ly + lh, hy)             # Mine right under the logo
 
 # -- a click opens the same switcher, the active source ticked --------------------
 avatar.click()

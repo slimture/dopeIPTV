@@ -3,10 +3,9 @@ window in a child process (offscreen):
 
 - a kids profile sees and plays nothing the provider marks for adults nor
   anything from a category named for them - not only in the main list but
-  in "All", the favourites (Home's and the window's), the guide, the
-  channels the phone remote, the remote API and Home Assistant list and
-  play, multiview and a worker's catalogue filter (Home's shelves, the
-  palette, programme search);
+  in "All", the favourites, the guide, the channels the
+  phone remote, the remote API and Home Assistant list and play, multiview
+  and a worker's catalogue filter (the palette, programme search);
 - while "Who's watching?" waits for a profile's PIN at start, the phone
   remote, the remote API, Home Assistant, a command from outside, the
   window's shortcuts, number keys and the media keys play nothing and list
@@ -141,9 +140,6 @@ got = on_server(lambda: w._phone_call("channels", {}))
 assert [c["id"] for c in got["channels"]] == [1], got
 w._events_favorites()
 assert [r["stream_id"] for r in w._events_favs.values()] == [1], w._events_favs
-# Home's own favourites shelf.
-home = w._ensure_home_page()
-assert ids(home._favorite_channels()) == [1]
 # The main list's "All": nothing from the category for adults either.
 w.all_items = [dict(r) for r in rows]
 w._apply_filter()
@@ -151,7 +147,7 @@ shown = [w.list_model.item_at(i).get("stream_id") for i in range(w.list_model.ro
 assert shown == [1], shown
 # The guide of the list.
 assert ids(w._guide_scope(False)[2]) == [1]
-# What the workers filter with (Home's shelves, the palette, programme search,
+# What the workers filter with (the palette, programme search,
 # TV mode, watch together): on a worker it reads the categories itself.
 getattr(w, "_kids_known", dict)().clear()
 keep, got = w._catalog_filter("live"), {}
@@ -295,16 +291,12 @@ def _kid_window():
         def __init__(self):
             self.client, self.overrides, self.pool = _Client(), None, QThreadPool()
             self.kids, self.refreshed = True, []
-            self._home_page = self
 
         def _profile_kids(self):
             return self.kids
 
-        def _home_showing(self):
-            return True
-
-        def refresh(self):                  # Home's
-            self.refreshed.append(True)
+        def _refresh_places(self, reason=""):     # the places' own pages
+            self.refreshed.append(reason)
 
     return W()
 
@@ -321,7 +313,7 @@ def _wait(win, cond, secs=5.0):
 def test_on_the_windows_thread_a_row_waits_for_its_category_to_be_known():
     """The window's thread never asks the provider itself: a row whose
     category it does not know yet is held back, the categories are read on
-    the pool, and Home is drawn again with what may be shown."""
+    the pool, and the places are drawn again with what may be shown."""
     _app()
     w = _kid_window()
     keep = w._kids_keep("live")

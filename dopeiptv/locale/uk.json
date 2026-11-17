@@ -2976,5 +2976,14 @@
   "card_grid": "Сітка",
   "card_list": "Список",
   "card_compact": "Компактний",
-  "card_airy": "Просторо"
+  "card_airy": "Просторо",
+  "nav_mine": "Моє",
+  "set_page_mine_sub": "Серіали, за якими ви стежите, і їхні нові серії",
+  "set_card_start": "Запуск",
+  "set_start_place": "Відкривати на",
+  "set_start_place_hint": "Де ви зупинилися, кожен профіль пам'ятає сам.",
+  "start_place_last": "Там, де ви зупинилися",
+  "start_place_mine": "Завжди на «Моє»",
+  "set_popular_where": "Угорі розділу",
+  "set_popular_note": "Найпопулярніші фільми й серіали тижня на TMDB - ті, що є у вашого джерела."
 }

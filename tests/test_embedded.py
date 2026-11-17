@@ -6,7 +6,7 @@ control bar) while __init__ is still running. If those flags are not set
 up front, building the player raises AttributeError and the whole window
 fails to open.
 
-Subprocess pattern (see test_multiview / test_home): each EmbeddedPlayer owns
+Subprocess pattern (see test_multiview / test_places): each EmbeddedPlayer owns
 a QOpenGLWidget, and tearing it down under the offscreen platform can segfault
 the interpreter at shutdown. Running it in a child and asserting on a printed
 marker (not the return code) keeps a teardown crash from failing the run - the

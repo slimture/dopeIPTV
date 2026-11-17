@@ -2976,5 +2976,14 @@
   "card_grid": "Сетка",
   "card_list": "Список",
   "card_compact": "Компактный",
-  "card_airy": "Свободно"
+  "card_airy": "Свободно",
+  "nav_mine": "Моё",
+  "set_page_mine_sub": "Сериалы, за которыми вы следите, и их новые серии",
+  "set_card_start": "Запуск",
+  "set_start_place": "Открывать на",
+  "set_start_place_hint": "Где вы остановились, каждый профиль помнит сам.",
+  "start_place_last": "Там, где вы остановились",
+  "start_place_mine": "Всегда на «Моё»",
+  "set_popular_where": "Вверху раздела",
+  "set_popular_note": "Самые популярные фильмы и сериалы недели на TMDB - те, что есть у вашего источника."
 }

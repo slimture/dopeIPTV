@@ -11,6 +11,31 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 - Phone remote: TV mode's remote fits the phone it is on. The d-pad takes the room left below Now playing - bigger on a tall phone, with the volume and channel rockers under it, beside it on a small one - and on its side the keys sit next to it; from 320 x 568 up nothing scrolls as it opens, the safe areas stay clear and every key is 44 px or more. Play/pause and mute sit with Back and Options, the touchpad switch with the number keys.
 - Phone remote: Now playing stays compact. Subtitles and sound, the sleep timer, Record and the next programme fold behind More (TV mode's remote folds its sound and sleep timer the same way); the phone remembers whether it was open. While folded, a recording's red dot and time and the sleep timer's minutes stay on the card - a tap on the dot asks to stop the recording.
+- The sidebar is the app's structure: Mine, TV, Movies, Series, Guide,
+  Search, then - under a hairline - Local files, Radio and Recordings.
+  Home is gone; Mine holds what were Favorites, Watch later and History
+  (as tabs in its header for now), and every place has the same header:
+  its name and how many it holds, with Mine's tabs beside it.
+- The app opens where you left off - each profile its own place, the
+  Guide or Search over the list you came from - or always on Mine
+  (Settings > General > Start). "Open Home at startup" became "Always on
+  Mine"; Home's other settings went with it, a popular shelf switched off
+  stays off at the top of Movies or Series.
+- Back and Esc from the Guide, Search and a series' page go back to the
+  place you came from; a profile switch goes to that person's place.
+- Popular right now becomes a row at the top of Movies and of Series,
+  switched on or off in Settings > Posters & info. Followed series and
+  their news are on Settings > Mine.
+- The donate heart asks alone, one week a month as before; Home's card is
+  gone with Home.
+
+### Added
+
+- One set of painted cards for every place (`ui/media_cards.py`): posters,
+  wide cards and list rows with the same pills (Live, New, Playing,
+  Watched), channel rows with what is on and next, a sideways Continue
+  row, the shared page header - one view per list, pictures only for what
+  is on screen, mirrored right to left, named for screen readers.
 
 ## [1.6.1]
 

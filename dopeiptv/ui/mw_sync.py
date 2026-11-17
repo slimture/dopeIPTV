@@ -375,9 +375,8 @@ class _SyncMixin:
             self._load_categories()
         elif getattr(self, "list_model", None) is not None:
             self.list_model.refresh_all()
-        home = getattr(self, "_home_page", None)
-        if home is not None and hasattr(self, "_home_showing") and self._home_showing():
-            home.refresh()
+        if hasattr(self, "_refresh_places"):
+            self._refresh_places("sync")
 
     # -- on, off -------------------------------------------------------------------
 

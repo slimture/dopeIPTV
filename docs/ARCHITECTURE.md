@@ -101,6 +101,9 @@ dopeiptv/
     ical.py            Reminders and recordings as iCalendar (RFC 5545)
     search_all.py      One search across every source: rows as the lists show
                        them, a guide's week compact, four groups ranked
+    places.py          The app's places (Mine, TV, Movies, Series, Guide,
+                       Search, Local files, Radio, Recordings): entries, modes,
+                       where the app opens, Home's settings retired
     shortcut_keys.py   Keyboard shortcuts: the actions, the app's keys, the
                        user's over them, never two on one key
     log.py             Central logging (configure_logging, DOPEIPTV_LOG)
@@ -154,7 +157,7 @@ dopeiptv/
     search_sources.py  The search across sources: each source's client, lists
                        (a portal's only as loaded) and guide from disk, once
     popular.py         Popular right now: TMDB's chart of the week matched
-                       against the provider's catalogue (Home shelves)
+                       against the provider's catalogue (Movies' and Series' tops)
 
   ui/                  Everything the user sees
     __init__.py        Lazy MainWindow export (PEP 562)
@@ -180,10 +183,9 @@ dopeiptv/
     mw_detail.py       EPG / detail-panel mixin
     mw_search.py       Sidebar category / item search mixin
     mw_sidebar.py      Sidebar chrome (collapse / icon rail / mid-compact)
-    mw_nav.py          Nav chrome (focus mode, nav colours/icons, Library)
     mw_shortcuts.py    Keyboard shortcuts: dispatch, the keys in force, live rebind
-    mw_nav.py          Nav chrome (focus mode, nav colours/icons, MINE,
-                       History's Watched filter, the nav's status)
+    mw_nav.py          Nav chrome (focus mode, nav colours/icons, the entry
+                       lit, History's Watched filter, the nav's status)
     mw_source_label.py The active source in plain sight: over the
                        categories, in the status line, TV mode's header
     mw_shortcuts.py    Keyboard shortcuts + registry
@@ -209,7 +211,11 @@ dopeiptv/
     mw_mpris.py        Desktop media controls (MPRIS host) + media keys
     mw_follow.py       Follow a series: new-episode checks and news
     mw_subtitles.py    Subtitles from OpenSubtitles; remembered per title
-    mw_home.py         The Home page (shelves: resume, favourites, new)
+    mw_places.py       The places and the way to each (no Home): a place's
+                       own page through its hook, else its list under the
+                       shared header; the start where the person left off
+    mw_popular.py      Popular right now for Movies and Series, matched to
+                       the source on a worker
     mw_guide.py        The Guide page in the middle pane, and its pop-out
     mw_series_page.py  A series' page in the middle pane: opened from anywhere,
                        played through the window's path, Back to the list as it was
@@ -222,7 +228,6 @@ dopeiptv/
     media_cards.py     The cards every place shares: pills, poster/wide/list cards,
                        channel rows, the sideways Continue row, the page header
                        and the shared page form (PlacePage)
-    home_widgets.py    Home's featured strip, shelves and cards
     mw_local.py        Local files: folders, library view, music queue
     mw_radio.py        Radio: radio-browser.info's stations, played as music
     mw_webstreams.py   Open address, YouTube/Twitch through yt-dlp, saved

@@ -2976,5 +2976,14 @@
   "card_grid": "شبکه",
   "card_list": "فهرست",
   "card_compact": "فشرده",
-  "card_airy": "باز"
+  "card_airy": "باز",
+  "nav_mine": "مال من",
+  "set_page_mine_sub": "سریال‌هایی که دنبال می‌کنید و قسمت‌های تازه‌شان",
+  "set_card_start": "شروع",
+  "set_start_place": "باز شدن در",
+  "set_start_place_hint": "جایی که متوقف شدید برای هر نمایه جداگانه است.",
+  "start_place_last": "جایی که متوقف شدید",
+  "start_place_mine": "همیشه روی مال من",
+  "set_popular_where": "در بالای",
+  "set_popular_note": "پرطرفدارترین فیلم‌ها و سریال‌های این هفته در TMDB - همان‌هایی که منبع شما دارد."
 }

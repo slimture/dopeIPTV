@@ -124,11 +124,10 @@ or "Shared" and where the shared one lives. Nerd's rows only while it is on.
   `show_drm`, `hd_group` (HDHomeRun), `radio`, `recordings` (VDR, NextPVR),
   `favourites`, `recordings` (DVBViewer), `recordings` (MythTV)
 
-**Home** (`home`)
-- (untitled): `home_enabled`, `home_start`
-- Sections on Home (this profile's): `home_sh_resume`, `home_sh_new_eps`, `home_sh_fav`,
-  `home_sh_history`, `home_sh_watchlist`, `home_sh_hero`, `home_sh_pop_movies`,
-  `home_sh_pop_series`, `home_sh_movies`, `home_sh_series`, `home_sh_channels`
+**Mine** (`mine`) - the place that holds favourites, Watch later and
+history (there is no Home since 1.6.2: its settings were carried over once
+by `core/places.retire_home` - "Open Home at startup" became `start_place`
+= mitt, a popular shelf switched off stays off - and taken away)
 - Followed series: `follow_notify`; the followed series, stop following
 
 **Local files** (`local`)
@@ -137,6 +136,8 @@ or "Shared" and where the shared one lives. Nerd's rows only while it is on.
 
 **Posters & info** (`metadata`)
 - (untitled): `metadata_source`, `tmdb_api_key` (Test)
+- Popular right now (TMDB's chart, what the source has), at the top of:
+  `popular_movies` (Movies), `popular_series` (Series)
 
 ## ACCOUNTS AND INTEGRATIONS
 
@@ -162,6 +163,8 @@ or "Shared" and where the shared one lives. Nerd's rows only while it is on.
 
 **General** (`general`)
 - Language: `language`
+- Start: `start_place` (where you left off - each profile's own
+  `last_place` / `last_list_place`, no row - or always on Mine)
 - Privacy: private viewing (until the app closes, not stored), clear recent history
 - Updates: `check_updates`, `update_channel`
 - Backup: back up, restore

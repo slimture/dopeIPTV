@@ -173,6 +173,9 @@ class _SourceLabelMixin:
     def _set_list_status(self, text: str) -> None:
         """The status line's resting words for the list shown."""
         self._list_readout = (str(getattr(self, "mode", "")), text)
+        count = getattr(self, "_place_count", None)
+        if count is not None:
+            count(text)                 # under the place's name (mw_places)
         shown = self._list_status_text(text)
         self._list_shown = shown
         self._set_status(shown)

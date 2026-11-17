@@ -301,9 +301,9 @@ s = ProfileSettings(os.path.join(tmp, "s.ini"), QSettings.Format.IniFormat)
 reg = profiles.start(s, [], "Me")
 kid = reg.add("Lisa", colour="pink")
 mine, theirs = profiles.pinned(s, MAIN_ID), profiles.pinned(s, kid.id)
-for view, lang, shelf in ((mine, "swe", "true"), (theirs, "fre", "false")):
+for view, lang, sub in ((mine, "swe", "eng"), (theirs, "fre", "ger")):
     view.setValue("audio_lang", lang)
-    view.setValue("home_sh_resume", shelf)
+    view.setValue("sub_lang", sub)
 s.sync()
 theme.apply_theme(s)
 w = mw.MainWindow(DemoClient(), s, PlaylistStore(s))
@@ -328,9 +328,9 @@ QDialog.exec = exec_
 w.open_settings()
 assert switched == [True] and profiles.active_id() == kid.id
 # Closing it stores none of the other profile's own into this one.
-got = (theirs.value("audio_lang"), theirs.value("home_sh_resume"))
-assert got == ("fre", "false"), got
-assert (mine.value("audio_lang"), mine.value("home_sh_resume")) == ("swe", "true")
+got = (theirs.value("audio_lang"), theirs.value("sub_lang"))
+assert got == ("fre", "ger"), got
+assert (mine.value("audio_lang"), mine.value("sub_lang")) == ("swe", "eng")
 print("SETTINGS_OPEN_OK", flush=True)
 os._exit(0)
 """

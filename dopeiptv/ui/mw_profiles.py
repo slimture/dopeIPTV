@@ -235,9 +235,8 @@ class _ProfilesMixin:
         # Held back while they were not known: shown now.
         self._kids_ver = int(self.__dict__.get("_kids_ver", 0)) + 1
         try:
-            if self._home_showing():
-                self._home_page.refresh()
-            elif getattr(self, "all_items", None) and not self._guide_page_showing():
+            self._refresh_places("kids")
+            if getattr(self, "all_items", None) and not self._guide_page_showing():
                 self._apply_filter()
             tv = getattr(self, "_tv_page", None)
             if tv is not None and not _gone(tv) and getattr(self, "_tv_on", False) \
@@ -299,8 +298,9 @@ class _ProfilesMixin:
 
     def switch_profile(self, pid: str) -> bool:
         """Use profile *pid* from now on (its PIN, if any, asked already):
-        what plays stops, the profile's own is read, and Home, the lists,
-        the sidebar and the guide show it - no restart. False when it
+        what plays stops, the profile's own is read, the window goes to its
+        start place (where it left off, or Mine), and the lists, the sidebar
+        and the guide show it - no restart. False when it
         cannot be (no such profile, or a window without profiles)."""
         store = self.profiles
         target = store.get(pid)
@@ -374,8 +374,6 @@ class _ProfilesMixin:
     def _profile_refresh(self) -> None:
         """Everything that shows the profile's own, shown again."""
         self._apply_theme_now()
-        self._home_poster_cache = None
-        self._home_chan_cache = None
         self._recent_cache = {}
         self._search_index_cache = {}     # the sidebar search's, made for the profile before
         self._guide_source_changed()      # its reminders' marks: drawn anew
@@ -387,9 +385,8 @@ class _ProfilesMixin:
             self.list_model.refresh_all()
         except Exception:
             pass
-        if self._home_showing():
-            self._home_page.refresh()
-        self._load_categories()
+        self._refresh_places("profile")
+        self._profile_place()
         tv = getattr(self, "_tv_page", None)
         # TV mode's page stays made once it is left: its screens read the
         # new profile's anew even while it is off, or the next time it is

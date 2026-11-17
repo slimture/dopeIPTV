@@ -293,13 +293,13 @@ class _LocalFilesMixin:
 
     def _local_rescan_shown(self) -> bool:
         """Is Local files' list what the window shows - the one Rescan's
-        key may act on? Not another place, not over Home, the Guide, the
-        Search page or a series' page, not in TV mode or full screen."""
+        key may act on? Not another place, not under the Guide, the Search
+        page or a series' page, not in TV mode or full screen."""
         if self.mode != "local" or getattr(self, "_tv_on", False) \
                 or getattr(self, "_player_fs", False):
             return False
-        for name in ("_home_showing", "_guide_page_showing",
-                     "_search_page_showing", "_series_page_showing"):
+        for name in ("_guide_page_showing", "_search_page_showing",
+                     "_series_page_showing"):
             shows = getattr(self, name, None)
             if shows is not None and shows():
                 return False

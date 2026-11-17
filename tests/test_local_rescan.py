@@ -137,8 +137,8 @@ def test_its_key_acts_only_where_local_files_shows(tmp_path, jobs):
     w.isActiveWindow = lambda: True
     w._shortcut_local_rescan()
     assert asked == [1]
-    for blocker in ("_home_showing", "_series_page_showing",
-                    "_search_page_showing", "_guide_page_showing"):
+    for blocker in ("_series_page_showing", "_search_page_showing",
+                    "_guide_page_showing"):
         setattr(w, blocker, lambda: True)
         w._shortcut_local_rescan()
         delattr(w, blocker)

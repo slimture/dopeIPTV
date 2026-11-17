@@ -2976,5 +2976,14 @@
   "card_grid": "Grille",
   "card_list": "Liste",
   "card_compact": "Compact",
-  "card_airy": "Aéré"
+  "card_airy": "Aéré",
+  "nav_mine": "Mes listes",
+  "set_page_mine_sub": "Les séries que vous suivez et leurs nouveaux épisodes",
+  "set_card_start": "Démarrage",
+  "set_start_place": "Ouvrir sur",
+  "set_start_place_hint": "L'endroit où vous vous êtes arrêté est propre à chaque profil.",
+  "start_place_last": "Là où vous vous êtes arrêté",
+  "start_place_mine": "Toujours sur Mes listes",
+  "set_popular_where": "En haut de",
+  "set_popular_note": "Les films et séries les plus populaires de la semaine sur TMDB - ceux que votre source propose."
 }

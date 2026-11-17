@@ -1,13 +1,14 @@
-"""No widget is shown as a window of its own on the way into Home.
+"""No widget is shown as a window of its own on the way through the
+places (Mine, TV, Movies, Series, Guide, Search, Local files, Radio,
+Recordings) and the donate heart's rhythm.
 
 A parentless widget made visible before it reaches a layout is, for that
 moment, a top-level window. On GNOME (Wayland) Qt asks the compositor for
 an activation token for it and drops it unused, and the pointer spins as
 if a program were starting - in 1.4.2 Home's donate heart did that every
-time Home opened.
+time Home opened (Home is gone since 1.6.2; its places are what opens now).
 
-Subprocess pattern (see test_home): a real MainWindow with its offscreen
-player.
+Subprocess pattern: a real MainWindow with its offscreen player.
 """
 import os
 import subprocess
@@ -35,8 +36,7 @@ from dopeiptv.core.gcguard import GcGuard
 GcGuard(app)
 settings = QSettings("dopeiptv-test", "stray-windows")
 settings.clear()
-settings.setValue("home_enabled", "true")
-# A month's asking on its first day: Home's donate card and its heart.
+# A month's asking on its first day: the sidebar's heart.
 import time
 settings.setValue("donate_first_seen", time.time() - 60 * 86400)
 settings.setValue("donate_period", time.time() - 60)
@@ -66,29 +66,23 @@ def step(fn):
     for _ in range(20):
         app.processEvents()
 
-step(w._show_home_page)
-step(w._leave_home)
-step(w._show_home_page)
-step(w._apply_home_settings)
+for place in ("mitt", "tv", "films", "series", "guide", "search", "local",
+              "radio", "rec", "mitt"):
+    step(lambda p=place: w._show_place(p))
+    assert w._place == place, (place, w._place)
+step(w._donate_heart_refresh)
 step(w.hide_donate_heart)
 settings.remove("donate_until")
 step(w._donate_heart_refresh)
-step(w._leave_home)
-step(w._show_home_page)
-# Home switched off in Settings, while it shows and again after.
-settings.setValue("home_enabled", "false")
-step(w._apply_home_settings)
-step(w._apply_home_settings)
-assert not w._home_showing()
-settings.setValue("home_enabled", "true")
-step(w._apply_home_settings)
-step(w._show_home_page)
+step(lambda: w._place_tab_picked("watchlist"))
+step(lambda: w._place_tab_picked("history"))
+step(lambda: w._show_place("tv"))
 assert not stray, stray
 print("NO_STRAY_OK", flush=True)
 """
 
 
-def test_home_shows_no_stray_windows():
+def test_the_places_show_no_stray_windows():
     try:
         import PyQt6  # noqa: F401
     except Exception:

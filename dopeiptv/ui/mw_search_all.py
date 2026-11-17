@@ -72,7 +72,6 @@ class _SearchAllMixin:
     """MainWindow mixin: the Search page."""
 
     _search_page: SearchPage | None = None
-    _sa_return_home = False
     _sa_sources: ss.Sources | None = None
     _sa_latest: sa.Latest | None = None
     _sa_pools: tuple[QThreadPool, QThreadPool] | None = None
@@ -184,10 +183,6 @@ class _SearchAllMixin:
             # From the guide's window: the page is the main window's.
             self.raise_()
             self.activateWindow()
-        from_home = self._home_showing()
-        back_home = from_home or (self._search_page_showing() and self._sa_return_home)
-        if from_home:
-            self._leave_home()
         if getattr(self, "_focus_mode", False):
             self._set_focus_mode(False)
         if not self._search_page_showing():
@@ -196,8 +191,7 @@ class _SearchAllMixin:
             self._sa_forget_if_private()
         page = self._ensure_search_page()
         self._mid_stack.setCurrentWidget(page)
-        self._sa_return_home = back_home
-        self._check_nav("search")
+        self._place_entered("search")
         made_for = self._sa_made_key()
         if self._sa_made_for is not None and self._sa_made_for != made_for:
             # Found for another profile, with the lock open, or before a
@@ -215,23 +209,17 @@ class _SearchAllMixin:
         """The list back in the middle pane; the page is kept, hidden, with
         its query and results for the next visit (not while viewing
         privately)."""
-        self._sa_return_home = False
         if self._search_page_showing():
             self._mid_stack.setCurrentIndex(0)
             self._sa_forget_if_private()
 
     def _leave_search_page(self) -> None:
-        """Back where you were: Home if the page was opened from there, else
-        the list under it, with its entry lit."""
+        """Back where you were: the place under it, as it was left, with its
+        entry lit (mw_places)."""
         if not self._search_page_showing():
             return
-        home = self._sa_return_home
         self._close_search_page()
-        if home and self._home_enabled():
-            self._show_home_page()
-            return
-        self._check_nav(self._nav_key_for_mode(self.mode))
-        self.listw.setFocus()
+        self._return_to_place()
 
     def _search_escape(self) -> None:
         """Esc on the page: the field emptied first, then the page left."""

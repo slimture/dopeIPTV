@@ -1,10 +1,10 @@
 """Navigation-chrome mixin for MainWindow.
 
-Focus mode, where a nav click goes and which entry is lit, the per-nav-item
-colour picker and the selected entry's colours, the painted nav icons (one
-outline style, glyph -> centred pixmap), the nav's status (a recording
-running, new episodes, Watch later's count), History's All / Watched filter,
-the collapsible MINE group, and the category solo toggle. Every method
+Focus mode, which entry is lit (a click goes to its place: mw_places), the
+per-nav-item colour picker and the selected entry's colours, the painted
+nav icons (one outline style, glyph -> centred pixmap), the nav's status (a
+recording running, new episodes, Watch later's count on Mine), History's
+All / Watched filter, and the category solo toggle. Every method
 operates on MainWindow widgets (self.nav_btns, self.cat_list, ...) through the
 mixin.
 """
@@ -44,40 +44,21 @@ class _NavMixin:
 
     @staticmethod
     def _nav_key_for_mode(mode: str) -> str:
-        """The nav entry a mode lights: Watched is History's second filter,
-        not an entry of its own."""
-        return "history" if mode == "watched" else mode
+        """The nav entry a mode lights: Mine's for its lists (Favorites,
+        Watch later, History and its Watched filter), else the mode's own."""
+        from ..core import places
+        return places.nav_of_mode(mode)
 
     def _check_nav(self, key: str) -> None:
         for k, b in self.nav_btns.items():
             b.setChecked(k == key)
 
     def _on_nav_clicked(self, key: str) -> None:
-        """A nav entry clicked. Home swaps the central stack, the Guide and
-        Search show their pages in the middle pane (the same calls their
-        shortcuts make), History comes back to the filter last chosen; the
-        rest are modes.
-        The entry of the list under the Guide page just takes the page away:
-        that list is still there, as it was left."""
-        if key == "home":
-            self._show_home_page()
-        elif key == "guide":
-            self._open_epg_guide()
-        elif key == "search":
-            self._open_search_page()
-        elif ((self._guide_page_showing() or self._series_page_showing()
-               or self._search_page_showing())
-                and key == self._nav_key_for_mode(self.mode)):
-            self._close_guide_page()
-            self._close_series_page()
-            self._close_search_page()
-            self._check_nav(key)
-            self.listw.setFocus()
-        elif key == "history":
-            self.switch_mode(
-                "watched" if self._history_filter == "watched" else "history")
-        else:
-            self.switch_mode(key)
+        """A nav entry clicked: its place (mw_places._show_place) - the Guide
+        and Search their pages over the list; the place shown again gives
+        the list back from under any page over it, as it was left."""
+        from ..core import places
+        self._show_place(places.PLACE_OF_NAV.get(key, key))
 
     # -- History's All / Watched -----------------------------------------------
 
@@ -104,7 +85,7 @@ class _NavMixin:
         """What the nav shows, all of it already known - nothing here asks
         the network: recordings running now, episodes of followed series that
         arrived since the series was last opened, what waits under Watch
-        later."""
+        later (on Mine, which holds it)."""
         rec = getattr(self, "rec", None)
         followed = getattr(self, "followed", None)
         wl = getattr(self, "watchlist", None)
@@ -113,22 +94,23 @@ class _NavMixin:
             "series": (sum(len(r.get("new") or [])
                            for r in followed.with_new())
                        if followed is not None else 0),
-            "watchlist": (len(wl.movies) + len(wl.shows)
-                          if wl is not None else 0),
+            "mitt": (len(wl.movies) + len(wl.shows)
+                     if wl is not None else 0),
         }
 
     def _refresh_nav_status(self) -> None:
         """Put the status on its entries: a red dot on Recordings while
         anything records, a pill with the new episodes on Series, a muted
-        count on Watch later - dots in the icon's corner on the rail."""
+        count of Watch later on Mine - dots in the icon's corner on the
+        rail."""
         btns = getattr(self, "nav_btns", None)
         if not btns:
             return
         st = self._nav_status()
-        kinds = {"rec": "dot", "series": "pill", "watchlist": "count"}
+        kinds = {"rec": "dot", "series": "pill", "mitt": "count"}
         words = {"rec": tr("nav_status_recording", n=st["rec"]),
                  "series": tr("nav_status_new_episodes", n=st["series"]),
-                 "watchlist": tr("nav_status_watchlist", n=st["watchlist"])}
+                 "mitt": tr("nav_status_watchlist", n=st["mitt"])}
         for key, kind in kinds.items():
             b = btns.get(key)
             if b is None:
@@ -575,19 +557,6 @@ class _NavMixin:
             cache.clear()
         cache[cache_key] = pm
         return pm
-
-    def _on_library_toggle(self, collapsed: bool) -> None:
-        """Fold the MINE group (Favorites, Watch later, History) behind its
-        disclosure arrow, the same gesture as the Categories header. On the
-        collapsed icon rail the group is always shown (its header/arrow are
-        hidden there), so the collapse only applies to the expanded sidebar."""
-        self._lib_toggle.setArrowType(
-            Qt.ArrowType.RightArrow if collapsed else Qt.ArrowType.DownArrow)
-        if hasattr(self, "_library_box"):
-            rail = getattr(self, "_sidebar_collapsed", False)
-            self._library_box.setVisible(rail or not collapsed)
-        if self.settings is not None:
-            self.settings.setValue("library_collapsed", collapsed)
 
     def _apply_cat_solo(self) -> None:
         if not hasattr(self, "cat_list"):

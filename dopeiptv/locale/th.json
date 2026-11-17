@@ -2976,5 +2976,14 @@
   "card_grid": "ตาราง",
   "card_list": "รายการ",
   "card_compact": "กะทัดรัด",
-  "card_airy": "โปร่ง"
+  "card_airy": "โปร่ง",
+  "nav_mine": "ของฉัน",
+  "set_page_mine_sub": "ซีรีส์ที่คุณติดตามและตอนใหม่",
+  "set_card_start": "เริ่มต้น",
+  "set_start_place": "เปิดที่",
+  "set_start_place_hint": "ตำแหน่งที่ค้างไว้แยกตามโปรไฟล์",
+  "start_place_last": "ที่ค้างไว้",
+  "start_place_mine": "ของฉันเสมอ",
+  "set_popular_where": "ด้านบนของ",
+  "set_popular_note": "ภาพยนตร์และซีรีส์ยอดนิยมประจำสัปดาห์บน TMDB ที่แหล่งของคุณมี"
 }

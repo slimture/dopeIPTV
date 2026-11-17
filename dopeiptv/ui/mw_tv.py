@@ -36,7 +36,7 @@ TV mode, its key, the View menu, tv_command, the picture's own way out of
 full screen (its button, a double click: TV mode is that full screen), and
 the window manager taking full screen away. While it is on it holds the
 central stack: what moves the window's own pages meanwhile (switch_mode,
-Home) only changes where leaving lands (_tv_land_on).
+a place) only changes where leaving lands (_tv_land_on).
 
 Its page is drawn complete or not at all: from the moment TV mode is asked
 until the window manager has made the window full screen, a plain curtain

@@ -280,31 +280,27 @@ pump()
 assert w._guide_window is None and w._guide_grid is None
 untouched()
 
-# -- from Home: the page, and Esc goes back to Home ---------------------------
-s.setValue("home_enabled", "true")
-w._show_home_page()
+# -- from Mine: the page, and Esc goes back to Mine ---------------------------
+w._show_place("mitt")
 pump()
-assert w._home_showing()
-w._home_page._open_guide()
+assert w._place == "mitt" and w.nav_btns["mitt"].isChecked()
+w._shortcut_epg_guide()
 pump(20)
-assert not w._home_showing() and w._guide_page_showing() and guide.isChecked()
-from_home = w._guide_grid
+assert w._guide_page_showing() and guide.isChecked() and w._list_place == "mitt"
+from_mine = w._guide_grid
 w._shortcut_epg_guide()                  # its key again: the same guide
 pump()
-assert w._guide_grid is from_home and w._guide_page_showing()
+assert w._guide_grid is from_mine and w._guide_page_showing()
 w._on_escape()
 pump()
-assert w._home_showing() and w.nav_btns["home"].isChecked()
-assert not w._guide_page_showing()
-# Home over the page takes the page away too.
-w._leave_home()
+assert w._place == "mitt" and w.nav_btns["mitt"].isChecked()
+assert not w._guide_page_showing() and w.mode in ("fav", "watchlist", "history", "watched")
+# Another place over the page takes the page away too.
 w._shortcut_epg_guide()
 pump()
-w._show_home_page()
+w._show_place("films")
 pump()
-assert not w._guide_page_showing()
-w._leave_home()
-pump()
+assert not w._guide_page_showing() and w.nav_btns["vod"].isChecked()
 assert not guide.isChecked()
 untouched()
 print("GUIDE_PAGE_OK", flush=True)

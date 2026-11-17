@@ -62,7 +62,7 @@ OLD_MAIN = {
     "theme": "nord", "accent": "green", "theme_follow_system": "false",
     "audio_lang": "swe", "sub_mode": "lang", "sub_lang": "eng", "sub_lang2": "swe",
     "track_prefs": json.dumps({"vod:30": {"aid": 2}}),
-    "home_sh_resume": "true", "home_sh_pop_movies": "false",
+    "last_place": "films", "last_list_place": "films",
     "trakt_access_token": "tok", "trakt_refresh_token": "ref", "trakt_expires_at": 99,
     "simkl_access_token": "stok",
     # The household's.
@@ -106,7 +106,8 @@ def test_the_split_is_declared_in_one_place():
                 "resume_positions_a", "epg_reminders_a", "followed_series_a", "viewing_stats",
                 "trakt_watched_cache", "trakt_watchlist_cache", "trakt_access_token",
                 "simkl_access_token", "recent_searches", "theme", "accent", "audio_lang",
-                "sub_lang", "sub_lang2", "sub_mode", "home_sh_resume", "track_prefs"):
+                "sub_lang", "sub_lang2", "sub_mode", "last_place", "last_list_place",
+                "track_prefs"):
         assert profiles.is_own(key), key
     for key in profiles.SHARED_EXAMPLES:
         assert not profiles.is_own(key), key

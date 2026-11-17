@@ -2976,5 +2976,14 @@
   "card_grid": "Siatka",
   "card_list": "Lista",
   "card_compact": "Kompaktowy",
-  "card_airy": "Przestronny"
+  "card_airy": "Przestronny",
+  "nav_mine": "Moje",
+  "set_page_mine_sub": "Seriale, które obserwujesz, i ich nowe odcinki",
+  "set_card_start": "Uruchamianie",
+  "set_start_place": "Otwieraj na",
+  "set_start_place_hint": "Miejsce, w którym skończyłeś, każdy profil pamięta osobno.",
+  "start_place_last": "Tam, gdzie skończyłeś",
+  "start_place_mine": "Zawsze na Moje",
+  "set_popular_where": "Na górze",
+  "set_popular_note": "Najpopularniejsze filmy i seriale tygodnia na TMDB - te, które ma twoje źródło."
 }

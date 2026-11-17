@@ -80,14 +80,12 @@ class _FollowMixin:
         self._refresh_nav_status()
         name = it.get("name") or it.get("title") or ""
         self._show_toast(tr("follow_off_toast", name=name), 4000)
-        if self._home_showing():
-            self._home_page.refresh()
+        self._refresh_places("follow")
 
     def _follow_mark_seen(self, series_id: Any) -> None:
         self.followed.seen(series_id)
         self._refresh_nav_status()
-        if self._home_showing():
-            self._home_page.refresh()
+        self._refresh_places("follow")
 
     def _follow_entered(self, series_id: Any, info: Any,
                         episodes: list) -> Any:
@@ -160,16 +158,15 @@ class _FollowMixin:
         else:
             text = tr("follow_new_series", n=len(fresh))
         log.info("follow: %s", text)
-        # Switched off under Settings -> Home: no toast and no desktop
-        # notification, but the shelf and the episode dots still show them.
+        # Switched off under Settings -> Mine: no toast and no desktop
+        # notification, but Mine and the episode dots still show them.
         if self.settings.value("follow_notify", "true") == "true":
             self._show_toast(text, 6000)
             if not self.isActiveWindow():
                 from ..services.notify import notify
                 notify(tr("home_new_episodes"), text,
                        self._follow_image(fresh[0][0]))
-        if self._home_showing():
-            self._home_page.refresh()
+        self._refresh_places("follow")
 
     def _follow_image(self, snap: dict) -> str:
         """The series' cover from the image cache, as a file the desktop can

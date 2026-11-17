@@ -179,9 +179,9 @@ class _PrivacyMixin:
                 self._load_items(getattr(self, "_history_subcat", None))
             except Exception:
                 pass
-        refresh = getattr(self, "_apply_home_settings", None)
+        refresh = getattr(self, "_refresh_places", None)
         if callable(refresh):
             try:
-                refresh()
+                refresh("clear")
             except Exception:
                 pass

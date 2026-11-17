@@ -545,7 +545,6 @@ from dopeiptv.ui import theme
 
 i18n.set_language("en")
 s = QSettings(os.path.join(tempfile.mkdtemp(), "s.ini"), QSettings.Format.IniFormat)
-s.setValue("home_enabled", "false")
 s.setValue("check_updates", "false")
 store = PlaylistStore(s)
 pl = store.add({"name": "Pirat", "server": "http://pirat.invalid", "username": "u", "password": "p"})
@@ -752,9 +751,12 @@ w._chan_entry_show("12", 2500)
 assert hub.note_text() == tr("chan_entry", num="12") and hub.messages() == []
 w._chan_entry_show("", 0)
 assert hub.note_text() == ""
-# Home has no sidebar: the line at the same corner, a decision above it.
-s.setValue("home_enabled", "true")
-w._show_home_page()
+# A page with no sidebar (one over the whole window, in the central stack):
+# the line at the same corner, a decision above it.
+from PyQt6.QtWidgets import QWidget as _W
+over = _W()
+w._center_stack.addWidget(over)
+w._center_stack.setCurrentWidget(over)
 job = hub.start(tr("sync_running"), kind="sync")
 w._show_action_toast("Port 3673 is taken", 15000, lambda: None, decide=True)
 pump(10)

@@ -2976,5 +2976,14 @@
   "card_grid": "グリッド",
   "card_list": "リスト",
   "card_compact": "コンパクト",
-  "card_airy": "ゆったり"
+  "card_airy": "ゆったり",
+  "nav_mine": "マイリスト",
+  "set_page_mine_sub": "フォロー中のシリーズと新しいエピソード",
+  "set_card_start": "起動",
+  "set_start_place": "起動時に開く画面",
+  "set_start_place_hint": "前回の場所はプロフィールごとに記憶されます。",
+  "start_place_last": "前回の場所",
+  "start_place_mine": "常にマイリスト",
+  "set_popular_where": "上部に表示",
+  "set_popular_note": "今週TMDBで人気の映画とシリーズのうち、ソースにあるもの。"
 }

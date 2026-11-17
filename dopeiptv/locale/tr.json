@@ -2976,5 +2976,14 @@
   "card_grid": "Izgara",
   "card_list": "Liste",
   "card_compact": "Sıkışık",
-  "card_airy": "Ferah"
+  "card_airy": "Ferah",
+  "nav_mine": "Benim",
+  "set_page_mine_sub": "Takip ettiğin diziler ve yeni bölümleri",
+  "set_card_start": "Başlangıç",
+  "set_start_place": "Açılış yeri",
+  "set_start_place_hint": "Kaldığın yer her profilin kendisine aittir.",
+  "start_place_last": "Kaldığın yer",
+  "start_place_mine": "Her zaman Benim",
+  "set_popular_where": "Şunun en üstünde",
+  "set_popular_note": "TMDB'de bu haftanın en popüler filmleri ve dizileri - kaynağında olanlar."
 }

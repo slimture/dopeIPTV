@@ -447,7 +447,6 @@ def settle(cond, secs=10):
 
 tmp = tempfile.mkdtemp()
 s = QSettings(os.path.join(tmp, "s.ini"), QSettings.Format.IniFormat)
-s.setValue("home_enabled", "false")
 # A key of the user's for the old guide search: the Search page's now.
 s.setValue(shortcut_keys.SETTING, '{"epg_search": "Ctrl+Alt+S"}')
 store = PlaylistStore(s)
@@ -502,7 +501,7 @@ settle(lambda: w.list_model.rowCount() > 0)
 # -- its key (the user's own for the guide search), its entry ------------------------
 assert w.shortcut_sequence("epg_search") == "Ctrl+Alt+S"
 nav = w.nav_btns["search"]
-assert list(w.nav_btns)[:2] == ["home", "search"] and nav.text() == tr("nav_search")
+assert list(w.nav_btns)[5] == "search" and nav.text() == tr("nav_search")   # the last of the upper places
 w._shortcut_run("epg_search")
 pump()
 page = w._search_page

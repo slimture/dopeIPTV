@@ -57,14 +57,8 @@ PRESET = {
     "mv_frameless": "false", "mv_on_top": "true", "mv_remember_geo": "false",
     "mv_stop_docked": "false", "mv_new_unmuted": "false",
     "mv_conflict_mode": "keep", "mv_autohide_secs": "7",
-    "mv_seek_step_min": "12", "mv_cells": "9", "home_enabled": "false",
-    "home_start": "true", "home_sh_resume": "false",
-    "home_sh_new_eps": "false", "home_sh_fav": "true",
-    "home_sh_history": "false", "home_sh_watchlist": "true",
-    "home_sh_movies": "false", "home_sh_series": "true",
-    "home_sh_channels": "false", "follow_notify": "false",
-    "home_sh_pop_movies": "true", "home_sh_pop_series": "false",
-    "home_sh_hero": "false",
+    "mv_seek_step_min": "12", "mv_cells": "9", "start_place": "mitt",
+    "follow_notify": "false", "popular_movies": "true", "popular_series": "false",
 }
 for k, v in PRESET.items():
     s.setValue(k, v)
@@ -111,12 +105,13 @@ def flip_and_ok(labels):
 from dopeiptv.i18n import tr
 flip_and_ok({tr("setting_autoplay_preview"), tr("set_upcoming_prompt"),
              tr("setting_deinterlace"), tr("mv_set_titlebar"),
-             tr("set_home_show")})
+             tr("set_follow_notify")})
 assert s.value("autoplay_preview") == "true"
 assert s.value("hide_upcoming_prompt") == "false"   # stored inverted
 assert s.value("video_deinterlace") == "false"
 assert s.value("mv_frameless") == "true"            # stored inverted
-assert s.value("home_enabled") == "true"
+assert s.value("follow_notify") == "true"
+assert s.value("start_place") == "mitt"             # kept as it was
 
 # 3. Search narrows the pages; nothing found says so.
 def search_and_cancel(self):
@@ -245,7 +240,7 @@ def layout(self):
             for i in range(nav.count())]
     keys = [k for k, _f in rows if k]
     assert keys[:6] == ["playback", "audio", "guide", "multiview", "recording", "casting"], keys
-    assert keys[6:10] == ["playlists", "home", "local", "metadata"], keys
+    assert keys[6:10] == ["playlists", "mine", "local", "metadata"], keys
     nerd_pages = ["nerd_net", "nerd_boxes", "nerd_player", "nerd_serve", "nerd_diag"]
     assert keys[-6:] == ["nerd"] + nerd_pages, keys
     at = {k: i for i, (k, _f) in enumerate(rows) if k}

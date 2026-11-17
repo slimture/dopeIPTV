@@ -733,7 +733,7 @@ class _PhoneBrowseMixin:
         return self._pb_play_movie(row, float(row.get("_resume_pos") or 0))
 
     def _pb_play_history(self, it: dict) -> bool:
-        """A History row, as Home replays one: from its stored address and
+        """A History row, as Mine replays one: from its stored address and
         kind, an episode under its series."""
         kind = str(it.get("_kind") or "live")
         if kind == "radio":

@@ -89,14 +89,17 @@ OWN_KEYS = frozenset({
     "track_prefs",
     # The season last picked on each series' page (ui/mw_series_page.py).
     "series_seasons",
+    # Where each person left off: the app opens there (core/places.py).
+    "last_place", "last_list_place",
 })
 #: Families: the name itself or the name + "_<source id>" (and the
 #: favourites' "_locked" / "_colors" beside it).
 OWN_FAMILIES = ("favorites", "movie_favorites", "series_favorites",
                 "radio_favorites", "web_favorites", "history",
                 "resume_positions", "epg_reminders", "followed_series")
-#: Prefixes: Home's shelves.
-OWN_PREFIXES = ("home_sh_",)
+#: Prefixes of a profile's own keys (none since Home's shelves went: they
+#: are carried over and taken away by core/places.retire_home).
+OWN_PREFIXES: tuple[str, ...] = ()
 
 #: The stores that keep a profile's own, by what they keep (core/stores.py,
 #: services/resume.py, services/reminders.py, core/viewing_stats.py).
@@ -125,7 +128,7 @@ SHARED_EXAMPLES = ("playlists", "active_playlist", "recording_jobs", "recordings
                    "stream_format", "cache_secs", "hwdec_mode", "volume",
                    "window_geometry", "splitter_state", "language",
                    "parental_pin_hash", "parental_salt", "epg_delay_min",
-                   "trakt_client_id", "trakt_client_secret", "home_enabled",
+                   "trakt_client_id", "trakt_client_secret", "start_place",
                    "donate_ask", "donate_until", "donate_period",
                    "donate_period_end", "donate_first_seen",
                    K_LIST, K_ACTIVE, K_ASK, K_MIGRATED, K_REMOVED)

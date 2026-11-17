@@ -2976,5 +2976,14 @@
   "card_grid": "Πλέγμα",
   "card_list": "Λίστα",
   "card_compact": "Συμπαγές",
-  "card_airy": "Αραιό"
+  "card_airy": "Αραιό",
+  "nav_mine": "Δικά μου",
+  "set_page_mine_sub": "Οι σειρές που ακολουθείτε και τα νέα τους επεισόδια",
+  "set_card_start": "Έναρξη",
+  "set_start_place": "Άνοιγμα σε",
+  "set_start_place_hint": "Το σημείο όπου σταματήσατε το κρατά κάθε προφίλ χωριστά.",
+  "start_place_last": "Όπου σταματήσατε",
+  "start_place_mine": "Πάντα στα Δικά μου",
+  "set_popular_where": "Στην κορυφή του",
+  "set_popular_note": "Οι πιο δημοφιλείς ταινίες και σειρές της εβδομάδας στο TMDB - όσες έχει η πηγή σας."
 }

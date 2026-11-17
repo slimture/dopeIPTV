@@ -2976,5 +2976,14 @@
   "card_grid": "گرڈ",
   "card_list": "فہرست",
   "card_compact": "مختصر",
-  "card_airy": "کشادہ"
+  "card_airy": "کشادہ",
+  "nav_mine": "میرا",
+  "set_page_mine_sub": "وہ سیریز جنہیں آپ فالو کرتے ہیں اور ان کی نئی اقساط",
+  "set_card_start": "آغاز",
+  "set_start_place": "یہاں کھولیں",
+  "set_start_place_hint": "جہاں آپ نے چھوڑا تھا، وہ ہر پروفائل کا اپنا ہوتا ہے۔",
+  "start_place_last": "جہاں آپ نے چھوڑا تھا",
+  "start_place_mine": "ہمیشہ میرا پر",
+  "set_popular_where": "سب سے اوپر",
+  "set_popular_note": "اس ہفتے TMDB پر سب سے مقبول فلمیں اور سیریز - جو آپ کے ذریعے میں ہیں۔"
 }

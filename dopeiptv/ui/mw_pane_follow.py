@@ -147,7 +147,7 @@ class _PaneFollowMixin:
             if callable(elsewhere) and elsewhere():
                 return False        # another source's channel: no row of these lists
         if str(getattr(self, "_pending_jump_key", None)) == key:
-            return True             # on its way there already (Home, the guide)
+            return True             # on its way there already (the guide)
         if self._pane_shows(kind, key, lp):
             return True
         if kind == "episode":
@@ -177,7 +177,7 @@ class _PaneFollowMixin:
     def _pane_shows(self, kind: str, key: str, lp: dict) -> bool:
         """Whether the pane shows what plays now - the list holding its row
         (then selected), or the series' page of its series."""
-        if self._home_showing() or self._search_page_showing() or self._guide_page_showing():
+        if self._search_page_showing() or self._guide_page_showing():
             return False
         if self._series_page_showing():
             if kind != "episode":
@@ -231,10 +231,8 @@ class _PaneFollowMixin:
         return True
 
     def _pane_leave_pages(self) -> None:
-        """Home, the Guide, Search and a series' page give way to the list,
-        as their Back to it does."""
-        if self._home_showing():
-            self._leave_home()
+        """The Guide, Search and a series' page give way to the list, as
+        their Back to it does."""
         self._close_guide_page()
         self._close_series_page()
         self._close_search_page()

@@ -3200,6 +3200,15 @@ _STRINGS: dict[str, dict[str, str]] = {
     "card_list": {"en": "List"},
     "card_compact": {"en": "Compact"},
     "card_airy": {"en": "Airy"},
+    "nav_mine": {"en": "Mine"},
+    "set_page_mine_sub": {"en": "The series you follow and their new episodes"},
+    "set_card_start": {"en": "Start"},
+    "set_start_place": {"en": "Open on"},
+    "set_start_place_hint": {"en": "Where you left off is each profile's own."},
+    "start_place_last": {"en": "Where you left off"},
+    "start_place_mine": {"en": "Always on Mine"},
+    "set_popular_where": {"en": "At the top of"},
+    "set_popular_note": {"en": "This week's most popular movies and series on TMDB - the ones your source has."},
 }
 
 

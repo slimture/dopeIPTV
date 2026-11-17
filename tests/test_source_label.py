@@ -164,8 +164,9 @@ assert "Pirat · Xtream" in lbl.toolTip() and tr("source_label_hint") in lbl.too
 assert lbl.accessibleName() == tr("source_label_name", name="Pirat · Xtream")
 cats = w._cat_section_label
 assert lbl.mapTo(w, lbl.rect().bottomLeft()).y() <= cats.mapTo(w, cats.rect().topLeft()).y()
+last = w.nav_btns["rec"]                     # the places, then the source
 assert lbl.mapTo(w, lbl.rect().topLeft()).y() >= \
-    w._library_box.mapTo(w, w._library_box.rect().bottomLeft()).y()
+    last.mapTo(w, last.rect().bottomLeft()).y()
 
 # -- the status line: the list's source, nothing playing ----------------------------
 assert w.list_model.rowCount() > 0

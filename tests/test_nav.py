@@ -1,11 +1,12 @@
-"""The sidebar's navigation: places on top (Home, TV, Guide, Movies, Series,
-Recordings, Local files), MINE (Favourites, Watch later, History) under
-them, the source's avatar and Settings at the foot (tests/
-test_sidebar_foot.py has the foot itself). The Guide is a place too,
-its page in the middle pane; Watched is History's second filter; the
-entries carry a quiet status (a recording running, new episodes, what waits
-under Watch later); the selected entry is a light wash with a leading bar;
-the rail keeps its groups apart with hairlines."""
+"""The sidebar's navigation - the app's places (core/places.py,
+ui/mw_places.py): Mine, TV, Movies, Series, Guide, Search, a hairline, then
+Local files, Radio, Recordings; no Home. The source's avatar and Settings
+at the foot (tests/test_sidebar_foot.py has the foot itself). Mine holds
+Favorites, Watch later and History as tabs in the place's header; the Guide
+is a place too, its page in the middle pane; Watched is History's second
+filter; the entries carry a quiet status (a recording running, new episodes,
+what waits under Watch later - on Mine); the selected entry is a light wash
+with a leading bar; the rail keeps its groups apart with a hairline."""
 from __future__ import annotations
 
 import os
@@ -157,21 +158,20 @@ pump(30)
 w._set_sidebar_collapsed(False)
 pump(10)
 
-# -- the order: places, MINE, the foot ----------------------------------------
-places = ["home", "search", "live", "guide", "vod", "series", "rec", "local", "radio"]
-mine = ["fav", "watchlist", "history"]
-assert list(w.nav_btns) == places + mine, list(w.nav_btns)
-assert "watched" not in w.nav_btns
+# -- the order: the places, a hairline, the lower places, the foot ------------
+upper = ["mitt", "live", "vod", "series", "guide", "search"]
+lower = ["local", "radio", "rec"]
+assert list(w.nav_btns) == upper + lower, list(w.nav_btns)
+assert not ({"home", "fav", "watchlist", "history", "watched"} & set(w.nav_btns))
 content = w._side      # the part that scrolls and the foot under it
 def y(widget):
     return widget.mapTo(content, widget.rect().topLeft()).y()
-ys = [y(w.nav_btns[k]) for k in places] + [y(w._lib_header)] + [y(w.nav_btns[k]) for k in mine]
+ys = [y(w.nav_btns[k]) for k in upper] + [y(w._places_rule)] + [y(w.nav_btns[k]) for k in lower]
 assert ys == sorted(ys) and len(set(ys)) == len(ys), ys
-assert all(w.nav_btns[k].property("primary") == "true" for k in places)
-assert all(w.nav_btns[k].property("primary") == "false" for k in mine)
-assert all(w.nav_btns[k].parentWidget() is w._library_box for k in mine)
-assert w._lib_section_label.text() == tr("sidebar_mine") == "MITT"
+assert all(b.property("primary") == "true" for b in w.nav_btns.values())
+assert w.nav_btns["mitt"].text() == tr("nav_mine") == "Mitt"
 assert w.nav_btns["guide"].text() == tr("nav_guide")
+assert not hasattr(w, "_lib_header") and not hasattr(w, "_home_page")
 # Settings at the foot, under its hairline: an icon, its name in the tooltip.
 # Multiview has left the sidebar (the menu bar's View group has it).
 assert y(w.cat_list) < y(w._bottom_rule) < y(w._settings_btn)
@@ -183,6 +183,7 @@ assert all(not b.icon().isNull() for b in w.nav_btns.values())
 # -- the guide: a place, its page in the middle pane --------------------------
 w.switch_mode("live")
 pump()
+assert w._place == "tv" and w.nav_btns["live"].isChecked()
 w.all_items = [{"name": "Kanal", "stream_id": 1}]
 guide = w.nav_btns["guide"]
 assert guide.isCheckable()
@@ -190,55 +191,63 @@ guide.click()
 pump()
 assert w._guide_page_showing() and len(w._guide_grid.channels) == 1
 assert guide.isChecked() and not w.nav_btns["live"].isChecked()
-assert w.mode == "live"
+assert w.mode == "live" and w._place == "guide" and w._list_place == "tv"
 # TV, the list under it, takes the page away; the list is as it was.
 w.nav_btns["live"].click()
 pump()
-assert not w._guide_page_showing()
+assert not w._guide_page_showing() and w._place == "tv"
 assert w.nav_btns["live"].isChecked() and not guide.isChecked()
-# Its shortcut opens it the same way.
+# Its shortcut opens it the same way; leaving it is back on TV.
 w._shortcut_epg_guide()
 assert w._guide_page_showing() and guide.isChecked()
 w._leave_guide_page()
-assert w.mode == "live" and w.nav_btns["live"].isChecked()
+assert w.mode == "live" and w.nav_btns["live"].isChecked() and w._place == "tv"
 
-# -- Watched: History's second filter ------------------------------------------
-w.switch_mode("watched")
+# -- Mine: Favorites, Watch later and History as the header's tabs -----------
+w.nav_btns["mitt"].click()
 pump()
-assert w.mode == "watched"
-assert w.nav_btns["history"].isChecked() and not w.nav_btns["live"].isChecked()
+assert w.mode == "fav" and w._place == "mitt" and w.nav_btns["mitt"].isChecked()
+head = w._place_header
+assert head.title.text() == tr("nav_mine")
+assert head.switch.keys() == ["fav", "watchlist", "history"] and head.view_key() == "fav"
+assert [b.text() for b in head.switch.buttons] == [tr("nav_favorites"), tr("nav_watchlist"),
+                                                   tr("nav_history")]
+head.switch.buttons[1].click()
+pump()
+assert w.mode == "watchlist" and w.nav_btns["mitt"].isChecked() and w._place == "mitt"
+head.switch.buttons[2].click()
+pump()
+assert w.mode == "history" and w._place == "mitt"
+# Watched: History's second filter, still Mine's History tab.
 chips = w._history_chip_btns
 assert not w._history_chips.isHidden()
-assert chips["watched"].isChecked() and not chips["all"].isChecked()
-assert chips["all"].text() == tr("history_chip_all") and chips["watched"].text() == tr("history_chip_watched")
-chips["all"].click()
-pump()
-assert w.mode == "history" and chips["all"].isChecked() and w.nav_btns["history"].isChecked()
 chips["watched"].click()
 pump()
-assert w.mode == "watched"
-# Remembered while the app runs: History comes back to Watched.
-w.switch_mode("live")
+assert w.mode == "watched" and head.view_key() == "history" and w.nav_btns["mitt"].isChecked()
+assert chips["all"].text() == tr("history_chip_all") and chips["watched"].text() == tr("history_chip_watched")
+# Remembered while the app runs: Mine comes back to History's Watched.
+w.nav_btns["vod"].click()
 pump()
-assert w._history_chips.isHidden()
-w.nav_btns["history"].click()
+assert w.mode == "vod" and w._place == "films" and head.title.text() == tr("nav_movies")
+assert head.switch.isHidden()
+w.nav_btns["mitt"].click()
 pump()
 assert w.mode == "watched" and chips["watched"].isChecked()
 chips["all"].click()
-w.switch_mode("vod")
-w.nav_btns["history"].click()
 pump()
 assert w.mode == "history"
-# Home and back lights History again for Watched.
-w.switch_mode("watched")
-w._show_home_page()
-assert w.nav_btns["home"].isChecked() and not w.nav_btns["history"].isChecked()
-w._leave_home()
-assert w.nav_btns["history"].isChecked() and w.mode == "watched"
+# Every other place: its list, its entry lit, its name in the header.
+for key, place, mode in (("live", "tv", "live"), ("vod", "films", "vod"),
+                         ("series", "series", "series"), ("local", "local", "local"),
+                         ("radio", "radio", "radio"), ("rec", "rec", "rec")):
+    w.nav_btns[key].click()
+    pump()
+    assert w.mode == mode and w._place == place and w.nav_btns[key].isChecked(), key
+    assert [k for k, b in w.nav_btns.items() if b.isChecked()] == [key]
 w.switch_mode("live")
 pump()
 
-# -- status: recording, new episodes, watch later ------------------------------
+# -- status: recording, new episodes, watch later on Mine ----------------------
 rec = w.nav_btns["rec"]
 assert rec.badge() == (None, 0)
 w.rec.stop_inplayer_cb = lambda: None
@@ -251,13 +260,13 @@ pump()
 assert rec.badge() == (None, 0), rec.badge()
 assert rec.toolTip() == tr("nav_recordings")
 
-wl = w.nav_btns["watchlist"]
-assert wl.badge() == (None, 0)
+mine = w.nav_btns["mitt"]
+assert mine.badge() == (None, 0)
 film = {"name": "Film", "stream_id": 5, "_tmdb_id": 42}
 w._add_watchlist(film, "vod", False)
-assert wl.badge() == ("count", 1), wl.badge()
+assert mine.badge() == ("count", 1), mine.badge()
 w._remove_watchlist(film, "vod", False)
-assert wl.badge() == (None, 0), wl.badge()
+assert mine.badge() == (None, 0), mine.badge()
 
 ser = w.nav_btns["series"]
 assert ser.badge() == (None, 0)
@@ -287,15 +296,15 @@ pump(20)
 assert all(b.text() == "" for b in w.nav_btns.values())
 assert w._settings_btn.text() == ""
 assert w._settings_btn.toolTip() == tr("btn_settings")
-assert w._lib_header.isHidden() and not w._rail_rule_mine.isHidden()
-assert w._rail_rule_mine.isVisible() and w._bottom_rule.isVisible() and w._bottom_rule.is_rail()
-assert y(w.nav_btns["radio"]) < y(w._rail_rule_mine) < y(w.nav_btns["fav"])
-assert y(w.nav_btns["history"]) < y(w._bottom_rule) < y(w._settings_btn)
+assert w._places_rule.isVisible() and w._places_rule.is_rail()
+assert w._bottom_rule.isVisible() and w._bottom_rule.is_rail()
+assert y(w.nav_btns["search"]) < y(w._places_rule) < y(w.nav_btns["local"])
+assert y(w.nav_btns["rec"]) < y(w._bottom_rule) < y(w._settings_btn)
 assert rec.badge() == ("dot", 1)
 w.rec.finish_inplayer(job["id"], "stopped")
 w._set_sidebar_collapsed(False)
 pump(20)
-assert w._rail_rule_mine.isHidden() and not w._lib_header.isHidden()
+assert w._places_rule.isVisible() and not w._places_rule.is_rail()
 assert not w._bottom_rule.is_rail()
 assert w.nav_btns["guide"].text() == tr("nav_guide")
 assert w._settings_btn.toolTip() == tr("btn_settings")
@@ -303,9 +312,12 @@ assert w._settings_btn.toolTip() == tr("btn_settings")
 # -- a language switch renames all of it ---------------------------------------
 w._set_language("en")
 pump()
-assert w.nav_btns["guide"].text() == "Guide" and w._lib_section_label.text() == "MINE"
-assert w.nav_btns["home"].text() == "Home"
+assert w.nav_btns["guide"].text() == "Guide" and w.nav_btns["mitt"].text() == "Mine"
 assert w._settings_btn.toolTip() == "Settings" and chips["watched"].text() == "Watched"
+w.nav_btns["mitt"].click()
+pump()
+assert w._place_header.title.text() == "Mine"
+assert [b.text() for b in w._place_header.switch.buttons][0] == "Favorites"
 print("NAV_OK", flush=True)
 os._exit(0)
 """

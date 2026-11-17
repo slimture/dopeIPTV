@@ -585,7 +585,6 @@ from dopeiptv.ui.main_window import MainWindow
 
 app = QApplication.instance() or QApplication([])
 settings = QSettings(os.path.join(_tmp, "s.ini"), QSettings.Format.IniFormat)
-settings.setValue("home_enabled", "false")
 launched = []
 mw_mod.launch_player = lambda *a, **k: launched.append(a)   # never a real mpv
 w = MainWindow(DemoClient(), settings)
@@ -894,7 +893,6 @@ from dopeiptv.ui.main_window import MainWindow
 
 app = QApplication.instance() or QApplication([])
 settings = QSettings(os.path.join(_tmp, "s.ini"), QSettings.Format.IniFormat)
-settings.setValue("home_enabled", "false")
 launched = []
 mw_mod.launch_player = lambda *a, **k: launched.append(a)
 mw_series_page.launch_player = lambda *a, **k: launched.append(a)
@@ -1069,7 +1067,6 @@ from dopeiptv.ui.main_window import MainWindow
 
 app = QApplication.instance() or QApplication([])
 settings = QSettings(os.path.join(_tmp, "s.ini"), QSettings.Format.IniFormat)
-settings.setValue("home_enabled", "false")
 mw_mod.launch_player = lambda *a, **k: None
 mw_series_page.launch_player = lambda *a, **k: None
 
@@ -1131,7 +1128,7 @@ w.show_cast_strip(None)
 hist = {"_url": "http://x/series/u/p/2001.mkv", "_key": "2001", "_kind": "episode",
         "name": "Show 30 · S2 * E1 - Ep 1",
         "_series_ctx": {"series_id": 130, "name": "Show 30"}}
-w._ensure_home_page()._play_history(hist)
+w._replay_history_row(hist)              # Mine's History (mw_places)
 app.processEvents()
 lp = w._last_playback
 assert str(lp["key"]) == "2001" and (lp.get("series_ctx") or {}).get("series_id") == 130, lp

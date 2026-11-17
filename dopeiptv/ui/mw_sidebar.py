@@ -46,18 +46,10 @@ class _SidebarMixin:
         self._cat_section_label.setVisible(not collapsed)
         self.cat_solo_btn.setVisible(not collapsed)
         self.cat_list.setVisible(not collapsed)
-        # The MINE header (label and fold arrow) belongs to the expanded
-        # sidebar; on the rail a hairline with its gap stands between the
-        # places and MINE instead, so the groups still read as groups. MINE's
-        # icons always show on the rail (its fold applies only expanded).
-        if hasattr(self, "_lib_header"):
-            self._lib_header.setVisible(not collapsed)
-            self._lib_section_label.setVisible(not collapsed)
-            self._lib_toggle.setVisible(not collapsed)
-            self._library_box.setVisible(
-                collapsed or not self._lib_toggle.isChecked())
-        if hasattr(self, "_rail_rule_mine"):
-            self._rail_rule_mine.setVisible(collapsed)
+        # The hairline between the places' two groups: across the sidebar,
+        # a short stroke on the rail.
+        if hasattr(self, "_places_rule"):
+            self._places_rule.set_rail(collapsed)
         if hasattr(self, "_bottom_rule"):
             self._bottom_rule.set_rail(collapsed)
         # The rail's stand-in stretch item (see construction note).
@@ -193,8 +185,8 @@ class _SidebarMixin:
     def _update_mid_compact(self, *_a) -> None:
         if not hasattr(self, "_mid"):
             return
-        # A hidden pane (Home showing) reports a stale width - deciding from
-        # it left the strip in the wrong form; _leave_home recomputes later.
+        # A hidden pane (focus mode, TV mode) reports a stale width - deciding
+        # from it left the strip in the wrong form; it is shown again later.
         if not self._mid.isVisible():
             return
         # Muted during a fullscreen exit: the pane is shown again BEFORE the

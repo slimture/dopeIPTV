@@ -42,7 +42,7 @@ from dopeiptv.ui.settings_ui import Chip, SettingsPage, SettingsShell, ToggleSwi
 w = MainWindow(DemoClient(), s, PlaylistStore(s))
 GROUPS = [
     ("set_grp_watch", ["playback", "audio", "guide", "multiview", "recording", "casting"]),
-    ("set_grp_content", ["playlists", "home", "local", "metadata"]),
+    ("set_grp_content", ["playlists", "mine", "local", "metadata"]),
     ("set_grp_accounts", ["history", "sync", "integrations"]),
     ("set_sec_system", ["general", "appearance", "shortcuts", "profiles", "parental", "advanced"]),
     ("nerd_page", ["nerd", "nerd_net", "nerd_boxes", "nerd_player", "nerd_serve", "nerd_diag"]),

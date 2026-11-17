@@ -102,7 +102,8 @@ from .mw_source_label import _SourceLabelMixin
 from .mw_mpris import _MprisMixin
 from .mw_multiview import _MultiviewMixin
 from .mw_guide import _GuideMixin
-from .mw_home import _HomeMixin
+from .mw_places import _PlacesMixin
+from .mw_popular import _PopularMixin
 from .mw_local import _LocalFilesMixin
 from .mw_onboarding import _OnboardingMixin
 from .mw_popout import _PopoutMixin
@@ -156,7 +157,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _BusyMixin, _UpdatesMixin, _SearchMixin, _SidebarMixin,
                  _NavMixin, _SourceLabelMixin, _ShortcutsMixin, _PaletteMixin, _OnboardingMixin, _SortMixin,
                  _LocalFilesMixin, _RadioMixin, _WebStreamsMixin,
-                 _PopoutMixin, _MultiviewMixin, _HomeMixin, _GuideMixin,
+                 _PopoutMixin, _MultiviewMixin, _PlacesMixin, _PopularMixin, _GuideMixin,
                  _SeriesPageMixin, _SearchAllMixin, _MprisMixin,
                  _FollowMixin, _PaneFollowMixin, _SubtitlesMixin, _CastMixin, _AirPlayMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
@@ -325,6 +326,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._watched_sync_running = False
         self._raw_categories: list = []
         self.mode: str = "live"
+        # The place the app opens on (mw_places): where the person left off,
+        # or Mine - its list mode set before the first list is fetched.
+        self._init_places()
         self.all_items: list = []
         # Which Favorites section is showing: "chan", "movie" or
         # "series". Drives the content kind (poster vs live, play as
@@ -410,7 +414,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._size_to_screen()   # first run: fit the actual display
         QTimer.singleShot(0, self._restore_splitter_state)
         self._show_busy(tr("status_loading_channels"))
-        QTimer.singleShot(100, self._load_categories)
+        load_first = self._start_loader()
+        QTimer.singleShot(100, lambda: (load_first(), self._open_start_place()))
         # Learn which Browse modes this provider actually has, then hide the
         # empty ones (deferred so the visible category load goes first).
         QTimer.singleShot(150, self._refresh_mode_availability)
@@ -432,9 +437,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._auto_refresh_timer.timeout.connect(self._maybe_auto_refresh)
         self._auto_refresh_timer.start(5 * 60_000)
 
-        # Land on the Home page (if enabled) - the classic view keeps loading
-        # underneath, so leaving Home is instant.
-        self._maybe_open_home_at_start()
         # "Start in TV mode" (mw_tv), once the window is up.
         QTimer.singleShot(300, self._maybe_start_tv_mode)
         # "Who's watching?" over it all when there are several profiles
@@ -602,8 +604,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
         root = QSplitter(Qt.Orientation.Horizontal)
         root.setHandleWidth(6)
-        # The central area is a stack: page 0 is the classic three-column
-        # view, page 1 (added lazily) is the full-window Home section.
+        # The central area is a stack: page 0 is the three-column window;
+        # TV mode adds its page (mw_tv).
         self._center_stack = QStackedWidget()
         self._center_stack.addWidget(root)
         self.setCentralWidget(self._center_stack)
@@ -684,9 +686,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # programme bars on a timeline. Drawn, not emoji: every OS renders its
         # own emoji font differently.
         self._rail_glyphs = {
-            "home": "home", "search": "search", "live": "tv", "guide": "guide", "vod": "movie",
-            "series": "series", "rec": "rec", "local": "folder_o",
-            "radio": "radio", "fav": "star", "watchlist": "bookmark", "history": "clock",
+            "mitt": "star", "search": "search", "live": "tv", "guide": "guide", "vod": "movie",
+            "series": "series", "rec": "rec", "local": "folder_o", "radio": "radio",
         }
         self._nav_texts: dict[str, str] = {}
         self.nav_btns: dict[str, NavButton] = {}
@@ -719,68 +720,23 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.nav_btns[key] = b
             self._apply_nav_color(key)
 
-        # Places: where content lives, always at the top. Home first - it is
-        # not a MODE (it swaps the whole central stack) - then Search, across
-        # every source; it and the Guide are pages over the list, no modes
-        # either; _on_nav_clicked sends each where it belongs.
-        for key, text in (("home", tr("nav_home")), ("search", tr("nav_search")),
-                          ("live", tr("nav_tv")),
-                          ("guide", tr("nav_guide")),
-                          ("vod", tr("nav_movies")),
-                          ("series", tr("nav_series")),
-                          ("rec", tr("nav_recordings")),
-                          ("local", tr("nav_local")),
-                          ("radio", tr("nav_radio"))):
+        # The places - the app's structure (mw_places, core/places.py): Mine,
+        # TV, Movies, Series, the Guide and Search, a hairline, then Local
+        # files, Radio and Recordings. Mine holds what were Favorites, Watch
+        # later and History; there is no Home. _on_nav_clicked sends each
+        # entry to its place.
+        upper = (("mitt", tr("nav_mine")), ("live", tr("nav_tv")),
+                 ("vod", tr("nav_movies")), ("series", tr("nav_series")),
+                 ("guide", tr("nav_guide")), ("search", tr("nav_search")))
+        lower = (("local", tr("nav_local")), ("radio", tr("nav_radio")),
+                 ("rec", tr("nav_recordings")))
+        for key, text in upper:
             _make_nav(key, text, sl, primary=True)
-        self.nav_btns["home"].setVisible(self._home_enabled())
-
-        # The icon rail has no section headers: a hairline (and its gap)
-        # keeps the places apart from MINE there.
-        self._rail_rule_mine = SideRule()
-        self._rail_rule_mine.set_rail(True)
-        self._rail_rule_mine.hide()
-        sl.addWidget(self._rail_rule_mine)
-
-        # MINE: the user's own lists, under a collapsible disclosure header
-        # (same arrow affordance as Categories). Watched lives inside History
-        # as a filter. (The attributes keep their Library names; the folded
-        # state keeps its old setting, so it carries over.)
-        self._lib_header = QWidget()
-        lib_hdr = QHBoxLayout(self._lib_header)
-        lib_hdr.setContentsMargins(0, 8, 0, 0)
-        lib_hdr.setSpacing(4)
-        self._lib_section_label = QLabel(
-            tr("sidebar_mine"), objectName="SectionLabel")
-        self._lib_section_label.setMinimumWidth(0)
-        lib_hdr.addWidget(self._lib_section_label)
-        lib_hdr.addStretch()
-        self._lib_toggle = QToolButton(objectName="SectionToggle")
-        self._lib_toggle.setCheckable(True)
-        self._lib_toggle.setArrowType(Qt.ArrowType.DownArrow)
-        self._lib_toggle.setAutoRaise(True)
-        self._lib_toggle.setFixedSize(22, 18)
-        self._lib_toggle.setToolTip(tr("tooltip_toggle_mine"))
-        self._lib_toggle.toggled.connect(self._on_library_toggle)
-        lib_hdr.addWidget(self._lib_toggle)
-        sl.addWidget(self._lib_header)
-
-        # Container so the whole group collapses/reveals in one move. No
-        # stylesheet on it (a bare 'background' would cascade onto the child
-        # buttons and wipe their :checked colours - see the #SideContent note).
-        self._library_box = QWidget()
-        lib_lay = QVBoxLayout(self._library_box)
-        lib_lay.setContentsMargins(0, 0, 0, 0)
-        lib_lay.setSpacing(2)
-        for key, text in (("fav", tr("nav_favorites")),
-                          ("watchlist", tr("nav_watchlist")),
-                          ("history", tr("nav_history"))):
-            _make_nav(key, text, lib_lay)
-        # The box must not be stretchable: it holds fixed-height buttons, and a
-        # default Preferred policy let the layout balloon it when the rail has
-        # spare height, spreading the icons far apart.
-        self._library_box.setSizePolicy(QSizePolicy.Policy.Preferred,
-                                        QSizePolicy.Policy.Fixed)
-        sl.addWidget(self._library_box)
+        # Between the two groups, on the rail too: a hairline and its gap.
+        self._places_rule = SideRule()
+        sl.addWidget(self._places_rule)
+        for key, text in lower:
+            _make_nav(key, text, sl, primary=True)
         # Rail-only filler. Expanded, the CATEGORY LIST is the layout's stretch
         # item and soaks up the spare height - but on the icon rail it's
         # hidden, and a QVBoxLayout with no stretch item spreads its surplus
@@ -794,11 +750,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._rail_filler.hide()
         sl.addWidget(self._rail_filler, 1)
         self._apply_nav_icons()
-        self.nav_btns["live"].setChecked(True)
-        # Restore the remembered collapsed state (setChecked fires the handler).
-        if self.settings is not None:
-            self._lib_toggle.setChecked(
-                self.settings.value("library_collapsed", False, type=bool))
+        from ..core import places as _places
+        self.nav_btns[_places.nav_of_mode(self.mode)].setChecked(True)
 
         # The source the lists show, over its categories: its name, its kind
         # in a chip with two sources or more, the source menu on a click
@@ -976,6 +929,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # leaving a huge gap on the right (see channel_list._justify_grid).
         ml.setContentsMargins(0, 14, 0, 10)
         ml.setSpacing(10)
+        # The place's header over its list: its name, its count, Mine's tabs
+        # (mw_places, media_cards.PageHeader) - the form every place shares.
+        self._build_place_header(ml)
         # No loading strip over the list any more: it pushed the list down
         # and up as work came and went. What the app is doing is said in the
         # notices' corner (mw_busy, ui/notices.py).
@@ -2204,7 +2160,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self._guide_page_visible():
             self._leave_guide_page()
             return
-        # ...and a series' page goes back to the list (or Home) it came from.
+        # ...and a series' page goes back to the place it came from.
         if self._series_page_visible():
             self._leave_series_page()
             return
@@ -2508,18 +2464,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._update_playlist_btn()
             self._update_provider_hint()
             self._refresh_nav_status()      # this playlist's followed series
-            # Drop any Home media cached from the previous (or empty offline)
-            # provider so the new provider's Recently-added / Featured shelves
-            # actually populate - otherwise the empty result cached while the
-            # welcome overlay was up would linger for MEDIA_CACHE_SECS and Home
-            # would look blank right after the first playlist is added.
-            self._home_poster_cache = None
-            self._home_chan_cache = None
+            # Drop what was read of the previous (or empty offline) provider -
+            # it means nothing for this one.
             self._recent_cache = {}
             self._guide_source_changed()    # the old source's guide goes
             self._sp_source_changed()       # and a series' page of it
-            if self._home_showing():
-                self._home_page.refresh()
+            self._popular_changed()         # popular right now: this source's
+            self._refresh_places("source")  # the places' own pages
             # Switching rebuilds the list but loads the guide from cache when
             # fresh - no forced network reload. A manual Refresh or the auto-
             # refresh time setting still drives a real re-fetch.
@@ -2544,8 +2495,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     # -- modes and categories ------------------------------------------------------
 
     def switch_mode(self, mode: str) -> None:
-        # Any mode switch drops back from the Home page to the classic view
-        # (in TV mode: where leaving it lands - TV mode holds the window).
+        # Any mode switch shows the three-column window (in TV mode: where
+        # leaving it lands - TV mode holds the window).
         if getattr(self, "_center_stack", None) is not None and not self._tv_land_on(0):
             self._center_stack.setCurrentIndex(0)
         # ... and from the Guide page to the list - unless the guide itself
@@ -2584,6 +2535,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._sync_search_hint()
         self._load_categories()
         self._update_sync_btn()
+        # Its place is the one shown now (mw_places) - under a page that
+        # stays over it, the place it goes back to.
+        self._mode_place(mode)
         # Opening Watched is a good moment to pull the latest Trakt
         # history (respects the 1 h TTL, so it's a no-op if just synced).
         if mode == "watched":

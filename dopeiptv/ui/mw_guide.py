@@ -82,7 +82,6 @@ class _GuideMixin:
     _guide_page: GuidePage | None = None
     _guide_grid: EpgGrid | None = None
     _guide_window: EpgGridDialog | None = None
-    _guide_return_home = False
     _guide_gen = 0
 
     # -- where the guide is ------------------------------------------------------
@@ -107,36 +106,28 @@ class _GuideMixin:
     def _close_guide_page(self) -> None:
         """Put the list back in the middle pane. The guide is kept, hidden
         (its timers stop with it), for the next time."""
-        self._guide_return_home = False
         if self._guide_page_showing():
             self._mid_stack.setCurrentIndex(0)
 
     def _leave_guide_page(self) -> None:
-        """Back where you were: Home if the guide was opened from there,
-        else the list you came from, with its entry lit again."""
+        """Back where you were: the place you came from, as it was left,
+        with its entry lit again (mw_places)."""
         if not self._guide_page_showing():
             return
-        home = self._guide_return_home
         self._close_guide_page()
-        if home and self._home_enabled():
-            self._show_home_page()
-            return
-        self._check_nav(self._nav_key_for_mode(self.mode))
-        self.listw.setFocus()
+        self._return_to_place()
 
     def _guide_category_clicked(self, _item=None) -> None:
         """A category picked in the sidebar while the Guide shows: its list,
         the way a nav entry leads to its own."""
         if self._guide_page_showing():
             self._close_guide_page()
-            self._check_nav(self._nav_key_for_mode(self.mode))
+            self._place_entered(self._list_place)
 
     def _relight_nav(self) -> None:
         """Light the entry of what the window shows (a click lit the Guide
         entry, but the guide came up in its window instead)."""
-        if self._home_showing():
-            self._check_nav("home")
-        elif self._guide_page_showing():
+        if self._guide_page_showing():
             self._check_nav("guide")
         elif self._search_page_showing():
             self._check_nav("search")
@@ -148,20 +139,14 @@ class _GuideMixin:
     def _open_epg_guide(self, global_scope: bool = False) -> None:
         """Open the TV guide: its page in the middle pane - or, popped out,
         its window brought forward. Scoped to the current list in TV /
-        Favorites mode; *global_scope* (Home's guide button) skips those -
-        whatever category the hidden classic view happens to have selected
-        is not a choice the user made from Home."""
+        Favorites mode; *global_scope* skips those (the whole line-up, or
+        the favourite channels)."""
         self._ensure_xmltv_loaded()
         if self._guide_window is not None:
             self._raise_guide_window()
             self._relight_nav()
             return
-        from_home = self._home_showing()
-        # Opened again while it shows (its key): still the guide Home opened,
-        # and Esc still goes back there.
-        back_home = from_home or (self._guide_page_showing()
-                                  and self._guide_return_home)
-        key, title, channels = self._guide_scope(global_scope or back_home)
+        key, title, channels = self._guide_scope(global_scope)
         if getattr(self, "_player_fs", False):
             # The video fills the screen and the pane is folded away: the
             # guide comes over it in its window, as it always did.
@@ -169,8 +154,6 @@ class _GuideMixin:
             self._relight_nav()
             self._guide_in_window(key, title, channels)
             return
-        if from_home:
-            self._leave_home()
         if getattr(self, "_focus_mode", False):
             self._set_focus_mode(False)
         page = self._ensure_guide_page()
@@ -185,8 +168,7 @@ class _GuideMixin:
             self._fetch_guide_lineup(self._guide_gen, key, title,
                                      self._guide_lineup_for_page)
         self._mid_stack.setCurrentWidget(page)
-        self._guide_return_home = back_home
-        self._check_nav("guide")
+        self._place_entered("guide")
         if grid is not None:
             grid.view.setFocus()
 
@@ -211,7 +193,7 @@ class _GuideMixin:
             cat = self.cat_list.currentItem()
             title = cat.text().strip() if cat else tr("nav_favorites")
             return ("fav", src, title, _lineup_sig(chans)), title, chans
-        # No meaningful live scope (Home, Movies, Series, ...). The guide
+        # No meaningful live scope (Mine's other lists, Movies, Series...). The guide
         # used to cover an arbitrary slice here: an auto-selected first
         # category, or the first 300 of the provider's full dump. Favorite
         # channels are the lineup the user actually curated - guide those

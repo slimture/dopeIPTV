@@ -2976,5 +2976,14 @@
   "card_grid": "Griglia",
   "card_list": "Elenco",
   "card_compact": "Compatto",
-  "card_airy": "Arioso"
+  "card_airy": "Arioso",
+  "nav_mine": "Miei",
+  "set_page_mine_sub": "Le serie che segui e i loro nuovi episodi",
+  "set_card_start": "Avvio",
+  "set_start_place": "Apri su",
+  "set_start_place_hint": "Il punto in cui eri rimasto è proprio di ogni profilo.",
+  "start_place_last": "Dove eri rimasto",
+  "start_place_mine": "Sempre su Miei",
+  "set_popular_where": "In cima a",
+  "set_popular_note": "I film e le serie più popolari della settimana su TMDB, quelli che ha la tua fonte."
 }

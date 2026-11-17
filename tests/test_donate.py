@@ -1,7 +1,8 @@
 """Donating from the app: the rhythm it asks in (core/donate_rhythm.py) -
 one week a month once the app is used for real, its colour the first day
-only, the answers that put it away - and the window keeping the heart and
-Home's card to it (ui/mw_donate.py), with a clock of the test's own."""
+only, the answers that put it away - and the window keeping the sidebar's
+heart to it (ui/mw_donate.py; Home and its card are gone), with a clock of
+the test's own."""
 from __future__ import annotations
 
 import os
@@ -160,16 +161,11 @@ class _Win(QObject, _DonateMixin):
         self._stats_log = viewing_stats.ViewingLog(self.settings)
         self._host = QWidget()                     # never shown: no windows
         self._donate_btn = HeartButton(self._host, size=12)
-        self._home_heart = None
-        self.home_on = False
         self.opened: list[str] = []
         self._init_donate()
 
     def _donate_time(self) -> float:
         return self.clock
-
-    def _home_showing(self) -> bool:
-        return self.home_on
 
     def open_donate(self, ref: str) -> None:
         self.opened.append(ref)
@@ -183,14 +179,6 @@ class _Win(QObject, _DonateMixin):
 
     def heart(self) -> bool:
         return not self._donate_btn.isHidden()
-
-    def home(self) -> None:
-        """Home built and on screen: its heart, then maybe its card."""
-        self._home_heart = HeartButton(self._host, size=15)
-        self._home_heart.setVisible(False)
-        self.card = self._donate_card()
-        self.home_on = True
-        self._donate_show()
 
 
 def _asking(tmp_path) -> _Win:
@@ -299,7 +287,7 @@ def test_a_supporter_is_never_asked(tmp_path, monkeypatch):
     for _ in range(4):
         w.watch(6)
         w.later(20 * DAY)
-        assert not w.heart() and w._donate_card() is None
+        assert not w.heart()
     assert w.settings.value(rhythm.K_PERIOD) is None
     w.settings.remove("supporter_key")
     w._donate_minute()                          # the plain icon again
@@ -312,7 +300,7 @@ def test_switched_off_it_never_asks(tmp_path):
     assert not w.heart()
     w.watch(6)
     w.later(30 * DAY)
-    assert not w.heart() and w._donate_card() is None
+    assert not w.heart()
     w.settings.setValue(rhythm.K_ASK, "true")
     w.watch(6)
     w._donate_minute()
@@ -343,8 +331,6 @@ def test_never_drawn_where_it_would_disturb(tmp_path, where):
     on(True)
     w.later(60)
     assert not w.heart()
-    w.home()
-    assert w.card is None and w._home_heart.isHidden()
     w.later(2 * DAY)                           # the week's days still count
     on(False)
     w.later(60)
@@ -353,44 +339,14 @@ def test_never_drawn_where_it_would_disturb(tmp_path, where):
     assert not w.heart()
 
 
-def test_the_heart_and_the_card_never_at_once(tmp_path):
+def test_only_the_heart_asks_no_card_anywhere(tmp_path):
+    """Home's card went with Home: the heart alone asks, and its answers
+    put it away."""
     w = _asking(tmp_path)
-    w.home()                                    # the first day, on Home: the card
-    assert w.card is not None
-    assert w._home_heart.isHidden() and not w.heart()
-    w.home_on = False
-    w._donate_show()                            # Home left: the sidebar's heart
-    assert w.heart()
-    w.home_on = True
-    w._donate_show()
-    assert not w.heart()
-    w.later(DAY)                                # the first day over: no card, Home's heart, muted
-    assert w._donate_card_now() is None
-    assert not w._home_heart.isHidden() and w._home_heart._rest == theme.P["muted"]
-    w.home()
-    assert w.card is None and not w._home_heart.isHidden()
-
-
-@pytest.mark.parametrize("answer", ["later", "already", "donate", "right_click"])
-def test_one_answer_for_both(tmp_path, answer):
-    w = _asking(tmp_path)
-    w.home()
-    card = w.card
-    if answer == "later":
-        card.later.emit()
-    elif answer == "already":
-        card.already.emit()
-    elif answer == "donate":
-        card.donate.emit()
-        assert w.opened == ["app-home"]
-    else:
-        w.hide_donate_heart()                   # the heart's right-click
-    assert w._donate_card_now() is None
-    w.home_on = False
+    assert w.heart() and not hasattr(w, "_donate_card")
+    w.hide_donate_heart()                       # the heart's right-click
     w.later(60)
     assert not w.heart()
-    w.home()
-    assert w.card is None and w._home_heart.isHidden()
 
 
 def test_the_keys_are_the_households(tmp_path):
