@@ -2916,6 +2916,7 @@
   "nerd_video_path_hint": "Dove il lettore disegna l'immagine. In un thread dedicato nulla nella finestra aspetta il video.",
   "video_path_thread": "Thread dedicato",
   "video_path_window": "Thread della finestra",
+  "video_path_pending": "Thread dedicato: parte con il primo video",
   "video_path_off": "Thread della finestra - disattivato",
   "video_path_fallback": "Thread della finestra - il thread dedicato non è partito: {reason}",
   "local_searching": "Ricerca in questa cartella e nelle sue sottocartelle…",

@@ -567,6 +567,24 @@ def load_with_options(m, url: str, options: dict[str, str]) -> bool:
     return False
 
 
+#: mpv's output that plays nothing and keeps the time: what a muted player
+#: opens instead of a stream to the system's sound server.
+QUIET_AO = "null"
+
+
+def ao_text(value) -> str:
+    """mpv's ``ao`` option as text to set it back: "" for its own choice,
+    else the outputs' names in order (what a user's mpv options asked)."""
+    if isinstance(value, str):
+        return "" if value == QUIET_AO else value
+    try:
+        names = [str(e.get("name")) for e in value or () if e.get("name")]
+    except Exception:
+        return ""
+    names = [n for n in names if n != QUIET_AO]
+    return ",".join(names)
+
+
 #: How long play() waits for a web page's file to be gone (some milliseconds).
 FILE_END_WAIT = 2.0
 
@@ -3268,6 +3286,7 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
                 m["mute"] = self._muted
             except Exception:
                 pass
+            self._quiet_output(m, reload=False)
             self._sync_pause_label(False)
             try:
                 m.pause = False
@@ -4352,6 +4371,7 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
                 m["mute"] = getattr(self, "_muted", False)
             except Exception:
                 pass
+            self._quiet_output(m, reload=True)
         for s in (self.vol, self.fs_vol):
             if s.value() != value:
                 s.blockSignals(True)
@@ -4414,7 +4434,34 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
                 m["volume"] = float(shown)
             except Exception:
                 pass
+            self._quiet_output(m, reload=True)
         self._apply_mute_icon()
+
+    def _quiet_output(self, m, reload: bool) -> None:
+        """While muted the player opens no sound output of its own (mpv's
+        null output keeps the time): a stream to the system's sound server
+        for every channel, even muted, made it renegotiate, and another
+        program's sound (Spotify) crackled at each change. Unmuted, the
+        system's own output again - *reload*: for the stream playing now."""
+        want = QUIET_AO if getattr(self, "_muted", False) else ""
+        if getattr(self, "_ao_now", "") == want:
+            return
+        try:
+            if want == QUIET_AO:
+                self._ao_user = ao_text(m["ao"])
+            else:
+                want = getattr(self, "_ao_user", "")
+            aid = m.aid if reload else None
+            m["ao"] = want
+            self._ao_now = QUIET_AO if want == QUIET_AO else ""
+            if reload and m.path is not None:
+                m.command("ao-reload")
+                # A device that could not be opened drops the sound track;
+                # the one picked comes back with the next output.
+                if aid not in (None, False) and m.aid is False:
+                    m.aid = aid
+        except Exception as e:
+            log.debug("sound output not switched: %s", e)
 
     # -- stream recording ------------------------------------------------------
 

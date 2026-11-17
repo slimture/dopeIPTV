@@ -25,7 +25,7 @@ WINDOW = "window"
 _OFF = frozenset({"0", "no", "off", "false"})
 _ON = frozenset({"1", "yes", "on", "true"})
 
-_state: dict[str, str] = {"mode": "", "why": "", "failed": "", "setting_off": ""}
+_state: dict[str, str] = {"mode": "", "why": "", "failed": "", "setting_off": "", "chosen": ""}
 
 
 def wanted(settings: Any | None = None) -> tuple[bool, str]:
@@ -61,6 +61,18 @@ def note_failed(reason: str) -> None:
     note(WINDOW, f"fallback: {_state['failed']}")
 
 
+def chosen(mode: str) -> None:
+    """The surface made for the player: the own thread starts with the first
+    video, so until then this is what is known (Nerd > Diagnostics said
+    "window thread" before anything had played)."""
+    _state["chosen"] = mode
+
+
+def pending() -> bool:
+    """The own thread was chosen and has not started (nor failed) yet."""
+    return _state["mode"] == "" and _state["chosen"] == THREAD
+
+
 def note(mode: str, why: str = "") -> None:
     """What the player uses now (THREAD or WINDOW) and, for the window's
     thread, why."""
@@ -83,9 +95,11 @@ def line() -> str:
         return "Video: own thread"
     if m == WINDOW:
         return f"Video: window thread ({_state['why']})" if _state["why"] else "Video: window thread"
+    if pending():
+        return "Video: own thread (not started yet)"
     return "Video: not started yet"
 
 
 def reset() -> None:
     """Tests only: as at start."""
-    _state.update(mode="", why="", failed="", setting_off="")
+    _state.update(mode="", why="", failed="", setting_off="", chosen="")

@@ -2916,6 +2916,7 @@
   "nerd_video_path_hint": "Var spelaren ritar sin bild. I en egen tråd väntar ingenting i fönstret på videon.",
   "video_path_thread": "Egen tråd",
   "video_path_window": "Fönstrets tråd",
+  "video_path_pending": "Egen tråd – startar med första videon",
   "video_path_off": "Fönstrets tråd - avstängd",
   "video_path_fallback": "Fönstrets tråd - den egna tråden kunde inte starta: {reason}",
   "local_searching": "Söker i mappen och dess undermappar…",

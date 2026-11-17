@@ -1456,7 +1456,7 @@ def video_path_chip() -> tuple[QLabel, QLabel | None]:
 
     from ..core import video_mode
     from .theme import P, tinted
-    own = video_mode.mode() == video_mode.THREAD
+    own = video_mode.mode() == video_mode.THREAD or video_mode.pending()
     short = tr("video_path_thread") if own else tr("video_path_window")
     tone = P["ok"] if own else P["warn"]
     wash, _ink = tinted(tone, P["pane"], 0.16, P["text"])
@@ -1483,6 +1483,8 @@ def video_path_text() -> str:
     why = video_mode.why()
     if video_mode.mode() == video_mode.THREAD:
         return tr("video_path_thread")
+    if video_mode.pending():
+        return tr("video_path_pending")
     if why.startswith("fallback: "):
         return tr("video_path_fallback", reason=why[len("fallback: "):])
     if why.startswith("switched off"):

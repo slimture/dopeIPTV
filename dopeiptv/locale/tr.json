@@ -2916,6 +2916,7 @@
   "nerd_video_path_hint": "Oynatıcının görüntüsünü nerede çizdiği. Kendi iş parçacığında pencerede hiçbir şey videoyu beklemez.",
   "video_path_thread": "Kendi iş parçacığı",
   "video_path_window": "Pencerenin iş parçacığı",
+  "video_path_pending": "Kendi iş parçacığı – ilk videoyla başlar",
   "video_path_off": "Pencerenin iş parçacığı - kapalı",
   "video_path_fallback": "Pencerenin iş parçacığı - kendi iş parçacığı başlatılamadı: {reason}",
   "local_searching": "Bu klasörde ve alt klasörlerinde aranıyor…",

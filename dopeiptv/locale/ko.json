@@ -2916,6 +2916,7 @@
   "nerd_video_path_hint": "플레이어가 영상을 어디에서 그리는지 보여 줍니다. 전용 스레드에서는 창의 어떤 것도 영상을 기다리지 않습니다.",
   "video_path_thread": "전용 스레드",
   "video_path_window": "창 스레드",
+  "video_path_pending": "전용 스레드 – 첫 동영상과 함께 시작됩니다",
   "video_path_off": "창 스레드 - 꺼짐",
   "video_path_fallback": "창 스레드 - 전용 스레드를 시작할 수 없었습니다: {reason}",
   "local_searching": "이 폴더와 하위 폴더 검색 중…",

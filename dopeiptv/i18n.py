@@ -3182,6 +3182,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "nerd_video_path_hint": {"en": "Where the player draws its picture. On its own thread nothing in the window waits for the video."},
     "video_path_thread": {"en": "Own thread"},
     "video_path_window": {"en": "Window thread"},
+    "video_path_pending": {"en": "Own thread - it starts with the first video"},
     "video_path_off": {"en": "Window thread - switched off"},
     "video_path_fallback": {"en": "Window thread - its own thread could not start: {reason}"},
     "pill_live": {"en": "Live"},

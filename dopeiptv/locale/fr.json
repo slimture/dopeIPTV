@@ -2916,6 +2916,7 @@
   "nerd_video_path_hint": "Où le lecteur dessine son image. Dans son propre thread, rien dans la fenêtre n'attend la vidéo.",
   "video_path_thread": "Thread dédié",
   "video_path_window": "Thread de la fenêtre",
+  "video_path_pending": "Thread dédié – démarre avec la première vidéo",
   "video_path_off": "Thread de la fenêtre - désactivé",
   "video_path_fallback": "Thread de la fenêtre - son propre thread n'a pas pu démarrer : {reason}",
   "local_searching": "Recherche dans ce dossier et ses sous-dossiers…",

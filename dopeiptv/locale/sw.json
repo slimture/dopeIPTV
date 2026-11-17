@@ -2916,6 +2916,7 @@
   "nerd_video_path_hint": "Mahali kichezaji kinapochora picha yake. Kwenye uzi wake yenyewe, hakuna kitu dirishani kinachosubiri video.",
   "video_path_thread": "Uzi wake yenyewe",
   "video_path_window": "Uzi wa dirisha",
+  "video_path_pending": "Uzi wake mwenyewe – huanza na video ya kwanza",
   "video_path_off": "Uzi wa dirisha - imezimwa",
   "video_path_fallback": "Uzi wa dirisha - uzi wake yenyewe haukuweza kuanza: {reason}",
   "local_searching": "Inatafuta katika folda hii na folda zake ndogo…",

@@ -2916,6 +2916,7 @@
   "nerd_video_path_hint": "Gdzie odtwarzacz rysuje obraz. We własnym wątku nic w oknie nie czeka na wideo.",
   "video_path_thread": "Własny wątek",
   "video_path_window": "Wątek okna",
+  "video_path_pending": "Własny wątek – uruchamia się przy pierwszym filmie",
   "video_path_off": "Wątek okna - wyłączone",
   "video_path_fallback": "Wątek okna - własny wątek nie mógł się uruchomić: {reason}",
   "local_searching": "Przeszukiwanie tego folderu i jego podfolderów…",

@@ -113,6 +113,7 @@ def make_video_surface(parent: QWidget | None = None, settings: Any | None = Non
     if want:
         why = can_start()
         if not why:
+            video_mode.chosen(video_mode.THREAD)
             return ThreadedVideoSurface(parent)
         log.warning("video: drawn on the window's thread (fallback: %s)", why)
         video_mode.note(video_mode.WINDOW, f"fallback: {why}")

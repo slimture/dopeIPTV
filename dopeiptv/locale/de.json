@@ -2916,6 +2916,7 @@
   "nerd_video_path_hint": "Wo der Player sein Bild zeichnet. In einem eigenen Thread wartet nichts im Fenster auf das Video.",
   "video_path_thread": "Eigener Thread",
   "video_path_window": "Fenster-Thread",
+  "video_path_pending": "Eigener Thread – startet mit dem ersten Video",
   "video_path_off": "Fenster-Thread – ausgeschaltet",
   "video_path_fallback": "Fenster-Thread – der eigene Thread konnte nicht starten: {reason}",
   "local_searching": "Dieser Ordner und seine Unterordner werden durchsucht…",

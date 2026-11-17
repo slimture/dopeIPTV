@@ -83,6 +83,32 @@ def test_nerd_diagnostics_says_it_in_words():
     assert "Video: window thread (fallback: mpv render context: boom)" in diagnostics(_Settings())
 
 
+def test_before_the_first_video_it_says_the_own_thread_is_coming():
+    """The own thread starts with the first video: until then Diagnostics
+    said "Window thread" in amber, and the person thought it was broken."""
+    from dopeiptv.ui.nerd_settings import video_path_chip, video_path_text
+    from dopeiptv.i18n import tr
+    video_mode.chosen(video_mode.THREAD)
+    assert video_mode.pending()
+    assert video_mode.line() == "Video: own thread (not started yet)"
+    assert video_path_text() == tr("video_path_pending")
+    chip, why = video_path_chip()
+    assert tr("video_path_thread") in chip.text() and why is not None
+    video_mode.note(video_mode.THREAD)
+    assert not video_mode.pending() and video_path_text() == tr("video_path_thread")
+    video_mode.note_failed("no frame could be shown")
+    assert not video_mode.pending()
+    assert video_mode.line().startswith("Video: window thread (fallback: ")
+
+
+def test_making_the_threaded_surface_notes_the_choice(monkeypatch):
+    monkeypatch.setattr(video_thread, "can_start", lambda: "")
+    made = []
+    monkeypatch.setattr(video_thread, "ThreadedVideoSurface", lambda parent=None: made.append(1) or QWidget())
+    video_thread.make_video_surface(QWidget(), _Settings())
+    assert made and video_mode.pending()
+
+
 # -- which surface ------------------------------------------------------------------
 
 def test_switched_off_makes_the_window_thread_surface(monkeypatch):

@@ -7,6 +7,24 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Fixed
+
+- With the player muted, another program's sound (Spotify) crackled at
+  every channel change: the player opened a new stream to the system's
+  sound server for each channel, muted or not, and the sound server
+  renegotiated. While muted it now opens none (mpv's null output keeps the
+  time); unmuting brings the system's output back, or the one your mpv
+  options name, with the sound track you had picked.
+- Nerd > Diagnostics said "Window thread" before anything had played on a
+  computer that draws the picture on its own thread: it now says the own
+  thread starts with the first video.
+
+### Removed
+
+- The DOPEIPTV_VIDEO_THREAD=force test switch: forcing Qt's own drawing onto
+  the render thread crashes on macOS (AppKit allows it only on the main
+  thread), so macOS gets a drawing path of its own instead.
+
 ## [1.6.2]
 
 A new look: the sidebar is the app's structure - Mine, TV, Movies and Series

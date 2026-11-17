@@ -2916,6 +2916,7 @@
   "nerd_video_path_hint": "Waar de speler zijn beeld tekent. In een eigen thread wacht niets in het venster op de video.",
   "video_path_thread": "Eigen thread",
   "video_path_window": "Thread van het venster",
+  "video_path_pending": "Eigen thread – start bij de eerste video",
   "video_path_off": "Thread van het venster - uitgezet",
   "video_path_fallback": "Thread van het venster - de eigen thread kon niet starten: {reason}",
   "local_searching": "Bezig met zoeken in deze map en de submappen…",

@@ -2916,6 +2916,7 @@
   "nerd_video_path_hint": "Onde o player desenha a imagem. Em uma thread própria, nada na janela espera pelo vídeo.",
   "video_path_thread": "Thread própria",
   "video_path_window": "Thread da janela",
+  "video_path_pending": "Thread própria – começa com o primeiro vídeo",
   "video_path_off": "Thread da janela - desativada",
   "video_path_fallback": "Thread da janela - a thread própria não pôde iniciar: {reason}",
   "local_searching": "Pesquisando nesta pasta e nas subpastas…",

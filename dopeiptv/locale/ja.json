@@ -2916,6 +2916,7 @@
   "nerd_video_path_hint": "プレーヤーが映像をどこで描画するか。専用スレッドなら、ウィンドウ内のものが映像を待つことはありません。",
   "video_path_thread": "専用スレッド",
   "video_path_window": "ウィンドウのスレッド",
+  "video_path_pending": "専用スレッド – 最初の動画で開始します",
   "video_path_off": "ウィンドウのスレッド - オフ",
   "video_path_fallback": "ウィンドウのスレッド - 専用スレッドを開始できませんでした: {reason}",
   "local_searching": "このフォルダーとサブフォルダーを検索中…",

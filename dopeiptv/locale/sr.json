@@ -2916,6 +2916,7 @@
   "nerd_video_path_hint": "Gde plejer crta sliku. U sopstvenoj niti ništa u prozoru ne čeka video.",
   "video_path_thread": "Sopstvena nit",
   "video_path_window": "Nit prozora",
+  "video_path_pending": "Sopstvena nit – pokreće se sa prvim videom",
   "video_path_off": "Nit prozora - isključeno",
   "video_path_fallback": "Nit prozora - sopstvena nit nije mogla da se pokrene: {reason}",
   "local_searching": "Pretraga ove fascikle i njenih podfascikli…",

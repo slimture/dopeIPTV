@@ -2916,6 +2916,7 @@
   "nerd_video_path_hint": "Nơi trình phát vẽ hình. Trên luồng riêng, không gì trong cửa sổ phải chờ video.",
   "video_path_thread": "Luồng riêng",
   "video_path_window": "Luồng của cửa sổ",
+  "video_path_pending": "Luồng riêng – khởi động cùng video đầu tiên",
   "video_path_off": "Luồng của cửa sổ - đã tắt",
   "video_path_fallback": "Luồng của cửa sổ - không khởi động được luồng riêng: {reason}",
   "local_searching": "Đang tìm trong thư mục này và các thư mục con…",

@@ -2916,6 +2916,7 @@
   "nerd_video_path_hint": "Tempat pemutar menggambar videonya. Di thread tersendiri, tidak ada yang di jendela menunggu video.",
   "video_path_thread": "Thread tersendiri",
   "video_path_window": "Thread jendela",
+  "video_path_pending": "Thread sendiri – dimulai dengan video pertama",
   "video_path_off": "Thread jendela - dimatikan",
   "video_path_fallback": "Thread jendela - thread tersendiri tidak bisa dimulai: {reason}",
   "local_searching": "Mencari di folder ini dan subfoldernya…",

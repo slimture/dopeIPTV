@@ -2916,6 +2916,7 @@
   "nerd_video_path_hint": "أين يرسم المشغّل صورته. في مسار خاص بها لا ينتظر شيء في النافذة الفيديو.",
   "video_path_thread": "مسار خاص",
   "video_path_window": "مسار النافذة",
+  "video_path_pending": "خيط خاص – يبدأ مع أول فيديو",
   "video_path_off": "مسار النافذة - متوقف",
   "video_path_fallback": "مسار النافذة - تعذّر بدء المسار الخاص: {reason}",
   "local_searching": "جارٍ البحث في هذا المجلد ومجلداته الفرعية…",
