@@ -284,10 +284,13 @@ class DvrPool:
             sessions = list(self._sessions.values())
             self._sessions.clear()
             self.active = None
+        # Taken before the close: a recorder leaves its session's list as it
+        # ends, a moment before its thread does - one looked for after the
+        # close could be gone from the list and still running.
+        recorders = [r for s in sessions for r in list(s.recorders)]
         for s in sessions:
             s.close()
         if wait:
             deadline = time.monotonic() + wait
-            for s in sessions:
-                for r in list(s.recorders):
-                    r.join(max(0.0, deadline - time.monotonic()))
+            for r in recorders:
+                r.join(max(0.0, deadline - time.monotonic()))
