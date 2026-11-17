@@ -382,6 +382,7 @@
   "opt_network_buffer": "네트워크 버퍼",
   "opt_sleep_timer": "취침 타이머",
   "opt_minutes": "{n}분",
+  "opt_seconds": "{n}초",
   "opt_hours": "{n}시간",
   "opt_sleep_custom": "사용자 지정…",
   "sleep_prompt": "재생을 정지할 시간 (분):",

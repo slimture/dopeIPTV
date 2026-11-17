@@ -382,6 +382,7 @@
   "opt_network_buffer": "Сетевой буфер",
   "opt_sleep_timer": "Таймер сна",
   "opt_minutes": "{n} мин",
+  "opt_seconds": "{n} с",
   "opt_hours": "{n} ч",
   "opt_sleep_custom": "Свой…",
   "sleep_prompt": "Остановить воспроизведение через (минут):",

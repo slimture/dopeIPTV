@@ -288,6 +288,7 @@ class _MittMixin:
             page.retranslate()
             page.activated.connect(self._mitt_activate)
             page.menu_requested.connect(self._mitt_menu)
+            page.history_remove.connect(self._mitt_forget_history_cards)
             page.heart.connect(self._mitt_heart)
             page.queue_nudged.connect(self._mitt_queue_nudge)
             page.queue_moved.connect(self._mitt_queue_move)
@@ -1149,7 +1150,7 @@ class _MittMixin:
 
     # -- History's rows ----------------------------------------------------------------
 
-    def _mitt_forget_history(self, e: mitt.Entry) -> None:
+    def _mitt_forget_history(self, e: mitt.Entry, render: bool = True) -> None:
         key, kind = e.row.get("_key"), e.row.get("_kind")
         if key is None or not kind:
             return
@@ -1160,7 +1161,28 @@ class _MittMixin:
         data = self._mitt_data
         if data is not None:
             data.history = [x for x in data.history if x.key != e.key]
+            if render:
+                self._mitt_render()
+
+    def _mitt_forget_history_cards(self, cards: list) -> None:
+        """Several of History's rows taken out at once (Delete, or Remove
+        on one of the rows picked); drawn again once."""
+        entries = [e for e in (self._mitt_entry(c) for c in cards) if e is not None]
+        for e in entries:
+            self._mitt_forget_history(e, render=False)
+        if entries and self._mitt_data is not None:
             self._mitt_render()
+
+    def _mitt_history_remove(self, item: Any, e: mitt.Entry) -> None:
+        """Remove in a History row's menu: every row picked when this one
+        is among several picked, else this one."""
+        page = self._mitt_page
+        picked = page.timeline.selected_cards() if page is not None else []
+        keys = {x.key for x in (self._mitt_entry(c) for c in picked) if x is not None}
+        if len(picked) > 1 and (any(c is item for c in picked) or e.key in keys):
+            self._mitt_forget_history_cards(picked)
+        else:
+            self._mitt_forget_history(e)
 
     # -- the menus ---------------------------------------------------------------------
 
@@ -1176,7 +1198,7 @@ class _MittMixin:
             m.addAction(tr("sa_open_series") if e.kind == mitt.SERIES else tr("btn_play"),
                         partial(self._mitt_activate, section, item))
             if section == "history":
-                m.addAction(tr("local_missing_remove"), partial(self._mitt_forget_history, e))
+                m.addAction(tr("local_missing_remove"), partial(self._mitt_history_remove, item, e))
             m.addSeparator()
             note = m.addAction(tr("sa_from_source",
                                   source=self._mitt_names().get(e.source, "?")))
@@ -1198,7 +1220,7 @@ class _MittMixin:
             self._mitt_title_menu(m, e, section)
         if section == "history" and self._mitt_is_active(e) and e.kind != mitt.LOCAL:
             m.addSeparator()
-            m.addAction(tr("local_missing_remove"), partial(self._mitt_forget_history, e))
+            m.addAction(tr("local_missing_remove"), partial(self._mitt_history_remove, item, e))
         if section == "queue":
             m.addSeparator()
             m.addAction(tr("mitt_move_top"), partial(self._mitt_queue_move, item, 0))
@@ -1320,7 +1342,7 @@ class _MittMixin:
             m.addAction(tr("ctx_continue_remove"), partial(self._mitt_forget_local, e))
         if section == "history":
             m.addSeparator()
-            m.addAction(tr("local_missing_remove"), partial(self._mitt_forget_history, e))
+            m.addAction(tr("local_missing_remove"), partial(self._mitt_history_remove, None, e))
         m.addSeparator()
         m.addAction(tr("ctx_copy_stream_url"), partial(self._mitt_copy, e))
 

@@ -50,6 +50,9 @@ same new look.
 
 ### Changed
 
+- When the Next episode card comes can be set in seconds too - 10, 20, 30
+  or 45 s before the end, besides 1 to 10 minutes (Settings > Playback).
+
 - macOS draws the picture on its own thread by default in a release too,
   as Linux and Windows do (a release there drew on the window's thread
   while the own thread was tried in test builds). Settings > Picture & sound and
@@ -128,6 +131,14 @@ same new look.
   the same marks everywhere; a star given from the menu shows at once.
 
 ### Fixed
+
+- Mine > History: several rows can be picked (Ctrl or Shift and a click -
+  nothing plays then) and taken out at once with Delete (a Mac's delete
+  key) or Remove in the menu of one of them; a click on its own plays as
+  before.
+- A series' page put Up next on E1 while E2 played, until a minute of it
+  had played: what plays now is where you are (a started episode further
+  on still comes first).
 
 - macOS: hovering the timeline over the video, the time under the pointer
   went behind the bar while the picture had its own thread (the picture's

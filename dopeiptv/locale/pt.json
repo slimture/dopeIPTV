@@ -382,6 +382,7 @@
   "opt_network_buffer": "Buffer de rede",
   "opt_sleep_timer": "Timer de desligamento",
   "opt_minutes": "{n} min",
+  "opt_seconds": "{n} s",
   "opt_hours": "{n} h",
   "opt_sleep_custom": "Personalizado…",
   "sleep_prompt": "Parar a reprodução após (minutos):",

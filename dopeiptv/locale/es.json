@@ -382,6 +382,7 @@
   "opt_network_buffer": "Búfer de red",
   "opt_sleep_timer": "Temporizador de apagado",
   "opt_minutes": "{n} min",
+  "opt_seconds": "{n} s",
   "opt_hours": "{n} h",
   "opt_sleep_custom": "Personalizado…",
   "sleep_prompt": "Detener la reproducción tras (minutos):",

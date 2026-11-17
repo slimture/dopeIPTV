@@ -163,7 +163,8 @@ class NextUp:
 
 
 def next_up(order: list[dict], watched: Callable[[dict], bool],
-            progress: Callable[[dict], Progress]) -> NextUp:
+            progress: Callable[[dict], Progress],
+            playing: Callable[[dict], bool] | None = None) -> NextUp:
     if not order:
         return NextUp(None)
     seen = [bool(watched(ep)) for ep in order]
@@ -178,6 +179,12 @@ def next_up(order: list[dict], watched: Callable[[dict], bool],
     if after:
         i = newest(after)
         return NextUp(order[i], resume=True, first=False, progress=prog[i])
+    # Else what plays now is where you are, however little of it has
+    # played: a minute into E2 the next one up was E1 (nothing "started").
+    if playing is not None:
+        now = next((i for i, ep in enumerate(order) if playing(ep)), -1)
+        if now >= 0 and not seen[now]:
+            return NextUp(order[now], resume=True, first=False, progress=prog[now])
     if 0 <= last < len(order) - 1:
         return NextUp(order[last + 1], first=False)
     if going:

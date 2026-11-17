@@ -382,6 +382,7 @@
   "opt_network_buffer": "Buffer di rete",
   "opt_sleep_timer": "Timer di spegnimento",
   "opt_minutes": "{n} min",
+  "opt_seconds": "{n} s",
   "opt_hours": "{n} h",
   "opt_sleep_custom": "Personalizzato…",
   "sleep_prompt": "Ferma la riproduzione dopo (minuti):",

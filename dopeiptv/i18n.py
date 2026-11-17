@@ -930,6 +930,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "opt_network_buffer": {"en": "Network buffer"},
     "opt_sleep_timer": {"en": "Sleep timer"},
     "opt_minutes": {"en": "{n} min"},
+    "opt_seconds": {"en": "{n} s"},
     "opt_hours": {"en": "{n} h"},
     "opt_sleep_custom": {"en": "Custom…"},
     "sleep_prompt": {"en": "Stop playback after (minutes):"},

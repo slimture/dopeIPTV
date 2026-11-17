@@ -382,6 +382,7 @@
   "opt_network_buffer": "بافر شبکه",
   "opt_sleep_timer": "زمان‌سنج خواب",
   "opt_minutes": "{n} دقیقه",
+  "opt_seconds": "{n} ثانیه",
   "opt_hours": "{n} ساعت",
   "opt_sleep_custom": "سفارشی…",
   "sleep_prompt": "توقف پخش پس از (دقیقه):",

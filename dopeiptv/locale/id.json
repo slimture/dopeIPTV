@@ -382,6 +382,7 @@
   "opt_network_buffer": "Buffer jaringan",
   "opt_sleep_timer": "Pengatur waktu tidur",
   "opt_minutes": "{n} mnt",
+  "opt_seconds": "{n} dtk",
   "opt_hours": "{n} jam",
   "opt_sleep_custom": "Khusus…",
   "sleep_prompt": "Hentikan pemutaran setelah (menit):",

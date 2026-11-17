@@ -39,6 +39,7 @@ a screen reader.
 
 from __future__ import annotations
 
+import sys
 import time
 from typing import Any, Callable, Iterable, Sequence
 
@@ -746,12 +747,21 @@ class TimelineView(_RowList):
 
     ROW_H = TIMELINE_H
     OBJECT_NAME = "MittTimelineView"
+    #: The rows picked to go from History (Delete); ui/mw_mitt removes them.
+    remove_rows = pyqtSignal(list)
 
     def __init__(self, loader=None, parent=None) -> None:
         self.words_for: Callable[[Card], tuple[str, str, str]] | None = None
         self.hover_action = ""
         super().__init__(loader, parent)
         self.setItemDelegate(TimelineDelegate(self))
+        # Several rows picked with Ctrl / Shift, to take them out at once.
+        self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+
+    def selected_cards(self) -> list[Card]:
+        rows = sorted(i.row() for i in self.selectionModel().selectedRows())
+        cards = [self.model_.item_at(r) for r in rows]
+        return [c for c in cards if c is not None and not isinstance(c, Heading)]
 
     def words(self, item: Card) -> tuple[str, str, str]:
         if self.words_for is None:
@@ -795,8 +805,13 @@ class TimelineView(_RowList):
                 self.setCurrentIndex(nxt)
 
     def _clicked(self, idx) -> None:
-        if not isinstance(self.model_.item_at(idx.row()), Heading):
-            super()._clicked(idx)
+        if isinstance(self.model_.item_at(idx.row()), Heading):
+            return
+        if QApplication.keyboardModifiers() & (
+                Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier
+                | Qt.KeyboardModifier.MetaModifier):
+            return                      # gathering rows to take out: nothing plays
+        super()._clicked(idx)
 
     def mouseMoveEvent(self, e) -> None:
         idx = self.indexAt(e.position().toPoint())
@@ -812,6 +827,13 @@ class TimelineView(_RowList):
         if e.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) \
                 and isinstance(self.current_item(), Heading):
             return
+        # Delete (a Mac's delete key is Backspace): the rows picked go.
+        if e.key() == Qt.Key.Key_Delete or (sys.platform == "darwin" and e.key() == Qt.Key.Key_Backspace):
+            cards = self.selected_cards()
+            if cards:
+                self.remove_rows.emit(cards)
+                e.accept()
+                return
         super().keyPressEvent(e)
 
 
@@ -1333,6 +1355,8 @@ class MittPage(QWidget):
 
     activated = pyqtSignal(str, object)
     menu_requested = pyqtSignal(str, object, QPoint)
+    #: History's rows picked and Delete pressed (TimelineView.remove_rows).
+    history_remove = pyqtSignal(list)
     heart = pyqtSignal(object)
     queue_nudged = pyqtSignal(object, int)
     queue_moved = pyqtSignal(object, int)
@@ -1485,6 +1509,7 @@ class MittPage(QWidget):
             view.activated.connect(lambda it, n=name: self._activate(n, it))
             view.menu.connect(lambda it, pos, n=name: self._menu(n, it, pos))
             view.back.connect(self.back)
+        self.timeline.remove_rows.connect(self.history_remove.emit)
         self.tiles.heart.connect(self.heart)
         self.queue.nudged.connect(self.queue_nudged)
         self.queue.moved_to.connect(self.queue_moved)

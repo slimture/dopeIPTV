@@ -382,6 +382,7 @@
   "opt_network_buffer": "网络缓冲",
   "opt_sleep_timer": "睡眠定时器",
   "opt_minutes": "{n} 分钟",
+  "opt_seconds": "{n} 秒",
   "opt_hours": "{n} 小时",
   "opt_sleep_custom": "自定义……",
   "sleep_prompt": "在多少分钟后停止播放：",

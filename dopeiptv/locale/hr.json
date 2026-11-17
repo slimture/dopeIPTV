@@ -382,6 +382,7 @@
   "opt_network_buffer": "Mrežni međuspremnik",
   "opt_sleep_timer": "Mjerač spavanja",
   "opt_minutes": "{n} min",
+  "opt_seconds": "{n} s",
   "opt_hours": "{n} h",
   "opt_sleep_custom": "Prilagođeno…",
   "sleep_prompt": "Zaustavi reprodukciju nakon (minuta):",

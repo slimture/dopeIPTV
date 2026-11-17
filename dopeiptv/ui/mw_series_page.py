@@ -540,8 +540,11 @@ class _SeriesPageMixin:
         finally:
             self.series_ctx = saved
         order = sv.flow(self._sp_seasons)
+        pk = self._sp_playing()[0]
         nxt = sv.next_up(order, lambda e: bool(states[sv.episode_key(e)].watched),
-                         lambda e: states[sv.episode_key(e)].progress)
+                         lambda e: states[sv.episode_key(e)].progress,
+                         playing=(lambda e: self._item_key(e) == pk or sv.episode_key(e) == pk)
+                         if pk else None)
         self._sp_next = nxt
         return states, nxt
 

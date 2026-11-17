@@ -382,6 +382,7 @@
   "opt_network_buffer": "Netwerkbuffer",
   "opt_sleep_timer": "Slaaptimer",
   "opt_minutes": "{n} min",
+  "opt_seconds": "{n} sec",
   "opt_hours": "{n} u",
   "opt_sleep_custom": "Aangepast…",
   "sleep_prompt": "Weergave stoppen na (minuten):",

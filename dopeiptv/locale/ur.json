@@ -382,6 +382,7 @@
   "opt_network_buffer": "نیٹ ورک بفر",
   "opt_sleep_timer": "سلیپ ٹائمر",
   "opt_minutes": "{n} منٹ",
+  "opt_seconds": "{n} سیکنڈ",
   "opt_hours": "{n} گھنٹے",
   "opt_sleep_custom": "حسب ضرورت…",
   "sleep_prompt": "پلے بیک روکیں اس کے بعد (منٹ):",

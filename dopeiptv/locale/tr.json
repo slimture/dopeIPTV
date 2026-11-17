@@ -382,6 +382,7 @@
   "opt_network_buffer": "Ağ arabelleği",
   "opt_sleep_timer": "Uyku zamanlayıcısı",
   "opt_minutes": "{n} dk",
+  "opt_seconds": "{n} sn",
   "opt_hours": "{n} sa",
   "opt_sleep_custom": "Özel…",
   "sleep_prompt": "Oynatmayı şu süreden sonra durdur (dakika):",

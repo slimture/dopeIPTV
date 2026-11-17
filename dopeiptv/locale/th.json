@@ -382,6 +382,7 @@
   "opt_network_buffer": "บัฟเฟอร์เครือข่าย",
   "opt_sleep_timer": "ตั้งเวลาปิด",
   "opt_minutes": "{n} นาที",
+  "opt_seconds": "{n} วินาที",
   "opt_hours": "{n} ชม.",
   "opt_sleep_custom": "กำหนดเอง…",
   "sleep_prompt": "หยุดเล่นหลังจาก (นาที):",

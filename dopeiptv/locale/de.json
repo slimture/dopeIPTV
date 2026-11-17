@@ -382,6 +382,7 @@
   "opt_network_buffer": "Netzwerkpuffer",
   "opt_sleep_timer": "Sleep-Timer",
   "opt_minutes": "{n} Min",
+  "opt_seconds": "{n} Sek.",
   "opt_hours": "{n} Std.",
   "opt_sleep_custom": "Eigene Zeit…",
   "sleep_prompt": "Wiedergabe stoppen nach (Minuten):",

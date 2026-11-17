@@ -382,6 +382,7 @@
   "opt_network_buffer": "Bufor sieciowy",
   "opt_sleep_timer": "Wyłącznik czasowy",
   "opt_minutes": "{n} min",
+  "opt_seconds": "{n} s",
   "opt_hours": "{n} godz.",
   "opt_sleep_custom": "Niestandardowy…",
   "sleep_prompt": "Zatrzymaj odtwarzanie po (minutach):",

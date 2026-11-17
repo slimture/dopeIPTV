@@ -382,6 +382,7 @@
   "opt_network_buffer": "Bafa ya mtandao",
   "opt_sleep_timer": "Kipima-muda cha kulala",
   "opt_minutes": "dakika {n}",
+  "opt_seconds": "sekunde {n}",
   "opt_hours": "saa {n}",
   "opt_sleep_custom": "Maalum…",
   "sleep_prompt": "Simamisha uchezaji baada ya (dakika):",

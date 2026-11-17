@@ -382,6 +382,7 @@
   "opt_network_buffer": "مخزّن الشبكة المؤقت",
   "opt_sleep_timer": "مؤقت النوم",
   "opt_minutes": "{n} دقيقة",
+  "opt_seconds": "{n} ثانية",
   "opt_hours": "{n} ساعة",
   "opt_sleep_custom": "مخصص…",
   "sleep_prompt": "إيقاف التشغيل بعد (دقائق):",

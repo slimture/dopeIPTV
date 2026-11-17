@@ -382,6 +382,7 @@
   "opt_network_buffer": "Tampon réseau",
   "opt_sleep_timer": "Minuterie de veille",
   "opt_minutes": "{n} min",
+  "opt_seconds": "{n} s",
   "opt_hours": "{n} h",
   "opt_sleep_custom": "Personnalisé…",
   "sleep_prompt": "Arrêter la lecture après (minutes) :",

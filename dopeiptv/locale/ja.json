@@ -382,6 +382,7 @@
   "opt_network_buffer": "ネットワークバッファ",
   "opt_sleep_timer": "スリープタイマー",
   "opt_minutes": "{n}分",
+  "opt_seconds": "{n}秒",
   "opt_hours": "{n}時間",
   "opt_sleep_custom": "カスタム…",
   "sleep_prompt": "再生を停止するまでの時間（分）：",

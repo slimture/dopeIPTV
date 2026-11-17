@@ -382,6 +382,7 @@
   "opt_network_buffer": "Buffer δικτύου",
   "opt_sleep_timer": "Χρονοδιακόπτης ύπνου",
   "opt_minutes": "{n} λεπτά",
+  "opt_seconds": "{n} δευτ.",
   "opt_hours": "{n} ώ.",
   "opt_sleep_custom": "Προσαρμοσμένο…",
   "sleep_prompt": "Διακοπή αναπαραγωγής μετά από (λεπτά):",

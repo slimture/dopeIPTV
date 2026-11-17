@@ -1425,8 +1425,10 @@ class _SettingsMixin:
             # How early the "Next episode" card appears. A number the user
             # picks rather than one guessed here: where the credits start
             # varies from show to show.
+            # Seconds too: a show's credits can be twenty seconds long.
             nextup_box = self._combo(
                 [("0", tr("option_off"))]
+                + [(str(s), tr("opt_seconds", n=s)) for s in (10, 20, 30, 45)]
                 + [(str(m * 60), tr("opt_minutes", n=m))
                    for m in (1, 2, 3, 5, 10)],
                 str(self.settings.value("nextup_lead_secs", "180")))

@@ -382,6 +382,7 @@
   "opt_network_buffer": "Мережевий буфер",
   "opt_sleep_timer": "Таймер сну",
   "opt_minutes": "{n} хв",
+  "opt_seconds": "{n} с",
   "opt_hours": "{n} год",
   "opt_sleep_custom": "Власне…",
   "sleep_prompt": "Зупинити відтворення через (хвилин):",

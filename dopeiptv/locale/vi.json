@@ -382,6 +382,7 @@
   "opt_network_buffer": "Bộ đệm mạng",
   "opt_sleep_timer": "Hẹn giờ ngủ",
   "opt_minutes": "{n} phút",
+  "opt_seconds": "{n} giây",
   "opt_hours": "{n} giờ",
   "opt_sleep_custom": "Tùy chỉnh…",
   "sleep_prompt": "Dừng phát lại sau (phút):",

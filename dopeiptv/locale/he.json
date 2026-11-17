@@ -382,6 +382,7 @@
   "opt_network_buffer": "מאגר רשת",
   "opt_sleep_timer": "טיימר שינה",
   "opt_minutes": "{n} דקות",
+  "opt_seconds": "{n} שניות",
   "opt_hours": "{n} שע׳",
   "opt_sleep_custom": "מותאם אישית…",
   "sleep_prompt": "עצור השמעה לאחר (דקות):",

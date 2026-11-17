@@ -382,6 +382,7 @@
   "opt_network_buffer": "नेटवर्क बफ़र",
   "opt_sleep_timer": "स्लीप टाइमर",
   "opt_minutes": "{n} मिनट",
+  "opt_seconds": "{n} सेकंड",
   "opt_hours": "{n} घं.",
   "opt_sleep_custom": "कस्टम…",
   "sleep_prompt": "इतने बाद प्लेबैक रोकें (मिनट):",
