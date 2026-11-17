@@ -15,8 +15,8 @@ point at them:
 All but `themes.png` are the website's English front-page pictures, made by
 `tools/site_screenshots.py` (see `docs/MAINTAINING.md`): take them with
 `xvfb-run -a -s "-screen 0 2560x1600x24" python tools/site_screenshots.py OUT en`,
-then save `main`, `guide`, `multiview` and `timeshift` from WebP
-as 1600×1000 PNG under the names above. The file names stay as they are:
+then save `hero-1`, `feat-c3`, `feat-mv` and `feat-c1` from WebP
+as 1600×1000 PNG under the names above (`hero-1` scaled down from 2560×1600). The file names stay as they are:
 the metainfo of every release already out points at them on `main`.
 
 ## Getting content for free (no personal provider needed)
