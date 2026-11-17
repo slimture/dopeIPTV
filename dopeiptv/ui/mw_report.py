@@ -12,7 +12,9 @@ fullscreen the report waits in the app menu, said by a note that opens it.
 And the answers to feedback: asked of the site on one timer (soon after a
 report that wants one, then less often), kept here, shown in a window of
 their own - its menu entry counts the new ones and a dot on the menu says
-so."""
+so. An answer that lets the person reply gets a box on its card: the reply
+goes as feedback in the report's thread (its own code hash, nothing else
+about them), is kept here with the report, and is asked about soon after."""
 
 from __future__ import annotations
 
@@ -221,14 +223,19 @@ class _ReportMixin:
         self._answers_busy = False
         self._answers_ok = got is not None
         settings = getattr(self, "settings", None)
-        fresh = 0
+        fresh = changed = 0
         if got and settings is not None:
             items = report.tickets(settings)
+            before = [list(t.get("r") or []) for t in items]
             fresh = report.merge_replies(items, got)
-            if fresh:
+            # Also kept: an answer that no longer lets them reply.
+            changed = fresh or before != [list(t.get("r") or []) for t in items]
+            if changed:
                 report.save_tickets(settings, items)
         dlg = self._answers_window()
         if dlg is not None:
+            if changed and not fresh:
+                dlg.set_tickets(report.tickets(settings))
             if fresh:
                 # In front of the person: shown, so no longer new.
                 dlg.set_tickets(report.tickets(settings))
@@ -321,7 +328,10 @@ class _ReportMixin:
         if dlg is not None:
             dlg.close()
         items = report.tickets(settings)
-        dlg = AnswersDialog(parent or self, items, check=self.check_answers_now, send=self._answers_send)
+        # A modified build sends nothing, a reply neither: no box for one.
+        reply = self._answers_reply if build_check.allowed() else None
+        dlg = AnswersDialog(parent or self, items, check=self.check_answers_now, send=self._answers_send,
+                            reply=reply)
         dlg.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self._answers_dialog = dlg
         self._answers_mark_seen()
@@ -336,6 +346,61 @@ class _ReportMixin:
         if dlg is not None:
             dlg.close()
         QTimer.singleShot(0, self.open_feedback)
+
+    def _answers_reply(self, code: str, text: str) -> None:
+        """The person's reply to the answer that lets them, from its card:
+        sent as feedback with the report's own code hash as its thread -
+        scrubbed as feedback is, within feedback's limits, never from a
+        modified build - and kept on the report here once the site took it;
+        asked about soon after, as a new report is. The site saying the
+        thread is closed (409) closes it here too."""
+        settings = getattr(self, "settings", None)
+        dlg = self._answers_window()
+        if settings is None or not build_check.allowed():
+            return
+        now = time.time()
+        wait = report.feedback_wait(report.sent_times(settings.value("feedback_sent", "")), now)
+        if wait:
+            if dlg is not None:
+                dlg.reply_failed(code, wait)
+            return
+        words = report.scrub(text, self._personal_values()).strip()[:report.REPLY_MAX]
+        if not words:
+            return
+        h = report.code_hash(code)
+        fields = {"reply": h, "thread": h}
+        if self._supporter_now():
+            fields["supporter"] = "yes"
+        if dlg is not None:
+            dlg.reply_sending(code)
+
+        def done(status) -> None:
+            win = self._answers_window()
+            items = report.tickets(settings)
+            ticket = next((t for t in items if t.get("c") == code), None)
+            if status and 200 <= status < 300:
+                at = time.time()
+                keep = [t for t in report.sent_times(settings.value("feedback_sent", "")) if at - t < 86400]
+                settings.setValue("feedback_sent", ",".join(str(int(t)) for t in [*keep, at]))
+                if ticket is not None:
+                    report.add_followup(ticket, words, at)
+                    report.save_tickets(settings, items)
+                self._schedule_answers()            # two minutes from now, as after a report
+                if win is not None:
+                    win.reply_sent(code, report.tickets(settings))
+                self._show_toast(tr("fba_reply_sent"), 5000)
+                log.info("report: a reply to an answer sent by the person")
+                return
+            if status == 409:
+                if ticket is not None and report.close_thread(ticket):
+                    report.save_tickets(settings, items)
+                if win is not None:
+                    win.reply_failed(code, "closed", report.tickets(settings))
+                return
+            if win is not None:
+                win.reply_failed(code, "failed")
+        run_async(self.pool, partial(report.send_status, "feedback", words, extra=fields), done,
+                  lambda _e=None: done(0))
 
     def _answered(self) -> list[dict]:
         settings = getattr(self, "settings", None)

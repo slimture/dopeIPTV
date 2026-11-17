@@ -870,16 +870,23 @@ def answer_text(a: dict) -> str:
 
 def answers_html(tickets: list) -> str:
     """The answered reports, newest first: what the person wrote (kept on
-    this computer only) and each answer with its day."""
+    this computer only), each answer with its day and their replies."""
     import datetime as _dt
     import html as _html
+
+    from ..core import report
+
+    def line(when, text: str, colour: str = "") -> str:
+        words = f"<span style='color:{colour}'>{_html.escape(text)}</span>" if colour else _html.escape(text)
+        return (f"<p style='margin:4px 0 0'><span style='color:{P['muted']}'>"
+                f"{_dt.date.fromtimestamp(int(when or 0)).isoformat()}</span>&nbsp; {words}</p>")
     rows = []
     ordered = sorted(tickets, key=lambda t: -max((a.get("t", 0) for a in t.get("r") or [{}]), default=0))
     for n, t in enumerate(ordered):
-        said = "".join(
-            f"<p style='margin:4px 0 0'><span style='color:{P['muted']}'>"
-            f"{_dt.date.fromtimestamp(int(a.get('t') or 0)).isoformat()}</span>&nbsp; "
-            f"{_html.escape(answer_text(a))}</p>" for a in t.get("r") or [])
+        # Their own replies in their own colour, the answers as they were.
+        said = "".join(line(e.get("t"), answer_text(e)) if kind == "answer"
+                       else line(e.get("t"), tr("fbr_you_replied", text=e["w"]), P["text2"])
+                       for kind, e in report.conversation(t))
         rows.append(f"<p style='margin:{12 if n else 0}px 0 0 0; color:{P['text2']}'>"
                     f"{_html.escape(tr('fbr_you', text=str(t.get('w') or '…')))}</p>{said}")
     return "".join(rows)
@@ -895,21 +902,30 @@ def _count(value) -> int:
 class AnswersDialog(QDialog):
     """Answers to feedback, in a window of their own: a card for each report
     that asked for one, newest first - the day it went, its first words
-    (kept on this computer only), each answer with its day, the new ones
-    marked and the waiting ones said - with Check now, and how it stays
-    anonymous. With no report yet, a way to send one."""
+    (kept on this computer only), each answer with its day and the person's
+    replies between them, the new ones marked and the waiting ones said -
+    with Check now, and how it stays anonymous. Under an answer that lets
+    them reply, a box and Send reply (*reply(code, text)*); what is typed
+    there stays while the cards are drawn again. With no report yet, a way
+    to send one."""
 
     #: The first words are kept to this many characters (mw_report).
     WORDS = 90
     #: The cards' room before they scroll.
     TALLEST = 460
 
-    def __init__(self, parent, tickets: list, check=None, send=None) -> None:
+    def __init__(self, parent, tickets: list, check=None, send=None, reply=None) -> None:
         super().__init__(parent)
-        self._check, self._send = check, send
+        self._check, self._send, self._reply = check, send, reply
         #: (code, answer's index) new while this window has been open.
         self._new: set[tuple[str, int]] = set()
+        #: What is typed in each card's reply box, and the replies on their way.
+        self._drafts: dict[str, str] = {}
+        self._sending: set[str] = set()
         self.cards: list[QFrame] = []
+        self.reply_boxes: dict[str, Any] = {}
+        self.reply_buttons: dict[str, QPushButton] = {}
+        self.reply_notes: dict[str, QLabel] = {}
         self.send_btn: QPushButton | None = None
         self.setWindowTitle(tr("fbr_title"))
         self.setMinimumWidth(540)
@@ -960,6 +976,9 @@ class AnswersDialog(QDialog):
         for t in tickets:
             for i in range(_count(t.get("seen")), len(t.get("r") or [])):
                 self._new.add((str(t.get("c")), i))
+        # Typing a reply: the same box has the cursor where it was once the
+        # cards are drawn again.
+        typing = next(((c, b.textCursor().position()) for c, b in self.reply_boxes.items() if b.hasFocus()), None)
         while self.rows.count():
             item = self.rows.takeAt(0)
             w = item.widget() if item is not None else None
@@ -967,6 +986,7 @@ class AnswersDialog(QDialog):
                 w.hide()
                 w.deleteLater()
         self.cards = []
+        self.reply_boxes, self.reply_buttons, self.reply_notes = {}, {}, {}
         self.send_btn = None
         ordered = sorted(tickets, key=lambda t: -float(t.get("t") or 0))
         for t in ordered:
@@ -976,6 +996,12 @@ class AnswersDialog(QDialog):
         if not ordered:
             self.rows.addWidget(self._empty())
         self.rows.addStretch(1)
+        if typing is not None and typing[0] in self.reply_boxes:
+            box = self.reply_boxes[typing[0]]
+            box.setFocus()
+            cursor = box.textCursor()
+            cursor.setPosition(min(typing[1], len(box.toPlainText())))
+            box.setTextCursor(cursor)
         asked = bool(report.open_codes(ordered, time.time()))
         self.check_btn.setVisible(asked)
         if not asked:
@@ -992,6 +1018,7 @@ class AnswersDialog(QDialog):
     def _card(self, t: dict) -> QFrame:
         import html as _html
 
+        from ..core import report
         from .qt_i18n import format_when
         card = QFrame(objectName="AnswerCard")
         card.setStyleSheet(f"QFrame#AnswerCard {{ background:{P['input']}; border-radius:12px; }}"
@@ -1025,8 +1052,25 @@ class AnswersDialog(QDialog):
             wait.setStyleSheet(f"font-size:13px; color:{P['muted']}; font-style:italic;")
             lay.addSpacing(2)
             lay.addWidget(wait)
-        for i, a in enumerate(answers):
+
+        def words(said: str, colour: str) -> None:
+            text = QLabel(said)
+            text.setTextFormat(Qt.TextFormat.PlainText)
+            text.setWordWrap(True)
+            text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            text.setStyleSheet(f"font-size:13px; color:{colour};")
+            lay.addWidget(text)
+        i = -1
+        for kind, a in report.conversation(t):
             lay.addSpacing(8)
+            if kind == "reply":
+                # Their own reply, as they sent it (kept on this computer only).
+                when = QLabel(tr("fba_you_replied", date=format_when(float(a["t"]), "d MMM yyyy")))
+                when.setStyleSheet(f"font-size:12px; font-weight:600; color:{P['muted']};")
+                lay.addWidget(when)
+                words(a["w"], P["text2"])
+                continue
+            i += 1
             fresh = (code, i) in self._new
             dot = f"<span style='color:{P['accent']}'>●</span>&nbsp; " if fresh else ""
             when = QLabel(dot + _html.escape(tr("fba_answer", date=format_when(float(a.get("t") or 0),
@@ -1037,13 +1081,114 @@ class AnswersDialog(QDialog):
             lay.addWidget(when)
             said = answer_text(a)
             if said:
-                text = QLabel(said)
-                text.setTextFormat(Qt.TextFormat.PlainText)
-                text.setWordWrap(True)
-                text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-                text.setStyleSheet(f"font-size:13px; color:{P['text']};")
-                lay.addWidget(text)
+                words(said, P["text"])
+        if self._reply is not None and report.can_reply(t):
+            self._reply_box(lay, code)
         return card
+
+    def _reply_box(self, lay: QVBoxLayout, code: str) -> None:
+        """Under the answer that lets them reply: a word on what it is, the
+        box (as long as the site takes), Send reply and how it went."""
+        from functools import partial
+
+        from PyQt6.QtWidgets import QPlainTextEdit
+        lay.addSpacing(10)
+        hint = QLabel(tr("fba_reply_hint"))
+        hint.setWordWrap(True)
+        hint.setStyleSheet(f"font-size:12px; color:{P['muted']};")
+        lay.addWidget(hint)
+        box = QPlainTextEdit()
+        box.setPlaceholderText(tr("fba_reply_placeholder"))
+        box.setAccessibleName(tr("fba_reply_placeholder"))
+        box.setTabChangesFocus(True)
+        box.setFixedHeight(84)
+        box.setStyleSheet(f"QPlainTextEdit {{ background: {P['bg']}; color: {P['text']}; border: none;"
+                          f" border-radius: 8px; padding: 6px 8px; selection-background-color: {P['sel']}; }}")
+        box.setPlainText(self._drafts.get(code, ""))
+        sending = code in self._sending
+        box.setReadOnly(sending)
+        lay.addWidget(box)
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        note = QLabel(tr("fba_reply_sending") if sending else "")
+        note.setWordWrap(True)
+        note.setStyleSheet(f"font-size:12px; color:{P['muted']};")
+        row.addWidget(note, 1)
+        send = QPushButton(tr("fba_reply_send"))
+        send.setEnabled(not sending and bool(box.toPlainText().strip()))
+        send.clicked.connect(partial(self._reply_clicked, code))
+        row.addWidget(send, 0, Qt.AlignmentFlag.AlignTop)
+        lay.addLayout(row)
+        self.reply_boxes[code], self.reply_buttons[code], self.reply_notes[code] = box, send, note
+        box.textChanged.connect(partial(self._draft_changed, code))
+
+    def _draft_changed(self, code: str) -> None:
+        """Kept as typed (a card drawn again has it back), never longer than
+        the site takes; Send reply only with something in it."""
+        from ..core import report
+        box, send = self.reply_boxes.get(code), self.reply_buttons.get(code)
+        if box is None or send is None:
+            return
+        text = box.toPlainText()
+        if len(text) > report.REPLY_MAX:
+            at = min(box.textCursor().position(), report.REPLY_MAX)
+            text = text[:report.REPLY_MAX]
+            box.blockSignals(True)
+            box.setPlainText(text)
+            box.blockSignals(False)
+            cursor = box.textCursor()
+            cursor.setPosition(at)
+            box.setTextCursor(cursor)
+        self._drafts[code] = text
+        send.setEnabled(code not in self._sending and bool(text.strip()))
+
+    def _reply_clicked(self, code: str, *_a) -> None:
+        text = self._drafts.get(code, "").strip()
+        if text and self._reply is not None and code not in self._sending:
+            self._reply(code, text)
+
+    # -- a reply on its way -----------------------------------------------------
+
+    def reply_sending(self, code: str) -> None:
+        self._sending.add(code)
+        box, send, note = (self.reply_boxes.get(code), self.reply_buttons.get(code),
+                           self.reply_notes.get(code))
+        if box is not None:
+            box.setReadOnly(True)
+        if send is not None:
+            send.setEnabled(False)
+        if note is not None:
+            note.setStyleSheet(f"font-size:12px; color:{P['muted']};")
+            note.setText(tr("fba_reply_sending"))
+
+    def reply_sent(self, code: str, tickets: list) -> None:
+        """It arrived: the box goes (until a newer answer lets them reply),
+        their reply shows in its place."""
+        self._sending.discard(code)
+        self._drafts.pop(code, None)
+        self.set_tickets(tickets)
+
+    def reply_failed(self, code: str, why: str, tickets: list | None = None) -> None:
+        """Not sent: *why* "wait" or "day" (feedback's own limits), "closed"
+        (the site is not waiting for a reply to that answer - the box goes,
+        what was typed is kept should a newer answer let them), else it did
+        not reach the site; the words stay in the box."""
+        self._sending.discard(code)
+        if why == "closed":
+            if tickets is not None:
+                self.set_tickets(tickets)
+            self.status.setStyleSheet(f"font-size:12px; color:{P['error']};")
+            self.status.setText(tr("fba_reply_closed"))
+            return
+        box, send, note = (self.reply_boxes.get(code), self.reply_buttons.get(code),
+                           self.reply_notes.get(code))
+        if box is not None:
+            box.setReadOnly(False)
+        if send is not None:
+            send.setEnabled(bool(self._drafts.get(code, "").strip()))
+        if note is not None:
+            note.setStyleSheet(f"font-size:12px; color:{P['error']};")
+            note.setText(tr({"wait": "fb_wait", "day": "fb_enough"}.get(why, "fba_reply_failed")))
 
     def _empty(self) -> QWidget:
         box = QWidget()

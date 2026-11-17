@@ -226,10 +226,18 @@ def send(kind: str, text: str, timeout: float = 15.0, endpoint: str | None = Non
          extra: dict | None = None) -> bool:
     """POST the report as the person left it. True when it arrived - never
     from a modified build (its reports go to whoever made it)."""
+    return 200 <= send_status(kind, text, timeout, endpoint, extra) < 300
+
+
+def send_status(kind: str, text: str, timeout: float = 15.0, endpoint: str | None = None,
+                extra: dict | None = None) -> int:
+    """send(), with the site's answer: its HTTP status - 409 for a reply to
+    an answer whose thread is closed - or 0 when nothing reached it (never
+    from a modified build)."""
     from .. import __version__
     if not build_check.allowed():
         log.info("report: not sent - not an official build")
-        return False
+        return 0
     extra = extra or {}
     fields = {"kind": kind if kind in ("error", "crash", "feedback") else "feedback",
               "version": __version__, "os": platform.system(),
@@ -239,9 +247,11 @@ def send(kind: str, text: str, timeout: float = 15.0, endpoint: str | None = Non
     fields.update({k: v for k, v in extra.items()
                    if k in ("topic", "area", "often", "supporter")
                    and isinstance(v, str) and v.isalpha() and len(v) <= 12})
-    # The hash of the code this computer keeps to be told the answers.
-    if re.fullmatch(r"[0-9a-f]{64}", str(extra.get("reply") or "")):
-        fields["reply"] = str(extra["reply"])
+    # The hash of the code this computer keeps to be told the answers - and
+    # for a reply to an answer, the same hash as the thread it belongs to.
+    for key in ("reply", "thread"):
+        if re.fullmatch(r"[0-9a-f]{64}", str(extra.get(key) or "")):
+            fields[key] = str(extra[key])
     # UTF-8 as it is (an escaped "å" is six bytes), and cut to what the site
     # takes - a long log once made the whole report too big to be kept.
     body = json.dumps(fields, ensure_ascii=False).encode("utf-8")
@@ -252,12 +262,12 @@ def send(kind: str, text: str, timeout: float = 15.0, endpoint: str | None = Non
         status, _data = _post(endpoint or ENDPOINT, body, timeout)
     except Exception as e:
         log.info("report: not sent (%s)", type(e).__name__)
-        return False
+        return 0
     if not 200 <= status < 300:
         log.info("report: not sent (HTTP %s)", status)
-        return False
-    log.info("report: sent (%s)", kind)
-    return True
+        return status
+    log.info("report: sent (%s%s)", kind, ", a reply" if "thread" in fields else "")
+    return status
 
 
 # -- answers: a random code kept here, its hash sent with the report ---------------
@@ -279,7 +289,9 @@ def code_hash(code: str) -> str:
 def tickets(settings: Any) -> list[dict]:
     """The reports this computer asked answers to: {"c": code, "t": sent,
     "w": the first words (kept here only), "r": answers, "seen": how many
-    were shown}. Old ones without answers drop off."""
+    were shown, "f": the person's replies to answers - {"t": sent, "w":
+    their words (kept here only), "a": how many answers there were}}. Old
+    ones without answers drop off; a reply counts as new activity."""
     import time
     try:
         raw = json.loads(str(settings.value("feedback_tickets", "") or "[]"))
@@ -290,7 +302,7 @@ def tickets(settings: Any) -> list[dict]:
     for t in raw if isinstance(raw, list) else []:
         if not isinstance(t, dict) or not isinstance(t.get("c"), str):
             continue
-        age = now - _sent(t)
+        age = now - _active(t)
         if age < ASK_DAYS * 86400 or (t.get("r") and age < KEEP_DAYS * 86400):
             out.append(t)
     return out[-20:]
@@ -337,18 +349,94 @@ def _sent(t: dict) -> float:
         return 0.0
 
 
+def _answers(t: dict) -> list[dict]:
+    return [a for a in t.get("r") or [] if isinstance(a, dict)]
+
+
+def followups(t: dict) -> list[dict]:
+    """The person's replies to answers on *t*, oldest first (kept here only)."""
+    out = []
+    for f in t.get("f") or []:
+        if isinstance(f, dict) and isinstance(f.get("w"), str):
+            try:
+                out.append({"t": float(f.get("t") or 0), "w": f["w"], "a": max(0, int(f.get("a") or 0))})
+            except (TypeError, ValueError):
+                continue
+    return sorted(out, key=lambda f: f["t"])
+
+
+def _active(t: dict) -> float:
+    """When the report was last touched by its sender: sent, or replied to."""
+    return max([_sent(t)] + [f["t"] for f in followups(t)])
+
+
+def _waiting_since(t: dict) -> float | None:
+    """Since when *t* waits for an answer: since it went while unanswered,
+    since the person's reply to the latest answer; None while it does not."""
+    if not _answers(t):
+        return _sent(t)
+    replies = followups(t)
+    if replies and replies[-1]["a"] >= len(_answers(t)):
+        return replies[-1]["t"]
+    return None
+
+
+#: A reply to an answer is the person's words only, as short as the site takes.
+REPLY_MAX = 2000
+
+
+def can_reply(t: dict) -> bool:
+    """The latest answer lets the person reply (the site said "open") and
+    they have not replied to it yet."""
+    answers = _answers(t)
+    if not answers or not answers[-1].get("open"):
+        return False
+    return not any(f["a"] >= len(answers) for f in followups(t))
+
+
+def add_followup(t: dict, words: str, now: float) -> None:
+    """The person's reply, sent, kept on its report: after the answers there
+    are now (the card shows it there)."""
+    t.setdefault("f", []).append({"t": int(now), "w": (words or "")[:REPLY_MAX], "a": len(_answers(t))})
+
+
+def close_thread(t: dict) -> bool:
+    """The site said the thread is closed (409): the latest answer no
+    longer lets them reply here either. True when that changed it."""
+    answers = _answers(t)
+    if answers and answers[-1].get("open"):
+        answers[-1].pop("open", None)
+        return True
+    return False
+
+
+def conversation(t: dict) -> list[tuple[str, dict]]:
+    """The answers and the person's replies in order: ("answer", a) and
+    ("reply", f), each reply right after the answer it replied to."""
+    answers = _answers(t)
+    replies = followups(t)
+    out: list[tuple[str, dict]] = [("reply", f) for f in replies if f["a"] == 0]
+    for i, a in enumerate(answers, 1):
+        out.append(("answer", a))
+        out += [("reply", f) for f in replies if f["a"] == i]
+    out += [("reply", f) for f in replies if f["a"] > len(answers)]
+    return out
+
+
 def open_codes(items: list[dict], now: float) -> list[str]:
-    """The codes still asked about: reports sent in the last ASK_DAYS."""
-    return [str(t["c"]) for t in items if now - _sent(t) < ASK_DAYS * 86400]
+    """The codes still asked about: reports sent - or replied to - in the
+    last ASK_DAYS."""
+    return [str(t["c"]) for t in items if now - _active(t) < ASK_DAYS * 86400]
 
 
 def next_ask(items: list[dict], now: float, last: float = 0.0) -> float | None:
     """Seconds until answers are asked next (*last*: when they last were,
-    0 for never); None while no report is asked about."""
-    asked = [t for t in items if now - _sent(t) < ASK_DAYS * 86400]
+    0 for never); None while no report is asked about. A reply to an answer
+    is asked about as a new report is."""
+    asked = [t for t in items if now - _active(t) < ASK_DAYS * 86400]
     if not asked:
         return None
-    waiting = [_sent(t) for t in asked if not t.get("r") and now - _sent(t) < ASK_SOON_FOR]
+    waiting = [w for w in (_waiting_since(t) for t in asked) if w is not None and now - w < ASK_SOON_FOR]
     if waiting:
         newest = max(waiting)
         due = newest + ASK_FIRST if last < newest + ASK_FIRST else last + ASK_SOON
@@ -381,7 +469,9 @@ def mark_seen(items: list[dict]) -> bool:
 
 
 def merge_replies(items: list[dict], got: dict) -> int:
-    """The site's answers (fetch_replies) into *items*; how many are new."""
+    """The site's answers (fetch_replies) into *items*; how many are new.
+    The same answers told differently - the latest no longer letting them
+    reply - replace the ones kept too, as nothing new."""
     fresh = 0
     for t in items:
         raw = got.get(t["c"])
@@ -389,6 +479,8 @@ def merge_replies(items: list[dict], got: dict) -> int:
         had = len(t.get("r") or [])
         if len(answers) > had:
             fresh += len(answers) - had
+            t["r"] = answers
+        elif answers and len(answers) == had and answers != t.get("r"):
             t["r"] = answers
     return fresh
 

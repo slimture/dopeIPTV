@@ -7,6 +7,17 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Added
+
+- Reply to an answer to your feedback. When dopeIPTV asks for more - an
+  answer that lets you reply - a box shows under it in Answers to
+  feedback; your reply goes with the same random code as the report and
+  nothing else about you, cleaned the same way as feedback. One reply per
+  answer: then it waits for the next answer, which the app asks for soon
+  after, as after new feedback. The card reads as the conversation - what
+  you wrote, each answer, your replies - and your own words stay on this
+  computer. A conversation that is closed says so.
+
 ## [1.6.3]
 
 Room for the list, a guide that follows the category, and every place in the
