@@ -788,7 +788,7 @@ def test_a_port_already_taken_leaves_no_thread_running(tmp_path):
         def _show_toast(self, text, _ms) -> None:
             self.told.append(text)
 
-        def _show_action_toast(self, text, _ms, _act, label=None) -> None:
+        def _show_action_toast(self, text, _ms, _act, label=None, decide=False) -> None:
             self.told.append(text)
 
     def ticking() -> int:

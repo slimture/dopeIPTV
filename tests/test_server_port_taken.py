@@ -290,7 +290,7 @@ def _window(tmp_path, port: int):
         def _show_toast(self, text, _ms) -> None:
             self.told.append(text)
 
-        def _show_action_toast(self, text, _ms, act, label=None) -> None:
+        def _show_action_toast(self, text, _ms, act, label=None, decide=False) -> None:
             self.told.append(text + " | " + (label or ""))
             self.acts.append(act)
     return Window()

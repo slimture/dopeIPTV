@@ -2951,5 +2951,8 @@
   "notice_reading_source": "{name} 읽는 중…",
   "notice_reading_sources": "소스 읽는 중 · {n}",
   "notice_scanning_network": "네트워크 검색 중…",
-  "notice_less": "간단히 보기"
+  "notice_messages": "메시지",
+  "notice_clear_all": "모두 지우기",
+  "notice_open": "열기",
+  "notice_unread": "읽지 않은 메시지: {n}"
 }

@@ -2951,5 +2951,8 @@
   "notice_reading_source": "Membaca {name}…",
   "notice_reading_sources": "Membaca sumber Anda · {n}",
   "notice_scanning_network": "Memindai jaringan…",
-  "notice_less": "Tampilkan lebih sedikit"
+  "notice_messages": "Pesan",
+  "notice_clear_all": "Hapus semua",
+  "notice_open": "Buka",
+  "notice_unread": "Pesan belum dibaca: {n}"
 }

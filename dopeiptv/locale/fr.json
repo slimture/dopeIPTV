@@ -2951,5 +2951,8 @@
   "notice_reading_source": "Lecture de {name}…",
   "notice_reading_sources": "Lecture de vos sources · {n}",
   "notice_scanning_network": "Analyse du réseau…",
-  "notice_less": "Afficher moins"
+  "notice_messages": "Messages",
+  "notice_clear_all": "Tout effacer",
+  "notice_open": "Ouvrir",
+  "notice_unread": "Messages non lus : {n}"
 }

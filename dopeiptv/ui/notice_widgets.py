@@ -1,16 +1,17 @@
-"""The notices drawn (ui/notices.py holds their state): the activity line
-and its ring on the icon rail, the panel of every job, the cards and their
-stack - flat, in P's colours made to read on every theme, rounded like the
-app's other surfaces, mirrored right to left, faded softly in and out
-unless the desktop asks for less motion."""
+"""The notices drawn (ui/notices.py holds their state), all at the
+sidebar's foot: the activity line (its ring on the icon rail) with the count
+of unread messages, the panel of the work and the messages, and the one card
+for a decision - flat, in P's colours made to read on every theme, rounded
+like the app's other surfaces, mirrored right to left, faded softly in and
+out unless the desktop asks for less motion."""
 from __future__ import annotations
 
 from functools import partial
 from typing import Any, Callable
 
 from PyQt6.QtCore import (
-    QEasingCurve, QEvent, QObject, QPoint, QPointF, QPropertyAnimation, QRect,
-    QRectF, QSize, Qt, QTimer, pyqtSignal,
+    QEasingCurve, QEvent, QObject, QPoint, QPointF, QPropertyAnimation, QRectF,
+    QSize, Qt, QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import (
@@ -20,7 +21,7 @@ from PyQt6.QtWidgets import (
 
 from ..core.log import log
 from ..i18n import tr
-from .notices import Card, Entry, NoticeHub
+from .notices import Entry, Message, NoticeHub
 from .theme import P, contrast, corner_radius, ink_on, tinted
 
 # -- colours -------------------------------------------------------------------
@@ -135,6 +136,19 @@ def paint_kind(p: QPainter, kind: str, r: QRectF, colour: QColor) -> None:
         p.drawLine(pt(0.3, 0.46), pt(0.5, 0.66))
         p.drawLine(pt(0.7, 0.46), pt(0.5, 0.66))
         p.drawLine(pt(0.16, 0.86), pt(0.84, 0.86))
+    elif kind == "note":
+        p.drawEllipse(QRectF(x + 0.14 * s, y + 0.14 * s, 0.72 * s, 0.72 * s))
+        p.drawLine(pt(0.34, 0.52), pt(0.46, 0.64))
+        p.drawLine(pt(0.46, 0.64), pt(0.68, 0.4))
+    elif kind == "bell":
+        path = QPainterPath(pt(0.22, 0.72))
+        path.lineTo(pt(0.78, 0.72))
+        path.cubicTo(pt(0.7, 0.62), pt(0.72, 0.5), pt(0.72, 0.42))
+        path.cubicTo(pt(0.72, 0.24), pt(0.6, 0.16), pt(0.5, 0.16))
+        path.cubicTo(pt(0.4, 0.16), pt(0.28, 0.24), pt(0.28, 0.42))
+        path.cubicTo(pt(0.28, 0.5), pt(0.3, 0.62), pt(0.22, 0.72))
+        p.drawPath(path)
+        p.drawLine(pt(0.44, 0.84), pt(0.56, 0.84))
     elif kind == "record":
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QColor(P["rec"]))
@@ -256,9 +270,48 @@ class _Fader:
             self._fx = None
 
 
+def two_lines(text: str, font: QFont, width: int) -> str:
+    """*text* wrapped to *width* in two lines at most, the second cut with
+    an ellipsis when it runs on (a long word cut too)."""
+    fm = QFontMetrics(font)
+    width = max(20, int(width))
+    words = str(text or "").split()
+    if not words:
+        return ""
+    first: list[str] = []
+    while words:
+        trial = " ".join([*first, words[0]])
+        if fm.horizontalAdvance(trial) <= width or not first:
+            first.append(words.pop(0))
+            if fm.horizontalAdvance(" ".join(first)) > width:
+                break
+        else:
+            break
+    line1 = fm.elidedText(" ".join(first), Qt.TextElideMode.ElideRight, width)
+    if not words:
+        return line1
+    return line1 + "\n" + fm.elidedText(" ".join(words), Qt.TextElideMode.ElideRight, width)
+
+
+def one_line(text: str, fm: QFontMetrics, width: int) -> str:
+    """*text* cut to *width* with an ellipsis; words ending in " · N found"
+    keep that count and give up the start instead ("Searching in Mo… · 12
+    found"), while the count takes half the room at most."""
+    width = max(20, int(width))
+    if fm.horizontalAdvance(text) <= width:
+        return text
+    head, sep, tail = text.rpartition(" · ")
+    if sep and head:
+        tail_w = fm.horizontalAdvance(sep + tail)
+        if tail_w <= width // 2:
+            return fm.elidedText(head, Qt.TextElideMode.ElideRight, width - tail_w) + sep + tail
+    return fm.elidedText(text, Qt.TextElideMode.ElideRight, width)
+
+
 class ActivityLine(QWidget):
-    """The running work as one line (or, on the icon rail, a ring with a
-    count). Enter, Space or a click opens its panel."""
+    """The line at the sidebar's foot: a passing note, else the running work
+    (or, on the icon rail, a ring), and the count of unread messages on a
+    dot. Enter, Space or a click opens the panel."""
 
     open_panel = pyqtSignal()
     TICK_MS = 50
@@ -273,6 +326,8 @@ class ActivityLine(QWidget):
         self._ring = False
         self._angle = 0
         self._entries: list[Entry] = []
+        self._note = ""
+        self._unread = 0
         self._fader = _Fader(self)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.TabFocus)
@@ -286,7 +341,7 @@ class ActivityLine(QWidget):
         self.hide()
 
     def set_ring(self, on: bool) -> None:
-        """The icon rail: a ring with a count, as wide as the rail's icons."""
+        """The icon rail: a ring with the count, as wide as the rail's icons."""
         if bool(on) == self._ring:
             return
         self._ring = bool(on)
@@ -295,13 +350,13 @@ class ActivityLine(QWidget):
         self.update()
 
     def refresh(self) -> None:
-        self._entries = self._hub.entries()
-        es = self._entries
-        if es:
-            words = [e.text + (f" {round(e.progress * 100)}%" if e.progress is not None else "")
-                     for e in es]
-            self.setToolTip("\n".join(words))
-            self.setAccessibleName(tr("notice_working") + ": " + "; ".join(words))
+        hub = self._hub
+        self._entries = hub.entries()
+        self._note = hub.note_text()
+        self._unread = hub.unread()
+        if self._entries or self._note or self._unread:
+            self.setToolTip(self._tip())
+            self.setAccessibleName(self._tip().replace("\n", "; "))
             self._fader.show()
             self._sync_spin()
         else:
@@ -309,8 +364,27 @@ class ActivityLine(QWidget):
             self._fader.hide()
         self.update()
 
+    def _tip(self) -> str:
+        lines = [self._note] if self._note else []
+        lines += [e.text + (f" {round(e.progress * 100)}%" if e.progress is not None else "")
+                  for e in self._entries]
+        if self._unread:
+            lines.append(tr("notice_unread", n=self._unread))
+        return "\n".join(lines)
+
+    def badge(self) -> int:
+        """The count on its dot: the messages not read yet."""
+        return self._unread
+
     def text(self) -> str:
-        return self._hub.line_text()
+        """What the line says now."""
+        if self._ring:
+            return ""
+        if self._note:
+            return self._note
+        if self._entries:
+            return self._hub.line_text()
+        return tr("notice_unread", n=self._unread) if self._unread else ""
 
     def sizeHint(self) -> QSize:
         if self._ring:
@@ -337,40 +411,47 @@ class ActivityLine(QWidget):
         self._spin.stop()
         super().hideEvent(e)
 
+    def _opens(self) -> bool:
+        return bool(self._entries) or bool(self._hub.messages())
+
     def mousePressEvent(self, e) -> None:    # noqa: N802 - Qt hook
-        if e.button() == Qt.MouseButton.LeftButton and self._entries:
+        if e.button() == Qt.MouseButton.LeftButton and self._opens():
             e.accept()
             self.open_panel.emit()
             return
         super().mousePressEvent(e)
 
     def keyPressEvent(self, e) -> None:      # noqa: N802 - Qt hook
-        if e.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space) and self._entries:
+        if e.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space) and self._opens():
             self.open_panel.emit()
             return
         super().keyPressEvent(e)
 
     def paintEvent(self, _e) -> None:    # noqa: N802 - Qt hook
-        if not self._entries:
+        if not (self._entries or self._note or self._unread):
             return
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         r = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
-        e = self._entries[0]
+        c = colours()
         rad = corner_radius(10)
         p.setPen(Qt.PenStyle.NoPen)
-        c = colours()
         p.setBrush(QColor(c["float_bg"] if self._floating else c["line_bg"]))
         if self.hasFocus():
             p.setPen(QPen(QColor(P["accent"]), 1.5))
         p.drawRoundedRect(r, rad, rad)
+        e = self._entries[0] if self._entries and not self._note else None
+        kind = e.kind if e is not None else ("note" if self._note else "bell")
         if self._ring:
             d = 20.0
             ring = QRectF((r.width() - d) / 2, (r.height() - d) / 2 - 1, d, d)
-            paint_progress(p, ring, e.progress, self._angle)
-            n = len(self._entries)
-            if n > 1:
-                self._badge(p, QPointF(ring.right() + 1, ring.top() + 2), str(n))
+            if e is not None:
+                paint_progress(p, ring, e.progress, self._angle)
+            ic = 10.0
+            paint_kind(p, kind, QRectF(ring.center().x() - ic / 2, ring.center().y() - ic / 2,
+                                       ic, ic), QColor(c["icon"]))
+            if self._unread:
+                self._badge(p, QPointF(ring.right() + 1, ring.top() + 2), str(self._unread))
             p.end()
             return
         rtl = self.layoutDirection() == Qt.LayoutDirection.RightToLeft
@@ -379,13 +460,16 @@ class ActivityLine(QWidget):
         ring = QRectF(r.right() - pad - ring_d if rtl else r.left() + pad,
                       (r.height() - ring_d) / 2, ring_d, ring_d)
         # The kind's icon in a ring that turns while the progress is not
-        # known (known, the bar under the words says it): one place for both.
-        if e.progress is None:
+        # known (known, the bar under the words says it).
+        if e is not None and e.progress is None:
             paint_progress(p, ring.adjusted(0.8, 0.8, -0.8, -0.8), None, self._angle)
         ic = 12.0
-        paint_kind(p, e.kind, QRectF(ring.center().x() - ic / 2, ring.center().y() - ic / 2,
-                                     ic, ic), QColor(c["icon"]))
-        more = len(self._entries) - 1
+        paint_kind(p, kind, QRectF(ring.center().x() - ic / 2, ring.center().y() - ic / 2,
+                                   ic, ic), QColor(c["icon"]))
+        if self._unread:
+            corner = QPointF(ring.left() + 3 if rtl else ring.right() - 3, ring.top() + 4)
+            self._badge(p, corner, str(self._unread))
+        more = len(self._entries) - 1 if e is not None else 0
         # "+N" as a small chip at the trailing end: the words take the room
         # between, whatever their direction.
         chip_w = 0.0
@@ -402,18 +486,24 @@ class ActivityLine(QWidget):
             p.drawText(chip, int(Qt.AlignmentFlag.AlignCenter), f"+{more}")
         tx0 = pad + ring_d + 8
         tx1 = pad + (chip_w + 6 if more else 0)
+        known = e is not None and e.progress is not None
         text_r = QRectF(r.left() + (tx1 if rtl else tx0), 0,
-                        r.width() - tx0 - tx1, r.height() - (3 if e.progress is not None else 0))
+                        r.width() - tx0 - tx1, r.height() - (3 if known else 0))
         p.setFont(self._font)
         fm = QFontMetrics(self._font)
-        pct = f" {round(e.progress * 100)}%" if e.progress is not None else ""
+        pct = f" {round(e.progress * 100)}%" if known and e is not None and e.progress is not None \
+            else ""
         room = int(text_r.width() - fm.horizontalAdvance(pct))
-        words = fm.elidedText(e.text, Qt.TextElideMode.ElideRight, max(20, room)) + pct
+        words = one_line(self.text() if e is None else e.text, fm, room) + pct
         align = Qt.AlignmentFlag.AlignVCenter | (Qt.AlignmentFlag.AlignRight if rtl
                                                  else Qt.AlignmentFlag.AlignLeft)
-        p.setPen(QColor(c["float_text"] if self._floating else c["line_text"]))
+        quiet = e is None and not self._note
+        if quiet:
+            p.setPen(QColor(c["float_more"] if self._floating else c["line_more"]))
+        else:
+            p.setPen(QColor(c["float_text"] if self._floating else c["line_text"]))
         p.drawText(text_r, int(align), words)
-        if e.progress is not None:
+        if known and e is not None and e.progress is not None:
             bar = QRectF(r.left() + pad, r.bottom() - 5, r.width() - 2 * pad, 2.5)
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(QColor(c["track"]))
@@ -427,41 +517,66 @@ class ActivityLine(QWidget):
         p.end()
 
     def _badge(self, p: QPainter, at: QPointF, text: str) -> None:
+        """The count of unread messages on a dot, in the worst one's colour."""
         p.setFont(self._small)
         fm = QFontMetrics(self._small)
         w = max(14.0, fm.horizontalAdvance(text) + 6.0)
         b = QRectF(at.x() - w / 2, at.y() - 7, w, 14)
+        fill = {"error": P["error"], "warning": P["warn"]}.get(self._hub.unread_level(),
+                                                               P["accent"])
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(P["accent"]))
+        p.setBrush(QColor(fill))
         p.drawRoundedRect(b, 7, 7)
-        p.setPen(QColor(ink_on(P["accent"])))
+        p.setPen(QColor(ink_on(fill)))
         p.drawText(b, int(Qt.AlignmentFlag.AlignCenter), text)
 
 
 class ActivityPanel(QFrame):
-    """Every running job, live: its icon, words, progress and - where its
-    producer can stop it - Cancel. A child of the window over everything
+    """The work and the messages, live: "Working on" - each job's icon,
+    words, progress and, where its producer can stop it, Cancel - and
+    "Messages", the newest first, each with its action and a dismiss, the
+    ones read before faded, Clear all. A child of the window over everything
     (it shows in a grab of the window); Esc or a click elsewhere closes it,
-    and it closes by itself when the last job ends."""
+    and it closes by itself when nothing is left in it. Opening it marks the
+    messages read."""
 
     W = 340
+    MAX_ROWS = 8
 
     def __init__(self, hub: NoticeHub, parent: QWidget) -> None:
         super().__init__(parent)
         self.setObjectName("NoticePanel")
         self._hub = hub
         self._anchor: QWidget | None = None
-        self._beside = False
+        self._beside: QWidget | bool = False
         self._angle = 0
+        self._fresh: set[int] = set()
         lay = QVBoxLayout(self)
         lay.setContentsMargins(14, 12, 14, 12)
         lay.setSpacing(10)
-        head = QLabel(tr("notice_working"))
-        head.setObjectName("NoticePanelHead")
-        lay.addWidget(head)
+        self._work_head = QLabel(tr("notice_working"))
+        self._work_head.setObjectName("NoticePanelHead")
+        lay.addWidget(self._work_head)
         self._rows = QVBoxLayout()
         self._rows.setSpacing(10)
         lay.addLayout(self._rows)
+        head = QHBoxLayout()
+        head.setContentsMargins(0, 0, 0, 0)
+        self._msg_head = QLabel(tr("notice_messages"))
+        self._msg_head.setObjectName("NoticePanelHead")
+        head.addWidget(self._msg_head, 1)
+        self.clear_btn = QPushButton(tr("notice_clear_all"))
+        self.clear_btn.setObjectName("NoticeRowCancel")
+        self.clear_btn.setFlat(True)
+        self.clear_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.clear_btn.clicked.connect(hub.clear)
+        head.addWidget(self.clear_btn)
+        self._msg_head_row = QWidget()
+        self._msg_head_row.setLayout(head)
+        lay.addWidget(self._msg_head_row)
+        self._msgs = QVBoxLayout()
+        self._msgs.setSpacing(8)
+        lay.addLayout(self._msgs)
         self.setFixedWidth(self.W)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._spin = QTimer(self)
@@ -470,11 +585,17 @@ class ActivityPanel(QFrame):
         hub.changed.connect(self._changed)
         self.hide()
 
-    def open_at(self, anchor: QWidget, beside: bool = False) -> None:
+    def _empty(self) -> bool:
+        return not self._hub.entries() and not self._hub.messages()
+
+    def open_at(self, anchor: QWidget, beside: QWidget | bool = False) -> None:
+        """Opened upward from *anchor* - or beside it, from the edge of
+        *beside* when that is a widget (the icon rail)."""
         self._anchor, self._beside = anchor, beside
+        self._fresh = {m.id for m in self._hub.messages() if not m.read}
         self.restyle()
         self._fill()
-        if not self._hub.entries():
+        if self._empty():
             return
         self.show()
         self.raise_()
@@ -483,6 +604,7 @@ class ActivityPanel(QFrame):
         QApplication.instance().installEventFilter(self)
         if not reduced_motion():
             self._spin.start()
+        self._hub.mark_read()        # seen now: the count on the line goes
 
     def close_panel(self) -> None:
         if self.isHidden():
@@ -501,29 +623,49 @@ class ActivityPanel(QFrame):
             f"#NoticePanelHead {{ color: {c['muted']}; font-size: 11px; font-weight: 700;"
             " letter-spacing: 0.5px; background: transparent; }"
             f"#NoticeRowText {{ color: {c['title']}; font-size: 13px; background: transparent; }}"
+            f"#NoticeRowRead {{ color: {c['muted']}; font-size: 13px; background: transparent; }}"
+            f"#NoticeRowBody {{ color: {c['body']}; font-size: 12px; background: transparent; }}"
             f"#NoticeRowPct {{ color: {c['muted']}; font-size: 12px; background: transparent; }}"
             f"#NoticeRowCancel {{ color: {c['action']}; font-size: 12px; font-weight: 600;"
             f" background: {c['action_bg']}; border: none; border-radius: 7px; padding: 3px 10px; }}"
-            f"#NoticeRowCancel:hover {{ background: {c['action_hover']}; }}")
+            f"#NoticeRowCancel:hover {{ background: {c['action_hover']}; }}"
+            f"#NoticeDismiss {{ color: {c['dismiss']}; background: transparent;"
+            " border: none; font-size: 12px; padding: 2px 5px; }"
+            f"#NoticeDismiss:hover {{ color: {c['title']}; }}")
 
     def _changed(self) -> None:
         if self.isHidden():
             return
-        if not self._hub.entries():
+        if self._empty():
             self.close_panel()
             return
         self._fill()
         self._place()
 
-    def _fill(self) -> None:
-        while self._rows.count():
-            item = self._rows.takeAt(0)
+    @staticmethod
+    def _clear(lay: QVBoxLayout) -> None:
+        while lay.count():
+            item = lay.takeAt(0)
             w = item.widget() if item is not None else None
             if w is not None:
                 w.hide()
                 w.deleteLater()
-        for e in self._hub.entries():
+
+    def _fill(self) -> None:
+        self._clear(self._rows)
+        self._clear(self._msgs)
+        entries = self._hub.entries()
+        for e in entries:
             self._rows.addWidget(_PanelRow(self, e))
+        self._work_head.setVisible(bool(entries))
+        msgs = self._hub.messages()
+        for m in msgs[:self.MAX_ROWS]:
+            self._msgs.addWidget(_MessageRow(self, m, fresh=m.id in self._fresh))
+        if len(msgs) > self.MAX_ROWS:
+            more = QLabel("+" + tr("notice_more", n=len(msgs) - self.MAX_ROWS))
+            more.setObjectName("NoticeRowPct")
+            self._msgs.addWidget(more)
+        self._msg_head_row.setVisible(bool(msgs))
         self.adjustSize()
 
     def _place(self) -> None:
@@ -534,8 +676,10 @@ class ActivityPanel(QFrame):
         self.adjustSize()
         top_left = a.mapTo(parent, QPoint(0, 0))
         rtl = self.layoutDirection() == Qt.LayoutDirection.RightToLeft
-        if self._beside:
-            x = top_left.x() - self.width() - 8 if rtl else top_left.x() + a.width() + 8
+        if self._beside is not False and self._beside is not None:
+            edge = self._beside if isinstance(self._beside, QWidget) else a
+            ex = edge.mapTo(parent, QPoint(0, 0)).x()
+            x = ex - self.width() - 8 if rtl else ex + edge.width() + 8
             y = top_left.y() + a.height() - self.height()
         else:
             x = top_left.x() + a.width() - self.width() if rtl else top_left.x()
@@ -589,9 +733,8 @@ class _PanelRow(QWidget):
         text.setObjectName("NoticeRowText")
         text.setWordWrap(True)
         col.addWidget(text)
-        self._bar_h = 3 if e.progress is not None else 0
-        if self._bar_h:
-            col.addSpacing(self._bar_h + 2)
+        if e.progress is not None:
+            col.addSpacing(5)
         lay.addLayout(col, 1)
         if e.progress is not None:
             pct = QLabel(f"{round(e.progress * 100)}%")
@@ -619,10 +762,7 @@ class _PanelRow(QWidget):
         x = self.width() - ic if rtl else 0.0
         c = colours()
         paint_kind(p, self._e.kind, QRectF(x, 2, ic, ic), QColor(c["body"]))
-        if self._e.progress is None:
-            if self.height() > 30:
-                paint_progress(p, QRectF(x + 3, 24, 10.0, 10.0), None, self.angle)
-        else:
+        if self._e.progress is not None:
             left = 26.0
             right = self.width() - 64.0 if not self._e.cancellable else self.width() - 120.0
             bar = QRectF(0 if rtl else left, self.height() - 5, max(20.0, right - left), 3)
@@ -640,57 +780,106 @@ class _PanelRow(QWidget):
         p.end()
 
 
-class NoticeCard(QFrame):
-    """One card: its mark, title, line, action and dismiss - flat, on the
-    theme's raised surface, rounded like the app's other surfaces."""
+class _MessageRow(QWidget):
+    """One message in the panel: its mark, words (faded once read), its
+    action and a dismiss."""
 
-    def __init__(self, hub: NoticeHub, card: Card, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setObjectName("NoticeCard")
-        self._hub = hub
-        self.card_id = card.id
-        self._level = card.level
-        self._whole = False
-        self.fader = _Fader(self)
-        outer = QHBoxLayout(self)
-        outer.setContentsMargins(12, 10, 8, 10)
-        outer.setSpacing(10)
+    def __init__(self, panel: ActivityPanel, m: Message, fresh: bool) -> None:
+        super().__init__(panel)
+        self.msg_id = m.id
+        self._panel = panel
+        self._level = m.level
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(8)
         self.mark = QWidget()
-        self.mark.setFixedSize(18, 19)
+        self.mark.setFixedSize(16, 18)
         self.mark.paintEvent = self._paint_mark
-        outer.addWidget(self.mark, 0, Qt.AlignmentFlag.AlignTop)
+        lay.addWidget(self.mark, 0, Qt.AlignmentFlag.AlignTop)
         col = QVBoxLayout()
         col.setContentsMargins(0, 0, 0, 0)
-        col.setSpacing(3)
-        head = QHBoxLayout()
-        head.setSpacing(6)
-        self.title = QLabel()
-        self.title.setObjectName("NoticeTitle")
-        self.title.setWordWrap(True)
-        self.title.setTextFormat(Qt.TextFormat.PlainText)
-        head.addWidget(self.title, 1)
-        self.count = QLabel()
-        self.count.setObjectName("NoticeCount")
-        head.addWidget(self.count, 0, Qt.AlignmentFlag.AlignTop)
-        col.addLayout(head)
+        col.setSpacing(2)
+        title = QLabel(m.title + (f"  ×{m.count}" if m.count > 1 else ""))
+        title.setObjectName("NoticeRowText" if fresh or m.decide else "NoticeRowRead")
+        title.setWordWrap(True)
+        title.setTextFormat(Qt.TextFormat.PlainText)
+        col.addWidget(title)
+        if m.body:
+            body = QLabel(m.body)
+            body.setObjectName("NoticeRowBody")
+            body.setWordWrap(True)
+            body.setTextFormat(Qt.TextFormat.PlainText)
+            col.addWidget(body)
+        if m.action is not None:
+            act = QPushButton(m.action_label or tr("notice_open"))
+            act.setObjectName("NoticeRowCancel")
+            act.setFlat(True)
+            act.setCursor(Qt.CursorShape.PointingHandCursor)
+            act.setAccessibleName((m.action_label or tr("notice_open")) + ": " + m.title)
+            act.clicked.connect(self._act)
+            row = QHBoxLayout()
+            row.setContentsMargins(0, 4, 0, 0)
+            row.addWidget(act)
+            row.addStretch(1)
+            col.addLayout(row)
+        lay.addLayout(col, 1)
+        close = QToolButton()
+        close.setObjectName("NoticeDismiss")
+        close.setText("✕")
+        close.setAutoRaise(True)
+        close.setCursor(Qt.CursorShape.PointingHandCursor)
+        close.setToolTip(tr("notice_dismiss"))
+        close.setAccessibleName(tr("notice_dismiss") + ": " + m.title)
+        close.clicked.connect(self._dismiss)
+        lay.addWidget(close, 0, Qt.AlignmentFlag.AlignTop)
+        self.dismiss_btn = close
+        self.setAccessibleName(m.text)
+        self.setAccessibleDescription(tr("notice_" + m.level))
+
+    def _paint_mark(self, _e) -> None:
+        p = QPainter(self.mark)
+        paint_level(p, self._level, QRectF(1, 2, 14, 14))
+        p.end()
+
+    def _act(self) -> None:
+        self._panel._hub.activate(self.msg_id)
+
+    def _dismiss(self) -> None:
+        self._panel._hub.dismiss(self.msg_id)
+
+
+class DecisionCard(QFrame):
+    """What needs a decision now, one at a time: a small card of the
+    sidebar's width right above the activity line - its mark, its words in
+    two lines at most (the whole of them in its tooltip), one action, a
+    dismiss, and "+N" when more wait behind it. In the sidebar's layout, so
+    the categories above it only get shorter."""
+
+    def __init__(self, hub: NoticeHub, parent: QWidget | None = None, *,
+                 floating: bool = False) -> None:
+        super().__init__(parent)
+        self.setObjectName("NoticeDecision")
+        self._hub = hub
+        self._floating = floating
+        self._msg: Message | None = None
+        self._words = ""
+        self.fader = _Fader(self)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        self.setMinimumWidth(0)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(10, 8, 6, 8)
+        outer.setSpacing(6)
+        top = QHBoxLayout()
+        top.setSpacing(8)
+        self.mark = QWidget()
+        self.mark.setFixedSize(16, 18)
+        self.mark.paintEvent = self._paint_mark
+        top.addWidget(self.mark, 0, Qt.AlignmentFlag.AlignTop)
         self.label = QLabel()
-        self.label.setObjectName("NoticeText")
-        self.label.setWordWrap(True)
+        self.label.setObjectName("NoticeDecisionText")
         self.label.setTextFormat(Qt.TextFormat.PlainText)
-        col.addWidget(self.label)
-        self.action_btn = QPushButton()
-        self.action_btn.setObjectName("NoticeAction")
-        self.action_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.action_btn.clicked.connect(self._act)
-        # Its own row, gone with the button: a card without an action is no
-        # taller than its words.
-        self._action_row = QWidget()
-        row = QHBoxLayout(self._action_row)
-        row.setContentsMargins(0, 4, 0, 0)
-        row.addWidget(self.action_btn, 0)
-        row.addStretch(1)
-        col.addWidget(self._action_row)
-        outer.addLayout(col, 1)
+        self.label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        top.addWidget(self.label, 1)
         self.close_btn = QToolButton()
         self.close_btn.setObjectName("NoticeDismiss")
         self.close_btn.setText("✕")
@@ -699,75 +888,114 @@ class NoticeCard(QFrame):
         self.close_btn.setToolTip(tr("notice_dismiss"))
         self.close_btn.setAccessibleName(tr("notice_dismiss"))
         self.close_btn.clicked.connect(self._dismiss)
-        outer.addWidget(self.close_btn, 0, Qt.AlignmentFlag.AlignTop)
-        self.show_card(card)
+        top.addWidget(self.close_btn, 0, Qt.AlignmentFlag.AlignTop)
+        outer.addLayout(top)
+        bottom = QHBoxLayout()
+        bottom.setContentsMargins(24, 0, 4, 0)
+        self.action_btn = QPushButton()
+        self.action_btn.setObjectName("NoticeDecisionAction")
+        self.action_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.action_btn.clicked.connect(self._act)
+        bottom.addWidget(self.action_btn, 0)
+        bottom.addStretch(1)
+        self.more = QLabel()
+        self.more.setObjectName("NoticeDecisionMore")
+        bottom.addWidget(self.more, 0, Qt.AlignmentFlag.AlignVCenter)
+        outer.addLayout(bottom)
+        self.hide()
 
-    def show_card(self, card: Card) -> None:
-        self._level = card.level
-        self.title.setText(card.title)
-        self.label.setText(card.body)
-        self.label.setVisible(bool(card.body))
-        self.count.setText(f"×{card.count}" if card.count > 1 else "")
-        self.count.setVisible(card.count > 1)
-        self.setAccessibleName(card.title + (" " + card.body if card.body else ""))
-        self.setAccessibleDescription(tr("notice_" + card.level))
-        has = card.action is not None
-        self.action_btn.setVisible(has and bool(card.action_label))
-        self._action_row.setVisible(has and bool(card.action_label))
-        self.action_btn.setText(card.action_label or "")
-        self.action_btn.setAccessibleName(card.action_label or "")
-        # A note written to be clicked ("click here"): the card is its button.
-        self._whole = has and not card.action_label
-        if self._whole:
-            self.setCursor(Qt.CursorShape.PointingHandCursor)
-            self.setFocusPolicy(Qt.FocusPolicy.TabFocus)
-        else:
-            self.unsetCursor()
-            self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+    def refresh(self) -> bool:
+        """The first decision waiting, drawn; False when none waits."""
+        waiting = self._hub.decisions()
+        if not waiting:
+            self._msg = None
+            self.hide()
+            return False
+        m = waiting[0]
+        self._msg = m
+        self._words = m.title + (" " + m.body if m.body else "")
+        self.setToolTip(self._words)
+        self.setAccessibleName(self._words)
+        self.setAccessibleDescription(tr("notice_" + m.level))
+        self.action_btn.setText(m.action_label or tr("notice_open"))
+        self.action_btn.setAccessibleName(m.action_label or tr("notice_open"))
+        self.action_btn.setVisible(m.action is not None)
+        self.more.setText(f"+{len(waiting) - 1}" if len(waiting) > 1 else "")
+        self.more.setVisible(len(waiting) > 1)
         self.restyle()
+        self._wrap()
+        if self.isHidden():
+            self.fader.show()
+            _announce(self)
+        return True
+
+    def text(self) -> str:
+        return self._words
+
+    def _wrap(self) -> None:
+        self.label.setText(two_lines(self._words, self._text_font(), self._room()))
+
+    def _room(self) -> int:
+        """The words' width: the card's less its margins, the mark and the
+        dismiss - before the sidebar has laid a new card out, the width its
+        foot will give it, so its height is right the first time (and the
+        categories above give up the right room at once)."""
+        w = self.width()
+        host = self.parentWidget()
+        lay = host.layout() if host is not None and not self._floating else None
+        if lay is not None and (self.isHidden() or w < 60):
+            w = lay.contentsRect().width() or w
+        m = self.layout().contentsMargins()
+        top = self.layout().itemAt(0).layout()
+        gaps = 2 * top.spacing() if top is not None else 16
+        return max(40, w - m.left() - m.right() - self.mark.width() - gaps
+                   - self.close_btn.sizeHint().width())
+
+    def _text_font(self) -> QFont:
+        return _font(13, QFont.Weight.Medium)
+
+    def resizeEvent(self, e) -> None:    # noqa: N802 - Qt hook
+        super().resizeEvent(e)
+        if self._msg is not None:
+            self._wrap()
 
     def restyle(self) -> None:
-        rad = int(round(corner_radius(12)))
+        rad = int(round(corner_radius(10)))
         c = colours()
+        bg = c["float_bg"] if self._floating else c["line_bg"]
+        text = c["float_text"] if self._floating else c["line_text"]
         self.setStyleSheet(
-            f"#NoticeCard {{ background: {c['surface']}; border: none; border-radius: {rad}px; }}"
-            f"#NoticeCard:focus {{ background: {c['hover']}; }}"
-            f"#NoticeTitle {{ color: {c['title']}; font-size: 13px; font-weight: 600;"
+            f"#NoticeDecision {{ background: {bg}; border: none; border-radius: {rad}px; }}"
+            f"#NoticeDecisionText {{ color: {text}; font-size: 13px; font-weight: 500;"
             " background: transparent; }"
-            f"#NoticeText {{ color: {c['body']}; font-size: 13px; background: transparent; }}"
-            f"#NoticeCount {{ color: {c['muted']}; font-size: 12px; font-weight: 600;"
-            " background: transparent; }"
-            f"#NoticeAction {{ color: {c['action']}; font-size: 13px; font-weight: 600;"
-            f" background: {c['action_bg']}; border: none; border-radius: 8px;"
-            " padding: 5px 12px; }"
-            f"#NoticeAction:hover {{ background: {c['action_hover']}; }}"
+            f"#NoticeDecisionMore {{ color: {c['line_more']}; font-size: 11px;"
+            " font-weight: 700; background: transparent; }"
+            f"#NoticeDecisionAction {{ color: {c['action']}; font-size: 12px; font-weight: 600;"
+            f" background: {c['action_bg']}; border: none; border-radius: 7px;"
+            " padding: 4px 10px; }"
+            f"#NoticeDecisionAction:hover {{ background: {c['action_hover']}; }}"
             f"#NoticeDismiss {{ color: {c['dismiss']}; background: transparent;"
-            " border: none; font-size: 12px; padding: 2px 5px; }"
-            f"#NoticeDismiss:hover {{ color: {c['title']}; }}")
+            " border: none; font-size: 12px; padding: 2px 4px; }"
+            f"#NoticeDismiss:hover {{ color: {text}; }}")
+        self.label.setFont(self._text_font())
         self.mark.update()
 
     def _paint_mark(self, _e) -> None:
+        if self._msg is None:
+            return
         p = QPainter(self.mark)
-        paint_level(p, self._level, QRectF(1, 2, 16, 16))
+        paint_level(p, self._msg.level, QRectF(1, 2, 14, 14))
         p.end()
 
     def _act(self) -> None:
-        self._hub.activate(self.card_id)
+        if self._msg is not None:
+            self._hub.activate(self._msg.id)
 
     def _dismiss(self) -> None:
-        self._hub.dismiss(self.card_id)
-
-    def mousePressEvent(self, e) -> None:    # noqa: N802 - Qt hook
-        if self._whole and e.button() == Qt.MouseButton.LeftButton:
-            e.accept()
-            self._act()
-            return
-        super().mousePressEvent(e)
+        if self._msg is not None:
+            self._hub.dismiss(self._msg.id)
 
     def keyPressEvent(self, e) -> None:      # noqa: N802 - Qt hook
-        if self._whole and e.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
-            self._act()
-            return
         if e.key() == Qt.Key.Key_Escape:
             self._dismiss()
             return
@@ -775,7 +1003,8 @@ class NoticeCard(QFrame):
 
 
 def _announce(widget: QWidget) -> None:
-    """Tell a screen reader a card came (an alert, as a toast's role is)."""
+    """Tell a screen reader something came that wants a decision (an
+    alert, as a toast's role is)."""
     try:
         from PyQt6.QtGui import QAccessible, QAccessibleEvent
         QAccessible.updateAccessibility(QAccessibleEvent(widget, QAccessible.Event.Alert))
@@ -783,142 +1012,9 @@ def _announce(widget: QWidget) -> None:
         log.debug("notices: no accessibility event", exc_info=True)
 
 
-class CardStack(QWidget):
-    """The cards, stacked upward from the corner: at most three, the newest
-    on top, older ones folded into "+N more" that opens them. A free child
-    of the window (a splitter would lay it out as a pane); clicks pass
-    around it; the pointer resting on it holds their time."""
-
-    MAX_W = 380
-    INSET = 16
-    GAP = 8
-
-    def __init__(self, hub: NoticeHub, parent: QWidget) -> None:
-        super().__init__(parent)
-        self.setObjectName("NoticeCards")
-        self._hub = hub
-        self._anchor: QRect | None = None
-        self._rtl = False
-        self._open = False
-        self._cards: dict[int, NoticeCard] = {}
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(self.GAP)
-        self._lay = lay
-        self.fold = QPushButton()
-        self.fold.setObjectName("NoticeFold")
-        self.fold.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.fold.clicked.connect(self._toggle)
-        lay.addWidget(self.fold, 0, Qt.AlignmentFlag.AlignLeading)
-        self.fold.hide()
-        hub.changed.connect(self.sync)
-        self.hide()
-
-    def card_widgets(self) -> list[NoticeCard]:
-        """The cards drawn, from the top."""
-        return [self._cards[c.id] for c in self._hub.shown_cards()
-                if c.id in self._cards and not self._cards[c.id].isHidden()]
-
-    def _toggle(self) -> None:
-        self._open = not self._open
-        self.sync()
-
-    def sync(self) -> None:
-        hub = self._hub
-        order = hub.shown_cards()
-        alive = {c.id for c in order}
-        for cid in list(self._cards):
-            if cid not in alive:
-                w = self._cards.pop(cid)
-                self._lay.removeWidget(w)
-                w.hide()
-                w.deleteLater()
-        fold_at = len(order) if self._open else min(len(order), hub.MAX_SHOWN)
-        if len(order) <= hub.MAX_SHOWN:
-            self._open = False
-        fresh: list[NoticeCard] = []
-        for i, c in enumerate(order):
-            w = self._cards.get(c.id)
-            if w is None:
-                w = NoticeCard(hub, c, self)
-                self._cards[c.id] = w
-                fresh.append(w)
-            else:
-                w.show_card(c)
-            self._lay.removeWidget(w)
-            self._lay.insertWidget(i, w)
-            w.setVisible(i < fold_at)
-        hidden = len(order) - fold_at
-        self._lay.removeWidget(self.fold)
-        self._lay.addWidget(self.fold, 0, Qt.AlignmentFlag.AlignLeading)
-        self.fold.setText(("+" + tr("notice_more", n=hidden)) if hidden
-                          else tr("notice_less"))
-        self.fold.setVisible(hidden > 0 or self._open)
-        self.restyle_fold()
-        self.place()
-        if self.isVisible():
-            for w in fresh:
-                if not w.isHidden():
-                    w.fader.show()
-                    _announce(w)
-
-    def restyle_fold(self) -> None:
-        self.fold.setStyleSheet(
-            f"#NoticeFold {{ color: {colours()['body']}; background: {colours()['surface']};"
-            " border: none; border-radius: 10px; padding: 4px 12px; font-size: 12px;"
-            " font-weight: 600; }"
-            f"#NoticeFold:hover {{ color: {colours()['title']}; }}")
-
-    def set_anchor(self, rect: QRect | None, rtl: bool = False) -> None:
-        """Where the corner is: the bottom of *rect* (window coordinates),
-        on its leading side; None draws nothing."""
-        self._anchor = QRect(rect) if rect is not None else None
-        self._rtl = bool(rtl)
-        self.place()
-
-    def place(self) -> None:
-        r = self._anchor
-        hub = self._hub
-        if r is None or hub.held or not hub.cards():
-            if hub.held or r is None:
-                hub.pause(False)
-            self.hide()
-            return
-        w = max(200, min(self.MAX_W, r.width() - 2 * self.INSET))
-        self._lay.invalidate()
-        for card in self._cards.values():
-            card.setFixedWidth(w)
-        self.setFixedWidth(w)
-        self._lay.activate()
-        # The cards' words wrap: their height at this width, not at the
-        # width a size hint guesses (a card of one line came out of two).
-        h = (self._lay.heightForWidth(w) if self._lay.hasHeightForWidth()
-             else self._lay.sizeHint().height())
-        self.setFixedHeight(min(h, max(60, r.height() - 2 * self.INSET)))
-        x = r.right() - self.INSET - w + 1 if self._rtl else r.left() + self.INSET
-        y = r.bottom() - self.INSET - self.height() + 1
-        self.move(x, y)
-        self.show()
-        self.raise_()
-        self._lay.activate()
-
-    def enterEvent(self, e) -> None:     # noqa: N802 - Qt hook
-        self._hub.pause(True)
-        super().enterEvent(e)
-
-    def leaveEvent(self, e) -> None:     # noqa: N802 - Qt hook
-        self._hub.pause(False)
-        super().leaveEvent(e)
-
-    def restyle(self) -> None:
-        for w in self._cards.values():
-            w.restyle()
-        self.restyle_fold()
-
-
 class Follow(QObject):
     """Calls *callback* once, soon after any watched widget moved, changed
-    size, showed or hid - the corner follows the window's panes."""
+    size, showed or hid - the notices follow the window's panes."""
 
     _EVENTS = (QEvent.Type.Resize, QEvent.Type.Move, QEvent.Type.Show, QEvent.Type.Hide,
                QEvent.Type.LayoutDirectionChange)
@@ -940,5 +1036,3 @@ class Follow(QObject):
         if event.type() in self._EVENTS:
             self._timer.start()
         return False
-
-

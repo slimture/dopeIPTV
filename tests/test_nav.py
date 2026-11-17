@@ -162,7 +162,7 @@ places = ["home", "search", "live", "guide", "vod", "series", "rec", "local", "r
 mine = ["fav", "watchlist", "history"]
 assert list(w.nav_btns) == places + mine, list(w.nav_btns)
 assert "watched" not in w.nav_btns
-content = w._side_scroll.widget()
+content = w._side      # the part that scrolls and the foot under it
 def y(widget):
     return widget.mapTo(content, widget.rect().topLeft()).y()
 ys = [y(w.nav_btns[k]) for k in places] + [y(w._lib_header)] + [y(w.nav_btns[k]) for k in mine]

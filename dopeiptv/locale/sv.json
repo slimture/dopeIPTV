@@ -2951,5 +2951,8 @@
   "notice_reading_source": "Läser {name}…",
   "notice_reading_sources": "Läser dina källor · {n}",
   "notice_scanning_network": "Söker igenom nätverket…",
-  "notice_less": "Visa färre"
+  "notice_messages": "Meddelanden",
+  "notice_clear_all": "Rensa alla",
+  "notice_open": "Öppna",
+  "notice_unread": "Olästa meddelanden: {n}"
 }

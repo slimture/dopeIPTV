@@ -1,7 +1,8 @@
-"""One place for what the app is doing and what it tells you - the state.
+"""What the app is doing and what it tells you - the state.
 
-Everything is in one corner, the one away from the video (bottom left;
-mirrored right to left):
+All of it lives at the foot of the sidebar (bottom left, mirrored right to
+left), in the sidebar's own layout: nothing lies over the list, its
+categories or the video.
 
 - **Activity** - background work that takes a while: a list or the guide
   loading, a folder read or searched, the network scanned, a sync, an
@@ -10,34 +11,32 @@ mirrored right to left):
   replaced by a newer job with the same key, or let go by its own safety
   timeout - a job can never stay. It shows only once it has run for
   ``SHOW_AFTER_MS`` (short work never flickers) and, once shown, stays at
-  least ``MIN_SHOWN_MS``. One line at the foot of the sidebar, just above
-  the source avatar (a ring with a count on the icon rail; on Home, where
-  there is no sidebar, at the same corner): an icon for the kind of work,
-  the job the person started first - else the oldest - "+N" for the rest,
-  a calm accent bar when its progress is known, a gentle spinner when not.
-  Jobs of one group merge into one line with a count ("Loading guide · 3
-  sources", their progress summed). A click or Enter opens the panel of
-  every job - its icon, words, progress and a Cancel where the producer
-  can stop it - which follows them live and closes when the last one ends.
-- **Cards** - what needs the person: an error, an offer with its action, a
-  short note. They stack upward from the bottom-left of the list pane,
-  next to the activity line, never over the video or the sidebar: at most
-  three, the newest on top, older ones folded into "+N more"; a card with
-  an action sorts above the passing ones and stays until answered or
-  dismissed, an error stays until dismissed, a passing note goes after
-  ``CARD_MS`` (held while the pointer rests on the cards); the same words
-  again are one card with a count.
+  least ``MIN_SHOWN_MS``. One line just above the source avatar: an icon
+  for the kind of work, the job the person started first - else the oldest
+  - "+N" for the rest, an accent bar when its progress is known, a gentle
+  spinner when not. Jobs of one group merge into one line ("Loading guide ·
+  3 sources", their progress summed).
+- **Notes** - passing words ("EPG cache cleared", "Copied"): the line's own
+  words for ``NOTE_MS``, then gone - no box.
+- **Messages** - an error, or a word that needs no decision: only a count
+  on the line ("1" on a dot); the panel (a click or Enter on the line)
+  lists them under the work, the newest first, each with its action if it
+  has one and a dismiss, the read ones faded, Clear all. Stream errors are
+  said on the video and never here.
+- **Decisions** - what really needs the person now (the server's port
+  offer): one small card of the sidebar's width right above the line - an
+  icon, its words in two lines at most, one action, a dismiss - and any
+  more waiting behind it as a count, until answered or dismissed.
 
 While the video fills the screen, TV mode shows or the picture is popped
-out, nothing is drawn: cards wait until you are back, work goes on unseen.
+out, nothing is drawn and no note is kept; messages and decisions wait.
 What is about the picture itself (its loading overlay, reconnecting, the
-stream banner, a typed channel number) stays over the video, and real
-questions stay dialogs.
+stream banner, a typed channel number with the player up) stays over the
+video, and real questions stay dialogs.
 
 ``NoticeHub`` is the state and its timers; ``Activity`` is a producer's
 handle on one job, safe from any thread and usable as a context manager;
-ui/notice_widgets.py draws it in P's colours, flat, rounded like the app's
-surfaces.
+ui/notice_widgets.py draws it.
 """
 from __future__ import annotations
 
@@ -91,31 +90,29 @@ class Entry:
 
 
 @dataclass
-class Card:
+class Message:
+    """A message in the panel - or, when it asks for a decision, the card
+    over the activity line."""
     id: int
     title: str
     body: str
     level: str
     action: Callable[[], Any] | None
     action_label: str | None
-    ms: int                         # 0: it stays until answered or dismissed
     key: str | None
     posted: float
+    decide: bool = False
     count: int = 1
-    left: float = 0.0               # what was left of its time when paused
+    read: bool = False
 
     @property
     def text(self) -> str:
         return self.title + ("\n" + self.body if self.body else "")
 
-    @property
-    def asks(self) -> bool:
-        """It waits for an answer: it has an action."""
-        return self.action is not None
-
 
 class NoticeHub(QObject):
-    """The window's notices: jobs under tokens, cards in a stack."""
+    """The window's notices: jobs under tokens, a passing note, messages
+    and decisions."""
 
     changed = pyqtSignal()
 
@@ -125,14 +122,15 @@ class NoticeHub(QObject):
     #: A job shows once it ran this long, and stays at least the next.
     SHOW_AFTER_MS = 400
     MIN_SHOWN_MS = 600
-    #: A passing card's time when its producer names none, and the least.
-    CARD_MS = 6000
-    CARD_MIN_MS = 3000
-    MAX_SHOWN = 3
-    MAX_CARDS = 12
-    #: A passing note held this long (seconds) while the video filled the
-    #: screen is no news any more when it comes back.
-    HELD_STALE_S = 120.0
+    #: How long a passing note is the line's words when its producer names
+    #: no time - and the least and the most it may name.
+    NOTE_MS = 4000
+    NOTE_MIN_MS = 2500
+    NOTE_MAX_MS = 6000
+    #: Messages kept (the oldest read ones go first), and how many words of
+    #: this session are kept for ``said``.
+    MAX_MESSAGES = 30
+    SAID = 50
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -144,10 +142,13 @@ class NoticeHub(QObject):
         self._vis = QTimer(self)
         self._vis.setSingleShot(True)
         self._vis.timeout.connect(self._tick)
-        self._cards: list[Card] = []
-        self._card_timers: dict[int, QTimer] = {}
+        self._messages: list[Message] = []
+        self._note: tuple[str, str | None] | None = None
+        self._note_timer = QTimer(self)
+        self._note_timer.setSingleShot(True)
+        self._note_timer.timeout.connect(self._note_over)
+        self._said: list[str] = []
         self._held = False
-        self._paused = False
 
     # -- jobs -------------------------------------------------------------------
 
@@ -211,13 +212,13 @@ class NoticeHub(QObject):
     def cancel(self, token: int) -> bool:
         return self._end(token)
 
-    def fail(self, token: int, text: str, **card: Any) -> bool:
-        """The job failed: it ends and *text* is said as an error card -
+    def fail(self, token: int, text: str, **said: Any) -> bool:
+        """The job failed: it ends and *text* is said as an error message -
         only for a job still running (a replaced one's failure is no news)."""
         if not self._end(token):
             return False
-        card.setdefault("level", "error")
-        self.post(text, **card)
+        said.setdefault("level", "error")
+        self.post(text, **said)
         return True
 
     def request_cancel(self, tokens: list[int]) -> bool:
@@ -361,18 +362,20 @@ class NoticeHub(QObject):
         if moved:
             self.changed.emit()
 
-    # -- cards ------------------------------------------------------------------
+    # -- notes, messages, decisions --------------------------------------------
 
     def post(self, text: str, *, title: str | None = None, level: str = "info",
              action: Callable[[], Any] | None = None, action_label: str | None = None,
-             ms: int | None = None, key: str | None = None, answer: bool = False) -> int:
-        """A card. *title* in bold over *text* - else the text's first line
-        is its title and the rest its line. *action* is what its button (or,
-        without *action_label*, a click on the card) does; a card with one,
-        or an *answer* wanted, stays until answered or dismissed, an error
-        until dismissed, a passing note *ms* (``CARD_MS`` when not given).
-        The same *key* - or the same words - again refresh the card there;
-        the same words count up."""
+             ms: int | None = None, key: str | None = None, decide: bool = False,
+             answer: bool = False) -> int:
+        """Something said. A passing note (info or a warning, nothing to do)
+        is the line's words for *ms* - none kept. An error, or anything with
+        an *action*, is a message for the panel, counted on the line until
+        read. One that asks for a decision now (*decide*, or *answer*) is the
+        card over the line. *title* in bold over *text* - else the text's
+        first line is its title. The same *key* or the same words again
+        refresh the one there; the same words count up. Returns its id (0
+        for a note)."""
         text = str(text or "").strip()
         if title is not None:
             head, body = str(title).strip(), text
@@ -384,127 +387,147 @@ class NoticeHub(QObject):
         if not head:
             head, body = body, ""
         level = level if level in LEVELS else "info"
-        stays = answer or action is not None or level == "error"
-        stay = 0 if stays else max(self.CARD_MIN_MS, int(ms or self.CARD_MS))
-        card = next((c for c in self._cards if (key is not None and c.key == key)
-                     or (key is None and c.key is None and c.title == head
-                         and c.body == body and c.level == level)), None)
+        decide = decide or answer
+        if action is None and not decide and level != "error":
+            self.note(head + (" " + body if body else ""), ms=ms, key=key)
+            return 0
+        self._say(head + (" - " + body if body else ""))
+        msg = next((m for m in self._messages if (key is not None and m.key == key)
+                    or (key is None and m.key is None and m.title == head
+                        and m.body == body and m.level == level)), None)
         now = time.monotonic()
-        if card is not None:
-            self._cards.remove(card)
-            same = (card.title, card.body) == (head, body)
-            card.count = card.count + 1 if same and key is None else 1
-            card.title, card.body, card.level, card.action = head, body, level, action
-            card.action_label, card.ms, card.posted = action_label, stay, now
+        if msg is not None:
+            self._messages.remove(msg)
+            same = (msg.title, msg.body) == (head, body)
+            msg.count = msg.count + 1 if same and key is None else 1
+            msg.title, msg.body, msg.level, msg.action = head, body, level, action
+            msg.action_label, msg.decide, msg.posted, msg.read = action_label, decide, now, False
         else:
             self._seq += 1
-            card = Card(self._seq, head, body, level, action, action_label, stay, key, now)
-        self._cards.append(card)
-        while len(self._cards) > self.MAX_CARDS:
-            old = next((c for c in self._cards if not c.asks and c.level != "error"),
-                       self._cards[0])
-            self._drop(old.id)
-        self._time_card(card)
+            msg = Message(self._seq, head, body, level, action, action_label, key, now, decide)
+        self._messages.append(msg)
+        while len(self._messages) > self.MAX_MESSAGES:
+            old = next((m for m in self._messages if m.read and not m.decide),
+                       next((m for m in self._messages if not m.decide), self._messages[0]))
+            self._messages.remove(old)
         self.changed.emit()
-        return card.id
+        return msg.id
 
-    def dismiss(self, card_id: int) -> bool:
-        if not any(c.id == card_id for c in self._cards):
+    def note(self, text: str, *, ms: int | None = None, key: str | None = None) -> None:
+        """Passing words: the line says them for *ms*, then they are gone. A
+        note while the video fills the screen is no news later: dropped."""
+        text = str(text or "").strip()
+        if not text:
+            return
+        self._say(text)
+        if self._held:
+            return
+        self._note = (text, key)
+        stay = int(ms) if ms else self.NOTE_MS
+        self._note_timer.start(max(self.NOTE_MIN_MS, min(self.NOTE_MAX_MS, stay)))
+        self.changed.emit()
+
+    def note_text(self) -> str:
+        return self._note[0] if self._note is not None else ""
+
+    def _note_over(self) -> None:
+        if self._note is not None:
+            self._note = None
+            self.changed.emit()
+
+    def dismiss(self, msg_id: int) -> bool:
+        msg = next((m for m in self._messages if m.id == msg_id), None)
+        if msg is None:
             return False
-        self._drop(card_id)
+        self._messages.remove(msg)
         self.changed.emit()
         return True
 
     def dismiss_key(self, key: str) -> bool:
-        card = next((c for c in self._cards if c.key == key), None)
-        return self.dismiss(card.id) if card is not None else False
+        """The message - or the note - said under *key* goes."""
+        if self._note is not None and self._note[1] == key:
+            self._note_timer.stop()
+            self._note = None
+            self.changed.emit()
+            return True
+        msg = next((m for m in self._messages if m.key == key), None)
+        return self.dismiss(msg.id) if msg is not None else False
 
-    def activate(self, card_id: int) -> bool:
-        """The card's action: the card goes, then the action runs - after
-        this event, since what it opens may run an event loop of its own."""
-        card = next((c for c in self._cards if c.id == card_id), None)
-        if card is None:
+    def activate(self, msg_id: int) -> bool:
+        """A message's action: the message goes, then the action runs -
+        after this event, since what it opens may run an event loop."""
+        msg = next((m for m in self._messages if m.id == msg_id), None)
+        if msg is None:
             return False
-        act = card.action
-        self.dismiss(card_id)
+        act = msg.action
+        self.dismiss(msg_id)
         if act is not None:
             QTimer.singleShot(0, act)
         return True
 
-    def cards(self) -> list[Card]:
-        """The cards, the oldest first."""
-        return list(self._cards)
+    def messages(self) -> list[Message]:
+        """The panel's messages, the newest first (decisions too)."""
+        return list(reversed(self._messages))
 
-    def shown_cards(self) -> list[Card]:
-        """The cards as the stack draws them, from the top: the ones that
-        ask for an answer, then the rest - each the newest first."""
-        asks = [c for c in self._cards if c.asks]
-        rest = [c for c in self._cards if not c.asks]
-        return list(reversed(asks)) + list(reversed(rest))
+    def decisions(self) -> list[Message]:
+        """What waits for a decision, the oldest first: the card shows the
+        first, the rest wait behind it."""
+        return [m for m in self._messages if m.decide]
+
+    def unread(self) -> int:
+        """The count on the line: messages not read yet (a decision has its
+        own card)."""
+        return sum(1 for m in self._messages if not m.read and not m.decide)
+
+    def unread_level(self) -> str:
+        """The worst level among them - the count's colour."""
+        levels = {m.level for m in self._messages if not m.read and not m.decide}
+        return "error" if "error" in levels else "warning" if "warning" in levels else "info"
+
+    def mark_read(self) -> None:
+        if any(not m.read for m in self._messages if not m.decide):
+            for m in self._messages:
+                if not m.decide:
+                    m.read = True
+            self.changed.emit()
+
+    def clear(self) -> None:
+        """Clear all: every message goes - a decision still waits for its."""
+        kept = [m for m in self._messages if m.decide]
+        if len(kept) != len(self._messages):
+            self._messages = kept
+            self.changed.emit()
 
     def texts(self) -> list[str]:
-        return [c.text for c in self._cards]
+        """The messages' words, the oldest first."""
+        return [m.text for m in self._messages]
 
-    def _drop(self, card_id: int) -> None:
-        self._cards = [c for c in self._cards if c.id != card_id]
-        t = self._card_timers.pop(card_id, None)
-        if t is not None:
-            t.stop()
-            t.deleteLater()
+    def said(self) -> list[str]:
+        """Everything said this session (notes and messages), the oldest
+        first, at most ``SAID``."""
+        return list(self._said)
 
-    def _time_card(self, card: Card, left: float | None = None) -> None:
-        t = self._card_timers.get(card.id)
-        if card.ms <= 0 or self._held or self._paused:
-            if t is not None:
-                t.stop()
-            card.left = float(card.ms) if left is None else left
-            return
-        if t is None:
-            t = QTimer(self)
-            t.setSingleShot(True)
-            t.timeout.connect(partial(self.dismiss, card.id))
-            self._card_timers[card.id] = t
-        t.start(int(max(1500.0, card.ms if left is None else left)))
+    def _say(self, words: str) -> None:
+        self._said.append(words)
+        del self._said[:-self.SAID]
 
-    # -- held, paused --------------------------------------------------------
+    # -- held ----------------------------------------------------------------
 
     @property
     def held(self) -> bool:
         return self._held
 
     def hold(self, on: bool) -> None:
-        """While held no card is drawn and none runs out; back, the passing
-        notes that went stale meanwhile are dropped and the rest shown with
-        their whole time."""
+        """While held nothing is drawn: a note in the middle of its time
+        goes, messages and decisions wait."""
         on = bool(on)
         if on == self._held:
             return
         self._held = on
-        if not on:
-            now = time.monotonic()
-            for c in list(self._cards):
-                if not c.asks and c.level == "info" and now - c.posted > self.HELD_STALE_S:
-                    self._drop(c.id)
-        for c in self._cards:
-            self._time_card(c)
+        if on and self._note is not None:
+            self._note_timer.stop()
+            self._note = None
         self.changed.emit()
-
-    def pause(self, on: bool) -> None:
-        """The pointer rests on the cards: none runs out until it leaves,
-        then each has what was left of its time."""
-        on = bool(on)
-        if on == self._paused:
-            return
-        self._paused = on
-        for c in self._cards:
-            t = self._card_timers.get(c.id)
-            if on:
-                left = float(t.remainingTime()) if t is not None and t.isActive() else float(c.ms)
-                if t is not None:
-                    t.stop()
-                c.left = left
-            else:
-                self._time_card(c, c.left or None)
 
 
 class _NullHub:
@@ -514,7 +537,10 @@ class _NullHub:
 
     def __getattr__(self, name: str) -> Callable[..., Any]:
         def nothing(*_a: Any, **_k: Any) -> Any:
-            return [] if name in ("jobs", "cards", "texts", "entries", "shown_cards") else 0
+            if name in ("note_text", "line_text"):
+                return ""
+            return [] if name in ("jobs", "messages", "decisions", "texts", "entries",
+                                  "said") else 0
         return nothing
 
 

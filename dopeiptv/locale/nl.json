@@ -2951,5 +2951,8 @@
   "notice_reading_source": "{name} lezen…",
   "notice_reading_sources": "Je bronnen lezen · {n}",
   "notice_scanning_network": "Netwerk scannen…",
-  "notice_less": "Minder tonen"
+  "notice_messages": "Meldingen",
+  "notice_clear_all": "Alles wissen",
+  "notice_open": "Openen",
+  "notice_unread": "Ongelezen meldingen: {n}"
 }

@@ -2951,5 +2951,8 @@
   "notice_reading_source": "กำลังอ่าน {name}…",
   "notice_reading_sources": "กำลังอ่านแหล่งของคุณ · {n}",
   "notice_scanning_network": "กำลังสแกนเครือข่าย…",
-  "notice_less": "แสดงน้อยลง"
+  "notice_messages": "ข้อความ",
+  "notice_clear_all": "ล้างทั้งหมด",
+  "notice_open": "เปิด",
+  "notice_unread": "ข้อความที่ยังไม่ได้อ่าน: {n}"
 }

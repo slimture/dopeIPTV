@@ -2951,5 +2951,8 @@
   "notice_reading_source": "Odczytywanie {name}…",
   "notice_reading_sources": "Odczytywanie źródeł · {n}",
   "notice_scanning_network": "Skanowanie sieci…",
-  "notice_less": "Pokaż mniej"
+  "notice_messages": "Komunikaty",
+  "notice_clear_all": "Wyczyść wszystko",
+  "notice_open": "Otwórz",
+  "notice_unread": "Nieprzeczytane komunikaty: {n}"
 }

@@ -2951,5 +2951,8 @@
   "notice_reading_source": "در حال خواندن {name}…",
   "notice_reading_sources": "در حال خواندن منابع شما · {n}",
   "notice_scanning_network": "در حال پویش شبکه…",
-  "notice_less": "نمایش کمتر"
+  "notice_messages": "پیام‌ها",
+  "notice_clear_all": "پاک کردن همه",
+  "notice_open": "باز کردن",
+  "notice_unread": "پیام‌های خوانده‌نشده: {n}"
 }

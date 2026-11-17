@@ -194,7 +194,7 @@ dopeiptv/
     mw_connections.py  Connections to the account: counted, warned about
     mw_mirrors.py      Nerd: a stream whose server is down, on the next address
     conn_test_dialog.py Nerd: Test connection's window
-    mw_busy.py         Loading indicator + spinner overlay
+    mw_busy.py         The notices at the sidebar's foot (notices.py, notice_widgets.py)
     mw_updates.py      Update-check badge/status wiring, "Update now"
     mw_reminders.py    Programme-reminder UI (set / list / fire)
     mw_calendar.py     Reminders and recordings as a calendar (file, served)

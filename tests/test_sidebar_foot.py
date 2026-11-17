@@ -98,7 +98,7 @@ w.switch_mode("live")
 pump(20)
 
 avatar, gear = w._playlist_btn, w._settings_btn
-content = w._side_scroll.widget()
+content = w._side      # the part that scrolls and the foot under it
 
 
 def rect(widget):

@@ -54,7 +54,8 @@ class _Window(_BusyMixin, QWidget):
 
     @property
     def notes(self) -> list[str]:
-        return self.notices.texts()
+        # Everything said: passing words on the line and messages alike.
+        return self.notices.said()
 
     def shown(self) -> bool:
         return bool(self.notices.jobs())

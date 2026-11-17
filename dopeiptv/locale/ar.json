@@ -2951,5 +2951,8 @@
   "notice_reading_source": "جارٍ قراءة {name}…",
   "notice_reading_sources": "جارٍ قراءة مصادرك · {n}",
   "notice_scanning_network": "جارٍ فحص الشبكة…",
-  "notice_less": "عرض أقل"
+  "notice_messages": "الرسائل",
+  "notice_clear_all": "مسح الكل",
+  "notice_open": "فتح",
+  "notice_unread": "رسائل غير مقروءة: {n}"
 }

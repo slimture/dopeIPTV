@@ -609,9 +609,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.setCentralWidget(self._center_stack)
 
         # Sidebar. Its content lives inside a scroll area so that on a short
-        # screen (small laptops) the bottom actions - EPG guide, Settings -
-        # stay reachable by scrolling instead of being clipped off. On a tall
-        # screen the scroll bar never appears and it looks identical to before.
+        # screen (small laptops) the places and the categories stay reachable
+        # by scrolling instead of being clipped off; the foot (the activity
+        # line, a decision card, the avatar and Settings) is a fixed area of
+        # its own under it, always on screen. On a tall screen the scroll bar
+        # never appears.
         # The scroll area sits INSIDE `side` (not in its place), so the
         # collapse-to-rail and splitter logic, which drive `side` and the button
         # widgets directly, are untouched.
@@ -643,7 +645,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             "QWidget#SideContent { background: transparent; }")
         self._side_scroll.setWidget(_side_content)
         sl = QVBoxLayout(_side_content)
-        sl.setContentsMargins(12, 16, 12, 12)
+        sl.setContentsMargins(12, 16, 12, 4)
+        # The foot, under the part that scrolls: that part gives up the room
+        # the foot takes (a decision card coming, mw_busy) and takes it back.
+        self._side_foot = QWidget(objectName="SideFoot")
+        self._side_foot.setStyleSheet("QWidget#SideFoot { background: transparent; }")
+        self._side_foot_lay = QVBoxLayout(self._side_foot)
+        self._side_foot_lay.setContentsMargins(12, 6, 12, 12)
+        self._side_foot_lay.setSpacing(6)
+        _side_outer.addWidget(self._side_foot)
         # Tight vertical rhythm so the TV..History nav stack stays compact.
         sl.setSpacing(2)
 
@@ -925,15 +935,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         donate_btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         donate_btn.customContextMenuRequested.connect(self._donate_heart_menu)
         self._bottom_rule = SideRule()
-        sl.addWidget(self._bottom_rule)
+        self._side_foot_lay.addWidget(self._bottom_rule)
         self._actions_box = QBoxLayout(QBoxLayout.Direction.LeftToRight)
         self._actions_box.setContentsMargins(0, 2, 0, 0)
         self._actions_box.setSpacing(10)
         self._actions_box.addWidget(self._playlist_btn)
         self._actions_box.addWidget(self._settings_btn)
-        sl.addLayout(self._actions_box)
+        self._side_foot_lay.addLayout(self._actions_box)
         # Centred as a pair (a per-button alignment spread them apart).
-        sl.setAlignment(self._actions_box, Qt.AlignmentFlag.AlignHCenter)
+        self._side_foot_lay.setAlignment(self._actions_box, Qt.AlignmentFlag.AlignHCenter)
         self._update_playlist_btn()
         self._logo_row.addStretch(1)
         self._build_private_pill()
@@ -5765,7 +5775,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._show_stream_error(msg)
 
     def _show_stream_error(self, text: str) -> None:
-        self._set_status(tr("status_stream_error", msg=text), error=True)
+        # Said here, on the video - never repeated as a message.
+        self._stream_failed_quietly()
         if self._player_fs and self.player:
             self.player.set_overlay_info(tr("status_stream_error", msg=text))
         else:

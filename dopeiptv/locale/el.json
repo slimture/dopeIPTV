@@ -2951,5 +2951,8 @@
   "notice_reading_source": "Ανάγνωση {name}…",
   "notice_reading_sources": "Ανάγνωση των πηγών σας · {n}",
   "notice_scanning_network": "Σάρωση δικτύου…",
-  "notice_less": "Λιγότερα"
+  "notice_messages": "Μηνύματα",
+  "notice_clear_all": "Απαλοιφή όλων",
+  "notice_open": "Άνοιγμα",
+  "notice_unread": "Μη αναγνωσμένα μηνύματα: {n}"
 }

@@ -2951,5 +2951,8 @@
   "notice_reading_source": "{name} پڑھا جا رہا ہے…",
   "notice_reading_sources": "آپ کے ذرائع پڑھے جا رہے ہیں · {n}",
   "notice_scanning_network": "نیٹ ورک اسکین ہو رہا ہے…",
-  "notice_less": "کم دکھائیں"
+  "notice_messages": "پیغامات",
+  "notice_clear_all": "سب صاف کریں",
+  "notice_open": "کھولیں",
+  "notice_unread": "بغیر پڑھے پیغامات: {n}"
 }

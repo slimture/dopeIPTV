@@ -1,5 +1,5 @@
 """The window's side of its notices (ui/notices.py): what the app is doing
-and what it tells the person, in one corner - the one away from the video.
+and what it tells the person, all at the foot of the sidebar.
 
 Every older way in leads there, so each producer keeps its call:
 
@@ -14,18 +14,21 @@ Every older way in leads there, so each producer keeps its call:
   - a late word from an older load (a source switched away from, a refresh
   replaced) changes nothing, and a list loaded meanwhile does not end it. A
   load that says nothing for ``GUIDE_QUIET_MS`` is let go with a calm note.
-- ``_show_toast`` / ``_show_action_toast`` / ``_flash_status`` - a card.
+- ``_show_toast`` / ``_flash_status`` - a passing note on the activity line.
+- ``_show_action_toast`` - a message with its action in the panel; with
+  *decide* the card that waits for a decision.
 - ``_set_status`` - the status line keeps only the list's state and what
   plays; activity words (``emphasis``) are a job ("status") until the next
-  status, an error a card.
+  status, an error a message.
 
-Where things are (``_notices_place``): the activity line at the foot of the
-sidebar, just above the source avatar (a ring on the icon rail; on a page
-with no sidebar - Home - at the same corner); the cards stacked upward from
-the bottom of the list pane on the sidebar's side, above its status line -
-never over the video or its controls, never over the sidebar. Nothing is
-drawn while the video fills the screen, TV mode shows or the picture is
-popped out: cards wait, work goes on unseen.
+Where things are (``_notices_place``): the activity line and the decision
+card are part of the sidebar's own layout, at its foot under the category
+list, just above the source avatar - the list only gets shorter while the
+card shows (the chosen category kept in view), nothing lies over a row.
+On the icon rail the line is a ring with the count and the card sits beside
+the rail; on a page with no sidebar (Home) both are at the same corner.
+Nothing is drawn while the video fills the screen, TV mode shows or the
+picture is popped out.
 """
 from __future__ import annotations
 
@@ -34,7 +37,7 @@ from PyQt6.QtWidgets import QLabel
 
 from ..core.log import log
 from ..i18n import tr
-from .notice_widgets import ActivityLine, ActivityPanel, CardStack, Follow
+from .notice_widgets import ActivityLine, ActivityPanel, DecisionCard, Follow
 from .notices import NoticeHub, hub_of
 from .theme import P
 
@@ -72,28 +75,22 @@ class _BusyMixin:
     # -- the hub and its corner -------------------------------------------------
 
     def _init_notices(self) -> None:
-        """Made once in _build_ui: the hub, the activity line at the
-        sidebar's foot (and its stand-in for pages with no sidebar), the
-        cards, the panel, and what moves them."""
+        """Made once in _build_ui: the hub; the decision card and the
+        activity line in the sidebar's fixed foot, under the part that
+        scrolls and over the source avatar (and their stand-ins for the icon
+        rail and a page with no sidebar); the panel; and what moves them."""
         hub = self.notices = NoticeHub(self)
         line = self._activity_line = ActivityLine(hub)
-        rule = getattr(self, "_bottom_rule", None)
-        host = rule.parentWidget() if rule is not None else None
-        lay = host.layout() if host is not None else None
-        if lay is not None:
-            # Just above the hairline over the source avatar: a stretch above
-            # takes its room, so nothing in the sidebar moves for it.
-            lay.insertWidget(lay.indexOf(rule), line)
-            lay.insertSpacing(lay.indexOf(rule), 6)
+        card = self._decision_card = DecisionCard(hub)
+        self._notices_foot(card, line)
         self._activity_float = ActivityLine(hub, self, floating=True)
-        self._notice_cards = CardStack(hub, self)
+        self._decision_float = DecisionCard(hub, self, floating=True)
         self._notice_panel = ActivityPanel(hub, self)
         for ln in (line, self._activity_float):
             ln.open_panel.connect(self._notices_open_panel)
         self._notice_follow = Follow(self._notices_place, self)
         for w in (self, getattr(self, "_mid", None), getattr(self, "_center_stack", None),
-                  getattr(self, "count_lbl", None), getattr(self, "_side", None),
-                  self._notice_panel):
+                  getattr(self, "_side", None), self._notice_panel):
             if w is not None:
                 self._notice_follow.watch(w)
         cs = getattr(self, "_center_stack", None)
@@ -101,9 +98,19 @@ class _BusyMixin:
             cs.currentChanged.connect(self._notice_follow.poke)
         hub.changed.connect(self._notices_changed)
 
+    def _notices_foot(self, card: DecisionCard, line: ActivityLine) -> None:
+        """The decision card and the activity line in the sidebar's foot, the
+        fixed area under the part that scrolls (main_window), over the
+        hairline and the avatar: in the layout, not over it - the scrolling
+        part gives up the room they take and takes it back."""
+        foot = getattr(self, "_side_foot_lay", None)
+        if foot is not None:
+            foot.insertWidget(0, card)
+            foot.insertWidget(1, line)
+
     def _notices_changed(self) -> None:
-        # Placed at once (cheap): the line on Home must not show a frame at
-        # the window's corner before it is moved to its own.
+        # Placed at once (cheap): a stand-in must not show a frame at the
+        # window's corner before it is moved to its own.
         self._notices_place()
 
     def _notices_held(self) -> bool:
@@ -124,66 +131,112 @@ class _BusyMixin:
                 and cs.currentWidget() is getattr(self, "_root", None) and side.isVisible())
 
     def _notices_place(self) -> None:
-        cards = getattr(self, "_notice_cards", None)
-        if cards is None:
+        card = getattr(self, "_decision_card", None)
+        if card is None:
             return
         held = self._notices_held()
         self.notices.hold(held)
-        rtl = self.layoutDirection() == Qt.LayoutDirection.RightToLeft
         line, floater = self._activity_line, self._activity_float
-        line.set_ring(bool(getattr(self, "_sidebar_collapsed", False)))
+        float_card = self._decision_float
+        rail = bool(getattr(self, "_sidebar_collapsed", False))
+        line.set_ring(rail)
+        was_shown = self._notices_foot_shown()
         if held:
-            line.hide()
-            floater.hide()
-            cards.set_anchor(None)
+            for w in (line, floater, card, float_card):
+                w.hide()
             self._notice_panel.close_panel()
+            self._notices_keep_category(was_shown)
             return
-        line.refresh()
+        rtl = self.layoutDirection() == Qt.LayoutDirection.RightToLeft
         m = self.NOTICE_MARGIN
-        cs = getattr(self, "_center_stack", None)
-        mid = getattr(self, "_mid", None)
-        det = getattr(self, "_det", None)
         if self._notices_sidebar_shown():
             floater.hide()
-            if mid is not None and mid.isVisible():
-                rect = QRect(mid.mapTo(self, QPoint(0, 0)), mid.size())
-                lbl = getattr(self, "count_lbl", None)
-                if lbl is not None and lbl.isVisible():
-                    top = lbl.mapTo(self, QPoint(0, 0)).y()
-                    if rect.top() < top < rect.bottom():
-                        rect.setBottom(top + m - 6)
-            elif det is not None:
-                # Focus mode: under the player and its controls only.
-                rect = QRect(det.mapTo(self, QPoint(0, 0)), det.size())
-                player = getattr(self, "player", None)
-                if player is not None and player.isVisible():
-                    rect.setTop(player.mapTo(self, QPoint(0, player.height())).y() + 8)
+            line.refresh()
+            if rail:
+                card.hide()
+                self._notices_float_card(float_card, beside=line)
             else:
-                rect = self.rect()
+                float_card.hide()
+                card.refresh()
         else:
-            # A page with no sidebar (Home): the line at the same corner.
+            # A page with no sidebar (Home): the same corner, its own pair.
+            cs = getattr(self, "_center_stack", None)
             area = (QRect(cs.mapTo(self, QPoint(0, 0)), cs.size()) if cs is not None
                     else self.rect())
+            card.hide()
             floater.refresh()
+            bottom = area.bottom() - m + 1
             if not floater.isHidden():
-                hint = floater.sizeHint()
-                fw = min(hint.width(), 300)
+                fw = min(floater.sizeHint().width(), 300)
                 fx = area.right() - m - fw + 1 if rtl else area.left() + m
-                floater.setGeometry(fx, area.bottom() - m - floater.height() + 1, fw,
-                                    floater.height())
+                floater.setGeometry(fx, bottom - floater.height(), fw, floater.height())
                 floater.raise_()
-                area.setBottom(area.bottom() - floater.height() - 8)
-            rect = area
+                bottom -= floater.height() + 8
+            self._notices_float_card(float_card, corner=(area, bottom))
         panel = self._notice_panel
         if not panel.isHidden():
             panel._place()
-            # The panel open: the cards step aside, never under it.
-            pg = panel.geometry()
-            if rtl:
-                rect.setRight(min(rect.right(), pg.left() - 8 + m))
+        self._notices_keep_category(was_shown)
+
+    def _notices_float_card(self, card: DecisionCard, beside=None, corner=None) -> None:
+        """The decision card where the sidebar has no room for it: beside the
+        icon rail's ring, or at the corner of a page with no sidebar."""
+        if not card.refresh():
+            return
+        rtl = self.layoutDirection() == Qt.LayoutDirection.RightToLeft
+        w = 280
+        card.setFixedWidth(w)
+        card.adjustSize()
+        h = card.sizeHint().height()
+        side = getattr(self, "_side", None)
+        if beside is not None and side is not None and side.isVisible():
+            # Beside the rail, not over it: from the sidebar's edge, its foot
+            # level with the ring's - or, with no ring, over the hairline.
+            edge = side.mapTo(self, QPoint(0, 0)).x()
+            x = edge - w - 8 if rtl else edge + side.width() + 8
+            if beside.isVisible():
+                y = beside.mapTo(self, QPoint(0, beside.height())).y() - h
             else:
-                rect.setLeft(max(rect.left(), pg.right() + 8 - m))
-        cards.set_anchor(rect, rtl)
+                rule = getattr(self, "_bottom_rule", None) or beside
+                y = rule.mapTo(self, QPoint(0, 0)).y() - 6 - h
+        elif corner is not None:
+            area, bottom = corner
+            x = area.right() - self.NOTICE_MARGIN - w + 1 if rtl else area.left() + self.NOTICE_MARGIN
+            y = bottom - h
+        else:
+            card.hide()
+            return
+        card.setGeometry(max(8, x), max(8, y), w, h)
+        card.raise_()
+
+    def _notices_foot_shown(self) -> tuple[bool, bool]:
+        return (not self._decision_card.isHidden(), not self._activity_line.isHidden())
+
+    def _notices_keep_category(self, was_shown: tuple[bool, bool]) -> None:
+        """The card or the line came or went, so the part of the sidebar that
+        scrolls changed height: the chosen category stays in view."""
+        if was_shown == self._notices_foot_shown():
+            return
+        cats = getattr(self, "cat_list", None)
+        if cats is not None:
+            QTimer.singleShot(0, self._notices_scroll_category)
+
+    def _notices_scroll_category(self) -> None:
+        cats = getattr(self, "cat_list", None)
+        item = cats.currentItem() if cats is not None else None
+        if item is None or cats.isHidden():
+            return
+        side = getattr(self, "_side", None)
+        if side is not None and side.layout() is not None:
+            side.layout().activate()        # the room it has now, not before
+        cats.scrollToItem(item)
+        # The part of the sidebar that scrolls got shorter too: the chosen
+        # row kept in its view as well.
+        area = getattr(self, "_side_scroll", None)
+        if area is not None and area.widget() is not None:
+            r = cats.visualItemRect(item)
+            at = cats.viewport().mapTo(area.widget(), r.center())
+            area.ensureVisible(at.x(), at.y(), 0, r.height() // 2 + 4)
 
     def _notices_open_panel(self) -> None:
         panel = self._notice_panel
@@ -191,13 +244,14 @@ class _BusyMixin:
             panel.close_panel()
             return
         line = self.sender() if isinstance(self.sender(), ActivityLine) else self._activity_line
-        panel.open_at(line, beside=bool(getattr(self, "_sidebar_collapsed", False))
-                      and line is self._activity_line)
+        rail = bool(getattr(self, "_sidebar_collapsed", False)) and line is self._activity_line
+        panel.open_at(line, beside=(getattr(self, "_side", None) or True) if rail else False)
 
     def _notices_restyle(self) -> None:
-        cards = getattr(self, "_notice_cards", None)
-        if cards is not None:
-            cards.restyle()
+        card = getattr(self, "_decision_card", None)
+        if card is not None:
+            for c in (card, self._decision_float):
+                c.restyle()
             self._notice_panel.restyle()
             self._activity_line.update()
             self._activity_float.update()
@@ -362,17 +416,19 @@ class _BusyMixin:
     # -- the older ways in --------------------------------------------------------
 
     def _show_toast(self, text: str, duration_ms: int = 0) -> None:
-        hub_of(self).post(text, ms=duration_ms or None)
+        """Passing words: the activity line's for a few seconds."""
+        hub_of(self).note(text, ms=duration_ms or None)
 
     def _show_action_toast(self, text: str, duration_ms: int, on_click,
-                           label: str | None = None) -> None:
-        """A card that does *on_click* - its button with *label*, else a
-        click on the card (words written as "click here")."""
-        hub_of(self).post(text, ms=duration_ms or None, action=on_click, action_label=label)
+                           label: str | None = None, decide: bool = False) -> None:
+        """A message that does *on_click* (its button, *label*), counted on
+        the activity line and listed in its panel; with *decide* it needs a
+        decision now - the card over the line."""
+        hub_of(self).post(text, action=on_click, action_label=label, decide=decide)
 
     def _flash_status(self, text: str, ms: int = 4000) -> None:
-        """A momentary word (guide refreshed, cache cleared, ...): a card."""
-        hub_of(self).post(text, ms=ms)
+        """A momentary word (guide refreshed, cache cleared, ...): a note."""
+        hub_of(self).note(text, ms=ms)
 
     def _write_status(self, text: str, error: bool = False,
                       emphasis: bool = False) -> None:
@@ -396,11 +452,21 @@ class _BusyMixin:
         hub.end_key("status")
         if error:
             hub.post(text, level="error")
-            rest = getattr(self, "_rest_status", None)
-            if rest and rest[0] and rest[0] == getattr(self, "_playing_shown", None):
-                stopped = getattr(self, "_source_status_stopped", None)
-                if callable(stopped):
-                    stopped()
+            self._status_play_ended()
             return
         self._rest_status = (text, False, False)
         self._write_status(text)
+
+    def _status_play_ended(self) -> None:
+        """What played failed: a line that said so says the list's again."""
+        rest = getattr(self, "_rest_status", None)
+        if rest and rest[0] and rest[0] == getattr(self, "_playing_shown", None):
+            stopped = getattr(self, "_source_status_stopped", None)
+            if callable(stopped):
+                stopped()
+
+    def _stream_failed_quietly(self) -> None:
+        """A stream error: said on the video (main_window), never as a
+        message - only the activity words for it ("Checking stream…") end."""
+        hub_of(self).end_key("status")
+        self._status_play_ended()

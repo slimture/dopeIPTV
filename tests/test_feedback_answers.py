@@ -64,34 +64,37 @@ def test_new_answers_counted_merged_and_marked_seen():
 
 # -- the note that opens it ------------------------------------------------------------
 
-def test_a_note_with_an_action_does_it_when_clicked_and_one_without_does_nothing():
+def test_an_answer_is_a_message_its_button_opens_it_and_a_plain_note_is_words():
     pytest.importorskip("PyQt6.QtWidgets")
-    from PyQt6.QtCore import QRect, Qt
-    from PyQt6.QtTest import QTest
-    from PyQt6.QtWidgets import QApplication, QWidget
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import QApplication, QPushButton, QWidget
 
-    from dopeiptv.ui.notice_widgets import CardStack
+    from dopeiptv.i18n import tr
+    from dopeiptv.ui.notice_widgets import ActivityLine, ActivityPanel
     from dopeiptv.ui.notices import NoticeHub
     app = QApplication.instance() or QApplication([])
     host = QWidget()
     host.resize(600, 400)
     host.show()
     hub = NoticeHub(host)
-    area = CardStack(hub, host)
-    area.set_anchor(QRect(0, 0, 600, 400))
+    line = ActivityLine(hub, host)
+    line.setGeometry(10, 350, 240, ActivityLine.H)
+    hub.changed.connect(line.refresh)
+    panel = ActivityPanel(hub, host)
     clicked = []
-    hub.post("Answered - click to read", ms=5000, action=lambda: clicked.append(1))
-    [card] = area.card_widgets()
-    assert card.cursor().shape() == Qt.CursorShape.PointingHandCursor
-    QTest.mouseClick(card, Qt.MouseButton.LeftButton)
+    mid = hub.post("Answered - click to read", ms=5000, action=lambda: clicked.append(1))
+    assert hub.unread() == 1 and line.badge() == 1          # a count on the line
+    panel.open_at(line)
+    [row] = [panel._msgs.itemAt(i).widget() for i in range(panel._msgs.count())]
+    assert row.msg_id == mid
+    [btn] = [b for b in row.findChildren(QPushButton) if b.objectName() == "NoticeRowCancel"]
+    assert btn.cursor().shape() == Qt.CursorShape.PointingHandCursor
+    assert btn.text() == tr("notice_open")
+    btn.click()
     app.processEvents()
-    assert clicked == [1] and not hub.cards() and not area.card_widgets()
-    hub.post("Just a note", ms=5000)
-    [card] = area.card_widgets()
-    assert card.cursor().shape() != Qt.CursorShape.PointingHandCursor
-    QTest.mouseClick(card, Qt.MouseButton.LeftButton)
-    app.processEvents()
-    assert clicked == [1] and card.isVisible() and hub.texts() == ["Just a note"]
+    assert clicked == [1] and not hub.messages()
+    assert hub.post("Just a note", ms=5000) == 0              # passing words
+    assert hub.note_text() == "Just a note" and hub.messages() == [] and clicked == [1]
     host.close()
 
 
@@ -217,10 +220,18 @@ inbox.answers[report.code_hash("mid")] = [{"t": int(now - 3600), "code": "fixed"
 w._answers_last = 0.0
 w._ask_answers()
 assert wait(lambda: toasts), toasts
-[card] = [c for c in w._notice_cards.card_widgets() if "answered" in c.title.text()]
-assert "answered" in toasts[-1] and card.isVisible()
+# A message: a count on the activity line, its button in the panel.
+from PyQt6.QtWidgets import QPushButton
+[msg] = [m for m in w.notices.messages() if "answered" in m.title]
+assert "answered" in toasts[-1] and w._activity_line.badge() >= 1
 assert w._answers_action.text() == tr("fba_menu") + " (1)…"
-QTest.mouseClick(card, Qt.MouseButton.LeftButton)
+w._activity_line.open_panel.emit()
+app.processEvents()
+panel = w._notice_panel
+rows = [panel._msgs.itemAt(i).widget() for i in range(panel._msgs.count())]
+[row] = [r for r in rows if getattr(r, "msg_id", None) == msg.id]
+[btn] = [b for b in row.findChildren(QPushButton) if b.objectName() == "NoticeRowCancel"]
+btn.click()
 assert wait(lambda: w._answers_window() is not None)
 assert report.unread(report.tickets(s)) == 0
 assert not any("answered" in t for t in w.notices.texts())

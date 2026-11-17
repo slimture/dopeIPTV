@@ -126,6 +126,37 @@ how connections to the account are counted.
   Nothing is drawn while the video fills the screen, TV mode shows or the
   picture is popped out - cards wait until you are back. The status line
   keeps the list's count and what plays; what is about the picture
+- The app's notices are in one calm place instead of four. What it is
+  doing (a list or the guide loading, a folder read or searched, the
+  network scanned, a sync, an update check, a download, a recording saved
+  as MP4) was a strip at the top of the list that pushed it down and up,
+  or words in the status line that stayed; what it told you was a dark
+  note at the window's foot, or the status line in red. Now all of it
+  lives at the foot of the sidebar, just above the source avatar, and
+  nothing appears over the list or the video. One quiet line says the
+  work - an icon for its kind, what you started first (else the oldest)
+  and "+2" for the rest, an accent bar when the progress is known
+  ("Loading programme guide… 45%"), a gentle spinner when not; guides
+  loading together are one line ("Loading guide · 3 sources"). Short
+  work never flickers in (it shows after 0.4 s, then for at least
+  0.6 s), and every job ends with its work, a newer one of the same kind
+  or its own time limit. Passing words ("EPG cache cleared", "Copied") are
+  that line's for a few seconds and gone - no box. An error or a message
+  only adds a small count to the line; a click opens "Working on" (every
+  job with its progress and a Cancel where it can stop) and "Messages"
+  (the newest first, with its action and a dismiss, the read ones faded,
+  Clear all). A stream that fails says so on the video and nowhere else.
+  Only what needs a decision now - the server's offer of a free port - is
+  a small card of the sidebar's width right above the line (its words in
+  two lines at most, one action, a dismiss); one at a time, more wait as
+  a count. The line and the card are part of the sidebar: the categories
+  above simply get shorter while the card shows, stay scrollable and keep
+  the chosen one in view, and the avatar stays on screen at any window
+  height. On the icon rail the line is a ring with the count and the card
+  sits beside the rail; on Home they keep the same corner. Nothing is
+  drawn while the video fills the screen, TV mode shows or the picture is
+  popped out - messages and decisions wait until you are back. The status
+  line keeps the list's count and what plays; what is about the picture
   (loading, reconnecting, a typed channel number) stays over the video,
   and real questions stay dialogs. Readable on every theme, mirrored right
   to left, read out by screen readers.

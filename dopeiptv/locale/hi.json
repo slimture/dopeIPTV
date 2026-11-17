@@ -2951,5 +2951,8 @@
   "notice_reading_source": "{name} पढ़ा जा रहा है…",
   "notice_reading_sources": "आपके स्रोत पढ़े जा रहे हैं · {n}",
   "notice_scanning_network": "नेटवर्क स्कैन हो रहा है…",
-  "notice_less": "कम दिखाएँ"
+  "notice_messages": "संदेश",
+  "notice_clear_all": "सब हटाएँ",
+  "notice_open": "खोलें",
+  "notice_unread": "अपठित संदेश: {n}"
 }

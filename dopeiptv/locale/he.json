@@ -2951,5 +2951,8 @@
   "notice_reading_source": "קורא את {name}…",
   "notice_reading_sources": "קורא את המקורות שלך · {n}",
   "notice_scanning_network": "סורק את הרשת…",
-  "notice_less": "הצג פחות"
+  "notice_messages": "הודעות",
+  "notice_clear_all": "נקה הכול",
+  "notice_open": "פתח",
+  "notice_unread": "הודעות שלא נקראו: {n}"
 }

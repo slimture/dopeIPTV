@@ -1,13 +1,16 @@
-"""The app's notices in one place (ui/notices.py, ui/notice_widgets.py):
-jobs under tokens that always end - finished, failed, cancelled, replaced
-or let go by their own timeout, a late answer touching nothing -, shown only
-after a moment and then for at least a moment, the person's own first,
-groups merged, a panel with Cancel; cards that stack three high with the
-rest folded, the newest on top and the ones that ask above, count the same
-words, stay when they wait for an answer or say an error, pause under the
-pointer and wait out the full screen; the window's older ways in routed
-there (mw_busy); and on the real window the activity at the sidebar's foot,
-the cards beside it in the list pane - never over the video."""
+"""The app's notices, calm and in one place (ui/notices.py,
+ui/notice_widgets.py, mw_busy): jobs under tokens that always end -
+finished, failed, cancelled, replaced or let go by their own timeout, a late
+answer touching nothing -, shown only after a moment and then for at least
+a moment, the person's own first, groups merged, a panel with Cancel;
+passing words on the activity line and gone; errors and messages only a
+count on it, listed in the panel ("Working on", "Messages": the newest
+first, read ones faded, Clear all); only what needs a decision a small card
+over the line, one at a time; stream errors said on the video alone. On the
+real window all of it in the sidebar's fixed foot: nothing over the list,
+the categories or the video, the categories only shorter while a card shows
+(none covered, every one reachable, the chosen one in view) at 700 px high
+with 64 long names, the card beside the icon rail."""
 from __future__ import annotations
 
 import os
@@ -21,14 +24,23 @@ import pytest
 pytest.importorskip("PyQt6.QtWidgets")
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt6.QtCore import QRect, Qt  # noqa: E402
+from PyQt6.QtCore import Qt  # noqa: E402
+from PyQt6.QtGui import QFontMetrics  # noqa: E402
 from PyQt6.QtTest import QTest  # noqa: E402
-from PyQt6.QtWidgets import QApplication, QWidget  # noqa: E402
+from PyQt6.QtWidgets import QApplication, QPushButton, QVBoxLayout, QWidget  # noqa: E402
 
 from dopeiptv.i18n import tr  # noqa: E402
 from dopeiptv.ui import theme  # noqa: E402
 from dopeiptv.ui.mw_busy import _BusyMixin  # noqa: E402
-from dopeiptv.ui.notice_widgets import ActivityLine, ActivityPanel, CardStack, colours  # noqa: E402
+from dopeiptv.ui.notice_widgets import (  # noqa: E402
+    ActivityLine,
+    ActivityPanel,
+    DecisionCard,
+    _font,
+    colours,
+    one_line,
+    two_lines,
+)
 from dopeiptv.ui.notices import Activity, NoticeHub, hub_of  # noqa: E402
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -74,18 +86,19 @@ def test_a_newer_job_of_the_same_key_replaces_it_and_the_old_answer_is_moot(app)
     new = hub.start("Checking catch-up…", key="ts_check")
     assert [j.token for j in hub.jobs()] == [new]
     assert not hub.finish(old)                          # the old answer: nothing
-    assert not hub.fail(old, "failed") and hub.cards() == []
+    assert not hub.fail(old, "failed") and hub.messages() == []
     assert hub.alive(new)
     assert hub.end_key("ts_check") and not hub.end_key("ts_check")
 
 
-def test_a_failure_ends_the_job_and_says_so(app):
+def test_a_failure_ends_the_job_and_is_a_message(app):
     hub = _hub()
     t = hub.start("Downloading yt-dlp")
     assert hub.fail(t, "The download failed")
     assert hub.jobs() == []
-    [card] = hub.cards()
-    assert card.title == "The download failed" and card.level == "error"
+    [msg] = hub.messages()
+    assert msg.title == "The download failed" and msg.level == "error"
+    assert hub.unread() == 1 and hub.unread_level() == "error"
 
 
 def test_a_job_nobody_ends_is_let_go_and_a_word_keeps_it(app):
@@ -107,6 +120,7 @@ def test_every_job_has_a_time_limit_and_idle_costs_nothing(app):
     assert hub._vis.isActive()                          # waiting to show it
     hub.cancel(t)
     assert not hub._vis.isActive() and not hub._job_timers
+    assert not hub._note_timer.isActive()
 
 
 def test_short_work_never_shows_and_shown_work_stays_a_moment(app):
@@ -193,76 +207,89 @@ def test_a_producer_on_a_worker_thread_is_heard_in_order(app):
     with pytest.raises(ValueError):
         with Activity(hub_of(Win()), "Reading folder Music…", kind="folder"):
             raise ValueError("no such folder")
-    assert _spin(app, lambda: "no such folder" in hub.texts())
-    assert hub.jobs() == []
+    assert _spin(app, lambda: any("no such folder" in t for t in hub.texts()))
+    assert hub.jobs() == [] and hub.messages()[0].level == "error"
 
 
-# -- cards ---------------------------------------------------------------------
+# -- notes, messages, decisions ------------------------------------------------
 
-def test_cards_newest_on_top_the_asking_above_the_same_words_counted(app):
+def test_passing_words_are_the_lines_and_then_gone(app):
     hub = _hub()
-    hub.post("One")
-    hub.post("Two")
-    ask = hub.post("Port 3673 is taken", action=lambda: None, action_label="Use port 3674")
-    hub.post("Three")
-    assert [c.title for c in hub.shown_cards()] == ["Port 3673 is taken", "Three", "Two", "One"]
-    again = hub.post("Two")
-    assert [c.title for c in hub.shown_cards()][:2] == ["Port 3673 is taken", "Two"]
-    assert next(c for c in hub.cards() if c.id == again).count == 2
-    k = hub.post("Channel: 1", key="chan_entry")
-    assert hub.post("Channel: 12", key="chan_entry") == k        # words follow, no count
-    assert next(c for c in hub.cards() if c.id == k).count == 1
-    assert hub.dismiss_key("chan_entry") and hub.dismiss(ask) and not hub.dismiss(ask)
-    assert hub.post("") == 0
-    cid = hub.post("Port is taken", title="Server mode")
-    card = next(c for c in hub.cards() if c.id == cid)
-    assert (card.title, card.body) == ("Server mode", "Port is taken")
+    hub.NOTE_MIN_MS = 10
+    assert hub.post("EPG cache cleared", ms=40) == 0            # no message
+    assert hub.note_text() == "EPG cache cleared" and hub.messages() == []
+    hub.post("Low disk space", level="warning")                 # nothing to do: a note
+    assert hub.note_text() == "Low disk space" and hub.unread() == 0
+    hub.note("Copied", ms=40)
+    assert _spin(app, lambda: hub.note_text() == "")
+    assert hub.said()[-3:] == ["EPG cache cleared", "Low disk space", "Copied"]
+    hub.note(tr("chan_entry", num="1"), key="chan_entry")
+    hub.note(tr("chan_entry", num="12"), key="chan_entry")      # the words follow
+    assert hub.note_text() == tr("chan_entry", num="12")
+    assert hub.dismiss_key("chan_entry") and hub.note_text() == ""
+    assert hub.post("") == 0 and not hub._note_timer.isActive()
 
 
-def test_passing_notes_go_the_asking_and_errors_stay(app):
+def test_errors_and_actions_are_messages_counted_until_read(app):
     hub = _hub()
-    hub.CARD_MIN_MS = 10
-    hub.post("Passing", ms=40)
-    hub.post("Answer me", action=lambda: None, action_label="Use")
-    hub.post("Stream error: HTTP 404", level="error", ms=40)
-    assert _spin(app, lambda: "Passing" not in hub.texts())
-    _spin(app, secs=0.1)
-    assert hub.texts() == ["Answer me", "Stream error: HTTP 404"]
+    a = hub.post("Could not delete", level="error")
+    b = hub.post("dopeIPTV answered your feedback", action=lambda: None)
+    assert [m.id for m in hub.messages()] == [b, a]                 # the newest first
+    assert hub.unread() == 2 and hub.unread_level() == "error"
+    again = hub.post("Could not delete", level="error")
+    assert again == a and hub.messages()[0].id == a and hub.messages()[0].count == 2
+    k = hub.post("Recording: News", level="error", key="rec")
+    assert hub.post("Recording: Sport", level="error", key="rec") == k
+    assert next(m for m in hub.messages() if m.id == k).count == 1
+    hub.mark_read()
+    assert hub.unread() == 0 and all(m.read for m in hub.messages())
+    hub.post("Could not delete", level="error")                     # news again
+    assert hub.unread() == 1 and not hub.messages()[0].read
+    cid = hub.post("Port is taken", title="Server mode", level="error")
+    msg = next(m for m in hub.messages() if m.id == cid)
+    assert (msg.title, msg.body) == ("Server mode", "Port is taken")
+    hub.clear()
+    assert hub.messages() == [] and hub.unread() == 0
 
 
-def test_a_note_under_the_pointer_waits(app):
+def test_messages_are_kept_to_a_bound_the_read_ones_first(app):
     hub = _hub()
-    hub.CARD_MIN_MS = 10
-    hub.post("Hold me", ms=60)
-    hub.pause(True)
-    _spin(app, secs=0.15)
-    assert hub.texts() == ["Hold me"]
-    hub.pause(False)
-    assert _spin(app, lambda: not hub.texts())
+    hub.MAX_MESSAGES = 3
+    first = hub.post("One", level="error")
+    hub.mark_read()
+    for t in ("Two", "Three", "Four"):
+        hub.post(t, level="error")
+    assert first not in [m.id for m in hub.messages()]
+    assert [m.title for m in hub.messages()] == ["Four", "Three", "Two"]
 
 
-def test_a_cards_action_runs_once_after_it_goes(app):
+def test_a_decision_is_the_card_one_at_a_time_and_its_action_runs_once(app):
     hub = _hub()
     done = []
-    c = hub.post("Use port 3674?", action=lambda: done.append(hub.texts()),
-                 action_label="Use port 3674")
-    assert hub.activate(c) and not hub.activate(c)
-    assert done == []                                    # after this event
-    _spin(app, lambda: bool(done))
-    assert done == [[]]
+    a = hub.post("Port 3673 is taken", action=lambda: done.append(hub.decisions()),
+                 action_label="Use port 3674", decide=True)
+    b = hub.post("Another question", action=lambda: None, decide=True)
+    assert [m.id for m in hub.decisions()] == [a, b] and hub.unread() == 0
+    hub.post("An error", level="error")
+    hub.clear()                                                 # decisions wait
+    assert [m.id for m in hub.decisions()] == [a, b]
+    assert hub.activate(a) and not hub.activate(a)
+    assert done == []                                           # after this event
+    assert _spin(app, lambda: bool(done))
+    assert [m.id for m in done[0]] == [b]
+    assert hub.dismiss(b) and hub.decisions() == []
 
 
-def test_held_cards_wait_and_a_stale_note_is_dropped(app):
+def test_held_drops_a_passing_note_and_keeps_the_rest(app):
     hub = _hub()
-    hub.CARD_MIN_MS = 10
+    hub.note("Saved")
     hub.hold(True)
-    hub.post("Recording started", ms=30)
-    hub.post("Answer me", action=lambda: None)
-    _spin(app, secs=0.15)
-    assert hub.texts() == ["Recording started", "Answer me"]      # no time ran
-    hub.cards()[0].posted -= NoticeHub.HELD_STALE_S + 1
+    assert hub.note_text() == "" and hub.held
+    hub.note("Recording started")                               # no news later
+    hub.post("Could not delete", level="error")
+    hub.post("Port 3673 is taken", action=lambda: None, decide=True)
     hub.hold(False)
-    assert hub.texts() == ["Answer me"]
+    assert hub.note_text() == "" and hub.unread() == 1 and len(hub.decisions()) == 1
 
 
 def test_hub_of_a_window_without_one_does_nothing():
@@ -271,68 +298,83 @@ def test_hub_of_a_window_without_one_does_nothing():
     hub = hub_of(Bare())
     assert hub.start("x") == 0 and hub.post("x") == 0 and hub.jobs() == []
     assert not hub.finish(1) and hub.texts() == [] and hub.entries() == []
+    assert hub.note_text() == "" and hub.messages() == [] and hub.decisions() == []
+    assert hub.unread() == 0 and hub.said() == []
+
+
+# -- words cut to their room -----------------------------------------------------
+
+def test_two_lines_at_most_then_an_ellipsis(app):
+    font = _font(13)
+    fm = QFontMetrics(font)
+    assert two_lines("Short", font, 200) == "Short"
+    long = ("Port 3673 is used by another program - the server cannot start there, "
+            "pick another one in Settings")
+    out = two_lines(long, font, 160)
+    lines = out.split("\n")
+    assert len(lines) == 2 and lines[1].endswith("…")
+    assert all(fm.horizontalAdvance(x) <= 160 for x in lines)
+    word = two_lines("Supercalifragilisticexpialidocious" * 3, font, 120)
+    assert all(fm.horizontalAdvance(x) <= 120 for x in word.split("\n"))
+    assert two_lines("", font, 100) == ""
+
+
+def test_one_line_keeps_the_count_and_gives_up_the_start(app):
+    fm = QFontMetrics(_font(13))
+    text = "Searching in Documentaries and nature… · 12 found"
+    out = one_line(text, fm, 180)
+    assert out.endswith(" · 12 found") and "…" in out and fm.horizontalAdvance(out) <= 180
+    assert one_line("Saved", fm, 180) == "Saved"
+    plain = one_line("Loading the programme guide for every source", fm, 120)
+    assert plain.endswith("…") and fm.horizontalAdvance(plain) <= 120
 
 
 # -- drawn ---------------------------------------------------------------------
 
-def _stack(app, rtl=False):
+def _host(app, rtl=False):
     host = QWidget()
     host.resize(900, 600)
     if rtl:
         host.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
     host.show()
+    return host
+
+
+def test_the_line_says_a_note_the_work_or_the_count(app):
+    host = _host(app)
     hub = _hub()
-    stack = CardStack(hub, host)
-    stack.set_anchor(QRect(200, 0, 500, 560), rtl)
-    return host, hub, stack
-
-
-def test_three_cards_show_the_rest_fold_and_open(app):
-    host, hub, stack = _stack(app)
-    for t in ("One", "Two", "Three", "Four"):
-        hub.post(t)
-    shown = stack.card_widgets()
-    assert [w.title.text() for w in shown] == ["Four", "Three", "Two"]
-    assert stack.fold.isVisible() and stack.fold.text() == "+" + tr("notice_more", n=1)
-    QTest.mouseClick(stack.fold, Qt.MouseButton.LeftButton)
-    assert len(stack.card_widgets()) == 4 and stack.fold.text() == tr("notice_less")
-    card = stack.card_widgets()[0]
-    assert card.accessibleName() == "Four" and card.accessibleDescription() == tr("notice_info")
-    assert card.close_btn.accessibleName() == tr("notice_dismiss")
-    QTest.mouseClick(card.close_btn, Qt.MouseButton.LeftButton)
-    assert "Four" not in hub.texts() and not stack.fold.isVisible()
-    g = stack.geometry()
-    assert g.left() == 200 + CardStack.INSET and g.bottom() <= 560
+    line = ActivityLine(hub, host)
+    line.setGeometry(16, 540, 220, ActivityLine.H)
+    hub.changed.connect(line.refresh)
+    line.refresh()
+    assert line.isHidden()                                      # nothing: nothing drawn
+    hub.note("EPG cache cleared")
+    assert line.isVisible() and line.text() == "EPG cache cleared"
+    hub._note_over()
+    hub.start(tr("notice_reading_folder", name="Music"), kind="folder", mine=True)
+    hub.start(tr("status_loading_programme_guide"), kind="guide", done=45, total=100)
+    _spin(app, secs=0.02)
+    assert line.text() == tr("notice_reading_folder", name="Music") + "  +1"
+    assert tr("notice_reading_folder", name="Music") in line.accessibleName()
+    assert "45%" in line.toolTip()
+    for j in hub.jobs():
+        hub.cancel(j.token)
+    hub.post("Could not delete", level="error")
+    hub.post("dopeIPTV answered your feedback", action=lambda: None)
+    assert line.badge() == 2 and line.text() == tr("notice_unread", n=2)
+    assert tr("notice_unread", n=2) in line.toolTip()
+    line.set_ring(True)
+    assert line.sizeHint().width() == ActivityLine.H and line.badge() == 2
+    hub.mark_read()
+    assert line.badge() == 0 and _spin(app, lambda: line.isHidden())    # nothing left
     host.close()
 
 
-def test_the_cards_corner_is_the_leading_one_and_mirrors(app):
-    host, hub, stack = _stack(app, rtl=True)
-    hub.post("Note")
-    assert stack.geometry().right() == QRect(200, 0, 500, 560).right() - CardStack.INSET
-    host.close()
-
-
-def test_nothing_is_drawn_while_held_or_without_a_place(app):
-    host, hub, stack = _stack(app)
-    hub.post("Note")
-    assert stack.isVisible()
-    hub.hold(True)
-    assert stack.isHidden() and hub.texts() == ["Note"]
-    hub.hold(False)
-    assert stack.isVisible()
-    stack.set_anchor(None)
-    assert stack.isHidden()
-    host.close()
-
-
-def test_the_line_says_the_work_and_its_panel_lists_and_stops_it(app):
-    host = QWidget()
-    host.resize(900, 600)
-    host.show()
+def test_the_panel_lists_the_work_and_the_messages_and_marks_them_read(app):
+    host = _host(app)
     hub = _hub()
-    line = ActivityLine(hub, host, floating=True)
-    line.setGeometry(16, 540, 280, ActivityLine.H)
+    line = ActivityLine(hub, host)
+    line.setGeometry(16, 540, 240, ActivityLine.H)
     panel = ActivityPanel(hub, host)
     line.open_panel.connect(lambda: panel.open_at(line))
     hub.changed.connect(line.refresh)
@@ -340,23 +382,67 @@ def test_the_line_says_the_work_and_its_panel_lists_and_stops_it(app):
     a = hub.start(tr("notice_reading_folder", name="Music"), kind="folder", mine=True,
                   cancel=lambda: stopped.append(1))
     b = hub.start(tr("status_loading_programme_guide"), kind="guide", done=45, total=100)
-    assert _spin(app, lambda: line.isVisible())
-    assert line.text() == tr("notice_reading_folder", name="Music") + "  +1"
-    assert tr("notice_working") in line.accessibleName() and "45%" in line.toolTip()
+    old = hub.post("Could not delete", level="error")
+    hub.mark_read()
+    new = hub.post("dopeIPTV answered your feedback", action=lambda: None)
+    assert _spin(app, lambda: line.isVisible() and len(hub.entries()) == 2)
     QTest.mouseClick(line, Qt.MouseButton.LeftButton)
-    assert panel.isVisible()
-    rows = [panel._rows.itemAt(i).widget() for i in range(panel._rows.count())]
-    assert len(rows) == 2 and "45%" in rows[1].accessibleName()
-    assert panel.geometry().bottom() < line.geometry().top()          # upward from it
-    from PyQt6.QtWidgets import QPushButton
-    [cancel] = rows[0].findChildren(QPushButton)
+    assert panel.isVisible() and panel.geometry().bottom() < line.geometry().top()
+    assert panel._work_head.text() == tr("notice_working") and panel._work_head.isVisibleTo(panel)
+    assert panel._msg_head.text() == tr("notice_messages")
+    assert panel.clear_btn.text() == tr("notice_clear_all")
+    jobs = [panel._rows.itemAt(i).widget() for i in range(panel._rows.count())]
+    msgs = [panel._msgs.itemAt(i).widget() for i in range(panel._msgs.count())]
+    assert len(jobs) == 2 and "45%" in jobs[1].accessibleName()
+    assert [m.msg_id for m in msgs] == [new, old]                    # the newest first
+    from PyQt6.QtWidgets import QLabel
+    names = [m.findChildren(QLabel)[0].objectName() for m in msgs]
+    assert names == ["NoticeRowText", "NoticeRowRead"]               # read ones faded
+    assert msgs[0].accessibleDescription() == tr("notice_info")
+    assert msgs[1].accessibleDescription() == tr("notice_error")
+    assert hub.unread() == 0 and line.badge() == 0                   # seen now
+    [cancel] = jobs[0].findChildren(QPushButton)
     cancel.click()
     assert stopped == [1] and not hub.alive(a)
-    assert _spin(app, lambda: panel._rows.count() == 1)               # live
+    assert _spin(app, lambda: panel._rows.count() == 1)              # live
+    msgs[1].dismiss_btn.click()
+    assert [m.id for m in hub.messages()] == [new]
+    panel.clear_btn.click()
+    assert hub.messages() == []
     hub.finish(b)
-    assert _spin(app, lambda: panel.isHidden())                       # by itself
-    line.set_ring(True)
-    assert line.sizeHint().width() == ActivityLine.H
+    assert _spin(app, lambda: panel.isHidden())                      # empty: it closes
+    host.close()
+
+
+def test_the_decision_card_one_action_two_lines_the_rest_counted(app):
+    host = _host(app)
+    lay = QVBoxLayout(host)
+    lay.addStretch(1)
+    hub = _hub()
+    card = DecisionCard(hub, host)
+    card.setFixedWidth(230)
+    lay.addWidget(card)
+    hub.changed.connect(card.refresh)
+    assert not card.refresh() and card.isHidden()
+    long = ("Port 3673 is used by another program - the server cannot start there; "
+            "it can start on the next free port instead")
+    took = []
+    hub.post(long, action=lambda: took.append(1), action_label="Use port 3674", decide=True)
+    hub.post("Another question", action=lambda: None, decide=True)
+    _spin(app, secs=0.05)
+    assert card.isVisible() and card.text() == long and card.toolTip() == long
+    lines = card.label.text().split("\n")
+    assert len(lines) == 2 and lines[1].endswith("…")
+    fm = QFontMetrics(card.label.font())
+    assert all(fm.horizontalAdvance(x) <= card.label.width() + 1 for x in lines), lines
+    assert card.action_btn.text() == "Use port 3674" and card.more.text() == "+1"
+    assert card.close_btn.accessibleName() == tr("notice_dismiss")
+    assert card.accessibleName() == long and card.accessibleDescription() == tr("notice_info")
+    card.action_btn.click()
+    assert _spin(app, lambda: took == [1])
+    assert card.text() == "Another question" and card.more.isHidden()
+    QTest.keyClick(card, Qt.Key.Key_Escape)
+    assert hub.decisions() == [] and card.isHidden()
     host.close()
 
 
@@ -391,14 +477,16 @@ class _Window(_BusyMixin, QWidget):
 def test_the_older_calls_land_in_the_hub(app):
     w = _Window()
     w._show_toast("Saved", 3000)
+    assert w.notices.note_text() == "Saved"
     w._flash_status("Guide cache cleared")
+    assert w.notices.note_text() == "Guide cache cleared" and w.notices.messages() == []
     act = []
     w._show_action_toast("Click here to read it", 9000, lambda: act.append(1))
-    w._show_action_toast("Port 3673 is taken", 9000, lambda: act.append(2), label="Use port 3674")
-    assert w.notices.texts() == ["Saved", "Guide cache cleared", "Click here to read it",
-                                 "Port 3673 is taken"]
-    assert w.notices.cards()[-1].action_label == "Use port 3674"
-    assert all(c.ms == 0 for c in w.notices.cards() if c.action)     # they wait
+    w._show_action_toast("Port 3673 is taken", 15000, lambda: act.append(2),
+                         label="Use port 3674", decide=True)
+    assert w.notices.texts() == ["Click here to read it", "Port 3673 is taken"]
+    [ask] = w.notices.decisions()
+    assert ask.action_label == "Use port 3674" and w.notices.unread() == 1
     w._show_busy("Loading channels…")
     w._show_busy("Loading movies…")                       # the newest words win
     assert [(j.text, j.kind, j.mine) for j in w.notices.jobs()] == [("Loading movies…", "list", True)]
@@ -418,9 +506,10 @@ def test_the_status_line_keeps_the_lists_state(app):
     w._set_status("Playing: News")                           # the next status ends it
     assert w.notices.jobs() == [] and w.line == "Playing: News"
     w._set_status(tr("status_checking_stream"), emphasis=True)
-    w._set_status(tr("status_stream_error", msg="404"), error=True)   # an error: a card
-    assert w.notices.jobs() == []
-    assert w.notices.cards()[-1].level == "error" and w.notices.cards()[-1].ms == 0
+    w._stream_failed_quietly()                               # said on the video alone
+    assert w.notices.jobs() == [] and w.notices.messages() == []
+    w._set_status(tr("status_error", msg="404"), error=True)  # an error: a message
+    assert w.notices.messages()[0].level == "error" and w.notices.unread() == 1
     assert w.line == "Playing: News"
 
 
@@ -462,8 +551,20 @@ store = PlaylistStore(s)
 pl = store.add({"name": "Pirat", "server": "http://pirat.invalid", "username": "u", "password": "p"})
 store.set_active(pl["id"])
 theme.apply_theme(s)
-w = mw.MainWindow(DemoClient(), s, store)
-w.resize(1200, 760)
+app.setStyleSheet(theme.build_style())
+
+
+class Client(DemoClient):
+    # A long list of categories with long names.
+    def live_categories(self):
+        names = ["Sweden | SVT, TV4 and the regional channels", "News", "Sport",
+                 "Documentaries and nature from around the world", "Kids", "Music"]
+        return [{"category_id": str(i), "category_name": f"{names[i % len(names)]} {i}"}
+                for i in range(64)]
+
+
+w = mw.MainWindow(Client(), s, store)
+w.resize(1180, 700)
 w.show()
 
 
@@ -481,96 +582,195 @@ def rect(widget):
 pump(40)
 w.switch_mode("live")
 pump(30)
-hub, cards, line = w.notices, w._notice_cards, w._activity_line
+hub, line, card = w.notices, w._activity_line, w._decision_card
 hub.SHOW_AFTER_MS = hub.MIN_SHOWN_MS = 0
 for j in hub.jobs():
     hub.cancel(j.token)
 pump(5)
+cats, area = w.cat_list, w._side_scroll
+assert cats.count() >= 64, cats.count()
 assert not hasattr(w, "loading_bar") and not hasattr(w, "_toast")
-# The activity: at the sidebar's foot, just above the source avatar.
+assert not hasattr(w, "_notice_cards")
+side, avatar, gear = rect(w._side), rect(w._playlist_btn), rect(w._settings_btn)
+win = w.rect()
+# The foot is a fixed area under the part that scrolls: the avatar on screen.
+assert w._side_foot.parentWidget() is w._side and area.widget().isAncestorOf(cats)
+assert not area.widget().isAncestorOf(line) and not area.widget().isAncestorOf(w._playlist_btn)
+assert win.contains(avatar) and side.contains(avatar), (avatar, side)
+
+# The activity: in the foot, just above the source avatar.
 w._show_busy(tr("status_loading_channels"))
 pump(5)
 assert line.isVisible() and line.text() == tr("status_loading_channels")
-side, avatar = rect(w._side), rect(w._playlist_btn)
 assert side.contains(rect(line)) and rect(line).bottom() < avatar.top(), (rect(line), avatar)
 w._apply_filter()
 pump(10)
 assert not hub.jobs(), [j.text for j in hub.jobs()]
-# The cards: from the bottom of the list pane on the sidebar's side, above
-# its status line - never in the player's pane, never over the sidebar.
-w._show_toast("A note", 60_000)
-t = w._guide_busy_begin()
-w._on_epg_progress(t, 10)
-pump(10)
-g, mid, det = rect(cards), rect(w._mid), rect(w._det)
-assert mid.contains(g) and not det.intersects(g) and not side.intersects(g), (mid, g)
-assert g.bottom() < rect(w.count_lbl).top() + 16, g
-assert abs(g.left() - mid.left() - 16) <= 1, (g, mid)
-assert hub.texts() == ["A note"], hub.texts()
-assert line.text().startswith(tr("status_loading_programme_guide")), line.text()
-# The panel of jobs opens upward from the line; the cards step aside.
+# Passing words: the line's, no message, nothing anywhere else.
+w._flash_status(tr("epg_cache_cleared"))
+pump(3)
+assert line.text() == tr("epg_cache_cleared") and hub.messages() == []
+hub._note_over()
+pump(3)
+assert line.isHidden()
+# An error: only a count on the line; the status line keeps the list's words.
+line_words = w.count_lbl.text()
+w._error("boom")
+w._show_action_toast(tr("fbr_new"), 9000, lambda: None)
+pump(3)
+assert line.isVisible() and line.badge() == 2 and line.text() == tr("notice_unread", n=2)
+assert w.count_lbl.text() == line_words and card.isHidden()
+# A stream error is said on the video, never as a message.
+w._show_stream_error("HTTP 404")
+pump(3)
+assert hub.unread() == 2 and not any("HTTP 404" in t for t in hub.texts())
+# The panel opens upward from the line, inside the window; reading clears the count.
+w._show_busy(tr("status_loading_channels"))
+pump(3)
 line.open_panel.emit()
 pump(10)
 panel = w._notice_panel
 assert panel.isVisible() and rect(panel).bottom() < rect(line).top()
-assert not rect(panel).intersects(rect(cards)), (rect(panel), rect(cards))
+assert win.contains(rect(panel)) and hub.unread() == 0 and line.badge() == 0
 panel.close_panel()
-pump(5)
-# The list loading meanwhile leaves the guide's job; the guide's end ends it.
-w._show_busy(tr("status_loading_channels"))
 w._hide_busy()
-pump(3)
-assert [j.key for j in hub.jobs()] == ["guide"]
-w._guide_busy_end(t)
-pump(3)
-assert not hub.jobs()
-# The video fills the screen: nothing drawn, the card waits.
+hub.clear()
+pump(5)
+assert line.isHidden()
+
+# A decision: the card right above the line, in the foot; the categories
+# only get shorter - none covered, the chosen one in view, every one reachable.
+cats.setCurrentRow(30)
+cats.scrollToItem(cats.currentItem())
+pump(5)
+vp_before = rect(area.viewport())
+words = ("Port 3673 is used by another program - the server cannot start there; "
+         "it can start on the next free port instead")
+w._show_action_toast(words, 15000, lambda: None, label=tr("nerd_server_use_port", port=3674),
+                     decide=True)
+w._show_action_toast("Another question", 15000, lambda: None, decide=True)
+hub.start(tr("notice_searching_in", name="Movies"), key="search", kind="search", mine=True)
+pump(20)
+c, ln, vp = rect(card), rect(line), rect(area.viewport())
+assert card.isVisible() and line.isVisible() and w._decision_float.isHidden()
+assert side.contains(c) and c.bottom() < ln.top() and ln.bottom() < avatar.top(), (c, ln, avatar)
+assert rect(w._playlist_btn) == avatar and win.contains(avatar)        # never pushed off
+assert vp.bottom() < c.top() and vp.height() < vp_before.height(), (vp, c, vp_before)
+assert not rect(w._mid).intersects(c) and not rect(w._mid).intersects(ln)
+assert card.toolTip() == words and card.label.text().count("\n") == 1
+assert card.label.text().endswith("…") and card.more.text() == "+1"
+foot = [c, ln, avatar, gear]
+
+
+def visible_part(row):
+    item = cats.item(row)
+    r = cats.visualItemRect(item)
+    r = r.intersected(cats.viewport().rect())
+    if r.isEmpty():
+        return QRect()
+    r = QRect(cats.viewport().mapTo(w, r.topLeft()), r.size())
+    return r.intersected(vp)
+
+
+def check_rows():
+    shown = 0
+    for row in range(cats.count()):
+        part = visible_part(row)
+        if part.isEmpty():
+            continue
+        shown += 1
+        for f in foot:
+            assert not part.intersects(f), (row, part, f)
+        hit = w.childAt(part.center())
+        assert hit is cats.viewport() or cats.viewport().isAncestorOf(hit), (row, hit)
+    return shown
+
+
+assert check_rows() >= 1
+label = rect(w._source_label).intersected(vp)
+assert all(not label.intersects(f) for f in foot), (label, foot)
+chosen = visible_part(30)
+assert chosen.height() == cats.visualItemRect(cats.item(30)).height(), chosen   # in view
+# Every category reachable: the side scrolled to its end, the list to its last.
+area.verticalScrollBar().setValue(area.verticalScrollBar().maximum())
+cats.scrollToBottom()
+pump(5)
+last = visible_part(cats.count() - 1)
+assert last.height() == cats.visualItemRect(cats.item(cats.count() - 1)).height(), last
+assert check_rows() >= 1
+# The card goes: the room comes back.
+hub.dismiss(hub.decisions()[0].id)
+pump(5)
+assert card.isVisible() and card.text() == "Another question" and card.more.isHidden()
+hub.dismiss(hub.decisions()[0].id)
+hub.end_key("search")
+pump(10)
+assert card.isHidden() and line.isHidden()
+assert rect(area.viewport()).height() == vp_before.height(), (rect(area.viewport()), vp_before)
+# The video fills the screen: nothing drawn, a decision waits.
+w._show_action_toast("Port 3673 is taken", 15000, lambda: None, label="Use port 3674",
+                     decide=True)
 w._player_fs = True
 w._notices_place()
 pump(3)
-assert cards.isHidden() and hub.held and hub.texts() == ["A note"]
+assert card.isHidden() and line.isHidden() and hub.held and len(hub.decisions()) == 1
 w._player_fs = False
 w._notices_place()
-pump(3)
-assert cards.isVisible() and not hub.held
-# The icon rail: the line becomes a ring.
-w._set_sidebar_collapsed(True)
-w._show_busy(tr("status_loading_channels"))
-pump(10)
-assert line.isVisible() and line.sizeHint().width() == line.H
-w._hide_busy()
-w._set_sidebar_collapsed(False)
 pump(5)
-# A typed channel number with no player: one card following the digits.
+assert card.isVisible() and not hub.held
+# The icon rail: the line a ring with the count, the card beside the rail.
+w._error("boom")
+w._set_sidebar_collapsed(True)
+pump(15)
+side = rect(w._side)
+fc = w._decision_float
+assert line.isVisible() and line.sizeHint().width() == line.H and line.badge() == 1
+assert card.isHidden() and fc.isVisible() and fc.text() == "Port 3673 is taken"
+assert rect(fc).left() >= side.right() and win.contains(rect(fc)), (rect(fc), side)
+assert not rect(fc).intersects(rect(w._playlist_btn)) and not rect(fc).intersects(side)
+assert side.contains(rect(line)) and rect(line).bottom() < rect(w._playlist_btn).top()
+line.open_panel.emit()
+pump(5)
+assert panel.isVisible() and rect(panel).left() >= side.right() and win.contains(rect(panel))
+panel.close_panel()
+hub.clear()                                  # no ring left: the card still beside
+pump(5)
+assert line.isHidden() and fc.isVisible() and rect(fc).left() >= side.right()
+assert rect(fc).bottom() < rect(w._playlist_btn).top() and win.contains(rect(fc))
+w._set_sidebar_collapsed(False)
+pump(10)
+assert fc.isHidden() and card.isVisible()
+hub.clear()
+for m in hub.decisions():
+    hub.dismiss(m.id)
+for j in hub.jobs():
+    hub.cancel(j.token)
+pump(5)
+# A typed channel number with no player: the line's words, following the digits.
 w._chan_entry_show("1", 2500)
 w._chan_entry_show("12", 2500)
-assert [x for x in hub.texts() if x.startswith(tr("chan_entry", num="1"))] == [tr("chan_entry", num="12")]
+assert hub.note_text() == tr("chan_entry", num="12") and hub.messages() == []
 w._chan_entry_show("", 0)
-assert tr("chan_entry", num="12") not in hub.texts()
-# Home has no sidebar: the line at the same corner, the cards above it.
+assert hub.note_text() == ""
+# Home has no sidebar: the line at the same corner, a decision above it.
 s.setValue("home_enabled", "true")
 w._show_home_page()
 job = hub.start(tr("sync_running"), kind="sync")
+w._show_action_toast("Port 3673 is taken", 15000, lambda: None, decide=True)
 pump(10)
 fl, central = w._activity_float, rect(w._center_stack)
-assert fl.isVisible() and not line.isVisible() or not w._side.isVisible()
+assert not w._side.isVisible() and fl.isVisible() and not line.isVisible()
 assert central.contains(rect(fl)) and rect(fl).left() - central.left() <= 20, rect(fl)
-assert not rect(cards).intersects(rect(fl)) and rect(cards).bottom() < rect(fl).top()
+assert fc.isVisible() and rect(fc).bottom() < rect(fl).top() and central.contains(rect(fc))
 hub.finish(job)
 w.switch_mode("live")
 pump(10)
-assert fl.isHidden()
-# An error: a card that stays, the status line keeps the list's words.
-line_words = w.count_lbl.text()
-w._error("boom")
-pump(2)
-assert hub.cards()[-1].level == "error" and "boom" in hub.texts()[-1] and hub.cards()[-1].ms == 0
-assert w.count_lbl.text() == line_words
+assert fl.isHidden() and fc.isHidden() and card.isVisible()
 print("NOTICES_WINDOW_OK")
 """
 
 
-def test_the_real_window_has_one_corner_for_its_notices():
+def test_the_real_window_keeps_its_notices_in_the_sidebars_foot():
     env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
     out = subprocess.run([sys.executable, "-c", _CHILD], cwd=_REPO_ROOT, env=env,
                          capture_output=True, text=True, timeout=180)

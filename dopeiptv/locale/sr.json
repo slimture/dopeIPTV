@@ -2951,5 +2951,8 @@
   "notice_reading_source": "Čitanje {name}…",
   "notice_reading_sources": "Čitanje vaših izvora · {n}",
   "notice_scanning_network": "Pretraga mreže…",
-  "notice_less": "Prikaži manje"
+  "notice_messages": "Poruke",
+  "notice_clear_all": "Obriši sve",
+  "notice_open": "Otvori",
+  "notice_unread": "Nepročitane poruke: {n}"
 }

@@ -347,22 +347,24 @@ w._player_fs = False
 w._report_wait_action.trigger()
 assert len(shown) == 4 and "Segmentation fault" in shown[-1] and not w._report_wait_action.isVisible()
 
-# The note itself, a card in the notices' corner: a click does what it was
-# given, once, and it goes; a plain card's click does nothing.
+# The note itself, a message in the panel at the sidebar's foot: its button
+# does what it was given, once, and it goes; passing words are no message.
+from PyQt6.QtWidgets import QPushButton
 clicked = []
-area = w._notice_cards
-w.notices.post("note", ms=5000, action=lambda: clicked.append(1))
+mid = w.notices.post("note", ms=5000, action=lambda: clicked.append(1))
 spin()
-[t] = [c for c in area.card_widgets() if c.title.text() == "note"]
-QTest.mouseClick(t, Qt.MouseButton.LeftButton)
+assert w.notices.unread() >= 1                    # a count on the activity line
+w._activity_line.open_panel.emit()
 spin()
-assert clicked == [1] and "note" not in w.notices.texts(), clicked
-w.notices.post("plain", ms=5000)
+panel = w._notice_panel
+rows = [panel._msgs.itemAt(i).widget() for i in range(panel._msgs.count())]
+[row] = [r for r in rows if getattr(r, "msg_id", None) == mid]
+[btn] = [b for b in row.findChildren(QPushButton) if b.objectName() == "NoticeRowCancel"]
+btn.click()
 spin()
-[t] = [c for c in area.card_widgets() if c.title.text() == "plain"]
-QTest.mouseClick(t, Qt.MouseButton.LeftButton)
-spin()
-assert clicked == [1] and "plain" in w.notices.texts()
+assert clicked == [1] and mid not in [m.id for m in w.notices.messages()], clicked
+assert w.notices.post("plain", ms=5000) == 0
+assert w.notices.note_text() == "plain" and "plain" not in w.notices.texts()
 print("REPORT_WAITS_OK")
 """
 

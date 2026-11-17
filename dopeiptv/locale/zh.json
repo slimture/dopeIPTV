@@ -2951,5 +2951,8 @@
   "notice_reading_source": "正在读取 {name}…",
   "notice_reading_sources": "正在读取你的来源 · {n}",
   "notice_scanning_network": "正在扫描网络…",
-  "notice_less": "收起"
+  "notice_messages": "消息",
+  "notice_clear_all": "全部清除",
+  "notice_open": "打开",
+  "notice_unread": "未读消息：{n}"
 }

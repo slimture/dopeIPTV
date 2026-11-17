@@ -2951,5 +2951,8 @@
   "notice_reading_source": "{name} を読み込み中…",
   "notice_reading_sources": "ソースを読み込み中 · {n}",
   "notice_scanning_network": "ネットワークをスキャン中…",
-  "notice_less": "表示を減らす"
+  "notice_messages": "メッセージ",
+  "notice_clear_all": "すべて消去",
+  "notice_open": "開く",
+  "notice_unread": "未読メッセージ: {n}"
 }

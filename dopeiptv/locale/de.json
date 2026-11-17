@@ -2951,5 +2951,8 @@
   "notice_reading_source": "{name} wird gelesen…",
   "notice_reading_sources": "Deine Quellen werden gelesen · {n}",
   "notice_scanning_network": "Netzwerk wird durchsucht…",
-  "notice_less": "Weniger anzeigen"
+  "notice_messages": "Meldungen",
+  "notice_clear_all": "Alle entfernen",
+  "notice_open": "Öffnen",
+  "notice_unread": "Ungelesene Meldungen: {n}"
 }

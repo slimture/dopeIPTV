@@ -539,9 +539,9 @@ def until(done, secs=20.0):
 
 
 def status():
-    # What the window said last: its newest card (ui/notices.py), else the
-    # status line.
-    said = w.notices.texts()
+    # What the window said last: its newest words on the activity line or
+    # message (ui/notices.py), else the status line.
+    said = w.notices.said()
     return said[-1] if said else w.count_lbl.text()
 
 

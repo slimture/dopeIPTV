@@ -2951,5 +2951,8 @@
   "notice_reading_source": "Читання {name}…",
   "notice_reading_sources": "Читання ваших джерел · {n}",
   "notice_scanning_network": "Сканування мережі…",
-  "notice_less": "Згорнути"
+  "notice_messages": "Повідомлення",
+  "notice_clear_all": "Очистити все",
+  "notice_open": "Відкрити",
+  "notice_unread": "Непрочитані повідомлення: {n}"
 }

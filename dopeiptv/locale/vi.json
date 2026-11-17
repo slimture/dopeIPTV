@@ -2951,5 +2951,8 @@
   "notice_reading_source": "Đang đọc {name}…",
   "notice_reading_sources": "Đang đọc các nguồn của bạn · {n}",
   "notice_scanning_network": "Đang quét mạng…",
-  "notice_less": "Thu gọn"
+  "notice_messages": "Thông báo",
+  "notice_clear_all": "Xóa tất cả",
+  "notice_open": "Mở",
+  "notice_unread": "Thông báo chưa đọc: {n}"
 }
