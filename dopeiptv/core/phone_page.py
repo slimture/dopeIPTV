@@ -66,8 +66,10 @@ small viewport's height, so the browser's bars never cover a key): the
 d-pad takes the room left, sized by container query units - the rockers
 beside it, or under it when that room is tall - and on its side the keys
 sit beside it; nothing scrolls as it opens, on a phone from 320 x 568 up.
-Its sound and sleep timer fold behind a More of their own. While something
-plays there, the whole Now playing card is a button - a pill at its
+Its sound, sleep timer and Record fold behind a More of their own - Record
+asks first as Now playing's does (a long press asks anyway) and gives way,
+while a recording runs, to its red dot and time, open or folded. While
+something plays there, the whole Now playing card is a button - a pill at its
 trailing edge says what it does - that brings the picture back on the TV
 (api/tv_key "picture").
 
@@ -336,6 +338,7 @@ _HTML = """<!doctype html>
     <div class="pair" id="tvActs" hidden>
       <button class="pill" id="tvTracks"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M10.5 10.3a2.2 2.2 0 1 0 0 3.4M17 10.3a2.2 2.2 0 1 0 0 3.4"/></svg><span id="tvTracksText"></span></button>
       <button class="pill" id="tvSleep"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 14.5A7.5 7.5 0 0 1 9.5 4.5a7.5 7.5 0 1 0 10 10z"/></svg><span id="tvSleepText"></span></button>
+      <button class="pill" id="tvRec" hidden><span class="recIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle class="fill" cx="12" cy="12" r="6"/></svg></span><span id="tvRecText"></span></button>
     </div>
     <div class="digits" id="digits" hidden>
       <button data-a="digit_1">1</button><button data-a="digit_2">2</button><button data-a="digit_3">3</button>
@@ -1612,9 +1615,10 @@ function actsOffer(s) {
 // -- More: the card kept compact ------------------------------------------------------------
 // What plays' sound and subtitles, the sleep timer, recording and the next
 // programme folded behind one button under Now playing (in TV mode's remote:
-// the sound and the sleep timer), open or folded as this phone left it. Folded,
-// nothing that runs is out of sight: a recording's red dot and time and the
-// sleep timer's minutes stay on the card, each a way to it.
+// the sound, the sleep timer and Record), open or folded as this phone left it.
+// Folded, nothing that runs is out of sight: a recording's red dot and time and
+// the sleep timer's minutes stay on the card, each a way to it. TV mode's fold
+// has no Stop of its own: its dot shows a recording, open or folded.
 const FOLDS = {
   now: {btn: "moreBtn", body: "nowMore", text: "moreText", key: "more", rec: "recLive", sleep: "sleepLive"},
   tv: {btn: "tvMoreBtn", body: "tvActs", text: "tvMoreText", key: "tv_more", rec: "tvRecLive", sleep: "tvSleepLive"},
@@ -1642,7 +1646,7 @@ function folds() {
     hide($(f.body), !open);
     $(f.btn).setAttribute("aria-expanded", String(open));
     $(f.text).textContent = open ? W.less : W.more;
-    hide($(f.rec), open || !recording);
+    hide($(f.rec), !recording || (open && k === "now"));
   }
   hide($("nowSet"), !isShown("tracksBtn") && !isShown("sleepBtn"));
   sleepTick(); recTick();
@@ -1783,11 +1787,13 @@ function jobSheet(id, state, title) {
 }
 
 // Now playing's own row for it, apart from the others: Record or Stop with
-// its time, and the next programme.
+// its time, and the next programme. TV mode's remote: Record in its fold,
+// gone while a recording runs (its dot says it, and stops it).
 function recOffer(s) {
   const live = s.kind === "live" && s.state !== "stopped" && !!s.channel;
   const running = !!(s.rec && s.rec.id);
   hide($("recBtn"), !(live && s.can_rec) && !running);
+  hide($("tvRec"), !(live && s.can_rec) || running);
   hide($("nextBtn"), !live || !s.next);
   $("recBtn").classList.toggle("on", running);
   $("recIcon").innerHTML = running ? STOPSQ : RECDOT;
@@ -1814,15 +1820,19 @@ function recTick() {
 }
 
 function initRec() {
-  const b = $("recBtn");
-  let held = 0, long = false;
-  b.addEventListener("pointerdown", () => {
-    long = false; clearTimeout(held);
-    held = setTimeout(() => { long = true; if (!(st.rec && st.rec.id)) recAsk(); }, T.hold);
-  });
-  for (const t of ["pointerup", "pointercancel", "pointerleave"]) b.addEventListener(t, () => clearTimeout(held));
-  b.addEventListener("click", () => { if (long) { long = false; return; } recPressed(); });
-  b.addEventListener("contextmenu", (e) => e.preventDefault());
+  $("tvRecText").textContent = W.rec;
+  // Now playing's Record and TV mode's remote's: one press, asked as set; a long press asks anyway.
+  for (const id of ["recBtn", "tvRec"]) {
+    const b = $(id);
+    let held = 0, long = false;
+    b.addEventListener("pointerdown", () => {
+      long = false; clearTimeout(held);
+      held = setTimeout(() => { long = true; if (!(st.rec && st.rec.id)) recAsk(); }, T.hold);
+    });
+    for (const t of ["pointerup", "pointercancel", "pointerleave"]) b.addEventListener(t, () => clearTimeout(held));
+    b.addEventListener("click", () => { if (long) { long = false; return; } recPressed(); });
+    b.addEventListener("contextmenu", (e) => e.preventDefault());
+  }
   $("nextBtn").addEventListener("click", nextSheet);
 }
 

@@ -2391,6 +2391,7 @@
   "tv_options": "Options",
   "tv_exit": "Quitter le mode TV",
   "tv_nothing_playing": "Son et sous-titres dès que quelque chose est lu.",
+  "tv_rec_live_only": "Chaînes en direct uniquement",
   "tv_key_fav": "Favori",
   "tv_hint": "OK ouvre · Retour revient",
   "tv_fav_added": "{name} ajouté aux favoris",

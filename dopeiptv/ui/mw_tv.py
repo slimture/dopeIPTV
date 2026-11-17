@@ -27,6 +27,14 @@ The phone remote, the remote API and Home Assistant turn it on and off and
 press its keys through one method, tv_command - the pad's way in; while TV
 mode is off only the player's own controls among those keys do anything.
 
+A question the app asks while TV mode is on (_choice_dialog, a recording
+that cannot start) is TV mode's own (_tv_ask): large, in a window of its
+own over the full screen - never under it - answered with the arrows, OK
+and Back from any of those inputs. Options' Record records what plays
+through the player's record button's own path (_record_now: no connection
+of its own), and asks before it stops it; while a recording runs a REC mark
+sits over the picture.
+
 TV mode is on exactly while ``_tv_on`` is: enter_tv_mode sets it, and
 exit_tv_mode - the one way out - clears it and puts the window back as it
 was (_Before: full screen or maximized, its geometry, the central page, the
@@ -190,6 +198,7 @@ class _TvMixin:
     _tv_watching = False
     _tv_page = None
     _tv_info = None
+    _tv_rec_mark = None
     _tv_filter: _TvKeys | None = None
     _tv_hub = None
     _tv_bridge: _TvBridge | None = None
@@ -313,6 +322,7 @@ class _TvMixin:
             app.removeEventFilter(self._tv_filter)
         self._tv_inputs_stop()
         self._tv_hide_info()
+        self._tv_rec_mark_sync()
         if getattr(self, "_tv_digit_timer", None) is not None:
             self._tv_digit_timer.stop()
         self._tv_digits = ""
@@ -560,6 +570,12 @@ class _TvMixin:
         if other is None and active is not None and active is not self:
             other = active
         if other is not None:
+            take = getattr(other, "tv_action", None)
+            if callable(take):
+                # TV mode's own question (TvAsk): the action itself, wherever
+                # the focus is.
+                take(action)
+                return
             key = ACTION_KEYS.get(action)
             target = QApplication.focusWidget() or other
             if key is not None and target is not None:
@@ -888,6 +904,7 @@ class _TvMixin:
         p._hide_fs_ui()
         p.video.setFocus(Qt.FocusReason.OtherFocusReason)
         self._tv_show_info()
+        self._tv_rec_mark_sync()
 
     def _tv_browse(self, screen: str | None = None) -> None:
         """TV mode's page again - what plays goes on behind it. With
@@ -900,6 +917,7 @@ class _TvMixin:
         was_watching = self._tv_watching
         self._tv_watching = False
         self._tv_hide_info()
+        self._tv_rec_mark_sync()
         if self._player_fs:
             self._was_fullscreen = True
             self._exit_player_fullscreen()
@@ -1239,6 +1257,129 @@ class _TvMixin:
     def _tv_set_sleep(self, minutes: int) -> None:
         if self.player is not None:
             self.player._start_sleep_timer(int(minutes))
+
+    # -- recording ------------------------------------------------------------------------------
+
+    def _tv_holds_picture(self) -> bool:
+        """TV mode's page in front of what plays (Back from the picture, a
+        look at a screen): the docked player hidden behind it, its stream
+        going on - still what the player shows, so recording it takes that
+        stream (mw_recording's _record_now, mw_phone_rec's Record)."""
+        return bool(self._tv_on and not self._tv_watching and self._tv_has_picture())
+
+    def _tv_rec_item(self) -> dict | None:
+        """The live channel Options' Record records: what the docked player
+        plays now, by the player's record button's own test (the phone's
+        Record's, _phone_rec_item) - None while nothing live plays."""
+        find = getattr(self, "_phone_rec_item", None)
+        return find() if callable(find) else None
+
+    def _tv_rec_job(self) -> dict | None:
+        """The recording of what plays running now - the player's own
+        (Record's, the record menu's, a scheduled one riding it) - or None."""
+        jobs = getattr(getattr(self, "rec", None), "jobs", None) or []
+        return next((j for j in jobs if j.get("status") == "recording" and j.get("inplayer")),
+                    None)
+
+    def _tv_rec_tile(self) -> tuple[str, str, bool]:
+        """Options' Record tile: its words, what it records, and whether it
+        can be pressed."""
+        job = self._tv_rec_job()
+        if job is not None:
+            began = float(job.get("start") or 0) or time.time()
+            mins = max(0, int((time.time() - began) // 60))
+            return (f"{tr('rec_stop_recording')} · {tr('opt_minutes', n=mins)}",
+                    str(job.get("title") or ""), True)
+        it = self._tv_rec_item()
+        if it is not None:
+            return tr("rec_record"), str(self.channel_display_name(it) or ""), True
+        return tr("rec_record"), tr("tv_rec_live_only"), False
+
+    def _tv_record(self) -> None:
+        """Options' Record: what plays recorded through the player's record
+        button's own path (_record_now, until stopped: from its rewind
+        buffer or its stream, no connection of its own) - its questions
+        asked as TV mode asks them (_choice_dialog, _rec_warn: _tv_ask).
+        While that recording runs: asked first, then stopped as the record
+        menu stops it."""
+        if not self._tv_on:
+            return
+        job = self._tv_rec_job()
+        if job is not None:
+            title = str(job.get("title") or "")
+            # As the phone asks it: "Stop recording SVT1?", Stop recording or Cancel.
+            idx = self._tv_ask(tr("phone_rec_stop_ask", title=title), "",
+                               [(tr("rec_stop_recording"), "danger"), (tr("common_cancel"), "normal")])
+            if idx == 0 and job.get("status") == "recording":
+                log.info("tv mode: the recording of what plays stopped from Options")
+                self.rec.cancel(job["id"])
+        else:
+            it = self._tv_rec_item()
+            if it is not None:
+                self._record_now(it, None)
+        self._tv_rec_changed()
+
+    def _tv_rec_changed(self) -> None:
+        """The recordings changed (_recordings_changed), or Record was
+        pressed: Options' Record and the REC mark over the picture say so."""
+        if not self._tv_on:
+            return
+        self._tv_rec_mark_sync()
+        page = self._tv_page
+        if page is None or sip.isdeleted(page):
+            return
+        scr = page.screens.get("settings")
+        if scr is not None and not sip.isdeleted(scr) and hasattr(scr, "refresh_rec"):
+            scr.refresh_rec()
+
+    def _tv_rec_mark_sync(self) -> None:
+        """The REC mark over the picture while TV mode shows it and a
+        recording runs; hidden otherwise."""
+        p = self.player
+        rec = getattr(self, "rec", None)
+        on = bool(self._tv_on and self._tv_watching and p is not None and rec is not None
+                  and rec.active_count() > 0)
+        mark = self._tv_rec_mark
+        if mark is not None and sip.isdeleted(mark):
+            mark = self._tv_rec_mark = None
+        if mark is None:
+            if not on:
+                return
+            from .tv_widgets import TvRecMark
+            mark = self._tv_rec_mark = TvRecMark(p)
+        if on:
+            mark.place()
+            mark.show()
+            mark.raise_()
+        else:
+            mark.hide()
+
+    # -- the app's questions, as TV mode asks them ----------------------------------------------
+
+    def _tv_ask(self, title: str, message: str, options: list,
+                dont_ask_setting: str | None = None) -> int | None:
+        """A question while TV mode is on (_choice_dialog's, Record's), as
+        TV mode shows it (tv_widgets.TvAsk): large, over its full screen in
+        a window of its own, answered with the arrows, OK and Back - the
+        keyboard's, a pad's, LIRC's and the phone's alike (_tv_input). The
+        same words and choices; Back is no answer, as closing the window
+        is; a "Don't show this again" turned on stores its key."""
+        from .tv_widgets import TvAsk
+        d = TvAsk(self, title, message, list(options), dont=bool(dont_ask_setting))
+        idx: int | None = None
+        try:
+            d.exec()
+            idx = d.chosen
+            if idx is not None and d.dont_on and dont_ask_setting:
+                self.settings.setValue(dont_ask_setting, "true")
+        finally:
+            d.deleteLater()
+        return idx
+
+    def _tv_tell(self, title: str, text: str) -> None:
+        """What the app would say in a box (_rec_warn), as TV mode asks:
+        the words, and OK."""
+        self._tv_ask(title, text, [(tr("common_ok"), "primary")])
 
     # -- Settings > General ------------------------------------------------------------------------
 

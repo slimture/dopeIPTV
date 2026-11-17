@@ -2391,6 +2391,7 @@
   "tv_options": "Tùy chọn",
   "tv_exit": "Thoát chế độ TV",
   "tv_nothing_playing": "Âm thanh và phụ đề khi có nội dung đang phát.",
+  "tv_rec_live_only": "Chỉ kênh trực tiếp",
   "tv_key_fav": "Yêu thích",
   "tv_hint": "OK để mở · Quay lại để trở lại",
   "tv_fav_added": "Đã thêm {name} vào yêu thích",

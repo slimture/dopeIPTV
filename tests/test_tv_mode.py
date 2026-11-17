@@ -362,8 +362,38 @@ assert until(lambda: played[-1] == "http://tv.invalid/7.ts" and w._tv_watching),
 key(Qt.Key.Key_Escape)
 key(Qt.Key.Key_Escape)
 assert until(lambda: not w._tv_watching) and w._tv_has_picture()
+# Options' Record, with the page in front of the picture: what plays.
+page.show_screen("settings")
+rec_tile = page.screen("settings").tiles["record"]
+assert rec_tile.isEnabled() and rec_tile.title == tr("rec_record") and rec_tile.sub == "Chan 7", \
+    (rec_tile.isEnabled(), rec_tile.title, rec_tile.sub)
+assert rec_tile in page.focusables()
 key(Qt.Key.Key_X)
 assert until(lambda: not w._tv_has_picture())
+page.screen("settings").refresh()
+assert not rec_tile.isEnabled() and rec_tile.sub == tr("tv_rec_live_only")
+
+# -- the app's questions in TV mode: its own window, answered with the remote --------------
+from PyQt6.QtCore import QTimer
+from dopeiptv.ui.tv_widgets import TvAsk
+seen = []
+
+
+def answer():
+    d = QApplication.activeModalWidget()
+    seen.append(type(d).__name__)
+    w._tv_input("down")                         # a pad's, LIRC's or the phone's arrow
+    # A keyboard's OK goes to the question, not to TV mode's filter.
+    QApplication.sendEvent(d.focus_at(), QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Return,
+                                                   Qt.KeyboardModifier.NoModifier))
+
+
+QTimer.singleShot(50, answer)
+QTimer.singleShot(5000, lambda: [x.reject() for x in QApplication.topLevelWidgets()
+                                 if isinstance(x, TvAsk)])
+picked = w._choice_dialog("Question", "Words", [("One", "primary"), ("Two", "normal")])
+assert seen == ["TvAsk"] and picked == 1, (seen, picked)
+assert w._tv_on and w._center_stack.currentWidget() is page
 
 # -- leaving puts the window back ----------------------------------------------------------
 key(Qt.Key.Key_Blue)

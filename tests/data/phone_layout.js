@@ -45,7 +45,7 @@ const gone = (page, sel) => page.waitForFunction(
 
 (async () => {
   const browser = await chromium.launch();
-  const problems = [], checks = {fits: {}, folded: {}, recLive: {}, remembered: null, errors: []};
+  const problems = [], checks = {fits: {}, folded: {}, recLive: {}, tvRec: {}, remembered: null, errors: []};
   try {
     for (const run of runs) {
       const tag = `${run.w}x${run.h}-${run.scheme}${run.lang === "en" ? "" : "-" + run.lang}`;
@@ -92,6 +92,20 @@ const gone = (page, sel) => page.waitForFunction(
           await look(what);
           await page.click(btn);
         }
+        // Record from the remote's fold: the pill gives way to the dot and its time, open or folded.
+        await page.click("#tvMoreBtn");
+        await shown(page, "#tvRec");
+        await page.click("#tvRec");
+        await shown(page, "#tvRecLive");
+        await gone(page, "#tvRec");
+        checks.tvRec[tag] = await page.evaluate(() => ({
+          open: document.getElementById("tvMoreBtn").getAttribute("aria-expanded"),
+          text: document.getElementById("tvRecLive").textContent}));
+        await look("tv-more-rec");
+        await page.click("#tvMoreBtn");
+        await page.evaluate(() => fetch("api/rec_stop", {method: "POST", headers: {"Content-Type": "application/json"},
+                                                         body: "{}"}));
+        await gone(page, "#tvRecLive");
       }
       await page.click("#tvBtn");
       await shown(page, "#moreBtn");

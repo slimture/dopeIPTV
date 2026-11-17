@@ -2391,6 +2391,7 @@
   "tv_options": "选项",
   "tv_exit": "退出电视模式",
   "tv_nothing_playing": "播放时可选择音频和字幕。",
+  "tv_rec_live_only": "仅限直播频道",
   "tv_key_fav": "收藏",
   "tv_hint": "OK 打开 · 返回 后退",
   "tv_fav_added": "已将 {name} 加入收藏",

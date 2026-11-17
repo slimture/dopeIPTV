@@ -2391,6 +2391,7 @@
   "tv_options": "विकल्प",
   "tv_exit": "टीवी मोड छोड़ें",
   "tv_nothing_playing": "ध्वनि और सबटाइटल, जब कुछ चल रहा हो।",
+  "tv_rec_live_only": "केवल लाइव चैनल",
   "tv_key_fav": "पसंदीदा",
   "tv_hint": "OK खोलता है · Back पीछे जाता है",
   "tv_fav_added": "{name} पसंदीदा में जोड़ा गया",

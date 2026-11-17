@@ -2391,6 +2391,7 @@
   "tv_options": "オプション",
   "tv_exit": "テレビモードを終了",
   "tv_nothing_playing": "音声と字幕は再生中に選べます。",
+  "tv_rec_live_only": "ライブチャンネルのみ",
   "tv_key_fav": "お気に入り",
   "tv_hint": "OK で開く · 戻るで戻る",
   "tv_fav_added": "{name} をお気に入りに追加しました",

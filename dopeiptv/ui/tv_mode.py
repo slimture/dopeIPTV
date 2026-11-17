@@ -5,8 +5,9 @@ Options - and under them the screen: Home's shelves (continue watching,
 favorites, live now), categories and then their channels with what is on,
 the guide (the app's own, larger), the films and series in posters, a
 search with a keyboard on screen, and the few options that matter on a
-TV. While a stream goes on behind the page, what plays is in a row of its
-own above the tabs (Up from a tab; OK there is the picture). Inside safe
+TV - recording what plays among them. While a stream goes on behind the
+page, what plays is in a row of its own above the tabs (Up from a tab; OK
+there is the picture). Inside safe
 margins (a TV's overscan cuts the edges off), in the theme's colours with
 the accent as the focus ring.
 
@@ -525,35 +526,84 @@ class ChannelsScreen(TvScreen):
 
 
 class OptionsScreen(TvScreen):
-    """What matters on a TV: the sound and subtitles of what plays, the
-    sleep timer, starting in TV mode, and leaving it."""
+    """What matters on a TV: the sound and subtitles of what plays,
+    recording it, the sleep timer, starting in TV mode, and leaving it.
+    Record is the player's record button's (ui/mw_tv.py ``_tv_record``):
+    only while a live channel plays, and while it records, Stop recording
+    with how long it has run. The tiles scroll when the screen has less
+    room than they need (two profiles, a small screen)."""
 
     key = "settings"
     SLEEP_STEPS = (0, 15, 30, 45, 60, 90, 120)
+    #: How often Record's time is said again while the screen shows.
+    REC_TICK_MS = 10_000
 
     def __init__(self, page: "TvPage") -> None:
         super().__init__(page)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(px(6))
+        self.area = QScrollArea()
+        self.area.setWidgetResizable(True)
+        self.area.setFrameShape(QFrame.Shape.NoFrame)
+        self.area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.area.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.area.setStyleSheet("background: transparent;")
+        lay.addWidget(self.area)
+        canvas = QWidget()
+        canvas.setStyleSheet("background: transparent;")
+        body = QVBoxLayout(canvas)
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(px(6))
         self.tiles: dict[str, TvTile] = {}
         for key, label in (("audio", tr("opt_audio_track")),
                            ("subtitles", tr("opt_subtitles")),
+                           ("record", tr("rec_record")),
                            ("sleep", tr("opt_sleep_timer")),
                            ("profile", tr("profile_who")),
                            ("start", tr("tv_start_in")),
                            ("exit", tr("tv_exit"))):
             tile = TvTile(label, w=1100, h=96, kind="option")
+            # Narrower where the screen is: the area scrolls down, never sideways.
+            tile.set_width(tile.width(), shrink=True)
             tile.payload = ("option", key)
             tile.clicked.connect(self._clicked)
-            lay.addWidget(tile)
+            body.addWidget(tile)
             self.tiles[key] = tile
         self.note = self._note("")
-        lay.addWidget(self.note)
-        lay.addStretch(1)
+        body.addWidget(self.note)
+        body.addStretch(1)
+        self.area.setWidget(canvas)
+        self._rec_timer = QTimer(self)
+        self._rec_timer.setInterval(self.REC_TICK_MS)
+        self._rec_timer.timeout.connect(self._rec_tick)
 
     def enter(self) -> None:
         self.refresh()
+
+    def showEvent(self, e) -> None:
+        super().showEvent(e)
+        self._rec_timer.start()
+
+    def hideEvent(self, e) -> None:
+        super().hideEvent(e)
+        self._rec_timer.stop()
+
+    def _rec_tick(self) -> None:
+        if not self.isVisible():
+            self._rec_timer.stop()
+            return
+        self.refresh_rec()
+
+    def refresh_rec(self) -> None:
+        """Record's tile as it is now: Record and the channel, Stop
+        recording with its minutes and what it records, or not to be
+        pressed (nothing live plays)."""
+        get = getattr(self.w, "_tv_rec_tile", None)
+        title, sub, on = get() if callable(get) else (tr("rec_record"), "", False)
+        tile = self.tiles["record"]
+        tile.set_text(title, sub)
+        tile.setEnabled(on)
 
     def refresh(self) -> None:
         w = self.w
@@ -562,6 +612,7 @@ class OptionsScreen(TvScreen):
             tile = self.tiles[key]
             tile.setEnabled(playing)
             tile.set_text(tile.title, w._tv_track_label(key) if playing else "")
+        self.refresh_rec()
         self.note.setText("" if playing else tr("tv_nothing_playing"))
         mins = w._tv_sleep_minutes()
         self.tiles["sleep"].set_text(self.tiles["sleep"].title,
@@ -595,6 +646,12 @@ class OptionsScreen(TvScreen):
             w.settings.setValue("tv_mode_start", "false" if on else "true")
         elif key == "exit":
             QTimer.singleShot(0, w.exit_tv_mode)
+            return
+        elif key == "record":
+            # Its questions after this press is done: a press from the
+            # phone (tv_command) gets its answer at once, never one held
+            # until the question on the TV is answered.
+            QTimer.singleShot(0, w._tv_record)
             return
         elif key == "profile":
             self.page.show_screen("profiles")

@@ -7,6 +7,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Added
+
+- Record in TV mode. Options has a Record tile: it records what plays through the player's record button's own path (from the rewind buffer or the player's stream, no connection of its own) - also while TV mode's page is in front of the picture - and while that recording runs it says "Stop recording · 12 min" and asks before it stops it; it cannot be pressed while nothing live plays. A REC mark (a red dot and REC) sits over the picture while a recording runs. The app's questions while TV mode is on - a recording's, a zap's - are TV mode's own: large, in a window over the full screen, answered with the remote's arrows, OK and Back (a game controller, LIRC and the phone's remote too). The phone's TV-mode remote has a Record pill in its More fold, asked first as Now playing's Record is (a long press asks anyway); while a recording runs, its red dot and time show it instead.
+
 ## [1.6.2]
 
 A new look: the sidebar is the app's structure - Mine, TV, Movies and Series

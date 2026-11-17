@@ -1,6 +1,7 @@
 """TV mode's building blocks, drawn to be read from the sofa: tiles,
 shelves, big lists and a poster grid, the on-screen keyboard, the colour
-keys and the info bar over the picture.
+keys, the info bar and the REC mark over the picture, and the app's
+questions asked large (``TvAsk``), answered with the remote.
 
 Sizes are for a 1080-line screen (``px``: scaled to the one TV mode opens
 on); colours are the theme's (``P``), the accent being the focus ring.
@@ -12,10 +13,10 @@ from __future__ import annotations
 import time
 
 from PyQt6 import sip
-from PyQt6.QtCore import QRect, QRectF, QSize, Qt, pyqtSignal
+from PyQt6.QtCore import QEvent, QRect, QRectF, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen, QPixmap
 from PyQt6.QtWidgets import (
-    QAbstractButton, QAbstractItemView, QFrame, QGridLayout, QHBoxLayout,
+    QAbstractButton, QAbstractItemView, QDialog, QFrame, QGridLayout, QHBoxLayout,
     QLabel, QListView, QScrollArea, QStyledItemDelegate, QVBoxLayout,
     QWidget,
 )
@@ -153,6 +154,7 @@ class TvTile(QAbstractButton):
         self.progress = progress
         self.payload: object = None
         self.current = False        # a tab: the screen on show
+        self.ink = ""               # a word tile's words in this P colour (unfocused)
         self._pm: QPixmap | None = None
         self._img_w, self._img_h = px(w), px(h)
         self._elastic = False       # narrower where the room is (set_width)
@@ -223,7 +225,7 @@ class TvTile(QAbstractButton):
             elif self.kind == "tab":
                 fill, ink = QColor(Qt.GlobalColor.transparent), colour("text2")
             else:
-                fill, ink = colour("btn"), colour("text")
+                fill, ink = colour("btn"), colour(self.ink or "text")
             if not enabled:
                 ink = colour("muted2")
             p.setPen(Qt.PenStyle.NoPen)
@@ -804,4 +806,206 @@ class TvInfoBar(QWidget):
                        Qt.AlignmentFlag.AlignVCenter, text)
             lx += fm.horizontalAdvance(text) + px(36)
         p.end()
+
+
+class TvRecMark(QWidget):
+    """A recording running, over the picture in TV mode: a red dot and REC
+    on a plate in the theme's colours, in the picture's top corner inside
+    the safe margins (the number and the sleep timer have the other one).
+    Takes no mouse and no focus; placed again as its parent changes size."""
+
+    #: As the window's own indicator says it ("● REC").
+    TEXT = "REC"
+
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setAccessibleName(tr("rec_status_recording"))
+        parent.installEventFilter(self)
+        self.hide()
+
+    def sizeHint(self) -> QSize:
+        words = QFontMetrics(font(30, bold=True)).horizontalAdvance(self.TEXT)
+        return QSize(px(22) + px(20) + px(12) + words + px(26), px(56))
+
+    def place(self) -> None:
+        host = self.parentWidget()
+        if host is None:
+            return
+        r, size = host.rect(), self.sizeHint()
+        self.setGeometry(r.x() + int(r.width() * 0.05), r.y() + int(r.height() * 0.05),
+                         size.width(), size.height())
+
+    def eventFilter(self, obj, e) -> bool:  # noqa: N802 - Qt's name
+        if obj is self.parentWidget() and e.type() == QEvent.Type.Resize:
+            self.place()
+        return False
+
+    def paintEvent(self, _e) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        r = QRectF(self.rect())
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(colour("bg", 0.85))
+        p.drawRoundedRect(r, r.height() / 2, r.height() / 2)
+        d = px(20)
+        x = r.x() + px(22)
+        p.setBrush(colour("rec"))
+        p.drawEllipse(QRectF(x, r.center().y() - d / 2, d, d))
+        x += d + px(12)
+        p.setPen(colour("text"))
+        p.setFont(font(30, bold=True))
+        p.drawText(QRectF(x, r.y(), max(1.0, r.right() - x), r.height()),
+                   Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self.TEXT)
+        p.end()
+
+
+class TvAsk(QDialog):
+    """A question while TV mode is on (ui/mw_tv.py ``_tv_ask``): the app's
+    own words and choices, large, centred over TV mode's full screen - a
+    window of its own, so never under the picture. The focus starts on the
+    app's primary choice (else the first); the arrows go from choice to
+    choice (and to "Don't show this again", which OK turns on and off), OK
+    picks one, Back is no answer - as closing the app's own question is.
+    A pad's, LIRC's or the phone's action comes in through ``tv_action``;
+    ``chosen`` is the choice's index, or None."""
+
+    WIDTH = 1000
+    _KEYS = {Qt.Key.Key_Up: "up", Qt.Key.Key_Down: "down", Qt.Key.Key_Left: "left",
+             Qt.Key.Key_Right: "right", Qt.Key.Key_Return: "ok", Qt.Key.Key_Enter: "ok",
+             Qt.Key.Key_Select: "ok", Qt.Key.Key_Escape: "back", Qt.Key.Key_Back: "back",
+             Qt.Key.Key_Exit: "back", Qt.Key.Key_Backspace: "back"}
+    _HELD = (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifier
+             | Qt.KeyboardModifier.MetaModifier)
+
+    def __init__(self, parent: QWidget | None, title: str, message: str,
+                 options: list[tuple[str, str]], dont: bool = False) -> None:
+        super().__init__(parent)
+        self.setObjectName("TvAsk")
+        self.setWindowTitle(title)
+        self.setModal(True)
+        self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
+        self.setStyleSheet(f"#TvAsk {{ background: {P['pane']};"
+                           f" border: {px(2)}px solid {P['border']}; }}")
+        self.chosen: int | None = None
+        self.dont_on = False
+        self._at = 0
+        room = parent.window().width() if parent is not None else 0
+        width = px(self.WIDTH) if room <= 0 else min(px(self.WIDTH), int(room * 0.82))
+        ring = px(TvTile.RING)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(px(40), px(36), px(40), px(36))
+        lay.setSpacing(px(12))
+        for text, size, key in ((title, 36, "text"), (message, 28, "text2")):
+            lbl = QLabel(text)
+            lbl.setFont(font(size, bold=key == "text"))
+            lbl.setWordWrap(True)
+            lbl.setFixedWidth(width)
+            lbl.setContentsMargins(ring, 0, ring, 0)
+            lbl.setStyleSheet(f"color:{P[key]};")
+            lay.addWidget(lbl)
+            if not text:
+                lbl.hide()
+        lay.addSpacing(px(8))
+        self.choices: list[TvTile] = []
+        for i, (label, kind) in enumerate(options):
+            tile = TvTile(str(label), w=self.WIDTH, h=84, kind="option")
+            tile.set_width(width)
+            tile.payload = ("choice", i)
+            if kind == "danger":
+                tile.ink = "rec"
+            tile.clicked.connect(lambda _c=False, i=i: self._pick(i))
+            lay.addWidget(tile)
+            self.choices.append(tile)
+        self.dont: TvTile | None = None
+        if dont:
+            lay.addSpacing(px(8))
+            self.dont = TvTile(tr("dont_show_again"), tr("option_off"), w=self.WIDTH, h=72,
+                               kind="option")
+            self.dont.set_width(width)
+            self.dont.clicked.connect(self._toggle_dont)
+            lay.addWidget(self.dont)
+        for tile in self.items():
+            tile.installEventFilter(self)
+        # The focus on the choice the app puts first in weight (its primary,
+        # often the one that opens nothing), else on the first.
+        self._at = next((i for i, (_label, kind) in enumerate(options) if kind == "primary"), 0)
+
+    def items(self) -> list[TvTile]:
+        return self.choices + ([self.dont] if self.dont is not None else [])
+
+    def _pick(self, i: int) -> None:
+        self.chosen = i
+        self.accept()
+
+    def _toggle_dont(self) -> None:
+        if self.dont is None:
+            return
+        self.dont_on = not self.dont_on
+        self.dont.set_text(self.dont.title, tr("option_on") if self.dont_on else tr("option_off"))
+
+    def focus_at(self) -> TvTile | None:
+        items = self.items()
+        return items[self._at] if items else None
+
+    def _focus(self, i: int) -> None:
+        items = self.items()
+        if not items:
+            return
+        self._at = max(0, min(len(items) - 1, i))
+        items[self._at].setFocus(Qt.FocusReason.OtherFocusReason)
+        for tile in items:
+            tile.update()
+
+    def tv_action(self, action: str) -> bool:
+        """One of TV mode's actions; False for one it does not take."""
+        if action in ("up", "left"):
+            self._focus(self._at - 1)
+        elif action in ("down", "right"):
+            self._focus(self._at + 1)
+        elif action == "ok":
+            tile = self.focus_at()
+            if tile is not None:
+                tile.click()
+        elif action == "back":
+            self.reject()
+        else:
+            return False
+        return True
+
+    def eventFilter(self, obj, e) -> bool:  # noqa: N802 - Qt's name
+        items = self.items()
+        if obj in items:
+            if e.type() == QEvent.Type.FocusIn:
+                self._at = items.index(obj)
+            elif e.type() == QEvent.Type.KeyPress and not (e.modifiers() & self._HELD):
+                action = self._KEYS.get(e.key())
+                if action is not None:
+                    self.tv_action(action)
+                    return True
+        return super().eventFilter(obj, e)
+
+    def keyPressEvent(self, e) -> None:
+        action = self._KEYS.get(e.key())
+        if action is not None and not (e.modifiers() & self._HELD):
+            self.tv_action(action)
+            return
+        super().keyPressEvent(e)
+
+    def showEvent(self, e) -> None:
+        super().showEvent(e)
+        self.adjustSize()
+        host = self.parentWidget()
+        area = host.window().frameGeometry() if host is not None else None
+        if area is None or area.isEmpty():
+            scr = self.screen()
+            area = scr.geometry() if scr is not None else None
+        if area is not None:
+            g = self.frameGeometry()
+            g.moveCenter(area.center())
+            self.move(g.topLeft())
+        self.raise_()
+        self.activateWindow()
+        self._focus(self._at)
 

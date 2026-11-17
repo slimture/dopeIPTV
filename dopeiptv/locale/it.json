@@ -2391,6 +2391,7 @@
   "tv_options": "Opzioni",
   "tv_exit": "Esci dalla modalità TV",
   "tv_nothing_playing": "Audio e sottotitoli quando qualcosa è in riproduzione.",
+  "tv_rec_live_only": "Solo canali in diretta",
   "tv_key_fav": "Preferito",
   "tv_hint": "OK apre · Indietro torna",
   "tv_fav_added": "{name} aggiunto ai preferiti",

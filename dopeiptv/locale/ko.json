@@ -2391,6 +2391,7 @@
   "tv_options": "옵션",
   "tv_exit": "TV 모드 나가기",
   "tv_nothing_playing": "재생 중일 때 오디오와 자막을 고를 수 있습니다.",
+  "tv_rec_live_only": "실시간 채널만",
   "tv_key_fav": "즐겨찾기",
   "tv_hint": "OK로 열기 · 뒤로로 돌아가기",
   "tv_fav_added": "{name}을(를) 즐겨찾기에 추가했습니다",

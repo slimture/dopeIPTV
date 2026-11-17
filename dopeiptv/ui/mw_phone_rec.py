@@ -178,15 +178,19 @@ class _PhoneRecMixin:
 
     def _phone_rec_item(self) -> dict | None:
         """The live channel the docked player plays now - what the phone's
-        Record records from (the player's record button's own test) - or
-        None: nothing that would make Record open a connection of its own."""
+        Record and TV mode's (mw_tv's Options) record from, the player's
+        record button's own test; shown, or behind TV mode's page with its
+        stream going on - or None: nothing that would make Record open a
+        connection of its own."""
         lp = getattr(self, "_last_playback", None) or {}
         it = getattr(self, "_playing_item", None)
         p = getattr(self, "player", None)
         mode, key_of = getattr(self, "playback_mode", None), getattr(self, "_item_key", None)
+        held = getattr(self, "_tv_holds_picture", None)
         if (lp.get("kind") != "live" or not it or it.get("stream_id") is None
                 or getattr(self, "_playing_catchup", False) or p is None
-                or not getattr(p, "current_url", None) or not p.isVisible()
+                or not getattr(p, "current_url", None)
+                or not (p.isVisible() or (callable(held) and held()))
                 or not callable(mode) or mode() != "embedded" or not callable(key_of)
                 or getattr(self, "_playing_group", None) != "live"
                 or getattr(self, "_playing_key", None) != key_of(it)):

@@ -12,6 +12,7 @@
 - **Every film has its own page**, like a series: the backdrop, the plot, the cast, and one button - Play, or Continue from where you stopped. Opening it never starts anything.
 - **Popular right now** can be switched off for Movies or Series in **Settings → Posters & info**.
 - **The phone remote's TV mode remote fits your phone**: the d-pad fills the room below Now playing, nothing scrolls, and every key is big enough for a thumb. Subtitles and sound, the sleep timer and recording fold away behind **More**, and the phone remembers how you left it.
+- **Record in TV mode.** Press **Options**, then **Record**: what you are watching is recorded, without a second connection to your provider. While it records, a small **REC** sits in the corner of the picture and the tile says **Stop recording · 12 min** - it asks before it stops. Any question the app has is shown big on the TV and answered with your remote. On the phone remote's TV mode remote, **Record** is under **More**.
 
 ### Fixed
 

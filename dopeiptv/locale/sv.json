@@ -2391,6 +2391,7 @@
   "tv_options": "Alternativ",
   "tv_exit": "Lämna TV-läget",
   "tv_nothing_playing": "Ljud och undertexter när något spelas.",
+  "tv_rec_live_only": "Bara livekanaler",
   "tv_key_fav": "Favorit",
   "tv_hint": "OK öppnar · Tillbaka går tillbaka",
   "tv_fav_added": "{name} har lagts till i favoriterna",

@@ -2391,6 +2391,7 @@
   "tv_options": "Seçenekler",
   "tv_exit": "TV modundan çık",
   "tv_nothing_playing": "Ses ve altyazı, bir şey oynarken.",
+  "tv_rec_live_only": "Yalnızca canlı kanallar",
   "tv_key_fav": "Favori",
   "tv_hint": "OK açar · Geri döner",
   "tv_fav_added": "{name} favorilere eklendi",

@@ -2391,6 +2391,7 @@
   "tv_options": "Opcije",
   "tv_exit": "Izađi iz TV načina",
   "tv_nothing_playing": "Zvuk i titlovi kad nešto svira.",
+  "tv_rec_live_only": "Samo kanali uživo",
   "tv_key_fav": "Favorit",
   "tv_hint": "OK otvara · Natrag vraća",
   "tv_fav_added": "{name} dodan u favorite",
