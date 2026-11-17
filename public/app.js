@@ -123,9 +123,6 @@
     overlay.setAttribute("aria-hidden", "true");
   }
 
-  if (hero) {
-    hero.addEventListener("click", function () { open(hero.querySelector("img.on")); });
-  }
   if (hasFx) {
     stage.addEventListener("click", function () { open(stage.querySelector(".sc.on .fx-pic img")); });
   }
@@ -354,19 +351,39 @@
       im.removeAttribute("data-srcset");
     });
   }
-  function step() {
-    if (!seen || document.hidden) { return; }
-    var next = (cur + 1) % pics.length;
-    if (!pics[next].complete || !pics[next].naturalWidth) { return; }   // not loaded yet
+  function show(next) {
+    if (next === cur || !pics[next].complete || !pics[next].naturalWidth) { return false; }
     pics[cur].classList.remove("on");
     pics[next].classList.add("on");
     cur = next;
+    return true;
+  }
+  function step() {
+    if (!seen || document.hidden) { return; }
+    show((cur + 1) % pics.length);
   }
   function start() {
     fetchRest();
-    box.classList.add("alive");
+    clearInterval(timer);
     timer = setInterval(step, reduce ? 9000 : 5200);
   }
+  // A swipe (or a drag with the mouse) to the next picture or the one
+  // before - mirrored right to left; the slideshow goes on from there.
+  var x0 = null, y0 = 0;
+  box.addEventListener("pointerdown", function (e) {
+    if (e.pointerType === "mouse" && e.button !== 0) { return; }
+    x0 = e.clientX; y0 = e.clientY;
+  });
+  box.addEventListener("pointercancel", function () { x0 = null; });
+  box.addEventListener("pointerup", function (e) {
+    if (x0 === null) { return; }
+    var dx = e.clientX - x0, dy = e.clientY - y0;
+    x0 = null;
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) { return; }
+    fetchRest();
+    var ahead = (dx < 0) !== (document.documentElement.dir === "rtl");
+    if (show((cur + (ahead ? 1 : pics.length - 1)) % pics.length)) { start(); }
+  });
   if (pics[0].complete) { setTimeout(start, 1200); }
   else { pics[0].addEventListener("load", function () { setTimeout(start, 1200); }, { once: true }); }
   if ("IntersectionObserver" in window) {
