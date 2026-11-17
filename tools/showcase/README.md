@@ -13,3 +13,7 @@ domain (works of the U.S. federal government), cut to 16:9:
 
 All from Wikimedia Commons, under those titles. Any other picture put here
 must be as free to use: the website shows it to everyone.
+
+Everything else the pictures show - the channels' logos, the posters and
+stills of the made-up films and series, and what the other channels play -
+is drawn by `tools/site_art.py`, so nothing of anyone else's is in them.

@@ -1150,6 +1150,13 @@ QFileDialog QTreeView::item:hover, QFileDialog QListView::item:hover {{
 QFileDialog QTreeView::item:selected, QFileDialog QListView::item:selected {{
     background: {ACCENT}; color: {ON};
 }}
+QTreeWidget {{
+    background: {p['input']}; border: none; border-radius: 6px;
+    color: {p['text']}; outline: none;
+}}
+QTreeWidget::item {{ padding: 3px 6px; color: {p['text']}; }}
+QTreeWidget::item:hover {{ background: {p['hover']}; }}
+QTreeWidget::item:selected {{ background: {ACCENT}; color: {ON}; }}
 QHeaderView {{ background: {p['btn']}; border: none; }}
 QHeaderView::section {{
     background: {p['btn']}; color: {p['text2']}; border: none;

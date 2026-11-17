@@ -305,13 +305,17 @@ preview, SEO) and `DEPLOY.md` (the server). In short:
   `tools/help_screenshots.py`. When the settings change, take them
   again with `QT_QPA_PLATFORM=offscreen python tools/help_screenshots.py
   OUT` (this repository) and copy `OUT/` over `public/help-shots/`.
-- The front page's four pictures of the app are
-  `public/screenshots/<lang>/<name>.webp`, taken by
-  `tools/site_screenshots.py` (this repository) with a made-up playlist and
-  public-domain stills from `tools/showcase/`; it needs OpenGL and ffmpeg:
+- The front page's pictures of the app are
+  `public/screenshots/<lang>/<name>.webp` - five hero pictures in five
+  themes, Movies, and a picture per feature with `spots.json` saying where
+  in it the feature is - taken by `tools/site_screenshots.py` (this
+  repository) from the real window over a made-up catalogue, its art drawn
+  by `tools/site_art.py` and public-domain stills from `tools/showcase/`;
+  it needs OpenGL, ffmpeg and Noto's fonts:
   `xvfb-run -a -s "-screen 0 2560x1600x24" python tools/site_screenshots.py
-  OUT`, then copy `OUT/` over `public/screenshots/`. Take them again when
-  the main window changes.
+  OUT --jobs 3` (about 50 minutes for every language), then copy `OUT/<lang>/`
+  over `public/screenshots/<lang>/`. Take them again when the main window
+  changes.
 - **The server's jq is 1.8.** In `render.jq`, every `EXPR as $x | ...`
   must start right after `|`, `(`, `[`, `;`, `then` or `else` - jq 1.8
   binds `a and b as $x` differently than 1.7.
