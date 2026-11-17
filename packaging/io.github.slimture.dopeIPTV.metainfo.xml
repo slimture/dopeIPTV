@@ -69,6 +69,18 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.6.4" date="2026-11-17">
+      <description>
+        <p>Casting with a card of its own that gets a stuck TV going again, and a round of fixes.</p>
+        <ul>
+          <li>While a cast runs, a card stands where the video was, with what plays, the TV and how it goes</li>
+          <li>A TV that gets stuck buffering is sent the stream again by itself, never with a second connection</li>
+          <li>What plays on the TV is marked On TV in every list, and the player has a cast button</li>
+          <li>The phone remote and the media keys drive what plays on the TV</li>
+          <li>Fixes: Search's right-click menu, the pointer over the video on macOS, Now playing, the messages panel</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.6.3" date="2026-11-17">
       <description>
         <p>Room for the list, a guide that follows the category, and every place in the same new look.</p>

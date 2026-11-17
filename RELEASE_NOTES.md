@@ -1,3 +1,25 @@
+## dopeIPTV 1.6.4
+
+**Casting with a card of its own that gets a stuck TV going again, and a round of fixes.**
+
+### New and better
+
+- **Casting has a new look.** While something plays on a TV, a card stands where the video was: the channel's logo or the film's poster, what is on, the TV it plays on and how it goes there - Playing, Paused, Buffering…, Reconnecting… - with big buttons for play and pause, 30 seconds back and forward, and Stop.
+- **A stuck cast gets going by itself.** A TV that buffers for ten seconds without anyone pausing is sent the stream again from where it was - twice at most, and never with a second connection to your provider. If that does not help, the card says so with **Try again**.
+- **On TV**: what plays on the TV is marked in every list and place, and the Now playing button goes to it.
+- **A cast button** in the player, and the cast window has the TV you used last on top, ready - Enter casts.
+- **AirPlay (macOS):** the AirPlay window opens by the card and stays with the app instead of over other programs; going back in a channel starts much sooner.
+- **The phone remote and the media keys** show and drive what plays on the TV - play and pause, stop, seek, channel up and down, the TV's volume.
+
+### Fixed
+
+- **Search:** a right-click on a result opened no menu and sent an error report instead.
+- **macOS:** the pointer hides again over the video, in the window and in full screen.
+- **Now playing** goes exactly to what plays - a recording or a local file too.
+- **Recently watched, Continue** and the other rows over the lists no longer start playing on a single click unless autoplay is on.
+- **Messages** at the foot of the sidebar: a long one is no longer cut off, and two no longer end up on top of each other.
+- **AirPlay** no longer says the Apple TV has not reached the Mac after every seek, and the card says Playing as soon as the TV does.
+
 ## dopeIPTV 1.6.3
 
 **Room for the list, a guide that follows the category, and every place in the same new look - with the picture on its own thread on a Mac too.**

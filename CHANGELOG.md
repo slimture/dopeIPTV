@@ -7,6 +7,8 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.6.4]
+
 ### Changed
 
 - Casting has a new look. While a cast runs, a card stands where the video
