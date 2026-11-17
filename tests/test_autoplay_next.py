@@ -406,6 +406,7 @@ def test_toggling_grid_inside_a_series_keeps_the_episodes():
         def findData(self, k): return 0
         def setCurrentIndex(self, i): pass
         def blockSignals(self, b): pass
+        def count(self): return 0
 
     class _Btn(_Box):
         def __init__(self, on): self.on = on
@@ -422,7 +423,8 @@ def test_toggling_grid_inside_a_series_keeps_the_episodes():
     f = SimpleNamespace()
     f.settings = SimpleNamespace(
         value=lambda k, d=None: store.get(k, d),
-        setValue=lambda k, v: store.__setitem__(k, v))
+        setValue=lambda k, v: store.__setitem__(k, v),
+        contains=lambda k: k in store)
     f.mode = "series"
     f.series_ctx = {"series_id": 7}
     f.all_items = list(episodes)
@@ -455,7 +457,8 @@ def test_toggling_grid_inside_a_series_keeps_the_episodes():
               "_count_text",
               "_is_combined_view", "_apply_list_layout", "_grid_on",
               "_inline_view_changed", "_sort_setting_key",
-              "_current_sort_raw", "_sync_sort_box"):
+              "_current_sort_raw", "_sync_sort_box", "_sort_options",
+              "_global_sort_order"):
         setattr(f, n, getattr(MainWindow, n).__get__(f))
 
     f._apply_filter()
