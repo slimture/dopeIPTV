@@ -319,6 +319,15 @@ assert w._show_place("tv") is True
 assert not w._guide_page_showing() and top.isVisible()
 w._place_tv_refresh()                                # a profile, a source, sync
 assert top.isVisible() and top.title_text()
+
+# Enter on a row picked plays it, as a double click does (the category
+# shown here holds one channel: stopped first, Enter starts it).
+w.player.stop()
+settle(lambda: playing() is None, what="stopped")
+w.listw.setFocus()
+w.listw.setCurrentIndex(w.list_model.index(0))
+QTest.keyClick(w.listw, Qt.Key.Key_Return)
+settle(lambda: playing() == str(w.list_model.item_at(0).get("stream_id")), what="Enter plays")
 print("TV PLACE OK", flush=True)
 os._exit(0)
 """

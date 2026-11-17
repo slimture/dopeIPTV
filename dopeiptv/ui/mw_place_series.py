@@ -46,6 +46,7 @@ from ..core import series_continue as sc
 from ..core import series_view as sv
 from ..core.log import log
 from ..i18n import tr
+from .media_cards import item_marks
 from .series_place import SeriesCard, SeriesPlace
 
 #: The grid or the list, remembered ("poster" / "list").
@@ -281,6 +282,8 @@ class _PlaceSeriesMixin:
                 except (TypeError, ValueError):
                     card.progress = None
         card.pills = self._place_series_pills(it)
+        if it.get("_kind") != "episode":
+            card.marks = item_marks(self, it, "series")
 
     def _place_series_art(self, it: dict) -> str:
         """A series' poster address as the list chooses it (TMDB's, else

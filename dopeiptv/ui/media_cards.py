@@ -258,6 +258,81 @@ class Card:
     initials: str = ""
     rank: int = 0
     data: Any = None
+    marks: tuple = ()
+
+
+#: The marks after a card's title, as the TV place's rows have them after a
+#: channel's name: a favourite's star, Watch later's clock (*Card.marks*).
+MARK_FAV, MARK_LATER = "fav", "later"
+MARK_GAP = 6
+
+
+def marks_width(fm: QFontMetrics, marks: Sequence[str]) -> int:
+    """The room *marks* take after a title set in *fm*."""
+    return sum(_mark_w(fm, m) + MARK_GAP for m in marks if m in (MARK_FAV, MARK_LATER))
+
+
+def _mark_w(fm: QFontMetrics, mark: str) -> int:
+    return fm.horizontalAdvance("\u2605") if mark == MARK_FAV else round(fm.ascent() * 0.86)
+
+
+def paint_marks(p: QPainter, marks: Sequence[str], x: int, line: QRect, fm: QFontMetrics,
+                rtl: bool) -> None:
+    """*marks* in the title's *line*, beginning at *x* (going left in a
+    right-to-left line): the star a glyph in the warning colour, as the TV
+    rows draw it, the clock drawn in the same ink."""
+    ink = colour("warn")
+    for m in marks:
+        if m not in (MARK_FAV, MARK_LATER):
+            continue
+        w = _mark_w(fm, m)
+        left = x - MARK_GAP - w if rtl else x + MARK_GAP
+        box = QRect(left, line.y(), w, line.height())
+        p.save()
+        if m == MARK_FAV:
+            p.setPen(ink)
+            p.drawText(box, int(Qt.AlignmentFlag.AlignCenter), "\u2605")
+        else:
+            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+            d = float(w)
+            cx, cy = box.x() + d / 2, box.y() + box.height() / 2
+            pen = QPen(ink, max(1.3, d * 0.12))
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            p.setPen(pen)
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawEllipse(QPointF(cx, cy), d / 2 - 1, d / 2 - 1)
+            hands = QPainterPath()
+            hands.moveTo(cx, cy - d * 0.28)
+            hands.lineTo(cx, cy)
+            hands.lineTo(cx + d * 0.22, cy + d * 0.12)
+            p.drawPath(hands)
+        p.restore()
+        x = left if rtl else left + w
+
+
+def _title_with_marks(p: QPainter, r: QRect, title: str, marks: Sequence[str],
+                      fm: QFontMetrics, align: int, rtl: bool) -> None:
+    """A card's title cut to leave room for its marks, the marks after it."""
+    room = max(10, r.width() - marks_width(fm, marks))
+    text = fm.elidedText(title, Qt.TextElideMode.ElideRight, room)
+    p.drawText(r, align, text)
+    if marks:
+        used = fm.horizontalAdvance(text)
+        x = r.right() + 1 - used if rtl else r.x() + used
+        paint_marks(p, marks, x, r, fm, rtl)
+
+
+def item_marks(window: Any, row: dict, kind: str) -> tuple:
+    """A row's marks as the window knows them: favourite, on Watch later."""
+    out = []
+    try:
+        if window.is_favorite_item(row, kind):
+            out.append(MARK_FAV)
+        if window.is_item_on_watchlist(row, kind):
+            out.append(MARK_LATER)
+    except Exception:
+        return ()
+    return tuple(out)
 
 
 def initials_of(text: str, n: int = 2) -> str:
@@ -1140,9 +1215,8 @@ class CardDelegate(QStyledItemDelegate):
         tf, lf = v.fonts()
         p.setFont(tf)
         p.setPen(colour("text"))
-        tr_ = parts["title"]
-        p.drawText(tr_, int(align), QFontMetrics(tf).elidedText(
-            card.title, Qt.TextElideMode.ElideRight, tr_.width()))
+        _title_with_marks(p, parts["title"], card.title, card.marks, QFontMetrics(tf),
+                          int(align), rtl)
         if card.line:
             lr = parts["line"]
             p.setFont(lf)
@@ -1170,8 +1244,8 @@ class CardDelegate(QStyledItemDelegate):
         align = _aligned(rtl)
         p.setFont(tf)
         p.setPen(colour("text"))
-        p.drawText(QRect(text.x(), y, text.width(), tfm.height()), int(align),
-                   tfm.elidedText(card.title, Qt.TextElideMode.ElideRight, text.width()))
+        _title_with_marks(p, QRect(text.x(), y, text.width(), tfm.height()), card.title,
+                          card.marks, tfm, int(align), rtl)
         y += tfm.height()
         if card.line:
             y += TEXT_GAP

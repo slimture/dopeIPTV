@@ -339,6 +339,16 @@ class ChannelListView(QListView):
             win._channel_jump()
             e.accept()
             return
+        # Enter plays the row picked, as a double click does (it did nothing:
+        # the view's own activated signal is not what the window listens to).
+        plain = not (e.modifiers() & (Qt.KeyboardModifier.ControlModifier
+                                      | Qt.KeyboardModifier.AltModifier
+                                      | Qt.KeyboardModifier.MetaModifier))
+        if (e.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and plain
+                and self.currentIndex().isValid()):
+            self.doubleClicked.emit(self.currentIndex())
+            e.accept()
+            return
         # Left/Right control the player when one is up, rather than navigating
         # the list and swapping the channel: a bare arrow fine-seeks, Shift+arrow
         # steps the timeshift timeline. (macOS tags arrows with KeypadModifier,

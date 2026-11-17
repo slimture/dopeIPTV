@@ -43,7 +43,7 @@ from ..core import film_view as fv
 from ..core import series_view as sv
 from ..core.log import log
 from ..i18n import tr
-from .media_cards import Card, CardDelegate, CardRow, CardView, PlacePage
+from .media_cards import Card, CardDelegate, CardRow, CardView, PlacePage, item_marks
 from .series_cards import minutes_text
 from .theme import corner_radius
 
@@ -64,6 +64,10 @@ class _FilmDelegate(CardDelegate):
         if card is None:
             return
         v.dress(card)
+        if v.marks is not None:
+            # Read as it paints, like the tint: a star given from the menu
+            # shows at once, without dressing the card again.
+            card.marks = v.marks(card)
         tint = v.tint(card) if v.tint is not None else ""
         if tint:
             c = QColor(tint)
@@ -95,6 +99,8 @@ class FilmCardView(CardView):
         self._gen = 0
         #: (card) -> a colour of the person's for it, or "".
         self.tint = None
+        #: (card) -> its marks (favourite, Watch later), or None for none.
+        self.marks = None
         super().__init__(loader, layout, parent)
         self.setItemDelegate(_FilmDelegate(self))
         self.setSelectionMode(self.SelectionMode.ExtendedSelection)
@@ -256,6 +262,8 @@ class _PlaceFilmsMixin:
         self._pf_popular_row, self._pf_continue_row = pop, cont
         view = FilmCardView(loader, self._pf_dress, self._pf_layout())
         view.tint = self._pf_tint
+        view.marks = lambda card: item_marks(
+            self, card.data if isinstance(card.data, dict) else {}, "vod")
         view.activated.connect(self._pf_activated)
         view.menu.connect(self._pf_menu)
         view.current_item_changed.connect(self._pf_current_changed)

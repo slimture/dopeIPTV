@@ -7,7 +7,17 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Changed
+
+- Movies' and Series' cards show a favourite's star and Watch later's clock
+  after the title, as the TV place's rows show a favourite channel's star -
+  the same marks everywhere; a star given from the menu shows at once.
+
 ### Fixed
+
+- Enter in a list (TV's channels, Movies' and Series' rows) plays the row
+  picked, as a double click does; it did nothing unless a channel number
+  was being typed.
 
 - With the player muted, another program's sound (Spotify) crackled at
   every channel change: the player opened a new stream to the system's
