@@ -323,16 +323,40 @@ def prune(stats_dir: str, now: float | None = None) -> int:
     return _remove(stats_dir, lambda r: _t(r) < cut)
 
 
+#: The most keys one request acts on at once (the page lists at most 300
+#: reports and 100 problems).
+MANY = 300
+
+
+def _keys(key) -> list[str] | None:
+    """One key or a list of them, each a report's id, a follow-up's or a
+    problem's key; None when one of them is not."""
+    keys = [key] if isinstance(key, str) else list(key)[:MANY] if isinstance(key, (list, tuple)) else []
+    if not keys or not all(isinstance(k, str) and _ID.match(k) for k in keys):
+        return None
+    return keys
+
+
 def delete(stats_dir: str, key: str, group: bool = False) -> int:
     """For good: the report *key* with its thread - its answers, follow-ups
     and code hash, so the app that sent it finds nothing - or with *group*
     every report of the problem *key* and the problem's own answers. How
     many reports went; -1 for a key that is not one."""
-    if not _ID.match(key or ""):
+    return delete_many(stats_dir, [], [key]) if group else delete_many(stats_dir, [key], [])
+
+
+def delete_many(stats_dir: str, keys, groups) -> int:
+    """For good, in one pass: the reports *keys*, each with its thread, and
+    the problems *groups*, each with all its reports and its own answers -
+    as delete() does one. How many reports went; -1 when nothing is asked
+    or one key is not one (and then nothing goes)."""
+    ks = _keys(keys) if keys else []
+    gs = _keys(groups) if groups else []
+    if ks is None or gs is None or not (ks or gs):
         return -1
-    if group:
-        return _remove(stats_dir, lambda r: bool(r.get("sig")) and _sig_key(str(r["sig"])) == key, (key,))
-    return _remove(stats_dir, lambda r: r.get("id") == key)
+    ids, sigs = set(ks), set(gs)
+    return _remove(stats_dir, lambda r: str(r.get("id") or "") in ids
+                   or (bool(sigs) and bool(r.get("sig")) and _sig_key(str(r["sig"])) in sigs), tuple(gs))
 
 
 def _rows(stats_dir: str) -> list[dict]:
@@ -368,12 +392,17 @@ def _archived(state: dict) -> dict:
 MARKS = ("new", "seen", "fixed")
 
 
-def mark(stats_dir: str, key, state: str) -> bool:
+def mark(stats_dir: str, key, state: str, threads: bool = False) -> bool:
     """*key* - a report's id, a follow-up's, or a group's signature hash; or
-    a list of them - seen, fixed or new."""
-    keys = [key] if isinstance(key, str) else list(key)[:200] if isinstance(key, (list, tuple)) else []
-    if state not in MARKS or not keys or not all(isinstance(k, str) and _ID.match(k) for k in keys):
+    a list of them - seen, fixed or new; with *threads* each report's
+    replies too (several marked at once from the list: none left unread)."""
+    keys = _keys(key)
+    if state not in MARKS or keys is None:
         return False
+    if threads:
+        asked = set(keys)
+        keys += [str(r["id"]) for r in _rows(stats_dir) if isinstance(r, dict) and r.get("thread_of")
+                 and str(r["thread_of"]) in asked and _ID.match(str(r.get("id") or ""))]
     with _LOCK:
         data = _state(stats_dir)
         for k in keys:
@@ -385,18 +414,25 @@ def mark(stats_dir: str, key, state: str) -> bool:
     return True
 
 
-def archive(stats_dir: str, key: str, on: bool) -> bool:
-    """A report (its id) or a problem (its key) into the archive - out of
-    the lists and the unread count - or back out of it."""
-    if not isinstance(key, str) or not _ID.match(key):
+def archive(stats_dir: str, key, on: bool) -> bool:
+    """A report (its id) or a problem (its key) - or a list of them - into
+    the archive, out of the lists and the unread count, or back out of it."""
+    keys = _keys(key)
+    if keys is None:
         return False
     with _LOCK:
         data = _state(stats_dir)
         arch = _archived(data)
-        if on:
-            arch[key] = int(time.time())
-        elif arch.pop(key, None) is None:
-            return True                          # not archived: nothing to write
+        now = int(time.time())
+        changed = False
+        for k in keys:
+            if on:
+                arch[k] = now
+                changed = True
+            elif arch.pop(k, None) is not None:
+                changed = True
+        if not changed:
+            return True                          # none archived: nothing to write
         data["archived"] = arch
         _write_json(_paths(stats_dir)[1], data)
     return True

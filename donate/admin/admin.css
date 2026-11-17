@@ -851,6 +851,27 @@ tr:last-child td { border-bottom: 0; }
 .fb-copy.again, .fb-copy-all.again, .fb-actions .btn.again { color: var(--text);
   background: color-mix(in srgb, var(--accent) 22%, transparent); }
 @media (hover: none) { .fb-copy { padding: 6px 13px; } }
+/* Picking several (feedback.js): a box before each row (Shift for a run),
+   the bar over the list saying how many and acting on them all - held under
+   the page's top while something is picked (--fb-top: its height). */
+.fb-line { display: flex; align-items: center; gap: 2px; }
+.fb-line .fb-head { flex: 1; min-width: 0; }
+.fb-pick { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 30px; height: 32px;
+  cursor: pointer; }
+.fb-pick input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.fb-line + .fb-meta { padding-inline-start: 38px; }
+.fb-row.picked .fb-line { background: color-mix(in srgb, var(--accent) 9%, transparent); border-radius: 8px; }
+.fb-pick-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0 0 4px; padding: 2px 0; }
+.fb-pick-bar.on { position: sticky; top: var(--fb-top, 64px); z-index: 3; background: var(--surface); padding: 6px 0;
+  box-shadow: 0 1px 0 var(--line); }
+.fb-pick-all { display: inline-flex; align-items: center; gap: 4px; margin-inline-end: auto; font-size: 13px;
+  color: var(--muted); cursor: pointer; }
+.fb-pick-bar.on .fb-pick-all { color: var(--text); font-weight: 650; }
+@media (hover: none) {
+  .fb-pick { width: 40px; height: 40px; }
+  .fb-pick input { width: 20px; height: 20px; }
+  .fb-line + .fb-meta { padding-inline-start: 48px; }
+}
 .chip.b-source { color: color-mix(in srgb, var(--s2) 78%, var(--text)); background: color-mix(in srgb, var(--s2) 14%, transparent); }
 .copy-buffer { position: fixed; top: 0; left: 0; width: 1px; height: 1px; margin: 0; padding: 0; border: 0;
   opacity: 0; font-size: 16px; pointer-events: none; }

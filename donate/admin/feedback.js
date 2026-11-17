@@ -21,6 +21,11 @@
  * the report open stays open with what is typed in it, the filters and the
  * scroll stay, the tab's count follows.
  *
+ * Several at once: a box before each row (Shift for a run of them), and
+ * over the list what is picked - marked seen (fixed, for problems),
+ * archived or deleted together, deletion asked first. What people wrote
+ * can be ordered the latest, the oldest or the unread first.
+ *
  * /admin/feedback, /admin/feedback-item, /admin/feedback-copy,
  * /admin/feedback-mark, /admin/feedback-reply, /admin/feedback-archive,
  * /admin/feedback-delete in donate.py (feedback.py). The app scrubs a
@@ -61,6 +66,16 @@
   const SORTS = [["count", "Most reported"], ["recent", "Most recent"], ["versions", "Most versions"],
                  ["new", "Newest problem"]];
   let sort = "count", only = "open", version = "";
+  // What people wrote, in the order picked: the latest first (a reply
+  // brings its report up), the oldest first, or what is not read first.
+  const WORD_SORTS = [["recent", "Latest first"], ["oldest", "Oldest first"], ["unread", "Unread first"]];
+  let wordSort = "recent";
+  // Rows picked to act on together, per list ("g:" + a problem's key,
+  // "i:" + a report's id): kept while the lists are drawn again, dropped
+  // once their row is no longer shown - nothing is done to a row out of sight.
+  const picked = { g: new Set(), i: new Set() };
+  const lastPick = { g: "", i: "" };
+  const bars = { g: null, i: null };
 
   const LOGIN = "/admin/login?next=" + encodeURIComponent("/admin/#feedback");
   function get(url) {
@@ -313,6 +328,142 @@
     if (openKey.charAt(0) === prefix && !list.kept) { open = null; openKey = ""; }
   }
 
+  // -- picking several ---------------------------------------------------------
+  // A box before each row; Shift picks every row between it and the one
+  // picked before. The bar over the list says how many and does to them all
+  // what a report's own buttons do to one (delete asks first, naming what goes).
+  const keyOf = (p, x) => p + ":" + (p === "g" ? x.key : x.id);
+  function prune(p, shown) {
+    const keep = new Set(shown.map((x) => keyOf(p, x)));
+    picked[p].forEach((k) => { if (!keep.has(k)) { picked[p].delete(k); } });
+  }
+  function setPicked(p, li, on) {
+    const set = picked[p];
+    if (on) { set.add(li.dataset.key); } else { set.delete(li.dataset.key); }
+    li.classList.toggle("picked", on);
+    const b = li.querySelector(".fb-line .fb-pick input");
+    if (b) { b.checked = on; }
+  }
+  function pickLine(p, rk, li, btn, what) {
+    const line = mk("div", "fb-line");
+    const lab = mk("label", "fb-pick");
+    const box = mk("input");
+    box.type = "checkbox";
+    box.checked = picked[p].has(rk);
+    box.setAttribute("aria-label", "Select: " + what);
+    li.classList.toggle("picked", box.checked);
+    box.addEventListener("click", (e) => {
+      const from = lastPick[p];
+      lastPick[p] = rk;
+      const rows = li.parentNode ? [].slice.call(li.parentNode.children) : [];
+      const a = rows.findIndex((x) => x.dataset.key === from);
+      if (!e.shiftKey || a < 0 || from === rk) { return; }
+      const b = rows.indexOf(li);
+      rows.slice(Math.min(a, b), Math.max(a, b) + 1).forEach((x) => setPicked(p, x, box.checked));
+    });
+    box.addEventListener("change", () => { setPicked(p, li, box.checked); refreshBar(p); });
+    lab.append(box);
+    line.append(lab, btn);
+    return line;
+  }
+  function refreshBar(p) {
+    const old = bars[p];
+    if (!old || !old.isConnected) { return null; }
+    const bar = pickBar(p, old.fbShown);
+    old.replaceWith(bar);
+    return bar;
+  }
+  // What goes when the rows picked are deleted, said before they go.
+  function deleteManyWords(p, chosen) {
+    const n = chosen.length;
+    const sum = (f) => chosen.reduce((s, x) => s + (f(x) || 0), 0);
+    if (p === "g") {
+      const all = sum((g) => g.all || g.count);
+      const outside = all - sum((g) => g.count);
+      return "Delete " + (n === 1 ? "this problem" : "these " + num.format(n) + " problems") + " for good: " +
+        (all === 1 ? "its one report" : "all " + plural(all, "report", "reports")) +
+        (outside > 0 ? " (" + num.format(outside) + " of them outside the period shown)" : "") +
+        ", the answers to " + (n === 1 ? "it" : "them") + " and every reply to those? Whoever asked for answers in" +
+        " the app finds nothing any more. This cannot be undone.";
+    }
+    const parts = [];
+    const answers = sum((i) => i.replies), replies = sum((i) => i.thread), codes = sum((i) => (i.answerable ? 1 : 0));
+    if (answers) { parts.push(plural(answers, "answer", "answers")); }
+    if (replies) { parts.push(plural(replies, "reply from them", "replies from them")); }
+    return "Delete " + (n === 1 ? "this feedback" : "these " + plural(n, "feedback report", "feedback reports")) +
+      " for good" + (parts.length ? ", with " + parts.join(" and ") : "") +
+      (codes ? " - and " + (codes === 1 ? "its code, so their app finds" : "their codes, so their apps find") +
+               " nothing for " + (codes === 1 ? "it" : "them") + " any more" : "") +
+      "? This cannot be undone.";
+  }
+  function pickBar(p, shown) {
+    const set = picked[p];
+    const keys = shown.map((x) => keyOf(p, x));
+    const chosen = shown.filter((x) => set.has(keyOf(p, x)));
+    const n = chosen.length;
+    const bar = mk("div", "fb-pick-bar" + (n ? " on" : ""));
+    bar.fbShown = shown;
+    bars[p] = bar;
+    const all = mk("label", "fb-pick-all");
+    const span = mk("span", "fb-pick");
+    const box = mk("input");
+    box.type = "checkbox";
+    box.checked = n > 0 && n === keys.length;
+    box.indeterminate = n > 0 && n < keys.length;
+    box.setAttribute("aria-label", n === keys.length ? "Select none" : "Select all shown");
+    span.append(box);
+    all.append(span, mk("span", "", n ? num.format(n) + " of " + num.format(keys.length) + " selected"
+                                      : "Select all " + num.format(keys.length)));
+    box.addEventListener("change", () => {
+      // Some or none picked: all of them; all of them: none.
+      const on = n < keys.length;
+      const list = bar.parentNode;
+      keys.forEach((k) => (on ? set.add(k) : set.delete(k)));
+      if (list) { list.querySelectorAll(".fb-row").forEach((li) => setPicked(p, li, set.has(li.dataset.key))); }
+      const again = refreshBar(p);
+      const f = again && again.querySelector(".fb-pick-all input");
+      if (f) { f.focus(); }
+    });
+    bar.append(all);
+    if (!n) { return bar; }
+    const ids = chosen.map((x) => (p === "g" ? x.key : x.id));
+    const inArchive = p === "g" ? only === "archived" : archived;
+    const act = (label, cls, title, run) => {
+      const b = mk("button", "btn btn-small quiet" + (cls ? " " + cls : ""), label);
+      b.type = "button";
+      if (title) { b.title = title; }
+      b.addEventListener("click", () => run(b));
+      bar.append(b);
+    };
+    // Done to them all: the picks let go and the lists asked again.
+    const send = (b, url, body) => {
+      b.disabled = true;
+      post(url, body).catch(() => false).then((ok) => {
+        if (!ok) { b.disabled = false; b.textContent = "Could not do it - try again"; return; }
+        set.clear();
+        reload();
+      });
+    };
+    act("Mark seen", "", "", (b) => send(b, "/admin/feedback-mark", { keys: ids, state: "seen", threads: p === "i" }));
+    if (p === "g") { act("Mark fixed", "", "", (b) => send(b, "/admin/feedback-mark", { keys: ids, state: "fixed" })); }
+    act(inArchive ? "Unarchive" : "Archive", "", inArchive ? "Back into the lists"
+        : "Out of the lists and the unread count - under Archived",
+        (b) => send(b, "/admin/feedback-archive", { keys: ids, archived: !inArchive }));
+    act("Delete…", "danger", "", (b) => {
+      if (!window.confirm(deleteManyWords(p, chosen))) { return; }
+      b.disabled = true;
+      post("/admin/feedback-delete", p === "g" ? { groups: ids } : { keys: ids }).catch(() => false).then((ok) => {
+        if (!ok) { b.disabled = false; b.textContent = "Could not delete them"; return; }
+        if (open && chosen.some((x) => keyOf(p, x) === openKey)) { open.hidden = true; open = null; openKey = ""; }
+        chosen.forEach((x) => copies.delete(p === "g" ? x.latest : x.id));
+        set.clear();
+        show();
+      });
+    });
+    act("Clear", "", "Select none", () => { set.clear(); if (p === "g") { problems(); } else { words(); } });
+    return bar;
+  }
+
   function controls(shown) {
     const bar = mk("div", "fb-controls");
     const chips = mk("div", "fb-chips");
@@ -358,6 +509,7 @@
       new: (a, b) => b.first - a.first,
     }[sort];
     groups.sort(by);
+    prune("g", groups);
     const list = { kept: false };
     if (!groups.length) {
       letGo("g", list);
@@ -382,11 +534,11 @@
                             copyButton("Copy", "fb-copy", groupCopy(g)));
       const body = bodyFor(rk, list);
       btn.addEventListener("click", () => toggle(body, rk, g.latest, g.key, g));
-      li.append(btn, meta, body);
+      li.append(pickLine("g", rk, li, btn, g.sig || "(no message)"), meta, body);
       ul.append(li);
     });
     letGo("g", list);
-    box.replaceChildren(controls(groups), ul);
+    box.replaceChildren(controls(groups), pickBar("g", groups), ul);
   }
 
   // What people wrote, the latest first (a reply to an answer brings its
@@ -413,7 +565,11 @@
       b.addEventListener("click", () => { archived = !archived; topic = ""; words(); });
       chips.append(b);
     }
-    bar.append(chips, buildSelect());
+    const order = mk("select", "fb-select");
+    order.setAttribute("aria-label", "Order");
+    WORD_SORTS.forEach(([v, t]) => { const o = mk("option", "", t); o.value = v; o.selected = wordSort === v; order.append(o); });
+    order.addEventListener("change", () => { wordSort = order.value; words(); });
+    bar.append(chips, order, buildSelect());
     if (shown.length) { bar.append(copyAll("feedback", shown, shown.map((i) => i.id), (i, c) => c.get(i.id) || "(not found)\n")); }
     return bar;
   }
@@ -426,9 +582,16 @@
     if (!every.length) { letGo("i", list); box.replaceChildren(mk("p", "empty", "No feedback in this period.")); return; }
     // A supporter's feedback first while it is new; the rest the latest first.
     const first = (i) => (i.sup && i.state === "new" ? 1 : 0);
+    const unread = (i) => (i.state === "new" ? 1 : 0);
+    const by = {
+      recent: (a, b) => first(b) - first(a) || b.last - a.last,
+      oldest: (a, b) => a.t - b.t,
+      unread: (a, b) => unread(b) - unread(a) || first(b) - first(a) || b.last - a.last,
+    }[wordSort] || ((a, b) => b.last - a.last);
     const items = (archived ? every.filter((i) => i.archived) : live)
       .filter((i) => (!topic || i.topic === topic) && (!build || i.build === build))
-      .sort((a, b) => first(b) - first(a));
+      .sort(by);
+    prune("i", items);
     const ul = mk("ul", "fb-list");
     items.forEach((it) => {
       const rk = "i:" + it.id;
@@ -456,13 +619,13 @@
                             copyButton("Copy", "fb-copy", itemCopy(it)));
       const body = bodyFor(rk, list);
       btn.addEventListener("click", () => toggle(body, rk, it.id, it.id));
-      li.append(btn, meta, body);
+      li.append(pickLine("i", rk, li, btn, it.preview || "(empty)"), meta, body);
       ul.append(li);
     });
     letGo("i", list);
-    box.replaceChildren(topicChips(live, items), items.length ? ul
-      : mk("p", "empty", archived ? "Nothing archived " + (topic || build ? "like this " : "") + "in this period."
-        : build ? "Nothing from this build on this topic in this period." : "Nothing on this topic in this period."));
+    box.replaceChildren(topicChips(live, items), ...(items.length ? [pickBar("i", items), ul] : [
+      mk("p", "empty", archived ? "Nothing archived " + (topic || build ? "like this " : "") + "in this period."
+        : build ? "Nothing from this build on this topic in this period." : "Nothing on this topic in this period.")]));
   }
 
   // Answering: one report, or a group (everyone who reported that problem,
@@ -684,7 +847,8 @@
   function busy() {
     const ae = document.activeElement;
     const tab = $("tab-feedback");
-    return !!ae && !!tab && tab.contains(ae) && /^(SELECT|INPUT|TEXTAREA)$/.test(ae.tagName);
+    return !!ae && !!tab && tab.contains(ae) && (/^(SELECT|TEXTAREA)$/.test(ae.tagName) ||
+      (ae.tagName === "INPUT" && ae.type !== "checkbox"));
   }
   function later() {
     clearTimeout(timer);
@@ -773,6 +937,13 @@
   }
   const draw0 = draw;
   draw = function () { draw0(); count(res.new); };
+  // The bar over what is picked stays under the page's top, whatever its height.
+  function topHeight() {
+    const t = document.querySelector(".top");
+    if (t) { document.documentElement.style.setProperty("--fb-top", t.offsetHeight + "px"); }
+  }
+  window.addEventListener("resize", topHeight);
+  topHeight();
   setTimeout(tick, 1200);
 
   window.AdminFeedback = { show: show, badge: () => (res ? res.new : 0) };

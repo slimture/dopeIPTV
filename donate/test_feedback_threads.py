@@ -273,6 +273,49 @@ def test_a_problem_deleted_takes_all_its_reports_and_its_answers():
     assert [g["key"] for g in feedback.summary(d, 30)["groups"]] != [key]
 
 
+def test_several_reports_and_problems_go_in_one_pass_or_none_does():
+    d = _fresh()
+    a = _report(d, "First.")
+    b = _report(d, "Second.", reply="d00d" * 16)
+    keep = _report(d, "Keep me.", reply="beef" * 16)
+    errs = []
+    for n in range(2):
+        status, got = feedback.accept(d, {"kind": "error", "version": "1.6.3", "os": "Linux",
+                                          "text": f"Traceback:\nValueError: bad {n}"}, "official")
+        errs.append(got["id"])
+    key = feedback._sig_key(feedback.signature("error", "Traceback:\nValueError: bad 0"))
+    feedback.add_reply(d, "report", a, "needinfo")
+    before = _lines(d)
+    # A bad key anywhere: nothing goes.
+    assert feedback.delete_many(d, [a, "../x"], []) == -1
+    assert feedback.delete_many(d, [], [key, 7]) == -1
+    assert feedback.delete_many(d, [], []) == -1
+    assert _lines(d) == before
+    assert feedback.delete_many(d, [a, b], [key]) == 4
+    assert [r["id"] for r in _lines(d)] == [keep]
+    assert a not in feedback._replies(d)["report"]
+    assert feedback.replies_for(d, [CODE]) == {}
+
+
+def test_several_are_archived_and_marked_at_once_their_replies_too():
+    d = _fresh()
+    a = _report(d, "First.")
+    b = _report(d, "Second.", reply="d00d" * 16)
+    feedback.add_reply(d, "report", a, "needinfo", let_reply=True)
+    assert feedback.accept(d, _follow("More words."), "official")[0] == 200
+    follow = _lines(d)[-1]["id"]
+    assert feedback.archive(d, [a, b], True)
+    assert feedback.item(d, a)["archived"] and feedback.item(d, b)["archived"]
+    assert feedback.archive(d, [a, b], False)
+    assert not feedback.item(d, a)["archived"] and not feedback.item(d, b)["archived"]
+    assert not feedback.archive(d, [a, "nope!"], True) and not feedback.item(d, a)["archived"]
+    # Marked seen with their threads: the reply under a is read too.
+    assert feedback.mark(d, [a, b], "seen", threads=True)
+    state = feedback._state(d)
+    assert state[a] == state[b] == state[follow] == "seen"
+    assert not feedback.mark(d, [a, "../x"], "seen")
+
+
 def test_prune_takes_a_thread_with_its_start_and_keeps_the_rest_whole():
     d = _fresh()
     now = time.time()
@@ -376,6 +419,46 @@ def test_archive_and_delete_routes_are_the_signed_in_admins_from_the_page_only()
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+def test_the_routes_take_several_at_once_from_the_signed_in_admins_page_only():
+    srv, stats, donate = _service()
+    try:
+        app = {"X-Dopeiptv-Report": "1"}
+        ids = [_call(srv, "POST", "/feedback/report", "official",
+                     _feedback(f"Report {n}.", reply=f"{n}0de" * 16), headers=app)[1]["id"] for n in range(3)]
+        for path, body in (("/admin/feedback-archive", {"keys": ids[:2], "archived": True}),
+                           ("/admin/feedback-mark", {"keys": ids[:2], "state": "seen", "threads": True}),
+                           ("/admin/feedback-delete", {"keys": ids[:2]})):
+            assert _admin_post(srv, donate, path, body, signed_in=False)[0] == 401
+            assert _admin_post(srv, donate, path, body, origin=False)[0] == 403
+        assert _admin_post(srv, donate, "/admin/feedback-archive", {"keys": ids[:2], "archived": True})[0] == 200
+        assert all(feedback.item(stats, i)["archived"] for i in ids[:2])
+        assert not feedback.item(stats, ids[2])["archived"]
+        assert _admin_post(srv, donate, "/admin/feedback-mark",
+                           {"keys": ids[:2], "state": "seen", "threads": True})[0] == 200
+        assert all(feedback.item(stats, i)["state"] == "seen" for i in ids[:2])
+        assert _admin_post(srv, donate, "/admin/feedback-delete", {"keys": [ids[0], "../x"]})[0] == 400
+        assert _admin_post(srv, donate, "/admin/feedback-delete", {"keys": ids[:2]}) == (200, {"ok": True, "gone": 2})
+        assert [feedback.item(stats, i) is None for i in ids] == [True, True, False]
+        assert _admin_post(srv, donate, "/admin/feedback-delete", {"groups": "nope"})[0] == 400
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_the_page_picks_several_and_orders_what_people_wrote():
+    with open(os.path.join(HERE, "admin", "feedback.js"), encoding="utf-8") as fh:
+        js = fh.read()
+    assert "fb-pick-bar" in js and "e.shiftKey" in js and "prune(\"g\", groups)" in js
+    assert "{ groups: ids }" in js and "{ keys: ids }" in js and "window.confirm(deleteManyWords(" in js
+    assert 'threads: p === "i"' in js and "box.indeterminate" in js
+    assert '["oldest", "Oldest first"]' in js and '["unread", "Unread first"]' in js
+    assert 'ae.type !== "checkbox"' in js and "--fb-top" in js
+    with open(os.path.join(HERE, "admin", "admin.css"), encoding="utf-8") as fh:
+        css = fh.read()
+    for rule in (".fb-pick {", ".fb-pick-bar.on {", ".fb-row.picked .fb-line {", ".fb-line + .fb-meta {"):
+        assert rule in css, rule
 
 
 def test_the_page_asks_by_itself_and_has_the_reply_switch_archive_and_delete():

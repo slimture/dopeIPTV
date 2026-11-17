@@ -1180,7 +1180,7 @@ class Handler(BaseHTTPRequestHandler):
             fb_dir = CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats"))
             # One key, or several (a report's unread replies, read at once).
             keys = data.get("keys") if isinstance(data.get("keys"), list) else str(data.get("key") or "")
-            ok = feedback.mark(fb_dir, keys, str(data.get("state") or ""))
+            ok = feedback.mark(fb_dir, keys, str(data.get("state") or ""), data.get("threads") is True)
             return self._send(200 if ok else 400, {"ok": ok})
         if path == "/admin/feedback-reply":
             import admin
@@ -1194,14 +1194,21 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/admin/feedback-archive":
             import admin
             import feedback
+            # One key, or several picked in the list.
+            keys = data.get("keys") if isinstance(data.get("keys"), list) else str(data.get("key") or "")
             ok = feedback.archive(CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats")),
-                                  str(data.get("key") or ""), data.get("archived") is not False)
+                                  keys, data.get("archived") is not False)
             return self._send(200 if ok else 400, {"ok": ok})
         if path == "/admin/feedback-delete":
             import admin
             import feedback
-            gone = feedback.delete(CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats")),
-                                   str(data.get("key") or ""), data.get("group") is True)
+            fb_dir = CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats"))
+            many = [data.get(k) for k in ("keys", "groups")]
+            if any(isinstance(v, list) for v in many):
+                # Several picked in the list, reports and problems, in one pass.
+                gone = feedback.delete_many(fb_dir, *[v if isinstance(v, list) else [] for v in many])
+            else:
+                gone = feedback.delete(fb_dir, str(data.get("key") or ""), data.get("group") is True)
             if gone < 0:
                 return self._send(400, {"ok": False})
             return self._send(200, {"ok": True, "gone": gone})
