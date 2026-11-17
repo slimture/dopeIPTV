@@ -219,6 +219,9 @@ dopeiptv/
     search_page.py     The Search page itself: field, chips, grouped results
     series_page.py     The series page itself: header, season chips, the list
     series_cards.py    Its episode cards: model, painted card, keys, lazy pictures
+    media_cards.py     The cards every place shares: pills, poster/wide/list cards,
+                       channel rows, the sideways Continue row, the page header
+                       and the shared page form (PlacePage)
     home_widgets.py    Home's featured strip, shelves and cards
     mw_local.py        Local files: folders, library view, music queue
     mw_radio.py        Radio: radio-browser.info's stations, played as music
