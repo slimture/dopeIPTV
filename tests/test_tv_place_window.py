@@ -315,6 +315,22 @@ w._leave_guide_page()
 assert not w._guide_page_showing() and top.isVisible() and w._place == "tv"
 w._open_epg_guide()
 settle(lambda: w._guide_page_showing(), what="the guide page again")
+# Another category picked while the guide shows: the guide stays and
+# follows it - that category's channels; the same one again changes nothing.
+def cat_item(cid):
+    return next(w.cat_list.item(i) for i in range(w.cat_list.count())
+                if w.cat_list.item(i).data(Qt.ItemDataRole.UserRole) == cid)
+for cid, n in (("2", 2), ("1", 12)):
+    item = cat_item(cid)
+    w.cat_list.setCurrentItem(item)
+    w.cat_list.itemClicked.emit(item)
+    settle(lambda n=n: w._guide_page_showing() and w._guide_grid is not None
+           and len(w._guide_grid.channels) == n, what="the guide follows " + cid)
+    assert w._guide_page.grid is w._guide_grid and w._guide_grid.category_name == item.text()
+grid = w._guide_grid
+w.cat_list.itemClicked.emit(w.cat_list.currentItem())
+app.processEvents()
+assert w._guide_grid is grid and w._guide_page_showing()
 assert w._show_place("tv") is True
 assert not w._guide_page_showing() and top.isVisible()
 w._place_tv_refresh()                                # a profile, a source, sync

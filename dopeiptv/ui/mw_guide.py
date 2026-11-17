@@ -4,7 +4,10 @@ is one of the places. Pop out puts the same guide in a window of its own.
 
 What it covers is settled as it opens (_guide_scope): the TV list's
 category, the Favorites folder shown, else the favourite channels, else
-the whole line-up (fetched on a worker). The guide is kept while the app
+the whole line-up (fetched on a worker). Over TV it follows the list: a
+category picked or arrowed to in the sidebar while it shows puts that
+category's channels in it, and it stays (_guide_follow_list, as the list's
+rows come in). The guide is kept while the app
 runs and shown again as it was - same source, same channels, the same day
 - and drawn afresh otherwise. Showing or leaving it never touches the
 player.
@@ -118,11 +121,36 @@ class _GuideMixin:
         self._return_to_place()
 
     def _guide_category_clicked(self, _item=None) -> None:
-        """A category picked in the sidebar while the Guide shows: its list,
-        the way a nav entry leads to its own."""
-        if self._guide_page_showing():
-            self._close_guide_page()
-            self._place_entered(self._list_place)
+        """A category picked in the sidebar while the Guide shows: over TV
+        the guide follows it - its channels come in as the list's do - and
+        stays; elsewhere its list, the way a nav entry leads to its own."""
+        if not self._guide_page_showing():
+            return
+        if self.mode == "live":
+            self._guide_follow_list()
+            return
+        self._close_guide_page()
+        self._place_entered(self._list_place)
+
+    def _guide_follow_list(self) -> None:
+        """The Guide page over TV covers the list's category: called each
+        time the list's rows are put in (_apply_filter), so a category
+        picked, or arrowed to, while the guide shows puts its channels in
+        it. The same channels again change nothing (a search typed, a
+        refresh); the focus stays in the sidebar while it is there."""
+        if self.mode != "live" or self.series_ctx or not self.all_items \
+                or not self._guide_page_showing():
+            return
+        key, title, channels = self._guide_scope(False)
+        grid = self._guide_grid
+        if grid is not None and grid.scope_key == key and self._guide_page.grid is grid:
+            return
+        self._guide_gen += 1
+        grid = self._new_guide_grid(key, title, channels)
+        self._guide_page.put(grid)
+        if not self.cat_list.hasFocus():
+            grid.view.setFocus()
+        log.info("guide: follows the list's category (%d channels)", len(channels))
 
     def _relight_nav(self) -> None:
         """Light the entry of what the window shows (a click lit the Guide

@@ -3842,6 +3842,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         shown = getattr(self, "_place_tv_list_shown", None)
         if shown is not None:
             shown()
+        # The Guide page over TV follows the list's category (mw_guide).
+        follow = getattr(self, "_guide_follow_list", None)
+        if follow is not None:
+            follow()
 
     # -- item identity -------------------------------------------------------------
 

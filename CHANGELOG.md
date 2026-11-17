@@ -20,6 +20,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Changed
 
+- The Guide follows the category you pick in the sidebar: with the guide
+  open over TV, picking Movies, News or any other category (or arrowing
+  through them) shows that category's channels in the guide, which stays
+  open - before, it closed and the category's channel list came instead.
+
 - Local files is a place of the new look, like Mine, TV, Movies and
   Series: the folder's name ("Local files" at the top) with how many
   folders and files it holds, a way back to the folder above ("Back to
