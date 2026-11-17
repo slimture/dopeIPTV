@@ -69,6 +69,18 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.6.2" date="2026-11-17">
+      <description>
+        <p>A new look: the sidebar is the app's structure, with Mine, TV, Movies and Series as places of their own, and the app opens where you left off.</p>
+        <ul>
+          <li>Mine: continue watching, favourite channels live now, favourite films and series, Watch later as a queue, new episodes and History as a timeline</li>
+          <li>TV: the category's header, Recently watched, and channels as rows with what is on and what is next, compact or airy</li>
+          <li>Movies and Series as posters or a list, with Popular right now and Continue; a film opens its own page</li>
+          <li>Home is gone; the app starts where you left off, or always on Mine</li>
+          <li>The phone remote's TV mode remote fits the phone, and Now playing folds its extra controls behind More</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.6.1" date="2026-11-16">
       <description>
         <p>A calmer guide, a night mode that tames loud adverts and bangs, and the visualiser for channels that are sound alone.</p>

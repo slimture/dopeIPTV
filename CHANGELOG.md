@@ -7,6 +7,25 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.6.2]
+
+A new look: the sidebar is the app's structure - Mine, TV, Movies and Series
+as places of their own, each with the same header - and the app opens where
+you left off.
+
+### Fixed
+
+- Going from a grid back to rows (Grid on and off, or Movies' posters and
+  then TV) left an empty strip to the left of the channels until the app
+  was started again.
+- A place's header: the filter, the sort and the Grid / List switch are
+  one height and in one line (the filter stood taller and higher on
+  macOS); a long category name is cut with "…" and shown whole in its
+  tooltip; on a narrow pane the sort shows its mark alone, so the posters
+  never run past the edge. The TV place's header and Recently watched line
+  up with the filter and the channels under them, and a row of small cards
+  fades out at an end with more that way.
+
 ### Changed
 
 - Phone remote: TV mode's remote fits the phone it is on. The d-pad takes the room left below Now playing - bigger on a tall phone, with the volume and channel rockers under it, beside it on a small one - and on its side the keys sit next to it; from 320 x 568 up nothing scrolls as it opens, the safe areas stay clear and every key is 44 px or more. Play/pause and mute sit with Back and Options, the touchpad switch with the number keys.
