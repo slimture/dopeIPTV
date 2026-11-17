@@ -2645,15 +2645,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if guide is not None:
             guide.setVisible(known["live"] is not False)
         # If the mode you're on just got hidden, move to the first visible one
-        # (under the Search page, which stays: the window moved, not you).
+        # (under the Search page or the Guide, which stay: the window moved,
+        # not you - and the place shown stays theirs).
         if self.mode in modes and known[self.mode] is False:
             for m in modes:
                 if known[m] is not False:
+                    held = getattr(self, "_guide_hold", False)
                     self._search_hold = True
+                    self._guide_hold = True
                     try:
                         self.switch_mode(m)
                     finally:
                         self._search_hold = False
+                        self._guide_hold = held
                     break
 
     def _remembered_cat_row(self, default_row: int = 0) -> int:

@@ -60,6 +60,11 @@ main.append(w)
 w.resize(1200, 760)
 w.show()
 app.processEvents()
+# The source's sections probed first: the demo source has no series, and a
+# probe landing mid-walk moves the window off an empty section by itself.
+w.pool.waitForDone(10000)
+for _ in range(50):
+    app.processEvents()
 
 def step(fn):
     fn()
@@ -69,7 +74,14 @@ def step(fn):
 for place in ("mitt", "tv", "films", "series", "guide", "search", "local",
               "radio", "rec", "mitt"):
     step(lambda p=place: w._show_place(p))
-    assert w._place == place, (place, w._place)
+    ok = w._place == place
+    if not ok:
+        # A section the source has nothing in (the demo has no series) is
+        # hidden and left for the first one with content - TV.
+        from dopeiptv.core import places as _places
+        nav = w.nav_btns.get(_places.NAV_OF.get(place, place))
+        ok = nav is not None and not nav.isVisible() and w._place == "tv"
+    assert ok, (place, w._place)
 step(w._donate_heart_refresh)
 step(w.hide_donate_heart)
 settings.remove("donate_until")
