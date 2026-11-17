@@ -18,6 +18,7 @@
 - Enter plays the row picked in TV, Movies and Series.
 - Movies' and Series' cards show a favourite's star and Watch later's clock.
 - **Mine → History**: pick several rows with Ctrl or Shift and take them out at once with `Delete`.
+- **Mine** follows the autoplay setting: with it off, one click picks and a double click plays, as in every other list.
 - A series' page no longer says the first episode is up next while the second one plays.
 - Jumping to what plays finds a radio station too, in the list or country you played it from.
 - The **Next episode** card can come 10, 20, 30 or 45 seconds before the end, not only whole minutes (**Settings → Playback**).

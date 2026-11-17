@@ -289,6 +289,7 @@ class _MittMixin:
             page.activated.connect(self._mitt_activate)
             page.menu_requested.connect(self._mitt_menu)
             page.history_remove.connect(self._mitt_forget_history_cards)
+            page.set_click_plays(self._autoplay_preview)
             page.heart.connect(self._mitt_heart)
             page.queue_nudged.connect(self._mitt_queue_nudge)
             page.queue_moved.connect(self._mitt_queue_move)
@@ -306,9 +307,9 @@ class _MittMixin:
             page.tiles.line_for = self._mitt_tile_line
             page.timeline.words_for = self._mitt_row_words
             page.folder_tiles.swatch_for = self._mitt_swatch
-            for strip in (page.rows["continue"].strip, page.rows["favorites"].strip,
-                          page.rows["new"].strip):
-                strip.click_plays = None
+            # New episodes only open a series' page: one click there; the rest
+            # play, so one click plays only with autoplay (set_click_plays).
+            page.rows["new"].strip.click_plays = None
             self._mitt_page = page
             self._mid_stack.addWidget(page)
             cats = getattr(self, "cat_list", None)

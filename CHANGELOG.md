@@ -132,6 +132,12 @@ same new look.
 
 ### Fixed
 
+- Mine played a title, a channel or a station on one click whatever the
+  autoplay setting said: its lists now follow Settings > Playback as the
+  others do - with autoplay off one click picks and a double click or
+  Enter plays (a double click always does); New episodes still open a
+  series' page on one click.
+
 - The jump to what plays (the sidebar's logo, Now playing) found a radio
   station only when it was in the list on screen: it now goes to Radio and
   the list it was played from - a country, language or genre opened again -

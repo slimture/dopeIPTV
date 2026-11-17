@@ -231,7 +231,15 @@ qv = page.queue
 r = qv.visualRect(qv.model_.index(0, 0))
 QTest.mouseClick(qv.viewport(), Qt.MouseButton.LeftButton, pos=r.center())
 app.processEvents()
+assert str(w._last_playback["key"]) == "40"     # autoplay off (the default): one click picks
+QTest.mouseDClick(qv.viewport(), Qt.MouseButton.LeftButton, pos=r.center())
+app.processEvents()
 assert str(w._last_playback["key"]) == "41" and w._last_playback["kind"] == "movie"
+# Autoplay on (Settings > Playback): one click plays, as in the other lists.
+w.settings.setValue("autoplay_preview", "true")
+assert qv._one_click() and page.timeline._one_click() and page.tiles._one_click()
+w.settings.setValue("autoplay_preview", "false")
+assert not page.rows["continue"].strip._one_click() and page.rows["new"].strip._one_click()
 # History: a channel live, a film with a resume point continues, one
 # without plays again from the start - neither asks. (Playing on from the
 # film above kept where the fake player got to: nowhere - its point again.)

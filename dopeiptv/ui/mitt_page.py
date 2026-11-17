@@ -1712,6 +1712,15 @@ class MittPage(QWidget):
         if not isinstance(item, Heading):
             self.activated.emit(name, item)
 
+    def set_click_plays(self, fn: Callable[[], bool]) -> None:
+        """One click plays only when *fn* says so (Settings > Playback's
+        autoplay): every list here that plays, as the app's other lists -
+        else a click picks and a double click or Enter plays."""
+        views = [self.tiles, self.queue, self.timeline, self.folder_items]
+        views += [row.strip for row in self.rows.values()]
+        for v in views:
+            v.click_plays = fn
+
     def _menu(self, name: str, item, pos: QPoint) -> None:
         if not isinstance(item, Heading):
             self.menu_requested.emit(name, item, pos)
