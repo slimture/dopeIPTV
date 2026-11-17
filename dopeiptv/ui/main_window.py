@@ -863,7 +863,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # A category clicked while the Guide shows: over TV the guide follows
         # it, else that category's list; double-clicked: its guide.
         self.cat_list.itemClicked.connect(self._guide_category_clicked)
-        self.cat_list.itemDoubleClicked.connect(self._guide_for_category)
+        self.cat_list.itemDoubleClicked.connect(self._guide_category_double_clicked)
         self.cat_list.itemClicked.connect(self._sp_category_clicked)
         self.cat_list.itemClicked.connect(self._fp_category_clicked)
         self.cat_list.itemClicked.connect(self._search_category_clicked)
@@ -2983,6 +2983,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _category_changed(self, cur, _prev=None) -> None:
         if not cur:
             return
+        # When: a double click right after it is the one that picked it
+        # (mw_guide's _guide_category_double_clicked).
+        self._cat_changed_at = time.monotonic()
         cat = cur.data(Qt.ItemDataRole.UserRole)
         if self.mode == "local" and cat == "__add__":
             # The "+ Add folder" row is a button, not a category: open the

@@ -340,6 +340,22 @@ w.cat_list.itemDoubleClicked.emit(item)
 settle(lambda: w._guide_page_showing() and w._guide_grid is not None
        and len(w._guide_grid.channels) == 2, what="the guide of a double-clicked category")
 assert w._guide_grid.category_name == item.text()
+# Another category double-clicked while the guide shows: the guide moves
+# there and stays; the category it shows double-clicked again (picked
+# before this double click): back to its list.
+other = cat_item("1")
+w.cat_list.setCurrentItem(other)
+w.cat_list.itemDoubleClicked.emit(other)
+settle(lambda: w._guide_page_showing() and w._guide_grid is not None
+       and len(w._guide_grid.channels) == 12, what="the guide moves on a double click")
+w._cat_changed_at -= 5                                # picked a while ago
+w.cat_list.itemDoubleClicked.emit(other)
+settle(lambda: not w._guide_page_showing() and top.isVisible(), what="a double click goes back")
+assert w._place == "tv" and w.cat_list.currentItem() is other
+w.cat_list.setCurrentItem(item)
+w.cat_list.itemDoubleClicked.emit(item)
+settle(lambda: w._guide_page_showing() and w._guide_grid is not None
+       and len(w._guide_grid.channels) == 2, what="the guide again")
 assert w._show_place("tv") is True
 assert not w._guide_page_showing() and top.isVisible()
 w._place_tv_refresh()                                # a profile, a source, sync

@@ -9,7 +9,9 @@ category picked or arrowed to in the sidebar while it shows puts that
 category's channels in it, and it stays (_guide_follow_list, as the list's
 rows come in) - a folder of favourite channels the same. A category
 double-clicked, or Show in the guide in its menu, opens the guide on it
-(_guide_for_category). The guide is kept while the app
+(_guide_for_category); the category the guide shows double-clicked again
+goes back to its list (_guide_category_double_clicked). The guide is kept
+while the app
 runs and shown again as it was - same source, same channels, the same day
 - and drawn afresh otherwise. Showing or leaving it never touches the
 player.
@@ -17,8 +19,10 @@ player.
 
 from __future__ import annotations
 
+import time
+
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
 
 from ..core.log import log
 from ..core.workers import run_async
@@ -158,6 +162,22 @@ class _GuideMixin:
         if self.cat_list.currentItem() is not item:
             self.cat_list.setCurrentItem(item)
         self._open_epg_guide()
+
+    def _guide_category_double_clicked(self, item=None) -> None:
+        """A category double-clicked: its guide - or, when the guide shows
+        and the category was picked already before this double click, back
+        to its list (one double click opens, the next one closes). A double
+        click whose first click picked another category moves the guide
+        there and leaves it open."""
+        if item is None or not self._guide_covers(item):
+            return
+        picked_now = time.monotonic() - getattr(self, "_cat_changed_at", 0.0) \
+            < QApplication.doubleClickInterval() / 1000 + 0.25
+        if self._guide_page_showing() and self.cat_list.currentItem() is item \
+                and not picked_now:
+            self._leave_guide_page()
+            return
+        self._guide_for_category(item)
 
     def _guide_follow_list(self) -> None:
         """The Guide page over TV covers the list's category: called each

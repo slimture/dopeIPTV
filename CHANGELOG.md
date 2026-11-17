@@ -52,7 +52,8 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   A folder of favourite channels works the same.
 - A double click on a TV category (or a folder of favourite channels)
   opens the guide on it, and its menu has Show in the guide: one click for
-  the channels and what is on now, two for the whole guide.
+  the channels and what is on now, two for the whole guide. Double-clicked
+  again, the category the guide shows goes back to its channel list.
 
 - Local files is a place of the new look, like Mine, TV, Movies and
   Series: the folder's name ("Local files" at the top) with how many
