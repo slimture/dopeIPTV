@@ -8,8 +8,8 @@ and copy the result into the website branch, ``public/help-shots/``::
     QT_QPA_PLATFORM=offscreen python tools/help_screenshots.py OUT [lang ...]
 
 OUT gets ``<lang>/<help id>.webp`` for each language (all of them when none
-is named). The help id is the answer's anchor on the help page (``set-home``
-for ``/help/#set-home``) - the site renders a picture for the ids in
+is named). The help id is the answer's anchor on the help page (``set-room``
+for ``/help/#set-room``) - the site renders a picture for the ids in
 ``site/i18n.json`` ``help_shots``. A picture can be of a page scrolled to
 the row or section the answer names. Nothing of the user's is read or
 written: the settings are a throwaway store, and the playlist the demo one.
@@ -36,7 +36,7 @@ SHOTS = {
     "set-language": ("appearance", ""),
     "set-playback": ("playback", ""),
     "set-playlists": ("playlists", ""),
-    "set-home": ("home", ""),
+    "set-room": ("appearance", "set_card_places_show"),
     "set-parental": ("parental", ""),
     "set-testbuilds": ("general", "setting_update_channel"),
     "set-profiles": ("profiles", ""),
