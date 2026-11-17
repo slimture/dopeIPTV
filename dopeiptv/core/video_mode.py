@@ -24,6 +24,10 @@ WINDOW = "window"
 
 _OFF = frozenset({"0", "no", "off", "false"})
 _ON = frozenset({"1", "yes", "on", "true"})
+#: DOPEIPTV_VIDEO_THREAD=force: tried even where Qt says the platform has no
+#: OpenGL on other threads (macOS) - to test it there; every other check
+#: and every fallback stays.
+_FORCE = frozenset({"force", "forced"})
 
 _state: dict[str, str] = {"mode": "", "why": "", "failed": "", "setting_off": ""}
 
@@ -35,7 +39,7 @@ def wanted(settings: Any | None = None) -> tuple[bool, str]:
     env = os.environ.get(ENV, "").strip().lower()
     if env in _OFF:
         return False, f"switched off ({ENV}=0)"
-    if env in _ON:
+    if env in _ON or env in _FORCE:
         return True, ""
     if settings is None:
         off = _state["setting_off"] == "1"
@@ -48,6 +52,12 @@ def wanted(settings: Any | None = None) -> tuple[bool, str]:
     if off:
         return False, "switched off in Settings"
     return True, ""
+
+
+def forced() -> bool:
+    """DOPEIPTV_VIDEO_THREAD=force: Qt's "no OpenGL on other threads" is not
+    taken as the last word."""
+    return os.environ.get(ENV, "").strip().lower() in _FORCE
 
 
 def failed() -> str:
@@ -80,7 +90,7 @@ def line() -> str:
     (fallback: ...)", or nothing known yet."""
     m = _state["mode"]
     if m == THREAD:
-        return "Video: own thread"
+        return "Video: own thread (forced)" if forced() else "Video: own thread"
     if m == WINDOW:
         return f"Video: window thread ({_state['why']})" if _state["why"] else "Video: window thread"
     return "Video: not started yet"

@@ -1482,6 +1482,8 @@ def video_path_text() -> str:
     from ..core import video_mode
     why = video_mode.why()
     if video_mode.mode() == video_mode.THREAD:
+        if video_mode.forced():
+            return f"{tr('video_path_thread')} ({video_mode.ENV}=force)"
         return tr("video_path_thread")
     if why.startswith("fallback: "):
         return tr("video_path_fallback", reason=why[len("fallback: "):])

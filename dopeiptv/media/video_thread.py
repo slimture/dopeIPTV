@@ -87,6 +87,9 @@ def _surface_format() -> QSurfaceFormat:
     return fmt
 
 
+_FORCED_SAID = [False]
+
+
 def can_start() -> str:
     """Why this system cannot draw the picture on a thread of its own ("":
     it can try)."""
@@ -97,7 +100,12 @@ def can_start() -> str:
         return f"the {name} platform"
     try:
         if not QOpenGLContext.supportsThreadedOpenGL():
-            return f"{name}: no OpenGL on other threads"
+            if not video_mode.forced():
+                return f"{name}: no OpenGL on other threads"
+            if not _FORCED_SAID[0]:
+                _FORCED_SAID[0] = True
+                log.warning("video: %s says no OpenGL on other threads - tried anyway "
+                            "(%s=force)", name, video_mode.ENV)
     except Exception as e:
         return f"{type(e).__name__}: {e}"
     if video_mode.failed():
