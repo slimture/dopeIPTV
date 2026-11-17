@@ -3043,5 +3043,17 @@
   "rec_mark_unwatched": "İzlenmedi olarak işaretle",
   "radio_n_countries": "{n} ülke",
   "radio_n_languages": "{n} dil",
-  "radio_n_genres": "{n} tür"
+  "radio_n_genres": "{n} tür",
+  "places_fold": "Bölümleri daralt",
+  "places_unfold": "Bölümleri tam göster",
+  "row_hide": "Bu sırayı gizle",
+  "row_hidden_note": "\"{row}\" gizlendi - {where} içinden geri getirebilirsiniz.",
+  "set_card_places_show": "Bölümlerin gösterdikleri",
+  "set_just_list": "Yalnızca liste",
+  "set_just_list_hint": "TV, Filmler, Diziler ve Yerel dosyaların üstünde sıra yok, başlıklar daha küçük; Filmler ve Diziler liste olarak, TV sıkışık. Kapatınca her şey eskisi gibi olur.",
+  "set_rows_over_lists": "Listelerin üstündeki sıralar",
+  "set_popular_link_hint": "TMDB'nin bu haftaki listesi, Filmler ve Diziler'in en üstünde",
+  "set_sidebar_entries": "Kenar çubuğunda",
+  "set_sidebar_entries_note": "Kenar çubuğundan çıkarılan bir bölüm yine kısayolundan, komut paletinden ve menülerden açılır.",
+  "set_places_fold_hint": "Kategorilere yer kalsın diye bölümler kenar çubuğunun üstünde bir sıra simge olarak - bölümlerin altındaki ok da aynısını yapar."
 }

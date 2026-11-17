@@ -3043,5 +3043,17 @@
   "rec_mark_unwatched": "Oznacz jako nieobejrzane",
   "radio_n_countries": "Kraje: {n}",
   "radio_n_languages": "Języki: {n}",
-  "radio_n_genres": "Gatunki: {n}"
+  "radio_n_genres": "Gatunki: {n}",
+  "places_fold": "Zwiń sekcje",
+  "places_unfold": "Pokaż sekcje w całości",
+  "row_hide": "Ukryj ten rząd",
+  "row_hidden_note": "Ukryto „{row}” – przywrócisz to w {where}.",
+  "set_card_places_show": "Co pokazują sekcje",
+  "set_just_list": "Tylko lista",
+  "set_just_list_hint": "Bez rzędów nad TV, Filmami, Serialami i Plikami lokalnymi oraz z mniejszymi nagłówkami; Filmy i Seriale jako lista, TV w widoku zwartym. Po wyłączeniu wszystko wraca do tego, co było.",
+  "set_rows_over_lists": "Rzędy nad listami",
+  "set_popular_link_hint": "Ranking tygodnia z TMDB, na górze Filmów i Seriali",
+  "set_sidebar_entries": "Na pasku bocznym",
+  "set_sidebar_entries_note": "Sekcja usunięta z paska bocznego nadal otwiera się swoim skrótem, z palety poleceń i z menu.",
+  "set_places_fold_hint": "Sekcje jako rząd ikon na górze paska bocznego, by kategorie miały miejsce – strzałka pod sekcjami robi to samo."
 }

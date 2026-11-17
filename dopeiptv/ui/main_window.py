@@ -55,7 +55,7 @@ from .theme import P, rounded
 from .player_resize import PlayerResizeHandle
 from ..core.wakelock import WakeLock
 from .dialogs import PlaylistDialog
-from .nav_widgets import NavButton, SideRule, SourceAvatar, SourceLabel
+from .nav_widgets import NavButton, PlacesFold, PlacesLayout, SideRule, SourceAvatar, SourceLabel
 from .app_menu import MENUS, lay_out, open_website
 from .widgets import (
     FlowRow, HeartButton, _SidebarLogo,
@@ -104,6 +104,7 @@ from .mw_mpris import _MprisMixin
 from .mw_multiview import _MultiviewMixin
 from .mw_guide import _GuideMixin
 from .mw_places import _PlacesMixin
+from .mw_place_look import _PlaceLookMixin
 from .mw_mitt import _MittMixin
 from .mw_popular import _PopularMixin
 from .mw_local import _LocalFilesMixin
@@ -167,7 +168,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _NavMixin, _SourceLabelMixin, _ShortcutsMixin, _PaletteMixin, _OnboardingMixin, _SortMixin,
                  _LocalFilesMixin, _PlaceLocalMixin, _LocalWatchMixin, _RadioMixin, _WebStreamsMixin,
                  _PlaceRecMixin, _PlaceRadioMixin,
-                 _PopoutMixin, _MultiviewMixin, _PlacesMixin, _PopularMixin, _GuideMixin,
+                 _PopoutMixin, _MultiviewMixin, _PlacesMixin, _PlaceLookMixin, _PopularMixin,
+                 _GuideMixin,
                  _SeriesPageMixin, _PlaceFilmsMixin, _FilmPageMixin, _PlaceSeriesMixin, _SearchAllMixin, _MittMixin,
                  _MprisMixin,
                  _FollowMixin, _PaneFollowMixin, _PlaceTvMixin, _SubtitlesMixin, _CastMixin, _AirPlayMixin, _DonateMixin,
@@ -735,19 +737,33 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # TV, Movies, Series, the Guide and Search, a hairline, then Local
         # files, Radio and Recordings. Mine holds what were Favorites, Watch
         # later and History; there is no Home. _on_nav_clicked sends each
-        # entry to its place.
+        # entry to its place. They are a block of their own (PlacesLayout):
+        # a column as ever, or folded a compact row of icons at the top that
+        # gives the categories the room (the chevron under them; Settings >
+        # Appearance), and an entry a person never uses can be taken out
+        # (mw_place_look).
+        self._places_box = QWidget(objectName="PlacesBox")
+        self._places_box.setStyleSheet("QWidget#PlacesBox { background: transparent; }")
+        # Preferred, not Fixed: a Fixed height caps the folded block's rows
+        # at one (a layout's height-for-width is held to the size hint).
+        self._places_box.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self._places_lay = PlacesLayout(self._places_box, spacing=sl.spacing())
+        sl.addWidget(self._places_box)
         upper = (("mitt", tr("nav_mine")), ("live", tr("nav_tv")),
                  ("vod", tr("nav_movies")), ("series", tr("nav_series")),
                  ("guide", tr("nav_guide")), ("search", tr("nav_search")))
         lower = (("local", tr("nav_local")), ("radio", tr("nav_radio")),
                  ("rec", tr("nav_recordings")))
         for key, text in upper:
-            _make_nav(key, text, sl, primary=True)
+            _make_nav(key, text, self._places_lay, primary=True)
         # Between the two groups, on the rail too: a hairline and its gap.
         self._places_rule = SideRule()
-        sl.addWidget(self._places_rule)
+        self._places_lay.addWidget(self._places_rule)
         for key, text in lower:
-            _make_nav(key, text, sl, primary=True)
+            _make_nav(key, text, self._places_lay, primary=True)
+        self._places_fold_btn = PlacesFold()
+        self._places_fold_btn.clicked.connect(self._toggle_places_fold)
+        self._places_lay.addWidget(self._places_fold_btn)
         # Rail-only filler. Expanded, the CATEGORY LIST is the layout's stretch
         # item and soaks up the spare height - but on the icon rail it's
         # hidden, and a QVBoxLayout with no stretch item spreads its surplus
@@ -763,6 +779,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._apply_nav_icons()
         from ..core import places as _places
         self.nav_btns[_places.nav_of_mode(self.mode)].setChecked(True)
+        # The profile's own: the entries taken out, the block folded or not.
+        self._place_look_init()
 
         # The source the lists show, over its categories: its name, its kind
         # in a chip with two sources or more, the source menu on a click
@@ -2618,10 +2636,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         gen = self._avail_gen
         self._mode_avail = {}
         # Start from all-visible so a mode hidden for the previous provider
-        # doesn't linger while the new provider's probes are in flight.
-        for m in ("live", "guide", "vod", "series"):
-            if m in self.nav_btns:
-                self.nav_btns[m].setVisible(True)
+        # doesn't linger while the new provider's probes are in flight (an
+        # entry the person took out of the sidebar stays out: mw_place_look).
+        self._nav_avail = {}
+        self._apply_nav_visibility()
         fns = {"live": getattr(self.client, "live_categories", None),
                "vod": getattr(self.client, "vod_categories", None),
                "series": getattr(self.client, "series_categories", None)}
@@ -2640,22 +2658,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         known = {m: self._mode_avail.get(m) for m in modes}
         # Fail open until we know at least one mode has content, so an all-empty
         # result (e.g. an auth glitch) never hides the whole Browse group.
-        guide = self.nav_btns.get("guide")
         if not any(v is True for v in known.values()):
-            for m in modes:
-                if m in self.nav_btns:
-                    self.nav_btns[m].setVisible(True)
-            if guide is not None:
-                guide.setVisible(True)
+            self._nav_avail = {}
+            self._apply_nav_visibility()
             return
-        for m in modes:
-            if m in self.nav_btns:
-                # Hide only on a definite empty (False); unknown (None) stays.
-                self.nav_btns[m].setVisible(known[m] is not False)
-        # The guide is TV's: a provider without channels has nothing in it.
+        # Hide only on a definite empty (False); unknown (None) stays. The
+        # guide is TV's: a provider without channels has nothing in it.
         # (Its shortcut and menu entries still open it.)
-        if guide is not None:
-            guide.setVisible(known["live"] is not False)
+        self._nav_avail = {m: known[m] is not False for m in modes}
+        self._nav_avail["guide"] = known["live"] is not False
+        self._apply_nav_visibility()
         # If the mode you're on just got hidden, move to the first visible one
         # (under the Search page or the Guide, which stay: the window moved,
         # not you - and the place shown stays theirs).

@@ -162,6 +162,11 @@ class _PlaceLocalMixin:
         place.layout_changed.connect(self._lp_layout_picked)
         place.cont.activated.connect(self._lp_continue)
         place.cont.menu.connect(self._lp_continue_menu)
+        # Continue hidden from its heading (mw_place_look); the header
+        # compact while Just the list.
+        place.cont.set_hide_key("local_continue")
+        place.cont.hide_requested.connect(self._place_row_hide)
+        self._place_look_adopt(place)
         place.filter.setText(self.search.text())
         place.filter.textChanged.connect(self._lp_filter)
         self.search.textChanged.connect(self._lp_search_changed)
@@ -625,12 +630,15 @@ class _PlaceLocalMixin:
         return out
 
     def _lp_rows_refresh(self) -> None:
-        """Continue: under a folder or the library, not over a search."""
+        """Continue: under a folder or the library, not over a search - nor
+        hidden from its heading, nor with Just the list (mw_place_look)."""
         place = self._lp_page
         if place is None or sip.isdeleted(place):
             return
+        shown = getattr(self, "_place_row_shown", None)
+        hidden = callable(shown) and not shown("local_continue")
         try:
-            cards = [] if self._local_search_text() else self._lp_continue_cards()
+            cards = [] if hidden or self._local_search_text() else self._lp_continue_cards()
         except Exception:
             log.exception("local files: Continue was not shown")
             cards = []

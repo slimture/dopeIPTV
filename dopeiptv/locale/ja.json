@@ -3043,5 +3043,17 @@
   "rec_mark_unwatched": "未視聴にする",
   "radio_n_countries": "{n} か国",
   "radio_n_languages": "{n} 言語",
-  "radio_n_genres": "{n} ジャンル"
+  "radio_n_genres": "{n} ジャンル",
+  "places_fold": "セクションを折りたたむ",
+  "places_unfold": "セクションをすべて表示",
+  "row_hide": "この行を非表示",
+  "row_hidden_note": "「{row}」を非表示にしました。{where}で元に戻せます。",
+  "set_card_places_show": "各セクションの表示",
+  "set_just_list": "リストだけ",
+  "set_just_list_hint": "テレビ、映画、シリーズ、ローカルファイルの上の行をなくし、見出しを小さくします。映画とシリーズは一覧表示、テレビはコンパクト表示。オフにすると元どおりです。",
+  "set_rows_over_lists": "リストの上の行",
+  "set_popular_link_hint": "TMDBの今週のランキング（映画とシリーズの上部）",
+  "set_sidebar_entries": "サイドバーに表示",
+  "set_sidebar_entries_note": "サイドバーから外したセクションも、ショートカット、コマンドパレット、メニューから開けます。",
+  "set_places_fold_hint": "セクションをサイドバー上部のアイコンの列にして、カテゴリーの場所を空けます。セクションの下の矢印でも同じことができます。"
 }

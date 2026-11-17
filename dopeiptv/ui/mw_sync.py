@@ -341,7 +341,12 @@ class _SyncMixin:
         keys = {k for k in applied.settings if sync.is_shortcuts(k)}
         if keys and hasattr(self, "apply_shortcuts"):
             self.apply_shortcuts()
-        later = applied.settings - _LIVE_KEYS - keys
+        # What the places show (a profile's own, kept under its name): at once.
+        from ..core import places
+        look = {k for k in applied.settings if str(k).rsplit("/", 1)[-1] in places.LOOK_KEYS}
+        if look and hasattr(self, "_places_look_changed"):
+            self._places_look_changed("sync")
+        later = applied.settings - _LIVE_KEYS - keys - look
         toast = getattr(self, "_show_toast", None)
         if toast is None:
             return

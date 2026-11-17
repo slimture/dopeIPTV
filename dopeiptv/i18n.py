@@ -3267,6 +3267,19 @@ _STRINGS: dict[str, dict[str, str]] = {
     "tv_by_name": {"en": "A to Z"},
     "tv_by_name_desc": {"en": "Z to A"},
     "tv_by_added": {"en": "newest first"},
+    # What the places show (core/places.py, ui/mw_place_look.py).
+    "places_fold": {"en": "Fold the places"},
+    "places_unfold": {"en": "Show the places in full"},
+    "row_hide": {"en": "Hide this row"},
+    "row_hidden_note": {"en": "{row} is hidden - bring it back in {where}."},
+    "set_card_places_show": {"en": "What the places show"},
+    "set_just_list": {"en": "Just the list"},
+    "set_just_list_hint": {"en": "No rows over TV, Movies, Series and Local files, and smaller headers; Movies and Series as rows, TV compact. Off again, everything is as you had it."},
+    "set_rows_over_lists": {"en": "Rows over the lists"},
+    "set_popular_link_hint": {"en": "This week's chart from TMDB, at the top of Movies and Series"},
+    "set_sidebar_entries": {"en": "In the sidebar"},
+    "set_sidebar_entries_note": {"en": "A place taken out of the sidebar still opens from its shortcut, the command palette and the menus."},
+    "set_places_fold_hint": {"en": "The places as a row of icons at the top of the sidebar, so the categories get the room - the arrow under the places does the same."},
 }
 
 

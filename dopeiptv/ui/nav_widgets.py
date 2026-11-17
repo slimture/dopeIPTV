@@ -1,16 +1,19 @@
 """The sidebar's own widgets: a nav entry with its selected bar and quiet
-status, the hairline between the sidebar's groups, the active source's
-avatar at its foot and its name over the categories."""
+status, the places' layout - a column, or folded a compact block of icons
+that wraps - with its fold control, the hairline between the sidebar's
+groups, the active source's avatar at its foot and its name over the
+categories."""
 
 from __future__ import annotations
 
+import math
 import re
 
-from PyQt6.QtCore import QPoint, QPointF, QRectF, Qt, pyqtSignal
+from PyQt6.QtCore import QPoint, QPointF, QRect, QRectF, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import (
     QColor, QFont, QFontMetricsF, QPainter, QPainterPath, QPaintEvent, QPen,
 )
-from PyQt6.QtWidgets import QPushButton, QSizePolicy, QWidget
+from PyQt6.QtWidgets import QLayout, QPushButton, QSizePolicy, QToolButton, QWidget
 
 from .theme import P, corner_radius, ink_on, tinted
 
@@ -25,7 +28,9 @@ class NavButton(QPushButton):
     bar at the leading edge while it is the entry you are on, and a status
     drawn over it - a dot, a count pill or a muted count at the trailing
     end, a dot in the icon's corner on the rail. The status is painted, not
-    laid out, so the label never moves when it comes or goes."""
+    laid out, so the label never moves when it comes or goes. Folded into
+    the places' compact block (the ``tile`` property, the icon alone as on
+    the rail) the bar lies under the icon instead."""
 
     navigate = pyqtSignal(str)
     menu_requested = pyqtSignal(str, QPoint)
@@ -86,7 +91,12 @@ class NavButton(QPushButton):
         pr.setPen(Qt.PenStyle.NoPen)
         rtl = self.isRightToLeft()
         w, h = float(self.width()), float(self.height())
-        if on:
+        if on and self.property("tile"):
+            length = max(6.0, min(18.0, w - 16.0))
+            pr.setBrush(QColor(ink))
+            pr.drawRoundedRect(QRectF((w - length) / 2, h - BAR_W - 1.0, length, BAR_W),
+                               BAR_W / 2, BAR_W / 2)
+        elif on:
             inset = max(6.0, h * 0.24)
             x = w - BAR_W if rtl else 0.0
             pr.setBrush(QColor(ink))
@@ -149,6 +159,214 @@ class NavButton(QPushButton):
             pr.setPen(QColor(ink if on else P.get("muted", "#8B8B96")))
         pr.setFont(f)
         pr.drawText(box, int(Qt.AlignmentFlag.AlignCenter), text)
+
+
+class PlacesFold(QToolButton):
+    """The places' fold control: a small chevron, up under the entries (fold
+    them into a compact block of icons, giving the categories the room) and
+    down as the last tile of that block (the entries in full again). Painted
+    in the theme's muted ink; its words are in the tooltip and for a screen
+    reader (the window's)."""
+
+    W, H = 28, 16
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.setObjectName("PlacesFold")
+        self.setAutoRaise(True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        # A click leaves no focus ring behind; Tab still reaches it.
+        self.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        # Grows to a tile in the folded block (a Fixed policy caps a
+        # layout's geometry at the hint).
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+        self._folded = False
+
+    def sizeHint(self) -> QSize:
+        return QSize(self.W, self.H)
+
+    def minimumSizeHint(self) -> QSize:
+        return QSize(self.W, self.H)
+
+    def set_folded(self, on: bool) -> None:
+        if bool(on) != self._folded:
+            self._folded = bool(on)
+            self.update()
+
+    def is_folded(self) -> bool:
+        return self._folded
+
+    def chevron_points(self) -> tuple[QPointF, QPointF, QPointF]:
+        """The chevron's three points: pointing up while the entries are in
+        full, down while they are folded."""
+        cx, cy = self.width() / 2.0, self.height() / 2.0
+        half_w, half_h = 5.0, 2.5
+        tip = cy + half_h if self._folded else cy - half_h
+        ends = cy - half_h if self._folded else cy + half_h
+        return QPointF(cx - half_w, ends), QPointF(cx, tip), QPointF(cx + half_w, ends)
+
+    def paintEvent(self, _event: QPaintEvent) -> None:
+        pr = QPainter(self)
+        pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        whole = QRectF(0.0, 0.0, float(self.width()), float(self.height()))
+        radius = corner_radius(8.0 if self._folded else 6.0)
+        if self.isDown() or self.underMouse():
+            pr.setPen(Qt.PenStyle.NoPen)
+            pr.setBrush(QColor(P.get("sel" if self.isDown() else "hover", "#1D1D24")))
+            pr.drawRoundedRect(whole, radius, radius)
+        if self.hasFocus():
+            pr.setPen(QPen(QColor(P.get("accent", "#4C8DFF")), 1.5))
+            pr.setBrush(Qt.BrushStyle.NoBrush)
+            pr.drawRoundedRect(whole.adjusted(1, 1, -1, -1), radius, radius)
+        ink = P.get("text2" if self.underMouse() else "muted", "#8B8B96")
+        pen = QPen(QColor(ink), 1.7)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        pr.setPen(pen)
+        pr.setBrush(Qt.BrushStyle.NoBrush)
+        a, b, c = self.chevron_points()
+        path = QPainterPath(a)
+        path.lineTo(b)
+        path.lineTo(c)
+        pr.drawPath(path)
+        pr.end()
+
+
+class PlacesLayout(QLayout):
+    """The places' entries in the sidebar. In full (and on the icon rail) a
+    column: each entry under the one before at the sidebar's width, the
+    hairline between the groups, the fold control centred under them -
+    as a QVBoxLayout would put them. Folded: a compact block of tiles, as
+    many to a row as fit with the rows as even as they can be (nine
+    entries and the fold control: two rows of five), wrapping onto another
+    row when the sidebar is narrow; the hairline left out, the fold control
+    the last tile. A hidden widget takes no room. Mirrored right to left."""
+
+    #: A tile is never narrower than this, nor wider than that; the gap.
+    TILE_MIN, TILE_MAX, TILE_GAP = 34, 48, 4
+
+    def __init__(self, parent: QWidget | None = None, spacing: int = 2) -> None:
+        super().__init__(parent)
+        self._items: list = []
+        self._folded = False
+        self.setSpacing(spacing)
+        self.setContentsMargins(0, 0, 0, 0)
+
+    # -- QLayout's plumbing ----------------------------------------------------
+
+    def addItem(self, item) -> None:  # noqa: N802 - Qt's name
+        self._items.append(item)
+
+    def count(self) -> int:
+        return len(self._items)
+
+    def itemAt(self, i: int):  # noqa: N802 - Qt's name
+        return self._items[i] if 0 <= i < len(self._items) else None
+
+    def takeAt(self, i: int):  # noqa: N802 - Qt's name
+        return self._items.pop(i) if 0 <= i < len(self._items) else None
+
+    def expandingDirections(self) -> Qt.Orientation:  # noqa: N802 - Qt's name
+        return Qt.Orientation(0)
+
+    def hasHeightForWidth(self) -> bool:  # noqa: N802 - Qt's name
+        return self._folded
+
+    def heightForWidth(self, width: int) -> int:  # noqa: N802 - Qt's name
+        return self._tiles(QRect(0, 0, width, 0), apply=False)
+
+    def setGeometry(self, rect: QRect) -> None:  # noqa: N802 - Qt's name
+        super().setGeometry(rect)
+        if self._folded:
+            self._tiles(rect, apply=True)
+        else:
+            self._column(rect)
+
+    def sizeHint(self) -> QSize:  # noqa: N802 - Qt's name
+        if self._folded:
+            n = len(self._tiled())
+            return QSize(n * self.TILE_MIN + max(0, n - 1) * self.TILE_GAP, self._tile_h())
+        shown = self._shown()
+        w = max((it.sizeHint().width() for it in shown), default=0)
+        return QSize(w, self._column_h(shown))
+
+    def minimumSize(self) -> QSize:  # noqa: N802 - Qt's name
+        if self._folded:
+            return QSize(self.TILE_MIN, self._tile_h())
+        shown = self._shown()
+        w = max((it.minimumSize().width() for it in shown), default=0)
+        return QSize(w, self._column_h(shown))
+
+    # -- folded or in full -----------------------------------------------------
+
+    def set_folded(self, on: bool) -> bool:
+        """Tiles (*on*) or the column; True when that changed. The owner
+        asks its widget for a new geometry (updateGeometry)."""
+        if bool(on) == self._folded:
+            return False
+        self._folded = bool(on)
+        self.invalidate()
+        return True
+
+    def is_folded(self) -> bool:
+        return self._folded
+
+    def grid(self, width: int, n: int) -> tuple[int, int, int]:
+        """(columns, rows, a tile's width) for *n* tiles in *width*."""
+        if n <= 0:
+            return 0, 0, 0
+        gap = self.TILE_GAP
+        fit = max(1, (max(0, width) + gap) // (self.TILE_MIN + gap))
+        rows = math.ceil(n / fit)
+        cols = math.ceil(n / rows)
+        tile_w = (width - (cols - 1) * gap) // cols if cols else 0
+        return cols, rows, max(1, min(self.TILE_MAX, tile_w))
+
+    def _shown(self) -> list:
+        return [it for it in self._items if not it.isEmpty()]
+
+    def _tiled(self) -> list:
+        return [it for it in self._shown() if not isinstance(it.widget(), SideRule)]
+
+    def _tile_h(self) -> int:
+        hs = [it.sizeHint().height() for it in self._tiled()
+              if not isinstance(it.widget(), PlacesFold)]
+        return max([self.TILE_MIN - 2, *hs])
+
+    def _column_h(self, shown: list) -> int:
+        if not shown:
+            return 0
+        return sum(it.sizeHint().height() for it in shown) + self.spacing() * (len(shown) - 1)
+
+    def _column(self, rect: QRect) -> None:
+        y = rect.y()
+        for n, it in enumerate(self._shown()):
+            if n:
+                y += self.spacing()
+            hint = it.sizeHint()
+            if isinstance(it.widget(), PlacesFold):
+                w = min(rect.width(), hint.width())
+                it.setGeometry(QRect(rect.x() + (rect.width() - w) // 2, y, w, hint.height()))
+            else:
+                it.setGeometry(QRect(rect.x(), y, rect.width(), hint.height()))
+            y += hint.height()
+
+    def _tiles(self, rect: QRect, apply: bool) -> int:
+        tiles = self._tiled()
+        cols, rows, tile_w = self.grid(rect.width(), len(tiles))
+        if not tiles:
+            return 0
+        tile_h, gap = self._tile_h(), self.TILE_GAP
+        if apply:
+            parent = self.parentWidget()
+            rtl = parent is not None and parent.isRightToLeft()
+            for i, it in enumerate(tiles):
+                r, c = divmod(i, cols)
+                off = c * (tile_w + gap)
+                x = rect.right() + 1 - off - tile_w if rtl else rect.x() + off
+                it.setGeometry(QRect(x, rect.y() + r * (tile_h + gap), tile_w, tile_h))
+        return rows * tile_h + (rows - 1) * gap
 
 
 class SideRule(QWidget):

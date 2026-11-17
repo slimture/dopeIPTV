@@ -170,6 +170,12 @@ class _PlaceSeriesMixin:
         place.popular.menu.connect(self._place_series_popular_menu)
         place.cont.activated.connect(self._place_series_continue)
         place.cont.menu.connect(self._place_series_continue_menu)
+        # Each hidden from its heading (mw_place_look; Popular right now in
+        # its own key on Posters & info); compact while Just the list.
+        for row, name in ((place.popular, "series_popular"), (place.cont, "series_continue")):
+            row.set_hide_key(name)
+            row.hide_requested.connect(self._place_row_hide)
+        self._place_look_adopt(place)
         place.header.sort_changed.connect(self._place_series_sort)
         place.header.view_changed.connect(self._place_series_view)
         place.filter.setText(self.search.text())
@@ -191,7 +197,13 @@ class _PlaceSeriesMixin:
         return place
 
     def _place_series_layout(self) -> str:
+        """Posters or rows: the person's own - rows while Just the list is
+        on, unless the switch picked posters since (mw_place_look)."""
         v = str(self.settings.value(VIEW_KEY, "poster") or "poster")
+        v = v if v in ("poster", "list") else "poster"
+        view = getattr(self, "_place_view", None)
+        if callable(view):
+            v = view("series", v)
         return v if v in ("poster", "list") else "poster"
 
     # -- the cards: what the list holds ---------------------------------------------
@@ -436,7 +448,11 @@ class _PlaceSeriesMixin:
         place = self._place_series
         if place is None or key not in ("poster", "list"):
             return
-        self.settings.setValue(VIEW_KEY, key)
+        pick = getattr(self, "_place_view_pick", None)
+        if callable(pick):
+            pick("series", key, VIEW_KEY)       # not over the own while Just the list
+        else:
+            self.settings.setValue(VIEW_KEY, key)
         place.grid.set_layout(key)
         self._place_series_head()
 
@@ -474,8 +490,10 @@ class _PlaceSeriesMixin:
                 self._place_series_put_row("popular", place.popular, [])
         except Exception:
             log.exception("series place: Popular right now was not shown")
+        row_shown = getattr(self, "_place_row_shown", None)
+        cont_on = not callable(row_shown) or row_shown("series_continue")
         try:
-            cont = self._place_series_continue_cards() if show else []
+            cont = self._place_series_continue_cards() if show and cont_on else []
         except Exception:
             log.exception("series place: Continue was not shown")
             cont = []

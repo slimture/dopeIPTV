@@ -234,6 +234,10 @@ SETTINGS_ALLOW = frozenset({
     "start_place", "popular_movies", "popular_series", "follow_notify",
     # The Movies place's grid or list (ui/mw_place_films.py).
     "films_view",
+    # What the places show (core/places.py), each profile its own.
+    "places_hidden", "places_folded", "just_the_list",
+    "place_row_tv_recent", "place_row_films_continue", "place_row_series_continue",
+    "place_row_local_continue", "place_row_radio_favs", "place_row_rec_now",
     "stream_format", "cache_secs", "autoplay_preview", "autoplay_next_episode",
     "nextup_lead_secs", "auto_reconnect_live", "hide_upcoming_prompt",
     "live_rewind_minutes", "live_rewind_disk", "live_rewind_kept",

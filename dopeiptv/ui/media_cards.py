@@ -10,9 +10,11 @@ look everywhere (flat, rounded, no borders, the palette ``P`` only):
   time and a bar, "Then ..." next; compact or airy; the one playing marked
   with the accent's bar;
 * ``CardRow``: a heading over a sideways row of small cards (Continue,
-  Popular right now) - picture, title, a line, progress, a rank;
+  Popular right now) - picture, title, a line, progress, a rank; its
+  heading's right click offers "Hide this row" (``set_hide_key``);
 * ``PageHeader``: a place's title, its count line, a sort control and a
-  segmented switch (grid / list, compact / airy);
+  segmented switch (grid / list, compact / airy); compact (Just the list)
+  the title smaller and on the count's line where they fit;
 * ``PlacePage``: the shared form - the header, its rows, then the content -
   in one scroll area that paints only the strip coming into view.
 
@@ -48,9 +50,9 @@ from PyQt6.QtGui import (
     QPainterPath, QPen, QPixmap,
 )
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QButtonGroup, QFrame, QHBoxLayout, QLabel, QLineEdit, QListView, QMenu,
-    QPushButton, QScrollArea, QSizePolicy, QStyle, QStyledItemDelegate, QToolButton,
-    QVBoxLayout, QWidget,
+    QAbstractItemView, QBoxLayout, QButtonGroup, QFrame, QHBoxLayout, QLabel, QLineEdit, QListView,
+    QMenu, QPushButton, QScrollArea, QSizePolicy, QSpacerItem, QStyle, QStyledItemDelegate,
+    QToolButton, QVBoxLayout, QWidget,
 )
 
 from ..i18n import tr
@@ -1849,21 +1851,27 @@ class CardStrip(_PaintedView):
 class CardRow(QWidget):
     """A heading ("Continue", "Popular right now") over a ``CardStrip``,
     with a button at either end while there is more that way; hidden while
-    it has no cards."""
+    it has no cards. Given a name (``set_hide_key``: a row of
+    core/places.ROWS) a right click on its heading offers "Hide this row"
+    and says so (``hide_requested``) - the window keeps it hidden."""
 
     activated = pyqtSignal(object)
     menu = pyqtSignal(object, QPoint)
+    hide_requested = pyqtSignal(str)
 
     def __init__(self, title: str = "", loader=None, picture: str = "wide",
                  parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("MediaCardRow")
+        self._hide_key = ""
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(10)
         self.heading = QLabel(title)
         self.heading.setObjectName("MediaRowHeading")
         self.heading.setTextFormat(Qt.TextFormat.PlainText)
+        self.heading.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.heading.customContextMenuRequested.connect(self._heading_menu)
         lay.addWidget(self.heading)
         self.strip = CardStrip(loader, picture)
         self.strip.activated.connect(self.activated)
@@ -1910,6 +1918,31 @@ class CardRow(QWidget):
     def set_title(self, text: str) -> None:
         self.heading.setText(text)
         self.heading.setVisible(bool(text))
+
+    def set_hide_key(self, name: str) -> None:
+        """The row's name among the rows that can be hidden; "" for none
+        (its heading offers nothing)."""
+        self._hide_key = str(name or "")
+
+    def hide_key(self) -> str:
+        return self._hide_key
+
+    def heading_menu(self) -> QMenu | None:
+        """The heading's menu: "Hide this row" - None for a row with no
+        name."""
+        if not self._hide_key:
+            return None
+        m = QMenu(self)
+        act = m.addAction(tr("row_hide"))
+        act.triggered.connect(lambda _c=False, k=self._hide_key: self.hide_requested.emit(k))
+        return m
+
+    def _heading_menu(self, pos: QPoint) -> None:
+        m = self.heading_menu()
+        if m is None:
+            return
+        m.exec(self.heading.mapToGlobal(pos))
+        m.deleteLater()
 
     def set_cards(self, cards: Iterable[Card]) -> None:
         cards = list(cards)
@@ -2060,13 +2093,41 @@ class Segmented(QWidget):
         super().keyPressEvent(e)
 
 
+class _TitleLabel(QLabel):
+    """A header's title: it asks for the room of its whole text (*full*),
+    not of the text cut to fit - else once cut short it never asked for
+    more again."""
+
+    def __init__(self, text: str = "") -> None:
+        super().__init__(text)
+        self.full = text
+
+    def sizeHint(self) -> QSize:
+        hint = super().sizeHint()
+        text = self.text()
+        if self.full and self.full != text:
+            fm = self.fontMetrics()
+            hint.setWidth(hint.width() - fm.horizontalAdvance(text)
+                          + fm.horizontalAdvance(self.full))
+        return hint
+
+
 class PageHeader(QWidget):
     """A place's header: its name, a muted count line under it ("312
     channels · by number"), and at the end a sort control (a menu of the
-    orders) and a segmented switch. Empty choices hide their control."""
+    orders) and a segmented switch. Empty choices hide their control.
+    Compact (``set_compact``: Just the list) the name is smaller and, where
+    there is room, on one line with the count - the list starts higher."""
 
     sort_changed = pyqtSignal(str)
     view_changed = pyqtSignal(str)
+
+    #: The title's size in pixels, in full and compact.
+    TITLE_PX, COMPACT_TITLE_PX = 24, 17
+    #: Compact, the count goes on the title's line while the title keeps at
+    #: least this much room beside it.
+    INLINE_TITLE_MIN = 80
+    INLINE_GAP = 10
 
     #: Every control at the header's end is this tall (the sort, the
     #: switch, a filter): one line, whatever the system's font makes of
@@ -2082,21 +2143,30 @@ class PageHeader(QWidget):
         super().__init__(parent)
         self.setObjectName("MediaPageHeader")
         self._title_full = title
+        self._compact = False
+        self._inline = False
+        self._kept: dict[int, tuple] = {}
         lay = QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(12)
-        col = QVBoxLayout()
+        # The title over the count; compact and with room, side by side.
+        col = self._col = QBoxLayout(QBoxLayout.Direction.TopToBottom)
         col.setSpacing(4)
-        self.title = QLabel(title)
+        self.title = _TitleLabel(title)
         self.title.setObjectName("MediaPageTitle")
         self.title.setTextFormat(Qt.TextFormat.PlainText)
         self.title.setAccessibleName(title)
+        # Its room can change without the header's own (the count coming
+        # onto its line): cut again whenever it does.
+        self.title.installEventFilter(self)
         col.addWidget(self.title)
         self.count = QLabel("")
         self.count.setObjectName("MediaPageCount")
         self.count.setTextFormat(Qt.TextFormat.PlainText)
         self.count.hide()
         col.addWidget(self.count)
+        self._col_tail = QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
+        col.addItem(self._col_tail)
         lay.addLayout(col, 1)
         self._extra = QHBoxLayout()
         self._extra.setSpacing(8)
@@ -2124,7 +2194,8 @@ class PageHeader(QWidget):
         self.restyle()
 
     def restyle(self) -> None:
-        self.title.setStyleSheet(f"color:{P['text']}; font-size:24px; font-weight:700;"
+        px = self.COMPACT_TITLE_PX if self._compact else self.TITLE_PX
+        self.title.setStyleSheet(f"color:{P['text']}; font-size:{px}px; font-weight:700;"
                                  " background:transparent;")
         self.count.setStyleSheet(f"color:{P['muted']}; font-size:12px; background:transparent;")
         r = round(corner_radius(10))
@@ -2139,8 +2210,83 @@ class PageHeader(QWidget):
 
     def set_title(self, text: str) -> None:
         self._title_full = text
+        self.title.full = text
         self.title.setAccessibleName(text)
+        self.title.updateGeometry()
         self._fit_title()
+        self._arrange_title()
+
+    # -- compact ----------------------------------------------------------------
+
+    def set_compact(self, on: bool) -> None:
+        """Compact (Just the list): the title smaller, on the count's line
+        where both fit; else as ever."""
+        on = bool(on)
+        if on == self._compact:
+            return
+        self._compact = on
+        self.restyle()
+        self._arrange_title()
+        QTimer.singleShot(0, lambda: None if sip.isdeleted(self) else self._fit_title())
+
+    def is_compact(self) -> bool:
+        return self._compact
+
+    def is_inline(self) -> bool:
+        """Whether the count is on the title's line now."""
+        return self._inline
+
+    def _wants_inline(self) -> bool:
+        if not self._compact:
+            return False
+        if not self.count.text():
+            return True
+        room = self._col.geometry().width()
+        if room <= 0:
+            return False
+        fm = self.count.fontMetrics()
+        need = fm.horizontalAdvance(self.count.text()) + 4 + self.INLINE_GAP
+        title_w = self.title.fontMetrics().horizontalAdvance(self._title_full)
+        return room >= need + min(title_w, self.INLINE_TITLE_MIN)
+
+    def _arrange_title(self) -> None:
+        """The title and the count one over the other, or side by side."""
+        inline = self._wants_inline()
+        if inline == self._inline:
+            return
+        self._inline = inline
+        col = self._col
+        labels = (self.title, self.count)
+        if inline:
+            col.setDirection(QBoxLayout.Direction.LeftToRight)
+            col.setSpacing(self.INLINE_GAP)
+            for lab in labels:
+                # Each asks for its text's room and gives it up to 1 px -
+                # the title first - so the header never holds the pane wide.
+                self._kept[id(lab)] = (QSizePolicy(lab.sizePolicy()), lab.minimumWidth())
+                lab.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+                lab.setMinimumWidth(max(1, lab.minimumWidth()))
+                col.setAlignment(lab, Qt.AlignmentFlag.AlignVCenter)
+            self._col_tail.changeSize(0, 0, QSizePolicy.Policy.Expanding,
+                                      QSizePolicy.Policy.Minimum)
+        else:
+            col.setDirection(QBoxLayout.Direction.TopToBottom)
+            col.setSpacing(4)
+            for lab in labels:
+                kept = self._kept.pop(id(lab), None)
+                if kept is not None:
+                    lab.setSizePolicy(kept[0])
+                    lab.setMinimumWidth(kept[1])
+                col.setAlignment(lab, Qt.AlignmentFlag(0))
+            self._col_tail.changeSize(0, 0, QSizePolicy.Policy.Minimum,
+                                      QSizePolicy.Policy.Minimum)
+        col.invalidate()
+        self.updateGeometry()
+
+    def eventFilter(self, obj, e) -> bool:  # noqa: N802 - Qt's name
+        if obj is self.title and e.type() == QEvent.Type.Resize:
+            self._fit_title()
+        return super().eventFilter(obj, e)
 
     def _fit_title(self) -> None:
         """The title cut to its room with an ellipsis (and whole in its
@@ -2163,6 +2309,7 @@ class PageHeader(QWidget):
             if self.sort_btn.toolButtonStyle() != style:
                 self.sort_btn.setToolButtonStyle(style)
         self._fit_title()
+        self._arrange_title()
 
     def showEvent(self, e) -> None:
         super().showEvent(e)
@@ -2171,6 +2318,7 @@ class PageHeader(QWidget):
     def set_count(self, text: str) -> None:
         self.count.setText(text)
         self.count.setVisible(bool(text))
+        self._arrange_title()
 
     def set_sort(self, options: Sequence[tuple[str, str]], current: str = "") -> None:
         """The orders as (key, words); [] hides the control."""
@@ -2315,6 +2463,21 @@ class PlacePage(QWidget):
         if callable(fn):
             fn()
         self.body.update()
+
+    #: Compact (Just the list): less room over the header and between the
+    #: parts, so the content starts higher.
+    COMPACT_TOP, COMPACT_SPACING = 6, 12
+
+    def set_compact(self, on: bool) -> None:
+        """The page compact (Just the list) or as ever: its header, and the
+        room over it and between its parts."""
+        top = min(self.MARGIN_TOP, self.COMPACT_TOP) if on else self.MARGIN_TOP
+        self._lay.setContentsMargins(self.MARGIN_X, top, self.MARGIN_X, self.MARGIN_BOTTOM)
+        self._lay.setSpacing(self.COMPACT_SPACING if on else self.SPACING)
+        self.header.set_compact(on)
+
+    def is_compact(self) -> bool:
+        return self.header.is_compact()
 
     def add_row(self, row: QWidget) -> None:
         """A row between the header and the content, after those added

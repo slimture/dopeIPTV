@@ -3043,5 +3043,17 @@
   "rec_mark_unwatched": "Als nicht gesehen markieren",
   "radio_n_countries": "{n} Länder",
   "radio_n_languages": "{n} Sprachen",
-  "radio_n_genres": "{n} Genres"
+  "radio_n_genres": "{n} Genres",
+  "places_fold": "Bereiche einklappen",
+  "places_unfold": "Bereiche ganz zeigen",
+  "row_hide": "Diese Zeile ausblenden",
+  "row_hidden_note": "„{row}“ ist ausgeblendet – zurückholen kannst du es unter {where}.",
+  "set_card_places_show": "Was die Bereiche zeigen",
+  "set_just_list": "Nur die Liste",
+  "set_just_list_hint": "Keine Zeilen über TV, Filmen, Serien und lokalen Dateien und kleinere Überschriften; Filme und Serien als Liste, TV kompakt. Wieder aus, ist alles wie vorher.",
+  "set_rows_over_lists": "Zeilen über den Listen",
+  "set_popular_link_hint": "Die Charts der Woche von TMDB, oben bei Filmen und Serien",
+  "set_sidebar_entries": "In der Seitenleiste",
+  "set_sidebar_entries_note": "Ein aus der Seitenleiste genommener Bereich öffnet sich weiter über sein Tastenkürzel, die Befehlspalette und die Menüs.",
+  "set_places_fold_hint": "Die Bereiche als Reihe von Symbolen oben in der Seitenleiste, damit die Kategorien Platz haben – der Pfeil unter den Bereichen macht dasselbe."
 }

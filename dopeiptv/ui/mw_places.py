@@ -282,7 +282,18 @@ class _PlacesMixin:
 
     def _refresh_places(self, reason: str = "") -> None:
         """What a place shows changed (a profile, a source, a followed
-        series, a sync): each place's own page asked to show it again."""
+        series, a sync): each place's own page asked to show it again - and
+        for another profile or a sync what the places show (mw_place_look:
+        the sidebar's entries, the fold, Just the list) as that one says."""
+        if reason in ("profile", "sync"):
+            look = getattr(self, "_place_look_apply", None)
+            if callable(look):
+                if reason == "profile":
+                    self._jl_views = None
+                try:
+                    look()
+                except Exception:
+                    log.exception("places: what the places show (%s)", reason)
         for place, hook in places.REFRESH_HOOKS.items():
             fn = getattr(self, hook, None)
             if callable(fn):

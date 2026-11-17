@@ -1,8 +1,10 @@
 """Sidebar chrome mixin for MainWindow.
 
-The left panel's expand/collapse (full <-> icon rail), the auto-collapse on a
-narrow window, the compact middle-column controls, and the little combo-menu
-helper. Pure UI moved out of main_window.py; every method operates on
+The left panel's expand/collapse (full <-> icon rail), the places folded into
+a compact block of icons on the full sidebar (``_apply_places_fold``; the
+choice is mw_place_look's), the auto-collapse on a narrow window, the compact
+middle-column controls, and the little combo-menu helper. Pure UI moved out
+of main_window.py; every method operates on
 MainWindow widgets (self._side, self.nav_btns, self._mid, ...) through the
 mixin, so behaviour is identical.
 """
@@ -14,7 +16,8 @@ from ..i18n import tr
 
 
 class _SidebarMixin:
-    """MainWindow mixin: the sidebar: its collapse to the icon rail and back."""
+    """MainWindow mixin: the sidebar: its collapse to the icon rail and back,
+    and its places folded."""
     def _on_side_toggle(self, checked: bool) -> None:
         """Collapse the left column to a narrow icon rail (or expand it back).
         The rail keeps the TV/Movies/Series nav as icons, so you reclaim the
@@ -33,11 +36,10 @@ class _SidebarMixin:
             return
         # The source's name over the categories reads it (mw_source_label).
         self._chrome_rail = collapsed
-        for key, b in self.nav_btns.items():
-            # Rail: icon only (centred); expanded: icon + label. The icon
-            # itself is always set (see _apply_nav_icons).
-            b.setText("" if collapsed else self._nav_texts[key])
-            self._set_rail(b, collapsed)
+        # Rail: icon only (centred); expanded: icon + label, or folded the
+        # icons in a compact block. The icon itself is always set (see
+        # _apply_nav_icons).
+        self._apply_places_fold(collapsed)
         # The logo (= the "now playing" jump) stays on the rail too, just
         # scaled down to fit; the category area and full-text buttons hide.
         self._sidebar_logo.setVisible(True)
@@ -142,6 +144,54 @@ class _SidebarMixin:
         btn.setProperty("rail", on)
         btn.style().unpolish(btn)
         btn.style().polish(btn)
+
+    # -- the places folded into a compact block --------------------------------
+
+    def _places_folded_now(self, collapsed: bool | None = None) -> bool:
+        """The places folded into their compact block: the profile's choice
+        (core/places.py), on the full sidebar only - the rail is as ever."""
+        if collapsed is None:
+            collapsed = bool(getattr(self, "_sidebar_collapsed", False))
+        from ..core import places
+        return not collapsed and places.folded(self.settings)
+
+    def _places_icons_only(self) -> bool:
+        """The entries show their icons alone: on the rail, or folded."""
+        return bool(getattr(self, "_sidebar_collapsed", False)) or self._places_folded_now()
+
+    def _apply_places_fold(self, collapsed: bool | None = None) -> None:
+        """The places' block as the sidebar is now: on the rail the icons in
+        a column as ever; in full the entries with their labels, or folded
+        a compact block of icons that wraps - the same buttons either way,
+        so the entry lit, its status, tooltip and name go with them. Visual
+        only: no widths are pinned (safe mid-drag, as the rest of the
+        chrome)."""
+        if not hasattr(self, "nav_btns"):
+            return
+        if collapsed is None:
+            collapsed = bool(getattr(self, "_sidebar_collapsed", False))
+        folded = self._places_folded_now(collapsed)
+        icon_only = collapsed or folded
+        for key, b in self.nav_btns.items():
+            b.setText("" if icon_only else self._nav_texts[key])
+            if bool(b.property("tile")) != folded:
+                b.setProperty("tile", folded)
+                b.update()
+            self._set_rail(b, icon_only)
+        lay = getattr(self, "_places_lay", None)
+        if lay is not None and lay.set_folded(folded):
+            self._places_box.updateGeometry()
+        fold = getattr(self, "_places_fold_btn", None)
+        if fold is not None:
+            fold.set_folded(folded)
+            fold.setVisible(not collapsed)
+            words = tr("places_unfold" if folded else "places_fold")
+            fold.setToolTip(words)
+            fold.setAccessibleName(words)
+        # The hairline between the groups is the column's, not the block's.
+        vis = getattr(self, "_apply_nav_visibility", None)
+        if callable(vis):
+            vis()
 
     def _set_sidebar_collapsed(self, collapsed: bool) -> None:
         """Flip collapsed state and keep the ☰ button in sync, without letting

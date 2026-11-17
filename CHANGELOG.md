@@ -24,6 +24,25 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   channel and when it began beside it, so Recordings can say them; its
   menu also opens the folder it is in.
 
+- Room for the list. The places in the sidebar fold into a compact block
+  of icons at its top - the small arrow under them, or Settings >
+  Appearance - so a long list of categories has the room again; the entry
+  you are on stays lit, a recording's dot and the other marks stay on
+  their icons, and the arrow unfolds them. The icon rail is as it was.
+- Guide, Search, Local files, Radio and Recordings can each be taken out
+  of the sidebar; their places still open from their shortcuts, the
+  command palette and the menus, and the app never opens on one you took
+  out.
+- A right click on a row's heading - Recently watched, Continue, Popular
+  right now, Recording now and next, My stations - hides it at once, and
+  a note says where it comes back (Popular right now keeps its one switch
+  on Settings > Posters & info).
+- Just the list, on Settings > Appearance: no rows over TV, Movies, Series
+  and Local files, smaller headers with the count beside the name, Movies
+  and Series as rows and TV compact - your own choices are kept, and
+  everything is as you had it once it is off. "What the places show" on
+  Settings > Appearance holds all of it, each profile its own.
+
 ### Changed
 
 - The Guide follows the category you pick in the sidebar: with the guide

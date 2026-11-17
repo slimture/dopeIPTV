@@ -138,7 +138,8 @@ by `core/places.retire_home` - "Open Home at startup" became `start_place`
 **Posters & info** (`metadata`)
 - (untitled): `metadata_source`, `tmdb_api_key` (Test)
 - Popular right now (TMDB's chart, what the source has), at the top of:
-  `popular_movies` (Movies), `popular_series` (Series)
+  `popular_movies` (Movies), `popular_series` (Series) - "Hide this row" on
+  its heading writes these same keys
 
 ## SERVICES
 
@@ -183,6 +184,17 @@ by `core/places.retire_home` - "Open Home at startup" became `start_place`
 - Theme: `theme`, `accent` (+ `accent_custom`), `theme_follow_system`,
   `theme_light` (these four this profile's), `corner_style`, `ui_scale`
 - Lists: `view_density`, `sort_order`
+- What the places show (all of it this profile's; core/places.py,
+  ui/mw_place_look.py): `just_the_list` (Just the list: no rows over TV,
+  Movies, Series and Local files, compact headers, Movies and Series as
+  rows and TV compact - never stored over `films_view`, `place_series_view`,
+  `tv_density`); the rows over the lists as chips (`place_row_tv_recent`,
+  `place_row_films_continue`, `place_row_series_continue`,
+  `place_row_local_continue`, `place_row_radio_favs`, `place_row_rec_now` -
+  also hidden from a row's heading, "Hide this row"); link → Posters & info
+  (Popular right now, one setting, one place); the sidebar's entries as
+  chips (`places_hidden`: Guide, Search, Local files, Radio, Recordings);
+  `places_folded` (also the chevron under the places)
 
 **Keyboard shortcuts** (`shortcuts`)
 - Keyboard shortcuts: `keyboard_shortcuts` (every rebindable action's key)

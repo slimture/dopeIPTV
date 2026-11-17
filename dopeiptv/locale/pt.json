@@ -3043,5 +3043,17 @@
   "rec_mark_unwatched": "Marcar como não visto",
   "radio_n_countries": "{n} países",
   "radio_n_languages": "{n} idiomas",
-  "radio_n_genres": "{n} gêneros"
+  "radio_n_genres": "{n} gêneros",
+  "places_fold": "Recolher as seções",
+  "places_unfold": "Expandir as seções",
+  "row_hide": "Ocultar esta fileira",
+  "row_hidden_note": "\"{row}\" foi ocultado – mostre de novo em {where}.",
+  "set_card_places_show": "O que as seções mostram",
+  "set_just_list": "Só a lista",
+  "set_just_list_hint": "Sem fileiras acima de TV, Filmes, Séries e Arquivos locais, e cabeçalhos menores; Filmes e Séries em lista, TV compacta. Desligado, tudo volta a ser como você deixou.",
+  "set_rows_over_lists": "Fileiras acima das listas",
+  "set_popular_link_hint": "O ranking da semana do TMDB, no topo de Filmes e Séries",
+  "set_sidebar_entries": "Na barra lateral",
+  "set_sidebar_entries_note": "Uma seção tirada da barra lateral ainda abre pelo atalho, pela paleta de comandos e pelos menus.",
+  "set_places_fold_hint": "As seções como uma fileira de ícones no topo da barra lateral, para dar espaço às categorias – a seta abaixo das seções faz o mesmo."
 }

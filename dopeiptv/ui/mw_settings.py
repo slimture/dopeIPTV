@@ -455,16 +455,18 @@ class _SettingsMixin:
             "vod": "nav_movies", "series": "nav_series",
             "rec": "nav_recordings", "local": "nav_local", "radio": "nav_radio",
         }
-        rail = getattr(self, "_sidebar_collapsed", False)
+        icon_only = self._places_icons_only()
         for key, btn in self.nav_btns.items():
             if key in nav_labels:
                 self._nav_texts[key] = tr(nav_labels[key])
                 btn.setToolTip(self._nav_texts[key])
                 btn.setAccessibleName(self._nav_texts[key])
-                # On the icon rail the buttons are icon-only - don't stamp
-                # text back onto them; the label lands when the rail expands.
-                if not rail:
+                # On the icon rail (and folded) the buttons are icon-only -
+                # don't stamp text back onto them; the label lands when the
+                # rail expands or the places unfold.
+                if not icon_only:
                     btn.setText(self._nav_texts[key])
+        self._apply_places_fold()       # the fold control's words
         self._refresh_nav_status()      # the status's words in the tooltips
         self._cat_section_label.setText(tr("sidebar_categories"))
         self._sync_place_header()       # the place's name and Mine's tabs
@@ -1359,10 +1361,61 @@ class _SettingsMixin:
             c.row(tr("setting_list_size"), density_box)
             c.row(tr("setting_sort_by"), sort_box)
 
+            # What the places show (core/places.py, mw_place_look): Just the
+            # list over all of it, the rows over the lists, the sidebar's
+            # entries and its fold - each profile's own. Popular right now
+            # keeps its one place on Posters & info: a row leads there.
+            from .mw_places import PLACE_WORDS
+            c = look.card(tr("set_card_places_show"))
+            just_box = c.toggle(tr("set_just_list"), _places.just_list(self.settings),
+                                tr("set_just_list_hint"), badge=own())
+
+            def chips_row(heading: str, chips: list) -> None:
+                box = ChipGroups([(heading, chips)])
+                words = " ".join([heading] + [ch.text() for ch in chips])
+                mark = own()
+                if mark is None:
+                    c.widget(box, words)
+                    return
+                holder = QWidget()
+                hv = QVBoxLayout(holder)
+                hv.setContentsMargins(0, 0, 0, 0)
+                hv.addWidget(mark, 0, Qt.AlignmentFlag.AlignRight)
+                hv.addWidget(box)
+                c.widget(holder, words)
+
+            # Pointing the way the words read, as nerd_link's.
+            sep = "‹" if rtl else "›"
+            row_chips = {r.name: Chip(f"{tr(PLACE_WORDS[r.place])} {sep} {tr(r.words)}",
+                                      _places.row_on(self.settings, r.name))
+                         for r in _places.ROWS.values() if r.own}
+            chips_row(tr("set_rows_over_lists"), list(row_chips.values()))
+            # "Posters & info": its "&" a letter on the button, not a mnemonic.
+            c.link(tr("card_popular"), tr("set_popular_link_hint"), meta.title.replace("&", "&&"),
+                   lambda: shell.show_page("metadata"),
+                   search=" ".join([tr("nav_movies"), tr("nav_series")]))
+            gone = _places.hidden(self.settings)
+            entry_chips = {p: Chip(tr(PLACE_WORDS[p]), p not in gone) for p in _places.HIDEABLE}
+            chips_row(tr("set_sidebar_entries"), list(entry_chips.values()))
+            c.note(tr("set_sidebar_entries_note"))
+            fold_box = c.toggle(tr("places_fold"), _places.folded(self.settings),
+                                tr("set_places_fold_hint"), badge=own())
+
             def commit_appearance(put, changed: set, final: bool) -> None:
                 put("view_density", density_box.currentData())
                 put("ui_scale", scale_box.currentData())
                 put("sort_order", sort_box.currentData())
+                # Written once switched: an untouched window stores nothing.
+                if just_box.isChecked() != _places.just_list(self.settings):
+                    put(_places.JUST_LIST_KEY, flag(just_box))
+                for name, chip in row_chips.items():
+                    if chip.isChecked() != _places.row_on(self.settings, name):
+                        put(_places.ROWS[name].key, flag(chip))
+                want = _places.hidden_text(p for p, ch in entry_chips.items() if not ch.isChecked())
+                if want != _places.hidden_text(_places.hidden(self.settings)):
+                    put(_places.HIDDEN_KEY, want)
+                if fold_box.isChecked() != _places.folded(self.settings):
+                    put(_places.FOLDED_KEY, flag(fold_box))
             page_commits["appearance"] = commit_appearance
 
         look.set_builder(build_appearance)
@@ -2930,6 +2983,9 @@ class _SettingsMixin:
                 self._apply_multiview_settings()
             if changed & set(_places.POPULAR_KEYS.values()):
                 self._popular_changed()     # Movies' and Series' tops ask again
+            if changed & _places.LOOK_KEYS:
+                # What the places show: the sidebar and the places at once.
+                self._places_look_changed("settings")
             if changed & {"metadata_source", "tmdb_api_key"}:
                 self.cover.reload()
             if changed & player_keys and self.player:

@@ -117,6 +117,11 @@ class _PlaceRadioMixin:
         v.menu.connect(self._rap_menu)
         place.favs.activated.connect(self._rap_fav_activate)
         place.favs.menu.connect(self._rap_fav_menu)
+        # My stations hidden from its heading (mw_place_look); the header
+        # compact while Just the list.
+        place.favs.set_hide_key("radio_favs")
+        place.favs.hide_requested.connect(self._place_row_hide)
+        self._place_look_adopt(place)
         place.back_requested.connect(self._rap_back)
         place.layout_changed.connect(self._rap_layout_picked)
         self._rap_mirror = ListMirror(self, place, self._rap_card_of, self._place_radio_active,
@@ -264,7 +269,8 @@ class _PlaceRadioMixin:
         place = self._rap_page
         if place is None or sip.isdeleted(place):
             return
-        cards = self._rap_fav_cards()
+        shown = getattr(self, "_place_row_shown", None)
+        cards = self._rap_fav_cards() if not callable(shown) or shown("radio_favs") else []
         old = place.favs.cards()
         if old and [c.key for c in old] == [c.key for c in cards]:
             for a, b in zip(old, cards, strict=True):

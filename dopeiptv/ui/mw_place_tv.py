@@ -75,6 +75,10 @@ class _PlaceTvMixin:
         top.activated.connect(self._place_tv_play_card)
         top.menu.connect(self._place_tv_card_menu)
         top.recent.set_line_of(self._place_tv_card_line)
+        # Recently watched hidden from its heading (mw_place_look), and the
+        # header compact while Just the list is on.
+        top.hide_requested.connect(self._place_row_hide)
+        self._place_look_adopt(top)
         self._list_page.layout().insertWidget(0, top)
         self._place_tv_top = top
         self.delegate.set_tv_density(self._place_tv_density_now())
@@ -87,7 +91,13 @@ class _PlaceTvMixin:
             player.stopped.connect(self._place_tv_playing_changed)
 
     def _place_tv_density_now(self) -> str:
+        """The rows' density: the profile's own - compact while Just the
+        list is on, unless the switch picked another since (mw_place_look)."""
         d = str(self.settings.value(DENSITY_KEY, "compact") or "compact")
+        d = d if d in DENSITIES else "compact"
+        view = getattr(self, "_place_view", None)
+        if callable(view):
+            d = view("tv", d)
         return d if d in DENSITIES else "compact"
 
     # -- where it is ----------------------------------------------------------------
@@ -268,7 +278,11 @@ class _PlaceTvMixin:
         with the current one kept in view."""
         if density not in DENSITIES:
             return
-        self.settings.setValue(DENSITY_KEY, density)
+        pick = getattr(self, "_place_view_pick", None)
+        if callable(pick):
+            pick("tv", density, DENSITY_KEY)    # not over the own while Just the list
+        else:
+            self.settings.setValue(DENSITY_KEY, density)
         self.delegate.set_tv_density(density)
         if self._place_tv_top is not None:
             self._place_tv_top.set_density(density, shown=not self._grid_on())
@@ -347,6 +361,10 @@ class _PlaceTvMixin:
     def _place_tv_recent(self) -> None:
         top = self._place_tv_top
         if top is None:
+            return
+        shown = getattr(self, "_place_row_shown", None)
+        if callable(shown) and not shown("tv_recent"):
+            top.set_recent([])              # hidden, or Just the list
             return
         cards = []
         for row in self._place_tv_recent_rows():

@@ -3043,5 +3043,17 @@
   "rec_mark_unwatched": "시청 안 함으로 표시",
   "radio_n_countries": "국가 {n}개",
   "radio_n_languages": "언어 {n}개",
-  "radio_n_genres": "장르 {n}개"
+  "radio_n_genres": "장르 {n}개",
+  "places_fold": "섹션 접기",
+  "places_unfold": "섹션 모두 보기",
+  "row_hide": "이 줄 숨기기",
+  "row_hidden_note": "'{row}'을(를) 숨겼습니다. {where}에서 다시 표시할 수 있습니다.",
+  "set_card_places_show": "각 섹션에 표시할 내용",
+  "set_just_list": "목록만",
+  "set_just_list_hint": "TV, 영화, 시리즈, 로컬 파일 위의 줄을 없애고 제목을 작게 합니다. 영화와 시리즈는 목록으로, TV는 간결하게. 끄면 모든 것이 원래대로 돌아옵니다.",
+  "set_rows_over_lists": "목록 위의 줄",
+  "set_popular_link_hint": "TMDB의 이번 주 차트, 영화와 시리즈 맨 위에 표시",
+  "set_sidebar_entries": "사이드바에 표시",
+  "set_sidebar_entries_note": "사이드바에서 뺀 섹션도 단축키, 명령 팔레트, 메뉴로 열 수 있습니다.",
+  "set_places_fold_hint": "섹션을 사이드바 위쪽의 아이콘 한 줄로 만들어 카테고리에 자리를 줍니다. 섹션 아래의 화살표도 같은 일을 합니다."
 }

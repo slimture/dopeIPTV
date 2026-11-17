@@ -3043,5 +3043,17 @@
   "rec_mark_unwatched": "Weka alama kuwa haijatazamwa",
   "radio_n_countries": "Nchi {n}",
   "radio_n_languages": "Lugha {n}",
-  "radio_n_genres": "Aina {n}"
+  "radio_n_genres": "Aina {n}",
+  "places_fold": "Kunja sehemu",
+  "places_unfold": "Onyesha sehemu zote",
+  "row_hide": "Ficha safu hii",
+  "row_hidden_note": "\"{row}\" imefichwa – irudishe kwenye {where}.",
+  "set_card_places_show": "Kile sehemu zinaonyesha",
+  "set_just_list": "Orodha tu",
+  "set_just_list_hint": "Hakuna safu juu ya TV, Filamu, Misururu na Faili za ndani, na vichwa vidogo; Filamu na Misururu kama orodha, TV kwa ufupi. Ukiizima, kila kitu kinarudi kama kilivyokuwa.",
+  "set_rows_over_lists": "Safu juu ya orodha",
+  "set_popular_link_hint": "Chati ya wiki hii kutoka TMDB, juu ya Filamu na Misururu",
+  "set_sidebar_entries": "Kwenye upau wa kando",
+  "set_sidebar_entries_note": "Sehemu iliyoondolewa kwenye upau wa kando bado hufunguka kwa mkato wake, paleti ya amri na menyu.",
+  "set_places_fold_hint": "Sehemu kama safu ya aikoni juu ya upau wa kando, ili aina zipate nafasi – mshale chini ya sehemu hufanya vivyo hivyo."
 }

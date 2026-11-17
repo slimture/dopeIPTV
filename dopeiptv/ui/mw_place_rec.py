@@ -192,6 +192,11 @@ class _PlaceRecMixin:
         v.menu.connect(self._rp_menu)
         place.now.activated.connect(self._rp_now_activate)
         place.now.menu.connect(self._rp_now_menu)
+        # What records now hidden from its heading (mw_place_look); the
+        # header compact while Just the list.
+        place.now.set_hide_key("rec_now")
+        place.now.hide_requested.connect(self._place_row_hide)
+        self._place_look_adopt(place)
         place.layout_changed.connect(self._rp_layout_picked)
         more = QMenu(place.more)
         more.aboutToShow.connect(partial(self._rp_fill_more, more))
@@ -575,7 +580,8 @@ class _PlaceRecMixin:
         place = self._rp_page
         if place is None or sip.isdeleted(place):
             return
-        cards = self._rp_now_cards()
+        shown = getattr(self, "_place_row_shown", None)
+        cards = self._rp_now_cards() if not callable(shown) or shown("rec_now") else []
         old = place.now.cards()
         if [c.key for c in old] == [c.key for c in cards] and old:
             for a, b in zip(old, cards, strict=True):

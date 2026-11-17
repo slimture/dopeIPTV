@@ -3043,5 +3043,17 @@
   "rec_mark_unwatched": "Tandai belum ditonton",
   "radio_n_countries": "{n} negara",
   "radio_n_languages": "{n} bahasa",
-  "radio_n_genres": "{n} genre"
+  "radio_n_genres": "{n} genre",
+  "places_fold": "Ciutkan bagian",
+  "places_unfold": "Tampilkan bagian sepenuhnya",
+  "row_hide": "Sembunyikan baris ini",
+  "row_hidden_note": "\"{row}\" disembunyikan – kembalikan di {where}.",
+  "set_card_places_show": "Yang ditampilkan bagian-bagian",
+  "set_just_list": "Daftarnya saja",
+  "set_just_list_hint": "Tanpa baris di atas TV, Film, Serial, dan Berkas lokal, serta judul lebih kecil; Film dan Serial sebagai daftar, TV ringkas. Saat dimatikan, semuanya kembali seperti semula.",
+  "set_rows_over_lists": "Baris di atas daftar",
+  "set_popular_link_hint": "Tangga minggu ini dari TMDB, di bagian atas Film dan Serial",
+  "set_sidebar_entries": "Di bilah samping",
+  "set_sidebar_entries_note": "Bagian yang dikeluarkan dari bilah samping tetap terbuka lewat pintasannya, palet perintah, dan menu.",
+  "set_places_fold_hint": "Bagian-bagian sebagai deretan ikon di atas bilah samping, agar kategori mendapat ruang – panah di bawah bagian melakukan hal yang sama."
 }

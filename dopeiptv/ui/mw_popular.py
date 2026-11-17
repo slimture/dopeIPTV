@@ -9,7 +9,8 @@ thread: at once when they are known, else once the catalogue is read on a
 worker (the source's lists - never a stream). The chart is fetched in the
 background once a day (through the TMDB key the covers use); when a new
 one comes the watchers (``popular_watch``) are told, and ask again.
-Nothing while ``popular_on(kind)`` is off (Settings > Posters & info).
+Nothing while ``popular_on(kind)`` is off (Settings > Posters & info, or
+Just the list on Settings > Appearance).
 """
 from __future__ import annotations
 
@@ -44,8 +45,9 @@ class _PopularMixin:
 
     def popular_on(self, kind: str) -> bool:
         """Whether popular right now goes at the top of Movies ("vod") or
-        Series ("series")."""
-        return places.popular_on(self.settings, kind)
+        Series ("series"): switched on (Settings > Posters & info) and Just
+        the list off (core/places.py) - nothing is asked for meanwhile."""
+        return places.popular_on(self.settings, kind) and not places.just_list(self.settings)
 
     def popular_watch(self, fn: Callable[[], None]) -> None:
         """*fn* is called when a new chart came (or the source changed):

@@ -3043,5 +3043,17 @@
   "rec_mark_unwatched": "Označi kao neodgledano",
   "radio_n_countries": "Zemalja: {n}",
   "radio_n_languages": "Jezika: {n}",
-  "radio_n_genres": "Žanrova: {n}"
+  "radio_n_genres": "Žanrova: {n}",
+  "places_fold": "Skupi odeljke",
+  "places_unfold": "Prikaži odeljke u celosti",
+  "row_hide": "Sakrij ovaj red",
+  "row_hidden_note": "„{row}” je sakriveno – vrati ga u {where}.",
+  "set_card_places_show": "Šta prikazuju odeljci",
+  "set_just_list": "Samo lista",
+  "set_just_list_hint": "Bez redova iznad TV-a, Filmova, Serija i Lokalnih datoteka, i sa manjim naslovima; Filmovi i Serije kao lista, TV zbijeno. Kada se isključi, sve je kao pre.",
+  "set_rows_over_lists": "Redovi iznad lista",
+  "set_popular_link_hint": "Top lista nedelje sa TMDB-a, na vrhu Filmova i Serija",
+  "set_sidebar_entries": "Na bočnoj traci",
+  "set_sidebar_entries_note": "Odeljak uklonjen sa bočne trake i dalje se otvara svojom prečicom, paletom komandi i iz menija.",
+  "set_places_fold_hint": "Odeljci kao red ikona na vrhu bočne trake, da kategorije imaju mesta – strelica ispod odeljaka radi isto."
 }

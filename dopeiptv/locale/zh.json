@@ -3043,5 +3043,17 @@
   "rec_mark_unwatched": "标为未看",
   "radio_n_countries": "{n} 个国家和地区",
   "radio_n_languages": "{n} 种语言",
-  "radio_n_genres": "{n} 个类型"
+  "radio_n_genres": "{n} 个类型",
+  "places_fold": "折叠栏目",
+  "places_unfold": "展开栏目",
+  "row_hide": "隐藏此行",
+  "row_hidden_note": "“{row}”已隐藏——可在{where}中恢复。",
+  "set_card_places_show": "各栏目显示的内容",
+  "set_just_list": "仅列表",
+  "set_just_list_hint": "电视、电影、剧集和本地文件上方不显示任何行，标题更小；电影和剧集以列表显示，电视为紧凑模式。关闭后一切恢复原样。",
+  "set_rows_over_lists": "列表上方的行",
+  "set_popular_link_hint": "TMDB 本周排行榜，显示在电影和剧集顶部",
+  "set_sidebar_entries": "在侧边栏中",
+  "set_sidebar_entries_note": "从侧边栏移除的栏目仍可通过其快捷键、命令面板和菜单打开。",
+  "set_places_fold_hint": "将栏目变为侧边栏顶部的一排图标，为分类腾出空间——栏目下方的箭头也能做到。"
 }

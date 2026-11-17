@@ -549,10 +549,14 @@ class TvPlaceTop(QWidget):
     density_changed = pyqtSignal(str)
     activated = pyqtSignal(object)
     menu = pyqtSignal(object, QPoint)
+    #: "Hide this row" from Recently watched's heading (its row's name).
+    hide_requested = pyqtSignal(str)
 
     # No inset of its own: the title and the cards line up with the filter
     # and the rows under them (6 px set them apart from everything below).
     MARGIN_X, MARGIN_TOP, MARGIN_BOTTOM, SPACING = 0, 6, 2, 16
+    #: Compact (Just the list): closer to the list's top and to the rows.
+    COMPACT_TOP, COMPACT_SPACING = 0, 10
 
     def __init__(self, loader=None, parent=None) -> None:
         super().__init__(parent)
@@ -569,7 +573,10 @@ class TvPlaceTop(QWidget):
         self.recent = ChannelCardRow(tr("tv_recent"), loader)
         self.recent.activated.connect(self.activated)
         self.recent.menu.connect(self.menu)
+        self.recent.set_hide_key("tv_recent")
+        self.recent.hide_requested.connect(self.hide_requested)
         lay.addWidget(self.recent)
+        self._lay = lay
         self._density = "compact"
         self._density_shown = True
         self._sort_opts: list[tuple[str, str]] = []
@@ -613,6 +620,17 @@ class TvPlaceTop(QWidget):
     def retranslate(self) -> None:
         self.recent.set_title(tr("tv_recent"))
         self.set_density(self._density, self._density_shown)
+
+    def set_compact(self, on: bool) -> None:
+        """Compact (Just the list): the header's, and less room round it."""
+        self._lay.setContentsMargins(self.MARGIN_X, self.COMPACT_TOP if on else self.MARGIN_TOP,
+                                     self.MARGIN_X, self.MARGIN_BOTTOM)
+        self._lay.setSpacing(self.COMPACT_SPACING if on else self.SPACING)
+        self.header.set_compact(on)
+        self._fit()
+
+    def is_compact(self) -> bool:
+        return self.header.is_compact()
 
     def set_title(self, text: str) -> None:
         self._title = text

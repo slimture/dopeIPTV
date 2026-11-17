@@ -3043,5 +3043,17 @@
   "rec_mark_unwatched": "Marcar como no visto",
   "radio_n_countries": "{n} países",
   "radio_n_languages": "{n} idiomas",
-  "radio_n_genres": "{n} géneros"
+  "radio_n_genres": "{n} géneros",
+  "places_fold": "Plegar las secciones",
+  "places_unfold": "Desplegar las secciones",
+  "row_hide": "Ocultar esta fila",
+  "row_hidden_note": "«{row}» está oculto: vuelve a mostrarlo en {where}.",
+  "set_card_places_show": "Lo que muestran las secciones",
+  "set_just_list": "Solo la lista",
+  "set_just_list_hint": "Sin filas sobre TV, Películas, Series y Archivos locales, y encabezados más pequeños; Películas y Series como lista, TV compacta. Al desactivarlo, todo vuelve a estar como lo tenías.",
+  "set_rows_over_lists": "Filas sobre las listas",
+  "set_popular_link_hint": "La lista de la semana de TMDB, arriba en Películas y Series",
+  "set_sidebar_entries": "En la barra lateral",
+  "set_sidebar_entries_note": "Una sección quitada de la barra lateral se sigue abriendo con su atajo, la paleta de comandos y los menús.",
+  "set_places_fold_hint": "Las secciones como una fila de iconos arriba en la barra lateral, para dejar sitio a las categorías; la flecha bajo las secciones hace lo mismo."
 }

@@ -3043,5 +3043,17 @@
   "rec_mark_unwatched": "Markera som osedd",
   "radio_n_countries": "{n} länder",
   "radio_n_languages": "{n} språk",
-  "radio_n_genres": "{n} genrer"
+  "radio_n_genres": "{n} genrer",
+  "places_fold": "Fäll ihop platserna",
+  "places_unfold": "Fäll ut platserna",
+  "row_hide": "Dölj den här raden",
+  "row_hidden_note": "{row} är dold - ta tillbaka den under {where}.",
+  "set_card_places_show": "Det platserna visar",
+  "set_just_list": "Bara listan",
+  "set_just_list_hint": "Inga rader ovanför TV, Filmer, Serier och Lokala filer, och mindre rubriker; Filmer och Serier som rader, TV kompakt. Stängs det av är allt som du hade det.",
+  "set_rows_over_lists": "Rader ovanför listorna",
+  "set_popular_link_hint": "Veckans topplista från TMDB, överst i Filmer och Serier",
+  "set_sidebar_entries": "I sidofältet",
+  "set_sidebar_entries_note": "En plats som tagits bort ur sidofältet öppnas ändå med sitt kortkommando, kommandopaletten och menyerna.",
+  "set_places_fold_hint": "Platserna som en rad ikoner överst i sidofältet, så att kategorierna får plats - pilen under platserna gör samma sak."
 }

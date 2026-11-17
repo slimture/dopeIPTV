@@ -257,6 +257,11 @@ class _PlaceFilmsMixin:
         cont = CardRow(tr("card_continue"), loader, picture="poster")
         cont.activated.connect(self._pf_activated)
         cont.menu.connect(self._pf_row_menu)
+        # Each hidden from its heading (mw_place_look; Popular right now in
+        # its own key on Posters & info).
+        for row, name in ((pop, "films_popular"), (cont, "films_continue")):
+            row.set_hide_key(name)
+            row.hide_requested.connect(self._place_row_hide)
         place.add_row(pop)
         place.add_row(cont)
         self._pf_popular_row, self._pf_continue_row = pop, cont
@@ -283,6 +288,7 @@ class _PlaceFilmsMixin:
         watch = getattr(self, "popular_watch", None)
         if callable(watch):
             watch(self._pf_popular_changed)
+        self._place_look_adopt(place)          # compact while Just the list
         self._pf_header()
         return place
 
@@ -343,7 +349,13 @@ class _PlaceFilmsMixin:
     # -- the category's films ---------------------------------------------------------
 
     def _pf_layout(self) -> str:
+        """Posters or rows: the person's own - rows while Just the list is
+        on, unless the switch picked posters since (mw_place_look)."""
         v = str(self.settings.value(VIEW_KEY, "poster") or "poster")
+        v = v if v in VIEWS else "poster"
+        view = getattr(self, "_place_view", None)
+        if callable(view):
+            v = view("films", v)
         return v if v in VIEWS else "poster"
 
     def _pf_list_changed(self) -> None:
@@ -509,7 +521,11 @@ class _PlaceFilmsMixin:
     def _pf_view_changed(self, kind: str) -> None:
         if kind not in VIEWS or self._pf_view is None:
             return
-        self.settings.setValue(VIEW_KEY, kind)
+        pick = getattr(self, "_place_view_pick", None)
+        if callable(pick):
+            pick("films", kind, VIEW_KEY)       # not over the own while Just the list
+        else:
+            self.settings.setValue(VIEW_KEY, kind)
         view = self._pf_view
         cur = view.current_item()
         view.set_layout(kind)
@@ -539,7 +555,9 @@ class _PlaceFilmsMixin:
             return
         quiet = bool(self.search.text().strip()) or self.mode != "vod"
         cat = getattr(self, "_current_cat", None)
-        self._pf_set_row(cont, [] if quiet or cat == "__continue__"
+        shown = getattr(self, "_place_row_shown", None)
+        cont_on = not callable(shown) or shown("films_continue")
+        self._pf_set_row(cont, [] if quiet or cat == "__continue__" or not cont_on
                          else self._pf_continue_cards())
         self._pf_set_row(pop, [] if quiet else self._pf_popular_cards())
         self._pf_mark_playing()

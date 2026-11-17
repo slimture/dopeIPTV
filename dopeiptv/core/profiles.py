@@ -96,6 +96,11 @@ OWN_KEYS = frozenset({
     "last_place", "last_list_place",
     # The recordings each person watched to their end (core/rec_view.py).
     "rec_watched",
+    # What the places show (core/places.py): the sidebar's entries hidden or
+    # folded, the rows over the lists, Just the list.
+    "places_hidden", "places_folded", "just_the_list",
+    "place_row_tv_recent", "place_row_films_continue", "place_row_series_continue",
+    "place_row_local_continue", "place_row_radio_favs", "place_row_rec_now",
 })
 #: Families: the name itself or the name + "_<source id>" (and the
 #: favourites' "_locked" / "_colors" beside it).

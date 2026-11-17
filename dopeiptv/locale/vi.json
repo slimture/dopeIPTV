@@ -3043,5 +3043,17 @@
   "rec_mark_unwatched": "Đánh dấu chưa xem",
   "radio_n_countries": "{n} quốc gia",
   "radio_n_languages": "{n} ngôn ngữ",
-  "radio_n_genres": "{n} thể loại"
+  "radio_n_genres": "{n} thể loại",
+  "places_fold": "Thu gọn các mục",
+  "places_unfold": "Hiện đầy đủ các mục",
+  "row_hide": "Ẩn hàng này",
+  "row_hidden_note": "Đã ẩn “{row}” – bật lại trong {where}.",
+  "set_card_places_show": "Những gì các mục hiển thị",
+  "set_just_list": "Chỉ danh sách",
+  "set_just_list_hint": "Không có hàng nào phía trên TV, Phim, Loạt phim và Tệp cục bộ, tiêu đề nhỏ hơn; Phim và Loạt phim dạng danh sách, TV nhỏ gọn. Tắt đi thì mọi thứ trở lại như cũ.",
+  "set_rows_over_lists": "Các hàng phía trên danh sách",
+  "set_popular_link_hint": "Bảng xếp hạng tuần này của TMDB, ở đầu Phim và Loạt phim",
+  "set_sidebar_entries": "Trên thanh bên",
+  "set_sidebar_entries_note": "Một mục đã bỏ khỏi thanh bên vẫn mở được bằng phím tắt của nó, bảng lệnh và các menu.",
+  "set_places_fold_hint": "Các mục thành một hàng biểu tượng ở đầu thanh bên để danh mục có chỗ – mũi tên dưới các mục cũng làm như vậy."
 }
