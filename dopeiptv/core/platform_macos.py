@@ -71,26 +71,53 @@ def gl_get_proc_address_fallback(name: bytes) -> int:
 
 
 _cursor_hidden = False
+_hidden_at: tuple[int, int] | None = None
 
 
 def set_cursor_hidden(hidden: bool) -> None:
-    """Hide/show the mouse cursor on macOS via an application override cursor.
+    """Hide/show the mouse cursor over the video on macOS.
 
     Per-widget ``setCursor(BlankCursor)`` does not reliably hide the pointer
-    over a QOpenGLWidget on macOS (the native view keeps its own cursor rect),
-    so the fullscreen/mini-player idle-hide has no effect there. An override
-    cursor is honoured by Cocoa. Kept balanced via the module flag so the
-    push/pop stack never drifts. macOS only - Linux uses the widget cursor."""
-    global _cursor_hidden
+    over a QOpenGLWidget on macOS (the native view keeps its own cursor
+    rect), so an application override cursor is set. That is still a cursor
+    rect on Qt's own view, though: over the picture's own native view (the
+    video drawn on its own thread, media/video_macos.PictureView) AppKit put
+    the arrow back and the pointer never went. So AppKit is asked as well,
+    the way a video player on the Mac does it: hidden until the mouse moves
+    (``NSCursor setHiddenUntilMouseMoves:``), whichever view is under it.
+    Kept balanced via the module flag so the push/pop stack never drifts.
+    macOS only - Linux uses the widget cursor."""
+    global _cursor_hidden, _hidden_at
     from PyQt6.QtCore import Qt
     from PyQt6.QtGui import QCursor
     from PyQt6.QtWidgets import QApplication
     if hidden and not _cursor_hidden:
         QApplication.setOverrideCursor(QCursor(Qt.CursorShape.BlankCursor))
         _cursor_hidden = True
+        pos = QCursor.pos()
+        _hidden_at = (pos.x(), pos.y())
+        _appkit_hidden(True)
     elif not hidden and _cursor_hidden:
         QApplication.restoreOverrideCursor()
         _cursor_hidden = False
+        _hidden_at = None
+        _appkit_hidden(False)
+
+
+def cursor_moved(x: int, y: int) -> bool:
+    """Whether a mouse move at (*x*, *y*) is the pointer really moving: a
+    move Qt sends while the pointer rests where it was hidden (a widget
+    shown or hidden under it) must not bring it back."""
+    return not _cursor_hidden or _hidden_at != (x, y)
+
+
+def _appkit_hidden(hidden: bool) -> None:
+    try:
+        import AppKit
+        AppKit.NSCursor.setHiddenUntilMouseMoves_(bool(hidden))
+    except Exception as e:  # no PyObjC: the override cursor alone
+        from .log import log
+        log.debug("macOS: the pointer not hidden through AppKit: %s", e)
 
 
 #: The sound output mpv tries first on macOS, CoreAudio after it (a libmpv

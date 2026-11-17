@@ -446,8 +446,13 @@ class _MacInputFilter(QObject):
               and event.type() in self._MOUSE_EVS):
             # Any mouse activity un-hides - including the click that opens
             # a context menu, so the menu never comes up with an invisible
-            # pointer. Only idle time over the bare video re-hides.
-            from ..core.platform_macos import set_cursor_hidden
+            # pointer. Only idle time over the bare video re-hides - and a
+            # move Qt sends while the pointer rests is no move.
+            from ..core.platform_macos import cursor_moved, set_cursor_hidden
+            if event.type() == QEvent.Type.MouseMove:
+                at = event.globalPosition().toPoint()
+                if not cursor_moved(at.x(), at.y()):
+                    return False
             set_cursor_hidden(False)
             if self._over_video():
                 self._cursor_timer.start()

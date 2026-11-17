@@ -29,6 +29,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- macOS: the pointer hides again over the video after two seconds, in the
+  window and in full screen. With the picture drawn on its own thread
+  (1.6.3) macOS put the arrow back over it; it is now hidden the way a
+  video player on the Mac hides it, until the mouse moves.
 - A right click (or the menu key) on a result on the Search page opened no
   menu and sent an error report instead; the menu is back.
 - A cast that gets stuck buffering recovers by itself: after ten seconds
