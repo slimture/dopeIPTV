@@ -2170,7 +2170,7 @@
   "conn_what_cast": "이것을 전송하면 제공자와의 연결이 하나 더 열립니다.",
   "set_grp_watch": "시청",
   "set_grp_content": "콘텐츠",
-  "set_grp_accounts": "계정 및 연동",
+  "set_grp_accounts": "서비스",
   "set_page_casting": "기기로 전송",
   "set_page_casting_sub": "재생 중인 것을 TV나 다른 기기로 보냅니다.",
   "set_page_sources": "소스",

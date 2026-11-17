@@ -2170,7 +2170,7 @@
   "conn_what_cast": "การแคสต์สิ่งนี้จะเปิดการเชื่อมต่อไปยังผู้ให้บริการเพิ่มอีกหนึ่ง",
   "set_grp_watch": "การรับชม",
   "set_grp_content": "เนื้อหา",
-  "set_grp_accounts": "บัญชีและการเชื่อมต่อ",
+  "set_grp_accounts": "บริการ",
   "set_page_casting": "แคสต์",
   "set_page_casting_sub": "ส่งสิ่งที่กำลังเล่นไปยังทีวีหรืออุปกรณ์อื่น",
   "set_page_sources": "แหล่งที่มา",

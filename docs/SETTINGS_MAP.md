@@ -139,7 +139,7 @@ by `core/places.retire_home` - "Open Home at startup" became `start_place`
 - Popular right now (TMDB's chart, what the source has), at the top of:
   `popular_movies` (Movies), `popular_series` (Series)
 
-## ACCOUNTS AND INTEGRATIONS
+## SERVICES
 
 **Watch history** (`history`)
 - Trakt: account (this profile's: `trakt_access_token` and its kin; connect

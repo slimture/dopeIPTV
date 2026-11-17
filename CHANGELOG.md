@@ -9,6 +9,8 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Changed
 
+- Settings' group "Accounts and integrations" is "Services" - one word like
+  the others, so it fits the sidebar in every language (it was cut off).
 - Movies' and Series' cards show a favourite's star and Watch later's clock
   after the title, as the TV place's rows show a favourite channel's star -
   the same marks everywhere; a star given from the menu shows at once.

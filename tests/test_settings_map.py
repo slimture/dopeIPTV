@@ -2,8 +2,8 @@
 one page of one group, and the search reaching all of them.
 
 The pages are grouped by what a person is doing (AGENTS.md, "Where a
-setting goes"; the map is docs/SETTINGS_MAP.md): WATCH, CONTENT, ACCOUNTS
-AND INTEGRATIONS, SYSTEM and - in its own colour - NERD, whose pages but
+setting goes"; the map is docs/SETTINGS_MAP.md): WATCH, CONTENT, SERVICES,
+SYSTEM and - in its own colour - NERD, whose pages but
 Status show only while Nerd is on. This checks, on the real dialog in a
 child process (offscreen, as test_settings_window):
 

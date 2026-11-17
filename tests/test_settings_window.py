@@ -228,7 +228,7 @@ from dopeiptv.ui.theme import P
 assert s.value("theme") == "latte" and s.value("accent") == "mint"
 assert P["bg"] == "#EFF1F5" and P["accent"] == "#34CFA0", P
 
-# 9. The sidebar reads in groups - Watch, Content, Accounts and integrations,
+# 9. The sidebar reads in groups - Watch, Content, Services,
 # System, Nerd; a heading cannot be selected and goes with its pages in a
 # search. The rewind settings, casting and every cache sit where people look
 # for them; Nerd's pages come out under NERD, in its colour, while it is on.

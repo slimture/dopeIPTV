@@ -2707,7 +2707,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "airplay_cpu": {"en": "The picture is converted on this Mac for the Apple TV, which keeps the processor busy while it plays."},
     "set_grp_watch": {"en": "Watch"},
     "set_grp_content": {"en": "Content"},
-    "set_grp_accounts": {"en": "Accounts and integrations"},
+    "set_grp_accounts": {"en": "Services"},
     "set_page_casting": {"en": "Casting"},
     "set_page_casting_sub": {"en": "Sending what plays to a TV or another device."},
     "set_page_sources": {"en": "Sources"},

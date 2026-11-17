@@ -432,7 +432,7 @@ neither, the rows ran together.
 **Where a setting goes - decide it before you write it.** Settings are
 grouped by what a person is doing: WATCH (Playback, Picture and sound,
 Guide, Multiview, Recording, Casting), CONTENT (Sources, Mine, Local
-files, Posters and info), ACCOUNTS AND INTEGRATIONS (watch history -
+files, Posters and info), SERVICES (watch history -
 Trakt, Simkl -, Sync, Integrations), SYSTEM (General, Appearance, Keyboard
 shortcuts, Profiles, Parental lock, Advanced) and NERD (Status, Network, Boxes and lists, Player, Remote
 and automation, Diagnostics). Every row there is today, page by page and
