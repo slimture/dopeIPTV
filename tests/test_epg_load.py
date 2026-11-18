@@ -240,7 +240,8 @@ def test_one_guide_load_at_a_time(monkeypatch):
         pool = None
 
         def __init__(self):
-            self.xmltv = XmltvGuide(client=None)
+            self.xmltv = XmltvGuide(client=None,
+                                    custom_url="http://guide.test/xmltv.xml")
             self.xmltv.ensure_loaded = lambda force=False: True
             self.finished = 0
             self.list_model = type("M", (), {"refresh_all": lambda s: None})()
@@ -269,3 +270,30 @@ def test_one_guide_load_at_a_time(monkeypatch):
     w.xmltv._loaded = False
     w._ensure_xmltv_loaded()          # the next one may go again
     assert len(jobs) == 1
+
+
+def test_a_guide_without_a_source_asks_nothing_and_says_nothing(monkeypatch):
+    # The first start's OfflineClient: no address, no box, no server - no
+    # request to "/xmltv.php" and no "EPG download failed" in the log.
+    from dopeiptv.providers.client import OfflineClient
+    from dopeiptv.providers.epg import NoGuideSource
+    said = []
+    monkeypatch.setattr(epg.log, "info", lambda msg, *a: said.append(msg % a))
+    client = OfflineClient()
+    asked = []
+    client.session.get = lambda *a, **k: asked.append(a)
+    client.get_from_server = lambda *a, **k: asked.append(a)
+    g = XmltvGuide(client)
+    assert not g.has_source() and not g.can_load()
+    assert g.ensure_loaded() is False
+    assert asked == [] and said == []
+    try:
+        g._download()
+        raise AssertionError("downloaded from nowhere")
+    except NoGuideSource:
+        pass
+    # Anything to load from is a source: an address of its own, a server.
+    assert XmltvGuide(client, "http://guide.test/x.xml").has_source()
+    client.server = "http://provider.test"
+    assert XmltvGuide(client).has_source()
+    assert not XmltvGuide(None).has_source()

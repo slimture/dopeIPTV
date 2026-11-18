@@ -81,10 +81,13 @@ pytest). Logs: `DOPEIPTV_LOG=debug DOPEIPTV_LOG_FILE=/tmp/dope.log`.
   sdist + wheel, AppImage + .deb (x86_64 and aarch64), macOS .dmg (arm64
   and x86_64), Windows .zip (x64 and arm64), Flatpak - plus `SHA256SUMS`.
   Each job uploads its own files, so one failing format never blocks the
-  others. **Experimental legs** may fail without failing the run: the
-  Flatpak and the Intel Mac. A flaky download (GitHub, conda-forge,
-  micromamba) is the usual reason a leg goes red - re-run the failed jobs
-  before looking for a bug.
+  others. The **experimental leg** may fail without failing the run: the
+  Intel Mac. The Flatpak is not one any more: it is built, installed and
+  started in its own runtime (`--self-check`, then 15 s on a virtual
+  screen), and a release whose Flatpak fails is red (#36 shipped a Flatpak
+  that crashed at every start while the leg was allowed to fail). A flaky
+  download (GitHub, conda-forge, micromamba) is the usual reason a leg goes
+  red - re-run the failed jobs before looking for a bug.
 
 Platform notes that are easy to forget:
 
@@ -380,7 +383,12 @@ tests check that placeholders line up and that every `tr("…")` key exists.
 - **dopeIPTV's own rewind buffer is experimental** (Settings → Playback).
   When it has had a release or two without trouble, drop the label.
 - **Flatpak** is built but not on Flathub (`packaging/flatpak/FLATHUB.md`
-  has what a submission needs); its build leg is experimental.
+  has what a submission needs). Its CI container comes with the SDK
+  installed; `/var/lib/flatpak` is a volume of its own so a newer SDK can
+  be installed over it (in the image's own layer that fails with "Invalid
+  cross-device link"). The build's own import line runs in the SDK, which
+  carries more than the runtime - only the installed Flatpak's
+  `--self-check` proves a library is there.
 - **AirPlay** is macOS only (AVFoundation and AVKit; tvOS broke the API
   other senders use). It plays on a real Apple TV through the bridge
   (checked from a checkout, November 2026); the packaged app's direct way

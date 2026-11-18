@@ -45,7 +45,7 @@ def test_a_test_build_publishes_what_built_and_a_release_fails_loud():
     # Every job of release.yml may fail without failing a test build (a
     # download that times out sends no failure mail) - never a release.
     expr = "(inputs.nightly_version || '') != ''"
-    assert RELEASE.count(f"continue-on-error: ${{{{ {expr} }}}}") == 3
+    assert RELEASE.count(f"continue-on-error: ${{{{ {expr} }}}}") == 4
     assert f"continue-on-error: ${{{{ matrix.experimental || {expr} }}}}" \
         in RELEASE
     # What did not build is named in the notes; no AppImage, no nightly.
@@ -53,6 +53,22 @@ def test_a_test_build_publishes_what_built_and_a_release_fails_loud():
     # Gather's publish guard on the signed checksums, the notes, the
     # pre-release and keeping the newest seven.
     assert NIGHTLY.count("if: steps.gather.outputs.publish == 'true'") == 4
+
+
+def test_a_release_fails_loud_when_its_flatpak_does_not_build_or_start():
+    # #36: the leg was allowed to fail, and every start of 1.5.0 to 1.6.5
+    # crashed. Only a test build may go on without it.
+    job = RELEASE.split("\n  flatpak:\n", 1)[1].split("\n  # ----", 1)[0]
+    assert "continue-on-error: ${{ (inputs.nightly_version || '') != '' }}" in job
+    assert "continue-on-error: true\n    container:" not in job
+    # The SDK installed over the image's own copy on a filesystem that can.
+    assert "volumes:\n        - /var/lib/flatpak" in job
+    # Installed, then run in the runtime the users get: the self-check and
+    # a start on a virtual screen, both failing the job.
+    smoke = job.split("Smoke test - install the Flatpak", 1)[1]
+    assert '"$APP" --self-check' in smoke
+    assert 'flatpak run "$APP" >/tmp/flatpak-start.log' in smoke
+    assert "did not keep running for 15 s" in smoke and "exit 1" in smoke
 
 
 def test_a_macos_rebuild_replaces_only_the_dmg_of_the_same_app():

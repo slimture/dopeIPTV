@@ -14,9 +14,18 @@ import zlib
 from typing import Callable
 
 from PyQt6.QtCore import QObject
-from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 
 from .log import log
+
+try:
+    from PyQt6.QtNetwork import QLocalServer, QLocalSocket
+    UNAVAILABLE = ""
+except (ImportError, OSError) as e:
+    # Qt's network library links Kerberos' GSSAPI library, which a runtime
+    # may not carry: the Flatpak crashed at every start from 1.5.0 on (#36).
+    # Without it the app still starts - a second start opens a window of
+    # its own instead of handing its command over.
+    UNAVAILABLE = str(e) or e.__class__.__name__
 
 
 def server_name() -> str:
@@ -58,7 +67,10 @@ def _make_folder(name: str) -> None:
 
 
 def send_to_running(command: dict, timeout_ms: int = 800) -> bool:
-    """Hand *command* to the copy running; False when there is none."""
+    """Hand *command* to the copy running; False when there is none (or
+    Qt's network library could not load, UNAVAILABLE)."""
+    if UNAVAILABLE:
+        return False
     sock = QLocalSocket()
     sock.connectToServer(server_name())
     if not sock.waitForConnected(timeout_ms):
@@ -84,25 +96,33 @@ class CommandServer(QObject):
     def __init__(self, on_command: Callable[[dict], None], parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._on = on_command
-        self._server = QLocalServer(self)
+        self._server: QLocalServer | None = None
+        if UNAVAILABLE:
+            log.warning("commands: Qt's network library could not load (%s) - "
+                        "a second start opens a window of its own", UNAVAILABLE)
+            return
+        server = self._server = QLocalServer(self)
         # The socket (Unix) or pipe (Windows) is the user's alone.
-        self._server.setSocketOptions(QLocalServer.SocketOption.UserAccessOption)
-        self._server.newConnection.connect(self._accept)
+        server.setSocketOptions(QLocalServer.SocketOption.UserAccessOption)
+        server.newConnection.connect(self._accept)
         name = server_name()
         _make_folder(name)
-        if not self._server.listen(name):
+        if not server.listen(name):
             # A copy that crashed leaves its socket file behind (Unix).
             QLocalServer.removeServer(name)
-            if not self._server.listen(name):
-                log.info("commands: not listening (%s)", self._server.errorString())
+            if not server.listen(name):
+                log.info("commands: not listening (%s)", server.errorString())
 
     @property
     def listening(self) -> bool:
-        return self._server.isListening()
+        return self._server is not None and self._server.isListening()
 
     def _accept(self) -> None:
-        while self._server.hasPendingConnections():
-            pending = self._server.nextPendingConnection()
+        server = self._server
+        if server is None:
+            return
+        while server.hasPendingConnections():
+            pending = server.nextPendingConnection()
             if pending is None:
                 break
             conn: QLocalSocket = pending
@@ -124,4 +144,5 @@ class CommandServer(QObject):
             read()
 
     def close(self) -> None:
-        self._server.close()
+        if self._server is not None:
+            self._server.close()

@@ -1709,18 +1709,27 @@ jobs:
           path: dist/dopeiptv
 
   # --------------------------------------------------------------- Flatpak ---
-  # Most likely to need iteration (building libmpv in Flatpak). Kept from
-  # blocking the release with continue-on-error.
+  # Built, installed and started in the runtime its users get, as every
+  # other package is: a release whose Flatpak does not build or start fails
+  # loud (#36 - every start crashed from 1.5.0 to 1.6.5 and nothing here
+  # noticed, the job was allowed to fail). A test build only names it missing.
   flatpak:
-    name: Flatpak (experimental)
+    name: Flatpak
     if: ${{ (inputs.replace_macos_dmg || '') == '' }}
     # Only the host: the build runs in the container below. Pinned for the
     # same reason as python-dist.
     runs-on: ubuntu-24.04
-    continue-on-error: true
+    continue-on-error: ${{ (inputs.nightly_version || '') != '' }}
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
       options: --privileged
+      # The image comes with the SDK installed in a layer of its own; once
+      # Flathub has a newer SDK, updating it there fails ("Invalid
+      # cross-device link": overlayfs cannot move a directory of a lower
+      # layer) and nothing builds. A volume of its own, filled from the
+      # image, is a plain filesystem.
+      volumes:
+        - /var/lib/flatpak
     steps:
       - uses: actions/checkout@v5
       - name: Nightly version
@@ -1810,37 +1819,72 @@ jobs:
           bundle: dopeIPTV.flatpak
           manifest-path: packaging/flatpak/io.github.slimture.dopeIPTV.yaml
           cache-key: flatpak-builder-${{ github.sha }}
-      - name: Smoke test - install flatpak and verify metadata
+      - name: Smoke test - install the Flatpak, self-check and start it
         run: |
-          # The flatpak-github-actions container is stripped down to
-          # flatpak+build tools and has neither apt-get, yum nor dnf, so we
-          # can't add xvfb and do a full launch here. Instead verify that:
-          #   1) the bundle installs into the system repo cleanly, and
-          #   2) 'flatpak info' can read every key it needs to launch (the
-          #      runtime it wants, the binary path, the app-id).
-          # A full launch smoke happens once a user downloads it. If the
-          # bundle format itself were broken, install would fail with a
-          # 'no such ref' or 'corrupt metadata' error - that IS caught here.
+          # In the runtime the users get, not the SDK the build ran in: the
+          # SDK carries more libraries, so an import that works in the build
+          # can still fail at every start (#36, Kerberos' GSSAPI library).
+          APP=io.github.slimture.dopeIPTV
           echo "::group::Install"
           flatpak install --system --bundle --noninteractive --assumeyes \
             dopeIPTV.flatpak
+          flatpak info "$APP"
+          flatpak info --show-runtime "$APP"
           echo "::endgroup::"
-          echo "::group::Inspect installed app"
-          flatpak info io.github.slimture.dopeIPTV
-          flatpak info --show-runtime io.github.slimture.dopeIPTV
+          # 1) The self-check: every Qt module the app uses loads, libmpv,
+          #    the languages, the guide's parse process. No window.
+          echo "::group::Self-check"
+          if ! flatpak run --env=QT_QPA_PLATFORM=offscreen "$APP" --self-check \
+              >/tmp/flatpak-selfcheck.log 2>&1; then
+            cat /tmp/flatpak-selfcheck.log
+            echo "::error::the installed Flatpak's self-check failed"
+            exit 1
+          fi
+          cat /tmp/flatpak-selfcheck.log
           echo "::endgroup::"
-          # With its build manifest the installed app must call itself
-          # official; where flatpak cannot run it here, that is only said.
+          # 2) With its build manifest the installed app calls itself official.
           if [ -f dopeiptv/_build_manifest.json ]; then
-            got=$(flatpak run --command=python3 io.github.slimture.dopeIPTV -c \
+            got=$(flatpak run --command=python3 "$APP" -c \
               'from dopeiptv.core import build_check as b; print(b.verdict().line())' 2>&1 | tail -1) || true
             echo "${got}"
             case "${got}" in
               "Build: official") ;;
-              "Build: modified"*) echo "::error::the Flatpak calls itself modified: ${got}"; exit 1 ;;
-              *) echo "::warning::the Flatpak's build check could not run here" ;;
+              *) echo "::error::the Flatpak does not call itself official: ${got}"; exit 1 ;;
             esac
           fi
+          # 3) The app started as a user starts it, its window on a virtual
+          #    screen: it must reach Qt and still run 15 s later, with no
+          #    library or module missing on the way.
+          echo "::group::Start"
+          XVFB_RUN=$(command -v xvfb-run || echo /app/bin/xvfb-run)
+          "$XVFB_RUN" --auto-servernum --server-args='-screen 0 1280x800x24' \
+            flatpak run "$APP" >/tmp/flatpak-start.log 2>&1 &
+          pid=$!
+          sleep 15
+          alive=no
+          kill -0 "$pid" 2>/dev/null && alive=yes
+          flatpak kill "$APP" 2>/dev/null || true
+          sleep 2
+          kill "$pid" 2>/dev/null || true
+          wait "$pid" 2>/dev/null || true
+          cat /tmp/flatpak-start.log
+          echo "::endgroup::"
+          if grep -qE "cannot open shared object|ImportError|ModuleNotFoundError|No module named|network library could not load" /tmp/flatpak-start.log; then
+            echo "::error::the Flatpak started with a library or module missing (above)"
+            exit 1
+          fi
+          if ! grep -q "Qt platform:" /tmp/flatpak-start.log; then
+            echo "::error::the Flatpak never reached Qt (above)"
+            exit 1
+          fi
+          if [ "$alive" != yes ]; then
+            echo "::error::the Flatpak did not keep running for 15 s (above)"
+            exit 1
+          fi
+          if grep -q "Traceback" /tmp/flatpak-start.log; then
+            echo "::warning::the Flatpak ran, with an error in its log (above)"
+          fi
+          echo "the Flatpak installed, passed its self-check and ran for 15 s"
       - name: Name the bundle with the version
         if: startsWith(github.ref, 'refs/tags/')
         run: |

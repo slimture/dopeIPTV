@@ -66,6 +66,9 @@ def guide_xml():
     return "".join(out).encode()
 
 class Client(OfflineClient):
+    def __init__(self):
+        super().__init__()
+        self.server = "http://provider.test"   # a source: its guide loads
     def live_categories(self):
         return [{"category_id": c, "category_name": n} for c, n in CATS]
     def live_streams(self, category_id=None):

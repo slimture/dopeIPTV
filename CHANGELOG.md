@@ -7,6 +7,39 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.6.6]
+
+### Fixed
+
+- Flatpak: every start crashed from 1.5.0 on, importing PyQt6.QtNetwork -
+  Qt's network library links Kerberos' GSSAPI library (libgssapi_krb5),
+  which the freedesktop runtime does not carry (#36). The manifest builds
+  MIT Kerberos before the app, and the build imports every Qt module the
+  app uses (tests/test_flatpak_manifest.py keeps that list to the code's),
+  so a missing library stops the build rather than every start.
+- core/instance.py: a QtNetwork that cannot load no longer stops the app -
+  the second start opens a window of its own instead of handing its
+  command over (UNAVAILABLE), and says why in the log.
+- providers/epg.py: with no provider (the first start's OfflineClient) the
+  guide was downloaded from "/xmltv.php" - no address - and the log said it
+  failed, the notices too when the pool was slow. `has_source` / `can_load`:
+  the window loads no guide with nothing to load it from, and a download
+  without a source raises `NoGuideSource`, said nowhere.
+
+### Build
+
+- The Flatpak leg is no longer experimental: the bundle is installed and
+  run in its own runtime - `--self-check`, then a start on a virtual
+  screen that must still run 15 s later - and a release whose Flatpak fails
+  is red (a test build names it missing). The build's own import line runs
+  in the SDK, which carries more than the runtime, so it could not have
+  caught #36.
+- `--self-check` loads every Qt module the app uses (`QT_MODULES`, QtDBus on
+  Linux) in every package's CI.
+- The Flatpak container's `/var/lib/flatpak` is a volume of its own: once
+  Flathub had a newer SDK, updating the image's copy failed ("Invalid
+  cross-device link") and 1.6.5 went out without a Flatpak.
+
 ## [1.6.5]
 
 ### Added

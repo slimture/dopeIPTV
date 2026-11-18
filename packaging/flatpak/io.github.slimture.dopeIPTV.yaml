@@ -103,6 +103,32 @@ modules:
         url: https://github.com/mpv-player/mpv/archive/v0.41.0.tar.gz
         sha256: ee21092a5ee427353392360929dc64645c54479aefdb5babc5cfbb5fad626209
 
+  # --- Kerberos' GSSAPI library: Qt's network library (QtNetwork - the
+  #     socket a second start hands its command over) links
+  #     libgssapi_krb5, which the freedesktop runtime does not carry; from
+  #     1.5.0 on every start crashed on it (#36) ---
+  - name: krb5
+    subdir: src
+    build-options:
+      # krb5 1.21 declares functions the old way (`void f();`), which C23 -
+      # GCC 15's default - reads as taking no arguments: it does not build.
+      cflags: -std=gnu17
+    config-opts:
+      - --disable-static
+      - --disable-rpath
+      - --localstatedir=/var/lib
+    cleanup:
+      - /bin
+      - /sbin
+      - /include
+      - /lib/pkgconfig
+      - /share
+      - /var
+    sources:
+      - type: archive
+        url: https://kerberos.org/dist/krb5/1.21/krb5-1.21.3.tar.gz
+        sha256: b7a4cd5ead67fb08b980b21abd150ff7217e85ea320c9ed0c6dadd304840ad35
+
   # --- the dopeIPTV app + its Python deps, all from vendored wheels ---
   - name: dopeiptv
     buildsystem: simple
@@ -111,6 +137,12 @@ modules:
       # wheels fetched into the build dir as sources (no --share=network).
       - pip3 install --no-index --find-links="${PWD}" --prefix=${FLATPAK_DEST}
         PyQt6 requests python-mpv pychromecast .
+      # Every Qt module the app imports must load with what the runtime
+      # and this bundle carry - a library one of them needs and nothing
+      # here has stopped the build, not every start (#36).
+      # tests/test_flatpak_manifest.py keeps this list to the code's own.
+      - PYTHONPATH="$(echo ${FLATPAK_DEST}/lib/python3*/site-packages)" python3 -c
+        "import PyQt6.QtCore, PyQt6.QtGui, PyQt6.QtWidgets, PyQt6.QtNetwork, PyQt6.QtDBus, PyQt6.QtOpenGL, PyQt6.QtOpenGLWidgets"
       - install -Dm644 packaging/io.github.slimture.dopeIPTV.desktop
         ${FLATPAK_DEST}/share/applications/io.github.slimture.dopeIPTV.desktop
       - install -Dm644 packaging/io.github.slimture.dopeIPTV.metainfo.xml
