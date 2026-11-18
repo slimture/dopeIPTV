@@ -389,8 +389,12 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     if ($screenshots | index("\($lang)/\($name)")) then $lang
     elif ($screenshots | index("en/\($name)")) then "en"
     else null end;
+  # The pictures' own version (sync-releases.sh: their names and sizes),
+  # else the release's - a picture replaced gets a new address at once.
+  def pics_v($version): ($ARGS.named.pics_v // "") as $p
+    | if $p != "" then $p else $version end;
   def pic_src($l; $name; $version):
-    "/screenshots/\($l)/\($name).webp?v=\($version)";
+    "/screenshots/\($l)/\($name).webp?v=\(pics_v($version))";
   def pic_set($l; $name; $small; $full; $version):
     if ($screenshots | index("\($l)/\($name)-\($small)")) then
       "\(pic_src($l; "\($name)-\($small)"; $version)) \($small)w, \(pic_src($l; $name; $version)) \($full)w"
@@ -535,7 +539,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
                    # in the app's repository). Inside a closed <details>,
                    # so it loads when the question is opened.
                    + (if ($S.help_shots // [] | index($id)) then
-                        "<img class=\"help-shot\" src=\"/help-shots/\($lang | h)/\($id | h).webp?v=\($version | h)\""
+                        "<img class=\"help-shot\" src=\"/help-shots/\($lang | h)/\($id | h).webp?v=\(pics_v($version) | h)\""
                         + " width=\"\($S.help_shot_size[0])\" height=\"\($S.help_shot_size[1])\""
                         + " loading=\"lazy\" decoding=\"async\" alt=\"\($q | h)\">"
                       else "" end)

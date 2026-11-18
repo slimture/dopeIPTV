@@ -426,6 +426,12 @@ done | jq -R 'split("\t") | {key: .[0], value: .[1]}' | jq -cs from_entries)
 screenshots=$(cd "$PUB/screenshots" 2>/dev/null && for f in */*.webp; do
     [ -f "$f" ] && echo "${f%.webp}"
 done | jq -R . | jq -cs .)
+# One version for the app's pictures (here and public/help-shots/): their
+# names and sizes, so a picture replaced on a deploy gets a new address at
+# once - nginx lets browsers keep a .webp a week. The release's version
+# alone stayed the same, and the old pictures stayed on screen.
+pics_v=$( (cd "$PUB" && find screenshots help-shots -type f -name '*.webp' \
+    -exec ls -ln {} + 2>/dev/null) | awk '{print $5, $NF}' | sort | md5 -q | cut -c1-10)
 sums=""
 [ -f "$FILES/SHA256SUMS" ] && sums=1
 year=$(date +%Y)
@@ -446,6 +452,7 @@ render() {  # render PAGE LANG TEMPLATE OUTFILE [BODY]
     tr=$SITE/lang/$2.json
     jq -n -j -f "$SITE/render.jq" \
         --arg page "$1" --arg lang "$2" --arg year "$year" --arg sums "$sums" \
+        --arg pics_v "$pics_v" \
         --argjson avail "$avail" --argjson asset_urls "$asset_urls" \
         --argjson screenshots "$screenshots" --argjson help_mtime "$help_mtime" \
         --slurpfile site "$SITE/i18n.json" --slurpfile helpfile "$SITE/help.json" \
