@@ -9,6 +9,9 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- Mac: the app's text is in the system's own font (San Francisco). The
+  style asked for "SF Pro Text", a name macOS does not list, so Qt searched
+  every font at start (about 70 ms) and fell back to another face.
 - Send feedback fits the screen: with answers to earlier feedback, "Something
   does not work" and the preview open it was taller than a laptop's screen,
   could not be made shorter and hid Send under the Dock. It is now at most
