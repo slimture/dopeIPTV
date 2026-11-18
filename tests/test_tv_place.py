@@ -300,6 +300,40 @@ def test_a_name_is_never_clipped_to_its_measure(app):
         drawn.clear()
 
 
+def test_the_name_column_fits_the_names_it_holds(app):
+    """Short names leave the room to what is on; long ones get it, up to
+    NAME_COL_MAX of the row - not a fixed 200 px that cut "BBC Earth (Geo"."""
+    from PyQt6.QtCore import QRect
+    from dopeiptv.ui.media_cards import NAME_COL_MAX, channel_parts
+    from dopeiptv.ui.tv_place import name_need
+    short, long_ = name_need(["SVT1", "TV4"]), name_need(["BBC Earth (Geography and Wildlife)"])
+    assert 0 < short < long_ and name_need([]) == 0
+    row = QRect(0, 0, 1200, 56)
+    plain = channel_parts(row, "compact", False)["name"].width()
+    narrow = channel_parts(row, "compact", False, short)["name"].width()
+    wide = channel_parts(row, "compact", False, long_)["name"].width()
+    assert narrow < plain < wide
+    assert narrow >= 96
+    assert wide <= round((1200 - 120) * NAME_COL_MAX) + 1
+    # And the row hands it on: the name painted whole.
+    rec = Recorder(1200, 56)
+    try:
+        name = "BBC Earth (Geography)"
+        paint_parts = paint_tv_row_with(rec, name, name_need([name]))
+    finally:
+        rec.end()
+    assert any(t == name for _r, t in rec.texts), rec.texts
+    assert paint_parts["name"].width() >= name_need([name]) - 1
+
+
+def paint_tv_row_with(rec, name, width):
+    from PyQt6.QtCore import QRect
+    from dopeiptv.ui.tv_place import paint_tv_row
+    return paint_tv_row(rec.painter, QRect(0, 0, 1200, 56), 1, 3,
+                        _row(name=name, favourite=True, archive=True), "compact", False,
+                        name_w=width)
+
+
 def test_a_heading_channel_is_painted_as_a_heading(app):
     from PyQt6.QtCore import QRect
     from dopeiptv.ui.tv_place import heading_of, paint_tv_row

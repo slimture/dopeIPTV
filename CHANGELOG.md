@@ -9,6 +9,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- TV: the channel names' column is as wide as the category's longest names
+  need, up to 40 % of the row - long names are no longer cut at a fixed
+  width, and a category of short names leaves the room to what is on. A
+  name that is still too long shows whole in its tooltip.
 - TV: a channel's name in the list no longer loses its last letter ("BBC
   Eart") on a scaled screen - Windows at 125 or 150 % drew it a pixel or two
   wider than it measured and the rest was cut off (#35).

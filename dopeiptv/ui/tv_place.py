@@ -30,7 +30,7 @@ from __future__ import annotations
 import time
 from bisect import bisect_left, bisect_right
 from dataclasses import dataclass
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Iterable, Sequence
 
 from PyQt6.QtCore import QPoint, QRect, QRectF, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen, QPixmap
@@ -246,9 +246,23 @@ def _marks_after(r: TvRow) -> list[str]:
     return [m for m, on in ((STAR, r.favourite), (ARCHIVE, r.archive)) if on]
 
 
+def name_need(names: Iterable[str], marks: bool = True) -> int:
+    """The width a name column needs for *names* (the list's, as shown):
+    the widest in the row's name font, the room a dot and a ring take
+    before it and, with *marks*, the favourite's and catch-up's after it,
+    and the slack a scaled screen needs (issue #35)."""
+    nfm = QFontMetrics(_font(TITLE_PX, BOLD))
+    widest = max((nfm.horizontalAdvance(n) for n in names if n), default=0)
+    if widest <= 0:
+        return 0
+    mfm = QFontMetrics(_font(SMALL_PX, BOLD))
+    after = sum(mfm.horizontalAdvance(m) + MARK_GAP for m in (STAR, ARCHIVE)) if marks else 0
+    return widest + 2 * (DOT + MARK_GAP) + after + 2 * NAME_SLACK
+
+
 def paint_tv_row(p: QPainter, rect: QRect, row: int, count: int, r: TvRow, density: str,
                  rtl: bool, hover: bool = False, selected: bool = False,
-                 pictures: Pictures | None = None) -> dict[str, QRect]:
+                 pictures: Pictures | None = None, name_w: int = 0) -> dict[str, QRect]:
     """*r* painted in *rect* (the list's row *row* of *count*); the parts
     it went into (for the tests)."""
     pictures = pictures if pictures is not None else Pictures()
@@ -259,7 +273,7 @@ def paint_tv_row(p: QPainter, rect: QRect, row: int, count: int, r: TvRow, densi
         if r.heading:
             _paint_heading(p, rect, r.heading, rtl)
             return {"heading": rect}
-        parts = channel_parts(rect, density, rtl)
+        parts = channel_parts(rect, density, rtl, name_w)
         align = _aligned(rtl)
         small = _font(SMALL_PX)
         sfm = QFontMetrics(small)
