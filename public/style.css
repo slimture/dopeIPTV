@@ -1018,6 +1018,10 @@ dialog.dn.dn-paused { width: min(400px, calc(100vw - 32px)); }
     border-bottom: 0; max-height: calc(100dvh - 24px); }
   .dn-chips { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dn-body { padding-bottom: max(22px, env(safe-area-inset-bottom)); }
+  /* The paused note is the same sheet: its own width (400px) left it
+     pinned to the left edge. */
+  dialog.dn.dn-paused { width: 100%; }
+  .dn-paused-body { padding-bottom: max(28px, calc(env(safe-area-inset-bottom) + 16px)); }
 }
 
 /* "How to install" (app.js): the help page's answer for one system in a
