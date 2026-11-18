@@ -87,22 +87,6 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   at once.
 - The decision card and the messages panel take a new theme's colours
   straight away.
-- AirPlay: after going back in a channel the sound is in step with the
-  picture again. The archive or the rewind buffer is joined between two
-  keyframes, so its sound began up to a few seconds before its picture, and
-  the stream made for the Apple TV noted that in a way the Apple TV does
-  not read - the picture ran ahead of the sound for the rest of the cast.
-  The sound before the first picture is now left out, and each track says
-  itself when it starts. The same for a channel or a film converted for
-  the Apple TV.
-- AirPlay: going back starts sooner the first time. Before the stream was
-  asked for, the archive was opened once just to see what it holds, which
-  took 8 s of an archive that sends at the speed it plays; that look now
-  takes about a second.
-- AirPlay: going back twice in quick succession (the 30 s button pressed
-  again while the first is still being readied) no longer leaves the Apple
-  TV with nothing - the first, given up, stopped the second one's stream.
-  A seek that does not go also lets go of the rewind buffer it held.
 - AirPlay: "The Apple TV has not reached this Mac" no longer comes while a
   seek is still being readied - the new stream is the Apple TV's to reach
   only once it has been handed it. A seek also asks the provider's archive
