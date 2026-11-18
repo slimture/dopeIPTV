@@ -28,16 +28,16 @@
     <div class="wrap">
       <nav class="legal-tabs" aria-label="{{h:foot_legal}}">
 {{b:tabs}}      </nav>
-{{b:note}}      <div class="legal-head" lang="{{v:clang}}" dir="ltr">
+      <div class="legal-head" lang="{{v:clang}}" dir="ltr">
         <h1>{{v:title}}</h1>
-        <p class="legal-meta">{{b:meta}}</p>
+{{b:lede}}        <p class="legal-meta">{{b:meta}}</p>
       </div>
-    </div>
+{{b:note}}    </div>
   </section>
 
   <section class="legal-main">
-    <div class="wrap">
-      <article class="legal" lang="{{v:clang}}" dir="ltr">
+    <div class="wrap legal-grid{{v:grid}}" dir="ltr">
+{{b:toc}}      <article class="legal" lang="{{v:clang}}" dir="ltr">
 {{b:body}}      </article>
     </div>
   </section>

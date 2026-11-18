@@ -475,6 +475,34 @@ var iptvCurrency = (function () {
       minimumFractionDigits: amount % 1 ? 2 : 0, maximumFractionDigits: amount % 1 ? 2 : 0 }).format(amount);
   } catch (e) { /* the page's own words stay */ }
 })();
+/* A legal page's contents (templates/legal.html): folded up on a phone - it
+ * is open in the page, for a browser without this file -, and on a
+ * computer, where it stays beside the text, the part being read is marked. */
+(function () {
+  "use strict";
+  var box = document.querySelector(".legal-tocbox");
+  if (!box) { return; }
+  var narrow = window.matchMedia && window.matchMedia("(max-width: 1000px)");
+  if (narrow && narrow.matches) { box.open = false; }
+  box.addEventListener("click", function (e) {
+    if (e.target.closest("a") && narrow && narrow.matches) { box.open = false; }
+  });
+  var links = {}, heads = [], queued = false;
+  box.querySelectorAll('a[href^="#"]').forEach(function (a) {
+    var h = document.getElementById(decodeURIComponent(a.getAttribute("href").slice(1)));
+    if (h) { links[h.id] = a; heads.push(h); }
+  });
+  function mark() {
+    queued = false;
+    var current = null;
+    heads.forEach(function (h) { if (h.getBoundingClientRect().top < window.innerHeight * 0.35) { current = h; } });
+    heads.forEach(function (h) { links[h.id].classList.toggle("is-here", h === current); });
+  }
+  function soon() { if (!queued) { queued = true; window.requestAnimationFrame(mark); } }
+  window.addEventListener("scroll", soon, { passive: true });
+  window.addEventListener("resize", soon);
+  mark();
+})();
 /* The support page's rules are folded questions (templates/support.html):
  * a link to one - /support/#refund, the privacy policy's, the app's - opens
  * it, on arrival and within the page. */

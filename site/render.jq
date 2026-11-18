@@ -727,14 +727,34 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     ([legal_langs[] as $c
       | "<link rel=\"alternate\" hreflang=\"\($c | h)\" href=\"\(url($path; $c) | h)\">\n"] | add)
     + "<link rel=\"alternate\" hreflang=\"x-default\" href=\"\($SITE + $path | h)\">\n";
+  # A legal page's contents (its <nav class="legal-toc">) beside the text
+  # rather than in it: on a computer it stays in view as you read and marks
+  # the part you are in (nav.js); on a phone it is folded up over the text.
+  def legal_toc($label):
+    # Split, not index(): jq's index() counts bytes and slicing counts
+    # characters, so a page with å, ä or ö was cut in the wrong place.
+    "<nav class=\"legal-toc\"" as $open
+    | (. / $open) as $p
+    | if ($p | length) < 2 then {toc: "", body: ., grid: ""} else
+        (($p[1:] | join($open)) / "</nav>") as $q
+        | {toc: ("      <aside class=\"legal-side\">\n        <details class=\"legal-tocbox\" open>\n"
+                 + "          <summary>\($label | h)</summary>\n          " + $open + $q[0] + "</nav>\n"
+                 + "        </details>\n      </aside>\n"),
+           body: ($p[0] + ($q[1:] | join("</nav>"))), grid: " has-toc"}
+      end;
+  # "3. Title" headings: the number in a mark of its own.
+  def legal_numbers:
+    gsub("<h2 id=\"(?<id>[^\"]+)\">(?<n>[0-9]+)\\. "; "<h2 id=\"\(.id)\"><span class=\"lnum\">\(.n)</span>");
   def page_legal:
     (if ($L.text | has($lang)) then $lang else "en" end) as $cl
     | $L.page[$page][$cl] as $P
     | $L.text[$cl] as $X
     | "/\($page)/" as $path
+    | (if $page == "support" then {toc: "", body: $body, grid: ""}
+       else ($body | legal_numbers | legal_toc($X.toc // "Contents")) end) as $parts
     | $tpl
     | expand(common + {title: ($P.title | h), desc: ($P.desc | h), clang: ($cl | h),
-                       canonical: (url($path; $cl) | h)};
+                       canonical: (url($path; $cl) | h), grid: $parts.grid};
         {hreflang: legal_hreflang($path), nav: nav($page),
          tabs: ([$L.pages[] as $p
            | "        <a href=\"/\($p | h)/\"\(if $p == $page then " aria-current=\"page\"" else "" end)>\(t("foot_\($p)") | h)</a>\n"]
@@ -743,9 +763,11 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
            "      <p class=\"legal-note\">\(t("legal_only_en") | h)</p>\n" end),
          meta: ("<time datetime=\"\($L.updated | h)\">\($X.updated | h)</time> · \($X.governing | h)"
            + " <a href=\"\($path + "?lang=" + $X.link | h)\" hreflang=\"\($X.link | h)\" lang=\"\($X.link | h)\">\($X.other | h)</a>"),
+         lede: (if ($P.lede // "") != "" then "        <p class=\"legal-lede\">\($P.lede | h)</p>\n" else "" end),
+         toc: $parts.toc,
          body: (if $page == "support" then
                   $body | gsub("%PORTAL%"; (if $PORTAL_URL != "" then $PORTAL_URL else "#monthly" end) | h)
-                else $body end),
+                else $parts.body end),
          ways: (if $page == "support" then support_ways else "" end),
          perks: (if $page == "support" then support_perks else "" end),
          money: (if $page == "support" then support_money else "" end)});

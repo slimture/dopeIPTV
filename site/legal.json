@@ -11,34 +11,40 @@
             "updated": "Senast uppdaterad 18 november 2026",
             "governing": "Det här är den svenska texten, som är den som gäller.",
             "other": "Read in English",
-            "link": "en"
+            "link": "en",
+            "toc": "Innehåll"
         },
         "en": {
             "updated": "Last updated 18 November 2026",
             "governing": "This is a translation of the Swedish text, which is the one that applies.",
             "other": "Läs på svenska",
-            "link": "sv"
+            "link": "sv",
+            "toc": "Contents"
         }
     },
     "page": {
         "privacy": {
             "sv": {
                 "title": "Integritetspolicy",
-                "desc": "Hur dopeIPTV och dopeiptv.org hanterar personuppgifter: vad appen, webbplatsen och dess tjänster behandlar, hur länge, och dina rättigheter enligt dataskyddsförordningen."
+                "desc": "Hur dopeIPTV och dopeiptv.org hanterar personuppgifter: vad appen, webbplatsen och dess tjänster behandlar, hur länge, och dina rättigheter enligt dataskyddsförordningen.",
+                "lede": "Vi vet inte vem du är, och vi försöker inte ta reda på det."
             },
             "en": {
                 "title": "Privacy policy",
-                "desc": "How dopeIPTV and dopeiptv.org handle personal data: what the app, the website and its services process, for how long, and your rights under the GDPR."
+                "desc": "How dopeIPTV and dopeiptv.org handle personal data: what the app, the website and its services process, for how long, and your rights under the GDPR.",
+                "lede": "We don't know who you are, and we don't try to find out."
             }
         },
         "terms": {
             "sv": {
                 "title": "Användarvillkor",
-                "desc": "Villkoren för appen dopeIPTV och dopeiptv.org: bara en spelare, utan kanaler eller innehåll, öppen källkod under GPL, och ditt ansvar för det du lägger till."
+                "desc": "Villkoren för appen dopeIPTV och dopeiptv.org: bara en spelare, utan kanaler eller innehåll, öppen källkod under GPL, och ditt ansvar för det du lägger till.",
+                "lede": "dopeIPTV är en gratis spelare med öppen källkod – det du tittar på lägger du till själv."
             },
             "en": {
                 "title": "Terms of use",
-                "desc": "The terms for the dopeIPTV app and dopeiptv.org: a player only, with no channels or content, open source under the GPL, and your responsibility for what you add."
+                "desc": "The terms for the dopeIPTV app and dopeiptv.org: a player only, with no channels or content, open source under the GPL, and your responsibility for what you add.",
+                "lede": "dopeIPTV is a free, open-source player – what you watch, you add yourself."
             }
         },
         "support": {
@@ -54,11 +60,13 @@
         "about": {
             "sv": {
                 "title": "Om oss och kontakt",
-                "desc": "dopeIPTV görs av Solecraft AB i Sverige. Företagsuppgifter, kontaktuppgifter och vad dopeIPTV är: bara en app, utan kanaler eller innehåll."
+                "desc": "dopeIPTV görs av Solecraft AB i Sverige. Företagsuppgifter, kontaktuppgifter och vad dopeIPTV är: bara en app, utan kanaler eller innehåll.",
+                "lede": "dopeIPTV görs av Solecraft AB i Örebro."
             },
             "en": {
                 "title": "About us and contact",
-                "desc": "dopeIPTV is made by Solecraft AB in Sweden. Company details, contact information and what dopeIPTV is: an app only, with no channels or content."
+                "desc": "dopeIPTV is made by Solecraft AB in Sweden. Company details, contact information and what dopeIPTV is: an app only, with no channels or content.",
+                "lede": "dopeIPTV is made by Solecraft AB in Örebro, Sweden."
             }
         }
     }
