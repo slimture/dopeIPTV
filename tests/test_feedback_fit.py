@@ -67,3 +67,32 @@ def test_a_short_feedback_window_is_as_tall_as_it_needs():
         assert fb._scroll.verticalScrollBar().maximum() == 0, "no scrolling while it fits"
     assert _send_in_sight(fb)
     fb.close()
+
+
+def test_it_opens_whole_on_the_screen_over_a_window_low_on_it():
+    # Qt centres a dialog over its parent alone: a tall one over a window
+    # near the foot of the screen opened with Send under the Dock (macOS).
+    app = _qapp()
+    from PyQt6.QtWidgets import QStyle, QWidget
+    from dopeiptv.ui import dialogs
+    parent = QWidget()
+    parent.resize(700, 420)
+    parent.show()
+    _settle(app)
+    room = dialogs.FeedbackDialog(parent, lambda opts: "")._room()
+    parent.move(room.x() + 40, room.bottom() - 420 - 10)
+    _settle(app)
+    tickets = [{"c": f"c{n}", "t": 1763400000 + n, "w": f"Report {n}",
+                "r": [{"code": "thanks", "t": 1763400000 + n}]} for n in range(8)]
+    fb = dialogs.FeedbackDialog(parent, lambda opts: "line\n" * 60, answers=tickets)
+    fb.show()
+    _settle(app)
+    title = fb.style().pixelMetric(QStyle.PixelMetric.PM_TitleBarHeight) or 28
+    top = fb.frameGeometry().y()
+    assert top >= room.top()
+    assert top + fb.height() + title <= room.bottom() + 1, "all of it above the Dock"
+    # Over its window as far as the screen allows: centred across it.
+    centre = fb.frameGeometry().center().x()
+    assert abs(centre - parent.frameGeometry().center().x()) <= 2 or fb.frameGeometry().left() == room.left()
+    fb.close()
+    parent.close()

@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QApplication, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
     QFrame, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
     QListWidgetItem, QMessageBox, QProgressBar, QPushButton, QScrollArea,
-    QSpinBox, QVBoxLayout, QWidget,
+    QSpinBox, QStyle, QVBoxLayout, QWidget,
 )
 
 from ..i18n import tr
@@ -1540,16 +1540,40 @@ class FeedbackDialog(QDialog):
         self.setMinimumHeight(min(want, self.SHORTEST, cap))
         self.resize(w, max(self.minimumHeight(), min(want, cap)))
         if self.isVisible():
-            # Once the window manager has the new size and its frame.
+            # Once the window manager has the new size and its frame - and
+            # again a moment later: macOS shows a window after Qt does, and a
+            # move before then can be lost.
             QTimer.singleShot(0, self._keep_on_screen)
+            QTimer.singleShot(150, self._keep_on_screen)
 
     def _room(self):
         """The screen's room for windows (the Dock and menu bar, the panel
-        left out), on the screen the window or its parent is on."""
+        left out), on the screen its parent window is on - the dialog's own
+        screen is only known once it is shown."""
         parent = self.parentWidget()
-        screen = self.screen() or (parent.screen() if parent is not None else None) \
+        screen = (parent.window().screen() if parent is not None else None) or self.screen() \
             or QApplication.primaryScreen()
         return screen.availableGeometry() if screen is not None else None
+
+    def _place(self) -> None:
+        """Centred over its window and wholly in the screen's room, title
+        bar and all - set before the window appears. Qt centres a dialog by
+        its parent alone, and a tall one over a window lower on the screen
+        went on under the Dock, Send with it."""
+        room = self._room()
+        if room is None:
+            return
+        title = self.style().pixelMetric(QStyle.PixelMetric.PM_TitleBarHeight) or 28
+        w, h = self.width(), self.height() + title
+        parent = self.parentWidget()
+        if parent is not None:
+            over = parent.window().frameGeometry()
+            x, y = over.x() + (over.width() - w) // 2, over.y() + (over.height() - h) // 2
+        else:
+            x, y = room.x() + (room.width() - w) // 2, room.y() + (room.height() - h) // 2
+        x = max(room.left(), min(x, room.right() - w + 1))
+        y = max(room.top(), min(y, room.bottom() - h + 1))
+        self.move(x, y)
 
     def _keep_on_screen(self) -> None:
         """Moved up (or in) so none of it is under the Dock or off the
@@ -1567,6 +1591,10 @@ class FeedbackDialog(QDialog):
     def showEvent(self, event) -> None:
         super().showEvent(event)
         self._fit()
+        if not getattr(self, "_placed", False):
+            # Before the window appears (Qt sends this event first).
+            self._placed = True
+            self._place()
 
     def options(self) -> dict:
         out: dict = {k: box.isChecked() and box.isVisibleTo(self) for k, box in self.attach.items()}

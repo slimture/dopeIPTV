@@ -33,6 +33,8 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   address and login (empty until filled in), the type picked back brings
   back what it had, and a source is stored as a new type only once that
   type's own fields are filled in. The same in Add source and the welcome.
+  Only looking through the types, without filling any in, changes nothing
+  and no longer ends in "This change was not saved".
 - Mac: the app's text is in the system's own font (San Francisco). The
   style asked for "SF Pro Text", a name macOS does not list, so Qt searched
   every font at start (about 70 ms) and fell back to another face.
@@ -40,7 +42,9 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   does not work" and the preview open it was taller than a laptop's screen,
   could not be made shorter and hid Send under the Dock. It is now at most
   nine tenths of the screen's height, what does not fit scrolls, and Cancel
-  and Send stay at its foot.
+  and Send stay at its foot. It opens centred over the window and wholly on
+  the screen: over a window low on a Mac's screen it opened half under the
+  Dock.
 - M3U sources: a channel keeps its id when the provider adds, removes or
   reorders channels. Ids used to be the channel's place in the list, so one
   channel added at the top moved every favourite, hidden or renamed channel,

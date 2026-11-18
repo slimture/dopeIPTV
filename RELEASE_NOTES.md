@@ -5,7 +5,7 @@
 ### Fixed
 
 - **A provider that refuses the login** no longer crashes the app as it opens. The lists from before stay; without them it says the user name or password is wrong.
-- **A source's type:** changing it in Settings no longer takes another type's address and login along (an Xtream login turned up under Jellyfin or Tvheadend). Each type keeps its own, and a source is stored as the new type only once its own fields are filled in.
+- **A source's type:** changing it in Settings no longer takes another type's address and login along (an Xtream login turned up under Jellyfin or Tvheadend). Each type keeps its own, a source is stored as the new type only once its own fields are filled in, and only looking through the types changes nothing and asks nothing.
 - **M3U channels keep who they are** when the provider adds, removes or reorders channels: favourites, hidden and renamed channels, your own numbers and reminders no longer move to the channel next door. The first start after the update reads the list as before; the start after that moves what is kept, in every profile.
 - **Settings sync:** restoring an older backup no longer takes anything from your other computers; the same playlist added on two computers is one; a full history list no longer removes titles on the others; and what a round brought in is kept even when the window closes right after.
 - **Server mode:** the tuner can no longer be reached from a web page (DNS rebinding). Plex, Jellyfin and Channels are not affected.
@@ -13,7 +13,7 @@
 - **AirPlay (macOS):** going back in a channel moves the Apple TV there again; a stream it is still loading is no longer started over after ten seconds; a seek reaches it sooner.
 - **TV:** a channel's name is no longer cut short on a scaled Windows screen, and the name column is as wide as the longest names need (#35).
 - **Mac:** the app's text is in the system's own font, and the app starts a little faster.
-- **Send feedback** fits the screen and scrolls; **messages** take a new theme's colours.
+- **Send feedback** fits the screen, scrolls and opens wholly on it - on a Mac it opened half under the Dock; **messages** take a new theme's colours.
 
 ### Changed
 

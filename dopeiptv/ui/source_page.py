@@ -258,6 +258,7 @@ class SourcePage(SourceFields, QScrollArea):
         self._update_kind()
         self._watch()
         self._stored = self.values()
+        self._stored_opts = self._own_options()
         self._building = False
         self._refresh_origins()
         self.show_tab("conn")
@@ -716,12 +717,34 @@ class SourcePage(SourceFields, QScrollArea):
         else:
             self.show_tab("conn")
 
+    def _own_options(self) -> dict:
+        """The options as the person set them (Nerd's), before a kind adds
+        its own (SAT>IP's tuners, a media server's ids)."""
+        return self.nerd_panel.values() if self.nerd_panel is not None else dict(self._options)
+
+    def _just_browsed(self) -> bool:
+        """Another type picked and none of its own fields filled in, nothing
+        else changed: someone looking through the types. Not a change to
+        store or to warn about - the source stays as it is stored. Each type
+        has its own fields (KindOwnFields), empty until filled in, so every
+        type but the stored one cannot be stored as it is."""
+        now, was = self.values(), self._stored
+        if now["kind"] == was.get("kind"):
+            return False
+        if ((now["epg_url"], now["refresh"]) != (was.get("epg_url"), was.get("refresh"))
+                or self._own_options() != self._stored_opts):
+            return False
+        if now["kind"] in MEDIA_KINDS:
+            return not self.signin.signed_in()
+        return not any(w.text().strip() for w in (self.server, self.user, self.pw, self.mac))
+
     def commit(self) -> bool:
         """Store what the page says, if it can be stored: True when it is
         (or nothing changed)."""
         self._live.stop()
         bad = self.problem()
-        self._show_problem(bad)
+        # Only looking through the types: no red line for fields not begun.
+        self._show_problem(None if bad is not None and self._just_browsed() else bad)
         if bad is not None:
             return False
         now = self.values()
@@ -734,6 +757,7 @@ class SourcePage(SourceFields, QScrollArea):
             out["options"] = {}
         self._store.update(self._pid, **out)
         self._stored = now
+        self._stored_opts = self._own_options()
         self._changed = True
         if self._saved is not None:
             self._saved(self._pid)
@@ -743,7 +767,7 @@ class SourcePage(SourceFields, QScrollArea):
         """Back to the page it is under - unless the change cannot be
         stored, which is said first (as OK said in the old dialog)."""
         bad = self.problem()
-        if bad is not None and self.values() != self._stored:
+        if bad is not None and self.values() != self._stored and not self._just_browsed():
             self._show_part(bad[2])
             QMessageBox.warning(self.window(), bad[0], bad[1])
             return
@@ -757,7 +781,7 @@ class SourcePage(SourceFields, QScrollArea):
             return
         stored = self.commit()
         self._left = True
-        if not stored and self.values() != self._stored:
+        if not stored and self.values() != self._stored and not self._just_browsed():
             bad = self.problem()
             if bad is not None:
                 QMessageBox.warning(self.window(), bad[0], f"{bad[1]}\n\n{tr('src_not_saved')}")

@@ -85,6 +85,44 @@ def test_another_kind_never_shows_or_stores_the_xtream_login(app):
     assert store.get("xt1") == XTREAM
 
 
+def _warnings(monkeypatch):
+    said = []
+    from dopeiptv.ui import source_page
+    monkeypatch.setattr(source_page.QMessageBox, "warning",
+                        staticmethod(lambda *a, **k: said.append(a[1:])))
+    return said
+
+
+def test_looking_through_the_types_is_no_change_to_warn_about(app, monkeypatch):
+    # Settings closed, or the page left, after only picking types: no "This
+    # change was not saved", no red line, the source as it was.
+    said = _warnings(monkeypatch)
+    store = _Store(XTREAM)
+    page = _page(store, "xt1")
+    for kind in ("tvheadend", "jellyfin", "stalker", "enigma2"):
+        _pick(page.kind, kind)
+        assert page.commit() is False
+        assert page.problem_label.isHidden(), kind
+    page.go_back()
+    page.leave()
+    assert said == []
+    assert store.updates == []
+    assert store.get("xt1") == XTREAM
+
+
+def test_a_type_begun_and_left_unfinished_is_still_said(app, monkeypatch):
+    said = _warnings(monkeypatch)
+    store = _Store(XTREAM)
+    page = _page(store, "xt1")
+    _pick(page.kind, "stalker")
+    page.server.setText("http://portal.invalid/c/")      # no MAC address yet
+    assert page.commit() is False
+    assert not page.problem_label.isHidden()
+    page.leave()
+    assert len(said) == 1 and "not saved" in said[0][1]
+    assert store.get("xt1")["kind"] == "xtream"
+
+
 def test_a_kind_filled_in_is_stored_and_the_old_one_comes_back(app):
     store = _Store(XTREAM)
     page = _page(store, "xt1")
