@@ -8,7 +8,8 @@ lands only while the form is still there."""
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from contextlib import contextmanager
+from typing import Any, Callable, Iterator
 
 from PyQt6 import sip
 from PyQt6.QtCore import QThreadPool, QTimer, pyqtSignal
@@ -187,6 +188,17 @@ class MediaSignIn(QWidget):
             if i >= 0:
                 self.servers.setCurrentIndex(i)
                 self._server_picked(i)
+
+    @contextmanager
+    def filling(self) -> Iterator[None]:
+        """The form fills its own fields (another kind's address and login
+        shown, ui/dialogs.KindOwnFields): not a new address or user typed,
+        so the sign-in stays."""
+        was, self._filling = self._filling, True
+        try:
+            yield
+        finally:
+            self._filling = was
 
     def form_changed(self, *_a: Any) -> None:
         """The address or the user changed: a token for another one is no

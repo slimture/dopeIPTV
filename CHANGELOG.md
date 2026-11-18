@@ -9,6 +9,14 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- A source's Type changed in Settings no longer takes another kind's
+  address and login with it. The Xtream address, user name and password
+  stayed in the fields of every type picked after it (Jellyfin, Tvheadend,
+  a box found on the network), and the page stored the source straight
+  away as the new type with that login. Each type now keeps its own
+  address and login (empty until filled in), the type picked back brings
+  back what it had, and a source is stored as a new type only once that
+  type's own fields are filled in. The same in Add source and the welcome.
 - Mac: the app's text is in the system's own font (San Francisco). The
   style asked for "SF Pro Text", a name macOS does not list, so Qt searched
   every font at start (about 70 ms) and fell back to another face.

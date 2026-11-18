@@ -22,6 +22,44 @@ from .media_signin import MediaSignIn
 from .theme import P
 
 
+class KindOwnFields:
+    """Each kind of source keeps its own address and login (and a portal's
+    MAC): another kind picked shows that kind's own - empty for one not
+    filled in - never what was typed for the kind before. An Xtream login
+    stayed in the fields of every kind picked after it: sent to a Tvheadend
+    or a box found on the network, and on a source's page stored at once
+    as the new kind. Now a kind changed is stored only once its own are
+    there, and the kind picked back brings back what it had.
+
+    *fields*: the line edits by name; *signin*, the form's media server
+    sign-in, which keeps its sign-in while the form fills its own fields."""
+
+    def __init__(self, kind: QComboBox, fields: dict[str, QLineEdit],
+                 signin: MediaSignIn | None = None) -> None:
+        self._kind, self._fields, self._signin = kind, fields, signin
+        self._shown = kind.currentData()
+        self._by_kind: dict[Any, dict[str, str]] = {}
+        # Before the form's own handlers of the kind: they see the new
+        # kind's fields.
+        kind.currentIndexChanged.connect(self._swapped)
+
+    def _swapped(self, _index: int = -1) -> None:
+        new = self._kind.currentData()
+        old = self._shown
+        if new == old:
+            return
+        self._by_kind[old] = {k: f.text() for k, f in self._fields.items()}
+        own = self._by_kind.get(new, {})
+        self._shown = new
+        if self._signin is None:
+            self._fill(own)
+            return
+        with self._signin.filling():
+            self._fill(own)
+
+    def _fill(self, own: dict[str, str]) -> None:
+        for k, f in self._fields.items():
+            f.setText(own.get(k, ""))
 
 
 def stalker_available() -> bool:
@@ -143,6 +181,9 @@ class SourceFields:
         self.server.textChanged.connect(self.signin.form_changed)
         self.user.textChanged.connect(self.signin.form_changed)
         self._build_satip(self._options)
+        self._kind_own = KindOwnFields(
+            self.kind, {"server": self.server, "user": self.user, "pw": self.pw,
+                        "mac": self.mac}, self.signin)
 
     def _build_satip(self, options: dict) -> None:
         """A SAT>IP server's fields: its channel lists (M3U, a file or an
