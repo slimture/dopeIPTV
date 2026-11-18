@@ -344,10 +344,6 @@ class _ChipPainting:
         self.update()
 
 
-class RoundChip(_ChipPainting, QPushButton):
-    """A round icon button on a filled circle (``set_chip``)."""
-
-
 class HeartButton(_ChipPainting, QPushButton):
     """A heart: at rest in *rest* (the heart's own red by default, or a
     muted tone), heart-red under the pointer - still, no beating (a moving

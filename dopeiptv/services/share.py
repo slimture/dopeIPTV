@@ -210,7 +210,7 @@ def lineup_guide(guides: list[tuple[str, str]], channels: list[dict]) -> Iterato
         if not by_id and not by_name:
             continue
         found: dict[str, list[dict]] = {}   # the guide's channel id -> lineup channels
-        parser = ET.XMLPullParser(events=("start", "end"))
+        parser: ET.XMLPullParser = ET.XMLPullParser(events=("start", "end"))
         depth = 0
         root: Any = None
         try:

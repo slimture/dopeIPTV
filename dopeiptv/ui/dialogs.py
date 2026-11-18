@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QApplication, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
     QFrame, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
     QListWidgetItem, QMessageBox, QProgressBar, QPushButton, QScrollArea,
-    QSpinBox, QVBoxLayout, QWidget,
+    QSpinBox, QStyle, QVBoxLayout, QWidget,
 )
 
 from ..i18n import tr
@@ -22,6 +22,44 @@ from .media_signin import MediaSignIn
 from .theme import P
 
 
+class KindOwnFields:
+    """Each kind of source keeps its own address and login (and a portal's
+    MAC): another kind picked shows that kind's own - empty for one not
+    filled in - never what was typed for the kind before. An Xtream login
+    stayed in the fields of every kind picked after it: sent to a Tvheadend
+    or a box found on the network, and on a source's page stored at once
+    as the new kind. Now a kind changed is stored only once its own are
+    there, and the kind picked back brings back what it had.
+
+    *fields*: the line edits by name; *signin*, the form's media server
+    sign-in, which keeps its sign-in while the form fills its own fields."""
+
+    def __init__(self, kind: QComboBox, fields: dict[str, QLineEdit],
+                 signin: MediaSignIn | None = None) -> None:
+        self._kind, self._fields, self._signin = kind, fields, signin
+        self._shown = kind.currentData()
+        self._by_kind: dict[Any, dict[str, str]] = {}
+        # Before the form's own handlers of the kind: they see the new
+        # kind's fields.
+        kind.currentIndexChanged.connect(self._swapped)
+
+    def _swapped(self, _index: int = -1) -> None:
+        new = self._kind.currentData()
+        old = self._shown
+        if new == old:
+            return
+        self._by_kind[old] = {k: f.text() for k, f in self._fields.items()}
+        own = self._by_kind.get(new, {})
+        self._shown = new
+        if self._signin is None:
+            self._fill(own)
+            return
+        with self._signin.filling():
+            self._fill(own)
+
+    def _fill(self, own: dict[str, str]) -> None:
+        for k, f in self._fields.items():
+            f.setText(own.get(k, ""))
 
 
 def stalker_available() -> bool:
@@ -143,6 +181,9 @@ class SourceFields:
         self.server.textChanged.connect(self.signin.form_changed)
         self.user.textChanged.connect(self.signin.form_changed)
         self._build_satip(self._options)
+        self._kind_own = KindOwnFields(
+            self.kind, {"server": self.server, "user": self.user, "pw": self.pw,
+                        "mac": self.mac}, self.signin)
 
     def _build_satip(self, options: dict) -> None:
         """A SAT>IP server's fields: its channel lists (M3U, a file or an
@@ -1294,8 +1335,13 @@ class FeedbackDialog(QDialog):
         self._edited = False
         self.setWindowTitle(tr("feedback_title"))
         self.setMinimumWidth(600)
-        col = QVBoxLayout(self)
-        col.setContentsMargins(24, 20, 24, 18)
+        # Everything but Cancel and Send scrolls: the answers, the questions
+        # and the preview together are taller than a laptop's screen, and a
+        # window as tall as all of it went off the screen with Send under it.
+        self._body = QWidget()
+        self._body.setObjectName("FeedbackBody")
+        col = QVBoxLayout(self._body)
+        col.setContentsMargins(24, 20, 24, 8)
         col.setSpacing(8)
 
         def label(text: str, size: int = 12, colour: str = "", bold: bool = True) -> QLabel:
@@ -1416,7 +1462,19 @@ class FeedbackDialog(QDialog):
         col.addWidget(note)
         self.answers.setVisible(not copy_only)
         note.setVisible(not copy_only)
-        buttons = QHBoxLayout()
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        self._scroll = QScrollArea()
+        self._scroll.setObjectName("FeedbackScroll")
+        self._scroll.setWidget(self._body)
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        outer.addWidget(self._scroll, 1)
+        self._button_bar = QWidget()
+        buttons = QHBoxLayout(self._button_bar)
+        buttons.setContentsMargins(24, 10, 24, 18)
         buttons.addStretch(1)
         cancel = QPushButton(tr("common_cancel"))
         self.send_btn = QPushButton(tr("build_copy_report" if copy_only else "report_send"),
@@ -1425,7 +1483,7 @@ class FeedbackDialog(QDialog):
         self.send_btn.clicked.connect(self.accept)
         buttons.addWidget(cancel)
         buttons.addWidget(self.send_btn)
-        col.addLayout(buttons)
+        outer.addWidget(self._button_bar)
         self._topics.buttonToggled.connect(lambda *_a: self._topic_changed())
         for box in self.attach.values():
             box.toggled.connect(lambda *_a: self._refresh())
@@ -1457,11 +1515,18 @@ class FeedbackDialog(QDialog):
         self._ready()
         self._fit()
 
+    #: How short the window may be made: the rest scrolls.
+    SHORTEST = 360
+    #: Its share of the screen's height at most.
+    SCREEN_SHARE = 0.9
+
     def _fit(self) -> None:
-        """As tall as what it holds at its width: the questions and the
-        preview come and go, and wrapped text (the topics, the notes) is
-        taller in some languages - a plain size hint leaves it overlapping."""
-        lay = self.layout()
+        """As tall as what it holds at its width, up to the screen's room:
+        the questions and the preview come and go, and wrapped text (the
+        topics, the notes) is taller in some languages - a plain size hint
+        leaves it overlapping. Past that room it scrolls, Cancel and Send
+        always in sight, and the window can be made shorter still."""
+        lay = self._body.layout()
         if lay is None:
             return
         lay.invalidate()
@@ -1469,12 +1534,67 @@ class FeedbackDialog(QDialog):
         w = max(self.width(), self.minimumWidth())
         h = lay.totalHeightForWidth(w) if lay.hasHeightForWidth() else lay.totalSizeHint().height()
         h = max(h, lay.totalSizeHint().height())
-        self.setMinimumHeight(h)
-        self.resize(w, h)
+        want = h + self._button_bar.sizeHint().height()
+        room = self._room()
+        cap = int(room.height() * self.SCREEN_SHARE) if room is not None else want
+        self.setMinimumHeight(min(want, self.SHORTEST, cap))
+        self.resize(w, max(self.minimumHeight(), min(want, cap)))
+        if self.isVisible():
+            # Once the window manager has the new size and its frame - and
+            # again a moment later: macOS shows a window after Qt does, and a
+            # move before then can be lost.
+            QTimer.singleShot(0, self._keep_on_screen)
+            QTimer.singleShot(150, self._keep_on_screen)
+
+    def _room(self):
+        """The screen's room for windows (the Dock and menu bar, the panel
+        left out), on the screen its parent window is on - the dialog's own
+        screen is only known once it is shown."""
+        parent = self.parentWidget()
+        screen = (parent.window().screen() if parent is not None else None) or self.screen() \
+            or QApplication.primaryScreen()
+        return screen.availableGeometry() if screen is not None else None
+
+    def _place(self) -> None:
+        """Centred over its window and wholly in the screen's room, title
+        bar and all - set before the window appears. Qt centres a dialog by
+        its parent alone, and a tall one over a window lower on the screen
+        went on under the Dock, Send with it."""
+        room = self._room()
+        if room is None:
+            return
+        title = self.style().pixelMetric(QStyle.PixelMetric.PM_TitleBarHeight) or 28
+        w, h = self.width(), self.height() + title
+        parent = self.parentWidget()
+        if parent is not None:
+            over = parent.window().frameGeometry()
+            x, y = over.x() + (over.width() - w) // 2, over.y() + (over.height() - h) // 2
+        else:
+            x, y = room.x() + (room.width() - w) // 2, room.y() + (room.height() - h) // 2
+        x = max(room.left(), min(x, room.right() - w + 1))
+        y = max(room.top(), min(y, room.bottom() - h + 1))
+        self.move(x, y)
+
+    def _keep_on_screen(self) -> None:
+        """Moved up (or in) so none of it is under the Dock or off the
+        screen - its title bar first."""
+        room = self._room()
+        if room is None or not self.isVisible():
+            return
+        frame = self.frameGeometry()
+        x = min(frame.x(), room.right() - frame.width() + 1)
+        y = min(frame.y(), room.bottom() - frame.height() + 1)
+        x, y = max(x, room.left()), max(y, room.top())
+        if (x, y) != (frame.x(), frame.y()):
+            self.move(x, y)
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
         self._fit()
+        if not getattr(self, "_placed", False):
+            # Before the window appears (Qt sends this event first).
+            self._placed = True
+            self._place()
 
     def options(self) -> dict:
         out: dict = {k: box.isChecked() and box.isVisibleTo(self) for k, box in self.attach.items()}
@@ -1497,6 +1617,9 @@ class FeedbackDialog(QDialog):
         self.preview.setVisible(on)
         self.show_btn.setText(tr("fb_hide" if on else "fb_show") + ("  \u25b4" if on else "  \u25be"))
         self._fit()
+        if on:
+            # What opened is what they asked to see: scrolled into sight.
+            QTimer.singleShot(0, lambda: self._scroll.ensureWidgetVisible(self.preview, 0, 12))
 
     def _ready(self) -> None:
         self.send_btn.setEnabled(bool(self.topic()) and bool(self.message.toPlainText().strip()))
@@ -2139,7 +2262,7 @@ class RestoreBackupDialog(QDialog):
         return lines
 
     def __init__(self, parent, backup, counts: dict, missing: int,
-                 risky: list, can_add: bool = True) -> None:
+                 risky: list, can_add: bool = True, syncing: bool = False) -> None:
         super().__init__(parent)
         from PyQt6.QtWidgets import QButtonGroup, QRadioButton
 
@@ -2185,6 +2308,8 @@ class RestoreBackupDialog(QDialog):
                 "  •  " + line for line in shown))
         if backup.full and bk.new_token_here(backup):
             notes.append(tr("restore_token_note"))
+        if replaceable and syncing:
+            notes.append(tr("restore_sync_note"))
         self.notes = QLabel("\n\n".join(notes))
         self.notes.setWordWrap(True)
         self.notes.setTextFormat(Qt.TextFormat.PlainText)

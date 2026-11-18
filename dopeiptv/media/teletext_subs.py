@@ -125,6 +125,8 @@ class TeletextSubsMixin:
         own = (getattr(self, "_chan_own", None) or {}).get("slang")
         if own and own != channel_prefs.SUB_OFF:
             out.append(str(own))
+        elif self._ttx_live and s is not None and str(s.value("sub_live", "true")) == "false":
+            return out              # live channels open without subtitles
         if s is not None and (own or s.value("sub_mode", "auto") == "lang"):
             out += [x for x in (s.value("sub_lang", "") or "",
                                 s.value("sub_lang2", "") or "") if x]

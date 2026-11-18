@@ -96,11 +96,6 @@ class _PlacesMixin:
         if page:
             QTimer.singleShot(0, lambda p=page: self._show_place(p))
 
-    def _start_place(self) -> str:
-        """The place the app opens on now (the profile's own last one)."""
-        base, page = places.start_places(self.settings)
-        return page or base
-
     def _profile_place(self) -> None:
         """Another profile in use: its start place - where that person left
         off, or Mine - with its list read anew for the profile."""
@@ -240,9 +235,6 @@ class _PlacesMixin:
             mode = "watched" if getattr(self, "_history_filter", "all") == "watched" \
                 else "history"
         return mode
-
-    def _current_place(self) -> str:
-        return self._place
 
     def _replay_history_row(self, it: dict) -> None:
         """A History row played again (Mine's history): from its stored

@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import errno
 import hmac
+import ipaddress
 import json
 import re
 import secrets
@@ -601,6 +602,45 @@ def _host_ok(host: str) -> bool:
     return 0 < len(host) <= 255 and all(c in allowed for c in host)
 
 
+#: Name endings a home network's own names have (RFC 6762's .local, RFC
+#: 8375's home.arpa, the routers' usual .lan, .home, .internal).
+HOME_SUFFIXES = (".local", ".lan", ".home", ".home.arpa", ".internal", ".localdomain")
+
+
+def tuner_host_ok(host: str | None) -> bool:
+    """Whether the ``Host`` a tuner endpoint was asked under is a name of
+    the home network: none (an HTTP/1.0 client), an IP address, localhost,
+    this computer's own name, a name without a dot, or a home suffix. The
+    tuner's endpoints need no token, so a web page whose own name a DNS
+    rebinding pointed at this computer must not reach them: its Host is its
+    own public name. Plex, Jellyfin, Channels and the rest ask by address."""
+    if not host:
+        return True
+    name = host.strip().lower()
+    if name.startswith("["):                       # [IPv6]:port
+        end = name.find("]")
+        if end < 0:
+            return False
+        name = name[1:end]
+    elif name.count(":") == 1:
+        name = name.rsplit(":", 1)[0]
+    name = name.rstrip(".")
+    if not name:
+        return False
+    try:
+        ipaddress.ip_address(name)
+        return True
+    except ValueError:
+        pass
+    if name == "localhost" or "." not in name or name.endswith(HOME_SUFFIXES):
+        return True
+    try:
+        own = socket.gethostname().lower().rstrip(".")
+    except OSError:
+        own = ""
+    return bool(own) and name == own
+
+
 def _own(handler: BaseHTTPRequestHandler) -> str:
     try:
         return str(handler.connection.getsockname()[0])
@@ -683,6 +723,10 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
                     if not server.local.allows(who, _own(self)):
                         # No token here: this computer's own networks only.
                         self._text(403, "only this computer's own network")
+                        return
+                    if not tuner_host_ok(self.headers.get("Host")):
+                        # Not a home name: a web page's own, rebound here.
+                        self._text(403, "ask the tuner by this computer's address")
                         return
                     self._hdhomerun(path, method)
                     return

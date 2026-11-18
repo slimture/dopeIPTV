@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 
 from PyQt6.QtCore import (
-    QAbstractListModel, QItemSelectionModel, QLocale, QMimeData, QModelIndex,
+    QAbstractListModel, QEvent, QItemSelectionModel, QLocale, QMimeData, QModelIndex,
     QPointF, QRect, QRectF, QSize, Qt, QTimer,
 )
 from PyQt6.QtGui import (
@@ -13,7 +13,7 @@ from PyQt6.QtGui import (
     QPixmapCache,
 )
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QListView, QListWidget, QStyle, QStyledItemDelegate,
+    QAbstractItemView, QListView, QListWidget, QStyle, QStyledItemDelegate, QToolTip,
 )
 
 from ..core.log import log
@@ -22,7 +22,7 @@ from .theme import P, corner_radius, on_accent
 from .category_flags import category_flag, flag_icon
 from .media_cards import Pictures
 from .tv_place import (
-    DENSITIES as TV_DENSITIES, TvRow, guide_now, guide_now_next, heading_of, paint_tv_row,
+    DENSITIES as TV_DENSITIES, TvRow, guide_now, guide_now_next, heading_of, name_need, paint_tv_row,
     tv_row_height,
 )
 
@@ -605,6 +605,7 @@ class ChannelDelegate(QStyledItemDelegate):
         self._nn: dict = {}
         self._nn_stamp: tuple | None = None
         self._tv_failed = False
+        self._name_w: tuple | None = None       # (the list it was worked out for, the width)
         self.set_density(density)
 
     def set_density(self, level: str) -> None:
@@ -634,6 +635,45 @@ class ChannelDelegate(QStyledItemDelegate):
         """Whether *model*'s rows are the TV place's: a live channel list as
         rows (a grid keeps its tiles)."""
         return not self.grid and getattr(model, "kind", None) == "live"
+
+    #: The rows a name column is sized from: a list of tens of thousands
+    #: is read only this far (the column has a ceiling anyway).
+    NAME_ROWS = 3000
+
+    def _tv_name_w(self, model) -> int:
+        """The name column's width for *model*'s list: its longest names'
+        (``tv_place.name_need``), worked out once per list - a category, a
+        filter, a renamed row (its count or ends change) works it out again."""
+        items = model.items() if hasattr(model, "items") else []
+        n = len(items)
+        key = (id(model), n, id(items[0]) if n else 0, id(items[-1]) if n else 0)
+        if self._name_w is not None and self._name_w[0] == key:
+            return self._name_w[1]
+        name_of = getattr(self.window, "channel_display_name", None)
+        names = []
+        for it in items[:self.NAME_ROWS]:
+            try:
+                name = name_of(it) if callable(name_of) else str(it.get("name") or "")
+            except Exception:
+                name = str(it.get("name") or "")
+            if name and heading_of(name) is None:
+                names.append(name)
+        width = name_need(names)
+        self._name_w = (key, width)
+        return width
+
+    def helpEvent(self, event, view, option, index) -> bool:  # noqa: N802 - Qt hook
+        """A TV row's name whole in a tooltip, where its column cut it."""
+        model = index.model()
+        if event is not None and event.type() == QEvent.Type.ToolTip and self.tv_rows(model):
+            it = model.item_at(index.row()) if hasattr(model, "item_at") else None
+            name_of = getattr(self.window, "channel_display_name", None)
+            if isinstance(it, dict) and not it.get("_tip"):
+                name = name_of(it) if callable(name_of) else str(it.get("name") or "")
+                if name and heading_of(name) is None:
+                    QToolTip.showText(event.globalPos(), name, view)
+                    return True
+        return super().helpEvent(event, view, option, index)
 
     def forget_guide(self) -> None:
         """A guide came in or changed: what is on asked again."""
@@ -696,7 +736,7 @@ class ChannelDelegate(QStyledItemDelegate):
             self.tv_density, option.direction == Qt.LayoutDirection.RightToLeft,
             hover=bool(option.state & QStyle.StateFlag.State_MouseOver),
             selected=bool(option.state & QStyle.StateFlag.State_Selected),
-            pictures=self._tv_pics)
+            pictures=self._tv_pics, name_w=self._tv_name_w(index.model()))
 
     @staticmethod
     def _scaled_logo(pm: QPixmap, url: str, size: int) -> QPixmap:

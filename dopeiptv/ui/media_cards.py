@@ -704,10 +704,19 @@ CH_NEXT_FROM = 640
 CH_NEXT_W = 200
 
 
-def channel_parts(rect: QRect, density: str, rtl: bool) -> dict[str, QRect]:
+#: The share of a row the name's column may take when it is sized to the
+#: names it holds (``channel_parts``' *name_need*).
+NAME_COL_MAX = 0.40
+
+
+def channel_parts(rect: QRect, density: str, rtl: bool,
+                  name_need: int = 0) -> dict[str, QRect]:
     """A channel row's parts: number, logo, the name's column, what is on
     (and, airy, what is next under it), and in a compact row wide enough
-    the next programme in a column of its own at the end."""
+    the next programme in a column of its own at the end. *name_need*: the
+    width the list's longest names take - the column is that wide, up to
+    NAME_COL_MAX of the row (short names leave the room to what is on);
+    0, a share of the row as before."""
     row_h, logo = CHANNEL_DENSITY.get(density, CHANNEL_DENSITY["compact"])
     x = rect.x() + CH_PAD_X
     num = QRect(x, rect.y(), CH_NUM_W, rect.height())
@@ -716,7 +725,10 @@ def channel_parts(rect: QRect, density: str, rtl: bool) -> dict[str, QRect]:
     x = logo_r.right() + 1 + CH_GAP
     end = rect.right() - CH_PAD_X
     width = end - x + 1
-    name_w = max(96, min(200, round(width * 0.28)))
+    if name_need > 0:
+        name_w = max(96, min(name_need, round(width * NAME_COL_MAX)))
+    else:
+        name_w = max(96, min(200, round(width * 0.28)))
     name = QRect(x, rect.y(), name_w, rect.height())
     x = name.right() + 1 + CH_GAP
     nxt = QRect()

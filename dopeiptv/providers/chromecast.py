@@ -1729,6 +1729,10 @@ class CastDialog(QDialog):
         # A channel watched from the rewind buffer: its pieces, for a
         # receiver fed through a converter here (never its loopback address).
         feed = ctx.get("feed") if isinstance(ctx, dict) else None
+        if self._is_airplay(name):
+            # An Apple TV plays a channel live, never from the buffer
+            # (mw_cast._cast_can_go_back); the window lets the pieces go.
+            feed = None
         more = {"feed": feed} if feed is not None else {}
         if isinstance(ctx, dict):
             ctx.update(url=self.url, source=self.source, codecs=self.codecs,

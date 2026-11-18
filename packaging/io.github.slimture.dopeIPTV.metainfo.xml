@@ -62,13 +62,24 @@
   </categories>
   <url type="homepage">https://dopeiptv.org/</url>
   <url type="help">https://dopeiptv.org/help/</url>
-  <url type="donation">https://dopeiptv.org/#donate</url>
   <url type="bugtracker">https://github.com/slimture/dopeIPTV/issues</url>
   <developer id="io.github.slimture">
     <name>dopeIPTV contributors</name>
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.6.5" date="2026-11-18">
+      <description>
+        <p>A crash and two mix-ups fixed, safer settings sync, and supporting dopeIPTV is now a tip.</p>
+        <ul>
+          <li>A provider that refuses the login no longer crashes the app</li>
+          <li>Each source type keeps its own address and login</li>
+          <li>M3U channels keep their favourites, numbers and reminders when the provider reorders its list</li>
+          <li>Settings sync: a restored backup takes nothing from the other computers, and fewer duplicates</li>
+          <li>Fixes for casting, AirPlay, the TV list's channel names and the feedback window</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.6.4" date="2026-11-17">
       <description>
         <p>Casting with a card of its own that gets a stuck TV going again, and a round of fixes.</p>
@@ -145,7 +156,7 @@
     </release>
     <release version="1.5.0" date="2026-11-14">
       <description>
-        <p>Boxes on the home network as sources: Enigma2 receivers, Tvheadend servers and HDHomeRun tuners, found on the network by themselves. Series recording with padding, a backup of everything in one file, keyboard shortcuts of your own, catch-up on Stalker portals, and for supporters end-to-end encrypted sync between computers. Nerd, a Settings page for tinkerers, off until chosen: the box from the app, picons, udpxy, guides from several places, network and player options that each say whether they work, failover to another source, stream health, channel numbers of your own, catch-up addresses, recording names, a remote API and every source shared as one playlist and guide. Private viewing and Clear recent history. Feedback from the app with only the part of the log that matters, and answers to it in the app - nothing that identifies anyone. A supporter key for those who donate, with a logo, an icon and two themes of their own.</p>
+        <p>Boxes on the home network as sources: Enigma2 receivers, Tvheadend servers and HDHomeRun tuners, found on the network by themselves. Series recording with padding, a backup of everything in one file, keyboard shortcuts of your own, catch-up on Stalker portals, and for supporters end-to-end encrypted sync between computers. Nerd, a Settings page for tinkerers, off until chosen: the box from the app, picons, udpxy, guides from several places, network and player options that each say whether they work, failover to another source, stream health, channel numbers of your own, catch-up addresses, recording names, a remote API and every source shared as one playlist and guide. Private viewing and Clear recent history. Feedback from the app with only the part of the log that matters, and answers to it in the app - nothing that identifies anyone. A supporter key for those who give a tip or monthly support, with a logo, an icon and two themes of their own.</p>
       </description>
     </release>
     <release version="1.4.5" date="2026-11-13">

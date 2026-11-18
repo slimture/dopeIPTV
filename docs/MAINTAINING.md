@@ -162,8 +162,8 @@ Only names here - the values are with the owner.
 | Trakt app registration | its client id is `DEFAULT_CLIENT_ID` in `providers/trakt.py`; the redirect goes through the website (see its README) | users can enter their own client id in Settings → Trakt |
 | The web server | runs the site and its cron sync (website branch: `README.md`, `DEPLOY.md`) | the site stops updating; the app is unaffected |
 | GitHub repository settings | releases, Actions, the Security tab for private reports | - |
-| Stripe Payment Link (donations) | `$DONATE` at the top of `site/render.jq` on the `website` branch - where the site's donate links point without JavaScript. `.github/FUNDING.yml` (the Sponsor button, shown with Settings → Features → Sponsorships ticked) and the README's "Support dopeIPTV" point at `dopeiptv.org/#donate`, which opens the dialog | no donate card on the site |
-| Stripe keys for the donate dialog | a restricted key (PaymentIntents: Write) and the publishable key, on the web server in `/usr/local/etc/iptv-donate.key` / `.conf`, read by `donate/donate.py` (website branch, `DEPLOY.md` "Donations"); Apple Pay needs the domain added in Stripe | the dialog sends visitors to the Payment Link's own page instead |
+| Stripe (dopeIPTV's own account, under Solecraft AB) - two Payment Links | a tip (the customer chooses the amount) and monthly support (a fixed price), both returning to `https://dopeiptv.org/support/?paid={CHECKOUT_SESSION_ID}`; their addresses are the web server's, in `/usr/local/etc/iptv-site.conf` (`SUPPORT_TIP_URL`, `SUPPORT_MONTHLY_URL`, `SUPPORT_SPONSORS_URL`), read by `sync-releases.sh` (website branch, `DEPLOY.md` "Support"). `.github/FUNDING.yml` (the Sponsor button, shown with Settings → Features → Sponsorships ticked), the README's "Support dopeIPTV" and the app's heart point at `dopeiptv.org/support/` | the site invites to no payment (the support page says "coming soon"); the app's heart still opens the support page |
+| Stripe key for the supporter key | a restricted key, read-only (Checkout Sessions: Read, PaymentIntents: Read), on the web server in `/usr/local/etc/iptv-donate.key`, read by `donate/donate.py` | the thank-you after paying shows no supporter key |
 | The admin page's password | `/usr/local/etc/nginx/iptv-admin.htpasswd` on the web server (website branch, `DEPLOY.md` "Statistics and the admin page") | `/admin/` cannot be opened; the site is unaffected |
 | Apple Developer Program (Solecraft AB, team `6QR76TBT4J`) | the macOS builds' signature and notarisation - see "macOS signing" below | the .dmg is signed ad hoc and users allow the first start under Privacy & Security |
 | GitHub Actions secrets `MACOS_CERT_P12`, `MACOS_CERT_PASSWORD` | the Developer ID Application certificate with its private key (base64 of the exported .p12) and the export password | as above |
@@ -305,13 +305,17 @@ preview, SEO) and `DEPLOY.md` (the server). In short:
   `tools/help_screenshots.py`. When the settings change, take them
   again with `QT_QPA_PLATFORM=offscreen python tools/help_screenshots.py
   OUT` (this repository) and copy `OUT/` over `public/help-shots/`.
-- The front page's four pictures of the app are
-  `public/screenshots/<lang>/<name>.webp`, taken by
-  `tools/site_screenshots.py` (this repository) with a made-up playlist and
-  public-domain stills from `tools/showcase/`; it needs OpenGL and ffmpeg:
+- The front page's pictures of the app are
+  `public/screenshots/<lang>/<name>.webp` - five hero pictures in five
+  themes, Movies, and a picture per feature with `spots.json` saying where
+  in it the feature is - taken by `tools/site_screenshots.py` (this
+  repository) from the real window over a made-up catalogue, its art drawn
+  by `tools/site_art.py` and public-domain stills from `tools/showcase/`;
+  it needs OpenGL, ffmpeg and Noto's fonts:
   `xvfb-run -a -s "-screen 0 2560x1600x24" python tools/site_screenshots.py
-  OUT`, then copy `OUT/` over `public/screenshots/`. Take them again when
-  the main window changes.
+  OUT --jobs 3` (about 50 minutes for every language), then copy `OUT/<lang>/`
+  over `public/screenshots/<lang>/`. Take them again when the main window
+  changes.
 - **The server's jq is 1.8.** In `render.jq`, every `EXPR as $x | ...`
   must start right after `|`, `(`, `[`, `;`, `then` or `else` - jq 1.8
   binds `a and b as $x` differently than 1.7.

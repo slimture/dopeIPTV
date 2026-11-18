@@ -800,13 +800,3 @@ class _PlaceRecMixin:
             return
         place.view.redress()
         self._rp_now_refresh()
-
-    def _rp_state(self) -> dict:
-        """What the place shows, for a test and the log."""
-        place = self._rp_page
-        view = place.view if place is not None else None
-        return {"shown": self._place_rec_showing(),
-                "cards": view.model_.rowCount() if view is not None else 0,
-                "layout": view.layout_kind if view is not None else "",
-                "title": place.header.title_text() if place is not None else "",
-                "now": [c.key for c in place.now.cards()] if place is not None else []}

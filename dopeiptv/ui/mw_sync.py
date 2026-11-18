@@ -51,6 +51,14 @@ _CHIP_TEXT = {"favorites": "nav_favorites", "settings": "settings_title",
               "sources": "tab_playlists", "history": "sync_cat_history"}
 
 
+def state_path() -> Path:
+    """Where this computer keeps its sync state (core/sync.State), beside the
+    settings."""
+    ini = QSettings(QSettings.Format.IniFormat, QSettings.Scope.UserScope,
+                    ORG, "sync").fileName()
+    return Path(ini).with_name("sync-state.json")
+
+
 class _SyncSignals(QObject):
     changed = pyqtSignal()
 
@@ -68,6 +76,28 @@ def _work(remote: sync.Remote, key: bytes, doc: dict, snap: sync.Snapshot,
     except Exception:
         log.warning("sync: round failed", exc_info=True)
         return sync.SyncError("fail")
+
+
+def seen_by(keys: set[str], active: str | None) -> set[str]:
+    """The settings a round changed, as profile *active* sees them: its own
+    by their plain names and the household's - not another profile's own.
+    Sync writes the first profile's own under their plain names and each
+    other profile's under "profiles/<id>/"; told by the full name, a second
+    profile's new theme was never put in effect while it was the one in use,
+    and one not in use asked for a restart that changes nothing. *active*
+    None: a window without profiles, the keys as they are."""
+    if active is None:
+        return set(keys)
+    from ..core import profiles
+    out: set[str] = set()
+    for key in keys:
+        own = profiles.split_key(key)
+        if own is not None:
+            if own[0] == active:
+                out.add(own[1])
+        elif not profiles.is_own(key) or active in ("", profiles.MAIN_ID):
+            out.add(key)
+    return out
 
 
 def _ignore(_result: object = None) -> None:
@@ -95,6 +125,7 @@ class _SyncMixin:
         self._sync_seen: str | None = None
         self._sync_seen_at = time.monotonic()
         self._sync_sent: str | None = None
+        self._sync_unwritten = False
         self._sync_timer = QTimer(self)
         self._sync_timer.setInterval(TICK_MS)
         self._sync_timer.timeout.connect(self._sync_tick)
@@ -140,9 +171,7 @@ class _SyncMixin:
     def _sync_path(self) -> Path:
         if self._sync_state_file is not None:
             return Path(self._sync_state_file)
-        ini = QSettings(QSettings.Format.IniFormat, QSettings.Scope.UserScope,
-                        ORG, "sync").fileName()
-        return Path(ini).with_name("sync-state.json")
+        return state_path()
 
     def _sync_state_for(self, slot: str) -> sync.State:
         st = self._sync_state
@@ -161,9 +190,16 @@ class _SyncMixin:
         text, path = state.dump(), state.path
         if wait:
             sync.write_private(path, text)
+            self._sync_unwritten = False
         else:
-            run_async(self._sync_pool, sync.write_private, _ignore, self._sync_write_failed,
-                      path, text)
+            # Until it is on disk: closing takes a queued write off the pool
+            # and has to make it itself then (_sync_on_close).
+            self._sync_unwritten = True
+            run_async(self._sync_pool, sync.write_private, self._sync_written,
+                      self._sync_write_failed, path, text)
+
+    def _sync_written(self, _result: object = None) -> None:
+        self._sync_unwritten = False
 
     @staticmethod
     def _sync_write_failed(msg: str) -> None:
@@ -285,7 +321,7 @@ class _SyncMixin:
         self.settings.setValue(sync.K_LAST, int(time.time()))
         self._sync_fails = 0
         now = time.monotonic()
-        self._sync_next = now + (5 if applied.skipped else PERIOD)
+        self._sync_next = now + (5 if applied.skipped or applied.again else PERIOD)
         try:
             self._sync_sent = self._sync_seen = sync.digest(ctx, cats)
             self._sync_seen_at = now
@@ -335,18 +371,21 @@ class _SyncMixin:
                 self.list_model.refresh_all()
         if applied.sources and hasattr(self, "_update_playlist_btn"):
             self._update_playlist_btn()
-        if applied.settings & _LIVE_KEYS and hasattr(self, "_apply_theme_now"):
+        from ..core import places, profiles
+        # What changed for the profile in use (another one's waits for it).
+        mine = seen_by(applied.settings, profiles.active_id() if isinstance(
+            self.settings, profiles.ProfileSettings) else None)
+        if mine & _LIVE_KEYS and hasattr(self, "_apply_theme_now"):
             self._apply_theme_now()
         # This system's keyboard shortcuts (another system's never come).
-        keys = {k for k in applied.settings if sync.is_shortcuts(k)}
+        keys = {k for k in mine if sync.is_shortcuts(k)}
         if keys and hasattr(self, "apply_shortcuts"):
             self.apply_shortcuts()
-        # What the places show (a profile's own, kept under its name): at once.
-        from ..core import places
-        look = {k for k in applied.settings if str(k).rsplit("/", 1)[-1] in places.LOOK_KEYS}
+        # What the places show (a profile's own): at once.
+        look = {k for k in mine if k in places.LOOK_KEYS}
         if look and hasattr(self, "_places_look_changed"):
             self._places_look_changed("sync")
-        later = applied.settings - _LIVE_KEYS - keys - look
+        later = mine - _LIVE_KEYS - keys - look
         toast = getattr(self, "_show_toast", None)
         if toast is None:
             return
@@ -466,7 +505,12 @@ class _SyncMixin:
             snap = sync.collect(self._sync_ctx(), cats)
             # Shortcuts never synced here yet: as the first round will.
             new = sync.newcomer(state.seen, state.doc, snap.platform)
-            if sync.stamp(state.doc, snap, cats, int(time.time()), new=new):
+            # Written also when nothing changed but the last round's copy was
+            # still waiting on the pool (cleared above): left unwritten, the
+            # next start took what that round put here for changes made now,
+            # and they beat what another computer changed since.
+            if sync.stamp(state.doc, snap, cats, int(time.time()), new=new) \
+                    or getattr(self, "_sync_unwritten", False):
                 self._sync_write_state(state, wait=True)
         except Exception:
             log.debug("sync: nothing kept on close", exc_info=True)

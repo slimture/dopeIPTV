@@ -38,7 +38,7 @@ from .box_finder import (
     BOX_KINDS, LOGIN_KINDS, MEDIA_KINDS, PIN_KINDS, PLACEHOLDERS, FindOnNetwork, add_box_kinds,
     add_media_kinds, retranslate_box_kinds,
 )
-from .dialogs import PlaylistDialog, stalker_available
+from .dialogs import KindOwnFields, PlaylistDialog, stalker_available
 from .media_signin import MediaSignIn
 from .theme import P
 
@@ -401,6 +401,11 @@ class WelcomeOverlay(QWidget):
         self._signin.finished.connect(self._signin_finished)
         self._server.textChanged.connect(self._signin.form_changed)
         self._user.textChanged.connect(self._signin.form_changed)
+        # Each kind its own address and login: an Xtream login filled in
+        # above is not a Jellyfin's or a box's.
+        self._kind_own = KindOwnFields(
+            self._conn_kind, {"server": self._server, "user": self._user, "pw": self._pw,
+                              "mac": self._mac}, self._signin)
         self._connect_signed = False
         form.addRow("", self._signin)
         form.addRow(self._lbl_mac, self._mac)

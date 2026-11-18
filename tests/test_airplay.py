@@ -99,6 +99,19 @@ def test_what_ffmpeg_finds_refines_the_plan():
 
 # -- ffmpeg's command line -----------------------------------------------------
 
+def test_a_seeks_pieces_come_in_shorter_segments():
+    """A moment gone back to (cast_feed's pieces): the Apple TV takes a
+    stream once LEAD segments are there - 2 s ones, so 6 s converted, not
+    18 - and a converted picture keys at the same step."""
+    p = ab.plan("", "http://p/live/u/pw/1.ts", ["h264", "aac"], live=True)
+    args = ab.ffmpeg_args("ffmpeg", p, feed=True)
+    assert args[args.index("-hls_time") + 1] == str(ab.FEED_SEGMENT_S) == "2"
+    assert args[args.index("-hls_list_size") + 1] == "0"          # every segment kept
+    p = ab.plan("", "http://p/live/u/pw/1.ts", ["mpeg2video", "mp2"], live=True)
+    args = ab.ffmpeg_args("ffmpeg", p, feed=True)
+    assert args[args.index("-force_key_frames") + 1] == "expr:gte(t,n_forced*2)"
+
+
 def test_ffmpeg_copies_into_fmp4_hls_relative_to_its_folder():
     p = ab.plan("", "http://p/live/u/pw/1.ts", ["h264", "aac"], live=True)
     args = ab.ffmpeg_args("ffmpeg", p, net=["-user_agent", "X"])
@@ -110,6 +123,7 @@ def test_ffmpeg_copies_into_fmp4_hls_relative_to_its_folder():
         ab.LIVE_WINDOW_S // ab.SEGMENT_S)
     assert "delete_segments" in args[args.index("-hls_flags") + 1]
     assert args[-1] == ab.PLAYLIST and not os.path.isabs(args[-1])
+
     assert "-sn" in args and "-tag:v" not in args
     assert args.index("-user_agent") < args.index("-i")
 
@@ -275,17 +289,17 @@ def test_a_live_playlist_waits_for_three_segments(fake_ffmpeg):
         b.stop()
 
 
-def test_a_moment_gone_back_to_starts_on_one_segment(monkeypatch):
-    """Pieces read here (the archive or the rewind buffer while casting) are
-    served with EXT-X-START at their first segment: there is no live edge to
-    keep three segments from, so one is enough to hand the TV."""
+def test_a_moment_gone_back_to_waits_for_three_segments_too(monkeypatch):
+    """Pieces read here (the archive or the rewind buffer while casting):
+    handed the Apple TV at one segment, it played on where it was (1.6.4) -
+    a channel's three, as live."""
     b = ab.AirPlayBridge()
     b.plan = ab.plan("", "http://p/live/1.ts", [], live=True)
     one = b"#EXTM3U\n#EXT-X-TARGETDURATION:6\n#EXTINF:6.000,\ns00000.m4s\n"
     monkeypatch.setattr(b, "_playlist", lambda: one)
     assert not b.ready()                              # live: three from the edge
     b.feed = object()                                 # type: ignore[assignment]
-    assert b.ready()
+    assert not b.ready()
 
 
 def test_ffmpeg_s_own_words_say_why_it_failed(fake_ffmpeg):
@@ -884,6 +898,61 @@ def test_a_new_stream_gives_the_apple_tv_its_own_time_to_reach_it(qapp, macos):
     assert time.monotonic() - rx._external_since < 5
     assert not rx._said_unreached
     rx.stop()
+
+
+def test_a_bridge_still_being_readied_is_not_unreached(qapp, macos):
+    """A seek starts a new bridge while the Apple TV still plays the old
+    stream: until the player is handed the new playlist, the TV cannot have
+    asked it - "has not reached this Mac" came during every slow seek."""
+    am, _ = macos
+    rx = am.AirPlayReceiver()
+    rx.context = lambda: {"kind": "live"}
+    told = []
+    rx.problem.connect(told.append)
+    rx.cast(am.NAME, "http://p/live/u/pw/1.m3u8", "SVT1")
+    p = _Player.made[-1]
+    p.route(True)
+    _pump(qapp)
+    _settle(am, rx)
+    rx.bridged = lambda: True                        # a new bridge, readied meanwhile
+    rx.bridge.remote_seen = False
+    rx.bridge.url = "http://192.168.1.2:9/tok/index.m3u8"
+    rx._external_since = time.monotonic() - 10 * am.UNREACHED_S
+    rx._sync_player(p)
+    assert told == [] and not rx._said_unreached
+    rx._opened_url = rx.bridge.url                   # handed over, and never asked
+    rx._sync_player(p)
+    assert told == ["airplay_unreachable"]
+    rx.stop()
+
+
+def test_a_seek_in_the_same_channel_does_not_ask_the_archive_twice(qapp, macos, monkeypatch):
+    """The channel on the TV went through the bridge: a seek's pieces are
+    that channel, so its stream is planned as before - no ffprobe of the
+    archive, one more opening of it seconds before the stream."""
+    am, _ = macos
+    rx = am.AirPlayReceiver()
+    rx.active = am.NAME
+    rx.plan = ab.Plan(direct=False, url="http://p/live/1.ts", live=True, video="copy",
+                      audio="aac")
+
+    def no_probe(*_a, **_k):
+        raise AssertionError("the archive was probed")
+    monkeypatch.setattr(am.ab, "probe", no_probe)
+    monkeypatch.setattr(am.ab, "firewall_blocks", lambda: False)
+    started = []
+    monkeypatch.setattr(rx.bridge, "available", lambda: True)
+    monkeypatch.setattr(rx.bridge, "start", lambda plan, *a, **k: started.append(plan) or "x")
+    monkeypatch.setattr(rx.bridge, "wait_ready", lambda **k: True)
+    rx.bridge.url = "http://lan/tok/index.m3u8"
+    monkeypatch.setattr(rx, "_open_blocking", lambda *a: None)
+
+    class Feed:
+        first_url = "http://p/timeshift/u/pw/60/2026-11-18:06-19/1.ts"
+    rx._ready({"url": "http://p/live/1.ts", "source": "http://p/live/1.ts", "codecs": [],
+               "live": True, "track": 0, "start": 0.0, "duration": 0.0, "settle": False,
+               "generation": rx._generation, "feed": Feed()}, False)
+    assert started and started[0].audio == "aac" and started[0].video == "copy"
 
 
 def test_the_airplay_window_floats_over_the_app_only_while_it_is_in_front(qapp, macos):

@@ -241,7 +241,7 @@ SETTINGS_ALLOW = frozenset({
     "stream_format", "cache_secs", "autoplay_preview", "autoplay_next_episode",
     "nextup_lead_secs", "auto_reconnect_live", "hide_upcoming_prompt",
     "live_rewind_minutes", "live_rewind_disk", "live_rewind_kept",
-    "audio_lang", "sub_mode", "sub_lang", "sub_lang2", "sub_scale", "sub_color",
+    "audio_lang", "sub_mode", "sub_lang", "sub_lang2", "sub_live", "sub_scale", "sub_color",
     "sub_background", "aspect_mode", "video_deinterlace", "video_sharpen",
     "video_tonemapping",
     "epg_upcoming_count", "epg_delay_min", "replay_delay_min", "guide_now_line",
@@ -426,6 +426,10 @@ def _eid(*parts: Any) -> str:
     return json.dumps([str(p) for p in parts], ensure_ascii=False)
 
 
+#: The sources' entry that keeps the playlists' order (a list of their ids).
+_ORDER = _eid("o")
+
+
 def _parts(ident: str) -> list[str]:
     try:
         got = json.loads(ident)
@@ -512,6 +516,10 @@ class Snapshot:
     profiles: set[str] = field(default_factory=set)
     #: This computer's system (Context.platform).
     platform: str = sys.platform
+    #: The sources (as tag() names them) whose history list is full here:
+    #: a title older than the oldest one kept fell off its end, and was not
+    #: removed (stamp()).
+    capped: set[str] = field(default_factory=set)
 
 
 def _collect_settings(ctx: Context) -> dict[str, Any]:
@@ -566,12 +574,15 @@ def _collect_favorites(ctx: Context, fps: dict[str, str]) -> dict[str, Any]:
     return out
 
 
-def _collect_history(ctx: Context, fps: dict[str, str]) -> dict[str, Any]:
+def _collect_history(ctx: Context, fps: dict[str, str],
+                     capped: set[str] | None = None) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for label, settings, resume in ctx.views():
         for fp, pid in fps.items():
             at = tag(fp, label)
             rows = _json(settings.value(f"history_{pid}"), [])
+            if capped is not None and len(rows) >= MAX_HISTORY:
+                capped.add(at)
             for e in rows:
                 if not isinstance(e, dict) or e.get("_kind") in _LOCAL_KINDS:
                     continue
@@ -586,12 +597,63 @@ def _collect_history(ctx: Context, fps: dict[str, str]) -> dict[str, Any]:
     return out
 
 
+#: This computer's playlists kept in the copy under an id that is not
+#: their own here (playlist id -> the copy's id): two computers that each
+#: had a playlist of another provider under the legacy id "default".
+K_SOURCE_IDS = "sync_source_ids"
+
+
+class SourceIds:
+    """A playlist's id here and the id the copy keeps it under: the same,
+    but for one whose id another computer's playlist had already taken
+    (_keep_own_sources). Kept beside the playlists (K_SOURCE_IDS)."""
+
+    def __init__(self, store: Any) -> None:
+        self.settings = getattr(store, "settings", None)
+        mine = {str(p.get("id")) for p in getattr(store, "items", None) or []
+                if isinstance(p, dict) and p.get("id")}
+        raw = _json(self.settings.value(K_SOURCE_IDS) if self.settings is not None
+                    else None, {})
+        self.to_entry: dict[str, str] = (
+            {str(k): str(v) for k, v in raw.items() if str(k) in mine and v}
+            if isinstance(raw, dict) else {})
+        self.to_local = {v: k for k, v in self.to_entry.items()}
+
+    def entry_of(self, pid: str) -> str:
+        return self.to_entry.get(pid, pid)
+
+    def local_of(self, entry: str) -> str | None:
+        """The playlist id here for the copy's *entry*: None when that is
+        the id of a playlist here that the copy keeps under another."""
+        if entry in self.to_local:
+            return self.to_local[entry]
+        return None if entry in self.to_entry else entry
+
+    def set(self, pid: str, entry: str) -> None:
+        if entry == pid:
+            self.to_entry.pop(pid, None)
+        else:
+            self.to_entry[pid] = entry
+        self._changed()
+
+    def forget(self, pid: str) -> None:
+        if self.to_entry.pop(pid, None) is not None:
+            self._changed()
+
+    def _changed(self) -> None:
+        self.to_local = {v: k for k, v in self.to_entry.items()}
+        if self.settings is not None:
+            self.settings.setValue(K_SOURCE_IDS, json.dumps(self.to_entry, sort_keys=True))
+
+
 def _collect_sources(ctx: Context) -> dict[str, Any]:
     out: dict[str, Any] = {}
+    ids = SourceIds(ctx.playlists)
     srcs = ctx.sources()
     for p in srcs:
-        out[_eid("s", p["id"])] = dict(p)
-    out[_eid("o")] = [str(p["id"]) for p in srcs]
+        e = ids.entry_of(str(p["id"]))
+        out[_eid("s", e)] = dict(p, id=e)
+    out[_eid("o")] = [ids.entry_of(str(p["id"])) for p in srcs]
     return out
 
 
@@ -605,7 +667,7 @@ def collect(ctx: Context, cats: tuple[str, ...] | list[str]) -> Snapshot:
     if "favorites" in cats:
         snap.values["favorites"] = _collect_favorites(ctx, fps)
     if "history" in cats:
-        snap.values["history"] = _collect_history(ctx, fps)
+        snap.values["history"] = _collect_history(ctx, fps, snap.capped)
     if "sources" in cats and ctx.playlists is not None:
         snap.values["sources"] = _collect_sources(ctx)
     return snap
@@ -635,6 +697,9 @@ def digest(ctx: Context, cats: tuple[str, ...] | list[str]) -> str:
     pids = [str(p["id"]) for p in ctx.sources()]
     if "sources" in cats:
         take(st, "playlists")
+        store = getattr(ctx.playlists, "settings", None)
+        if store is not None:
+            take(store, K_SOURCE_IDS)
     for label, view, resume in ctx.views():
         h.update(label.encode("utf-8", "replace") + b"\3")
         if "favorites" in cats:
@@ -699,6 +764,52 @@ def _in_domain(cat: str, ident: str, entry: dict, snap: Snapshot) -> bool:
     return False
 
 
+def _history_floors(local: dict[str, Any], snap: Snapshot) -> dict[str, int]:
+    """Per source whose history list is full here (Snapshot.capped): when
+    the oldest title it still keeps was watched."""
+    floors: dict[str, int] = {}
+    if not snap.capped:
+        return floors
+    for ident, value in local.items():
+        parts = _parts(ident)
+        if len(parts) > 1 and parts[1] == "h" and parts[0] in snap.capped:
+            t = _own_time(ident, value)
+            floors[parts[0]] = min(floors.get(parts[0], t), t)
+    return floors
+
+
+def _fell_off(ident: str, entry: dict, floors: dict[str, int]) -> bool:
+    """Whether a history title not found here only fell off the end of a
+    full list - which also holds this computer's own files and recordings,
+    so it keeps fewer titles than the others. Removed is something else:
+    as a tombstone it took the title from the computers with room for it."""
+    if not floors:
+        return False
+    parts = _parts(ident)
+    return len(parts) > 1 and parts[1] == "h" and parts[0] in floors \
+        and int(entry["t"]) <= floors[parts[0]]
+
+
+def _same_order(theirs: Any, mine: Any, entries: dict[str, dict],
+                local: dict[str, Any]) -> bool:
+    """Whether the playlists' order kept in the copy (*theirs*) is the one
+    here (*mine*) - told by what each playlist is, not by its id: a
+    playlist added by hand on two computers has an id of its own on each,
+    and each then took the other's order for a change of its own, round
+    after round. One this computer does not have is left out."""
+    if not isinstance(theirs, list) or not isinstance(mine, list):
+        return False
+    fp_of: dict[str, str] = {}
+    for source in ({k: e.get("v") for k, e in entries.items()}, local):
+        for ident, value in source.items():
+            parts = _parts(ident)
+            if parts[:1] == ["s"] and len(parts) == 2 and isinstance(value, dict):
+                fp_of[parts[1]] = source_fp(value)
+    here = list(dict.fromkeys(fp_of.get(str(i), str(i)) for i in mine))
+    there = list(dict.fromkeys(fp_of.get(str(i), str(i)) for i in theirs))
+    return [fp for fp in there if fp in set(here)] == here
+
+
 def stamp(doc: dict[str, Any], snap: Snapshot, cats: tuple[str, ...] | list[str],
           now: int, fresh: bool | set[str] | frozenset[str] = False,
           new: Collection[str] = ()) -> bool:
@@ -723,6 +834,9 @@ def stamp(doc: dict[str, Any], snap: Snapshot, cats: tuple[str, ...] | list[str]
             e = entries.get(ident)
             if e is not None and "v" in e and _canon(e["v"]) == _canon(value):
                 continue
+            if cat == "sources" and ident == _ORDER and e is not None and "v" in e \
+                    and _same_order(e["v"], value, entries, local):
+                continue
             if timed:
                 t = _own_time(ident, value)
                 if e is not None and int(e["t"]) > t:
@@ -735,9 +849,11 @@ def stamp(doc: dict[str, Any], snap: Snapshot, cats: tuple[str, ...] | list[str]
             changed = True
         if fresh_cat:
             continue
+        floors = _history_floors(local, snap) if timed else {}
         for ident, e in list(entries.items()):
             if "v" in e and ident not in local and ident not in new \
-                    and _in_domain(cat, ident, e, snap):
+                    and _in_domain(cat, ident, e, snap) \
+                    and not _fell_off(ident, e, floors):
                 entries[ident] = {"t": max(now, int(e["t"]) + 1), "d": 1}
                 changed = True
     return changed
@@ -945,6 +1061,10 @@ class Applied:
     history: set[str] = field(default_factory=set)       # playlist ids
     sources: bool = False
     skipped: set[str] = field(default_factory=set)       # changed meanwhile
+    #: Something of this computer's own the copy does not have yet (a
+    #: playlist that kept its own after its id was taken): the next round
+    #: soon, not in half an hour.
+    again: bool = False
 
     def any(self) -> bool:
         return bool(self.settings or self.favorites or self.history or self.sources)
@@ -1077,7 +1197,12 @@ def _apply_history(ctx: Context, new: dict[str, Any], old: dict[str, Any],
                     if isinstance(e, dict) and e.get("_kind") in _LOCAL_KINDS]
             rows = here + [v for v in mine.values() if isinstance(v, dict)]
             rows.sort(key=lambda e: str(e.get("_watched_at") or ""), reverse=True)
-            settings.setValue(f"history_{pid}", json.dumps(rows[:MAX_HISTORY]))
+            rows = rows[:MAX_HISTORY]
+            if rows == _json(settings.value(f"history_{pid}"), []):
+                # A full list keeps fewer titles than the others have: the
+                # same ones again each round, and nothing changed here.
+                continue
+            settings.setValue(f"history_{pid}", json.dumps(rows))
         elif sub == "r" and resume is not None:
             key = f"resume_positions_{pid}"
             data = {k: v for k, v in _json(resume.value(key), {}).items()
@@ -1092,27 +1217,89 @@ def _apply_history(ctx: Context, new: dict[str, Any], old: dict[str, Any],
         out.history.add(pid)
 
 
+def _keep_own_sources(ctx: Context, ids: SourceIds, wanted: dict[str, dict],
+                      entries: dict[str, dict], own: dict[str, dict], out: Applied) -> None:
+    """Two computers that each kept a playlist of another provider under the
+    legacy id "default" (made from the settings of a version before
+    playlists): joining, this one's own lost to the other's under the same
+    id - its playlist became the other provider, its favourites with it.
+    Told by this computer's own entry: new to the copy (the time 0) and
+    beaten by another computer's of another playlist (not one of its own
+    changed: the same playlist on both is the same address and login). This
+    one keeps its own then, under another id in the copy - the other
+    computer's id for it if the copy has one, else a new one - and the
+    other's comes in beside it."""
+    srcs = ctx.sources()
+    used = {ids.entry_of(str(p["id"])) for p in srcs}
+    for p in srcs:
+        pid = str(p["id"])
+        e = ids.entry_of(pid)
+        mine, won, v = own.get(_eid("s", e)), entries.get(_eid("s", e)), wanted.get(e)
+        if (v is None or not isinstance(mine, dict) or "v" not in mine
+                or int(mine.get("t", 1)) != 0 or not isinstance(won, dict)
+                or int(won.get("t", 0)) == 0):
+            continue
+        fp = source_fp(p)
+        if source_fp(v) == fp:
+            continue
+        new = next((k for k, w in wanted.items()
+                    if k not in used and source_fp(w) == fp), None)
+        while new is None or new in used or (new in wanted and source_fp(wanted[new]) != fp):
+            new = secrets.token_hex(4)
+        log.info("sync: another computer's playlist had this one's id - each keeps its own")
+        ids.set(pid, new)
+        used.discard(e)
+        used.add(new)
+        out.again = True
+
+
 def _apply_sources(ctx: Context, new: dict[str, Any], old: dict[str, Any],
-                   out: Applied) -> None:
+                   out: Applied, entries: dict[str, dict] | None = None,
+                   own: dict[str, dict] | None = None) -> None:
+    """The copy's playlists here. Their ids in *new*, *old* and *entries*
+    are the copy's (SourceIds); *own*: this computer's entries as it
+    stamped them this round."""
     store = ctx.playlists
     if store is None or _canon(new) == _canon(old):
         return
-    here = {str(p["id"]): p for p in ctx.sources()}
-    fps_here = {source_fp(p) for p in here.values()}
+    ids = SourceIds(store)
     wanted: dict[str, dict] = {}
     for ident, v in new.items():
         parts = _parts(ident)
         if parts[:1] == ["s"] and len(parts) == 2 and isinstance(v, dict):
             wanted[parts[1]] = v
-    for pid, p in here.items():
-        v = wanted.get(pid)
+    if own:
+        _keep_own_sources(ctx, ids, wanted, entries or {}, own, out)
+    here = {ids.entry_of(str(p["id"])): p for p in ctx.sources()}
+    fps_here = {source_fp(p) for p in here.values()}
+
+    def when(e: str) -> int:
+        return int((entries or {}).get(_eid("s", e), {}).get("t", 0))
+
+    # The same playlist kept under an id of its own on another computer
+    # (added by hand on both): what was changed there last - its password,
+    # its name, its options - comes here too. Without this only a playlist
+    # with the same id on both followed a change.
+    twins: dict[str, str] = {}
+    for e, v in wanted.items():
+        if e not in here:
+            fp = source_fp(v)
+            if fp not in twins or when(e) > when(twins[fp]):
+                twins[fp] = e
+    for e, p in here.items():
+        pid = str(p["id"])
+        v = wanted.get(e)
+        twin = twins.get(source_fp(p))
+        if v is not None and twin is not None and when(twin) > when(e):
+            v = wanted[twin]
         if v is None:
-            if _eid("s", pid) not in old:
+            if _eid("s", e) not in old:
                 continue
             if pid == str(store.active_id):
                 log.info("sync: playlist removed elsewhere kept - it is in use here")
                 continue
             store.remove(pid)
+            ids.forget(pid)
             out.sources = True
         elif _canon(dict(v, id=pid)) != _canon(p):
             # A new dict, not this one changed: the playlist in use is held
@@ -1120,16 +1307,37 @@ def _apply_sources(ctx: Context, new: dict[str, Any], old: dict[str, Any],
             store.items[store.items.index(p)] = dict(v, id=pid)
             store.update(pid)
             out.sources = True
-    for pid, v in wanted.items():
-        if pid in here or source_fp(v) in fps_here:
+    for e, v in wanted.items():
+        if e in here or source_fp(v) in fps_here:
             continue                # here already, under an id of this computer's
+        pid = e
+        if store.get(pid) is not None or ids.local_of(e) is None:
+            while store.get(pid) is not None or pid in ids.to_entry or pid in wanted:
+                pid = secrets.token_hex(4)
         store.add(dict(v, id=pid))
+        if pid != e:
+            ids.set(pid, e)
         fps_here.add(source_fp(v))
         out.sources = True
     order = new.get(_eid("o"))
     if isinstance(order, list) and order != old.get(_eid("o")):
         current = [str(p["id"]) for p in ctx.sources()]
-        store.reorder([str(x) for x in order])
+        # By what each playlist is: one kept here under another id takes
+        # its place in the order all the same.
+        local_of: dict[str, str] = {}
+        for p in ctx.sources():
+            local_of.setdefault(source_fp(p), str(p["id"]))
+        pids = []
+        for x in order:
+            i = str(x)
+            mine_id = ids.local_of(i)
+            if mine_id is not None and mine_id in current:
+                pids.append(mine_id)
+            elif i in wanted:
+                pids.append(local_of.get(source_fp(wanted[i]), i))
+            else:
+                pids.append(i)
+        store.reorder(pids)
         if [str(p["id"]) for p in ctx.sources()] != current:
             out.sources = True
 
@@ -1157,7 +1365,8 @@ def apply(ctx: Context, result: RoundResult, before: Snapshot, now_here: Snapsho
             _apply_settings(ctx.settings, new, old, out, ctx)
             ctx.refresh_others()            # a profile that came with it
         elif cat == "sources":
-            _apply_sources(ctx, new, old, out)
+            _apply_sources(ctx, new, old, out, result.merged["c"].get(cat) or {},
+                           result.stamped["c"].get(cat) or {})
         elif cat == "favorites":
             _apply_favorites(ctx, result.merged["c"].get(cat) or {}, new, old,
                              ctx.places(), out)
@@ -1167,6 +1376,11 @@ def apply(ctx: Context, result: RoundResult, before: Snapshot, now_here: Snapsho
 
 
 # -- this computer's copy --------------------------------------------------------------------
+
+#: In the state file after a restore (rejoin()): the next round, of any
+#: slot, is this computer's first.
+_REJOIN = "rejoin"
+
 
 class State:
     """This computer's copy of the last snapshot, beside the settings (a
@@ -1192,7 +1406,10 @@ class State:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return st
-        if not isinstance(data, dict) or data.get("slot") != slot:
+        if not isinstance(data, dict):
+            return st
+        if data.get("slot") != slot:
+            st.fresh = bool(data.get(_REJOIN))     # a restore brought this slot
             return st
         doc = data.get("doc")
         if isinstance(doc, dict) and isinstance(doc.get("c"), dict):
@@ -1229,6 +1446,28 @@ def write_private(path: Path, text: str) -> None:
             except OSError:
                 pass
             raise
+
+
+def rejoin(path: Path) -> bool:
+    """After a backup was put in place over everything: this computer's copy
+    of the last snapshot forgotten and its next round marked fresh, so it
+    joins its slot again as a computer new to it - the others' newer values
+    win where they differ and nothing the backup lacks is removed from them.
+    Whatever slot the restored settings name (a backup can bring another
+    sync code, or one to a computer that never synced). True when sync had
+    been used here."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        data = None
+    used = isinstance(data, dict) and bool(data.get("slot"))
+    seen = data.get("seen") if used and isinstance(data, dict) else None
+    write_private(path, json.dumps(
+        {"slot": str(data["slot"]) if used and isinstance(data, dict) else "",
+         "version": 0, "fresh": True, "joining": False, _REJOIN: True,
+         "seen": sorted(str(c) for c in seen) if isinstance(seen, list) else [],
+         "doc": empty_doc()}, separators=(",", ":")))
+    return used
 
 
 def forget(path: Path) -> None:

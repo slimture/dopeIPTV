@@ -47,7 +47,7 @@ PRESET = {
     "live_rewind_minutes": "120", "live_rewind_disk": "true",
     "live_rewind_kept": "true", "live_rewind_space_gb": "5",
     "ui_scale": "125", "sub_scale": "150", "sub_color": "yellow",
-    "sub_background": "true",
+    "sub_background": "true", "sub_live": "false",
     "replay_delay_min": "-75", "epg_delay_min": "90",
     "view_density": "large", "epg_upcoming_count": "7",
     "sort_order": "alpha_desc", "check_updates": "false",

@@ -28,6 +28,21 @@ def test_build_style_returns_string():
     assert len(qss) > 100
 
 
+def test_a_mac_keeps_the_system_font_and_others_their_faces(monkeypatch):
+    # macOS lists no "SF Pro Text": naming it made Qt search every font at
+    # start and fall back to another face. The app's font there is already
+    # the system's, so the stylesheet names none.
+    assert theme.ui_font_rule("darwin") == ""
+    for platform in ("linux", "win32"):
+        assert theme.ui_font_rule(platform) == f"font-family: {theme.UI_FAMILIES};"
+    assert '"SF Pro Text", "Inter", "Cantarell", "Noto Sans", sans-serif' == theme.UI_FAMILIES
+    monkeypatch.setattr(theme.sys, "platform", "darwin")
+    mac = build_style()
+    assert "SF Pro Text" not in mac and "font-family: \"" not in mac.split("}", 1)[0]
+    monkeypatch.setattr(theme.sys, "platform", "linux")
+    assert f"font-family: {theme.UI_FAMILIES};" in build_style()
+
+
 class _Settings(dict):
     def value(self, key, default=None):
         return self.get(key, default)

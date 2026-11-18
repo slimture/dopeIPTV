@@ -334,6 +334,39 @@ def test_a_send_on_its_way_beside_a_tv_that_plays_says_playing(sync_runs, clock)
     assert w.cast_bar.pill.state == cc.STARTING
 
 
+def test_a_seek_is_said_on_the_card_until_the_tv_plays_it(sync_runs, clock):
+    """Going back (or to live) while casting: the card says where to and
+    that it takes a moment - not Playing for the old stream, not an error -
+    until the TV has played the new one a little while."""
+    import time as _t
+    from dopeiptv.i18n import tr
+    from dopeiptv.ui import cast_card as cc
+    w = _window("live")
+    _tick(w, clock, 1, "PLAYING/None")
+    when = _t.mktime((2026, 11, 18, 6, 19, 0, 0, 0, -1))
+    w._cast_inflight = 1                                   # the seek's send on its way
+    w._cast_moving(w._cast_ctx, when)
+    assert w.cast_bar.pill.state == cc.MOVING
+    assert w.cast_bar.pill.text == tr("cast_state_moving")
+    assert "06:19" in w.cast_bar.note.text()
+    _tick(w, clock, 3, "PLAYING/None")                    # the old stream still plays
+    assert w.cast_bar.pill.state == cc.MOVING
+    w._cast_inflight = 0                                   # handed over; the TV loads it
+    _tick(w, clock, 4, "BUFFERING/None")
+    assert w.cast_bar.pill.state == cc.MOVING
+    _tick(w, clock, 1, "PLAYING/None")
+    assert w.cast_bar.pill.state == cc.MOVING             # a moment of play is not yet it
+    _tick(w, clock, 3, "PLAYING/None")
+    assert w.cast_bar.pill.state == cc.PLAYING and "_moving" not in w._cast_ctx
+    # Back to live says so too; a send that fails ends it.
+    w._cast_moving(w._cast_ctx, "live")
+    assert w.cast_bar.pill.state == cc.TO_LIVE
+    assert w.cast_bar.note.text() == tr("cast_note_to_live")
+    w._error = lambda _m: None
+    w._cast_send_failed("receiver gone")
+    assert "_moving" not in w._cast_ctx
+
+
 def test_a_send_a_newer_one_replaced_is_no_error(monkeypatch):
     """Live while a seek was on its way: the seek's send stops ("Casting
     stopped.") and the newer one goes - nothing to tell."""
@@ -367,13 +400,14 @@ def test_the_tracks_button_is_a_chromecast_s_alone():
 def test_a_stuck_channel_is_sent_again_twice_then_the_card_says_try_again(sync_runs, clock):
     from dopeiptv.ui import cast_card as cc
     w = _window("live")
+    _tick(w, clock, 1, "PLAYING/None")        # it has played: 10 s is a stall
     _tick(w, clock, 11, "BUFFERING/None")
     assert len(w.cast.casts) == 1 and w.cast.casts[0]["settle"] is True
     assert w.cast.casts[0]["url"] == "http://p/7.m3u8"           # the live edge
     assert w.cast_bar.pill.state == cc.RECONNECTING and "1" in w.cast_bar.pill.text
-    _tick(w, clock, 11)
+    _tick(w, clock, 46)                       # a try's stream: 45 s to start
     assert len(w.cast.casts) == 2 and w.cast_bar.pill.state == cc.RECONNECTING
-    _tick(w, clock, 11)
+    _tick(w, clock, 46)                       # a try's stream: 45 s to start
     assert len(w.cast.casts) == 2, "two tries, no more by itself"
     assert w.cast_bar.pill.state == cc.FAILED and w.cast_bar.action_kind == "retry"
     assert w.toasts and w.toasts[-1][3] == "cast_stuck"
@@ -392,6 +426,7 @@ def test_a_stuck_channel_is_sent_again_twice_then_the_card_says_try_again(sync_r
 
 def test_a_stuck_film_goes_on_from_where_it_was(sync_runs, clock):
     w = _window("movie", duration=888.0)
+    _tick(w, clock, 1, "PLAYING/None")        # it has played: 10 s is a stall
     _tick(w, clock, 11, "BUFFERING/None")
     assert len(w.cast.casts) == 1
     sent = w.cast.casts[0]
@@ -413,6 +448,7 @@ def test_a_pause_or_a_stall_that_ends_by_itself_sends_nothing(sync_runs, clock):
 def test_nothing_is_sent_again_beside_a_stream_on_its_way(sync_runs, clock):
     sync_runs.append("hold")
     w = _window("live")
+    _tick(w, clock, 1, "PLAYING/None")        # it has played: 10 s is a stall
     _tick(w, clock, 11, "BUFFERING/None")
     assert len(sync_runs) == 2 and w._cast_inflight == 1     # one on its way
     _tick(w, clock, 40)
@@ -427,6 +463,7 @@ def test_a_full_account_is_not_sent_again_by_itself(sync_runs, clock):
     from dopeiptv.i18n import tr
     from dopeiptv.ui import cast_card as cc
     w = _window("live")
+    _tick(w, clock, 1, "PLAYING/None")        # it has played: 10 s is a stall
     w.verdict = object()                 # another stream holds the connection
     _tick(w, clock, 11, "BUFFERING/None")
     assert w.cast.casts == []
@@ -437,14 +474,15 @@ def test_a_full_account_is_not_sent_again_by_itself(sync_runs, clock):
 def test_a_try_that_fails_to_go_waits_for_the_next(sync_runs, clock):
     from dopeiptv.ui import cast_card as cc
     w = _window("live")
+    _tick(w, clock, 1, "PLAYING/None")        # it has played: 10 s is a stall
 
     def refuse(*_a, **_k):
         raise RuntimeError("receiver gone")
     w.cast.cast = refuse
     _tick(w, clock, 11, "BUFFERING/None")
     assert w.errors == [] and w.cast_bar.pill.state == cc.RECONNECTING
-    _tick(w, clock, 11, "IDLE/None")
-    _tick(w, clock, 11)
+    _tick(w, clock, 46, "IDLE/None")          # a try's stream: 45 s to start
+    _tick(w, clock, 46)
     assert w.cast_bar.pill.state == cc.FAILED and w.toasts
 
 

@@ -1,3 +1,29 @@
+## dopeIPTV 1.6.5
+
+**A crash and two mix-ups fixed, safer settings sync, and supporting dopeIPTV is now a tip.**
+
+### Fixed
+
+- **A provider that refuses the login** no longer crashes the app as it opens. The lists from before stay; without them it says the user name or password is wrong.
+- **A source's type:** changing it in Settings no longer takes another type's address and login along (an Xtream login turned up under Jellyfin or Tvheadend). Each type keeps its own, a source is stored as the new type only once its own fields are filled in, and only looking through the types changes nothing and asks nothing.
+- **M3U channels keep who they are** when the provider adds, removes or reorders channels: favourites, hidden and renamed channels, your own numbers and reminders no longer move to the channel next door. The first start after the update reads the list as before; the start after that moves what is kept, in every profile.
+- **Settings sync:** restoring an older backup no longer takes anything from your other computers; the same playlist added on two computers is one; two computers that each had their first provider from before playlists - a different one on each - now keep both, each with its own favourites, instead of one taking the other's place; a full history list no longer removes titles on the others; and what a round brought in is kept even when the window closes right after.
+- **Server mode:** the tuner can no longer be reached from a web page (DNS rebinding). Plex, Jellyfin and Channels are not affected.
+- **Casting:** going back in a channel says so on the card - "Going back…", "Back to live…" - until the TV plays it.
+- **AirPlay (macOS):** a stream the Apple TV is still loading is no longer started over after ten seconds.
+- **TV:** a channel's name is no longer cut short on a scaled Windows screen, and the name column is as wide as the longest names need (#35).
+- **Mac:** the app's text is in the system's own font, and the app starts a little faster.
+- **Send feedback** fits the screen, scrolls and opens wholly on it - on a Mac it opened half under the Dock; **messages** take a new theme's colours.
+
+### New
+
+- **Subtitles on live TV** (Settings > Picture and sound): turn it off to have subtitles on films and series but not on live channels, whose DVB subtitles otherwise come on by themselves in your language.
+
+### Changed
+
+- **Supporting dopeIPTV is a tip or monthly support**, in all 27 languages, and the heart opens the new support page on dopeiptv.org.
+- **AirPlay (macOS):** an Apple TV plays channels live - going back in a channel is no longer offered there, as it was slow and the sound came out of step. Pause, films and episodes work as before, and a Chromecast goes back as before.
+
 ## dopeIPTV 1.6.4
 
 **Casting with a card of its own that gets a stuck TV going again, and a round of fixes.**

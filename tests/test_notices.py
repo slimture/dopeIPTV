@@ -802,6 +802,17 @@ hub.finish(job)
 w.switch_mode("live")
 pump(10)
 assert fl.isHidden() and fc.isHidden() and card.isVisible()
+# Another theme: the card and the panel keep style sheets of their own, and
+# take the new theme's colours with the rest of the window.
+from dopeiptv.ui.notice_widgets import colours
+before = (panel.styleSheet(), card.styleSheet(), fc.styleSheet())
+s.setValue("theme", "light" if not theme.P.get("light") else "dark")
+w._apply_theme_now()
+pump(5)
+c = colours()
+assert c["surface"] in panel.styleSheet() and panel.styleSheet() != before[0]
+assert c["line_bg"] in card.styleSheet() and card.styleSheet() != before[1]
+assert c["float_bg"] in fc.styleSheet() and fc.styleSheet() != before[2]
 print("NOTICES_WINDOW_OK")
 """
 

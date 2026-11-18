@@ -442,6 +442,64 @@ def test_first_upload_join_and_both_ways(tmp_path, site):
     assert a.settings.value("window_geometry") == "a-geometry"
 
 
+def test_an_older_backup_restored_takes_nothing_from_the_others(tmp_path, site):
+    """A backup put in place over everything (core/backup.apply_pending, then
+    sync.rejoin at start): the restored computer joins again as a new one -
+    the others' newer values come back to it and nothing the backup lacks
+    is removed from them. Without it the old values were stamped as new
+    and won everywhere, and what they lacked went on every computer."""
+    slot, key = sync.derive(os.urandom(32))
+    remote = sync.Remote(slot, site.url, timeout=5)
+    a, b = Computer(tmp_path, "a", slot), Computer(tmp_path, "b", slot)
+    pid = a.playlists.add(dict(PROVIDER))["id"]
+    a.favs(pid).add("all", {"stream_id": 1, "name": "One"})
+    a.settings.setValue("theme", "nord")
+    a.round(remote, key, now=1000)
+    b.state.fresh = b.state.joining = True
+    b.round(remote, key, now=2000)
+    a.favs(pid).add("all", {"stream_id": 2, "name": "Two"})
+    a.settings.setValue("theme", "dracula")
+    a.round(remote, key, now=3000)
+    sync.write_private(b.state.path, b.state.dump())
+
+    # B's backup from before: the old theme, no favorite Two.
+    b.settings.setValue("theme", "graphite")
+    b.favs(pid).remove(1)
+    b.favs(pid).add("all", {"stream_id": 1, "name": "One"})
+    assert sync.rejoin(b.state.path)
+    b.state = sync.State.load(b.state.path, slot)
+    assert b.state.fresh and not b.state.joining and b.state.doc == sync.empty_doc()
+    b.round(remote, key, now=4000)
+    assert b.settings.value("theme") == "dracula"
+    assert {x["stream_id"] for x in b.favs(pid).items()} == {1, 2}
+    a.round(remote, key, now=5000)
+    assert a.settings.value("theme") == "dracula"
+    assert {x["stream_id"] for x in a.favs(pid).items()} == {1, 2}
+
+    # Once synced the mark is gone: the next round is an ordinary one.
+    sync.write_private(b.state.path, b.state.dump())
+    assert not sync.State.load(b.state.path, slot).fresh
+
+
+def test_rejoin_marks_any_slot_and_a_computer_that_never_synced(tmp_path):
+    path = tmp_path / "sync-state.json"
+    assert not sync.rejoin(path)                        # never synced here
+    assert sync.State.load(path, "any-slot").fresh      # a backup brought a code
+    st = sync.State(path, "slot-a")
+    st.seen = {"favorites"}
+    st.doc["c"]["settings"] = {"theme": {"t": 5, "v": "nord"}}
+    st.version = 9
+    sync.write_private(path, st.dump())
+    assert sync.rejoin(path)
+    got = sync.State.load(path, "slot-a")
+    assert got.fresh and got.version == 0 and got.doc == sync.empty_doc()
+    assert got.seen == {"favorites"}
+    assert sync.State.load(path, "slot-b").fresh        # another code from the backup
+    st = sync.State(path, "slot-b")
+    sync.write_private(path, st.dump())
+    assert not sync.State.load(path, "slot-c").fresh    # no restore: a stranger's state
+
+
 def test_the_same_playlist_under_another_id_is_one_playlist(tmp_path, site):
     """Added by hand on both computers before syncing: favorites follow it by
     its address and login, and nothing is listed twice."""

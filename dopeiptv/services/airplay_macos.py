@@ -61,6 +61,8 @@ without them there is no AirPlay entry and the app runs as before.
 """
 from __future__ import annotations
 
+from dataclasses import replace
+
 import importlib.util
 import re
 import sys
@@ -580,6 +582,9 @@ class AirPlayReceiver(QObject):
         self._external_since = 0.0
         self._lost_at = 0.0
         self._opened_at = 0.0
+        #: What the player was last handed (the bridge's playlist or a
+        #: direct address): a new bridge is the TV's to reach only once it is.
+        self._opened_url = ""
         # When a new item went into a player already on the Apple TV.
         self._swapped_at = 0.0
         self._user_paused = False
@@ -791,7 +796,17 @@ class AirPlayReceiver(QObject):
                 if self.bridge.running():
                     self.bridge.stop()
                 time.sleep(SETTLE_S)
-            if not req["codecs"] or force_bridge:
+            last = self.plan
+            if (feed is not None and not req["codecs"] and not force_bridge
+                    and self.active is not None and last is not None and not last.direct):
+                # A seek in the channel already on the TV: its archive or
+                # rewind buffer is that channel, so what the bridge does with
+                # it is known - not asked of the provider once more (one
+                # more opening of the archive, seconds before the stream).
+                p = replace(p, video=last.video, audio=last.audio, hevc=last.hevc,
+                            adts=last.adts)
+                log.info("airplay: a seek in the same channel - its stream as before")
+            elif not req["codecs"] or force_bridge:
                 found = ab.probe(p.url, net, self.bridge.exe)
                 p = ab.refine(p, found)
                 if not duration and found["duration"] > 0 \
@@ -926,6 +941,7 @@ class AirPlayReceiver(QObject):
         self._offset, self._pos, self._note, self._note_error = (
             offset, 0.0, "", "")
         self._opened_at = now
+        self._opened_url = target
         self._user_paused = False
         self._said_unreached = False
         p.setVolume_(self._volume)
@@ -1309,6 +1325,7 @@ class AirPlayReceiver(QObject):
                           "BUFFERING/NONE" if tc == _TC_WAITING else
                           "PAUSED/NONE")
         if (self._external and self.bridged() and not self.bridge.remote_seen
+                and self._opened_url == self.bridge.url
                 and not self._said_unreached
                 and now - self._external_since > UNREACHED_S):
             # On the TV, and the TV never asked: macOS's firewall said no,

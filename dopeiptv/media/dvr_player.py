@@ -228,14 +228,6 @@ class DvrPlayerMixin:
         if rec is not None:
             rec.stop()
 
-    def dvr_recording_channels(self) -> int:
-        """Channels a recording keeps streaming besides the one on screen."""
-        pool = self._dvr_pool
-        if pool is None:
-            return 0
-        return sum(1 for s in pool.sessions
-                   if s.recording and s is not self._dvr)
-
     # -- time ------------------------------------------------------------------
 
     def _dvr_resolve_open(self) -> float | None:

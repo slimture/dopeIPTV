@@ -1,7 +1,7 @@
-"""The supporter key: a thank-you for a donation.
+"""The supporter key: a thank-you for a tip or monthly support.
 
 dopeiptv.org signs it with a key of its own (Ed25519, donate/supporter.py
-on the website branch) when a donation goes through, and the app checks
+on the website branch) when a payment goes through, and the app checks
 the signature here, offline - nothing is asked of a server, and nothing
 about the person is in the key: a version, the day it was made and a
 random id. It shows a supporter mark in About and opens the supporter

@@ -47,7 +47,7 @@ _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_set_cast_quality", "_toggle_cast_mute", "_show_cast_volume",
             "_cast_tracks_menu", "manage_cast", "_cast_ended_there",
             "_cast_plays_as_is", "_cast_is_kodi", "_cast_began",
-            "_cast_hooks_end", "_cast_on_airplay", "_show_cast_label", "_cast_tracks_shown",
+            "_cast_hooks_end", "_cast_on_airplay", "_show_cast_label", "_cast_tracks_shown", "_cast_moving_to",
             "_cast_drop_feed", "_cast_takes_feed", "_cast_title_ended",
             "_cast_feed", "_cast_written", "_cast_from_moment",
             "_cast_send_feed", "_archive_feed", "_buffer_feed",
@@ -2960,3 +2960,39 @@ def test_no_receiver_is_handed_the_rewind_buffer_s_loopback_address(monkeypatch)
     w.manage_cast()
     assert shown == {"url": "http://p/live/u/pw/7.m3u8",
                      "source": "http://p/live/u/pw/7.ts"}
+
+
+class _CastAirPlay(_CastAt):
+    """An Apple TV's manager, as the hub says it."""
+
+    def __init__(self, airplay=True):
+        super().__init__(0.0, 0.0)
+        self._airplay = airplay
+
+    def is_airplay(self, _name):
+        return self._airplay
+
+
+def test_an_apple_tv_plays_a_channel_live_and_never_goes_back():
+    """Going back in a live channel was a new stream the Apple TV started
+    over each time - slow, and its sound out of step. On an Apple TV a
+    channel plays live: no timeline, no steps back, no move to a moment
+    (the phone remote and the media keys come through that too)."""
+    from datetime import datetime, timedelta
+    w = _with_strip()
+    w._cast_device = "Living room"
+    w._effective_ts_minutes = lambda it: 4320
+    w._cast_ctx = {"archive": True, "sid": 9851, "item": {"stream_id": 9851}}
+    moved = []
+    w._cast_from_archive = lambda when: moved.append(when)
+
+    w.cast = _CastAirPlay(airplay=True)
+    assert w._cast_can_go_back() is False
+    assert w._cast_timeline() is None
+    w._cast_to_moment(datetime.now() - timedelta(hours=1))
+    assert moved == []
+
+    # The same channel on a Chromecast still goes back.
+    w.cast = _CastAirPlay(airplay=False)
+    assert w._cast_can_go_back() is True
+    assert w._cast_timeline() is not None

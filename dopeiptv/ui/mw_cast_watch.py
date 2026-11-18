@@ -50,6 +50,18 @@ class _CastWatchMixin:
 
     #: A skip on the card, in seconds.
     CAST_SKIP_S = 30
+    #: A seek has reached the TV once it has played this long (a moment of
+    #: the old stream's Playing right after the send is not it).
+    CAST_MOVED_S = 2.0
+    #: A seek said on the card at most this long; the watchdog has it after.
+    CAST_MOVING_MAX_S = 120.0
+
+    def _cast_moving(self, ctx: dict, to) -> None:
+        """A seek on its way to the TV - to a moment (seconds since the
+        epoch) or to live ("live"): the card says so until the TV plays it."""
+        ctx["_moving"], ctx["_moving_at"] = to, time.monotonic()
+        self._cast_watch().new_stream()         # what plays now is not it
+        self._cast_card_state()
 
     # -- what the card shows ------------------------------------------------------------
 
@@ -245,6 +257,25 @@ class _CastWatchMixin:
         ctx = getattr(self, "_cast_ctx", None) or {}
         ph = cast_watch.phase(getattr(getattr(self, "cast", None), "state", ""))
         now = time.monotonic()
+        moving = ctx.get("_moving")
+        if moving is not None and not watch.failed and not watch.recovering() \
+                and not self._cast_waiting_route():
+            there = (not self._cast_busy() and ph == cast_watch.PLAYING and watch.started
+                     and watch.playing_since is not None
+                     and now - watch.playing_since >= self.CAST_MOVED_S)
+            if there or now - float(ctx.get("_moving_at") or now) > self.CAST_MOVING_MAX_S:
+                ctx.pop("_moving", None)
+            elif moving == "live":
+                card.set_state(cast_card.TO_LIVE, note=tr("cast_note_to_live"))
+                return
+            else:
+                try:
+                    when = time.strftime("%H:%M", time.localtime(float(moving)))
+                except (TypeError, ValueError, OverflowError):
+                    when = ""
+                card.set_state(cast_card.MOVING, note=tr("cast_note_moving", time=when)
+                               if when else "")
+                return
         if watch.failed:
             card.set_state(cast_card.FAILED, note=str(ctx.get("_fail_note") or ""),
                            action="retry")

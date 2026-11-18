@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import sys
 
 ACCENTS = {
     "blue":   ("Blue",   "#4C8DFF", "#5E99FF"),
@@ -720,6 +721,21 @@ def _check_png(color: str, size: int = 12) -> str:
     return path.replace("\\", "/")
 
 
+#: The UI's faces where the system's own is not the app's default.
+UI_FAMILIES = '"SF Pro Text", "Inter", "Cantarell", "Noto Sans", sans-serif'
+
+
+def ui_font_rule(platform: str | None = None) -> str:
+    """The stylesheet's font family for every widget. On a Mac none: the
+    application's font is already the system's (San Francisco), and naming
+    "SF Pro Text" - not a family macOS lists - had Qt look through every
+    font at start (70 ms) and settle on another face. Elsewhere the faces
+    as they were."""
+    if (platform or sys.platform) == "darwin":
+        return ""
+    return f"font-family: {UI_FAMILIES};"
+
+
 def build_style() -> str:
     """Generate the full application QSS from the active palette."""
     p = dict(P)
@@ -747,7 +763,7 @@ def build_style() -> str:
     chip_r = min(12, round(corner_radius(12)))
     return rounded(f"""
 * {{
-    font-family: "SF Pro Text", "Inter", "Cantarell", "Noto Sans", sans-serif;
+    {ui_font_rule()}
     color: {p['text']};
 }}
 QMainWindow, QDialog {{ background: {p['bg']}; }}
@@ -1150,6 +1166,13 @@ QFileDialog QTreeView::item:hover, QFileDialog QListView::item:hover {{
 QFileDialog QTreeView::item:selected, QFileDialog QListView::item:selected {{
     background: {ACCENT}; color: {ON};
 }}
+QTreeWidget {{
+    background: {p['input']}; border: none; border-radius: 6px;
+    color: {p['text']}; outline: none;
+}}
+QTreeWidget::item {{ padding: 3px 6px; color: {p['text']}; }}
+QTreeWidget::item:hover {{ background: {p['hover']}; }}
+QTreeWidget::item:selected {{ background: {ACCENT}; color: {ON}; }}
 QHeaderView {{ background: {p['btn']}; border: none; }}
 QHeaderView::section {{
     background: {p['btn']}; color: {p['text2']}; border: none;

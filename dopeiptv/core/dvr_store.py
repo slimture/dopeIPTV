@@ -33,10 +33,6 @@ class Segment:
     closed: bool = False
 
 
-class StoreClosed(Exception):
-    """The store was closed while a reader waited on it."""
-
-
 class SegmentStore:
     SEG_SECONDS = 2.0
     MIN_FREE_BYTES = 1 << 30

@@ -30,7 +30,7 @@ from __future__ import annotations
 import time
 from bisect import bisect_left, bisect_right
 from dataclasses import dataclass
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Iterable, Sequence
 
 from PyQt6.QtCore import QPoint, QRect, QRectF, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen, QPixmap
@@ -235,6 +235,9 @@ NARROW_FROM = 440
 
 #: The marks after a name: the favourite's star, catch-up's rewind.
 STAR, ARCHIVE = "★", "◀◀"
+#: Pixels kept free after a name before it is cut with "…": a scaled
+#: screen draws text a little wider than it measures.
+NAME_SLACK = 3
 DOT = 8
 MARK_GAP = 6
 
@@ -243,9 +246,23 @@ def _marks_after(r: TvRow) -> list[str]:
     return [m for m, on in ((STAR, r.favourite), (ARCHIVE, r.archive)) if on]
 
 
+def name_need(names: Iterable[str], marks: bool = True) -> int:
+    """The width a name column needs for *names* (the list's, as shown):
+    the widest in the row's name font, the room a dot and a ring take
+    before it and, with *marks*, the favourite's and catch-up's after it,
+    and the slack a scaled screen needs (issue #35)."""
+    nfm = QFontMetrics(_font(TITLE_PX, BOLD))
+    widest = max((nfm.horizontalAdvance(n) for n in names if n), default=0)
+    if widest <= 0:
+        return 0
+    mfm = QFontMetrics(_font(SMALL_PX, BOLD))
+    after = sum(mfm.horizontalAdvance(m) + MARK_GAP for m in (STAR, ARCHIVE)) if marks else 0
+    return widest + 2 * (DOT + MARK_GAP) + after + 2 * NAME_SLACK
+
+
 def paint_tv_row(p: QPainter, rect: QRect, row: int, count: int, r: TvRow, density: str,
                  rtl: bool, hover: bool = False, selected: bool = False,
-                 pictures: Pictures | None = None) -> dict[str, QRect]:
+                 pictures: Pictures | None = None, name_w: int = 0) -> dict[str, QRect]:
     """*r* painted in *rect* (the list's row *row* of *count*); the parts
     it went into (for the tests)."""
     pictures = pictures if pictures is not None else Pictures()
@@ -256,7 +273,7 @@ def paint_tv_row(p: QPainter, rect: QRect, row: int, count: int, r: TvRow, densi
         if r.heading:
             _paint_heading(p, rect, r.heading, rtl)
             return {"heading": rect}
-        parts = channel_parts(rect, density, rtl)
+        parts = channel_parts(rect, density, rtl, name_w)
         align = _aligned(rtl)
         small = _font(SMALL_PX)
         sfm = QFontMetrics(small)
@@ -345,9 +362,11 @@ def _paint_name(p: QPainter, name_r: QRect, r: TvRow, rtl: bool, selected: bool,
     marks = _marks_after(r)
     mark_f = _font(SMALL_PX, BOLD)
     mfm = QFontMetrics(mark_f)
-    marks_w = sum(mfm.horizontalAdvance(m) + MARK_GAP for m in marks)
+    marks_w = sum(mfm.horizontalAdvance(m) + MARK_GAP for m in marks) + (NAME_SLACK if marks else 0)
     room = max(10, line.width() - lead_w - marks_w)
-    text = nfm.elidedText(r.name, Qt.TextElideMode.ElideRight, room)
+    # A little slack: with the screen scaled (Windows at 125 or 150 %) the
+    # drawn text comes out a pixel or two wider than its measure (issue #35).
+    text = nfm.elidedText(r.name, Qt.TextElideMode.ElideRight, max(10, room - NAME_SLACK))
     tw = min(room, nfm.horizontalAdvance(text))
     tx = line.right() + 1 - lead_w - tw if rtl else line.x() + lead_w
     name_box = QRect(tx, line.y(), tw + 1, line.height())
@@ -359,10 +378,11 @@ def _paint_name(p: QPainter, name_r: QRect, r: TvRow, rtl: bool, selected: bool,
     else:
         ink = colour("text")
     p.setPen(ink)
-    p.drawText(name_box, int(_aligned(rtl)), text)
+    # Never clipped to its measure: the last letter was cut off ("BBC Eart").
+    p.drawText(name_box, int(_aligned(rtl)) | int(Qt.TextFlag.TextDontClip), text)
     if marks:
         p.setFont(mark_f)
-        mx = tx - MARK_GAP if rtl else tx + tw + MARK_GAP
+        mx = tx - MARK_GAP - NAME_SLACK if rtl else tx + tw + MARK_GAP + NAME_SLACK
         for m in marks:
             mw = mfm.horizontalAdvance(m)
             p.setPen(colour("warn"))

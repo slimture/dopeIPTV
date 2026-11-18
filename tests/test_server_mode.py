@@ -911,6 +911,26 @@ def test_the_tuner_s_endpoints_are_refused_beyond_its_own_networks(server, monke
     assert _get(srv, f"/playlist.m3u?token={TOKEN}").status == 200, "the token's routes as before"
 
 
+def test_the_tuner_answers_only_under_a_home_name(server):
+    """DNS rebinding: a web page at home points its own name at this
+    computer and asks the tuner, which needs no token - its Host is that
+    public name, so it is refused; the addresses and home names clients use
+    still work (Plex, Jellyfin and Channels ask by address)."""
+    from dopeiptv.services.home_server import tuner_host_ok
+    for ok in (None, "", "192.168.1.5:5004", "127.0.0.1", "[::1]:5004", "[fe80::1]",
+               "localhost:5004", "nas", "mypc.local", "box.lan:8000", "tv.home.arpa"):
+        assert tuner_host_ok(ok), ok
+    for bad in ("evil.example", "evil.example:8000", "attacker.com.", "a.b.c.example.org",
+                "[::1", "rebind.it:80"):
+        assert not tuner_host_ok(bad), bad
+    srv = server[0]
+    for path in ("/discover.json", "/lineup.json", "/auto/v5"):
+        with pytest.raises(urllib.error.HTTPError) as e:
+            _get(srv, path, {"Host": "evil.example:8000"})
+        assert e.value.code == 403, path
+    assert _get(srv, "/discover.json").status == 200          # by its address, as before
+
+
 def test_the_discovery_is_not_answered_beyond_its_own_networks():
     from dopeiptv.providers.hdhomerun import discover_packet
     dev = hdhr.new_device_id()

@@ -79,6 +79,10 @@ MP4_PATHS = (".mp4", ".m4v", ".mov")
 # longer GOP made segments far longer than the playlist's target, and
 # the Apple TV gave up (CoreMedia -12888, playlist unchanged too long).
 SEGMENT_S = 6
+#: A seek's pieces (cast_feed) in shorter segments: the Apple TV wants
+#: LEAD of them before it takes a stream, so a moment gone back to is on
+#: the TV after 6 s of it converted rather than 18.
+FEED_SEGMENT_S = 2
 LIVE_WINDOW_S = 300         # how much of a channel the playlist keeps
 LEAD = 3                    # segments a live playlist has before it goes
 READY_WAIT_S = 30.0         # how long the first playlist may take
@@ -297,6 +301,7 @@ def ffmpeg_args(exe: str, p: Plan, start: float = 0.0,
 
     *feed*: the pieces of a broadcast on stdin (cast_feed.Feed), written
     as one EVENT playlist that keeps every segment."""
+    seg = FEED_SEGMENT_S if feed else SEGMENT_S
     if feed:
         src, opts = cast_feed.INPUT, list(cast_feed.INPUT_OPTIONS)
     else:
@@ -316,7 +321,7 @@ def ffmpeg_args(exe: str, p: Plan, start: float = 0.0,
                "-bufsize", "16M"]),
             # A keyframe at every segment boundary, or the segments come out
             # as long as the encoder's own idea of a GOP.
-            "-force_key_frames", f"expr:gte(t,n_forced*{SEGMENT_S})"]
+            "-force_key_frames", f"expr:gte(t,n_forced*{seg})"]
     # Copied AAC out of a TS comes as ADTS; the MP4 segments need it as
     # ASC, or ffmpeg stops at the first packet ("Malformed AAC bitstream").
     audio = (["-c:a", "copy", *(["-bsf:a", "aac_adtstoasc"] if p.adts else [])]
@@ -336,7 +341,7 @@ def ffmpeg_args(exe: str, p: Plan, start: float = 0.0,
         # A feed carries only the chosen track (cast_feed.reader_args).
         "-map", "0:v:0?", "-map", f"0:a:{0 if feed else p.audio_track}?", "-sn", "-dn",
         *video, *audio, "-max_muxing_queue_size", "1024",
-        "-f", "hls", "-hls_time", str(SEGMENT_S),
+        "-f", "hls", "-hls_time", str(seg),
         "-hls_segment_type", "fmp4", "-hls_fmp4_init_filename", "init.mp4",
         *keep, "-hls_segment_filename", "s%05d.m4s", PLAYLIST,
     ]
@@ -611,16 +616,14 @@ class AirPlayBridge:
 
     def ready(self) -> bool:
         """The playlist has enough to start: LEAD segments of a channel (an
-        Apple TV starts three segments from the live edge), one of a film or
-        of pieces read here (a moment gone back to: the playlist says to
-        start at its first segment, EXT-X-START, so there is no live edge to
-        keep back from) - or all there is of something shorter."""
+        Apple TV starts three segments from the live edge - pieces read here
+        too: handed one, the Apple TV played on where it was), one of a film
+        - or all there is of something shorter."""
         body = self._playlist()
         n = segments_in(body)
         if b"#EXT-X-ENDLIST" in body:
             return n > 0
-        live = self.plan is not None and self.plan.live and self.feed is None
-        return n >= (LEAD if live else 1)
+        return n >= (LEAD if self.plan is not None and self.plan.live else 1)
 
     def wait_ready(self, timeout: float = READY_WAIT_S,
                    stopping: Callable[[], bool] | None = None) -> bool:

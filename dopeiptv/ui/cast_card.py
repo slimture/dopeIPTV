@@ -43,13 +43,17 @@ from .widgets import paint_strip_glyph
 #: The card's states (ui/mw_cast_watch.py picks one).
 STARTING, PLAYING, PAUSED, BUFFERING = "starting", "playing", "paused", "buffering"
 RECONNECTING, WAITING, FAILED, ENDED = "reconnecting", "waiting", "failed", "ended"
-STATES = (STARTING, PLAYING, PAUSED, BUFFERING, RECONNECTING, WAITING, FAILED, ENDED)
+#: A seek on its way to the TV: back in time, or back to live.
+MOVING, TO_LIVE = "moving", "to_live"
+STATES = (STARTING, PLAYING, PAUSED, BUFFERING, RECONNECTING, WAITING, FAILED, ENDED,
+          MOVING, TO_LIVE)
 #: The states that turn the pill's spinner.
-SPINNING = frozenset({STARTING, BUFFERING, RECONNECTING, WAITING})
+SPINNING = frozenset({STARTING, BUFFERING, RECONNECTING, WAITING, MOVING, TO_LIVE})
 _WORDS = {STARTING: "cast_state_starting", PLAYING: "cast_state_playing",
           PAUSED: "cast_state_paused", BUFFERING: "cast_state_buffering",
           RECONNECTING: "cast_state_reconnecting", WAITING: "cast_state_waiting",
-          FAILED: "cast_state_failed", ENDED: "cast_state_ended"}
+          FAILED: "cast_state_failed", ENDED: "cast_state_ended",
+          MOVING: "cast_state_moving", TO_LIVE: "cast_state_to_live"}
 
 #: The widest the content gets; a wider pane centres it.
 MAX_W = 600

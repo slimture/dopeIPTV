@@ -52,6 +52,7 @@ def test_ten_seconds_stuck_is_sent_again_twice_then_it_fails():
 
 def test_a_pause_is_not_a_stall_nor_waiting_for_an_apple_tv():
     w = cw.Watchdog()
+    w.tick(-1.0, cw.PLAYING)                          # it has played
     # The person paused it: a receiver that buffers meanwhile is not stuck.
     assert _run(w, cw.BUFFERING, 0.0, 60.0, held=True) == []
     assert _run(w, cw.PAUSED, 61.0, 120.0) == []
@@ -71,6 +72,7 @@ def test_nothing_is_judged_while_a_stream_is_on_its_way():
 
 def test_a_stall_that_ends_by_itself_is_told_and_costs_no_try():
     w = cw.Watchdog()
+    w.tick(-1.0, cw.PLAYING)                          # it has played
     _run(w, cw.BUFFERING, 0.0, 6.0)
     assert w.tick(7.0, cw.PLAYING) == cw.RESOLVED and w.last_stall == 7.0
     assert w.tries == 0
@@ -80,6 +82,7 @@ def test_a_stall_that_ends_by_itself_is_told_and_costs_no_try():
 
 def test_playing_again_after_a_try_ends_the_stall_and_its_tries():
     w = cw.Watchdog()
+    w.tick(-1.0, cw.PLAYING)                          # it has played
     _run(w, cw.BUFFERING, 0.0, 10.0)
     assert w.tries == 1
     # Playing a moment is not yet over: a blink of play between stalls
@@ -95,7 +98,30 @@ def test_playing_again_after_a_try_ends_the_stall_and_its_tries():
 
 def test_an_error_on_the_receiver_counts_as_stuck():
     w = cw.Watchdog()
+    w.tick(-1.0, cw.PLAYING)                          # it has played
     assert [s for _t, s in _run(w, cw.ERROR, 0.0, 10.0)] == [cw.BEGAN, cw.RECOVER]
+
+
+def test_a_stream_that_has_not_played_yet_has_longer_to_start():
+    """A cast just begun or a seek: an Apple TV loading a new stream often
+    buffers longer than STALL_S - sent again then, it only started over."""
+    w = cw.Watchdog()
+    said = _run(w, cw.BUFFERING, 0.0, cw.START_STALL_S - 1)
+    assert [s for _t, s in said] == [cw.BEGAN] and w.tries == 0
+    assert w.tick(cw.START_STALL_S, cw.BUFFERING) == cw.RECOVER
+    # Once it has played, ten seconds is a stall again.
+    w = cw.Watchdog()
+    w.tick(0.0, cw.PLAYING)
+    assert [s for _t, s in _run(w, cw.BUFFERING, 1.0, 11.0)] == [cw.BEGAN, cw.RECOVER]
+    # A new stream sent (a seek) starts over: its time to start, the tries kept.
+    w.new_stream()
+    assert not w.started and w.tries == 1
+    assert [s for _t, s in _run(w, cw.BUFFERING, 12.0, 40.0)] == [cw.BEGAN]
+    # And a stream seen on its way is a new one too.
+    w = cw.Watchdog()
+    w.tick(0.0, cw.PLAYING)
+    w.tick(1.0, cw.BUFFERING, busy=True)
+    assert not w.started
 
 
 def test_an_ending_is_no_stall():

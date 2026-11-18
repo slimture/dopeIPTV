@@ -148,6 +148,29 @@ assert m["sid"] == "no" and m["sub-visibility"] is True
 assert m["subs-fallback"] == "default"
 p.stop()
 
+# Subtitles in Swedish, but not on live TV: a channel opens with none (its
+# Swedish DVB subtitles stay in the menu), while a film still gets them.
+settings.setValue("sub_mode", "lang")
+settings.setValue("sub_lang", "swe")
+settings.setValue("sub_live", "false")
+m.sets.clear()
+p.play("http://x/live/2.ts", "Channel", local_buffer=True)
+assert m["sid"] == "no", m.sets
+assert p._ttx_langs() == []                      # no teletext page picked either
+p.stop()
+m.sets.clear()
+p.play("http://x/movie/6.mkv", "Film")
+assert m["sid"] == "auto" and m["slang"].startswith("swe,sv")
+p.stop()
+# On (the default): a live channel picks the Swedish track as before.
+settings.setValue("sub_live", "true")
+m.sets.clear()
+p.play("http://x/live/3.ts", "Channel", local_buffer=True)
+assert m["sid"] == "auto" and m["slang"].startswith("swe,sv"), m.sets
+assert p._ttx_langs()[:1] == ["swe"]
+p.stop()
+settings.remove("sub_live")
+
 # A Settings save mid-film does not choose a track: off only hides.
 settings.setValue("sub_mode", "off")
 m.sets.clear()

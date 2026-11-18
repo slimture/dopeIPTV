@@ -7,6 +7,105 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.6.5]
+
+### Added
+
+- Settings > Picture and sound: **Subtitles on live TV**. Off, live channels
+  start without subtitles - a channel's DVB or teletext subtitles in the
+  language asked for are no longer turned on by themselves - while films and
+  series still get them; the player's menu turns them on when wanted. On by
+  default, as before; each profile's own.
+
+### Changed
+
+- Supporting dopeIPTV is a tip or monthly support: the
+  heart, the menu and Settings say so in all 27 languages ("I've supported",
+  "Ask for support now and then"), and the heart opens the new support page
+  on dopeiptv.org (a tip of your choice, fixed monthly support, GitHub
+  Sponsors), where the supporter key comes after paying. The software
+  catalogues' "Donate" link is gone.
+- AirPlay: an Apple TV plays a channel live. Going back in it - the rewind
+  buffer, the archive, the steps and the timeline, from the card, the phone
+  remote or the media keys - is no longer offered there: each step was a
+  new stream the Apple TV started over, slow and with its sound out of
+  step. Pausing, films and episodes work as before; a Chromecast goes back
+  as before.
+
+### Fixed
+
+- An Xtream provider that refuses the login no longer crashes the app as
+  the categories load ("'str' object has no attribute 'get'"). The panel
+  answers a list with its refusal instead of a list; that is now a failed
+  load - the lists kept from before stay, else "Wrong username or password"
+  - and never stored as the list.
+- Settings sync: two computers that each had a playlist called "default"
+  - the one a version before playlists made from its settings - of another
+  provider on each no longer lose one of them when the second joins. Its
+  playlist used to become the first computer's provider, with its own
+  favourites under it. Now each keeps its own and gets the other's beside
+  it; the playlist kept here under another id in the copy is noted in
+  `sync_source_ids`, and the next round sends it at once.
+- A source's Type changed in Settings no longer takes another kind's
+  address and login with it. The Xtream address, user name and password
+  stayed in the fields of every type picked after it (Jellyfin, Tvheadend,
+  a box found on the network), and the page stored the source straight
+  away as the new type with that login. Each type now keeps its own
+  address and login (empty until filled in), the type picked back brings
+  back what it had, and a source is stored as a new type only once that
+  type's own fields are filled in. The same in Add source and the welcome.
+  Only looking through the types, without filling any in, changes nothing
+  and no longer ends in "This change was not saved".
+- Mac: the app's text is in the system's own font (San Francisco). The
+  style asked for "SF Pro Text", a name macOS does not list, so Qt searched
+  every font at start (about 70 ms) and fell back to another face.
+- Send feedback fits the screen: with answers to earlier feedback, "Something
+  does not work" and the preview open it was taller than a laptop's screen,
+  could not be made shorter and hid Send under the Dock. It is now at most
+  nine tenths of the screen's height, what does not fit scrolls, and Cancel
+  and Send stay at its foot. It opens centred over the window and wholly on
+  the screen: over a window low on a Mac's screen it opened half under the
+  Dock.
+- M3U sources: a channel keeps its id when the provider adds, removes or
+  reorders channels. Ids used to be the channel's place in the list, so one
+  channel added at the top moved every favourite, hidden or renamed channel,
+  own number and reminder onto the channel next to it. The first start after
+  the update reads the list as before; the start after that moves everything
+  stored for the source - in every profile - to the new ids (by the address
+  or name kept with it, else its place, which is what it showed until then).
+- Restoring an older backup on a computer that syncs no longer takes
+  anything from the others: the restored computer joins sync again as a
+  new one, so the other computers keep what they have and their newer
+  changes come back to it. The restore window says so while sync is on.
+- Server mode: the tuner's addresses (the HDHomeRun endpoints, which need no
+  token) answer only when asked by an address or a home name - a web page
+  can no longer reach them by DNS rebinding and read the lineup or start a
+  stream. Plex, Jellyfin and Channels ask by address and are not affected.
+- Casting: going back in a channel says so on the card - "Going back…" and
+  where to, fetched from the archive - and "Back to live…" for live, until
+  the TV plays it; no more Playing for the old stream meanwhile.
+- Settings sync: the same playlist added by hand on two computers was sent
+  to the site again every other round, for ever, and a new password on one
+  never reached the other - they are one playlist now. A history list that
+  is full on one computer no longer removes the oldest titles on the
+  others, and what a round brought in is kept even when the window closes
+  right after it. A second profile's theme that arrives by sync is shown
+  at once.
+- The decision card and the messages panel take a new theme's colours
+  straight away.
+- TV: the channel names' column is as wide as the category's longest names
+  need, up to 40 % of the row - long names are no longer cut at a fixed
+  width, and a category of short names leaves the room to what is on. A
+  name that is still too long shows whole in its tooltip.
+- TV: a channel's name in the list no longer loses its last letter ("BBC
+  Eart") on a scaled screen - Windows at 125 or 150 % drew it a pixel or two
+  wider than it measured and the rest was cut off (#35).
+- AirPlay: a stream the Apple TV is still loading - a cast just begun - is
+  no longer sent again after ten seconds of buffering: that only started it
+  over (it went back a few seconds at the start). A new stream has 45
+  seconds to start; once it has played, ten seconds stuck is a stall as
+  before.
+
 ## [1.6.4]
 
 ### Changed

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import html
+import os
 import re
 import threading
 import time
@@ -12,9 +13,31 @@ from typing import Any
 
 from ..core._lazy_requests import requests
 
-from ..core import mirrors
+from ..core import m3u_ids, mirrors
 from ..core.log import log, register_secrets
 from ..i18n import LocalizedError, tr
+
+
+class NoList(LocalizedError):
+    """A list action answered with something that is no list - a refused
+    login's {"user_info": {"auth": 0}}, an error object. Treated as a failed
+    request: nothing is stored, the last good copy is served if there is
+    one, else the load fails with the reason."""
+
+
+def list_rows(data: Any) -> list | None:
+    """A list action's answer as rows: a list as it is, with anything in it
+    that is no object left out; an object of rows keyed by id (some panels
+    answer so) as its rows; anything else - a refused login's user_info, an
+    error object, a number - None."""
+    if isinstance(data, list):
+        if all(isinstance(r, dict) for r in data):
+            return data
+        return [r for r in data if isinstance(r, dict)]
+    if (isinstance(data, dict) and data and "user_info" not in data
+            and all(isinstance(v, dict) for v in data.values())):
+        return list(data.values())
+    return None
 
 
 def json_object(pairs: list[tuple[str, Any]]) -> dict:
@@ -212,7 +235,7 @@ class ListCache:
         self._tls.reply = None
         try:
             data = fetch() or []
-        except requests.RequestException:
+        except (requests.RequestException, NoList):
             self._tls.reply = None
             with self._list_lock:
                 hit = self._list_cache.get(key)
@@ -511,50 +534,63 @@ class XtreamClient(Mirrored, ListCache):
         if limit is not None or active is not None:
             self.account_seen = {"max": limit, "active": active, "at": time.monotonic()}
 
+    def _rows(self, key: tuple, **params: Any) -> list[dict]:
+        """A list action through the list cache, as rows (list_rows): what
+        the panel answered, or the copy kept from before - an old copy that
+        is no list (an older version stored a refused login's answer) is
+        none."""
+        return list_rows(self._cached_list(key, lambda: self._list_api(**params))) or []
+
+    def _list_api(self, **params: Any) -> list:
+        """A list action asked of the panel. A panel that refuses the login
+        answers it with {"user_info": {"auth": 0}} - an object, not a list:
+        its keys walked as rows crashed the category list. That, or any
+        other answer that is no list, is a failed request (NoList)."""
+        data = self._api(**params)
+        rows = list_rows(data)
+        if rows is not None:
+            return rows
+        ui = data.get("user_info") if isinstance(data, dict) else None
+        refused = isinstance(ui, dict) and str(ui.get("auth", 0)) != "1"
+        log.warning("xtream %s @ %s: no list in the answer (%s)",
+                    params.get("action"), self.server,
+                    "the login was refused" if refused else type(data).__name__)
+        raise NoList("err_wrong_login" if refused else "err_unexpected_response")
+
     def live_categories(self) -> list[dict]:
-        return self._cached_list(
-            ("get_live_categories",),
-            lambda: self._api(action="get_live_categories"))
+        return self._rows(("get_live_categories",), action="get_live_categories")
 
     def live_streams(self, category_id: str | None = None) -> list[dict]:
         p: dict[str, Any] = {"action": "get_live_streams"}
         if category_id:
             p["category_id"] = category_id
-        return self._cached_list(("get_live_streams", category_id),
-                                 lambda: self._api(**p))
+        return self._rows(("get_live_streams", category_id), **p)
 
     def vod_categories(self) -> list[dict]:
-        return self._cached_list(
-            ("get_vod_categories",),
-            lambda: self._api(action="get_vod_categories"))
+        return self._rows(("get_vod_categories",), action="get_vod_categories")
 
     def vod_streams(self, category_id: str | None = None) -> list[dict]:
         p: dict[str, Any] = {"action": "get_vod_streams"}
         if category_id:
             p["category_id"] = category_id
-        return self._cached_list(("get_vod_streams", category_id),
-                                 lambda: self._api(**p))
+        return self._rows(("get_vod_streams", category_id), **p)
 
     def series_categories(self) -> list[dict]:
-        return self._cached_list(
-            ("get_series_categories",),
-            lambda: self._api(action="get_series_categories"))
+        return self._rows(("get_series_categories",), action="get_series_categories")
 
     def series_list(self, category_id: str | None = None) -> list[dict]:
         p: dict[str, Any] = {"action": "get_series"}
         if category_id:
             p["category_id"] = category_id
-        return self._cached_list(("get_series", category_id),
-                                 lambda: self._api(**p))
+        return self._rows(("get_series", category_id), **p)
 
     def held_series(self) -> tuple[list[dict], list[dict]] | None:
         """Every series and their categories as held already (memory or the
         disk copy), or None - never a request (the command palette)."""
-        rows = self.held(("get_series", None))
-        if not isinstance(rows, list):
+        rows = list_rows(self.held(("get_series", None)))
+        if rows is None:
             return None
-        cats = self.held(("get_series_categories",))
-        return rows, cats if isinstance(cats, list) else []
+        return rows, list_rows(self.held(("get_series_categories",))) or []
 
     def series_info(self, series_id: int | str) -> dict:
         return self._api(action="get_series_info", series_id=series_id) or {}
@@ -750,11 +786,17 @@ class M3UClient(OfflineClient):
     RETRY_SECS = 60.0
     _ATTR = re.compile(r'([\w-]+)="([^"]*)"')
 
-    def __init__(self, url: str) -> None:
+    def __init__(self, url: str, stable: bool = False, map_path: str = "") -> None:
         super().__init__()
         self.server = (url or "").strip()
+        # core/m3u_ids.py: *stable* - a channel's id made from the channel,
+        # else its place in the list (and *map_path* told what each place's
+        # stable id is, for the move at the next start).
+        self.stable = stable
+        self.map_path = map_path
         self._channels: list[dict] = []
         self._by_stream_id: dict[int, dict] = {}
+        self._by_line: dict[int, dict] = {}
         self._loaded = False
         self._stale = False
         self._failed_at = 0.0
@@ -856,20 +898,35 @@ class M3UClient(OfflineClient):
                 pending["_url"] = line
                 channels.append(pending)
                 pending = None
+        stable = m3u_ids.stable_ids(
+            m3u_ids.channel_key(c["epg_channel_id"], c["name"]) for c in channels)
+        if self.stable:
+            for c, new_id in zip(channels, stable, strict=True):
+                c["stream_id"] = new_id
+        elif self.map_path and channels:
+            m3u_ids.save_map(self.map_path, [
+                (c["num"], new_id, c["name"], c["_url"])
+                for c, new_id in zip(channels, stable, strict=True)])
         self._channels = channels
         # Index by stream_id for O(1) lookup - _channel() (and thus stream_url,
         # hit on every zap) would otherwise linear-scan the whole list. Rebuilt
         # here, the only place _channels is (re)assigned, so it can't go stale.
         self._by_stream_id = {c["stream_id"]: c for c in channels}
+        # The other kind of id still plays its channel: read with stable
+        # ids, one by place (kept by an older version on another computer, a
+        # tuner's old lineup) the channel at that place; read by place, a
+        # stable one that sync brought from a computer that moved already.
+        self._by_line = ({c["num"]: c for c in channels} if self.stable else
+                         dict(zip(stable, channels, strict=True)))
 
     def authenticate(self) -> dict:
         # Fetching + parsing the list is this provider's "auth": it proves the
         # URL is reachable and yields at least one channel.
-        old = (self._channels, self._by_stream_id, self.epg_url)
+        old = (self._channels, self._by_stream_id, self._by_line, self.epg_url)
         self._parse(self._fetch())
         if not self._channels:
             # A refresh that comes back empty keeps the lineup it had.
-            self._channels, self._by_stream_id, self.epg_url = old
+            self._channels, self._by_stream_id, self._by_line, self.epg_url = old
             raise LocalizedError("err_m3u_no_channels")
         self._loaded = True
         self._stale = False
@@ -926,7 +983,7 @@ class M3UClient(OfflineClient):
             sid = int(stream_id)
         except (TypeError, ValueError):
             return None
-        return self._by_stream_id.get(sid)
+        return self._by_stream_id.get(sid) or self._by_line.get(sid)
 
     def timeshift_urls(self, stream_id: int | str, start_dt: datetime,
                        duration_min: int) -> list[str]:
@@ -1168,7 +1225,12 @@ def _make_client(playlist: dict):
     known lineup)."""
     kind = (playlist or {}).get("kind")
     if kind == "m3u":
-        return M3UClient(playlist.get("server", ""))
+        pid = str(playlist.get("id") or "")
+        stable = m3u_ids.is_stable(pid)
+        cache = _list_cache_path(playlist) if pid and not stable else None
+        return M3UClient(playlist.get("server", ""), stable=stable,
+                         map_path=m3u_ids.map_path(os.path.dirname(cache), pid)
+                         if cache else "")
     if kind in BOX_KINDS:
         return make_box_client(playlist)
     if kind in MEDIA_KINDS:
