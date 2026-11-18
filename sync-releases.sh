@@ -418,7 +418,7 @@ for c in $(jq -r '.names | keys_unsorted[] | select(. != "en")' "$SITE/i18n.json
 done
 avail=$(for c in $codes; do echo "$c"; done | jq -R . | jq -cs .)
 
-asset_urls=$(for p in /style.css /nav.js /app.js /help.js /events.js; do
+asset_urls=$(for p in /style.css /nav.js /app.js /help.js /features.js /events.js; do
     printf '%s\t%s?v=%s\n' "$p" "$p" "$(md5 -q "$PUB$p" | cut -c1-10)"
 done | jq -R 'split("\t") | {key: .[0], value: .[1]}' | jq -cs from_entries)
 # The app's pictures, per language: public/screenshots/<lang>/<name>.webp,
@@ -429,7 +429,8 @@ done | jq -R . | jq -cs .)
 sums=""
 [ -f "$FILES/SHA256SUMS" ] && sums=1
 year=$(date +%Y)
-newest=$(ls -t "$SITE/templates/help.html" "$SITE"/lang/*.json | head -1)
+newest=$(ls -t "$SITE/templates/help.html" "$SITE/templates/features.html" \
+    "$SITE/features.json" "$SITE"/lang/*.json | head -1)
 help_mtime=$(date -r "$newest" +%s)
 rel=$REL
 [ -s "$rel" ] && jq -e 'type == "object"' "$rel" >/dev/null 2>&1 || rel=/dev/null
@@ -448,6 +449,7 @@ render() {  # render PAGE LANG TEMPLATE OUTFILE [BODY]
         --argjson avail "$avail" --argjson asset_urls "$asset_urls" \
         --argjson screenshots "$screenshots" --argjson help_mtime "$help_mtime" \
         --slurpfile site "$SITE/i18n.json" --slurpfile helpfile "$SITE/help.json" \
+        --slurpfile featfile "$SITE/features.json" \
         --slurpfile fmt "$SITE/formats.json" --slurpfile legal "$SITE/legal.json" \
         --slurpfile en "$SITE/lang/en.json" --slurpfile tr "$tr" \
         --slurpfile rel "$rel" --slurpfile dl "$counts" --slurpfile spots "$spots" \
@@ -462,6 +464,7 @@ legal_langs=$(jq -r '.text | keys[]' "$SITE/legal.json")
 for c in $codes; do
     render index "$c" "$SITE/templates/index.html" "$OUT/i18n/$c/index.html"
     render help "$c" "$SITE/templates/help.html" "$OUT/i18n/$c/help/index.html"
+    render features "$c" "$SITE/templates/features.html" "$OUT/i18n/$c/features/index.html"
     render 404 "$c" "$SITE/templates/404.html" "$OUT/i18n/$c/404.html"
     written=en
     for l in $legal_langs; do

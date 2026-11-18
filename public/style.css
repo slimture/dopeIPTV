@@ -564,6 +564,10 @@ section.help-main { padding-top: 0; }
 }
 .help-mag svg { width: 20px; height: 20px; display: block; }
 .help-searchbar:focus-within .help-mag { color: var(--accent); }
+/* Right to left the glass stands at the start, on the right, and the text
+   keeps clear of it there (it sat on top of the "/" key at the left). */
+[dir="rtl"] .help-mag { left: auto; right: 18px; }
+[dir="rtl"] .help-searchbar input { padding: 17px 50px 17px 16px; }
 .help-searchbar input {
   flex: 1; min-width: 0;
   background: none; border: 0; outline: none;
@@ -707,6 +711,85 @@ body.searching .help-layout { grid-template-columns: 1fr; }
 /* While filtering, sections lose their headings' distance - the list should
    read as results, not as a table of contents with gaps in it. */
 body.searching .help-sec { margin-bottom: 26px; }
+
+/* ---- Everything dopeIPTV does (/features/) -------------------------------- */
+/* The help page's top and search, the groups beside the list as its
+   contents are (a row of pills on a phone, as the explorer's tabs), and the
+   features as quiet tiles: a title and a line, a link to the help where it
+   explains more. features.js filters by group and by the box. */
+.fl-top .fl-lead { margin: -10px 0 24px; max-width: 60ch; color: var(--muted); font-size: 1.1rem; }
+section.fl-main { padding: 0 0 80px; }
+.fl-layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 48px;
+  align-items: start; padding-top: 34px; }
+.fl-index { position: sticky; top: 80px; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.fl-index a { display: flex; align-items: center; gap: 10px; padding: 7px 12px; border-radius: 8px;
+  color: var(--muted); font-size: 14px; line-height: 1.35; transition: background .15s, color .15s, opacity .15s; }
+.fl-index a:hover { color: var(--text); background: var(--surface-2); }
+.fl-index a[aria-current] { color: var(--accent); background: var(--surface-2); font-weight: 600; }
+.fl-index a.is-empty { opacity: .45; }
+.fl-index .ic { flex: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7;
+  stroke-linecap: round; stroke-linejoin: round; }
+.fl-index .l { min-width: 0; }
+.fl-index .n { margin-inline-start: auto; padding-inline-start: 8px; color: var(--faint); font-size: 13px;
+  font-weight: 500; font-variant-numeric: tabular-nums; }
+.fl-index a[aria-current] .n { color: inherit; }
+.fl-body { min-width: 0; }
+.fl-group { padding: 0; margin: 0 0 46px; scroll-margin-top: 80px; }
+.fl-group[hidden] { display: none; }
+.fl-group h2 { display: flex; align-items: center; gap: 12px; margin: 0 0 16px; padding-bottom: 12px;
+  border-bottom: 1px solid var(--line); font-size: 26px; letter-spacing: -.025em; }
+.fl-group h2 .ic { flex: none; width: 26px; height: 26px; color: var(--accent); fill: none; stroke: currentColor;
+  stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.fl-list { list-style: none; margin: 0; padding: 0; display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.fl-item { display: flex; flex-direction: column; padding: 17px 20px 18px; border-radius: 16px;
+  background: var(--surface); scroll-margin-top: 90px; }
+.fl-item[hidden] { display: none; }
+.fl-item h3 { margin: 0; font-family: var(--display); font-size: 17px; font-weight: 600; letter-spacing: -.015em;
+  line-height: 1.3; }
+.fl-item p { margin: 5px 0 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
+.fl-help { align-self: flex-start; margin-top: auto; padding-top: 9px; color: var(--accent); font-size: 14px;
+  font-weight: 600; }
+.fl-help::after { content: " →"; }
+[dir="rtl"] .fl-help::after { content: " ←"; }
+.fl-help:hover { text-decoration: underline; }
+.fl-in { animation: fl-in .28s ease-out; }
+@keyframes fl-in { from { opacity: 0; transform: translateY(6px); } }
+body.searching .fl-group { margin-bottom: 30px; }
+/* On a phone the groups are a row of pills that stays under the bar. */
+@media (max-width: 860px) {
+  .fl-layout { grid-template-columns: minmax(0, 1fr); gap: 0; padding-top: 0; }
+  .fl-index { top: 56px; z-index: 5; flex-direction: row; gap: 8px; overflow-x: auto; margin: 0 -24px;
+    padding: 14px 24px; background: var(--bg); scrollbar-width: none; }
+  .fl-index::-webkit-scrollbar { display: none; }
+  .fl-index a { flex: none; padding: 9px 15px; border-radius: 999px; background: var(--surface); }
+  .fl-index a[aria-current] { background: var(--text); color: var(--bg); }
+  .fl-index a[aria-current] .n { color: inherit; opacity: .7; }
+  .fl-index .ic { width: 16px; height: 16px; }
+  .fl-group { margin-bottom: 36px; scroll-margin-top: 130px; }
+  .fl-group:first-of-type { margin-top: 12px; }
+  .fl-group h2 { font-size: 22px; }
+  .fl-group h2 .ic { width: 22px; height: 22px; }
+}
+@media (max-width: 720px) { .fl-index { margin: 0 -18px; padding-inline: 18px; } }
+@media (max-width: 560px) {
+  .fl-list { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .fl-item { padding: 15px 17px 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fl-in { animation: none; }
+  .fl-index a { transition: none; }
+}
+/* The front page's way to it, under the feature explorer. */
+.fl-more { margin: 40px 0 0; text-align: center; font-size: 17px; font-weight: 600; }
+.fl-more a { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); }
+.fl-more a:hover { text-decoration: underline; }
+.fl-more .arr { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round; transition: transform .2s ease; }
+.fl-more a:hover .arr { transform: translateX(3px); }
+[dir="rtl"] .fl-more .arr { transform: scaleX(-1); }
+[dir="rtl"] .fl-more a:hover .arr { transform: scaleX(-1) translateX(3px); }
+@media (prefers-reduced-motion: reduce) { .fl-more .arr { transition: none; } }
 
 /* ---- Legal pages: privacy, terms, donations, about ---------------------- */
 /* Long text, so it reads like a document: one column of comfortable width,
