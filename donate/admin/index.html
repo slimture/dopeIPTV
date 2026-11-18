@@ -59,7 +59,7 @@
   <section class="kpis" id="kpis" aria-label="More numbers"></section>
 
   <section class="card">
-    <div class="card-head"><h2>From visit to donation</h2><span class="muted" id="funnel-note"></span></div>
+    <div class="card-head"><h2>From visit to support</h2><span class="muted" id="funnel-note"></span></div>
     <div id="funnel"></div>
   </section>
 
@@ -93,19 +93,20 @@
   </section>
 
   <section class="group">
-    <h3 class="group-head">Donations</h3>
+    <h3 class="group-head">Support</h3>
     <section class="card">
-      <div class="card-head"><h2 class="heart-head">Donations</h2><span class="muted" id="donations-all"></span></div>
+      <div class="card-head"><h2 class="heart-head">Tips and monthly support</h2><span class="muted" id="donations-all"></span></div>
       <div class="notify" id="notify"></div>
       <div id="donations"></div>
     </section>
     <section class="card">
       <div class="card-head"><h2>Supporter keys</h2><span class="muted" id="sk-count"></span></div>
-      <p class="sk-help">A donation gets its key in the dialog and behind a link in Stripe's receipt. Someone who lost
-        theirs: the payment's id from Stripe's Dashboard (pi_…) makes the same key again. Someone who gave another
-        way: make one by hand. Nothing about the person is in a key or kept here.</p>
+      <p class="sk-help">A tip or monthly support gets its key on the support page, back from Stripe's payment page.
+        Someone who lost theirs: the Checkout Session's id from Stripe's Dashboard (cs_live_… - under the
+        payment, "Checkout Session") makes the same key again. Someone who gave another way (GitHub Sponsors):
+        make one by hand. Nothing about the person is in a key or kept here.</p>
       <div class="acct-inline sk-row">
-        <input id="sk-pi" placeholder="pi_…" autocomplete="off" spellcheck="false" aria-label="Payment id">
+        <input id="sk-pi" placeholder="cs_live_…" autocomplete="off" spellcheck="false" aria-label="Checkout Session id">
         <button type="button" class="btn" id="sk-again">Make the key again</button>
         <button type="button" class="btn quiet" id="sk-hand">Make one by hand</button>
       </div>
@@ -230,8 +231,8 @@
     The app updating itself shows in the visitor log too, marked, but is never a visit: when,
     the file, the version it came from, the system and the country - no address. One from your
     own network is shown and marked, and not counted.
-    Countries: IP Geolocation by <a href="https://db-ip.com">DB-IP</a>. Donations come from
-    Stripe. While it is open, this page keeps itself up to date: it looks for new visits every
+    Countries: IP Geolocation by <a href="https://db-ip.com">DB-IP</a>. Tips and monthly support
+    come from Stripe. While it is open, this page keeps itself up to date: it looks for new visits every
     15 seconds and redraws what changed. <span id="updated"></span></p>
 </main>
 <div class="tip" id="tip" hidden></div>

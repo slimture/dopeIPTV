@@ -65,18 +65,21 @@ What the PHP version worked out on every request is split in two:
   has, else English - and answers `/dl.php` (on to the file) and
   `/trakt/callback/` (on to the app) itself.
 
-Nothing for this site talks to php-fpm. The one thing that is not static is
-the donate dialog's small service, `donate/donate.py` (standard-library
-Python behind `/donate/`): it asks Stripe for a payment session with the
-secret key, so the card form and Apple Pay / Google Pay can open on the page
-itself, in the donor's own currency. Without it the dialog sends visitors to
-Stripe's own page. Setting it up: `DEPLOY.md`, "Donations".
+Nothing for this site talks to php-fpm. Nothing is paid on it either: a tip
+and monthly support are Stripe's own pages (two Payment Links on dopeIPTV's
+own account), linked from the support page, `/support/`, with GitHub Sponsors
+beside them; their addresses are the server's (`/usr/local/etc/iptv-site.conf`,
+read by `sync-releases.sh`), and until one is set the site invites to nothing.
+The one thing that is not static is a small service, `donate/donate.py`
+(standard-library Python on a Unix socket): back from paying, `/support/key`
+asks Stripe, with a read-only key, whether the payment went through and
+gives the supporter key for it. Setting it up: `DEPLOY.md`, "Support".
 
 The same service serves the admin page, `/admin/` for its admins only
 (`donate/admin.py`, `donate/admin/`; signing in with a passkey, or a password
 and an authenticator code, and invites for a new admin:
 `donate/admin_auth.py`): unique visitors, how they found the
-site, countries, browsers and devices, downloads and donations by day,
+site, countries, browsers and devices, downloads and tips and monthly support by day,
 week, month and year, and every visit of the last 13 months one by one -
 sorted, grouped and filtered as wanted (`donate/admin/logtools.js`) - and an
 Analysis tab (`donate/admin/analysis.js`, `donate/analysis.py`) that breaks
@@ -90,9 +93,9 @@ that do run pages (a browser without a screen, or one years out of date,
 unless a pointer, touch or key said a person was there) kept and marked
 but not counted. Signed in once,
 a browser stays signed in (a cookie signed by the service), and a new
-donation comes as a notification on the devices that turned them on (the
+tip comes as a notification on the devices that turned them on (the
 browser's own Web Push) and as a note on the site's own pages there. Setting it up: `DEPLOY.md`, "Statistics
-and the admin page" and "Signed in for good, and told of donations".
+and the admin page" and "Signed in for good, and told of support".
 
 Config templates live in `deploy/` with role-based names —
 `proxy-iptv.dope.rs.conf` and `content-iptv.dope.rs.conf`. Replace the
@@ -269,11 +272,14 @@ curl -sI 'https://dopeiptv.org/trakt/callback/?code=x&state=y' | grep -i locatio
 
 ## The legal pages
 
-`/privacy/`, `/terms/`, `/donations/` and `/about/` - the privacy policy,
-the terms of use, donations and the supporter key, and the company details
-the Swedish E-Commerce Act asks for. Linked from a row at the foot of every
-page; the front page and the help also say, in every language, that
-dopeIPTV is a player only and provides no channels or content.
+`/privacy/`, `/terms/`, `/support/` and `/about/` - the privacy policy,
+the terms of use, support (a tip, monthly support, the supporter key,
+refunds and disputes), and the company details the Swedish E-Commerce Act
+asks for. Linked from a row at the foot of every page (`/donations/` sends
+visitors to `/support/`). Every footer names Solecraft AB with its
+organisation number, address and e-mail, and says in the reader's language
+that dopeIPTV does not contain, sell or link to any channels or other
+content (`foot_made_by`, `foot_nocontent`).
 
 - The texts are HTML fragments in `site/legal/sv/` and `site/legal/en/`.
   **The Swedish text governs**; the English is its translation, and the two
@@ -293,8 +299,8 @@ dopeIPTV is a player only and provides no channels or content.
   the VAT number) - none should be left when the pages go live.
 - They need the content server's two `legal` locations
   (`deploy/content-iptv.dope.rs.conf`): copy it and reload nginx once.
-- When donations open again, take the "paused" box off the top of
-  `site/legal/*/donations.html`.
+- The support page's ways to pay come from `site/render.jq` (where the
+  text says `<!--SUPPORT-OPTIONS-->`), with the links from the server.
 
 ## Still to add (drop-in, no code changes)
 

@@ -28,21 +28,30 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 # shows the English text inside its own header and footer.
 | $legal[0] as $L
 | "https://dopeiptv.org" as $SITE | "https://github.com/slimture/dopeIPTV" as $REPO
-# The donate button's address: a Stripe Payment Link (donate.stripe.com/...
-# or buy.stripe.com/...). nav.js opens the donate dialog over it (paid
-# through donate/donate.py); the link itself is what a click does without
-# script. Empty: no donate section and no footer link at all.
-| "https://donate.stripe.com/bJe4gy7gv4SmdrYgGba7C00" as $DONATE
-# Who the money goes to - the company behind dopeIPTV, and the name on the
-# donor's card statement: one quiet line at the foot of the donate dialog and
-# the footer's copyright (kept small on purpose). Empty: the dialog line goes.
-| "Solecraft AB" as $PAYEE
-# Its mark beside the payee line (public/solecraft.svg, from solecraft.se).
-| "/solecraft-logo.svg" as $PAYEE_LOGO
-| "https://solecraft.se" as $PAYEE_URL
-# Where a larger gift is arranged (a bank transfer, no card fees): under the
-# dialog's amounts. Empty: no such line.
-| "info@solecraft.se" as $MORE_EMAIL
+# Support (the support page, /support/): a tip and monthly support are
+# Stripe Payment Links on dopeIPTV's own Stripe account, and GitHub Sponsors.
+# Their addresses are the server's, not git's: sync-releases.sh reads them
+# from /usr/local/etc/iptv-site.conf (SUPPORT_TIP_URL, SUPPORT_MONTHLY_URL,
+# SUPPORT_SPONSORS_URL) and passes them here. Empty: that way says "coming
+# soon" and links nowhere. What the page suggests - a tip's amount, the
+# monthly one - is set beside them (SUPPORT_TIP_HINT, SUPPORT_MONTHLY_PRICE),
+# as the Payment Links are made.
+| ($ARGS.named.tip_url // "") as $TIP_URL
+| ($ARGS.named.monthly_url // "") as $MONTHLY_URL
+| ($ARGS.named.sponsors_url // "") as $SPONSORS_URL
+| (($ARGS.named.tip_hint // "") | if . == "" then "50 kr" else . end) as $TIP_HINT
+| (($ARGS.named.monthly_price // "") | if . == "" then "30 kr" else . end) as $MONTHLY_PRICE
+# The ways to pay are invited to - the header's link and heart, the front
+# page's band, the footer's link - only once a Stripe link is set: until
+# then the support page is there (its policy, GitHub Sponsors, "coming
+# soon"), but nothing on the site asks for money that cannot be taken.
+| ($TIP_URL != "" or $MONTHLY_URL != "") as $SUPPORT_ON
+# The company behind dopeIPTV: in every footer and on the support page, as
+# Stripe's review and the Swedish E-Commerce Act ask.
+| "Solecraft AB" as $COMPANY
+| "559601-3176" as $ORGNR
+| "Mogatan 21, SE-702 13 Örebro, Sweden" as $ADDRESS
+| "info@solecraft.se" as $EMAIL
 
 # -- the PHP helpers ---------------------------------------------------------
 
@@ -157,27 +166,6 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
       | "<link rel=\"alternate\" hreflang=\"\($c | h)\" href=\"\(url($path; $c) | h)\">\n"]
      | add)
     + "<link rel=\"alternate\" hreflang=\"x-default\" href=\"\($SITE + $path | h)\">\n";
-  # The donate dialog's words, for nav.js on every page (data, not script).
-  def donate_i18n:
-    if $DONATE == "" then "" else
-      "<div id=\"donate-i18n\" hidden"
-      + ([[["title", "donate_eyebrow"], ["sub", "donate_modal_sub"], ["other", "donate_other"], ["othershort", "donate_other_short"], ["currency", "donate_currency"],
-           ["cont", "donate_continue"], ["email", "donate_email"], ["pay", "donate_pay"],
-           ["busy", "donate_busy"], ["lock", "donate_lock"], ["back", "donate_back"],
-           ["thanks", "donate_thanks"], ["receipt", "donate_receipt"], ["failed", "donate_failed"],
-           ["emailmissing", "donate_email_missing"], ["range", "donate_range"],
-           ["close", "donate_close"], ["loading", "donate_loading"], ["paused", "donate_paused"],
-           ["apple", "donate_apple"], ["google", "donate_google"], ["card", "donate_card"],
-           ["key", "donate_key"], ["keyhow", "donate_key_how"], ["keycopy", "donate_key_copy"],
-           ["keycopied", "donate_key_copied"], ["keyopen", "donate_key_open"], ["keywait", "donate_key_wait"],
-           ["keynone", "donate_key_none"]][]
-          | . as [$k, $key] | " data-\($k)=\"\(t($key) | h)\""] | add)
-      + (if $PAYEE == "" then "" else " data-payee=\"\($PAYEE | h)\" data-payeenote=\"\(t("donate_payee_note") | h)\""
-             + (if $PAYEE_LOGO == "" then "" else " data-payeelogo=\"\($PAYEE_LOGO | h)\"" end)
-             + (if $PAYEE_URL == "" then "" else " data-payeeurl=\"\($PAYEE_URL | h)\"" end) end)
-      + (if $MORE_EMAIL == "" then "" else " data-more=\"\(t("donate_more") | h)\" data-moremail=\"\($MORE_EMAIL | h)\"" end)
-      + " data-lang=\"\($lang | h)\"></div>\n"
-    end;
   # Feedback from the footer's link (nav.js): its words, on every page.
   def feedback_i18n:
     "<div id=\"feedback-i18n\" hidden"
@@ -201,7 +189,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     # one of them reads. The footer has it for whoever looks for the source.
     | def cur($key): $key != "" and $key == $current;
     # The bar's links are only what a visitor leaves the page for: Help, then
-    # Donate, gathered at the end with the language and the blue Download
+    # Support, gathered at the end with the language and the blue Download
     # button - one group, the logo alone on the other side. The features
     # are further down this same page, where everyone scrolls
     # anyway. The narrow-window menu keeps every link - it is all there is
@@ -212,16 +200,12 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     | ([$links[] | . as [$href, $label, $key]
       | "          <a role=\"menuitem\" class=\"navmenu-item\(if cur($key) then " is-current" else "" end)\" href=\"\($href | h)\"\(if cur($key) then " aria-current=\"page\"" else "" end)>\($label | h)</a>\n"]
      | add) as $menuitems
-    # Donate: a quiet link beside the others (nav.js opens the dialog; the
-    # address is Stripe's own page for when it cannot).
-    | (if $DONATE == "" then "" else
-         "      <a class=\"navlink navdonate\" href=\"\($DONATE | h)\" rel=\"nofollow noopener\"><svg class=\"heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("donate_btn") | h)</a>\n" end) as $navdonate
-    | (if $DONATE == "" then "" else
-         "          <a role=\"menuitem\" class=\"navmenu-item navdonate\" href=\"\($DONATE | h)\" rel=\"nofollow noopener\"><svg class=\"heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("donate_btn") | h)</a>\n" end) as $menudonate
+    # Support: a quiet link beside the others, to the support page.
+    | "      <a class=\"navlink navdonate\" href=\"/support/\"\(if $current == "support" then " aria-current=\"page\"" else "" end)><svg class=\"heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_nav") | h)</a>\n" as $navdonate
+    | "          <a role=\"menuitem\" class=\"navmenu-item navdonate\" href=\"/support/\"><svg class=\"heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_nav") | h)</a>\n" as $menudonate
     # ...and on a phone, where the links fold into the menu, a heart of its
     # own in the header, one tap from anywhere.
-    | (if $DONATE == "" then "" else
-         "      <a class=\"navheart\" href=\"\($DONATE | h)\" rel=\"nofollow noopener\" aria-label=\"\(t("donate_btn") | h)\" title=\"\(t("donate_btn") | h)\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg></a>\n" end) as $navheart
+    | "      <a class=\"navheart\" href=\"/support/\" aria-label=\"\(t("support_nav") | h)\" title=\"\(t("support_nav") | h)\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg></a>\n" as $navheart
     | (if ($avail | length) > 1 then
          "      <details class=\"langpick\" id=\"langPick\" name=\"hdrmenu\">\n"
          + "        <summary aria-label=\"\(t("lang_label") | h)\" title=\"\($S.names[$lang] // $lang | h)\">\n"
@@ -237,9 +221,18 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
        else "" end) as $langpick
     | ($navtpl
        | expand({brand_href: (if $home then "#top" else "/" end), nav_base: $base};
-                {navlinks: ($navlinks + $navdonate + $navheart), langpick: $langpick,
-                 menuitems: ($menuitems + $menudonate)}))
-      + donate_i18n + feedback_i18n;
+                {navlinks: ($navlinks + (if $SUPPORT_ON then $navdonate + $navheart else "" end)),
+                 langpick: $langpick,
+                 menuitems: ($menuitems + (if $SUPPORT_ON then $menudonate else "" end))}))
+      + feedback_i18n;
+  # Every footer: who makes dopeIPTV, where to reach them, and that it holds
+  # no channels - in plain sight on every page (Stripe's review, the Swedish
+  # E-Commerce Act's section 8).
+  def company_line:
+    "    <div class=\"foot-legal\">\n"
+    + "      <p class=\"foot-company\">\(t("foot_made_by") | gsub("%COMPANY%"; $COMPANY) | h) · \(t("foot_orgnr") | h) \($ORGNR | h) · \($ADDRESS | h) · <a href=\"mailto:\($EMAIL | h)\">\($EMAIL | h)</a></p>\n"
+    + "      <p class=\"foot-nocontent\">\(t("foot_nocontent") | h)</p>\n"
+    + "    </div>\n";
   def common:
     {lang: ($lang | h),
      dir: (if ($S.rtl | index($lang)) then "rtl" else "ltr" end),
@@ -249,7 +242,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
      featjs: ($asset_urls["/features.js"] // "/features.js" | h),
      # Without a hash (an older sync-releases.sh) still the file, not "null".
      eventsjs: ($asset_urls["/events.js"] // "/events.js" | h),
-     year: $year};
+     year: $year, company: company_line};
 
 # -- index.php ----------------------------------------------------------------
 
@@ -362,25 +355,56 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
         + "        <p class=\"dlx-gh\"><a href=\"\($REPO | h)/releases/latest\" rel=\"nofollow\">\(t("dl_all_name") | h)</a></p>\n"
         + "      </div>\n"
       end;
-  def donate:
-    if $DONATE == "" then "" else
-      "  <section id=\"donate\" class=\"pt0\">\n"
+  # The band on the front page: why, and a way to the support page.
+  def support_band:
+      "  <section id=\"support\" class=\"pt0\">\n"
       + "    <div class=\"wrap\">\n"
       + "      <div class=\"donate\">\n"
       + "        <div class=\"donate-fx\" aria-hidden=\"true\"><svg class=\"donate-big\" viewBox=\"0 0 24 24\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg><i></i><i></i><i></i><i></i><i></i><i></i></div>\n"
       + "        <div class=\"donate-text\">\n"
-      + "          <h2>\(t("donate_h2") | h)</h2>\n"
-      + "          <p>\(t("donate_p") | h)</p>\n"
-      + "          <p class=\"donate-short\">\(t("donate_p_short") | h)</p>\n"
+      + "          <h2>\(t("support_h2") | h)</h2>\n"
+      + "          <p>\(t("support_p") | h)</p>\n"
+      + "          <p class=\"donate-short\">\(t("support_p_short") | h)</p>\n"
       + "        </div>\n"
       + "        <div class=\"donate-act\">\n"
-      + "          <a class=\"btn primary donate-btn\" href=\"\($DONATE | h)\" rel=\"nofollow noopener\"><svg class=\"donate-heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("donate_btn") | h)</a>\n"
-      + "          <small>\(t("donate_paused_note") | h)</small>\n"
+      + "          <a class=\"btn primary donate-btn\" href=\"/support/\"><svg class=\"donate-heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_btn") | h)</a>\n"
+      + "          <small>\(t("support_band_note") | h)</small>\n"
       + "        </div>\n"
       + "      </div>\n"
       + "    </div>\n"
-      + "  </section>\n\n"
-    end;
+      + "  </section>\n\n";
+  # The support page's ways to give (in the support page's legal text where
+  # it says <!--SUPPORT-OPTIONS-->), the thank-you nav.js fills in after
+  # paying, and the company. A way without its address says "coming soon".
+  def support_way($cls; $title; $text; $href; $btn; $primary; $ev):
+    "      <div class=\"sway \($cls)\">\n"
+    + "        <h2>\($title | h)</h2>\n"
+    + "        <p>\($text)</p>\n"
+    + (if $href == "" then
+         "        <span class=\"btn\(if $primary then " primary" else "" end) is-off\" aria-disabled=\"true\">\(t("support_soon") | h)</span>\n"
+       else
+         "        <a class=\"btn\(if $primary then " primary" else "" end)\" href=\"\($href | h)\" rel=\"nofollow noopener\" data-support=\"\($ev)\">\($btn | h)</a>\n"
+       end)
+    + "      </div>\n";
+  # In the reader's language and direction, also where the page's text
+  # around them is the English one (render.jq page_legal).
+  def support_options:
+    " lang=\"\($lang | h)\" dir=\"\(if ($S.rtl | index($lang)) then "rtl" else "ltr" end)\"" as $in_lang
+    | "    <div class=\"support-ways\"\($in_lang)>\n"
+    + support_way("sway-tip"; t("support_tip_h"); t("support_tip_p") | h | gsub("%AMOUNT%"; "<bdi>\($TIP_HINT | h)</bdi>");
+                  $TIP_URL; t("support_tip_btn"); true; "tip")
+    + support_way("sway-monthly"; t("support_monthly_h"); t("support_monthly_p") | h | gsub("%AMOUNT%"; "<bdi>\($MONTHLY_PRICE | h)</bdi>");
+                  $MONTHLY_URL; t("support_monthly_btn"); true; "monthly")
+    + support_way("sway-gh"; "GitHub Sponsors"; t("support_gh_p") | h; $SPONSORS_URL; t("support_gh_btn"); false; "github")
+    + "    </div>\n"
+    + "    <p class=\"support-stripe\"\($in_lang)>\(t("support_stripe") | h)</p>\n"
+    + "    <div id=\"support-thanks\" class=\"support-thanks\"\($in_lang) hidden"
+    + ([[["thanks", "support_thanks"], ["again", "support_again"], ["key", "support_key"],
+         ["keyhow", "support_key_how"], ["keycopy", "support_key_copy"], ["keycopied", "support_key_copied"],
+         ["keyopen", "support_key_open"], ["keywait", "support_key_wait"], ["keynone", "support_key_none"],
+         ["loading", "support_loading"]][]
+        | . as [$k, $key] | " data-\($k)=\"\(t($key) | h)\""] | add)
+    + "></div>\n";
   # The app's own pictures (tools/site_screenshots.py in its repository):
   # public/screenshots/<lang>/<name>.webp, in the reader's language or else
   # English; $screenshots lists what is there as "<lang>/<name>". A smaller
@@ -495,9 +519,8 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
            + (if $notes == "" then "" else
                 " · <a class=\"wn-link\" href=\"\($REPO | h)/releases/tag/v\($version | h)\" rel=\"nofollow\" data-wn>\(t("wn_h2") | h)</a>" end)),
          downloads: downloads($version; $reldate),
-         donate: donate,
-         donate_footer: (if $DONATE == "" then "" else
-           "      <a href=\"\($DONATE | h)\" rel=\"nofollow noopener\">\(t("donate_btn") | h)</a>\n" end),
+         donate: (if $SUPPORT_ON then support_band else "" end),
+         donate_footer: (if $SUPPORT_ON then "      <a href=\"/support/\">\(t("support_nav") | h)</a>\n" else "" end),
          verify: (if $sums == "1" then "      <p class=\"autonote\">\(t("note_verify"))</p>\n" else "" end),
          # What's new: the notes in a <template>, opened in a dialog from the
          # link beside the version (app.js) - no section of their own.
@@ -556,7 +579,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
                  | hq($id) as $q
                  | "            <details class=\"help-item\" id=\"\($id | h)\">\n"
                    + "              <summary><h3>\($q | h)</h3></summary>\n"
-                   + "              <div class=\"help-a\">\(t(hkey($id) + "_a") | gsub("%LANGS%"; langlist) | gsub("%DONATE%"; (if $DONATE == "" then "/#donate" else $DONATE | h end)))"
+                   + "              <div class=\"help-a\">\(t(hkey($id) + "_a") | gsub("%LANGS%"; langlist) | gsub("%DONATE%"; "/support/"))"
                    # The settings page the answer is about, as the app shows
                    # it in the reader's language (tools/help_screenshots.py
                    # in the app's repository). Inside a closed <details>,
@@ -641,7 +664,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
            "      <p class=\"legal-note\">\(t("legal_only_en") | h)</p>\n" end),
          meta: ("<time datetime=\"\($L.updated | h)\">\($X.updated | h)</time> · \($X.governing | h)"
            + " <a href=\"\($path + "?lang=" + $X.link | h)\" hreflang=\"\($X.link | h)\" lang=\"\($X.link | h)\">\($X.other | h)</a>"),
-         body: $body});
+         body: (if $page == "support" then $body | sub("<!--SUPPORT-OPTIONS-->"; support_options) else $body end)});
 
 # -- sitemap.php ------------------------------------------------------------------
 

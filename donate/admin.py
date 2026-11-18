@@ -18,10 +18,10 @@ missing auth_basic line cannot open the page to everyone.
 Visitors come from stats_collect.py's STATS_DIR/stats.json, without what
 the visits judged likely robots added (kept apart there, and which visitors
 were which in kinds.json); the all-time
-download counts from the site's downloads.json; donations from Stripe
-itself - the PaymentIntents the donate dialog made (metadata source), found
-with Stripe's search and kept for five minutes. Donations through the old
-Payment Link page carry no such mark and are not in it.
+download counts from the site's downloads.json; tips and monthly support
+from Stripe itself - the succeeded payments on dopeIPTV's own account, found
+with Stripe's search and kept for five minutes. Donations taken before the
+move to that account (on Solecraft AB's) are not in it.
 """
 from __future__ import annotations
 
@@ -52,7 +52,6 @@ STATIC = {
     "/admin/sw.js": ("sw.js", "application/javascript; charset=utf-8"),
     "/admin/app.webmanifest": ("app.webmanifest", "application/manifest+json"),
 }
-SOURCES = ("iptv.dope.rs donate dialog", "iptv.dope.rs donate dialog (wallet)")
 
 
 def static(path: str):
@@ -86,7 +85,7 @@ def _top(d: dict, n: int | None = None) -> list:
     return rows if n is None else rows[:n]
 
 
-# -- donations, from Stripe -----------------------------------------------------
+# -- tips and monthly support, from Stripe -----------------------------------------------------
 
 _CACHE: dict = {"at": 0.0, "data": None}
 _LOCK = threading.Lock()
@@ -94,7 +93,7 @@ _LOCK = threading.Lock()
 
 def _stripe_search(key: str, query: str, api_version: str) -> list:
     out, page = [], None
-    for _ in range(5):                       # up to 500 donations of each kind
+    for _ in range(5):                       # up to 500 payments
         params = {"query": query, "limit": "100"}
         if page:
             params["page"] = page
@@ -113,10 +112,12 @@ def _stripe_search(key: str, query: str, api_version: str) -> list:
 
 
 def donations(key: str, api_version: str = "", max_age: int = 300) -> dict:
-    """Succeeded donations through the dialog: [{id, t, amount, currency,
+    """Succeeded payments on dopeIPTV's own Stripe account - tips and monthly
+    support, both through Stripe's Payment Links: [{id, t, amount, currency,
     how, who}], newest first; cached for *max_age* seconds (the page: five
-    minutes; the donation watcher in donate.py: one). {"error"} if Stripe
-    could not be asked (the page says so instead of showing zero)."""
+    minutes; the watcher in donate.py: one). {"error"} if Stripe could not be
+    asked (the page says so instead of showing zero). The account is
+    dopeIPTV's alone, so every succeeded payment on it is support."""
     with _LOCK:
         if _CACHE["data"] is not None and time.time() - _CACHE["at"] < max_age:
             return _CACHE["data"]
@@ -124,18 +125,16 @@ def donations(key: str, api_version: str = "", max_age: int = 300) -> dict:
         return {"error": "not configured", "list": []}
     rows = []
     try:
-        for src in SOURCES:
-            q = f"status:'succeeded' AND metadata['source']:'{src}'"
-            for pi in _stripe_search(key, q, api_version):
-                meta = pi.get("metadata") or {}
-                rows.append({
-                    "id": str(pi.get("id") or ""),
-                    "t": int(pi.get("created") or 0),
-                    "amount": int(pi.get("amount_received") or pi.get("amount") or 0),
-                    "currency": (pi.get("currency") or "").upper(),
-                    "how": "Apple Pay / Google Pay" if src.endswith("(wallet)") else "Card form",
-                    "who": meta.get("name") or pi.get("receipt_email") or "",
-                })
+        for pi in _stripe_search(key, "status:'succeeded'", api_version):
+            monthly = bool(pi.get("invoice")) or "subscription" in str(pi.get("description") or "").lower()
+            rows.append({
+                "id": str(pi.get("id") or ""),
+                "t": int(pi.get("created") or 0),
+                "amount": int(pi.get("amount_received") or pi.get("amount") or 0),
+                "currency": (pi.get("currency") or "").upper(),
+                "how": "Monthly support" if monthly else "Tip",
+                "who": pi.get("receipt_email") or "",
+            })
     except (urllib.error.URLError, TimeoutError, ValueError) as e:
         msg = getattr(e, "reason", None) or str(e)
         return {"error": f"Stripe: {msg}"[:200], "list": []}

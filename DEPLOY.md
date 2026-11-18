@@ -247,98 +247,62 @@ cp -R /root/iptv-php/public/. "$W/public/"
 cp /root/iptv-php/sync-releases.php "$W/"
 ```
 
-## Donations
+## Support (a tip, monthly support)
 
-The donate dialog (`public/nav.js`) takes the payment on the page itself,
-as solequiz.com does: Apple Pay or Google Pay where the visitor has it,
-otherwise Stripe's card form inside Stripe's own frames. Stripe needs a
-server holding the secret key for that, which is `donate/donate.py`: Python's
-standard library only, on a Unix socket in the jail
-(`/var/run/iptv_donate/donate.sock`), reached through `/donate/` in the content
-server's nginx file. It never sees a card number, and with no network port
-nothing outside the machine can reach it.
+Nothing is paid on the site itself. A tip (any amount, once) and monthly
+support (a fixed price) are two **Stripe Payment Links** on dopeIPTV's own
+Stripe account (Solecraft AB): Stripe's own payment pages, reached by plain
+links on the support page (`/support/`, `site/legal/<lang>/support.html` with
+the ways to pay from `site/render.jq`). GitHub Sponsors sits beside them.
 
-Until it runs, the dialog sends visitors to Stripe's own donate page (the
-Payment Link at the top of `site/render.jq`), so the steps below can come in
-any order and the site never shows a broken button.
-
-**Stripe Dashboard** (start in test mode, the toggle top right, and repeat
-with live keys once a test payment has gone through):
-
-1. Developers → API keys → **Create secret key** → *Customize permissions*
-   (no template), named e.g. `dopeIPTV donate`, with **PaymentIntents:
-   Write** and nothing else - the card form and the wallets both pay a
-   PaymentIntent. Copy the `rk_...` key.
-2. The **publishable key** (`pk_...`) is on the same page.
-3. Settings → Payments → **Payment method domains** → Add `iptv.dope.rs`.
-   Stripe reads `/.well-known/apple-developer-merchantid-domain-association`
-   from the site (deployed with `public/`) and Apple Pay turns "Verified".
-   Google Pay needs nothing more.
-4. What the card form offers is a *payment method configuration*: Stripe no
-   longer lets a PaymentIntent list its own methods. The account's default
-   one is shared with every site on the account, so make one for dopeIPTV:
-   Settings → Payments → Payment methods, the configuration menu at the
-   top → create one (e.g. "dopeIPTV"), turn on Cards, Apple Pay, Google
-   Pay and whatever else you want, and put its id in the service's
-   config as `DONATE_PMC=pmc_...` (`service iptv_donate restart`). Without
-   it the form shows the default set. Settings → Customer emails → **Successful
-   payments** on, so every donor gets a receipt.
-
-**The service (jail):**
+Their addresses are this server's, never git's: `sync-releases.sh` reads them
+from `/usr/local/etc/iptv-site.conf` and renders them into the pages. Until a
+Stripe link is there, the site invites to nothing - no link or heart in the
+header, no band on the front page, no link in the footer - and the support
+page says "Coming soon" where the buttons will be. The day the links are
+added, the next sync (within 15 minutes) shows them everywhere.
 
 ```sh
-bastille console pontusweb
-pkg install -y python3
-python3 --version                    # 3.9 or later
-cd ~/dopeiptv && git pull origin website
-cp -R donate /usr/local/www/iptv/
-install -m 600 -o iptv -g iptv /dev/null /usr/local/etc/iptv-donate.key
-cat > /usr/local/etc/iptv-donate.key # paste the rk_... key, Enter, Ctrl-D
-cat > /usr/local/etc/iptv-donate.conf <<'CONF'
-STRIPE_PUBLISHABLE_KEY=pk_...
-DONATE_CURRENCY=eur
-DONATE_COUNTRY=SE
+install -m 644 /dev/null /usr/local/etc/iptv-site.conf
+cat > /usr/local/etc/iptv-site.conf <<'CONF'
+SUPPORT_TIP_URL=https://buy.stripe.com/...
+SUPPORT_MONTHLY_URL=https://buy.stripe.com/...
+SUPPORT_SPONSORS_URL=https://github.com/sponsors/slimture
+SUPPORT_TIP_HINT=50 kr
+SUPPORT_MONTHLY_PRICE=30 kr
 CONF
-install -m 555 deploy/iptv_donate /usr/local/etc/rc.d/iptv_donate
-install -m 640 -o iptv -g iptv /dev/null /var/log/iptv-donate.log
-sysrc iptv_donate_enable=YES
-service iptv_donate start
-tail -n 1 /var/log/iptv-donate.log   # [donate] listening on unix:/var/run/iptv_donate/donate.sock, 41 currencies (eur by default), configured
-python3 -I /usr/local/www/iptv/donate/donate.py --check   # 200 {"publishableKey": "pk_...", ...}
+su -m iptv -c 'sh /usr/local/www/iptv/sync-releases.sh'
 ```
 
-The key goes in with `cat` rather than `echo` so it never lands in the
-shell's history. Every other setting (the receipt's "Support dopeIPTV",
-which currencies are offered) is listed at the top of `donate.py`; change
-the `.conf` and `service iptv_donate restart`.
+Only `https://` addresses are taken; a line left out (or empty) is that way
+"coming soon". The hint and the price are only words on the page - the
+amounts themselves are set in the Payment Links.
 
-Donors pay in their own currency - 41 of them: those of the site's
-languages and the world's largest. The dialog picks it from where the
-device says it is (kronor in Sweden, rupees in India, yuan in China, euro
-in the euro countries...) and shows round amounts in it - 30/50/100/250 kr,
-3/5/10/25 euro; a menu in the dialog's head changes it on either step. The
-table is `CURRENCIES` in `donate.py` - look at the rows of currencies that
-lose value fast (the lira) now and then; `DONATE_CURRENCY` is only the
-fallback when the page cannot tell. Not the rouble or the rial: Stripe
-does not take payments from Russia or Iran. A payment in another currency
-than the account's own is converted by Stripe, for its conversion fee.
-
-A Unix socket rather than 127.0.0.1: in a Bastille jail a connection to
-127.0.0.1 can hang (the jail has no loopback of its own), and a socket file
-needs no network at all. The rc script makes `/var/run/iptv_donate` for it
-(and the pidfile); the socket is left writable so nginx's worker can connect.
-
-Log rotation, next to the two lines from step 10 (SIGHUP makes daemon(8)
-reopen the log):
+**Back from paying** each Payment Link sends the visitor to
+`https://dopeiptv.org/support/?paid={CHECKOUT_SESSION_ID}` (Payment Link →
+After payment → "Don't show confirmation page" → that address). The page
+then asks `/support/key`, which `donate/donate.py` answers: it asks Stripe
+for that Checkout Session and, once it is paid, gives the supporter key made
+from it (`donate/supporter.py`) - the same key for the same payment, every
+time. For that the service needs a **restricted key, read-only**: Developers
+→ API keys → Create restricted key, with **Checkout Sessions: Read** and
+**PaymentIntents: Read**, nothing else. It goes in the file the service reads
+(never in git, never in a shell's history):
 
 ```sh
-echo '/var/log/iptv-donate.log                     iptv:iptv      640  5     1024 *    JC    /var/run/iptv_donate/iptv_donate.pid' \
-    >> /usr/local/etc/newsyslog.conf.d/iptv.dope.rs.conf
-newsyslog -nv 2>&1 | grep donate
+install -m 600 -o iptv -g iptv /dev/null /usr/local/etc/iptv-donate.key
+cat > /usr/local/etc/iptv-donate.key   # paste the rk_live_... key, Enter, Ctrl-D
+service iptv_donate restart
+tail -n 1 /var/log/iptv-donate.log     # ... Stripe set up, supporter keys on
+python3 -I /usr/local/www/iptv/donate/donate.py --check   # 200 {"stripe": true, ...}
 ```
 
-**nginx (host)** - the content server's file as in step 8, which now has the
-`/donate/` location and the rate limit in front of it:
+Without the key the support page still works; the thank-you then says the
+key could not be made, and the admin page's Support list stays empty.
+
+**nginx (host)** - the content server's file as in step 8: `/support/` is a
+legal page now (`/donations/` sends visitors there), `/support/key` reaches
+the service with the rate limit in front, and the old `/donate/` answers 410:
 
 ```sh
 C=/usr/local/bastille/jails/pontusweb/root/usr/local/etc/nginx/conf.d/iptv.dope.rs.conf
@@ -347,24 +311,25 @@ bastille cmd pontusweb nginx -t && bastille cmd pontusweb service nginx reload
 ```
 
 and the site's row in the TLS-front proxy's CSP map
-(`deploy/csp.snippet.txt` has the line and why each Stripe address is
-there), then `nginx -t && service nginx reload` on the host.
+(`deploy/csp.snippet.txt`): nothing from Stripe any more - the old row's
+Stripe and Google Pay addresses come out. Then `nginx -t && service nginx
+reload` on the host.
 
-**Check:** open the site, Donate. The amounts appear; Safari with a card in
-Wallet shows "Donate with Apple Pay", Chrome with a saved card "Donate with
-Google Pay", everything else goes straight to the card form. In test mode
-the card `4242 4242 4242 4242`, any future date and any CVC pays; the
-payment shows in the Dashboard under Payments, with "iptv.dope.rs donate
-dialog" in its metadata.
+**Check:** in Stripe's test mode (a sandbox), make the two Payment Links
+there, put their `https://buy.stripe.com/test_...` addresses in
+`iptv-site.conf` and a test restricted key (`rk_test_...`) in the key file,
+sync, and pay with the card `4242 4242 4242 4242`, any future date, any CVC.
+Back on the support page the thank-you shows a supporter key; the admin
+page lists the payment. Then the same with the live links and key.
 
 ## Statistics and the admin page
 
 `https://iptv.dope.rs/admin/` shows visitors (unique over any span),
 page views, time per visit, how visitors found the site, countries,
 languages, browsers and versions, systems, devices and screens, downloads
-and donations - per day, week, month and calendar year - and, under
+and tips and monthly support - per day, week, month and calendar year - and, under
 *Visitors*, every visit of the last 13 months one by one: when, from where,
-which pages and how long, downloads, the donate dialog, and every other
+which pages and how long, downloads, a support link clicked, and every other
 visit by the same visitor. The log sorts (newest, oldest, most pages,
 longest), groups (a year by month, a month by day, or by country, system
 and the rest, each group folded with its own sums) and filters. *Analysis*
@@ -565,7 +530,7 @@ which counts every click. Once per visitor needs the visitor's address in
 /dl.php's log, the `iptv_dl` format in the content server's file; lines
 written before it count each click.
 
-## Signed in for good, and told of donations
+## Signed in for good, and told of support
 
 **Signed in once, signed in for good.** Signed in, a browser holds a
 cookie signed by the donate service (`iptv_admin`, 400 days, renewed by
@@ -586,13 +551,13 @@ nginx -V 2>&1 | tr ' ' '\n' | grep auth_request
 No line: install a build that has it (`pkg install nginx-full`) before the
 new content file, or `nginx -t` refuses it.
 
-**Notifications on your devices.** A new donation comes as a notification
-- "New donation: 12.50 EUR", how it was paid and from whom; a click opens
-the admin page's donations. It is the browser's own push (Apple's,
+**Notifications on your devices.** A new tip or monthly support comes as a
+notification - "New tip: 50.00 SEK" or "New monthly: 30.00 SEK", and from
+whom; a click opens the admin page's Support. It is the browser's own push (Apple's,
 Google's, Mozilla's or Microsoft's push service carries it, encrypted for
 that device alone): no app, no third party. The service looks at Stripe
 every minute and a half; its first look only notes where it is, so a
-restart never repeats old donations. It signs the pushes with a key of its
+restart never repeats old payments. It signs the pushes with a key of its
 own, made on first use (`stats/push-vapid.pem`), and needs Python's
 cryptography package (jail):
 
@@ -605,7 +570,7 @@ The jail must reach the push services over HTTPS (web.push.apple.com,
 fcm.googleapis.com, updates.push.services.mozilla.com,
 *.notify.windows.com), as it reaches api.stripe.com.
 
-Then on each device: open `/admin/`, and in the Donations card press
+Then on each device: open `/admin/`, and in the Support card press
 *Turn on notifications on this device* and allow them. On a Mac in Safari,
 Chrome or Firefox; on an iPhone or iPad Apple allows it only from the Home
 Screen: Safari, Share, *Add to Home Screen*, open dopeIPTV from there, sign
@@ -613,7 +578,7 @@ in once, then turn them on. The card lists the devices that get them and
 has *Send a test*; *Turn off* takes this device off.
 
 **A note on the site.** In a browser that has opened `/admin/`, the
-site's own pages show new donations in a small note at the foot of the
+site's own pages show new tips and monthly support in a small note at the foot of the
 page; dismissed, or seen on the admin page, they do not come back. The
 page knows to ask by a cookie without a secret (`iptv_admin_hint`); the
 answer, `/admin/news`, is the signed session's to give, and that one path
@@ -639,7 +604,7 @@ a row a day, the problems grouped by what went wrong (sortable: most
 reported, most recent, most versions, newest; not fixed / all / fixed;
 one version), what people wrote, each report in full with *Copy for a bug
 fix*, and seen / fixed marks. A new report sends a push to the admins'
-devices, like a donation.
+devices, like a tip.
 
 1. Copy the files and restart (jail):
 
@@ -665,11 +630,13 @@ devices, like a donation.
 
 ## Supporter keys
 
-A donation comes with a supporter key for the app: shown in the donate
-dialog when the payment goes through, and behind a link in Stripe's receipt
-(the payment's description), so it can be fetched again later. The app
-checks a key offline against the public half of a signing key made here.
-Without the signing key nothing changes: no key, no link in the receipt.
+A tip or monthly support comes with a supporter key for the app: shown on
+the support page when the visitor comes back from Stripe's payment page (the
+Checkout Session's id in the address, "Support" above). The same payment
+always gives the same key; a lost one is made again on the admin page from
+the Checkout Session's id. The app checks a key offline against the public
+half of a signing key made here. Without the signing key nothing changes:
+the thank-you shows no key.
 
 Make the signing key once, in the jail (the service runs as iptv):
 
@@ -987,5 +954,4 @@ after each with `nginx -t && service nginx reload`.
 **Check:** `curl -sI https://iptv.dope.rs/help/?lang=sv` answers `301` with
 `location: https://dopeiptv.org/help/?lang=sv`; the same for http://, for
 `/dl.php?f=...` and for `/trakt/callback?code=x`; https://dopeiptv.org/ shows
-the page with a `canonical` of https://dopeiptv.org/; a donation goes
-through, with Apple Pay on an iPhone.
+the page with a `canonical` of https://dopeiptv.org/.

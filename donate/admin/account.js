@@ -197,7 +197,7 @@
 
   // -- the other admins ---------------------------------------------------------------------
   function drawAdmins(res) {
-    const c = card("Admins", "Everyone here sees the same statistics and donations, and can invite or remove an admin.");
+    const c = card("Admins", "Everyone here sees the same statistics and support payments, and can invite or remove an admin.");
     const list = mk("ul", "acct-list");
     res.admins.forEach((a) => {
       const li = mk("li");

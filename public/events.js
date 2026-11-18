@@ -34,8 +34,10 @@
       return;
     }
     if (a.matches("a.dlx-how[data-how]")) { once("how", a.getAttribute("data-how")); return; }
-    if (/^https?:$/.test(a.protocol) && a.hostname && a.hostname !== location.hostname &&
-        !/(^|\.)stripe\.com$/.test(a.hostname)) {   // the donate link opens the dialog
+    // A way to give on the support page (Stripe's page, GitHub Sponsors):
+    // counted as support, not as a way out.
+    if (a.hasAttribute("data-support")) { once("donate", a.getAttribute("data-support")); return; }
+    if (/^https?:$/.test(a.protocol) && a.hostname && a.hostname !== location.hostname) {
       once("out", a.hostname.replace(/^www\./, ""));
     }
   }, true);
@@ -57,7 +59,7 @@
 
   // How far down the front page: each part once it is a quarter in view.
   if (window.IntersectionObserver) {
-    var parts = ["features", "shots", "download", "donate"].map(function (id) {
+    var parts = ["features", "shots", "download", "support"].map(function (id) {
       return document.getElementById(id);
     }).filter(Boolean);
     if (parts.length) {

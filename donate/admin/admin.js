@@ -123,7 +123,7 @@
     if (tab === "analysis" && window.AdminAnalysis) { window.AdminAnalysis.show(); }
     if (tab === "feedback" && window.AdminFeedback) { window.AdminFeedback.show(); }
   }
-  // Donations seen here are not shown again in the note on the site's own
+  // Tips and monthly support seen here are not shown again in the note on the site's own
   // pages (public/nav.js, the same browser's storage).
   function markSeen() {
     try {
@@ -215,7 +215,7 @@
     const strong = (t) => mk("strong", "", t);
     line.append(strong(num.format(people)), document.createTextNode(people === 1 ? " person found dopeIPTV, " : " people found dopeIPTV, "),
                 strong(num.format(T.downloads)), document.createTextNode(" downloaded it and "),
-                strong(num.format(D.count || 0)), document.createTextNode((D.count === 1 ? " donated." : " donated.")));
+                strong(num.format(D.count || 0)), document.createTextNode((D.count === 1 ? " supported." : " supported.")));
     head.append(mk("div", "when", when), line);
     const judged = judgedLine();
     if (judged) { head.append(mk("div", "judged", judged)); }
@@ -228,12 +228,12 @@
               spark(S.map((d) => d.visitors), "s1"), "", vs),
       bigStat("Downloads", num.format(T.downloads), days ? change(T.downloads, B.downloads) : null,
               spark(S.map((d) => d.downloads), "s3"), "", num.format(data.downloads_all_time) + " all time"),
-      bigStat("Donations", D.error ? "–" : num.format(D.count || 0), null, null, "heart",
+      bigStat("Support", D.error ? "–" : num.format(D.count || 0), null, null, "heart",
               D.error ? "Stripe did not answer" : (D.count ? sums(D.sums) : "none yet in this period")));
     box.replaceChildren(head, stats);
   }
 
-  // -- from visit to donation ----------------------------------------------------
+  // -- from visit to support -----------------------------------------------------
   function funnel() {
     const rows = data.by_channel || [];
     const t = { visits: 0, more: 0, downloaded: 0, donate: 0 };
@@ -243,8 +243,8 @@
     if (!t.visits) { box.replaceChildren(mk("p", "empty", "No visits in this period yet.")); $("funnel-note").textContent = ""; return; }
     $("funnel-note").textContent = "share of all visits";
     const steps = [["Visits", t.visits], ["Read more than one page", t.more], ["Downloaded", t.downloaded],
-                   ["Opened the donate dialog", t.donate]];
-    if (donated !== null) { steps.push(["Donated", donated]); }
+                   ["Clicked a support link", t.donate]];
+    if (donated !== null) { steps.push(["Supported", donated]); }
     const ul = mk("ul", "funnel");
     steps.forEach(([label, n], i) => {
       const li = mk("li", "step-" + i + (i === steps.length - 1 && donated !== null ? " last" : ""));
@@ -280,7 +280,7 @@
            delta(T.views, B.views)),
       tile("Time per visit", timed ? duration(avg) : "–",
            timed ? bounce + "% left within 10 s" + (untimed ? " · " + num.format(untimed) + " without a time" : "") : "", "", true),
-      tile("Donate dialog", num.format(opened ? opened[1] : 0), "times opened" + (D.error ? "" : " · " + sums(D.sums)), "", true),
+      tile("Support links", num.format(opened ? opened[1] : 0), "clicks" + (D.error ? "" : " · " + sums(D.sums)), "", true),
       // The app updating itself through dopeiptv.org: people who keep it,
       // never counted among the downloads above.
       tile("Updates from the app", num.format(T.updates || 0), "", delta(T.updates || 0, B.updates), false, updatesNote())
@@ -583,8 +583,8 @@
     );
   }
 
-  // -- donations -------------------------------------------------------------------
-  // Notifications of new donations, turned on per device: the browser's own
+  // -- support ---------------------------------------------------------------------
+  // Notifications of new tips and monthly support, turned on per device: the browser's own
   // push (donate.py signs and sends it, sw.js shows it). On an iPhone only
   // from the Home Screen, which is Apple's rule.
   const PUSH_OK = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
@@ -714,7 +714,7 @@
       " · " + num.format(R.all || 0) + " since counting began";
   }
   // Supporter keys (donate/supporter.py): one again for a payment (the same
-  // key its donor got), or one by hand; and how many have been handed out.
+  // key its supporter got), or one by hand; and how many have been handed out.
   let skWired = false;
   function supporterKeys() {
     const out = $("sk-out"), count = $("sk-count");
@@ -733,10 +733,10 @@
     if (!skWired) {
       skWired = true;
       $("sk-again").addEventListener("click", () => {
-        const pi = $("sk-pi").value.trim();
-        if (!/^pi_[A-Za-z0-9]{8,64}$/.test(pi)) { out.replaceChildren(mk("p", "error", "That is not a payment id (pi_…).")); return; }
+        const cs = $("sk-pi").value.trim();
+        if (!/^cs_(live|test)_[A-Za-z0-9]{8,200}$/.test(cs)) { out.replaceChildren(mk("p", "error", "That is not a Checkout Session id (cs_live_…).")); return; }
         out.replaceChildren(mk("p", "muted", "Asking Stripe…"));
-        post("/admin/supporter-key", { pi: pi }).then(([ok, j]) => shown(ok, j))
+        post("/admin/supporter-key", { cs: cs }).then(([ok, j]) => shown(ok, j))
           .catch((e) => out.replaceChildren(mk("p", "error", String(e))));
       });
       $("sk-hand").addEventListener("click", () => {
@@ -754,14 +754,14 @@
     checkPush().then(notifyRow);
     notifyRow();
     $("donations-all").textContent = D.error ? "" :
-      "All time: " + num.format(D.count_all) + (D.count_all === 1 ? " donation" : " donations") +
+      "All time: " + num.format(D.count_all) + (D.count_all === 1 ? " payment" : " payments") +
       (D.count_all ? " · " + sums(D.sums_all) : "");
     if (D.error) {
-      box.replaceChildren(mk("p", "error", "Could not ask Stripe (" + D.error + "). The key in " +
-        "/usr/local/etc/iptv-donate.key needs PaymentIntents: Write, which includes reading them."));
+      box.replaceChildren(mk("p", "error", "Could not ask Stripe (" + D.error + "). The restricted key in " +
+        "/usr/local/etc/iptv-donate.key needs Checkout Sessions: Read and PaymentIntents: Read."));
       return;
     }
-    if (!D.recent.length) { box.replaceChildren(mk("p", "empty", "No donations through the dialog yet.")); return; }
+    if (!D.recent.length) { box.replaceChildren(mk("p", "empty", "No tips or monthly support yet.")); return; }
     let rel = null;
     try { rel = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" }); } catch (e) { rel = null; }
     const ago = (t) => {
@@ -800,14 +800,14 @@
     const box = mk("div", "chan-rows");
     const head = mk("div", "chan-row head");
     head.append(mk("span", "c-name", "Came from"), mk("span", "c-visits", "Visits"), mk("span", "m", "Read more than one page"),
-                mk("span", "m", "Downloaded"), mk("span", "m", "Opened donate"), mk("span", "c-time", "Time per visit"));
+                mk("span", "m", "Downloaded"), mk("span", "m", "Support link"), mk("span", "c-time", "Time per visit"));
     box.append(head);
     rows.forEach(([name, r]) => {
       const row = mk("div", "chan-row"), v = mk("span", "c-visits"), vb = mk("i");
       vb.style.width = Math.max(4, r.visits / most * 100) + "%";
       v.append(mk("b", "", num.format(r.visits)), vb);
       row.append(mk("span", "c-name", name), v, meter(r.more, r.visits, "m1", "Read more"),
-                 meter(r.downloaded, r.visits, "m2", "Downloaded"), meter(r.donate, r.visits, "m3", "Opened donate"),
+                 meter(r.downloaded, r.visits, "m2", "Downloaded"), meter(r.donate, r.visits, "m3", "Support link"),
                  mk("span", "c-time", (r.timed !== undefined ? r.timed : r.visits) ? duration(r.time / (r.timed !== undefined ? r.timed : r.visits)) : "–"));
       box.append(row);
     });

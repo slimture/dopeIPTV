@@ -1,15 +1,20 @@
 {
-    "updated": "2026-11-16",
-    "pages": ["privacy", "terms", "donations", "about"],
+    "updated": "2026-11-18",
+    "pages": [
+        "privacy",
+        "terms",
+        "support",
+        "about"
+    ],
     "text": {
         "sv": {
-            "updated": "Senast uppdaterad 16 november 2026",
+            "updated": "Senast uppdaterad 18 november 2026",
             "governing": "Det här är den svenska texten, som är den som gäller.",
             "other": "Read in English",
             "link": "en"
         },
         "en": {
-            "updated": "Last updated 16 November 2026",
+            "updated": "Last updated 18 November 2026",
             "governing": "This is a translation of the Swedish text, which is the one that applies.",
             "other": "Läs på svenska",
             "link": "sv"
@@ -36,14 +41,14 @@
                 "desc": "The terms for the dopeIPTV app and dopeiptv.org: a player only, with no channels or content, open source under the GPL, and your responsibility for what you add."
             }
         },
-        "donations": {
+        "support": {
             "sv": {
-                "title": "Donationer och supporternyckel",
-                "desc": "Att donera till dopeIPTV är frivilligt och appen förblir gratis. Vad donationerna går till, vad supporternyckeln är, hur du får den igen och hur du får pengarna tillbaka."
+                "title": "Stöd dopeIPTV",
+                "desc": "Dricks en gång eller månadsstöd till dopeIPTV, via Stripe. Frivilligt – appen förblir gratis och inget säljs i utbyte. Supporternyckeln, uppsägning, pengarna tillbaka och vem du betalar."
             },
             "en": {
-                "title": "Donations and supporter key",
-                "desc": "Donating to dopeIPTV is voluntary and the app stays free. What donations pay for, what the supporter key is, how to get it again and how to get a refund."
+                "title": "Support dopeIPTV",
+                "desc": "A one-time tip or monthly support for dopeIPTV, through Stripe. Voluntary – the app stays free and nothing is sold in return. The supporter key, cancelling, refunds and who you pay."
             }
         },
         "about": {
