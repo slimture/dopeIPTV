@@ -1,6 +1,7 @@
 <div class="lead">
 <h2 id="kort">Kort sagt</h2>
 <ul>
+<li><strong>Vi har nästan inga personuppgifter.</strong> Inga konton, inga namn, inga e-postadresser (utom när du mejlar oss eller betalar via Stripe) och inga IP-adresser i statistiken.</li>
 <li><strong>Appen sparar dina uppgifter på din dator.</strong> Dina källor, inloggningar, favoriter, din historik och dina inställningar stannar där. Appen har ingen analys eller telemetri, och du har inget konto hos oss.</li>
 <li><strong>Appen kontaktar oss bara när den har ett skäl:</strong> för att leta efter uppdateringar (det går att stänga av), när du själv skickar en felrapport eller feedback och – om du slår på det – för synkronisering av inställningar och för att titta tillsammans med vänner, båda krypterade så att vi inte kan läsa dem.</li>
 <li><strong>Webbplatsen räknar besök i egen statistik</strong>, utan kakor och utan externa analystjänster. Din IP-adress används för att räkna fram ett pseudonymt besökar-id och ett land. Den sparas inte i statistiken, och serverloggarna som innehåller den raderas efter kort tid.</li>
@@ -127,16 +128,16 @@
 <p>Tjänster som du använder via appen, som TMDB och Trakt, kan finnas i andra länder. Din app kontaktar dem direkt när du ber om det, och deras egna policyer gäller.</p>
 
 <h2 id="lagring">9. Hur länge vi sparar uppgifter</h2>
+<p>Det mesta vi sparar säger inget om vem du är: inget namn, ingen e-postadress, inget konto. Bara två saker är knutna till en person – ett mejl du skickar till oss, och en betalning (hos Stripe och i våra räkenskaper). Allt annat saknar antingen något som pekar ut dig eller sparas bara en kort tid.</p>
 <ul>
-<li>Frontserverns loggar: högst 30 dagar, sedan tas de bort automatiskt.</li>
-<li>Loggen över sidvisningar: ungefär en vecka. Loggen över klick på nedladdningar: roteras efter storlek, och de tio senaste delarna sparas.</li>
-<li>Besök i statistiken: 400 dagar, därefter anonyma. Besökar-id: 25 månader. Uppgifter om uppdateringar: 400 dagar.</li>
-<li>Felrapporter och feedback: 12 månader från att de skickades, sedan tas de bort automatiskt. De är utformade så att de inte pekar ut dig.</li>
-<li>Synkade data: tills du raderar dem, eller 180 dagar efter att de senast användes.</li>
-<li>Titta tillsammans: bara i minnet, tills en timme efter rummets senaste anrop.</li>
-<li>Uppgifter om betalningar: hos Stripe enligt dess villkor, och i våra räkenskaper i sju år.</li>
-<li>E-post: så länge ärendet kräver.</li>
-<li>I din webbläsare: tills du rensar dem (språkkakan i ett år).</li>
+<li><strong>Serverloggar</strong> – IP-adressen och webbläsaren för en förfrågan, inget annat om dig: frontserverns loggar högst 30 dagar, loggen över sidvisningar ungefär en vecka, loggen över klick på nedladdningar roteras efter storlek (de tio senaste delarna). Sedan tas de bort automatiskt.</li>
+<li><strong>Statistik</strong> – ingen IP-adress och inget namn, bara ett pseudonymt id: varje besök i 400 dagar, därefter utan ens id (bara dag, land, webbläsare och liknande finns kvar); id:na i 25 månader; uppgifter om uppdateringar i 400 dagar, aldrig med IP-adress.</li>
+<li><strong>Felrapporter och feedback</strong> – ingen IP-adress, inget namn, ingen e-postadress, och rensade från sådant som kan identifiera innan de sparas: 12 månader, sedan tas de bort automatiskt.</li>
+<li><strong>Synkade data</strong> – krypterade på din dator, så att vi varken kan läsa dem eller se vems de är: tills du raderar dem, eller 180 dagar efter att de senast användes.</li>
+<li><strong>Titta tillsammans</strong> – krypterat, bara i minnet, aldrig på disk: tills en timme efter rummets senaste anrop.</li>
+<li><strong>Betalningar</strong> – det namn eller den e-postadress du anger för kvittot: hos Stripe enligt dess villkor, och i våra räkenskaper i sju år, som bokföringslagen kräver. Vår server sparar inget av det själv.</li>
+<li><strong>Mejl du skickar till oss</strong>: så länge ärendet kräver.</li>
+<li><strong>I din webbläsare</strong> – på din egen enhet, där vi inte kan se det: tills du rensar det (språkkakan i ett år).</li>
 </ul>
 
 <h2 id="rattigheter">10. Dina rättigheter</h2>
@@ -149,7 +150,8 @@
 <li>invända mot behandling som grundar sig på vårt berättigade intresse – till exempel statistiken;</li>
 <li>få ut uppgifter som du har lämnat till oss i ett maskinläsbart format (dataportabilitet), när behandlingen grundar sig på ett avtal.</li>
 </ul>
-<p>Skriv till <a href="mailto:info@solecraft.se">info@solecraft.se</a>. Vi svarar inom en månad, utan kostnad. Mycket av det vi har pekar inte direkt ut dig: för att hitta dina besök i statistiken behöver vi den IP-adress och den webbläsare du använde och ungefär när, och för att hitta en rapport eller en feedback behöver vi veta vad du skrev.</p>
+<p><strong>I praktiken har vi nästan inget som säger vem du är.</strong> Vi har inga konton, inga namn och inga e-postadresser – utom i ett mejl du skickar till oss, och det namn eller den e-postadress du anger hos Stripe när du betalar. Statistiken sparar inga IP-adresser, bara ett pseudonymt id som inte visar adressen och som vi inte använder för att ta reda på vem du är. Rapporter och feedback sparas utan IP-adress, webbläsaruppgifter och e-postadress. Synkroniserade uppgifter och Titta tillsammans är krypterade, så att vi varken kan läsa dem eller se vems de är. Din IP-adress finns hos oss bara i serverloggarna, som raderas automatiskt efter en vecka till högst 30 dagar (avsnitt 9).</p>
+<p>Skriv till <a href="mailto:info@solecraft.se">info@solecraft.se</a>. Vi svarar inom en månad, utan kostnad. Eftersom vi inte själva kan peka ut dig behöver vi oftast din hjälp för att hitta något alls: för dina besök i statistiken den IP-adress och den webbläsare du använde och ungefär när, för en rapport eller en feedback vad du skrev, och för en betalning datum, belopp och e-postadressen på kvittot. Utan det har vi ofta inget som vi kan koppla till dig – och då finns det inget att visa, rätta eller radera.</p>
 <p>Vi fattar inga automatiserade beslut som har rättsliga eller liknande betydande följder för dig.</p>
 <p>Du kan lämna klagomål till Integritetsskyddsmyndigheten (IMY), <a href="https://www.imy.se" rel="noopener">imy.se</a>, eller till dataskyddsmyndigheten där du bor. Vi blir glada om du hör av dig till oss först.</p>
 
