@@ -3113,5 +3113,7 @@
   "cast_state_moving": "Spolar tillbaka…",
   "cast_state_to_live": "Tillbaka till live…",
   "cast_note_moving": "Till {time} · hämtas ur arkivet - det tar några sekunder.",
-  "cast_note_to_live": "Livesändningen är på väg till tv:n."
+  "cast_note_to_live": "Livesändningen är på väg till tv:n.",
+  "setting_sub_live": "Undertexter på live-tv",
+  "setting_sub_live_hint": "Av: live-kanaler startar utan undertexter, medan filmer och serier får dem som vanligt. Slå på dem i spelaren när du vill."
 }

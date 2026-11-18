@@ -3113,5 +3113,7 @@
   "cast_state_moving": "Cofanie…",
   "cast_state_to_live": "Powrót na żywo…",
   "cast_note_moving": "Do {time} · pobierane z archiwum - to potrwa kilka sekund.",
-  "cast_note_to_live": "Transmisja na żywo jest w drodze do telewizora."
+  "cast_note_to_live": "Transmisja na żywo jest w drodze do telewizora.",
+  "setting_sub_live": "Napisy w telewizji na żywo",
+  "setting_sub_live_hint": "Wyłączone: kanały na żywo startują bez napisów, filmy i seriale nadal je mają. Włącz je w odtwarzaczu, kiedy chcesz."
 }

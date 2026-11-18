@@ -3113,5 +3113,7 @@
   "cast_state_moving": "Retrocediendo…",
   "cast_state_to_live": "Volviendo al directo…",
   "cast_note_moving": "A las {time} · se trae del archivo; tarda unos segundos.",
-  "cast_note_to_live": "La emisión en directo va de camino a la tele."
+  "cast_note_to_live": "La emisión en directo va de camino a la tele.",
+  "setting_sub_live": "Subtítulos en TV en directo",
+  "setting_sub_live_hint": "Desactivado: los canales en directo empiezan sin subtítulos; las películas y series los siguen teniendo. Actívalos en el reproductor cuando quieras."
 }

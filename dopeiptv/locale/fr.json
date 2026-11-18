@@ -3113,5 +3113,7 @@
   "cast_state_moving": "Retour en arrière…",
   "cast_state_to_live": "Retour au direct…",
   "cast_note_moving": "À {time} · récupéré dans les archives - cela prend quelques secondes.",
-  "cast_note_to_live": "Le direct arrive sur la télé."
+  "cast_note_to_live": "Le direct arrive sur la télé.",
+  "setting_sub_live": "Sous-titres en TV en direct",
+  "setting_sub_live_hint": "Désactivé : les chaînes en direct démarrent sans sous-titres, les films et séries les gardent. Activez-les dans le lecteur quand vous voulez."
 }

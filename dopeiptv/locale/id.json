@@ -3113,5 +3113,7 @@
   "cast_state_moving": "Mundur…",
   "cast_state_to_live": "Kembali ke siaran langsung…",
   "cast_note_moving": "Ke {time} · diambil dari arsip - butuh beberapa detik.",
-  "cast_note_to_live": "Siaran langsung sedang dikirim ke TV."
+  "cast_note_to_live": "Siaran langsung sedang dikirim ke TV.",
+  "setting_sub_live": "Subtitle di TV langsung",
+  "setting_sub_live_hint": "Mati: saluran langsung dimulai tanpa subtitle, sedangkan film dan serial tetap memakainya. Nyalakan di pemutar kapan saja."
 }

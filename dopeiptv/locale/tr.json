@@ -3113,5 +3113,7 @@
   "cast_state_moving": "Geri sarılıyor…",
   "cast_state_to_live": "Canlı yayına dönülüyor…",
   "cast_note_moving": "{time} · arşivden alınıyor - birkaç saniye sürer.",
-  "cast_note_to_live": "Canlı yayın televizyona geliyor."
+  "cast_note_to_live": "Canlı yayın televizyona geliyor.",
+  "setting_sub_live": "Canlı TV'de altyazılar",
+  "setting_sub_live_hint": "Kapalı: canlı kanallar altyazısız başlar, filmler ve diziler yine altyazılı olur. İstediğinizde oynatıcıdan açabilirsiniz."
 }

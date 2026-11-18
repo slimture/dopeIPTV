@@ -3113,5 +3113,7 @@
   "cast_state_moving": "Voltando…",
   "cast_state_to_live": "Voltando ao vivo…",
   "cast_note_moving": "Para {time} · buscando no arquivo - leva alguns segundos.",
-  "cast_note_to_live": "A transmissão ao vivo está a caminho da TV."
+  "cast_note_to_live": "A transmissão ao vivo está a caminho da TV.",
+  "setting_sub_live": "Legendas na TV ao vivo",
+  "setting_sub_live_hint": "Desligado: os canais ao vivo começam sem legendas; filmes e séries continuam com elas. Ative-as no player quando quiser."
 }

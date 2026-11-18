@@ -3113,5 +3113,7 @@
   "cast_state_moving": "되감는 중…",
   "cast_state_to_live": "실시간으로 돌아가는 중…",
   "cast_note_moving": "{time}(으)로 · 보관 영상에서 가져오는 중이며 몇 초 걸립니다.",
-  "cast_note_to_live": "실시간 방송을 TV로 보내는 중입니다."
+  "cast_note_to_live": "실시간 방송을 TV로 보내는 중입니다.",
+  "setting_sub_live": "실시간 TV 자막",
+  "setting_sub_live_hint": "끔: 실시간 채널은 자막 없이 시작되고, 영화와 시리즈에는 계속 자막이 나옵니다. 원할 때 플레이어에서 켤 수 있습니다."
 }

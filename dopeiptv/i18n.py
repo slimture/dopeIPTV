@@ -183,6 +183,8 @@ _STRINGS: dict[str, dict[str, str]] = {
     "setting_subtitles": {"en": "Subtitles"},
     "setting_sub_lang": {"en": "Preferred subtitle language"},
     "setting_sub_lang_fallback": {"en": "Fallback subtitle language"},
+    "setting_sub_live": {"en": "Subtitles on live TV"},
+    "setting_sub_live_hint": {"en": "Off: live channels start without subtitles, while films and series still get them. Turn them on in the player when you want them."},
     "setting_aspect_ratio": {"en": "Aspect ratio"},
     "setting_network_buffer": {"en": "Network buffer"},
     "setting_live_rewind": {"en": "Rewind live channels"},

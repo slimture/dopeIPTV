@@ -3113,5 +3113,7 @@
   "cast_state_moving": "Torno indietro…",
   "cast_state_to_live": "Torno alla diretta…",
   "cast_note_moving": "Alle {time} · preso dall'archivio, ci vuole qualche secondo.",
-  "cast_note_to_live": "La diretta sta arrivando alla TV."
+  "cast_note_to_live": "La diretta sta arrivando alla TV.",
+  "setting_sub_live": "Sottotitoli nella TV in diretta",
+  "setting_sub_live_hint": "Disattivato: i canali in diretta partono senza sottotitoli, film e serie continuano ad averli. Attivali nel lettore quando vuoi."
 }

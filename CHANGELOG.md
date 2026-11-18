@@ -9,6 +9,14 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [1.6.5]
 
+### Added
+
+- Settings > Picture and sound: **Subtitles on live TV**. Off, live channels
+  start without subtitles - a channel's DVB or teletext subtitles in the
+  language asked for are no longer turned on by themselves - while films and
+  series still get them; the player's menu turns them on when wanted. On by
+  default, as before; each profile's own.
+
 ### Changed
 
 - Supporting dopeIPTV is a tip or monthly support, never a donation: the

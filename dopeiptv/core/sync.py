@@ -241,7 +241,7 @@ SETTINGS_ALLOW = frozenset({
     "stream_format", "cache_secs", "autoplay_preview", "autoplay_next_episode",
     "nextup_lead_secs", "auto_reconnect_live", "hide_upcoming_prompt",
     "live_rewind_minutes", "live_rewind_disk", "live_rewind_kept",
-    "audio_lang", "sub_mode", "sub_lang", "sub_lang2", "sub_scale", "sub_color",
+    "audio_lang", "sub_mode", "sub_lang", "sub_lang2", "sub_live", "sub_scale", "sub_color",
     "sub_background", "aspect_mode", "video_deinterlace", "video_sharpen",
     "video_tonemapping",
     "epg_upcoming_count", "epg_delay_min", "replay_delay_min", "guide_now_line",

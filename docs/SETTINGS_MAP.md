@@ -32,7 +32,7 @@ has two profiles or more.
 - (only without the embedded player) why playback opens in mpv
 
 **Picture & sound** (`audio`)
-- Audio & subtitles: `audio_lang`, `sub_mode`, `sub_lang`, `sub_lang2` (this profile's; the language picks a teletext subtitle page too; the page chosen per channel in the player's menu is `teletext_pages`, no row)
+- Audio & subtitles: `audio_lang`, `sub_mode`, `sub_lang`, `sub_lang2`, `sub_live` (subtitles on live channels too, or films and series alone) (this profile's; the language picks a teletext subtitle page too; the page chosen per channel in the player's menu is `teletext_pages`, no row)
 - How subtitles look: `sub_scale`, `sub_color`, `sub_background`
 - Video: `aspect_mode`, `video_deinterlace`, `video_sharpen`, `video_tonemapping`
 - Decoding: `hwdec_mode`; `video_own_thread` (the picture drawn on a thread

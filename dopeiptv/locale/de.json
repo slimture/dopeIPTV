@@ -3113,5 +3113,7 @@
   "cast_state_moving": "Springt zurück…",
   "cast_state_to_live": "Zurück zu live…",
   "cast_note_moving": "Zu {time} · wird aus dem Archiv geholt - das dauert ein paar Sekunden.",
-  "cast_note_to_live": "Die Live-Sendung ist auf dem Weg zum Fernseher."
+  "cast_note_to_live": "Die Live-Sendung ist auf dem Weg zum Fernseher.",
+  "setting_sub_live": "Untertitel bei Live-TV",
+  "setting_sub_live_hint": "Aus: Live-Sender starten ohne Untertitel, Filme und Serien bekommen sie weiterhin. Im Player kannst du sie jederzeit einschalten."
 }

@@ -1644,6 +1644,9 @@ class _SettingsMixin:
                              tr("setting_sub_lang_ttx_hint"), badge=own()), subs_on)
             c.shown_if(c.row(tr("setting_sub_lang_fallback"), slang2_box, badge=own()),
                        subs_on)
+            sub_live_box = c.toggle(tr("setting_sub_live"), is_on("sub_live", "true"),
+                                    tr("setting_sub_live_hint"), badge=own())
+            c.shown_if(sub_live_box, subs_on)
             sub_box.currentIndexChanged.connect(lambda _i: subs_card.refresh())
             sub_size_box = self._combo(
                 [(v, tr("opt_percent", n=v)) for v in SUB_SCALES],
@@ -1714,6 +1717,7 @@ class _SettingsMixin:
                 put("sub_mode", sub_box.currentData())
                 put("sub_lang", slang_box.currentData())
                 put("sub_lang2", slang2_box.currentData())
+                put("sub_live", flag(sub_live_box))
                 put("sub_scale", sub_size_box.currentData())
                 put("sub_color", sub_color_box.currentData())
                 put("sub_background", flag(sub_box_box))
@@ -2931,7 +2935,7 @@ class _SettingsMixin:
         from ..core import profiles as _profiles
         built_for = _profiles.active_id()
         player_keys = {
-            "audio_lang", "sub_mode", "sub_lang", "sub_lang2", "sub_scale",
+            "audio_lang", "sub_mode", "sub_lang", "sub_lang2", "sub_live", "sub_scale",
             "sub_color", "sub_background", "aspect_mode",
             "video_deinterlace", "video_sharpen", "video_tonemapping"}
 

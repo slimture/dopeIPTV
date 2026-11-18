@@ -3113,5 +3113,7 @@
   "cast_state_moving": "Terugspoelen…",
   "cast_state_to_live": "Terug naar live…",
   "cast_note_moving": "Naar {time} · wordt uit het archief gehaald - dat duurt een paar seconden.",
-  "cast_note_to_live": "De live-uitzending is onderweg naar de tv."
+  "cast_note_to_live": "De live-uitzending is onderweg naar de tv.",
+  "setting_sub_live": "Ondertitels bij live-tv",
+  "setting_sub_live_hint": "Uit: live zenders starten zonder ondertitels, films en series krijgen ze nog steeds. Zet ze aan in de speler wanneer je wilt."
 }

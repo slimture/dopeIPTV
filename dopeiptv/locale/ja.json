@@ -3113,5 +3113,7 @@
   "cast_state_moving": "巻き戻し中…",
   "cast_state_to_live": "ライブに戻っています…",
   "cast_note_moving": "{time} へ · アーカイブから取得中です。数秒かかります。",
-  "cast_note_to_live": "ライブ放送をテレビに送っています。"
+  "cast_note_to_live": "ライブ放送をテレビに送っています。",
+  "setting_sub_live": "ライブTVの字幕",
+  "setting_sub_live_hint": "オフ：ライブチャンネルは字幕なしで始まり、映画やシリーズには引き続き表示されます。必要なときはプレーヤーでオンにできます。"
 }

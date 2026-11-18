@@ -3113,5 +3113,7 @@
   "cast_state_moving": "正在回退…",
   "cast_state_to_live": "正在回到直播…",
   "cast_note_moving": "跳到 {time} · 正从回看中获取，需要几秒钟。",
-  "cast_note_to_live": "直播正在发送到电视。"
+  "cast_note_to_live": "直播正在发送到电视。",
+  "setting_sub_live": "直播电视字幕",
+  "setting_sub_live_hint": "关闭：直播频道开始时不显示字幕，电影和剧集照常显示。需要时可在播放器中打开。"
 }

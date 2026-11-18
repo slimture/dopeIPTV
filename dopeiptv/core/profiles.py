@@ -86,7 +86,7 @@ OWN_KEYS = frozenset({
     "theme", "accent", "accent_custom", "theme_follow_system", "theme_light",
     "tv_density",
     # The languages to hear and read, and the tracks picked per title.
-    "audio_lang", "sub_mode", "sub_lang", "sub_lang2", "sub_last_lang",
+    "audio_lang", "sub_mode", "sub_lang", "sub_lang2", "sub_last_lang", "sub_live",
     "track_prefs",
     # The season last picked on each series' page (ui/mw_series_page.py).
     "series_seasons",

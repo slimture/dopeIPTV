@@ -15,6 +15,10 @@
 - **Mac:** the app's text is in the system's own font, and the app starts a little faster.
 - **Send feedback** fits the screen, scrolls and opens wholly on it - on a Mac it opened half under the Dock; **messages** take a new theme's colours.
 
+### New
+
+- **Subtitles on live TV** (Settings > Picture and sound): turn it off to have subtitles on films and series but not on live channels, whose DVB subtitles otherwise come on by themselves in your language.
+
 ### Changed
 
 - **Supporting dopeIPTV is a tip or monthly support** - never a donation - in all 27 languages, and the heart opens the new support page on dopeiptv.org.

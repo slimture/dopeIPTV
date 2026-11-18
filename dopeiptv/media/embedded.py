@@ -220,6 +220,12 @@ _SUB_LANG_TAGS = {
 }
 
 
+def live_subtitles(settings) -> bool:
+    """Subtitles on live channels as on films and series (the default), or
+    live channels open without them (Settings > Picture and sound)."""
+    return settings is None or str(settings.value("sub_live", "true")) != "false"
+
+
 def _set_forced_only(m, on: bool) -> None:
     """Show only the forced subtitle events, or everything. mpv 0.37 renamed
     sub-forced-only to sub-forced-events-only, and the libmpv in use may be
@@ -2538,7 +2544,11 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         set_opt("alang", channel_prefs.audio_langs(own, s.value("audio_lang", "") or ""))
         sub_mode = s.value("sub_mode", "auto")
         if load:
-            self._sub_defaults(sub_mode, live, set_opt)
+            # Subtitles for films and series alone, if so chosen: a live
+            # channel opens without them - its DVB or teletext subtitles
+            # can still be turned on in the player.
+            self._sub_defaults("off" if live and not live_subtitles(s) else sub_mode,
+                               live, set_opt)
             if channel_prefs.own_subtitles(own):
                 self._own_subtitles(own, live, set_opt)
             self._ttx_before_load(set_opt)
