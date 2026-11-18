@@ -2786,7 +2786,9 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             if gen != self._load_gen or self.mode != request_mode:
                 return
             self._hide_busy()
-            self._raw_categories = cats or []
+            # Only rows: a source that answers with something else (a
+            # refused login's object) must not take the list down with it.
+            self._raw_categories = [c for c in cats or [] if isinstance(c, dict)]
             if hasattr(self, "_kids_note_cats"):
                 self._kids_note_cats(request_mode, self._raw_categories)
             if request_mode == "live":
@@ -2820,7 +2822,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             # and is never asked for the PIN of the rest (mw_profiles).
             kids = self._profile_kids()
             from ..core.profiles import adult_category
-            for c in cats:
+            for c in self._raw_categories:
                 cid = c.get("category_id")
                 if self.overrides.is_hidden(self.mode, cid):
                     continue

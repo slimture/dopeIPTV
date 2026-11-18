@@ -18,6 +18,28 @@ from ..core.log import log, register_secrets
 from ..i18n import LocalizedError, tr
 
 
+class NoList(LocalizedError):
+    """A list action answered with something that is no list - a refused
+    login's {"user_info": {"auth": 0}}, an error object. Treated as a failed
+    request: nothing is stored, the last good copy is served if there is
+    one, else the load fails with the reason."""
+
+
+def list_rows(data: Any) -> list | None:
+    """A list action's answer as rows: a list as it is, with anything in it
+    that is no object left out; an object of rows keyed by id (some panels
+    answer so) as its rows; anything else - a refused login's user_info, an
+    error object, a number - None."""
+    if isinstance(data, list):
+        if all(isinstance(r, dict) for r in data):
+            return data
+        return [r for r in data if isinstance(r, dict)]
+    if (isinstance(data, dict) and data and "user_info" not in data
+            and all(isinstance(v, dict) for v in data.values())):
+        return list(data.values())
+    return None
+
+
 def json_object(pairs: list[tuple[str, Any]]) -> dict:
     """object_pairs_hook for the big lists. json.loads() is one C call that
     holds the interpreter (the GIL) to the end: a 30 MB movie list stopped
@@ -213,7 +235,7 @@ class ListCache:
         self._tls.reply = None
         try:
             data = fetch() or []
-        except requests.RequestException:
+        except (requests.RequestException, NoList):
             self._tls.reply = None
             with self._list_lock:
                 hit = self._list_cache.get(key)
@@ -512,50 +534,63 @@ class XtreamClient(Mirrored, ListCache):
         if limit is not None or active is not None:
             self.account_seen = {"max": limit, "active": active, "at": time.monotonic()}
 
+    def _rows(self, key: tuple, **params: Any) -> list[dict]:
+        """A list action through the list cache, as rows (list_rows): what
+        the panel answered, or the copy kept from before - an old copy that
+        is no list (an older version stored a refused login's answer) is
+        none."""
+        return list_rows(self._cached_list(key, lambda: self._list_api(**params))) or []
+
+    def _list_api(self, **params: Any) -> list:
+        """A list action asked of the panel. A panel that refuses the login
+        answers it with {"user_info": {"auth": 0}} - an object, not a list:
+        its keys walked as rows crashed the category list. That, or any
+        other answer that is no list, is a failed request (NoList)."""
+        data = self._api(**params)
+        rows = list_rows(data)
+        if rows is not None:
+            return rows
+        ui = data.get("user_info") if isinstance(data, dict) else None
+        refused = isinstance(ui, dict) and str(ui.get("auth", 0)) != "1"
+        log.warning("xtream %s @ %s: no list in the answer (%s)",
+                    params.get("action"), self.server,
+                    "the login was refused" if refused else type(data).__name__)
+        raise NoList("err_wrong_login" if refused else "err_unexpected_response")
+
     def live_categories(self) -> list[dict]:
-        return self._cached_list(
-            ("get_live_categories",),
-            lambda: self._api(action="get_live_categories"))
+        return self._rows(("get_live_categories",), action="get_live_categories")
 
     def live_streams(self, category_id: str | None = None) -> list[dict]:
         p: dict[str, Any] = {"action": "get_live_streams"}
         if category_id:
             p["category_id"] = category_id
-        return self._cached_list(("get_live_streams", category_id),
-                                 lambda: self._api(**p))
+        return self._rows(("get_live_streams", category_id), **p)
 
     def vod_categories(self) -> list[dict]:
-        return self._cached_list(
-            ("get_vod_categories",),
-            lambda: self._api(action="get_vod_categories"))
+        return self._rows(("get_vod_categories",), action="get_vod_categories")
 
     def vod_streams(self, category_id: str | None = None) -> list[dict]:
         p: dict[str, Any] = {"action": "get_vod_streams"}
         if category_id:
             p["category_id"] = category_id
-        return self._cached_list(("get_vod_streams", category_id),
-                                 lambda: self._api(**p))
+        return self._rows(("get_vod_streams", category_id), **p)
 
     def series_categories(self) -> list[dict]:
-        return self._cached_list(
-            ("get_series_categories",),
-            lambda: self._api(action="get_series_categories"))
+        return self._rows(("get_series_categories",), action="get_series_categories")
 
     def series_list(self, category_id: str | None = None) -> list[dict]:
         p: dict[str, Any] = {"action": "get_series"}
         if category_id:
             p["category_id"] = category_id
-        return self._cached_list(("get_series", category_id),
-                                 lambda: self._api(**p))
+        return self._rows(("get_series", category_id), **p)
 
     def held_series(self) -> tuple[list[dict], list[dict]] | None:
         """Every series and their categories as held already (memory or the
         disk copy), or None - never a request (the command palette)."""
-        rows = self.held(("get_series", None))
-        if not isinstance(rows, list):
+        rows = list_rows(self.held(("get_series", None)))
+        if rows is None:
             return None
-        cats = self.held(("get_series_categories",))
-        return rows, cats if isinstance(cats, list) else []
+        return rows, list_rows(self.held(("get_series_categories",))) or []
 
     def series_info(self, series_id: int | str) -> dict:
         return self._api(action="get_series_info", series_id=series_id) or {}

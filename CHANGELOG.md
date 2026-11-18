@@ -18,6 +18,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- An Xtream provider that refuses the login no longer crashes the app as
+  the categories load ("'str' object has no attribute 'get'"). The panel
+  answers a list with its refusal instead of a list; that is now a failed
+  load - the lists kept from before stay, else "Wrong username or password"
+  - and never stored as the list.
 - A source's Type changed in Settings no longer takes another kind's
   address and login with it. The Xtream address, user name and password
   stayed in the fields of every type picked after it (Jellyfin, Tvheadend,
