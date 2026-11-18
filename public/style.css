@@ -204,13 +204,13 @@ h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.03em; line-height:
 .sec-head p { color: var(--muted); margin: 14px 0 0; font-size: 1.1rem; }
 /* Section openings centred, as a page of few words reads best. The FAQ keeps
    its heading in the side column. */
-#features .sec-head, #shots .sec-head { margin-inline: auto; text-align: center; }
+#features .sec-head { margin-inline: auto; text-align: center; }
 .dl-head { align-items: center !important; text-align: center; }
 .dl-head .sec-head { margin-inline: auto; }
 /* These openings are a heading alone, and the 60ch measure is for running
    text: it broke a one-line sentence in two on a wide screen. A heading
    longer than the page still wraps, balanced. */
-#features .sec-head, #shots .sec-head, .dl-head .sec-head { max-width: none; }
+#features .sec-head, .dl-head .sec-head { max-width: none; }
 /* Features, the way Apple lists them: a line icon, a title and a line or
    two of text - three columns on a computer, a list on a phone (app.js
    folds all but six there behind "Show all features"). No boxes. */
@@ -1304,10 +1304,10 @@ dialog.howdlg::backdrop { background: rgba(5, 7, 10, .66); }
    and the bands still take turns. */
 .is-phone main { display: flex; flex-direction: column; }
 .is-phone main > #download { order: 1; }
-.is-phone #donate { background: var(--surface); }
+.is-phone #support { background: var(--surface); }
 .is-phone #download { background: var(--bg); }
 .is-phone #download .dlx-card { background: var(--surface); }
-.is-phone #donate .donate {
+.is-phone #support .donate {
   background: radial-gradient(90% 60% at 50% 100%, color-mix(in srgb, var(--heart) 22%, transparent), transparent 75%),
     var(--bg); }
 .is-phone .bar .btn { display: none; }
@@ -1695,7 +1695,7 @@ dialog.howdlg::backdrop { background: rgba(5, 7, 10, .66); }
 #features, #download { background: var(--surface); }
 #features .fxp-tab.is-on { background: var(--bg); }
 #download .dlx-card { background: var(--bg); }
-#donate .donate {
+#support .donate {
   background: radial-gradient(55% 130% at 86% 50%, color-mix(in srgb, var(--heart) 24%, transparent), transparent 72%),
     var(--surface); }
 #download .dlx-big.alt, #download .dlx.has-mine .dlx-card:not(.is-mine) .dlx-big { background: var(--surface); }
@@ -1703,11 +1703,16 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
 /* What dopeIPTV is built on, right under the donate band: a heading; opened, a card unfolds downwards and the projects drop into
    place one after another, specks of the accent drifting down behind them
    (nav.js animates the height). */
-#built { padding: 0 0 88px; margin-top: -8px; }
+/* It stands on its own below the downloads, with room above it; right
+   under the support band (#support, there only once a way to pay is set up)
+   it tucks up to the band as one block. Never a negative margin without the
+   band: it pulled the row halfway over the downloads' edge. */
+#built { padding: 48px 0 88px; }
+#support + #built { padding-top: 0; margin-top: -8px; }
 /* On a phone the strip has a surface of its own, from the line under the
-   donate band: room above the card, not on the line. */
-.is-phone #built { background: var(--surface); padding-top: 32px; }
-@media (max-width: 720px) { #built { padding-bottom: 48px; margin-top: 4px; } }
+   band: room above the card, not on the line. */
+.is-phone #built, .is-phone #support + #built { background: var(--surface); padding-top: 32px; }
+@media (max-width: 720px) { #built, #support + #built { padding-bottom: 48px; margin-top: 4px; } }
 /* The heading in a card of its own, near square - the donate card's
    corners and surface, a soft glow of the accent instead of its pink. */
 .built-more > summary { position: relative; border: 1px solid var(--line);
@@ -1859,7 +1864,7 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
      not under it: sections are shorter on top here than on a computer. */
   html { scroll-padding-top: 64px; }
   .hero .cta-row .btn.primary { min-width: 62%; justify-content: center; }
-  #features .sec-head p, .donate-text p, #shots .sec-head p { display: none; }
+  #features .sec-head p, .donate-text p { display: none; }
   .donate-text .donate-short { display: block; margin: 0 auto 4px; max-width: 34ch;
     font-size: 15px; line-height: 1.5; }
   .sec-head { margin-bottom: 18px; }

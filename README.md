@@ -250,6 +250,15 @@ chown -R iptv:iptv /usr/local/www/iptv
 `--delete` (rsync) is likewise never right here: the live data is absent from
 the source tree, so it would delete all of it.
 
+**Before a change to the pages or `style.css` goes out**, `python3 -m pytest
+donate` checks the stylesheet against the pages (`donate/test_site_layout.py`):
+every `#id` a rule names must be one a page or script makes - a renamed
+section once left three rules styling nothing - and "Built on" (`#built`)
+may be pulled up only right under the support band (`#support + #built`).
+The band is there only once a way to pay is set up; without it the pull put
+the row halfway over the downloads' edge. A part whose place depends on what
+is before it gets its rule from that neighbour (`A + B`), never on its own.
+
 ## Trakt sign-in comes back through here
 
 `/trakt/callback/` is part of the app, not of the site: it is the redirect
