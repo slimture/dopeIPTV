@@ -263,6 +263,7 @@ DAY = 86400.0
 # Watch together: a member asks every 25 s or so, and again for each message
 # the others send - a room of eight on one address stays well under this.
 TOGETHER_PER_WINDOW = 1200
+TOGETHER_NEW_PER_WINDOW = 30      # rooms one address opens in WINDOW
 
 
 _SPAN: dict[str, float] = {}       # a limit's own window, where it is not WINDOW
@@ -1410,6 +1411,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_quiet(400, {"error": "member"})
         addr = self.headers.get("X-Real-IP") or "local"
         if not _allowed("tg:" + addr, TOGETHER_PER_WINDOW):
+            return self._send_quiet(429, {"error": "slow down"})
+        # Asking for a room that is not there makes it: without a limit of
+        # its own one address filled every room there is (leaving is no room).
+        if self.command != "DELETE" and not together.RELAY.has(room) \
+                and not _allowed("tg-new:" + addr, TOGETHER_NEW_PER_WINDOW):
             return self._send_quiet(429, {"error": "slow down"})
         if self.command == "GET":
             args = {k: v[0] for k, v in urllib.parse.parse_qs(query).items()}

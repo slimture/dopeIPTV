@@ -52,6 +52,9 @@ KEEP_MESSAGES = 300
 ROOM_BYTES = 128 * 1024
 MAX_ROOMS = 500
 IDLE_SECS = 3600
+#: A room nobody ever said anything in goes sooner: asking for a room that
+#: is not there makes it, and MAX_ROOMS of those held the relay for an hour.
+EMPTY_SECS = 300
 MEMBER_SECS = 90
 MAX_WAIT = 25.0
 #: Long polls held at once: in all, and from one address.
@@ -86,17 +89,26 @@ class Relay:
         self.opened = 0                 # rooms made since the counts were last read
 
     # -- inside the lock
-    def _sweep(self, now: float) -> None:
-        if now - self._swept < SWEEP_SECS:
+    def _sweep(self, now: float, force: bool = False) -> None:
+        if not force and now - self._swept < SWEEP_SECS:
             return
         self._swept = now
-        for rid in [r for r, room in self._rooms.items() if now - room.touched > IDLE_SECS]:
+        for rid in [r for r, room in self._rooms.items()
+                    if now - room.touched > (IDLE_SECS if room.msgs else EMPTY_SECS)]:
             del self._rooms[rid]
+
+    def has(self, rid: str) -> bool:
+        """Whether room *rid* is kept now (the service limits how many new
+        ones an address opens)."""
+        with self._lock:
+            return rid in self._rooms
 
     def _room(self, rid: str, now: float) -> _Room | None:
         self._sweep(now)
         room = self._rooms.get(rid)
         if room is None:
+            if len(self._rooms) >= MAX_ROOMS:
+                self._sweep(now, force=True)
             if len(self._rooms) >= MAX_ROOMS:
                 return None
             room = self._rooms[rid] = _Room(self._lock, now)

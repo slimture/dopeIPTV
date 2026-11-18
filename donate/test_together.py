@@ -267,6 +267,43 @@ def test_an_address_is_slowed_down():
         srv.server_close()
 
 
+def test_one_address_cannot_open_every_room():
+    """Asking for a room makes it. An address opens only so many in a while;
+    the rooms it has are still answered, and so is another address."""
+    srv, _stats, donate = _service()
+    try:
+        ip = "203.0.113.20"
+        donate.TOGETHER_NEW_PER_WINDOW = 3
+        rooms = [f"{i:02x}" * 32 for i in range(0x30, 0x35)]
+        codes = [_call(srv, "GET", f"/together/{r}?after=0&wait=0", A, ip=ip)[0] for r in rooms]
+        assert codes == [200, 200, 200, 429, 429]
+        assert _call(srv, "GET", f"/together/{rooms[0]}?after=0&wait=0", A, ip=ip)[0] == 200
+        assert _call(srv, "POST", f"/together/{rooms[4]}", A, _blob(100), ip=ip)[0] == 429
+        assert _call(srv, "GET", f"/together/{rooms[4]}?after=0&wait=0", A,
+                     ip="203.0.113.21")[0] == 200
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_a_room_nobody_spoke_in_goes_soon_and_makes_way_when_full():
+    clock = FakeClock()
+    relay = together.Relay(clock=clock, wall=lambda: 0.0)
+    old = together.MAX_ROOMS
+    together.MAX_ROOMS = 3
+    try:
+        spoken, silent = "aa" * 32, ["b%d" % i * 32 for i in range(2)]
+        assert relay.post(spoken, A, _blob(100))[0] == 200
+        for rid in silent:
+            assert relay.poll(rid, A, 0, 0)[0] == 200
+        assert relay.poll("cc" * 32, A, 0, 0)[0] == 503             # full
+        clock.t += together.EMPTY_SECS + 1
+        assert relay.poll("cc" * 32, A, 0, 0)[0] == 200             # the silent ones went
+        assert relay.has(spoken) and not relay.has(silent[0])
+    finally:
+        together.MAX_ROOMS = old
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     for name, fn in tests:
