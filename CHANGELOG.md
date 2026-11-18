@@ -9,6 +9,9 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- TV: a channel's name in the list no longer loses its last letter ("BBC
+  Eart") on a scaled screen - Windows at 125 or 150 % drew it a pixel or two
+  wider than it measured and the rest was cut off (#35).
 - AirPlay: a stream the Apple TV is still loading - a cast just begun, a
   seek in a channel - is no longer sent again after ten seconds of
   buffering: that only started it over (it went back a few seconds at the

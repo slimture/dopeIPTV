@@ -269,6 +269,37 @@ def test_marks_beside_the_name(app):
     assert star.right() <= parts["name"].right() + 1
 
 
+def test_a_name_is_never_clipped_to_its_measure(app):
+    """Issue #35: on a scaled screen the drawn name came out a pixel or two
+    wider than its measure and its last letter was cut off ("BBC Eart") -
+    it is drawn without clipping, with a little room before it is cut."""
+    from PyQt6.QtCore import QRect, Qt
+    from PyQt6.QtGui import QPainter, QPixmap
+    from dopeiptv.ui.tv_place import NAME_SLACK, paint_tv_row
+    drawn = []
+
+    class P(QPainter):
+        def drawText(self, *a):
+            if len(a) == 3:
+                drawn.append((str(a[2]), int(a[1])))
+            super().drawText(*a)
+    for width in (376, 900):
+        pix = QPixmap(width, 56)
+        painter = P(pix)
+        try:
+            name = "BBC Earth (Geography and Wildlife)"
+            parts = paint_tv_row(painter, QRect(0, 0, width, 56), 1, 3,
+                                 _row(name=name, favourite=True, archive=True),
+                                 "compact", False)
+        finally:
+            painter.end()
+        text, flags = next((t, f) for t, f in drawn if t.startswith("BBC"))
+        assert text == name or text.endswith("…"), text
+        assert flags & int(Qt.TextFlag.TextDontClip)
+        assert parts["name_text"].right() + NAME_SLACK < parts["name"].right() + 1
+        drawn.clear()
+
+
 def test_a_heading_channel_is_painted_as_a_heading(app):
     from PyQt6.QtCore import QRect
     from dopeiptv.ui.tv_place import heading_of, paint_tv_row
