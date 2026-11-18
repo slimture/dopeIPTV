@@ -36,6 +36,8 @@ def test_kerberos_is_built_before_the_app():
     block = text.split("  - name: krb5\n", 1)[1].split("\n  - name: ", 1)[0]
     assert re.search(r"url: https://kerberos\.org/dist/krb5/[\d.]+/krb5-[\d.]+\.tar\.gz", block)
     assert re.search(r"sha256: [0-9a-f]{64}\b", block)
+    # Its K&R declarations do not build as C23, the SDK's compiler's default.
+    assert "cflags: -std=gnu17" in block
 
 
 def test_the_build_imports_every_qt_module_the_app_uses():

@@ -109,6 +109,10 @@ modules:
   #     1.5.0 on every start crashed on it (#36) ---
   - name: krb5
     subdir: src
+    build-options:
+      # krb5 1.21 declares functions the old way (`void f();`), which C23 -
+      # GCC 15's default - reads as taking no arguments: it does not build.
+      cflags: -std=gnu17
     config-opts:
       - --disable-static
       - --disable-rpath
