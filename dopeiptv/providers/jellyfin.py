@@ -129,18 +129,6 @@ def _json(r: Any) -> Any:
         raise LocalizedError("err_unexpected_response") from None
 
 
-def public_info(server: str, flavor: str) -> dict:
-    """The server's own name and version, asked without signing in."""
-    r = _call(flavor, server, "GET", "/System/Info/Public")
-    if r.status_code in (404, 405):
-        raise LocalizedError("err_box_not_found", kind=NAMES[flavor])
-    r.raise_for_status()
-    js = _json(r)
-    if not isinstance(js, dict) or not (js.get("Id") or js.get("ServerName")):
-        raise LocalizedError("err_box_not_found", kind=NAMES[flavor])
-    return js
-
-
 def _signed_in(js: Any, server: str, flavor: str) -> dict:
     user = js.get("User") if isinstance(js, dict) else None
     token = str((js or {}).get("AccessToken") or "") if isinstance(js, dict) else ""

@@ -26,7 +26,7 @@ from PyQt6.QtCore import QObject, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction, QGuiApplication
 
 from ..core import build_check, report
-from ..core.log import log, log_dir
+from ..core.log import log
 from ..core.workers import run_async
 from ..i18n import tr
 from .mw_updates import build_known
@@ -566,7 +566,3 @@ class _ReportMixin:
             self._show_toast(tr("report_not_sent"), 9000)
         run_async(self.pool, lambda: report.send(kind, payload, extra=fields), done, lambda _e=None: done(False))
         log.info("report: %s sent by the person", kind)
-
-    @staticmethod
-    def _report_folder() -> str:
-        return log_dir()

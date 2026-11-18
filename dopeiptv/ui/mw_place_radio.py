@@ -367,12 +367,3 @@ class _PlaceRadioMixin:
             return
         self._rap_favs_refresh()
         place.view.redress()
-
-    def _rap_state(self) -> dict:
-        place = self._rap_page
-        view = place.view if place is not None else None
-        return {"shown": self._place_radio_showing(),
-                "cards": view.model_.rowCount() if view is not None else 0,
-                "layout": view.layout_kind if view is not None else "",
-                "title": place.header.title_text() if place is not None else "",
-                "favs": [c.key for c in place.favs.cards()] if place is not None else []}

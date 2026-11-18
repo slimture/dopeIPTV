@@ -915,13 +915,3 @@ class _PlaceLocalMixin:
         self._lp_cont_sig = None
         self._lp_rows_refresh()
         place.view.redress()
-
-    def _lp_state(self) -> dict:
-        """What the place shows, for a test and the log."""
-        place = self._lp_page
-        view = place.view if place is not None else None
-        return {"shown": self._place_local_showing(),
-                "cards": view.model_.rowCount() if view is not None else 0,
-                "layout": view.layout_kind if view is not None else "",
-                "title": place.header.title_text() if place is not None else "",
-                "continue": [c.key for c in place.cont.cards()] if place is not None else []}

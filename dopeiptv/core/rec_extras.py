@@ -21,7 +21,6 @@ import subprocess
 import tempfile
 import time
 from datetime import datetime
-from typing import Any
 
 from .log import log
 from .nerd_check import FAIL, INFO, OK, WARN, Check
@@ -226,10 +225,3 @@ def check_post(command: str, timeout: float = 20.0) -> Check:
     if out.returncode != 0:
         return Check(FAIL, "nerd_ck_post_code", {"code": out.returncode}, "\n".join(lines))
     return Check(OK, "nerd_ck_post_ok", {"ms": ms}, "\n".join(lines))
-
-
-def settings_value(settings: Any, key: str) -> str:
-    try:
-        return str(settings.value(key, "") or "")
-    except Exception:
-        return ""

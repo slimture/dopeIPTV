@@ -139,10 +139,6 @@ class CastHub:
 
     # -- finding devices and casting to one -----------------------------------
 
-    @staticmethod
-    def chromecast_available() -> bool:
-        return ChromecastManager.available()
-
     # -- devices known by their address -------------------------------------
 
     def stored(self) -> list[cast_devices.Added]:
