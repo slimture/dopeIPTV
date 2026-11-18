@@ -191,6 +191,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     ($current == "home") as $home
     | (if $home then "" else "/" end) as $base
     | (if $current == "help" then "/help/"
+       elif $current == "features" then "/features/"
        elif ($L.pages | index($current)) != null then "/\($current)/"
        else "/" end) as $self
     | [[$base + "#features", t("nav_features"), ""],
@@ -245,6 +246,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
      locale: ($S.locale[$lang] // "en_US" | h),
      css: ($asset_urls["/style.css"] | h), navjs: ($asset_urls["/nav.js"] | h),
      appjs: ($asset_urls["/app.js"] | h), helpjs: ($asset_urls["/help.js"] | h),
+     featjs: ($asset_urls["/features.js"] // "/features.js" | h),
      # Without a hash (an older sync-releases.sh) still the file, not "null".
      eventsjs: ($asset_urls["/events.js"] // "/events.js" | h),
      year: $year};
@@ -542,6 +544,38 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
              + "          </section>\n"] | add),
          help_version: (if ($version | truthy) then " " + ($version | h) else "" end)});
 
+# -- /features/ -------------------------------------------------------------------
+# Everything the app does, a line each: site/features.json lists the groups
+# (an icon each) and their features in order, with the help answer a feature
+# links to; the words are fl_g_<group>, fl_<key>_h and fl_<key>_p. Read as
+# --slurpfile featfile, and absent (an older sync) as an empty list.
+
+  def page_features:
+    ($R.version // "" | tostring) as $version
+    | ($ARGS.named.featfile[0] // {groups: []}) as $FL
+    | ([$FL.groups[].items | length] | add // 0) as $total
+    | "<svg class=\"ic\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\">" as $svg
+    | $tpl
+    | expand(common + {canonical: (url("/features/"; $lang) | h)};
+        {hreflang: hreflang("/features/"), nav: nav("features"),
+         fl_index: ("          <a href=\"#top\" data-g=\"\" aria-current=\"true\">\(t("fl_all") | h)<span class=\"n\">\($total)</span></a>\n"
+           + ([$FL.groups[]
+               | "          <a href=\"#\(.k | h)\" data-g=\"\(.k | h)\">\($svg)\(.icon)</svg><span class=\"l\">\(t("fl_g_\(.k)") | h)</span><span class=\"n\">\(.items | length)</span></a>\n"]
+              | add // "")),
+         fl_groups: ([$FL.groups[] | .k as $g
+           | "          <section class=\"fl-group\" id=\"\($g | h)\" data-g=\"\($g | h)\" aria-labelledby=\"\($g | h)-h\">\n"
+             + "            <h2 id=\"\($g | h)-h\">\($svg)\(.icon)</svg>\(t("fl_g_\($g)") | h)</h2>\n"
+             + "            <ul class=\"fl-list\">\n"
+             + ([.items[] | . as [$k, $help]
+                 | "              <li class=\"fl-item\" id=\"f-\($k | h)\"><h3>\(t("fl_\($k)_h") | h)</h3><p>\(t("fl_\($k)_p") | h)</p>"
+                   + (if $help != "" then
+                        "<a class=\"fl-help\" href=\"/help/#\($help | h)\">\(t("fl_help") | h)</a>"
+                      else "" end)
+                   + "</li>\n"] | add // "")
+             + "            </ul>\n"
+             + "          </section>\n"] | add // ""),
+         fl_version: (if ($version | truthy) then " " + ($version | h) else "" end)});
+
 # -- 404.php --------------------------------------------------------------------
 
   def page_404: $tpl | expand(common; {nav: nav("")});
@@ -578,7 +612,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 
   def page_sitemap:
     [["/", (if ($R.published_at | truthy) then (try ($R.published_at | tostring | fromdateiso8601) catch null) else null end)],
-     ["/help/", $help_mtime]] as $pages
+     ["/help/", $help_mtime], ["/features/", $help_mtime]] as $pages
     | "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
       + "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\" xmlns:xhtml=\"http://www.w3.org/1999/xhtml\">\n"
       + ([$pages[] as [$path, $ts] | $avail[] as $code
@@ -603,6 +637,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 
   if $page == "index" then page_index
   elif $page == "help" then page_help
+  elif $page == "features" then page_features
   elif $page == "404" then page_404
   elif $page == "sitemap" then page_sitemap
   elif ($L.pages | index($page)) != null then page_legal

@@ -15,6 +15,7 @@ website/
 │   ├── style.css           the look: black/white, greys, the app's blue; light + dark
 │   ├── app.js              OS-detect for the hero button (progressive enhancement)
 │   ├── nav.js, help.js     the narrow-window menu and the help search
+│   ├── features.js         /features/: the groups filter the list, the box searches it
 │   ├── events.js           what visitors do on a page, for the statistics (what, never who)
 │   ├── favicon.svg         the app's icon (blue tile, white play)
 │   ├── fonts/              Inter (OFL), self-hosted; Apple devices use their own SF
@@ -28,10 +29,12 @@ website/
 │   └── screenshots/        the app's pictures, <lang>/<name>.webp (from the app's tools/site_screenshots.py):
 │                           hero-1..5 (the first picture's slideshow), feat-<key> (the feature explorer)
 ├── site/                   what the pages are made from - not web-served
-│   ├── templates/          index.html, help.html, legal.html, 404.html and nav.html
+│   ├── templates/          index.html, help.html, features.html, legal.html, 404.html and nav.html
 │   ├── lang/*.json         the texts, one file per language (en.json is the source)
 │   ├── i18n.json           language names, which are right-to-left, ICU locales
 │   ├── help.json           the help page's sections and topics
+│   ├── features.json       every feature of the app (/features/, linked under the feature explorer):
+│                           its groups and their features in order, each with the help answer it links to
 │   ├── legal.json          the legal pages: their titles, the date, the languages
 │   ├── legal/{sv,en}/      their texts - Swedish governs, English is a translation
 │   ├── formats.json        dates and numbers per language, as ICU 76.1 writes them
