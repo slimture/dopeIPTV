@@ -142,7 +142,7 @@ w._supporter_action.trigger()
 assert len(shown) == n + 1
 assert tr("heart_tip_key") in w._donate_btn.toolTip()
 d2 = dialogs.SupporterDialog(w, s)
-assert d2.where.isVisibleTo(d2) and "Stripe" in d2.where.text()
+assert d2.where.isVisibleTo(d2) and "dopeiptv.org" in d2.where.text()
 assert d2.heart.isVisibleTo(d2) and not d2.mark.isVisibleTo(d2)
 d2.key.setText(key)
 assert not d2.where.isVisibleTo(d2)

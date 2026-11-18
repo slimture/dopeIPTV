@@ -1,7 +1,7 @@
 # The "Sponsor" button on the repository page. GitHub reads this file from
 # the default branch (main), so a change here shows after the next release,
 # and shows the button only with Settings -> General -> Features ->
-# Sponsorships ticked. The link opens the site's donate dialog, which takes
-# the donor's own currency (the website branch, public/nav.js).
-# Add `github: slimture` once GitHub Sponsors is set up for the account.
-custom: ["https://dopeiptv.org/?ref=github-sponsor#donate"]
+# Sponsorships ticked. The support page has a tip, monthly support and
+# GitHub Sponsors side by side.
+# Add `github: slimture` once the GitHub Sponsors profile is approved.
+custom: ["https://dopeiptv.org/support/?ref=github-sponsor"]

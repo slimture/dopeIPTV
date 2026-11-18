@@ -7,6 +7,15 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Changed
+
+- Supporting dopeIPTV is a tip or monthly support, never a donation: the
+  heart, the menu and Settings say so in all 27 languages ("I've supported",
+  "Ask for support now and then"), and the heart opens the new support page
+  on dopeiptv.org (a tip of your choice, fixed monthly support, GitHub
+  Sponsors), where the supporter key comes after paying. The software
+  catalogues' "Donate" link is gone.
+
 ### Fixed
 
 - A source's Type changed in Settings no longer takes another kind's

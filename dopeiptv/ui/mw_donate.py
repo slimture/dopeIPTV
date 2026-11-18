@@ -1,4 +1,5 @@
-"""Donating, from inside the app - asked now and then, never in the way.
+"""Support (a tip or monthly support), from inside the app - asked now and
+then, never in the way.
 
 "Support dopeIPTV…" is always in the app menu and in About. Beyond that
 the app asks in one rhythm (core/donate_rhythm.py): one week a month, once
@@ -8,10 +9,10 @@ that week the heart has its colour; the other six days it is muted. Nothing
 beats, pulses or pops up. Left alone it goes after its week and comes back
 next month.
 
-Donate (the heart, or its right-click menu) opens the donate dialog on the
-website (with a ?ref= saying from where - the site's statistics read it)
+The heart (or its right-click menu) opens the support page on the website
+(with a ?ref= saying from where - the site's statistics read it)
 and ends the week; the right-click's "Hide for three months" puts it away
-for three months; "I've donated" for a year, taken at the person's word. A
+for three months; "I've supported" for a year, taken at the person's word. A
 supporter key: never asked. Settings, General can switch the asking off altogether. It is not
 drawn in full screen, in TV mode, in private viewing or for a kids
 profile - the week's days still count.
@@ -31,9 +32,9 @@ from ..core.xdg import open_url
 from ..i18n import tr
 from .theme import HEART, P
 
-# #support: the donate band, not the payment form - an invitation, not
-# a bill (#donate opens the form, for links from people already decided).
-DONATE_URL = "https://dopeiptv.org/?ref={ref}#support"
+# The support page: why, a tip or monthly support, GitHub Sponsors - and
+# the supporter key after paying. Nothing is paid in the app.
+DONATE_URL = "https://dopeiptv.org/support/?ref={ref}"
 #: How long the seconds watched are taken as known (the household's logs
 #: are read again only after this, and only while a period could begin).
 WATCH_MEMO_S = 600.0

@@ -1081,7 +1081,7 @@ class _SettingsMixin:
             c.row(tr("tv_inputs_found"), tv_found, tr("tv_inputs_found_hint"),
                   search="lirc gamepad controller joystick cec remote evdev sdl")
             # Supporting the app: feedback, the supporter key, and - last and
-            # quiet - whether the app asks for a donation now and then.
+            # quiet - whether the app asks for support now and then.
             c = support_card = general.card(tr("donate_support"))
             icon_box = None
             if hasattr(self, "open_answers"):
@@ -1112,7 +1112,7 @@ class _SettingsMixin:
                 key_btn.clicked.connect(lambda _c=False: supporter_window())
                 key_row = c.row(tr("supporter_menu"), key_btn,
                                 tr("supporter_tip", date=format_month(mine["since"])) if mine else tr("set_supporter_hint"),
-                                search="supporter key donation donated code nyckel")
+                                search="supporter key tip monthly support donation code nyckel")
                 shared["supporter_row"] = (key_btn, key_row, support_card)
                 # The supporter's app icon - for a supporter only, on unless
                 # turned off; applied as it is switched (commit below).

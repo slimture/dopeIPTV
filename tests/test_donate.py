@@ -275,7 +275,7 @@ def test_donate_opens_the_site_and_ends_the_week(tmp_path, monkeypatch):
     opened: list[str] = []
     monkeypatch.setattr(mw_donate, "open_url", opened.append)
     _DonateMixin.open_donate(w, "app-home")
-    assert opened == ["https://dopeiptv.org/?ref=app-home#support"]
+    assert opened == ["https://dopeiptv.org/support/?ref=app-home"]
 
 
 def test_a_supporter_is_never_asked(tmp_path, monkeypatch):
