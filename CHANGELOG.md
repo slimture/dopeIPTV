@@ -9,6 +9,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- Server mode: the tuner's addresses (the HDHomeRun endpoints, which need no
+  token) answer only when asked by an address or a home name - a web page
+  can no longer reach them by DNS rebinding and read the lineup or start a
+  stream. Plex, Jellyfin and Channels ask by address and are not affected.
 - Casting: going back in a channel says so on the card - "Going back…" and
   where to, fetched from the archive - and "Back to live…" for live, until
   the TV plays it; no more Playing for the old stream meanwhile.
