@@ -9,6 +9,13 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- M3U sources: a channel keeps its id when the provider adds, removes or
+  reorders channels. Ids used to be the channel's place in the list, so one
+  channel added at the top moved every favourite, hidden or renamed channel,
+  own number and reminder onto the channel next to it. The first start after
+  the update reads the list as before; the start after that moves everything
+  stored for the source - in every profile - to the new ids (by the address
+  or name kept with it, else its place, which is what it showed until then).
 - Restoring an older backup on a computer that syncs no longer takes
   anything from the others: the restored computer joins sync again as a
   new one, so the other computers keep what they have and their newer

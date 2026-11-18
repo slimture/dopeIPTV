@@ -117,6 +117,7 @@ map and the one-way import rule.
 | `core/nerd.py` | Nerd settings into what the player and network do (mpv options, user agent/headers/proxy per source, IP version, VPN guard); nothing while Nerd is off |
 | `core/nerd_lists.py` | Nerd on a source's lists: local picon folder, a channel's guide chosen by hand, udpxy for multicast |
 | `core/channel_numbers.py` | Nerd: channel numbers of the user's own per source (`nerd_chno_<source id>`), numbering in list order, a number's channel; they win over the source's `num` |
+| `core/m3u_ids.py` | Stable channel ids for M3U sources: a channel's id from its guide id and name and which of the channels with both alike it is (`channel_key`, `stable_ids`; never below `LINE_MAX`, ids by place always are), the same after the provider adds, removes or reorders channels and on every computer; the move in two starts - a source read by place writes its map (`save_map`: place, new id, name, address), the next start, before any store, gives every value naming a channel by place, in every profile, its new id (`start`, `migrate`: by the address kept with it, else its name, else its place - favourites, history, hidden and renamed channels, own numbers, the guide chosen by hand, reminders, series rules, channel settings, stream health, the viewing log, recording jobs) and marks it moved (`m3u_stable_<source id>`, this computer's); the other kind of id still plays its channel (`M3UClient._by_line`) |
 | `core/channel_prefs.py` | Nerd: settings of a channel's own (`nerd_channel_prefs`, by source + stream id): audio/subtitle language, deinterlace, aspect, audio delay (the old `nerd_adelay/` keys move in on read); what each sets in mpv; applied only while Nerd is on; every spelling of a language for the app's own languages too (`all_spellings`, `same_language`: "swe" finds "sv", "sv-SE") |
 | `core/shortcut_keys.py` | Keyboard shortcuts: the rebindable actions and the app's keys, the user's over them always (`keyboard_shortcuts`, portable text), never two actions on one key, the keys the app keeps, the old editor's keys carried over |
 | `core/palette_match.py` | The command palette's matching: folded text (case, accents, punctuation left out), word starts weigh more, an `Index` folded once for tens of thousands of channels (`scored`: the matches with their scores) |
@@ -528,7 +529,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   shortcut_keys, palette_match, search_all, guide_rows, channel_prefs,
   http_login, commands,
   conn_test, health, home_net, nerd, nerd_lists, channel_numbers,
-  shortcut_keys, palette_match, local_search, local_listing, local_watch, search_all,
+  shortcut_keys, palette_match, local_search, local_listing, local_watch, search_all, m3u_ids,
   guide_rows, places, cast_watch,
   channel_prefs, http_login, commands,
   instance, nerd_check, privacy, rec_extras, series_rules, series_view,

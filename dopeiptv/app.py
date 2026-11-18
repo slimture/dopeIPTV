@@ -233,6 +233,17 @@ def _put_restore_in_place() -> bool | None:
     return ok
 
 
+def _move_m3u_ids(settings, store) -> None:
+    """M3U sources onto stable channel ids before any store or client reads
+    them (core/m3u_ids.start). Never in the way of starting."""
+    try:
+        from .core import m3u_ids
+        from .providers.epg import _epg_cache_dir
+        m3u_ids.start(settings.raw(), store.playlists(), str(_epg_cache_dir()))
+    except Exception as e:
+        log.warning("m3u ids: not moved: %s", e)
+
+
 def _profile_files() -> list:
     """The three files beside the app's settings that hold a profile's own
     keys too (resume positions, followed series, the watched marks' cache),
@@ -532,6 +543,7 @@ def main() -> int:
         else:
             log.info("Embedded playback: enabled")
     store = PlaylistStore(settings)
+    _move_m3u_ids(settings, store)
     # This install's id at Jellyfin, Emby and Plex, before the first client.
     from .providers import mediaserver
     mediaserver.install_device_store(settings)

@@ -130,6 +130,7 @@ files = [
     "dopeiptv/core/film_view.py",
     "dopeiptv/core/series_continue.py",
     "dopeiptv/core/mitt.py",
+    "dopeiptv/core/m3u_ids.py",
     "dopeiptv/core/night_mode.py",
     "dopeiptv/core/rec_mp4.py",
     "dopeiptv/core/rec_view.py",
