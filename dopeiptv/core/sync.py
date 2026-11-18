@@ -426,6 +426,10 @@ def _eid(*parts: Any) -> str:
     return json.dumps([str(p) for p in parts], ensure_ascii=False)
 
 
+#: The sources' entry that keeps the playlists' order (a list of their ids).
+_ORDER = _eid("o")
+
+
 def _parts(ident: str) -> list[str]:
     try:
         got = json.loads(ident)
@@ -512,6 +516,10 @@ class Snapshot:
     profiles: set[str] = field(default_factory=set)
     #: This computer's system (Context.platform).
     platform: str = sys.platform
+    #: The sources (as tag() names them) whose history list is full here:
+    #: a title older than the oldest one kept fell off its end, and was not
+    #: removed (stamp()).
+    capped: set[str] = field(default_factory=set)
 
 
 def _collect_settings(ctx: Context) -> dict[str, Any]:
@@ -566,12 +574,15 @@ def _collect_favorites(ctx: Context, fps: dict[str, str]) -> dict[str, Any]:
     return out
 
 
-def _collect_history(ctx: Context, fps: dict[str, str]) -> dict[str, Any]:
+def _collect_history(ctx: Context, fps: dict[str, str],
+                     capped: set[str] | None = None) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for label, settings, resume in ctx.views():
         for fp, pid in fps.items():
             at = tag(fp, label)
             rows = _json(settings.value(f"history_{pid}"), [])
+            if capped is not None and len(rows) >= MAX_HISTORY:
+                capped.add(at)
             for e in rows:
                 if not isinstance(e, dict) or e.get("_kind") in _LOCAL_KINDS:
                     continue
@@ -605,7 +616,7 @@ def collect(ctx: Context, cats: tuple[str, ...] | list[str]) -> Snapshot:
     if "favorites" in cats:
         snap.values["favorites"] = _collect_favorites(ctx, fps)
     if "history" in cats:
-        snap.values["history"] = _collect_history(ctx, fps)
+        snap.values["history"] = _collect_history(ctx, fps, snap.capped)
     if "sources" in cats and ctx.playlists is not None:
         snap.values["sources"] = _collect_sources(ctx)
     return snap
@@ -699,6 +710,52 @@ def _in_domain(cat: str, ident: str, entry: dict, snap: Snapshot) -> bool:
     return False
 
 
+def _history_floors(local: dict[str, Any], snap: Snapshot) -> dict[str, int]:
+    """Per source whose history list is full here (Snapshot.capped): when
+    the oldest title it still keeps was watched."""
+    floors: dict[str, int] = {}
+    if not snap.capped:
+        return floors
+    for ident, value in local.items():
+        parts = _parts(ident)
+        if len(parts) > 1 and parts[1] == "h" and parts[0] in snap.capped:
+            t = _own_time(ident, value)
+            floors[parts[0]] = min(floors.get(parts[0], t), t)
+    return floors
+
+
+def _fell_off(ident: str, entry: dict, floors: dict[str, int]) -> bool:
+    """Whether a history title not found here only fell off the end of a
+    full list - which also holds this computer's own files and recordings,
+    so it keeps fewer titles than the others. Removed is something else:
+    as a tombstone it took the title from the computers with room for it."""
+    if not floors:
+        return False
+    parts = _parts(ident)
+    return len(parts) > 1 and parts[1] == "h" and parts[0] in floors \
+        and int(entry["t"]) <= floors[parts[0]]
+
+
+def _same_order(theirs: Any, mine: Any, entries: dict[str, dict],
+                local: dict[str, Any]) -> bool:
+    """Whether the playlists' order kept in the copy (*theirs*) is the one
+    here (*mine*) - told by what each playlist is, not by its id: a
+    playlist added by hand on two computers has an id of its own on each,
+    and each then took the other's order for a change of its own, round
+    after round. One this computer does not have is left out."""
+    if not isinstance(theirs, list) or not isinstance(mine, list):
+        return False
+    fp_of: dict[str, str] = {}
+    for source in ({k: e.get("v") for k, e in entries.items()}, local):
+        for ident, value in source.items():
+            parts = _parts(ident)
+            if parts[:1] == ["s"] and len(parts) == 2 and isinstance(value, dict):
+                fp_of[parts[1]] = source_fp(value)
+    here = list(dict.fromkeys(fp_of.get(str(i), str(i)) for i in mine))
+    there = list(dict.fromkeys(fp_of.get(str(i), str(i)) for i in theirs))
+    return [fp for fp in there if fp in set(here)] == here
+
+
 def stamp(doc: dict[str, Any], snap: Snapshot, cats: tuple[str, ...] | list[str],
           now: int, fresh: bool | set[str] | frozenset[str] = False,
           new: Collection[str] = ()) -> bool:
@@ -723,6 +780,9 @@ def stamp(doc: dict[str, Any], snap: Snapshot, cats: tuple[str, ...] | list[str]
             e = entries.get(ident)
             if e is not None and "v" in e and _canon(e["v"]) == _canon(value):
                 continue
+            if cat == "sources" and ident == _ORDER and e is not None and "v" in e \
+                    and _same_order(e["v"], value, entries, local):
+                continue
             if timed:
                 t = _own_time(ident, value)
                 if e is not None and int(e["t"]) > t:
@@ -735,9 +795,11 @@ def stamp(doc: dict[str, Any], snap: Snapshot, cats: tuple[str, ...] | list[str]
             changed = True
         if fresh_cat:
             continue
+        floors = _history_floors(local, snap) if timed else {}
         for ident, e in list(entries.items()):
             if "v" in e and ident not in local and ident not in new \
-                    and _in_domain(cat, ident, e, snap):
+                    and _in_domain(cat, ident, e, snap) \
+                    and not _fell_off(ident, e, floors):
                 entries[ident] = {"t": max(now, int(e["t"]) + 1), "d": 1}
                 changed = True
     return changed
@@ -1077,7 +1139,12 @@ def _apply_history(ctx: Context, new: dict[str, Any], old: dict[str, Any],
                     if isinstance(e, dict) and e.get("_kind") in _LOCAL_KINDS]
             rows = here + [v for v in mine.values() if isinstance(v, dict)]
             rows.sort(key=lambda e: str(e.get("_watched_at") or ""), reverse=True)
-            settings.setValue(f"history_{pid}", json.dumps(rows[:MAX_HISTORY]))
+            rows = rows[:MAX_HISTORY]
+            if rows == _json(settings.value(f"history_{pid}"), []):
+                # A full list keeps fewer titles than the others have: the
+                # same ones again each round, and nothing changed here.
+                continue
+            settings.setValue(f"history_{pid}", json.dumps(rows))
         elif sub == "r" and resume is not None:
             key = f"resume_positions_{pid}"
             data = {k: v for k, v in _json(resume.value(key), {}).items()
@@ -1093,7 +1160,7 @@ def _apply_history(ctx: Context, new: dict[str, Any], old: dict[str, Any],
 
 
 def _apply_sources(ctx: Context, new: dict[str, Any], old: dict[str, Any],
-                   out: Applied) -> None:
+                   out: Applied, entries: dict[str, dict] | None = None) -> None:
     store = ctx.playlists
     if store is None or _canon(new) == _canon(old):
         return
@@ -1104,8 +1171,25 @@ def _apply_sources(ctx: Context, new: dict[str, Any], old: dict[str, Any],
         parts = _parts(ident)
         if parts[:1] == ["s"] and len(parts) == 2 and isinstance(v, dict):
             wanted[parts[1]] = v
+
+    def when(pid: str) -> int:
+        return int((entries or {}).get(_eid("s", pid), {}).get("t", 0))
+
+    # The same playlist kept under an id of its own on another computer
+    # (added by hand on both): what was changed there last - its password,
+    # its name, its options - comes here too. Without this only a playlist
+    # with the same id on both followed a change.
+    twins: dict[str, str] = {}
+    for pid, v in wanted.items():
+        if pid not in here:
+            fp = source_fp(v)
+            if fp not in twins or when(pid) > when(twins[fp]):
+                twins[fp] = pid
     for pid, p in here.items():
         v = wanted.get(pid)
+        twin = twins.get(source_fp(p))
+        if v is not None and twin is not None and when(twin) > when(pid):
+            v = wanted[twin]
         if v is None:
             if _eid("s", pid) not in old:
                 continue
@@ -1129,7 +1213,14 @@ def _apply_sources(ctx: Context, new: dict[str, Any], old: dict[str, Any],
     order = new.get(_eid("o"))
     if isinstance(order, list) and order != old.get(_eid("o")):
         current = [str(p["id"]) for p in ctx.sources()]
-        store.reorder([str(x) for x in order])
+        # By what each playlist is: one kept here under another id takes
+        # its place in the order all the same.
+        local_of: dict[str, str] = {}
+        for p in ctx.sources():
+            local_of.setdefault(source_fp(p), str(p["id"]))
+        ids = [str(x) for x in order]
+        store.reorder([i if i in current or i not in wanted
+                       else local_of.get(source_fp(wanted[i]), i) for i in ids])
         if [str(p["id"]) for p in ctx.sources()] != current:
             out.sources = True
 
@@ -1157,7 +1248,7 @@ def apply(ctx: Context, result: RoundResult, before: Snapshot, now_here: Snapsho
             _apply_settings(ctx.settings, new, old, out, ctx)
             ctx.refresh_others()            # a profile that came with it
         elif cat == "sources":
-            _apply_sources(ctx, new, old, out)
+            _apply_sources(ctx, new, old, out, result.merged["c"].get(cat) or {})
         elif cat == "favorites":
             _apply_favorites(ctx, result.merged["c"].get(cat) or {}, new, old,
                              ctx.places(), out)

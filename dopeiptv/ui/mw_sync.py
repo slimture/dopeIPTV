@@ -95,6 +95,7 @@ class _SyncMixin:
         self._sync_seen: str | None = None
         self._sync_seen_at = time.monotonic()
         self._sync_sent: str | None = None
+        self._sync_unwritten = False
         self._sync_timer = QTimer(self)
         self._sync_timer.setInterval(TICK_MS)
         self._sync_timer.timeout.connect(self._sync_tick)
@@ -161,9 +162,16 @@ class _SyncMixin:
         text, path = state.dump(), state.path
         if wait:
             sync.write_private(path, text)
+            self._sync_unwritten = False
         else:
-            run_async(self._sync_pool, sync.write_private, _ignore, self._sync_write_failed,
-                      path, text)
+            # Until it is on disk: closing takes a queued write off the pool
+            # and has to make it itself then (_sync_on_close).
+            self._sync_unwritten = True
+            run_async(self._sync_pool, sync.write_private, self._sync_written,
+                      self._sync_write_failed, path, text)
+
+    def _sync_written(self, _result: object = None) -> None:
+        self._sync_unwritten = False
 
     @staticmethod
     def _sync_write_failed(msg: str) -> None:
@@ -466,7 +474,12 @@ class _SyncMixin:
             snap = sync.collect(self._sync_ctx(), cats)
             # Shortcuts never synced here yet: as the first round will.
             new = sync.newcomer(state.seen, state.doc, snap.platform)
-            if sync.stamp(state.doc, snap, cats, int(time.time()), new=new):
+            # Written also when nothing changed but the last round's copy was
+            # still waiting on the pool (cleared above): left unwritten, the
+            # next start took what that round put here for changes made now,
+            # and they beat what another computer changed since.
+            if sync.stamp(state.doc, snap, cats, int(time.time()), new=new) \
+                    or getattr(self, "_sync_unwritten", False):
                 self._sync_write_state(state, wait=True)
         except Exception:
             log.debug("sync: nothing kept on close", exc_info=True)
