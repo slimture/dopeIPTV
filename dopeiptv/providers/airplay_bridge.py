@@ -274,24 +274,36 @@ def parse_probe(text: str) -> dict[str, Any]:
     return out
 
 
+#: A look for the codecs' names alone: a transport stream says them in its
+#: tables, in its first second. The picture's size, which waits for the
+#: next keyframe (_probe_limits), is the readers' to find.
+NAMES_PROBE = ["-analyzeduration", "1000000", "-probesize", "1000000"]
+
+
 def probe(source: str, net: list[str] | None = None, exe: str | None = None,
-          timeout: float = 20.0) -> dict[str, Any]:
+          timeout: float = 20.0, names_only: bool = False) -> dict[str, Any]:
     """The stream's codecs and length, from ffmpeg; empty on any failure -
-    not knowing is a reason to copy, never to refuse."""
+    not knowing is a reason to copy, never to refuse. *names_only*: the
+    codecs' names and no more (a seek's first piece) - an archive that
+    sends at the speed it plays kept the full look waiting 8 s for 8 s of
+    it, before the stream itself was even asked for."""
     exe = exe or ffmpeg_path()
     if not exe:
         return parse_probe("")
+    began = time.monotonic()
     try:
         res = subprocess.run(
-            [exe, "-hide_banner", "-nostdin", *_probe_limits(source),
+            [exe, "-hide_banner", "-nostdin",
+             *(NAMES_PROBE if names_only else _probe_limits(source)),
              *(net or []), "-i", source],
             capture_output=True, timeout=timeout, creationflags=NO_WINDOW)
         found = parse_probe(res.stderr.decode("utf-8", "replace"))
     except Exception as e:
         log.info("airplay: could not look into the stream (%s)", e)
         return parse_probe("")
-    log.info("airplay: the stream is %s with %s sound", found["video"] or "?",
-             ",".join(found["audio"]) or "no")
+    log.info("airplay: the stream is %s with %s sound (looked into in %.1f s)",
+             found["video"] or "?", ",".join(found["audio"]) or "no",
+             time.monotonic() - began)
     return found
 
 
@@ -516,6 +528,9 @@ class AirPlayBridge:
         self._proc: subprocess.Popen[bytes] | None = None
         self._tail: collections.deque[str] = collections.deque(maxlen=8)
         self._lock = threading.Lock()
+        # One start at a time: two seeks close together each start a run
+        # from a thread of their own.
+        self._starting = threading.Lock()
 
     @staticmethod
     def available() -> bool:
@@ -541,55 +556,57 @@ class AirPlayBridge:
         ffmpeg reads its pieces (each read with *net_for*'s options); the
         bridge owns it from now and closes it when another stream replaces
         it or the bridge stops."""
-        self._stop(keep=feed)
-        exe = self.exe or ffmpeg_path()
-        if not exe:
-            raise RuntimeError("no ffmpeg")
-        self.plan, self.error, self.remote_seen = p, "", False
-        self._tail.clear()
-        self.folder = tempfile.mkdtemp(prefix="airplay-", dir=_cache_dir())
-        self.prefix = f"/{secrets.token_urlsafe(18)}/"
-        server = _Server(("0.0.0.0", 0), _Handler)
-        server.bridge = self
-        threading.Thread(target=server.serve_forever,
-                         kwargs={"poll_interval": 0.2}, daemon=True).start()
-        self._server = server
-        host = lan_address()
-        self._own = {"127.0.0.1", "::1", "::ffff:127.0.0.1", host,
-                     f"::ffff:{host}"}
-        self.url = f"http://{host}:{server.server_address[1]}{self.prefix}{PLAYLIST}"
-        args = ffmpeg_args(exe, p, start, net, feed=feed is not None)
-        try:
-            self._proc = subprocess.Popen(
-                args, cwd=self.folder,
-                stdin=subprocess.PIPE if feed is not None else subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
-                creationflags=NO_WINDOW)
-        except OSError as e:
-            self.stop()
-            raise RuntimeError(f"ffmpeg did not start ({e})") from e
-        if feed is not None and self._proc.stdin is not None:
-            self.feed = feed
-            feed.attach(self._proc.stdin, exe, net_for, audio=p.audio_track)
-        # Its pid beside its files: a run that crashes leaves ffmpeg pulling
-        # the channel - one of the account's connections - and the next
-        # start ends it (sweep_leftovers).
-        try:
-            with open(os.path.join(self.folder, PIDFILE), "w") as fh:
-                fh.write(str(self._proc.pid))
-        except OSError:
-            pass
-        threading.Thread(target=self._drain, args=(self._proc,),
-                         daemon=True).start()
-        log.info("airplay bridge: serving on port %d (%s; picture %s, sound "
-                 "%s, %s)", server.server_address[1], p.why,
-                 p.video, p.audio,
-                 f"the {feed.kind} in pieces, one playlist" if feed is not None
-                 else "live" if p.live else "film")
-        if p.costs_cpu:
-            log.info("airplay bridge: the picture is converted to H.264 "
-                     "here (%s) - this costs the processor", video_encoder())
-        return self.url
+        with self._starting:
+            self._stop(keep=feed)
+            exe = self.exe or ffmpeg_path()
+            if not exe:
+                raise RuntimeError("no ffmpeg")
+            self.plan, self.error, self.remote_seen = p, "", False
+            self._tail.clear()
+            self.folder = tempfile.mkdtemp(prefix="airplay-", dir=_cache_dir())
+            self.prefix = f"/{secrets.token_urlsafe(18)}/"
+            server = _Server(("0.0.0.0", 0), _Handler)
+            server.bridge = self
+            threading.Thread(target=server.serve_forever,
+                             kwargs={"poll_interval": 0.2}, daemon=True).start()
+            self._server = server
+            host = lan_address()
+            self._own = {"127.0.0.1", "::1", "::ffff:127.0.0.1", host,
+                         f"::ffff:{host}"}
+            url = self.url = (f"http://{host}:{server.server_address[1]}"
+                              f"{self.prefix}{PLAYLIST}")
+            args = ffmpeg_args(exe, p, start, net, feed=feed is not None)
+            try:
+                self._proc = subprocess.Popen(
+                    args, cwd=self.folder,
+                    stdin=subprocess.PIPE if feed is not None else subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                    creationflags=NO_WINDOW)
+            except OSError as e:
+                self._stop()
+                raise RuntimeError(f"ffmpeg did not start ({e})") from e
+            if feed is not None and self._proc.stdin is not None:
+                self.feed = feed
+                feed.attach(self._proc.stdin, exe, net_for, audio=p.audio_track)
+            # Its pid beside its files: a run that crashes leaves ffmpeg pulling
+            # the channel - one of the account's connections - and the next
+            # start ends it (sweep_leftovers).
+            try:
+                with open(os.path.join(self.folder, PIDFILE), "w") as fh:
+                    fh.write(str(self._proc.pid))
+            except OSError:
+                pass
+            threading.Thread(target=self._drain, args=(self._proc,),
+                             daemon=True).start()
+            log.info("airplay bridge: serving on port %d (%s; picture %s, sound "
+                     "%s, %s)", server.server_address[1], p.why,
+                     p.video, p.audio,
+                     f"the {feed.kind} in pieces, one playlist" if feed is not None
+                     else "live" if p.live else "film")
+            if p.costs_cpu:
+                log.info("airplay bridge: the picture is converted to H.264 "
+                         "here (%s) - this costs the processor", video_encoder())
+            return url
 
     def _drain(self, proc: subprocess.Popen[bytes]) -> None:
         last, said = "", 0
@@ -633,11 +650,16 @@ class AirPlayBridge:
         return n >= (LEAD if self.plan is not None and self.plan.live else 1)
 
     def wait_ready(self, timeout: float = READY_WAIT_S,
-                   stopping: Callable[[], bool] | None = None) -> bool:
+                   stopping: Callable[[], bool] | None = None,
+                   url: str = "") -> bool:
         """Wait for ready(); False when ffmpeg gave up (self.error says
-        why), the time ran out or *stopping* says the cast went away."""
+        why), the time ran out or *stopping* says the cast went away.
+        *url*: what start() returned - False as well once another run has
+        taken its place, whose playlist is not this one's."""
         end = time.monotonic() + timeout
         while time.monotonic() < end:
+            if url and self.url != url:
+                return False
             if self.ready():
                 return True
             proc = self._proc
@@ -660,7 +682,16 @@ class AirPlayBridge:
             log.info("airplay bridge: the receiver is reading the stream")
 
     def stop(self) -> None:
-        self._stop()
+        with self._starting:
+            self._stop()
+
+    def stop_run(self, url: str) -> None:
+        """Stop the run start() returned *url* for - and nothing if another
+        has taken its place since: a seek given up for a newer one must not
+        end the newer one's stream."""
+        with self._starting:
+            if url and self.url == url:
+                self._stop()
 
     def _stop(self, keep: cast_feed.Feed | None = None) -> None:
         with self._lock:
@@ -668,6 +699,7 @@ class AirPlayBridge:
             server, self._server = self._server, None
             folder, self.folder = self.folder, None
             feed, self.feed = self.feed, None
+            self.prefix, self.url = None, ""
         if feed is not None:
             # Done with, unless it is the one being started again.
             feed.detach() if feed is keep else feed.close()
@@ -688,7 +720,6 @@ class AirPlayBridge:
             log.info("airplay bridge: stopped")
         if folder:
             shutil.rmtree(folder, ignore_errors=True)
-        self.prefix, self.url = None, ""
 
 
 PIDFILE = "ffmpeg.pid"

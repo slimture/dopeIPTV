@@ -430,3 +430,20 @@ def test_a_channel_joined_with_its_sound_ahead_keeps_the_difference(tmp_path):
         m = _Measured(str(folder))
         assert not m.empty_edits(), m.tracks
         assert abs((m.start("vide") - m.start("soun")) - 0.7) < 0.035
+
+
+@needs_ffmpeg
+def test_the_quick_look_names_the_codecs_of_a_stream_joined_mid_gop(tmp_path):
+    """A seek's first look (airplay_bridge.probe, names_only) at an archive
+    that opens between two keyframes: no picture size yet, but the names
+    the plan needs - from the stream's tables."""
+    src = _source(tmp_path, "mp2")
+    with open(src, "rb") as f:
+        data = f.read()
+    cut = (len(data) // 188 * 13 // 100) * 188        # no keyframe near
+    mid = tmp_path / "timeshift.ts"
+    mid.write_bytes(data[cut:])
+    found = ab.probe(str(mid), [], FFMPEG, names_only=True)
+    assert found["video"] == "h264" and found["audio"] == ["mp2"]
+    plan = ab.refine(ab.Plan(False, str(mid), live=True), found)
+    assert (plan.video, plan.audio) == ("copy", "aac")

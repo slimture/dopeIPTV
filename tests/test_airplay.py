@@ -955,6 +955,161 @@ def test_a_seek_in_the_same_channel_does_not_ask_the_archive_twice(qapp, macos, 
     assert started and started[0].audio == "aac" and started[0].video == "copy"
 
 
+def test_a_run_given_up_for_a_newer_one_leaves_the_newer_one(fake_ffmpeg):
+    """Two seeks close together: the first, still waiting for its segments,
+    is given up - and stopping it stopped the bridge, which by then was the
+    second seek's run. The Apple TV was left with nothing."""
+    plan = ab.plan("", "http://p/live/1.ts", [], live=True)
+    b = ab.AirPlayBridge()
+    b.exe = sys.executable
+    fake_ffmpeg(0, "live")                            # never ready
+    first = b.start(plan)
+    fake_ffmpeg(4, "live")
+    second = b.start(plan)
+    try:
+        assert first != second and b.url == second
+        began = time.monotonic()
+        assert not b.wait_ready(20, url=first)        # not its playlist to wait for
+        assert time.monotonic() - began < 2 and not b.error
+        b.stop_run(first)
+        assert b.running() and b.url == second and b.prefix in second
+        assert b.wait_ready(10, url=second)
+        assert _get(second)[0] == 200
+        b.stop_run(second)
+        assert not b.hls and b.url == ""
+    finally:
+        b.stop()
+
+
+def test_two_seeks_close_together_end_on_the_newer_stream(qapp, macos, fake_ffmpeg,
+                                                          monkeypatch):
+    am, _ = macos
+    monkeypatch.setattr(am.ab, "probe", lambda *a, **k: {
+        "video": "h264", "audio": ["mp2"], "duration": 0.0})
+    rx = am.AirPlayReceiver()
+    rx.bridge.exe = sys.executable
+    rx.context = lambda: {"kind": "live"}
+    out = {}
+
+    def cast(key, url):
+        try:
+            out[key] = rx.cast(am.NAME, url, "TV")
+        except Exception as e:
+            out[key] = e
+
+    fake_ffmpeg(0, "live")                            # the first never gets ready
+    a = threading.Thread(target=cast, args=("a", "http://p/live/u/pw/1.ts"))
+    a.start()
+    end = time.monotonic() + 10
+    while not rx.bridge.running() and time.monotonic() < end:
+        _pump(qapp, 0.02)
+    fake_ffmpeg(4, "live")
+    b = threading.Thread(target=cast, args=("b", "http://p/live/u/pw/2.ts"))
+    b.start()
+    while a.is_alive() or b.is_alive():
+        _pump(qapp, 0.02)
+    assert out["b"] == am.NAME, out
+    assert getattr(out["a"], "key", "") == "cast_stopped", out
+    p = _Player.made[-1]
+    assert rx.bridge.running() and p.item.url == rx.bridge.url
+    assert _get(rx.bridge.url)[0] == 200              # still served
+    assert rx.active == am.NAME and rx._req["url"].endswith("2.ts")
+    rx.stop()
+
+
+def test_a_seek_that_does_not_go_lets_its_pieces_go(qapp, macos, monkeypatch):
+    """Pieces no converter ever read hold the rewind buffer streaming - a
+    connection to the provider: a cast call that fails closes them."""
+    am, _ = macos
+    monkeypatch.setattr(am.ab, "firewall_blocks", lambda: True)
+    rx = am.AirPlayReceiver()
+    monkeypatch.setattr(rx.bridge, "available", lambda: True)
+    closed = threading.Event()
+
+    class Feed:
+        first_url = "http://127.0.0.1:5000/tok/12.ts"
+        kind = "rewind buffer"
+
+        def close(self):
+            closed.set()
+    with pytest.raises(Exception) as e:
+        rx.cast(am.NAME, "http://p/live/1.ts", "TV", feed=Feed())
+    assert getattr(e.value, "key", "") == "airplay_firewall"
+    assert closed.wait(5)
+
+
+def test_where_the_apple_tv_began_is_in_the_log(qapp, macos, caplog):
+    """Once per stream: how far into it the Apple TV started playing - a
+    seek's pieces at their first second, not at their newest end."""
+    import logging
+    caplog.set_level(logging.INFO, logger="dopeiptv")
+    am, _ = macos
+    rx = am.AirPlayReceiver()
+    rx.context = lambda: {"kind": "live"}
+    rx.cast(am.NAME, "http://p/live/u/pw/1.m3u8", "SVT1")
+    p = _Player.made[-1]
+    p.route(True)
+    _pump(qapp)
+    p.t = 1.5
+    _settle(am, rx)
+    rx._sync()
+    said = [r.getMessage() for r in caplog.records
+            if "the Apple TV plays" in r.getMessage()]
+    assert len(said) == 1 and "1.5 s into the stream" in said[0]
+    rx.cast(am.NAME, "http://p/live/u/pw/2.m3u8", "SVT1")
+    rx._sync()
+    assert sum("the Apple TV plays" in r.getMessage() for r in caplog.records) == 2
+    rx.stop()
+
+
+def test_a_seek_s_first_look_is_for_the_codecs_names_alone(qapp, macos, monkeypatch):
+    """Going back from a channel the Apple TV fetched itself, nothing is
+    known of its archive yet: ffmpeg looks - for the names only (a second
+    of it), not for the picture's size, which took 8 s of an archive that
+    sends at the speed it plays before the stream was even asked for."""
+    am, _ = macos
+    rx = am.AirPlayReceiver()
+    rx.active = am.NAME
+    rx.plan = ab.Plan(direct=True, url="http://p/live/1.m3u8", live=True)
+    looks, real_probe = [], ab.probe
+
+    def probe(url, net=None, exe=None, **kw):
+        looks.append(kw)
+        return {"video": "h264", "audio": ["mp2"], "duration": 0.0}
+    monkeypatch.setattr(am.ab, "probe", probe)
+    started = []
+    monkeypatch.setattr(rx.bridge, "available", lambda: True)
+    monkeypatch.setattr(rx.bridge, "start", lambda plan, *a, **k: started.append(plan) or "x")
+    monkeypatch.setattr(rx.bridge, "wait_ready", lambda **k: True)
+    monkeypatch.setattr(rx, "_open_blocking", lambda *a: None)
+
+    class Feed:
+        first_url = "http://p/timeshift/u/pw/60/2026-11-18:16-59/1.ts"
+    req = {"url": "http://p/live/1.m3u8", "source": "http://p/live/1.m3u8", "codecs": [],
+           "live": True, "track": 0, "start": 0.0, "duration": 0.0, "settle": False,
+           "generation": rx._generation, "feed": Feed()}
+    rx._ready(dict(req), False)
+    assert looks == [{"names_only": True}]
+    assert started[0].audio == "aac" and started[0].video == "copy"
+    rx._ready(dict(req, feed=None, source="http://p/live/1.ts", url=""), False)
+    assert looks[-1] == {"names_only": False}            # a channel: the whole look
+    # The command: a second of the stream, whatever its address.
+    ran = []
+
+    def run(args, **_kw):
+        ran.append(args)
+        return types.SimpleNamespace(stderr=b"  Stream #0:0[0x100]: Video: h264, none, "
+                                     b"25 fps\n  Stream #0:1[0x101]: Audio: aac (LC), 48000 Hz\n")
+    monkeypatch.setattr(ab.subprocess, "run", run)
+    found = real_probe(Feed.first_url, [], "ffmpeg", names_only=True)
+    assert found["video"] == "h264" and found["audio"] == ["aac"]
+    a = ran[0]
+    assert a[a.index("-analyzeduration") + 1] == "1000000"
+    assert a[a.index("-probesize") + 1] == "1000000"
+    real_probe(Feed.first_url, [], "ffmpeg")
+    assert ran[1][ran[1].index("-analyzeduration") + 1] == "8000000"
+
+
 def test_the_airplay_window_floats_over_the_app_only_while_it_is_in_front(qapp, macos):
     am, _ = macos
     rx = am.AirPlayReceiver()
