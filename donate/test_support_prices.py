@@ -20,12 +20,17 @@ SITE = os.path.join(ROOT, "site")
 pytestmark = pytest.mark.skipif(shutil.which("jq") is None, reason="no jq")
 
 
-def _support(prices: str, price: str = "", lang: str = "en", portal: str = "") -> str:
+def _support(prices: str, price: str = "", lang: str = "en", portal: str = "",
+             page: str = "support") -> str:
     def f(*p):
         return os.path.join(SITE, *p)
-    written = lang if os.path.exists(f("legal", lang, "support.html")) else "en"
+    src = json.load(open(f("legal.json"), encoding="utf-8")).get("source", {}).get(page, page)
+    written = lang if os.path.exists(f("legal", lang, f"{src}.html")) else "en"
+    tpl = f("templates", f"{page}.html")
+    if not os.path.exists(tpl):
+        tpl = f("templates", "legal.html")
     args = ["jq", "-n", "-j", "-f", f("render.jq"),
-            "--arg", "page", "support", "--arg", "lang", lang, "--arg", "year", "2026",
+            "--arg", "page", page, "--arg", "lang", lang, "--arg", "year", "2026",
             "--arg", "sums", "", "--arg", "pics_v", "x", "--arg", "tips", "on",
             "--arg", "tip_url", "", "--arg", "monthly_url", "https://buy.stripe.com/x",
             "--arg", "sponsors_url", "", "--arg", "portal_url", portal, "--arg", "tip_hint", "50 kr",
@@ -37,9 +42,9 @@ def _support(prices: str, price: str = "", lang: str = "en", portal: str = "") -
             "--slurpfile", "legal", f("legal.json"), "--slurpfile", "en", f("lang", "en.json"),
             "--slurpfile", "tr", f("lang", f"{lang}.json"), "--slurpfile", "rel", os.devnull,
             "--slurpfile", "dl", os.devnull, "--slurpfile", "spots", f("spots.json"),
-            "--rawfile", "tpl", f("templates", "support.html"),
+            "--rawfile", "tpl", tpl,
             "--rawfile", "navtpl", f("templates", "nav.html"),
-            "--rawfile", "body", f("legal", written, "support.html")]
+            "--rawfile", "body", f("legal", written, f"{src}.html")]
     return subprocess.run(args, check=True, capture_output=True, text=True).stdout
 
 
@@ -79,9 +84,9 @@ def test_the_tip_hint_is_marked_for_the_dialog():
 def test_the_portal_under_monthly_support_and_in_the_rules():
     page = _support("", "29 kr", "sv", "https://billing.stripe.com/p/login/x")
     assert '<a class="sway-manage" href="https://billing.stripe.com/p/login/x"' in page
-    assert 'href="https://billing.stripe.com/p/login/x">Hantera eller avsluta ditt månadsstöd</a> under Månadsstöd' in page
+    assert 'href="https://billing.stripe.com/p/login/x">Hantera eller avsluta ditt månadsstöd</a> – du får' in page
     plain = _support("", "29 kr", "sv")
-    assert "sway-manage" not in plain and 'href="#monthly">Hantera' in plain
+    assert "sway-manage" not in plain and 'href="/support/#monthly">Hantera' in plain
     assert "%PORTAL%" not in plain
 
 
@@ -101,3 +106,38 @@ def test_every_language_has_the_page_s_words():
     for f in glob.glob(os.path.join(SITE, "lang", "*.json")):
         have = json.load(open(f, encoding="utf-8"))
         assert not [k for k in keys if not have.get(k)], f
+
+
+def test_the_payment_terms_are_a_page_of_the_legal_set():
+    # The support page's rules, one text, as a page with the legal tabs: each
+    # folded question a numbered section, who you pay the last.
+    for lang, n, last in (("sv", 10, 'id="foretaget"'), ("en", 10, 'id="company"')):
+        page = _support("", "29 kr", lang, "https://billing.stripe.com/p/login/x", page="payments")
+        tabs = re.search(r'<nav class="legal-tabs"[^>]*>(.*?)</nav>', page, re.S).group(1)
+        assert re.findall(r'href="/([a-z]+)/"', tabs) == ["privacy", "terms", "payments", "about"]
+        assert 'href="/payments/" aria-current="page"' in tabs and "/support/" not in tabs
+        assert page.count('<span class="lnum">') == n and f'<h2 {last}>' in page
+        assert "sp-q" not in page and "sp-company" not in page and "%PORTAL%" not in page
+        assert 'class="legal-tocbox"' in page
+        assert 'href="https://billing.stripe.com/p/login/x"' in page
+    plain = _support("", "", "de", page="payments")
+    assert 'lang="en"' in plain and 'href="/support/#monthly"' in plain
+
+
+def test_the_support_page_links_its_rules_and_keeps_no_tabs():
+    page = _support("", "29 kr", "sv")
+    assert '<li class="sp-trust-terms">' in page and '<a href="/payments/">Betalvillkor</a>' in page
+    for p in ("privacy", "terms", "about"):
+        assert "legal-tabs" in _support("", "", "en", page=p)
+
+
+def test_the_heart_says_support_us_and_the_footer_the_country():
+    import glob
+    for f in glob.glob(os.path.join(SITE, "lang", "*.json")):
+        have = json.load(open(f, encoding="utf-8"))
+        assert have.get("support_nav") and have.get("foot_payments"), f
+        assert "%TOWN%" in have.get("foot_place", ""), f
+        assert "foot_support" not in have, f
+    en = _support("", "", "en", page="terms")
+    assert ">Support us</a>" in en and "· Örebro, Sweden ·" in en
+    assert "· Örebro, Sverige ·" in _support("", "", "sv", page="terms")

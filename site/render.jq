@@ -275,7 +275,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
   # E-Commerce Act's section 8).
   def company_line:
     "    <div class=\"foot-legal\">\n"
-    + "      <p class=\"foot-company\">\(t("foot_made_by") | gsub("%COMPANY%"; $COMPANY) | h) · \(t("foot_orgnr") | h) \($ORGNR | h) · \($TOWN | h) · <a href=\"mailto:\($EMAIL | h)\">\($EMAIL | h)</a></p>\n"
+    + "      <p class=\"foot-company\">\(t("foot_made_by") | gsub("%COMPANY%"; $COMPANY) | h) · \(t("foot_orgnr") | h) \($ORGNR | h) · \(t("foot_place") | gsub("%TOWN%"; $TOWN) | h) · <a href=\"mailto:\($EMAIL | h)\">\($EMAIL | h)</a></p>\n"
     + "      <p class=\"foot-nocontent\">\(t("foot_nocontent") | h)</p>\n"
     + "    </div>\n";
   def common:
@@ -460,6 +460,8 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     + "      <ul class=\"sp-trust\">\n"
     + ([["support_trust_stripe", "support_trust_refund", "support_trust_cancel"][]
        | "        <li>\(check)\(t(.) | h)</li>\n"] | add)
+    # The rules behind those three, a page of the legal set (/payments/).
+    + "        <li class=\"sp-trust-terms\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h4\"/></svg><a href=\"/payments/\">\(t("foot_payments") | h)</a></li>\n"
     + "      </ul>\n"
     + "      <div id=\"support-thanks\" class=\"support-thanks\" hidden"
     + ([[["thanks", "support_thanks"], ["again", "support_again"], ["key", "support_key"],
@@ -745,18 +747,33 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
   # "3. Title" headings: the number in a mark of its own.
   def legal_numbers:
     gsub("<h2 id=\"(?<id>[^\"]+)\">(?<n>[0-9]+)\\. "; "<h2 id=\"\(.id)\"><span class=\"lnum\">\(.n)</span>");
+  # The payment terms (legal.json's source: the support page's own rules,
+  # one text in two forms) as a page of the legal set: each folded question
+  # a numbered section, who you pay the last, the contents as on the others.
+  def as_terms($label):
+    (. / "<details class=\"sp-q\" id=\"") as $p
+    | [$p[1:][] | capture("^(?<id>[^\"]+)\">\\s*<summary><h3>(?<t>[\\s\\S]*?)</h3></summary>\\s*<div class=\"sp-a\">\\s*(?<c>[\\s\\S]*?)</div>\\s*</details>\\s*(?<rest>[\\s\\S]*)$")] as $qs
+    | (if ($qs | length) == 0 then null else
+         [$qs[-1].rest | capture("<div class=\"sp-company\" id=\"(?<id>[^\"]+)\">\\s*<h3>(?<t>[\\s\\S]*?)</h3>\\s*(?<c>[\\s\\S]*?)</div>")] | first end) as $co
+    | ([$qs[] | {id, t, c}] + (if $co != null then [$co] else [] end)) as $secs
+    | ($p[0] | gsub("<p class=\"sp-intro\">"; "<p>"))
+      + "<nav class=\"legal-toc\" aria-label=\"\($label | h)\">\n<ol>\n"
+      + ([$secs[] | "<li><a href=\"#\(.id)\">\(.t)</a></li>\n"] | add)
+      + "</ol>\n</nav>\n\n"
+      + ([$secs | to_entries[] | "<h2 id=\"\(.value.id)\">\(.key + 1). \(.value.t)</h2>\n\(.value.c | rtrimstr("\n"))\n\n"] | add);
   def page_legal:
     (if ($L.text | has($lang)) then $lang else "en" end) as $cl
     | $L.page[$page][$cl] as $P
     | $L.text[$cl] as $X
     | "/\($page)/" as $path
     | (if $page == "support" then {toc: "", body: $body, grid: ""}
-       else ($body | legal_numbers | legal_toc($X.toc // "Contents")) end) as $parts
+       else ($body | if $page == "payments" then as_terms($X.toc // "Contents") else . end
+             | legal_numbers | legal_toc($X.toc // "Contents")) end) as $parts
     | $tpl
     | expand(common + {title: ($P.title | h), desc: ($P.desc | h), clang: ($cl | h),
                        canonical: (url($path; $cl) | h), grid: $parts.grid};
         {hreflang: legal_hreflang($path), nav: nav($page),
-         tabs: ([$L.pages[] as $p
+         tabs: ([($L.tabs // $L.pages)[] as $p
            | "        <a href=\"/\($p | h)/\"\(if $p == $page then " aria-current=\"page\"" else "" end)>\(t("foot_\($p)") | h)</a>\n"]
            | add),
          note: (if $cl == $lang then "" else
@@ -765,9 +782,8 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
            + " <a href=\"\($path + "?lang=" + $X.link | h)\" hreflang=\"\($X.link | h)\" lang=\"\($X.link | h)\">\($X.other | h)</a>"),
          lede: (if ($P.lede // "") != "" then "        <p class=\"legal-lede\">\($P.lede | h)</p>\n" else "" end),
          toc: $parts.toc,
-         body: (if $page == "support" then
-                  $body | gsub("%PORTAL%"; (if $PORTAL_URL != "" then $PORTAL_URL else "#monthly" end) | h)
-                else $parts.body end),
+         body: ((if $page == "support" then $body else $parts.body end)
+                | gsub("%PORTAL%"; (if $PORTAL_URL != "" then $PORTAL_URL else "/support/#monthly" end) | h)),
          ways: (if $page == "support" then support_ways else "" end),
          perks: (if $page == "support" then support_perks else "" end),
          money: (if $page == "support" then support_money else "" end)});

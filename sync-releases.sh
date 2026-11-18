@@ -509,8 +509,11 @@ for c in $codes; do
         # The support page has a form of its own: the ways to give at the
         # top, its rules folded below them.
         [ -f "$SITE/templates/$p.html" ] && tpl=$SITE/templates/$p.html
+        # The payment terms are the support page's rules as a page of
+        # their own: one text, two forms (legal.json's source).
+        src=$(jq -r --arg p "$p" '.source[$p] // $p' "$SITE/legal.json")
         render "$p" "$c" "$tpl" "$OUT/i18n/$c/$p/index.html" \
-            "$SITE/legal/$written/$p.html"
+            "$SITE/legal/$written/$src.html"
     done
 done
 render sitemap en /dev/null "$OUT/i18n/sitemap.xml"

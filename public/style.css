@@ -1086,6 +1086,11 @@ footer .v a:hover { color: var(--accent); }
 .sp-trust li { display: inline-flex; align-items: center; gap: 7px; }
 .sp-trust svg { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--accent);
   stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+/* The rules behind the promises: a quiet link to the payment terms. */
+.sp-trust .sp-trust-terms svg { stroke: var(--muted); stroke-width: 1.9; }
+.sp-trust a { color: inherit; text-decoration: underline; text-decoration-color: var(--line-2);
+  text-underline-offset: 3px; }
+.sp-trust a:hover, .sp-trust a:focus-visible { color: var(--text); text-decoration-color: currentColor; }
 .sp .support-thanks { max-width: 780px; margin: 24px auto 0; box-sizing: border-box; }
 .sp-sec { padding: 60px 0; border-top: 1px solid var(--line); }
 .sp-sec h2 { font-size: clamp(1.45rem, 3vw, 1.95rem); letter-spacing: -.02em; margin: 0 auto 10px;

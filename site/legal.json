@@ -3,9 +3,19 @@
     "pages": [
         "privacy",
         "terms",
+        "payments",
         "support",
         "about"
     ],
+    "tabs": [
+        "privacy",
+        "terms",
+        "payments",
+        "about"
+    ],
+    "source": {
+        "payments": "support"
+    },
     "text": {
         "sv": {
             "updated": "Senast uppdaterad 18 november 2026",
@@ -45,6 +55,18 @@
                 "title": "Terms of use",
                 "desc": "The terms for the dopeIPTV app and dopeiptv.org: a player only, with no channels or content, open source under the GPL, and your responsibility for what you add.",
                 "lede": "dopeIPTV is a free, open-source player – what you watch, you add yourself."
+            }
+        },
+        "payments": {
+            "sv": {
+                "title": "Betalvillkor",
+                "desc": "Villkoren för dricks och månadsstöd till dopeIPTV: hur betalningen går till, hur du säger upp, supporternyckeln och pengarna tillbaka inom 14 dagar.",
+                "lede": "Dricks och månadsstöd är frivilligt – säg upp när du vill och få pengarna tillbaka inom 14 dagar."
+            },
+            "en": {
+                "title": "Payment terms",
+                "desc": "The terms for tips and monthly support to dopeIPTV: how paying works, cancelling, the supporter key and your money back within 14 days.",
+                "lede": "Tips and monthly support are voluntary – cancel whenever you like and get your money back within 14 days."
             }
         },
         "support": {
