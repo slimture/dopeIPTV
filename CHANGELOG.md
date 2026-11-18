@@ -9,6 +9,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- AirPlay: "The Apple TV has not reached this Mac" no longer comes while a
+  seek is still being readied - the new stream is the Apple TV's to reach
+  only once it has been handed it. A seek also asks the provider's archive
+  one time less: the channel already on the TV is known, so the archive is
+  no longer probed first.
 - TV: the channel names' column is as wide as the category's longest names
   need, up to 40 % of the row - long names are no longer cut at a fixed
   width, and a category of short names leaves the room to what is on. A

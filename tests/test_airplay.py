@@ -900,6 +900,61 @@ def test_a_new_stream_gives_the_apple_tv_its_own_time_to_reach_it(qapp, macos):
     rx.stop()
 
 
+def test_a_bridge_still_being_readied_is_not_unreached(qapp, macos):
+    """A seek starts a new bridge while the Apple TV still plays the old
+    stream: until the player is handed the new playlist, the TV cannot have
+    asked it - "has not reached this Mac" came during every slow seek."""
+    am, _ = macos
+    rx = am.AirPlayReceiver()
+    rx.context = lambda: {"kind": "live"}
+    told = []
+    rx.problem.connect(told.append)
+    rx.cast(am.NAME, "http://p/live/u/pw/1.m3u8", "SVT1")
+    p = _Player.made[-1]
+    p.route(True)
+    _pump(qapp)
+    _settle(am, rx)
+    rx.bridged = lambda: True                        # a new bridge, readied meanwhile
+    rx.bridge.remote_seen = False
+    rx.bridge.url = "http://192.168.1.2:9/tok/index.m3u8"
+    rx._external_since = time.monotonic() - 10 * am.UNREACHED_S
+    rx._sync_player(p)
+    assert told == [] and not rx._said_unreached
+    rx._opened_url = rx.bridge.url                   # handed over, and never asked
+    rx._sync_player(p)
+    assert told == ["airplay_unreachable"]
+    rx.stop()
+
+
+def test_a_seek_in_the_same_channel_does_not_ask_the_archive_twice(qapp, macos, monkeypatch):
+    """The channel on the TV went through the bridge: a seek's pieces are
+    that channel, so its stream is planned as before - no ffprobe of the
+    archive, one more opening of it seconds before the stream."""
+    am, _ = macos
+    rx = am.AirPlayReceiver()
+    rx.active = am.NAME
+    rx.plan = ab.Plan(direct=False, url="http://p/live/1.ts", live=True, video="copy",
+                      audio="aac")
+
+    def no_probe(*_a, **_k):
+        raise AssertionError("the archive was probed")
+    monkeypatch.setattr(am.ab, "probe", no_probe)
+    monkeypatch.setattr(am.ab, "firewall_blocks", lambda: False)
+    started = []
+    monkeypatch.setattr(rx.bridge, "available", lambda: True)
+    monkeypatch.setattr(rx.bridge, "start", lambda plan, *a, **k: started.append(plan) or "x")
+    monkeypatch.setattr(rx.bridge, "wait_ready", lambda **k: True)
+    rx.bridge.url = "http://lan/tok/index.m3u8"
+    monkeypatch.setattr(rx, "_open_blocking", lambda *a: None)
+
+    class Feed:
+        first_url = "http://p/timeshift/u/pw/60/2026-11-18:06-19/1.ts"
+    rx._ready({"url": "http://p/live/1.ts", "source": "http://p/live/1.ts", "codecs": [],
+               "live": True, "track": 0, "start": 0.0, "duration": 0.0, "settle": False,
+               "generation": rx._generation, "feed": Feed()}, False)
+    assert started and started[0].audio == "aac" and started[0].video == "copy"
+
+
 def test_the_airplay_window_floats_over_the_app_only_while_it_is_in_front(qapp, macos):
     am, _ = macos
     rx = am.AirPlayReceiver()
