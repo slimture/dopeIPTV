@@ -87,6 +87,12 @@ LIVE_WINDOW_S = 300         # how much of a channel the playlist keeps
 LEAD = 3                    # segments a live playlist has before it goes
 READY_WAIT_S = 30.0         # how long the first playlist may take
 PLAYLIST = "index.m3u8"
+#: Each track's fragments say when they start (tfdt). A stream joined in the
+#: middle of a GOP has its sound start before its picture; left to itself
+#: the MP4 muxer starts both tracks at zero and writes the difference as an
+#: empty edit in the init segment, which an Apple TV does not apply to HLS:
+#: the picture then ran ahead of the sound by up to a GOP, for the whole cast.
+TRACK_TIMES = ["-hls_segment_options", "movflags=+frag_discont"]
 
 SOCKETFILTERFW = "/usr/libexec/ApplicationFirewall/socketfilterfw"
 
@@ -343,6 +349,7 @@ def ffmpeg_args(exe: str, p: Plan, start: float = 0.0,
         *video, *audio, "-max_muxing_queue_size", "1024",
         "-f", "hls", "-hls_time", str(seg),
         "-hls_segment_type", "fmp4", "-hls_fmp4_init_filename", "init.mp4",
+        *TRACK_TIMES,
         *keep, "-hls_segment_filename", "s%05d.m4s", PLAYLIST,
     ]
 

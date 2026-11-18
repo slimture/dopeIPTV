@@ -19,7 +19,10 @@ growing playlist and plays on - and can go back within what is written:
 Each reader copies its piece as MPEG-TS: from its first keyframe (a stream
 copy drops what comes before one), with SPS/PPS in front of every keyframe
 (dump_extra), and its clock carried on from where the last piece ended
-(-output_ts_offset), so the converter sees one stream. Whatever the piece's
+(-output_ts_offset), so the converter sees one stream. The first piece's
+sound from before that keyframe is left out here (LeadTrim): a stream
+whose sound starts up to a GOP before its picture is what an HLS player
+plays out of sync. Whatever the piece's
 address is - the provider's, or the rewind buffer's loopback server - only
 ffmpeg here reads it; the TV only ever sees the converter's playlist on the
 LAN.
@@ -47,6 +50,10 @@ KEYFRAME_INPUT = ["-fflags", "+genpts+discardcorrupt"]
 #: Every keyframe carries its SPS/PPS, so the converter - and the TV - can
 #: start decoding at the first one of every piece.
 KEYFRAME_OUTPUT = ["-bsf:v", "dump_extra=freq=keyframe"]
+#: One sound frame per PES packet, so the sound before the first picture
+#: can be left out to the frame (LeadTrim) - the default packs a fifth of
+#: a second into one.
+FRAME_PES = ["-pes_payload_size", "0"]
 #: A little room between one piece's clock and the next, so their frames
 #: never overlap (which the converter would have to squeeze).
 JOIN_GAP_S = 0.25
@@ -87,7 +94,7 @@ def reader_args(exe: str, url: str, start: float = 0.0, ts_offset: float = 0.0,
         *(["-ss", f"{start:.3f}"] if start > 0 else []),
         *KEYFRAME_INPUT, "-i", url,
         "-map", "0:v:0?", "-map", f"0:a:{max(0, int(audio))}?", "-sn", "-dn",
-        "-c", "copy", *KEYFRAME_OUTPUT,
+        "-c", "copy", *KEYFRAME_OUTPUT, *FRAME_PES,
         *(["-output_ts_offset", f"{ts_offset:.3f}"] if ts_offset > 0 else []),
         "-f", "mpegts", "pipe:1",
     ]
@@ -207,9 +214,12 @@ class Feed:
                     if piece is None:
                         break
                 url, at, wall = piece
+                # Only where the stream begins: at a join the sound plays
+                # on from the piece before.
+                trim = None if self.pieces else LeadTrim()
                 got = self._read(sink, exe, url, at,
                                  media + (JOIN_GAP_S if self.pieces else 0.0),
-                                 net_for(url), stop)
+                                 net_for(url), stop, trim)
                 if got is None or stop.is_set():
                     break                       # the converter went away
                 if got < 0.5:
@@ -263,9 +273,11 @@ class Feed:
 
     def _read(self, sink: IO[bytes], exe: str, url: str, at: float,
               ts_offset: float, net: list[str],
-              stop: threading.Event) -> float | None:
+              stop: threading.Event,
+              trim: LeadTrim | None = None) -> float | None:
         """Copy one piece into *sink*: how many seconds it gave, or None
-        when *sink* is gone."""
+        when *sink* is gone. *trim*: its sound from before its first
+        picture left out."""
         args = reader_args(exe, url, at, ts_offset, net, self.audio)
         try:
             proc = subprocess.Popen(args, stdin=subprocess.DEVNULL,
@@ -281,6 +293,7 @@ class Feed:
             _end(proc)
         log.info("cast feed: reading the %s from %s", self.kind,
                  redact_url(url))
+        began = time.monotonic()
         out: list[float] = [0.0]
         errs = threading.Thread(target=_progress, args=(proc, out), daemon=True)
         errs.start()
@@ -288,13 +301,29 @@ class Feed:
         stdout = proc.stdout
         try:
             while stdout is not None:
-                chunk = stdout.read(65536)
-                if not chunk:
-                    break
-                try:
-                    sink.write(chunk)
-                except (OSError, ValueError):
-                    gone = True
+                raw = stdout.read(65536)
+                if began and raw:
+                    # What the wait before a seek's stream is made of: the
+                    # provider answering, and ffmpeg's look into the piece.
+                    log.info("cast feed: the %s gave its first picture and "
+                             "sound after %.1f s", self.kind,
+                             time.monotonic() - began)
+                    began = 0.0
+                chunk = raw
+                if trim is not None:
+                    chunk = trim.feed(raw) if raw else trim.flush()
+                    if trim.done:
+                        if trim.lead > 0:
+                            log.info("cast feed: %.2f s of sound before the "
+                                     "first picture left out", trim.lead)
+                        trim = None
+                if chunk:
+                    try:
+                        sink.write(chunk)
+                    except (OSError, ValueError):
+                        gone = True
+                        break
+                if not raw:
                     break
         except Exception:
             pass
@@ -336,6 +365,236 @@ def _end(proc: subprocess.Popen[Any]) -> None:
             return
         except Exception:
             continue
+
+
+# -- the sound before the first picture -----------------------------------------
+
+_TS = 188
+_PTS_WRAP = 1 << 33
+#: PMT stream types that are a picture (MPEG-1/2, MPEG-4, H.264, HEVC, VVC).
+_PICTURE_TYPES = frozenset({0x01, 0x02, 0x10, 0x1B, 0x24, 0x33})
+#: Sound held back at most this long waiting for the first picture: a
+#: stream whose picture never comes (radio with a dead picture PID) plays.
+LEAD_MAX_S = 20.0
+LEAD_MAX_BYTES = 4 << 20
+_AFTER_MAX = 20000          # packets looked at once the picture has begun
+
+
+def _payload(pkt: bytes) -> bytes:
+    afc = (pkt[3] >> 4) & 3
+    if not afc & 1:
+        return b""
+    return pkt[5 + pkt[4]:] if afc & 2 else pkt[4:]
+
+
+def _pes_pts(pkt: bytes) -> int | None:
+    """The PTS (90 kHz) of the PES packet that starts in *pkt*, if any."""
+    if not pkt[1] & 0x40:
+        return None
+    p = _payload(pkt)
+    if len(p) < 14 or p[:3] != b"\x00\x00\x01" or not p[7] & 0x80:
+        return None
+    return (((p[9] >> 1) & 7) << 30 | p[10] << 22 | (p[11] >> 1) << 15
+            | p[12] << 7 | p[13] >> 1)
+
+
+def _before(a: int, b: int) -> bool:
+    """PTS *a* is earlier than *b*, across the 33-bit wrap."""
+    return 0 < (b - a) % _PTS_WRAP < _PTS_WRAP // 2
+
+
+class LeadTrim:
+    """A transport stream without the sound that precedes its first picture.
+
+    A piece is joined in the middle of a GOP: the copy drops the picture up
+    to its first keyframe, the sound starts at once - up to a GOP earlier.
+    Written as fragmented MP4, that start is one track's offset against the
+    other, which an Apple TV plays as sound out of step with the picture.
+
+    feed() takes the readers' output as it comes and gives back what goes
+    on: sound packets are held until the first picture's PTS is known, then
+    only those from that PTS on are let through (whole PES packets - one
+    sound frame each, FRAME_PES). A stream with no picture, one it cannot
+    read, or one whose picture does not come within LEAD_MAX_S passes as
+    it is: nothing is ever lost but the sound before the first picture.
+    """
+
+    def __init__(self) -> None:
+        self.done = False
+        #: Seconds of sound left out, once done.
+        self.lead = 0.0
+        self._rest = b""
+        self._pmt: int | None = None
+        self._video: int | None = None
+        self._sound: set[int] = set()
+        self._first: int | None = None      # the first picture's PTS
+        self._held: list[tuple[int | None, list[bytes]]] = []
+        self._held_pid: dict[int, list[bytes]] = {}
+        self._held_bytes = 0
+        self._mapped = False
+        self._after = 0
+        self._dropping: set[int] = set()
+        self._passed: set[int] = set()
+        self._oldest: int | None = None
+        self._cut: int | None = None
+
+    def feed(self, chunk: bytes) -> bytes:
+        if self.done:
+            return chunk
+        data = self._rest + chunk
+        out: list[bytes] = []
+        at = 0
+        while len(data) - at >= _TS:
+            pkt = data[at:at + _TS]
+            if pkt[0] != 0x47:
+                # Not what the readers write: hands off.
+                out.append(self._give_up())
+                out.append(data[at:])
+                self._rest = b""
+                return b"".join(out)
+            at += _TS
+            out.append(self._packet(pkt))
+            if self.done:
+                out.append(data[at:])
+                self._rest = b""
+                return b"".join(out)
+        self._rest = data[at:]
+        return b"".join(out)
+
+    def flush(self) -> bytes:
+        """The stream ended: what was still held."""
+        if self.done:
+            return b""
+        rest, self._rest = self._rest, b""
+        return self._give_up() + rest
+
+    def _give_up(self) -> bytes:
+        held = b"".join(b"".join(pkts) for _pts, pkts in self._held)
+        self._held, self._held_pid = [], {}
+        self.done = True
+        return held
+
+    def _packet(self, pkt: bytes) -> bytes:
+        pid = (pkt[1] & 0x1F) << 8 | pkt[2]
+        start = bool(pkt[1] & 0x40)
+        if pid == 0 and start and self._pmt is None:
+            self._read_pat(pkt)
+            return pkt
+        if pid == self._pmt and start and not self._mapped:
+            self._read_pmt(pkt)
+            if self._mapped and (self._video is None or not self._sound):
+                return self._give_up() + pkt          # sound alone, or none
+            return pkt
+        if self._first is not None:
+            # Bounded: a sound PID that never speaks is not waited for.
+            self._after += 1
+            if self._after > _AFTER_MAX:
+                self._finish()
+                return pkt
+        if pid == self._video and self._first is None:
+            pts = _pes_pts(pkt)
+            if pts is None:
+                return pkt
+            self._first = pts
+            return self._release() + pkt
+        if pid not in self._sound or pid in self._passed:
+            return pkt
+        if self._first is None:
+            return self._hold(pid, pkt, start)
+        if start:
+            pts = _pes_pts(pkt)
+            if pts is not None and _before(pts, self._first):
+                self._dropping.add(pid)
+                self._note_cut(pts)
+                return b""
+            self._dropping.discard(pid)
+            self._passed.add(pid)
+            if self._passed >= self._sound:
+                self._finish()
+            return pkt
+        return b"" if pid in self._dropping else pkt
+
+    def _hold(self, pid: int, pkt: bytes, start: bool) -> bytes:
+        if start:
+            pts = _pes_pts(pkt)
+            pkts = [pkt]
+            self._held.append((pts, pkts))
+            self._held_pid[pid] = pkts
+            if pts is not None:
+                if self._oldest is None:
+                    self._oldest = pts
+                elif (pts - self._oldest) % _PTS_WRAP > LEAD_MAX_S * 90000:
+                    return self._give_up()
+        elif pid in self._held_pid:
+            self._held_pid[pid].append(pkt)
+        else:
+            return b""                  # the tail of a PES begun before the piece
+        self._held_bytes += _TS
+        if self._held_bytes > LEAD_MAX_BYTES:
+            return self._give_up()
+        return b""
+
+    def _release(self) -> bytes:
+        """The first picture is known: the held sound from it on goes out."""
+        first = self._first
+        assert first is not None
+        out: list[bytes] = []
+        for pts, pkts in self._held:
+            if pts is not None and _before(pts, first):
+                self._note_cut(pts)
+                continue
+            out.extend(pkts)
+            self._passed.add((pkts[0][1] & 0x1F) << 8 | pkts[0][2])
+        # A sound PES that began before the picture and is still arriving.
+        self._dropping = {pid for pid in self._held_pid
+                          if pid not in self._passed}
+        self._held, self._held_pid = [], {}
+        if self._passed >= self._sound:
+            self._finish()
+        return b"".join(out)
+
+    def _note_cut(self, pts: int) -> None:
+        if self._cut is None:
+            self._cut = pts
+
+    def _finish(self) -> None:
+        if self._cut is not None and self._first is not None:
+            self.lead = ((self._first - self._cut) % _PTS_WRAP) / 90000.0
+        self.done = True
+
+    def _section(self, pkt: bytes) -> bytes:
+        p = _payload(pkt)
+        if not p or 1 + p[0] >= len(p):
+            return b""
+        return p[1 + p[0]:]
+
+    def _read_pat(self, pkt: bytes) -> None:
+        s = self._section(pkt)
+        if len(s) < 12 or s[0] != 0x00:
+            return
+        end = min(len(s), 3 + ((s[1] & 0x0F) << 8 | s[2]) - 4)
+        for i in range(8, end - 3, 4):
+            if s[i] << 8 | s[i + 1]:                    # not the network PID
+                self._pmt = (s[i + 2] & 0x1F) << 8 | s[i + 3]
+                return
+
+    def _read_pmt(self, pkt: bytes) -> None:
+        s = self._section(pkt)
+        if len(s) < 16 or s[0] != 0x02:
+            return
+        end = min(len(s), 3 + ((s[1] & 0x0F) << 8 | s[2]) - 4)
+        i = 12 + ((s[10] & 0x0F) << 8 | s[11])
+        sound: set[int] = set()
+        video: int | None = None
+        while i + 5 <= end:
+            kind = s[i]
+            pid = (s[i + 1] & 0x1F) << 8 | s[i + 2]
+            if kind in _PICTURE_TYPES:
+                video = pid if video is None else video
+            else:
+                sound.add(pid)
+            i += 5 + ((s[i + 3] & 0x0F) << 8 | s[i + 4])
+        self._video, self._sound, self._mapped = video, sound, True
 
 
 def written(playlist: bytes) -> float:
