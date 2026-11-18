@@ -3108,5 +3108,9 @@
   "cast_note_failed": "La TV si è bloccata durante il caricamento. Inviarlo di nuovo due volte non è servito.",
   "cast_note_no_room": "Non reinviato da solo: qualcos'altro usa la connessione del tuo account. Riprova chiede prima.",
   "cast_note_send_failed": "Impossibile inviarlo di nuovo: {msg}",
-  "cast_stuck_notice": "{name} si è bloccato caricando {title} e non si è ripreso."
+  "cast_stuck_notice": "{name} si è bloccato caricando {title} e non si è ripreso.",
+  "cast_state_moving": "Torno indietro…",
+  "cast_state_to_live": "Torno alla diretta…",
+  "cast_note_moving": "Alle {time} · preso dall'archivio, ci vuole qualche secondo.",
+  "cast_note_to_live": "La diretta sta arrivando alla TV."
 }

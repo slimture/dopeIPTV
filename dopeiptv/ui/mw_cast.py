@@ -1652,6 +1652,7 @@ class _CastMixin:
         if not device or not url:
             return
         log.info("cast: back to the live edge")
+        self._cast_moving_to(ctx, "live")
         # The rewind buffer was all the cast had of the provider (not kept
         # beside it): its feed ends first, and the provider is given a
         # moment, before the TV asks for the channel - never two at once.
@@ -1679,6 +1680,12 @@ class _CastMixin:
                                    dvr=bool(ctx.get("archive"))),
             lambda _n: self.show_cast_strip(device, title),
             self._cast_send_failed)
+
+    def _cast_moving_to(self, ctx: dict, to) -> None:
+        """A seek on its way to the TV, said on the card (mw_cast_watch)."""
+        say = getattr(self, "_cast_moving", None)
+        if callable(say):
+            say(ctx, to)
 
     def _cast_send(self, work, done, failed) -> None:
         """*work* (a receiver's cast call) on the pool, counted as on its way
@@ -1708,6 +1715,7 @@ class _CastMixin:
             # way): nothing failed, the newer one is what the TV gets.
             log.info("cast: a send was replaced by a newer one")
             return
+        (self._cast_ctx or {}).pop("_moving", None)
         self._error(tr("cast_failed", msg=msg))
 
     def _cast_continue_archive(self) -> None:
@@ -2169,6 +2177,7 @@ class _CastMixin:
                    archive_from=datetime.fromtimestamp(feed.first_wall),
                    feed=feed)
         title = ctx.get("title") or "dopeIPTV"
+        self._cast_moving_to(ctx, feed.first_wall)
         log.info("cast: %s from %s, in pieces as one playlist",
                  for_log(title),
                  datetime.fromtimestamp(feed.first_wall).strftime("%H:%M:%S"))
@@ -2194,6 +2203,10 @@ class _CastMixin:
         sid = ctx.get("sid")
         if sid is None or not device:
             return
+        try:
+            self._cast_moving_to(ctx, paused_at.timestamp())
+        except (AttributeError, TypeError, ValueError, OverflowError):
+            pass
         # The TRANSPORT STREAM, through the converter - not the panel's HLS
         # wrapper of the same archive. This is decided by the logs, not by
         # preference: across every attempt, each cast that actually played

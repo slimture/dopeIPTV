@@ -3108,5 +3108,9 @@
   "cast_note_failed": "テレビが読み込み中に止まりました。2回送り直しても直りませんでした。",
   "cast_note_no_room": "自動では送り直していません。アカウントの接続を別のものが使っています。「再試行」は先に確認します。",
   "cast_note_send_failed": "送り直せませんでした：{msg}",
-  "cast_stuck_notice": "{name}で{title}の読み込みが止まり、回復しませんでした。"
+  "cast_stuck_notice": "{name}で{title}の読み込みが止まり、回復しませんでした。",
+  "cast_state_moving": "巻き戻し中…",
+  "cast_state_to_live": "ライブに戻っています…",
+  "cast_note_moving": "{time} へ · アーカイブから取得中です。数秒かかります。",
+  "cast_note_to_live": "ライブ放送をテレビに送っています。"
 }

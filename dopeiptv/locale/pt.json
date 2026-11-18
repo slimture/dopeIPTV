@@ -3108,5 +3108,9 @@
   "cast_note_failed": "A TV ficou presa a carregar. Enviar novamente duas vezes não ajudou.",
   "cast_note_no_room": "Não foi reenviado sozinho: outra coisa usa a ligação da sua conta. Tentar novamente pergunta primeiro.",
   "cast_note_send_failed": "Não foi possível enviar novamente: {msg}",
-  "cast_stuck_notice": "{name} ficou preso a carregar {title} e não recuperou."
+  "cast_stuck_notice": "{name} ficou preso a carregar {title} e não recuperou.",
+  "cast_state_moving": "Voltando…",
+  "cast_state_to_live": "Voltando ao vivo…",
+  "cast_note_moving": "Para {time} · buscando no arquivo - leva alguns segundos.",
+  "cast_note_to_live": "A transmissão ao vivo está a caminho da TV."
 }

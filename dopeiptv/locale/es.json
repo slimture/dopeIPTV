@@ -3108,5 +3108,9 @@
   "cast_note_failed": "La TV se quedó atascada cargando. Volver a enviarla dos veces no ayudó.",
   "cast_note_no_room": "No se volvió a enviar sola: otra cosa usa la conexión de tu cuenta. Reintentar pregunta primero.",
   "cast_note_send_failed": "No se pudo volver a enviar: {msg}",
-  "cast_stuck_notice": "{name} se quedó atascado cargando {title} y no se recuperó."
+  "cast_stuck_notice": "{name} se quedó atascado cargando {title} y no se recuperó.",
+  "cast_state_moving": "Retrocediendo…",
+  "cast_state_to_live": "Volviendo al directo…",
+  "cast_note_moving": "A las {time} · se trae del archivo; tarda unos segundos.",
+  "cast_note_to_live": "La emisión en directo va de camino a la tele."
 }

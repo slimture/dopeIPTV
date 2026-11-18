@@ -3108,5 +3108,9 @@
   "cast_note_failed": "La TV s'est bloquée au chargement. Le renvoyer deux fois n'a pas suffi.",
   "cast_note_no_room": "Pas renvoyé automatiquement : autre chose utilise la connexion de votre compte. Réessayer demande d'abord.",
   "cast_note_send_failed": "Impossible de le renvoyer : {msg}",
-  "cast_stuck_notice": "{name} s'est bloqué au chargement de {title} et ne s'est pas rétabli."
+  "cast_stuck_notice": "{name} s'est bloqué au chargement de {title} et ne s'est pas rétabli.",
+  "cast_state_moving": "Retour en arrière…",
+  "cast_state_to_live": "Retour au direct…",
+  "cast_note_moving": "À {time} · récupéré dans les archives - cela prend quelques secondes.",
+  "cast_note_to_live": "Le direct arrive sur la télé."
 }

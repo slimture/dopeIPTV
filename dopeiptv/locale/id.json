@@ -3108,5 +3108,9 @@
   "cast_note_failed": "TV macet saat memuat. Mengirim ulang dua kali tidak membantu.",
   "cast_note_no_room": "Tidak dikirim ulang otomatis: hal lain sedang memakai koneksi akun Anda. Coba lagi akan bertanya dulu.",
   "cast_note_send_failed": "Tidak dapat dikirim ulang: {msg}",
-  "cast_stuck_notice": "{name} macet saat memuat {title} dan tidak pulih."
+  "cast_stuck_notice": "{name} macet saat memuat {title} dan tidak pulih.",
+  "cast_state_moving": "Mundur…",
+  "cast_state_to_live": "Kembali ke siaran langsung…",
+  "cast_note_moving": "Ke {time} · diambil dari arsip - butuh beberapa detik.",
+  "cast_note_to_live": "Siaran langsung sedang dikirim ke TV."
 }

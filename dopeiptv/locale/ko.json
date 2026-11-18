@@ -3108,5 +3108,9 @@
   "cast_note_failed": "TV가 로딩 중에 멈췄습니다. 두 번 다시 보내도 해결되지 않았습니다.",
   "cast_note_no_room": "자동으로 다시 보내지 않았습니다. 다른 항목이 계정의 연결을 사용 중입니다. 다시 시도하면 먼저 물어봅니다.",
   "cast_note_send_failed": "다시 보낼 수 없습니다: {msg}",
-  "cast_stuck_notice": "{name}에서 {title} 로딩이 멈춘 뒤 복구되지 않았습니다."
+  "cast_stuck_notice": "{name}에서 {title} 로딩이 멈춘 뒤 복구되지 않았습니다.",
+  "cast_state_moving": "되감는 중…",
+  "cast_state_to_live": "실시간으로 돌아가는 중…",
+  "cast_note_moving": "{time}(으)로 · 보관 영상에서 가져오는 중이며 몇 초 걸립니다.",
+  "cast_note_to_live": "실시간 방송을 TV로 보내는 중입니다."
 }

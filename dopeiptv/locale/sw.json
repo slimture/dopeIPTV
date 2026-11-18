@@ -3108,5 +3108,9 @@
   "cast_note_failed": "TV ilikwama ikipakia. Kutuma tena mara mbili hakukusaidia.",
   "cast_note_no_room": "Haikutumwa tena yenyewe: kitu kingine kinatumia muunganisho wa akaunti yako. Jaribu tena itauliza kwanza.",
   "cast_note_send_failed": "Haikuweza kutumwa tena: {msg}",
-  "cast_stuck_notice": "{name} ilikwama ikipakia {title} na haikurudi."
+  "cast_stuck_notice": "{name} ilikwama ikipakia {title} na haikurudi.",
+  "cast_state_moving": "Inarudi nyuma…",
+  "cast_state_to_live": "Inarudi mubashara…",
+  "cast_note_moving": "Hadi {time} · inaletwa kutoka kwenye hifadhi - itachukua sekunde chache.",
+  "cast_note_to_live": "Matangazo ya mubashara yanakuja kwenye TV."
 }

@@ -3108,5 +3108,9 @@
   "cast_note_failed": "TV yüklerken takıldı. İki kez yeniden göndermek işe yaramadı.",
   "cast_note_no_room": "Kendiliğinden yeniden gönderilmedi: hesabınızın bağlantısını başka bir şey kullanıyor. Tekrar dene önce sorar.",
   "cast_note_send_failed": "Yeniden gönderilemedi: {msg}",
-  "cast_stuck_notice": "{name}, {title} yüklenirken takıldı ve toparlanamadı."
+  "cast_stuck_notice": "{name}, {title} yüklenirken takıldı ve toparlanamadı.",
+  "cast_state_moving": "Geri sarılıyor…",
+  "cast_state_to_live": "Canlı yayına dönülüyor…",
+  "cast_note_moving": "{time} · arşivden alınıyor - birkaç saniye sürer.",
+  "cast_note_to_live": "Canlı yayın televizyona geliyor."
 }

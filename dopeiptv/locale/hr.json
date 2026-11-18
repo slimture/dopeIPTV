@@ -3108,5 +3108,9 @@
   "cast_note_failed": "TV je zapeo pri učitavanju. Dva ponovna slanja nisu pomogla.",
   "cast_note_no_room": "Nije ponovno poslano samo od sebe: nešto drugo koristi vezu tvog računa. Pokušaj ponovno prvo pita.",
   "cast_note_send_failed": "Nije se moglo ponovno poslati: {msg}",
-  "cast_stuck_notice": "{name} je zapeo pri učitavanju {title} i nije se oporavio."
+  "cast_stuck_notice": "{name} je zapeo pri učitavanju {title} i nije se oporavio.",
+  "cast_state_moving": "Vraćanje unatrag…",
+  "cast_state_to_live": "Povratak na uživo…",
+  "cast_note_moving": "Na {time} · dohvaća se iz arhive - potrajat će nekoliko sekundi.",
+  "cast_note_to_live": "Prijenos uživo stiže na televizor."
 }

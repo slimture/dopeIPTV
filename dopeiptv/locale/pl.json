@@ -3108,5 +3108,9 @@
   "cast_note_failed": "Telewizor zawiesił się przy wczytywaniu. Dwukrotne ponowne wysłanie nie pomogło.",
   "cast_note_no_room": "Nie wysłano ponownie automatycznie: coś innego używa połączenia twojego konta. Spróbuj ponownie najpierw zapyta.",
   "cast_note_send_failed": "Nie udało się wysłać ponownie: {msg}",
-  "cast_stuck_notice": "{name} zawiesił się przy wczytywaniu {title} i się nie odzyskał."
+  "cast_stuck_notice": "{name} zawiesił się przy wczytywaniu {title} i się nie odzyskał.",
+  "cast_state_moving": "Cofanie…",
+  "cast_state_to_live": "Powrót na żywo…",
+  "cast_note_moving": "Do {time} · pobierane z archiwum - to potrwa kilka sekund.",
+  "cast_note_to_live": "Transmisja na żywo jest w drodze do telewizora."
 }

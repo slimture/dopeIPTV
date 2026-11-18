@@ -3108,5 +3108,9 @@
   "cast_note_failed": "Tv:n fastnade när den laddade. Att skicka den igen två gånger hjälpte inte.",
   "cast_note_no_room": "Skickades inte igen av sig själv: något annat använder kontots anslutning. Försök igen frågar först.",
   "cast_note_send_failed": "Den kunde inte skickas igen: {msg}",
-  "cast_stuck_notice": "{name} fastnade när den laddade {title} och kom inte igång igen."
+  "cast_stuck_notice": "{name} fastnade när den laddade {title} och kom inte igång igen.",
+  "cast_state_moving": "Spolar tillbaka…",
+  "cast_state_to_live": "Tillbaka till live…",
+  "cast_note_moving": "Till {time} · hämtas ur arkivet - det tar några sekunder.",
+  "cast_note_to_live": "Livesändningen är på väg till tv:n."
 }

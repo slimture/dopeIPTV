@@ -334,6 +334,39 @@ def test_a_send_on_its_way_beside_a_tv_that_plays_says_playing(sync_runs, clock)
     assert w.cast_bar.pill.state == cc.STARTING
 
 
+def test_a_seek_is_said_on_the_card_until_the_tv_plays_it(sync_runs, clock):
+    """Going back (or to live) while casting: the card says where to and
+    that it takes a moment - not Playing for the old stream, not an error -
+    until the TV has played the new one a little while."""
+    import time as _t
+    from dopeiptv.i18n import tr
+    from dopeiptv.ui import cast_card as cc
+    w = _window("live")
+    _tick(w, clock, 1, "PLAYING/None")
+    when = _t.mktime((2026, 11, 18, 6, 19, 0, 0, 0, -1))
+    w._cast_inflight = 1                                   # the seek's send on its way
+    w._cast_moving(w._cast_ctx, when)
+    assert w.cast_bar.pill.state == cc.MOVING
+    assert w.cast_bar.pill.text == tr("cast_state_moving")
+    assert "06:19" in w.cast_bar.note.text()
+    _tick(w, clock, 3, "PLAYING/None")                    # the old stream still plays
+    assert w.cast_bar.pill.state == cc.MOVING
+    w._cast_inflight = 0                                   # handed over; the TV loads it
+    _tick(w, clock, 4, "BUFFERING/None")
+    assert w.cast_bar.pill.state == cc.MOVING
+    _tick(w, clock, 1, "PLAYING/None")
+    assert w.cast_bar.pill.state == cc.MOVING             # a moment of play is not yet it
+    _tick(w, clock, 3, "PLAYING/None")
+    assert w.cast_bar.pill.state == cc.PLAYING and "_moving" not in w._cast_ctx
+    # Back to live says so too; a send that fails ends it.
+    w._cast_moving(w._cast_ctx, "live")
+    assert w.cast_bar.pill.state == cc.TO_LIVE
+    assert w.cast_bar.note.text() == tr("cast_note_to_live")
+    w._error = lambda _m: None
+    w._cast_send_failed("receiver gone")
+    assert "_moving" not in w._cast_ctx
+
+
 def test_a_send_a_newer_one_replaced_is_no_error(monkeypatch):
     """Live while a seek was on its way: the seek's send stops ("Casting
     stopped.") and the newer one goes - nothing to tell."""

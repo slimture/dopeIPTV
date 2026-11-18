@@ -3108,5 +3108,9 @@
   "cast_note_failed": "הטלוויזיה נתקעה בטעינה. שליחה חוזרת פעמיים לא עזרה.",
   "cast_note_no_room": "לא נשלח שוב מעצמו: משהו אחר משתמש בחיבור של החשבון שלך. \"נסה שוב\" שואל קודם.",
   "cast_note_send_failed": "לא ניתן היה לשלוח שוב: {msg}",
-  "cast_stuck_notice": "{name} נתקע בטעינת {title} ולא התאושש."
+  "cast_stuck_notice": "{name} נתקע בטעינת {title} ולא התאושש.",
+  "cast_state_moving": "חוזר אחורה…",
+  "cast_state_to_live": "חזרה לשידור החי…",
+  "cast_note_moving": "אל {time} · נטען מהארכיון - זה לוקח כמה שניות.",
+  "cast_note_to_live": "השידור החי בדרך לטלוויזיה."
 }

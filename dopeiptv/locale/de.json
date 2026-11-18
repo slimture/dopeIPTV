@@ -3108,5 +3108,9 @@
   "cast_note_failed": "Der Fernseher hing beim Laden. Zweimal erneut senden hat nicht geholfen.",
   "cast_note_no_room": "Nicht von selbst erneut gesendet: Etwas anderes nutzt die Verbindung deines Kontos. Erneut versuchen fragt zuerst.",
   "cast_note_send_failed": "Er konnte nicht erneut gesendet werden: {msg}",
-  "cast_stuck_notice": "{name} hing beim Laden von {title} und hat sich nicht erholt."
+  "cast_stuck_notice": "{name} hing beim Laden von {title} und hat sich nicht erholt.",
+  "cast_state_moving": "Springt zurück…",
+  "cast_state_to_live": "Zurück zu live…",
+  "cast_note_moving": "Zu {time} · wird aus dem Archiv geholt - das dauert ein paar Sekunden.",
+  "cast_note_to_live": "Die Live-Sendung ist auf dem Weg zum Fernseher."
 }

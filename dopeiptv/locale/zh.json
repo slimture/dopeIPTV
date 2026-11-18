@@ -3108,5 +3108,9 @@
   "cast_note_failed": "电视加载时卡住了。重新发送两次也没有用。",
   "cast_note_no_room": "没有自动重新发送：其他内容正在使用你账户的连接。点“重试”会先询问。",
   "cast_note_send_failed": "无法重新发送：{msg}",
-  "cast_stuck_notice": "{name} 加载 {title} 时卡住了，未能恢复。"
+  "cast_stuck_notice": "{name} 加载 {title} 时卡住了，未能恢复。",
+  "cast_state_moving": "正在回退…",
+  "cast_state_to_live": "正在回到直播…",
+  "cast_note_moving": "跳到 {time} · 正从回看中获取，需要几秒钟。",
+  "cast_note_to_live": "直播正在发送到电视。"
 }

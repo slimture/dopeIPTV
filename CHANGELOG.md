@@ -9,6 +9,9 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- Casting: going back in a channel says so on the card - "Going back…" and
+  where to, fetched from the archive - and "Back to live…" for live, until
+  the TV plays it; no more Playing for the old stream meanwhile.
 - Settings sync: the same playlist added by hand on two computers was sent
   to the site again every other round, for ever, and a new password on one
   never reached the other - they are one playlist now. A history list that

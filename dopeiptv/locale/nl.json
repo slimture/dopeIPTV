@@ -3108,5 +3108,9 @@
   "cast_note_failed": "De tv bleef hangen bij het laden. Twee keer opnieuw sturen hielp niet.",
   "cast_note_no_room": "Niet vanzelf opnieuw gestuurd: iets anders gebruikt de verbinding van je account. Opnieuw proberen vraagt eerst.",
   "cast_note_send_failed": "Opnieuw sturen lukte niet: {msg}",
-  "cast_stuck_notice": "{name} bleef hangen bij het laden van {title} en herstelde niet."
+  "cast_stuck_notice": "{name} bleef hangen bij het laden van {title} en herstelde niet.",
+  "cast_state_moving": "Terugspoelen…",
+  "cast_state_to_live": "Terug naar live…",
+  "cast_note_moving": "Naar {time} · wordt uit het archief gehaald - dat duurt een paar seconden.",
+  "cast_note_to_live": "De live-uitzending is onderweg naar de tv."
 }
