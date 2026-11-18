@@ -97,6 +97,7 @@ def test_four_short_questions_and_who_you_pay_in_the_visitor_s_language():
     assert re.findall(r'<details class="sp-q" id="([a-z]+)"', page) == ["cancel", "refund", "key", "again"]
     assert '<div class="sp-company" id="company">' in page and "559601-3176" in page
     assert "SE559601317601" in page and 'href="/about/#foretaget"' in page
+    assert "Mogatan 21, 702 13 Örebro, Sverige" in page
     assert '<p class="sp-more"><a href="/payments/">Läs hela betalvillkoren</a></p>' in page
     de = _support("", "", "de")
     assert "Bekomme ich mein Geld zurück?" in de and 'href="/about/#company"' in de

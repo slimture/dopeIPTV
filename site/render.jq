@@ -71,6 +71,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 # The footer names the town; the full address is on the About and contact
 # page (linked beside it), the support page, the privacy policy and the terms.
 | "Örebro" as $TOWN
+| "Mogatan 21, 702 13 Örebro" as $ADDRESS
 | "info@solecraft.se" as $EMAIL
 # The tip dialog's foot: who is paid (the logo links to the company), and
 # whom to write to for more than its largest amount.
@@ -778,7 +779,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
       + "        <p class=\"sp-more\"><a href=\"/payments/\">\(t("support_fq_more") | h)</a></p>\n"
       + "        <div class=\"sp-company\" id=\"company\">\n"
       + "          <h3>\(t("support_who_h") | h)</h3>\n"
-      + "          <p>\($COMPANY | h) · \(t("foot_orgnr") | h) <bdi>\($ORGNR | h)</bdi> · \(t("foot_place") | gsub("%TOWN%"; $TOWN) | h)"
+      + "          <p>\($COMPANY | h) · \(t("foot_orgnr") | h) <bdi>\($ORGNR | h)</bdi> · \(t("foot_place") | gsub("%TOWN%"; $ADDRESS) | h)"
       + " · \(t("foot_vat") | h) <bdi>\($VAT | h)</bdi> · \($mail) · <a href=\"/about/#\(if $lang == "sv" then "foretaget" else "company" end)\">\(t("support_company_all") | h)</a></p>\n"
       + "        </div>\n"
       + "      </div>\n";
