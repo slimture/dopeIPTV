@@ -25,6 +25,12 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   on dopeiptv.org (a tip of your choice, fixed monthly support, GitHub
   Sponsors), where the supporter key comes after paying. The software
   catalogues' "Donate" link is gone.
+- AirPlay: an Apple TV plays a channel live. Going back in it - the rewind
+  buffer, the archive, the steps and the timeline, from the card, the phone
+  remote or the media keys - is no longer offered there: each step was a
+  new stream the Apple TV started over, slow and with its sound out of
+  step. Pausing, films and episodes work as before; a Chromecast goes back
+  as before.
 
 ### Fixed
 
@@ -87,11 +93,6 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   at once.
 - The decision card and the messages panel take a new theme's colours
   straight away.
-- AirPlay: "The Apple TV has not reached this Mac" no longer comes while a
-  seek is still being readied - the new stream is the Apple TV's to reach
-  only once it has been handed it. A seek also asks the provider's archive
-  one time less: the channel already on the TV is known, so the archive is
-  no longer probed first.
 - TV: the channel names' column is as wide as the category's longest names
   need, up to 40 % of the row - long names are no longer cut at a fixed
   width, and a category of short names leaves the room to what is on. A
@@ -99,16 +100,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 - TV: a channel's name in the list no longer loses its last letter ("BBC
   Eart") on a scaled screen - Windows at 125 or 150 % drew it a pixel or two
   wider than it measured and the rest was cut off (#35).
-- AirPlay: a stream the Apple TV is still loading - a cast just begun, a
-  seek in a channel - is no longer sent again after ten seconds of
-  buffering: that only started it over (it went back a few seconds at the
-  start, and a seek never took). A new stream has 45 seconds to start; once
-  it has played, ten seconds stuck is a stall as before. A seek reaches the
-  Apple TV sooner too: its stream is cut into 2-second segments, so the
-  Apple TV has the three it waits for after 6 seconds of it, not 18.
-- AirPlay: going back in a channel while it is cast moves the Apple TV
-  there again. Since 1.6.4 the moment was handed over at its first segment
-  and the Apple TV played on where it was; it waits for three again, as
+- AirPlay: a stream the Apple TV is still loading - a cast just begun - is
+  no longer sent again after ten seconds of buffering: that only started it
+  over (it went back a few seconds at the start). A new stream has 45
+  seconds to start; once it has played, ten seconds stuck is a stall as
   before.
 
 ## [1.6.4]

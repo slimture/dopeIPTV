@@ -10,7 +10,7 @@
 - **Settings sync:** restoring an older backup no longer takes anything from your other computers; the same playlist added on two computers is one; two computers that each had their first provider from before playlists - a different one on each - now keep both, each with its own favourites, instead of one taking the other's place; a full history list no longer removes titles on the others; and what a round brought in is kept even when the window closes right after.
 - **Server mode:** the tuner can no longer be reached from a web page (DNS rebinding). Plex, Jellyfin and Channels are not affected.
 - **Casting:** going back in a channel says so on the card - "Going back…", "Back to live…" - until the TV plays it.
-- **AirPlay (macOS):** going back in a channel moves the Apple TV there again; a stream it is still loading is no longer started over after ten seconds; a seek reaches it sooner.
+- **AirPlay (macOS):** a stream the Apple TV is still loading is no longer started over after ten seconds.
 - **TV:** a channel's name is no longer cut short on a scaled Windows screen, and the name column is as wide as the longest names need (#35).
 - **Mac:** the app's text is in the system's own font, and the app starts a little faster.
 - **Send feedback** fits the screen, scrolls and opens wholly on it - on a Mac it opened half under the Dock; **messages** take a new theme's colours.
@@ -22,6 +22,7 @@
 ### Changed
 
 - **Supporting dopeIPTV is a tip or monthly support**, in all 27 languages, and the heart opens the new support page on dopeiptv.org.
+- **AirPlay (macOS):** an Apple TV plays channels live - going back in a channel is no longer offered there, as it was slow and the sound came out of step. Pause, films and episodes work as before, and a Chromecast goes back as before.
 
 ## dopeIPTV 1.6.4
 

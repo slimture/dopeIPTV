@@ -383,7 +383,8 @@ row in the table above; in short:
   the rewind buffer while it holds the moment - kept recording beside the
   cast only with Settings > Casting's `cast_keep_buffer` on, a second
   connection, asked first over a full or unknown limit; never to a DLNA TV
-  or a Kodi - else in the archive, zapping while casting on the same
+  or a Kodi - else in the archive (none of it on an Apple TV: a channel
+  plays live there, `_cast_can_go_back`), zapping while casting on the same
   receiver, "Add a device by address…"; a running cast as the media
   controls, the phone remote and the remote API see and drive it -
   `_cast_media`, `_cast_command`: pause, stop, seek, the TV's volume and

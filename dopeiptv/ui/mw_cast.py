@@ -377,7 +377,12 @@ class _CastMixin:
 
     def _cast_can_go_back(self) -> bool:
         """The live channel on the TV can be wound back: it has an archive,
-        or its rewind buffer holds some of it."""
+        or its rewind buffer holds some of it. Never on an Apple TV: each
+        step back there was a new stream the Apple TV started over, slow and
+        out of step with its sound - it plays a channel live (and pauses it
+        itself), films and episodes as before."""
+        if self._cast_on_airplay():
+            return False
         ctx = getattr(self, "_cast_ctx", None) or {}
         if ctx.get("archive"):
             return True
@@ -1131,9 +1136,10 @@ class _CastMixin:
             self._cast_hooks_end()
             self._cast_drop_feed(ending=True)
             self._cast_release_buffer()
-        elif not self._cast_takes_feed(device):
+        elif not self._cast_takes_feed(device) or self._cast_on_airplay():
             # A TV or a Kodi took the address as it is: no pieces read here,
             # and the rewind buffer (this computer's loopback) is no use to it.
+            # An Apple TV plays the channel live (_cast_can_go_back).
             if ctx.get("feed") is not None:
                 self._cast_drop_feed(ending=True)
                 ctx["archive_from"] = None
@@ -1608,7 +1614,12 @@ class _CastMixin:
 
     def _cast_to_moment(self, when) -> None:
         """Point the cast at *when*: out of the rewind buffer while it holds
-        that moment, else within what the archive actually holds."""
+        that moment, else within what the archive actually holds. Not on an
+        Apple TV (_cast_can_go_back) - the phone remote and the media keys
+        come through here too."""
+        if self._cast_on_airplay():
+            log.info("cast: an Apple TV plays the channel live - not going back")
+            return
         ctx = self._cast_ctx or {}
         it = ctx.get("item") or {}
         now = datetime.now()
@@ -1898,7 +1909,7 @@ class _CastMixin:
         or None when what is playing is not a broadcast: the archive's depth
         and what the rewind buffer holds, whichever reaches further back."""
         ctx = self._cast_ctx or {}
-        if not getattr(self, "_cast_device", None):
+        if not getattr(self, "_cast_device", None) or self._cast_on_airplay():
             return None
         now = time.time()
         widths = []
@@ -2147,6 +2158,8 @@ class _CastMixin:
         """Cast this channel from *when*: out of the rewind buffer - the one
         a feed reads, or the one kept for the cast - while it still holds
         that moment, else out of the provider's archive."""
+        if self._cast_on_airplay():
+            return
         ctx, device = self._cast_ctx or {}, self._cast_device
         session = self._cast_buffer()
         span = self._cast_buffer_span() if session is not None else None
@@ -2198,7 +2211,10 @@ class _CastMixin:
         This is the timeshift menu's doing - going back an hour, picking a
         programme out of the guide. Pausing does not come through here: it is
         held on this machine, which is the only way it ever worked.
+        Not on an Apple TV (_cast_can_go_back).
         """
+        if self._cast_on_airplay():
+            return
         ctx, device = self._cast_ctx or {}, self._cast_device
         sid = ctx.get("sid")
         if sid is None or not device:
