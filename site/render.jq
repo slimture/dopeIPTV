@@ -57,7 +57,9 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 # Stripe's review and the Swedish E-Commerce Act ask.
 | "Solecraft AB" as $COMPANY
 | "559601-3176" as $ORGNR
-| "Mogatan 21, SE-702 13 Örebro, Sweden" as $ADDRESS
+# The footer names the town; the full address is on the About and contact
+# page (linked beside it), the support page, the privacy policy and the terms.
+| "Örebro" as $TOWN
 | "info@solecraft.se" as $EMAIL
 # The tip dialog's foot: who is paid (the logo links to the company), and
 # whom to write to for more than its largest amount.
@@ -263,7 +265,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
   # E-Commerce Act's section 8).
   def company_line:
     "    <div class=\"foot-legal\">\n"
-    + "      <p class=\"foot-company\">\(t("foot_made_by") | gsub("%COMPANY%"; $COMPANY) | h) · \(t("foot_orgnr") | h) \($ORGNR | h) · \($ADDRESS | h) · <a href=\"mailto:\($EMAIL | h)\">\($EMAIL | h)</a></p>\n"
+    + "      <p class=\"foot-company\">\(t("foot_made_by") | gsub("%COMPANY%"; $COMPANY) | h) · \(t("foot_orgnr") | h) \($ORGNR | h) · \($TOWN | h) · <a href=\"mailto:\($EMAIL | h)\">\($EMAIL | h)</a></p>\n"
     + "      <p class=\"foot-nocontent\">\(t("foot_nocontent") | h)</p>\n"
     + "    </div>\n";
   def common:
