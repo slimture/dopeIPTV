@@ -1,3 +1,12 @@
+## dopeIPTV 1.6.6
+
+**The Flatpak starts again.**
+
+### Fixed
+
+- **Flatpak (Linux):** the app crashed as it started, from 1.5.0 on - Qt's network part needs the Kerberos library (`libgssapi_krb5`), which the Flatpak runtime does not have. The Flatpak now carries it, and its build stops if any Qt part the app uses misses a library (#36).
+- **If that library is ever missing,** the app still starts: a second start then opens a window of its own instead of handing its command to the one running.
+
 ## dopeIPTV 1.6.5
 
 **A crash and two mix-ups fixed, safer settings sync, and supporting dopeIPTV is now a tip.**

@@ -68,6 +68,15 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.6.6" date="2026-11-18">
+      <description>
+        <p>The Flatpak starts again.</p>
+        <ul>
+          <li>The Flatpak no longer crashes as it starts: it carries the Kerberos library Qt's network part needs</li>
+          <li>Without that library the app still starts instead of crashing</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.6.5" date="2026-11-18">
       <description>
         <p>A crash and two mix-ups fixed, safer settings sync, and supporting dopeIPTV is now a tip.</p>

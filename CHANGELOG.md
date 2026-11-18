@@ -7,6 +7,20 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.6.6]
+
+### Fixed
+
+- Flatpak: every start crashed from 1.5.0 on, importing PyQt6.QtNetwork -
+  Qt's network library links Kerberos' GSSAPI library (libgssapi_krb5),
+  which the freedesktop runtime does not carry (#36). The manifest builds
+  MIT Kerberos before the app, and the build imports every Qt module the
+  app uses (tests/test_flatpak_manifest.py keeps that list to the code's),
+  so a missing library stops the build rather than every start.
+- core/instance.py: a QtNetwork that cannot load no longer stops the app -
+  the second start opens a window of its own instead of handing its
+  command over (UNAVAILABLE), and says why in the log.
+
 ## [1.6.5]
 
 ### Added
