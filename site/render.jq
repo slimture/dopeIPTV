@@ -37,13 +37,22 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 # /usr/local/etc/iptv-site.conf and passes them here. A way with none of
 # them says "coming soon" and links nowhere. What the page suggests - a
 # tip's amount, the monthly one - is set beside them (SUPPORT_TIP_HINT,
-# SUPPORT_MONTHLY_PRICE).
+# SUPPORT_MONTHLY_PRICE). SUPPORT_MONTHLY_PRICES - "SEK 29, EUR 2.50, USD 3",
+# the monthly price's own currency first - are the amounts its Stripe price
+# has in each currency; nav.js shows the visitor's (Stripe charges the one of
+# where they are), SUPPORT_MONTHLY_PRICE (else the first) without nav.js.
 | (($ARGS.named.tips // "") == "on") as $TIPS_ON
 | ($ARGS.named.tip_url // "") as $TIP_URL
 | ($ARGS.named.monthly_url // "") as $MONTHLY_URL
 | ($ARGS.named.sponsors_url // "") as $SPONSORS_URL
 | (($ARGS.named.tip_hint // "") | if . == "" then "50 kr" else . end) as $TIP_HINT
-| (($ARGS.named.monthly_price // "") | if . == "" then "30 kr" else . end) as $MONTHLY_PRICE
+| [($ARGS.named.monthly_prices // "") | splits("[,;](?=\\s*[A-Za-z])")
+   | gsub("^\\s+|\\s+$"; "") | capture("^(?<c>[A-Za-z]{3})\\s+(?<a>[0-9]+([.,][0-9]{1,2})?)$")?
+   | {key: (.c | ascii_downcase), value: (.a | sub(","; "."))}] as $PRICE_LIST
+| ($PRICE_LIST | from_entries) as $MONTHLY_PRICES
+| (($ARGS.named.monthly_price // "")
+   | if . != "" then . elif ($PRICE_LIST | length) > 0
+     then "\($PRICE_LIST[0].value) \($PRICE_LIST[0].key | ascii_upcase)" else "30 kr" end) as $MONTHLY_PRICE
 # The ways to pay are invited to - the header's link and heart, the front
 # page's band, the footer's link - only once one is set up: until then the
 # support page is there (its policy, GitHub Sponsors, "coming soon"), but
@@ -431,9 +440,12 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
   def support_options:
     " lang=\"\($lang | h)\" dir=\"\(if ($S.rtl | index($lang)) then "rtl" else "ltr" end)\"" as $in_lang
     | "    <div class=\"support-ways\"\($in_lang)>\n"
-    + support_way("sway-tip"; t("support_tip_h"); t("support_tip_p") | h | gsub("%AMOUNT%"; "<bdi>\($TIP_HINT | h)</bdi>");
+    + support_way("sway-tip"; t("support_tip_h"); t("support_tip_p") | h
+                  | gsub("%AMOUNT%"; "<bdi class=\"sway-hint\">\($TIP_HINT | h)</bdi>");
                   $TIP_URL; t("support_tip_btn"); true; "tip")
-    + support_way("sway-monthly"; t("support_monthly_h"); t("support_monthly_p") | h | gsub("%AMOUNT%"; "<bdi>\($MONTHLY_PRICE | h)</bdi>");
+    + support_way("sway-monthly"; t("support_monthly_h"); t("support_monthly_p") | h
+                  | gsub("%AMOUNT%"; "<bdi class=\"sway-price\"\(if ($PRICE_LIST | length) > 0
+                      then " data-prices=\"\($MONTHLY_PRICES | tojson | h)\" data-base=\"\($PRICE_LIST[0].key | h)\"" else "" end)>\($MONTHLY_PRICE | h)</bdi>");
                   $MONTHLY_URL; t("support_monthly_btn"); true; "monthly")
     + support_way("sway-gh"; "GitHub Sponsors"; t("support_gh_p") | h; $SPONSORS_URL; t("support_gh_btn"); false; "github")
     + "    </div>\n"

@@ -285,7 +285,8 @@ SUPPORT_TIPS=on
 SUPPORT_MONTHLY_URL=https://buy.stripe.com/...
 SUPPORT_SPONSORS_URL=https://github.com/sponsors/slimture
 SUPPORT_TIP_HINT=50 kr
-SUPPORT_MONTHLY_PRICE=30 kr
+SUPPORT_MONTHLY_PRICE=29 kr
+SUPPORT_MONTHLY_PRICES=SEK 29, EUR 2.50, GBP 2.50, USD 3
 CONF
 su -m iptv -c 'sh /usr/local/www/iptv/sync-releases.sh'
 ```
@@ -297,6 +298,18 @@ buy.stripe.com/...`, used while `SUPPORT_TIPS` is not on). Only `https://`
 addresses are taken; a way left out (or empty) is "coming soon". The hint
 and the price are only words on the page - the dialog's amounts come from
 `donate.py`, the monthly price is set in its Payment Link.
+
+**In the visitor's currency.** Monthly support's Stripe price can have an
+amount of its own per currency (the price → "Add a price by currency"), and
+Stripe's page then charges the one of where the visitor is - the price's
+own currency where it has none. `SUPPORT_MONTHLY_PRICES` lists the same
+amounts, the price's own currency first (`SEK 29, EUR 2.50, GBP 2.50,
+USD 3`; a comma or a point for the decimals); `nav.js` shows the visitor's
+by the same rule - the country's currency where the list has it, else the
+first - and `SUPPORT_MONTHLY_PRICE` (else the first, "29 SEK") is what the
+page says without JavaScript. Keep the two in step: a currency added in
+Stripe is added here too. The tip's hint ("50 kr is a good start") follows
+the tip dialog: its second amount in the currency it opens in.
 
 **Stripe Dashboard** (start in a sandbox - test mode - and repeat with live
 keys once a test payment has gone through):

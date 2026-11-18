@@ -468,6 +468,7 @@ monthly_url=$(https_or_nothing "$(conf SUPPORT_MONTHLY_URL)")
 sponsors_url=$(https_or_nothing "$(conf SUPPORT_SPONSORS_URL)")
 tip_hint=$(conf SUPPORT_TIP_HINT)
 monthly_price=$(conf SUPPORT_MONTHLY_PRICE)
+monthly_prices=$(conf SUPPORT_MONTHLY_PRICES)
 
 render() {  # render PAGE LANG TEMPLATE OUTFILE [BODY]
     mkdir -p "${4%/*}"
@@ -477,7 +478,7 @@ render() {  # render PAGE LANG TEMPLATE OUTFILE [BODY]
         --arg pics_v "$pics_v" \
         --arg tips "$tips" --arg tip_url "$tip_url" --arg monthly_url "$monthly_url" \
         --arg sponsors_url "$sponsors_url" --arg tip_hint "$tip_hint" \
-        --arg monthly_price "$monthly_price" \
+        --arg monthly_price "$monthly_price" --arg monthly_prices "$monthly_prices" \
         --argjson avail "$avail" --argjson asset_urls "$asset_urls" \
         --argjson screenshots "$screenshots" --argjson help_mtime "$help_mtime" \
         --slurpfile site "$SITE/i18n.json" --slurpfile helpfile "$SITE/help.json" \

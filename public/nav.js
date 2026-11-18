@@ -384,6 +384,97 @@ var iptvHit = (function () {
     document.addEventListener("visibilitychange", function () { if (!document.hidden) { check(); } });
   })();
 })();
+/* The visitor's currency, from where the device says it is: its time zone
+ * first (a place, where the language is only a preference), then the
+ * regions of its languages, then the part of the world its time zone is in,
+ * then the page's language. Nothing is asked of anyone: the tip dialog picks
+ * its currency with it, and the support page shows monthly support's price
+ * in it (the one Stripe charges is the one of where the visitor is).
+ * guess(offered, lang, exact): a currency code offered(code) accepts, or
+ * "". *exact*: only the country's own - not the euro or the dollar for a
+ * part of the world, nor the page's language - as Stripe charges a price in
+ * the visitor's currency only where it has that currency, else its own. */
+var iptvCurrency = (function () {
+  "use strict";
+  var EURO = " AT BE BG CY DE EE ES FI FR GR HR IE IT LT LU LV MT NL PT SI SK AD MC SM VA ME XK AX EU ";
+  var BY_COUNTRY = { SE: "sek", NO: "nok", SJ: "nok", DK: "dkk", FO: "dkk", GL: "dkk",
+    GB: "gbp", IM: "gbp", JE: "gbp", GG: "gbp", CH: "chf", LI: "chf", PL: "pln", CZ: "czk",
+    HU: "huf", RO: "ron", US: "usd", PR: "usd", AU: "aud", CA: "cad", NZ: "nzd", JP: "jpy",
+    KR: "krw", BR: "brl", MX: "mxn", IL: "ils", CN: "cny", HK: "hkd", MO: "hkd", TW: "twd",
+    SG: "sgd", IN: "inr", ID: "idr", TH: "thb", VN: "vnd", PH: "php", MY: "myr", PK: "pkr",
+    AE: "aed", SA: "sar", EG: "egp", TR: "try", UA: "uah", RS: "rsd", ZA: "zar", KE: "kes",
+    TZ: "tzs", CO: "cop", CL: "clp" };
+  var BY_ZONE = { "Europe/Stockholm": "SE", "Europe/Oslo": "NO", "Arctic/Longyearbyen": "NO",
+    "Europe/Copenhagen": "DK", "Atlantic/Faroe": "FO", "America/Nuuk": "GL", "America/Godthab": "GL",
+    "Europe/London": "GB", "Europe/Belfast": "GB", "Europe/Isle_of_Man": "GB", "Europe/Jersey": "GB",
+    "Europe/Guernsey": "GB", "Europe/Zurich": "CH", "Europe/Vaduz": "CH", "Europe/Warsaw": "PL",
+    "Europe/Prague": "CZ", "Europe/Budapest": "HU", "Europe/Bucharest": "RO", "Asia/Tokyo": "JP",
+    "Asia/Seoul": "KR", "Pacific/Auckland": "NZ", "Asia/Jerusalem": "IL", "Asia/Tel_Aviv": "IL",
+    "Pacific/Honolulu": "US", "America/Puerto_Rico": "PR",
+    "Asia/Shanghai": "CN", "Asia/Chongqing": "CN", "Asia/Harbin": "CN", "Asia/Urumqi": "CN",
+    "Asia/Hong_Kong": "HK", "Asia/Macau": "MO", "Asia/Taipei": "TW", "Asia/Singapore": "SG",
+    "Asia/Kolkata": "IN", "Asia/Calcutta": "IN", "Asia/Jakarta": "ID", "Asia/Makassar": "ID",
+    "Asia/Jayapura": "ID", "Asia/Pontianak": "ID", "Asia/Bangkok": "TH", "Asia/Ho_Chi_Minh": "VN",
+    "Asia/Saigon": "VN", "Asia/Manila": "PH", "Asia/Kuala_Lumpur": "MY", "Asia/Kuching": "MY",
+    "Asia/Karachi": "PK", "Asia/Dubai": "AE", "Asia/Riyadh": "SA", "Africa/Cairo": "EG",
+    "Europe/Istanbul": "TR", "Asia/Istanbul": "TR", "Europe/Kyiv": "UA", "Europe/Kiev": "UA",
+    "Europe/Uzhgorod": "UA", "Europe/Zaporozhye": "UA", "Europe/Belgrade": "RS",
+    "Africa/Johannesburg": "ZA", "Africa/Nairobi": "KE", "Africa/Dar_es_Salaam": "TZ",
+    "America/Bogota": "CO", "America/Santiago": "CL", "America/Punta_Arenas": "CL", "Pacific/Easter": "CL" };
+  var ZONE_RX = [
+    [/^Europe\/(Berlin|Paris|Madrid|Rome|Amsterdam|Brussels|Vienna|Dublin|Lisbon|Athens|Luxembourg|Helsinki|Tallinn|Riga|Vilnius|Bratislava|Ljubljana|Zagreb|Malta|Monaco|San_Marino|Vatican|Andorra|Sofia|Mariehamn|Busingen|Podgorica|Nicosia)$|^Asia\/(Nicosia|Famagusta)$|^Atlantic\/(Canary|Madeira|Azores)$|^Africa\/Ceuta$/, "EU"],
+    [/^Australia\//, "AU"],
+    [/^America\/(Toronto|Vancouver|Edmonton|Winnipeg|Halifax|St_Johns|Regina|Montreal|Moncton|Whitehorse|Yellowknife|Iqaluit|Glace_Bay|Goose_Bay|Swift_Current|Dawson_Creek|Fort_Nelson|Creston|Inuvik|Thunder_Bay|Rankin_Inlet|Cambridge_Bay|Atikokan)$/, "CA"],
+    [/^America\/(Sao_Paulo|Bahia|Fortaleza|Recife|Belem|Manaus|Cuiaba|Campo_Grande|Porto_Velho|Boa_Vista|Rio_Branco|Maceio|Araguaina|Santarem|Noronha|Eirunepe)$/, "BR"],
+    [/^America\/(Mexico_City|Monterrey|Merida|Cancun|Chihuahua|Hermosillo|Mazatlan|Tijuana|Matamoros|Ojinaga|Bahia_Banderas|Ciudad_Juarez)$/, "MX"],
+    [/^America\/(New_York|Chicago|Denver|Los_Angeles|Phoenix|Anchorage|Detroit|Boise|Juneau|Sitka|Nome|Adak|Metlakatla|Yakutat|Menominee|Indiana\/.+|Kentucky\/.+|North_Dakota\/.+)$|^US\//, "US"]];
+  var BY_LANG = { sv: "SE", ja: "JP", ko: "KR", pl: "PL", he: "IL", zh: "CN", hi: "IN", ur: "PK",
+    id: "ID", th: "TH", vi: "VN", tr: "TR", uk: "UA", sr: "RS", sw: "KE" };
+  function guess(offered, lang, exact) {
+    function currencyOf(country) {
+      country = (country || "").toUpperCase();
+      var c = BY_COUNTRY[country] || (country && EURO.indexOf(" " + country + " ") >= 0 ? "eur" : "");
+      return c && offered(c) ? c : "";
+    }
+    var tz = "";
+    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) { /* none */ }
+    var country = BY_ZONE[tz] || "";
+    ZONE_RX.forEach(function (z) { if (!country && z[0].test(tz)) { country = z[1]; } });
+    var got = currencyOf(country);
+    (navigator.languages || [navigator.language || ""]).forEach(function (l) {
+      var m = /^[a-z]{2,3}[-_]([A-Za-z]{2})\b/.exec(l || "");
+      if (!got && m) { got = currencyOf(m[1]); }
+    });
+    if (exact) { return got; }
+    if (!got && /^(Europe|Africa|Atlantic)\//.test(tz) && offered("eur")) { got = "eur"; }
+    if (!got && /^(America|Asia|Pacific|Indian)\//.test(tz) && offered("usd")) { got = "usd"; }
+    return got || currencyOf(BY_LANG[(lang || "").split("-")[0]]) || "";
+  }
+  return { guess: guess };
+})();
+
+/* Monthly support's price on the support page in the visitor's currency:
+ * SUPPORT_MONTHLY_PRICES (render.jq) are the amounts its Stripe price has in
+ * each currency, and Stripe's own page charges the one of where the visitor
+ * is - so the same guess picks it here, and a currency the price does not
+ * have is its own (data-base), as at Stripe. Without this file the page
+ * says the price as SUPPORT_MONTHLY_PRICE has it. */
+(function () {
+  "use strict";
+  var el = document.querySelector(".sway-price[data-prices]");
+  if (!el) { return; }
+  var prices = {};
+  try { prices = JSON.parse(el.getAttribute("data-prices") || "{}") || {}; } catch (e) { return; }
+  var lang = (el.closest("[lang]") || document.documentElement).getAttribute("lang") || "en";
+  var c = iptvCurrency.guess(function (code) { return !!prices[code]; }, lang, true);
+  if (!c) { c = el.getAttribute("data-base") || ""; }
+  var amount = parseFloat(prices[c]);
+  if (!c || !isFinite(amount)) { return; }
+  try {
+    el.textContent = new Intl.NumberFormat(lang, { style: "currency", currency: c.toUpperCase(),
+      minimumFractionDigits: amount % 1 ? 2 : 0, maximumFractionDigits: amount % 1 ? 2 : 0 }).format(amount);
+  } catch (e) { /* the page's own words stay */ }
+})();
 /* The tip dialog: Stripe's card form (the Payment Element) in a dialog on
  * this page - nothing leaves the site but the payment itself, which goes
  * from Stripe's iframes straight to Stripe. A tip is once and of any
@@ -696,65 +787,14 @@ var iptvHit = (function () {
     return Math.round(v * 100);
   }
 
-  // Where the device says it is: its time zone first (a place, where the
-  // language is only a preference), then the regions of its languages,
-  // then the part of the world its time zone is in, then the page's language.
-  var EURO = " AT BE BG CY DE EE ES FI FR GR HR IE IT LT LU LV MT NL PT SI SK AD MC SM VA ME XK AX EU ";
-  var BY_COUNTRY = { SE: "sek", NO: "nok", SJ: "nok", DK: "dkk", FO: "dkk", GL: "dkk",
-    GB: "gbp", IM: "gbp", JE: "gbp", GG: "gbp", CH: "chf", LI: "chf", PL: "pln", CZ: "czk",
-    HU: "huf", RO: "ron", US: "usd", PR: "usd", AU: "aud", CA: "cad", NZ: "nzd", JP: "jpy",
-    KR: "krw", BR: "brl", MX: "mxn", IL: "ils", CN: "cny", HK: "hkd", MO: "hkd", TW: "twd",
-    SG: "sgd", IN: "inr", ID: "idr", TH: "thb", VN: "vnd", PH: "php", MY: "myr", PK: "pkr",
-    AE: "aed", SA: "sar", EG: "egp", TR: "try", UA: "uah", RS: "rsd", ZA: "zar", KE: "kes",
-    TZ: "tzs", CO: "cop", CL: "clp" };
-  var BY_ZONE = { "Europe/Stockholm": "SE", "Europe/Oslo": "NO", "Arctic/Longyearbyen": "NO",
-    "Europe/Copenhagen": "DK", "Atlantic/Faroe": "FO", "America/Nuuk": "GL", "America/Godthab": "GL",
-    "Europe/London": "GB", "Europe/Belfast": "GB", "Europe/Isle_of_Man": "GB", "Europe/Jersey": "GB",
-    "Europe/Guernsey": "GB", "Europe/Zurich": "CH", "Europe/Vaduz": "CH", "Europe/Warsaw": "PL",
-    "Europe/Prague": "CZ", "Europe/Budapest": "HU", "Europe/Bucharest": "RO", "Asia/Tokyo": "JP",
-    "Asia/Seoul": "KR", "Pacific/Auckland": "NZ", "Asia/Jerusalem": "IL", "Asia/Tel_Aviv": "IL",
-    "Pacific/Honolulu": "US", "America/Puerto_Rico": "PR",
-    "Asia/Shanghai": "CN", "Asia/Chongqing": "CN", "Asia/Harbin": "CN", "Asia/Urumqi": "CN",
-    "Asia/Hong_Kong": "HK", "Asia/Macau": "MO", "Asia/Taipei": "TW", "Asia/Singapore": "SG",
-    "Asia/Kolkata": "IN", "Asia/Calcutta": "IN", "Asia/Jakarta": "ID", "Asia/Makassar": "ID",
-    "Asia/Jayapura": "ID", "Asia/Pontianak": "ID", "Asia/Bangkok": "TH", "Asia/Ho_Chi_Minh": "VN",
-    "Asia/Saigon": "VN", "Asia/Manila": "PH", "Asia/Kuala_Lumpur": "MY", "Asia/Kuching": "MY",
-    "Asia/Karachi": "PK", "Asia/Dubai": "AE", "Asia/Riyadh": "SA", "Africa/Cairo": "EG",
-    "Europe/Istanbul": "TR", "Asia/Istanbul": "TR", "Europe/Kyiv": "UA", "Europe/Kiev": "UA",
-    "Europe/Uzhgorod": "UA", "Europe/Zaporozhye": "UA", "Europe/Belgrade": "RS",
-    "Africa/Johannesburg": "ZA", "Africa/Nairobi": "KE", "Africa/Dar_es_Salaam": "TZ",
-    "America/Bogota": "CO", "America/Santiago": "CL", "America/Punta_Arenas": "CL", "Pacific/Easter": "CL" };
-  var ZONE_RX = [
-    [/^Europe\/(Berlin|Paris|Madrid|Rome|Amsterdam|Brussels|Vienna|Dublin|Lisbon|Athens|Luxembourg|Helsinki|Tallinn|Riga|Vilnius|Bratislava|Ljubljana|Zagreb|Malta|Monaco|San_Marino|Vatican|Andorra|Sofia|Mariehamn|Busingen|Podgorica|Nicosia)$|^Asia\/(Nicosia|Famagusta)$|^Atlantic\/(Canary|Madeira|Azores)$|^Africa\/Ceuta$/, "EU"],
-    [/^Australia\//, "AU"],
-    [/^America\/(Toronto|Vancouver|Edmonton|Winnipeg|Halifax|St_Johns|Regina|Montreal|Moncton|Whitehorse|Yellowknife|Iqaluit|Glace_Bay|Goose_Bay|Swift_Current|Dawson_Creek|Fort_Nelson|Creston|Inuvik|Thunder_Bay|Rankin_Inlet|Cambridge_Bay|Atikokan)$/, "CA"],
-    [/^America\/(Sao_Paulo|Bahia|Fortaleza|Recife|Belem|Manaus|Cuiaba|Campo_Grande|Porto_Velho|Boa_Vista|Rio_Branco|Maceio|Araguaina|Santarem|Noronha|Eirunepe)$/, "BR"],
-    [/^America\/(Mexico_City|Monterrey|Merida|Cancun|Chihuahua|Hermosillo|Mazatlan|Tijuana|Matamoros|Ojinaga|Bahia_Banderas|Ciudad_Juarez)$/, "MX"],
-    [/^America\/(New_York|Chicago|Denver|Los_Angeles|Phoenix|Anchorage|Detroit|Boise|Juneau|Sitka|Nome|Adak|Metlakatla|Yakutat|Menominee|Indiana\/.+|Kentucky\/.+|North_Dakota\/.+)$|^US\//, "US"]];
-  var BY_LANG = { sv: "SE", ja: "JP", ko: "KR", pl: "PL", he: "IL", zh: "CN", hi: "IN", ur: "PK",
-    id: "ID", th: "TH", vi: "VN", tr: "TR", uk: "UA", sr: "RS", sw: "KE" };
   function offered(c) { return !!(c && cfg.currencies && cfg.currencies[c]); }
-  function currencyOf(country) {
-    country = (country || "").toUpperCase();
-    var c = BY_COUNTRY[country] || (country && EURO.indexOf(" " + country + " ") >= 0 ? "eur" : "");
-    return offered(c) ? c : "";
-  }
+  // Where the device says it is (iptvCurrency), unless a currency was
+  // chosen in this dialog before on this device.
   function guessCurrency() {
     var saved = "";
     try { saved = localStorage.getItem("dn-currency") || ""; } catch (e) { /* none */ }
     if (offered(saved)) { return saved; }
-    var tz = "";
-    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) { /* none */ }
-    var country = BY_ZONE[tz] || "";
-    ZONE_RX.forEach(function (z) { if (!country && z[0].test(tz)) { country = z[1]; } });
-    var got = currencyOf(country);
-    (navigator.languages || [navigator.language || ""]).forEach(function (l) {
-      var m = /^[a-z]{2,3}[-_]([A-Za-z]{2})\b/.exec(l || "");
-      if (!got && m) { got = currencyOf(m[1]); }
-    });
-    if (!got && /^(Europe|Africa|Atlantic)\//.test(tz) && offered("eur")) { got = "eur"; }
-    if (!got && /^(America|Asia|Pacific|Indian)\//.test(tz) && offered("usd")) { got = "usd"; }
-    return got || currencyOf(BY_LANG[LANG]) || cfg.currency || "eur";
+    return iptvCurrency.guess(offered, LANG) || cfg.currency || "eur";
   }
   function loadStripe() {
     if (window.Stripe) { return Promise.resolve(window.Stripe); }
@@ -1088,10 +1128,17 @@ var iptvHit = (function () {
     el.cur.value = code();
     el.manyCur = list.length > 1;
   }
+  // The support page's "%AMOUNT% is a good start" (render.jq .sway-hint):
+  // the amount the dialog chooses first, in the currency it opens in.
+  function showHint() {
+    var hint = document.querySelector(".sway-hint"), p = cfg ? C().presets || [] : [];
+    if (hint && p.length) { hint.textContent = fmt(p[Math.min(1, p.length - 1)]); }
+  }
   // A new currency: its own round amounts, the second one chosen.
   function setCurrency(c, mine) {
     if (!offered(c)) { return; }
     cur = c;
+    showHint();
     if (mine) { try { localStorage.setItem("dn-currency", c); } catch (e) { /* none */ } }
     chosen = 0; el.custom.value = ""; el.custom2.value = "";
     el.err1.hidden = true; el.err2.hidden = true;
@@ -1389,6 +1436,9 @@ var iptvHit = (function () {
     // README, the release notes: dopeiptv.org/#donate - opens the dialog.
     try { history.replaceState(null, "", window.location.pathname + window.location.search); } catch (e) { /* harmless */ }
     open();
+  }
+  if (document.querySelector(".sway-hint")) {
+    getConfig().then(showHint, function () { /* the page's own words stay */ });
   }
 })();
 
