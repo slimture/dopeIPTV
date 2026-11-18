@@ -9,6 +9,15 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- Settings sync: the same playlist added by hand on two computers was sent
+  to the site again every other round, for ever, and a new password on one
+  never reached the other - they are one playlist now. A history list that
+  is full on one computer no longer removes the oldest titles on the
+  others, and what a round brought in is kept even when the window closes
+  right after it. A second profile's theme that arrives by sync is shown
+  at once.
+- The decision card and the messages panel take a new theme's colours
+  straight away.
 - AirPlay: "The Apple TV has not reached this Mac" no longer comes while a
   seek is still being readied - the new stream is the Apple TV's to reach
   only once it has been handed it. A seek also asks the provider's archive
