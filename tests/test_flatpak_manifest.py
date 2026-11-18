@@ -4,6 +4,7 @@ not carry, and every start crashed from 1.5.0 to 1.6.5. Read as text - a
 test imports only what CI installs."""
 from __future__ import annotations
 
+import ast
 import os
 import re
 import subprocess
@@ -45,6 +46,41 @@ def test_the_build_imports_every_qt_module_the_app_uses():
     used = _qt_modules_the_code_imports()
     assert "QtNetwork" in used and "QtNetwork" in checked
     assert used <= checked, sorted(used - checked)
+
+
+def _app_constant(name: str) -> tuple[str, ...]:
+    with open(os.path.join(ROOT, "dopeiptv", "app.py"), encoding="utf-8") as fh:
+        tree = ast.parse(fh.read())
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == name for t in node.targets):
+            return ast.literal_eval(node.value)
+    raise AssertionError(f"app.py has no {name}")
+
+
+def test_the_self_check_loads_every_qt_module_the_app_uses():
+    # Every package's CI runs --self-check on what it built (the Flatpak
+    # inside its own runtime): a Qt module one of them cannot load fails
+    # that build.
+    listed = set(_app_constant("QT_MODULES"))
+    linux = set(_app_constant("QT_MODULES_LINUX"))
+    assert listed | linux == _qt_modules_the_code_imports()
+    assert "QtNetwork" in listed and linux == {"QtDBus"}
+
+
+def test_the_self_check_names_a_qt_module_that_cannot_load():
+    code = (
+        "import sys\n"
+        "sys.modules['PyQt6.QtNetwork'] = None\n"
+        "from dopeiptv import app\n"
+        "missing = app._qt_modules_missing()\n"
+        "assert len(missing) == 1 and missing[0].startswith('QtNetwork ('), missing\n"
+        "print('NAMED_OK')\n"
+    )
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+    proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+                          cwd=ROOT, env=env, timeout=120)
+    assert "NAMED_OK" in proc.stdout, proc.stderr[-2000:]
 
 
 def test_the_app_starts_without_qts_network_library():

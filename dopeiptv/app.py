@@ -49,6 +49,28 @@ _SUPPRESSED_QT_WARNINGS = (
 )
 _original_msg_handler = None
 
+# Every Qt module the app imports (tests/test_flatpak_manifest.py keeps the
+# list whole), QtDBus on Linux alone. The self-check loads each: a package
+# whose Qt cannot load one - a library it links that the package lacks, as
+# the Flatpak's network library lacked Kerberos' (#36) - fails its build,
+# not its users' start.
+QT_MODULES = ("QtCore", "QtGui", "QtWidgets", "QtNetwork", "QtOpenGL",
+              "QtOpenGLWidgets")
+QT_MODULES_LINUX = ("QtDBus",)
+
+
+def _qt_modules_missing() -> list[str]:
+    """The Qt modules of QT_MODULES this package cannot load, with why."""
+    import importlib
+    names = QT_MODULES + (QT_MODULES_LINUX if sys.platform.startswith("linux") else ())
+    missing = []
+    for name in names:
+        try:
+            importlib.import_module("PyQt6." + name)
+        except (ImportError, OSError) as e:
+            missing.append(f"{name} ({e})")
+    return missing
+
 
 def _qt_message_filter(msg_type, context, message):
     msg_bytes = message.encode("utf-8", "replace") if isinstance(message, str) else message
@@ -276,6 +298,11 @@ def main() -> int:
         # report whether libmpv is present. It lets CI prove the embedded
         # player is wired up on a machine with no system mpv - the exact case
         # that used to slip through because the build host had mpv installed.
+        missing_qt = _qt_modules_missing()
+        if missing_qt:
+            log.error("self-check: Qt could not load %s", "; ".join(missing_qt))
+            return 1
+        log.info("self-check: every Qt module the app uses loads")
         if _libmpv is None:
             reason = _libmpv_error
         else:

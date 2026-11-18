@@ -21,6 +21,20 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   the second start opens a window of its own instead of handing its
   command over (UNAVAILABLE), and says why in the log.
 
+### Build
+
+- The Flatpak leg is no longer experimental: the bundle is installed and
+  run in its own runtime - `--self-check`, then a start on a virtual
+  screen that must still run 15 s later - and a release whose Flatpak fails
+  is red (a test build names it missing). The build's own import line runs
+  in the SDK, which carries more than the runtime, so it could not have
+  caught #36.
+- `--self-check` loads every Qt module the app uses (`QT_MODULES`, QtDBus on
+  Linux) in every package's CI.
+- The Flatpak container's `/var/lib/flatpak` is a volume of its own: once
+  Flathub had a newer SDK, updating the image's copy failed ("Invalid
+  cross-device link") and 1.6.5 went out without a Flatpak.
+
 ## [1.6.5]
 
 ### Added
