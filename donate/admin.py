@@ -112,8 +112,8 @@ def _stripe_search(key: str, query: str, api_version: str) -> list:
 
 
 def donations(key: str, api_version: str = "", max_age: int = 300) -> dict:
-    """Succeeded payments on dopeIPTV's own Stripe account - tips and monthly
-    support, both through Stripe's Payment Links: [{id, t, amount, currency,
+    """Succeeded payments on dopeIPTV's own Stripe account - tips (the tip
+    dialog) and monthly support (a Payment Link): [{id, t, amount, currency,
     how, who}], newest first; cached for *max_age* seconds (the page: five
     minutes; the watcher in donate.py: one). {"error"} if Stripe could not be
     asked (the page says so instead of showing zero). The account is

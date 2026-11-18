@@ -65,15 +65,17 @@ What the PHP version worked out on every request is split in two:
   has, else English - and answers `/dl.php` (on to the file) and
   `/trakt/callback/` (on to the app) itself.
 
-Nothing for this site talks to php-fpm. Nothing is paid on it either: a tip
-and monthly support are Stripe's own pages (two Payment Links on dopeIPTV's
-own account), linked from the support page, `/support/`, with GitHub Sponsors
-beside them; their addresses are the server's (`/usr/local/etc/iptv-site.conf`,
-read by `sync-releases.sh`), and until one is set the site invites to nothing.
-The one thing that is not static is a small service, `donate/donate.py`
-(standard-library Python on a Unix socket): back from paying, `/support/key`
-asks Stripe, with a read-only key, whether the payment went through and
-gives the supporter key for it. Setting it up: `DEPLOY.md`, "Support".
+Nothing for this site talks to php-fpm. A tip is given in the tip dialog on
+the page (`public/nav.js`: Stripe's card form in Stripe's frames, Apple Pay,
+Google Pay, on dopeIPTV's own Stripe account); monthly support is Stripe's
+own page (a Payment Link), linked from the support page, `/support/`, with
+GitHub Sponsors beside them. What is on is the server's
+(`/usr/local/etc/iptv-site.conf`, read by `sync-releases.sh`), and until one
+is set the site invites to nothing. The one thing that is not static is a
+small service, `donate/donate.py` (standard-library Python on a Unix socket):
+the dialog's `/donate/` makes the PaymentIntent, and back from paying,
+`/donate/key` and `/support/key` ask Stripe whether the payment went through
+and give the supporter key for it. Setting it up: `DEPLOY.md`, "Support".
 
 The same service serves the admin page, `/admin/` for its admins only
 (`donate/admin.py`, `donate/admin/`; signing in with a passkey, or a password

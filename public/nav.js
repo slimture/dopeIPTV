@@ -1,6 +1,6 @@
 /* Counting visits, for the site's own statistics (donate/stats_collect.py):
  * the page tells /hit once it is shown in a browser, how long it was looked
- * at when it is left, and when the donate dialog opens or a donation goes
+ * at when it is left, and when the tip dialog opens or a tip goes
  * through. No cookie, no id, nothing kept in the browser; the server counts.
  * Robots that fetch pages without running them never send it, which is
  * what makes the numbers honest. Nothing here can get in the page's way.
@@ -15,7 +15,7 @@
  * header on every frame of a scroll, and the sections rising into view and
  * moving layers clipped to rounded corners cost it too; Safari and Firefox
  * do all of it cheaply. On Chromium the header is near-opaque instead, the
- * sections are simply there and the donate band is not clipped (style.css,
+ * sections are simply there and the support band is not clipped (style.css,
  * app.js). userAgentData and window.chrome are Chromium's alone; Brave can
  * hide the first, so both are asked. */
 var IPTV_CR = !!(navigator.userAgentData || window.chrome || navigator.brave);
@@ -135,16 +135,18 @@ var iptvHit = (function () {
   });
 })();
 
-/* Support: nothing is paid on this site. A tip and monthly support are
- * Stripe's own Payment Links, on the support page (/support/, render.jq's
- * support options). What is here:
- * - old links that opened the donate dialog (dopeiptv.org/#donate: GitHub's
- *   Sponsor button, older apps, release notes) land on /support/; the app's
- *   heart (#support) shows the band on the front page, an invitation;
- * - back from paying (/support/?paid=<Checkout Session id>) the thank-you
- *   shows the supporter key - /support/key (donate/donate.py) asks Stripe
- *   whether that session is paid - with a copy button and a dopeiptv://
- *   link, kept in this browser so the page shows it again;
+/* Support, around the tip dialog (the next part): a tip is given in the
+ * dialog, monthly support through Stripe's own Payment Link on the support
+ * page (/support/, render.jq's support options). What is here:
+ * - links from elsewhere: dopeiptv.org/#donate (GitHub's Sponsor button,
+ *   older apps, release notes) opens the tip dialog, the app's heart
+ *   (#support) shows the band on the front page, an invitation; with the
+ *   dialog off both land on /support/, a receipt's #key link too;
+ * - back from monthly support's Payment Link (/support/?paid=<Checkout
+ *   Session id>) - or from a tip's receipt with the dialog off - the
+ *   thank-you shows the supporter key: /support/key (donate/donate.py) asks
+ *   Stripe whether it is paid; a copy button and a dopeiptv:// link, kept
+ *   in this browser so the page shows it again;
  * - the owner's note: new tips and monthly support at the foot of the
  *   site's pages, in the browser that has opened /admin/.
  */
@@ -178,12 +180,16 @@ var iptvHit = (function () {
       { duration: 620, easing: "ease-out" });
   }
 
-  // -- where an old link lands -------------------------------------------------
-  var path = window.location.pathname;
-  if (window.location.hash === "#donate" || /^#key=/.test(window.location.hash)) {
-    // The donate dialog is gone: the support page has the ways to give. A
-    // receipt's old #key link finds its way there too (its key: write to us).
-    window.location.replace("/support/" + window.location.search);
+  // -- where a link from elsewhere lands ----------------------------------------
+  // The tip dialog takes #donate and a receipt's #key itself (the next part).
+  // Without it - the dialog off, or a browser without <dialog> - the support
+  // page has the ways to give, and its thank-you a receipt's key.
+  var DIALOG = !!(document.getElementById("tip-i18n") && window.fetch && window.Promise &&
+                  typeof HTMLDialogElement === "function");
+  var path = window.location.pathname, onSupport = /^\/support\//.test(path);
+  var receipt = /^#key=([A-Za-z0-9_-]{16,40})$/.exec(window.location.hash);
+  if (!DIALOG && (window.location.hash === "#donate" || (receipt && !onSupport))) {
+    window.location.replace("/support/" + window.location.search + (receipt ? window.location.hash : ""));
     return;
   }
   if (window.location.hash === "#support") {
@@ -191,7 +197,7 @@ var iptvHit = (function () {
     // A front page without it (no way to pay is set up yet) leaves that to
     // the support page.
     var band0 = document.getElementById("support");
-    if (!band0 && !/^\/support\//.test(path)) {
+    if (!band0 && !onSupport) {
       window.location.replace("/support/" + window.location.search);
       return;
     }
@@ -214,10 +220,11 @@ var iptvHit = (function () {
       seen.forEach(function (s) { band.classList.toggle("is-live", s.isIntersecting); });
     }, { threshold: 0.2 }).observe(band);
   }
-  // A heart pressed beats once on its way to the support page.
+  // A heart pressed beats once on its way to the support page (one that
+  // opens the tip dialog beats there).
   document.addEventListener("click", function (e) {
     var a = e.target.closest ? e.target.closest("a.navdonate, a.navheart, a.donate-btn") : null;
-    if (a) { thump(a.querySelector("svg") || a); }
+    if (a && !(DIALOG && a.hasAttribute("data-tip-dialog"))) { thump(a.querySelector("svg") || a); }
   });
 
   // -- the thank-you after paying ----------------------------------------------
@@ -260,16 +267,16 @@ var iptvHit = (function () {
       return true;
     };
     var tries = 0;
-    var ask = function (cs) {
+    var ask = function (what) {
       fetch("/support/key", { method: "POST", credentials: "same-origin",
-        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ s: cs }) })
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify(what) })
         .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return [r.status, j]; }); })
         .then(function (got) {
           if (got[0] === 200 && showKey(got[1].key)) {
             if (typeof iptvHit === "function") { iptvHit("donated"); }
             return;
           }
-          if (got[0] === 202 && ++tries < 6) { say(T.keywait); setTimeout(function () { ask(cs); }, 5000); return; }
+          if (got[0] === 202 && ++tries < 6) { say(T.keywait); setTimeout(function () { ask(what); }, 5000); return; }
           say(got[0] === 202 ? T.keywait : T.keynone);
         })
         .catch(function () { say(T.keywait); });
@@ -284,8 +291,15 @@ var iptvHit = (function () {
           .replace(/[?&]+$/, "").replace(/\?&+/, "?") + window.location.hash);
       } catch (e) { /* the address stays; harmless */ }
       requestAnimationFrame(function () { box.scrollIntoView({ block: "start" }); });
-      ask(paid[1]);
-    } else if (kept && showKey(kept)) {
+      ask({ s: paid[1] });
+    } else if (receipt && !DIALOG) {
+      // A tip's receipt while the dialog is off: its key here instead.
+      box.hidden = false;
+      say(T.loading);
+      try { history.replaceState(null, "", path + window.location.search); } catch (e) { /* harmless */ }
+      requestAnimationFrame(function () { box.scrollIntoView({ block: "start" }); });
+      ask({ t: receipt[1] });
+    } else if (kept && !receipt && showKey(kept)) {
       box.hidden = false;
       box.querySelector(".support-thanks-h").textContent = T.again;
     }
@@ -369,6 +383,1013 @@ var iptvHit = (function () {
     timer = setInterval(check, 120000);
     document.addEventListener("visibilitychange", function () { if (!document.hidden) { check(); } });
   })();
+})();
+/* The tip dialog: Stripe's card form (the Payment Element) in a dialog on
+ * this page - nothing leaves the site but the payment itself, which goes
+ * from Stripe's iframes straight to Stripe. A tip is once and of any
+ * amount; monthly support is a Payment Link on the support page, which the
+ * dialog points to.
+ *
+ * Every tip link (data-tip-dialog: the header's link and heart, the front
+ * page's band, the support page's tip) points at the support page, so with
+ * this file gone, the dialog off (no #tip-i18n, SUPPORT_TIPS) or no
+ * <dialog>, a click simply goes there. Once the dialog is open it never leaves the
+ * page: a failure is a sentence in the dialog and the reason in the
+ * console. The page holds the dialog's words in #tip-i18n; amounts and the
+ * publishable key come from /donate/config, the PaymentIntent from
+ * /donate/session (donate/donate.py).
+ *
+ * Apple Pay and Google Pay: where the device has one, the main button opens
+ * the wallet's own sheet (Stripe's Payment Request) and /donate/wallet
+ * confirms the payment with what the wallet hands back; "Pay with card"
+ * under it opens the card form.
+ *
+ * The wallet button has to be there when the dialog opens. Asked only on
+ * opening, the config, Stripe.js and Stripe's wallet check ran one after
+ * another, and the button turned from "Continue" into Apple Pay a second or
+ * two later. So they start when a tip link is pointed at, focused or
+ * touched - the visitor is about to open it - and run side by side; and the
+ * button is the wallet's from the start, live as soon as Stripe is ready,
+ * wherever the wallet is as good as certain: Apple Pay where Safari itself
+ * says the device has it, Google Pay in Chrome (computer and Android alike),
+ * and whatever Stripe answered last time on this device - which also keeps
+ * "Continue" steady for a browser Stripe said has no wallet.
+ *
+ * The visitor pays in their own currency: guessCurrency() picks it from
+ * where the device says it is, out of the ones /donate/config offers, and a
+ * small menu in the dialog's head changes it on either step - on the card
+ * form's step the form follows at once (remembered on this device).
+ *
+ * A tip comes with a supporter key for the app (donate/supporter.py): the
+ * thank-you shows it with a copy button and a dopeiptv:// link that hands
+ * it to the app. It comes from /donate/key once Stripe says the payment
+ * went through ({cs} right after paying, or back from a method that left
+ * the page), in /donate/wallet's answer for Apple Pay and Google Pay, and
+ * from the link in Stripe's receipt (dopeiptv.org/support/#key=<token>,
+ * {t}) - so it can be fetched again later. Remembered in this browser only,
+ * where the dialog offers it again.
+ */
+(function () {
+  "use strict";
+  var words = document.getElementById("tip-i18n");
+  if (!words || !window.fetch || !window.Promise ||
+      typeof HTMLDialogElement !== "function") { return; }
+  var T = words.dataset;
+  var LANG = T.lang || document.documentElement.lang || "en";
+  // The Stripe.js release solequiz.com runs on against the same account.
+  var STRIPE_JS = "https://js.stripe.com/endive/stripe.js";
+  var ZERO_DECIMAL = /^(bif|clp|djf|gnf|jpy|kmf|krw|mga|pyg|rwf|ugx|vnd|vuv|xaf|xof|xpf)$/;
+  var cfg = null, cfgLoading = null, stripeLoading = null, dlg = null, el = {}, chosen = 0, live = null, busy = false, cur = "";
+  var stripe = null, pr = null, wallet = null, walletAmount = 0, prepping = false, paidSecret = "";
+  var APPLE = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
+  // Asked once: whoever turned motion down gets the dialog without the show.
+  var CALM = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  var HEART = "M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z";
+
+  function isTip(a) {
+    return !!a && a.hasAttribute("data-tip-dialog");
+  }
+  function mk(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) { n.className = cls; }
+    if (text) { n.textContent = text; }
+    return n;
+  }
+  // Small line icons, drawn in the text's colour.
+  var ICONS = {
+    card: ["M3.5 6.5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z",
+           "M3.5 9.5h17", "M7 15h4"],
+    company: ["M4.5 20.5v-15a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v15", "M14.5 9.5h4a1 1 0 0 1 1 1v10",
+              "M3 20.5h18", "M8 8h3", "M8 11.5h3", "M8 15h3", "M9.5 20.5v-2.5"],
+    pencil: ["M4 20l1-4.2L15.6 5.2a2 2 0 0 1 2.8 0l.4.4a2 2 0 0 1 0 2.8L8.2 19 4 20z", "M13.8 7l3.2 3.2"]
+  };
+  function icon(name) {
+    var NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
+    [["viewBox", "0 0 24 24"], ["class", "dn-ico"], ["aria-hidden", "true"], ["fill", "none"],
+     ["stroke", "currentColor"], ["stroke-width", "1.8"], ["stroke-linecap", "round"],
+     ["stroke-linejoin", "round"]].forEach(function (a) { svg.setAttribute(a[0], a[1]); });
+    ICONS[name].forEach(function (d) {
+      var path = document.createElementNS(NS, "path");
+      path.setAttribute("d", d);
+      svg.append(path);
+    });
+    return svg;
+  }
+  function heart(cls) {
+    var NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("class", cls);
+    svg.setAttribute("aria-hidden", "true");
+    var path = document.createElementNS(NS, "path");
+    path.setAttribute("d", HEART);
+    svg.append(path);
+    return svg;
+  }
+
+  // -- the heart's show --------------------------------------------------------
+  // A heart pressed thumps, a ring goes out from it and small hearts spray
+  // from it; the dialog grows out of it. On a thank-you, a bigger burst. The
+  // sparks are drawn in a popover - the top layer, over the open dialog and
+  // its dimmed backdrop - where the browser has one, else over the page.
+  var SPARKS = ["#ff375f", "#ff6b8b", "#ff2d55", "#ff9eb5", "#ff453a"];
+  function centre(node) {
+    var r = node.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+  function thump(node, big) {
+    if (!node || !node.animate) { return; }
+    if (CALM) {                     // less motion: it glows instead of beating
+      node.animate([{ opacity: 1 }, { opacity: 0.45 }, { opacity: 1 }], { duration: big ? 900 : 620, easing: "ease-in-out" });
+      return;
+    }
+    var k = big ? [1, 1.45, 0.92, 1.18, 1] : [1, 1.7, 0.85, 1.25, 1];
+    node.animate(k.map(function (v) { return { transform: "scale(" + v + ")" }; }),
+      { duration: big ? 900 : 620, easing: "ease-out" });
+  }
+  // A layer for the show, over everything: a popover is in the top layer,
+  // above an open dialog and its backdrop. Without popovers, over the page
+  // (or null, for what only makes sense on top).
+  function showLayer(onTopOnly) {
+    var layer = mk("div", "dn-burst");
+    var top = typeof layer.showPopover === "function";
+    if (!top && onTopOnly) { return null; }
+    if (top) { layer.setAttribute("popover", "manual"); }
+    document.body.append(layer);
+    if (top) {
+      try { layer.showPopover(); } catch (e) { if (onTopOnly) { layer.remove(); return null; } }
+    }
+    layer.done = function (ms) {
+      setTimeout(function () {
+        try { if (top) { layer.hidePopover(); } } catch (e) { /* gone already */ }
+        layer.remove();
+      }, ms);
+    };
+    return layer;
+  }
+  function burst(at, big, into, wait) {
+    if (CALM || !at || !document.body.animate) { return; }
+    wait = wait || 0;
+    var layer = into || showLayer(false);
+    var put = function (n) { n.style.left = at.x + "px"; n.style.top = at.y + "px"; layer.append(n); return n; };
+    [0, 1].forEach(function (i) {
+      put(mk("i", "dn-ring")).animate([
+        { transform: "translate(-50%, -50%) scale(.2)", opacity: 0.85 },
+        { transform: "translate(-50%, -50%) scale(" + (big ? 5 : 3) + ")", opacity: 0 }
+      ], { duration: big ? 1000 : 700, delay: wait + i * (big ? 160 : 110), easing: "cubic-bezier(.2, .7, .2, 1)", fill: "forwards" });
+    });
+    var n = big ? 26 : 14, longest = 0;
+    for (var i = 0; i < n; i++) {
+      var h = put(heart("dn-spark"));
+      h.style.color = SPARKS[i % SPARKS.length];
+      var a = (i / n) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+      var d = (big ? 110 : 46) + Math.random() * (big ? 150 : 80);
+      var dx = Math.cos(a) * d, dy = Math.sin(a) * d - (big ? 40 : 18);
+      var size = (big ? 0.7 : 0.55) + Math.random() * (big ? 0.9 : 0.6);
+      var rot = (Math.random() - 0.5) * 70, ms = (big ? 900 : 650) + Math.random() * 400;
+      longest = Math.max(longest, ms);
+      h.animate([
+        { transform: "translate(-50%, -50%) scale(.1) rotate(0deg)", opacity: 1 },
+        { opacity: 1, offset: 0.65 },
+        { transform: "translate(calc(-50% + " + dx.toFixed(1) + "px), calc(-50% + " + dy.toFixed(1) + "px)) scale(" + size.toFixed(2) + ") rotate(" + rot.toFixed(0) + "deg)", opacity: 0 }
+      ], { duration: ms, delay: wait, easing: "cubic-bezier(.12, .8, .3, 1)", fill: "forwards" });
+    }
+    if (!into) { layer.done(wait + longest + 250); }
+    return longest;
+  }
+
+  // Pressing Donate: a big heart flies out of the one pressed to the middle
+  // of the screen, beats twice - a ring going out at each beat - and opens
+  // into the dialog, with a few sparks. About a second, once a page view:
+  // the next time the dialog only grows out of the heart.
+  var heroShown = false;
+  function heroHeart(from) {
+    if (heroShown || !from || !dlg.animate) { return false; }
+    var layer = showLayer(true);
+    if (!layer) { return false; }
+    heroShown = true;
+    var NS = "http://www.w3.org/2000/svg", big = heart("dn-hero");
+    var defs = document.createElementNS(NS, "defs"), grad = document.createElementNS(NS, "linearGradient");
+    [["id", "dn-hg"], ["x1", "0"], ["y1", "0"], ["x2", "1"], ["y2", "1"]].forEach(function (a) { grad.setAttribute(a[0], a[1]); });
+    [["0", "#ff8aa5"], [".5", "#ff375f"], ["1", "#d70f45"]].forEach(function (st) {
+      var stop = document.createElementNS(NS, "stop");
+      stop.setAttribute("offset", st[0]); stop.setAttribute("stop-color", st[1]);
+      grad.append(stop);
+    });
+    // Its glow is drawn in the heart itself, painted once: as a CSS filter
+    // Chrome worked it out again on every frame of the show.
+    var glow = document.createElementNS(NS, "filter"), drop = document.createElementNS(NS, "feDropShadow");
+    [["id", "dn-hs"], ["x", "-60%"], ["y", "-60%"], ["width", "220%"], ["height", "220%"]].forEach(function (a) { glow.setAttribute(a[0], a[1]); });
+    [["dx", "0"], ["dy", "2"], ["stdDeviation", "2.3"], ["flood-color", "#ff2d55"], ["flood-opacity", ".55"]].forEach(function (a) { drop.setAttribute(a[0], a[1]); });
+    glow.append(drop); defs.append(grad, glow); big.prepend(defs);
+    big.querySelector("path").setAttribute("fill", "url(#dn-hg)");
+    big.querySelector("path").setAttribute("filter", "url(#dn-hs)");
+    var size = Math.round(Math.min(240, window.innerWidth * 0.5, window.innerHeight * 0.4));
+    var mid = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    big.style.width = big.style.height = size + "px";
+    big.style.left = mid.x + "px"; big.style.top = mid.y + "px";
+    layer.append(big);
+    if (CALM) {
+      // Less motion: the heart only lights up in the middle and fades into
+      // the dialog. Nothing flies, grows or bursts.
+      big.style.transform = "translate(-50%, -50%)";
+      big.animate([{ opacity: 0 }, { opacity: 1, offset: 0.3 }, { opacity: 1, offset: 0.55 }, { opacity: 0 }],
+        { duration: 1000, easing: "ease-in-out", fill: "both" });
+      dlg.animate([{ opacity: 0 }, { opacity: 0, offset: 0.5 }, { opacity: 1 }], { duration: 1000 });
+      try {
+        dlg.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 380, pseudoElement: "::backdrop" });
+      } catch (e) { /* the backdrop just appears */ }
+      layer.done(1200);
+      return true;
+    }
+    var T0 = 1150, at = function (f) { return Math.round(T0 * f); };
+    var dx = (from.x - mid.x).toFixed(0), dy = (from.y - mid.y).toFixed(0);
+    var c = "translate(-50%, -50%) ";
+    big.animate([
+      { transform: "translate(calc(-50% + " + dx + "px), calc(-50% + " + dy + "px)) scale(.05)", opacity: 0.7,
+        easing: "cubic-bezier(.2, .9, .3, 1.25)" },
+      { transform: c + "scale(1)", opacity: 1, offset: 0.34, easing: "ease-out" },
+      { transform: c + "scale(1.15)", offset: 0.45, easing: "ease-in-out" },
+      { transform: c + "scale(.96)", offset: 0.55, easing: "ease-in-out" },
+      { transform: c + "scale(1.1)", offset: 0.65, easing: "ease-in-out" },
+      { transform: c + "scale(1)", opacity: 1, offset: 0.74, easing: "cubic-bezier(.5, 0, .8, .4)" },
+      { transform: c + "scale(1.9)", opacity: 0 }
+    ], { duration: T0, fill: "both" });
+    // a ring at each beat
+    [0.45, 0.65].forEach(function (f) {
+      var ring = mk("i", "dn-ring dn-ring--hero");
+      ring.style.left = mid.x + "px"; ring.style.top = mid.y + "px";
+      ring.style.width = ring.style.height = Math.round(size * 0.8) + "px";
+      layer.prepend(ring);          // behind the heart: only what passes its edge shows
+      ring.animate([
+        { transform: c + "scale(.9)", opacity: 0.85 },
+        { transform: c + "scale(2.3)", opacity: 0 }
+      ], { duration: 700, delay: at(f) - 40, easing: "cubic-bezier(.2, .7, .2, 1)", fill: "forwards" });
+    });
+    // it opens: sparks, and the dialog where the heart was
+    burst(mid, false, layer, at(0.76));
+    var sheet = window.matchMedia && window.matchMedia("(max-width: 560px)").matches;
+    // Hidden until the heart opens, then in. The curve goes on that last
+    // step alone: on the whole animation it brought the dialog in half way,
+    // behind the heart still beating.
+    var hide = { opacity: 0, transform: sheet ? "translateY(100%)" : "scale(.82)" };
+    dlg.animate([
+      hide,
+      Object.assign({ offset: at(0.72) / (at(0.72) + 420), easing: "cubic-bezier(.18, .9, .22, 1.08)" }, hide),
+      { opacity: 1, transform: "none" }
+    ], { duration: at(0.72) + 420 });
+    try {
+      dlg.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 380, pseudoElement: "::backdrop" });
+    } catch (e) { /* the backdrop just appears */ }
+    layer.done(T0 + 1400);
+    return true;
+  }
+  // The dialog grows out of the heart (a phone's sheet rises from the bottom).
+  function grow(from) {
+    if (!dlg.animate) { return; }
+    if (CALM) {                     // less motion: it fades in where it opens
+      dlg.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240, easing: "ease-out" });
+      return;
+    }
+    var r = dlg.getBoundingClientRect();
+    var sheet = r.bottom >= window.innerHeight - 2 && r.width >= window.innerWidth - 2;
+    var start;
+    if (sheet) {
+      start = { transform: "translateY(100%)" };
+    } else if (from) {
+      start = { transform: "translate(" + (from.x - (r.left + r.width / 2)).toFixed(0) + "px, " +
+                (from.y - (r.top + r.height / 2)).toFixed(0) + "px) scale(.08)", opacity: 0 };
+    } else {
+      start = { transform: "scale(.92)", opacity: 0 };
+    }
+    dlg.animate([start, { transform: "none", opacity: 1 }],
+      { duration: sheet ? 420 : 560, easing: "cubic-bezier(.18, .9, .22, 1.08)" });
+    try {
+      dlg.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 320, pseudoElement: "::backdrop" });
+    } catch (e) { /* the backdrop just appears */ }
+  }
+  function celebrate() {
+    var big = el.done.querySelector(".dn-bigheart");
+    if (!big) { return; }
+    thump(big, true);
+    burst(centre(big), true);
+  }
+
+  function code() { return cur || (cfg && cfg.currency) || "eur"; }
+  // The amounts of the chosen currency: its buttons, smallest and largest.
+  function C() {
+    var row = cfg.currencies && cfg.currencies[code()];
+    return row || { presets: cfg.presets || [], min: cfg.min, max: cfg.max };
+  }
+  function fmt(minor) {
+    var c = code().toUpperCase();
+    var major = ZERO_DECIMAL.test(c.toLowerCase()) ? minor : minor / 100;
+    try {
+      return new Intl.NumberFormat(LANG, { style: "currency", currency: c,
+        minimumFractionDigits: major % 1 ? 2 : 0, maximumFractionDigits: major % 1 ? 2 : 0 }).format(major);
+    } catch (e) { return major + " " + c; }
+  }
+  function toMinor(text) {
+    var v = parseFloat(String(text).replace(/\s/g, "").replace(",", "."));
+    if (!isFinite(v)) { return 0; }
+    if (ZERO_DECIMAL.test(code())) { return Math.round(v); }
+    if (/^(huf|twd|idr)$/.test(code())) { return Math.round(v) * 100; }   // whole units only
+    return Math.round(v * 100);
+  }
+
+  // Where the device says it is: its time zone first (a place, where the
+  // language is only a preference), then the regions of its languages,
+  // then the part of the world its time zone is in, then the page's language.
+  var EURO = " AT BE BG CY DE EE ES FI FR GR HR IE IT LT LU LV MT NL PT SI SK AD MC SM VA ME XK AX EU ";
+  var BY_COUNTRY = { SE: "sek", NO: "nok", SJ: "nok", DK: "dkk", FO: "dkk", GL: "dkk",
+    GB: "gbp", IM: "gbp", JE: "gbp", GG: "gbp", CH: "chf", LI: "chf", PL: "pln", CZ: "czk",
+    HU: "huf", RO: "ron", US: "usd", PR: "usd", AU: "aud", CA: "cad", NZ: "nzd", JP: "jpy",
+    KR: "krw", BR: "brl", MX: "mxn", IL: "ils", CN: "cny", HK: "hkd", MO: "hkd", TW: "twd",
+    SG: "sgd", IN: "inr", ID: "idr", TH: "thb", VN: "vnd", PH: "php", MY: "myr", PK: "pkr",
+    AE: "aed", SA: "sar", EG: "egp", TR: "try", UA: "uah", RS: "rsd", ZA: "zar", KE: "kes",
+    TZ: "tzs", CO: "cop", CL: "clp" };
+  var BY_ZONE = { "Europe/Stockholm": "SE", "Europe/Oslo": "NO", "Arctic/Longyearbyen": "NO",
+    "Europe/Copenhagen": "DK", "Atlantic/Faroe": "FO", "America/Nuuk": "GL", "America/Godthab": "GL",
+    "Europe/London": "GB", "Europe/Belfast": "GB", "Europe/Isle_of_Man": "GB", "Europe/Jersey": "GB",
+    "Europe/Guernsey": "GB", "Europe/Zurich": "CH", "Europe/Vaduz": "CH", "Europe/Warsaw": "PL",
+    "Europe/Prague": "CZ", "Europe/Budapest": "HU", "Europe/Bucharest": "RO", "Asia/Tokyo": "JP",
+    "Asia/Seoul": "KR", "Pacific/Auckland": "NZ", "Asia/Jerusalem": "IL", "Asia/Tel_Aviv": "IL",
+    "Pacific/Honolulu": "US", "America/Puerto_Rico": "PR",
+    "Asia/Shanghai": "CN", "Asia/Chongqing": "CN", "Asia/Harbin": "CN", "Asia/Urumqi": "CN",
+    "Asia/Hong_Kong": "HK", "Asia/Macau": "MO", "Asia/Taipei": "TW", "Asia/Singapore": "SG",
+    "Asia/Kolkata": "IN", "Asia/Calcutta": "IN", "Asia/Jakarta": "ID", "Asia/Makassar": "ID",
+    "Asia/Jayapura": "ID", "Asia/Pontianak": "ID", "Asia/Bangkok": "TH", "Asia/Ho_Chi_Minh": "VN",
+    "Asia/Saigon": "VN", "Asia/Manila": "PH", "Asia/Kuala_Lumpur": "MY", "Asia/Kuching": "MY",
+    "Asia/Karachi": "PK", "Asia/Dubai": "AE", "Asia/Riyadh": "SA", "Africa/Cairo": "EG",
+    "Europe/Istanbul": "TR", "Asia/Istanbul": "TR", "Europe/Kyiv": "UA", "Europe/Kiev": "UA",
+    "Europe/Uzhgorod": "UA", "Europe/Zaporozhye": "UA", "Europe/Belgrade": "RS",
+    "Africa/Johannesburg": "ZA", "Africa/Nairobi": "KE", "Africa/Dar_es_Salaam": "TZ",
+    "America/Bogota": "CO", "America/Santiago": "CL", "America/Punta_Arenas": "CL", "Pacific/Easter": "CL" };
+  var ZONE_RX = [
+    [/^Europe\/(Berlin|Paris|Madrid|Rome|Amsterdam|Brussels|Vienna|Dublin|Lisbon|Athens|Luxembourg|Helsinki|Tallinn|Riga|Vilnius|Bratislava|Ljubljana|Zagreb|Malta|Monaco|San_Marino|Vatican|Andorra|Sofia|Mariehamn|Busingen|Podgorica|Nicosia)$|^Asia\/(Nicosia|Famagusta)$|^Atlantic\/(Canary|Madeira|Azores)$|^Africa\/Ceuta$/, "EU"],
+    [/^Australia\//, "AU"],
+    [/^America\/(Toronto|Vancouver|Edmonton|Winnipeg|Halifax|St_Johns|Regina|Montreal|Moncton|Whitehorse|Yellowknife|Iqaluit|Glace_Bay|Goose_Bay|Swift_Current|Dawson_Creek|Fort_Nelson|Creston|Inuvik|Thunder_Bay|Rankin_Inlet|Cambridge_Bay|Atikokan)$/, "CA"],
+    [/^America\/(Sao_Paulo|Bahia|Fortaleza|Recife|Belem|Manaus|Cuiaba|Campo_Grande|Porto_Velho|Boa_Vista|Rio_Branco|Maceio|Araguaina|Santarem|Noronha|Eirunepe)$/, "BR"],
+    [/^America\/(Mexico_City|Monterrey|Merida|Cancun|Chihuahua|Hermosillo|Mazatlan|Tijuana|Matamoros|Ojinaga|Bahia_Banderas|Ciudad_Juarez)$/, "MX"],
+    [/^America\/(New_York|Chicago|Denver|Los_Angeles|Phoenix|Anchorage|Detroit|Boise|Juneau|Sitka|Nome|Adak|Metlakatla|Yakutat|Menominee|Indiana\/.+|Kentucky\/.+|North_Dakota\/.+)$|^US\//, "US"]];
+  var BY_LANG = { sv: "SE", ja: "JP", ko: "KR", pl: "PL", he: "IL", zh: "CN", hi: "IN", ur: "PK",
+    id: "ID", th: "TH", vi: "VN", tr: "TR", uk: "UA", sr: "RS", sw: "KE" };
+  function offered(c) { return !!(c && cfg.currencies && cfg.currencies[c]); }
+  function currencyOf(country) {
+    country = (country || "").toUpperCase();
+    var c = BY_COUNTRY[country] || (country && EURO.indexOf(" " + country + " ") >= 0 ? "eur" : "");
+    return offered(c) ? c : "";
+  }
+  function guessCurrency() {
+    var saved = "";
+    try { saved = localStorage.getItem("dn-currency") || ""; } catch (e) { /* none */ }
+    if (offered(saved)) { return saved; }
+    var tz = "";
+    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) { /* none */ }
+    var country = BY_ZONE[tz] || "";
+    ZONE_RX.forEach(function (z) { if (!country && z[0].test(tz)) { country = z[1]; } });
+    var got = currencyOf(country);
+    (navigator.languages || [navigator.language || ""]).forEach(function (l) {
+      var m = /^[a-z]{2,3}[-_]([A-Za-z]{2})\b/.exec(l || "");
+      if (!got && m) { got = currencyOf(m[1]); }
+    });
+    if (!got && /^(Europe|Africa|Atlantic)\//.test(tz) && offered("eur")) { got = "eur"; }
+    if (!got && /^(America|Asia|Pacific|Indian)\//.test(tz) && offered("usd")) { got = "usd"; }
+    return got || currencyOf(BY_LANG[LANG]) || cfg.currency || "eur";
+  }
+  function loadStripe() {
+    if (window.Stripe) { return Promise.resolve(window.Stripe); }
+    if (!stripeLoading) {
+      stripeLoading = new Promise(function (ok, fail) {
+        var s = document.createElement("script");
+        s.src = STRIPE_JS;
+        s.onload = function () { ok(window.Stripe); };
+        s.onerror = function () { stripeLoading = null; s.remove(); fail(new Error("stripe.js")); };
+        document.head.appendChild(s);
+      });
+    }
+    return stripeLoading;
+  }
+  // /donate/config once, shared by the warm-up and the dialog.
+  function getConfig() {
+    if (cfg) { return Promise.resolve(cfg); }
+    if (!cfgLoading) {
+      cfgLoading = fetch("/donate/config", { credentials: "same-origin" })
+        .then(function (r) { if (!r.ok) { throw new Error("/donate/config answered " + r.status); } return r.json(); })
+        .then(function (c) { cfg = c; if (!offered(cur)) { cur = guessCurrency(); } return c; },
+              function (err) { cfgLoading = null; throw err; });
+    }
+    return cfgLoading;
+  }
+  // Safari's own answer, at once and without Stripe: whether this device can
+  // pay with Apple Pay at all. Stripe's check (a card in the Wallet, the
+  // domain registered) comes after and has the last word.
+  function applePayLikely() {
+    try { return APPLE && !!window.ApplePaySession && ApplePaySession.canMakePayments(); }
+    catch (e) { return false; }
+  }
+  // The wallet to show before Stripe has answered, or null. Chrome is not
+  // asked itself: a canMakePayment() of our own for Google Pay, with other
+  // data than Stripe's, can use up Chrome's quota and make Stripe's own
+  // check fail - so Chrome is taken at its word until Stripe says otherwise.
+  function likelyWallet() {
+    var said = "";
+    try { said = localStorage.getItem("dn-wallet") || ""; } catch (e) { /* none */ }
+    if (said === "apple" || said === "google") { return said; }
+    if (said === "none") { return null; }
+    if (applePayLikely()) { return "apple"; }
+    var ua = navigator.userAgent;
+    if (window.PaymentRequest && /Chrome\//.test(ua) &&
+        !/Edg\/|EdgA\/|OPR\/|SamsungBrowser|YaBrowser|Firefox/.test(ua)) { return "google"; }
+    return null;
+  }
+  // The main button as the wallet's (kind "apple"/"google"; waiting: shown,
+  // not yet live) or, with no wallet, as the card button it then is - it
+  // opens the card form, which "Continue" did not say.
+  function walletLook(kind, waiting) {
+    el.go.classList.remove("dn-wallet", "dn-wallet--apple", "dn-wallet--google", "dn-wallet--wait");
+    el.go.classList.add("dn-wallet");
+    if (kind) {
+      el.go.textContent = kind === "apple" ? T.apple.replace("Apple Pay", "\uF8FF\u00A0Pay") : T.google;
+      el.go.classList.add("dn-wallet--" + kind);
+      if (waiting) { el.go.classList.add("dn-wallet--wait"); }
+    } else {
+      el.go.replaceChildren(icon("card"), document.createTextNode(T.card));
+    }
+    el.go.disabled = !!waiting;
+    el.card.hidden = !kind;
+  }
+  // Pointed at, focused or touched: get everything ready before the click.
+  function warm() {
+    if (!dlg) { build(); }
+    loadStripe().catch(function () { /* said where it matters */ });
+    getConfig().then(prepareWallet).catch(function () { /* open() says so */ });
+  }
+  function css(name, dflt) {
+    var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || dflt;
+  }
+  function appearance() {
+    var dark = css("color-scheme", "dark").indexOf("light") < 0;
+    return {
+      theme: dark ? "night" : "stripe",
+      variables: {
+        colorPrimary: css("--accent", "#2997ff"), colorText: css("--text", "#f5f5f7"),
+        colorTextSecondary: css("--muted", "#aeaeb4"), colorBackground: css("--surface", "#202023"),
+        colorDanger: "#ff6b6b", borderRadius: "12px", spacingUnit: "4px", fontSizeBase: "15px",
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+      },
+      rules: {
+        ".Input": { backgroundColor: css("--ink", "#0e0e10"), border: "1px solid " + css("--line-2", "#45454b"), boxShadow: "none" },
+        ".Input:focus": { border: "1px solid " + css("--accent", "#2997ff"), boxShadow: "0 0 0 1px " + css("--accent", "#2997ff") },
+        ".Label": { fontWeight: "600" }
+      }
+    };
+  }
+  // What went wrong goes to the console, for whoever looks after the site;
+  // the visitor gets a plain sentence and stays on the page.
+  function warn(what, err) { try { console.warn("[tip] " + what, err || ""); } catch (e) { /* none */ } }
+
+  function build() {
+    dlg = mk("dialog", "dn");
+    dlg.setAttribute("aria-labelledby", "dn-title");
+    var head = mk("div", "dn-head"), ht = mk("div");
+    var h = mk("h2", "", T.title); h.id = "dn-title";
+    h.prepend(heart("dn-titleheart"));
+    ht.append(h, mk("p", "", T.sub));
+    var x = mk("button", "dn-x", "×"); x.type = "button"; x.setAttribute("aria-label", T.close);
+    x.addEventListener("click", close);
+    el.curwrap = mk("span", "dn-curwrap");
+    el.cur = mk("select", "dn-cur");
+    el.cur.setAttribute("aria-label", T.currency || "Currency");
+    el.cur.addEventListener("change", function () { setCurrency(el.cur.value, true); });
+    el.curwrap.append(el.cur);
+    head.append(ht, el.curwrap, x);
+
+    el.amounts = mk("div", "dn-step");
+    el.chips = mk("div", "dn-chips");
+    el.chips.setAttribute("role", "radiogroup");
+    var other = mk("label", "dn-other", T.other);
+    el.custom = mk("input", "dn-input");
+    Object.assign(el.custom, { type: "text", inputMode: "decimal", autocomplete: "off" });
+    el.custom.addEventListener("input", function () { setAmount(toMinor(el.custom.value), true); });
+    other.append(el.custom);
+    el.err1 = mk("p", "dn-error"); el.err1.hidden = true; el.err1.setAttribute("role", "alert");
+    el.go = mk("button", "btn primary dn-go"); el.go.type = "button";
+    el.go.addEventListener("click", function () {
+      if (wallet) { payWallet(); } else { toPay(); }
+    });
+    // A button of its own with a card on it: as a small link under a wallet
+    // button it was easy to miss.
+    el.card = mk("button", "btn dn-card"); el.card.type = "button"; el.card.hidden = true;
+    el.card.append(icon("card"), document.createTextNode(T.card));
+    walletLook(null, false);        // the card button until a wallet turns up
+    el.card.addEventListener("click", toPay);
+    // A larger gift than the dialog takes: a line to write instead (a bank
+    // transfer to the company, no card fees), under the range error - shown
+    // only once someone types more than the cap. Up from the start it read
+    // as "is this enough?" before anyone had chosen. The cap stays - it
+    // keeps stolen cards from trying big amounts.
+    el.more1 = moreLine();
+    el.amounts.append(el.chips, other, el.err1);
+    if (el.more1) { el.amounts.append(el.more1); }
+    el.amounts.append(el.go, el.card);
+    // A supporter key this browser keeps, offered again (a supporter can
+    // still give again - the amounts are right above).
+    if (T.key && storedKey()) {
+      el.mine = mk("button", "dn-mine"); el.mine.type = "button";
+      el.mine.append(heart("dn-mineheart"), document.createTextNode(T.key));
+      el.mine.addEventListener("click", function () { keyOnly(); showKey(storedKey()); });
+      el.amounts.append(el.mine);
+    }
+    // Monthly support instead: its Payment Link is on the support page.
+    if (T.monthly) {
+      var monthly = mk("p", "dn-more dn-monthly"), to = mk("a", "", T.monthly);
+      to.href = "/support/#monthly";
+      monthly.append(to);
+      el.amounts.append(monthly);
+    }
+
+    el.pay = mk("div", "dn-step"); el.pay.hidden = true;
+    // The amount stays open here: the same choices, smaller, and an own
+    // amount - the card form and the button follow at once.
+    var top = mk("div", "dn-paytop");
+    el.chips2 = mk("div", "dn-chips dn-chips--sm");
+    el.chips2.setAttribute("role", "radiogroup");
+    el.custom2 = mk("input", "dn-input dn-input--sm");
+    Object.assign(el.custom2, { type: "text", inputMode: "decimal", autocomplete: "off" });
+    el.custom2.setAttribute("aria-label", T.other);
+    el.custom2.placeholder = T.othershort || T.other;
+    el.custom2.addEventListener("input", function () { setAmount(toMinor(el.custom2.value), true); });
+    // A box to write in, not a fifth amount: a dashed edge and a pencil
+    // while it is empty. "SEK …" there read as one more amount, cut short.
+    var own = mk("label", "dn-own");
+    own.append(el.custom2, icon("pencil"));
+    top.append(el.chips2, own);
+    var em = mk("label", "dn-email", T.email);
+    el.email = mk("input", "dn-input");
+    Object.assign(el.email, { type: "email", name: "email", autocomplete: "email", required: true, spellcheck: false });
+    em.append(el.email);
+    el.fields = mk("div", "dn-fields");
+    el.err2 = mk("p", "dn-error"); el.err2.hidden = true; el.err2.setAttribute("role", "alert");
+    el.payBtn = mk("button", "btn primary dn-paybtn"); el.payBtn.type = "button"; el.payBtn.disabled = true;
+    el.payBtn.addEventListener("click", pay);
+    el.more2 = moreLine();
+    el.pay.append(top, em, el.fields, el.err2);
+    if (el.more2) { el.pay.append(el.more2); }
+    el.pay.append(el.payBtn, mk("p", "dn-lock", T.lock));
+
+    el.loading = mk("p", "dn-loading", T.loading); el.loading.hidden = true;
+    el.done = mk("div", "dn-step dn-done"); el.done.hidden = true;
+    var bigHeart = mk("p", "dn-heart"); bigHeart.append(heart("dn-bigheart"));
+    el.receipt = mk("p", "", T.receipt);
+    el.done.append(bigHeart, mk("h3", "", T.thanks), el.receipt);
+    if (T.key) { el.done.append(keyBox()); }
+
+    var body = mk("div", "dn-body");
+    body.append(el.loading, el.amounts, el.pay, el.done);
+    // Who is paid: the company behind dopeIPTV, the name on the statement.
+    // With its logotype that is the name, as in the footer and the app's
+    // About: "A project by Solecraft" - an icon beside the words said less.
+    if (T.payee && T.payeenote) {
+      el.payee = mk("p", "dn-payee");
+      var mark = icon("company"), name = document.createTextNode(T.payee);
+      if (T.payeelogo) {
+        name = mk("span", "dn-sole-logo", T.payee);    // the text is for screen readers
+        name.style.setProperty("--logo", "url(" + T.payeelogo + ")");
+        mark = null;
+      }
+      // The company's mark and name lead to its site, in a new tab, so the
+      // dialog - and a payment begun in it - stays where it is.
+      var toPayee = function (child, label) {
+        if (!T.payeeurl) { return child; }
+        var a = mk("a", "dn-payee-link" + (T.payeelogo && child === name ? " dn-sole" : ""));
+        Object.assign(a, { href: T.payeeurl, target: "_blank", rel: "noopener" });
+        if (label) { a.setAttribute("aria-label", label); }
+        a.append(child);
+        return a;
+      };
+      var parts = T.payeenote.split("{payee}"), words = mk("span");
+      if (parts.length > 1) {
+        words.append(parts[0], toPayee(name, T.payee), parts.slice(1).join(T.payee));
+      } else {
+        words.textContent = T.payeenote;
+        if (mark === null) { words.append(" ", toPayee(name, T.payee)); }
+      }
+      if (mark) { el.payee.append(toPayee(mark, T.payee)); }
+      el.payee.append(words);
+      body.append(el.payee);
+    }
+    dlg.append(head, body);
+    dlg.addEventListener("cancel", function (e) { e.preventDefault(); close(); });
+    dlg.addEventListener("click", function (e) { if (e.target === dlg) { close(); } });
+    document.body.appendChild(dlg);
+  }
+  // -- the supporter key ------------------------------------------------------
+  function storedKey() {
+    try { return localStorage.getItem("dn-supporter-key") || ""; } catch (e) { return ""; }
+  }
+  function keyBox() {
+    el.key = mk("div", "dn-key"); el.key.hidden = true;
+    el.keyText = mk("code", "dn-keytext");
+    el.keyText.setAttribute("translate", "no");
+    var row = mk("div", "dn-keyrow");
+    el.keyCopy = mk("button", "btn primary dn-keycopy", T.keycopy); el.keyCopy.type = "button";
+    el.keyCopy.addEventListener("click", function () {
+      var said = function () {
+        el.keyCopy.textContent = T.keycopied;
+        setTimeout(function () { el.keyCopy.textContent = T.keycopy; }, 2500);
+      };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(el.keyText.textContent).then(said, function () { pick(); });
+      } else { pick(); }
+    });
+    el.keyOpen = mk("a", "btn dn-keyopen", T.keyopen);
+    row.append(el.keyCopy, el.keyOpen);
+    el.keyNote = mk("p", "dn-keynote", T.keyhow);
+    el.keyState = mk("p", "dn-keystate"); el.keyState.hidden = true;
+    el.key.append(mk("p", "dn-keyhead", T.key), el.keyText, row, el.keyNote);
+    var box = mk("div");
+    box.append(el.key, el.keyState);
+    return box;
+  }
+  function pick() {        // no clipboard: the key selected, for the visitor's own copy
+    var r = document.createRange(); r.selectNodeContents(el.keyText);
+    var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  }
+  function showKey(key) {
+    if (!el.key || !/^DS1-[A-Za-z0-9_-]{20,}$/.test(key || "")) { return; }
+    el.keyText.textContent = key;
+    el.keyOpen.href = "dopeiptv://supporter?key=" + encodeURIComponent(key);
+    el.key.hidden = false; el.keyState.hidden = true;
+    try { localStorage.setItem("dn-supporter-key", key); } catch (e) { /* this browser keeps nothing */ }
+  }
+  function keyState(text) {
+    if (!el.keyState) { return; }
+    el.keyState.textContent = text; el.keyState.hidden = !text;
+  }
+  // From the service: once the payment went through (Stripe is asked).
+  function fetchKey(ask, quiet) {
+    if (!T.key) { return; }
+    if (!quiet) { keyState(T.loading); }
+    fetch("/donate/key", { method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify(ask) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return [r.status, j]; }); })
+      .then(function (got) {
+        if (got[0] === 200 && got[1].key) { showKey(got[1].key); return; }
+        keyState(quiet ? "" : got[0] === 202 ? T.keywait : T.keynone);
+      })
+      .catch(function () { keyState(quiet ? "" : T.keywait); });
+  }
+  // The thank-you without "a receipt is on its way": a key asked for later.
+  function keyOnly() {
+    if (!dlg) { build(); }
+    el.receipt.hidden = true;
+    show(el.done);
+    if (!dlg.open) { dlg.showModal(); }
+  }
+
+  function show(step) {
+    var thanks = step === el.done && el.done.hidden;
+    [el.loading, el.amounts, el.pay, el.done].forEach(function (s) { s.hidden = s !== step; });
+    if (thanks) { requestAnimationFrame(function () { requestAnimationFrame(celebrate); }); }
+    el.curwrap.hidden = !el.manyCur || step === el.loading || step === el.done;
+    if (el.payee) { el.payee.hidden = step === el.done; }
+  }
+  function mark() {
+    [el.chips, el.chips2].forEach(function (box) {
+      [].forEach.call(box.children, function (c) {
+        var on = Number(c.dataset.amount) === chosen;
+        c.classList.toggle("is-on", on);
+        c.setAttribute("aria-checked", on ? "true" : "false");
+      });
+    });
+  }
+  function chips() {
+    [el.chips, el.chips2].forEach(function (box) {
+      box.replaceChildren();
+      (C().presets || []).forEach(function (minor) {
+        var b = mk("button", "dn-chip", fmt(minor)); b.type = "button";
+        b.setAttribute("role", "radio"); b.dataset.amount = String(minor);
+        b.addEventListener("click", function () { setAmount(minor, false); });
+        box.appendChild(b);
+      });
+    });
+    var p = C().presets || [];
+    if (!chosen && p.length) { chosen = p[Math.min(1, p.length - 1)]; }
+    mark();
+  }
+  function currencies() {
+    var list = Object.keys(cfg.currencies || {}).sort();
+    el.cur.replaceChildren();
+    list.forEach(function (c) {
+      var o = mk("option", "", c.toUpperCase()); o.value = c;
+      el.cur.appendChild(o);
+    });
+    el.cur.value = code();
+    el.manyCur = list.length > 1;
+  }
+  // A new currency: its own round amounts, the second one chosen.
+  function setCurrency(c, mine) {
+    if (!offered(c)) { return; }
+    cur = c;
+    if (mine) { try { localStorage.setItem("dn-currency", c); } catch (e) { /* none */ } }
+    chosen = 0; el.custom.value = ""; el.custom2.value = "";
+    el.err1.hidden = true; el.err2.hidden = true;
+    if (el.cur.value !== c) { el.cur.value = c; }
+    chips();
+    // On the card form's step the form follows: a deferred intent takes a
+    // new currency as it takes a new amount.
+    if (live && live.elements) {
+      try { live.elements.update({ currency: c, amount: chosen }); }
+      catch (e) { warn("the card form did not take the currency:", e); }
+    }
+    if (pr) {
+      try { pr.update({ currency: c, total: { label: cfg.name || T.title, amount: chosen || C().min } }); }
+      catch (e) { warn("the wallet is made again for the currency:", e); pr = null; wallet = null; prepareWallet(); }
+    }
+    payLabel();
+  }
+  function inRange(minor) { return !!minor && minor >= C().min && minor <= C().max; }
+  function moreLine() {
+    if (!(T.more && T.moremail && T.more.indexOf("{email}") >= 0)) { return null; }
+    var more = mk("p", "dn-more"), at = T.more.split("{email}");
+    var mail = mk("a", "", T.moremail);
+    mail.href = "mailto:" + T.moremail + "?subject=" + encodeURIComponent("dopeIPTV");
+    more.append(at[0], mail, at.slice(1).join(""));
+    more.hidden = true;
+    return more;
+  }
+  // The "give more" line: only for an amount above the cap.
+  function showMore() {
+    var over = !!chosen && !!cfg && chosen > C().max;
+    if (el.more1) { el.more1.hidden = !over; }
+    if (el.more2) { el.more2.hidden = !over; }
+  }
+  function rangeText() {
+    return (T.range || "").replace("{min}", fmt(C().min)).replace("{max}", fmt(C().max));
+  }
+  // Any change of amount, on either step: the chips, the button, and the
+  // card form (a deferred intent - the PaymentIntent is made on "Donate").
+  function setAmount(minor, typed) {
+    chosen = minor;
+    if (!typed) { el.custom.value = ""; el.custom2.value = ""; }
+    el.err1.hidden = true; el.err2.hidden = true;
+    mark();
+    if (live && live.elements && inRange(minor)) { live.elements.update({ amount: minor }); }
+    payLabel();
+    showMore();
+  }
+  function payLabel() {
+    if (!cfg) { return; }
+    el.payBtn.textContent = (T.pay || "").replace("{amount}", fmt(chosen || 0));
+    var ok = inRange(chosen);
+    if (!ok && el.pay && !el.pay.hidden && chosen) { el.err2.textContent = rangeText(); el.err2.hidden = false; }
+    el.payBtn.disabled = busy || !ok || !live || !live.complete;
+  }
+  function teardown() {
+    if (live) { try { live.destroy(); } catch (e) { /* gone already */ } }
+    live = null; el.fields.replaceChildren();
+  }
+  function close() {
+    teardown(); busy = false; el.cur.disabled = false;
+    if (dlg && dlg.open) { dlg.close(); }
+  }
+
+  function open(href, from) {
+    if (!dlg) { build(); }
+    if (typeof iptvHit === "function") { iptvHit("donate"); }
+    el.loading.textContent = T.loading;
+    show(el.loading);
+    dlg.showModal();
+    var hero = heroHeart(from);
+    if (!hero) { grow(from); }
+    open.hero = hero;
+    // Stripe.js loads beside the config, not after it.
+    if (window.ApplePaySession || window.PaymentRequest) { loadStripe().catch(function () { /* below */ }); }
+    getConfig()
+      .then(function () {
+        currencies(); chips(); prepareWallet(); show(el.amounts);
+      })
+      .catch(function (err) {
+        warn("the donate service did not answer (donate.py, nginx /donate/):", err);
+        el.loading.textContent = T.failed;
+      });
+  }
+
+  function amountOk() {
+    if (!inRange(chosen)) {
+      el.err1.textContent = rangeText();
+      el.err1.hidden = false;
+      return false;
+    }
+    return true;
+  }
+  function stripeFor(Stripe, key) {
+    if (!stripe) { stripe = Stripe(key, { locale: LANG }); }
+    return stripe;
+  }
+  // The wallet button, where there is a wallet: made ready when the dialog
+  // opens, so a click can open the sheet at once (it must, inside the click).
+  function prepareWallet() {
+    if (wallet || !cfg.publishableKey || !(window.ApplePaySession || window.PaymentRequest)) { return; }
+    var guess = likelyWallet();
+    if (guess) { walletLook(guess, !pr); }
+    if (pr || prepping) { return; }        // made already, or on its way
+    prepping = true;
+    loadStripe().then(function (Stripe) {
+      var st = stripeFor(Stripe, cfg.publishableKey);
+      pr = st.paymentRequest({
+        country: cfg.country || "SE", currency: code(),
+        total: { label: cfg.name || T.title, amount: chosen || C().min },
+        requestPayerEmail: true, requestPayerName: true,
+        disableWallets: ["link", "browserCard"]
+      });
+      pr.on("paymentmethod", walletPaid);
+      return pr.canMakePayment().then(function (can) {
+        prepping = false;
+        wallet = can && ((APPLE && can.applePay && "apple") || (can.googlePay && "google")) || null;
+        walletLook(wallet, false);
+        try { localStorage.setItem("dn-wallet", wallet || "none"); } catch (e) { /* none */ }
+      });
+    }).catch(function () { prepping = false; pr = null; wallet = null; walletLook(null, false); });
+  }
+  function payWallet() {
+    if (!amountOk() || !pr) { return; }
+    walletAmount = chosen;
+    pr.update({ currency: code(), total: { label: cfg.name || T.title, amount: walletAmount } });
+    pr.show();
+  }
+  function donated() {
+    if (typeof iptvHit === "function") { iptvHit("donated"); }
+  }
+  function walletDone(res) {
+    donated(); show(el.done);
+    if (res && res.key) { showKey(res.key); } else if (res && res.cs) { fetchKey({ cs: res.cs }, true); }
+  }
+  function walletFailed(msg) {
+    show(el.amounts);
+    el.err1.textContent = msg || T.failed; el.err1.hidden = false;
+  }
+  function walletPaid(ev) {
+    fetch("/donate/wallet", { method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount: walletAmount, currency: code(), paymentMethod: ev.paymentMethod.id,
+        email: ev.payerEmail || "", name: ev.payerName || "" }) })
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (res) {
+        if (res.ok) { ev.complete("success"); walletDone(res); return; }
+        if (res.action) {
+          ev.complete("success");
+          show(el.loading);
+          var next = stripe.handleNextAction ? stripe.handleNextAction({ clientSecret: res.action })
+                                             : stripe.confirmCardPayment(res.action);
+          return next.then(function (r) {
+            if (r.error) { walletFailed(r.error.message); } else { walletDone({ cs: res.action }); }
+          });
+        }
+        ev.complete("fail");
+        walletFailed(res.error && res.error !== "stripe" ? res.error : "");
+      }, function () { ev.complete("fail"); walletFailed(); });
+  }
+
+  function toPay() {
+    if (!amountOk()) { return; }
+    el.loading.textContent = T.loading;
+    show(el.loading);
+    el.err2.hidden = true;
+    el.custom2.value = el.custom.value;
+    loadStripe().catch(function () {
+      throw new Error("Stripe.js did not load - is https://js.stripe.com in the site's Content-Security-Policy?");
+    }).then(function (Stripe) {
+      var st = stripeFor(Stripe, cfg.publishableKey);
+      // A deferred intent: the form is made for an amount that can still
+      // change; the PaymentIntent is made with the final one on "Donate".
+      var opts = { mode: "payment", amount: chosen, currency: code(),
+                   appearance: appearance() };
+      if (cfg.pmc) { opts.paymentMethodConfiguration = cfg.pmc; }
+      var elements = st.elements(opts);
+      // The wallets have their own button above, as on solequiz.com.
+      var pe = elements.create("payment", { layout: { type: "accordion", defaultCollapsed: false },
+        // Link (Stripe's saved cards, any browser - Linux and Firefox too)
+        // shows once it is on in the dopeIPTV payment method configuration.
+        paymentMethodOrder: ["card", "link", "paypal", "revolut_pay", "amazon_pay", "klarna"],
+        wallets: { applePay: "never", googlePay: "never" } });
+      teardown();
+      live = { elements: elements, complete: false, destroy: function () { pe.destroy(); } };
+      show(el.pay);
+      pe.mount(el.fields);
+      pe.on("change", function (ev) { live.complete = !!ev.complete; payLabel(); });
+      pe.on("loaderror", function (ev) {
+        warn("the card form did not load:", ev && ev.error);
+        fail();
+      });
+      mark();
+      payLabel();
+    }).catch(function (err) {
+      warn("could not open the card form:", err);
+      show(el.amounts);
+      el.err1.textContent = T.failed; el.err1.hidden = false;
+    });
+  }
+
+  function fail(msg) {
+    el.err2.textContent = msg || T.failed; el.err2.hidden = false;
+  }
+  function payAgain(msg) {
+    busy = false; el.cur.disabled = false;
+    payLabel();
+    fail(msg);
+  }
+  function pay() {
+    if (!live || !live.elements || busy) { return; }
+    if (!inRange(chosen)) { payLabel(); return; }
+    if (!el.email.checkValidity() || !el.email.value.trim()) {
+      fail(T.emailmissing); el.email.focus(); return;
+    }
+    busy = true; el.err2.hidden = true; el.cur.disabled = true;
+    el.payBtn.disabled = true; el.payBtn.textContent = T.busy;
+    var elements = live.elements, amount = chosen, currency = code();
+    elements.submit().then(function (r) {
+      if (r && r.error) { throw { shown: r.error.message }; }
+      return fetch("/donate/session", { method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: amount, currency: currency }) })
+        .then(function (res) {
+          if (!res.ok) { throw new Error("/donate/session answered " + res.status + " (the reason is in /var/log/iptv-donate.log)"); }
+          return res.json();
+        });
+    }).then(function (sess) {
+      paidSecret = sess.clientSecret;
+      return stripe.confirmPayment({
+        elements: elements,
+        clientSecret: sess.clientSecret,
+        redirect: "if_required",          // only a method that must leave the page (Klarna and the like)
+        confirmParams: {
+          return_url: window.location.origin + "/support/?tipped=1",
+          receipt_email: el.email.value.trim()
+        }
+      });
+    }).then(function (r) {
+      if (r && r.error) { payAgain(r.error.message); return; }
+      var state = r && r.paymentIntent && r.paymentIntent.status;
+      if (state === "succeeded" || state === "processing") {
+        teardown(); busy = false; donated(); show(el.done);
+        fetchKey({ cs: paidSecret }, state !== "succeeded");
+        return;
+      }
+      warn("payment ended as", state);
+      payAgain();
+    }).catch(function (err) {
+      if (err && err.shown) { payAgain(err.shown); return; }
+      warn("the payment did not go through:", err);
+      payAgain();
+    });
+  }
+
+  function intent(e) {
+    var a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
+    if (isTip(a)) { warm(); }
+  }
+  document.addEventListener("pointerover", intent, { passive: true });
+  document.addEventListener("focusin", intent);
+  document.addEventListener("touchstart", intent, { passive: true });
+
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest ? e.target.closest("a[href]") : null;
+    if (!isTip(a) || e.defaultPrevented || e.button !== 0 ||
+        e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) { return; }
+    e.preventDefault();
+    var menu = a.closest("details");
+    var mark = a.querySelector("svg") || a;
+    var from = centre(mark);
+    if (menu) { menu.open = false; }
+    thump(mark, false);
+    open(a.href, from);
+    if (!open.hero) { burst(from, false); }
+  });
+
+  // Back from a payment method that left the page (Klarna and the like).
+  var back = /[?&]payment_intent_client_secret=([A-Za-z0-9_]+)/.exec(window.location.search);
+  var receipt = /^#key=([A-Za-z0-9_-]{16,40})$/.exec(window.location.hash);
+  if (/[?&](tipped|donated)=1(&|$)/.test(window.location.search)) {
+    try {
+      // Stripe's own return parameters go too: the secret is not for the history.
+      history.replaceState(null, "", window.location.pathname +
+        window.location.search.replace(/([?&])(tipped|donated|payment_intent|payment_intent_client_secret|redirect_status)=[^&]*/g, "$1")
+          .replace(/[?&]+$/, "").replace(/\?&+/, "?") +
+        window.location.hash);
+    } catch (e) { /* the address stays; harmless */ }
+    build(); show(el.done); dlg.showModal();
+    if (back) { fetchKey({ cs: back[1] }, false); }
+  } else if (receipt) {
+    // The link in Stripe's receipt: the key again, once the payment went through.
+    keyOnly();
+    fetchKey({ t: receipt[1] }, false);
+  } else if (window.location.hash === "#donate") {
+    // A link from elsewhere - GitHub's Sponsor button in older releases, the
+    // README, the release notes: dopeiptv.org/#donate - opens the dialog.
+    try { history.replaceState(null, "", window.location.pathname + window.location.search); } catch (e) { /* harmless */ }
+    open();
+  }
 })();
 
 /* A copy button on each command in the help - on the help page and in the

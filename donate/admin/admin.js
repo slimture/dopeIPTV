@@ -733,10 +733,13 @@
     if (!skWired) {
       skWired = true;
       $("sk-again").addEventListener("click", () => {
-        const cs = $("sk-pi").value.trim();
-        if (!/^cs_(live|test)_[A-Za-z0-9]{8,200}$/.test(cs)) { out.replaceChildren(mk("p", "error", "That is not a Checkout Session id (cs_live_…).")); return; }
+        // A tip's payment (pi_…) or monthly support's Checkout Session (cs_…).
+        const id = $("sk-pi").value.trim();
+        const ask = /^pi_[A-Za-z0-9]{8,200}$/.test(id) ? { pi: id }
+          : /^cs_(live|test)_[A-Za-z0-9]{8,200}$/.test(id) ? { cs: id } : null;
+        if (!ask) { out.replaceChildren(mk("p", "error", "That is not a payment id (pi_…) or a Checkout Session id (cs_live_…).")); return; }
         out.replaceChildren(mk("p", "muted", "Asking Stripe…"));
-        post("/admin/supporter-key", { cs: cs }).then(([ok, j]) => shown(ok, j))
+        post("/admin/supporter-key", ask).then(([ok, j]) => shown(ok, j))
           .catch((e) => out.replaceChildren(mk("p", "error", String(e))));
       });
       $("sk-hand").addEventListener("click", () => {
@@ -758,7 +761,7 @@
       (D.count_all ? " · " + sums(D.sums_all) : "");
     if (D.error) {
       box.replaceChildren(mk("p", "error", "Could not ask Stripe (" + D.error + "). The restricted key in " +
-        "/usr/local/etc/iptv-donate.key needs Checkout Sessions: Read and PaymentIntents: Read."));
+        "/usr/local/etc/iptv-donate.key needs PaymentIntents: Write and Checkout Sessions: Read."));
       return;
     }
     if (!D.recent.length) { box.replaceChildren(mk("p", "empty", "No tips or monthly support yet.")); return; }

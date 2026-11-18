@@ -249,23 +249,36 @@ cp /root/iptv-php/sync-releases.php "$W/"
 
 ## Support (a tip, monthly support)
 
-Nothing is paid on the site itself. A tip (any amount, once) and monthly
-support (a fixed price) are two **Stripe Payment Links** on dopeIPTV's own
-Stripe account (Solecraft AB): Stripe's own payment pages, reached by plain
-links on the support page (`/support/`, `site/legal/<lang>/support.html` with
-the ways to pay from `site/render.jq`). GitHub Sponsors sits beside them.
+Everything is on dopeIPTV's own Stripe account (Solecraft AB), and always
+called a **tip** or **monthly support** - never a donation: Solecraft AB is a
+company, not a charity, and Stripe reviews the words.
 
-Their addresses are this server's, never git's: `sync-releases.sh` reads them
-from `/usr/local/etc/iptv-site.conf` and renders them into the pages. Until a
-Stripe link is there, the site invites to nothing - no link or heart in the
+- **A tip** (any amount, once) is given in the **tip dialog** on the page
+  (`public/nav.js`): Apple Pay or Google Pay where the visitor has it,
+  otherwise Stripe's card form inside Stripe's own frames. The header's link
+  and heart, the front page's band and the support page's tip button open
+  it. Stripe needs a server holding the secret key for that, which is
+  `donate/donate.py`: Python's standard library only, on a Unix socket in
+  the jail (`/var/run/iptv_donate/donate.sock`), reached through `/donate/`
+  in the content server's nginx file. It never sees a card number, and with
+  no network port nothing outside the machine can reach it.
+- **Monthly support** (a fixed price) is a **Stripe Payment Link**: Stripe's
+  own payment page, reached by a plain link on the support page
+  (`/support/`, `site/legal/<lang>/support.html` with the ways to pay from
+  `site/render.jq`); the dialog points there too. GitHub Sponsors sits
+  beside them.
+
+The site's side is this server's, never git's: `sync-releases.sh` reads
+`/usr/local/etc/iptv-site.conf` and renders it into the pages. Until one of
+the ways is on, the site invites to nothing - no link or heart in the
 header, no band on the front page, no link in the footer - and the support
-page says "Coming soon" where the buttons will be. The day the links are
-added, the next sync (within 15 minutes) shows them everywhere.
+page says "Coming soon" where the buttons will be. The day they are added,
+the next sync (within 15 minutes) shows them everywhere.
 
 ```sh
 install -m 644 /dev/null /usr/local/etc/iptv-site.conf
 cat > /usr/local/etc/iptv-site.conf <<'CONF'
-SUPPORT_TIP_URL=https://buy.stripe.com/...
+SUPPORT_TIPS=on
 SUPPORT_MONTHLY_URL=https://buy.stripe.com/...
 SUPPORT_SPONSORS_URL=https://github.com/sponsors/slimture
 SUPPORT_TIP_HINT=50 kr
@@ -274,35 +287,92 @@ CONF
 su -m iptv -c 'sh /usr/local/www/iptv/sync-releases.sh'
 ```
 
-Only `https://` addresses are taken; a line left out (or empty) is that way
-"coming soon". The hint and the price are only words on the page - the
-amounts themselves are set in the Payment Links.
+`SUPPORT_TIPS=on` turns the tip dialog on - only once the service below
+answers, or a click on a tip shows "Something went wrong". Instead of the
+dialog a tip can be a Payment Link of its own (`SUPPORT_TIP_URL=https://
+buy.stripe.com/...`, used while `SUPPORT_TIPS` is not on). Only `https://`
+addresses are taken; a way left out (or empty) is "coming soon". The hint
+and the price are only words on the page - the dialog's amounts come from
+`donate.py`, the monthly price is set in its Payment Link.
 
-**Back from paying** each Payment Link sends the visitor to
-`https://dopeiptv.org/support/?paid={CHECKOUT_SESSION_ID}` (Payment Link →
-After payment → "Don't show confirmation page" → that address). The page
-then asks `/support/key`, which `donate/donate.py` answers: it asks Stripe
-for that Checkout Session and, once it is paid, gives the supporter key made
-from it (`donate/supporter.py`) - the same key for the same payment, every
-time. For that the service needs a **restricted key, read-only**: Developers
-→ API keys → Create restricted key, with **Checkout Sessions: Read** and
-**PaymentIntents: Read**, nothing else. It goes in the file the service reads
-(never in git, never in a shell's history):
+**Stripe Dashboard** (start in a sandbox - test mode - and repeat with live
+keys once a test payment has gone through):
+
+1. Developers → API keys → **Create restricted key**, named e.g.
+   `dopeIPTV`, with **PaymentIntents: Write** (the dialog's card form and
+   wallets pay a PaymentIntent; Write reads as well) and **Checkout
+   Sessions: Read** (monthly support's key, back from its Payment Link) -
+   nothing else. Copy the `rk_...` key.
+2. The **publishable key** (`pk_...`) is on the same page.
+3. Settings → Payments → **Payment method domains** → Add `dopeiptv.org`.
+   Stripe reads `/.well-known/apple-developer-merchantid-domain-association`
+   from the site (deployed with `public/`; Stripe's file, the same for every
+   account - if the Dashboard offers another, put that one there) and Apple
+   Pay turns "Verified". Google Pay needs nothing more.
+4. Optional: what the card form offers is a *payment method
+   configuration*. The account's default one is fine on an account of
+   dopeIPTV's own; for another set make one (Settings → Payments → Payment
+   methods, the configuration menu at the top, Cards, Apple Pay, Google
+   Pay...) and put its id in the service's config as `DONATE_PMC=pmc_...`.
+5. Settings → Business → **Public details**: the statement descriptor
+   `DOPEIPTV` (what the bank statement says; the service adds nothing to
+   it unless `DONATE_SUFFIX` is set), the support e-mail and the website
+   `https://dopeiptv.org`. Settings → **Customer emails** → Successful
+   payments on, so every tip gets a receipt; the receipt says "Tip for
+   dopeIPTV" (`DONATE_NAME`) and carries the link that shows the supporter
+   key again.
+6. **Monthly support**: Product catalogue → a product "Monthly support for
+   dopeIPTV" with a recurring monthly price, then Payment Links → New, that
+   price → After payment → "Don't show confirmation page" →
+   `https://dopeiptv.org/support/?paid={CHECKOUT_SESSION_ID}`. Its
+   `https://buy.stripe.com/...` address goes in `iptv-site.conf` as
+   `SUPPORT_MONTHLY_URL`. Settings → Billing → **Customer portal** on, so a
+   supporter can cancel from the link in their e-mails.
+
+**The service (jail)** - the key goes in with `cat` rather than `echo` so it
+never lands in the shell's history:
 
 ```sh
+bastille console pontusweb
+cd ~/dopeiptv && git pull origin website
+cp -R donate /usr/local/www/iptv/
 install -m 600 -o iptv -g iptv /dev/null /usr/local/etc/iptv-donate.key
-cat > /usr/local/etc/iptv-donate.key   # paste the rk_live_... key, Enter, Ctrl-D
+cat > /usr/local/etc/iptv-donate.key   # paste the rk_... key, Enter, Ctrl-D
+cat > /usr/local/etc/iptv-donate.conf <<'CONF'
+STRIPE_PUBLISHABLE_KEY=pk_...
+DONATE_CURRENCY=sek
+DONATE_COUNTRY=SE
+CONF
 service iptv_donate restart
-tail -n 1 /var/log/iptv-donate.log     # ... Stripe set up, supporter keys on
-python3 -I /usr/local/www/iptv/donate/donate.py --check   # 200 {"stripe": true, ...}
+tail -n 1 /var/log/iptv-donate.log     # ... Stripe set up, tip dialog on (41 currencies, sek by default), supporter keys on ...
+python3 -I /usr/local/www/iptv/donate/donate.py --check   # 200 {"stripe": true, "dialog": true, ...}
 ```
 
-Without the key the support page still works; the thank-you then says the
-key could not be made, and the admin page's Support list stays empty.
+Every other setting (the receipt's name, the return address, which
+currencies are offered) is listed at the top of `donate.py`; change the
+`.conf` and `service iptv_donate restart`. The visitor pays in their own
+currency - 41 of them; the dialog picks it from where the device says it is
+and shows round amounts in it (30/50/100/250 kr, 3/5/10/25 euro), and a menu
+in its head changes it. The table is `CURRENCIES` in `donate.py`;
+`DONATE_CURRENCY` is only the fallback when the page cannot tell. A payment
+in another currency than the account's own is converted by Stripe, for its
+conversion fee.
+
+**Back from monthly support's Payment Link** the support page asks
+`/support/key`, which `donate/donate.py` answers: it asks Stripe for that
+Checkout Session and, once it is paid, gives the supporter key made from it
+(`donate/supporter.py`) - the same key for the same payment, every time. A
+tip's key comes the same way from its PaymentIntent, in the dialog and
+through its receipt's link (`/support/#key=...`). Without the Stripe key
+the support page still works; the dialog then cannot open, the thank-you
+says the key could not be made, and the admin page's Support list stays
+empty.
 
 **nginx (host)** - the content server's file as in step 8: `/support/` is a
-legal page now (`/donations/` sends visitors there), `/support/key` reaches
-the service with the rate limit in front, and the old `/donate/` answers 410:
+legal page (`/donations/` sends visitors there), `/donate/` and
+`/support/key` reach the service with the rate limit in front, and
+`/.well-known/apple-developer-merchantid-domain-association` is served for
+Apple Pay:
 
 ```sh
 C=/usr/local/bastille/jails/pontusweb/root/usr/local/etc/nginx/conf.d/iptv.dope.rs.conf
@@ -311,16 +381,19 @@ bastille cmd pontusweb nginx -t && bastille cmd pontusweb service nginx reload
 ```
 
 and the site's row in the TLS-front proxy's CSP map
-(`deploy/csp.snippet.txt`): nothing from Stripe any more - the old row's
-Stripe and Google Pay addresses come out. Then `nginx -t && service nginx
-reload` on the host.
+(`deploy/csp.snippet.txt` has the line and why each Stripe address is
+there: Stripe.js, its frames, Google Pay's), then `nginx -t && service
+nginx reload` on the host.
 
-**Check:** in Stripe's test mode (a sandbox), make the two Payment Links
-there, put their `https://buy.stripe.com/test_...` addresses in
-`iptv-site.conf` and a test restricted key (`rk_test_...`) in the key file,
-sync, and pay with the card `4242 4242 4242 4242`, any future date, any CVC.
-Back on the support page the thank-you shows a supporter key; the admin
-page lists the payment. Then the same with the live links and key.
+**Check:** in the sandbox, with its keys (`pk_test_...`, `rk_test_...`) and
+a test Payment Link: open the site, the heart. The amounts appear; Safari
+with a card in Wallet shows "Tip with Apple Pay", Chrome with a saved card
+"Pay with Google Pay", everything else goes to the card form. The card
+`4242 4242 4242 4242`, any future date and any CVC pays; the thank-you
+shows a supporter key, the payment shows in the Dashboard with
+"dopeiptv.org tip dialog" in its metadata, and the admin page lists it.
+Then monthly support from the support page, the same way. Then the same
+with the live keys and link.
 
 ## Statistics and the admin page
 
@@ -630,11 +703,12 @@ devices, like a tip.
 
 ## Supporter keys
 
-A tip or monthly support comes with a supporter key for the app: shown on
-the support page when the visitor comes back from Stripe's payment page (the
-Checkout Session's id in the address, "Support" above). The same payment
-always gives the same key; a lost one is made again on the admin page from
-the Checkout Session's id. The app checks a key offline against the public
+A tip or monthly support comes with a supporter key for the app: a tip's
+in the tip dialog's thank-you and through the link in its receipt, monthly
+support's on the support page when the visitor comes back from Stripe's
+payment page (the Checkout Session's id in the address, "Support" above).
+The same payment always gives the same key; a lost one is made again on the
+admin page from the payment's id. The app checks a key offline against the public
 half of a signing key made here. Without the signing key nothing changes:
 the thank-you shows no key.
 
@@ -654,12 +728,14 @@ and every key handed out stops being reissuable (the ones people have keep
 working in the app); make a new one only together with a new app release.
 
 Stripe: the restricted key needs "PaymentIntents: Write" (which reads as
-well); the receipt link finds its payment with Stripe's search.
+well) and "Checkout Sessions: Read"; a tip's receipt link finds its payment
+with Stripe's search.
 
-The admin page makes a key again for a payment (its pi_... id from
-Stripe's Dashboard - the same key the donor got) or by hand for someone who
-gave another way; it also counts the keys handed out. Nothing about the
-donor is kept: supporters.jsonl beside the statistics has an id and a time.
+The admin page makes a key again for a payment (a tip's pi_... id or
+monthly support's cs_live_... Checkout Session from Stripe's Dashboard -
+the same key the supporter got) or by hand for someone who gave another
+way; it also counts the keys handed out. Nothing about the supporter is
+kept: supporters.jsonl beside the statistics has an id and a time.
 
 ## Answers to feedback
 

@@ -34,8 +34,8 @@
       return;
     }
     if (a.matches("a.dlx-how[data-how]")) { once("how", a.getAttribute("data-how")); return; }
-    // A way to give on the support page (Stripe's page, GitHub Sponsors):
-    // counted as support, not as a way out.
+    // A way to give on the support page (the tip dialog, Stripe's page,
+    // GitHub Sponsors): counted as support, not as a way out.
     if (a.hasAttribute("data-support")) { once("donate", a.getAttribute("data-support")); return; }
     if (/^https?:$/.test(a.protocol) && a.hostname && a.hostname !== location.hostname) {
       once("out", a.hostname.replace(/^www\./, ""));

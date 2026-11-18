@@ -447,11 +447,12 @@ counts=$COUNTS
 spots=$SITE/spots.json
 [ -s "$spots" ] && jq -e 'type == "object"' "$spots" >/dev/null 2>&1 || spots=/dev/null
 
-# The support page's links - a tip and monthly support (Stripe Payment Links on
-# dopeIPTV's own account) and GitHub Sponsors - with the amounts the page
-# names: the server's, never git's, in /usr/local/etc/iptv-site.conf
-# (DEPLOY.md, "Support"). Lines KEY=value, read here, never run. Until a
-# Stripe link is there the site invites to nothing (site/render.jq).
+# The support page's ways - the tip dialog (SUPPORT_TIPS=on) or a tip's
+# Payment Link, monthly support's Payment Link and GitHub Sponsors (all on
+# dopeIPTV's own Stripe account) - with the amounts the page names: the
+# server's, never git's, in /usr/local/etc/iptv-site.conf (DEPLOY.md,
+# "Support"). Lines KEY=value, read here, never run. Until one of them is
+# set the site invites to nothing (site/render.jq).
 SITE_CONF=${IPTV_SITE_CONF:-/usr/local/etc/iptv-site.conf}
 conf() {  # conf KEY: its value in $SITE_CONF, or nothing
     [ -r "$SITE_CONF" ] || return 0
@@ -461,6 +462,7 @@ conf() {  # conf KEY: its value in $SITE_CONF, or nothing
 https_or_nothing() {  # an address that is not https:// is left out
     case $1 in https://*) printf '%s' "$1" ;; *) ;; esac
 }
+tips=$(conf SUPPORT_TIPS)
 tip_url=$(https_or_nothing "$(conf SUPPORT_TIP_URL)")
 monthly_url=$(https_or_nothing "$(conf SUPPORT_MONTHLY_URL)")
 sponsors_url=$(https_or_nothing "$(conf SUPPORT_SPONSORS_URL)")
@@ -473,7 +475,7 @@ render() {  # render PAGE LANG TEMPLATE OUTFILE [BODY]
     jq -n -j -f "$SITE/render.jq" \
         --arg page "$1" --arg lang "$2" --arg year "$year" --arg sums "$sums" \
         --arg pics_v "$pics_v" \
-        --arg tip_url "$tip_url" --arg monthly_url "$monthly_url" \
+        --arg tips "$tips" --arg tip_url "$tip_url" --arg monthly_url "$monthly_url" \
         --arg sponsors_url "$sponsors_url" --arg tip_hint "$tip_hint" \
         --arg monthly_price "$monthly_price" \
         --argjson avail "$avail" --argjson asset_urls "$asset_urls" \

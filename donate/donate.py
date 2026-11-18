@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """donate.py - the one piece of the site that is not static.
 
-Support for dopeIPTV is paid on Stripe's own pages: two Payment Links made in
-the Dashboard of dopeIPTV's own Stripe account - a one-time tip of the
-payer's choosing and a fixed monthly support - that the site's support page
-(/support/) links to. Their addresses are the site's (sync-releases.sh reads
-them from /usr/local/etc/iptv-site.conf), not this service's, and nothing
-here takes a payment or sees a card. What this does for support: after
-paying, Stripe sends the payer back to /support/?paid=<Checkout Session id>
-and the page asks for the supporter key that thanks them (supporter.py) -
-given only once Stripe says that session is paid. It also serves the site's
+Support for dopeIPTV is a tip or monthly support, never a donation, on
+dopeIPTV's own Stripe account (Solecraft AB). A tip is paid in the tip
+dialog on the site itself (public/nav.js): Stripe's card form (the Payment
+Element) in Stripe's iframes, and Apple Pay / Google Pay in the wallet's own
+sheet. Both pay a PaymentIntent, and only a server holding the secret key
+can make one - this is that server. It never sees a card. Monthly support is
+a Stripe Payment Link (the site's, /usr/local/etc/iptv-site.conf); back from
+it, the support page asks here for the supporter key. It also serves the site's
 admin page, /admin/ (admin.py), for its admins only - a passkey, or
 a password and perhaps an authenticator code, and invites for a new admin
 (admin_auth.py); signed in once, a browser stays signed in (a signed
@@ -17,10 +16,19 @@ cookie, /admin-session) - and
 tells the owner's devices when someone has supported dopeIPTV: Web Push, turned on per
 device on the admin page (needs Python's cryptography package).
 
-    POST /support/key     {"s": "cs_..."}  (the Checkout Session Stripe sent the payer back with)
+    GET  /donate/config   {"publishableKey", "currency", "country", "name", "pmc",
+                           "currencies": {"sek": {"presets", "min", "max"}, ...}}
+    POST /donate/session  {"amount": 5000, "currency": "sek"}
+                          ->  {"clientSecret", "publishableKey"}
+    POST /donate/wallet   {"amount", "currency", "paymentMethod", "email", "name"}
+                          ->  {"ok": true, "key"?} | {"action": client_secret} | {"error"}
+    POST /support/key     {"cs": client_secret} (the tip dialog, right after
+                          paying) | {"t": receipt token} (a tip's receipt link)
+                          | {"s": "cs_..."} (back from monthly support's page)
                           ->  {"key", "since"} | {"pending": true} (202) | {"error"}
-    GET  /support/status  {"stripe", "keys"}: whether it is set up (--check;
-                          nginx does not pass it on)
+                          (/donate/key: the same, for a page cached from before)
+    GET  /support/status  {"stripe", "dialog", "keys"}: whether it is set up
+                          (--check; nginx does not pass it on)
     GET/PUT/DELETE /sync/<slot>
                           settings sync, for everyone (sync.py): ciphertext
                           kept per slot, nothing about the person; requests,
@@ -35,9 +43,19 @@ modified build (X-dopeIPTV-Build: modified) with 403 and the words it shows
 many were refused is kept, per day - the admin page shows it.
 
 A tip or the first payment of monthly support comes with a supporter key for
-the app: the same key for the same payment (made from the Checkout Session's
-id), so the thank-you can be opened again. Nothing about the payer is kept
-here - Stripe keeps the payment, and its receipt.
+the app (supporter.py): the same key for the same payment. A tip's shows in
+the dialog when the payment goes through, and behind a link in Stripe's
+receipt (the PaymentIntent's description: ".../support/#key=<token>", the
+token also in its metadata), so it can be fetched again later; monthly
+support's on the support page it comes back to. A key is only given once
+Stripe says the payment went through. Nothing about the payer is kept here.
+
+The payer tips in their own currency: the page picks it from where the
+device says it is (nav.js), out of CURRENCIES below, and the amounts are
+round ones in that currency - 30/50/100/250 kr, not 3 euro. A currency or
+an amount outside that table is refused. The words are a tip's everywhere
+(the receipt's "Tip for dopeIPTV", the buttons): Stripe takes donations
+only for charities.
 
 Standard library only (Python 3.9+). It listens on a Unix socket - no
 network, so nothing outside the machine can reach it and a jail's loopback
@@ -51,11 +69,27 @@ named by DONATE_CONFIG (default /usr/local/etc/iptv-donate.conf):
 
     STRIPE_SECRET_KEY_FILE  file holding dopeIPTV's own Stripe key (default
                             /usr/local/etc/iptv-donate.key): a restricted key
-                            that may only read - Checkout Sessions: Read (the
-                            supporter key after paying) and PaymentIntents:
-                            Read (the admin page's list, the push notes).
-                            Missing: no key after paying, and the admin page
-                            says Stripe is not set up.
+                            with PaymentIntents: Write (the tip dialog, which
+                            includes reading them: the admin page, the push
+                            notes) and Checkout Sessions: Read (the key back
+                            from monthly support's page), nothing else.
+    STRIPE_PUBLISHABLE_KEY  pk_live_... (public; handed to the page)
+    DONATE_CURRENCY         the currency when the page cannot tell (eur)
+    DONATE_CURRENCIES       the ones offered, e.g. eur,sek,usd (default: all
+                            of CURRENCIES)
+    DONATE_COUNTRY          the account's country, for the wallets (SE)
+    DONATE_MIN / DONATE_MAX / DONATE_PRESETS
+                            override DONATE_CURRENCY's row of CURRENCIES
+                            (minor units: 200 / 100000 / 300,500,1000,2500)
+    DONATE_NAME             what the receipt says it was for ("Tip for dopeIPTV")
+    DONATE_SUFFIX           added to the account's statement descriptor on card
+                            statements (empty: the account's own, DOPEIPTV)
+    DONATE_PMC              a payment method configuration (pmc_...) for the card
+                            form: the set of methods made for dopeIPTV in the
+                            Dashboard (Settings -> Payment methods). Empty: the
+                            account's default set.
+    DONATE_RETURN_URL       where Stripe sends the payer back after a payment
+                            method that leaves the page (Klarna and the like)
     DONATE_ORIGIN           the site's origin; other origins are refused
     STRIPE_API_VERSION      empty: the account's default
     LISTEN                  unix:/var/run/iptv_donate/donate.sock (default),
@@ -103,6 +137,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 # directory off the path.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+STRIPE_PI = "https://api.stripe.com/v1/payment_intents"
 STRIPE_CS = "https://api.stripe.com/v1/checkout/sessions"
 
 
@@ -137,6 +172,72 @@ def _int(key: str, default: int) -> int:
 
 ORIGIN = CONF.get("DONATE_ORIGIN", "https://dopeiptv.org").rstrip("/")
 API_VERSION = CONF.get("STRIPE_API_VERSION", "")
+
+CURRENCIES: dict[str, dict[str, object]] = {
+    k: {"presets": p, "min": lo, "max": hi} for k, (p, lo, hi) in {
+        "eur": ([300, 500, 1000, 2500], 200, 100000),
+        "usd": ([300, 500, 1000, 2500], 200, 100000),
+        "gbp": ([300, 500, 1000, 2000], 200, 100000),
+        "chf": ([300, 500, 1000, 2500], 200, 100000),
+        "sek": ([3000, 5000, 10000, 25000], 2000, 1000000),
+        "nok": ([3000, 5000, 10000, 25000], 2000, 1000000),
+        "dkk": ([2500, 4000, 7500, 20000], 1500, 750000),
+        "pln": ([1500, 2500, 5000, 10000], 1000, 400000),
+        "czk": ([7500, 12500, 25000, 60000], 5000, 2500000),
+        "huf": ([120000, 200000, 400000, 1000000], 80000, 40000000),
+        "ron": ([1500, 2500, 5000, 12500], 1000, 500000),
+        "aud": ([500, 800, 1500, 4000], 300, 150000),
+        "cad": ([500, 800, 1500, 3500], 300, 150000),
+        "nzd": ([500, 900, 1800, 4500], 300, 150000),
+        "jpy": ([500, 800, 1500, 4000], 300, 150000),
+        "krw": ([5000, 8000, 15000, 40000], 3000, 1500000),
+        "brl": ([1500, 3000, 6000, 15000], 1000, 600000),
+        "mxn": ([6000, 10000, 20000, 50000], 4000, 2000000),
+        "ils": ([1200, 2000, 4000, 10000], 800, 400000),
+        "cny": ([2500, 4000, 8000, 20000], 1500, 800000),
+        "hkd": ([2500, 4000, 8000, 20000], 1500, 800000),
+        "twd": ([10000, 15000, 30000, 80000], 7000, 3500000),
+        "sgd": ([500, 800, 1500, 3500], 300, 150000),
+        "inr": ([25000, 50000, 100000, 250000], 15000, 10000000),
+        "idr": ([5000000, 10000000, 20000000, 50000000], 3000000, 2000000000),
+        "thb": ([10000, 20000, 40000, 100000], 7000, 4000000),
+        "vnd": ([75000, 150000, 300000, 750000], 50000, 30000000),
+        "php": ([15000, 30000, 60000, 150000], 10000, 6000000),
+        "myr": ([1500, 2500, 5000, 12500], 1000, 500000),
+        "pkr": ([80000, 150000, 300000, 750000], 50000, 30000000),
+        "aed": ([1000, 2000, 4000, 10000], 800, 400000),
+        "sar": ([1000, 2000, 4000, 10000], 800, 400000),
+        "egp": ([15000, 25000, 50000, 125000], 10000, 5000000),
+        "try": ([15000, 25000, 50000, 125000], 10000, 5000000),
+        "uah": ([15000, 25000, 50000, 120000], 10000, 5000000),
+        "rsd": ([35000, 60000, 120000, 300000], 25000, 12000000),
+        "zar": ([6000, 10000, 20000, 50000], 4000, 2000000),
+        "kes": ([40000, 70000, 140000, 350000], 30000, 14000000),
+        "tzs": ([800000, 1500000, 3000000, 7500000], 600000, 300000000),
+        "cop": ([1200000, 2000000, 4000000, 10000000], 800000, 400000000),
+        "clp": ([3000, 5000, 10000, 25000], 2000, 1000000),
+    }.items()}
+# Two-decimal for Stripe, but nobody pays a fraction: whole units only.
+WHOLE_UNITS = {"huf", "twd", "idr"}
+
+CURRENCY = CONF.get("DONATE_CURRENCY", "eur").lower()
+_offered = [c.strip().lower() for c in CONF.get("DONATE_CURRENCIES", "").split(",") if c.strip()]
+if _offered:
+    CURRENCIES = {k: v for k, v in CURRENCIES.items() if k in _offered or k == CURRENCY}
+_row = CURRENCIES.setdefault(CURRENCY, {"presets": [300, 500, 1000, 2500], "min": 200, "max": 100000})
+if "DONATE_MIN" in CONF:
+    _row["min"] = _int("DONATE_MIN", 200)
+if "DONATE_MAX" in CONF:
+    _row["max"] = _int("DONATE_MAX", 100000)
+if CONF.get("DONATE_PRESETS"):
+    _row["presets"] = [int(x) for x in CONF["DONATE_PRESETS"].split(",") if x.strip().isdigit()]
+COUNTRY = CONF.get("DONATE_COUNTRY", "SE").upper()
+NAME = CONF.get("DONATE_NAME", "Tip for dopeIPTV")
+PMC = [CONF.get("DONATE_PMC", "").strip()]        # emptied if Stripe refuses it
+SUFFIX = [CONF.get("DONATE_SUFFIX", "").strip()[:22]]   # likewise
+RETURN_URL = CONF.get("DONATE_RETURN_URL", "https://dopeiptv.org/support/?tipped=1")
+ORIGIN = CONF.get("DONATE_ORIGIN", "https://dopeiptv.org").rstrip("/")
+PUBLISHABLE = CONF.get("STRIPE_PUBLISHABLE_KEY", "")
 
 
 def _secret() -> str:
@@ -210,14 +311,58 @@ def _post(url: str, form: dict | None, key: str) -> tuple[int, dict]:
 
 # -- supporter keys (supporter.py) ----------------------------------------------
 
+def _intent(form: dict, key: str) -> tuple[int, dict]:
+    """POST a PaymentIntent with this site's extras - the statement suffix
+    and the payment method configuration. One Stripe refuses (by name in its
+    error) is left out from then on and the call made again, so neither can
+    stop a payment."""
+    while True:
+        full = dict(form)
+        if SUFFIX[0]:
+            full["statement_descriptor_suffix"] = SUFFIX[0]
+        if PMC[0] and "payment_method" not in form:
+            full["payment_method_configuration"] = PMC[0]
+        status, body = _post(STRIPE_PI, full, key)
+        if status == 200:
+            return status, body
+        err = (body.get("error") or {}) if isinstance(body, dict) else {}
+        said = str(err.get("param") or "") + " " + str(err.get("message") or "")
+        for name, box in (("statement_descriptor_suffix", SUFFIX), ("payment_method_configuration", PMC)):
+            if status == 400 and box[0] and name in said:
+                print(f"[donate] leaving out {name} {box[0]}: {str(err.get('message', ''))[:200]}",
+                      file=sys.stderr, flush=True)
+                box[0] = ""
+                break
+        else:
+            return status, body
+
+
+
+
 SUPPORTER_KEY_FILE = CONF.get("SUPPORTER_KEY_FILE", "/usr/local/etc/iptv-donate-supporter.key")
 #: A Checkout Session's id, as Stripe hands it back after paying.
 _CS = re.compile(r"^cs_(?:live|test)_[A-Za-z0-9]{8,200}$")
+#: The receipt link's token, and a PaymentIntent's id (the tip dialog).
+_TOKEN = re.compile(r"^[A-Za-z0-9_-]{16,40}$")
+_PI = re.compile(r"^pi_[A-Za-z0-9]{8,64}$")
 
 
 def _supporter_seed() -> bytes | None:
     import supporter
     return supporter.load_seed(SUPPORTER_KEY_FILE)
+
+
+def _with_receipt_link(form: dict) -> dict:
+    """The PaymentIntent's description carries the way back to its key:
+    Stripe's receipt shows it. The token alone gives nothing until the
+    payment has succeeded."""
+    if _supporter_seed() is None:
+        return form
+    token = secrets.token_urlsafe(16)
+    form = dict(form)
+    form["metadata[supporter]"] = token
+    form["description"] = f"{NAME} - your supporter key for the app: {ORIGIN}/support/#key={token}"
+    return form
 
 
 def _stats_dir() -> str:
@@ -238,6 +383,14 @@ def key_for(payment_id: str, created: int, how: str) -> dict | None:
     except OSError as e:
         print(f"[donate] supporter count: {e!r}", file=sys.stderr, flush=True)
     return {"key": key, "since": supporter.check(key, _public())["since"]}
+
+
+def key_for_intent(pi: dict, how: str) -> dict | None:
+    """{"key", "since"} for a succeeded PaymentIntent (the tip dialog), or
+    None - the same key as ever for the same payment."""
+    if pi.get("status") != "succeeded" or not _PI.match(str(pi.get("id") or "")):
+        return None
+    return key_for(str(pi["id"]), int(pi.get("created") or time.time()), how)
 
 
 def paid_session(cs: str) -> tuple[int, dict]:
@@ -274,17 +427,106 @@ def _public() -> bytes:
 
 
 def find_key(data: dict) -> tuple[int, dict]:
-    """POST /support/key: the support page right after paying, with the
-    Checkout Session Stripe sent the payer back with ({"s"}). A tip and the
-    first payment of monthly support each give one key."""
-    if _supporter_seed() is None:
+    """POST /support/key (and the old /donate/key): the tip dialog right
+    after paying ({"cs"}: the PaymentIntent's client secret), the link in a
+    tip's receipt ({"t"}), or the support page back from monthly support's
+    Stripe page ({"s"}: the Checkout Session). Stripe says whether the
+    payment went through; each gives one key, the same one every time."""
+    stripe = _secret()
+    if not stripe or _supporter_seed() is None:
         return 404, {"error": "no keys"}
-    status, sess = paid_session(str(data.get("s") or ""))
-    if status != 200:
-        return status, sess
-    how = "monthly" if sess.get("mode") == "subscription" else "tip"
-    got = key_for(str(sess["id"]), int(sess.get("created") or time.time()), how)
-    return (200, got) if got else (404, {"error": "no keys"})
+    if data.get("s"):
+        status, sess = paid_session(str(data.get("s") or ""))
+        if status != 200:
+            return status, sess
+        how = "monthly" if sess.get("mode") == "subscription" else "tip"
+        got = key_for(str(sess["id"]), int(sess.get("created") or time.time()), how)
+        return (200, got) if got else (404, {"error": "no keys"})
+    cs, token = str(data.get("cs") or ""), str(data.get("t") or "")
+    if cs:
+        pid = cs.split("_secret_", 1)[0]
+        if not _PI.match(pid) or "_secret_" not in cs:
+            return 400, {"error": "bad"}
+        status, pi = _post(f"{STRIPE_PI}/{pid}", None, stripe)
+        if status != 200 or not hmac.compare_digest(str(pi.get("client_secret") or ""), cs):
+            return 404, {"error": "not found"}
+        how = "page"
+    elif _TOKEN.match(token):
+        query = urllib.parse.urlencode({"query": f"metadata['supporter']:'{token}'", "limit": "3"})
+        status, found = _post(f"{STRIPE_PI}/search?{query}", None, stripe)
+        hits = [p for p in (found.get("data") or []) if (p.get("metadata") or {}).get("supporter") == token] \
+            if status == 200 else []
+        if not hits:
+            return 404, {"error": "not found"}
+        pi = hits[0]
+        how = "receipt"
+    else:
+        return 400, {"error": "bad"}
+    if pi.get("status") in ("processing", "requires_action", "requires_confirmation"):
+        return 202, {"pending": True}
+    got = key_for_intent(pi, how)
+    return (200, got) if got else (404, {"error": "not paid"})
+
+
+def wallet_pay(amount: int, currency: str, method: str, email: str, name: str) -> tuple[int, dict]:
+    """Apple Pay / Google Pay: confirm a PaymentIntent with the payment
+    method the wallet handed the page. Without redirects - a wallet card
+    needs none - so the answer is final, or 3-D Secure for the page."""
+    key = _secret()
+    if not key:
+        return 503, {"error": "not configured"}
+    form = {
+        "amount": str(amount),
+        "currency": currency,
+        "payment_method": method,
+        "confirm": "true",
+        "automatic_payment_methods[enabled]": "true",
+        "automatic_payment_methods[allow_redirects]": "never",
+        "description": NAME,
+        "metadata[source]": "dopeiptv.org tip dialog (wallet)",
+    }
+    if email:
+        form["receipt_email"] = email
+    if name:
+        form["metadata[name]"] = name[:100]
+    status, body = _intent(_with_receipt_link(form), key)
+    if status == 200:
+        state = body.get("status")
+        if state == "succeeded" or state == "processing":
+            got = key_for_intent(body, "wallet") if state == "succeeded" else None
+            return 200, dict({"ok": True}, **(got or {}))
+        if state == "requires_action" and body.get("client_secret"):
+            return 200, {"action": body["client_secret"]}
+    err = (body.get("error") or {}) if isinstance(body, dict) else {}
+    print(f"[support] wallet {status}: {str(err.get('message', ''))[:200]}",
+          file=sys.stderr, flush=True)
+    # A decline's own words are for the payer; anything else stays here.
+    msg = err.get("message") if err.get("type") == "card_error" else None
+    return 402 if err.get("type") == "card_error" else 502, {"error": msg or "stripe"}
+
+
+def create_session(amount: int, currency: str) -> tuple[int, dict]:
+    """The PaymentIntent the card form pays: Stripe's Payment Element shows
+    the methods of the payment method configuration (DONATE_PMC, else the
+    account's default) and confirms it in the browser."""
+    key = _secret()
+    if not key or not PUBLISHABLE:
+        return 503, {"error": "not configured"}
+    form = {
+        "amount": str(amount),
+        "currency": currency,
+        "automatic_payment_methods[enabled]": "true",
+        "description": NAME,
+        "metadata[source]": "dopeiptv.org tip dialog",
+    }
+    status, body = _intent(_with_receipt_link(form), key)
+    if status == 200 and body.get("client_secret"):
+        return 200, {"clientSecret": body["client_secret"], "publishableKey": PUBLISHABLE}
+    err = (body.get("error") or {}) if isinstance(body, dict) else {}
+    print(f"[support] payment intent {status}: {str(err.get('message', ''))[:300]}",
+          file=sys.stderr, flush=True)
+    return 502, {"error": "stripe"}
+
 
 
 # -- the admin's session -------------------------------------------------------
@@ -1031,10 +1273,10 @@ class Handler(BaseHTTPRequestHandler):
         return self._send(200, {"ok": True, "devices": len(push_subs())})
 
     def _supporter_key(self, data: dict) -> tuple[int, dict]:
-        """A supporter key made by an admin: again for a payment (its
-        Checkout Session's cs_... id, in Stripe's Dashboard - the same key the
-        page gave), or by hand for someone who gave another way or before the
-        move to dopeIPTV's own account. Also how many have been handed out."""
+        """A supporter key made by an admin: again for a payment - a tip's
+        PaymentIntent (pi_...) or monthly support's Checkout Session (cs_...),
+        both in Stripe's Dashboard: the same key the payer got - or by hand
+        for someone who gave another way. Also how many have been handed out."""
         import supporter
         seed = _supporter_seed()
         if seed is None:
@@ -1042,6 +1284,17 @@ class Handler(BaseHTTPRequestHandler):
         count = supporter.handed_out(_stats_dir())
         if data.get("count"):
             return 200, {"handed_out": count}
+        pid = str(data.get("pi") or "").strip()
+        if pid:
+            if not _PI.match(pid):
+                return 400, {"error": "not a payment id (pi_...)"}
+            status, pi = _post(f"{STRIPE_PI}/{pid}", None, _secret())
+            if status != 200:
+                return 404, {"error": "Stripe does not know that payment"}
+            got = key_for_intent(pi, "admin")
+            if not got:
+                return 409, {"error": "that payment has not succeeded (" + str(pi.get("status")) + ")"}
+            return 200, dict(got, handed_out=supporter.handed_out(_stats_dir()))
         cs = str(data.get("cs") or "").strip()
         if cs:
             if not _CS.match(cs):
@@ -1293,8 +1546,20 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/admin/" or path in ADMIN_GET:
             return self._admin(path)
         if path == "/support/status":       # --check, through the socket; nginx does not pass it on
-            return self._send(200, {"stripe": bool(_secret()), "keys": _supporter_seed() is not None})
-        return self._send(404, {"error": "not found"})
+            return self._send(200, {"stripe": bool(_secret()), "dialog": bool(PUBLISHABLE),
+                                    "keys": _supporter_seed() is not None})
+        if path != "/donate/config":
+            return self._send(404, {"error": "not found"})
+        if not PUBLISHABLE or not _secret():
+            return self._send(503, {"error": "not configured"})
+        # pmc too: the page's card form must name the same payment method
+        # configuration as the PaymentIntent it is made for (not a secret).
+        row = CURRENCIES[CURRENCY]
+        self._send(200, {"publishableKey": PUBLISHABLE, "currency": CURRENCY,
+                         "country": COUNTRY, "name": NAME, "pmc": PMC[0],
+                         "currencies": CURRENCIES,
+                         # a page cached from before the currencies:
+                         "min": row["min"], "max": row["max"], "presets": row["presets"]})
 
     def _key(self) -> None:
         if (self.headers.get("Origin") or "").rstrip("/") != ORIGIN:
@@ -1319,9 +1584,47 @@ class Handler(BaseHTTPRequestHandler):
             return self._feedback()
         if path == FEEDBACK_REPLIES:
             return self._feedback_replies()
-        if path == "/support/key":
+        if path in ("/support/key", "/donate/key"):
             return self._key()
-        return self._send(404, {"error": "not found"})
+        if path not in ("/donate/session", "/donate/wallet"):
+            return self._send(404, {"error": "not found"})
+        origin = (self.headers.get("Origin") or "").rstrip("/")
+        if origin != ORIGIN:
+            return self._send(403, {"error": "origin"})
+        addr = self.headers.get("X-Real-IP") or "local"     # a Unix socket has no peer address
+        if not _allowed(addr):
+            return self._send(429, {"error": "slow down"})
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = 0
+        if length <= 0 or length > 1024:
+            return self._send(400, {"error": "body"})
+        try:
+            data = json.loads(self.rfile.read(length))
+            amount = int(data.get("amount"))
+            currency = str(data.get("currency") or CURRENCY).lower()
+        except (ValueError, TypeError, AttributeError):
+            return self._send(400, {"error": "amount"})
+        row = CURRENCIES.get(currency)
+        if row is None:
+            return self._send(400, {"error": "currency"})
+        lo, hi = int(row["min"]), int(row["max"])     # type: ignore[call-overload]
+        if not lo <= amount <= hi:
+            return self._send(400, {"error": "amount", "min": lo, "max": hi})
+        if currency in WHOLE_UNITS and amount % 100:
+            return self._send(400, {"error": "amount"})
+        if path == "/donate/session":
+            status, body = create_session(amount, currency)
+            return self._send(status, body)
+        method = str(data.get("paymentMethod") or "")
+        if not method.startswith("pm_") or len(method) > 255:
+            return self._send(400, {"error": "payment method"})
+        email = str(data.get("email") or "").strip()[:254]
+        name = str(data.get("name") or "").strip()
+        status, body = wallet_pay(amount, currency, method, email if "@" in email else "", name)
+        self._send(status, body)
+
 
 
 LISTEN = CONF.get("LISTEN", "unix:/var/run/iptv_donate/donate.sock")
@@ -1448,8 +1751,10 @@ def main() -> None:
     else:
         host, _, port = LISTEN.rpartition(":")
         srv = ThreadingHTTPServer((host or "127.0.0.1", int(port)), Handler)
+    dialog = (f"on ({len(CURRENCIES)} currencies, {CURRENCY} by default)" if PUBLISHABLE
+              else "off (no STRIPE_PUBLISHABLE_KEY)")
     print(f"[donate] listening on {LISTEN}, Stripe {'set up' if _secret() else 'NOT set up'}, "
-          f"supporter keys {'on' if _supporter_seed() is not None else 'off'}, "
+          f"tip dialog {dialog}, supporter keys {'on' if _supporter_seed() is not None else 'off'}, "
           f"push notifications {'ready' if push_ready() else 'off (no cryptography package)'}",
           file=sys.stderr, flush=True)
     if push_ready() and _secret():

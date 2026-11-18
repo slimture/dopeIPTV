@@ -28,30 +28,41 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 # shows the English text inside its own header and footer.
 | $legal[0] as $L
 | "https://dopeiptv.org" as $SITE | "https://github.com/slimture/dopeIPTV" as $REPO
-# Support (the support page, /support/): a tip and monthly support are
-# Stripe Payment Links on dopeIPTV's own Stripe account, and GitHub Sponsors.
-# Their addresses are the server's, not git's: sync-releases.sh reads them
-# from /usr/local/etc/iptv-site.conf (SUPPORT_TIP_URL, SUPPORT_MONTHLY_URL,
-# SUPPORT_SPONSORS_URL) and passes them here. Empty: that way says "coming
-# soon" and links nowhere. What the page suggests - a tip's amount, the
-# monthly one - is set beside them (SUPPORT_TIP_HINT, SUPPORT_MONTHLY_PRICE),
-# as the Payment Links are made.
+# Support (the support page, /support/), on dopeIPTV's own Stripe account:
+# a tip is given in the tip dialog on the page (nav.js: Stripe's card form,
+# Apple Pay and Google Pay, donate/donate.py) once SUPPORT_TIPS=on, else
+# through a Stripe Payment Link (SUPPORT_TIP_URL); monthly support is a
+# Payment Link (SUPPORT_MONTHLY_URL); and GitHub Sponsors. They are the
+# server's, not git's: sync-releases.sh reads them from
+# /usr/local/etc/iptv-site.conf and passes them here. A way with none of
+# them says "coming soon" and links nowhere. What the page suggests - a
+# tip's amount, the monthly one - is set beside them (SUPPORT_TIP_HINT,
+# SUPPORT_MONTHLY_PRICE).
+| (($ARGS.named.tips // "") == "on") as $TIPS_ON
 | ($ARGS.named.tip_url // "") as $TIP_URL
 | ($ARGS.named.monthly_url // "") as $MONTHLY_URL
 | ($ARGS.named.sponsors_url // "") as $SPONSORS_URL
 | (($ARGS.named.tip_hint // "") | if . == "" then "50 kr" else . end) as $TIP_HINT
 | (($ARGS.named.monthly_price // "") | if . == "" then "30 kr" else . end) as $MONTHLY_PRICE
 # The ways to pay are invited to - the header's link and heart, the front
-# page's band, the footer's link - only once a Stripe link is set: until
-# then the support page is there (its policy, GitHub Sponsors, "coming
-# soon"), but nothing on the site asks for money that cannot be taken.
-| ($TIP_URL != "" or $MONTHLY_URL != "") as $SUPPORT_ON
+# page's band, the footer's link - only once one is set up: until then the
+# support page is there (its policy, GitHub Sponsors, "coming soon"), but
+# nothing on the site asks for money that cannot be taken. With the tip
+# dialog on, the header's link and heart and the band's button open it
+# (data-tip-dialog; without nav.js they go to the support page); the footer's
+# link is the support page, where monthly support is too.
+| ($TIPS_ON or $TIP_URL != "" or $MONTHLY_URL != "") as $SUPPORT_ON
+| (if $TIPS_ON then " data-tip-dialog" else "" end) as $TIP_ATTR
 # The company behind dopeIPTV: in every footer and on the support page, as
 # Stripe's review and the Swedish E-Commerce Act ask.
 | "Solecraft AB" as $COMPANY
 | "559601-3176" as $ORGNR
 | "Mogatan 21, SE-702 13 Örebro, Sweden" as $ADDRESS
 | "info@solecraft.se" as $EMAIL
+# The tip dialog's foot: who is paid (the logo links to the company), and
+# whom to write to for more than its largest amount.
+| "/solecraft-logo.svg" as $PAYEE_LOGO
+| "https://solecraft.se" as $PAYEE_URL
 
 # -- the PHP helpers ---------------------------------------------------------
 
@@ -166,6 +177,28 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
       | "<link rel=\"alternate\" hreflang=\"\($c | h)\" href=\"\(url($path; $c) | h)\">\n"]
      | add)
     + "<link rel=\"alternate\" hreflang=\"x-default\" href=\"\($SITE + $path | h)\">\n";
+  # The tip dialog's words (nav.js), on every page while it is on. The
+  # amounts, the currencies and Stripe's publishable key come from the
+  # service (/donate/config).
+  def tip_i18n:
+    if $TIPS_ON | not then "" else
+      "<div id=\"tip-i18n\" hidden"
+      + ([[["title", "support_btn"], ["sub", "tip_sub"], ["other", "tip_other"], ["othershort", "tip_other_short"],
+           ["currency", "tip_currency"], ["cont", "tip_continue"], ["email", "tip_email"], ["pay", "tip_pay"],
+           ["busy", "tip_busy"], ["lock", "support_stripe"], ["back", "tip_back"],
+           ["thanks", "support_thanks"], ["receipt", "tip_receipt"], ["failed", "tip_failed"],
+           ["emailmissing", "tip_email_missing"], ["range", "tip_range"],
+           ["close", "donate_close"], ["loading", "support_loading"],
+           ["apple", "tip_apple"], ["google", "tip_google"], ["card", "tip_card"],
+           ["key", "support_key"], ["keyhow", "support_key_how"], ["keycopy", "support_key_copy"],
+           ["keycopied", "support_key_copied"], ["keyopen", "support_key_open"], ["keywait", "tip_key_wait"],
+           ["keynone", "support_key_none"], ["payeenote", "tip_payee_note"], ["more", "tip_more"]][]
+          | . as [$k, $key] | " data-\($k)=\"\(t($key) | h)\""] | add)
+      + " data-payee=\"\($COMPANY | h)\" data-payeelogo=\"\($PAYEE_LOGO | h)\" data-payeeurl=\"\($PAYEE_URL | h)\""
+      + " data-moremail=\"\($EMAIL | h)\""
+      + (if $MONTHLY_URL == "" then "" else " data-monthly=\"\(t("support_monthly_h") | h)\"" end)
+      + " data-lang=\"\($lang | h)\"></div>\n"
+    end;
   # Feedback from the footer's link (nav.js): its words, on every page.
   def feedback_i18n:
     "<div id=\"feedback-i18n\" hidden"
@@ -201,11 +234,11 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
       | "          <a role=\"menuitem\" class=\"navmenu-item\(if cur($key) then " is-current" else "" end)\" href=\"\($href | h)\"\(if cur($key) then " aria-current=\"page\"" else "" end)>\($label | h)</a>\n"]
      | add) as $menuitems
     # Support: a quiet link beside the others, to the support page.
-    | "      <a class=\"navlink navdonate\" href=\"/support/\"\(if $current == "support" then " aria-current=\"page\"" else "" end)><svg class=\"heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_nav") | h)</a>\n" as $navdonate
-    | "          <a role=\"menuitem\" class=\"navmenu-item navdonate\" href=\"/support/\"><svg class=\"heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_nav") | h)</a>\n" as $menudonate
+    | "      <a class=\"navlink navdonate\" href=\"/support/\"\($TIP_ATTR)\(if $current == "support" then " aria-current=\"page\"" else "" end)><svg class=\"heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_nav") | h)</a>\n" as $navdonate
+    | "          <a role=\"menuitem\" class=\"navmenu-item navdonate\" href=\"/support/\"\($TIP_ATTR)><svg class=\"heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_nav") | h)</a>\n" as $menudonate
     # ...and on a phone, where the links fold into the menu, a heart of its
     # own in the header, one tap from anywhere.
-    | "      <a class=\"navheart\" href=\"/support/\" aria-label=\"\(t("support_nav") | h)\" title=\"\(t("support_nav") | h)\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg></a>\n" as $navheart
+    | "      <a class=\"navheart\" href=\"/support/\"\($TIP_ATTR) aria-label=\"\(t("support_nav") | h)\" title=\"\(t("support_nav") | h)\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg></a>\n" as $navheart
     | (if ($avail | length) > 1 then
          "      <details class=\"langpick\" id=\"langPick\" name=\"hdrmenu\">\n"
          + "        <summary aria-label=\"\(t("lang_label") | h)\" title=\"\($S.names[$lang] // $lang | h)\">\n"
@@ -224,7 +257,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
                 {navlinks: ($navlinks + (if $SUPPORT_ON then $navdonate + $navheart else "" end)),
                  langpick: $langpick,
                  menuitems: ($menuitems + (if $SUPPORT_ON then $menudonate else "" end))}))
-      + feedback_i18n;
+      + tip_i18n + feedback_i18n;
   # Every footer: who makes dopeIPTV, where to reach them, and that it holds
   # no channels - in plain sight on every page (Stripe's review, the Swedish
   # E-Commerce Act's section 8).
@@ -367,7 +400,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
       + "          <p class=\"donate-short\">\(t("support_p_short") | h)</p>\n"
       + "        </div>\n"
       + "        <div class=\"donate-act\">\n"
-      + "          <a class=\"btn primary donate-btn\" href=\"/support/\"><svg class=\"donate-heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_btn") | h)</a>\n"
+      + "          <a class=\"btn primary donate-btn\" href=\"/support/\"\($TIP_ATTR)><svg class=\"donate-heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_btn") | h)</a>\n"
       + "          <small>\(t("support_band_note") | h)</small>\n"
       + "        </div>\n"
       + "      </div>\n"
@@ -376,11 +409,16 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
   # The support page's ways to give (in the support page's legal text where
   # it says <!--SUPPORT-OPTIONS-->), the thank-you nav.js fills in after
   # paying, and the company. A way without its address says "coming soon".
+  # A tip with the dialog on opens it (data-tip-dialog), and without nav.js goes
+  # to the tip's Payment Link if there is one, else stays on this page.
   def support_way($cls; $title; $text; $href; $btn; $primary; $ev):
-    "      <div class=\"sway \($cls)\">\n"
+    ($ev == "tip" and $TIPS_ON) as $dialog
+    | "      <div class=\"sway \($cls)\"\(if $ev == "monthly" then " id=\"monthly\"" else "" end)>\n"
     + "        <h2>\($title | h)</h2>\n"
     + "        <p>\($text)</p>\n"
-    + (if $href == "" then
+    + (if $dialog then
+         "        <a class=\"btn\(if $primary then " primary" else "" end)\" href=\"\(if $href == "" then "/support/" else $href end | h)\" rel=\"nofollow noopener\" data-tip-dialog data-support=\"\($ev)\">\($btn | h)</a>\n"
+       elif $href == "" then
          "        <span class=\"btn\(if $primary then " primary" else "" end) is-off\" aria-disabled=\"true\">\(t("support_soon") | h)</span>\n"
        else
          "        <a class=\"btn\(if $primary then " primary" else "" end)\" href=\"\($href | h)\" rel=\"nofollow noopener\" data-support=\"\($ev)\">\($btn | h)</a>\n"

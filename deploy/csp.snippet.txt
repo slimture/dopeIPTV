@@ -1,7 +1,7 @@
 Add this line inside the existing `map $server_name $csp_policy { ... }` block
 in the TLS-front proxy's /usr/local/etc/nginx/nginx.conf (next to your main site row):
 
-    "dopeiptv.org" "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none';";
+    "dopeiptv.org" "default-src 'self'; img-src 'self' data: https://*.stripe.com; style-src 'self'; script-src 'self' https://js.stripe.com https://*.js.stripe.com; connect-src 'self' https://api.stripe.com https://checkout.stripe.com; frame-src https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://checkout.stripe.com https://pay.google.com; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none';";
 
 Why this is safe AND sufficient for the site:
   - default-src 'self'      everything same-origin by default
@@ -9,15 +9,25 @@ Why this is safe AND sufficient for the site:
   - style-src 'self'        external style.css only (no inline styles -> no 'unsafe-inline')
   - script-src 'self'       external nav.js and friends; the JSON-LD block is a
                             non-executable data block and is NOT affected by script-src
-  - connect-src 'self'      the site's own calls (/support/key, /feedback/, /hit);
-                            everything else is same-origin <a> links
+  - connect-src 'self'      the site's own calls (/donate/, /support/key,
+                            /feedback/, /hit); everything else is same-origin <a> links
   - object/base/form locked down
 
-Nothing from Stripe is loaded on the site any more: a tip and monthly support
-are Stripe's own pages (Payment Links), reached by a plain link, which a CSP
-does not govern. Until November 2026 the donate dialog loaded Stripe.js and
-its frames, and this row allowed js.stripe.com, api.stripe.com, Stripe's
-frames and Google Pay's - take those out of an older row.
+Stripe, for the tip dialog only:
+  - script-src  https://js.stripe.com https://*.js.stripe.com
+                Stripe.js, loaded by nav.js when a tip link is pointed at or the
+                dialog opens - a visitor who never does never fetches anything
+                from Stripe
+  - frame-src   https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com
+                https://checkout.stripe.com https://pay.google.com
+                the card form and 3-D Secure live in Stripe's frames, so the card
+                number never touches this page
+  - connect-src https://api.stripe.com https://checkout.stripe.com
+  - img-src     https://*.stripe.com   (card brand logos)
+
+Without the Stripe parts the site still works, but the tip dialog cannot load
+Stripe.js and says something went wrong; monthly support (a Payment Link,
+Stripe's own page, reached by a plain link) is not governed by the CSP.
 
 The global add_header Content-Security-Policy $csp_policy already applies it, so no
 per-server add_header is needed.
