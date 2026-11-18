@@ -70,6 +70,28 @@ def _work(remote: sync.Remote, key: bytes, doc: dict, snap: sync.Snapshot,
         return sync.SyncError("fail")
 
 
+def seen_by(keys: set[str], active: str | None) -> set[str]:
+    """The settings a round changed, as profile *active* sees them: its own
+    by their plain names and the household's - not another profile's own.
+    Sync writes the first profile's own under their plain names and each
+    other profile's under "profiles/<id>/"; told by the full name, a second
+    profile's new theme was never put in effect while it was the one in use,
+    and one not in use asked for a restart that changes nothing. *active*
+    None: a window without profiles, the keys as they are."""
+    if active is None:
+        return set(keys)
+    from ..core import profiles
+    out: set[str] = set()
+    for key in keys:
+        own = profiles.split_key(key)
+        if own is not None:
+            if own[0] == active:
+                out.add(own[1])
+        elif not profiles.is_own(key) or active in ("", profiles.MAIN_ID):
+            out.add(key)
+    return out
+
+
 def _ignore(_result: object = None) -> None:
     """The result of work done for its side effect."""
 
@@ -343,18 +365,21 @@ class _SyncMixin:
                 self.list_model.refresh_all()
         if applied.sources and hasattr(self, "_update_playlist_btn"):
             self._update_playlist_btn()
-        if applied.settings & _LIVE_KEYS and hasattr(self, "_apply_theme_now"):
+        from ..core import places, profiles
+        # What changed for the profile in use (another one's waits for it).
+        mine = seen_by(applied.settings, profiles.active_id() if isinstance(
+            self.settings, profiles.ProfileSettings) else None)
+        if mine & _LIVE_KEYS and hasattr(self, "_apply_theme_now"):
             self._apply_theme_now()
         # This system's keyboard shortcuts (another system's never come).
-        keys = {k for k in applied.settings if sync.is_shortcuts(k)}
+        keys = {k for k in mine if sync.is_shortcuts(k)}
         if keys and hasattr(self, "apply_shortcuts"):
             self.apply_shortcuts()
-        # What the places show (a profile's own, kept under its name): at once.
-        from ..core import places
-        look = {k for k in applied.settings if str(k).rsplit("/", 1)[-1] in places.LOOK_KEYS}
+        # What the places show (a profile's own): at once.
+        look = {k for k in mine if k in places.LOOK_KEYS}
         if look and hasattr(self, "_places_look_changed"):
             self._places_look_changed("sync")
-        later = applied.settings - _LIVE_KEYS - keys - look
+        later = mine - _LIVE_KEYS - keys - look
         toast = getattr(self, "_show_toast", None)
         if toast is None:
             return

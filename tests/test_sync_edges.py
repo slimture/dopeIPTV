@@ -160,6 +160,24 @@ def test_the_order_follows_a_playlist_kept_under_another_id(tmp_path, site):
     assert [p["id"] for p in a.playlists.items] == ["cccc3333", "aaaa1111"]
 
 
+def test_what_a_round_changed_is_told_for_the_profile_in_use():
+    """Sync writes the first profile's own under their plain names and each
+    other profile's under its id. The window acts on what changed for the
+    profile in use: its theme at once, another profile's not at all."""
+    from dopeiptv.core.profiles import MAIN_ID
+    from dopeiptv.ui.mw_sync import _LIVE_KEYS, seen_by
+    changed = {"theme", "profiles/kid1/theme", "profiles/kid1/places_hidden",
+               "profiles/kid2/accent", "cache_secs", "keyboard_shortcuts"}
+    assert seen_by(changed, None) == changed                    # no profiles: as they are
+    first = seen_by(changed, MAIN_ID)
+    assert first == {"theme", "cache_secs", "keyboard_shortcuts"}
+    kid = seen_by(changed, "kid1")
+    assert kid == {"theme", "places_hidden", "cache_secs", "keyboard_shortcuts"}
+    assert kid & _LIVE_KEYS == {"theme"}                        # put in effect at once
+    # The first profile's theme changed, a third one is in use: nothing to show.
+    assert not seen_by({"theme", "profiles/kid1/accent"}, "kid2") & _LIVE_KEYS
+
+
 def test_closing_right_after_a_round_still_keeps_that_rounds_copy(tmp_path, site, qapp):
     """The round's copy is written on the pool; closing clears the pool.
     One still waiting there is written by the close itself - else the next
