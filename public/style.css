@@ -592,10 +592,10 @@ section.help-main { padding-top: 0; }
 @media (hover: none), (pointer: coarse) { .help-key { display: none; } }
 .help-count { margin: 12px 4px 0; color: var(--accent); font-size: 14px; font-weight: 600; }
 
-.help-layout {
-  display: grid; grid-template-columns: 230px 1fr; gap: 48px;
-  align-items: start; padding-top: 34px;
-}
+/* The topics beside the answers as the features page has its groups
+   (.fl-layout, .fl-index: an icon, the name and how many answers; a row of
+   pills under the bar on a phone) - one look for both pages. */
+.help-layout { align-items: start; }
 /* A grid item's automatic minimum size is its CONTENT's minimum, so the long
    command lines in the <pre> blocks made the column as wide as the longest
    one and the whole page scrolled sideways on a phone. min-width:0 lets the
@@ -604,32 +604,78 @@ section.help-main { padding-top: 0; }
 .help-toc, .help-body { min-width: 0; }
 /* Hiding the contents would otherwise leave the answers in the 230px column
    the contents used to sit in. While filtering the results take the width. */
-body.searching .help-layout { grid-template-columns: 1fr; }
-.help-toc {
-  position: sticky; top: 80px;
-  display: flex; flex-direction: column; gap: 1px;
-}
+body.searching .help-layout { grid-template-columns: minmax(0, 1fr); }
 /* An author `display` beats the UA's [hidden] rule, so the contents column
    would stay on screen while filtering unless this says otherwise. */
 .help-toc[hidden] { display: none; }
-.help-toc a {
-  color: var(--muted); text-decoration: none; font-size: 14px;
-  padding: 7px 12px; border-radius: 8px; line-height: 1.35;
+
+.help-lead { margin: -12px 0 22px; max-width: 60ch; color: var(--muted); font-size: 1.1rem; }
+/* Three steps to begin with, as cards, and the questions asked most -
+   over the topics, and gone while searching. */
+.help-home { margin: 0 0 46px; }
+body.searching .help-home { display: none; }
+.help-steps-h { font-size: 22px; letter-spacing: -.02em; margin: 0 0 14px; }
+.help-steps { list-style: none; margin: 0 0 34px; padding: 0; display: grid; gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr)); counter-reset: step; }
+.help-step { counter-increment: step; min-width: 0; }
+.help-step-a { display: flex; flex-direction: column; height: 100%; padding: 16px 18px 18px;
+  border-radius: 16px; background: var(--surface); color: var(--text); transition: background .15s; }
+a.help-step-a:hover { background: var(--surface-2); }
+.help-step-a::before { content: counter(step); width: 26px; height: 26px; display: grid; place-items: center;
+  border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; font-size: 14px;
+  margin-bottom: 10px; }
+.help-step h3 { margin: 0; font-family: var(--display); font-size: 17px; font-weight: 600;
+  letter-spacing: -.015em; line-height: 1.3; }
+.help-step p { margin: 5px 0 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
+.help-step-os { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.help-step-os a { padding: 4px 11px; border-radius: 999px; background: var(--bg); color: var(--accent);
+  font-size: 14px; font-weight: 600; }
+.help-step-os a:hover { text-decoration: underline; }
+/* The questions asked most: a quiet list, two columns where there is room. */
+.help-faq { list-style: none; margin: 0; padding: 0; display: grid; column-gap: 28px;
+  grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.help-faq li { min-width: 0; border-bottom: 1px solid var(--line); }
+.help-faq a { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 0; color: var(--text); font-size: 16px; line-height: 1.4; }
+.help-faq a::after { content: "→"; flex: none; color: var(--faint); transition: transform .15s, color .15s; }
+[dir="rtl"] .help-faq a::after { content: "←"; }
+.help-faq a:hover { color: var(--accent); }
+.help-faq a:hover::after { color: var(--accent); transform: translateX(3px); }
+[dir="rtl"] .help-faq a:hover::after { transform: translateX(-3px); }
+@media (max-width: 760px) {
+  .help-faq { grid-template-columns: minmax(0, 1fr); }
+  /* A phone's steps are rows: the number beside the words, not over them. */
+  .help-steps { gap: 10px; margin-bottom: 30px; }
+  .help-step-a { display: grid; grid-template-columns: 26px minmax(0, 1fr); column-gap: 14px;
+    align-content: start; padding: 15px 16px; }
+  .help-step-a::before { grid-row: 1 / span 3; margin: 0; }
+  .help-step h3, .help-step p, .help-step-os { grid-column: 2; }
+  .help-step h3 { margin-top: 2px; }
 }
-.help-toc a:hover { color: var(--text); background: var(--surface-2); }
-.help-toc a.is-current {
-  color: var(--accent); background: var(--surface-2); font-weight: 600;
-}
+@media (max-width: 1000px) { .help-steps { grid-template-columns: minmax(0, 1fr); } }
 
 /* These are <section> elements inside a <section>, and the site gives every
    section 72px of padding - which showed up as a dead band above and below
    each heading. They set their own spacing with margins instead. */
-.help-sec { padding: 0; margin: 0 0 44px; scroll-margin-top: 80px; }
+.help-sec { padding: 0; margin: 0 0 48px; scroll-margin-top: 80px; }
+.help-sec[hidden] { display: none; }
 .help-sec h2 {
+  display: flex; align-items: center; gap: 12px;
   font-size: 26px; letter-spacing: -.025em;
   color: var(--text); margin: 0 0 4px;
   padding-bottom: 12px; border-bottom: 1px solid var(--line);
 }
+.help-sec h2 .ic { flex: none; width: 26px; height: 26px; color: var(--accent); fill: none; stroke: currentColor;
+  stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+/* What the topic covers, in a line under its name. */
+.help-sec-p { margin: 10px 0 4px; color: var(--muted); font-size: 15px; line-height: 1.5; }
+body.searching .help-sec-p { display: none; }
+/* To the same topic on the features page. */
+.help-sec-more { display: inline-block; margin-top: 14px; color: var(--accent); font-size: 14px; font-weight: 600; }
+.help-sec-more::after { content: " →"; }
+[dir="rtl"] .help-sec-more::after { content: " ←"; }
+.help-sec-more:hover { text-decoration: underline; }
+body.searching .help-sec-more { display: none; }
 .help-item { border-bottom: 1px solid var(--line); scroll-margin-top: 80px; }
 .help-sec .help-item:last-child { border-bottom: 0; }
 .help-item > summary {
@@ -706,11 +752,34 @@ body.searching .help-layout { grid-template-columns: 1fr; }
 /* A picture of the settings page an answer is about (render.jq). */
 .help-shot { display: block; width: 100%; max-width: 640px; height: auto; margin: 14px 0 0;
   border-radius: 6px; border: 1px solid var(--line); background: var(--surface); }
+/* An answer's neighbours, at its foot. */
+.help-a .help-rel { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 8px; margin: 16px 0 0;
+  padding-top: 12px; border-top: 1px solid var(--line); }
+.help-rel span { color: var(--faint); font-size: 13px; font-weight: 600; margin-inline-end: 2px; }
+.help-rel a { padding: 3px 10px; border-radius: 999px; background: var(--surface); font-size: 14px; line-height: 1.4; }
+.help-rel a:hover { background: var(--surface-2); text-decoration: none; }
+/* A tip or a warning set apart from the steps. */
+.help-a .tip { color: var(--text); background: var(--surface); border-radius: 10px; padding: 10px 14px;
+  border-inline-start: 3px solid var(--accent); }
 .help-none { color: var(--muted); padding: 26px 2px; font-size: 16px; }
-.help-foot { margin-top: 34px; }
+/* Where to go when the answer is not here. */
+.help-stuck { margin: 30px 0 0; padding: 22px 24px; border-radius: 16px; background: var(--surface); }
+.help-stuck h2 { margin: 0 0 6px; font-size: 20px; letter-spacing: -.02em; }
+.help-stuck p { margin: 0; color: var(--muted); line-height: 1.65; max-width: 74ch; }
+.help-stuck a { color: var(--accent); }
+.help-stuck b { color: var(--text); font-weight: 600; }
 /* While filtering, sections lose their headings' distance - the list should
    read as results, not as a table of contents with gaps in it. */
 body.searching .help-sec { margin-bottom: 26px; }
+@media (max-width: 860px) {
+  .help-sec { scroll-margin-top: 130px; }
+  .help-item { scroll-margin-top: 130px; }
+  .help-sec h2 { font-size: 22px; }
+  .help-sec h2 .ic { width: 22px; height: 22px; }
+  .help-home { margin: 12px 0 36px; }
+  .help-steps-h { font-size: 20px; }
+}
+@media (prefers-reduced-motion: reduce) { .help-step-a, .help-faq a::after { transition: none; } }
 
 /* ---- Everything dopeIPTV does (/features/) -------------------------------- */
 /* The help page's top and search, the groups beside the list as its
@@ -872,12 +941,6 @@ section.legal-main { padding: 30px 0 72px; }
 }
 
 @media (max-width: 860px) {
-  .help-layout { grid-template-columns: 1fr; gap: 22px; }
-  .help-toc {
-    position: static; flex-direction: row; flex-wrap: wrap; gap: 6px;
-    padding-bottom: 8px;
-  }
-  .help-toc a { background: var(--surface-2); }
   .help-top h1 { font-size: 27px; }
   .help-searchbar input { font-size: 16px; padding: 15px 14px 15px 46px; }
 }

@@ -517,23 +517,46 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     + ([$S.names | to_entries[] | select(.key as $k | $avail | index($k) != null)
         | "<li lang=\"\(.key | h)\"><bdi>\(.value | h)</bdi></li>"] | join(""))
     + "</ul>";
+  # The help page (site/help.json): its topics in "groups" - each with its
+  # icon, its title's key and the answers in it by id ("watch-rewind" is
+  # help_watch_rewind_q / _a, so an answer keeps its id, and every link to
+  # it, whichever topic it is filed under) -, the questions asked most in
+  # "popular", the three steps to begin with in "steps", and an answer's
+  # neighbours in "related". A topic of the features page links there.
+  def hkey($id): "help_" + ($id | sub("-"; "_"));
+  def hq($id): t(hkey($id) + "_q") as $q | if $q == hkey($id) + "_q" then null else $q end;
   def page_help:
     ($R.version // "" | tostring) as $version
+    | "<svg class=\"ic\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\">" as $svg
+    | ($HELP.related // {}) as $REL
+    | [$HELP.groups[] | . as $g | {k, title, features, icon,
+        items: [.items[] | select(hq(.) != null)]} | select(.items | length > 0)] as $GROUPS
     | $tpl
     | expand(common + {canonical: (url("/help/"; $lang) | h)};
         {hreflang: hreflang("/help/"), nav: nav("help"),
-         toc: ([$HELP | to_entries[] | .key as $sec
-           | "          <a href=\"#\($sec | h)\" data-toc=\"\($sec | h)\">\(t("help_\($sec)_title") | h)</a>\n"] | add),
-         sections: ([$HELP | to_entries[] | .key as $sec
-           | "          <section class=\"help-sec\" id=\"\($sec | h)\" data-sec=\"\($sec | h)\">\n"
-             + "            <h2>\(t("help_\($sec)_title") | h)</h2>\n"
-             + ([.value[] as $tp
-                 | t("help_\($sec)_\($tp)_q") as $q
-                 | select($q != "help_\($sec)_\($tp)_q")
-                 | "\($sec)-\($tp)" as $id
+         popular: ([($HELP.popular // [])[] | select(hq(.) != null)
+           | "              <li><a href=\"#\(. | h)\">\(hq(.) | h)</a></li>\n"] | add // ""),
+         steps: ([($HELP.steps // [])[] | . as $st
+           | ($st.links // []) as $links
+           | "            <li class=\"help-step\">"
+             + (if $st.href then "<a class=\"help-step-a\" href=\"#\($st.href | h)\">" else "<div class=\"help-step-a\">" end)
+             + "<h3>\(t("help_step_\($st.k)_h") | h)</h3><p>\(t("help_step_\($st.k)_p") | h)</p>"
+             + (if ($links | length) > 0 then
+                  "<span class=\"help-step-os\">" + ([$links[] | "<a href=\"#\(.[1] | h)\">\(.[0] | h)</a>"] | join("")) + "</span>"
+                else "" end)
+             + (if $st.href then "</a>" else "</div>" end)
+             + "</li>\n"] | add // ""),
+         toc: ([$GROUPS[]
+           | "          <a href=\"#\(.k | h)\" data-toc=\"\(.k | h)\">\($svg)\(.icon)</svg><span class=\"l\">\(t(.title) | h)</span><span class=\"n\">\(.items | length)</span></a>\n"] | add // ""),
+         sections: ([$GROUPS[] | . as $g
+           | "          <section class=\"help-sec\" id=\"\($g.k | h)\" data-sec=\"\($g.k | h)\" aria-labelledby=\"\($g.k | h)-h\">\n"
+             + "            <h2 id=\"\($g.k | h)-h\">\($svg)\($g.icon)</svg>\(t($g.title) | h)</h2>\n"
+             + (t("help_g_\($g.k)_p") as $p | if $p != "help_g_\($g.k)_p" then "            <p class=\"help-sec-p\">\($p | h)</p>\n" else "" end)
+             + ([$g.items[] as $id
+                 | hq($id) as $q
                  | "            <details class=\"help-item\" id=\"\($id | h)\">\n"
                    + "              <summary><h3>\($q | h)</h3></summary>\n"
-                   + "              <div class=\"help-a\">\(t("help_\($sec)_\($tp)_a") | gsub("%LANGS%"; langlist) | gsub("%DONATE%"; (if $DONATE == "" then "/#donate" else $DONATE | h end)))"
+                   + "              <div class=\"help-a\">\(t(hkey($id) + "_a") | gsub("%LANGS%"; langlist) | gsub("%DONATE%"; (if $DONATE == "" then "/#donate" else $DONATE | h end)))"
                    # The settings page the answer is about, as the app shows
                    # it in the reader's language (tools/help_screenshots.py
                    # in the app's repository). Inside a closed <details>,
@@ -543,9 +566,17 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
                         + " width=\"\($S.help_shot_size[0])\" height=\"\($S.help_shot_size[1])\""
                         + " loading=\"lazy\" decoding=\"async\" alt=\"\($q | h)\">"
                       else "" end)
+                   + ([($REL[$id] // [])[] | select(hq(.) != null)
+                       | "<a href=\"#\(. | h)\">\(hq(.) | h)</a>"] as $rel
+                      | if ($rel | length) > 0 then
+                          "<p class=\"help-rel\"><span>\(t("help_related") | h)</span>\($rel | join(""))</p>"
+                        else "" end)
                    + "</div>\n"
                    + "            </details>\n"] | add // "")
-             + "          </section>\n"] | add),
+             + (if ($g.features // "") != "" then
+                  "            <a class=\"help-sec-more\" href=\"/features/#\($g.features | h)\">\(t("help_features_link") | h)</a>\n"
+                else "" end)
+             + "          </section>\n"] | add // ""),
          help_version: (if ($version | truthy) then " " + ($version | h) else "" end)});
 
 # -- /features/ -------------------------------------------------------------------

@@ -1,15 +1,16 @@
-/* Help page: live search, and the folded questions opened where needed.
+/* Help page: live search, the folded questions opened where needed, and the
+ * topics beside them marking where you are.
  *
  * An EXTERNAL file, not an inline <script>. The site's CSP is
  * `script-src 'self'` with no 'unsafe-inline' (deploy/csp.snippet.txt), so an
  * inline block is silently blocked - which is exactly why the first version
  * of this search did nothing at all on the live site.
  *
- * Every topic is in the page as a <details>, so filtering is showing and
+ * Every answer is in the page as a <details>, so filtering is showing and
  * hiding, and what matches is opened: a hit reads without a second click.
- * A link to a question (/help/#start-linux, from the download cards) opens
- * that one. With this file absent the page is still complete - the questions
- * open by hand - just unfiltered.
+ * A link to a question (/help/#start-linux, from the download cards, the
+ * features page, a related answer) opens that one. With this file absent
+ * the page is still complete - the questions open by hand - just unfiltered.
  */
 (function () {
   var box = document.getElementById('helpSearch');
@@ -21,13 +22,25 @@
   var count = document.getElementById('helpCount');
   var none = document.getElementById('helpNone');
   var clear = document.getElementById('helpClear');
-  var toc = document.querySelector('.help-toc');
+  var toc = document.getElementById('helpToc');
+  var calm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  // What a question is searched by: itself and its answer - not the related
+  // answers' names at its foot, which would make it match their words too.
   items.forEach(function (el) {
-    el.dataset.text = (el.textContent || '').toLowerCase();
+    var text = '';
+    var sum = el.querySelector('summary');
+    var ans = el.querySelector('.help-a');
+    if (sum) text += sum.textContent + ' ';
+    if (ans) {
+      var copy = ans.cloneNode(true);
+      [].forEach.call(copy.querySelectorAll('.help-rel'), function (r) { r.remove(); });
+      text += copy.textContent;
+    }
+    el.dataset.text = text.toLowerCase();
   });
 
-  function mark(on) {
+  function searching(on) {
     document.body.classList.toggle('searching', on);
   }
 
@@ -44,7 +57,7 @@
     }
     items.forEach(function (el, i) {
       var t = el.dataset.text;
-      // Every word has to appear somewhere in the topic, so two words narrow
+      // Every word has to appear somewhere in the answer, so two words narrow
       // instead of widening - which is what people expect from a search box.
       var on = terms.every(function (w) { return t.indexOf(w) !== -1; });
       el.hidden = !on;
@@ -58,10 +71,6 @@
     secs.forEach(function (s) {
       s.hidden = !s.querySelector('.help-item:not([hidden])');
     });
-    tocs.forEach(function (a) {
-      var s = document.getElementById(a.dataset.toc);
-      a.hidden = !!(s && s.hidden);
-    });
     if (count) {
       count.hidden = !q;
       count.textContent = count.dataset.fmt
@@ -70,8 +79,8 @@
     }
     if (none) none.hidden = !(q && hits === 0);
     if (clear) clear.hidden = !q;
-    if (toc) toc.hidden = !!q;   // the contents mean nothing while filtering
-    mark(!!q);
+    if (toc) toc.hidden = !!q;   // the topics mean nothing while filtering
+    searching(!!q);
   }
 
   box.addEventListener('input', function () { apply(box.value); });
@@ -85,7 +94,8 @@
   }
   // "/" focuses the box, the way search on a documentation site usually does.
   document.addEventListener('keydown', function (e) {
-    if (e.key === '/' && document.activeElement !== box) {
+    if (e.key === '/' && document.activeElement !== box
+        && !/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '')) {
       e.preventDefault();
       box.focus();
       box.select();
@@ -93,19 +103,39 @@
   });
   apply(box.value);
 
-  // A link to one question opens it, on arrival and on a link within the page.
+  // The topics were others before (1.6.4): an old link to one lands on the
+  // topic its answers are in now. An answer's own id never changed.
+  var MOVED = { tv: 'guide', more: 'cast', set: 'personal', local: 'library', tech: 'about' };
+
+  // A link to one question opens it, on arrival and on a link within the
+  // page (the popular questions, a related answer, the steps).
   function openTarget() {
     var id = decodeURIComponent(location.hash.slice(1));
+    if (MOVED[id]) {
+      id = MOVED[id];
+      if (window.history && history.replaceState) history.replaceState(null, '', '#' + id);
+    }
     var el = id && document.getElementById(id);
-    if (!el || !el.classList.contains('help-item')) return false;
-    el.open = true;
-    el.scrollIntoView();
-    return true;
+    if (!el) return false;
+    if (el.classList.contains('help-item')) {
+      if (box.value) { box.value = ''; apply(''); }
+      el.open = true;
+      el.scrollIntoView();
+      return true;
+    }
+    if (el.classList.contains('help-sec')) {
+      if (box.value) { box.value = ''; apply(''); }
+      el.scrollIntoView();
+      return true;
+    }
+    return false;
   }
   window.addEventListener('hashchange', openTarget);
   // The box takes the keys on arrival - here rather than with `autofocus`,
-  // which scrolled the page back up past the question a link had opened.
-  if (!openTarget()) box.focus({ preventScroll: true });
+  // which scrolled the page back up past the question a link had opened. On
+  // a phone that would also open the keyboard over the page, so not there.
+  var touch = window.matchMedia && matchMedia('(hover: none), (pointer: coarse)').matches;
+  if (!openTarget() && !touch) box.focus({ preventScroll: true });
 
   // An opened question puts itself in the address bar, so it can be linked to
   // the way the old heading links could.
@@ -118,33 +148,45 @@
   });
 
   // The page is long enough that "where am I" is a real question, so the
-  // contents mark the section you are reading.
-  // A short last section never climbs as high as the band that marks
-  // sections, so at the very bottom of the page it is the last one's turn.
+  // topics mark the one you are reading (as the features page marks its
+  // group). On a phone they are a row of pills: the marked one is kept in
+  // sight. A short last topic never climbs as high as the band that marks
+  // topics, so at the very bottom of the page it is the last one's turn.
   if (window.IntersectionObserver && tocs.length) {
     var seen = {};
-    var mark = function () {
-      var current = '';
+    var current = null;
+    var markToc = function () {
+      var now = '';
       var root = document.documentElement;
       if (window.innerHeight + window.scrollY >= root.scrollHeight - 4) {
-        current = secs[secs.length - 1].id;
+        now = secs[secs.length - 1].id;
       } else {
-        secs.forEach(function (s) { if (!current && seen[s.id]) current = s.id; });
+        secs.forEach(function (s) { if (!now && seen[s.id]) now = s.id; });
       }
+      if (now === current) return;
+      current = now;
       tocs.forEach(function (a) {
-        a.classList.toggle('is-current', a.dataset.toc === current);
+        if (a.dataset.toc === now) {
+          a.setAttribute('aria-current', 'location');
+          if (toc && toc.scrollWidth > toc.clientWidth + 4) {
+            var l = a.offsetLeft - toc.clientWidth / 2 + a.offsetWidth / 2;
+            toc.scrollTo({ left: Math.max(0, l), behavior: calm ? 'auto' : 'smooth' });
+          }
+        } else {
+          a.removeAttribute('aria-current');
+        }
       });
     };
     var spy = new IntersectionObserver(function (entries) {
       entries.forEach(function (en) { seen[en.target.id] = en.isIntersecting; });
-      mark();
-    }, { rootMargin: '-80px 0px -65% 0px' });
+      markToc();
+    }, { rootMargin: '-140px 0px -60% 0px' });
     secs.forEach(function (s) { spy.observe(s); });
     var queued = false;
     window.addEventListener('scroll', function () {
       if (queued) return;
       queued = true;
-      requestAnimationFrame(function () { queued = false; mark(); });
+      requestAnimationFrame(function () { queued = false; markToc(); });
     }, { passive: true });
   }
 })();

@@ -27,6 +27,7 @@
   <section class="help-top">
     <div class="wrap">
       <h1>dopeIPTV {{h:help_h1}}</h1>
+      <p class="help-lead">{{h:help_lead}}</p>
 
       <div class="help-searchbar">
         <span class="help-mag" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"
@@ -39,23 +40,34 @@
         <button type="button" id="helpClear" hidden
                 aria-label="{{h:help_clear}}">✕</button>
       </div>
-      <p class="help-count" id="helpCount" hidden
+      <p class="help-count" id="helpCount" hidden aria-live="polite"
          data-fmt="{{h:help_hits}}"></p>
     </div>
   </section>
 
   <section class="help-main">
     <div class="wrap">
-      <div class="help-layout">
-        <nav class="help-toc" aria-label="{{h:help_toc}}">
+      <div class="fl-layout help-layout">
+        <nav class="fl-index help-toc" id="helpToc" aria-label="{{h:help_toc}}">
 {{b:toc}}        </nav>
 
         <div class="help-body">
+          <div class="help-home">
+            <h2 class="help-steps-h">{{h:help_steps_h}}</h2>
+            <ol class="help-steps">
+{{b:steps}}            </ol>
+            <h2 class="help-steps-h">{{h:help_popular}}</h2>
+            <ul class="help-faq">
+{{b:popular}}            </ul>
+          </div>
 {{b:sections}}          <p class="help-none" id="helpNone" hidden>{{h:help_no_hits}}</p>
+
+          <aside class="help-stuck">
+            <h2>{{h:help_stuck_h}}</h2>
+            <p>{{t:help_stuck_p}}</p>
+          </aside>
         </div>
       </div>
-
-      <p class="autonote help-foot">{{t:help_more}}</p>
     </div>
   </section>
 </main>
