@@ -191,7 +191,7 @@ EPISODE_TITLES = ["Pilot", "High Tide", "The Visitor", "Lights Out", "Small Hour
                   "Open Water", "Postcards", "The Long Way Round"]
 #: The other sources the Search page finds things in, and what each has.
 SOURCES = [
-    ("nordic", "Nordic IPTV", "xtream"),
+    ("playlist", "My playlist", "xtream"),
     ("server", "Home server", "jellyfin"),
     ("box", "Living room box", "enigma2"),
     ("cable", "City Cable", "m3u"),
@@ -550,7 +550,7 @@ def _build_window(st: Stage) -> None:
     class Showcase(OfflineClient):
         """The made-up source: its lists, guide and streams."""
 
-        def __init__(self, label: str = "nordic") -> None:
+        def __init__(self, label: str = "playlist") -> None:
             super().__init__()
             self.label = label
             self.server = f"http://{label}.example"
@@ -664,7 +664,7 @@ def _build_window(st: Stage) -> None:
         store.add({"id": pid, "name": name, "kind": kind,
                    "server": f"http://{pid}.example", "username": "showcase",
                    "password": "showcase", "epg_url": "", "refresh": "never"})
-    store.set_active("nordic")
+    store.set_active("playlist")
 
     _prepare_files(st)
     settings.setValue("local_dirs", json.dumps([st.own_dir]))
