@@ -230,11 +230,6 @@ class _SettingsMixin:
         else:
             self._apply_filter()
 
-    def _set_theme(self, theme: str, accent: str) -> None:
-        self.settings.setValue("theme", theme)
-        self.settings.setValue("accent", accent)
-        self._apply_theme_now()
-
     def _watch_color_scheme(self) -> None:
         """Follow the desktop between its light and dark mode, live, when
         Settings says so (Qt 6.5+; elsewhere the setting simply holds)."""
@@ -287,6 +282,9 @@ class _SettingsMixin:
         self._search_restyle()       # the Search page
         self._place_tv_restyle()     # the TV place's header and row
         getattr(self, "_mitt_restyle", lambda: None)()   # Mine
+        # The notices keep a style sheet of their own: the decision card and
+        # the panel of messages stayed in the old theme's colours.
+        getattr(self, "_notices_restyle", lambda: None)()
         if getattr(self, "_tv_page", None) is not None:
             self._tv_page.restyle()  # TV mode's page (its tiles paint from P)
 
