@@ -144,15 +144,18 @@ grep -n sync-releases /etc/crontab
 ## 10. Log rotation (jail)
 
 nginx writes `/dl.php`, and only that, to a log of its own; the sync counts
-downloads in it. `P` keeps the newest rotation (`.0`) uncompressed, so the
-sync can finish reading the file it was rotated into. 30 is SIGUSR1: nginx
-reopens its logs.
+downloads in it. It holds IP addresses, so it is turned over at midnight and
+kept a week, as the statistics' log (the privacy policy says so): the sync
+reads it every 15 minutes and keeps the counts itself, so nothing older is
+needed. `P` keeps the newest rotation (`.0`) uncompressed, so the sync can
+finish reading the file it was rotated into. 30 is SIGUSR1: nginx reopens
+its logs.
 
 ```sh
 mkdir -p /usr/local/etc/newsyslog.conf.d
 cat > /usr/local/etc/newsyslog.conf.d/iptv.dope.rs.conf <<'EOF'
 # logfilename                                [owner:group]  mode count size when flags [/pid_file] [sig]
-/var/log/nginx/iptv.dope.rs-downloads.log                   644  10    1024 *    JP    /var/run/nginx.pid 30
+/var/log/nginx/iptv.dope.rs-downloads.log    root:iptv      640  7     *    @T00 JP    /var/run/nginx.pid 30
 /var/log/iptv-sync.log                       iptv:iptv      644  5     1024 *    JN
 EOF
 newsyslog -nv 2>&1 | grep iptv          # a dry run: both files listed, nothing rotated

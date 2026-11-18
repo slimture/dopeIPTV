@@ -1,12 +1,12 @@
 <div class="lead">
 <h2 id="kort">Kort sagt</h2>
 <ul>
-<li><strong>Vi har nästan inga personuppgifter.</strong> Inga konton, inga namn, inga e-postadresser (utom när du mejlar oss eller betalar via Stripe) och inga IP-adresser i statistiken.</li>
-<li><strong>Appen sparar dina uppgifter på din dator.</strong> Dina källor, inloggningar, favoriter, din historik och dina inställningar stannar där. Appen har ingen analys eller telemetri, och du har inget konto hos oss.</li>
-<li><strong>Appen kontaktar oss bara när den har ett skäl:</strong> för att leta efter uppdateringar (det går att stänga av), när du själv skickar en felrapport eller feedback och – om du slår på det – för synkronisering av inställningar och för att titta tillsammans med vänner, båda krypterade så att vi inte kan läsa dem.</li>
-<li><strong>Webbplatsen räknar besök i egen statistik</strong>, utan kakor och utan externa analystjänster. Din IP-adress används för att räkna fram ett pseudonymt besökar-id och ett land. Den sparas inte i statistiken, och serverloggarna som innehåller den raderas efter kort tid.</li>
-<li><strong>Dricks och månadsstöd:</strong> du betalar via Stripe – dricks i Stripes formulär på vår sida, månadsstöd på Stripes egen sida; kortuppgifter går direkt till Stripe och aldrig till oss.</li>
-<li>Vi säljer inga personuppgifter, visar ingen reklam och använder inga spårare från andra företag.</li>
+<li><strong>Vi vet inte vem du är, och vi försöker inte ta reda på det.</strong> Du har inget konto hos oss, och det vi sparar innehåller inga namn, inga e-postadresser och inga IP-adresser. Det enda som kan knytas till en person är ett mejl du själv skickar till oss och en betalning, som Stripe hanterar.</li>
+<li><strong>Appen sparar allt på din dator.</strong> Dina källor, inloggningar, favoriter, din historik och dina inställningar lämnar aldrig datorn. Ingen analys, ingen telemetri, ingen reklam.</li>
+<li><strong>Appen hör bara av sig när det finns ett skäl:</strong> för att leta efter uppdateringar (det går att stänga av), när du själv skickar en felrapport eller feedback – som du ser i sin helhet och som redan är rensad från namn, adresser, inloggningar och det du har tittat på – och, om du slår på det, för synkronisering och för att titta tillsammans, båda krypterade så att vi inte kan läsa dem.</li>
+<li><strong>Webbplatsens statistik anonymiseras i flera steg.</strong> Inga kakor och inga externa analystjänster. Din IP-adress görs direkt om till ett land och ett pseudonymt id och skrivs aldrig in i statistiken, och loggarna som innehåller den raderas automatiskt efter en vecka (frontserverns driftloggar efter högst 30 dagar). Efter 13 månader tas även id:t bort, och bara anonyma siffror finns kvar.</li>
+<li><strong>Dricks och månadsstöd</strong> betalas via Stripe. Kortuppgifter går direkt till Stripe och aldrig till oss, och vår server sparar inget om betalningen.</li>
+<li><strong>Det här samlar vi aldrig in:</strong> vad du tittar på, dina källor, kanaler och inloggningar, och var du är noggrannare än land. Vi använder inga kakor som följer dig, säljer inga uppgifter, visar ingen reklam och har inga spårare från andra – inte ens typsnitten hämtas från någon annan.</li>
 </ul>
 </div>
 
@@ -67,23 +67,24 @@
 <p>För att kunna skicka en sida till dig behöver vår webbserver din IP-adress, och din webbläsare skickar dessutom sidans adress, tidpunkten, webbläsarens och systemets namn och version (user agent), sidan du kom från (referrer) och vilka språk du föredrar.</p>
 <ul>
 <li>Frontservern, som hanterar den krypterade anslutningen, för för drift och säkerhet en allmän teknisk logg över anrop och en logg över fel. De byts varje natt och sparas i högst 30 dagar, sedan tas de bort automatiskt. Anrop för synkronisering och för att titta tillsammans loggas aldrig.</li>
-<li>För statistiken nedan för servern två separata loggar med IP-adress, tidpunkt, adress, status, referrer, webbläsare och språk: en över sidvisningar och sidornas visningssignal, som sparas i ungefär en vecka, och en över klick på nedladdningar, som roteras efter storlek och där de tio senaste delarna sparas.</li>
+<li>För statistiken nedan för servern två separata loggar med IP-adress, tidpunkt, adress, status, referrer, webbläsare och språk: en över sidvisningar och sidornas visningssignal och en över klick på nedladdningar. Båda byts varje natt och sparas i ungefär en vecka, sedan tas de bort automatiskt. Det är de enda ställena där din IP-adress skrivs ned.</li>
 <li>Tjänsterna bakom webbplatsen – supporternyckeln, feedback, synkronisering och titta tillsammans – håller IP-adresser bara i minnet, en kort stund – högst ett dygn – för att begränsa hur många anrop en adress kan göra.</li>
 </ul>
 <p>Rättslig grund: vårt berättigade intresse av att driva webbplatsen säkert (artikel 6.1 f).</p>
 
 <h3>Statistik</h3>
-<p>Vi räknar besök själva: utan kakor, utan att spara något i din webbläsare och utan externa analystjänster. Syftet är att förstå hur människor hittar och använder webbplatsen och appen, så att vi kan göra dem bättre.</p>
+<p>Vi räknar besök själva: utan kakor, utan att spara något i din webbläsare och utan externa analystjänster. Syftet är att förstå hur människor hittar och använder webbplatsen och appen, så att vi kan göra dem bättre – inte att veta vem någon är.</p>
 <p>När en sida har öppnats i din webbläsare skickar den en kort signal till vår server med: sidan; sidan du kom från; sidans och webbläsarens språk; skärmens storlek; om webbläsaren uppger att den är automatiserad; hur länge sidan visades; om muspekare, pekskärm eller tangentbord användes (bara att det hände); om en länk för dricks eller stöd följdes eller en betalning genomfördes; samt en del av det du gör på sidan – hjälpfrågor du öppnar, ord du söker efter i hjälpen och hur många svar som hittades, delar av startsidan som du scrollar fram till, installationsanvisningar du öppnar, byte av språk och adressen (bara webbplatsen) till en länk till en annan webbplats som du följer.</p>
-<p>Var femtonde minut går servern igenom loggarna och sparar varje besök med:</p>
-<ul>
-<li>ett <strong>pseudonymt besökar-id</strong>: en envägshash av IP-adressen och webbläsarens namn, beräknad med en hemlig nyckel som bara finns på vår server. Själva IP-adressen sparas inte i statistiken;</li>
-<li>ett <strong>land</strong>, som slås upp från IP-adressen i en landsdatabas på vår egen server (<a href="https://db-ip.com" rel="noopener">DB-IP:s</a> fria databas) – inget skickas någonstans;</li>
-<li>tidpunkt, webbläsare och version, operativsystem, typ av enhet, skärmstorlek, språk, hur du hittade oss (den länkande webbplatsen och sidan, utan sökord eller andra parametrar; en <code>?ref=</code>-märkning på våra egna länkar), sidorna och tiden på var och en, nedladdningar, stödlänkarna, handlingarna ovan och om du har varit här förut.</li>
-</ul>
+<p><strong>Så anonymiseras ett besök, steg för steg:</strong></p>
+<ol>
+<li><strong>Direkt.</strong> Var femtonde minut läser servern loggen. IP-adressen används till två saker och skrivs sedan inte in i statistiken: ett <strong>land</strong>, som slås upp i en landsdatabas på vår egen server (<a href="https://db-ip.com" rel="noopener">DB-IP:s</a> fria databas – inget skickas någonstans), och ett <strong>pseudonymt besökar-id</strong>: en förkortad envägshash av IP-adressen och webbläsarens namn, beräknad med en hemlig nyckel som bara finns på vår server. Id:t visar inte adressen, vi kopplar det inte till något annat och vi försöker aldrig ta reda på vem som står bakom det – det finns bara för att vi ska kunna räkna unika och återkommande besökare.</li>
+<li><strong>Efter ungefär en vecka</strong> raderas loggen med IP-adresserna automatiskt.</li>
+<li><strong>Efter 13 månader (400 dagar)</strong> tas id:t, klockslaget, skärmstorleken och versionsnumren bort, tiden avrundas till tio sekunder och besöket blandas med månadens övriga, så att ordningen inte säger något. Kvar finns bara dag, land, webbläsare och system, typ av enhet, sidans språk, hur besökaren kom, antal sidor och om det blev en nedladdning eller en följd stödlänk. Det är inte längre personuppgifter och sparas utan tidsgräns, liksom summor per dag.</li>
+<li><strong>Efter 25 månader</strong> raderas de sista besökar-id:na, som bara sparas så länge för att kunna jämföra ett år med året före.</li>
+</ol>
+<p>Fram till steg 3 sparas varje besök med id, land, tidpunkt, webbläsare och version, operativsystem, typ av enhet, skärmstorlek, språk, hur du hittade oss (den länkande webbplatsen och sidan, utan sökord eller andra parametrar; en <code>?ref=</code>-märkning på våra egna länkar), sidorna och tiden på var och en, nedladdningar, stödlänkarna, handlingarna ovan och om du har varit här förut.</p>
 <p>Besök från icke-offentliga adresser och från webbplatsens administratörer räknas inte, och besök som ser ut att komma från robotar markeras som sådana.</p>
-<p>För uppdateringar som appen hämtar (avsnitt 2) sparar vi tidpunkt, fil, versionen som uppdaterades, operativsystem och processor, land och om den kom från vårt eget nätverk – inte IP-adressen.</p>
-<p><strong>Hur länge:</strong> varje besök och varje uppdatering sparas i 400 dagar (13 månader). Därefter görs besöken anonyma – bara dag, land, webbläsare och system utan versionsnummer, typ av enhet, sidans språk, hur besökaren kom, antal sidor, tiden avrundad till tio sekunder och om det blev en nedladdning eller en följd stödlänk finns kvar, utan id och utan klockslag – och uppgifterna om uppdateringar raderas. Besökar-id sparas i 25 månader, så att vi kan räkna unika och återkommande besökare ett år jämfört med året före. Anonyma besök och summor per dag sparas utan tidsgräns; de är inte längre personuppgifter.</p>
+<p>För uppdateringar som appen hämtar (avsnitt 2) sparar vi tidpunkt, fil, versionen som uppdaterades, operativsystem och processor, land och om den kom från vårt eget nätverk – aldrig IP-adressen och inget id. De raderas efter 400 dagar; bara summor per dag finns kvar.</p>
 <p>Bara webbplatsens administratörer kan se statistiken. Rättslig grund: vårt berättigade intresse av att förstå och förbättra webbplatsen och appen (artikel 6.1 f). Vi har valt metoder som inte följer dig: inga kakor, inga externa tjänster, pseudonyma id och fasta tider för radering. Du kan när som helst invända (avsnitt 10).</p>
 
 <h3>Feedbackformuläret</h3>
@@ -128,13 +129,14 @@
 <p>Tjänster som du använder via appen, som TMDB och Trakt, kan finnas i andra länder. Din app kontaktar dem direkt när du ber om det, och deras egna policyer gäller.</p>
 
 <h2 id="lagring">9. Hur länge vi sparar uppgifter</h2>
-<p>Det mesta vi sparar säger inget om vem du är: inget namn, ingen e-postadress, inget konto. Bara två saker är knutna till en person – ett mejl du skickar till oss, och en betalning (hos Stripe och i våra räkenskaper). Allt annat saknar antingen något som pekar ut dig eller sparas bara en kort tid.</p>
+<p>Det mesta vi sparar säger inget om vem du är: inget namn, ingen e-postadress, ingen IP-adress, inget konto. Bara två saker är knutna till en person – ett mejl du skickar till oss, och en betalning (hos Stripe och i våra räkenskaper). Allt annat saknar något som pekar ut dig, eller sparas bara en kort tid och raderas sedan automatiskt.</p>
 <ul>
-<li><strong>Serverloggar</strong> – IP-adressen och webbläsaren för en förfrågan, inget annat om dig: frontserverns loggar högst 30 dagar, loggen över sidvisningar ungefär en vecka, loggen över klick på nedladdningar roteras efter storlek (de tio senaste delarna). Sedan tas de bort automatiskt.</li>
-<li><strong>Statistik</strong> – ingen IP-adress och inget namn, bara ett pseudonymt id: varje besök i 400 dagar, därefter utan ens id (bara dag, land, webbläsare och liknande finns kvar); id:na i 25 månader; uppgifter om uppdateringar i 400 dagar, aldrig med IP-adress.</li>
+<li><strong>Serverloggar</strong> – de enda ställena där en IP-adress skrivs ned, med webbläsaren och vad som hämtades, inget annat om dig: statistikens två loggar ungefär en vecka, frontserverns driftloggar högst 30 dagar. Sedan tas de bort automatiskt.</li>
+<li><strong>Statistik</strong> – ingen IP-adress och inget namn, bara ett pseudonymt id: varje besök i 400 dagar, därefter helt anonymt (utan id, klockslag och skärmstorlek); de sista id:na raderas efter 25 månader. Uppgifter om uppdateringar, aldrig med IP-adress eller id: 400 dagar.</li>
 <li><strong>Felrapporter och feedback</strong> – ingen IP-adress, inget namn, ingen e-postadress, och rensade från sådant som kan identifiera innan de sparas: 12 månader, sedan tas de bort automatiskt.</li>
 <li><strong>Synkade data</strong> – krypterade på din dator, så att vi varken kan läsa dem eller se vems de är: tills du raderar dem, eller 180 dagar efter att de senast användes.</li>
 <li><strong>Titta tillsammans</strong> – krypterat, bara i minnet, aldrig på disk: tills en timme efter rummets senaste anrop.</li>
+<li><strong>Begränsning av anrop</strong> – tjänsterna bakom webbplatsen håller IP-adresser bara i minnet, högst ett dygn, för att stoppa missbruk. De skrivs aldrig ned.</li>
 <li><strong>Betalningar</strong> – det namn eller den e-postadress du anger för kvittot: hos Stripe enligt dess villkor, och i våra räkenskaper i sju år, som bokföringslagen kräver. Vår server sparar inget av det själv.</li>
 <li><strong>Mejl du skickar till oss</strong>: så länge ärendet kräver.</li>
 <li><strong>I din webbläsare</strong> – på din egen enhet, där vi inte kan se det: tills du rensar det (språkkakan i ett år).</li>
@@ -150,7 +152,7 @@
 <li>invända mot behandling som grundar sig på vårt berättigade intresse – till exempel statistiken;</li>
 <li>få ut uppgifter som du har lämnat till oss i ett maskinläsbart format (dataportabilitet), när behandlingen grundar sig på ett avtal.</li>
 </ul>
-<p><strong>I praktiken har vi nästan inget som säger vem du är.</strong> Vi har inga konton, inga namn och inga e-postadresser – utom i ett mejl du skickar till oss, och det namn eller den e-postadress du anger hos Stripe när du betalar. Statistiken sparar inga IP-adresser, bara ett pseudonymt id som inte visar adressen och som vi inte använder för att ta reda på vem du är. Rapporter och feedback sparas utan IP-adress, webbläsaruppgifter och e-postadress. Synkroniserade uppgifter och Titta tillsammans är krypterade, så att vi varken kan läsa dem eller se vems de är. Din IP-adress finns hos oss bara i serverloggarna, som raderas automatiskt efter en vecka till högst 30 dagar (avsnitt 9).</p>
+<p><strong>I praktiken har vi nästan inget som säger vem du är.</strong> Vi har inga konton, inga namn och inga e-postadresser – utom i ett mejl du skickar till oss, och det namn eller den e-postadress du anger hos Stripe när du betalar. Statistiken sparar inga IP-adresser, bara ett pseudonymt id som inte visar adressen och som vi inte använder för att ta reda på vem du är. Rapporter och feedback sparas utan IP-adress, webbläsaruppgifter och e-postadress. Synkroniserade uppgifter och Titta tillsammans är krypterade, så att vi varken kan läsa dem eller se vems de är. Din IP-adress skrivs hos oss bara ned i serverloggarna, som raderas automatiskt efter en vecka (frontserverns driftloggar efter högst 30 dagar, avsnitt 9).</p>
 <p>Skriv till <a href="mailto:info@solecraft.se">info@solecraft.se</a>. Vi svarar inom en månad, utan kostnad. Eftersom vi inte själva kan peka ut dig behöver vi oftast din hjälp för att hitta något alls: för dina besök i statistiken den IP-adress och den webbläsare du använde och ungefär när, för en rapport eller en feedback vad du skrev, och för en betalning datum, belopp och e-postadressen på kvittot. Utan det har vi ofta inget som vi kan koppla till dig – och då finns det inget att visa, rätta eller radera.</p>
 <p>Vi fattar inga automatiserade beslut som har rättsliga eller liknande betydande följder för dig.</p>
 <p>Du kan lämna klagomål till Integritetsskyddsmyndigheten (IMY), <a href="https://www.imy.se" rel="noopener">imy.se</a>, eller till dataskyddsmyndigheten där du bor. Vi blir glada om du hör av dig till oss först.</p>
