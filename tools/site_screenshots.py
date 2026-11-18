@@ -113,8 +113,10 @@ TITLES = {
                "Night Forest", "Big Skies", "The Long Migration"],
     "Ocean": ["The Coral Garden", "Ocean Giants", "Harbour Seals", "Kelp Forests",
               "Life in the Shallows", "Deep Reef"],
-    "Sport": ["Matchday Live", "Goals & Highlights", "Tennis: Semi-final",
-              "Cycling: Mountain Stage", "Sports Desk", "Extra Time"],
+    "Sport": ["Matchday Live", "Goals & Highlights", "Cycling: Mountain Stage",
+              "Sports Desk", "Extra Time", "Transfer Talk"],
+    "Tennis": ["Tennis: Semi-final", "Court Report", "Classic Matches",
+               "Doubles Live", "Baseline", "Tennis: Semi-final"],
     "Movies": ["Lantern Bay", "Glasshouse City", "Northbound",
                "The Quiet Orchard", "Copper Valley", "Echo Ridge"],
     "Kids": ["Robo Pals", "Tiny Planet", "Story Time", "Space Pups",
@@ -125,7 +127,8 @@ TITLES = {
 
 #: What a channel's programmes are, where its category says two things.
 GENRE_OF = {"Science & Nature": "Science", "Wild Earth": "Nature", "Deep Blue": "Ocean",
-            "Summit": "Nature", "Daybreak": "Nature", "Wings": "Nature"}
+            "Summit": "Nature", "Daybreak": "Nature", "Wings": "Nature",
+            "Court One": "Tennis"}
 
 #: Films: (id, title, motif, year, minutes, rating, genre, category, plot).
 FILMS = [
@@ -222,6 +225,13 @@ ORDER = ("Northwind News", "Meridian 24", "Arena Sport", "Court One", "Wild Eart
          "Cinema Noir", "Reel Classics")
 
 
+#: The channels with catch-up (the provider's archive): a few, as on a
+#: real list - the news, the football, the launches and a film channel.
+ARCHIVE = ("Northwind News", "Arena Sport", "Launchpad", "Cinema Noir")
+#: The channels made favourites: a handful, not every other row.
+FAVOURITES = ("Northwind News", "Wild Earth", "Orbit", "Cosmos", "Cinema Noir")
+
+
 def stream_rows() -> list[dict]:
     rows: list[dict] = []
     for cat_id, cat_name, chans in LINEUP:
@@ -229,7 +239,8 @@ def stream_rows() -> list[dict]:
             sid = ORDER.index(name) + 1
             rows.append({"stream_id": sid, "num": sid, "name": name,
                          "category_id": cat_id, "epg_channel_id": f"ch{sid}",
-                         "tv_archive": 1, "tv_archive_duration": 7,
+                         "tv_archive": int(name in ARCHIVE),
+                         "tv_archive_duration": 7 if name in ARCHIVE else 0,
                          "stream_type": "live", "_cat": cat_name,
                          "_glyph": glyph, "_colour": colour, "_picture": picture})
     rows.sort(key=lambda r: r["num"])
@@ -780,8 +791,7 @@ def _seed(st: Stage) -> None:
         row = {k: v for k, v in s.items() if not k.startswith("_")}
         w.history.add(w.client.live_url(s["stream_id"]), s["name"], s["stream_icon"],
                       s["stream_id"], "live", row)
-    for name in ("Orbit", "Northwind News", "Arena Sport", "Wild Earth", "Pixel Kids",
-                 "Lumen Music", "Cosmos", "Deep Blue"):
+    for name in FAVOURITES:
         s = by[name]
         w.favs.add(FAV_DEFAULT_GROUP, {k: v for k, v in s.items() if not k.startswith("_")})
     for f, frac in ((st.films[0], 0.42), (st.films[3], 0.7), (st.films[6], 0.25)):
@@ -1313,16 +1323,75 @@ def feat_lf(st: Stage):
     return feature(st, img, span(st, page, w._det), spot)
 
 
+class _PlayingTV:
+    """What a Chromecast on the home network answers while it plays what it
+    was sent - the device manager's answers, made up: playing, at its volume.
+    The cast card and its state are the app's own."""
+
+    TAKES_FEED = True
+
+    def __init__(self) -> None:
+        self.active: Any = None
+        self.state = ""
+        self.duration = 0.0
+        self.bridge = None
+        self.gone = False
+
+    def knows(self, name: str | None) -> bool:
+        return name == CAST_DEVICES[0]
+
+    def scan(self) -> list[str]:
+        return [CAST_DEVICES[0]]
+
+    def cast(self, name: str, *_a, **_k) -> str:
+        from types import SimpleNamespace
+        self.active = SimpleNamespace(name=name)
+        self.state = "PLAYING/None"
+        return name
+
+    def position(self) -> float:
+        return 0.0
+
+    def bridged(self) -> bool:
+        return False
+
+    def volume(self) -> tuple[float, bool]:
+        return 0.6, False
+
+    def set_volume(self, _level: float) -> None:
+        pass
+
+    def set_muted(self, _muted: bool) -> None:
+        pass
+
+    def pause(self) -> None:
+        pass
+
+    def resume(self) -> None:
+        pass
+
+    def seek(self, _seconds: float) -> None:
+        pass
+
+    def stop(self) -> None:
+        self.active, self.state = None, ""
+
+    def shutdown(self) -> None:
+        pass
+
+
 def feat_cast(st: Stage):
     """Cast to the TV: the channel sent to a TV found on the home network,
-    the strip that says so where the player was."""
+    the cast card in the video's place while the TV plays it."""
     from dopeiptv.providers.chromecast import CastDialog
     w = st.w
     tv_place(st, "Arena Sport")
     # The home network's devices, and the TV taking the stream: what the
     # device managers would answer.
+    tv = _PlayingTV()
+    w.cast.chromecast = tv
+    w.cast._current = tv
     w.cast.scan = lambda: list(CAST_DEVICES)
-    w.cast.cast = lambda name, *a, **k: name
     opened = dialogs_stay_open(CastDialog)
     w.cast_playing()
     spin(st, 2.5)
@@ -1331,9 +1400,9 @@ def feat_cast(st: Stage):
     dlg._cast()
     spin(st, 2.5)
     dlg.accept()
-    spin(st, 1.5)
+    spin(st, 2.5)
     no_focus(st)
-    settle(st, 0.5)
+    settle(st, 1)
     img = grab(st)
     spot = rect_in_window(st, w.cast_bar)
     return feature(st, img, span(st, w._mid, w._det), spot)
@@ -1629,6 +1698,7 @@ def _contact_sheet(out: str) -> None:
 
 def _merge_spots(out: str, lang: str) -> None:
     folder = os.path.join(out, lang)
+    os.makedirs(folder, exist_ok=True)
     spot_dir = os.path.join(folder, ".spots")
     path = os.path.join(folder, "spots.json")
     try:
