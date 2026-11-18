@@ -321,7 +321,7 @@ class _SyncMixin:
         self.settings.setValue(sync.K_LAST, int(time.time()))
         self._sync_fails = 0
         now = time.monotonic()
-        self._sync_next = now + (5 if applied.skipped else PERIOD)
+        self._sync_next = now + (5 if applied.skipped or applied.again else PERIOD)
         try:
             self._sync_sent = self._sync_seen = sync.digest(ctx, cats)
             self._sync_seen_at = now

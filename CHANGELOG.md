@@ -33,6 +33,13 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   answers a list with its refusal instead of a list; that is now a failed
   load - the lists kept from before stay, else "Wrong username or password"
   - and never stored as the list.
+- Settings sync: two computers that each had a playlist called "default"
+  - the one a version before playlists made from its settings - of another
+  provider on each no longer lose one of them when the second joins. Its
+  playlist used to become the first computer's provider, with its own
+  favourites under it. Now each keeps its own and gets the other's beside
+  it; the playlist kept here under another id in the copy is noted in
+  `sync_source_ids`, and the next round sends it at once.
 - A source's Type changed in Settings no longer takes another kind's
   address and login with it. The Xtream address, user name and password
   stayed in the fields of every type picked after it (Jellyfin, Tvheadend,

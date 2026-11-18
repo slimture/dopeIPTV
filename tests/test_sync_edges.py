@@ -160,6 +160,135 @@ def test_the_order_follows_a_playlist_kept_under_another_id(tmp_path, site):
     assert [p["id"] for p in a.playlists.items] == ["cccc3333", "aaaa1111"]
 
 
+OTHER = dict(PROVIDER, name="Other IPTV", server="http://other.example:2095",
+             username="bo")
+
+
+def _stations(c, pid):
+    return {x["stream_id"] for x in c.favs(pid).items()}
+
+
+def test_two_computers_with_a_default_playlist_of_another_provider_each(tmp_path, site):
+    """A version before playlists made one called "default" from its
+    settings, on each computer - of another provider on each. Joining, B's
+    lost to A's under the same id: B's playlist became A's provider, and
+    B's favourites went with it. Now each keeps its own and gets the
+    other's beside it, the favourites with their own provider."""
+    slot, key = sync.derive(os.urandom(32))
+    remote = sync.Remote(slot, site.url, timeout=5)
+    a, b = Computer(tmp_path, "a", slot), Computer(tmp_path, "b", slot)
+    a.playlists.add(dict(PROVIDER, id="default"))
+    b.playlists.add(dict(OTHER, id="default"))
+    a.favs("default").add("all", {"stream_id": 1, "name": "A's"})
+    b.favs("default").add("all", {"stream_id": 7, "name": "B's"})
+    a.state.seen = set(sync.CATEGORIES)
+    a.round(remote, key, now=100)
+
+    b.state.fresh = b.state.joining = True
+    _, applied = b.round(remote, key, now=200)
+    assert applied.sources and applied.again
+    mine = b.playlists.get("default")
+    assert (mine["server"], mine["username"]) == (OTHER["server"], "bo")
+    assert b.playlists.active_id == "default"
+    assert _stations(b, "default") == {7}
+    theirs = [p for p in b.playlists.items if p["id"] != "default"]
+    assert [p["server"] for p in theirs] == [PROVIDER["server"]]
+    assert _stations(b, theirs[0]["id"]) == {1}
+
+    # B's own goes to the copy next round; A gets it beside its own.
+    b.round(remote, key, now=300)
+    a.round(remote, key, now=400)
+    assert a.playlists.get("default")["server"] == PROVIDER["server"]
+    got = [p for p in a.playlists.items if p["id"] != "default"]
+    assert [p["server"] for p in got] == [OTHER["server"]]
+    assert _stations(a, "default") == {1} and _stations(a, got[0]["id"]) == {7}
+
+    # A change goes to the right playlist both ways.
+    a.playlists.update("default", password="a-new")
+    b.playlists.update("default", password="b-new")
+    a.round(remote, key, now=500)
+    b.round(remote, key, now=600)
+    a.round(remote, key, now=700)
+    assert b.playlists.get("default")["password"] == "b-new"
+    assert b.playlists.get(theirs[0]["id"])["password"] == "a-new"
+    assert a.playlists.get("default")["password"] == "a-new"
+    assert a.playlists.get(got[0]["id"])["password"] == "b-new"
+
+    # Then nothing moves.
+    b.round(remote, key, now=800)
+    a.round(remote, key, now=900)
+    puts = site.puts()
+    for now, c in ((1000, b), (1100, a), (1200, b)):
+        c.round(remote, key, now=now)
+    assert site.puts() == puts
+    assert len(a.playlists.items) == len(b.playlists.items) == 2
+
+
+def test_the_same_default_playlist_on_both_is_one(tmp_path, site):
+    """The same provider under "default" on both: one playlist, as before -
+    the group's version where they differ."""
+    slot, key = sync.derive(os.urandom(32))
+    remote = sync.Remote(slot, site.url, timeout=5)
+    a, b = Computer(tmp_path, "a", slot), Computer(tmp_path, "b", slot)
+    a.playlists.add(dict(PROVIDER, id="default", name="Mine"))
+    b.playlists.add(dict(PROVIDER, id="default", password="old"))
+    a.state.seen = set(sync.CATEGORIES)
+    a.round(remote, key, now=100)
+    b.state.fresh = b.state.joining = True
+    _, applied = b.round(remote, key, now=200)
+    assert not applied.again
+    assert [(p["id"], p["name"], p["password"]) for p in b.playlists.items] == [
+        ("default", "Mine", "pw")]
+    assert b.settings.value(sync.K_SOURCE_IDS) is None
+
+
+def test_a_new_address_typed_on_one_is_no_other_playlist(tmp_path, site):
+    """A computer that synced before takes a playlist's new address made
+    on another as it always did: only one new to the copy keeps its own."""
+    slot, key = sync.derive(os.urandom(32))
+    remote = sync.Remote(slot, site.url, timeout=5)
+    a, b = Computer(tmp_path, "a", slot), Computer(tmp_path, "b", slot)
+    a.playlists.add(dict(PROVIDER, id="default"))
+    a.state.seen = set(sync.CATEGORIES)
+    a.round(remote, key, now=100)
+    b.state.fresh = b.state.joining = True
+    b.round(remote, key, now=200)
+    a.playlists.update("default", server="http://moved.example:8080")
+    a.round(remote, key, now=300)
+    _, applied = b.round(remote, key, now=400)
+    assert not applied.again
+    assert [(p["id"], p["server"]) for p in b.playlists.items] == [
+        ("default", "http://moved.example:8080")]
+
+
+def test_a_playlist_kept_under_another_id_removed_elsewhere(tmp_path, site):
+    """Removed on the other computer: gone here too, and its id with it."""
+    slot, key = sync.derive(os.urandom(32))
+    remote = sync.Remote(slot, site.url, timeout=5)
+    a, b = Computer(tmp_path, "a", slot), Computer(tmp_path, "b", slot)
+    a.playlists.add(dict(PROVIDER, id="default"))
+    b.playlists.add(dict(OTHER, id="default"))
+    b.playlists.add(dict(PROVIDER, name="Third", server="http://third.example", id="cccc3333"))
+    a.state.seen = set(sync.CATEGORIES)
+    a.round(remote, key, now=100)
+    b.state.fresh = b.state.joining = True
+    b.round(remote, key, now=200)
+    b.round(remote, key, now=300)
+    a.round(remote, key, now=400)
+    other_on_a = next(p["id"] for p in a.playlists.items if p["server"] == OTHER["server"])
+    a.playlists.remove(other_on_a)
+    a.round(remote, key, now=500)
+    b.playlists.set_active("cccc3333")
+    b.round(remote, key, now=600)
+    assert sorted(p["server"] for p in b.playlists.items) == [
+        PROVIDER["server"], "http://third.example"]
+    assert b.playlists.get("default") is None
+    # Only A's playlist, the copy's "default", is still kept under another id.
+    kept = json.loads(b.settings.value(sync.K_SOURCE_IDS) or "{}")
+    assert list(kept.values()) == ["default"]
+    assert b.playlists.get(next(iter(kept)))["server"] == PROVIDER["server"]
+
+
 def test_what_a_round_changed_is_told_for_the_profile_in_use():
     """Sync writes the first profile's own under their plain names and each
     other profile's under its id. The window acts on what changed for the
