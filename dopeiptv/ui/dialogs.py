@@ -1294,8 +1294,13 @@ class FeedbackDialog(QDialog):
         self._edited = False
         self.setWindowTitle(tr("feedback_title"))
         self.setMinimumWidth(600)
-        col = QVBoxLayout(self)
-        col.setContentsMargins(24, 20, 24, 18)
+        # Everything but Cancel and Send scrolls: the answers, the questions
+        # and the preview together are taller than a laptop's screen, and a
+        # window as tall as all of it went off the screen with Send under it.
+        self._body = QWidget()
+        self._body.setObjectName("FeedbackBody")
+        col = QVBoxLayout(self._body)
+        col.setContentsMargins(24, 20, 24, 8)
         col.setSpacing(8)
 
         def label(text: str, size: int = 12, colour: str = "", bold: bool = True) -> QLabel:
@@ -1416,7 +1421,19 @@ class FeedbackDialog(QDialog):
         col.addWidget(note)
         self.answers.setVisible(not copy_only)
         note.setVisible(not copy_only)
-        buttons = QHBoxLayout()
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        self._scroll = QScrollArea()
+        self._scroll.setObjectName("FeedbackScroll")
+        self._scroll.setWidget(self._body)
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        outer.addWidget(self._scroll, 1)
+        self._button_bar = QWidget()
+        buttons = QHBoxLayout(self._button_bar)
+        buttons.setContentsMargins(24, 10, 24, 18)
         buttons.addStretch(1)
         cancel = QPushButton(tr("common_cancel"))
         self.send_btn = QPushButton(tr("build_copy_report" if copy_only else "report_send"),
@@ -1425,7 +1442,7 @@ class FeedbackDialog(QDialog):
         self.send_btn.clicked.connect(self.accept)
         buttons.addWidget(cancel)
         buttons.addWidget(self.send_btn)
-        col.addLayout(buttons)
+        outer.addWidget(self._button_bar)
         self._topics.buttonToggled.connect(lambda *_a: self._topic_changed())
         for box in self.attach.values():
             box.toggled.connect(lambda *_a: self._refresh())
@@ -1457,11 +1474,18 @@ class FeedbackDialog(QDialog):
         self._ready()
         self._fit()
 
+    #: How short the window may be made: the rest scrolls.
+    SHORTEST = 360
+    #: Its share of the screen's height at most.
+    SCREEN_SHARE = 0.9
+
     def _fit(self) -> None:
-        """As tall as what it holds at its width: the questions and the
-        preview come and go, and wrapped text (the topics, the notes) is
-        taller in some languages - a plain size hint leaves it overlapping."""
-        lay = self.layout()
+        """As tall as what it holds at its width, up to the screen's room:
+        the questions and the preview come and go, and wrapped text (the
+        topics, the notes) is taller in some languages - a plain size hint
+        leaves it overlapping. Past that room it scrolls, Cancel and Send
+        always in sight, and the window can be made shorter still."""
+        lay = self._body.layout()
         if lay is None:
             return
         lay.invalidate()
@@ -1469,8 +1493,35 @@ class FeedbackDialog(QDialog):
         w = max(self.width(), self.minimumWidth())
         h = lay.totalHeightForWidth(w) if lay.hasHeightForWidth() else lay.totalSizeHint().height()
         h = max(h, lay.totalSizeHint().height())
-        self.setMinimumHeight(h)
-        self.resize(w, h)
+        want = h + self._button_bar.sizeHint().height()
+        room = self._room()
+        cap = int(room.height() * self.SCREEN_SHARE) if room is not None else want
+        self.setMinimumHeight(min(want, self.SHORTEST, cap))
+        self.resize(w, max(self.minimumHeight(), min(want, cap)))
+        if self.isVisible():
+            # Once the window manager has the new size and its frame.
+            QTimer.singleShot(0, self._keep_on_screen)
+
+    def _room(self):
+        """The screen's room for windows (the Dock and menu bar, the panel
+        left out), on the screen the window or its parent is on."""
+        parent = self.parentWidget()
+        screen = self.screen() or (parent.screen() if parent is not None else None) \
+            or QApplication.primaryScreen()
+        return screen.availableGeometry() if screen is not None else None
+
+    def _keep_on_screen(self) -> None:
+        """Moved up (or in) so none of it is under the Dock or off the
+        screen - its title bar first."""
+        room = self._room()
+        if room is None or not self.isVisible():
+            return
+        frame = self.frameGeometry()
+        x = min(frame.x(), room.right() - frame.width() + 1)
+        y = min(frame.y(), room.bottom() - frame.height() + 1)
+        x, y = max(x, room.left()), max(y, room.top())
+        if (x, y) != (frame.x(), frame.y()):
+            self.move(x, y)
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
@@ -1497,6 +1548,9 @@ class FeedbackDialog(QDialog):
         self.preview.setVisible(on)
         self.show_btn.setText(tr("fb_hide" if on else "fb_show") + ("  \u25b4" if on else "  \u25be"))
         self._fit()
+        if on:
+            # What opened is what they asked to see: scrolled into sight.
+            QTimer.singleShot(0, lambda: self._scroll.ensureWidgetVisible(self.preview, 0, 12))
 
     def _ready(self) -> None:
         self.send_btn.setEnabled(bool(self.topic()) and bool(self.message.toPlainText().strip()))

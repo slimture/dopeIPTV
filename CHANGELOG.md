@@ -9,6 +9,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- Send feedback fits the screen: with answers to earlier feedback, "Something
+  does not work" and the preview open it was taller than a laptop's screen,
+  could not be made shorter and hid Send under the Dock. It is now at most
+  nine tenths of the screen's height, what does not fit scrolls, and Cancel
+  and Send stay at its foot.
 - M3U sources: a channel keeps its id when the provider adds, removes or
   reorders channels. Ids used to be the channel's place in the list, so one
   channel added at the top moved every favourite, hidden or renamed channel,
