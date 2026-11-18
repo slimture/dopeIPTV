@@ -99,6 +99,19 @@ def test_what_ffmpeg_finds_refines_the_plan():
 
 # -- ffmpeg's command line -----------------------------------------------------
 
+def test_a_seeks_pieces_come_in_shorter_segments():
+    """A moment gone back to (cast_feed's pieces): the Apple TV takes a
+    stream once LEAD segments are there - 2 s ones, so 6 s converted, not
+    18 - and a converted picture keys at the same step."""
+    p = ab.plan("", "http://p/live/u/pw/1.ts", ["h264", "aac"], live=True)
+    args = ab.ffmpeg_args("ffmpeg", p, feed=True)
+    assert args[args.index("-hls_time") + 1] == str(ab.FEED_SEGMENT_S) == "2"
+    assert args[args.index("-hls_list_size") + 1] == "0"          # every segment kept
+    p = ab.plan("", "http://p/live/u/pw/1.ts", ["mpeg2video", "mp2"], live=True)
+    args = ab.ffmpeg_args("ffmpeg", p, feed=True)
+    assert args[args.index("-force_key_frames") + 1] == "expr:gte(t,n_forced*2)"
+
+
 def test_ffmpeg_copies_into_fmp4_hls_relative_to_its_folder():
     p = ab.plan("", "http://p/live/u/pw/1.ts", ["h264", "aac"], live=True)
     args = ab.ffmpeg_args("ffmpeg", p, net=["-user_agent", "X"])
@@ -110,6 +123,7 @@ def test_ffmpeg_copies_into_fmp4_hls_relative_to_its_folder():
         ab.LIVE_WINDOW_S // ab.SEGMENT_S)
     assert "delete_segments" in args[args.index("-hls_flags") + 1]
     assert args[-1] == ab.PLAYLIST and not os.path.isabs(args[-1])
+
     assert "-sn" in args and "-tag:v" not in args
     assert args.index("-user_agent") < args.index("-i")
 

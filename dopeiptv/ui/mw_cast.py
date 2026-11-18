@@ -1686,6 +1686,9 @@ class _CastMixin:
         and a stuck cast is never sent again beside it."""
         self._cast_inflight = getattr(self, "_cast_inflight", 0) + 1
         ctx = getattr(self, "_cast_ctx", None)
+        watch = getattr(self, "_cast_watch", None)
+        if callable(watch):
+            watch().new_stream()                # it has its time to start
 
         def over(fn, ok, *a):
             self._cast_inflight = max(0, getattr(self, "_cast_inflight", 1) - 1)

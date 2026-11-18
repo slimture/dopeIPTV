@@ -9,6 +9,13 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- AirPlay: a stream the Apple TV is still loading - a cast just begun, a
+  seek in a channel - is no longer sent again after ten seconds of
+  buffering: that only started it over (it went back a few seconds at the
+  start, and a seek never took). A new stream has 45 seconds to start; once
+  it has played, ten seconds stuck is a stall as before. A seek reaches the
+  Apple TV sooner too: its stream is cut into 2-second segments, so the
+  Apple TV has the three it waits for after 6 seconds of it, not 18.
 - AirPlay: going back in a channel while it is cast moves the Apple TV
   there again. Since 1.6.4 the moment was handed over at its first segment
   and the Apple TV played on where it was; it waits for three again, as

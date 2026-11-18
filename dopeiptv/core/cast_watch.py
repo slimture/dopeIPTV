@@ -29,6 +29,11 @@ ENDED, ERROR, IDLE, STARTING = "ended", "error", "idle", "starting"
 
 #: Buffering this long, not paused by the person, is a stall.
 STALL_S = 10.0
+#: A stream that has not played yet - a cast just begun, a seek, a channel
+#: sent again - is given this long to start: an Apple TV loading a new
+#: stream often takes more than STALL_S, and sending it again then only
+#: started it over (it went back a few seconds, and a seek never took).
+START_STALL_S = 45.0
 #: The tries for one stall before the card says it failed.
 TRIES = 2
 #: Playing this long after a try: the stall is over, and so are its tries.
@@ -66,6 +71,7 @@ class Watchdog:
     """One cast's stalls (a new title or channel on the TV is a new one)."""
 
     stall_s: float = STALL_S
+    start_stall_s: float = START_STALL_S
     tries_max: int = TRIES
     settled_s: float = SETTLED_S
     #: Stuck since (monotonic seconds), while it is.
@@ -80,12 +86,21 @@ class Watchdog:
     buffered_at: float | None = None
     #: How long the last stall lasted, once it ended.
     last_stall: float = 0.0
+    #: The stream on the receiver has played since it was sent.
+    started: bool = False
 
     def reset(self) -> None:
         """Try again: a stall of its own, its own tries."""
         self.since = self.playing_since = self.buffered_at = None
         self.tries = 0
         self.failed = False
+        self.started = False
+
+    def new_stream(self) -> None:
+        """A stream sent to the receiver (a seek, live, a try): it has
+        START_STALL_S to start before a wait is a stall; the tries stay."""
+        self.since = self.playing_since = None
+        self.started = False
 
     def tick(self, now: float, ph: str, held: bool = False, busy: bool = False) -> str:
         """The receiver is *ph* at *now*; *held*: the person paused it (or an
@@ -96,7 +111,10 @@ class Watchdog:
             return ""
         if ph == BUFFERING:
             self.buffered_at = now
+        if busy:
+            self.started = False                # a new stream on its way
         if ph == PLAYING:
+            self.started = True
             said = ""
             if self.since is not None and not self.tries:
                 self.last_stall = max(0.0, now - self.since)
@@ -121,7 +139,7 @@ class Watchdog:
         if self.since is None:
             self.since = now
             return BEGAN
-        if now - self.since < self.stall_s:
+        if now - self.since < (self.stall_s if self.started else self.start_stall_s):
             return ""
         self.last_stall = now - self.since
         self.since = None
