@@ -155,6 +155,28 @@ def test_past_the_space_for_all_a_new_slot_waits_and_the_rest_are_written():
         back()
 
 
+def test_slots_made_small_cannot_all_grow_past_the_space():
+    """A new slot is refused once the space is full, but one there already
+    is still written - so many made small could each grow to MAX_BLOB after.
+    Growing stops at GROW_SHARE of the space; a slot rewritten no larger
+    (a household that syncs) is taken as before."""
+    d = tempfile.mkdtemp()
+    back = _limit({(sync, "MAX_TOTAL"): 4000})
+    try:
+        slots = [f"{i:02x}" * 32 for i in range(1, 9)]
+        for slot in slots:
+            assert sync.put(d, slot, 0, _blob(100))[0] == 200
+        grown = [sync.put(d, slot, 1, _blob(2000))[0] for slot in slots]
+        assert grown[0] == 200 and grown[-1] == 507
+        assert sync.usage(d, recount=True)["bytes"] <= 4000 * sync.GROW_SHARE
+        kept = sync.get(d, slots[-1])
+        assert kept["version"] == 1                                 # as it was
+        assert sync.put(d, slots[-1], 1, _blob(100))[0] == 200      # no larger: written
+        assert sync.put(d, slots[0], 2, _blob(1500))[0] == 200      # smaller: written
+    finally:
+        back()
+
+
 def test_past_80_percent_it_says_so():
     d = tempfile.mkdtemp()
     sync.put(d, SLOT, 0, _blob(1000))

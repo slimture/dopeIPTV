@@ -26,7 +26,8 @@ admin page says so and the owner's devices are told (donate.py).
                             wrote since version n: the app merges and tries
                             again
                           | 413 more than MAX_BLOB
-                          | 507 a new slot while all of them keep MAX_TOTAL
+                          | 507 a new slot while all of them keep MAX_TOTAL,
+                            or one that grows past GROW_SHARE of it
     DELETE /sync/<slot>   200 {"deleted": true | false}
 
 Stored as <STATS_DIR>/sync/<slot>.json, mode 600, written whole (a temporary
@@ -59,6 +60,11 @@ MIN_BLOB = 1 + 12 + 16
 KEEP_DAYS = 180
 #: All slots together, on disk: past it a new slot is refused (507).
 MAX_TOTAL = 5 * 1024 ** 3
+#: A slot there already may still grow past MAX_TOTAL, but not past this:
+#: without it, slots made small while there was room could each be written
+#: up to MAX_BLOB afterwards, and the disk had no limit at all.
+#: (As a share of MAX_TOTAL.)
+GROW_SHARE = 1.5
 #: Past this share of MAX_TOTAL the admin page and the owner's devices are told.
 WARN_SHARE = 0.8
 #: How long a count of the folder holds before it is made again (put and
@@ -219,6 +225,11 @@ def put(stats_dir: str, slot: str, version_seen: object, blob: object) -> tuple[
         if cur is None and usage(stats_dir)["bytes"] + size > MAX_TOTAL:
             return 507, {"error": "full"}
         before = _size(path) if cur else 0
+        grows = len(str(blob)) - len(cur["blob"]) if cur else 0
+        if grows > 0 and usage(stats_dir)["bytes"] + grows > MAX_TOTAL * GROW_SHARE:
+            # Rewritten no larger it would still be taken: a household that
+            # syncs goes on syncing while the space is full.
+            return 507, {"error": "full"}
         now = int(time.time())
         _write(path, {"version": version + 1, "t": now, "blob": blob})
         _changed(stats_dir, _size(path) - before, 0 if cur else 1)
