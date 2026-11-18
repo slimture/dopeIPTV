@@ -59,12 +59,10 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 # The ways to pay are invited to - the header's link and heart, the front
 # page's band, the footer's link - only once one is set up: until then the
 # support page is there (its policy, GitHub Sponsors, "coming soon"), but
-# nothing on the site asks for money that cannot be taken. With the tip
-# dialog on, the header's link and heart and the band's button open it
-# (data-tip-dialog; without nav.js they go to the support page); the footer's
-# link is the support page, where monthly support is too.
+# nothing on the site asks for money that cannot be taken. Every one of them
+# goes to the support page, where both ways are - as the app's heart does;
+# its tip button opens the tip dialog there (data-tip-dialog).
 | ($TIPS_ON or $TIP_URL != "" or $MONTHLY_URL != "") as $SUPPORT_ON
-| (if $TIPS_ON then " data-tip-dialog" else "" end) as $TIP_ATTR
 # The company behind dopeIPTV: in every footer and on the support page, as
 # Stripe's review and the Swedish E-Commerce Act ask.
 | "Solecraft AB" as $COMPANY
@@ -248,11 +246,11 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
       | "          <a role=\"menuitem\" class=\"navmenu-item\(if cur($key) then " is-current" else "" end)\" href=\"\($href | h)\"\(if cur($key) then " aria-current=\"page\"" else "" end)>\($label | h)</a>\n"]
      | add) as $menuitems
     # Support: a quiet link beside the others, to the support page.
-    | "      <a class=\"navlink navdonate\" href=\"/support/\"\($TIP_ATTR)\(if $current == "support" then " aria-current=\"page\"" else "" end)><svg class=\"heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_nav") | h)</a>\n" as $navdonate
-    | "          <a role=\"menuitem\" class=\"navmenu-item navdonate\" href=\"/support/\"\($TIP_ATTR)><svg class=\"heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_nav") | h)</a>\n" as $menudonate
+    | "      <a class=\"navlink navdonate\" href=\"/support/\"\(if $current == "support" then " aria-current=\"page\"" else "" end)><svg class=\"heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_nav") | h)</a>\n" as $navdonate
+    | "          <a role=\"menuitem\" class=\"navmenu-item navdonate\" href=\"/support/\"><svg class=\"heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_nav") | h)</a>\n" as $menudonate
     # ...and on a phone, where the links fold into the menu, a heart of its
     # own in the header, one tap from anywhere.
-    | "      <a class=\"navheart\" href=\"/support/\"\($TIP_ATTR) aria-label=\"\(t("support_nav") | h)\" title=\"\(t("support_nav") | h)\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg></a>\n" as $navheart
+    | "      <a class=\"navheart\" href=\"/support/\" aria-label=\"\(t("support_nav") | h)\" title=\"\(t("support_nav") | h)\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg></a>\n" as $navheart
     | (if ($avail | length) > 1 then
          "      <details class=\"langpick\" id=\"langPick\" name=\"hdrmenu\">\n"
          + "        <summary aria-label=\"\(t("lang_label") | h)\" title=\"\($S.names[$lang] // $lang | h)\">\n"
@@ -402,21 +400,19 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
         + "        <p class=\"dlx-gh\"><a href=\"\($REPO | h)/releases/latest\" rel=\"nofollow\">\(t("dl_all_name") | h)</a></p>\n"
         + "      </div>\n"
       end;
-  # The band on the front page: why, and a way to the support page.
+  # The band on the front page: the support page's top, small - the
+  # supporter's icon, why in a sentence, and one button to the support page,
+  # where both ways are. A soft glow behind it; the button's heart beats
+  # while the band is in view (nav.js .is-live).
   def support_band:
       "  <section id=\"support\" class=\"pt0\">\n"
       + "    <div class=\"wrap\">\n"
-      + "      <div class=\"donate\">\n"
-      + "        <div class=\"donate-fx\" aria-hidden=\"true\"><svg class=\"donate-big\" viewBox=\"0 0 24 24\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg><i></i><i></i><i></i><i></i><i></i><i></i></div>\n"
-      + "        <div class=\"donate-text\">\n"
-      + "          <h2>\(t("support_h2") | h)</h2>\n"
-      + "          <p>\(t("support_p") | h)</p>\n"
-      + "          <p class=\"donate-short\">\(t("support_p_short") | h)</p>\n"
-      + "        </div>\n"
-      + "        <div class=\"donate-act\">\n"
-      + "          <a class=\"btn primary donate-btn\" href=\"/support/\"\($TIP_ATTR)><svg class=\"donate-heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_btn") | h)</a>\n"
-      + "          <small>\(t("support_band_note") | h)</small>\n"
-      + "        </div>\n"
+      + "      <div class=\"donate donate-calm\">\n"
+      + "        <img class=\"donate-icon\" src=\"/supporter-icon.png?v=1\" width=\"64\" height=\"64\" alt=\"\" loading=\"lazy\">\n"
+      + "        <h2>\(t("support_h2") | h)</h2>\n"
+      + "        <p>\(t("support_p_short") | h)</p>\n"
+      + "        <a class=\"btn primary donate-btn\" href=\"/support/\"><svg class=\"donate-heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_btn") | h)</a>\n"
+      + "        <small>\(t("support_band_note") | h)</small>\n"
       + "      </div>\n"
       + "    </div>\n"
       + "  </section>\n\n";

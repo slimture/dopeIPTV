@@ -2051,3 +2051,28 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
 .fbs-send { align-self: stretch; justify-content: center; padding: 14px 18px; font-size: 16px; }
 .fbs-send:disabled { opacity: .55; cursor: default; transform: none; }
 .fbs-thanks { margin: 18px 0; text-align: center; font-weight: 650; font-size: 1.05rem; }
+
+/* The band, calm (render.jq support_band): the support page's top, small -
+   the supporter's icon, why in a sentence, one button to the support page.
+   A soft glow behind the icon and nothing drifting; the button's heart
+   still beats while the band is in view (.is-live, above). */
+#support .donate.donate-calm { display: flex; flex-direction: column; align-items: center; gap: 0;
+  text-align: center; padding: 44px 28px 40px; overflow: hidden;
+  background: radial-gradient(42% 70% at 50% 32%, color-mix(in srgb, var(--heart) 13%, transparent), transparent 100%),
+    var(--surface); }
+.is-phone #support .donate.donate-calm {
+  background: radial-gradient(60% 55% at 50% 28%, color-mix(in srgb, var(--heart) 14%, transparent), transparent 100%),
+    var(--bg); }
+.donate-calm .donate-icon { width: 64px; height: 64px; border-radius: 15px;
+  box-shadow: 0 14px 32px -16px color-mix(in srgb, var(--heart) 75%, transparent); }
+.donate-calm h2 { font-size: clamp(1.35rem, 2.6vw, 1.75rem); line-height: 1.25; margin: 16px auto 8px;
+  max-width: 26ch; text-align: center; letter-spacing: -.02em; }
+.donate-calm p { margin: 0 auto 20px; max-width: 46ch; color: var(--muted); line-height: 1.6; }
+#support .donate-calm p { display: block; }
+.donate-calm .donate-btn { min-width: 220px; justify-content: center; }
+.donate-calm small { margin-top: 10px; color: var(--faint); font-size: 12.5px; line-height: 1.5; }
+@media (max-width: 760px) {
+  #support .donate.donate-calm { padding: 30px 20px 26px; }
+  .donate-calm small { display: block; }
+}
+
