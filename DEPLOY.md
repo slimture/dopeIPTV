@@ -287,6 +287,7 @@ SUPPORT_SPONSORS_URL=https://github.com/sponsors/slimture
 SUPPORT_TIP_HINT=50 kr
 SUPPORT_MONTHLY_PRICE=29 kr
 SUPPORT_MONTHLY_PRICES=SEK 29, EUR 2.50, GBP 2.50, USD 3
+SUPPORT_PORTAL_URL=https://billing.stripe.com/p/login/...
 CONF
 su -m iptv -c 'sh /usr/local/www/iptv/sync-releases.sh'
 ```
@@ -298,6 +299,17 @@ buy.stripe.com/...`, used while `SUPPORT_TIPS` is not on). Only `https://`
 addresses are taken; a way left out (or empty) is "coming soon". The hint
 and the price are only words on the page - the dialog's amounts come from
 `donate.py`, the monthly price is set in its Payment Link.
+
+`SUPPORT_PORTAL_URL` is Stripe's customer portal (Settings → Billing →
+Customer portal → its login link): "Manage or cancel your monthly support"
+under monthly support's button, and in the rules' "Cancelling monthly
+support". Without it that link goes to the monthly card.
+
+**The page itself** is `site/templates/support.html`: the two ways at the
+top, what a supporter gets (the app's supporter icon, `public/supporter-icon.png`,
+drawn by the app's `ui/app_icon.py`), where the money goes, and the rules -
+`site/legal/<sv|en>/support.html`, each section a folded question
+(`<details class="sp-q">`), who you pay open below them.
 
 **In the visitor's currency.** Monthly support's Stripe price can have an
 amount of its own per currency (the price → "Add a price by currency"), and

@@ -45,6 +45,9 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 | ($ARGS.named.tip_url // "") as $TIP_URL
 | ($ARGS.named.monthly_url // "") as $MONTHLY_URL
 | ($ARGS.named.sponsors_url // "") as $SPONSORS_URL
+# Stripe's customer portal: where a monthly supporter changes their card or
+# cancels (SUPPORT_PORTAL_URL, its login link: they get a link by e-mail).
+| ($ARGS.named.portal_url // "") as $PORTAL_URL
 | (($ARGS.named.tip_hint // "") | if . == "" then "50 kr" else . end) as $TIP_HINT
 | [($ARGS.named.monthly_prices // "") | splits("[,;](?=\\s*[A-Za-z])")
    | gsub("^\\s+|\\s+$"; "") | capture("^(?<c>[A-Za-z]{3})\\s+(?<a>[0-9]+([.,][0-9]{1,2})?)$")?
@@ -434,12 +437,19 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
        else
          "        <a class=\"btn\(if $primary then " primary" else "" end)\" href=\"\($href | h)\" rel=\"nofollow noopener\" data-support=\"\($ev)\">\($btn | h)</a>\n"
        end)
+    + (if $ev == "monthly" and $PORTAL_URL != "" then
+         "        <a class=\"sway-manage\" href=\"\($PORTAL_URL | h)\" rel=\"nofollow noopener\">\(t("support_manage") | h)</a>\n"
+       else "" end)
     + "      </div>\n";
-  # In the reader's language and direction, also where the page's text
-  # around them is the English one (render.jq page_legal).
-  def support_options:
-    " lang=\"\($lang | h)\" dir=\"\(if ($S.rtl | index($lang)) then "rtl" else "ltr" end)\"" as $in_lang
-    | "    <div class=\"support-ways\"\($in_lang)>\n"
+  # The support page's own parts (templates/support.html), in the reader's
+  # language: the two ways as big cards - a tip, monthly support with the
+  # customer portal under it -, GitHub Sponsors as a line once it is set up,
+  # what makes it safe, the thank-you nav.js fills in after paying; what a
+  # supporter gets and where the money goes. The rules - the legal text, in
+  # Swedish or English - fold up below them (site/legal/<lang>/support.html).
+  def support_ways:
+    def check: "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M5 12.5l4.2 4.2L19 7\"/></svg>";
+    "      <div class=\"support-ways\">\n"
     + support_way("sway-tip"; t("support_tip_h"); t("support_tip_p") | h
                   | gsub("%AMOUNT%"; "<bdi class=\"sway-hint\">\($TIP_HINT | h)</bdi>");
                   $TIP_URL; t("support_tip_btn"); true; "tip")
@@ -447,16 +457,37 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
                   | gsub("%AMOUNT%"; "<bdi class=\"sway-price\"\(if ($PRICE_LIST | length) > 0
                       then " data-prices=\"\($MONTHLY_PRICES | tojson | h)\" data-base=\"\($PRICE_LIST[0].key | h)\"" else "" end)>\($MONTHLY_PRICE | h)</bdi>");
                   $MONTHLY_URL; t("support_monthly_btn"); true; "monthly")
-    + support_way("sway-gh"; "GitHub Sponsors"; t("support_gh_p") | h; $SPONSORS_URL; t("support_gh_btn"); false; "github")
-    + "    </div>\n"
-    + "    <p class=\"support-stripe\"\($in_lang)>\(t("support_stripe") | h)</p>\n"
-    + "    <div id=\"support-thanks\" class=\"support-thanks\"\($in_lang) hidden"
+    + "      </div>\n"
+    + (if $SPONSORS_URL != "" then
+         "      <p class=\"sp-gh\"><a href=\"\($SPONSORS_URL | h)\" rel=\"nofollow noopener\" data-support=\"github\">\(t("support_gh_btn") | h)</a> · \(t("support_gh_p") | h)</p>\n"
+       else "" end)
+    + "      <ul class=\"sp-trust\">\n"
+    + ([["support_trust_stripe", "support_trust_refund", "support_trust_cancel"][]
+       | "        <li>\(check)\(t(.) | h)</li>\n"] | add)
+    + "      </ul>\n"
+    + "      <div id=\"support-thanks\" class=\"support-thanks\" hidden"
     + ([[["thanks", "support_thanks"], ["again", "support_again"], ["key", "support_key"],
          ["keyhow", "support_key_how"], ["keycopy", "support_key_copy"], ["keycopied", "support_key_copied"],
          ["keyopen", "support_key_open"], ["keywait", "support_key_wait"], ["keynone", "support_key_none"],
          ["loading", "support_loading"]][]
         | . as [$k, $key] | " data-\($k)=\"\(t($key) | h)\""] | add)
     + "></div>\n";
+  def support_perks:
+    def theme($cls; $name):
+      "<span class=\"tp \($cls)\" aria-hidden=\"true\"><i class=\"tp-side\"></i><i class=\"tp-main\"><b></b><b></b><b class=\"on\"></b><b></b></i></span>";
+    "      <div class=\"sp-perks-grid\">\n"
+    + "        <div class=\"perk perk-themes\"><div class=\"perk-art\">\(theme("tp-aurora"; "Aurora"))\(theme("tp-dawn"; "Dawn"))</div><h3>\(t("support_perk_themes") | h)</h3><p>Aurora · Dawn</p></div>\n"
+    + "        <div class=\"perk perk-icon\"><div class=\"perk-art\"><img src=\"/supporter-icon.png?v=1\" width=\"64\" height=\"64\" alt=\"\"></div><h3>\(t("support_perk_icon") | h)</h3></div>\n"
+    + "        <div class=\"perk perk-heart\"><div class=\"perk-art\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg></div><h3>\(t("support_perk_heart") | h)</h3></div>\n"
+    + "        <div class=\"perk perk-feedback\"><div class=\"perk-art\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.5 4v-4h0A1.5 1.5 0 0 1 4 14.5z\"/></svg></div><h3>\(t("support_perk_feedback") | h)</h3></div>\n"
+    + "      </div>\n";
+  def support_money:
+    "      <ul class=\"sp-money-list\">\n"
+    + ([[["support_money_dev", "<path d=\"M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16\"/>"],
+        ["support_money_servers", "<rect x=\"4\" y=\"4\" width=\"16\" height=\"6.5\" rx=\"2\"/><rect x=\"4\" y=\"13.5\" width=\"16\" height=\"6.5\" rx=\"2\"/><path d=\"M8 7.2h.01M8 16.7h.01\"/>"],
+        ["support_money_apple", "<rect x=\"3\" y=\"4\" width=\"18\" height=\"12\" rx=\"2\"/><path d=\"M8 20h8M12 16v4\"/>"]][]
+       | "        <li><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\">\(.[1])</svg><span>\(t(.[0]) | h)</span></li>\n"] | add)
+    + "      </ul>\n";
   # The app's own pictures (tools/site_screenshots.py in its repository):
   # public/screenshots/<lang>/<name>.webp, in the reader's language or else
   # English; $screenshots lists what is there as "<lang>/<name>". A smaller
@@ -716,7 +747,12 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
            "      <p class=\"legal-note\">\(t("legal_only_en") | h)</p>\n" end),
          meta: ("<time datetime=\"\($L.updated | h)\">\($X.updated | h)</time> · \($X.governing | h)"
            + " <a href=\"\($path + "?lang=" + $X.link | h)\" hreflang=\"\($X.link | h)\" lang=\"\($X.link | h)\">\($X.other | h)</a>"),
-         body: (if $page == "support" then $body | sub("<!--SUPPORT-OPTIONS-->"; support_options) else $body end)});
+         body: (if $page == "support" then
+                  $body | gsub("%PORTAL%"; (if $PORTAL_URL != "" then $PORTAL_URL else "#monthly" end) | h)
+                else $body end),
+         ways: (if $page == "support" then support_ways else "" end),
+         perks: (if $page == "support" then support_perks else "" end),
+         money: (if $page == "support" then support_money else "" end)});
 
 # -- sitemap.php ------------------------------------------------------------------
 

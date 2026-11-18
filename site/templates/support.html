@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="{{v:lang}}" dir="{{v:dir}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{v:title}} · dopeIPTV</title>
+<meta name="description" content="{{v:desc}}">
+<link rel="canonical" href="{{v:canonical}}">
+{{b:hreflang}}<meta name="theme-color" content="#151517">
+<meta name="robots" content="index,follow">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="dopeIPTV">
+<meta property="og:locale" content="{{v:locale}}">
+<meta property="og:title" content="{{v:title}} · dopeIPTV">
+<meta property="og:description" content="{{v:desc}}">
+<meta property="og:url" content="{{v:canonical}}">
+<meta property="og:image" content="https://dopeiptv.org/og-image.png?v=2">
+<link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico?v=2" sizes="32x32">
+<link rel="icon" href="/favicon.png?v=2" sizes="512x512" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
+<link rel="stylesheet" href="{{v:css}}">
+</head>
+<body>
+{{b:nav}}
+<main id="top" class="sp">
+  <section class="sp-hero">
+    <div class="wrap">
+      <div class="sp-head">
+        <img class="sp-icon" src="/supporter-icon.png?v=1" width="96" height="96" alt="">
+        <h1>{{h:support_btn}}</h1>
+        <p class="sp-lead">{{h:support_p}}</p>
+      </div>
+{{b:ways}}    </div>
+  </section>
+
+  <section class="sp-sec sp-perks" aria-labelledby="sp-perks-h">
+    <div class="wrap">
+      <h2 id="sp-perks-h">{{h:support_perks_h}}</h2>
+      <p class="sp-sec-p">{{h:support_perks_p}}</p>
+{{b:perks}}    </div>
+  </section>
+
+  <section class="sp-sec sp-money" aria-labelledby="sp-money-h">
+    <div class="wrap">
+      <h2 id="sp-money-h">{{h:support_money_h}}</h2>
+{{b:money}}    </div>
+  </section>
+
+  <section class="sp-sec sp-faq" aria-labelledby="sp-faq-h">
+    <div class="wrap">
+      <h2 id="sp-faq-h">{{h:support_faq_h}}</h2>
+{{b:note}}      <p class="legal-meta" lang="{{v:clang}}" dir="ltr">{{b:meta}}</p>
+      <article class="sp-legal" lang="{{v:clang}}" dir="ltr">
+{{b:body}}      </article>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="maker">
+      <a class="sole" href="https://solecraft.se/" rel="noopener" aria-label="{{h:footer_built_by}}" data-tip="{{h:footer_built_by}}"><span class="sole-logo">Solecraft</span></a>
+      <span class="v">dopeIPTV · © {{v:year}} Solecraft AB</span>
+    </div>
+    <nav>
+      <a href="/">{{h:nav_download}}</a>
+      <a href="https://github.com/slimture/dopeIPTV">GitHub</a>
+      <a href="/help/">{{h:nav_help}}</a>
+      <a href="#feedback" data-feedback>{{h:foot_feedback}}</a>
+      <a href="/privacy/">{{h:foot_privacy_terms}}</a>
+    </nav>
+{{v:company}}  </div>
+</footer>
+<script src="{{v:navjs}}" defer></script>
+<script src="{{v:eventsjs}}" defer></script>
+</body>
+</html>

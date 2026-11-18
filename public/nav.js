@@ -475,6 +475,21 @@ var iptvCurrency = (function () {
       minimumFractionDigits: amount % 1 ? 2 : 0, maximumFractionDigits: amount % 1 ? 2 : 0 }).format(amount);
   } catch (e) { /* the page's own words stay */ }
 })();
+/* The support page's rules are folded questions (templates/support.html):
+ * a link to one - /support/#refund, the privacy policy's, the app's - opens
+ * it, on arrival and within the page. */
+(function () {
+  "use strict";
+  if (!document.querySelector(".sp-q")) { return; }
+  function openTarget() {
+    var id = "";
+    try { id = decodeURIComponent(location.hash.slice(1)); } catch (e) { return; }
+    var el = id && document.getElementById(id);
+    if (el && el.classList.contains("sp-q")) { el.open = true; el.scrollIntoView(); }
+  }
+  window.addEventListener("hashchange", openTarget);
+  openTarget();
+})();
 /* The tip dialog: Stripe's card form (the Payment Element) in a dialog on
  * this page - nothing leaves the site but the payment itself, which goes
  * from Stripe's iframes straight to Stripe. A tip is once and of any

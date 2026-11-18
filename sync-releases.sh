@@ -466,6 +466,7 @@ tips=$(conf SUPPORT_TIPS)
 tip_url=$(https_or_nothing "$(conf SUPPORT_TIP_URL)")
 monthly_url=$(https_or_nothing "$(conf SUPPORT_MONTHLY_URL)")
 sponsors_url=$(https_or_nothing "$(conf SUPPORT_SPONSORS_URL)")
+portal_url=$(https_or_nothing "$(conf SUPPORT_PORTAL_URL)")
 tip_hint=$(conf SUPPORT_TIP_HINT)
 monthly_price=$(conf SUPPORT_MONTHLY_PRICE)
 monthly_prices=$(conf SUPPORT_MONTHLY_PRICES)
@@ -477,7 +478,7 @@ render() {  # render PAGE LANG TEMPLATE OUTFILE [BODY]
         --arg page "$1" --arg lang "$2" --arg year "$year" --arg sums "$sums" \
         --arg pics_v "$pics_v" \
         --arg tips "$tips" --arg tip_url "$tip_url" --arg monthly_url "$monthly_url" \
-        --arg sponsors_url "$sponsors_url" --arg tip_hint "$tip_hint" \
+        --arg sponsors_url "$sponsors_url" --arg portal_url "$portal_url" --arg tip_hint "$tip_hint" \
         --arg monthly_price "$monthly_price" --arg monthly_prices "$monthly_prices" \
         --argjson avail "$avail" --argjson asset_urls "$asset_urls" \
         --argjson screenshots "$screenshots" --argjson help_mtime "$help_mtime" \
@@ -504,7 +505,11 @@ for c in $codes; do
         if [ "$l" = "$c" ]; then written=$c; fi
     done
     for p in $legal_pages; do
-        render "$p" "$c" "$SITE/templates/legal.html" "$OUT/i18n/$c/$p/index.html" \
+        tpl=$SITE/templates/legal.html
+        # The support page has a form of its own: the ways to give at the
+        # top, its rules folded below them.
+        [ -f "$SITE/templates/$p.html" ] && tpl=$SITE/templates/$p.html
+        render "$p" "$c" "$tpl" "$OUT/i18n/$c/$p/index.html" \
             "$SITE/legal/$written/$p.html"
     done
 done
