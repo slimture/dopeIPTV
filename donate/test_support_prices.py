@@ -141,3 +141,14 @@ def test_the_heart_says_support_us_and_the_footer_the_country():
     en = _support("", "", "en", page="terms")
     assert ">Support us</a>" in en and "· Örebro, Sweden ·" in en
     assert "· Örebro, Sverige ·" in _support("", "", "sv", page="terms")
+
+
+def test_nginx_serves_every_legal_page():
+    # A page sync-releases.sh renders but nginx does not route is a 404 on
+    # the live site - which /payments/ was, its first hour.
+    pages = set(json.load(open(os.path.join(SITE, "legal.json"), encoding="utf-8"))["pages"])
+    conf = open(os.path.join(ROOT, "deploy", "content-iptv.dope.rs.conf"), encoding="utf-8").read()
+    routes = re.findall(r"location ~ \^/\(\?<iptv_legal(?:_bare)?>([a-z|]+)\)", conf)
+    assert len(routes) == 2
+    for r in routes:
+        assert set(r.split("|")) == pages
