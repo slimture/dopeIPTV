@@ -21,7 +21,7 @@
 
 ### Changed
 
-- **Supporting dopeIPTV is a tip or monthly support** - never a donation - in all 27 languages, and the heart opens the new support page on dopeiptv.org.
+- **Supporting dopeIPTV is a tip or monthly support**, in all 27 languages, and the heart opens the new support page on dopeiptv.org.
 
 ## dopeIPTV 1.6.4
 
