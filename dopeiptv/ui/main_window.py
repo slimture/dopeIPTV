@@ -3408,6 +3408,11 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         ends it, and an older load's late word touches neither. *label*
         names the wait after what the person did."""
         x = self.xmltv
+        can_load = getattr(x, "can_load", None)
+        if callable(can_load) and not can_load():
+            # No provider yet (the first start): no guide to wait for, and
+            # no "could not load" for one that was never there.
+            return
         self._guide_loading = x
         token = self._guide_busy_begin(label)
         self._guide_load_token = token

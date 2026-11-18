@@ -20,6 +20,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 - core/instance.py: a QtNetwork that cannot load no longer stops the app -
   the second start opens a window of its own instead of handing its
   command over (UNAVAILABLE), and says why in the log.
+- providers/epg.py: with no provider (the first start's OfflineClient) the
+  guide was downloaded from "/xmltv.php" - no address - and the log said it
+  failed, the notices too when the pool was slow. `has_source` / `can_load`:
+  the window loads no guide with nothing to load it from, and a download
+  without a source raises `NoGuideSource`, said nowhere.
 
 ### Build
 

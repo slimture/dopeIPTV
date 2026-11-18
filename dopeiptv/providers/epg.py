@@ -362,6 +362,11 @@ def _index_command() -> tuple[list[str], dict[str, str]]:
             INDEX_FLAG], env
 
 
+class NoGuideSource(RuntimeError):
+    """Nothing to download a guide from: no address of its own or the
+    playlist's, no box guide, no server - the first start, no provider."""
+
+
 class XmltvGuide:
     """Downloads and indexes the provider's XMLTV guide.
 
@@ -438,6 +443,23 @@ class XmltvGuide:
         age = self._cache_age()
         return ((age is not None and age > self.CACHE_TTL)
                 or self.runs_out_soon(now))
+
+    def has_source(self) -> bool:
+        """Whether there is anywhere to download this guide from: an address
+        of its own, an M3U playlist (its url-tvg is known once it is read),
+        a box's own guide, or a server's xmltv.php."""
+        if self.custom_url:
+            return True
+        c = self.client
+        if c is None:
+            return False
+        if hasattr(c, "epg_url") or callable(getattr(c, "own_guide", None)):
+            return True
+        return getattr(c, "server", None) != ""
+
+    def can_load(self) -> bool:
+        """A source to download this guide from, or a copy on disk."""
+        return self.has_source() or self._cache_age() is not None
 
     def _cache_age(self) -> float | None:
         """Seconds since the cached guide was written; None without one."""
@@ -545,6 +567,10 @@ class XmltvGuide:
             # An M3U/offline client with no guide URL: there is no Xtream
             # xmltv.php endpoint to fall back to, so report "no EPG" cleanly.
             raise RuntimeError("no EPG source for this playlist")
+        elif getattr(self.client, "server", None) == "":
+            # No provider at all (the first start's OfflineClient): there
+            # is no xmltv.php to ask - "/xmltv.php" alone is no address.
+            raise NoGuideSource("no provider")
         else:
             params = {"username": self.client.username,
                       "password": self.client.password}
@@ -669,6 +695,9 @@ class XmltvGuide:
             self._last_try = time.monotonic()
             try:
                 data = self._download()
+            except NoGuideSource:
+                self._failed = not self._loaded
+                return self._loaded
             except Exception as e:
                 log.info("EPG download failed (%s)", e)
                 # A refresh that cannot reach the guide keeps the one it has

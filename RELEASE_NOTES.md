@@ -6,6 +6,7 @@
 
 - **Flatpak (Linux):** the app crashed as it started, from 1.5.0 on - Qt's network part needs the Kerberos library (`libgssapi_krb5`), which the Flatpak runtime does not have. The Flatpak now carries it (#36). Before a release goes out, its Flatpak is now installed and started in the same runtime you get, as the other packages already were - every Qt part the app uses must load, and the app must keep running.
 - **If that library is ever missing,** the app still starts: a second start then opens a window of its own instead of handing its command to the one running.
+- **First start without a source:** the app no longer tries to load a programme guide from nowhere (it could say the guide failed to load).
 
 ## dopeIPTV 1.6.5
 

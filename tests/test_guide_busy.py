@@ -22,6 +22,8 @@ from dopeiptv.ui.mw_busy import _BusyMixin
 from dopeiptv.ui.notices import NoticeHub
 
 _app = QApplication.instance() or QApplication([])
+# A guide with somewhere to load from: one with none is never loaded.
+GUIDE_URL = "http://guide.test/xmltv.xml"
 
 
 class _Window(_BusyMixin, QWidget):
@@ -44,7 +46,7 @@ class _Window(_BusyMixin, QWidget):
 
     @staticmethod
     def _guide():
-        g = XmltvGuide(client=None)
+        g = XmltvGuide(client=None, custom_url=GUIDE_URL)
         g.ensure_loaded = lambda force=False: True
         return g
 
@@ -240,7 +242,7 @@ def test_a_lookups_own_load_is_owned_by_the_window(monkeypatch):
     programmes) found no guide and loads it itself: its first word makes the
     window own a load beside it, whose end ends the strip."""
     jobs = _jobs(monkeypatch)
-    w = _Window(guide=XmltvGuide(client=None))
+    w = _Window(guide=XmltvGuide(client=None, custom_url=GUIDE_URL))
     g = w.xmltv
     g.PARSE_ELSEWHERE = False
     g.progress_cb = w._guide_progress(0)      # as the window makes every guide
@@ -291,3 +293,18 @@ def test_tv_mode_never_loads_the_guide_on_the_windows_thread():
     w.xmltv.loaded = True
     on, _next, frac = now_next(w, {"name": "C"})
     assert "News" in on and frac is not None and w.asked == 1
+
+
+def test_no_provider_no_guide_load_and_no_failure():
+    # The first start (no provider): nothing to load the guide from, so no
+    # "Loading programme guide", no job and no "could not load".
+    from dopeiptv.providers.client import OfflineClient
+    jobs = []
+    w = _Window(guide=XmltvGuide(OfflineClient()))
+    mw_run = mw.run_async
+    try:
+        mw.run_async = lambda _pool, fn, done, err=None: jobs.append(fn)
+        w._load_guide()
+    finally:
+        mw.run_async = mw_run
+    assert jobs == [] and not w.shown() and w.notes == []
