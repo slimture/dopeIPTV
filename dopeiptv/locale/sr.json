@@ -1806,6 +1806,7 @@
   "restore_cannot_replace": "Ova rezervna kopija nema plejliste ni podešavanja, pa ne može da zameni ono što je ovde.",
   "restore_kept": "Nisu u ovoj rezervnoj kopiji, pa ostaju kakvi su ovde: {what}.",
   "restore_risky_source": "Plejlista „{name}”: {what}",
+  "restore_sync_note": "Sinhronizacija je uključena: posle vraćanja ovaj računar se ponovo pridružuje sinhronizaciji kao nov. Ostali računari zadržavaju ono što imaju, a njihove novije promene vraćaju se ovde. Ako želite da zadržite samo sadržaj rezervne kopije, isključite sinhronizaciju pre vraćanja.",
   "restore_token_note": "Token daljinskog upravljanja nikad se ne uzima iz rezervne kopije: novi se pravi na ovom računaru kada se uključi daljinsko upravljanje ili deljenje.",
   "epg_zoom_out": "Umanji",
   "epg_zoom_in": "Uvećaj",

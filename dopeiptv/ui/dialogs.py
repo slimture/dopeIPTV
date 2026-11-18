@@ -2139,7 +2139,7 @@ class RestoreBackupDialog(QDialog):
         return lines
 
     def __init__(self, parent, backup, counts: dict, missing: int,
-                 risky: list, can_add: bool = True) -> None:
+                 risky: list, can_add: bool = True, syncing: bool = False) -> None:
         super().__init__(parent)
         from PyQt6.QtWidgets import QButtonGroup, QRadioButton
 
@@ -2185,6 +2185,8 @@ class RestoreBackupDialog(QDialog):
                 "  •  " + line for line in shown))
         if backup.full and bk.new_token_here(backup):
             notes.append(tr("restore_token_note"))
+        if replaceable and syncing:
+            notes.append(tr("restore_sync_note"))
         self.notes = QLabel("\n\n".join(notes))
         self.notes.setWordWrap(True)
         self.notes.setTextFormat(Qt.TextFormat.PlainText)

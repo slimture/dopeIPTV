@@ -386,9 +386,11 @@ class _SettingsMixin:
                 QMessageBox.warning(parent, tr("restore_title"), why)
             return
         store = getattr(self, "playlist_store", None)
+        on = getattr(self, "_sync_on", None)
         dlg = RestoreBackupDialog(parent, b, backup.summary(b),
                                   len(backup.missing_paths(b)), backup.risky(b),
-                                  can_add=store is not None)
+                                  can_add=store is not None,
+                                  syncing=bool(on and on()))
         if not dlg.exec():
             return
         if dlg.choice() == "add":

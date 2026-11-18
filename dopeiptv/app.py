@@ -213,13 +213,24 @@ def _watch_link_events(app, window) -> None:
 def _put_restore_in_place() -> bool | None:
     """A backup staged in Settings put in place (core/backup.apply_pending):
     None when none waited, else whether it went in. Never in the way of
-    starting."""
+    starting. Once it went in, sync joins again as a newcomer
+    (core/sync.rejoin): the older backup never removes or overwrites the
+    other computers' newer data."""
     try:
         from .core import backup
-        return backup.apply_pending()
+        ok = backup.apply_pending()
     except Exception as e:
         log.warning("restore: not put in place: %s", e)
         return None
+    if ok:
+        try:
+            from .core import sync
+            from .ui.mw_sync import state_path
+            if sync.rejoin(state_path()):
+                log.info("restore: sync joins again as this computer's first round")
+        except Exception as e:
+            log.warning("restore: sync state not reset: %s", e)
+    return ok
 
 
 def _profile_files() -> list:

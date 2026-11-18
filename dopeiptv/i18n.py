@@ -1392,6 +1392,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "restore_cannot_replace": {"en": "This backup holds no playlists or settings, so it cannot replace what is here."},
     "restore_kept": {"en": "Not in this backup, so kept as they are here: {what}."},
     "restore_risky_source": {"en": "Playlist “{name}”: {what}"},
+    "restore_sync_note": {"en": "Sync is on: after the restore this computer joins sync again as a new one. The other computers keep what they have, and their newer changes come back here. To keep only what the backup holds, turn sync off before you restore."},
     "restore_token_note": {"en": "The remote control token is never taken from a backup: a new one is made on this computer when remote control or sharing is turned on."},
     "set_page_multiview_sub": {"en": "Several channels side by side."},
     "set_page_recording_sub": {"en": "Where recordings go and how much room they may take."},

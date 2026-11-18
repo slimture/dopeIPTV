@@ -1806,6 +1806,7 @@
   "restore_cannot_replace": "Cadangan ini tidak berisi daftar putar atau pengaturan, jadi tidak bisa menggantikan yang ada di sini.",
   "restore_kept": "Tidak ada di cadangan ini, jadi tetap seperti di sini: {what}.",
   "restore_risky_source": "Daftar putar “{name}”: {what}",
+  "restore_sync_note": "Sinkronisasi aktif: setelah pemulihan, komputer ini bergabung lagi ke sinkronisasi sebagai komputer baru. Komputer lain tetap menyimpan apa yang mereka miliki, dan perubahan mereka yang lebih baru kembali ke sini. Untuk menyimpan isi cadangan saja, matikan sinkronisasi sebelum memulihkan.",
   "restore_token_note": "Token kendali jarak jauh tidak pernah diambil dari cadangan: token baru dibuat di komputer ini saat kendali jarak jauh atau berbagi dinyalakan.",
   "epg_zoom_out": "Perkecil",
   "epg_zoom_in": "Perbesar",

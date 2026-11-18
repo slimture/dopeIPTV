@@ -9,6 +9,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- Restoring an older backup on a computer that syncs no longer takes
+  anything from the others: the restored computer joins sync again as a
+  new one, so the other computers keep what they have and their newer
+  changes come back to it. The restore window says so while sync is on.
 - Server mode: the tuner's addresses (the HDHomeRun endpoints, which need no
   token) answer only when asked by an address or a home name - a web page
   can no longer reach them by DNS rebinding and read the lineup or start a

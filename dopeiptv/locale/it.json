@@ -1806,6 +1806,7 @@
   "restore_cannot_replace": "Questo backup non contiene playlist né impostazioni, quindi non può sostituire ciò che c'è qui.",
   "restore_kept": "Non sono in questo backup, quindi restano come sono qui: {what}.",
   "restore_risky_source": "Playlist «{name}»: {what}",
+  "restore_sync_note": "La sincronizzazione è attiva: dopo il ripristino questo computer si unisce di nuovo alla sincronizzazione come uno nuovo. Gli altri computer mantengono ciò che hanno e le loro modifiche più recenti tornano qui. Per tenere solo il contenuto del backup, disattiva la sincronizzazione prima di ripristinare.",
   "restore_token_note": "Il token del telecomando non viene mai preso da un backup: se ne crea uno nuovo su questo computer quando si attiva il telecomando o la condivisione.",
   "epg_zoom_out": "Riduci zoom",
   "epg_zoom_in": "Aumenta zoom",

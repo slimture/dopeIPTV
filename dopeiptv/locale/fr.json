@@ -1806,6 +1806,7 @@
   "restore_cannot_replace": "Cette sauvegarde ne contient ni listes de lecture ni paramètres : elle ne peut donc pas remplacer ce qui est ici.",
   "restore_kept": "Absents de cette sauvegarde, donc gardés tels qu'ils sont ici : {what}.",
   "restore_risky_source": "Liste de lecture « {name} » : {what}",
+  "restore_sync_note": "La synchronisation est activée : après la restauration, cet ordinateur rejoint la synchronisation comme un nouveau. Les autres ordinateurs gardent ce qu'ils ont, et leurs modifications plus récentes reviennent ici. Pour ne garder que le contenu de la sauvegarde, désactivez la synchronisation avant de restaurer.",
   "restore_token_note": "Le jeton de la télécommande n'est jamais repris d'une sauvegarde : un nouveau est créé sur cet ordinateur quand la télécommande ou le partage est activé.",
   "epg_zoom_out": "Zoom arrière",
   "epg_zoom_in": "Zoom avant",

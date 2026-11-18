@@ -51,6 +51,14 @@ _CHIP_TEXT = {"favorites": "nav_favorites", "settings": "settings_title",
               "sources": "tab_playlists", "history": "sync_cat_history"}
 
 
+def state_path() -> Path:
+    """Where this computer keeps its sync state (core/sync.State), beside the
+    settings."""
+    ini = QSettings(QSettings.Format.IniFormat, QSettings.Scope.UserScope,
+                    ORG, "sync").fileName()
+    return Path(ini).with_name("sync-state.json")
+
+
 class _SyncSignals(QObject):
     changed = pyqtSignal()
 
@@ -163,9 +171,7 @@ class _SyncMixin:
     def _sync_path(self) -> Path:
         if self._sync_state_file is not None:
             return Path(self._sync_state_file)
-        ini = QSettings(QSettings.Format.IniFormat, QSettings.Scope.UserScope,
-                        ORG, "sync").fileName()
-        return Path(ini).with_name("sync-state.json")
+        return state_path()
 
     def _sync_state_for(self, slot: str) -> sync.State:
         st = self._sync_state

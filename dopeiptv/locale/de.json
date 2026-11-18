@@ -1806,6 +1806,7 @@
   "restore_cannot_replace": "Diese Sicherung enthält weder Wiedergabelisten noch Einstellungen und kann deshalb nicht ersetzen, was hier ist.",
   "restore_kept": "Nicht in dieser Sicherung, daher bleibt hier, wie es ist: {what}.",
   "restore_risky_source": "Wiedergabeliste „{name}“: {what}",
+  "restore_sync_note": "Die Synchronisierung ist an: Nach der Wiederherstellung tritt dieser Computer der Synchronisierung neu bei. Die anderen Computer behalten, was sie haben, und ihre neueren Änderungen kommen hierher zurück. Wenn du nur den Inhalt der Sicherung willst, schalte die Synchronisierung vor dem Wiederherstellen aus.",
   "restore_token_note": "Das Token der Fernsteuerung wird nie aus einer Sicherung übernommen: Auf diesem Computer wird ein neues erstellt, sobald Fernsteuerung oder Teilen eingeschaltet wird.",
   "epg_zoom_out": "Herauszoomen",
   "epg_zoom_in": "Hineinzoomen",

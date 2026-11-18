@@ -1259,6 +1259,11 @@ def apply(ctx: Context, result: RoundResult, before: Snapshot, now_here: Snapsho
 
 # -- this computer's copy --------------------------------------------------------------------
 
+#: In the state file after a restore (rejoin()): the next round, of any
+#: slot, is this computer's first.
+_REJOIN = "rejoin"
+
+
 class State:
     """This computer's copy of the last snapshot, beside the settings (a
     JSON file of its own: it can be large, and is never in the shared
@@ -1283,7 +1288,10 @@ class State:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return st
-        if not isinstance(data, dict) or data.get("slot") != slot:
+        if not isinstance(data, dict):
+            return st
+        if data.get("slot") != slot:
+            st.fresh = bool(data.get(_REJOIN))     # a restore brought this slot
             return st
         doc = data.get("doc")
         if isinstance(doc, dict) and isinstance(doc.get("c"), dict):
@@ -1320,6 +1328,28 @@ def write_private(path: Path, text: str) -> None:
             except OSError:
                 pass
             raise
+
+
+def rejoin(path: Path) -> bool:
+    """After a backup was put in place over everything: this computer's copy
+    of the last snapshot forgotten and its next round marked fresh, so it
+    joins its slot again as a computer new to it - the others' newer values
+    win where they differ and nothing the backup lacks is removed from them.
+    Whatever slot the restored settings name (a backup can bring another
+    sync code, or one to a computer that never synced). True when sync had
+    been used here."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        data = None
+    used = isinstance(data, dict) and bool(data.get("slot"))
+    seen = data.get("seen") if used and isinstance(data, dict) else None
+    write_private(path, json.dumps(
+        {"slot": str(data["slot"]) if used and isinstance(data, dict) else "",
+         "version": 0, "fresh": True, "joining": False, _REJOIN: True,
+         "seen": sorted(str(c) for c in seen) if isinstance(seen, list) else [],
+         "doc": empty_doc()}, separators=(",", ":")))
+    return used
 
 
 def forget(path: Path) -> None:
