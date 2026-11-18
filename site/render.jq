@@ -67,6 +67,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 # Stripe's review and the Swedish E-Commerce Act ask.
 | "Solecraft AB" as $COMPANY
 | "559601-3176" as $ORGNR
+| "SE559601317601" as $VAT
 # The footer names the town; the full address is on the About and contact
 # page (linked beside it), the support page, the privacy policy and the terms.
 | "Örebro" as $TOWN
@@ -275,7 +276,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
   # E-Commerce Act's section 8).
   def company_line:
     "    <div class=\"foot-legal\">\n"
-    + "      <p class=\"foot-company\">\(t("foot_made_by") | gsub("%COMPANY%"; $COMPANY) | h) · \(t("foot_orgnr") | h) \($ORGNR | h) · \(t("foot_place") | gsub("%TOWN%"; $TOWN) | h) · <a href=\"mailto:\($EMAIL | h)\">\($EMAIL | h)</a></p>\n"
+    + "      <p class=\"foot-company\">\(t("foot_made_by") | gsub("%COMPANY%"; $COMPANY) | h) · \(t("foot_orgnr") | h) <bdi>\($ORGNR | h)</bdi> · \(t("foot_place") | gsub("%TOWN%"; $TOWN) | h) · <a href=\"mailto:\($EMAIL | h)\">\($EMAIL | h)</a></p>\n"
     + "      <p class=\"foot-nocontent\">\(t("foot_nocontent") | h)</p>\n"
     + "    </div>\n";
   def common:
@@ -761,6 +762,26 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
       + ([$secs[] | "<li><a href=\"#\(.id)\">\(.t)</a></li>\n"] | add)
       + "</ol>\n</nav>\n\n"
       + ([$secs | to_entries[] | "<h2 id=\"\(.value.id)\">\(.key + 1). \(.value.t)</h2>\n\(.value.c | rtrimstr("\n"))\n\n"] | add);
+  # The support page's questions: four short ones in the visitor's own
+  # language, the whole of it in the payment terms (/payments/), and who is
+  # paid - so the page is the visitor's language all through.
+  def support_faq:
+    "<a href=\"mailto:\($EMAIL | h)\">\($EMAIL | h)</a>" as $mail
+    | "<a href=\"\((if $PORTAL_URL != "" then $PORTAL_URL else "#monthly" end) | h)\">\(t("support_manage") | h)</a>" as $manage
+    | "      <div class=\"sp-legal\">\n"
+      + ([[["cancel", "support_fq_cancel"], ["refund", "support_fq_refund"], ["key", "support_fq_key"], ["again", "support_fq_lost"]][]
+         | . as [$id, $k]
+         | "        <details class=\"sp-q\" id=\"\($id)\">\n"
+           + "          <summary><h3>\(t($k + "_q") | h)</h3></summary>\n"
+           + "          <div class=\"sp-a\"><p>\(t($k + "_a") | h | gsub("%EMAIL%"; $mail) | gsub("%MANAGE%"; $manage))</p></div>\n"
+           + "        </details>\n"] | add)
+      + "        <p class=\"sp-more\"><a href=\"/payments/\">\(t("support_fq_more") | h)</a></p>\n"
+      + "        <div class=\"sp-company\" id=\"company\">\n"
+      + "          <h3>\(t("support_who_h") | h)</h3>\n"
+      + "          <p>\($COMPANY | h) · \(t("foot_orgnr") | h) <bdi>\($ORGNR | h)</bdi> · \(t("foot_place") | gsub("%TOWN%"; $TOWN) | h)"
+      + " · \(t("foot_vat") | h) <bdi>\($VAT | h)</bdi> · \($mail) · <a href=\"/about/#\(if $lang == "sv" then "foretaget" else "company" end)\">\(t("support_company_all") | h)</a></p>\n"
+      + "        </div>\n"
+      + "      </div>\n";
   def page_legal:
     (if ($L.text | has($lang)) then $lang else "en" end) as $cl
     | $L.page[$page][$cl] as $P
@@ -785,6 +806,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
          body: ((if $page == "support" then $body else $parts.body end)
                 | gsub("%PORTAL%"; (if $PORTAL_URL != "" then $PORTAL_URL else "/support/#monthly" end) | h)),
          ways: (if $page == "support" then support_ways else "" end),
+         faq: (if $page == "support" then support_faq else "" end),
          perks: (if $page == "support" then support_perks else "" end),
          money: (if $page == "support" then support_money else "" end)});
 

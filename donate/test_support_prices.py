@@ -84,16 +84,24 @@ def test_the_tip_hint_is_marked_for_the_dialog():
 def test_the_portal_under_monthly_support_and_in_the_rules():
     page = _support("", "29 kr", "sv", "https://billing.stripe.com/p/login/x")
     assert '<a class="sway-manage" href="https://billing.stripe.com/p/login/x"' in page
-    assert 'href="https://billing.stripe.com/p/login/x">Hantera eller avsluta ditt månadsstöd</a> – du får' in page
+    assert 'tryck på <a href="https://billing.stripe.com/p/login/x">Hantera eller avsluta ditt månadsstöd</a> ovan' in page
     plain = _support("", "29 kr", "sv")
-    assert "sway-manage" not in plain and 'href="/support/#monthly">Hantera' in plain
-    assert "%PORTAL%" not in plain
+    assert "sway-manage" not in plain and 'href="#monthly">Hantera' in plain
+    assert "%PORTAL%" not in plain and "%MANAGE%" not in plain and "%EMAIL%" not in plain
 
 
-def test_the_rules_fold_up_and_who_you_pay_stays_open():
+def test_four_short_questions_and_who_you_pay_in_the_visitor_s_language():
+    # The whole of the rules is the payment terms (/payments/); the support
+    # page asks four short questions in the visitor's own language.
     page = _support("", "29 kr", "sv")
-    assert page.count('<details class="sp-q"') == 9
-    assert '<div class="sp-company" id="foretaget">' in page and "559601-3176" in page
+    assert re.findall(r'<details class="sp-q" id="([a-z]+)"', page) == ["cancel", "refund", "key", "again"]
+    assert '<div class="sp-company" id="company">' in page and "559601-3176" in page
+    assert "SE559601317601" in page and 'href="/about/#foretaget"' in page
+    assert '<p class="sp-more"><a href="/payments/">Läs hela betalvillkoren</a></p>' in page
+    de = _support("", "", "de")
+    assert "Bekomme ich mein Geld zurück?" in de and 'href="/about/#company"' in de
+    assert "Changed your mind" not in de and "legal-meta" not in de and '<div class="sp-legal">' in de
+    assert "Tappat bort nyckeln?" in page
     assert "<!--SUPPORT-OPTIONS-->" not in page and "legal-tabs" not in page
     assert page.count('class="perk ') == 4 and page.count("<li><svg") >= 3
 
@@ -102,7 +110,9 @@ def test_every_language_has_the_page_s_words():
     import glob
     keys = [k for k in json.load(open(os.path.join(SITE, "lang", "en.json"), encoding="utf-8"))
             if k.startswith(("support_trust_", "support_perk", "support_money_", "support_faq_", "support_manage"))]
-    assert len(keys) == 15
+    keys += [k for k in json.load(open(os.path.join(SITE, "lang", "en.json"), encoding="utf-8"))
+             if k.startswith("support_fq_")] + ["support_who_h", "support_company_all", "foot_vat"]
+    assert len(keys) == 15 + 12
     for f in glob.glob(os.path.join(SITE, "lang", "*.json")):
         have = json.load(open(f, encoding="utf-8"))
         assert not [k for k in keys if not have.get(k)], f
@@ -139,7 +149,7 @@ def test_the_heart_says_support_us_and_the_footer_the_country():
         assert "%TOWN%" in have.get("foot_place", ""), f
         assert "foot_support" not in have, f
     en = _support("", "", "en", page="terms")
-    assert ">Support us</a>" in en and "· Örebro, Sweden ·" in en
+    assert ">Support us</a>" in en and "· Örebro, Sweden ·" in en and "<bdi>559601-3176</bdi>" in en
     assert "· Örebro, Sverige ·" in _support("", "", "sv", page="terms")
 
 

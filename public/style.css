@@ -1124,7 +1124,12 @@ footer .v a:hover { color: var(--accent); }
 .sp-money-list svg { flex: none; width: 26px; height: 26px; fill: none; stroke: var(--accent);
   stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .sp-faq .legal-note, .sp-faq .legal-meta { max-width: 720px; margin-left: auto; margin-right: auto; text-align: center; }
-.sp-legal { max-width: 720px; margin: 26px auto 0; font-size: 16px; line-height: 1.65; color: var(--text); text-align: left; }
+.sp-legal { max-width: 720px; margin: 26px auto 0; font-size: 16px; line-height: 1.65; color: var(--text); text-align: start; }
+.sp-more { margin: 18px 0 0; }
+.sp-more a { color: var(--accent); font-weight: 500; text-decoration: none; }
+.sp-more a::after { content: " →"; }
+[dir="rtl"] .sp-more a::after { content: " ←"; }
+.sp-more a:hover, .sp-more a:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
 .sp-intro { margin: 0 0 14px; color: var(--muted); }
 .sp-q { border-bottom: 1px solid var(--line); scroll-margin-top: 80px; }
 .sp-q > summary { list-style: none; cursor: pointer; display: flex; align-items: center;

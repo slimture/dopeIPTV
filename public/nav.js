@@ -503,17 +503,36 @@ var iptvCurrency = (function () {
   window.addEventListener("resize", soon);
   mark();
 })();
-/* The support page's rules are folded questions (templates/support.html):
- * a link to one - /support/#refund, the privacy policy's, the app's - opens
- * it, on arrival and within the page. */
+/* The support page's questions are folded (render.jq support_faq): a link
+ * to one - /support/#refund - opens it, on arrival and within the page. The
+ * page held all of the rules until November 2026; a link to one of those
+ * still lands: the four kept here by their Swedish names too, the rest in
+ * the payment terms (/payments/, in the language that page is shown in). */
 (function () {
   "use strict";
   if (!document.querySelector(".sp-q")) { return; }
+  var SAME = { uppsagning: "cancel", "pengarna-tillbaka": "refund", nyckeln: "key", igen: "again",
+               foretaget: "company" };
+  var TERMS = { what: "vad", costs: "pengarna", how: "sa-gar-det-till", disputes: "tvister",
+                "personal-data": "personuppgifter" };
   function openTarget() {
     var id = "";
     try { id = decodeURIComponent(location.hash.slice(1)); } catch (e) { return; }
+    if (Object.prototype.hasOwnProperty.call(SAME, id)) { id = SAME[id]; }
     var el = id && document.getElementById(id);
+    if (!el && /\/support\/$/.test(location.pathname)) {
+      var en = "";
+      for (var k in TERMS) {
+        if (Object.prototype.hasOwnProperty.call(TERMS, k) && (k === id || TERMS[k] === id)) { en = k; }
+      }
+      if (en) {
+        location.replace("/payments/" + location.search + "#" +
+                         (document.documentElement.lang === "sv" ? TERMS[en] : en));
+      }
+      return;
+    }
     if (el && el.classList.contains("sp-q")) { el.open = true; el.scrollIntoView(); }
+    else if (el) { el.scrollIntoView(); }
   }
   window.addEventListener("hashchange", openTarget);
   openTarget();
