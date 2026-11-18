@@ -7,6 +7,8 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.6.5]
+
 ### Changed
 
 - Supporting dopeIPTV is a tip or monthly support, never a donation: the
