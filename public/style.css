@@ -1050,8 +1050,10 @@ footer .v a:hover { color: var(--accent); }
    supporter themes drawn small in their own colours, the icon, the heart,
    feedback first), where the money goes, and the rules folded up as
    questions - with who you pay open below them. */
+/* The glow sits behind the icon and fades out before the header, which then
+   meets the page's own colour - not a pink band under its edge. */
 .sp-hero { padding: 52px 0 46px; position: relative; isolation: isolate;
-  background: radial-gradient(70% 90% at 50% 0%, color-mix(in srgb, var(--heart) 14%, transparent), transparent 72%); }
+  background: radial-gradient(40% 40% at 50% 34%, color-mix(in srgb, var(--heart) 13%, transparent), transparent 100%); }
 .sp-head { text-align: center; max-width: 660px; margin: 0 auto; }
 .sp-icon { display: block; width: 96px; height: 96px; margin: 0 auto; border-radius: 22px;
   box-shadow: 0 20px 44px -20px color-mix(in srgb, var(--heart) 75%, transparent); }
