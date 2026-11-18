@@ -590,7 +590,6 @@ class AirPlayReceiver(QObject):
         self._user_paused = False
         self._fell_back = False
         self._said_unreached = False
-        self._said_playing = False
         self._closing = False
         self._row: tuple[QLabel, QPushButton] | None = None
         # AVRouteDetector, on while the cast dialog is open: None while it
@@ -739,17 +738,10 @@ class AirPlayReceiver(QObject):
         gen = self._generation
         self._fell_back = False
         log.info("airplay: cast asked (%s)", "a channel" if live else "a title")
-        try:
-            self._prepare({"url": url, "source": src, "codecs": list(codecs or []),
-                           "track": track, "live": live, "start": float(start or 0),
-                           "duration": float(duration or 0), "settle": settle,
-                           "generation": gen, "feed": feed})
-        except Exception:
-            if feed is not None and self.bridge.feed is not feed:
-                # Never read, or no longer: its hold on the rewind buffer -
-                # a connection to the provider - goes with it.
-                threading.Thread(target=feed.close, daemon=True).start()
-            raise
+        self._prepare({"url": url, "source": src, "codecs": list(codecs or []),
+                       "track": track, "live": live, "start": float(start or 0),
+                       "duration": float(duration or 0), "settle": settle,
+                       "generation": gen, "feed": feed})
         if self._generation != gen:
             raise LocalizedError("cast_stopped")
         self.active = device_name
@@ -815,35 +807,24 @@ class AirPlayReceiver(QObject):
                             adts=last.adts)
                 log.info("airplay: a seek in the same channel - its stream as before")
             elif not req["codecs"] or force_bridge:
-                found = ab.probe(p.url, net, self.bridge.exe,
-                                 names_only=feed is not None)
+                found = ab.probe(p.url, net, self.bridge.exe)
                 p = ab.refine(p, found)
                 if not duration and found["duration"] > 0 \
                         and req["live"] is not True:
                     duration = found["duration"]
             gen = req["generation"]
-            began = time.monotonic()
             target = self.bridge.start(
                 p, req["start"], net, feed=feed,
                 net_for=lambda u: self._network(u)[0])
             if not self.bridge.wait_ready(
-                    stopping=lambda: self._generation != gen, url=target):
+                    stopping=lambda: self._generation != gen):
                 why = self.bridge.error
-                # Only this run: a newer seek may have started its own
-                # meanwhile, and that one is the stream the TV gets.
-                self.bridge.stop_run(target)
+                self.bridge.stop()
                 if self._generation != gen:
-                    log.info("airplay: a newer stream took this one's place "
-                             "before it was ready")
                     raise LocalizedError("cast_stopped")
                 raise LocalizedError("airplay_bridge_failed", msg=why or "?")
-            if self._generation != gen:
-                self.bridge.stop_run(target)
-                raise LocalizedError("cast_stopped")
-            offset, seek_to = req["start"], 0.0
-            log.info("airplay: the bridge has its first segments after %.1f s "
-                     "(%.0f s written)", time.monotonic() - began,
-                     self.bridge.written())
+            target, offset, seek_to = self.bridge.url, req["start"], 0.0
+            log.info("airplay: the bridge has its first segments")
         self._open_blocking(target, offset, seek_to)
         # Only once the player has it: until then the strip asks about the
         # stream still playing.
@@ -963,7 +944,6 @@ class AirPlayReceiver(QObject):
         self._opened_url = target
         self._user_paused = False
         self._said_unreached = False
-        self._said_playing = False
         p.setVolume_(self._volume)
         # Never on this Mac's speakers or screen: paused and muted until the
         # Apple TV has it; a new stream on a route already chosen goes on.
@@ -1344,15 +1324,6 @@ class AirPlayReceiver(QObject):
             self.state = ("PLAYING/NONE" if tc == _TC_PLAYING else
                           "BUFFERING/NONE" if tc == _TC_WAITING else
                           "PAUSED/NONE")
-            if tc == _TC_PLAYING and not self._said_playing:
-                # Where it began: a seek's stream starts at its first
-                # second - further in, the TV took its newest end instead.
-                self._said_playing = True
-                log.info("airplay: the Apple TV plays, %.1f s into the stream, "
-                         "%.0f s after it was handed it%s", self._pos,
-                         now - self._opened_at,
-                         " (%.0f s of it written)" % self.bridge.written()
-                         if self.bridged() else "")
         if (self._external and self.bridged() and not self.bridge.remote_seen
                 and self._opened_url == self.bridge.url
                 and not self._said_unreached
