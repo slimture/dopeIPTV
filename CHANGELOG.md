@@ -133,6 +133,35 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   API answers have a size ceiling far above any real one; an answer that
   never ends fails as a request does.
 - services/notify.py: a notification shows a series' name as words.
+- Private viewing: the system's media controls (MPRIS, macOS Now Playing,
+  Windows) show "dopeIPTV" for a private playback - no title, programme,
+  series or artwork, here or of a cast - and work as before; the remote
+  API's status says `private: true` with no title or programme; a
+  recording begun privately is not named in its events once private
+  viewing is off.
+- core/commands.py, app.py: a `dopeiptv://` link is read alone - nothing
+  after it on the command line reaches the app or Qt, so a link cannot
+  start server mode, play a file or load a Qt plugin; a link that asks to
+  play an address is asked about first, with the server and the whole
+  address shown (saved addresses, `--play`, `--channel` and channel links
+  as before); what a second start hands over is size-limited and checked.
+- ui/mw_queue.py: nothing dropped on the window plays while "Who's
+  watching?" waits for a PIN; a kids profile adds a source by a drop only
+  with a grown-up's PIN.
+- core/pins.py: PINs are kept by PBKDF2 (600 000 rounds, a salt each); an
+  old one still works and is written anew when next entered. After two
+  wrong tries each further one waits, 5 s growing to 60 s, never a lock.
+  An app up to 1.6.8 cannot read a PIN kept the new way.
+- core/discord_rpc.py, core/tv_input.py: Discord status goes only to a
+  Discord of the same user; lircd's socket is listened to only where
+  another user could not have put it.
+- services/media_session.py: an artwork address with a media server's
+  token in it is no longer put on the session bus.
+- Casting: what a device says about itself is bounded (SSDP, DLNA, mDNS,
+  Kodi and Chromecast probes - no redirect, same host, capped sizes); a TV
+  is remembered by its own id, so one that answers to a known name as
+  another device is not cast to until picked, and each device's address is
+  shown.
 ## [1.6.8]
 
 ### Security
