@@ -1976,6 +1976,7 @@
   "together_alone": "这里还没有其他人——分享房间码吧。",
   "together_alone_join": "这里还没有其他人。如果你在等人，请检查房间码。",
   "together_code_bad": "这不是房间码。房间码由 10 个字母和数字组成，例如 K7PQM-2XDH9。",
+  "together_old_code": "这个房间使用的是较短的旧房间码，更容易被猜到。请在所有电脑上更新 dopeIPTV，然后新建一个房间。",
   "together_name_needed": "选一个其他人会看到的名字。",
   "together_left_room": "你已离开房间。其他人会继续观看。",
   "together_private_left": "你已离开一起看房间：隐私观看已开启。",

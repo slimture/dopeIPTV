@@ -1976,6 +1976,7 @@
   "together_alone": "Nie ma tu jeszcze nikogo innego – udostępnij kod.",
   "together_alone_join": "Nie ma tu jeszcze nikogo innego. Jeśli na kogoś czekasz, sprawdź kod.",
   "together_code_bad": "To nie jest kod pokoju. Kod ma 10 liter i cyfr, np. K7PQM-2XDH9.",
+  "together_old_code": "Ten pokój ma stary, krótszy kod, który łatwiej odgadnąć. Zaktualizujcie dopeIPTV na wszystkich komputerach, a potem załóżcie nowy pokój.",
   "together_name_needed": "Wybierz imię, które zobaczą inni.",
   "together_left_room": "Opuszczono pokój. Inni oglądają dalej.",
   "together_private_left": "Opuszczono pokój wspólnego oglądania: oglądanie prywatne jest włączone.",

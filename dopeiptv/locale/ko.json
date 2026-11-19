@@ -1976,6 +1976,7 @@
   "together_alone": "아직 아무도 없습니다. 코드를 공유하세요.",
   "together_alone_join": "아직 아무도 없습니다. 기다리는 사람이 있다면 코드를 확인하세요.",
   "together_code_bad": "방 코드가 아닙니다. 코드는 K7PQM-2XDH9처럼 영문자와 숫자 10자입니다.",
+  "together_old_code": "이 방은 예전의 짧은 코드를 쓰고 있어 추측하기가 더 쉽습니다. 모든 컴퓨터에서 dopeIPTV를 업데이트한 뒤 새 방을 만드세요.",
   "together_name_needed": "다른 사람들에게 보일 이름을 정하세요.",
   "together_left_room": "방에서 나갔습니다. 다른 사람들은 계속 시청합니다.",
   "together_private_left": "함께 보기 방에서 나갔습니다: 비공개 시청이 켜져 있습니다.",

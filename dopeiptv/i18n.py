@@ -2576,6 +2576,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "together_alone": {"en": "Nobody else is here yet - share the code."},
     "together_alone_join": {"en": "Nobody else is here yet. If you expected someone, check the code."},
     "together_code_bad": {"en": "That isn't a room code. A code has 10 letters and digits, like K7PQM-2XDH9."},
+    "together_old_code": {"en": "This room has an old, shorter code, which is easier to guess. Update dopeIPTV on every computer, then start a new room."},
     "together_name_needed": {"en": "Choose a name the others will see."},
     "together_left_room": {"en": "You left the room. The others go on watching."},
     "together_private_left": {"en": "You left the watch together room: private viewing is on."},

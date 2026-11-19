@@ -1976,6 +1976,7 @@
   "together_alone": "Aún no hay nadie más aquí: comparte el código.",
   "together_alone_join": "Aún no hay nadie más aquí. Si esperabas a alguien, revisa el código.",
   "together_code_bad": "Eso no es un código de sala. Un código tiene 10 letras y cifras, como K7PQM-2XDH9.",
+  "together_old_code": "Esta sala tiene un código antiguo y más corto, más fácil de adivinar. Actualizad dopeIPTV en todos los ordenadores y luego cread una sala nueva.",
   "together_name_needed": "Elige un nombre que verán los demás.",
   "together_left_room": "Has salido de la sala. Los demás siguen viendo.",
   "together_private_left": "Has salido de la sala de ver juntos: la visualización privada está activada.",
