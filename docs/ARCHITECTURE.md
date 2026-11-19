@@ -282,6 +282,7 @@ dopeiptv/
     player_overlays.py What floats over the picture: centre play/pause, hover
                        scrubber, TIMESHIFT pill, Next episode, fullscreen UI
     control_icons.py   The player's control glyphs, drawn
+    audio_effects.py   The visualiser, the equaliser and night mode on the core
     popout_mirror.py   The pop-out's picture: the mirror (raster, GL or the
                        picture's own thread), the docked placeholder
     seek_slider.py     The seek bar slider: click, drag, hover time
@@ -590,9 +591,10 @@ Import direction is one-way: `ui` may use `services`, `media`, `core`
 and `providers`; `services` builds on `providers`/`core` but never
 imports `ui`; `media` and `providers` may use `core`; `core` depends on
 nothing above it.  (The one cross-edge is the player's overlays -
-`media.embedded` and `media.loading_overlay` - -> `ui.theme` for their
-colours, which is why `ui/__init__` exposes
-`MainWindow` lazily so touching `ui.theme` never drags in the window.)
+`media.embedded`, `media.loading_overlay` and `media.audio_effects` (the
+visualiser) - -> `ui.theme` for their colours, which is why
+`ui/__init__` exposes `MainWindow` lazily so touching `ui.theme` never
+drags in the window.)
 
 ## Data flow
 
