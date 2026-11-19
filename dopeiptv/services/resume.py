@@ -65,8 +65,11 @@ class ResumeStore:
         user is effectively at the start or the end. For movies and episodes an
         *item* snapshot is kept (plus the episode's *series_ctx*) so the
         'Continue watching' list can render and replay it."""
-        if privacy.private():
-            return       # private viewing: where it stopped is not kept
+        if privacy.private_key(key):
+            # Private viewing, or the private playback of this title going
+            # on after it ended: where it stopped is not kept - the store's
+            # own check, whoever calls.
+            return
         rkey = f"{group}:{key}"
         if dur > 0 and 60 < pos < dur * 0.95:
             entry: dict[str, Any] = {"pos": round(pos), "dur": round(dur),

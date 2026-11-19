@@ -179,6 +179,40 @@ def test_a_private_film_keeps_no_resume_point_or_watched_mark_after_private_ends
         privacy.playback_stopped()
 
 
+def test_the_resume_store_itself_keeps_nothing_of_a_private_playback_going_on(settings):
+    """The store's own check, whoever calls it: a title begun privately keeps
+    no resume point after private viewing ends while it plays - its key as
+    a number or as text alike - and the next title is kept as always."""
+    r = ResumeStore(settings, "resume_a")
+    privacy.set_private(True)
+    privacy.playback_started("movie", 7)
+    privacy.set_private(False)
+    r.record("vod", "7", 600.0, 5400.0, item={"name": "Hemlig"})
+    r.record("vod", 7, 700.0, 5400.0, item={"name": "Hemlig"})
+    assert r.saved_position(7, "movie") == 0 and r.saved_position("7", "movie") == 0
+    assert privacy.playback_private("movie", "7"), "a number and its text are one key"
+    privacy.playback_started("movie", 8)
+    r.record("vod", 8, 600.0, 5400.0, item={"name": "Synlig"})
+    assert r.saved_position(8, "movie") == 600
+
+
+def test_the_log_names_no_title_of_a_private_playback_going_on(settings):
+    """for_log: "<private>" while private viewing is on, and while a playback
+    that began private goes on after it ended - until Stop or another title."""
+    privacy.set_private(True)
+    privacy.playback_started("movie", 7)
+    assert privacy.for_log("Hemlig") == "<private>"
+    privacy.set_private(False)
+    assert privacy.for_log("Hemlig") == "<private>", "the private film still plays"
+    privacy.playback_started("movie", 8)
+    assert privacy.for_log("Synlig") == "Synlig"
+    privacy.set_private(True)
+    privacy.playback_started("movie", 9)
+    privacy.set_private(False)
+    privacy.playback_stopped()
+    assert privacy.for_log("Synlig") == "Synlig", "Stop ends the private playback"
+
+
 def test_the_clear_window(settings):
     from PyQt6.QtWidgets import QApplication
 

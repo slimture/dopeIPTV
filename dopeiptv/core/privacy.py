@@ -46,7 +46,13 @@ def private() -> bool:
 # going on after private viewing ends - a reconnect, a backup address, a seek
 # in the archive - stays private to the end of its run, for every reporter
 # (Discord, the media servers, Watch together, the statistics, the events).
-_private_playback: tuple[str, Any] | None = None
+_private_playback: tuple[str, str] | None = None
+
+
+def _key(key: Any) -> str:
+    """A title's key as one kind of value: a provider gives the same id as a
+    number in one list and as text in another."""
+    return "" if key is None else str(key)
 
 
 def playback_started(kind: str, key: Any) -> None:
@@ -54,7 +60,7 @@ def playback_started(kind: str, key: Any) -> None:
     while one plays): marked private while private viewing is on; anything
     else chosen after it ended is not."""
     global _private_playback
-    ident = (str(kind or ""), key)
+    ident = (str(kind or ""), _key(key))
     if private():
         _private_playback = ident
     elif _private_playback != ident:
@@ -70,14 +76,22 @@ def playback_stopped() -> None:
 
 def playback_private(kind: str, key: Any) -> bool:
     """Whether the playback (*kind*, *key*) is to be kept to this computer."""
-    return private() or _private_playback == (str(kind or ""), key)
+    return private() or _private_playback == (str(kind or ""), _key(key))
+
+
+def private_key(key: Any) -> bool:
+    """Whether a store keeping something of the title *key* - a resume
+    point - is to keep nothing: private viewing on, or that title the
+    private playback still going on (whatever kind the store calls it)."""
+    return private() or (_private_playback is not None and _private_playback[1] == _key(key))
 
 
 def for_log(text: Any) -> Any:
     """What a log line may say of what is played: its title or name, or
-    "<private>" while private viewing is on - the log is kept on disk and
-    goes with a report."""
-    return "<private>" if _private else text
+    "<private>" while private viewing is on or a playback that began
+    private still goes on after it - the log is kept on disk and goes with
+    a report."""
+    return "<private>" if _private or _private_playback is not None else text
 
 
 def cutoff(seconds: int, now: float | None = None) -> float | None:
