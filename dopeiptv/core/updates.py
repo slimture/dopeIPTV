@@ -21,6 +21,7 @@ from __future__ import annotations
 import platform
 import re
 import sys
+from typing import Any
 from urllib.parse import quote
 
 from .. import VERSION
@@ -108,12 +109,33 @@ def _from_site(d: dict, nightly: bool = False) -> dict:
             "sums": str(d.get("sha256sums") or ""), "sums_sig": str(d.get("sha256sums_sig") or "")}
 
 
+def _site_get(name: str) -> Any:
+    """dopeiptv.org's *name*: https to the site itself (build_check.secure)
+    and no redirect followed - one is an error, and GitHub is asked."""
+    url = f"{SITE}/{name}"
+    if not build_check.secure(url):
+        raise ValueError(f"{name}: not dopeiptv.org over https")
+    r = requests.get(url, headers=site_headers(url), timeout=15, allow_redirects=False)
+    if getattr(r, "is_redirect", False):
+        raise ValueError(f"{name}: dopeiptv.org sent it elsewhere")
+    r.raise_for_status()
+    return r
+
+
+def _github_get(url: str, **kw: Any) -> Any:
+    """GitHub's *url*, its redirects followed by hand, each https
+    (selfupdate._get_https) - a moved repository's too."""
+    from .selfupdate import _get_https
+    r = _get_https(url, headers=lambda _url: _headers(), get=requests.get, timeout=15, **kw)
+    r.raise_for_status()
+    return r
+
+
 def fetch_site_release() -> dict:
     """The release dopeiptv.org offers. Raises on network/HTTP error, and
     when it names a test build: those are signed with the same key, so only
     the version keeps one off Releases (GitHub is asked then)."""
-    r = requests.get(f"{SITE}/releases.json", headers=site_headers(), timeout=15)
-    r.raise_for_status()
+    r = _site_get("releases.json")
     rel = _from_site(r.json() or {})
     if is_nightly(rel["tag"]):
         raise ValueError(f"releases.json names a test build ({rel['tag']}), not a release")
@@ -123,10 +145,7 @@ def fetch_site_release() -> dict:
 def fetch_github_release(repo: str = GITHUB_REPO) -> dict:
     """The newest published release on GitHub. Raises on network/HTTP
     error."""
-    r = requests.get(
-        f"https://api.github.com/repos/{repo}/releases/latest",
-        headers=_headers(), timeout=15)
-    r.raise_for_status()
+    r = _github_get(f"https://api.github.com/repos/{repo}/releases/latest")
     return _release(r.json() or {})
 
 
@@ -148,8 +167,7 @@ def fetch_site_nightly() -> dict:
     """The test build dopeiptv.org knows of (its unlinked ``nightly.json``).
     Raises on network/HTTP error, and when the site has none - GitHub is
     asked then, so a site not yet writing the file loses no test build."""
-    r = requests.get(f"{SITE}/nightly.json", headers=site_headers(), timeout=15)
-    r.raise_for_status()
+    r = _site_get("nightly.json")
     rel = _from_site(r.json() or {}, nightly=True)
     if not is_nightly(rel["tag"]):
         raise ValueError(f"nightly.json names no test build ({rel['tag']})")
@@ -169,10 +187,7 @@ def fetch_latest_nightly(repo: str = GITHUB_REPO) -> dict | None:
 
 def fetch_github_nightly(repo: str = GITHUB_REPO) -> dict | None:
     """The newest nightly build on GitHub. Raises on network/HTTP error."""
-    r = requests.get(
-        f"https://api.github.com/repos/{repo}/releases",
-        params={"per_page": 30}, headers=_headers(), timeout=15)
-    r.raise_for_status()
+    r = _github_get(f"https://api.github.com/repos/{repo}/releases", params={"per_page": 30})
     best: dict | None = None
     for d in r.json() or []:
         if not isinstance(d, dict) or d.get("draft") \

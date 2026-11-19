@@ -46,6 +46,8 @@ class Releases:
         self.tag, self.body = tag, body
         self.sums_for = body if sums_for is None else sums_for
         self.hits: list[tuple[str, str]] = []
+        #: Where the release's file moves on to (GitHub's storage), if anywhere.
+        self.moved_to: str | None = None
         srv = self
 
         class H(BaseHTTPRequestHandler):
@@ -65,6 +67,14 @@ class Releases:
                     digest = hashlib.sha256(srv.sums_for).hexdigest()
                     return self._send(f"{'0' * 64}  yt-dlp.exe\n{digest}  {ASSET}\n".encode())
                 if self.path == f"{base}/download/{srv.tag}/{ASSET}":
+                    if srv.moved_to:
+                        self.send_response(302)
+                        self.send_header("Location", srv.moved_to)
+                        self.send_header("Content-Length", "0")
+                        self.end_headers()
+                        return
+                    return self._send(srv.body)
+                if self.path == "/storage/" + ASSET:
                     return self._send(srv.body)
                 self.send_response(404)
                 self.send_header("Content-Length", "0")
@@ -239,6 +249,22 @@ def test_a_download_that_does_not_start_is_never_used(tmp_path):
         assert list(tmp_path.iterdir()) == []
     finally:
         srv.close()
+
+
+@posix
+def test_the_download_follows_its_redirects_only_over_https(tmp_path, releases):
+    """A release's file moves on to GitHub's storage. Followed by hand,
+    each hop https (rule 10): a hop to plain http is refused before it is
+    asked - only a test's own server on this computer may be http."""
+    port = releases.httpd.server_address[1]
+    releases.moved_to = f"http://127.0.0.1:{port}/storage/{ASSET}"
+    assert ytdlp.install(tmp_path, releases=releases.url, asset=ASSET) == "2099.01.02"
+    assert ("/storage/" + ASSET, f"dopeIPTV/{VERSION}") in releases.hits
+    releases.moved_to = f"http://downloads.example/storage/{ASSET}"
+    with pytest.raises(YtdlpError) as e:
+        ytdlp.install(tmp_path / "again", releases=releases.url, asset=ASSET)
+    assert e.value.reason == "download"
+    assert not (tmp_path / "again").exists() or not ytdlp.managed_path(tmp_path / "again").exists()
 
 
 def test_no_release_binary_for_this_computer(tmp_path, monkeypatch):

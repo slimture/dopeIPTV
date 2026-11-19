@@ -353,6 +353,17 @@ def _headers() -> dict[str, str]:
     return {"User-Agent": f"dopeIPTV/{VERSION}"}
 
 
+def _get(url: str, **kw: Any) -> Any:
+    """GET *url* with its redirects followed by hand, each https - a
+    release's file moves on to GitHub's storage, never to plain http
+    (selfupdate._get_https); only the app's name and version with each."""
+    from .selfupdate import UpdateError, _get_https
+    try:
+        return _get_https(url, headers=lambda _url: _headers(), get=requests.get, **kw)
+    except UpdateError as e:
+        raise YtdlpError("download", str(e)) from e
+
+
 def parse_sums(text: str) -> dict[str, str]:
     """SHA2-256SUMS: file name -> its SHA-256 (lower-case hex)."""
     out: dict[str, str] = {}
@@ -392,7 +403,7 @@ def install(base: str | Path | None = None, *, releases: str = RELEASES,
     tag = tag or latest_tag(releases)
     base_url = f"{releases}/download/{tag}"
     try:
-        r = requests.get(f"{base_url}/{SUMS}", timeout=20, headers=_headers())
+        r = _get(f"{base_url}/{SUMS}", timeout=20)
     except requests.RequestException as e:
         raise YtdlpError("download", type(e).__name__) from e
     if r.status_code != 200:
@@ -408,8 +419,7 @@ def install(base: str | Path | None = None, *, releases: str = RELEASES,
         digest = hashlib.sha256()
         size = 0
         try:
-            with requests.get(f"{base_url}/{asset}", stream=True, timeout=30,
-                              headers=_headers()) as resp:
+            with _get(f"{base_url}/{asset}", stream=True, timeout=30) as resp:
                 if resp.status_code != 200:
                     raise YtdlpError("download", f"HTTP {resp.status_code}")
                 total = int(resp.headers.get("Content-Length") or 0)

@@ -29,6 +29,7 @@ import sys
 import threading
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from .. import VERSION
 from . import build_check, desktop_entry, ed25519
@@ -131,14 +132,27 @@ _HOPS = 5
 DOWNLOAD_MAX = 2 << 30          # no release file comes near 2 GiB
 
 
-def _get_https(url: str, **kw):
+def _loopback(url: str) -> bool:
+    from urllib.parse import urlsplit
+    try:
+        return (urlsplit(url).hostname or "") in ("127.0.0.1", "localhost", "::1")
+    except ValueError:
+        return False
+
+
+def _get_https(url: str, *, headers: Callable[[str], dict] = site_headers,
+               get: Callable[..., Any] | None = None, **kw):
     """GET *url*, following its redirects by hand: each address https (a
     release's file on GitHub moves on to its storage, never to plain http),
-    and each hop's headers its own - the build's kind only to dopeiptv.org."""
+    and each hop's headers its own (*headers* of its address) - the build's
+    kind only to dopeiptv.org. A first address on this computer (a test's
+    own server) may be http, and lead on to this computer alone. *get*:
+    the requests.get to use (the caller's own)."""
+    local = url.startswith("http://") and _loopback(url)
     for _ in range(_HOPS + 1):
-        if not url.startswith("https://"):
+        if not (url.startswith("https://") or (local and url.startswith("http://") and _loopback(url))):
             raise UpdateError("upd_err_not_https")
-        r = requests.get(url, allow_redirects=False, headers=site_headers(url), **kw)
+        r = (get or requests.get)(url, allow_redirects=False, headers=headers(url), **kw)
         if not getattr(r, "is_redirect", False):
             return r
         from urllib.parse import urljoin
