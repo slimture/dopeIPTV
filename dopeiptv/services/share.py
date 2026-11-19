@@ -29,6 +29,9 @@ from ..core.log import log, redact_url
 from ..core.remote_api import stream_path
 
 _STEP = 1 << 18
+# The most one unpacking call gives: a crafted step of a gzipped guide
+# would otherwise unpack to hundreds of MB at once (epg.py's _ZLIB_OUT).
+_UNPACK_STEP = 1 << 22
 # Held back from the end of each guide: room for "</tv>" and what trails it,
 # and, when a guide was cut short, for the element it was cut in.
 _HOLD = 1 << 16
@@ -341,9 +344,15 @@ def plain_chunks(path: str) -> Iterator[bytes]:
                 return
             while data:
                 started = True
-                out = d.decompress(data)
-                if out:
-                    yield out
+                out = d.decompress(data, _UNPACK_STEP)
+                while True:
+                    if out:
+                        yield out
+                    # A full slice may have more behind it, in the input
+                    # left over or inside zlib itself.
+                    if d.eof or (not d.unconsumed_tail and len(out) < _UNPACK_STEP):
+                        break
+                    out = d.decompress(d.unconsumed_tail, _UNPACK_STEP)
                 if not d.eof:
                     data = b""
                     continue
