@@ -12,6 +12,7 @@ pytest.importorskip("PyQt6")
 
 from PyQt6.QtWidgets import QApplication, QDialog, QLabel, QMainWindow  # noqa: E402
 
+from dopeiptv.ui import about as about_ui  # noqa: E402
 from dopeiptv.ui import mw_settings  # noqa: E402
 
 
@@ -64,7 +65,7 @@ def _rows(dialog: QDialog) -> list:
 def _open_about(monkeypatch, answer) -> dict:
     app = QApplication.instance() or QApplication([])
     pending = []
-    monkeypatch.setattr(mw_settings, "run_async",
+    monkeypatch.setattr(about_ui, "run_async",
                         lambda pool, fn, done, fail: pending.append(done))
     seen: dict = {}
 
@@ -115,7 +116,7 @@ def test_over_settings_it_is_its_child_and_a_late_answer_is_harmless(monkeypatch
     from PyQt6 import sip
     app = QApplication.instance() or QApplication([])
     pending = []
-    monkeypatch.setattr(mw_settings, "run_async",
+    monkeypatch.setattr(about_ui, "run_async",
                         lambda pool, fn, done, fail: pending.append((done, fail)))
     seen: dict = {}
 

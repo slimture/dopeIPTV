@@ -461,7 +461,7 @@ def _about(monkeypatch) -> tuple[list[str], list]:
     _qapp()
     from PyQt6.QtWidgets import QDialog, QLabel, QMainWindow
 
-    from dopeiptv.ui import mw_settings
+    from dopeiptv.ui import about, mw_settings
 
     class Host(QMainWindow):
         pool = None
@@ -480,7 +480,7 @@ def _about(monkeypatch) -> tuple[list[str], list]:
             pass
 
     asked: list = []
-    monkeypatch.setattr(mw_settings, "run_async", lambda pool, fn, done, fail: asked.append(fn))
+    monkeypatch.setattr(about, "run_async", lambda pool, fn, done, fail: asked.append(fn))
     seen: list[str] = []
 
     def fake_exec(dialog):

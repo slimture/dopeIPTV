@@ -367,6 +367,8 @@ dopeiptv/
                        Integrations)
     set_system.py      Settings' SYSTEM pages (General, Appearance, Keyboard
                        shortcuts, Profiles, Parental lock, Advanced)
+    about.py           About: the version, the update check, the release notes
+                       cut to what is new to the reader
     net_advanced.py    Nerd's Own DNS, Other networks (VLANs) and Low latency
                        cards
     nerd_check_line.py The ✓ / ! / ✗ line under a Nerd setting, its Test and
