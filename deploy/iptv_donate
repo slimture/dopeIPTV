@@ -10,8 +10,11 @@
 #   sysrc iptv_donate_enable=YES
 #   service iptv_donate start
 #
-# daemon(8) restarts it if it ever stops, and reopens the log on SIGHUP
-# (newsyslog, DEPLOY.md "Donations").
+# daemon(8) restarts it if it ever stops, and reopens the log on SIGHUP (-H)
+# - newsyslog turns it over and sends that (DEPLOY.md, "Hardening,
+# November 2026"). Without -H daemon does not catch a SIGHUP, which can end
+# it and leave the service unwatched: newsyslog's line comes only after
+# this file is in place and the service restarted with it.
 
 . /etc/rc.subr
 
@@ -35,7 +38,7 @@ load_rc_config $name
 piddir=/var/run/${name}
 pidfile=${piddir}/${name}.pid
 command=/usr/sbin/daemon
-command_args="-R 5 -P ${pidfile} -o ${iptv_donate_log} ${iptv_donate_python} -I ${iptv_donate_script}"
+command_args="-R 5 -H -P ${pidfile} -o ${iptv_donate_log} ${iptv_donate_python} -I ${iptv_donate_script}"
 start_precmd=iptv_donate_precmd
 
 iptv_donate_precmd()

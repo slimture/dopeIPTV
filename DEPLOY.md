@@ -556,6 +556,13 @@ takes the sign-in name or the name shown, so "admin" and "Pontus" are the
 same admin. Any `/admin/` address opened without a session goes to
 `/admin/login`.
 
+`ADMIN_USERS` in `/usr/local/etc/iptv-donate.conf` counts only while
+`admin-users.json` has no admin at all, and only for a name it lists:
+empty or left out - the default - it is nobody (since November 2026; an
+empty or lost admin file used to make an admin of whatever named one).
+The first admin then comes from `admin_users.py invite` ("Locked out"
+below), never from a header.
+
 **From the old password to the new sign-in** (once): put the files in
 place and restart the service (below), open `https://dopeiptv.org/admin/`
 with the old password, and on the *Account* tab make an invite for
@@ -600,7 +607,7 @@ their sessions.
 ```sh
 cd ~/dopeiptv && git pull origin website
 cp -R donate /usr/local/www/iptv/
-install -d -o iptv -g iptv -m 750 /usr/local/www/iptv/stats
+install -d -o iptv -g iptv -m 700 /usr/local/www/iptv/stats
 install -m 640 -o root -g iptv /dev/null /var/log/nginx/iptv.dope.rs-stats.log
 install -m 640 -o iptv -g iptv /dev/null /var/log/iptv-stats.log
 service iptv_donate restart
@@ -615,7 +622,13 @@ The log is made before nginx opens it, so it belongs to the `iptv` group
 keeps only the day before (two days of addresses at the most), and leaves
 that one uncompressed so a line written
 just before midnight is still read. The counts live in
-`/usr/local/www/iptv/stats/` - outside the web root.
+`/usr/local/www/iptv/stats/` - outside the web root - and are the `iptv`
+user's alone: every file 0600, every folder 0700. The service starts with
+umask 077 and narrows anything left wider at each start (reports,
+supporters, the counts were 0644 before November 2026, the folders 0750),
+and `stats_collect.py` writes its files the same way, so the `iptv` group
+reads none of it. Something else that reads them - a backup - runs as
+root or as `iptv`.
 
 **nginx (host)** - the content server's file as in step 8, which now has the
 `iptv_stats` log for `/` and `/help/` and the `/admin/` location:
@@ -1075,3 +1088,194 @@ after each with `nginx -t && service nginx reload`.
 `location: https://dopeiptv.org/help/?lang=sv`; the same for http://, for
 `/dl.php?f=...` and for `/trakt/callback?code=x`; https://dopeiptv.org/ shows
 the page with a `canonical` of https://dopeiptv.org/.
+
+## Hardening, November 2026
+
+What a security review of the site found, and what changed (each commit
+says it in full). Nothing changes for a visitor, for the app - 1.6.7, 1.6.8
+and newer sync, send feedback, watch together, update and tip as before -
+or for the admin page.
+
+- **The content server's error log** holds only what stops it (`error_log
+  ... crit`), as the proxy's dopeiptv servers already did. Before, nginx
+  wrote every request a limit refused there with its whole request line -
+  sync slots, watch-together rooms, admin invites, checkout ids - which
+  the privacy policy says are never logged anywhere. What is there from
+  before is cleaned out once, below.
+- **Limits that apply.** nginx runs a location's `return` before its
+  `limit_req`, so a limit beside a return was never asked - /hit's never
+  was. /dl.php now has one of its own (`iptv_dl`), and both are answered
+  from a named location after the limit. A file's name is at most 120
+  characters; a name the site does not know (made up in the shape of a
+  test build's, which nginx sends on to GitHub) is counted under `other`
+  in downloads.json, so the total stays. The admin pages are counted by
+  address too (`iptv_admin_addr`), whatever cookie comes along.
+- **The logs** hold 1024 characters of a browser's name at the most, 2048
+  of an address or the page that linked, and no user name in the download
+  log.
+- **A request's body** is held in memory, never in nginx's temp folder on
+  disk, in both nginx layers; the proxy lets at most 8 sync copies come in
+  at once from one address (`dopeiptv_sync_put`).
+- **Nothing with a dot first** is served (/.gitignore and /files/.gitignore
+  were) but /.well-known/, where `security.txt` now says how to report a
+  security problem. Its `Expires` is a year ahead: renew it each November
+  (`donate/test_deploy_content.py` fails once it has passed).
+- **The lang cookie** is `Secure; SameSite=Lax`.
+- **The proxy** sends no version (`server_tokens off`), a
+  Permissions-Policy, Cross-Origin-Opener-Policy on the admin pages,
+  Cross-Origin-Resource-Policy on the admin pages and the services, and
+  HSTS on iptv.dope.rs's move. `deploy/proxy-headers.sh` now puts into the
+  live files whatever of the repo's they lack (it stopped once the first
+  headers were in).
+- **Feedback**: a report is cut before it is cleaned, a crash's first
+  frame is found in one look (a made-up one held the service for
+  seconds), and a home folder's name becomes `<user>`.
+- **The service's log** is turned over by newsyslog; its daemon reopens it
+  on a SIGHUP (`-H` in `deploy/iptv_donate`).
+
+**pontusweb (jail)** - `bastille console pontusweb`, then `sh`. The files,
+the tests, the service with its new rc file:
+
+```sh
+cd ~/dopeiptv
+git checkout website
+git pull origin website
+python3 -m pytest -q -p no:cacheprovider donate/
+cp -R donate /usr/local/www/iptv/
+cp sync-releases.sh /usr/local/www/iptv/
+cp -R public/. /usr/local/www/iptv/public/
+install -m 555 deploy/iptv_donate /usr/local/etc/rc.d/iptv_donate
+service iptv_donate restart
+tail -n 2 /var/log/iptv-donate.log
+```
+
+The service's log turned over - only once the rc file above runs it, whose
+daemon reopens the log on newsyslog's SIGHUP (without `-H` daemon does not
+catch one). Five copies of up to 1 MB, the service's alone to read:
+
+```sh
+grep -q iptv-donate.log /usr/local/etc/newsyslog.conf.d/iptv.dope.rs.conf || echo '/var/log/iptv-donate.log                     iptv:iptv      600  5     1024 *    J     /var/run/iptv_donate/iptv_donate.pid' >> /usr/local/etc/newsyslog.conf.d/iptv.dope.rs.conf
+newsyslog -nv 2>&1 | grep iptv-donate
+```
+
+The content server's file - new zones only, no zone's key changed, so a
+reload takes it; the workers' start time and the log say so:
+
+```sh
+diff /usr/local/etc/nginx/conf.d/iptv.dope.rs.conf deploy/content-iptv.dope.rs.conf
+cp /usr/local/etc/nginx/conf.d/iptv.dope.rs.conf /root/iptv.dope.rs.conf.before-hardening
+cp deploy/content-iptv.dope.rs.conf /usr/local/etc/nginx/conf.d/iptv.dope.rs.conf
+nginx -t && service nginx reload
+ps -axo pid,lstart,command | grep "[n]ginx: worker"
+grep -n emerg /var/log/nginx/error.log | tail -3
+```
+
+If `nginx -t` complains, `cp /root/iptv.dope.rs.conf.before-hardening
+/usr/local/etc/nginx/conf.d/iptv.dope.rs.conf` puts the old file back.
+
+Then what the content server wrote into the jail's error log before: every
+line that names its server (`server: dopeiptv.org`, `server: iptv.dope.rs`,
+or its port, `:8081`) goes; Nextcloud's lines stay. The file is written over
+in place, so nginx goes on writing to it. Older copies of the log, if
+anything turns it over (`error.log.0`, `error.log.0.bz2`...), hold the same
+lines and go whole:
+
+```sh
+grep -c -E 'server: (dopeiptv\.org|iptv\.dope\.rs|[0-9.*]*:8081)' /var/log/nginx/error.log
+grep -v -E 'server: (dopeiptv\.org|iptv\.dope\.rs|[0-9.*]*:8081)' /var/log/nginx/error.log > /root/error.log.kept
+cat /root/error.log.kept > /var/log/nginx/error.log
+rm /root/error.log.kept
+ls -l /var/log/nginx/
+rm -f /var/log/nginx/error.log.[0-9]*
+```
+
+The first line counts what goes; run again afterwards it says 0, and
+stays so: a refused request writes nothing there now.
+
+**webproxy (jail)** - `bastille console webproxy`, then `sh`. The script
+brings both of the proxy's files for the site up to the repo's, keeping
+their addresses and certificates, tests them with `nginx -t` and reloads
+(or puts both back):
+
+```sh
+fetch -qo /root/proxy-headers.sh https://raw.githubusercontent.com/slimture/dopeIPTV/website/deploy/proxy-headers.sh
+sh /root/proxy-headers.sh
+ps -axo pid,lstart,command | grep "[n]ginx: worker"
+grep -n emerg /var/log/nginx/error.log | tail -3
+```
+
+It says which of the http block's headers it named again, any line the
+live file has with a value of its own (kept), and "done" for each file it
+changed, with its copy in /root; run again, it says "nothing changed".
+(Without GitHub from the jail: on the host, `cp
+/root/iptv-static/deploy/proxy-headers.sh
+/usr/local/bastille/jails/webproxy/root/root/` after step 2's fetch.)
+
+The proxy's dopeiptv servers have written only what stops them since the
+"no front server log" round; lines from before that name visitors'
+addresses. The same cleaning, by those servers' names:
+
+```sh
+grep -c -E 'server: (www\.)?(dopeiptv\.org|iptv\.dope\.rs)' /var/log/nginx/error.log
+grep -v -E 'server: (www\.)?(dopeiptv\.org|iptv\.dope\.rs)' /var/log/nginx/error.log > /root/error.log.kept
+cat /root/error.log.kept > /var/log/nginx/error.log
+rm /root/error.log.kept
+ls -l /var/log/nginx/
+rm -f /var/log/nginx/error.log.[0-9]*
+```
+
+**Port 8081: only the proxy.** The content server answers whoever reaches
+10.0.1.2:8081 and believes the X-Real-IP it is told (the statistics, every
+limit per visitor), and the address that may is this server's own, never
+the repo's. From the host and from a jail other than webproxy:
+
+```sh
+fetch -T 5 -qo /dev/null http://10.0.1.2:8081/ && echo "8081 answers here"
+```
+
+Only the proxy should get an answer. Where another does, the content
+server's file includes `/usr/local/etc/nginx/iptv-only-from-proxy.conf`
+(a pattern: nothing until the file is there, and a new copy of the repo's
+file keeps it). With the proxy's address as pontusweb sees it - `jls -j
+webproxy ip4.addr` on the host, or `ifconfig` in webproxy for a VNET jail -
+put in that file, in pontusweb:
+
+```nginx
+allow <the proxy's address>;
+deny all;
+```
+
+then `nginx -t && service nginx reload`, and at once `curl -sI
+https://dopeiptv.org/ | head -1`: still 200 - a 403 means the proxy comes
+from another address; `rm /usr/local/etc/nginx/iptv-only-from-proxy.conf`
+and reload, then look again. The check above then answers 403 everywhere
+but on the proxy.
+
+**Check** (from anywhere):
+
+```sh
+curl -sI https://dopeiptv.org/.gitignore | head -1
+curl -s https://dopeiptv.org/.well-known/security.txt
+curl -sI 'https://dopeiptv.org/?lang=sv' | grep -i '^set-cookie'
+curl -sI https://dopeiptv.org/admin/login | grep -i -E '^(server|permissions-policy|cross-origin-[a-z]+-policy):'
+curl -sI https://dopeiptv.org/ | grep -i -E '^(server|permissions-policy|cross-origin-[a-z]+-policy):'
+curl -sI https://iptv.dope.rs/ | grep -i '^strict-transport-security'
+curl -sI 'https://dopeiptv.org/dl.php?f=SHA256SUMS' | grep -i '^location'
+curl -s -o /dev/null -w '%{http_code}\n' "https://dopeiptv.org/dl.php?f=dopeIPTV-1.6.8.90-$(printf 'x%.0s' $(seq 110))"
+curl -s -o /dev/null -w '%{http_code}\n' https://dopeiptv.org/sync/$(printf 'ab%.0s' $(seq 32))
+```
+
+Answers: `HTTP/2 404`; the five lines of security.txt; `set-cookie:
+lang=sv; Max-Age=31536000; path=/; Secure; SameSite=Lax`; on /admin/login
+`server: nginx` (no version), the permissions policy and both
+cross-origin policies, `same-origin`; on / the same but no cross-origin
+line; the HSTS line; `location: /files/SHA256SUMS`; `404` for a name of
+128 characters (a test build's shape: before, a 302 to GitHub); `404` for
+an empty sync slot, as before. Then in the app: Sync now, Send feedback, a
+watch-together room - as before; the admin page signs in and fills.
+
+**Privacy, behind the scenes** shows the code of site commit 12d6507. Once
+this round is on GitHub, make it again (`python3 tools/transparency.py
+--app <a checkout of the app at v1.6.8> --ref v1.6.8`) so its excerpts of
+feedback.py's cleaning, the proxy's /sync/ and /together/ blocks and the
+statistics' log format are this round's.

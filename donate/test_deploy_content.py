@@ -414,3 +414,39 @@ def test_the_admin_pages_are_counted_by_address_whatever_cookie_comes():
         assert limits == ["zone=iptv_admin burst=30 nodelay", "zone=iptv_admin_addr burst=300 nodelay"], uri
     # Signing in as before: its own zone, for everyone.
     assert find_location(srv, "/admin/auth/password").values("limit_req") == ["zone=iptv_signin burst=10 nodelay"]
+
+
+def test_the_port_can_be_kept_to_the_proxy_without_this_file_naming_it():
+    # The proxy's address is the server's own: a file of the owner's beside
+    # nginx.conf, which a new copy of this one keeps. A pattern (nginx lets
+    # one match nothing), so until it is made nothing changes.
+    import fnmatch
+    srv = _server(conf())
+    pattern = srv.values("include")
+    assert pattern == ["iptv-only-from-proxy.con[f]"]
+    assert fnmatch.fnmatch("iptv-only-from-proxy.conf", pattern[0])
+    assert not fnmatch.fnmatch("iptv-only-from-proxy.conf.bak", pattern[0])
+    assert srv.body.index(srv.one("include")) < srv.body.index(next(b for b in srv.body if b.name == "location"))
+    deploy = open(os.path.join(ROOT, "DEPLOY.md"), encoding="utf-8").read()
+    assert "/usr/local/etc/nginx/iptv-only-from-proxy.conf" in deploy and "deny all;" in deploy
+
+
+def test_the_services_log_is_turned_over_and_reopened():
+    # newsyslog sends a SIGHUP to daemon(8)'s pid file; only with -H does
+    # daemon reopen its log on one rather than take it amiss.
+    rc = open(os.path.join(ROOT, "deploy", "iptv_donate"), encoding="utf-8").read()
+    args = re.search(r'command_args="([^"]+)"', rc).group(1).split()
+    assert "-H" in args and "-o" in args and args[args.index("-P") + 1] == "${pidfile}"
+    pidfile = re.search(r"^pidfile=(.+)$", rc, re.M).group(1).replace("${piddir}", "/var/run/${name}") \
+        .replace("${name}", "iptv_donate")
+    deploy = open(os.path.join(ROOT, "DEPLOY.md"), encoding="utf-8").read()
+    line = re.search(r"'(/var/log/iptv-donate\.log\s+iptv:iptv\s+600\s[^']*)'", deploy).group(1)
+    fields = line.split()
+    # logfilename owner:group mode count size when flags pid_file: a SIGHUP
+    # (newsyslog's own, no signal named) to daemon's pid file.
+    assert fields[1:7] == ["iptv:iptv", "600", "5", "1024", "*", "J"] and len(fields) == 8
+    assert fields[7] == pidfile == "/var/run/iptv_donate/iptv_donate.pid"
+    # The line goes in only after the rc file with -H and a restart.
+    rc_in = deploy.index("install -m 555 deploy/iptv_donate")
+    assert rc_in < deploy.index("service iptv_donate restart", rc_in) < deploy.index(line)
+    assert "install -d -o iptv -g iptv -m 700 /usr/local/www/iptv/stats" in deploy
