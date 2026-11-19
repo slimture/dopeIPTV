@@ -110,19 +110,38 @@ _IPV6 = re.compile(r"(?<![\w:])(?:(?:[0-9A-Fa-f]{1,4}:){5,7}[0-9A-Fa-f]{1,4}"
                    r"|[0-9A-Fa-f:]{0,30}::[0-9A-Fa-f:]{0,30}[0-9A-Fa-f])(?![\w:])")
 _EMAIL = re.compile(r"[\w.+-]{1,64}@[\w-]{1,63}(?:\.[\w-]{1,63})+")
 _MAC = re.compile(r"(?<![0-9A-Fa-f])(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}(?![0-9A-Fa-f])")
-_KEYVAL = re.compile(r"(?i)\b(user(?:name)?|pass(?:word)?|pwd|token|key|secret|auth|mac)(\s*[=:]\s*)([^\s&'\",;]+)")
+# As the app's core/report.py: a login written name=value or name: value, a
+# quoted name or value too (JSON's "password": "x y"; the quotes stay), a
+# header that carries one to the end of its line, a bearer token, and a
+# server written without its scheme (iptv.example.com/live/...).
+_KEYVAL = re.compile(r"(?i)\b(user(?:name)?|pass(?:word)?|pwd|token|key|api_key|apikey|secret|"
+                     r"auth|sid|session|mac|play_token|login|host)([\"']?\s*[=:]\s*)"
+                     r"(\"[^\"\n]{0,200}\"|'[^'\n]{0,200}'|[^\s&'\",;]+)")
+_AUTH_LINE = re.compile(r"(?i)\b((?:proxy-)?authorization|(?:set-)?cookie)([\"']?\s*[:=]\s*)[^\r\n]*")
+_BEARER = re.compile(r"(?i)\b(bearer)\s+[A-Za-z0-9._~+/=-]{8,}")
+_HOST_PATH = re.compile(r"(?<![\w@/.:-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}"
+                        r"(?::\d{1,5})?/[^\s'\"<>()\[\]]*", re.IGNORECASE)
 _VERSION = re.compile(r"^[0-9A-Za-z.+_-]{1,40}$")
 _SUPPORTER = re.compile(r"(?i)\bDS1-[A-Za-z0-9_-]{20,}")
+
+
+def _hide_value(m: re.Match) -> str:
+    value = m.group(3)
+    quote = value[0] if value[:1] in ("'", '"') else ""
+    return f"{m.group(1)}{m.group(2)}{quote}<hidden>{quote}"
 
 
 def scrub(text: str) -> str:
     out = _URL.sub(lambda m: f"{m.group(1)}://<address>", text or "")
     out = _SUPPORTER.sub("<supporter key>", out)
     out = _EMAIL.sub("<email>", out)
+    out = _HOST_PATH.sub("<address>", out)
     out = _MAC.sub("<mac>", out)
     out = _IPV6.sub("<ip>", out)
     out = _IPV4.sub(lambda m: m.group(0) if m.group(0).startswith("127.") else "<ip>", out)
-    return _KEYVAL.sub(lambda m: f"{m.group(1)}{m.group(2)}<hidden>", out)
+    out = _AUTH_LINE.sub(lambda m: f"{m.group(1)}{m.group(2)}<hidden>", out)
+    out = _BEARER.sub(lambda m: f"{m.group(1)} <hidden>", out)
+    return _KEYVAL.sub(_hide_value, out)
 
 
 def _paths(stats_dir: str) -> tuple[str, str]:

@@ -40,6 +40,23 @@ def test_the_other_patterns_still_go():
     assert out == "http://<address> <ip> <mac> <email> token=<hidden> <supporter key>", out
 
 
+def test_logins_in_quotes_json_headers_and_addresses_without_a_scheme_go():
+    cases = {
+        'password="my secret" next': 'password="<hidden>" next',
+        '{"password": "secret123", "user": "kalle"}': '{"password": "<hidden>", "user": "<hidden>"}',
+        "Authorization: Bearer abc.def.ghi": "Authorization: <hidden>",
+        "got Bearer eyJhbGciOiJIUzI1NiJ9.x.y today": "got Bearer <hidden> today",
+        "Cookie: sid=abc; theme=dark": "Cookie: <hidden>",
+        "HTTPConnectionPool(host='iptv.example.com', port=8080)": "HTTPConnectionPool(host='<hidden>', port=8080)",
+        "iptv.example.com:8080/live/kalle/pw/1.ts failed": "<address> failed",
+    }
+    for text, scrubbed in cases.items():
+        assert feedback.scrub(text) == scrubbed, (text, feedback.scrub(text))
+    for keep in ('File "~/dopeIPTV/dopeiptv/ui/main_window.py", line 42', "lib/python3.12/site-packages/x.py",
+                 "dopeIPTV 1.6.7/notes", "localhost:3673"):
+        assert feedback.scrub(keep) == keep, keep
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     for name, fn in tests:
