@@ -555,7 +555,7 @@ class QueueDelegate(_RowDelegate):
         small = mc.px_font(mc.SMALL_PX)
         _text(p, parts["pos"], str(index.row() + 1), small, mc.colour("muted"), rtl,
               Qt.AlignmentFlag.AlignCenter)
-        pm = v.images.get(card.image) if card.image else None
+        pm, _own = mc.card_picture(v.images, card)
         mc.paint_picture(p, parts["picture"], pm, v.pictures, corner_radius(6),
                          card.initials or mc.initials_of(card.title))
         text = parts["text"]
@@ -991,7 +991,7 @@ class FolderItemDelegate(_RowDelegate):
         if focus:
             mc.paint_ring(p, QRectF(rect).adjusted(1, 1, -1, -1), corner_radius(10), 1.6)
         parts = folder_item_parts(rect, rtl)
-        pm = v.images.get(card.image) if card.image else None
+        pm, _own = mc.card_picture(v.images, card)
         mc.paint_picture(p, parts["picture"], pm, v.pictures, corner_radius(8),
                          card.initials or mc.initials_of(card.title, 3),
                          fit=card.rank == FolderItemsView.LOGO)
