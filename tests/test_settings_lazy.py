@@ -334,3 +334,36 @@ def test_settings_opens_on_one_page_and_shows_no_window_of_its_own(tmp_path):
                           text=True, env=env, cwd=_REPO_ROOT, timeout=240)
     assert "LAZY_OK" in proc.stdout, (
         f"stdout={proc.stdout[-2000:]!r}\nstderr={proc.stderr[-4000:]!r}")
+
+
+def test_a_row_made_again_never_breaks_the_column_of_controls():
+    # Profiles' card is made again when a profile is removed (and Nerd's
+    # lists and a source's page do the same): the old rows go, their
+    # controls with them. The next page built aligned the column of every
+    # page so far - and met a deleted control: "wrapped C/C++ object of
+    # type QWidget has been deleted" (an error report from 1.6.6).
+    from PyQt6 import sip
+    from PyQt6.QtWidgets import QHBoxLayout
+    d, shell, pages, built, told = _shell()
+    shell.ready()
+    d.resize(900, 600)
+    d.show()
+    app.processEvents()
+    card = pages["one"].card("Profiles")
+    controls = QHBoxLayout()
+    controls.addWidget(QPushButton("Edit"))
+    controls.addWidget(QPushButton("Remove"))
+    row = card.row("A profile", controls, "Everyone")
+    shell.align_column()
+    holder = pages["one"].column[-1]
+    assert holder.isAncestorOf(holder.findChildren(QPushButton)[0])
+    # As ProfilesPage.refresh takes the card's rows away.
+    from PyQt6.QtCore import QEvent
+    row.hide()
+    row.deleteLater()
+    app.sendPostedEvents(None, QEvent.Type.DeferredDelete.value)
+    assert sip.isdeleted(holder)
+    shell.show_page("two")                    # built now: the column aligned again
+    assert built[-1] == "two"
+    assert holder not in pages["one"].column
+    assert all(not sip.isdeleted(c) for p in pages.values() for c in p.column)

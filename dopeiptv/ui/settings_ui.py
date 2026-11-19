@@ -626,7 +626,12 @@ class SettingsShell(QWidget):
         control's, within the column's bounds. Each control used to take the
         width of its own text, so a long entry ("Default (provider order)")
         stuck out past the dropdowns above it. Only the minimum is set: a
-        control whose text grows later widens instead of being cut off."""
+        control whose text grows later widens instead of being cut off.
+        A card made again (Profiles when one is removed, Nerd's lists, a
+        source's page) deletes its old rows, their controls with them: those
+        leave the column here, never measured."""
+        for p in self.pages:
+            p.column = [c for c in p.column if not sip.isdeleted(c)]
         align_controls([c for p in self.pages for c in p.column])
 
     def add_page(self, page: SettingsPage, icon: QIcon) -> SettingsPage:
@@ -1093,7 +1098,9 @@ class SettingsShell(QWidget):
 def align_controls(controls: list[QWidget]) -> None:
     """The widest control's width for all of *controls* (a column down a
     page), within their bounds; only the minimum, so one whose text grows
-    later widens rather than being cut off."""
+    later widens rather than being cut off. A control already deleted is
+    left out."""
+    controls = [c for c in controls if not sip.isdeleted(c)]
     if not controls:
         return
     for c in controls:
