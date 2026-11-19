@@ -3099,5 +3099,7 @@
   "link_play_title": "¿Reproducir esta dirección?",
   "link_play_body": "Un enlace abierto fuera de dopeIPTV pide reproducir una dirección en {host}:\n\n{address}\n\nEse servidor verá la dirección IP de este equipo. Reprodúcela solo si te fías del origen del enlace.",
   "pin_wait": "Demasiados intentos fallidos. Vuelve a intentarlo en {n} s.",
-  "cast_other_device": "«{name}» no es el mismo dispositivo que la última vez: ahora responde desde {address}. Elígelo en la lista si es tu tele."
+  "cast_other_device": "«{name}» no es el mismo dispositivo que la última vez: ahora responde desde {address}. Elígelo en la lista si es tu tele.",
+  "settings_open_title": "Tu archivo de ajustes no es privado",
+  "settings_open_body": "Contiene tus inicios de sesión y su disco no permitió que solo tú pudieras leerlo, así que otras cuentas de este ordenador quizá puedan leerlo. Está en {path}"
 }

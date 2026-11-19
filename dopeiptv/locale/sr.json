@@ -3099,5 +3099,7 @@
   "link_play_title": "Pustiti ovu adresu?",
   "link_play_body": "Link otvoren izvan dopeIPTV-a traži da se pusti adresa na {host}:\n\n{address}\n\nTaj server će videti IP adresu ovog računara. Pusti je samo ako veruješ izvoru linka.",
   "pin_wait": "Previše pogrešnih pokušaja. Pokušaj ponovo za {n} s.",
-  "cast_other_device": "„{name}“ nije isti uređaj kao prošli put - sada odgovara sa adrese {address}. Izaberi ga na listi ako je to tvoj televizor."
+  "cast_other_device": "„{name}“ nije isti uređaj kao prošli put - sada odgovara sa adrese {address}. Izaberi ga na listi ako je to tvoj televizor.",
+  "settings_open_title": "Vaša datoteka podešavanja nije privatna",
+  "settings_open_body": "Sadrži vaše prijave, a njen disk nije dozvolio da samo vi možete da je čitate, pa je možda mogu čitati drugi nalozi na ovom računaru. Nalazi se ovde: {path}"
 }

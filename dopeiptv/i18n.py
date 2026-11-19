@@ -455,6 +455,8 @@ _STRINGS: dict[str, dict[str, str]] = {
     "desktop_entry_title": {"en": "Add to the application menu?"},
     "desktop_entry_done": {"en": "Added. This window keeps the icon it started with — the icon and name appear the next time you start dopeIPTV."},
     "desktop_entry_ask": {"en": "Nothing has installed a menu entry for this copy of dopeIPTV, so your desktop has no icon or name for it - on Wayland that is why the taskbar shows a blank placeholder. Add one now? It goes in your home folder only, and Settings can remove it again."},
+    "settings_open_title": {"en": "Your settings file is not private"},
+    "settings_open_body": {"en": "It holds your logins, and its drive would not let it be made readable by you alone, so other accounts on this computer may read it. It is at {path}"},
     "ext_play_title": {"en": "Open external player?"},
     "ext_play_body": {"en": "Something is playing in the mini player. Opening an external player pulls a second stream from the provider, which many accounts don't allow. Stop the mini player first?"},
     "ext_play_stop_open": {"en": "Stop and open externally"},

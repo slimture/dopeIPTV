@@ -3099,5 +3099,7 @@
   "link_play_title": "Dit adres afspelen?",
   "link_play_body": "Een link die buiten dopeIPTV is geopend, vraagt om een adres op {host} af te spelen:\n\n{address}\n\nDie server ziet het IP-adres van deze computer. Speel het alleen af als je vertrouwt waar de link vandaan komt.",
   "pin_wait": "Te veel verkeerde pogingen. Probeer het over {n} s opnieuw.",
-  "cast_other_device": "‘{name}’ is niet hetzelfde apparaat als de vorige keer - het antwoordt nu vanaf {address}. Kies het in de lijst als dat jouw tv is."
+  "cast_other_device": "‘{name}’ is niet hetzelfde apparaat als de vorige keer - het antwoordt nu vanaf {address}. Kies het in de lijst als dat jouw tv is.",
+  "settings_open_title": "Je instellingenbestand is niet privé",
+  "settings_open_body": "Het bevat je inloggegevens, en de schijf liet niet toe dat alleen jij het kunt lezen, dus andere accounts op deze computer kunnen het misschien lezen. Het staat op {path}"
 }

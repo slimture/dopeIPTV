@@ -3099,5 +3099,7 @@
   "link_play_title": "播放这个地址？",
   "link_play_body": "在 dopeIPTV 之外打开的一个链接要求播放 {host} 上的地址：\n\n{address}\n\n该服务器会看到这台电脑的 IP 地址。只有在你信任链接来源时才播放。",
   "pin_wait": "错误次数过多。请在 {n} 秒后重试。",
-  "cast_other_device": "“{name}”已不是上次的那台设备——它现在从 {address} 应答。如果这是你的电视，请在列表中选择它。"
+  "cast_other_device": "“{name}”已不是上次的那台设备——它现在从 {address} 应答。如果这是你的电视，请在列表中选择它。",
+  "settings_open_title": "你的设置文件不是私密的",
+  "settings_open_body": "其中有你的登录信息，而它所在的磁盘不允许设为只有你能读取，因此这台电脑上的其他账户可能读到它。位置：{path}"
 }

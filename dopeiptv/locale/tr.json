@@ -3099,5 +3099,7 @@
   "link_play_title": "Bu adres oynatılsın mı?",
   "link_play_body": "dopeIPTV dışında açılan bir bağlantı, {host} üzerindeki bir adresi oynatmak istiyor:\n\n{address}\n\nO sunucu bu bilgisayarın IP adresini görecek. Yalnızca bağlantının geldiği yere güveniyorsan oynat.",
   "pin_wait": "Çok fazla yanlış deneme. {n} sn sonra yeniden dene.",
-  "cast_other_device": "“{name}” geçen seferki cihaz değil - şimdi {address} adresinden yanıt veriyor. Senin TV'nse listeden seç."
+  "cast_other_device": "“{name}” geçen seferki cihaz değil - şimdi {address} adresinden yanıt veriyor. Senin TV'nse listeden seç.",
+  "settings_open_title": "Ayar dosyanız gizli değil",
+  "settings_open_body": "Giriş bilgilerinizi içeriyor ve sürücüsü onu yalnızca sizin okuyabileceğiniz hâle getirmeye izin vermedi; bu bilgisayardaki başka hesaplar onu okuyabilir. Konumu: {path}"
 }

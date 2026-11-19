@@ -3099,5 +3099,7 @@
   "link_play_title": "Spela upp den här adressen?",
   "link_play_body": "En länk som öppnades utanför dopeIPTV vill spela upp en adress på {host}:\n\n{address}\n\nDen servern får se den här datorns IP-adress. Spela bara upp den om du litar på var länken kom ifrån.",
   "pin_wait": "För många felaktiga försök. Försök igen om {n} s.",
-  "cast_other_device": "”{name}” är inte samma enhet som förra gången - den svarar nu från {address}. Välj den i listan om det är din tv."
+  "cast_other_device": "”{name}” är inte samma enhet som förra gången - den svarar nu från {address}. Välj den i listan om det är din tv.",
+  "settings_open_title": "Din inställningsfil är inte privat",
+  "settings_open_body": "Den innehåller dina inloggningar, och dess enhet lät den inte bli läsbar för bara dig, så andra konton på den här datorn kan kanske läsa den. Den ligger i {path}"
 }

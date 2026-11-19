@@ -412,6 +412,9 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         # Offered once the window is up and doing something; a link in the
         # status row, never a dialog over the window.
         QTimer.singleShot(6000, self._maybe_offer_desktop_entry)
+        # A settings file this start could not keep to this user (a drive
+        # without permissions): said once, calmly (mw_settings).
+        QTimer.singleShot(3000, self._tell_settings_not_private)
 
         self._auto_refresh_timer = QTimer(self)
         self._auto_refresh_timer.timeout.connect(self._maybe_auto_refresh)

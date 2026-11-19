@@ -3099,5 +3099,7 @@
   "link_play_title": "Cheza anwani hii?",
   "link_play_body": "Kiungo kilichofunguliwa nje ya dopeIPTV kinaomba kucheza anwani iliyo kwenye {host}:\n\n{address}\n\nSeva hiyo itaona anwani ya IP ya kompyuta hii. Icheze tu ikiwa unaamini kiungo kilikotoka.",
   "pin_wait": "Majaribio mengi yasiyo sahihi. Jaribu tena baada ya sekunde {n}.",
-  "cast_other_device": "“{name}” si kifaa kilekile cha mara ya mwisho - sasa kinajibu kutoka {address}. Kichague kwenye orodha ikiwa ni TV yako."
+  "cast_other_device": "“{name}” si kifaa kilekile cha mara ya mwisho - sasa kinajibu kutoka {address}. Kichague kwenye orodha ikiwa ni TV yako.",
+  "settings_open_title": "Faili lako la mipangilio si la faragha",
+  "settings_open_body": "Lina taarifa zako za kuingia, na diski yake haikuruhusu lisomwe na wewe peke yako, kwa hiyo akaunti nyingine kwenye kompyuta hii huenda zikalisoma. Liko hapa: {path}"
 }

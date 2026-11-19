@@ -3099,5 +3099,7 @@
   "link_play_title": "Phát địa chỉ này?",
   "link_play_body": "Một liên kết được mở bên ngoài dopeIPTV yêu cầu phát một địa chỉ trên {host}:\n\n{address}\n\nMáy chủ đó sẽ thấy địa chỉ IP của máy tính này. Chỉ phát nếu bạn tin tưởng nơi liên kết xuất phát.",
   "pin_wait": "Quá nhiều lần thử sai. Thử lại sau {n} giây.",
-  "cast_other_device": "“{name}” không còn là thiết bị như lần trước - giờ nó trả lời từ {address}. Hãy chọn nó trong danh sách nếu đó là TV của bạn."
+  "cast_other_device": "“{name}” không còn là thiết bị như lần trước - giờ nó trả lời từ {address}. Hãy chọn nó trong danh sách nếu đó là TV của bạn.",
+  "settings_open_title": "Tệp cài đặt của bạn không riêng tư",
+  "settings_open_body": "Tệp này chứa thông tin đăng nhập của bạn, và ổ đĩa của nó không cho phép chỉ mình bạn đọc được, nên các tài khoản khác trên máy tính này có thể đọc nó. Tệp nằm ở {path}"
 }

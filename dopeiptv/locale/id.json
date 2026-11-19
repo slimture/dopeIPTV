@@ -3099,5 +3099,7 @@
   "link_play_title": "Putar alamat ini?",
   "link_play_body": "Sebuah tautan yang dibuka di luar dopeIPTV meminta untuk memutar alamat di {host}:\n\n{address}\n\nServer itu akan melihat alamat IP komputer ini. Putar hanya jika kamu memercayai asal tautan itu.",
   "pin_wait": "Terlalu banyak percobaan yang salah. Coba lagi dalam {n} dtk.",
-  "cast_other_device": "“{name}” bukan perangkat yang sama seperti terakhir kali - sekarang ia menjawab dari {address}. Pilih di daftar jika itu memang TV-mu."
+  "cast_other_device": "“{name}” bukan perangkat yang sama seperti terakhir kali - sekarang ia menjawab dari {address}. Pilih di daftar jika itu memang TV-mu.",
+  "settings_open_title": "File pengaturan Anda tidak pribadi",
+  "settings_open_body": "File ini berisi info masuk Anda, dan drive-nya tidak mengizinkan file ini hanya bisa dibaca oleh Anda, jadi akun lain di komputer ini mungkin bisa membacanya. Letaknya di {path}"
 }

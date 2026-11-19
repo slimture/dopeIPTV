@@ -70,6 +70,7 @@ from . import about, set_content, set_services, set_system, set_watch
 from .theme import P, THEMES, apply_theme, build_style, effective_theme
 from .settings_ui import Chip, SettingsPage, SettingsShell, page_icon, settings_style
 from .widgets import confirm, file_dialog_options, plain_text
+from .notices import hub_of
 from ..core.workers import run_async
 
 
@@ -172,6 +173,29 @@ class _SettingsMixin:
             self.desktop_entry_btn.show()
         except Exception as e:      # never let a nicety break startup
             log.warning("desktop entry offer failed: %s", e)
+
+    def _tell_settings_not_private(self) -> None:
+        """Once a start, when a settings file could not be made readable by
+        this user alone (core/settings_files.py: a drive that keeps no
+        permissions): a calm message saying where it is - the app works
+        on. Its button opens the folder."""
+        try:
+            from ..core import settings_files
+            found = settings_files.not_private()
+            if not found or getattr(self, "_settings_open_told", False):
+                return
+            self._settings_open_told = True
+            path = found[0]
+            folder = os.path.dirname(path)
+
+            def show() -> None:
+                from ..core import xdg
+                xdg.open_folder(folder)
+            hub_of(self).post(tr("settings_open_body", path=path), title=tr("settings_open_title"),
+                              level="warning", action=show, action_label=tr("btn_open_folder"),
+                              key="settings_not_private")
+        except Exception as e:      # never in the way of starting
+            log.warning("settings: the note on their permissions was not shown: %s", e)
 
     def _ask_desktop_entry(self) -> None:
         """The status-row link was clicked: ask, and remember the answer."""

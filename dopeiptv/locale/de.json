@@ -3099,5 +3099,7 @@
   "link_play_title": "Diese Adresse abspielen?",
   "link_play_body": "Ein außerhalb von dopeIPTV geöffneter Link möchte eine Adresse auf {host} abspielen:\n\n{address}\n\nDieser Server sieht die IP-Adresse dieses Computers. Spiel sie nur ab, wenn du der Herkunft des Links vertraust.",
   "pin_wait": "Zu viele falsche Versuche. Versuch es in {n} s noch einmal.",
-  "cast_other_device": "„{name}“ ist nicht mehr dasselbe Gerät wie beim letzten Mal - es antwortet jetzt von {address}. Wähl es in der Liste aus, wenn das dein Fernseher ist."
+  "cast_other_device": "„{name}“ ist nicht mehr dasselbe Gerät wie beim letzten Mal - es antwortet jetzt von {address}. Wähl es in der Liste aus, wenn das dein Fernseher ist.",
+  "settings_open_title": "Ihre Einstellungsdatei ist nicht privat",
+  "settings_open_body": "Sie enthält Ihre Zugangsdaten, und ihr Laufwerk ließ nicht zu, dass nur Sie sie lesen können – andere Konten auf diesem Computer können sie vielleicht lesen. Sie liegt unter {path}"
 }
