@@ -209,6 +209,8 @@ map and the one-way import rule.
 | `media/video_surface.py` | The window-thread video surface (`_MpvGLWidget`: the fallback and the switch's other side; `DOPEIPTV_GUI_RENDER=tuned` takes its waits off the window's thread) and the Linux pop-out's raster mirror; the core's options (`build_core`) for every surface |
 | `media/subtitle_text.py` | Stray right-to-left marks out of subtitle files before mpv reads them |
 | `ui/main_window.py` | MainWindow composition root (+ `mw_*` mixins) |
+| `ui/mw_build.py` | The window built (`_BuildMixin`): `_build_ui`'s parts, one method each, which main_window.py's `_build_ui` calls in the order they were always made - that order is the focus chain, the stacking of overlapping siblings and the order signals' handlers run in: the menus (`_build_menus`), the central stack and its splitter (`_build_center`), the sidebar (`_build_sidebar_shell`, `_build_places_nav`, `_build_category_column`, `_build_sidebar_foot`), the middle pane (`_build_middle_pane`, `_build_list_controls`, `_build_list_view`, `_build_status_row`), the three columns in the splitter with their floors and the window's minimum size (`_build_columns`), the timers and the playback state set beside them (`_build_timers`), Escape, Delete and the rebindable keys (`_build_shortcuts`); a part's locals that a later part uses handed on as return values and arguments (`side, sl`, `mid, lp, ml`...); its base `_BuildDetailMixin` (`ui/mw_build_detail.py`) the detail column |
+| `ui/mw_build_detail.py` | The window's detail column built (`_BuildDetailMixin`, the base of `_BuildMixin`): the pane and its focus-mode strip (`_build_detail_pane`), the cast card in the video's place and its controls wired (`_build_cast_card`), the docked player and what the window hears from it (`_build_player`), the info column under the video that scrolls and the player's resize handle (`_build_info_column`), the poster with its play button, Now playing and a film's synopsis (`_build_detail_header`), a film's Continue, the cast's photos and the programme list (`_build_detail_lists`) |
 | `ui/mw_lists.py` | The lists in the window (`_ListsMixin`): a mode switched and the modes a source has (`switch_mode`, `_refresh_mode_availability`, `_apply_mode_visibility`), the category column with the category kept per mode (`_load_categories`, `_remembered_cat_row`, `_category_changed`; `_UNSET`, no category waiting to be picked again), the middle list (`_load_items`; the combined views under their headings - `_show_grouped`, `_load_recordings_grouped`, `_load_favorites_all`), grid or rows (`_apply_list_layout`), what a row is called and how it is tinted (`channel_display_name`, `item_tint`), the catalogue as the lists show it - hidden, locked, a kids profile's (`_visible_catalog`, `_catalog_filter`, `_channel_hidden`), the filter and the status row's count (`_apply_filter`, `_count_text`), a row found and selected (`_try_select_key`, `_reveal_item_in_list`, `_reveal_channel_in_list`) |
 | `ui/app_menu.py` | The app's menus, one layout on every platform: File (Settings and Quit at its foot), View, History, Help (About last); on macOS About, Settings, Quit and the supporter entries go into the application menu by their roles (`_MAC_ROLES`), the rest never moved by its words; no empty menu, no stray separator |
 | `ui/channel_list.py` | List model, view, delegate painting; rows put in and taken out without a reset, the selection and the scroll kept (`insert_items`, `append_items`, `remove_rows`); a live channel list's rows painted the TV place's way (`tv_rows`, `tv_density`, `ui/tv_place.paint_tv_row`: the window's facts per painted row - number, logo, favourite, catch-up, stream health, a box's tuner ring, the technical line, its own colours - and the guide's now and next from memory, kept per channel for the minute, `forget_guide`; the name's column as wide as the list's longest names need, worked out once per list - `_tv_name_w`, `tv_place.name_need` - and a row's whole name in its tooltip), every other list and a grid of tiles as before |
@@ -443,12 +445,17 @@ row in the table above; in short:
 
 What stays in `main_window.py` is the `__init__`/`_build_ui` composition
 and the playback path (start/stop, seek, fullscreen, reconnect) - keep
-playback code there.
+playback code there. `_build_ui` itself only calls the window's parts in
+the order they were always made - each built in `mw_build` (`_BuildMixin`;
+the detail column, the cast card and the player in its base
+`mw_build_detail`) - so a widget is made there: keep that order, and put a
+new part where it belongs in it.
 
 When making changes:
 
 - **UI changes**: find the method by name across `ui/main_window.py` and
-  the `mw_*` mixins (e.g. `open_settings` lives in `mw_settings.py`).
+  the `mw_*` mixins (e.g. `open_settings` lives in `mw_settings.py`; the
+  window's widgets are made in `mw_build.py` and `mw_build_detail.py`).
   A mixin method resolves on `MainWindow` via MRO, so a pure move between
   them never changes behaviour.
 - **Playback**: `media/embedded.py` for the in-app player (its DVR row

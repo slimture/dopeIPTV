@@ -335,6 +335,10 @@ dopeiptv/
   ui/                  Everything the user sees
     __init__.py        Lazy MainWindow export (PEP 562)
     main_window.py     MainWindow composition root (QMainWindow + mixins)
+    mw_build.py        The window built: _build_ui's parts (menus, sidebar,
+                       middle pane, columns, timers, keys) in their old order
+    mw_build_detail.py The detail column built: the pane, the cast card, the
+                       player, the info under it
     mw_lists.py        The lists: a mode switched, the categories, the middle
                        list, the filter
     app_menu.py        The app's menus, one layout on every platform: File,
