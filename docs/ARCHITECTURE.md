@@ -420,6 +420,8 @@ dopeiptv/
                        the archive; the strip's timeshift menu, back to live
     mw_cast_watch.py   The cast card's picture, words and state; a stuck cast
                        sent again (twice, then Try again); "On TV" marks
+    cast_add_dialogs.py The cast window's Add Kodi… and Add a device by
+                       address… windows
     cast_dialog.py     The cast window: the devices found and added, tracks and
                        quality, the TV cast to last first
     cast_card.py       The cast card in the video's place (pure presentation)
