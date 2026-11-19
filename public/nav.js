@@ -1414,7 +1414,7 @@ var iptvCurrency = (function () {
           });
         }
         ev.complete("fail");
-        walletFailed(res.error && res.error !== "stripe" ? res.error : "");
+        walletFailed();
       }, function () { ev.complete("fail"); walletFailed(); });
   }
 

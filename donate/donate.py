@@ -138,6 +138,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 STRIPE_PI = "https://api.stripe.com/v1/payment_intents"
+STRIPE_PM = "https://api.stripe.com/v1/payment_methods/"
+#: The wallets the tip dialog offers (nav.js turns Link and the browser's
+#: own saved cards off): what /donate/wallet takes, and nothing else.
+WALLETS = ("apple_pay", "google_pay")
+_PM = re.compile(r"^pm_[A-Za-z0-9]{8,200}$")
 STRIPE_CS = "https://api.stripe.com/v1/checkout/sessions"
 
 
@@ -471,10 +476,23 @@ def find_key(data: dict) -> tuple[int, dict]:
 def wallet_pay(amount: int, currency: str, method: str, email: str, name: str) -> tuple[int, dict]:
     """Apple Pay / Google Pay: confirm a PaymentIntent with the payment
     method the wallet handed the page. Without redirects - a wallet card
-    needs none - so the answer is final, or 3-D Secure for the page."""
+    needs none - so the answer is final, or 3-D Secure for the page.
+
+    Only a card from one of WALLETS, as Stripe says it is: a card typed in
+    on some other page with this site's publishable key is never charged
+    here. And a refusal says only that - never Stripe's reason, so this is
+    no way to learn which stolen card works."""
     key = _secret()
     if not key:
         return 503, {"error": "not configured"}
+    if not _PM.match(method):
+        return 400, {"error": "payment method"}
+    status, pm = _post(STRIPE_PM + method, None, key)
+    wallet = ((pm.get("card") or {}).get("wallet") or {}).get("type") if isinstance(pm, dict) else None
+    if status != 200 or pm.get("type") != "card" or wallet not in WALLETS:
+        print(f"[support] wallet refused: {status} {str(pm.get('type') if isinstance(pm, dict) else '')[:20]}"
+              f" {str(wallet)[:20]}", file=sys.stderr, flush=True)
+        return (402, {"error": "declined"}) if status == 200 or status == 404 else (502, {"error": "stripe"})
     form = {
         "amount": str(amount),
         "currency": currency,
@@ -500,9 +518,10 @@ def wallet_pay(amount: int, currency: str, method: str, email: str, name: str) -
     err = (body.get("error") or {}) if isinstance(body, dict) else {}
     print(f"[support] wallet {status}: {str(err.get('message', ''))[:200]}",
           file=sys.stderr, flush=True)
-    # A decline's own words are for the payer; anything else stays here.
-    msg = err.get("message") if err.get("type") == "card_error" else None
-    return 402 if err.get("type") == "card_error" else 502, {"error": msg or "stripe"}
+    # A decline is said as one, never why: the reason stays in the log.
+    if err.get("type") == "card_error":
+        return 402, {"error": "declined"}
+    return 502, {"error": "stripe"}
 
 
 def create_session(amount: int, currency: str) -> tuple[int, dict]:
@@ -1660,7 +1679,7 @@ class Handler(BaseHTTPRequestHandler):
             status, body = create_session(amount, currency)
             return self._send(status, body)
         method = str(data.get("paymentMethod") or "")
-        if not method.startswith("pm_") or len(method) > 255:
+        if not _PM.match(method):
             return self._send(400, {"error": "payment method"})
         email = str(data.get("email") or "").strip()[:254]
         name = str(data.get("name") or "").strip()
