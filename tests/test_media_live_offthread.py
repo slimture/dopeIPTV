@@ -81,12 +81,13 @@ fresh()
 assert w._link_waits(partial(w._stream_for, news))[0] == "live_url"
 assert opened == []
 
-# -- a multiview cell
+# -- a multiview cell (on a busy machine the worker may already have
+# begun by the next line: what matters is that it is never the window's thread)
 cells = []
 w.add_to_multiview = lambda url, title, *a, **k: cells.append(url)
 fresh()
 w._add_channel_to_multiview(news)
-assert opened == [] and cells == [], (opened, cells)
+assert "WINDOW" not in opened and cells == [], (opened, cells)
 assert wait(lambda: cells), "the cell gets its address"
 assert opened == ["worker"] and "LiveStreamId=ls1" in cells[0], (opened, cells)
 
@@ -105,7 +106,7 @@ class Dialog:
 mw_cast.CastDialog = Dialog
 fresh()
 w._open_cast_dialog(news)
-assert opened == [] and not cast, (opened, cast)
+assert "WINDOW" not in opened and not cast, (opened, cast)
 assert wait(lambda: cast), "the cast dialog opens once the address is in"
 assert opened == ["worker"] and "LiveStreamId=ls1" in cast["url"], (opened, cast)
 
@@ -116,7 +117,7 @@ w._within_storage_cap = lambda: True
 w.rec.add_job = lambda url, title, *a, **k: jobs.append(url)
 fresh()
 w._record_now(news, 30)
-assert opened == [] and jobs == [], (opened, jobs)
+assert "WINDOW" not in opened and jobs == [], (opened, jobs)
 assert wait(lambda: jobs), "the recording starts once the address is in"
 assert opened == ["worker"] and "LiveStreamId=ls1" in jobs[0], (opened, jobs)
 
