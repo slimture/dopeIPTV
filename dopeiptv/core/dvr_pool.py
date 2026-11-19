@@ -12,6 +12,12 @@ space cap - or with the disk running low - the channels left longest ago
 give way first, then the one watched. At most MAX_FROZEN channels are
 kept. Everything is wiped when the app ends (and swept at the next start
 after a crash): history is for this session only.
+
+A channel watched in private viewing (core/privacy.py; its session marked
+``private``) keeps its history only while it is the channel in the player
+or the one just left - so a reconnect and Stop, then Play find it again -
+and loses it when another channel is watched, when private viewing ends,
+and as the app closes, before the pool returns.
 """
 from __future__ import annotations
 
@@ -24,7 +30,8 @@ from pathlib import Path
 from .dvr_ingest import NotAStream
 from .dvr_session import DvrSession, IngestFactory
 from .dvr_store import SegmentStore
-from .log import log, redact_url
+from .log import log
+from .privacy import url_for_log
 
 
 class DvrPool:
@@ -94,10 +101,11 @@ class DvrPool:
             s.store.keep_seconds = self.keep_seconds
             s.last_used = self._clock()
             self.active = s
+            self._forget_private(s)
             self._enforce()
             self._start_ticking()
             log.info("DVR pool: watching %s (%d channel(s) kept)",
-                     redact_url(url), len(self._sessions))
+                     url_for_log(url), len(self._sessions))
             return s
 
     def release(self, s: DvrSession) -> None:
@@ -125,7 +133,7 @@ class DvrPool:
             return
         self._refused[s.key] = (why, time.monotonic())
         log.info("DVR pool: %s sent %s - played without the buffer for "
-                 "%.0f min", redact_url(s.url), why, self.REFUSED_FOR / 60)
+                 "%.0f min", url_for_log(s.url), why, self.REFUSED_FOR / 60)
 
     # -- read from elsewhere (server mode, core/restream.py) ------------------
 
@@ -173,6 +181,7 @@ class DvrPool:
             self.active = s
             if s.key not in self._sessions:
                 self._sessions[s.key] = s
+            self._forget_private(s)
             self._enforce()
             self._start_ticking()
             return s
@@ -183,6 +192,21 @@ class DvrPool:
             self._note_refused(s)
         s.let_go(who)
         self._recording_done(s)
+
+    # -- private viewing -------------------------------------------------------
+
+    def forget_private(self) -> None:
+        """Private viewing ended: the history of every channel watched in
+        it and left goes. The one still in the player keeps its buffer
+        until it is left."""
+        with self._lock:
+            self._forget_private(self.active)
+
+    def _forget_private(self, keep: DvrSession | None) -> None:
+        for s in list(self._sessions.values()):
+            if s.private and s is not keep and s is not self.active \
+                    and not s.recording and not s.held:
+                self._drop(s, "watched privately")
 
     def _recording_done(self, s: DvrSession) -> None:
         with self._lock:
@@ -290,7 +314,14 @@ class DvrPool:
         recorders = [r for s in sessions for r in list(s.recorders)]
         for s in sessions:
             s.close()
+        # What was watched privately is off the disk before this returns
+        # (the app may end before the closing threads get to it).
+        private = [s for s in sessions if s.private]
+        for s in private:
+            s.purge()
         if wait:
             deadline = time.monotonic() + wait
             for r in recorders:
                 r.join(max(0.0, deadline - time.monotonic()))
+            for s in private:
+                s.join(deadline - time.monotonic())

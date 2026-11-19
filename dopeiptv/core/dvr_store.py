@@ -414,10 +414,46 @@ class SegmentStore:
         shutil.rmtree(self.root, ignore_errors=True)
 
 
+#: In a session folder whose channel was watched privately (core/privacy.py).
+PRIVATE_MARK = ".private"
+
+
+def mark_private(root: Path) -> None:
+    """Say on disk that *root* holds a channel watched privately: should
+    the app be killed before it deletes it, the next start does at once."""
+    try:
+        (root / PRIVATE_MARK).touch()
+    except OSError:
+        pass
+
+
+def _pid_of(entry: Path) -> int:
+    try:
+        return int(entry.name.split("-", 1)[0])
+    except ValueError:
+        return 0
+
+
+def _gone(pid: int) -> bool:
+    """Whether the process that made a folder has ended - known for sure
+    only where asking is harmless (not Windows, where os.kill ends it)."""
+    if pid <= 0 or os.name == "nt":
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    except OSError:
+        return False
+    return False
+
+
 def sweep_abandoned(base: Path, older_than: float = 600.0) -> int:
     """Remove session folders nobody writes to any more - left by a crash
     or a killed app. A running session writes a segment every two seconds,
-    so a folder untouched for ten minutes is no one's."""
+    so a folder untouched for ten minutes is no one's. One watched
+    privately (PRIVATE_MARK) whose process has ended goes whatever its
+    age: a private channel's buffer is never for a later session."""
     removed = 0
     try:
         entries = list(base.iterdir())
@@ -426,7 +462,12 @@ def sweep_abandoned(base: Path, older_than: float = 600.0) -> int:
     now = time.time()
     for entry in entries:
         try:
-            if entry.is_dir() and now - entry.stat().st_mtime > older_than:
+            if not entry.is_dir():
+                continue
+            left_private = ((entry / PRIVATE_MARK).exists()
+                            and _pid_of(entry) != os.getpid()
+                            and _gone(_pid_of(entry)))
+            if left_private or now - entry.stat().st_mtime > older_than:
                 shutil.rmtree(entry, ignore_errors=True)
                 removed += 1
         except OSError:
