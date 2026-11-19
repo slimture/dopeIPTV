@@ -9,7 +9,7 @@ one group, every row on one page, that the search finds them, and that
 this file names every page.
 
 The pages are built in `ui/mw_settings.py` (`open_settings`; WATCH's in
-`ui/set_watch.py`), Nerd's in
+`ui/set_watch.py`, CONTENT's in `ui/set_content.py`), Nerd's in
 `ui/nerd_settings.py` (with `ui/net_advanced.py`), the shortcuts in
 `ui/shortcuts.py`, Simkl in `ui/mw_simkl.py`, sync in `ui/mw_sync.py`,
 Discord in `ui/mw_discord.py`. A row without a key is an action or a

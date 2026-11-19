@@ -361,6 +361,8 @@ dopeiptv/
     set_watch.py       Settings' WATCH pages (Playback, Picture and sound,
                        Guide, Multiview, Recording, Casting), each built the
                        first time it is needed
+    set_content.py     Settings' CONTENT pages (Sources, Mine, Local files,
+                       Posters and info)
     net_advanced.py    Nerd's Own DNS, Other networks (VLANs) and Low latency
                        cards
     nerd_check_line.py The ✓ / ! / ✗ line under a Nerd setting, its Test and
