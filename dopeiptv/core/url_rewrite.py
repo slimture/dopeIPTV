@@ -142,7 +142,9 @@ def parse(value: Any) -> list[Rule]:
             return []
         try:
             data = json.loads(value)
-        except ValueError:
+        except (ValueError, RecursionError):
+            # RecursionError: "[[[[..." nested past Python's limit (a backup
+            # or another computer's sync carries the options).
             return []
     if not isinstance(data, list):
         return []

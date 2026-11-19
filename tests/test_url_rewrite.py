@@ -78,6 +78,16 @@ def test_a_rule_that_cannot_work_is_named_and_skipped(find, replace):
     assert apply("http://h/1.ts", [bad, good]) == "https://h/1.ts"
 
 
+def test_rules_nested_past_python_s_limit_are_no_rules():
+    """A source's options come from a backup or another computer's sync:
+    "[[[[..." nested deeper than Python's recursion limit raised
+    RecursionError from json.loads wherever an address was handed out."""
+    deep = "[" * 100_000 + "]" * 100_000
+    assert parse(deep) == []
+    assert parse('[{"find": "a", "replace": "b"}, ' + deep + "]") == []
+    assert parse('[{"find": "a", "replace": "b"}]') == [Rule("a", "b", False)]
+
+
 def test_rules_that_can_work():
     assert problem(Rule("(", "[", False)) == ""            # plain text: anything goes
     assert problem(Rule(r"(\d+)", r"<\1>", True)) == ""
