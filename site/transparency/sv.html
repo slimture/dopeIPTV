@@ -25,6 +25,7 @@
 <li><a href="#private">Privat tittande</a></li>
 <li><a href="#updates">Sökning efter uppdateringar</a></li>
 <li><a href="#website">Webbplatsens statistik</a></li>
+<li><a href="#webservers">Servrarna bakom dopeiptv.org</a></li>
 <li><a href="#hosts">Vart appen ansluter</a></li>
 <li><a href="#builds">Så vet du att appen kör den här koden</a></li>
 </ol>
@@ -226,7 +227,7 @@
 <p class="tp-promise">Vi räknar besök utan kakor, utan externa tjänster och utan att spara din IP-adress i statistiken.</p>
 <h3>Så fungerar det</h3>
 <ol class="tp-flow">
-<li><b>Webbservern</b> skriver varje anrop i en logg – med IP-adressen. Loggen raderas efter högst två dygn. Frontservern före den för ingen logg över anrop.</li>
+<li><b>Webbservern</b> skriver varje sidvisning i en logg – med IP-adressen. Loggen raderas efter högst två dygn. Frontservern före den för ingen logg över anrop.</li>
 <li><b>Var femtonde minut</b> läses loggen: adressen blir ett land (uppslaget på vår egen server) och ett besökar-id, och skrivs inte vidare.</li>
 <li><b>Efter 30 dagar</b> förlorar ett besök sitt id, klockslaget och skärmstorleken. Bara anonyma siffror finns kvar.</li>
 </ol>
@@ -244,7 +245,7 @@
 <!--tp:ex website anon-->
 <p class="fine">Framtaget genom att köra webbplatsens egen kod, med en påhittad nyckel.</p>
 <h3>Koden</h3>
-<p>Webbserverns loggformat – det enda stället där din IP-adress skrivs ned:</p>
+<p>Webbserverns loggformat för sidvisningar – den och nedladdningarnas logg (<a href="#webservers">del 7</a>) är de enda ställena där din IP-adress skrivs ned:</p>
 <!--tp:code website log-->
 <p>Besökar-id:t och besöket så som det sparas:</p>
 <!--tp:code website visitor-->
@@ -270,7 +271,69 @@
 <li>Under sina första 30 dagar sparas ett besök i detalj, och tills månaden efter är slut går dess id att spåra med den månadens nyckel. Den som tog över vår server under den tiden skulle kunna knyta nya besök till adresser. Därefter är besöket anonymt och nyckeln borta.</li>
 </ul>
 
-<h2 id="hosts">7. Vart appen ansluter</h2>
+<h2 id="webservers">7. Servrarna bakom dopeiptv.org</h2>
+<p class="tp-promise">Ditt besök går genom två webbservrar och en liten tjänst, och bara statistikens två loggar skriver ned din adress – borta efter högst två dygn. Här är inställningarna som avgör det.</p>
+<h3>Så fungerar det</h3>
+<ol class="tp-flow">
+<li><b>Frontservern</b>, en TLS-proxy i en egen jail, har webbplatsens certifikat och svarar på din krypterade anslutning. Den skickar anropet vidare med din adress i ett huvud som den sätter själv, <code>X-Real-IP</code> – det din webbläsare skickade under det namnet ersätts.</li>
+<li><b>Innehållsservern</b>, i en annan jail på samma maskin och på en egen port, lämnar ut sidorna och filerna – alla gjorda i förväg, var femtonde minut; ingen PHP, inget program som körs för en sida – och skriver statistikens två loggar.</li>
+<li><b>En liten tjänst</b> i Python (<code>donate.py</code>) svarar på det som inte är en fil: dricks och supporternyckeln, feedback och felrapporter, synkronisering, Titta tillsammans och administrationssidan. Den lyssnar på en Unix-socket, inte på nätverket, så utifrån nås den bara genom innehållsservern, på de sökvägar som den servern lämnar vidare.</li>
+</ol>
+<p>En jail är FreeBSD:s sätt att skilja delar av en och samma maskin från varandra, var och en med egna filer, användare och program.</p>
+<p><strong>Vad var och en ser.</strong> Frontservern måste se allt för att kunna svara: din adress, adressen du ber om, det din webbläsare skickar med och ett anrops innehåll – en rapport, en synkkopia (redan låst av appen). Innehållsservern får samma anrop från den som vanlig HTTP, med din adress i <code>X-Real-IP</code>, och litar på det huvudet – därför är dess port tänkt bara för frontservern. Tjänsten får bara anropen till sina egna sökvägar, med samma huvud; den håller din adress bara i minnet, för sina gränser (<a href="#reports">del 1</a>), och dess egen logg säger vad som gick fel, aldrig från vilken adress.</p>
+<p><strong>Vad som skrivs ned.</strong> Ingen av frontserverns servrar för webbplatsen – dopeiptv.org, www.dopeiptv.org, vanlig <code>http://</code> och det gamla iptv.dope.rs – för någon logg över anrop, och var och en skriver ett fel bara på den nivå som stoppar nginx själv (<code>crit</code>): annars skulle ett nekat eller trasigt anrop skrivas där med sin adress. Innehållsservern är likadan som helhet, utom två loggar, båda för statistiken:</p>
+<ul>
+<li><strong>Sidvisningar:</strong> förstasidan, hjälpsidan och <code>/hit</code>, signalen en sida skickar när den har visats (<a href="#website">del 6</a>). En rad var: din adress, tidpunkten, metoden, adressen som efterfrågades, statusen, sidan som länkade hit utan sin frågedel eller sitt fragment, webbläsarens namn och sidans språk – webbläsarens namn avkortat vid 1 024 tecken, adresserna vid 2 048.</li>
+<li><strong>Nedladdningar:</strong> <code>/dl.php</code>, som varje nedladdningslänk och appens egen uppdatering går genom: nginx:s vanliga format med samma avkortningar och inget användarnamn, din adress som sista fält.</li>
+</ul>
+<p>Inget annat: ingen annan sida, ingen kaka, inget som ett anrop har med sig i sitt innehåll, inget om synk, Titta tillsammans, feedback, dricks eller administrationssidan. En webbläsare som har öppnat administrationssidan lämnas utanför båda. Båda loggarna läses var femtonde minut, byts vid midnatt, och bara föregående dygn sparas – högst två dygn.</p>
+<p><strong>Vad som skyddar dem.</strong> Varje väg in till tjänsten har en gräns på innehållsservern, räknad efter adressen som frontservern satte: 10 anrop i minuten för dricksrutan, supporternyckeln och feedback, 30 för synk, 120 för <code>/hit</code> och för nedladdningar, 180 för Titta tillsammans, 20 för inloggning, och på administrationssidan 30 för en webbläsare utan session och 600 för en och samma adress – var och en med utrymme för en topp ovanpå. Därefter svarar nginx 429, ”sakta ner”. Frontservern begränsar anslutningar och räknar sidorna mot en generös gräns, och släpper in högst åtta synkkopior åt gången från en adress. nginx håller de här räkningarna i minnet, aldrig på disk. Varje väg in har också en största storlek på det som skickas – 1 kB för dricks, supporternyckeln och <code>/hit</code>; 4 kB för Titta tillsammans och frågan efter svar; 256 kB för en rapport; 3 MB för en synkkopia; 64 kB för resten – och nginx håller så mycket i minnet, så att inget du skickar hamnar i en tillfällig fil på disk, i någon av servrarna.</p>
+<p><strong>Vad varje svar bär med sig.</strong> Frontservern lägger samma säkerhetshuvuden på varje svar, även på ”hittades inte” och på ett fel. Dess innehållspolicy (Content Security Policy) låter en sida ladda bara det som kommer från dopeiptv.org självt, bilder som är skrivna in i sidan (<code>data:</code>) och – för dricksrutan – Stripes formulär och Google Pays; inget skript eller stil som är skrivet in i en sida körs (det finns ingen <code>'unsafe-inline'</code>), inget insticksprogram heller, ingen <code>&lt;base&gt;</code>-tagg kan ändra vart en sidas länkar pekar, inget formulär kan skickas någonstans, och ingen annan webbplats kan visa en sida i en ram. Sedan: bara https, i ett år, namnen under det också; en fil är den typ den skickas som, aldrig gissad; bara webbplatsens namn går till nästa webbplats du öppnar – ingenting alls från administrationssidorna, supportsidan och vägen tillbaka från Trakt; kamera, mikrofon, plats, skärmdelning, USB och liknande är avstängda för varje sida och ram; administrationssidorna öppnas i ett eget fönster, och varken de eller tjänsternas svar laddas någonsin in i en annan webbplats sida. Inget svar anger nginx:s version. Den enda kaka webbplatsen ger en besökare är språket, och bara när du väljer ett: i ett år, skickad bara över https och inte med när en annan webbplats sida skickar något hit eller laddar en del av den. Inget namn som börjar med en punkt lämnas ut – en bortglömd <code>.git</code>-mapp eller <code>.env</code>-fil skulle inte lämnas ut – utom <code>/.well-known/</code>, där <code>security.txt</code> säger hur du berättar för oss om ett säkerhetsproblem: privat, via GitHub.</p>
+<details class="tp-proof">
+<summary>Vill du se hur det fungerar bakom kulisserna?</summary>
+<div class="tp-proof-body">
+<h3>Så ser det ut</h3>
+<p class="tp-ex-h">Huvudena som frontserverns fil lägger på förstasidan:</p>
+<!--tp:ex webservers page-->
+<p class="tp-ex-h">…och på administrationssidans inloggning – ingen referrer alls, och ett eget fönster och egna filer:</p>
+<!--tp:ex webservers admin-->
+<p class="fine">Framtaget genom att läsa frontserverns fil så som nginx gör: dess <code>add_header</code>-rader, varje maps värde för den adressen, och policyns rad ur <code>csp.snippet.txt</code>. Vad servern verkligen skickar kan du se själv (nedan).</p>
+<h3>Koden</h3>
+<p>Vägen ett anrop tar: frontservern lämnar det vidare och sätter <code>X-Real-IP</code> själv; innehållsserverns port, som en fil på servern håller till frontservern; en av vägarna vidare till tjänsten, dess Unix-socket; användaren tjänsten körs som; och hur den startar:</p>
+<!--tp:code webservers path-->
+<p>Det som aldrig skrivs ned – varje server i frontserverns två filer för webbplatsen, och innehållsservern som helhet:</p>
+<!--tp:code webservers nolog-->
+<p>De två loggarna: vad en rad innehåller och hur mycket av det som skickades, vem som lämnas utanför, och de enda ställena där de skrivs:</p>
+<!--tp:code webservers logs-->
+<p>Hur länge de sparas – raderna som <code>DEPLOY.md</code> ger serverns loggrotation: byts vid midnatt (<code>@T00</code>), en gammal kopia sparas (<code>1</code>). Tjänstens egen logg innehåller ingen adress; av den sparas fem kopior, högst en megabyte var:</p>
+<!--tp:code webservers kept-->
+<p>Gränserna på båda servrarna, och den största storlek varje väg tar emot, i minnet:</p>
+<!--tp:code webservers limits-->
+<p>Huvudena, policyns rad, språkkakan, inget med en punkt först, och <code>security.txt</code>:</p>
+<!--tp:code webservers headers-->
+<h3>Kontrollera det själv</h3>
+<p>Det varje svar bär med sig kan du se från vilken dator som helst – huvudena, ett ”hittades inte” för ett namn med en punkt, och <code>security.txt</code>:</p>
+<pre class="tp-cmd"><code>curl -sI https://dopeiptv.org/
+curl -sI https://dopeiptv.org/admin/login
+curl -sI https://dopeiptv.org/.gitignore
+curl -s https://dopeiptv.org/.well-known/security.txt</code></pre>
+<blockquote class="tp-ask" data-for="webservers"><p>Här nedan finns konfigurationen för servrarna bakom dopeiptv.org, webbplatsen för tv-spelaren dopeIPTV med öppen källkod: TLS-frontproxyn (nginx), innehållsservern bakom den (nginx), den lilla Python-tjänsten bakom den, och hur länge deras loggar sparas. Förklara på enkel svenska, steg för steg, vad som händer med en besökares anrop – vad varje del ser, och vad den skriver ned. Granska den sedan som en angripare skulle: kan någon nå innehållsservern eller tjänsten på annat sätt än genom frontproxyn, få dem att tro på en annan adress, ta sig runt en gräns, få nginx att skriva ett anrop eller dess innehåll till disk eller till en logg, få en fil utlämnad som inte borde lämnas ut, eller ladda webbplatsens sidor i en annan webbplats? Jämför det kommentarerna och den här sidan lovar – ingen logg utom statistikens två, det som skärs bort ur dem, högst två dygn, innehåll som hålls i minnet, huvudena på varje svar – med vad direktiven verkligen gör, och säg var de skiljer sig. Peka ut svagheter och vad konfigurationen inte skyddar mot. Gissa inte: säg till där något beror på det som inte finns med – frontproxyns huvudfil nginx.conf, filen som håller innehållsserverns port till proxyn, resten av tjänstens kod.</p></blockquote>
+<!--tp:copy webservers-->
+</div>
+</details>
+<h3>Det här skyddar det inte mot</h3>
+<ul>
+<li>För att alls kunna svara ser frontservern och innehållsservern din adress och ditt anrop när de passerar – i minnet, i det ögonblicket. Den som har makten över maskinen skulle kunna läsa dem där, eller slå på loggarna.</li>
+<li>Från frontservern till innehållsservern går ett anrop som vanlig HTTP, mellan två jails på samma maskin: det passerar aldrig ett nätverk, men det är inte krypterat där.</li>
+<li>En fellogg för det som stoppar nginx är tom av vana, inte av löfte: nginx lägger vissa fel där – en TLS-handskakning den inte förstår, en arbetsprocess utan lediga filer – och en sådan rad kan ange adressen och anropet den gällde.</li>
+<li>Det här är konfiguration, och utifrån kan du inte se att servern kör den. Det som körs är det ägaren kopierar till servern för hand, så som <a href="https://github.com/slimture/dopeIPTV/blob/website/DEPLOY.md" rel="noopener">DEPLOY.md</a> beskriver steg för steg. Huvudena, ”hittades inte” för ett namn med en punkt och <code>security.txt</code> kan du kontrollera (ovan); loggarna kan du inte.</li>
+<li>Några av frontserverns inställningar finns inte i den öppna koden på GitHub, eftersom dess huvudfil också tjänar andra webbplatser: gränsen för sidor och för anslutningar, dess TLS-versioner och chiffer, och själva policyns rad (<code>csp.snippet.txt</code> är dess kopia). Testa dess TLS själv med valfritt TLS-testverktyg.</li>
+<li>Innehållsservern litar på adressen den får i <code>X-Real-IP</code>. Att bara frontservern når dess port vilar på en liten fil på servern med frontserverns adress, som med flit inte finns på GitHub. Utan den skulle ett program på ett annat ställe på maskinen kunna ge statistiken och gränserna vilken adress det ville.</li>
+<li>Vilket program som helst i tjänstens jail kan nå dess socket, och tjänsten körs som samma användare som gör sidorna: ett fel i den som lät någon köra kod skulle kunna ändra webbplatsen. Vem som är inloggad på administrationssidan tar den inte från nginx: den kontrollerar den signerade sessionen själv.</li>
+<li>Gränserna räknar adresser. De som delar en – ett mobilnät, en skola – delar dess gränser, och den som har många adresser får många.</li>
+</ul>
+
+<h2 id="hosts">8. Vart appen ansluter</h2>
 <p class="tp-promise">De nätverksmål vi hittade i appens egen kod finns med här, med när appen använder vart och ett. Det är vad en sökning hittade, inget löfte om varenda en.</p>
 <p>Listan är framtagen genom att söka igenom appens kod efter varje värdnamn i den – samma sökning som du kan göra själv. Appen pratar också med det du själv lägger till: dina källor, och boxarna, tv-apparaterna och servrarna i ditt nätverk – och med adresserna som deras egna listor anger, som kanallogotyper och tv-guider på andra servrar, och, genom yt-dlp, webbplatsen för en adress du öppnar. De kommer från dina uppgifter, inte från koden, så de finns inte i listorna nedan.</p>
 <p>Listan är det som appens egen kod namnger. Den är ingen garanti för att ingen annan anslutning kan ske: biblioteken appen är byggd på, videospelaren i den (mpv och FFmpeg), yt-dlp och ditt operativsystem kan göra egna anslutningar, och en adress som sätts ihop medan appen kör står inte utskriven i koden. Det du kan göra är att läsa den länkade koden och själv se appens trafik – båda nedan.</p>
@@ -326,7 +389,7 @@ grep -rnoE --include='*.py' "https?://[A-Za-z0-9.-]+" dopeiptv | sort -t: -k3 -u
 grep -rnoE --include='*.py' "[\"'][a-z0-9.-]+\.(org|com|net|info|tv|io|dev|se|app)[\"']" dopeiptv | sort -t: -k3 -u</code></pre>
 <p>Eller se vad appen verkligen gör: en brandvägg för program visar varje anslutning när den sker – OpenSnitch på Linux, LuLu eller Little Snitch på en Mac, eller brandväggens logg i Windows. Den visar vad som hände medan du tittade, med dina inställningar: prova funktionerna du använder, och dem du inte använder.</p>
 
-<h2 id="builds">8. Så vet du att appen kör den här koden</h2>
+<h2 id="builds">9. Så vet du att appen kör den här koden</h2>
 <p class="tp-promise">Appen du laddar ner byggs öppet från versionens tagg i den här koden, signeras, och märker om den har ändrats.</p>
 <ul>
 <li><strong>Byggd öppet.</strong> Varje version byggs av GitHub Actions från versionens tagg i koden – inte på våra datorer. <a href="https://github.com/slimture/dopeIPTV/blob/%REF%/.github/workflows/release.yml" rel="noopener">Byggets recept</a> finns i koden, och <a href="https://github.com/slimture/dopeIPTV/actions/workflows/release.yml" rel="noopener">loggen från varje bygge</a> är öppen för alla.</li>

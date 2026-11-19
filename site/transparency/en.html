@@ -25,6 +25,7 @@
 <li><a href="#private">Private viewing</a></li>
 <li><a href="#updates">Looking for updates</a></li>
 <li><a href="#website">This website's statistics</a></li>
+<li><a href="#webservers">The servers behind dopeiptv.org</a></li>
 <li><a href="#hosts">Where the app connects</a></li>
 <li><a href="#builds">How you know the app runs this code</a></li>
 </ol>
@@ -226,7 +227,7 @@
 <p class="tp-promise">We count visits without cookies, without outside services and without keeping your IP address in the statistics.</p>
 <h3>How it works</h3>
 <ol class="tp-flow">
-<li><b>The web server</b> writes each request in a log – with the IP address. The log is deleted after two days at the most. The front server before it keeps no log of requests.</li>
+<li><b>The web server</b> writes each page view in a log – with the IP address. The log is deleted after two days at the most. The front server before it keeps no log of requests.</li>
 <li><b>Every 15 minutes</b> the log is read: the address becomes a country (looked up on our own server) and a visitor ID, and is not written further.</li>
 <li><b>After 30 days</b> a visit loses its ID, the time of day and the screen size. Only anonymous figures remain.</li>
 </ol>
@@ -244,7 +245,7 @@
 <!--tp:ex website anon-->
 <p class="fine">Made by running the site's own code, with a made-up key.</p>
 <h3>The code</h3>
-<p>The web server's log format – the only place your IP address is written down:</p>
+<p>The web server's log format for page views – it and the downloads' log (<a href="#webservers">part 7</a>) are the only places your IP address is written down:</p>
 <!--tp:code website log-->
 <p>The visitor ID and the visit as it is kept:</p>
 <!--tp:code website visitor-->
@@ -270,7 +271,69 @@
 <li>For its first 30 days a visit is kept in detail, and until the month after has ended its ID can be traced with that month's key. Whoever took over our server in that time could tie recent visits to addresses. After it, the visit is anonymous and the key is gone.</li>
 </ul>
 
-<h2 id="hosts">7. Where the app connects</h2>
+<h2 id="webservers">7. The servers behind dopeiptv.org</h2>
+<p class="tp-promise">Your visit passes two web servers and a small service, and only the statistics' two logs write your address down – gone after two days at the most. Here are the settings that decide it.</p>
+<h3>How it works</h3>
+<ol class="tp-flow">
+<li><b>The front server</b>, a TLS proxy in a jail of its own, holds the site's certificate and answers your encrypted connection. It passes the request on with your address in a header it sets itself, <code>X-Real-IP</code> – whatever your browser sent under that name is replaced.</li>
+<li><b>The content server</b>, in another jail on the same machine and on a port of its own, serves the pages and files – all made in advance, every quarter of an hour; no PHP, no program run for a page – and writes the statistics' two logs.</li>
+<li><b>A small service</b> in Python (<code>donate.py</code>) answers what is not a file: a tip and its supporter key, feedback and error reports, settings sync, Watch together and the admin page. It listens on a Unix socket, not on the network, so from outside it is reached only through the content server, on the paths that server hands it.</li>
+</ol>
+<p>A jail is FreeBSD's way of walling parts of one machine off from each other, each with its own files, users and programs.</p>
+<p><strong>What each one sees.</strong> The front server has to see everything to answer: your address, the address you ask for, what your browser sends with it, and a request's body – a report, a sync copy (already locked by the app). The content server gets the same request from it as plain HTTP, your address in <code>X-Real-IP</code>, and believes that header – which is why its port is meant for the front server alone. The service gets only the requests for its own paths, with the same header; it keeps your address only in memory, for its limits (<a href="#reports">part 1</a>), and its own log says what went wrong, never from which address.</p>
+<p><strong>What is written down.</strong> None of the front server's servers for the site – dopeiptv.org, www.dopeiptv.org, plain <code>http://</code> and the old iptv.dope.rs – keeps a log of requests, and each writes an error only at the level of what stops nginx itself (<code>crit</code>): a refused or broken request would otherwise be written there with its address. The content server is the same as a whole, but for two logs, both for the statistics:</p>
+<ul>
+<li><strong>Page views:</strong> the front page, the help page and <code>/hit</code>, the signal a page sends once it is shown (<a href="#website">part 6</a>). A line each: your address, the time, the method, the address asked for, the status, the page that linked here without its query or fragment, the browser's name and the page's language – the browser's name cut at 1,024 characters, the addresses at 2,048.</li>
+<li><strong>Downloads:</strong> <code>/dl.php</code>, which every download link and the app's own update go through: nginx's usual format with the same cuts and no user name, your address as the last field.</li>
+</ul>
+<p>Nothing else: no other page, no cookie, nothing a request carries in its body, nothing of sync, Watch together, feedback, tips or the admin page. A browser that has opened the admin page is left out of both. Both logs are read every 15 minutes, turned over at midnight, and only the day before is kept – two days at the most.</p>
+<p><strong>What guards them.</strong> Every way in to the service has a limit on the content server, counted by the address the front server set: 10 requests a minute for the tip dialog, the supporter key and feedback, 30 for sync, 120 for <code>/hit</code> and for downloads, 180 for Watch together, 20 for signing in, and on the admin page 30 for a browser without a session and 600 for any one address – each with a burst on top. Past it nginx answers 429, “slow down”. The front server limits connections and counts the pages against a generous allowance, and lets at most eight sync copies in at once from one address. nginx keeps these counts in memory, never on disk. Every way in also has a largest body – 1 KB for a tip, the supporter key and <code>/hit</code>; 4 KB for Watch together and asking for answers; 256 KB for a report; 3 MB for a sync copy; 64 KB for the rest – and nginx holds a body up to that size in memory, so nothing you send lies in a temporary file on disk, in either server.</p>
+<p><strong>What every answer carries.</strong> The front server adds the same security headers to every answer, a “not found” or an error too. Its content security policy lets a page load only what comes from dopeiptv.org itself, pictures written into the page (<code>data:</code>), and – for the tip dialog – Stripe's form and Google Pay's; no script or style written into a page runs (there is no <code>'unsafe-inline'</code>), no plugin either, no <code>&lt;base&gt;</code> tag can change where a page's links point, no form can be sent anywhere, and no other site can show a page in a frame. Then: https only, for a year, the names under it too; a file is the type it is sent as, never guessed; only the site's name goes to the next site you open – nothing at all from the admin pages, the support page and the way back from Trakt; camera, microphone, location, screen capture, USB and the like are off for every page and frame; the admin pages open in a window of their own, and they and the services' answers are never loaded into another site's page. No answer names nginx's version. The one cookie the site gives a visitor is the language, and only when you pick one: for a year, sent only over https, and not along when another site's page posts here or loads a part of it. No name that starts with a dot is served – a forgotten <code>.git</code> folder or <code>.env</code> file would not be – but <code>/.well-known/</code>, where <code>security.txt</code> says how to tell us about a security problem: privately, through GitHub.</p>
+<details class="tp-proof">
+<summary>Want to see how it works behind the scenes?</summary>
+<div class="tp-proof-body">
+<h3>What it looks like</h3>
+<p class="tp-ex-h">The headers the front server's file adds to the front page:</p>
+<!--tp:ex webservers page-->
+<p class="tp-ex-h">…and to the admin page's sign-in – no referrer at all, and a window and its files of its own:</p>
+<!--tp:ex webservers admin-->
+<p class="fine">Made by reading the front server's file the way nginx does: its <code>add_header</code> lines, each map's value for that address, and the policy's row from <code>csp.snippet.txt</code>. What the server really sends, you can see yourself (below).</p>
+<h3>The code</h3>
+<p>The way a request takes: the front server hands it on and sets <code>X-Real-IP</code> itself; the content server's port, kept to the front server by a file on the server; one of the ways on to the service, its Unix socket; the user the service runs as; and how it starts:</p>
+<!--tp:code webservers path-->
+<p>What is never written down – every server in the front server's two files for the site, and the content server as a whole:</p>
+<!--tp:code webservers nolog-->
+<p>The two logs: what a line holds and how much of what was sent, who is left out, and the only places they are written:</p>
+<!--tp:code webservers logs-->
+<p>How long they are kept – the lines <code>DEPLOY.md</code> gives the server's log rotation: turned over at midnight (<code>@T00</code>), one old copy kept (<code>1</code>). The service's own log holds no address; of it five copies are kept, a megabyte each at the most:</p>
+<!--tp:code webservers kept-->
+<p>The limits on both servers, and the largest body each way takes, held in memory:</p>
+<!--tp:code webservers limits-->
+<p>The headers, the policy's row, the language cookie, nothing with a dot first, and <code>security.txt</code>:</p>
+<!--tp:code webservers headers-->
+<h3>Check it yourself</h3>
+<p>What every answer carries you can see from any computer – the headers, a “not found” for a name with a dot, and <code>security.txt</code>:</p>
+<pre class="tp-cmd"><code>curl -sI https://dopeiptv.org/
+curl -sI https://dopeiptv.org/admin/login
+curl -sI https://dopeiptv.org/.gitignore
+curl -s https://dopeiptv.org/.well-known/security.txt</code></pre>
+<blockquote class="tp-ask" data-for="webservers"><p>Below is the configuration of the servers behind dopeiptv.org, the website of the open-source TV player dopeIPTV: the TLS front proxy (nginx), the content server behind it (nginx), the small Python service behind that, and how long their logs are kept. Explain in plain English, step by step, what happens to a visitor's request – what each part sees, and what it writes down. Then review it as an attacker would: could anyone reach the content server or the service other than through the front proxy, make them believe another address, get around a limit, make nginx write a request or its body to disk or to a log, have a file served that should not be, or load the site's pages into another site? Compare what the comments and this page promise – no log but the statistics' two, what is cut from them, two days at the most, bodies held in memory, the headers on every answer – with what the directives really do, and say where they differ. Point out weaknesses and what the configuration does not protect against. Do not guess: say so where something depends on what is not included – the front proxy's main nginx.conf, the file that keeps the content server's port to the proxy, the rest of the service's code.</p></blockquote>
+<!--tp:copy webservers-->
+</div>
+</details>
+<h3>What it does not protect against</h3>
+<ul>
+<li>To answer at all, the front server and the content server see your address and your request as they pass – in memory, for that moment. Whoever controls the machine could read them there, or turn the logs on.</li>
+<li>From the front server to the content server a request goes as plain HTTP, between two jails on the same machine: it never crosses a network, but it is not encrypted there.</li>
+<li>An error log kept for what stops nginx is empty by habit, not by promise: nginx files some failures there – a TLS handshake it cannot make sense of, a worker out of open files – and such a line can name the address and the request it happened on.</li>
+<li>This is configuration, and from outside you cannot see that the server runs it. What runs is what the owner copies to the server by hand, as <a href="https://github.com/slimture/dopeIPTV/blob/website/DEPLOY.md" rel="noopener">DEPLOY.md</a> says step by step. The headers, the “not found” for a name with a dot and <code>security.txt</code> you can check (above); the logs you cannot.</li>
+<li>Some of the front server's settings are not in the repository, because its main file serves other sites too: the allowance for pages and the connection limit, its TLS versions and ciphers, and the policy's row itself (<code>csp.snippet.txt</code> is its copy). Test its TLS yourself with any TLS checker.</li>
+<li>The content server believes the address it is told in <code>X-Real-IP</code>. That only the front server can reach its port rests on a small file on the server with the front server's address, deliberately not in the repository. Without it, a program elsewhere on the machine could give the statistics and the limits any address it liked.</li>
+<li>Any program in the service's jail can reach its socket, and the service runs as the same user that renders the pages: a flaw in it that let someone run code could change the site. Who is signed in to the admin page it does not take from nginx: it checks the signed session itself.</li>
+<li>The limits count addresses. People who share one – a phone network, a school – share its limits, and someone with many addresses gets many.</li>
+</ul>
+
+<h2 id="hosts">8. Where the app connects</h2>
 <p class="tp-promise">The network destinations we found in the app's own code are listed here, with when the app uses each. It is what a search found, not a promise of every one.</p>
 <p>The list is made by searching the app's code for every host name in it – the same search you can run yourself. The app also talks to what you add yourself: your sources, and the boxes, TVs and servers on your network – and to the addresses their own lists name, such as channel logos and guides on other servers, and, through yt-dlp, the site of an address you open. Those come from your data, not from the code, so they are not in the lists below.</p>
 <p>The list is what the app's own code names. It is not a guarantee that no other connection can happen: the libraries it is built on, the video player inside it (mpv and FFmpeg), yt-dlp and your operating system can make connections of their own, and an address put together while the app runs is not written out in the code. What you can do is read the linked code and watch the app's traffic yourself – both below.</p>
@@ -326,7 +389,7 @@ grep -rnoE --include='*.py' "https?://[A-Za-z0-9.-]+" dopeiptv | sort -t: -k3 -u
 grep -rnoE --include='*.py' "[\"'][a-z0-9.-]+\.(org|com|net|info|tv|io|dev|se|app)[\"']" dopeiptv | sort -t: -k3 -u</code></pre>
 <p>Or watch what the app really does: an application firewall shows every connection as it happens – OpenSnitch on Linux, LuLu or Little Snitch on a Mac, or the firewall's log on Windows. It shows what happened while you watched, with your settings: try the features you use, and the ones you do not.</p>
 
-<h2 id="builds">8. How you know the app runs this code</h2>
+<h2 id="builds">9. How you know the app runs this code</h2>
 <p class="tp-promise">The app you download is built in public from the version's tag in this code, signed, and it can tell when it has been changed.</p>
 <ul>
 <li><strong>Built in public.</strong> Every release is built by GitHub Actions from the version's tag in the code – not on our computers. <a href="https://github.com/slimture/dopeIPTV/blob/%REF%/.github/workflows/release.yml" rel="noopener">The build's recipe</a> is in the code, and <a href="https://github.com/slimture/dopeIPTV/actions/workflows/release.yml" rel="noopener">the log of every build</a> is open to anyone.</li>

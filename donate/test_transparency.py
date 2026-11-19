@@ -7,16 +7,25 @@ against the code they show (site/transparency.json, tools/transparency.py).
   leaves out a proof;
 - each part's copy button has its question, and its proof is folded;
 - every address on the page points at the version it names - a tag or a
-  commit, never a branch that moves.
+  commit, never a branch that moves;
+- what the page shows of this site's own files is still there to be shown
+  (tools/transparency.py's CODE), and its reader of nginx's files reads
+  them as the content server's test does.
 """
 import json
 import os
 import re
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 REPO = "https://github.com/slimture/dopeIPTV/blob/"
 PLACEHOLDER = re.compile(r"<!--tp:(code|ex|tests|copy|hosts) ([a-z]+)(?: ([a-z]+))?-->")
+sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+
+import transparency  # noqa: E402
+from test_deploy_content import _unescape, parse  # noqa: E402
 
 
 def _data() -> dict:
@@ -93,3 +102,68 @@ def test_every_address_names_its_version():
         for blk in blocks:
             for part in blk["parts"]:
                 assert part["code"].strip() and part["start"] <= part["end"], part["path"]
+
+
+def _site_blocks():
+    for part, blocks in transparency.CODE.items():
+        for blk in blocks:
+            for b in [blk] + blk.get("with", []):
+                if b["repo"] == "site":
+                    yield part, blk["id"], b
+
+
+def test_what_the_page_shows_of_the_site_is_still_there():
+    # A function renamed, a location moved or a line reworded in donate/ or
+    # deploy/ fails here, not on the next run of the tool.
+    seen = 0
+    for part, bid, b in _site_blocks():
+        try:
+            parts = transparency.excerpt(ROOT, "HEAD", b)
+        except SystemExit as e:
+            raise AssertionError(f"{part} {bid}: {e}") from None
+        assert parts and all(p["code"].strip() for p in parts), (part, bid, b["path"])
+        seen += 1
+    assert seen
+
+
+def _shape(node: dict) -> list:
+    # The page keeps a word as written (a regex's \t stays two characters);
+    # nginx, and the content server's test, read the escape.
+    return [(_unescape(k["words"][0]), len(k["words"]), k["start"], None if k["kids"] is None else _shape(k))
+            for k in node["kids"]]
+
+
+def _their_shape(block) -> list:
+    return [(b.name, 1 + len(b.args), b.line, None if b.body is None else _their_shape(b))
+            for b in block.body]
+
+
+def test_the_page_reads_nginx_as_the_content_servers_test_does():
+    paths = sorted({b["path"] for _p, _i, b in _site_blocks() if "nginx" in b})
+    assert "deploy/content-iptv.dope.rs.conf" in paths and "deploy/proxy-dopeiptv.org.conf" in paths
+    for path in paths:
+        with open(os.path.join(ROOT, path), encoding="utf-8") as fh:
+            text = fh.read()
+        assert _shape(transparency.nginx_tree(text, path)) == _their_shape(parse(text)), path
+
+
+def test_a_block_is_found_by_its_words_and_whole_with_its_comments():
+    text = ("# the zones\n"
+            "limit_req_zone $a zone=one:1m rate=1r/s;\n"
+            "map $uri $x {\n    default \"a;b {c}\";   # not the end of it\n}\n"
+            "server {\n    server_name a.example;\n    location / { return 404; }\n}\n"
+            "server {\n    server_name b.example;\n    # the way in\n"
+            "    location / {\n        proxy_pass http://x;\n    }\n    location /x/ { }\n}\n")
+    tree = transparency.nginx_tree(text)
+    assert [n["start"] for n in transparency.nginx_find(tree, "server > location /")] == [8, 13]
+    (loc,) = transparency.nginx_find(tree, "server[server_name b.example] > location /")
+    assert (loc["start"], loc["end"]) == (13, 15)
+    assert transparency.nginx_find(tree, "server[server_name example] > location /") == []
+    (m,) = transparency.nginx_find(tree, "map $uri")
+    assert (m["start"], m["end"], m["kids"][0]["words"]) == (3, 5, ["default", "a;b {c}"])
+    lines = text.splitlines()
+    spans = []
+    for sel in ["limit_req_zone", "server[server_name b.example] > location /"]:
+        for node in transparency.nginx_find(tree, sel):
+            spans.append((transparency._comments_above(lines, node["start"]), node["end"]))
+    assert transparency._merge(spans, lines) == [(1, 2), (12, 15)]
