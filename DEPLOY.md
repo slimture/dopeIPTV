@@ -1355,6 +1355,18 @@ or for the admin page.
   (0711), and the start line says so. Note what is left: Nextcloud's
   php-fpm runs as `www` in this jail too, so it can reach the socket as
   nginx can; no other user can.
+- **The logs keep less of the address asked for.** A page view (`/`,
+  `/help/`) keeps its path, never its query - `?fbclid=`, `?utm_...`,
+  whatever a link carried; a `?lang=` the line's `l` says already, and
+  `stats_collect.py` reads only the path. `/hit` keeps the twelve fields
+  the page's signal sends (`nav.js`) and `stats_collect.py` reads - each as
+  sent, the page that linked last, so a long one is cut before the rest -
+  and nothing else of its query. A download's request line keeps its
+  method, the file's name (`$iptv_dl_file`, the name `/dl.php` answers
+  for) and the protocol. `stats_collect.py` and `sync-releases.sh` read the
+  lines of before and of now alike while the old ones age out, two days
+  (`donate/test_log_fields.py` works the lines out from the file as nginx
+  writes them and counts both).
 
 **pontusweb (jail)** - `bastille console pontusweb`, then `sh`. First the
 allow list, before the content server's new file, which nginx no longer
@@ -1428,4 +1440,22 @@ fetch -T 5 -o /dev/null http://10.0.1.2:8081/
 ```
 
 says `Forbidden`; from anywhere, the site, Sync now, Send feedback and a
-watch-together room in the app, and the admin page work as before.
+watch-together room in the app, and the admin page work as before. Then
+the logs: open `https://dopeiptv.org/?utm_source=check&fbclid=x` in a
+private window (no admin cookie there), and from anywhere
+
+```sh
+curl -sI 'https://dopeiptv.org/dl.php?f=SHA256SUMS&utm_source=check' | head -1
+```
+
+and in pontusweb:
+
+```sh
+tail -n 4 /var/log/nginx/iptv.dope.rs-stats.log
+tail -n 1 /var/log/nginx/iptv.dope.rs-downloads.log
+```
+
+Among the last lines, the page's says `"u":"/"` and its `/hit`'s
+`"u":"/hit?p=%2F&ev=view&t=&x=&n=&s=check&l=en&...&r="` - no `fbclid`
+anywhere; the download's request is `"HEAD /dl.php?f=SHA256SUMS
+HTTP/1.0" 302` (a HEAD is not counted).
