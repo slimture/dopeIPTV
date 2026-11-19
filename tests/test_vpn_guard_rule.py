@@ -86,6 +86,43 @@ def test_files_always_play_and_home_streams_unless_covered(guard):
     assert nerd.blocks_stream(WAN[0], "enigma2")
 
 
+def test_an_address_is_judged_by_where_it_goes_not_how_it_is_spelt(guard):
+    """http://134744072/ reaches 8.8.8.8 - the system's resolver takes an
+    integer, octal, hex or short IPv4 - but had no dot, so it counted as a
+    box's name on the home network and played past the guard. And a
+    Windows network path (//server/share, \\\\server\\share,
+    file://server/...) is on another computer, not the person's own file."""
+    for host in ("134744072", "0x08080808", "010.010.010.010", "8.8.2056", "0x8.0x8.0x8.0x8",
+                 "::ffff:8.8.8.8"):
+        assert nerd.ipv4_any(host) is None or str(nerd.ipv4_any(host)) == "8.8.8.8", host
+        assert not nerd.is_home_host(host), host
+    for host in ("3232235777", "0xc0a80101", "10.1", "127.1", "0177.0.0.1", "::ffff:192.168.1.1"):
+        assert nerd.is_home_host(host), host
+    for host in ("vuduo2", "4294967296", "1.2.3.4.5.lan"):
+        assert nerd.is_home_host(host), host
+    for bad in ("1.2.3.256", "256.1.1", "0x1ffffffff", "1..2", "08", "²", "1" * 11):
+        assert nerd.ipv4_any(bad) is None, bad
+    away = ["http://134744072/live.ts", "http://0x08080808/x", "//8.8.8.8/share/x.ts",
+            "\\\\134744072\\share\\x.ts", "file://8.8.8.8/share/x.ts",
+            "\\\\?\\UNC\\8.8.8.8\\share\\x.ts"]
+    for url in away:
+        assert not nerd.is_own_file(url) and not nerd.is_lan_url(url), url
+    nas = ["//nas/share/x.ts", "\\\\nas\\share\\x.ts", "file://nas.local/x.ts",
+           "file:////192.168.1.2/x.ts"]
+    for url in nas:
+        assert not nerd.is_own_file(url) and nerd.is_lan_url(url), url
+    for url in ("\\\\?\\C:\\Users\\u\\rec.ts", "file://localhost/home/u/rec.ts", "file:///C:/rec.ts"):
+        assert nerd.is_own_file(url), url
+    guard(lan=False)
+    for url in away:
+        assert nerd.blocks_stream(url), url
+    for url in nas:
+        assert not nerd.blocks_stream(url), url
+    guard(lan=True)
+    for url in nas:
+        assert nerd.blocks_stream(url), url
+
+
 def _window_says(url: str) -> bool:
     from dopeiptv.ui.main_window import MainWindow
 

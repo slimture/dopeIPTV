@@ -204,50 +204,122 @@ HOME_SUFFIXES = (".local", ".lan", ".home", ".internal", ".home.arpa", ".localdo
 HOME_NAMES = ("localhost", "fritz.box")
 
 
+def ipv4_any(text: str) -> Any:
+    """*text* as an IPv4 address in every spelling the system's resolver
+    takes (inet_aton): four parts, or fewer with the last filling the rest
+    ("10.1" is 10.0.0.1), each decimal, octal with a leading 0 or hex with
+    0x - "134744072", "0x08080808" and "010.010.010.010" are all 8.8.8.8.
+    None for anything else."""
+    import ipaddress
+    parts = text.split(".")
+    if not 1 <= len(parts) <= 4:
+        return None
+    nums = []
+    for part in parts:
+        p = part.lower()
+        try:
+            if p.startswith("0x"):
+                if not p[2:] or len(p) > 10:
+                    return None
+                nums.append(int(p[2:], 16))
+            elif len(p) > 1 and p.startswith("0"):
+                if len(p) > 12:
+                    return None
+                nums.append(int(p[1:], 8))
+            elif p.isascii() and p.isdigit() and len(p) <= 10:
+                nums.append(int(p))
+            else:
+                return None
+        except ValueError:
+            return None
+    last_bits = 8 * (5 - len(nums))
+    if any(n > 255 for n in nums[:-1]) or nums[-1] >= 1 << last_bits:
+        return None
+    value = 0
+    for n in nums[:-1]:
+        value = value << 8 | n
+    return ipaddress.IPv4Address(value << last_bits | nums[-1])
+
+
 def is_home_host(host: str) -> bool:
     """A host on this computer or the home network: a loopback, private or
-    link-local address, a name without a dot (a box called "vuduo2"), or a
-    name only a home network has (.local, .lan, .home, .internal,
-    .home.arpa, fritz.box). One rule for the VPN guard and for the events
-    sent to a home system."""
+    link-local address - in whatever spelling the system takes it, judged
+    by the address it reaches (ipv4_any; an IPv4-mapped IPv6 one by its
+    IPv4) -, a name without a dot (a box called "vuduo2"), or a name only
+    a home network has (.local, .lan, .home, .internal, .home.arpa,
+    fritz.box). One rule for the VPN guard and for the events sent to a
+    home system."""
     import ipaddress
     h = (host or "").strip().strip("[]").rstrip(".").lower()
     if not h:
         return False
+    ip: Any
     try:
         ip = ipaddress.ip_address(h.split("%", 1)[0])
     except ValueError:
-        return h in HOME_NAMES or h.endswith(HOME_SUFFIXES) or "." not in h
+        ip = ipv4_any(h)
+        if ip is None:
+            return h in HOME_NAMES or h.endswith(HOME_SUFFIXES) or "." not in h
+    if ip.version == 6 and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
     return ip.is_private or ip.is_loopback or ip.is_link_local
 
 
-_NET_SCHEMES = ("http:", "https:", "rtmp:", "rtmps:", "rtsp:", "udp:", "rtp:", "srt:",
-                "mms:", "mmsh:", "tcp:", "hls:", "ftp:", "dvb:")
+# A scheme ("udp:@239.0.0.1:1234", "smb://", "rtmpt:..."): two letters at
+# least, so a Windows drive ("C:\\...") is a path.
+_SCHEME = re.compile(r"[A-Za-z][A-Za-z0-9+.-]+:")
+
+
+def _network_host(url: str) -> str | None:
+    """The server of a path or file: address on another computer - a
+    Windows network path (\\\\server\\share, //server/share,
+    \\\\?\\UNC\\server\\share) or file://server/... -, else None."""
+    from urllib.parse import unquote
+    u = (url or "").strip()
+    if u.lower().startswith("file:"):
+        try:
+            parts = urlsplit(u)
+        except ValueError:
+            return ""
+        host = parts.netloc.lower()
+        if host not in ("", "localhost") and not re.fullmatch(r"[a-z]:", host):
+            return parts.hostname or host
+        u = unquote(parts.path)
+    s = u.replace("\\", "/")
+    if not s.startswith("//"):
+        return None
+    rest = s[2:]
+    if rest[:2] in ("?/", "./"):
+        if not rest[2:].upper().startswith("UNC/"):
+            return None                     # \\?\C:\... is this computer's
+        rest = rest[6:]
+    return rest.split("/", 1)[0]
 
 
 def is_own_file(url: str) -> bool:
     """A file on this computer - the user's own recording or video, never a
-    stream from anywhere: a file: address or a bare path."""
+    stream from anywhere: a file: address or a path, never one on another
+    computer (a Windows network path, file://server/...)."""
     u = (url or "").strip()
     if not u:
         return False
-    if u.lower().startswith("file:"):
-        return True
-    # A path ("/home/...", "C:\\...") - not "udp:@239.0.0.1:1234".
-    return "://" not in u and not u.lower().startswith(_NET_SCHEMES)
+    if not u.lower().startswith("file:") and _SCHEME.match(u):
+        return False
+    return _network_host(u) is None
 
 
 def is_lan_url(url: str) -> bool:
     """A stream on this computer or the home network (is_home_host), or a
     file of its own - the VPN guard leaves those alone unless told to cover
     the home network too (a file never is: blocks_stream)."""
-    from urllib.parse import urlsplit
     if is_own_file(url):
         return True
-    try:
-        host = urlsplit(url or "").hostname or ""
-    except ValueError:
-        return False
+    host = _network_host(url)
+    if host is None:
+        try:
+            host = urlsplit(url or "").hostname or ""
+        except ValueError:
+            return False
     return is_home_host(host)
 
 
