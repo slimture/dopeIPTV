@@ -45,6 +45,14 @@ assessment of each. The findings, and what came of them:
 | Website statistics | Referrer and URL queries in the raw log; the content server's default log | low | Website: queries and fragments never logged; no other log |
 | Website statistics | A completed payment was noted on the visit | medium | 1.6.8 + website: counted per day only |
 | Transparency page | "Every destination", "built from exactly this code" and the site's own checksum check were claimed more strongly than shown | info | Website: what a search found, not a promise; builds not yet reproducible, said so; the site's check shown in code |
+| Players | A playlist line such as `--log-file=` or `--include=` was read as an option by an external mpv/VLC or the mpv recorder (live attack, sweeps; proven) | high | 1.6.9: the address after `--`, and nothing but a stream's address or a file's path handed over |
+| Players | ffmpeg read `concat:`, `subfile:`, `unix:` and local files behind an address | medium | 1.6.9: a stream's protocols only, everywhere ffmpeg is started |
+| Local servers | The loopback proxy took anyone's requests; one address could open unlimited connections; a forged Host reached the token-bearing addresses | medium | 1.6.9: a per-run key, connection caps, time limits, `host_for_addresses` |
+| Recordings | A batch file after a recording ran a title's `&` / `%VAR%`; a NUL or `..` in a name or folder | high (Windows) | 1.6.9: text only; names and folders made safe |
+| Backups | A restore turned on server mode or joined a sync unnamed | medium | 1.6.9: named before it is put back |
+| Build chain | Downloads by "latest", actions by tag, unhashed pip installs, the update key in every build job | high | 1.6.9: SHA-256 pins, a hashed lock, actions by commit, read-only workflows, the key in one signing step |
+| Updates | A taken-over site could offer an older signed release; a file lying in the download folder | medium | 1.6.9: never older than the copy running; a file of the updater's own |
+| Player text | A station's or programme's title drawn as rich text over the picture | low | 1.6.9: plain text |
 | Overall | The parts reviewed are not the whole attack surface: parsers of provider data, logins at rest, the local servers, the programs the app starts, the build chain | info | 1.6.9 (in progress): five more reviews - local servers and processes, untrusted input and secrets, supply chain and platforms, the website's services - with their findings to be added here |
 
 ## The next round

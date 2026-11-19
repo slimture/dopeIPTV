@@ -79,6 +79,45 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   playlist and which settings wait, and Review shows each beside this
   computer's, with Apply and Keep mine. Nothing changes for anyone who
   never uses these settings. Found in a red-team review.
+- media/players.py, core/recording.py: a playlist line that starts with a
+  dash (`--log-file=`, `--include=`) is no longer read as an option by an
+  external mpv or VLC or by the mpv recorder - it overwrote a file or
+  loaded a configuration from another server; what is no stream's address
+  or file's path is not handed to a player or the recorder at all.
+- core/player_exec.py: ffmpeg and ffprobe, wherever the app starts them for
+  a stream (recorder, casts, AirPlay, server mode), read only a stream's
+  protocols - no `concat:`, `subfile:`, `unix:` or local files behind an
+  address.
+- core/net_bridge.py: the loopback proxy for a source's own DNS or pinned
+  certificate asks for a key made for each run; another program on the
+  computer cannot use it.
+- core/rec_extras.py: the command after a recording, when it is a batch
+  file on Windows, gets a programme's title as text only (`&`, `%VAR%`).
+- core/recording.py: a recording's name leaves out control characters and
+  Windows device names; a job's folder stays inside the recordings folder.
+- core/backup.py: restoring a backup names server mode, adult channels
+  through it and a sync code before anything is put back, and shows a
+  command in full.
+- The app's servers: a playlist's addresses are never written under a Host
+  of the asker's choosing; at most 256 connections at once, 64 per
+  address; server mode's answers time out when nobody reads them; the
+  tuner's token-free endpoints are held to 10 requests a second per
+  address; cast addresses carry 144-bit tokens compared in constant time.
+- media/embedded.py, ui/cert_trust.py: the text over the picture (a
+  station's title, a programme's or channel's name) and the "certificate
+  changed" question show outside text as plain words, never rich text.
+- core/selfupdate.py, core/winupdate.py: an installer takes no release that
+  is not newer than the copy running; the download is a file of the
+  updater's own; on Windows the installer waits in the user's local app
+  data, not the shared temp folder.
+- Builds: every binary the release downloads (libmpv for Windows, the
+  AppImage runtime and tool, micromamba) is pinned by SHA-256
+  (`packaging/build-inputs.json`, `tools/build_inputs.py`); Python packages
+  come from a hashed lock; actions are pinned by commit and workflows are
+  read-only by default; the update key is handed to one signing step in a
+  job that builds nothing; CI fails on a known vulnerability in a shipped
+  package (`tools/audit_deps.py`). The Flatpak ships urllib3 2.8.0 and
+  certifi 2026.10.23 and no longer has logind access.
 ## [1.6.8]
 
 ### Security
