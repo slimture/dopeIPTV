@@ -470,6 +470,8 @@ class MqttSink(_Sink):
     """The broker: one connection kept open, a last will, keepalive."""
 
     name = "mqtt"
+    COMMANDS_PER_S = 10.0
+    COMMANDS_BURST = 30
 
     def __init__(self, cfg: Config, limit: int = QUEUE_MAX, after: Iterable[_Sink] = (),
                  on_command: Callable[[str, Any], None] | None = None,
@@ -491,6 +493,12 @@ class MqttSink(_Sink):
         self.options: tuple[str, ...] = tuple(options)
         self._forget = forget and not cfg.commands
         self.commands_heard = 0
+        #: Commands handed on: a token bucket (COMMANDS_PER_S, at most
+        #: COMMANDS_BURST at once) - a flood from the broker is dropped,
+        #: never queued onto the window's thread.
+        self._tokens = float(self.COMMANDS_BURST)
+        self._filled = time.monotonic()
+        self._dropped = 0
         self._readable = False
         self._wake_r, self._wake_w = socket.socketpair()
         for s in (self._wake_r, self._wake_w):
@@ -555,11 +563,29 @@ class MqttSink(_Sink):
             cmd = mqtt_control.parse(self.prefix, topic, payload, retained)
             if cmd is None or self.on_command is None:
                 continue
+            if not self._paced():
+                self._dropped += 1
+                if self._dropped == 1:
+                    log.info("events: commands come faster than %d a second - the rest dropped",
+                             int(self.COMMANDS_PER_S))
+                continue
+            self._dropped = 0
             self.commands_heard += 1
             try:
                 self.on_command(*cmd)
             except Exception as e:
                 log.info("events: a command was not taken: %s", e)
+
+    def _paced(self) -> bool:
+        """One more command may go to the window now (the token bucket)."""
+        now = time.monotonic()
+        self._tokens = min(float(self.COMMANDS_BURST),
+                           self._tokens + (now - self._filled) * self.COMMANDS_PER_S)
+        self._filled = now
+        if self._tokens < 1.0:
+            return False
+        self._tokens -= 1.0
+        return True
 
     def _controls(self, cl: mqtt.Client) -> None:
         """Home Assistant's controls for the commands, or none."""

@@ -222,12 +222,20 @@ class Client:
         sock = self._sock
         return bool(self._buf) or (isinstance(sock, ssl.SSLSocket) and sock.pending() > 0)
 
+    #: Packets one take() reads at most: a broker that never stops sending
+    #: would otherwise keep it reading - and its thread with it - for good.
+    #: What is left is read by the next take() (pending() says so).
+    TAKE_MAX = 256
+
     def take(self, wait: float = 0.0) -> list[tuple[str, bytes, bool]]:
         """The PUBLISHes the broker sent - those read on the way to another
-        answer (inbox) and those waiting now - waiting at most *wait* for
-        one when there is none. Raises as a read does (the broker went)."""
+        answer (inbox) and those waiting now, TAKE_MAX packets at most -
+        waiting at most *wait* for one when there is none. Raises as a read
+        does (the broker went)."""
         end = time.monotonic() + max(0.0, wait)
-        while self._sock is not None:
+        for _ in range(self.TAKE_MAX):
+            if self._sock is None:
+                break
             if not self.pending():
                 left = max(0.0, end - time.monotonic())
                 try:
