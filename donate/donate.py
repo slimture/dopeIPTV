@@ -812,6 +812,43 @@ def push(title: str, body: str, url: str = "/admin/#donations", tag: str = "") -
     return sent, why
 
 
+#: Reports reach the admins' devices one notice at a time: the first at
+#: once, those after it within this many seconds as one "N more" at its end.
+FEEDBACK_PUSH_GAP = 300
+_FB_PUSH: dict = {"last": -1e18, "waiting": 0, "lock": threading.Lock()}
+
+
+def feedback_notice(title: str, body: str) -> bool:
+    """A report to the devices, never a stream of them: told at once when
+    none was told within FEEDBACK_PUSH_GAP, else counted into the one notice
+    that comes when the gap is over. Whether this one went at once."""
+    st = _FB_PUSH
+    with st["lock"]:
+        now = time.monotonic()
+        if not st["waiting"] and now - st["last"] >= FEEDBACK_PUSH_GAP:
+            st["last"] = now
+            now_one = True
+        else:
+            st["waiting"] += 1
+            if st["waiting"] == 1:
+                later = threading.Timer(max(1.0, st["last"] + FEEDBACK_PUSH_GAP - now), _feedback_more)
+                later.daemon = True
+                later.start()
+            now_one = False
+    if now_one:
+        threading.Thread(target=push, args=(title, body, "/admin/#feedback", "feedback"), daemon=True).start()
+    return now_one
+
+
+def _feedback_more() -> None:
+    st = _FB_PUSH
+    with st["lock"]:
+        n, st["waiting"], st["last"] = st["waiting"], 0, time.monotonic()
+    if n:
+        push(f"{n} more report{'s' if n != 1 else ''}", "Feedback, error reports and replies",
+             "/admin/#feedback", "feedback")
+
+
 def _watch_donations() -> None:
     """Every minute and a half: any payment newer than the newest already
     told - a tip, monthly support - goes to the devices. The first look only
@@ -1364,13 +1401,12 @@ class Handler(BaseHTTPRequestHandler):
                                        official.kind(self.headers.get(official.HEADER)))
         if status == 200 and not body.get("duplicate") and push_ready():
             kind = str(data.get("kind") or "feedback")
-            threading.Thread(target=push, args=(
+            feedback_notice(
                 ("A reply to your answer" if data.get("thread")
                  else {"error": "An error report", "crash": "A crash report"}.get(kind, "Feedback"))
                 + (" from the website" if data.get("from") == "site"
                    else " from a supporter" if data.get("supporter") == "yes" else " from the app"),
-                f"dopeIPTV {str(data.get('version') or '?')[:20]} · {str(data.get('os') or '?')[:20]}",
-                "/admin/#feedback", "feedback"), daemon=True).start()
+                f"dopeIPTV {str(data.get('version') or '?')[:20]} · {str(data.get('os') or '?')[:20]}")
         return self._send(status, body)
 
     def _feedback_replies(self) -> None:

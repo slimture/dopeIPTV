@@ -11,12 +11,18 @@ a hand-made request sends something it should not.
 Stored one report a line in feedback.jsonl beside the statistics; what an
 admin marked (seen, fixed) in feedback-state.json.
 
-Not a way to fill the disk or the inbox: the same report twice in a day
-is kept once; past SAME_SIG_DAY reports of one problem in a day the rest
-are only counted (no text); past DAY_MOST reports a day, everyone
-together, none are taken until the next day; the file never grows past
-MAX_FILE. (The app waits a minute between two and stops at a few a day;
-nginx and donate.py limit each address as well.)
+Not a way to fill the disk or the inbox: a text is kept to what the app
+or the site's box can send, counted in bytes (MAX_BYTES, SITE_BYTES,
+THREAD_BYTES - letters outside ASCII take several); the same report twice
+in a day is kept once; past SAME_SIG_DAY reports of one problem in a day
+the rest are only counted (no text); once a day's texts together reach
+DAY_BYTES, the day's later ones keep their first LATE_BYTES; past DAY_MOST
+reports a day, everyone together, none are taken until the next day; and
+the file never grows past MAX_FILE - the oldest reports go first to make
+room (make_room), so a full file never refuses what comes. (The app waits
+a minute between two and stops at a few a day; nginx and donate.py limit
+each address as well, and donate.py sends the admins one notice at a time,
+a few minutes apart.)
 
 Answers, without a support desk: the app keeps a random code for a report
 the person wants an answer to and sends only its SHA-256 ("reply"). An
@@ -61,14 +67,24 @@ import hashlib
 import json
 import os
 import re
+import sys
 import threading
 import time
 import uuid
 
 KINDS = ("error", "crash", "feedback")
+#: A report's text, in characters as the app cuts it, and in bytes: the
+#: app's whole request is at most 56 000 (core/report.py, MAX_BODY).
 MAX_TEXT = 48_000
+MAX_BYTES = 56_000
+#: The site's box takes 4000 characters, at most three bytes each.
+SITE_BYTES = 12_000
 #: A follow-up is the person's words only, kept short (the app's box takes as many).
 THREAD_TEXT = 2000
+THREAD_BYTES = 6000
+#: The texts kept in a day, everyone together; past it a report keeps its start.
+DAY_BYTES = 4 << 20
+LATE_BYTES = 2000
 #: What feedback is about, where, how often: the app's short lists, nothing else kept.
 CHOICES = {"topic": ("bug", "idea", "like", "question"),
            "area": ("playback", "guide", "recording", "lists", "settings", "cast", "updates", "other",
@@ -134,26 +150,40 @@ def _same(kind: str, text: str, thread_of: str = "") -> str:
     return hashlib.sha256((lead + " ".join(text.lower().split())).encode("utf-8")).hexdigest()[:24]
 
 
+def _bytes(text: str) -> int:
+    return len(text.encode("utf-8"))
+
+
+def _cut(text: str, most: int) -> str:
+    """*text* in at most *most* bytes of UTF-8, never half a letter."""
+    raw = text.encode("utf-8")
+    return text if len(raw) <= most else raw[:most].decode("utf-8", "ignore")
+
+
 def _memory(stats_dir: str, now: float) -> dict:
     """The limits' memory for *stats_dir*: hashes of the last day's
-    reports, today's count, today's count per problem. Under _LOCK."""
+    reports, today's count, today's count per problem, today's texts'
+    bytes. Under _LOCK."""
     today = dt.date.fromtimestamp(now).isoformat()
     mem = _seen.get(stats_dir)
     if mem is None:
-        mem = {"hashes": {}, "day": today, "n": 0, "sigs": {}}
+        mem = {"hashes": {}, "day": today, "n": 0, "sigs": {}, "bytes": 0}
         for r in _rows(stats_dir):
-            t = r.get("t", 0)
-            if now - t >= 86400:
+            if not isinstance(r, dict):
+                continue
+            t = _t(r)
+            if t == float("inf") or now - t >= 86400:
                 continue
             if r.get("text"):
-                mem["hashes"][_same(r.get("kind", ""), r["text"], str(r.get("thread_of") or ""))] = t
+                mem["hashes"][_same(r.get("kind", ""), str(r["text"]), str(r.get("thread_of") or ""))] = t
             if dt.date.fromtimestamp(t).isoformat() == today:
                 mem["n"] += 1
                 sig = r.get("sig") or ""
                 mem["sigs"][sig] = mem["sigs"].get(sig, 0) + 1
+                mem["bytes"] += _bytes(str(r.get("text") or ""))
         _seen[stats_dir] = mem
     if mem["day"] != today:
-        mem.update(day=today, n=0, sigs={})
+        mem.update(day=today, n=0, sigs={}, bytes=0)
     if len(mem["hashes"]) > 20000 or any(now - t >= 86400 for t in list(mem["hashes"].values())[:1]):
         mem["hashes"] = {h: t for h, t in mem["hashes"].items() if now - t < 86400}
     return mem
@@ -179,7 +209,9 @@ def accept(stats_dir: str, body: dict, build: str = "unknown") -> tuple[int, dic
     if not _VERSION.match(version):
         version = "?"
     system = re.sub(r"[^A-Za-z0-9 ._-]", "", str(body.get("os") or ""))[:24] or "?"
-    text = scrub(str(body.get("text") or "")).strip()[:THREAD_TEXT if thread else MAX_TEXT]
+    site = kind == "feedback" and not thread and body.get("from") == "site"
+    text = _cut(scrub(str(body.get("text") or "")).strip()[:THREAD_TEXT if thread else MAX_TEXT],
+                THREAD_BYTES if thread else SITE_BYTES if site else MAX_BYTES)
     if not text:
         return 400, {"error": "empty"}
     now = time.time()
@@ -194,13 +226,15 @@ def accept(stats_dir: str, body: dict, build: str = "unknown") -> tuple[int, dic
         row["sup"] = 1
     if kind == "feedback" and not thread:
         row.update({k: str(body.get(k)) for k, allowed in CHOICES.items() if body.get(k) in allowed})
-        if body.get("from") == "site":
+        if site:
             row["from"] = "site"
     os.makedirs(stats_dir, exist_ok=True)
     path, _state = _paths(stats_dir)
+    make_room(stats_dir)
     with _LOCK:
         try:
             if os.path.getsize(path) >= MAX_FILE:
+                # Nothing could go (no report in it can be read): never past it.
                 return 503, {"error": "full"}
         except OSError:
             pass
@@ -224,9 +258,16 @@ def accept(stats_dir: str, body: dict, build: str = "unknown") -> tuple[int, dic
             # Counted, so the problem's number stays right; its text is
             # already here many times over today.
             row["text"], row["counted"] = "", True
+        elif mem["bytes"] + _bytes(row["text"]) > DAY_BYTES:
+            # The day's room is used up (many long reports, or someone
+            # filling it): this one keeps its start, enough to read it by.
+            short = _cut(row["text"], LATE_BYTES)
+            if short != row["text"]:
+                row["text"], row["cut"] = short.rstrip() + " …", True
         mem["hashes"][same] = now
         mem["n"] += 1
         mem["sigs"][sig] = mem["sigs"].get(sig, 0) + 1
+        mem["bytes"] += _bytes(row["text"])
         with open(path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(row, ensure_ascii=False) + "\n")
     if rid:
@@ -321,6 +362,50 @@ def prune(stats_dir: str, now: float | None = None) -> int:
     many reports went."""
     cut = (now if now is not None else time.time()) - KEEP_DAYS * 86400
     return _remove(stats_dir, lambda r: _t(r) < cut)
+
+
+def make_room(stats_dir: str) -> int:
+    """A file at MAX_FILE brought down to three quarters of it: the oldest
+    reports go first, each with its follow-ups, answers and marks, as prune
+    takes them - so a full file never refuses what comes next, however it
+    was filled. How many reports went (0 while there is room)."""
+    path, _state = _paths(stats_dir)
+    try:
+        size = os.path.getsize(path)
+    except OSError:
+        return 0
+    if size < MAX_FILE:
+        return 0
+    # Each report's share of the file: its own line and its follow-ups'.
+    share: dict[str, int] = {}
+    when: dict[str, float] = {}
+    with open(path, "rb") as fh:
+        for line in fh:
+            try:
+                r = json.loads(line)
+            except ValueError:
+                continue
+            if not isinstance(r, dict):
+                continue
+            rid = str(r.get("thread_of") or r.get("id") or "")
+            if not rid:
+                continue
+            share[rid] = share.get(rid, 0) + len(line)
+            if not r.get("thread_of"):
+                when[rid] = _t(r)
+    need, goes = size - MAX_FILE * 3 // 4, set()
+    for rid in sorted(when, key=when.__getitem__):
+        if need <= 0 or when[rid] == float("inf"):
+            break
+        need -= share.get(rid, 0)
+        goes.add(rid)
+    if not goes:
+        return 0
+    gone = _remove(stats_dir, lambda r: str(r.get("id") or "") in goes)
+    if gone:
+        print(f"[feedback] the file was full: the oldest {gone} reports made room",
+              file=sys.stderr, flush=True)
+    return gone
 
 
 #: The most keys one request acts on at once (the page lists at most 300
@@ -593,32 +678,54 @@ def replies_for(stats_dir: str, hashes: list) -> dict:
     return out
 
 
-_ASKING: dict = {"key": None, "rows": []}
+_ASKING: dict = {"key": None, "rows": [], "at": 0}
 
 
 def _asking_rows(stats_dir: str) -> list[dict]:
     """Under _LOCK: the reports whose senders can be told answers, and the
-    follow-ups to them - kept in memory and read again only when the file
-    changes (every copy of the app asks now and then, and the file may hold
-    many megabytes); a rewrite (prune, delete) forgets them at once."""
+    follow-ups to them - kept in memory (every copy of the app asks now and
+    then, and the file may hold many megabytes). A report added is only
+    appended, so only what came after the part already read is read; a
+    rewrite (prune, delete, make_room) is another file and forgets them at
+    once, and so does anything that does not line up."""
     path, _state = _paths(stats_dir)
     try:
         st = os.stat(path)
-        key = (path, st.st_mtime_ns, st.st_size)
     except OSError:
         return []
-    if _ASKING["key"] != key:
-        rows = []
-        for r in _rows(stats_dir):
-            if not isinstance(r, dict):
-                continue
-            if r.get("thread_of"):
-                rows.append({"id": r.get("id"), "thread_of": r["thread_of"], "to": r.get("to"), "t": r.get("t", 0)})
-            elif r.get("reply"):
-                rows.append({"id": r.get("id"), "sig": r.get("sig"), "kind": r.get("kind"), "reply": r["reply"]})
-        _ASKING["rows"] = rows
-        _ASKING["key"] = key
-    return _ASKING["rows"]
+    key = (path, st.st_dev, st.st_ino)
+    at = int(_ASKING["at"])
+    if _ASKING["key"] == key and at == st.st_size:
+        return _ASKING["rows"]
+    rows: list[dict] = _ASKING["rows"]
+    try:
+        with open(path, "rb") as fh:
+            if _ASKING["key"] != key or not 0 < at <= st.st_size or not _line_ends(fh, at):
+                rows, at = [], 0
+            fh.seek(at)
+            data = fh.read()
+    except OSError:
+        return []
+    end = data.rfind(b"\n") + 1                  # a line still being written waits
+    for line in data[:end].splitlines():
+        try:
+            r = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(r, dict):
+            continue
+        if r.get("thread_of"):
+            rows.append({"id": r.get("id"), "thread_of": r["thread_of"], "to": r.get("to"), "t": r.get("t", 0)})
+        elif r.get("reply"):
+            rows.append({"id": r.get("id"), "sig": r.get("sig"), "kind": r.get("kind"), "reply": r["reply"]})
+    _ASKING.update(key=key, rows=rows, at=at + end)
+    return rows
+
+
+def _line_ends(fh, at: int) -> bool:
+    """Whether the part already read ends a line where it ended."""
+    fh.seek(at - 1)
+    return fh.read(1) == b"\n"
 
 
 def _asking(stats_dir: str) -> list[dict]:
