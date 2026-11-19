@@ -421,8 +421,10 @@ class TracksMixin:
 
     def _remember_sub_lang(self, m, tid) -> None:
         """The language of a subtitle turned on by hand: the next film opens
-        with a track in it chosen, hidden, so turning it on is instant."""
-        if m is None or not self._settings:
+        with a track in it chosen, hidden, so turning it on is instant. Not
+        from a private playback: it would say what language was watched."""
+        from ..core.privacy import playing_private
+        if m is None or not self._settings or playing_private():
             return
         try:
             track = next((t for t in (m.track_list or [])

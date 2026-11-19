@@ -470,3 +470,66 @@ def test_a_private_streams_address_says_only_its_server_in_the_log():
     assert privacy.url_for_log("/home/anna/Films/The Bridge.mkv") == "<private>"
     assert privacy.url_for_log(None) == "<private>"
     assert privacy.for_log("The Bridge") == "<private>"
+
+
+def test_the_subtitle_language_of_a_private_playback_is_not_kept():
+    from dopeiptv.media.embedded import EmbeddedPlayer
+    m = SimpleNamespace(track_list=[{"type": "sub", "id": 2, "lang": "swe"}])
+    p = SimpleNamespace(_settings=_S(volume=80))
+    p._remember_sub_lang = EmbeddedPlayer._remember_sub_lang.__get__(p)
+    _began_private("movie", 7)
+    p._remember_sub_lang(m, 2)
+    assert "sub_last_lang" not in p._settings
+    privacy.playback_started("movie", 8)
+    p._remember_sub_lang(m, 2)
+    assert p._settings["sub_last_lang"] == "swe"
+
+
+def test_events_say_what_happened_not_what_to_the_end_of_a_private_playback():
+    """Webhooks, MQTT and Home Assistant's retained state: while a playback
+    is private they say that something plays, paused or stopped - never its
+    title, channel, programme, series or source - and that holds after
+    private viewing is turned off while it still plays."""
+    from dopeiptv.core import events
+    from dopeiptv.ui.mw_events import _EventsMixin
+    sent: list = []
+
+    class Dispatcher:
+        active = True
+
+        def emit(self, event, fields=None, private=False, state=None):
+            sent.append(events.payload(event, fields, private))
+            if state is not None:
+                self.set_state(*state, private=private)
+
+        def set_state(self, state, fields=None, private=False, now=None):
+            sent.append(events.state_payload(state, fields, private))
+
+    class W(_EventsMixin):
+        _events = Dispatcher()
+        _events_favs = {"Hidden Channel": {"stream_id": 7}}
+        playlist_store = SimpleNamespace(active=lambda: {"name": "My provider"})
+        xmltv = SimpleNamespace(current_programme=lambda it: {"title": "Secret Show"})
+        _last_playback = {"kind": "movie"}
+    w = W()
+    it = {"stream_id": 7, "name": "Hidden Channel"}
+    privacy.set_private(True)
+    privacy.playback_started("live", 7)
+    w._events_started(7, "Hidden Channel", it, "live", False)
+    privacy.set_private(False)                  # mid-playback
+    w._events_private_changed(False)
+    w._events_started(7, "Hidden Channel", it, "live", False)    # a reconnect
+    w._events_paused(True)
+    w._events_paused(False)
+    w._events_publish_state()
+    # The next channel, in the open: never the private one's name as "previous".
+    privacy.playback_started("live", 9)
+    w._events_started(9, "Open Channel", {"stream_id": 9, "name": "Open Channel"}, "live", False)
+    text = json.dumps(sent)
+    assert "Hidden Channel" not in text and "My provider" in text
+    before = [m for m in sent if m.get("channel") != "Open Channel"]
+    assert before and all(m.get("private") is True for m in before)
+    assert not [m for m in before if "Secret Show" in json.dumps(m) or "source" in m]
+    assert {m.get("event") for m in before} >= {"playback_started", "playback_paused",
+                                                "playback_resumed"}
+    w._events_stopped()
