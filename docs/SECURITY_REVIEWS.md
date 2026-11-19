@@ -53,6 +53,10 @@ assessment of each. The findings, and what came of them:
 | Build chain | Downloads by "latest", actions by tag, unhashed pip installs, the update key in every build job | high | 1.6.9: SHA-256 pins, a hashed lock, actions by commit, read-only workflows, the key in one signing step |
 | Updates | A taken-over site could offer an older signed release; a file lying in the download folder | medium | 1.6.9: never older than the copy running; a file of the updater's own |
 | Player text | A station's or programme's title drawn as rich text over the picture | low | 1.6.9: plain text |
+| Stream addresses | An `av://lavfi` channel address made the player write a file of the provider's choosing; `gopher://`, `edl://`, `memory://` reached past streams (input review; proven) | critical | 1.6.9: `core/stream_address.py`, checked where every address is handed out and in both players |
+| Guide cache | The guide's index was unpickled with no restriction | high (needs local write) | 1.6.9: a restricted unpickler |
+| Pictures | A logo naming `/dev/zero` or `\\host\share` was read on sight; an SVG made Qt open files it named; no size cap | high | 1.6.9: `core/picture_files.py`, `core/svg_safe.py`, a 64 MB download cap and allocation limits |
+| Answers | An endless M3U, Xtream or API answer filled memory; deep JSON raised past the handlers | high | 1.6.9: a ceiling on every answer read whole |
 | Overall | The parts reviewed are not the whole attack surface: parsers of provider data, logins at rest, the local servers, the programs the app starts, the build chain | info | 1.6.9 (in progress): five more reviews - local servers and processes, untrusted input and secrets, supply chain and platforms, the website's services - with their findings to be added here |
 
 ## The next round

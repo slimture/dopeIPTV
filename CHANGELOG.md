@@ -118,6 +118,21 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   job that builds nothing; CI fails on a known vulnerability in a shipped
   package (`tools/audit_deps.py`). The Flatpak ships urllib3 2.8.0 and
   certifi 2026.10.23 and no longer has logind access.
+- core/stream_address.py: a channel's address from a provider or playlist
+  is checked before it is played - only network media protocols from a
+  network source, never an address that carries a filter graph, an edit
+  list or an option. An `av://lavfi` address could make the player write a
+  file of the provider's choosing (proven).
+- providers/epg.py: the guide's index on disk is read by a restricted
+  unpickler; a file planted in the cache can no longer run code.
+- core/picture_files.py, core/svg_safe.py: a row's picture is read from
+  disk only where the app's own pictures are - a logo naming `/dev/zero` or
+  a network share (a Windows login hash) is never read; an SVG logo can no
+  longer make Qt open files it names.
+- core/_lazy_requests.py, core/workers.py: pictures, playlists, lists and
+  API answers have a size ceiling far above any real one; an answer that
+  never ends fails as a request does.
+- services/notify.py: a notification shows a series' name as words.
 ## [1.6.8]
 
 ### Security
