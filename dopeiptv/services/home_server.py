@@ -72,6 +72,8 @@ K_TUNERS = "nerd_server_tuners"
 K_SOURCES = "nerd_server_sources"
 K_TOKEN = "nerd_server_token"
 K_DEVICE = "nerd_server_device_id"
+#: Channels and categories for adults handed out too (off: left out).
+K_ADULT = "nerd_server_adult"
 MAX_BODY = 64 * 1024
 #: A stream whose client reads nothing for this long is let go.
 STREAM_WRITE_TIMEOUT = 30.0
@@ -108,6 +110,9 @@ class Config:
     sources: dict[str, list[str]] = field(default_factory=dict)
     token: str = ""
     device_id: str = ""
+    #: Channels for adults in the lineup and the share (``kept_out``); off,
+    #: as a TV in a child's room has no profile or PIN.
+    adult: bool = False
 
 
 def parse_sources(raw: Any) -> dict[str, list[str]]:
@@ -131,6 +136,11 @@ def _int(value: Any, default: int, lo: int, hi: int) -> int:
     return n if lo <= n <= hi else default
 
 
+def read_flag(value: Any) -> bool:
+    """A switch as QSettings hands it back (a bool, or "true"/"false")."""
+    return value is True or str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
 def read_config(settings: Any) -> Config:
     """The server's settings; a token and a device id made the first time."""
     token = str(settings.value(K_TOKEN, "") or "").strip()
@@ -144,7 +154,7 @@ def read_config(settings: Any) -> Config:
     return Config(port=_int(settings.value(K_PORT, DEFAULT_PORT), DEFAULT_PORT, 1024, 65535),
                   tuners=_int(settings.value(K_TUNERS, 0), 0, 0, MAX_TUNERS),
                   sources=parse_sources(settings.value(K_SOURCES, "")),
-                  token=token, device_id=device)
+                  token=token, device_id=device, adult=read_flag(settings.value(K_ADULT, False)))
 
 
 def changes_from_page(body: dict, known: list[str]) -> dict[str, str]:
@@ -168,6 +178,10 @@ def changes_from_page(body: dict, known: list[str]) -> dict[str, str]:
         kept = {str(k): [str(c) for c in v][:5000] for k, v in src.items()
                 if str(k) in known and isinstance(v, list)}
         out[K_SOURCES] = json.dumps(kept, sort_keys=True) if kept else ""
+    if "adult" in body:
+        if not isinstance(body.get("adult"), bool):
+            raise ValueError('"adult" is true or false')
+        out[K_ADULT] = "true" if body["adult"] else "false"
     return out
 
 
@@ -250,6 +264,7 @@ class HomeServer:
         self._lineup_lock = threading.Lock()
         self._authed: set[str] = set()
         self._refused_names: set[str] = set()
+        self._refused_addresses: set[str] = set()
         self._refused_lock = threading.Lock()
         self.restream = Restreamer(host.pool, self.limit, self.total, others=self._others,
                                    app_session=host.app_session, ingest_for=self._ingest_for,
@@ -276,6 +291,21 @@ class HomeServer:
         log.info("server: the tuner was asked as %r, not a home network's name, and refused - "
                  "a device asks it by this computer's address or a name under %s",
                  name, ", ".join(HOME_SUFFIXES))
+        return True
+
+    def refused_address(self, address: str) -> bool:
+        """A tuner endpoint asked from an address outside this computer's own
+        home networks (``home_net.LocalNetworks``): logged once per address,
+        with how to let it in - a media server reaching the tuner over a VPN
+        or Tailscale otherwise loses it with nothing said. True when logged."""
+        who = (address or "").strip()[:64]
+        with self._refused_lock:
+            if who in self._refused_addresses or len(self._refused_addresses) >= REFUSED_NAMES_MAX:
+                return False
+            self._refused_addresses.add(who)
+        log.info("server: the tuner refused %s - not on one of this computer's own home "
+                 "networks (a VPN's, Tailscale's or a provider's shared range are not); to let "
+                 "it in, add it under Nerd > Network > Other networks", who)
         return True
 
     # -- on and off ---------------------------------------------------------------------
@@ -355,7 +385,7 @@ class HomeServer:
         _rows, cats = self.share.channels(pl)
         excluded = self.host.filters(str(pl["id"]))[0]
         return [(cid, name) for cid, name in cats.items()
-                if cid not in excluded and not adult_category(name)]
+                if cid not in excluded and (self.config.adult or not adult_category(name))]
 
     def lineup(self) -> list[LineupChannel]:
         """Every channel served, numbered: the app's own numbers where it
@@ -378,7 +408,8 @@ class HomeServer:
             for r in rows:
                 cid = str(r.get("category_id"))
                 sid = str(r.get("stream_id"))
-                if kept_out(r, cats, excluded, hidden) or (wanted and cid not in wanted):
+                if kept_out(r, cats, excluded, hidden, adult=self.config.adult) \
+                        or (wanted and cid not in wanted):
                     continue
                 own = numbers.get(sid)
                 num = str(own if own is not None else (r.get("_num_own", r.get("num")) or "")).strip()
@@ -559,7 +590,7 @@ class HomeServer:
         everything = [p for p in (self.host.sources() or []) if p.get("id") and p.get("kind") != "local"]
         served = {str(p["id"]) for p in self.served()}
         return {"port": self.port, "tuners": self.config.tuners, "auto_tuners": self.auto_tuners(),
-                "command": launch_command(),
+                "adult": self.config.adult, "command": launch_command(),
                 "sources": [{"id": str(p["id"]), "name": str(p.get("name") or p.get("server") or ""),
                              "kind": str(p.get("kind") or "xtream"), "served": str(p["id"]) in served,
                              "categories": (chosen.get(str(p["id"])) or None)} for p in everything]}
@@ -752,6 +783,7 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
                     # address still has its tuner.
                     if not server.local.allows(who, _own(self)):
                         # No token here: this computer's own networks only.
+                        server.refused_address(who)
                         self._text(403, "only this computer's own network")
                         return
                     if cross_site(self.headers):

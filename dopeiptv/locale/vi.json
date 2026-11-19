@@ -2744,7 +2744,7 @@
   "nerd_server_hint": "VLC, Kodi, ứng dụng IPTV của TV – và Plex, Jellyfin hoặc Emby, vốn nhận dopeIPTV là một bộ thu HDHomeRun – xem các nguồn của bạn qua ứng dụng này: mỗi kênh chỉ được tải một lần, tại đây, rồi chia sẻ cho mọi thiết bị đang xem. Không cần cửa sổ, điều tương tự chạy với dopeiptv --server.",
   "nerd_server_tuners_auto": "Theo tài khoản",
   "nerd_server_sources": "Nguồn được phát",
-  "nerd_server_sources_hint": "Không chọn: nguồn đang dùng. Danh mục của từng nguồn được chọn trên trang của máy chủ trong trình duyệt. Danh mục ẩn, bị khóa và người lớn không bao giờ được phát.",
+  "nerd_server_sources_hint": "Không chọn: nguồn đang dùng. Danh mục của từng nguồn được chọn trên trang của máy chủ trong trình duyệt. Danh mục ẩn và bị khóa không bao giờ được phát, danh mục người lớn chỉ khi bật Kênh người lớn.",
   "nerd_server_open": "Mở trong trình duyệt",
   "nerd_server_copy_tuner": "Sao chép địa chỉ bộ thu",
   "nerd_server_copy_m3u": "Sao chép địa chỉ danh sách phát",
@@ -3081,5 +3081,7 @@
   "cast_note_moving": "Đến {time} · đang lấy từ kho lưu trữ - mất vài giây.",
   "cast_note_to_live": "Chương trình trực tiếp đang được gửi tới TV.",
   "setting_sub_live": "Phụ đề trên TV trực tiếp",
-  "setting_sub_live_hint": "Tắt: kênh trực tiếp bắt đầu không có phụ đề, còn phim và series vẫn có. Bật trong trình phát khi bạn muốn."
+  "setting_sub_live_hint": "Tắt: kênh trực tiếp bắt đầu không có phụ đề, còn phim và series vẫn có. Bật trong trình phát khi bạn muốn.",
+  "srv_adult": "Kênh người lớn",
+  "srv_adult_hint": "Tắt: kênh và danh mục dành cho người lớn (XXX, 18+ hoặc được nhà cung cấp đánh dấu như vậy) không có trong danh sách kênh và danh sách phát được chia sẻ – TV trong phòng trẻ em không có hồ sơ hay mã PIN. Danh mục ẩn và bị khóa không bao giờ được phát."
 }

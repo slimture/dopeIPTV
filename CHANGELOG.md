@@ -51,7 +51,8 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   cross-site/same-site Sec-Fetch-Site and is answered before the lock-out,
   which never counts this computer or a web page (the phone remote's too);
   `.fritz.box` and `.ts.net` join the home suffixes, a refused name logged
-  once.
+  once, and a refused address too (`refused_address`), with the way in:
+  Nerd > Network > Other networks.
 - services/share.py: the remote API's `/playlist.m3u` and `/stream/...`
   leave out hidden, locked and adult channels through one rule with server
   mode's lineup (`kept_out`); a source whose filters cannot be read is left
@@ -75,6 +76,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Added
 
+- Server mode: Channels for adults (`nerd_server_adult`, off): on, the
+  lineup, the page's categories and the remote API's share hand out
+  channels and categories for adults too (`kept_out`'s *adult*, `Config.adult`,
+  the page's `adult`); hidden and locked ones never.
 - Send feedback and the error report window link to the privacy policy
   (`feedback_dialogs.privacy_link`).
 

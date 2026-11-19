@@ -2744,7 +2744,7 @@
   "nerd_server_hint": "VLC、Kodi、电视上的 IPTV 应用 - 以及把 dopeIPTV 识别为 HDHomeRun 调谐器的 Plex、Jellyfin 或 Emby - 通过这个应用观看你的源：每个频道只在这里获取一次，再分享给所有正在观看的设备。没有窗口时，用 dopeiptv --server 也能同样运行。",
   "nerd_server_tuners_auto": "按账户",
   "nerd_server_sources": "提供的源",
-  "nerd_server_sources_hint": "未选择：当前源。各个源的分类在浏览器中的服务器页面上选择。隐藏、锁定和成人分类永远不会提供。",
+  "nerd_server_sources_hint": "未选择：当前源。各个源的分类在浏览器中的服务器页面上选择。隐藏和锁定的分类永远不会提供，成人分类只在开启“成人频道”时提供。",
   "nerd_server_open": "在浏览器中打开",
   "nerd_server_copy_tuner": "复制调谐器地址",
   "nerd_server_copy_m3u": "复制播放列表地址",
@@ -3081,5 +3081,7 @@
   "cast_note_moving": "跳到 {time} · 正从回看中获取，需要几秒钟。",
   "cast_note_to_live": "直播正在发送到电视。",
   "setting_sub_live": "直播电视字幕",
-  "setting_sub_live_hint": "关闭：直播频道开始时不显示字幕，电影和剧集照常显示。需要时可在播放器中打开。"
+  "setting_sub_live_hint": "关闭：直播频道开始时不显示字幕，电影和剧集照常显示。需要时可在播放器中打开。",
+  "srv_adult": "成人频道",
+  "srv_adult_hint": "关闭：成人频道和分类（XXX、18+ 或提供商如此标记的）不会出现在频道列表和共享播放列表中——儿童房里的电视没有个人资料，也没有 PIN。隐藏和锁定的分类永远不会提供。"
 }

@@ -576,9 +576,11 @@ Server for the home, off by default; `dopeiptv --server` without a window,
   tuner's endpoints (Plex cannot send one - the settings say so), which
   with the UDP discovery answer only this computer's own networks and
   Nerd's other networks - not every private range (`home_net.LocalNetworks`:
-  a VPN's other customers, carrier NAT and Tailscale's 100.64/10 get 403); the
-  sources and categories chosen, never a hidden, locked or adult one nor a
-  channel hidden by hand; nothing a device watches enters history,
+  a VPN's other customers, carrier NAT and Tailscale's 100.64/10 get 403, and
+  the log names each refused address once with the way in); the sources and
+  categories chosen, never a hidden or locked one nor a channel hidden by
+  hand, and none for adults unless `nerd_server_adult` is on; nothing a
+  device watches enters history,
   statistics, Trakt or Simkl.
 
 To be seen with real devices (tested against a fake provider, fake HLS

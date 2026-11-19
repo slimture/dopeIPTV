@@ -2744,7 +2744,7 @@
   "nerd_server_hint": "VLC, Kodi, programu ya IPTV ya TV – na Plex, Jellyfin au Emby, zinazoipata dopeIPTV kama kitafutaji cha HDHomeRun – hutazama vyanzo vyako kupitia programu hii: kila chaneli huletwa mara moja, hapa, na kushirikiwa na kila kifaa kinachoitazama. Bila dirisha, hiyo hiyo huendeshwa kwa dopeiptv --server.",
   "nerd_server_tuners_auto": "Kulingana na akaunti",
   "nerd_server_sources": "Vyanzo vinavyotolewa",
-  "nerd_server_sources_hint": "Hakuna kilichochaguliwa: chanzo kinachotumika. Kategoria za kila chanzo huchaguliwa kwenye ukurasa wa seva katika kivinjari. Kategoria zilizofichwa, zilizofungwa na za watu wazima hazitolewi kamwe.",
+  "nerd_server_sources_hint": "Hakuna kilichochaguliwa: chanzo kinachotumika. Kategoria za kila chanzo huchaguliwa kwenye ukurasa wa seva katika kivinjari. Kategoria zilizofichwa na zilizofungwa hazitolewi kamwe, na za watu wazima tu wakati Chaneli za watu wazima imewashwa.",
   "nerd_server_open": "Fungua kwenye kivinjari",
   "nerd_server_copy_tuner": "Nakili anwani ya kitafutaji",
   "nerd_server_copy_m3u": "Nakili anwani ya orodha ya kucheza",
@@ -3081,5 +3081,7 @@
   "cast_note_moving": "Hadi {time} · inaletwa kutoka kwenye hifadhi - itachukua sekunde chache.",
   "cast_note_to_live": "Matangazo ya mubashara yanakuja kwenye TV.",
   "setting_sub_live": "Manukuu kwenye TV mubashara",
-  "setting_sub_live_hint": "Imezimwa: chaneli mubashara zinaanza bila manukuu, filamu na mfululizo bado zinayapata. Yawashe kwenye kicheza video unapotaka."
+  "setting_sub_live_hint": "Imezimwa: chaneli mubashara zinaanza bila manukuu, filamu na mfululizo bado zinayapata. Yawashe kwenye kicheza video unapotaka.",
+  "srv_adult": "Chaneli za watu wazima",
+  "srv_adult_hint": "Imezimwa: chaneli na kategoria za watu wazima (XXX, 18+ au zilizowekwa alama hivyo na mtoa huduma) hazijumuishwi kwenye orodha ya chaneli wala orodha ya kucheza inayoshirikiwa – TV katika chumba cha mtoto haina wasifu wala PIN. Kategoria zilizofichwa na zilizofungwa hazitolewi kamwe."
 }

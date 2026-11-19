@@ -2744,7 +2744,7 @@
   "nerd_server_hint": "VLC, Kodi, aplikacja IPTV w telewizorze – oraz Plex, Jellyfin czy Emby, które widzą dopeIPTV jako tuner HDHomeRun – oglądają twoje źródła przez tę aplikację: każdy kanał jest pobierany raz, tutaj, i dzielony między wszystkie urządzenia, które go oglądają. Bez okna to samo działa z dopeiptv --server.",
   "nerd_server_tuners_auto": "Z konta",
   "nerd_server_sources": "Udostępniane źródła",
-  "nerd_server_sources_hint": "Nic nie wybrano: aktywne źródło. Kategorie każdego źródła wybierasz na stronie serwera w przeglądarce. Ukryte, zablokowane i dla dorosłych kategorie nigdy nie są udostępniane.",
+  "nerd_server_sources_hint": "Nic nie wybrano: aktywne źródło. Kategorie każdego źródła wybierasz na stronie serwera w przeglądarce. Ukryte i zablokowane kategorie nigdy nie są udostępniane, a te dla dorosłych tylko z włączonymi Kanałami dla dorosłych.",
   "nerd_server_open": "Otwórz w przeglądarce",
   "nerd_server_copy_tuner": "Kopiuj adres tunera",
   "nerd_server_copy_m3u": "Kopiuj adres playlisty",
@@ -3081,5 +3081,7 @@
   "cast_note_moving": "Do {time} · pobierane z archiwum - to potrwa kilka sekund.",
   "cast_note_to_live": "Transmisja na żywo jest w drodze do telewizora.",
   "setting_sub_live": "Napisy w telewizji na żywo",
-  "setting_sub_live_hint": "Wyłączone: kanały na żywo startują bez napisów, filmy i seriale nadal je mają. Włącz je w odtwarzaczu, kiedy chcesz."
+  "setting_sub_live_hint": "Wyłączone: kanały na żywo startują bez napisów, filmy i seriale nadal je mają. Włącz je w odtwarzaczu, kiedy chcesz.",
+  "srv_adult": "Kanały dla dorosłych",
+  "srv_adult_hint": "Wyłączone: kanały i kategorie dla dorosłych (XXX, 18+ lub tak oznaczone przez dostawcę) nie trafiają do listy kanałów ani do udostępnianej playlisty – telewizor w pokoju dziecka nie ma profilu ani PIN-u. Ukryte i zablokowane kategorie nigdy nie są udostępniane."
 }

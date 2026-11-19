@@ -30,7 +30,7 @@ WORDS = ("srv_page_title", "srv_in_use", "srv_watching", "srv_nobody", "srv_shar
          "nerd_remote_port", "srv_port_hint", "srv_tuners", "srv_tuners_hint", "srv_sources",
          "srv_sources_hint", "srv_all_categories", "common_save", "srv_saved", "srv_start",
          "srv_start_hint", "srv_offline", "srv_no_sources", "common_loading", "srv_minutes",
-         "private_menu")
+         "private_menu", "srv_adult", "srv_adult_hint")
 _HEX = re.compile(r"#[0-9A-Fa-f]{6}")
 
 
@@ -89,6 +89,8 @@ _HTML = """<!doctype html>
         <input type="number" id="tuners" min="0" max="64" inputmode="numeric"></div>
       <div class="row col"><div class="what"><b id="lSources"></b><small id="lSourcesHint"></small></div>
         <div id="sources"></div></div>
+      <div class="row"><div class="what"><b id="lAdult"></b><small id="lAdultHint"></small></div>
+        <label class="check"><input type="checkbox" id="adult"></label></div>
       <div class="row end"><span class="note" id="savedNote" hidden></span><button class="btn primary" id="save"></button></div>
     </div>
   </section>
@@ -235,7 +237,7 @@ function drawCats(src, wrap) {
 
 function showSettings(s) {
   settings = s;
-  $("port").value = s.port; $("tuners").value = s.tuners;
+  $("port").value = s.port; $("tuners").value = s.tuners; $("adult").checked = !!s.adult;
   $("lTunersHint").textContent = W.srv_tuners_hint;
   $("cmd").textContent = s.command;
   const box = $("sources");
@@ -258,7 +260,8 @@ function showSettings(s) {
 async function save() {
   const sources = {};
   for (const src of settings.sources) if (src.served) sources[src.id] = src.categories || [];
-  const body = {port: Number($("port").value), tuners: Number($("tuners").value), sources: sources};
+  const body = {port: Number($("port").value), tuners: Number($("tuners").value), sources: sources,
+                adult: $("adult").checked};
   try {
     const r = await api("api/settings", body);
     $("savedNote").textContent = W.srv_saved; $("savedNote").hidden = false;
@@ -283,7 +286,8 @@ function init() {
   $("lPlaylist").textContent = W.srv_addr_playlist; $("lGuide").textContent = W.srv_addr_guide;
   $("lPort").textContent = W.nerd_remote_port; $("lPortHint").textContent = W.srv_port_hint;
   $("lTuners").textContent = W.srv_tuners; $("lSources").textContent = W.srv_sources;
-  $("lSourcesHint").textContent = W.srv_sources_hint; $("lStartHint").textContent = W.srv_start_hint;
+  $("lSourcesHint").textContent = W.srv_sources_hint;
+  $("lAdult").textContent = W.srv_adult; $("lAdultHint").textContent = W.srv_adult_hint; $("lStartHint").textContent = W.srv_start_hint;
   $("save").textContent = W.common_save; $("usage").textContent = W.common_loading;
   for (const b of document.querySelectorAll("[data-copy]")) {
     b.textContent = W.problem_copy;

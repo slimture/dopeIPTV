@@ -2744,7 +2744,7 @@
   "nerd_server_hint": "VLC, Kodi, o app de IPTV de uma TV – e Plex, Jellyfin ou Emby, que encontram o dopeIPTV como um sintonizador HDHomeRun – assistem às suas fontes por este app: cada canal é buscado uma vez, aqui, e compartilhado por todos os aparelhos que o assistem. Sem janela, o mesmo roda com dopeiptv --server.",
   "nerd_server_tuners_auto": "Pela conta",
   "nerd_server_sources": "Fontes servidas",
-  "nerd_server_sources_hint": "Nenhuma escolhida: a fonte ativa. As categorias de cada uma são escolhidas na página do servidor em um navegador. Categorias ocultas, bloqueadas e adultas nunca são servidas.",
+  "nerd_server_sources_hint": "Nenhuma escolhida: a fonte ativa. As categorias de cada uma são escolhidas na página do servidor em um navegador. Categorias ocultas e bloqueadas nunca são servidas; as adultas, só com Canais adultos ligado.",
   "nerd_server_open": "Abrir no navegador",
   "nerd_server_copy_tuner": "Copiar o endereço do sintonizador",
   "nerd_server_copy_m3u": "Copiar o endereço da playlist",
@@ -3081,5 +3081,7 @@
   "cast_note_moving": "Para {time} · buscando no arquivo - leva alguns segundos.",
   "cast_note_to_live": "A transmissão ao vivo está a caminho da TV.",
   "setting_sub_live": "Legendas na TV ao vivo",
-  "setting_sub_live_hint": "Desligado: os canais ao vivo começam sem legendas; filmes e séries continuam com elas. Ative-as no player quando quiser."
+  "setting_sub_live_hint": "Desligado: os canais ao vivo começam sem legendas; filmes e séries continuam com elas. Ative-as no player quando quiser.",
+  "srv_adult": "Canais adultos",
+  "srv_adult_hint": "Desligado: canais e categorias adultos (XXX, 18+ ou marcados assim pelo provedor) ficam fora da lista de canais e da playlist compartilhada – uma TV no quarto de uma criança não tem perfil nem PIN. Categorias ocultas e bloqueadas nunca são servidas."
 }

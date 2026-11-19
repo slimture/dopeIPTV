@@ -43,15 +43,18 @@ def _attr(value: Any) -> str:
 Filters = Callable[[str], tuple[set[str], set[str], Any]]
 
 
-def kept_out(row: dict, cats: dict[str, str], excluded: set[str], hidden: set[str]) -> bool:
+def kept_out(row: dict, cats: dict[str, str], excluded: set[str], hidden: set[str],
+             adult: bool = False) -> bool:
     """Whether a channel is never handed to another device - server mode's
     lineup and the remote API's share alike: in a hidden or locked category
     (*excluded*: a locked one even while it is unlocked here), hidden by hand
-    (*hidden*), or for adults (marked so, or in an adult category)."""
+    (*hidden*), or for adults (marked so, or in an adult category) unless
+    server mode's setting lets those out (*adult*, ``nerd_server_adult``)."""
     from ..core.profiles import adult_category, adult_item
     cid = str(row.get("category_id"))
-    return (cid in excluded or str(row.get("stream_id")) in hidden or adult_item(row)
-            or adult_category(cats.get(cid, "")))
+    if cid in excluded or str(row.get("stream_id")) in hidden:
+        return True
+    return not adult and (adult_item(row) or adult_category(cats.get(cid, "")))
 
 
 class Share:
@@ -60,8 +63,11 @@ class Share:
     def __init__(self, sources: Callable[[], list[dict]],
                  make_client: Callable[[dict], Any] | None = None,
                  guide_path: Callable[[str], str] | None = None,
-                 ttl: float = LIST_TTL, filters: Filters | None = None) -> None:
+                 ttl: float = LIST_TTL, filters: Filters | None = None,
+                 adult: Callable[[], bool] | None = None) -> None:
         self._sources = sources
+        #: Server mode's "Channels for adults" (``kept_out``'s *adult*).
+        self._adult = adult
         self._make = make_client
         self._guide_path = guide_path
         self._filters = filters
@@ -119,7 +125,12 @@ class Share:
         if self._filters is None:
             return rows, cats
         excluded, hidden, _numbers = self._filters(str(pl["id"]))
-        return [r for r in rows if not kept_out(r, cats, excluded, hidden)], cats
+        try:
+            adult = bool(self._adult()) if self._adult is not None else False
+        except Exception as e:                      # unread: the safe side, off
+            log.debug("share: the adult switch not read (%s)", e)
+            adult = False
+        return [r for r in rows if not kept_out(r, cats, excluded, hidden, adult)], cats
 
     # -- the playlist ------------------------------------------------------------
     def m3u(self, base: str, token: str) -> str:

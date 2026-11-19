@@ -13,8 +13,8 @@
 
 - **Your settings files are yours alone** on Linux and macOS: they hold every login and token, and another account on the computer could read them.
 - **A second start** hands its command to the copy running over a channel no other account on the computer can take over.
-- **Server mode's tuner** answers only your home's own networks - a VPN's tunnel, a public network or a provider's shared address range no longer count - and a web page in your browser can neither drive it nor shut anyone out; the same for the phone remote. The tuner also answers under a Fritz!Box name (`.fritz.box`) or a Tailscale name (`.ts.net`), and the log says why a name is refused.
-- **Sharing over the remote API** leaves out hidden, locked and adult channels, as server mode always did.
+- **Server mode's tuner** answers only your home's own networks - a VPN's tunnel, a public network or a provider's shared address range no longer count - and a web page in your browser can neither drive it nor shut anyone out; the same for the phone remote. **If Plex or Jellyfin reaches the tuner through a VPN or Tailscale,** add its address under Nerd > Network > Other networks; the log names every address it refuses. The tuner also answers under a Fritz!Box name (`.fritz.box`) or a Tailscale name (`.ts.net`), and the log says why a name is refused.
+- **Sharing over the remote API** leaves out hidden and locked channels, as server mode always did.
 - **An address from outside** - a `dopeiptv://` link, `--play`, Open address…, the remote API - is never played or cast with your source's own headers, user agent, proxy or route, unless it is on that source's server.
 - **Programme guides:** a guide built to swell in memory is refused wherever it hides it, and a download or its unpacking stops at 2 GB.
 - **Updates on the Releases channel** never install a test build.
@@ -23,6 +23,7 @@
 
 ### New
 
+- **Channels for adults in server mode** (Settings > Nerd > Remote and automation, and the server's page): off, as before, they stay out of the lineup and the shared playlist; on, they go out too. Hidden and locked categories never do.
 - **Send feedback and error reports** link to the privacy policy, and dopeiptv.org has a new page, **Privacy, behind the scenes**: each privacy promise with the code that keeps it, an example made by that code, and a way to ask any AI to check it.
 
 ### Changed

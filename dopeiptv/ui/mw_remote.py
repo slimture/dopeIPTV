@@ -110,7 +110,8 @@ class _RemoteMixin:
         bridge = self._remote_bridge
         # What server mode's lineup leaves out the share leaves out too.
         share = Share(lambda: bridge.call("_sources_full", {}),
-                      filters=lambda pid: bridge.call("_share_filters", {"pid": pid})) \
+                      filters=lambda pid: bridge.call("_share_filters", {"pid": pid}),
+                      adult=lambda: bool(bridge.call("_share_adult", {}))) \
             if cfg["share"] else None
         srv = RemoteServer(cfg["host"], cfg["port"], cfg["token"], self._remote_call,
                            share=share, remote=cfg["remote"],
@@ -178,6 +179,9 @@ class _RemoteMixin:
             return [dict(p) for p in store.playlists()] if store is not None else []
         if action == "_share_filters":
             return self._server_filters(str(params.get("pid") or ""))
+        if action == "_share_adult":
+            from ..services import home_server as hs
+            return hs.read_flag(self.settings.value(hs.K_ADULT, False))
         if action == "sources":
             store = getattr(self, "playlist_store", None)
             active = store.active_id if store is not None else None

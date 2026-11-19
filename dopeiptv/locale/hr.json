@@ -2744,7 +2744,7 @@
   "nerd_server_hint": "VLC, Kodi, IPTV aplikacija televizora – i Plex, Jellyfin ili Emby, koji dopeIPTV pronalaze kao HDHomeRun tuner – gledaju tvoje izvore kroz ovu aplikaciju: svaki se kanal dohvaća jednom, ovdje, i dijeli sa svim uređajima koji ga gledaju. Bez prozora isto radi s dopeiptv --server.",
   "nerd_server_tuners_auto": "Prema računu",
   "nerd_server_sources": "Izvori koji se dijele",
-  "nerd_server_sources_hint": "Ništa odabrano: aktivni izvor. Kategorije svakog izvora biraš na stranici poslužitelja u pregledniku. Skrivene, zaključane i kategorije za odrasle nikad se ne dijele.",
+  "nerd_server_sources_hint": "Ništa odabrano: aktivni izvor. Kategorije svakog izvora biraš na stranici poslužitelja u pregledniku. Skrivene i zaključane kategorije nikad se ne dijele, one za odrasle samo kad su uključeni Kanali za odrasle.",
   "nerd_server_open": "Otvori u pregledniku",
   "nerd_server_copy_tuner": "Kopiraj adresu tunera",
   "nerd_server_copy_m3u": "Kopiraj adresu popisa",
@@ -3081,5 +3081,7 @@
   "cast_note_moving": "Na {time} · dohvaća se iz arhive - potrajat će nekoliko sekundi.",
   "cast_note_to_live": "Prijenos uživo stiže na televizor.",
   "setting_sub_live": "Titlovi na TV-u uživo",
-  "setting_sub_live_hint": "Isključeno: kanali uživo počinju bez titlova, filmovi i serije ih i dalje imaju. Uključite ih u playeru kad želite."
+  "setting_sub_live_hint": "Isključeno: kanali uživo počinju bez titlova, filmovi i serije ih i dalje imaju. Uključite ih u playeru kad želite.",
+  "srv_adult": "Kanali za odrasle",
+  "srv_adult_hint": "Isključeno: kanali i kategorije za odrasle (XXX, 18+ ili tako označeni kod pružatelja) ostaju izvan popisa kanala i dijeljene playliste – televizor u dječjoj sobi nema profil ni PIN. Skrivene i zaključane kategorije nikad se ne dijele."
 }

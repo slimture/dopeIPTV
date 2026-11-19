@@ -2744,7 +2744,7 @@
   "nerd_server_hint": "VLC, Kodi, IPTV aplikacija televizora – i Plex, Jellyfin ili Emby, koji dopeIPTV vide kao HDHomeRun tjuner – gledaju tvoje izvore preko ove aplikacije: svaki kanal se preuzima jednom, ovde, i deli sa svim uređajima koji ga gledaju. Bez prozora isto radi sa dopeiptv --server.",
   "nerd_server_tuners_auto": "Prema nalogu",
   "nerd_server_sources": "Izvori koji se dele",
-  "nerd_server_sources_hint": "Ništa izabrano: aktivni izvor. Kategorije svakog izvora biraš na stranici servera u pregledaču. Skrivene, zaključane i kategorije za odrasle nikad se ne dele.",
+  "nerd_server_sources_hint": "Ništa izabrano: aktivni izvor. Kategorije svakog izvora biraš na stranici servera u pregledaču. Skrivene i zaključane kategorije nikad se ne dele, one za odrasle samo kad su uključeni Kanali za odrasle.",
   "nerd_server_open": "Otvori u pregledaču",
   "nerd_server_copy_tuner": "Kopiraj adresu tjunera",
   "nerd_server_copy_m3u": "Kopiraj adresu plejliste",
@@ -3081,5 +3081,7 @@
   "cast_note_moving": "Na {time} · preuzima se iz arhive - potrajaće nekoliko sekundi.",
   "cast_note_to_live": "Prenos uživo stiže na televizor.",
   "setting_sub_live": "Titlovi na TV uživo",
-  "setting_sub_live_hint": "Isključeno: kanali uživo počinju bez titlova, filmovi i serije ih i dalje imaju. Uključite ih u plejeru kad želite."
+  "setting_sub_live_hint": "Isključeno: kanali uživo počinju bez titlova, filmovi i serije ih i dalje imaju. Uključite ih u plejeru kad želite.",
+  "srv_adult": "Kanali za odrasle",
+  "srv_adult_hint": "Isključeno: kanali i kategorije za odrasle (XXX, 18+ ili tako označeni kod provajdera) ostaju van liste kanala i deljene plejliste – televizor u dečjoj sobi nema profil ni PIN. Skrivene i zaključane kategorije nikad se ne dele."
 }

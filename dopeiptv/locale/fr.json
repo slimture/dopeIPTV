@@ -2744,7 +2744,7 @@
   "nerd_server_hint": "VLC, Kodi, l'appli IPTV d'une TV – et Plex, Jellyfin ou Emby, qui trouvent dopeIPTV comme un tuner HDHomeRun – regardent tes sources à travers cette appli : chaque chaîne est récupérée une seule fois, ici, et partagée par tous les appareils qui la regardent. Sans fenêtre, la même chose tourne avec dopeiptv --server.",
   "nerd_server_tuners_auto": "Selon le compte",
   "nerd_server_sources": "Sources diffusées",
-  "nerd_server_sources_hint": "Aucune choisie : la source active. Les catégories de chacune se choisissent sur la page du serveur dans un navigateur. Les catégories masquées, verrouillées et pour adultes ne sont jamais diffusées.",
+  "nerd_server_sources_hint": "Aucune choisie : la source active. Les catégories de chacune se choisissent sur la page du serveur dans un navigateur. Les catégories masquées et verrouillées ne sont jamais diffusées, celles pour adultes seulement avec Chaînes pour adultes activé.",
   "nerd_server_open": "Ouvrir dans le navigateur",
   "nerd_server_copy_tuner": "Copier l'adresse du tuner",
   "nerd_server_copy_m3u": "Copier l'adresse de la playlist",
@@ -3081,5 +3081,7 @@
   "cast_note_moving": "À {time} · récupéré dans les archives - cela prend quelques secondes.",
   "cast_note_to_live": "Le direct arrive sur la télé.",
   "setting_sub_live": "Sous-titres en TV en direct",
-  "setting_sub_live_hint": "Désactivé : les chaînes en direct démarrent sans sous-titres, les films et séries les gardent. Activez-les dans le lecteur quand vous voulez."
+  "setting_sub_live_hint": "Désactivé : les chaînes en direct démarrent sans sous-titres, les films et séries les gardent. Activez-les dans le lecteur quand vous voulez.",
+  "srv_adult": "Chaînes pour adultes",
+  "srv_adult_hint": "Désactivé : les chaînes et catégories pour adultes (XXX, 18+ ou signalées ainsi par le fournisseur) restent hors de la liste des chaînes et de la playlist partagée – une télé dans une chambre d'enfant n'a ni profil ni code PIN. Les catégories masquées et verrouillées ne sont jamais diffusées."
 }

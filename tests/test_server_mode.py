@@ -1251,3 +1251,101 @@ def test_private_viewing_never_names_the_person_s_channel(server):
         privacy.set_private(False)
         logger.removeHandler(keep)
         logger.setLevel(level)
+
+
+# -- channels for adults: out unless the person lets them out ---------------------------------
+
+def test_channels_for_adults_go_out_only_when_the_person_lets_them(server):
+    """Off by default (a TV in a child's room has no profile or PIN); on,
+    the adult category and the channel the provider marks join the lineup
+    and the page's categories - a hidden or locked one never does."""
+    from dataclasses import replace
+    srv = server[0]
+    assert srv.config.adult is False
+    assert {c.name for c in srv.lineup()} == {"One", "Two", "Three"}
+    srv.refresh(replace(srv.config, adult=True))
+    assert {c.name for c in srv.lineup()} == {"One", "Two", "Three", "Night", "Marked"}
+    cats = json.loads(_get(srv, "/api/categories?source=p1", {"X-Dopeiptv-Token": TOKEN}).read())
+    assert [c["name"] for c in cats["categories"]] == ["News", "XXX Adult"]
+    view = json.loads(_get(srv, "/api/settings", {"X-Dopeiptv-Token": TOKEN}).read())
+    assert view["adult"] is True
+
+
+def test_the_adult_switch_is_read_stored_and_checked():
+    class Settings:
+        def __init__(self, values):
+            self.values = values
+
+        def value(self, key, default=None):
+            return self.values.get(key, default)
+
+        def setValue(self, key, value):
+            self.values[key] = value
+
+    assert hs.read_config(Settings({})).adult is False
+    assert hs.read_config(Settings({hs.K_ADULT: "true"})).adult is True
+    assert hs.read_config(Settings({hs.K_ADULT: True})).adult is True
+    assert hs.read_config(Settings({hs.K_ADULT: "false"})).adult is False
+    assert hs.changes_from_page({"adult": True}, ["p1"]) == {hs.K_ADULT: "true"}
+    assert hs.changes_from_page({"adult": False}, ["p1"]) == {hs.K_ADULT: "false"}
+    with pytest.raises(ValueError):
+        hs.changes_from_page({"adult": "yes"}, ["p1"])
+    page, _csp = server_page.render({"bg": "#101010"}, {"bg": "#ffffff"},
+                                    {"srv_adult": "Channels for adults"})
+    assert b'id="adult"' in page and b"Channels for adults" in page
+
+
+def test_the_share_hands_out_adult_channels_only_when_let():
+    from dopeiptv.services.share import Share, kept_out
+    cats = {"1": "News", "3": "XXX Adult", "4": "Locked"}
+    news = {"stream_id": 1, "category_id": "1"}
+    night = {"stream_id": 5, "category_id": "3"}
+    marked = {"stream_id": 7, "category_id": "1", "is_adult": "1"}
+    locked = {"stream_id": 6, "category_id": "4"}
+    by_hand = {"stream_id": 8, "category_id": "1"}
+    for adult in (False, True):
+        assert not kept_out(news, cats, {"4"}, {"8"}, adult)
+        assert kept_out(locked, cats, {"4"}, {"8"}, adult), "locked never goes out"
+        assert kept_out(by_hand, cats, {"4"}, {"8"}, adult), "hidden by hand never goes out"
+        assert kept_out(night, cats, {"4"}, {"8"}, adult) is not adult
+        assert kept_out(marked, cats, {"4"}, {"8"}, adult) is not adult
+
+    let_out = [False]
+    share = Share(lambda: [{"id": "p1", "kind": "xtream"}], filters=lambda _pid: ({"4"}, {"8"}, {}),
+                  adult=lambda: let_out[0])
+    share.channels = lambda _pl: ([news, night, marked, locked, by_hand], cats)  # type: ignore[method-assign]
+    pl = {"id": "p1"}
+    assert [r["stream_id"] for r in share.handed_out(pl)[0]] == [1]
+    let_out[0] = True
+    assert [r["stream_id"] for r in share.handed_out(pl)[0]] == [1, 5, 7]
+
+
+def test_an_address_the_tuner_refuses_is_said_once_with_the_way_in(server, monkeypatch):
+    """A media server reaching the tuner over a VPN or Tailscale is refused;
+    the log says so once per address, with where to let it in."""
+    srv = server[0]
+    said: list[str] = []
+
+    class Elsewhere:
+        def allows(self, _address, _own=""):
+            return False
+
+    class Log:
+        def info(self, msg, *args):
+            said.append(msg % args)
+
+        def __getattr__(self, _name):
+            return lambda *a, **k: None
+
+    monkeypatch.setattr(srv, "local", Elsewhere())
+    monkeypatch.setattr(hs, "log", Log())
+    for path in ("/discover.json", "/lineup.json"):
+        with pytest.raises(urllib.error.HTTPError) as e:
+            _get(srv, path)
+        assert e.value.code == 403
+    refused = [s for s in said if "the tuner refused" in s]
+    assert len(refused) == 1, said
+    assert "127.0.0.1" in refused[0] and "Nerd > Network > Other networks" in refused[0]
+    for i in range(hs.REFUSED_NAMES_MAX + 5):
+        srv.refused_address(f"10.9.0.{i}")
+    assert len(srv._refused_addresses) == hs.REFUSED_NAMES_MAX, "a flood of addresses stays small"

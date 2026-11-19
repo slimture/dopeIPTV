@@ -2744,7 +2744,7 @@
   "nerd_server_hint": "VLC, Kodi, de IPTV-app van een tv – en Plex, Jellyfin of Emby, die dopeIPTV vinden als HDHomeRun-tuner – kijken via deze app naar je bronnen: elke zender wordt één keer opgehaald, hier, en gedeeld met elk apparaat dat ernaar kijkt. Zonder venster draait hetzelfde met dopeiptv --server.",
   "nerd_server_tuners_auto": "Van het account",
   "nerd_server_sources": "Gedeelde bronnen",
-  "nerd_server_sources_hint": "Niets gekozen: de actieve bron. De categorieën van elke bron kies je op de pagina van de server in een browser. Verborgen, vergrendelde en volwassenencategorieën worden nooit gedeeld.",
+  "nerd_server_sources_hint": "Niets gekozen: de actieve bron. De categorieën van elke bron kies je op de pagina van de server in een browser. Verborgen en vergrendelde categorieën worden nooit gedeeld, die voor volwassenen alleen met Kanalen voor volwassenen aan.",
   "nerd_server_open": "Openen in de browser",
   "nerd_server_copy_tuner": "Adres van de tuner kopiëren",
   "nerd_server_copy_m3u": "Adres van de afspeellijst kopiëren",
@@ -3081,5 +3081,7 @@
   "cast_note_moving": "Naar {time} · wordt uit het archief gehaald - dat duurt een paar seconden.",
   "cast_note_to_live": "De live-uitzending is onderweg naar de tv.",
   "setting_sub_live": "Ondertitels bij live-tv",
-  "setting_sub_live_hint": "Uit: live zenders starten zonder ondertitels, films en series krijgen ze nog steeds. Zet ze aan in de speler wanneer je wilt."
+  "setting_sub_live_hint": "Uit: live zenders starten zonder ondertitels, films en series krijgen ze nog steeds. Zet ze aan in de speler wanneer je wilt.",
+  "srv_adult": "Kanalen voor volwassenen",
+  "srv_adult_hint": "Uit: kanalen en categorieën voor volwassenen (XXX, 18+ of zo gemarkeerd door de aanbieder) blijven buiten de zenderlijst en de gedeelde playlist – een tv in een kinderkamer heeft geen profiel of pincode. Verborgen en vergrendelde categorieën worden nooit gedeeld."
 }

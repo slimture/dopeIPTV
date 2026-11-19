@@ -2744,7 +2744,7 @@
   "nerd_server_hint": "VLC, Kodi, bir televizyonun IPTV uygulaması – ve dopeIPTV'yi bir HDHomeRun alıcısı olarak bulan Plex, Jellyfin veya Emby – kaynaklarını bu uygulama üzerinden izler: her kanal burada bir kez alınır ve onu izleyen tüm cihazlarla paylaşılır. Pencere olmadan aynısı dopeiptv --server ile çalışır.",
   "nerd_server_tuners_auto": "Hesaba göre",
   "nerd_server_sources": "Sunulan kaynaklar",
-  "nerd_server_sources_hint": "Hiçbiri seçilmedi: etkin kaynak. Her birinin kategorileri, sunucunun tarayıcıdaki sayfasında seçilir. Gizli, kilitli ve yetişkin kategorileri asla sunulmaz.",
+  "nerd_server_sources_hint": "Hiçbiri seçilmedi: etkin kaynak. Her birinin kategorileri, sunucunun tarayıcıdaki sayfasında seçilir. Gizli ve kilitli kategoriler asla sunulmaz, yetişkin kategorileri yalnızca Yetişkin kanalları açıkken sunulur.",
   "nerd_server_open": "Tarayıcıda aç",
   "nerd_server_copy_tuner": "Alıcının adresini kopyala",
   "nerd_server_copy_m3u": "Oynatma listesinin adresini kopyala",
@@ -3081,5 +3081,7 @@
   "cast_note_moving": "{time} · arşivden alınıyor - birkaç saniye sürer.",
   "cast_note_to_live": "Canlı yayın televizyona geliyor.",
   "setting_sub_live": "Canlı TV'de altyazılar",
-  "setting_sub_live_hint": "Kapalı: canlı kanallar altyazısız başlar, filmler ve diziler yine altyazılı olur. İstediğinizde oynatıcıdan açabilirsiniz."
+  "setting_sub_live_hint": "Kapalı: canlı kanallar altyazısız başlar, filmler ve diziler yine altyazılı olur. İstediğinizde oynatıcıdan açabilirsiniz.",
+  "srv_adult": "Yetişkin kanalları",
+  "srv_adult_hint": "Kapalı: yetişkinlere yönelik kanallar ve kategoriler (XXX, 18+ veya sağlayıcının böyle işaretledikleri) kanal listesine ve paylaşılan oynatma listesine girmez – bir çocuk odasındaki televizyonun profili ya da PIN'i yoktur. Gizli ve kilitli kategoriler asla sunulmaz."
 }

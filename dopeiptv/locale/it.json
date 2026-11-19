@@ -2744,7 +2744,7 @@
   "nerd_server_hint": "VLC, Kodi, l'app IPTV di una TV – e Plex, Jellyfin o Emby, che trovano dopeIPTV come sintonizzatore HDHomeRun – guardano le tue sorgenti attraverso questa app: ogni canale viene preso una sola volta, qui, e condiviso da tutti i dispositivi che lo guardano. Senza finestra, la stessa cosa gira con dopeiptv --server.",
   "nerd_server_tuners_auto": "Dall'account",
   "nerd_server_sources": "Sorgenti offerte",
-  "nerd_server_sources_hint": "Nessuna scelta: la sorgente attiva. Le categorie di ognuna si scelgono nella pagina del server in un browser. Le categorie nascoste, bloccate e per adulti non vengono mai offerte.",
+  "nerd_server_sources_hint": "Nessuna scelta: la sorgente attiva. Le categorie di ognuna si scelgono nella pagina del server in un browser. Le categorie nascoste e bloccate non vengono mai offerte, quelle per adulti solo con Canali per adulti attivo.",
   "nerd_server_open": "Apri nel browser",
   "nerd_server_copy_tuner": "Copia l'indirizzo del sintonizzatore",
   "nerd_server_copy_m3u": "Copia l'indirizzo della playlist",
@@ -3081,5 +3081,7 @@
   "cast_note_moving": "Alle {time} · preso dall'archivio, ci vuole qualche secondo.",
   "cast_note_to_live": "La diretta sta arrivando alla TV.",
   "setting_sub_live": "Sottotitoli nella TV in diretta",
-  "setting_sub_live_hint": "Disattivato: i canali in diretta partono senza sottotitoli, film e serie continuano ad averli. Attivali nel lettore quando vuoi."
+  "setting_sub_live_hint": "Disattivato: i canali in diretta partono senza sottotitoli, film e serie continuano ad averli. Attivali nel lettore quando vuoi.",
+  "srv_adult": "Canali per adulti",
+  "srv_adult_hint": "Disattivato: i canali e le categorie per adulti (XXX, 18+ o segnalati così dal fornitore) restano fuori dall'elenco dei canali e dalla playlist condivisa: una TV nella cameretta di un bambino non ha profilo né PIN. Le categorie nascoste e bloccate non vengono mai offerte."
 }

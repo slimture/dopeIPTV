@@ -2744,7 +2744,7 @@
   "nerd_server_hint": "VLC, Kodi, die IPTV-App eines Fernsehers – und Plex, Jellyfin oder Emby, die dopeIPTV als HDHomeRun-Tuner finden – schauen deine Quellen über diese App: Jeder Sender wird einmal hier abgerufen und mit allen Geräten geteilt, die ihn schauen. Ohne Fenster läuft dasselbe mit dopeiptv --server.",
   "nerd_server_tuners_auto": "Vom Konto",
   "nerd_server_sources": "Bereitgestellte Quellen",
-  "nerd_server_sources_hint": "Keine gewählt: die aktive Quelle. Die Kategorien jeder Quelle wählst du auf der Seite des Servers im Browser. Ausgeblendete, gesperrte und Erwachsenen-Kategorien werden nie bereitgestellt.",
+  "nerd_server_sources_hint": "Keine gewählt: die aktive Quelle. Die Kategorien jeder Quelle wählst du auf der Seite des Servers im Browser. Ausgeblendete und gesperrte Kategorien werden nie bereitgestellt, Erwachsenen-Kategorien nur mit eingeschalteten „Kanälen für Erwachsene“.",
   "nerd_server_open": "Im Browser öffnen",
   "nerd_server_copy_tuner": "Adresse des Tuners kopieren",
   "nerd_server_copy_m3u": "Adresse der Playlist kopieren",
@@ -3081,5 +3081,7 @@
   "cast_note_moving": "Zu {time} · wird aus dem Archiv geholt - das dauert ein paar Sekunden.",
   "cast_note_to_live": "Die Live-Sendung ist auf dem Weg zum Fernseher.",
   "setting_sub_live": "Untertitel bei Live-TV",
-  "setting_sub_live_hint": "Aus: Live-Sender starten ohne Untertitel, Filme und Serien bekommen sie weiterhin. Im Player kannst du sie jederzeit einschalten."
+  "setting_sub_live_hint": "Aus: Live-Sender starten ohne Untertitel, Filme und Serien bekommen sie weiterhin. Im Player kannst du sie jederzeit einschalten.",
+  "srv_adult": "Kanäle für Erwachsene",
+  "srv_adult_hint": "Aus: Kanäle und Kategorien für Erwachsene (XXX, 18+ oder vom Anbieter so markiert) bleiben aus der Senderliste und der geteilten Playlist heraus – ein Fernseher im Kinderzimmer hat kein Profil und keine PIN. Ausgeblendete und gesperrte Kategorien werden nie bereitgestellt."
 }

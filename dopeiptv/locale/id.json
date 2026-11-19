@@ -2744,7 +2744,7 @@
   "nerd_server_hint": "VLC, Kodi, aplikasi IPTV di TV – dan Plex, Jellyfin, atau Emby, yang menemukan dopeIPTV sebagai tuner HDHomeRun – menonton sumbermu lewat aplikasi ini: setiap saluran diambil sekali, di sini, dan dibagikan ke setiap perangkat yang menontonnya. Tanpa jendela, hal yang sama berjalan dengan dopeiptv --server.",
   "nerd_server_tuners_auto": "Dari akun",
   "nerd_server_sources": "Sumber yang disajikan",
-  "nerd_server_sources_hint": "Tidak ada yang dipilih: sumber aktif. Kategori tiap sumber dipilih di halaman server di browser. Kategori tersembunyi, terkunci, dan dewasa tidak pernah disajikan.",
+  "nerd_server_sources_hint": "Tidak ada yang dipilih: sumber aktif. Kategori tiap sumber dipilih di halaman server di browser. Kategori tersembunyi dan terkunci tidak pernah disajikan, kategori dewasa hanya jika Saluran dewasa aktif.",
   "nerd_server_open": "Buka di browser",
   "nerd_server_copy_tuner": "Salin alamat tuner",
   "nerd_server_copy_m3u": "Salin alamat playlist",
@@ -3081,5 +3081,7 @@
   "cast_note_moving": "Ke {time} · diambil dari arsip - butuh beberapa detik.",
   "cast_note_to_live": "Siaran langsung sedang dikirim ke TV.",
   "setting_sub_live": "Subtitle di TV langsung",
-  "setting_sub_live_hint": "Mati: saluran langsung dimulai tanpa subtitle, sedangkan film dan serial tetap memakainya. Nyalakan di pemutar kapan saja."
+  "setting_sub_live_hint": "Mati: saluran langsung dimulai tanpa subtitle, sedangkan film dan serial tetap memakainya. Nyalakan di pemutar kapan saja.",
+  "srv_adult": "Saluran dewasa",
+  "srv_adult_hint": "Mati: saluran dan kategori dewasa (XXX, 18+, atau ditandai begitu oleh penyedia) tidak masuk ke daftar saluran dan playlist bersama – TV di kamar anak tidak punya profil atau PIN. Kategori tersembunyi dan terkunci tidak pernah disajikan."
 }

@@ -77,6 +77,7 @@
           <li>Reset all settings removes everything the app keeps, from saved pictures and guides to its log files; recordings stay</li>
           <li>Posters no longer blink when a better picture arrives</li>
           <li>The settings files are readable by your own account only, and server mode's tuner answers only your home's own networks</li>
+          <li>Server mode can hand out channels for adults too, when you turn it on</li>
           <li>Addresses opened from outside are never played with a source's own headers, and test builds never install on the Releases channel</li>
           <li>Send feedback links to the privacy policy, and dopeiptv.org shows the code behind each privacy promise</li>
         </ul>

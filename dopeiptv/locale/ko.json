@@ -2744,7 +2744,7 @@
   "nerd_server_hint": "VLC, Kodi, TV의 IPTV 앱, 그리고 dopeIPTV를 HDHomeRun 튜너로 찾는 Plex, Jellyfin, Emby가 이 앱을 통해 내 소스를 시청해요. 각 채널은 여기서 한 번만 가져와 시청 중인 모든 기기가 함께 써요. 창 없이 실행하려면 dopeiptv --server를 쓰면 돼요.",
   "nerd_server_tuners_auto": "계정에 따름",
   "nerd_server_sources": "제공하는 소스",
-  "nerd_server_sources_hint": "선택 안 함: 활성 소스. 소스별 카테고리는 브라우저의 서버 페이지에서 골라요. 숨김, 잠금, 성인 카테고리는 절대 제공하지 않아요.",
+  "nerd_server_sources_hint": "선택 안 함: 활성 소스. 소스별 카테고리는 브라우저의 서버 페이지에서 골라요. 숨김, 잠금 카테고리는 절대 제공하지 않고, 성인 카테고리는 성인 채널을 켰을 때만 제공해요.",
   "nerd_server_open": "브라우저에서 열기",
   "nerd_server_copy_tuner": "튜너 주소 복사",
   "nerd_server_copy_m3u": "재생 목록 주소 복사",
@@ -3081,5 +3081,7 @@
   "cast_note_moving": "{time}(으)로 · 보관 영상에서 가져오는 중이며 몇 초 걸립니다.",
   "cast_note_to_live": "실시간 방송을 TV로 보내는 중입니다.",
   "setting_sub_live": "실시간 TV 자막",
-  "setting_sub_live_hint": "끔: 실시간 채널은 자막 없이 시작되고, 영화와 시리즈에는 계속 자막이 나옵니다. 원할 때 플레이어에서 켤 수 있습니다."
+  "setting_sub_live_hint": "끔: 실시간 채널은 자막 없이 시작되고, 영화와 시리즈에는 계속 자막이 나옵니다. 원할 때 플레이어에서 켤 수 있습니다.",
+  "srv_adult": "성인 채널",
+  "srv_adult_hint": "끄면 성인용 채널과 카테고리(XXX, 18+ 또는 제공업체가 그렇게 표시한 것)는 채널 목록과 공유 재생 목록에서 빠져요. 아이 방의 TV에는 프로필도 PIN도 없으니까요. 숨김, 잠금 카테고리는 절대 제공하지 않아요."
 }

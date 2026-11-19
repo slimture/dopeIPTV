@@ -2744,7 +2744,7 @@
   "nerd_server_hint": "VLC, Kodi, en tv:s IPTV-app – och Plex, Jellyfin eller Emby, som hittar dopeIPTV som en HDHomeRun-tuner – tittar på dina källor genom den här appen: varje kanal hämtas en gång, här, och delas av alla enheter som tittar på den. Utan fönster körs samma sak med dopeiptv --server.",
   "nerd_server_tuners_auto": "Från kontot",
   "nerd_server_sources": "Källor som delas",
-  "nerd_server_sources_hint": "Ingen vald: den aktiva källan. Kategorierna i varje källa väljer du på serverns sida i en webbläsare. Dolda, låsta och vuxenkategorier delas aldrig.",
+  "nerd_server_sources_hint": "Ingen vald: den aktiva källan. Kategorierna i varje källa väljer du på serverns sida i en webbläsare. Dolda och låsta kategorier delas aldrig, vuxenkategorier bara med Kanaler för vuxna påslaget.",
   "nerd_server_open": "Öppna i webbläsaren",
   "nerd_server_copy_tuner": "Kopiera tunerns adress",
   "nerd_server_copy_m3u": "Kopiera spellistans adress",
@@ -3081,5 +3081,7 @@
   "cast_note_moving": "Till {time} · hämtas ur arkivet - det tar några sekunder.",
   "cast_note_to_live": "Livesändningen är på väg till tv:n.",
   "setting_sub_live": "Undertexter på live-tv",
-  "setting_sub_live_hint": "Av: live-kanaler startar utan undertexter, medan filmer och serier får dem som vanligt. Slå på dem i spelaren när du vill."
+  "setting_sub_live_hint": "Av: live-kanaler startar utan undertexter, medan filmer och serier får dem som vanligt. Slå på dem i spelaren när du vill.",
+  "srv_adult": "Kanaler för vuxna",
+  "srv_adult_hint": "Av: kanaler och kategorier för vuxna (XXX, 18+ eller markerade så av leverantören) lämnas utanför kanallistan och den delade spellistan – en tv i ett barnrum har ingen profil eller PIN-kod. Dolda och låsta kategorier delas aldrig."
 }
