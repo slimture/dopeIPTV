@@ -94,9 +94,11 @@ named by DONATE_CONFIG (default /usr/local/etc/iptv-donate.conf):
     STRIPE_API_VERSION      empty: the account's default
     LISTEN                  unix:/var/run/iptv_donate/donate.sock (default),
                             or host:port for TCP
-    ADMIN_USERS             until the new sign-in has its first admin: who of
-                            nginx's old password prompt may open /admin/
-                            (default: anyone it let in). After that the
+    ADMIN_USERS             only until the new sign-in has its first admin,
+                            and only with nginx's old password prompt still
+                            in front: who of it may open /admin/. Empty (the
+                            default): nobody - the first admin is then made
+                            with admin_users.py invite. After that the
                             admins are <STATS_DIR>/admin-users.json's.
     STATS_IGNORE            addresses, networks or host names whose visits
                             stats_collect.py leaves out (your own)
@@ -293,11 +295,17 @@ def _forget_quiet(now: float) -> int:
 
 
 def _forget_loop() -> None:
-    """Every FORGET_EVERY: the quiet addresses forgotten, requests or none."""
+    """Every FORGET_EVERY: the quiet addresses forgotten, requests or none -
+    the limits' here, and the failed sign-in tries' (admin_auth)."""
     while True:
         time.sleep(FORGET_EVERY)
         with _LOCK:
             _forget_quiet(time.monotonic())
+        try:
+            import admin_auth
+            admin_auth.forget()
+        except Exception as e:  # noqa: BLE001 - the loop keeps its minute
+            _fault(e, "forgetting")
 
 
 def _allowed(addr: str, most: int = PER_WINDOW, window: float = WINDOW) -> bool:
@@ -314,6 +322,66 @@ def _allowed(addr: str, most: int = PER_WINDOW, window: float = WINDOW) -> bool:
         if len(_SEEN) > 5000 or now - _SWEPT[0] >= FORGET_EVERY:
             _forget_quiet(now)
         return True
+
+
+def _plain(text: object, most: int = 80) -> str:
+    """*text* for the service's log: at most *most* printable ASCII
+    characters. Whatever a request says of itself (where it comes from, what
+    it asks for) is anyone's to choose - never a way to write lines of
+    their own into the log, or to fill it."""
+    return re.sub(r"[^\x20-\x7e]", "?", str(text))[:most]
+
+
+_FAULTS: dict = {}          # (what, where) -> [when last said, how many since]
+FAULT_EVERY = 3600.0
+
+
+def _fault(e: BaseException, what: str) -> None:
+    """Something that should not happen, said in the log by its kind and
+    place - never with its words, which can hold what a request sent - and
+    the same one at most once an hour, with how often it came meanwhile: a
+    request that finds a fault cannot fill the log by asking again."""
+    tb, where = e.__traceback__, "?"
+    while tb is not None:                   # the innermost place in this service's own files
+        name = tb.tb_frame.f_code.co_filename
+        if os.path.dirname(os.path.abspath(name)) == os.path.dirname(os.path.abspath(__file__)):
+            where = f"{os.path.basename(name)}:{tb.tb_lineno}"
+        tb = tb.tb_next
+    key = (what, type(e).__name__, where)
+    now = time.monotonic()
+    with _LOCK:
+        if len(_FAULTS) > 500:
+            _FAULTS.clear()
+        seen = _FAULTS.setdefault(key, [None, 0])
+        seen[1] += 1
+        if seen[0] is not None and now - seen[0] < FAULT_EVERY:
+            return
+        n, seen[0], seen[1] = seen[1], now, 0
+    print(f"[donate] {what}: {type(e).__name__} at {where}" + (f" ({n} times since last said)" if n > 1 else ""),
+          file=sys.stderr, flush=True)
+
+
+def _said_once(line: str) -> None:
+    """*line* in the log, the same one at most once an hour."""
+    now = time.monotonic()
+    with _LOCK:
+        if len(_FAULTS) > 500:
+            _FAULTS.clear()
+        seen = _FAULTS.setdefault(("said", line), [None, 0])
+        if seen[0] is not None and now - seen[0] < FAULT_EVERY:
+            return
+        seen[0] = now
+    print(f"[donate] {line}", file=sys.stderr, flush=True)
+
+
+def _stripe_said(body: object) -> str:
+    """Why Stripe refused, in its own fixed words (type, code, decline code,
+    the field) - never its sentence, which can repeat what the payer typed
+    (an e-mail address it found wrong)."""
+    err = (body.get("error") or {}) if isinstance(body, dict) else {}
+    if not isinstance(err, dict):
+        return ""
+    return " ".join(_plain(err[k], 40) for k in ("type", "code", "decline_code", "param") if err.get(k))
 
 
 def _post(url: str, form: dict | None, key: str) -> tuple[int, dict]:
@@ -539,8 +607,7 @@ def wallet_pay(amount: int, currency: str, method: str, email: str, name: str) -
         if state == "requires_action" and body.get("client_secret"):
             return 200, {"action": body["client_secret"]}
     err = (body.get("error") or {}) if isinstance(body, dict) else {}
-    print(f"[support] wallet {status}: {str(err.get('message', ''))[:200]}",
-          file=sys.stderr, flush=True)
+    print(f"[support] wallet {status}: {_stripe_said(body)}", file=sys.stderr, flush=True)
     # A decline is said as one, never why: the reason stays in the log.
     if err.get("type") == "card_error":
         return 402, {"error": "declined"}
@@ -597,11 +664,15 @@ def _auth():
 
 
 def _is_admin(user: str) -> bool:
+    """Whether *user* is an admin: one of admin_auth's - or, while it has
+    none yet, one named in ADMIN_USERS (nginx's old password prompt then
+    names them). With no admin and nobody named there, nobody is: an empty
+    or lost admin file must never mean that whoever says a name is one."""
     auth = _auth()
     if auth.has_users():
         return auth.is_admin(user)
     allowed = [u.strip() for u in CONF.get("ADMIN_USERS", "").split(",") if u.strip()]
-    return bool(user) and (not allowed or user in allowed)
+    return bool(user) and user in allowed
 _USER_OK = re.compile(r"^[A-Za-z0-9_.@-]{1,64}$")
 
 
@@ -612,22 +683,51 @@ def _stats_dir() -> str:
 
 
 def _session_key() -> bytes:
+    """The key the session cookies are signed with: the file's, made on
+    first use. Never a short or empty one - a file left empty (a full disk
+    the moment it was made, a hand that emptied it) used to be read as the
+    key, and a cookie signed with an empty key is anyone's to make. A file
+    without a whole key is made anew: written in full beside itself and put
+    in place in one step (which signs every browser out, as deleting the
+    file does)."""
     path = CONF.get("ADMIN_SESSION_KEY_FILE") or os.path.join(_stats_dir(), "admin-session.key")
-    try:
-        with open(path, encoding="ascii") as fh:
-            key = fh.read().strip()
+
+    def read() -> str:
+        try:
+            with open(path, encoding="ascii") as fh:
+                return fh.read().strip()
+        except (FileNotFoundError, UnicodeDecodeError):
+            return ""
+    key = read()
+    if len(key) >= 32:
+        return key.encode()
+    with _LOCK:
+        key = read()                        # another request made it just now
         if len(key) >= 32:
             return key.encode()
-    except FileNotFoundError:
-        pass
-    key = secrets.token_hex(32)
-    try:
-        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, "w", encoding="ascii") as fh:
-            fh.write(key + "\n")
-    except FileExistsError:            # another request made it just now
-        with open(path, encoding="ascii") as fh:
-            return fh.read().strip().encode()
+        os.makedirs(os.path.dirname(path) or ".", mode=0o700, exist_ok=True)
+        tmp = f"{path}.{os.getpid()}.{secrets.token_hex(4)}.tmp"
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        try:
+            with os.fdopen(fd, "w", encoding="ascii") as fh:
+                fh.write(secrets.token_hex(32) + "\n")
+            if os.path.exists(path):
+                os.replace(tmp, path)       # in place of a file that holds no key
+            else:
+                try:
+                    os.link(tmp, path)      # only if no other process made one meanwhile
+                except FileExistsError:
+                    pass
+                os.unlink(tmp)
+        except BaseException:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
+        key = read()
+    if len(key) < 32:
+        raise RuntimeError("the admin session key could not be kept")
     return key.encode()
 
 
@@ -636,11 +736,13 @@ def _session_sign(user: str, until: int) -> str:
     return hmac.new(_session_key(), msg, hashlib.sha256).hexdigest()
 
 
-def session_cookie(user: str) -> str | None:
+def session_cookie(user: str, carry: str = "") -> str | None:
+    """A session cookie for *user*: a new session, or - *carry*, the session
+    cookie the browser came with - that same session for another 400 days."""
     auth = _auth()
     if auth.has_users():
         try:
-            return auth.session_cookie(user)
+            return auth.session_cookie(user, carry)
         except auth.AuthError:
             return None
     if not _USER_OK.match(user):
@@ -649,22 +751,37 @@ def session_cookie(user: str) -> str | None:
     return f"{user}.{until}.{_session_sign(user, until)}"
 
 
-def session_user(cookie_header: str) -> str:
-    """The admin a valid session cookie names, or ""."""
+def session_of(cookie_header: str) -> tuple[str, str]:
+    """(the admin a valid session cookie names, that cookie's value), or
+    ("", ""). Every cookie of the name is looked at, a few at the most: one
+    that names nobody, put before the browser's own by someone else, does
+    not hide it."""
     auth = _auth()
+    seen = 0
     for part in (cookie_header or "").split(";"):
         name, _, value = part.strip().partition("=")
         if name != SESSION_COOKIE:
             continue
+        seen += 1
+        if seen > 4:
+            break
         if auth.has_users():
-            return auth.session_user(value)
+            user = auth.session_user(value)
+            if user:
+                return user, value
+            continue
         user, _, rest = value.partition(".")
         until, _, sig = rest.partition(".")
-        if not _USER_OK.match(user) or not until.isdigit() or int(until) < time.time():
-            return ""
+        if not _USER_OK.match(user) or not re.fullmatch(r"[0-9]{1,12}", until) or int(until) < time.time():
+            continue
         if hmac.compare_digest(sig, _session_sign(user, int(until))):
-            return user
-    return ""
+            return user, value
+    return "", ""
+
+
+def session_user(cookie_header: str) -> str:
+    """The admin a valid session cookie names, or ""."""
+    return session_of(cookie_header)[0]
 
 
 # -- telling the owner support came in: Web Push ----------------------------
@@ -957,14 +1074,71 @@ PUBLIC_GET = ("/admin/login", "/admin/login.js", "/admin/passkey.js", "/admin/ad
 SIGN_IN = "/admin/auth/"         # + an action: signing in, an invite, signing out
 
 
+#: How long a request may take to arrive once its connection is open, and
+#: how long its answer may take to be taken. nginx hands over a request it
+#: has read in full and takes the answer at once; anything else that opens
+#: the socket and then says nothing holds a thread no longer than this.
+READ_SECS = 60
+WRITE_SECS = 600
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "iptv-donate"
     sys_version = ""
+    timeout = READ_SECS
+    _started = False
+    _session = ""               # the session cookie that named this request's admin (_user)
 
     def log_message(self, fmt: str, *args) -> None:
         # Nothing of a request is written here - not its address, path or
         # time. (nginx logs only the statistics' page views and downloads.)
         pass
+
+    def send_response(self, code: int, message: str | None = None) -> None:
+        self._started = True
+        super().send_response(code, message)
+
+    def send_error(self, code: int, message: str | None = None, explain: str | None = None) -> None:
+        """The base class's own refusals - a request line it cannot read, a
+        method nobody answers here - said as this service says everything:
+        a word in JSON, not a page that names what runs here and repeats
+        what was asked."""
+        self.close_connection = True
+        if self._started:
+            return
+        try:
+            self._send(code, {"error": {400: "bad request", 414: "too long", 431: "too long",
+                                        501: "method"}.get(code, "refused")})
+        except OSError:
+            pass
+
+    def _write(self, data: bytes) -> None:
+        """The answer's body. Taking it may need longer than a request needs
+        to arrive (a long answer behind a slow line), never without end."""
+        try:
+            self.connection.settimeout(WRITE_SECS)
+        except OSError:
+            pass
+        self.wfile.write(data)
+
+    def _answer(self, handle) -> None:
+        """One request, answered whatever it holds. What a handler does not
+        expect is a fault of this service: said in the log by its kind and
+        place (never with its words - they can be the request's), answered
+        500, and the connection closed. Whoever asked and went away is
+        neither."""
+        try:
+            handle()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, TimeoutError):
+            self.close_connection = True
+        except Exception as e:  # noqa: BLE001 - the one place every handler's fault ends
+            self.close_connection = True
+            _fault(e, "a request could not be answered")
+            if not self._started:
+                try:
+                    self._send(500, {"error": "internal"})
+                except Exception:  # noqa: BLE001 - nobody there to tell
+                    pass
 
     def _send(self, status: int, body: dict) -> None:
         data = json.dumps(body).encode()
@@ -973,7 +1147,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
-        self.wfile.write(data)
+        self._write(data)
 
     def _redirect(self, where: str) -> None:
         self.send_response(302)
@@ -990,7 +1164,7 @@ class Handler(BaseHTTPRequestHandler):
             if length > most:
                 return None
             data = json.loads(self.rfile.read(length)) if length > 0 else {}
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, RecursionError):     # the last: brackets nested without end
             return None
         return data if isinstance(data, dict) else {}
 
@@ -1002,9 +1176,10 @@ class Handler(BaseHTTPRequestHandler):
         before the first admin exists (admin_auth has none) does it still
         count - nginx's old password prompt names the owner there, the way
         to make that first invite."""
-        user = session_user(self.headers.get("Cookie") or "")
+        user, self._session = session_of(self.headers.get("Cookie") or "")
         if _is_admin(user):
             return user
+        self._session = ""
         if _auth().has_users():
             return ""
         named = (self.headers.get("X-Admin-User") or "").strip()
@@ -1035,9 +1210,19 @@ class Handler(BaseHTTPRequestHandler):
         self._session_headers(session_cookie(user))
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
-        self.wfile.write(data)
+        self._write(data)
 
     def _signed_out(self) -> None:
+        # The session ends here, on the server, not only in this browser: a
+        # copy of its cookie made before names nobody afterwards. (Signing
+        # out everywhere has ended all of them already.)
+        try:
+            auth = _auth()
+            value = session_of(self.headers.get("Cookie") or "")[1]
+            if value and auth.has_users():
+                auth.sign_out(value)
+        except Exception as e:  # noqa: BLE001 - the browser is signed out all the same
+            _fault(e, "a session could not be ended on the server")
         data = json.dumps({"ok": True, "next": "/admin/login"}).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -1046,7 +1231,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Set-Cookie", f"{HINT_COOKIE}=; Max-Age=0; Path=/; Secure; SameSite=Lax")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
-        self.wfile.write(data)
+        self._write(data)
 
     def _admin(self, path: str) -> None:
         """The admin page and its numbers, for a signed-in admin only: nginx
@@ -1147,11 +1332,11 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype)
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Robots-Tag", "noindex, nofollow")
-        if path == "/admin/":           # signed in for good, renewed by each visit
-            self._session_headers(session_cookie(user))
+        if path == "/admin/":           # signed in for good, renewed by each visit: the same session
+            self._session_headers(session_cookie(user, getattr(self, "_session", "")))
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
-        self.wfile.write(data)
+        self._write(data)
 
     def _news(self) -> None:
         """The last two weeks' tips and monthly support, for the owner's note on the site's
@@ -1194,15 +1379,18 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-cache")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
-        self.wfile.write(data)
+        self._write(data)
 
     def _sign_in(self, action: str) -> None:
         """Signing in - a passkey, or a password and perhaps a code - taking up
         an invite, and signing out. Open to anyone, from the site's own pages
         only; admin_auth counts the failures and holds back a guesser."""
         if (self.headers.get("Origin") or "").rstrip("/") != ORIGIN:
-            print(f"[donate] admin sign-in refused ({action}): from {self.headers.get('Origin') or 'no origin'}, "
-                  f"not {ORIGIN} (DONATE_ORIGIN)", file=sys.stderr, flush=True)
+            # Said so that a wrong DONATE_ORIGIN shows - with what the request
+            # called itself cut short and plain, and each such place once an
+            # hour: both are the sender's own words.
+            _said_once(f"admin sign-in refused ({_plain(action, 20)}): from "
+                       f"{_plain(self.headers.get('Origin') or 'no origin', 60)}, not {ORIGIN} (DONATE_ORIGIN)")
             return self._send(403, {"error": f"This page is not {ORIGIN}; sign in there."})
         data = self._body(16384)
         if data is None:
@@ -1242,8 +1430,10 @@ class Handler(BaseHTTPRequestHandler):
                                                        str(data.get("code") or ""), addr))
         except auth.AuthError as e:
             # What went wrong, for whoever reads the service's log: never what
-            # was typed (a password in the name field would land there).
-            print(f"[donate] admin sign-in refused ({action}, {addr}): {e.why or e}", file=sys.stderr, flush=True)
+            # was typed (a password in the name field would land there), and
+            # never from which address - an address is written down nowhere
+            # but in the web server's two logs, which go after two days.
+            print(f"[donate] admin sign-in refused ({_plain(action, 20)}): {e.why or e}", file=sys.stderr, flush=True)
             return self._send(400, {"error": str(e)})
         return self._send(404, {"error": "not found"})
 
@@ -1283,9 +1473,11 @@ class Handler(BaseHTTPRequestHandler):
             if not done:
                 return self._send(404, {"error": "not found"})
             done()
+            return self._send(200, auth.account(user))
         except auth.AuthError as e:
             return self._send(400, {"error": str(e)})
-        return self._send(200, auth.account(user))
+        except KeyError:                    # removed by another admin a moment ago
+            return self._send(401, {"error": "signed out"})
 
     def _admin_post(self, path: str) -> None:
         """Turning a device's notifications on or off, a test, a group of the
@@ -1450,7 +1642,10 @@ class Handler(BaseHTTPRequestHandler):
                  else {"error": "An error report", "crash": "A crash report"}.get(kind, "Feedback"))
                 + (" from the website" if data.get("from") == "site"
                    else " from a supporter" if data.get("supporter") == "yes" else " from the app"),
-                f"dopeIPTV {str(data.get('version') or '?')[:20]} · {str(data.get('os') or '?')[:20]}")
+                # A version and a system's name as the report is kept with
+                # them - never a sender's own sentence on the admins' phones.
+                "dopeIPTV " + (re.sub(r"[^0-9A-Za-z.+_-]", "", str(data.get("version") or ""))[:20] or "?")
+                + " · " + (re.sub(r"[^A-Za-z0-9 ._-]", "", str(data.get("os") or ""))[:20] or "?"))
         return self._send(status, body)
 
     def _feedback_replies(self) -> None:
@@ -1526,7 +1721,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(400, {"error": "body"})
         try:
             data = json.loads(self.rfile.read(length))
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, RecursionError):
             return self._send(400, {"error": "body"})
         if not isinstance(data, dict):
             return self._send(400, {"error": "body"})
@@ -1598,12 +1793,24 @@ class Handler(BaseHTTPRequestHandler):
         except OSError:
             self.close_connection = True
 
+    def do_GET(self) -> None:
+        self._answer(self._on_get)
+
+    def do_POST(self) -> None:
+        self._answer(self._on_post)
+
     def do_PUT(self) -> None:
+        self._answer(self._on_put)
+
+    def do_DELETE(self) -> None:
+        self._answer(self._on_delete)
+
+    def _on_put(self) -> None:
         if self.path.split("?", 1)[0].startswith(SYNC):
             return self._sync()
         return self._send(404, {"error": "not found"})
 
-    def do_DELETE(self) -> None:
+    def _on_delete(self) -> None:
         path = self.path.split("?", 1)[0]
         if path.startswith(SYNC):
             return self._sync()
@@ -1611,7 +1818,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._together()
         return self._send(404, {"error": "not found"})
 
-    def do_GET(self) -> None:
+    def _on_get(self) -> None:
         path = self.path.split("?", 1)[0]
         if path.startswith(SYNC):
             return self._sync()
@@ -1664,7 +1871,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(400, {"error": "body"})
         return self._send(*find_key(data))
 
-    def do_POST(self) -> None:
+    def _on_post(self) -> None:
         path = self.path.split("?", 1)[0]
         if path.startswith(TOGETHER):
             return self._together()
@@ -1696,7 +1903,8 @@ class Handler(BaseHTTPRequestHandler):
             data = json.loads(self.rfile.read(length))
             amount = int(data.get("amount"))
             currency = str(data.get("currency") or CURRENCY).lower()
-        except (ValueError, TypeError, AttributeError):
+        except (ValueError, TypeError, AttributeError, OverflowError, RecursionError):
+            # The last two: an amount written 1e999, brackets nested without end.
             return self._send(400, {"error": "amount"})
         row = CURRENCIES.get(currency)
         if row is None:
@@ -1797,8 +2005,55 @@ def _sync_cleanup() -> None:
         time.sleep(86400)
 
 
-class UnixHTTPServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
+class _Quiet:
+    """What both servers share: room for a burst of connections to wait
+    their turn (the default is five; nginx was told "try again" past it),
+    and a connection that fails said in the log by its kind and place -
+    never the default's traceback, whose last line can repeat what a
+    request sent."""
     daemon_threads = True
+    request_queue_size = 128
+
+    def handle_error(self, request, client_address) -> None:
+        e = sys.exc_info()[1]
+        if e is None or isinstance(e, (BrokenPipeError, ConnectionError, TimeoutError)):
+            return                          # whoever asked went away
+        _fault(e, "a connection failed")
+
+
+class UnixHTTPServer(_Quiet, socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
+    pass
+
+
+class TCPHTTPServer(_Quiet, ThreadingHTTPServer):
+    pass
+
+
+def keep_private(stats_dir: str) -> int:
+    """Everything kept beside the statistics is this service's alone to
+    read - reports, the admins, the sync copies, the counts: the folder and
+    what is in it narrowed at each start (files 0600, folders 0700),
+    whatever an earlier version, a copy made by hand or a restore left
+    wider. What is someone else's (not this user's) is left as it is. How
+    many were narrowed."""
+    import stat
+    narrowed = 0
+    try:
+        os.makedirs(stats_dir, mode=0o700, exist_ok=True)
+    except OSError:
+        return 0
+    me = os.geteuid() if hasattr(os, "geteuid") else -1
+    for where, _dirs, files in os.walk(stats_dir):
+        for path, want in [(where, 0o700)] + [(os.path.join(where, f), 0o600) for f in files]:
+            try:
+                st = os.lstat(path)
+                if stat.S_ISLNK(st.st_mode) or st.st_uid != me or not stat.S_IMODE(st.st_mode) & 0o077:
+                    continue
+                os.chmod(path, stat.S_IMODE(st.st_mode) & want)
+                narrowed += 1
+            except OSError:
+                continue
+    return narrowed
 
 
 def _connection():
@@ -1832,6 +2087,14 @@ def check() -> int:
 def main() -> None:
     if "--check" in sys.argv[1:]:
         raise SystemExit(check())
+    # Whatever this service makes from here on is its own alone to read
+    # (the socket below is opened to nginx by name).
+    os.umask(0o077)
+    narrowed = keep_private(_stats_dir())
+    if narrowed:
+        print(f"[donate] {narrowed} file(s) and folder(s) beside the statistics were readable by others "
+              "on this machine: now the service's alone", file=sys.stderr, flush=True)
+    srv: socketserver.BaseServer
     if LISTEN.startswith("unix:"):
         path = LISTEN[5:]
         try:
@@ -1842,7 +2105,7 @@ def main() -> None:
         os.chmod(path, 0o666)               # nginx's worker connects to it
     else:
         host, _, port = LISTEN.rpartition(":")
-        srv = ThreadingHTTPServer((host or "127.0.0.1", int(port)), Handler)
+        srv = TCPHTTPServer((host or "127.0.0.1", int(port)), Handler)
     dialog = (f"on ({len(CURRENCIES)} currencies, {CURRENCY} by default)" if PUBLISHABLE
               else "off (no STRIPE_PUBLISHABLE_KEY)")
     print(f"[donate] listening on {LISTEN}, Stripe {'set up' if _secret() else 'NOT set up'}, "

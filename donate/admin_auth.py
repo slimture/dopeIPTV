@@ -4,8 +4,12 @@ Several admins, each signing in with a passkey (WebAuthn: Face ID, Touch ID,
 a phone or a security key), or with a password and - if they turned it on -
 a code from an authenticator app (TOTP, RFC 6238). A new admin comes in
 through a one-time invite link another admin makes. A signed cookie keeps a
-browser signed in (400 days, renewed by each visit); "sign out everywhere"
-ends all of one admin's sessions at once.
+browser signed in (400 days, renewed by each visit). Each sign-in is a
+session of its own, named in its cookie: signing out ends that session on
+the server - a copy of the cookie made before is worth nothing after - and
+"sign out everywhere" ends all of one admin's sessions at once. An admin
+removed and invited again under the same name starts afresh: no cookie
+from before fits.
 
 Kept in <STATS_DIR>/admin-users.json (mode 600): password hashes (scrypt),
 the passkeys' public keys, authenticator secrets, invites as hashes of their
@@ -35,6 +39,22 @@ MIN_PASSWORD = 10
 FAIL_WINDOW = 15 * 60
 FAIL_LIMIT = 10
 USER_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{1,31}$")
+#: A session's own name in its cookie: random, the same through every renewal.
+SID_RE = re.compile(r"^[0-9a-f]{16}$")
+#: scrypt as a new password is hashed: N = 2^15 (32 MB), r = 8, p = 3 - one
+#: of the settings OWASP's password storage guidance gives as equal. A hash
+#: made with less (p = 1, until November 2026) is checked as it was made and
+#: made again at that admin's next sign-in with the password.
+SCRYPT = (15, 8, 3)
+#: A hash takes 32 MB while it is made: at most this many at once, the rest
+#: wait their turn - a burst of sign-in tries cannot take the memory.
+_HASHING = threading.BoundedSemaphore(4)
+#: What a guesser can make the service remember, at the most.
+MAX_FAIL_KEYS = 20000
+MAX_CHALLENGES = 5000
+#: Sessions ended by signing out, remembered per admin until they would
+#: have run out by themselves.
+MAX_ENDED = 2000
 
 _LOCK = threading.RLock()
 _CFG: dict = {"path": "", "origin": "", "key": b""}
@@ -42,6 +62,7 @@ _challenges: dict = {}        # challenge -> (until, purpose, subject)
 _tickets: dict = {}           # second-step ticket -> (until, user)
 _pending_totp: dict = {}      # user -> (until, secret)
 _fails: dict = {}             # address or user -> [times]
+_SEEN: dict = {"stamp": None, "data": None}     # the admins as last read, for the checks every request makes
 
 
 class AuthError(Exception):
@@ -54,7 +75,11 @@ class AuthError(Exception):
 
 
 def configure(stats_dir: str, origin: str, key: bytes) -> None:
+    if len(key) < 32:
+        # Never a short or empty key: a cookie signed with one is anyone's to make.
+        raise ValueError("the session key is too short")
     _CFG.update(path=os.path.join(stats_dir, "admin-users.json"), origin=origin.rstrip("/"), key=key)
+    _SEEN.update(stamp=None, data=None)
 
 
 def rp_id() -> str:
@@ -97,43 +122,87 @@ def _save(data: dict) -> None:
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=1, sort_keys=True)
     os.replace(tmp, path)
+    with _LOCK:
+        _SEEN.update(stamp=None, data=None)
+
+
+def _users() -> dict:
+    """The admins, to look at only (never changed in place): read again
+    when the file is another one than last time - every request to the
+    admin page asks who its cookie names, a made-up cookie too, and none of
+    them should cost a read of the file."""
+    try:
+        st = os.stat(_CFG["path"])
+    except FileNotFoundError:
+        return {}
+    stamp = (_CFG["path"], st.st_ino, st.st_mtime_ns, st.st_size)
+    with _LOCK:
+        if _SEEN["stamp"] == stamp:
+            return _SEEN["data"]
+    users = _load()["users"]
+    with _LOCK:
+        _SEEN.update(stamp=stamp, data=users)
+    return users
 
 
 def has_users() -> bool:
-    return bool(_load()["users"])
+    return bool(_users())
 
 
 def is_admin(user: str) -> bool:
-    return bool(user) and user in _load()["users"]
+    return bool(user) and user in _users()
 
 
 # -- passwords ---------------------------------------------------------------------
-def hash_password(password: str) -> str:
+def hash_password(password: str, how: tuple = SCRYPT) -> str:
+    logn, r, p = how
     salt = secrets.token_bytes(16)
-    digest = hashlib.scrypt(password.encode(), salt=salt, n=2 ** 15, r=8, p=1,
-                            maxmem=64 * 1024 * 1024, dklen=32)
-    return f"scrypt$15$8$1${b64u(salt)}${b64u(digest)}"
+    with _HASHING:
+        digest = hashlib.scrypt(password.encode(), salt=salt, n=2 ** logn, r=r, p=p,
+                                maxmem=64 * 1024 * 1024, dklen=32)
+    return f"scrypt${logn}${r}${p}${b64u(salt)}${b64u(digest)}"
+
+
+def _how(stored: str) -> tuple | None:
+    """(log2 N, r, p) a stored hash was made with, or None for none of ours."""
+    try:
+        kind, logn, r, p, _salt, _digest = stored.split("$")
+        how = (int(logn), int(r), int(p))
+    except (ValueError, AttributeError):
+        return None
+    return how if kind == "scrypt" and 10 <= how[0] <= 20 and 1 <= how[1] <= 32 and 1 <= how[2] <= 16 else None
+
+
+def _work(how: tuple) -> int:
+    return 2 ** how[0] * how[1] * how[2]
 
 
 def check_password(password: str, stored: str) -> bool:
+    how = _how(stored)
+    if how is None:
+        return False
     try:
-        kind, logn, r, p, salt, digest = stored.split("$")
-        if kind != "scrypt":
-            return False
-        got = hashlib.scrypt(password.encode(), salt=unb64u(salt), n=2 ** int(logn), r=int(r),
-                             p=int(p), maxmem=64 * 1024 * 1024, dklen=32)
+        _kind, _logn, _r, _p, salt, digest = stored.split("$")
+        with _HASHING:
+            got = hashlib.scrypt(password.encode(), salt=unb64u(salt), n=2 ** how[0], r=how[1],
+                                 p=how[2], maxmem=64 * 1024 * 1024, dklen=32)
         return hmac.compare_digest(got, unb64u(digest))
     except (ValueError, AuthError):
         return False
 
 
-_DUMMY: list = []
+_DUMMY: dict = {}
 
 
-def _dummy_hash() -> str:
-    if not _DUMMY:
-        _DUMMY.append(hash_password(secrets.token_hex(16)))
-    return _DUMMY[0]
+def _dummy_hash(users: dict | None = None) -> str:
+    """A hash nobody's password fits, made as the admins' own are (the
+    lightest of them, while they differ): a name that does not exist takes
+    as long to refuse as one that does."""
+    made = [h for h in (_how((rec or {}).get("password") or "") for rec in (users or {}).values()) if h]
+    how = min(made, key=_work) if made else SCRYPT
+    if how not in _DUMMY:
+        _DUMMY[how] = hash_password(secrets.token_hex(16), how)
+    return _DUMMY[how]
 
 
 def _good_password(password: str) -> None:
@@ -276,6 +345,10 @@ def _challenge(purpose: str, subject: str = "") -> str:
     with _LOCK:
         for k in [k for k, v in _challenges.items() if v[0] < now]:
             del _challenges[k]
+        if len(_challenges) >= MAX_CHALLENGES:
+            # Asked for faster than they run out: the oldest go first.
+            for k in sorted(_challenges, key=lambda k: _challenges[k][0])[:MAX_CHALLENGES // 4]:
+                del _challenges[k]
         ch = b64u(secrets.token_bytes(32))
         _challenges[ch] = (now + CHALLENGE_SECS, purpose, subject)
     return ch
@@ -285,8 +358,10 @@ def _client(data_b64: str, kind: str, purpose: str, subject: str = "") -> bytes:
     raw = unb64u(data_b64)
     try:
         client = json.loads(raw)
-    except ValueError:
+    except (ValueError, RecursionError):
         raise AuthError("bad client data") from None
+    if not isinstance(client, dict):
+        raise AuthError("bad client data")
     if client.get("type") != kind or client.get("origin") != _CFG["origin"] or client.get("crossOrigin"):
         raise AuthError("This sign-in came from somewhere else.")
     with _LOCK:
@@ -318,23 +393,40 @@ def _creation_options(uid: str, user: str, name: str, exclude: list, purpose: st
     }
 
 
+def _read_passkey(read):
+    """*read()*, what a passkey sent taken apart: anything in it that is not
+    what it should be - bytes that end early, a key without its parts, a
+    thing nested without end - is a passkey refused, never an error of the
+    service's own."""
+    try:
+        return read()
+    except AuthError:
+        raise
+    except (ValueError, TypeError, KeyError, IndexError, AttributeError, OverflowError, RecursionError,
+            struct.error):
+        raise AuthError("This passkey's answer could not be read.") from None
+
+
 def _new_passkey(cred: dict, purpose: str, user: str, label: str) -> dict:
     resp = cred.get("response") if isinstance(cred, dict) else None
     if not isinstance(resp, dict):
         raise AuthError("No passkey came back.")
     _client(resp.get("clientDataJSON", ""), "webauthn.create", purpose, user)
-    att, _ = cbor(unb64u(resp.get("attestationObject", "")))
-    if not isinstance(att, dict) or not isinstance(att.get("authData"), bytes):
-        raise AuthError("bad attestation")
-    ad = auth_data(att["authData"])
-    _rp_ok(ad)
-    if "cred" not in ad:
-        raise AuthError("The passkey sent no key.")
-    cid = b64u(ad["cred"])
+
+    def read() -> tuple:
+        att, _ = cbor(unb64u(resp.get("attestationObject", "")))
+        if not isinstance(att, dict) or not isinstance(att.get("authData"), bytes):
+            raise AuthError("bad attestation")
+        ad = auth_data(att["authData"])
+        _rp_ok(ad)
+        if "cred" not in ad:
+            raise AuthError("The passkey sent no key.")
+        return ad, b64u(ad["cred"]), cose_key(ad["key"])
+    ad, cid, key = _read_passkey(read)
     for other in _load()["users"].values():
         if any(p["id"] == cid for p in other.get("passkeys", [])):
             raise AuthError("This passkey is already added.")
-    return {"id": cid, "key": cose_key(ad["key"]), "count": ad["count"], "added": _now(), "used": 0,
+    return {"id": cid, "key": key, "count": ad["count"], "added": _now(), "used": 0,
             "name": (str(label or "").strip() or "Passkey")[:60]}
 
 
@@ -344,35 +436,136 @@ def _sign(*parts) -> str:
     return hmac.new(_CFG["key"], msg, hashlib.sha256).hexdigest()
 
 
-def session_cookie(user: str) -> str:
-    rec = _load()["users"].get(user)
+def _sign_session(user: str, until: int, epoch: int, sid: str) -> str:
+    # Its own first line: never the same bytes as a cookie from before
+    # sessions had names (_sign), whatever the name, time and numbers are.
+    msg = "\n".join(("session", user, str(until), str(epoch), sid)).encode()
+    return hmac.new(_CFG["key"], msg, hashlib.sha256).hexdigest()
+
+
+_NUMBER = re.compile(r"^[0-9]{1,20}$")
+
+
+def _read_cookie(value: str) -> tuple | None:
+    """(user, until, epoch, session) of a cookie this service signed - the
+    session "" for one from before sessions had names (user.until.epoch.sig,
+    until November 2026; it holds until it runs out or its browser's next
+    visit gives it a name) - or None. Says nothing of whether it still
+    holds (session_user)."""
+    value = value if isinstance(value, str) and len(value) <= 300 else ""
+    parts = value.rsplit(".", 4)
+    if len(parts) == 5 and SID_RE.match(parts[3]):
+        user, until, epoch, sid, sig = parts
+        if USER_RE.match(user) and _NUMBER.match(until) and _NUMBER.match(epoch) \
+                and hmac.compare_digest(sig, _sign_session(user, int(until), int(epoch), sid)):
+            return user, int(until), int(epoch), sid
+    parts = value.rsplit(".", 3)
+    if len(parts) == 4:
+        user, until, epoch, sig = parts
+        if USER_RE.match(user) and _NUMBER.match(until) and _NUMBER.match(epoch) \
+                and hmac.compare_digest(sig, _sign(user, until, epoch)):
+            return user, int(until), int(epoch), ""
+    return None
+
+
+def _ended_key(sid: str, value: str) -> str:
+    """What a session signed out of is remembered by: its name, or - for a
+    cookie from before sessions had one - that very cookie."""
+    return sid or "c:" + hashlib.sha256(value.encode()).hexdigest()[:32]
+
+
+def _holds(rec: dict | None, got: tuple, value: str) -> bool:
+    _user, until, epoch, sid = got
+    return bool(rec) and until >= _now() and int(rec.get("epoch", 1)) == epoch \
+        and _ended_key(sid, value) not in (rec.get("out") or {})
+
+
+def session_cookie(user: str, carry: str = "") -> str:
+    """A session cookie for *user*: a new session - or, with *carry* (the
+    cookie this browser came with, still holding), that same session for
+    another SESSION_SECS."""
+    rec = _users().get(user)
     if not rec:
         raise AuthError("unknown admin")
+    had = _read_cookie(carry) if carry else None
+    sid = had[3] if had and had[0] == user and had[3] and _holds(rec, had, carry) else secrets.token_hex(8)
     until, epoch = _now() + SESSION_SECS, int(rec.get("epoch", 1))
-    return f"{user}.{until}.{epoch}.{_sign(user, until, epoch)}"
+    return f"{user}.{until}.{epoch}.{sid}.{_sign_session(user, until, epoch, sid)}"
 
 
 def session_user(value: str) -> str:
     """The admin a session cookie's value names, while it holds, or ""."""
-    parts = (value or "").split(".")
-    if len(parts) != 4:
+    got = _read_cookie(value)
+    if not got:
         return ""
-    user, until, epoch, sig = parts
-    if not USER_RE.match(user) or not until.isdigit() or not epoch.isdigit() or int(until) < _now():
-        return ""
-    if not hmac.compare_digest(sig, _sign(user, until, epoch)):
-        return ""
-    rec = _load()["users"].get(user)
-    return user if rec and int(rec.get("epoch", 1)) == int(epoch) else ""
+    return got[0] if _holds(_users().get(got[0]), got, value) else ""
+
+
+def sign_out(value: str) -> bool:
+    """The session *value* belongs to, ended on the server: the cookie and
+    every renewal of it - a copy someone made before - name nobody from now
+    on. Remembered with the admin until the session would have run out by
+    itself. False for a cookie that names no session that holds."""
+    got = _read_cookie(value)
+    if not got:
+        return False
+    user, until, _epoch, sid = got
+    with _LOCK:
+        data = _load()
+        rec = data["users"].get(user)
+        if not _holds(rec, got, value):
+            return False
+        now = _now()
+        out = {k: t for k, t in (rec.get("out") or {}).items() if isinstance(t, int) and t > now}
+        # A named session could be renewed until now, so until SESSION_SECS
+        # from now; a cookie without a name is only itself.
+        out[_ended_key(sid, value)] = now + SESSION_SECS if sid else until
+        for k in sorted(out, key=lambda k: out[k])[:max(0, len(out) - MAX_ENDED)]:
+            del out[k]
+        rec["out"] = out
+        _save(data)
+    return True
+
+
+def _new_epoch(but: int = 0) -> int:
+    """A number no session of this name has carried: an admin removed and
+    invited again, or signed out everywhere, starts where no cookie from
+    before fits. (Counting from 1 did not: the same name invited again was
+    at 1 again, and a removed admin's cookie was good once more.)"""
+    while True:
+        n = secrets.randbits(48) + 2
+        if n != but:
+            return n
 
 
 # -- guessing --------------------------------------------------------------------------
 def _failed(*keys: str) -> None:
     now = time.time()
     with _LOCK:
+        if len(_fails) >= MAX_FAIL_KEYS:
+            # More guessers than are remembered: the longest quiet go first.
+            for k in sorted(_fails, key=lambda k: _fails[k][-1])[:MAX_FAIL_KEYS // 4]:
+                del _fails[k]
         for k in keys:
             if k:
-                _fails.setdefault(k, []).append(now)
+                _fails.setdefault(k[:100], []).append(now)
+
+
+def forget(now: float | None = None) -> None:
+    """What signing in keeps in memory, let go once it is no longer needed:
+    the addresses and names of failed tries after FAIL_WINDOW (the service
+    calls this every minute - before, they stayed until the next try, from
+    anyone), and challenges, tickets and half-made authenticators once
+    they have run out."""
+    now = time.time() if now is None else now
+    with _LOCK:
+        for k in list(_fails):
+            _fails[k] = [t for t in _fails[k] if now - t < FAIL_WINDOW]
+            if not _fails[k]:
+                del _fails[k]
+        for store in (_challenges, _tickets, _pending_totp):
+            for k in [k for k, v in store.items() if v[0] < now]:
+                del store[k]
 
 
 def blocked(*keys: str) -> bool:
@@ -382,7 +575,7 @@ def blocked(*keys: str) -> bool:
             _fails[k] = [t for t in _fails[k] if now - t < FAIL_WINDOW]
             if not _fails[k]:
                 del _fails[k]
-        return any(len(_fails.get(k, ())) >= FAIL_LIMIT for k in keys if k)
+        return any(len(_fails.get(k[:100], ())) >= FAIL_LIMIT for k in keys if k)
 
 
 def _guard(addr: str, user: str = "") -> None:
@@ -406,7 +599,7 @@ def login_passkey(cred: dict, addr: str) -> str:
             raise AuthError("No passkey came back.")
         client = _client(resp.get("clientDataJSON", ""), "webauthn.get", "login")
         raw_ad = unb64u(resp.get("authenticatorData", ""))
-        ad = auth_data(raw_ad)
+        ad = _read_passkey(lambda: auth_data(raw_ad))
         _rp_ok(ad)
         cid = str(cred.get("rawId") or cred.get("id") or "")
         with _LOCK:
@@ -450,13 +643,24 @@ def login_password(user: str, password: str, addr: str) -> dict:
     user = _named(user, users)
     _guard(addr, user)
     rec = users.get(user)
+    password = str(password or "")
     # The same work for a name that does not exist: no faster "no".
-    stored = (rec or {}).get("password") or _dummy_hash()
-    if not check_password(str(password or ""), stored) or not rec or not rec.get("password"):
+    stored = (rec or {}).get("password") or _dummy_hash(users)
+    if not check_password(password, stored) or not rec or not rec.get("password"):
         _failed("a:" + addr, "u:" + user)
         why = ("no admin by that name" if not rec else
                f"{user} has no password" if not rec.get("password") else f"wrong password for {user}")
         raise AuthError("That name and password do not match.", why)
+    if _work(_how(stored) or SCRYPT) < _work(SCRYPT):
+        # Hashed when hashing asked for less: made again as it is asked now,
+        # with the password just shown to be right.
+        fresh = hash_password(password)
+        with _LOCK:
+            data = _load()
+            cur = data["users"].get(user)
+            if cur and cur.get("password") == stored:
+                cur["password"] = fresh
+                _save(data)
     if rec.get("totp"):
         ticket = secrets.token_urlsafe(24)
         with _LOCK:
@@ -532,7 +736,7 @@ def _join(data: dict, token: str, inv: dict, **fields) -> str:
         raise AuthError("There is already an admin by that name.")
     data["users"][user] = {"id": inv["uid"], "name": inv.get("name") or user, "created": _now(),
                            "by": inv.get("by", ""), "password": "", "totp": None, "passkeys": [],
-                           "epoch": 1, **fields}
+                           "epoch": _new_epoch(), **fields}
     data["invites"].pop(_token_key(token), None)
     _save(data)
     return user
@@ -540,10 +744,12 @@ def _join(data: dict, token: str, inv: dict, **fields) -> str:
 
 def invite_password(token: str, password: str) -> str:
     _good_password(password)
+    invite_info(token)                  # an invite there is, before any hashing
+    hashed = hash_password(password)    # not under the lock: every request's session check waits for that
     with _LOCK:
         data = _load()
         inv = invite_info(token)
-        return _join(data, token, inv, password=hash_password(password))
+        return _join(data, token, inv, password=hashed)
 
 
 def invite_passkey_options(token: str) -> dict:
@@ -563,7 +769,9 @@ def invite_passkey(token: str, cred: dict, label: str) -> str:
 # -- one's own account -------------------------------------------------------------------
 def account(user: str) -> dict:
     data = _load()
-    rec = data["users"][user]
+    rec = data["users"].get(user)
+    if rec is None:
+        raise AuthError("unknown admin")
     return {
         "me": {"user": user, "name": rec.get("name") or user, "password": bool(rec.get("password")),
                "totp": bool(rec.get("totp")),
@@ -619,12 +827,16 @@ def passkey_rename(user: str, pid: str, label: str) -> None:
 
 def password_set(user: str, password: str, current: str) -> None:
     _good_password(password)
+    stored = (_load()["users"].get(user) or {}).get("password") or ""
+    if stored and not check_password(str(current or ""), stored):
+        raise AuthError("Your current password is not right.")
+    hashed = hash_password(password)    # not under the lock: every request's session check waits for that
     with _LOCK:
         data = _load()
         rec = data["users"][user]
-        if rec.get("password") and not check_password(str(current or ""), rec["password"]):
+        if (rec.get("password") or "") != stored:       # changed elsewhere meanwhile
             raise AuthError("Your current password is not right.")
-        rec["password"] = hash_password(password)
+        rec["password"] = hashed
         _save(data)
 
 
@@ -700,5 +912,6 @@ def sign_out_everywhere(user: str) -> None:
     with _LOCK:
         data = _load()
         rec = data["users"][user]
-        rec["epoch"] = int(rec.get("epoch", 1)) + 1
+        rec["epoch"] = _new_epoch(int(rec.get("epoch", 1)))
+        rec.pop("out", None)            # every session of before is over; none needs remembering
         _save(data)

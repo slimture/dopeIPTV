@@ -124,7 +124,9 @@ def _service():
     stats = os.path.join(root, "stats")
     os.makedirs(stats)
     with open(conf, "w") as fh:
-        fh.write(f"STATS_DIR={stats}\nLISTEN=127.0.0.1:0\n")
+        # ADMIN_USERS: the one nginx's old password prompt names, for the
+        # tests that open the admin page before any admin exists (_admin_get).
+        fh.write(f"STATS_DIR={stats}\nLISTEN=127.0.0.1:0\nADMIN_USERS=tester\n")
     os.environ["DONATE_CONFIG"] = conf
     os.environ["STATS_DIR"] = stats
     sys.modules.pop("donate", None)
@@ -230,7 +232,8 @@ def test_official_source_and_no_header_are_served():
 
 def _admin_get(srv, path):
     """As a signed-in admin: with no admins set up yet, donate.py lets in
-    whoever nginx's old password named (X-Admin-User)."""
+    whom nginx's old password named (X-Admin-User) - if ADMIN_USERS names
+    them too (_service does)."""
     return _call(srv, "GET", path, headers={"X-Admin-User": "tester"})
 
 
