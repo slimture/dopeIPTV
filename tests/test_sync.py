@@ -5,6 +5,7 @@ syncing through a stand-in for dopeiptv.org on 127.0.0.1 - no real network."""
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import tempfile
@@ -195,6 +196,8 @@ class Site:
 
     def __init__(self):
         self.slots: dict[str, tuple[int, str]] = {}
+        #: A slot's credential once a write bound it (its SHA-256, as kept there).
+        self.auth: dict[str, str] = {}
         self.calls: list[tuple[str, str]] = []
         self.headers: list[dict[str, str]] = []
         self.full = False
@@ -218,7 +221,15 @@ class Site:
                 if site.refuse:
                     self._send(site.refuse, {"error": "no"})
                     return None
-                return self.path.rsplit("/", 1)[-1]
+                slot = self.path.rsplit("/", 1)[-1]
+                token = self.headers.get("X-Sync-Auth") or ""
+                kept = site.auth.get(slot)
+                if kept and hashlib.sha256(token.encode()).hexdigest() != kept:
+                    self._send(403, {"error": "refused"})
+                    return None
+                if token and self.command == "PUT":
+                    site.auth.setdefault(slot, hashlib.sha256(token.encode()).hexdigest())
+                return slot
 
             def do_GET(self):
                 slot = self._slot()
@@ -1258,3 +1269,35 @@ def test_the_window_says_an_earlier_copy_handed_back(tmp_path, site, qapp):
     assert said and said[0].action is not None and w.settings.value("theme") == "dracula"
     w._sync_forget()
     w._sync_pool.waitForDone(2000)
+
+
+def test_the_slot_is_bound_to_a_credential_only_the_code_gives():
+    """auth_of: a third value from the code, which the site keeps only a
+    hash of - the first write with it binds the slot, and from then on a
+    request without it (an older app's, or anyone's who learnt the slot)
+    is turned down: it can neither read, write nor delete the copy."""
+    raw = os.urandom(32)
+    slot, key = sync.derive(raw)
+    auth = sync.auth_of(raw)
+    assert len(auth) == 64 and auth != slot and bytes.fromhex(auth) != key
+    assert sync.auth_of(raw) == auth and sync.auth_of(os.urandom(32)) != auth
+    site = Site()
+    try:
+        mine = sync.Remote.of(raw, site.url, timeout=5)
+        assert mine.headers[sync.AUTH_HEADER] == auth
+        # An older app's requests, before any new one wrote: as they were.
+        older = sync.Remote(slot, site.url, timeout=5)
+        assert older.put(0, b"x" * 40) == (True, 1)
+        assert mine.put(1, b"y" * 40) == (True, 2)            # binds the slot
+        assert site.auth[slot] == hashlib.sha256(auth.encode()).hexdigest()
+        assert mine.get() == (2, b"y" * 40)
+        for call in (older.get, lambda: older.put(2, b"z" * 40)):
+            with pytest.raises(sync.SyncError) as e:
+                call()
+            assert e.value.kind == "refused"
+        assert older.delete() is False
+        assert sync.Remote(slot, site.url, timeout=5, auth="0" * 64).delete() is False
+        assert site.slots[slot][0] == 2, "nobody but the code's computers changed it"
+    finally:
+        site.close()
+

@@ -40,8 +40,12 @@ class Site:
         site = self
 
         class FakeRemote:
-            def __init__(self, slot, endpoint=None, timeout=20.0):
+            def __init__(self, slot, endpoint=None, timeout=20.0, auth=""):
                 self.slot = slot
+
+            @classmethod
+            def of(cls, raw, endpoint=None, timeout=20.0):
+                return cls(sync.derive(raw)[0], endpoint, timeout, auth=sync.auth_of(raw))
 
             def _ask(self):
                 site.calls += 1

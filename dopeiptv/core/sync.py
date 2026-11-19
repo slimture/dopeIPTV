@@ -16,6 +16,16 @@ No account, no e-mail, no name and no supporter key go along: nothing that
 says who asks (donate/sync.py on the website branch). A copy no computer
 has read or written for 180 days is deleted there.
 
+The slot names the copy; it does not open it. Every request also carries
+a third value from the code (auth_of, X-Sync-Auth), of which the site
+keeps only a SHA-256: the first write with it binds the slot to it, and
+from then on a request without it - to read, write or delete - is turned
+down. Whoever learns a slot (the site's own log, were there one, or its
+disk) can neither delete the copy nor write another in its place. A slot
+written only by an older app, which sends none, goes on as before until a
+computer with this one writes to it; after that the older app's requests
+are turned down and it says so (sync_err_refused) until it is updated.
+
 What syncs (one switch each): favorites with their folders, settings from
 an explicit allow-list (never window sizes, folders and paths of this
 computer, the supporter key, the sync code, logins of other services),
@@ -178,6 +188,13 @@ def derive(raw: bytes) -> tuple[str, bytes]:
     nothing about the other."""
     slot = hkdf(raw, _SALT, b"slot", 32).hex()
     return slot, hkdf(raw, _SALT, b"key", 32)
+
+
+def auth_of(raw: bytes) -> str:
+    """The credential a request to the code's slot carries (64 hex): from a
+    label of its own, so neither the slot nor the key says anything of it,
+    and the site keeps only its SHA-256."""
+    return hkdf(raw, _SALT, b"auth", 32).hex()
 
 
 # -- a snapshot, sealed -----------------------------------------------------------
@@ -950,18 +967,29 @@ def live(doc: dict[str, Any], cat: str) -> dict[str, Any]:
 
 # -- the site ---------------------------------------------------------------------------
 
+#: The header the slot's credential goes in (auth_of).
+AUTH_HEADER = "X-Sync-Auth"
+
+
 class Remote:
     """GET, PUT and DELETE of one slot on dopeiptv.org - with nothing about
     the person: the app's name and version, and the ciphertext. Blocking: a
     worker thread's."""
 
     def __init__(self, slot: str, endpoint: str | None = None,
-                 timeout: float = 20.0) -> None:
+                 timeout: float = 20.0, auth: str = "") -> None:
         self.url = (endpoint or ENDPOINT) + slot
         self.timeout = timeout
         from .. import __version__
         self.headers = {"User-Agent": f"dopeIPTV/{__version__}",
                         "Content-Type": "application/json", **build_check.headers()}
+        if auth:
+            self.headers[AUTH_HEADER] = auth
+
+    @classmethod
+    def of(cls, raw: bytes, endpoint: str | None = None, timeout: float = 20.0) -> Remote:
+        """The site's side of the code *raw*: its slot, with its credential."""
+        return cls(derive(raw)[0], endpoint, timeout, auth=auth_of(raw))
 
     def _call(self, method: str, body: dict | None = None) -> Any:
         from ._lazy_requests import requests

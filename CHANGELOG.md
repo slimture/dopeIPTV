@@ -21,6 +21,13 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   dopeiptv.org alone, five hops at most; it stops reading once more has
   come than the file is (`DOWNLOAD_MAX` when no size is given), and
   GitHub's checksum list stops at 1 MiB while it is read.
+- core/sync.py: every sync request carries a credential from the code
+  (`auth_of`, `X-Sync-Auth`, `Remote.of`) that the site keeps only a
+  SHA-256 of; the first write with it binds the slot, and from then on a
+  request without it - to read, write or delete - is turned down. A slot
+  alone no longer lets anyone delete or replace a household's copy. An
+  older app goes on syncing a slot until a computer with this version
+  writes to it, then says the site turned it down until it is updated.
 
 ## [1.6.8]
 

@@ -271,7 +271,7 @@ class _SyncMixin:
             self._sync_set_status("fail")
             self._sync_next = now + PERIOD
             return False
-        remote = sync.Remote(slot, self._sync_endpoint)
+        remote = sync.Remote.of(raw, self._sync_endpoint)
         self._sync_job = (self._sync_gen, snap, cats, state)
         self._sync_busy = True
         self._sync_set_status("running")
@@ -482,8 +482,7 @@ class _SyncMixin:
         """Sync off here; *delete_there*: the site's copy goes too."""
         raw = sync.code_of(self.settings)
         if delete_there and raw is not None:
-            slot, _key = sync.derive(raw)
-            remote = sync.Remote(slot, self._sync_endpoint)
+            remote = sync.Remote.of(raw, self._sync_endpoint)
             run_async(self._sync_pool, remote.delete, _ignore, self._sync_delete_failed)
         self._sync_forget()
 
