@@ -75,6 +75,21 @@ WHOLE = [
       "dopeiptv/core/build_check.py", "dopeiptv/core/selfupdate.py", "dopeiptv/core/update_keys.py"]),
 ]
 
+#: The question over all the parts at once - the page's "copy everything".
+ALL_ASK = (
+    "Below is dopeIPTV's security and privacy in {n} parts - an open-source TV player, its code at "
+    "commit {ref}. Each part has its own question and the code it is about (each block headed with "
+    "the address of those lines on GitHub). Answer every part in turn: explain in plain English "
+    "what the code does, then review it as an attacker would and say where it falls short. Then, "
+    "at the end, give one table of every weakness you found across all parts - the part, the file "
+    "and line, who could use it (a provider, a device on the network, a web page, another user of "
+    "the computer, someone on the network path, the developer's own server), what they could do, "
+    "how serious it is (critical, high, medium, low), and how to fix it - and an overall "
+    "assessment. Look for ways the parts could be combined, too. Do not guess: say so where "
+    "something depends on code that is not included, and do not take the comments' word for what "
+    "the code does."
+)
+
 _ASK = re.compile(r'<blockquote class="tp-ask" data-for="([a-z]+)">(.*?)</blockquote>', re.S)
 _CODE = re.compile(r"<!--tp:code ([a-z]+) ([a-z]+)-->")
 _H2 = re.compile(r'<h2 id="([a-z]+)">(.*?)</h2>', re.S)
@@ -150,8 +165,7 @@ def main(argv: list[str]) -> int:
         ref = _git(app, "rev-parse", "HEAD")
     parts = kit(app, ref, a.lang)
     os.makedirs(a.out, exist_ok=True)
-    head = (f"dopeIPTV review kit - app {ref[:12]}, {len(parts)} parts. Each part is a question and "
-            f"the code it is about; paste one part at a time, or all of them, into an AI assistant.")
+    head = ALL_ASK.format(n=len(parts), ref=ref)
     for i, (part, text) in enumerate(parts, 1):
         with open(os.path.join(a.out, f"{i:02d}-{part}.txt"), "w", encoding="utf-8") as fh:
             fh.write(text + "\n")

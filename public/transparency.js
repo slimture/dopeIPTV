@@ -8,6 +8,7 @@
   var buttons = document.querySelectorAll(".tp-copy[data-for]");
   if (!buttons.length) { return; }
   function textFor(part) {
+    if (part === "all") { return everything(); }
     var ask = document.querySelector('.tp-ask[data-for="' + part + '"]');
     var out = [ask ? ask.textContent.replace(/\s+/g, " ").trim() : ""];
     [].forEach.call(document.querySelectorAll('.tp-src[data-for="' + part + '"]'), function (src) {
@@ -15,6 +16,19 @@
       out.push("--- " + src.getAttribute("data-head") + " ---\n" + (code ? code.textContent : ""));
     });
     return out.join("\n\n");
+  }
+  // "Copy everything": the question over all of them, then every part's
+  // heading, question and code, in the page's order.
+  function everything() {
+    var all = document.querySelector('.tp-ask[data-for="all"]');
+    var out = [all ? all.textContent.replace(/\s+/g, " ").trim() : ""];
+    [].forEach.call(document.querySelectorAll(".tp-ask[data-for]"), function (ask) {
+      var part = ask.getAttribute("data-for");
+      if (part === "all") { return; }
+      var h = document.getElementById(part);
+      out.push("## " + (h ? h.textContent.replace(/\s+/g, " ").trim() : part) + "\n\n" + textFor(part));
+    });
+    return out.join("\n\n\n");
   }
   function byHand(btn, text) {
     var row = btn.parentNode, box = row.querySelector("textarea.tp-copied");

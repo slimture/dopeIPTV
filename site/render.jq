@@ -938,6 +938,8 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
        | gsub("<!--tp:ex (?<s>[a-z]+) (?<k>[a-z]+)-->"; tp_ex($TP; .s; .k))
        | gsub("<!--tp:tests (?<s>[a-z]+)-->"; tp_tests($TP; .s))
        | gsub("<!--tp:hosts (?<k>[a-z]+) (?<g>[a-z]+)-->"; tp_hosts($TP; .k; .g))
+       | gsub("<!--tp:copyall-->";
+           "<p class=\"tp-copy-row\"><button type=\"button\" class=\"btn primary tp-copy\" data-for=\"all\" data-done=\"\(t("tp_copied") | h)\" hidden>\(t("tp_copy_all") | h)</button></p>")
        | gsub("<!--tp:copy (?<s>[a-z]+)-->";
            "<p class=\"tp-copy-row\"><button type=\"button\" class=\"btn primary tp-copy\" data-for=\"\(.s)\" data-done=\"\(t("tp_copied") | h)\" hidden>\(t("tp_copy") | h)</button></p>")
        | legal_numbers | legal_toc(t("tp_toc"))) as $parts
