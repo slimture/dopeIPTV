@@ -169,6 +169,68 @@ def test_an_update_is_kept_at_its_hour_and_for_thirty_days():
     assert sc.UPDATES_DAYS == 30
 
 
+
+def test_a_months_hashes_go_with_its_key_and_its_counts_stay():
+    from datetime import date
+    sc, _dir = _module()
+    import admin
+    uniques = {"2026-09-01": ["a", "b"], "2026-09-02": ["a", "c", "r"], "2026-09-08": ["d"],
+               "2026-10-05": ["x"], "2026-11-02": ["y"]}
+    kinds = {"2026-09-01": {"p": ["a"], "r": []}, "2026-09-02": {"p": ["c"], "r": ["r"]},
+             "2026-09-08": {"p": [], "r": []}, "2026-10-05": {"p": ["x"], "r": []}}
+    frozen: dict = {}
+    assert sc.freeze_months(uniques, kinds, frozen, date(2026, 11, 19)) == 1
+    assert sorted(uniques) == ["2026-10-05", "2026-11-02"] and "2026-09-01" not in kinds
+    sep = frozen["2026-09"]
+    assert sep["unique"] == 4 and sep["people"] == 2 and sep["robots"] == 1
+    assert sep["weeks"] == {"2026-08-31": 3, "2026-09-07": 1}
+    assert not any(f'"{h}"' in json.dumps(frozen) for h in "abcdrxy"), "no hash is kept"
+    # Counted once: a second run leaves the numbers as they are.
+    assert sc.freeze_months(uniques, kinds, frozen, date(2026, 11, 20)) == 0
+    # The admin page: a whole month from its count, a whole week from its
+    # own, a few days of a week as the days' visitors summed.
+    per_day = {"2026-09-01": {"visitors": 2}, "2026-09-02": {"visitors": 2},
+               "2026-09-08": {"visitors": 1}, "2026-10-05": {"visitors": 1}}
+    sept = ["2026-09-%02d" % i for i in range(1, 31)]
+    assert admin._union(uniques, sept, per_day, kinds, frozen) == 4
+    assert admin._union(uniques, sept + ["2026-10-05"], per_day, kinds, frozen) == 5
+    assert admin._union(uniques, ["2026-09-%02d" % i for i in range(1, 7)], per_day, kinds, frozen) == 3
+    assert admin._union(uniques, ["2026-09-02", "2026-09-08"], per_day, kinds, frozen) == 2 + 1
+    j = admin._judged(uniques, kinds, sept, per_day, frozen)
+    assert j["people"] == 2 and j["robots"] == 1 and j["all"]
+
+
+def test_a_whole_month_of_visits_is_k_anonymous():
+    sc, _dir = _module()
+    base = {"country": "SE", "browser": "Firefox", "os": "Linux", "device": "desktop", "lang": "sv",
+            "channel": "", "site": "", "pages": 2, "time": 40, "timed": True, "returning": False,
+            "downloaded": False, "donate": False, "kind": ""}
+    rows = [dict(base, day="2026-09-%02d" % (1 + i % 3)) for i in range(15)]
+    lone = dict(base, day="2026-09-17", country="IS", browser="Lynx", site="example.org",
+                pages=37, time=1234, donate=True)
+    rows.append(lone)
+    out = sc.k_anonymous(rows)
+    key = lambda a: tuple(a.get(f) for f in sc._QI)  # noqa: E731
+    counts: dict = {}
+    for a in out:
+        counts[key(a)] = counts.get(key(a), 0) + 1
+    assert all(n >= sc.K_ANON for n in counts.values())
+    assert not any(a.get("site") == "example.org" or a.get("browser") == "Lynx" for a in out)
+    assert all(a["pages"] in (1, 2, 3, 5, 6) and a["time"] in sc._TIMES for a in out)
+    # Fewer than K_ANON visits in a month: none kept one by one.
+    assert sc.k_anonymous(rows[:3]) == []
+    # The month is made so once it is whole, and only once.
+    os.makedirs(sc.ANON_DIR, exist_ok=True)
+    path = os.path.join(sc.ANON_DIR, "2026-09.json")
+    with open(path, "w") as fh:
+        json.dump({"days": ["2026-09-01"], "visits": rows}, fh)
+    sc._close_months()
+    with open(path) as fh:
+        month = json.load(fh)
+    assert month["k"] == sc.K_ANON and len(month["visits"]) == len(out)
+    sc._close_months()
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     for name, fn in tests:

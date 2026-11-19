@@ -74,6 +74,7 @@
 <h4>Settings sync</h4>
 <p>For everyone, only if you turn it on. What you choose to sync – favourites, settings and, if you turn them on, playlists with their logins and watch history – is encrypted on your computer, before anything is sent, with a key made from a sync code that only your computers know.</p>
 <p>Our server stores only the encrypted data, under a random-looking number that is also made from that code, with a version number and the time it was written. We cannot read it and cannot tell whose it is: sync needs no account, no e-mail address, no name and no supporter key, and nothing that identifies you is sent. Sync requests are not logged.</p>
+<p>The number alone opens nothing: every request also carries a credential made from the same code, of which the server keeps only a one-way hash. Once a computer with dopeIPTV 1.6.9 or later has synced, the server refuses to read, replace or delete the data for anyone who does not have it.</p>
 <ul>
 <li><strong>Space:</strong> one synced copy can be at most 2 MB and all copies together at most 5 GB. When that space is full, a new copy has to wait, while copies already stored can still be updated.</li>
 <li><strong>Deleting:</strong> data that no computer has read or written for 180 days is deleted, and you can delete it yourself in the app (<em>Stop syncing on this computer</em>, then also delete the synced copy).</li>
@@ -122,7 +123,7 @@
 <p>To send you a page, our web server needs your IP address, and your browser also sends the address of the page, the time, the name and version of your browser and system (the user agent), the page you came from (the referrer) and the languages you prefer.</p>
 <ul>
 <li>The front server, which handles the encrypted connection, keeps no log of the requests to dopeiptv.org, and writes an error down only when something stops it working. Settings sync and watch together requests are never logged anywhere.</li>
-<li>For the statistics below, the server keeps two separate logs with IP address, time, address, status, referrer, browser and language: one of page views and the pages' view signal, and one of download clicks. Both are turned over every night and only the day before is kept – two days at the most –, then removed automatically. They are the only places where your IP address is written down.</li>
+<li>Nothing else is logged: the server behind it writes no log of other requests. For the statistics below it keeps two separate logs with IP address, time, address, status, referrer (only the address of the page you came from, never its query or fragment, which can hold a search or a session), browser and language: one of page views and the pages' view signal, and one of download clicks. Both are turned over every night and only the day before is kept – two days at the most –, then removed automatically. They are the only places where your IP address is written down.</li>
 <li>The services behind the website – the supporter key, feedback, sync and watch together – keep IP addresses only in memory, briefly – at most a day – to limit how many requests one address can make.</li>
 </ul>
 <p>Legal basis: our legitimate interest in running the website securely (Article 6(1)(f)).</p>
@@ -150,9 +151,8 @@
 <p>The ID does not show the address, we do not link it to anything else and we never try to find out who is behind it – it exists only so that we can count unique and returning visitors. It is pseudonymous, not anonymous: as long as its month's key exists, someone who had both the statistics and the key could try addresses until one fits.</p></li>
 <li><strong>After two days at the most</strong> the log with the IP addresses is deleted automatically.</li>
 <li><p><strong>After 30 days</strong> the ID, the time of day, the screen size and the version numbers are removed, the time is rounded to ten seconds and the visit is mixed with the rest of the month, so that their order tells nothing.</p>
-<p>Only the day, country, browser and system, type of device, page language, how the visitor came, the number of pages and whether there was a download or a support link followed remain. That is no longer personal data and is kept without a time limit, as are the totals per day.</p></li>
-<li><strong>When the month after the visit's month has ended</strong>, that month's key is deleted. From then on no one – we included – can tell which address an ID belonged to.</li>
-<li><strong>After 25 months</strong> the last visitor IDs, which by then can be tied to nothing, are deleted; they are kept only to count visitors per day, week and month.</li>
+<p>Only the day, country, browser and system, type of device, page language, how the visitor came, the number of pages and whether there was a download or a support link followed remain. Once the month is over, every visit kept is made to look like at least four others of the same month in all of these: a rarer one loses details, one at a time – the site it came from, the language, the browser and so on, its day becoming its week – and one that still stands out is removed, leaving only the day's totals. That is no longer personal data and is kept without a time limit, as are the totals per day.</p></li>
+<li><strong>When the month after the visit's month has ended</strong>, that month's key is deleted, and with it the month's visitor IDs: only the number of different visitors in the month and in each week of it is kept. From then on there is no ID left to tie to anything.</li>
 </ol>
 <p>Until step 3 each visit is kept with:</p>
 <ul>
@@ -226,7 +226,7 @@
 <p>Most of what we keep says nothing about who you are: no name, no e-mail address, no IP address, no account. Only two things are tied to a person – an e-mail you send us, and a payment (at Stripe and in our accounts). Everything else holds nothing that points to you, or is kept only briefly and then deleted automatically.</p>
 <ul>
 <li><strong>Server logs</strong> – the only places where an IP address is written down, with the browser and what was fetched, nothing else about you: the statistics' two logs, two days at the most. Then removed automatically. The front server keeps no log of requests.</li>
-<li><strong>Statistics</strong> – no IP address and no name, only a pseudonymous ID: each visit for 30 days, then fully anonymous (without ID, time of day or screen size); the key that makes the IDs is deleted when the month after has ended, the last IDs after 25 months. Update records, never with an IP address, exact time or ID: 30 days.</li>
+<li><strong>Statistics</strong> – no IP address and no name, only a pseudonymous ID: each visit for 30 days, then fully anonymous (without ID, time of day or screen size); the key that makes the IDs, and the IDs with it, are deleted when the month after has ended; only counts remain. Update records, never with an IP address, exact time or ID: 30 days.</li>
 <li><strong>Error reports and feedback</strong> – no IP address, no name, no e-mail address, and cleaned of anything identifying before they are stored: 12 months, then removed automatically.</li>
 <li><strong>Synced data</strong> – encrypted on your computer, so we cannot read it or tell whose it is: until you delete it, or 180 days after it was last used.</li>
 <li><strong>Watch together</strong> – encrypted, in memory only, never on disk: until an hour after the room's last request.</li>

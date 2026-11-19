@@ -180,23 +180,67 @@ def _net(row: dict) -> dict:
     return out
 
 
-def _union(uniques: dict, days: list, per_day: dict, kinds: dict):
-    """Different visitors over these days, the likely robots left out, or
-    None where a day had visitors whose hashes are gone (kept 25 months) -
-    the page then shows the visits summed instead."""
-    if any((per_day.get(d) or {}).get("visitors") and d not in uniques for d in days):
+def _week(day: str) -> str:
+    d = date.fromisoformat(day)
+    return (d - timedelta(days=d.weekday())).isoformat()
+
+
+def _frozen_part(f: dict, days: list, per_day: dict):
+    """Different visitors on *days* of a month whose hashes are gone, from
+    its counts (stats_collect.freeze_months): the month's when the days hold
+    all of it, else its whole weeks' and the rest's per day (visitors over a
+    few days of a week are the days' summed). None as _union says."""
+    want = set(days)
+    have = set(f.get("days") or [])
+    if any((per_day.get(d) or {}).get("visitors") and d not in have for d in want):
         return None
-    seen: set = set()
+    if have <= want:
+        return int(f.get("unique") or 0)
+    n, covered = 0, set()
+    for w, count in (f.get("weeks") or {}).items():
+        wdays = {d for d in have if _week(d) == w}
+        if wdays and wdays <= want:
+            n += int(count or 0)
+            covered |= wdays
+    return n + sum((per_day.get(d) or {}).get("visitors", 0) for d in want - covered)
+
+
+def _union(uniques: dict, days: list, per_day: dict, kinds: dict, frozen: dict | None = None):
+    """Different visitors over these days, the likely robots left out - a
+    month at a time, since a visitor's hash is its month's own (a key per
+    month) - or None where a day had visitors whose hashes are gone and no
+    count of them is kept: the page then shows the visits summed instead. A
+    month whose key has gone is counted from its numbers (*frozen*)."""
+    frozen = frozen or {}
+    by_month: dict = {}
     for d in days:
-        robots = set((kinds.get(d) or {}).get("r", ()))
-        seen.update(x for x in uniques.get(d, ()) if x not in robots)
-    return len(seen)
+        by_month.setdefault(d[:7], []).append(d)
+    total = 0
+    for m, ds in by_month.items():
+        if m in frozen:
+            part = _frozen_part(frozen[m], ds, per_day)
+            if part is None:
+                return None
+            total += part
+            continue
+        if any((per_day.get(d) or {}).get("visitors") and d not in uniques for d in ds):
+            return None
+        seen: set = set()
+        for d in ds:
+            robots = set((kinds.get(d) or {}).get("r", ()))
+            seen.update(x for x in uniques.get(d, ()) if x not in robots)
+        total += len(seen)
+    return total
 
 
-def _judged(uniques: dict, kinds: dict, days: list, per_day: dict) -> dict:
+def _judged(uniques: dict, kinds: dict, days: list, per_day: dict, frozen: dict | None = None) -> dict:
     """Over these days: the different visitors who showed they were people,
     those judged likely robots (and nothing else), and from which day visits
-    were judged - a day counted before that was not."""
+    were judged - a day counted before that was not. A month whose hashes
+    are gone counts with its numbers when the days hold all of it, else as
+    not judged."""
+    frozen = frozen or {}
+    want = set(days)
     judged = [d for d in days if d in kinds]
     people: set = set()
     robots: set = set()
@@ -206,12 +250,20 @@ def _judged(uniques: dict, kinds: dict, days: list, per_day: dict) -> dict:
         people.update(kinds[d].get("p", ()))
         robots.update(r)
         others.update(x for x in uniques.get(d, ()) if x not in r)
+    n_people, n_robots = len(people), len(robots - others)
+    for f in frozen.values():
+        fj = set(f.get("judged") or [])
+        if fj and fj <= want:
+            judged += sorted(fj)
+            n_people += int(f.get("people") or 0)
+            n_robots += int(f.get("robots") or 0)
     left_out = [(per_day.get(d) or {}).get("robots") or {} for d in days]
-    return {"people": len(people), "robots": len(robots - others),
+    return {"people": n_people, "robots": n_robots,
             "views": sum(rb.get("views", 0) for rb in left_out),
             "downloads": sum(sum(((rb.get("lists") or {}).get("downloads") or {}).values()) for rb in left_out),
             "since": min(judged) if judged else None,
-            "all": all(d in kinds for d in days if (per_day.get(d) or {}).get("visitors"))}
+            "all": all(d in kinds or d in set(judged) for d in days
+                       if (per_day.get(d) or {}).get("visitors"))}
 
 
 SUMMED = ("views", "visitors", "requests", "visits", "engaged", "bounces", "returning", "timed")
@@ -242,6 +294,7 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
     stats = _load(os.path.join(stats_dir, "stats.json"), {"days": {}})
     uniques = _load(os.path.join(stats_dir, "uniques.json"), {})
     kinds = _load(os.path.join(stats_dir, "kinds.json"), {})
+    frozen = _load(os.path.join(stats_dir, "uniques-months.json"), {})
     per_day = {d: _net(row) for d, row in (stats.get("days") or {}).items()}
     today = datetime.now().astimezone().date()  # the server's day, as the logs' dates
     if days:
@@ -276,11 +329,11 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
             _sum_into(total, row.get(k))
     if step != "day":                           # a week's or month's different visitors
         for key_b, ds in bucket_days.items():
-            u = _union(uniques, ds, per_day, kinds)
+            u = _union(uniques, ds, per_day, kinds, frozen)
             if u is not None:
                 buckets[key_b]["visitors"] = u
     series = [dict(date=k, **v) for k, v in sorted(buckets.items())]
-    totals["unique"] = _union(uniques, range_days, per_day, kinds)
+    totals["unique"] = _union(uniques, range_days, per_day, kinds, frozen)
 
     before = None
     if days:
@@ -293,7 +346,7 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
                 before[k] += _timed(row) if k == "timed" else row.get(k, 0)
             before["downloads"] += sum((row.get("downloads") or {}).values())
             before["updates"] += _updates(row)
-        before["unique"] = _union(uniques, prev_days, per_day, kinds)
+        before["unique"] = _union(uniques, prev_days, per_day, kinds, frozen)
 
     don = donations(key, api_version)
     since = datetime.combine(first, datetime.min.time()).astimezone().timestamp()
@@ -321,7 +374,7 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
         y["donations"] += 1
         y["sums"][r["currency"]] = y["sums"].get(r["currency"], 0) + r["amount"]
     for y in years.values():
-        y["unique"] = _union(uniques, y.pop("days"), per_day, kinds)
+        y["unique"] = _union(uniques, y.pop("days"), per_day, kinds, frozen)
 
     dl_all = _load(downloads_json, {})
     return {
@@ -333,7 +386,7 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
         "geo": bool(stats.get("geo")),
         "today": {k: (per_day.get(today.isoformat()) or {}).get(k, 0) for k in ("views", "visitors")},
         "totals": totals,
-        "judged": _judged(uniques, kinds, range_days, per_day),
+        "judged": _judged(uniques, kinds, range_days, per_day, frozen),
         "before": before,
         "series": series,
         "top": {k: _top(v) for k, v in sums.items()},

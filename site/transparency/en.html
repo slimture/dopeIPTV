@@ -224,7 +224,7 @@
 <li><b>After 30 days</b> a visit loses its ID, the time of day and the screen size. Only anonymous figures remain.</li>
 </ol>
 <p>The visitor ID is a <strong>keyed hash</strong>: the IP address and the browser's name run through HMAC-SHA256 with a key that exists only on our server, cut to twelve characters. The key is new every month, and a month's key is deleted once the month after it has ended. Within a month the same visitor gets the same ID, so we can count unique and returning visitors. The ID does not show the address, but it is pseudonymous, not anonymous: as long as its month's key exists, whoever had both the statistics and the key could try addresses until one fits. Once the key is gone, nobody can – we included.</p>
-<p>How long each part is kept: the log with your address two days at the most; each visit in detail – its ID, the second it came, the browser's version, the screen, the languages, the page that linked here, all of which together could point to one person – 30 days; the key that made its ID until the month after has ended; the IDs on their own, to count visitors per day, week and month, 25 months – by then they can be tied to nothing; after that only anonymous figures. A payment is never noted on a visit – a tip counts only in the day's total – so a visit cannot be tied to the payment service's record of who paid.</p>
+<p>How long each part is kept: the log with your address two days at the most; each visit in detail – its ID, the second it came, the browser's version, the screen, the languages, the page that linked here, all of which together could point to one person – 30 days; the key that made its ID, and the month's IDs with it, until the month after has ended – then only the number of different visitors in that month and its weeks; the anonymous visits kept after that are each made to look like at least four others of their month, or removed. A payment is never noted on a visit – a tip counts only in the day's total – so a visit cannot be tied to the payment service's record of who paid.</p>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">
@@ -264,7 +264,7 @@
 </ul>
 
 <h2 id="hosts">7. Where the app connects</h2>
-<p class="tp-promise">Every network destination named in the app's own code is listed here, with when the app uses it.</p>
+<p class="tp-promise">The network destinations we found in the app's own code are listed here, with when the app uses each. It is what a search found, not a promise of every one.</p>
 <p>The list is made by searching the app's code for every host name in it – the same search you can run yourself. The app also talks to what you add yourself: your sources, and the boxes, TVs and servers on your network – and to the addresses their own lists name, such as channel logos and guides on other servers, and, through yt-dlp, the site of an address you open. Those come from your data, not from the code, so they are not in the lists below.</p>
 <p>The list is what the app's own code names. It is not a guarantee that no other connection can happen: the libraries it is built on, the video player inside it (mpv and FFmpeg), yt-dlp and your operating system can make connections of their own, and an address put together while the app runs is not written out in the code. What you can do is read the linked code and watch the app's traffic yourself – both below.</p>
 <h3>Addresses the app connects to</h3>
@@ -282,7 +282,7 @@
 <tr><td><!--tp:hosts talks hdhomerun--></td><td>SiliconDust: the guide for an HDHomeRun tuner you add.</td></tr>
 <tr><td><!--tp:hosts talks itunes--></td><td>Apple's iTunes Search: missing cover art for your own music (artist and album). You can turn it off.</td></tr>
 <tr><td><!--tp:hosts talks demo--></td><td>Mux, Apple and Bitmovin: the demo channels, only when you play them.</td></tr>
-<tr><td><!--tp:hosts talks dns--></td><td>Cloudflare, Quad9 or Google: only if you turn on the app's own DNS (Nerd settings) and choose one of them.</td></tr>
+<tr><td><!--tp:hosts talks dns--></td><td>Cloudflare, Quad9 or Google: only if you turn on the app's own DNS (Nerd settings) and choose one of them. (<code>8.8.8.8</code> is also in the casting code, where nothing is sent to it – see below.)</td></tr>
 </tbody>
 </table>
 <h3>Addresses the app only shows you</h3>
@@ -320,14 +320,17 @@ grep -rnoE --include='*.py' "[\"'][a-z0-9.-]+\.(org|com|net|info|tv|io|dev|se|ap
 <p>Or watch what the app really does: an application firewall shows every connection as it happens – OpenSnitch on Linux, LuLu or Little Snitch on a Mac, or the firewall's log on Windows. It shows what happened while you watched, with your settings: try the features you use, and the ones you do not.</p>
 
 <h2 id="builds">8. How you know the app runs this code</h2>
-<p class="tp-promise">The app you download is built from exactly this code, in public, and it can tell when it has been changed.</p>
+<p class="tp-promise">The app you download is built in public from the version's tag in this code, signed, and it can tell when it has been changed.</p>
 <ul>
 <li><strong>Built in public.</strong> Every release is built by GitHub Actions from the version's tag in the code – not on our computers. <a href="https://github.com/slimture/dopeIPTV/blob/%REF%/.github/workflows/release.yml" rel="noopener">The build's recipe</a> is in the code, and <a href="https://github.com/slimture/dopeIPTV/actions/workflows/release.yml" rel="noopener">the log of every build</a> is open to anyone.</li>
-<li><strong>Signed.</strong> The release's files are listed with their checksums, and the list is signed with our release key. The app checks an update against it, and this website checks every file it hands out against it too.</li>
+<li><strong>Signed.</strong> The release's files are listed with their checksums, and the list is signed with our release key. The app checks an update against it, and this website checks every file it hands out against it too, before it hands it out (below).</li>
+<li><strong>Not yet reproducible.</strong> The build's log and the signature show what was built, from which tag and where. They are not a byte-for-byte proof: the builds are not reproducible yet, so you cannot build the same bytes yourself and compare. Until they are, the open log and recipe are what you can check.</li>
 <li><strong>It checks itself.</strong> The app carries a signed list of its own files and checks them when it starts. A changed copy knows it is changed, and does not use our services: it looks for no updates here and sends no reports to us. Run straight from the code, it says so, and works as an official build.</li>
 <li><strong>A courtesy, not a lock.</strong> The check is made by the app itself, and what kind of build it is the app says about itself. A copy changed on purpose can change the check too, and anyone can write a request by hand. So none of the protection on this page rests on it – that is the encryption and the cleaning above. What it gives you is an app that knows when it is not ours, and says so.</li>
 </ul>
 <!--tp:code builds allowed-->
+<p>And how this website checks a release's files before it hands one out – a list not signed with our key, or a file not on it, and nothing goes out:</p>
+<!--tp:code builds site-->
 <p>You can also run the tests yourself, or run the app straight from the code:</p>
 <pre class="tp-cmd"><code>git clone https://github.com/slimture/dopeIPTV
 cd dopeIPTV

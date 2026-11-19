@@ -961,7 +961,9 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "iptv-donate"
     sys_version = ""
 
-    def log_message(self, fmt: str, *args) -> None:     # nginx logs requests
+    def log_message(self, fmt: str, *args) -> None:
+        # Nothing of a request is written here - not its address, path or
+        # time. (nginx logs only the statistics' page views and downloads.)
         pass
 
     def _send(self, status: int, body: dict) -> None:
@@ -1502,11 +1504,17 @@ class Handler(BaseHTTPRequestHandler):
         if self.command != "GET" and not _allowed("sync-w:" + addr, SYNC_WRITES_PER_WINDOW):
             return self._send(429, {"error": "slow down"})
         where = _stats_dir()
-        if self.command == "GET":
-            got = sync.get(where, slot)
-            return self._send(200, got) if got else self._send(404, {"error": "none"})
-        if self.command == "DELETE":
-            return self._send(200, {"deleted": sync.delete(where, slot)})
+        auth = self.headers.get("X-Sync-Auth") or ""
+        if auth and not sync.AUTH.match(auth):
+            return self._send(400, {"error": "auth"})
+        try:
+            if self.command == "GET":
+                got = sync.get(where, slot, auth)
+                return self._send(200, got) if got else self._send(404, {"error": "none"})
+            if self.command == "DELETE":
+                return self._send(200, {"deleted": sync.delete(where, slot, auth)})
+        except sync.Refused:
+            return self._send(403, {"error": "refused"})
         try:
             length = int(self.headers.get("Content-Length") or 0)
         except ValueError:
@@ -1525,7 +1533,7 @@ class Handler(BaseHTTPRequestHandler):
         if not sync.exists(where, slot) and not _allowed("sync-new:" + addr, SYNC_NEW_PER_DAY, DAY):
             return self._send(429, {"error": "slow down"})
         try:
-            status, body = sync.put(where, slot, data.get("version_seen"), data.get("blob"))
+            status, body = sync.put(where, slot, data.get("version_seen"), data.get("blob"), auth)
         except OSError as e:
             print(f"[donate] sync: not stored ({type(e).__name__})", file=sys.stderr, flush=True)
             return self._send(503, {"error": "not stored"})

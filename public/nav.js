@@ -93,7 +93,10 @@ var iptvHit = (function () {
     started = true;
     since = Date.now();
     var src = (/[?&](?:ref|utm_source|source)=([^&#]*)/.exec(location.search) || [])[1] || "";
-    send("ev=view&r=" + encodeURIComponent(document.referrer || "") +
+    // The page that linked here without its query or fragment: those can
+    // carry a search, a session or a click id, and are never needed.
+    var ref = (document.referrer || "").split(/[?#]/)[0];
+    send("ev=view&r=" + encodeURIComponent(ref) +
          "&s=" + encodeURIComponent(decodeURIComponent(src).slice(0, 40)) +
          "&l=" + encodeURIComponent(document.documentElement.lang || "") +
          "&bl=" + encodeURIComponent(navigator.language || "") +

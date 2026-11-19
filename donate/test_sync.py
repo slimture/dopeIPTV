@@ -279,6 +279,63 @@ def test_the_routes_need_no_key_and_keep_only_ciphertext():
         srv.server_close()
 
 
+def test_a_bound_slot_opens_only_to_its_credential():
+    """X-Sync-Auth: the first write with one binds the slot to its SHA-256
+    (all that is kept); from then on a GET, PUT or DELETE without it is
+    403 - before the copy or its version is said - and a slot an older
+    app wrote without one goes on as before until a newer app writes."""
+    import hashlib
+    d = tempfile.mkdtemp()
+    auth, other = "1f" * 32, "2e" * 32
+    assert sync.put(d, SLOT, 0, _blob())[0] == 200                 # an older app's: unbound
+    assert sync.get(d, SLOT)["version"] == 1
+    assert sync.put(d, SLOT, 1, _blob(), auth)[0] == 200           # the newer app binds it
+    with open(os.path.join(sync.folder(d), SLOT + ".json")) as fh:
+        kept = json.load(fh)
+    assert kept["auth"] == hashlib.sha256(auth.encode()).hexdigest() and auth not in json.dumps(kept)
+    assert sync.get(d, SLOT, auth)["version"] == 2
+    for who in ("", other):
+        try:
+            sync.get(d, SLOT, who)
+        except sync.Refused:
+            pass
+        else:
+            raise AssertionError("read without the credential")
+        assert sync.put(d, SLOT, 2, _blob(), who) == (403, {"error": "refused"})
+        assert sync.put(d, SLOT, 0, _blob(), who) == (403, {"error": "refused"}), \
+            "a stale version is not answered with the copy either"
+        try:
+            sync.delete(d, SLOT, who)
+        except sync.Refused:
+            pass
+        else:
+            raise AssertionError("deleted without the credential")
+    assert sync.put(d, SLOT, 2, _blob(), auth)[0] == 200           # the binding stays
+    with open(os.path.join(sync.folder(d), SLOT + ".json")) as fh:
+        assert json.load(fh)["auth"] == kept["auth"]
+    assert sync.delete(d, SLOT, auth) and sync.get(d, SLOT, auth) is None
+    # A new slot written with a credential is bound from its first version.
+    assert sync.put(d, SLOT, 0, _blob(), auth)[0] == 200
+    assert sync.put(d, SLOT, 1, _blob())[0] == 403
+
+    # Over HTTP: the header, a malformed one refused outright.
+    srv, _key, _stats, _donate = _service()
+    try:
+        path = "/sync/" + "cd" * 32
+        h = {"X-Sync-Auth": auth}
+        assert _call(srv, "PUT", path, None, {"version_seen": 0, "blob": _blob()}, headers=h)[0] == 200
+        assert _call(srv, "GET", path, headers=h)[0] == 200
+        assert _call(srv, "GET", path) == (403, {"error": "refused"})
+        assert _call(srv, "GET", path, headers={"X-Sync-Auth": other})[0] == 403
+        assert _call(srv, "GET", path, headers={"X-Sync-Auth": "nope"})[0] == 400
+        assert _call(srv, "PUT", path, None, {"version_seen": 1, "blob": _blob()})[0] == 403
+        assert _call(srv, "DELETE", path) == (403, {"error": "refused"})
+        assert _call(srv, "DELETE", path, headers=h) == (200, {"deleted": True})
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
 def test_an_address_is_slowed_down():
     srv, key, _stats, donate = _service()
     try:

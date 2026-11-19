@@ -60,8 +60,12 @@ it moves to STATS_DIR/visits-anon/<month>.json with its day, country,
 browser and system without versions, device, page language, how the
 visitor came, the number of pages, the time rounded to ten seconds, and
 whether there was a download or the donate dialog - no id, no time of day,
-no screen, mixed in the month so their order tells nothing. Those, and the
-counts per day, are kept for good.
+no screen, mixed in the month so their order tells nothing. Once a month is
+whole they are made k-anonymous (k_anonymous, K_ANON = 5): pages and time
+in a few steps, and a visit unlike four others of its month in everything
+kept is told less - its site, channel, language, browser and so on, field
+by field, its day as its week - until it is like them, or left out (its
+counts stay in the day's). Those, and the counts per day, are kept for good.
 
 Each update the app fetched for itself goes to STATS_DIR/updates/<day>.json
 for the same log: the hour it came in, the file, the version it came from,
@@ -78,10 +82,12 @@ statistics and the key could try addresses until one fits - the ID is
 pseudonymous, not anonymous; after it nobody can, this server's own
 administrators included. So a visitor is the same visitor within a month
 and is told returning from the month before at the most; unique visitors
-over a span longer than a month are the months' summed. The hashes are
-kept 25 months (uniques.json) to count them per day, week and month;
-kinds.json, which of a day's visitors were people and which robots, keeps
-the same hashes as long. Robots that say so, scripts and empty browser
+over a span longer than a month are the months' summed. The hashes
+(uniques.json; kinds.json, which of a day's visitors were people and which
+robots) are kept only while their month's key is: once it goes, the month
+is counted once more - different visitors in the month and in each of its
+weeks, people and robots - into uniques-months.json, and its hashes are
+deleted (freeze_months). Robots that say so, scripts and empty browser
 names are left out everywhere.
 
 Your own visits are left out three ways: a browser that has opened the
@@ -145,7 +151,6 @@ SITE_HOSTS = {h.strip().lower() for h in CONF.get(
     "SITE_HOST", "dopeiptv.org,www.dopeiptv.org,iptv.dope.rs").split(",") if h.strip()}
 GEO_DB = CONF.get("GEO_DB", os.path.join(STATS_DIR, "dbip-country-lite.mmdb"))
 GEO_URL = "https://download.db-ip.com/free/dbip-country-lite-{month}.mmdb.gz"
-KEEP_UNIQUE_DAYS = 761    # the visitor hashes: 25 months, a year against the year before
 KEEP_PER_DAY = 40         # a day's longest lists (sites, files): the top 40, the rest summed
 VISITS_DIR = os.path.join(STATS_DIR, "visits")
 ANON_DIR = os.path.join(STATS_DIR, "visits-anon")
@@ -1106,8 +1111,10 @@ def collect(backfill: bool = False, with_fetch: bool = False) -> None:
         seen_dl = state.setdefault("seen_dl", {})
         for old in sorted(seen_dl)[:-2]:        # a download's day can only still get lines for a day
             seen_dl.pop(old, None)
-        for old in sorted(uniques)[:-KEEP_UNIQUE_DAYS]:
-            uniques.pop(old, None)
+        frozen_path = os.path.join(STATS_DIR, "uniques-months.json")
+        frozen = _load(frozen_path, {})
+        if freeze_months(uniques, kinds, frozen, datetime.now().astimezone().date()):
+            _save(frozen_path, frozen)
         for old in [d for d in kinds if not uniques or d < min(uniques)]:
             kinds.pop(old, None)
         # A day's list of sites or files stays short, so the years stay small -
@@ -1205,6 +1212,120 @@ def _updates_to_the_hour(state: dict) -> None:
     state["updates_hourly"] = 1
 
 
+def week_of(day: str) -> str:
+    """The Monday a day's week starts on (the admin page's weeks)."""
+    d = date.fromisoformat(day)
+    return (d - timedelta(days=d.weekday())).isoformat()
+
+
+def freeze_months(uniques: dict, kinds: dict, frozen: dict, today: date) -> int:
+    """The months whose key is gone (all but this one and the one before):
+    counted into *frozen* - {"days", "unique", "weeks", "judged", "people",
+    "robots"}, as the admin page counts them from the hashes - and their
+    hashes deleted from *uniques* and *kinds*. A month counted before keeps
+    its numbers. Returns how many months went."""
+    keep_from = _month_before(today.strftime("%Y-%m"))
+    months = sorted({d[:7] for d in (*uniques, *kinds) if d[:7] < keep_from})
+    for m in months:
+        days = sorted(d for d in {*uniques, *kinds} if d[:7] == m)
+        if m not in frozen:
+            seen: set = set()
+            people: set = set()
+            robots: set = set()
+            others: set = set()
+            weeks: dict = {}
+            for d in days:
+                r = set((kinds.get(d) or {}).get("r", ()))
+                mine = {x for x in uniques.get(d, ()) if x not in r}
+                seen |= mine
+                weeks.setdefault(week_of(d), set()).update(mine)
+                if d in kinds:
+                    people.update(kinds[d].get("p", ()))
+                    robots |= r
+                    others |= mine
+            frozen[m] = {"days": [d for d in days if d in uniques], "unique": len(seen),
+                         "weeks": {w: len(v) for w, v in sorted(weeks.items())},
+                         "judged": [d for d in days if d in kinds],
+                         "people": len(people), "robots": len(robots - others)}
+        for d in days:
+            uniques.pop(d, None)
+            kinds.pop(d, None)
+    return len(months)
+
+
+#: Each visit kept for good is like at least K_ANON - 1 others of its month
+#: in every field kept (k_anonymous).
+K_ANON = 5
+#: The fields a kept visit could be told by, together.
+_QI = ("day", "country", "browser", "os", "device", "lang", "channel", "site", "pages",
+       "time", "timed", "returning", "downloaded", "donate", "kind")
+_TIMES = (0, 10, 30, 60, 180, 600, 1800)
+
+
+def _week_in_month(day: str) -> str:
+    return max(week_of(day), day[:8] + "01")
+
+
+#: What a visit unlike K_ANON - 1 others is told less by, in this order -
+#: the least telling first, the day (to its week) and the country last.
+_LESS = (
+    ("site", lambda a: ""), ("channel", lambda a: ""), ("lang", lambda a: ""),
+    ("kind", lambda a: ""), ("browser", lambda a: "Other"), ("os", lambda a: "Other"),
+    ("device", lambda a: ""), ("time", lambda a: 0), ("pages", lambda a: 1),
+    ("returning", lambda a: None), ("downloaded", lambda a: None),
+    ("donate", lambda a: None), ("timed", lambda a: None),
+    ("day", lambda a: _week_in_month(a["day"])), ("country", lambda a: ""),
+)
+
+
+def k_anonymous(rows: list, k: int = K_ANON) -> list:
+    """A whole month's anonymous visits with every one like at least k - 1
+    others in all of _QI: the pages and the time in a few steps first, then
+    a rarer visit told less, field by field (_LESS), until it is; one still
+    rare after all of them is left out (the day's counts keep it)."""
+    def key(a: dict) -> tuple:
+        return tuple(a.get(f) for f in _QI)
+    out = []
+    for a in rows:
+        if not isinstance(a, dict) or not a.get("day"):
+            continue
+        pages = int(a.get("pages") or 0)
+        t = max(int(a.get("time") or 0), 0)
+        out.append(dict(a, pages=pages if pages <= 3 else 5 if pages <= 5 else 6,
+                        time=max(x for x in _TIMES if x <= t)))
+    for field, less in _LESS:
+        counts: dict = {}
+        for a in out:
+            counts[key(a)] = counts.get(key(a), 0) + 1
+        rare = [a for a in out if counts[key(a)] < k]
+        if not rare:
+            break
+        for a in rare:
+            a[field] = less(a)
+    counts = {}
+    for a in out:
+        counts[key(a)] = counts.get(key(a), 0) + 1
+    return [a for a in out if counts[key(a)] >= k]
+
+
+def _close_months() -> None:
+    """A month of anonymous visits that is whole - before this one, and no
+    day of it left in detail - made k-anonymous once."""
+    this_month = datetime.now(timezone.utc).strftime("%Y-%m")
+    left = {os.path.basename(f)[:7] for f in glob.glob(os.path.join(VISITS_DIR, "*.json"))}
+    for f in sorted(glob.glob(os.path.join(ANON_DIR, "*.json"))):
+        m = os.path.basename(f)[:7]
+        if m >= this_month or m in left:
+            continue
+        month = _load(f, {})
+        if not isinstance(month, dict) or month.get("k"):
+            continue
+        month["visits"] = k_anonymous(month.get("visits") or [])
+        month["visits"].sort(key=lambda a: tuple(str(a.get(x)) for x in _QI))
+        month["k"] = K_ANON
+        _save(f, month)
+
+
 def _anonymize_old() -> None:
     """Visits older than STATS_VISITS_DAYS: into the month's anonymous file,
     then the day's file goes. A day already in the month file is never
@@ -1225,6 +1346,7 @@ def _anonymize_old() -> None:
             _save(month_path, month)
         with contextlib.suppress(OSError):
             os.unlink(f)
+    _close_months()
     # The app's updates of then: counted in stats.json already, so they go.
     gone_updates = (datetime.now(timezone.utc).date() - timedelta(days=UPDATES_DAYS)).isoformat()
     for f in glob.glob(os.path.join(UPDATES_DIR, "*.json")):

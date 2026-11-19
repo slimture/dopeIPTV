@@ -460,7 +460,9 @@ How it counts, so the numbers are honest:
   returning from the month before at the most; unique visitors over a
   longer span are the months' summed. (Before November 2026 one secret
   was kept for 25 months; the first run of this version deletes it.) The
-  hashes themselves are kept 25 months for the counts. Single visits are
+  hashes go with their month's key: the month is counted once more into
+  `uniques-months.json` (different visitors in the month and each week,
+  people and robots) and its hashes deleted. Single visits are
   kept 30 days (`STATS_VISITS_DAYS`: a visit in detail - its time to the
   second, versions, screen, languages, the page that linked - can point to
   one person; it was 400 days in November 2026, a `STATS_VISITS_DAYS`
@@ -468,7 +470,9 @@ How it counts, so the numbers are honest:
   no id, no time of day, no versions or screen, only the day, country,
   browser and system, device, how the visitor came, pages, time and whether
   there was a download or the donate dialog - and kept for good, as are the
-  counts per day. Countries come from DB-IP's free database
+  counts per day; once a month is whole they are made k-anonymous (each
+  like at least four others of the month, a rarer one told less field by
+  field or left out: `k_anonymous`). Countries come from DB-IP's free database
   (CC BY 4.0), fetched once a month by the quarter-hour run and looked up
   on the server - nothing is sent anywhere.
 - What visitors do on a page (`public/events.js`, since November 2026):

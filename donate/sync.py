@@ -8,7 +8,12 @@ byte of it, and cannot tell from the slot whose it is.
 
 A request carries nothing about the person: no account, no name, no key
 (an older app still sends its supporter key in X-Dopeiptv-Supporter; it is
-not read). Nothing ties a slot to anyone or logs one; nginx does not log
+not read). It does carry the slot's credential (X-Sync-Auth, 64 hex,
+another value from the same code): the first write with one binds the
+slot to its SHA-256, which is all that is kept of it, and from then on a
+request without it - GET, PUT or DELETE - is answered 403. A slot alone
+opens nothing. A slot only an older app has written (it sends no
+credential) is read and written as before until a newer app writes it. Nothing ties a slot to anyone or logs one; nginx does not log
 /sync/ at all. What is kept, per slot, is the ciphertext, a version number
 and when it was written. A slot nobody has read or written for KEEP_DAYS
 goes (cleanup, once a day).
@@ -19,6 +24,8 @@ MAX_TOTAL for all slots together - past it a new slot is refused (507)
 while the slots there can still be written. Past WARN_SHARE of it the
 admin page says so and the owner's devices are told (donate.py).
 
+    every request          403 - the slot is bound and X-Sync-Auth is not
+                            its credential
     GET    /sync/<slot>   200 {"version", "t", "blob"} | 404
     PUT    /sync/<slot>   {"version_seen": n, "blob": base64}
                           -> 200 {"version", "t"}
@@ -41,6 +48,8 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
+import hmac
 import json
 import os
 import re
@@ -50,6 +59,8 @@ import threading
 import time
 
 SLOT = re.compile(r"^[0-9a-f]{64}$")
+#: A slot's credential as a request carries it (X-Sync-Auth).
+AUTH = re.compile(r"^[0-9a-f]{64}$")
 #: The most ciphertext one slot keeps (the app refuses more before sending).
 MAX_BLOB = 2 * 1024 * 1024
 #: A PUT's body: the blob in base64 and a little JSON around it.
@@ -181,17 +192,35 @@ def usage(stats_dir: str, recount: bool = False) -> dict:
             "warn": share >= WARN_SHARE, "full": total >= MAX_TOTAL}
 
 
+class Refused(Exception):
+    """The slot is bound to a credential and the request did not carry it."""
+
+
+def _seal(auth: str) -> str:
+    """What is kept of a credential: its SHA-256."""
+    return hashlib.sha256(auth.encode("ascii")).hexdigest()
+
+
+def _check(data: dict | None, auth: str) -> None:
+    """Refused unless the slot is unbound or *auth* is its credential."""
+    kept = data.get("auth") if data else None
+    if kept and not (auth and hmac.compare_digest(_seal(auth), str(kept))):
+        raise Refused()
+
+
 def exists(stats_dir: str, slot: str) -> bool:
     return os.path.exists(_path(stats_dir, slot))
 
 
-def get(stats_dir: str, slot: str) -> dict | None:
-    """{"version", "t", "blob"} kept under *slot*, or None."""
+def get(stats_dir: str, slot: str, auth: str = "") -> dict | None:
+    """{"version", "t", "blob"} kept under *slot*, or None. Refused when
+    the slot is bound and *auth* is not its credential."""
     path = _path(stats_dir, slot)
     with _lock(slot):
         data = _read(path)
         if data is None:
             return None
+        _check(data, auth)
         try:
             if time.time() - os.path.getmtime(path) > TOUCH_SECS:
                 os.utime(path)
@@ -200,11 +229,14 @@ def get(stats_dir: str, slot: str) -> dict | None:
     return {"version": data["version"], "t": int(data.get("t") or 0), "blob": data["blob"]}
 
 
-def put(stats_dir: str, slot: str, version_seen: object, blob: object) -> tuple[int, dict]:
+def put(stats_dir: str, slot: str, version_seen: object, blob: object,
+        auth: str = "") -> tuple[int, dict]:
     """Keep *blob* as the next version of *slot* - if *version_seen* is the
     version kept now (0: none yet). A new slot is refused while all the
-    slots keep MAX_TOTAL; one there already can still be written. (status,
-    body to answer)."""
+    slots keep MAX_TOTAL; one there already can still be written. A bound
+    slot takes only its credential (403, before anything of it is said);
+    an unbound one is bound to *auth* when one comes. (status, body to
+    answer)."""
     path = _path(stats_dir, slot)
     if not isinstance(version_seen, int) or isinstance(version_seen, bool) or version_seen < 0:
         return 400, {"error": "version_seen"}
@@ -215,6 +247,10 @@ def put(stats_dir: str, slot: str, version_seen: object, blob: object) -> tuple[
         return 400, {"error": "blob"}
     with _lock(slot):
         cur = _read(path)
+        try:
+            _check(cur, auth)
+        except Refused:
+            return 403, {"error": "refused"}
         version = cur["version"] if cur else 0
         if version_seen != version:
             body: dict = {"error": "conflict", "version": version,
@@ -231,14 +267,21 @@ def put(stats_dir: str, slot: str, version_seen: object, blob: object) -> tuple[
             # syncs goes on syncing while the space is full.
             return 507, {"error": "full"}
         now = int(time.time())
-        _write(path, {"version": version + 1, "t": now, "blob": blob})
+        kept = {"version": version + 1, "t": now, "blob": blob}
+        bound = (cur or {}).get("auth") or (_seal(auth) if auth else "")
+        if bound:
+            kept["auth"] = bound
+        _write(path, kept)
         _changed(stats_dir, _size(path) - before, 0 if cur else 1)
     return 200, {"version": version + 1, "t": now}
 
 
-def delete(stats_dir: str, slot: str) -> bool:
+def delete(stats_dir: str, slot: str, auth: str = "") -> bool:
+    """Remove *slot*. Refused when it is bound and *auth* is not its
+    credential."""
     path = _path(stats_dir, slot)
     with _lock(slot):
+        _check(_read(path), auth)
         size = _size(path)
         try:
             os.unlink(path)

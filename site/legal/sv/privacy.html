@@ -74,6 +74,7 @@
 <h4>Synkronisering av inställningar</h4>
 <p>För alla, bara om du slår på den. Det du väljer att synka – favoriter, inställningar och, om du slår på dem, spellistor med inloggningar och tittarhistorik – krypteras på din dator, innan något skickas, med en nyckel som tas fram ur en synkkod som bara dina datorer känner till.</p>
 <p>Vår server sparar bara de krypterade uppgifterna, under ett slumpmässigt nummer som också tas fram ur koden, tillsammans med ett versionsnummer och tidpunkten då de skrevs. Vi kan inte läsa dem och kan inte se vems de är: synkroniseringen kräver inget konto, ingen e-postadress, inget namn och ingen supporternyckel, och inget som visar vem du är skickas. Anrop för synkronisering loggas inte.</p>
+<p>Numret ensamt öppnar ingenting: varje anrop har också med sig en behörighet som tas fram ur samma kod, och av den sparar servern bara en envägshash. När en dator med dopeIPTV 1.6.9 eller senare har synkroniserat vägrar servern att läsa, ersätta eller radera uppgifterna för den som inte har den.</p>
 <ul>
 <li><strong>Utrymme:</strong> en synkad kopia får vara högst 2 MB och alla kopior tillsammans högst 5 GB. Är det utrymmet fullt får en ny kopia vänta, medan kopior som redan finns fortfarande kan uppdateras.</li>
 <li><strong>Radering:</strong> uppgifter som ingen dator har läst eller skrivit på 180 dagar raderas, och du kan själv radera dem i appen (<em>Sluta synka på den här datorn</em>, och radera också den synkade kopian).</li>
@@ -122,7 +123,7 @@
 <p>För att kunna skicka en sida till dig behöver vår webbserver din IP-adress, och din webbläsare skickar dessutom sidans adress, tidpunkten, webbläsarens och systemets namn och version (user agent), sidan du kom från (referrer) och vilka språk du föredrar.</p>
 <ul>
 <li>Frontservern, som hanterar den krypterade anslutningen, för ingen logg över anropen till dopeiptv.org, och skriver bara ned ett fel när något hindrar den från att fungera. Anrop för synkronisering och för att titta tillsammans loggas aldrig någonstans.</li>
-<li>För statistiken nedan för servern två separata loggar med IP-adress, tidpunkt, adress, status, referrer, webbläsare och språk: en över sidvisningar och sidornas visningssignal och en över klick på nedladdningar. Båda byts varje natt och bara föregående dygn sparas – högst två dygn –, sedan tas de bort automatiskt. Det är de enda ställena där din IP-adress skrivs ned.</li>
+<li>Inget annat loggas: servern bakom skriver ingen logg över andra anrop. För statistiken nedan för den två separata loggar med IP-adress, tidpunkt, adress, status, referrer (bara adressen till sidan du kom från, aldrig dess frågedel eller fragment, som kan innehålla en sökning eller en session), webbläsare och språk: en över sidvisningar och sidornas visningssignal och en över klick på nedladdningar. Båda byts varje natt och bara föregående dygn sparas – högst två dygn –, sedan tas de bort automatiskt. Det är de enda ställena där din IP-adress skrivs ned.</li>
 <li>Tjänsterna bakom webbplatsen – supporternyckeln, feedback, synkronisering och titta tillsammans – håller IP-adresser bara i minnet, en kort stund – högst ett dygn – för att begränsa hur många anrop en adress kan göra.</li>
 </ul>
 <p>Rättslig grund: vårt berättigade intresse av att driva webbplatsen säkert (artikel 6.1 f).</p>
@@ -150,9 +151,8 @@
 <p>Id:t visar inte adressen, vi kopplar det inte till något annat och vi försöker aldrig ta reda på vem som står bakom det – det finns bara för att vi ska kunna räkna unika och återkommande besökare. Det är pseudonymt, inte anonymt: så länge månadens nyckel finns skulle den som hade både statistiken och nyckeln kunna prova adresser tills en passar.</p></li>
 <li><strong>Efter högst två dygn</strong> raderas loggen med IP-adresserna automatiskt.</li>
 <li><p><strong>Efter 30 dagar</strong> tas id:t, klockslaget, skärmstorleken och versionsnumren bort, tiden avrundas till tio sekunder och besöket blandas med månadens övriga, så att ordningen inte säger något.</p>
-<p>Kvar finns bara dag, land, webbläsare och system, typ av enhet, sidans språk, hur besökaren kom, antal sidor och om det blev en nedladdning eller en följd stödlänk. Det är inte längre personuppgifter och sparas utan tidsgräns, liksom summor per dag.</p></li>
-<li><strong>När månaden efter besökets månad är slut</strong> raderas den månadens nyckel. Därefter kan ingen – inte heller vi – se vilken adress ett id hörde till.</li>
-<li><strong>Efter 25 månader</strong> raderas de sista besökar-id:na, som då inte går att koppla till något; de sparas bara för att räkna besökare per dag, vecka och månad.</li>
+<p>Kvar finns bara dag, land, webbläsare och system, typ av enhet, sidans språk, hur besökaren kom, antal sidor och om det blev en nedladdning eller en följd stödlänk. När månaden är slut görs varje sparat besök likt minst fyra andra från samma månad i allt detta: ett ovanligare tappar detaljer, en i taget – sidan det kom från, språket, webbläsaren och så vidare, och dagen blir veckan – och ett som ändå sticker ut tas bort, så att bara dagens summor finns kvar. Det är inte längre personuppgifter och sparas utan tidsgräns, liksom summor per dag.</p></li>
+<li><strong>När månaden efter besökets månad är slut</strong> raderas den månadens nyckel, och med den månadens besökar-id: bara antalet olika besökare under månaden och under varje vecka i den sparas. Därefter finns inget id kvar att koppla till något.</li>
 </ol>
 <p>Fram till steg 3 sparas varje besök med:</p>
 <ul>
@@ -226,7 +226,7 @@
 <p>Det mesta vi sparar säger inget om vem du är: inget namn, ingen e-postadress, ingen IP-adress, inget konto. Bara två saker är knutna till en person – ett mejl du skickar till oss, och en betalning (hos Stripe och i våra räkenskaper). Allt annat saknar något som pekar ut dig, eller sparas bara en kort tid och raderas sedan automatiskt.</p>
 <ul>
 <li><strong>Serverloggar</strong> – de enda ställena där en IP-adress skrivs ned, med webbläsaren och vad som hämtades, inget annat om dig: statistikens två loggar, högst två dygn. Sedan tas de bort automatiskt. Frontservern för ingen logg över anrop.</li>
-<li><strong>Statistik</strong> – ingen IP-adress och inget namn, bara ett pseudonymt id: varje besök i 30 dagar, därefter helt anonymt (utan id, klockslag och skärmstorlek); nyckeln som gör id:na raderas när månaden efter är slut, de sista id:na efter 25 månader. Uppgifter om uppdateringar, aldrig med IP-adress, exakt tidpunkt eller id: 30 dagar.</li>
+<li><strong>Statistik</strong> – ingen IP-adress och inget namn, bara ett pseudonymt id: varje besök i 30 dagar, därefter helt anonymt (utan id, klockslag och skärmstorlek); nyckeln som gör id:na, och id:na med den, raderas när månaden efter är slut; bara antal finns kvar. Uppgifter om uppdateringar, aldrig med IP-adress, exakt tidpunkt eller id: 30 dagar.</li>
 <li><strong>Felrapporter och feedback</strong> – ingen IP-adress, inget namn, ingen e-postadress, och rensade från sådant som kan identifiera innan de sparas: 12 månader, sedan tas de bort automatiskt.</li>
 <li><strong>Synkade data</strong> – krypterade på din dator, så att vi varken kan läsa dem eller se vems de är: tills du raderar dem, eller 180 dagar efter att de senast användes.</li>
 <li><strong>Titta tillsammans</strong> – krypterat, bara i minnet, aldrig på disk: tills en timme efter rummets senaste anrop.</li>

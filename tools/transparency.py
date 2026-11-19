@@ -71,7 +71,8 @@ CODE: dict[str, list[dict]] = {
         {"id": "send", "repo": "app", "path": "dopeiptv/core/sync.py",
          "names": ["ENDPOINT", "Remote.__init__", "Remote._call"],
          "with": [{"repo": "app", "path": "dopeiptv/core/build_check.py", "names": ["secure"]}]},
-        {"id": "server", "repo": "site", "path": "donate/sync.py", "names": ["put"],
+        {"id": "server", "repo": "site", "path": "donate/sync.py",
+         "names": ["AUTH", "Refused", "_seal", "_check", "get", "put", "delete"],
          "with": [{"repo": "site", "path": "donate/donate.py", "names": ["Handler._sync"]}]},
         {"id": "nolog", "repo": "site", "path": "deploy/proxy-dopeiptv.org.conf",
          "from": r"^\s*location \^~ /sync/", "to": r"^\s*\}"},
@@ -110,6 +111,9 @@ CODE: dict[str, list[dict]] = {
     ],
     "builds": [
         {"id": "allowed", "repo": "app", "path": "dopeiptv/core/build_check.py", "names": ["kind", "allowed"]},
+        {"id": "site", "repo": "site", "path": "sync-releases.sh",
+         "from": r"^    # ---- The signed checksum list", "to": r"^    fi$",
+         "with": [{"repo": "site", "path": "donate/release_sums.py", "names": ["why_not"]}]},
     ],
     "website": [
         {"id": "log", "repo": "site", "path": "deploy/content-iptv.dope.rs.conf",
@@ -117,10 +121,11 @@ CODE: dict[str, list[dict]] = {
         {"id": "visitor", "repo": "site", "path": "donate/stats_collect.py",
          "names": ["MonthKeys", "_hash", "_hash_before", "_new_visit"]},
         {"id": "kept", "repo": "site", "path": "donate/stats_collect.py",
-         "from": r"^KEEP_UNIQUE_DAYS = ", "to": r"^UPDATES_DAYS = ",
+         "from": r"^KEEP_PER_DAY = ", "to": r"^UPDATES_DAYS = ",
          "with": [{"repo": "site", "path": "donate/stats_collect.py",
                    "from": r"^    if ev in \(\"donate\", \"donated\"\):", "to": r"^        return$"}]},
-        {"id": "anon", "repo": "site", "path": "donate/stats_collect.py", "names": ["anonymous"]},
+        {"id": "anon", "repo": "site", "path": "donate/stats_collect.py",
+         "names": ["anonymous", "freeze_months", "K_ANON", "_QI", "_LESS", "k_anonymous"]},
     ],
 }
 
