@@ -46,7 +46,7 @@ build without tagging, run `release.yml` by hand (`workflow_dispatch`) on
 | `packaging/` | AppStream metainfo, desktop file, icons, Flatpak manifest, macOS helpers |
 | `*.spec` | PyInstaller specs (Linux, macOS, Windows) |
 | `.github/workflows/` | `ci.yml`, `nightly.yml`, `release.yml` |
-| `docs/` | Architecture, developer notes, features, translating, this file |
+| `docs/` | Architecture, developer notes, features, translating, the threat model (`SECURITY.md`) and the security reviews, this file |
 
 ## Every day
 
