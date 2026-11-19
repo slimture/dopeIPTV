@@ -7,6 +7,7 @@ or both. The stores' "Trakt" layer holds what those accounts say together.
 
 from __future__ import annotations
 
+import hmac
 import html
 import secrets
 import threading
@@ -1071,7 +1072,8 @@ class _TraktMixin:
             if params.get("error"):
                 info.setText(tr("trakt_denied"))
                 return
-            if params.get("state") != state["token"]:
+            if not hmac.compare_digest(str(params.get("state") or "").encode("utf-8"),
+                                       state["token"].encode("utf-8")):
                 # Mismatched state: never trust the code (CSRF guard).
                 info.setText(tr("trakt_login_failed", msg="state mismatch"))
                 return
@@ -1111,7 +1113,7 @@ class _TraktMixin:
             self.pool,
             lambda: capture_oauth_redirect(
                 OAUTH_PORT, timeout=180.0,
-                should_cancel=lambda: state["cancelled"]),
+                should_cancel=lambda: state["cancelled"], state=state["token"]),
             captured, capture_failed)
         open_url(trakt.authorize_url(state["token"], challenge))
         d.exec()
