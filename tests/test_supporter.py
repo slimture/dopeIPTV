@@ -34,6 +34,15 @@ def test_anything_else_does_not():
     assert supporter.parse(flipped, PUB) is None                      # one letter changed
     for junk in ("", "DS1-", "DS1-!!!", "hello", key[:40], "DS2-" + key[4:]):
         assert supporter.parse(junk, PUB) is None, junk
+    # base64 skipped what is not in its alphabet, so a key with junk in it
+    # - or padding, or a character more or less - checked out as the key.
+    body = key[4:]
+    assert len(body) == 100
+    for spelt in (key + "=", key + "==", "DS1-" + body[:50] + "!" + body[50:],
+                  "DS1-" + body[:50] + "." + body[50:], "DS1-" + body[:50] + "+/" + body[52:],
+                  key + "A", key[:-1], "DS1-" + body + "AAAA"):
+        assert supporter.parse(spelt, PUB) is None, spelt
+    assert supporter.parse("ds1-" + body, PUB) == supporter.parse(key, PUB) is not None
     # No public key in the app yet: nothing checks out.
     assert supporter.PUBLIC_KEY_HEX == "" or len(bytes.fromhex(supporter.PUBLIC_KEY_HEX)) == 32
     if not supporter.PUBLIC_KEY_HEX:
