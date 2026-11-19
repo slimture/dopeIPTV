@@ -18,7 +18,7 @@ from ..core.privacy import for_log
 from ..core.recording import SCRAMBLED, RecordingManager, format_size, free_path, safe_filename
 from .notices import hub_of
 from .theme import P
-from .widgets import confirm
+from .widgets import confirm, plain_text
 from ..core.workers import run_async
 from .qt_i18n import format_when
 from PyQt6.QtCore import QDateTime, Qt, QTimer
@@ -236,6 +236,7 @@ class _RecordingMixin:
         lay.setContentsMargins(22, 20, 22, 18)
         lay.setSpacing(16)
         lbl = QLabel(message)
+        lbl.setTextFormat(Qt.TextFormat.PlainText)      # it names a title or a channel
         lbl.setWordWrap(True)
         lbl.setStyleSheet(f"font-size:13px; color:{P['text2']};")
         lay.addWidget(lbl)
@@ -423,7 +424,7 @@ class _RecordingMixin:
         if getattr(self, "_tv_on", False) and callable(tell):
             tell(title, text)
             return
-        QMessageBox.warning(self, title, text)
+        QMessageBox.warning(self, title, plain_text(text))
 
     def _recorder_ready(self) -> bool:
         if self.rec.recorder()[1]:
@@ -949,7 +950,7 @@ class _RecordingMixin:
         try:
             path = self.rec.build_path(title, channel=self.channel_display_name(it))
         except OSError as e:
-            QMessageBox.warning(self, tr("rec_status_recording"), str(e))
+            QMessageBox.warning(self, tr("rec_status_recording"), plain_text(str(e)))
             return
         self.play_live_channel(it)
         if self.player and self.player.start_stream_record(path):
@@ -1049,7 +1050,9 @@ class _RecordingMixin:
                 job["start"] + 3600))))
         stop_edit.setCalendarPopup(True)
         stop_edit.setDisplayFormat("yyyy-MM-dd HH:mm")
-        f.addRow(tr("field_title"), QLabel(job["title"]))
+        title_lbl = QLabel(job["title"])
+        title_lbl.setTextFormat(Qt.TextFormat.PlainText)    # the guide's title
+        f.addRow(tr("field_title"), title_lbl)
         f.addRow(tr("field_start"), start_edit)
         f.addRow(tr("field_stop"), stop_edit)
         bb = QDialogButtonBox(
@@ -1258,7 +1261,7 @@ class _RecordingMixin:
             self.rec.move_info(path, new_path)   # keep the info sidecar attached
             self._rec_watched().moved(path, new_path)
         except OSError as e:
-            QMessageBox.warning(self, tr("msg_rename_rec_title"), str(e))
+            QMessageBox.warning(self, tr("msg_rename_rec_title"), plain_text(str(e)))
         cur = self.cat_list.currentItem()
         self._load_items(
             cur.data(Qt.ItemDataRole.UserRole) if cur else None)
@@ -1311,7 +1314,7 @@ class _RecordingMixin:
                 self.rec.move_info(it["_path"], dest)
                 self._rec_watched().moved(it["_path"], dest)
         except OSError as e:
-            QMessageBox.warning(self, tr("msg_move_rec_title"), str(e))
+            QMessageBox.warning(self, tr("msg_move_rec_title"), plain_text(str(e)))
         self._load_categories()
 
     def _new_rec_folder(self, items=None) -> None:
@@ -1326,7 +1329,7 @@ class _RecordingMixin:
                 os.path.join(self.rec.directory(), name),
                 exist_ok=True)
         except OSError as e:
-            QMessageBox.warning(self, tr("msg_new_folder_title"), str(e))
+            QMessageBox.warning(self, tr("msg_new_folder_title"), plain_text(str(e)))
             return
         if items:
             self._move_recordings(items, name)

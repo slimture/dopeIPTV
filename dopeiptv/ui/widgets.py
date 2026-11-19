@@ -126,6 +126,17 @@ def drag_frameless_resize(win, state, gpos, min_w: int = RESIZE_MIN_W,
     win.setGeometry(g)
 
 
+def plain_text(text: str) -> str:
+    """*text* - words a provider, a guide, a box or a server sent - for what
+    has no plain mode of its own, a QMessageBox or a tooltip: Qt reads a tag
+    there as markup (a programme called <img src=...> showed a picture), so
+    what would be read so (Qt.mightBeRichText) is escaped, its line breaks
+    kept; anything else is left as it is. A QLabel takes PlainText instead."""
+    text = str(text or "")
+    return (Qt.convertFromPlainText(text, Qt.WhiteSpaceMode.WhiteSpaceNormal)
+            if Qt.mightBeRichText(text) else text)
+
+
 def confirm(parent, title: str, text: str, *, default_yes: bool = True) -> bool:
     """A Yes/No confirmation with no icon - the stock QMessageBox.question
     stamps a large question-mark glyph into the dialog that reads as clutter
@@ -134,6 +145,7 @@ def confirm(parent, title: str, text: str, *, default_yes: bool = True) -> bool:
     box = QMessageBox(parent)
     box.setIcon(QMessageBox.Icon.NoIcon)
     box.setWindowTitle(title)
+    box.setTextFormat(Qt.TextFormat.PlainText)      # a title or a name in it is words
     box.setText(text)
     box.setStandardButtons(
         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)

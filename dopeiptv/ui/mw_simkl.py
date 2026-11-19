@@ -10,6 +10,7 @@ nothing here shows, and every hook returns at once.
 
 from __future__ import annotations
 
+import html
 import threading
 import time
 
@@ -254,7 +255,9 @@ class _SimklPinDialog(QDialog):
         except (TypeError, ValueError):
             self.expires_at = time.time() + 900
         page = str(data.get("verification_url") or "https://simkl.com/pin/")
-        self.info.setText(tr("trakt_enter_code", url=page, code=self.code))
+        # The prompt is markup of the app's own; the service's words go in escaped.
+        self.info.setText(tr("trakt_enter_code", url=html.escape(page),
+                             code=html.escape(self.code)))
         open_url(str(data.get("verification_uri_complete") or page))
         QTimer.singleShot(self.interval * 1000, self._poll)
 

@@ -94,6 +94,7 @@ class BoxInfoDialog(_BoxWindow):
         for i, (name, value) in enumerate(rows):
             grid.addWidget(self._name(name), i, 0)
             v = QLabel(str(value))
+            v.setTextFormat(Qt.TextFormat.PlainText)    # what the box says of itself
             v.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             v.setWordWrap(True)
             grid.addWidget(v, i, 1)
@@ -158,6 +159,7 @@ class BoxInfoDialog(_BoxWindow):
         for i, (name, value) in enumerate(rows):
             self.signal.addWidget(self._name(name), i, 0)
             v = QLabel(value)
+            v.setTextFormat(Qt.TextFormat.PlainText)
             v.setStyleSheet("font-family:monospace;")
             v.setWordWrap(True)
             self.signal.addWidget(v, i, 1)

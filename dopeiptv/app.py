@@ -655,11 +655,12 @@ def main() -> int:
             # recover by themselves (cooldown + caches).
             if isinstance(e, RuntimeError) and "username or password" in str(e):
                 from .i18n import tr
+                from .ui.widgets import plain_text
                 where = f"{tr('settings_title')} → {tr('set_page_sources')}"
                 QMessageBox.warning(
                     w, tr("msg_connection_failed"),
-                    f"{pl['name']}: {e}\n\n"
-                    + tr("msg_check_playlist_credentials", where=where))
+                    plain_text(f"{pl['name']}: {e}\n\n"
+                               + tr("msg_check_playlist_credentials", where=where)))
 
         QTimer.singleShot(500, _check_auth)
 

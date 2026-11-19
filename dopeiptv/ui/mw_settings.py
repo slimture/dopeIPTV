@@ -1923,6 +1923,7 @@ class _SettingsMixin:
             c = playlists.card(tr("set_card_selected_playlist"))
             account_lbl = c.row(tr("set_account"), refresh_pl_btn,
                                 tr("account_loading")).hint_label
+            account_lbl.setTextFormat(Qt.TextFormat.PlainText)    # the provider's words
             # How the app reaches every source, and the boxes and channel
             # lists: Nerd's, a row each here, where the sources are.
             c = playlists.card()

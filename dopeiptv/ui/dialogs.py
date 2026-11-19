@@ -1757,6 +1757,9 @@ class ProblemDialog(QDialog):
         head.setWordWrap(True)
         head.setStyleSheet(f"font-size:16px; font-weight:700; color:{P['text']};")
         body = QLabel(summary)
+        # What was tried may hold what a server answered: words, never markup.
+        for lbl in (head, body):
+            lbl.setTextFormat(Qt.TextFormat.PlainText)
         body.setWordWrap(True)
         body.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         body.setStyleSheet(f"font-size:13px; color:{P['text2']};")
@@ -1848,6 +1851,7 @@ class StreamHealthDialog(QDialog):
         col = QVBoxLayout()
         col.setSpacing(6)
         head = QLabel(name)
+        head.setTextFormat(Qt.TextFormat.PlainText)     # the channel's name
         head.setWordWrap(True)
         head.setStyleSheet(f"font-size:16px; font-weight:700; color:{P['text']};")
         self.summary = QLabel(tr({"ok": "health_sum_ok", "warn": "health_sum_warn",
@@ -1877,6 +1881,7 @@ class StreamHealthDialog(QDialog):
             lbl = QLabel(label)
             lbl.setStyleSheet(f"font-size:12px; color:{P['muted']};")
             val = QLabel(value)
+            val.setTextFormat(Qt.TextFormat.PlainText)  # the last error, as a server put it
             val.setWordWrap(True)
             val.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             val.setStyleSheet(f"font-size:13px; color:{P['text']};")
@@ -1996,6 +2001,7 @@ class ChannelNumberDialog(QDialog):
         col.setContentsMargins(24, 22, 24, 20)
         col.setSpacing(10)
         head = QLabel(name or tr("chno_title"))
+        head.setTextFormat(Qt.TextFormat.PlainText)
         head.setWordWrap(True)
         head.setStyleSheet(f"font-size:16px; font-weight:700; color:{P['text']};")
         sub = QLabel(tr("chno_sub"))
@@ -2093,6 +2099,7 @@ class ChannelSettingsDialog(QDialog):
         col.setContentsMargins(24, 22, 24, 20)
         col.setSpacing(10)
         head = QLabel(name or tr("chanprefs_title"))
+        head.setTextFormat(Qt.TextFormat.PlainText)
         head.setWordWrap(True)
         head.setStyleSheet(f"font-size:16px; font-weight:700; color:{P['text']};")
         self.marker = QLabel("")

@@ -776,6 +776,7 @@ class BouquetEditorDialog(QDialog):
         lay.addWidget(self.backup_line)
         bottom = QHBoxLayout()
         self.status = QLabel(tr("bq_loading"))
+        self.status.setTextFormat(Qt.TextFormat.PlainText)     # the box's words
         self.status.setWordWrap(True)
         self.status.setStyleSheet(f"color:{P['muted']}; font-size:12px;")
         bottom.addWidget(self.status, 1)

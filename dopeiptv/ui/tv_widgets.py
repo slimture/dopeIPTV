@@ -300,6 +300,7 @@ class TvShelf(QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(px(8))
         self.title = QLabel(title)
+        self.title.setTextFormat(Qt.TextFormat.PlainText)
         self.title.setFont(font(32, bold=True))
         self.title.setStyleSheet(f"color:{P['text']};")
         lay.addWidget(self.title)
@@ -899,6 +900,7 @@ class TvAsk(QDialog):
         lay.setSpacing(px(12))
         for text, size, key in ((title, 36, "text"), (message, 28, "text2")):
             lbl = QLabel(text)
+            lbl.setTextFormat(Qt.TextFormat.PlainText)  # the question names a title
             lbl.setFont(font(size, bold=key == "text"))
             lbl.setWordWrap(True)
             lbl.setFixedWidth(width)

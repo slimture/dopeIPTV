@@ -61,7 +61,7 @@ from .nav_widgets import NavButton, PlacesFold, PlacesLayout, SideRule, SourceAv
 from .app_menu import MENUS, lay_out, open_website
 from .widgets import (
     HeartButton, _SidebarLogo,
-    confirm, file_dialog_options,
+    confirm, file_dialog_options, plain_text,
 )
 from .mw_settings import _SettingsMixin
 from .mw_trakt import _TraktMixin
@@ -1486,6 +1486,9 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         self.now_bar.setRange(0, 100)
         self.now_desc = QLabel("", objectName="NowDesc")
         self.now_desc.setWordWrap(True)
+        # The guide's title and description: words, never markup.
+        for lbl in (self.now_title, self.now_desc):
+            lbl.setTextFormat(Qt.TextFormat.PlainText)
         for w in (self.now_time, self.now_title, self.now_bar, self.now_desc):
             nc.addWidget(w)
         self.now_card.hide()
@@ -2475,7 +2478,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                 return
             QMessageBox.warning(
                 self, tr("playlist_msg_title"),
-                tr("msg_could_not_connect", name=pl['name'], msg=msg))
+                plain_text(tr("msg_could_not_connect", name=pl['name'], msg=msg)))
 
         run_async(self.pool, candidate.authenticate, done, fail)
 
