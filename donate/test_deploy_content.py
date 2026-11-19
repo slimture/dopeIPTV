@@ -356,3 +356,30 @@ def test_a_download_name_is_at_most_120_characters():
     assert map_value(top, "$iptv_dl_file", longest + "x") == ""
     assert map_value(top, "$iptv_dl_nightly", map_value(top, "$iptv_dl_file", longest)) == "nightly-1.6.8.90"
     assert map_value(top, "$iptv_dl_nightly", map_value(top, "$iptv_dl_file", longest + "x")) == ""
+
+
+def test_a_log_line_holds_only_so_much_of_what_was_sent():
+    top = conf()
+    # Each value of the sender's own cut short (a header can be 8k); what
+    # the site sets or nginx knows is written as it is.
+    cuts = {"$iptv_log_ua": 1024, "$iptv_log_uri": 2048, "$iptv_log_request": 2048,
+            "$iptv_log_method": 16, "$iptv_ref": 2048}
+    ours = {"$http_x_real_ip", "$time_iso8601", "$time_local", "$status", "$body_bytes_sent",
+            "$iptv_lang", "$remote_addr"}
+    for fmt in top.all("log_format"):
+        used = set(re.findall(r"\$\w+", "".join(fmt.args[1:])))
+        assert used <= set(cuts) | ours, (fmt.args[0], used - set(cuts) - ours)
+    assert {f.args[0] for f in top.all("log_format")} == {"iptv_stats", "iptv_dl"}
+    for var, most in cuts.items():
+        long = "Mozilla/5.0 " + "x" * 9000
+        assert map_value(top, var, long) == long[:most], var
+        assert map_value(top, var, "GET") == "GET", var
+        assert map_value(top, var, "") == "", var
+    # The page that linked: still without its query or fragment.
+    assert map_value(top, "$iptv_ref", "https://example.com/a/b?q=x#f") == "https://example.com/a/b"
+    # The download log as sync-releases.sh and stats_collect.py read it:
+    # the request line second between quotes, the browser sixth, the
+    # address last - and no user name the request could have sent.
+    dl = "".join(next(f for f in top.all("log_format") if f.args[0] == "iptv_dl").args[1:])
+    assert dl.split('"')[1] == "$iptv_log_request" and dl.split('"')[5] == "$iptv_log_ua"
+    assert dl.startswith("$remote_addr - - [$time_local] ") and dl.endswith('"$http_x_real_ip"')
