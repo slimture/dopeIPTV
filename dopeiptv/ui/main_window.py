@@ -2557,75 +2557,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
     def _flush_poster_refresh(self) -> None:
         self.list_model.refresh_all()
 
-    # -- trakt scrobbling -------------------------------------------------------------
-
-
-    def _jump_to_now_playing(self) -> None:
-        """Clicking the sidebar logo jumps the middle column to whatever's
-        playing - here, or on a TV while a cast runs (_now_playing): select
-        and scroll to its row, switching to its section and opening the
-        'All' category first so the row is actually in the list. Works for
-        every kind - live channels, movies, series episodes and recordings
-        (_playing_item is live-only by design, so movies and episodes read
-        their snapshot from _last_playback, a cast's from its context)."""
-        now = self._now_playing()
-        playing = now.item if now is not None else None
-        if now is None or playing is None:
-            self._show_toast(tr("toast_nothing_playing"))
-            return
-        key, group = now.key, now.group
-        # Wherever it lands, its card is picked and on screen once the
-        # place's rows are in (a folder is read in slices, a list loads).
-        self._np_reveal_soon(key)
-        # A playing episode is on its series' page, marked there. Before the
-        # list is looked through: an episode's id can be a series' id too.
-        if group == "episode" and now.series_ctx:
-            self._open_series_page(now.series_ctx, focus=key)
-            return
-        if self._try_select_key(key):
-            return
-        # A station: the list it was played from in Radio (mw_radio).
-        if group == "radio" and self._radio_jump(key):
-            return
-        # A local file lives in its own folder - go to the Local files
-        # section and browse to the folder the file is in, then select it.
-        if group == "local":
-            path = now.path
-            if path and os.path.isfile(path):
-                self._pending_jump_key = path
-                QTimer.singleShot(8000, self._clear_pending_jump)
-                if self.mode != "local":
-                    self.switch_mode("local")
-                self._local_reveal(path)
-                return
-        # Not in the current (possibly category-filtered) list: remember the
-        # target and navigate to a view that contains it, then select once it
-        # has loaded (see _load_categories / _apply_filter). Land on the item's
-        # own category so the sidebar reflects what's playing, not just "All".
-        self._pending_jump_key = key
-        self._pending_jump_cat = playing.get("category_id")
-        QTimer.singleShot(8000, self._clear_pending_jump)   # safety net
-        target = {"live": "live", "vod": "vod", "episode": "series",
-                  "rec": "rec", "radio": "radio"}.get(group, self.mode)
-        if self.mode != target:
-            self.switch_mode(target)     # done() honours _pending_jump_cat
-        elif self.cat_list.count():
-            row, cat = 0, self._pending_jump_cat
-            if cat is not None:
-                for i in range(self.cat_list.count()):
-                    d = self.cat_list.item(i).data(Qt.ItemDataRole.UserRole)
-                    if d is not None and str(d) == str(cat):
-                        row = i
-                        break
-            self._pending_jump_cat = None
-            if self.cat_list.currentRow() == row:
-                self._apply_filter()   # same category: just (re)select the row
-            else:
-                self.cat_list.setCurrentRow(row)
-
-    def _clear_pending_jump(self) -> None:
-        self._pending_jump_key = None
-        self._pending_jump_cat = None
+    # -- a channel tuned from the guide -----------------------------------------------
 
     @from_pane
     def tune_from_guide(self, ch) -> None:
