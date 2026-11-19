@@ -28,6 +28,13 @@ from .notices import hub_of
 from .widgets import confirm
 
 
+def _drop_waits(window) -> bool:
+    """"Who's watching?" waits for a profile's PIN at start: nothing
+    dropped on the window plays, or adds a source, before it is given."""
+    locked = getattr(window, "_profile_locked", None)
+    return bool(callable(locked) and locked())
+
+
 class _QueueMixin:
 
     def _add_dropped_playlist(self, found) -> None:
@@ -70,13 +77,8 @@ class _QueueMixin:
             out = [t for t in mime.text().split() if "://" in t][:1]
         return out
 
-    def _drop_waits(self) -> bool:
-        """"Who's watching?" waits for a profile's PIN at start: nothing
-        dropped on the window plays, or adds a source, before it is given."""
-        return bool(getattr(self, "_profile_locked", lambda: False)())
-
     def dragEnterEvent(self, e) -> None:
-        if self._drop_waits():
+        if _drop_waits(self):
             return
         mime = e.mimeData()
         if (any(u.isLocalFile()
@@ -86,7 +88,7 @@ class _QueueMixin:
             e.acceptProposedAction()
 
     def dropEvent(self, e) -> None:
-        if self._drop_waits():
+        if _drop_waits(self):
             return
         for u in e.mimeData().urls():
             p = u.toLocalFile()

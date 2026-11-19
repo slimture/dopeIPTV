@@ -316,6 +316,12 @@ class _Store:
     def profiles(self):
         return list(self._ps)
 
+    def verify(self, pid, pin):
+        # As ProfileStore.verify: the switch asks the store, which also
+        # writes a PIN kept the old way anew (core/pins.py).
+        p = self.get(pid)
+        return p is not None and p.verify(pin)
+
 
 class _NoParental:
     def has_pin(self):
