@@ -1081,7 +1081,8 @@ class RoundResult:
 def round_trip(remote: Remote, key: bytes, doc: dict[str, Any], snap: Snapshot,
                cats: tuple[str, ...] | list[str], now: int | None = None,
                fresh: bool = False, joining: bool = False,
-               seen: set[str] | frozenset[str] | None = None) -> RoundResult:
+               seen: set[str] | frozenset[str] | None = None,
+               bind: bool = False) -> RoundResult:
     """One sync, on a worker thread: the site's copy fetched, this
     computer's copy brought up to *snap* and merged in, and the result put
     back if it is any different - on a conflict (another computer was
@@ -1092,7 +1093,10 @@ def round_trip(remote: Remote, key: bytes, doc: dict[str, Any], snap: Snapshot,
     than the highest counter either side has (counter()); a copy whose
     counter is below the one *doc* has seen is older than what this
     computer had - the merge keeps this computer's newer entries anyway,
-    and the result is put back and said (*older*)."""
+    and the result is put back and said (*older*). *bind*: this computer
+    has not yet written the slot with its credential (auth_of) - put it
+    back even unchanged, so the site binds the slot on this first round
+    and from then on refuses anyone without the credential."""
     now = int(time.time()) if now is None else now
     highest = counter(doc)
     got = remote.get()
@@ -1115,7 +1119,7 @@ def round_trip(remote: Remote, key: bytes, doc: dict[str, Any], snap: Snapshot,
         version = got[0] if got else 0
         merged = merge(theirs, stamped)
         prune(merged, now)
-        if got is not None and _canon(merged) == _canon(theirs):
+        if got is not None and _canon(merged) == _canon(theirs) and not bind:
             return RoundResult(merged, stamped, version, False, len(got[1]), older)
         merged = _counted(merged, max(counter(merged), highest) + 1)
         blob = seal(key, merged)
@@ -1475,6 +1479,9 @@ class State:
         self.fresh = False
         self.joining = False
         self.seen: set[str] = set()
+        #: This computer has written the slot with its credential, so the
+        #: site holds the slot bound to it (round_trip's *bind*).
+        self.bound = False
 
     @classmethod
     def load(cls, path: Path, slot: str) -> State:
@@ -1495,6 +1502,7 @@ class State:
         st.version = int(data.get("version") or 0)
         st.fresh = bool(data.get("fresh"))
         st.joining = bool(data.get("joining"))
+        st.bound = bool(data.get("bound"))
         seen = data.get("seen")
         st.seen = {str(c) for c in seen} if isinstance(seen, list) else set()
         return st
@@ -1502,7 +1510,7 @@ class State:
     def dump(self) -> str:
         return json.dumps({"slot": self.slot, "version": self.version,
                            "fresh": self.fresh, "joining": self.joining,
-                           "seen": sorted(self.seen), "doc": self.doc},
+                           "bound": self.bound, "seen": sorted(self.seen), "doc": self.doc},
                           ensure_ascii=False, separators=(",", ":"))
 
 

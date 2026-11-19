@@ -28,6 +28,9 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   alone no longer lets anyone delete or replace a household's copy. An
   older app goes on syncing a slot until a computer with this version
   writes to it, then says the site turned it down until it is updated.
+  The first round with this version puts the copy back even unchanged
+  (`round_trip`'s *bind*, `State.bound`), so a household's slot is bound
+  as soon as one of its computers has updated.
 - core/together.py: each member of a room has an Ed25519 key of its own,
   its id the hash of the public key, and signs every message over the room
   and its exact bytes - nobody in a room can speak as another (1.6.8

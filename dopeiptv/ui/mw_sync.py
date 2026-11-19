@@ -65,12 +65,12 @@ class _SyncSignals(QObject):
 
 def _work(remote: sync.Remote, key: bytes, doc: dict, snap: sync.Snapshot,
           cats: tuple[str, ...], fresh: bool, joining: bool,
-          seen: frozenset[str]) -> object:
+          seen: frozenset[str], bind: bool = False) -> object:
     """The round on the sync thread: its result, or the SyncError (which
     the pool's fail signal would turn into a bare string)."""
     try:
         return sync.round_trip(remote, key, doc, snap, cats, fresh=fresh,
-                               joining=joining, seen=seen)
+                               joining=joining, seen=seen, bind=bind)
     except sync.SyncError as e:
         return e
     except Exception:
@@ -280,7 +280,7 @@ class _SyncMixin:
                            timeout_ms=180_000)
         run_async(self._sync_pool, _work, self._sync_done, self._sync_crashed,
                   remote, key, state.doc, snap, cats, state.fresh, state.joining,
-                  frozenset(state.seen))
+                  frozenset(state.seen), not state.bound)
         return True
 
     # -- what came back ------------------------------------------------------------
@@ -316,6 +316,8 @@ class _SyncMixin:
             return
         state.doc, state.version = keep, result.version
         state.fresh = state.joining = False
+        if result.uploaded:
+            state.bound = True          # written with the credential: bound there
         state.seen |= sync.seen_after(cats, applied)
         self._sync_write_state(state)
         self.settings.setValue(sync.K_LAST, int(time.time()))

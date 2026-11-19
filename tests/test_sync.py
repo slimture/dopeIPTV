@@ -1301,3 +1301,29 @@ def test_the_slot_is_bound_to_a_credential_only_the_code_gives():
     finally:
         site.close()
 
+
+def test_the_first_round_binds_the_slot_even_with_nothing_new():
+    """A slot an older app wrote, unbound: the first round of this version
+    puts the copy back even unchanged, so the site binds it at once - and
+    later rounds with nothing new send nothing, as before."""
+    raw = os.urandom(32)
+    slot, key = sync.derive(raw)
+    site = Site()
+    try:
+        older = sync.Remote(slot, site.url, timeout=5)
+        snap = sync.Snapshot(platform="linux")
+        doc = sync.empty_doc()
+        sealed = sync.seal(key, sync._counted(doc, 1))
+        assert older.put(0, sealed) == (True, 1)
+        assert slot not in site.auth
+        mine = sync.Remote.of(raw, site.url, timeout=5)
+        theirs = sync.unseal(key, older.get()[1])
+        r = sync.round_trip(mine, key, theirs, snap, (), bind=True)
+        assert r.uploaded and slot in site.auth, "bound on the first round"
+        r2 = sync.round_trip(mine, key, r.merged, snap, (), bind=False)
+        assert not r2.uploaded
+        with pytest.raises(sync.SyncError):
+            older.get()
+    finally:
+        site.close()
+
