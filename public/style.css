@@ -360,8 +360,8 @@ h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.03em; line-height:
 .autonote a.verify-link:hover { text-decoration: underline; }
 
 /* The footer (render.jq, site_footer): dopeIPTV and what it is beside the
-   links in three small groups; under a hairline Solecraft, the version and
-   the company line. On a phone the brand goes over the groups, two columns
+   links in three small groups; under a hairline Solecraft, the version
+   under it, and the company line. On a phone the brand goes over the groups, two columns
    of them (the app's beside contact and legal), each link a finger's room. */
 footer { background: var(--surface); padding: 44px 0 36px; margin-top: 24px; }
 footer .foot-top { display: flex; justify-content: space-between; align-items: flex-start;
@@ -381,8 +381,7 @@ footer .foot-col a { color: var(--muted); font-size: 14px; }
 footer .foot-col a:hover { color: var(--accent); }
 footer .foot-base { margin-top: 36px; padding-top: 20px; border-top: 1px solid var(--line);
   display: grid; gap: 10px; }
-footer .foot-maker { display: flex; align-items: center; justify-content: space-between;
-  gap: 8px 16px; flex-wrap: wrap; }
+footer .foot-maker { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
 footer .v { font-size: 12.5px; color: var(--faint); }
 footer .foot-company { margin: 0; color: var(--faint); font-size: 12.5px; line-height: 1.6; }
 footer .foot-company a { color: inherit; }
