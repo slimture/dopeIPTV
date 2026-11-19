@@ -205,7 +205,80 @@ def test_the_socket_is_named_in_the_users_own_folder_not_tmp(runtime_dir, monkey
         assert "/" not in instance.server_name()
     monkeypatch.setattr(instance.sys, "platform", "linux")
     monkeypatch.delenv("XDG_RUNTIME_DIR")
-    assert "/" not in instance.server_name()                 # no runtime folder: as before
+    cache = tempfile.mkdtemp(prefix="dpc")
+    monkeypatch.setenv("XDG_CACHE_HOME", cache)
+    # No runtime folder: a folder of the user's own in their cache, not /tmp.
+    assert os.path.dirname(instance.server_name()) == os.path.join(cache, "dopeiptv", "instance")
+    monkeypatch.setenv("XDG_CACHE_HOME", "/" + "x" * instance.SOCKET_PATH_MAX)
+    assert "/" not in instance.server_name()                 # too long for a socket: as before
+    shutil.rmtree(cache, ignore_errors=True)
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="Linux's socket folder")
+def test_without_a_runtime_folder_a_second_start_reaches_the_copy_through_its_own(
+        app, monkeypatch):
+    from dopeiptv.core import instance
+    for var in ("DOPEIPTV_INSTANCE_SOCKET", "FLATPAK_ID", "XDG_RUNTIME_DIR"):
+        monkeypatch.delenv(var, raising=False)
+    cache = tempfile.mkdtemp(prefix="dpc")
+    monkeypatch.setenv("XDG_CACHE_HOME", cache)
+    folder = os.path.join(cache, "dopeiptv", "instance")
+    os.makedirs(folder)
+    os.chmod(folder, 0o755)                     # made wider before: narrowed
+    got: list[dict] = []
+    server = instance.CommandServer(got.append)
+    try:
+        assert server.listening
+        name = instance.server_name()
+        assert name.startswith(folder) and os.path.exists(name)
+        assert os.stat(folder).st_mode & 0o777 == 0o700
+        env = {k: v for k, v in os.environ.items() if k != "XDG_RUNTIME_DIR"}
+        sender = subprocess.Popen(
+            [sys.executable, "-c",
+             "import sys, json\n"
+             "from PyQt6.QtCore import QCoreApplication\n"
+             "app = QCoreApplication([])\n"
+             "from dopeiptv.core.instance import send_to_running\n"
+             "sys.exit(0 if send_to_running(json.loads(sys.argv[1])) else 3)",
+             json.dumps({"open": True})],
+            cwd=_REPO_ROOT, env=env)
+        _wait_for(got, sender)
+        assert sender.wait(10) == 0 and got == [{"open": True}]
+    finally:
+        server.close()
+        shutil.rmtree(cache, ignore_errors=True)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="folder owners")
+def test_a_socket_folder_another_account_owns_is_not_listened_in(app, socket_name, monkeypatch):
+    from dopeiptv.core import instance
+    monkeypatch.setattr(instance.os, "getuid", lambda: os.stat(os.path.dirname(socket_name)).st_uid + 1)
+    server = instance.CommandServer(lambda _c: None)
+    assert not server.listening and not os.path.exists(socket_name)
+    server.close()
+
+
+def test_a_windows_pipe_s_name_holds_a_word_only_its_user_can_read(monkeypatch, tmp_path):
+    """Named pipes are the whole machine's: another account could make
+    dopeiptv-<user> first and hear this one's commands. The name carries a
+    random word kept in the user's own local app data."""
+    from dopeiptv.core import instance
+    monkeypatch.delenv("DOPEIPTV_INSTANCE_SOCKET", raising=False)
+    monkeypatch.delenv("FLATPAK_ID", raising=False)
+    monkeypatch.setattr(instance.sys, "platform", "win32")
+    mine, theirs = tmp_path / "mine", tmp_path / "theirs"
+    monkeypatch.setenv("LOCALAPPDATA", str(mine))
+    first = instance.server_name()
+    base, key = first.rsplit("-", 1)
+    assert base.startswith("dopeiptv-") and len(key) == 32 and "/" not in first
+    assert instance.server_name() == first, "every start of this user: the same name"
+    assert (mine / "dopeiptv" / instance.PIPE_KEY).read_text() == key
+    monkeypatch.setenv("LOCALAPPDATA", str(theirs))
+    assert instance.server_name() != first, "another account's word is its own"
+    (theirs / "dopeiptv" / instance.PIPE_KEY).write_text("not a key")
+    assert instance.server_name() == base, "a damaged key: the name as before"
+    monkeypatch.delenv("LOCALAPPDATA")
+    assert instance.server_name() == base
 
 
 @pytest.mark.skipif(not sys.platform.startswith("linux"), reason="the runtime folder is Linux's")
