@@ -26,6 +26,7 @@ from . import cast_devices
 from .cast_feed import is_loopback
 from .chromecast import ChromecastManager, _host_of
 from .dlna import DlnaManager
+from .dlna import host_of as dlna_host_of
 from .kodi import KodiDevice, KodiManager
 
 
@@ -170,11 +171,55 @@ class CastHub:
                 log.info("cast: %s by address not listed (%s)", key, e)
         return names
 
+    def _cc_labels(self) -> dict | None:
+        """The Chromecasts by the names the list shows them by (two of one
+        name carry their address), or None when the manager does not say."""
+        labels = getattr(self.chromecast, "labels", None)
+        if callable(labels):
+            return dict(labels())
+        devices = getattr(self.chromecast, "devices", None)
+        return {c.name: c for c in list(devices)} if isinstance(devices, list) else None
+
+    # -- which device it is -----------------------------------------------------
+
+    def _found(self, name: str | None) -> tuple[str, str, str]:
+        """(kind, its own id, its address) of the device *name* is in the
+        list now; ("", "", "") when it is not there, or is one the system
+        picks (an Apple TV)."""
+        if not name or any(m.knows(name) for m in self.added):
+            return "", "", ""
+        kodi = getattr(self.kodi, "devices", None)
+        if isinstance(kodi, dict) and name in kodi:
+            d = kodi[name]
+            return "kodi", str(d.port), str(d.host)
+        tvs = getattr(self.dlna, "renderers", None)
+        if isinstance(tvs, dict) and name in tvs:
+            r = tvs[name]
+            return "dlna", str(r.udn or ""), dlna_host_of(r.location)
+        cc = (self._cc_labels() or {}).get(name)
+        if cc is not None:
+            return "chromecast", str(getattr(cc, "uuid", "") or ""), _host_of(cc)
+        return "", "", ""
+
+    def where(self, name: str | None) -> str:
+        """The address of the device *name* is ("192.168.1.20"), for the
+        person to see which device a name stands for; "" when not known."""
+        return self._found(name)[2]
+
+    def ident(self, name: str | None) -> str:
+        """What tells the device *name* is from another that takes its
+        name: its kind, its own id and its address
+        ("chromecast:<uuid>@192.168.1.20"). "" when not known. Anything on
+        the network can announce itself under a familiar name; it cannot
+        have been at that address with that id the last time."""
+        kind, own, address = self._found(name)
+        return f"{kind}:{own}@{address}" if kind and address else ""
+
     def _listed(self, key: str) -> set[str] | None:
         """The names a manager lists now, or None when it does not say."""
         if key == "cc":
-            devices = getattr(self.chromecast, "devices", None)
-            return {c.name for c in list(devices)} if isinstance(devices, list) else None
+            labels = self._cc_labels()
+            return set(labels) if labels is not None else None
         table = getattr(self.dlna, "renderers", None) if key == "dlna" \
             else getattr(self.kodi, "devices", None)
         return set(table.copy()) if isinstance(table, dict) else None
@@ -187,8 +232,9 @@ class CastHub:
             renderers = list((getattr(self.dlna, "renderers", None) or {}).items())
             return next((n for n, r in renderers if r.location == loc), "")
         if dev["kind"] == "chromecast":
-            devices = list(getattr(self.chromecast, "devices", None) or [])
-            return next((c.name for c in devices if _host_of(c) == dev["host"]), "")
+            labels = self._cc_labels() or {}
+            return next((label for label, c in labels.items()
+                         if _host_of(c) == dev["host"]), "")
         return ""
 
     def added_key(self, name: str | None) -> str:
@@ -293,7 +339,24 @@ class CastHub:
 
     def cast(self, device_name: str, url: str, title: str,
              *args: Any, **kwargs: Any) -> str:
+        """*expect* (a keyword): the device this name was the last time it
+        was cast to (``ident``). When the one answering to the name now is
+        another - another id, another address - nothing is sent to it: the
+        person picks it knowingly, with its address in sight (the cast
+        window), or not at all."""
         mgr = self._for(device_name)
+        expect = str(kwargs.pop("expect", "") or "")
+        if expect:
+            now = self.ident(device_name)
+            find = getattr(mgr, "find", None)
+            if not now and callable(find):
+                find(device_name)       # not met in this run yet: looked for
+                now = self.ident(device_name)
+            if now and now != expect:
+                log.warning("cast: %s is not the device it was (%s) - nothing sent to it",
+                            device_name, self.where(device_name))
+                raise LocalizedError("cast_other_device", name=device_name,
+                                     address=self.where(device_name))
         for other in self._managers():
             if other is mgr or getattr(other, "active", None) is None:
                 continue

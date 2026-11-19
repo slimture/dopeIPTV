@@ -3097,5 +3097,6 @@
   "srv_adult_hint": "Tắt: kênh và danh mục dành cho người lớn (XXX, 18+ hoặc được nhà cung cấp đánh dấu như vậy) không có trong danh sách kênh và danh sách phát được chia sẻ – TV trong phòng trẻ em không có hồ sơ hay mã PIN. Danh mục ẩn và bị khóa không bao giờ được phát.",
   "link_play_title": "Phát địa chỉ này?",
   "link_play_body": "Một liên kết được mở bên ngoài dopeIPTV yêu cầu phát một địa chỉ trên {host}:\n\n{address}\n\nMáy chủ đó sẽ thấy địa chỉ IP của máy tính này. Chỉ phát nếu bạn tin tưởng nơi liên kết xuất phát.",
-  "pin_wait": "Quá nhiều lần thử sai. Thử lại sau {n} giây."
+  "pin_wait": "Quá nhiều lần thử sai. Thử lại sau {n} giây.",
+  "cast_other_device": "“{name}” không còn là thiết bị như lần trước - giờ nó trả lời từ {address}. Hãy chọn nó trong danh sách nếu đó là TV của bạn."
 }

@@ -472,9 +472,42 @@ class ChromecastManager:
                 pass
             self._browser = None
 
+    def labels(self) -> dict:
+        """Each device under the name the list shows it by: its own - or,
+        when two devices answer to one name, the name with the address, so
+        that neither stands in for the other (anything on the network can
+        announce itself as "Living room TV")."""
+        by_name: dict[str, list] = {}
+        for c in list(self.devices):
+            by_name.setdefault(c.name, []).append(c)
+        out: dict = {}
+        for name, group in by_name.items():
+            if len(group) == 1:
+                out[name] = group[0]
+                continue
+            for c in group:
+                label, n = f"{name} ({_host_of(c) or '?'})", 2
+                while label in out:
+                    label, n = f"{name} ({_host_of(c) or '?'}) #{n}", n + 1
+                out[label] = c
+        return out
+
+    def label_of(self, cc) -> str:
+        """The name *cc* has in the list now ("" when it is not in it)."""
+        return next((label for label, c in self.labels().items() if c is cc), "")
+
+    def find(self, name: str) -> bool:
+        """Whether *name* is a device here - looked for first when this run
+        has not met it yet (as cast() does)."""
+        with self._lock:
+            if self._device(name) is None:
+                self.scan()
+            return self._device(name) is not None
+
     def scan(self) -> list[str]:
         with self._lock:
             was_active = getattr(self.active, "name", None)
+            was_at = _host_of(self.active) if self.active is not None else ""
             self._tear_down()
             devices, browser = _pc().get_chromecasts(timeout=6)
             self._browser = browser
@@ -484,11 +517,13 @@ class ChromecastManager:
             # A running cast survives all this: the receiver plays the stream
             # by itself, so dropping the sender socket does not stop the TV.
             # Re-point 'active' at the freshly discovered object with the same
-            # name, or the stop button would have nothing left to talk to.
+            # name, or the stop button would have nothing left to talk to -
+            # the one at the same address, when two answer to that name.
             if was_active:
-                self.active = next(
-                    (c for c in self.devices if c.name == was_active), None)
-            return sorted(cc.name for cc in self.devices)
+                same = [c for c in self.devices if c.name == was_active]
+                self.active = next((c for c in same if _host_of(c) == was_at),
+                                   same[0] if same else None)
+            return sorted(self.labels())
 
     def set_hosts(self, hosts: list[dict], attach: bool = True) -> list[str]:
         """Chromecasts by their address, listed from now on beside those
@@ -511,7 +546,7 @@ class ChromecastManager:
         pc = _pc()
         if pc is None or not self.by_host:
             return []
-        names: list[str] = []
+        names: list = []
         for h in self.by_host:
             host = str(h["host"])
             cc = next((c for c in self.devices if _host_of(c) == host), None)
@@ -528,11 +563,11 @@ class ChromecastManager:
                     continue
                 self.devices.append(cc)
                 self._hosted.append(cc)
-            names.append(cc.name)
-        return names
+            names.append(cc)
+        return [self.label_of(cc) or cc.name for cc in names]
 
     def _device(self, name: str):
-        return next((c for c in self.devices if c.name == name), None)
+        return self.labels().get(name)
 
     def stale(self, status) -> bool:
         """Whether *status* is still talking about the stream we replaced."""

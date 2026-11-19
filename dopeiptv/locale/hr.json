@@ -3097,5 +3097,6 @@
   "srv_adult_hint": "Isključeno: kanali i kategorije za odrasle (XXX, 18+ ili tako označeni kod pružatelja) ostaju izvan popisa kanala i dijeljene playliste – televizor u dječjoj sobi nema profil ni PIN. Skrivene i zaključane kategorije nikad se ne dijele.",
   "link_play_title": "Reproducirati ovu adresu?",
   "link_play_body": "Poveznica otvorena izvan dopeIPTV-a traži reprodukciju adrese na {host}:\n\n{address}\n\nTaj će poslužitelj vidjeti IP adresu ovog računala. Reproduciraj je samo ako vjeruješ izvoru poveznice.",
-  "pin_wait": "Previše pogrešnih pokušaja. Pokušaj ponovno za {n} s."
+  "pin_wait": "Previše pogrešnih pokušaja. Pokušaj ponovno za {n} s.",
+  "cast_other_device": "„{name}” nije isti uređaj kao prošli put - sada odgovara s adrese {address}. Odaberi ga na popisu ako je to tvoj televizor."
 }

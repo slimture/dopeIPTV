@@ -624,16 +624,19 @@ class CastCard(QWidget):
 
     # -- what it says ---------------------------------------------------------------
 
-    def set_media(self, title: str, line: str, device: str, airplay: bool = False) -> None:
+    def set_media(self, title: str, line: str, device: str, airplay: bool = False,
+                  where: str = "") -> None:
         self.title.setText(title or "")
         self.title.setVisible(bool(title))
         self.line.setText(line or "")
         self.line.setVisible(bool(line))
-        self.set_device(device, airplay)
+        self.set_device(device, airplay, where)
 
-    def set_device(self, device: str, airplay: bool = False) -> None:
+    def set_device(self, device: str, airplay: bool = False, where: str = "") -> None:
+        """The TV it plays on - and, in its tooltip, *where* that TV is (its
+        address): which device the name stands for."""
         self.device.setText(device or "")
-        self.device.setToolTip(device or "")
+        self.device.setToolTip(f"{device}\n{where}" if device and where else device or "")
         self.device.setAccessibleName(tr("cast_casting_to", name=device or ""))
         self.device_mark.set_glyph("airplay" if airplay else "cast")
         self.device_row.setVisible(bool(device))

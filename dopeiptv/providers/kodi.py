@@ -30,7 +30,7 @@ from ..core.privacy import url_for_log
 from ..i18n import LocalizedError
 from . import mdns
 from .cast_bridge import lan_address
-from .dlna import FileShare, _NoBridge
+from .dlna import FileShare, _NoBridge, _read_body
 
 # A Kodi's name in the device list says what it is, and keeps it apart from
 # a Chromecast or a TV of the same name.
@@ -50,6 +50,8 @@ GONE_AFTER = 2
 # Polls without any answer at all before Kodi counts as gone (switched off).
 UNREACHABLE_AFTER = 10
 _INVALID_PARAMS = -32602
+#: The longest JSON-RPC answer read: the ones asked for here are short.
+MAX_ANSWER = 256 * 1024
 
 
 class KodiError(Exception):
@@ -225,17 +227,26 @@ class KodiRpc:
              timeout: float = 6.0) -> Any:
         self._ident += 1
         http = self.session or requests
+        # To this Kodi and nowhere it points on to: a redirect would carry
+        # the request - the stream's address in it - to another address.
+        # And an answer is some kilobytes: no more is read (MAX_ANSWER).
         r = http.post(self.device.endpoint,
                       data=json.dumps(rpc_request(method, params, self._ident)),
                       headers={"Content-Type": "application/json",
                                "User-Agent": UA},
-                      auth=self.device.login, timeout=timeout)
+                      auth=self.device.login, timeout=timeout,
+                      allow_redirects=False, stream=True)
         if r.status_code == 401:
+            r.close()
             raise KodiAuthError()
         if r.status_code != 200:
+            r.close()
             raise KodiError(r.status_code, f"HTTP {r.status_code}")
         try:
-            body = r.json()
+            raw = _read_body(r, MAX_ANSWER)
+            if len(raw) > MAX_ANSWER:
+                raise ValueError("too long for an answer")
+            body = json.loads(raw.decode("utf-8", "replace"))
         except ValueError as e:
             raise KodiError(-32700, "not a JSON-RPC answer") from e
         if not isinstance(body, dict):
@@ -407,6 +418,14 @@ class KodiManager:
         if dev is None:
             dev = self._merge([]).get(label)
         return dev
+
+    def find(self, label: str) -> bool:
+        """Whether *label* is a Kodi here - looked for first when this run
+        has not met it yet (as cast() does)."""
+        with self._lock:
+            if self.device(label) is None:
+                self.scan()
+            return self.device(label) is not None
 
     # -- talking to the one casting ----------------------------------------------
 

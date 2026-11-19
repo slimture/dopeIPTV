@@ -3097,5 +3097,6 @@
   "srv_adult_hint": "Desactivado: los canales y categorías para adultos (XXX, 18+ o marcados así por el proveedor) quedan fuera de la lista de canales y de la playlist compartida: un televisor en el cuarto de un niño no tiene perfil ni PIN. Las categorías ocultas y bloqueadas nunca se sirven.",
   "link_play_title": "¿Reproducir esta dirección?",
   "link_play_body": "Un enlace abierto fuera de dopeIPTV pide reproducir una dirección en {host}:\n\n{address}\n\nEse servidor verá la dirección IP de este equipo. Reprodúcela solo si te fías del origen del enlace.",
-  "pin_wait": "Demasiados intentos fallidos. Vuelve a intentarlo en {n} s."
+  "pin_wait": "Demasiados intentos fallidos. Vuelve a intentarlo en {n} s.",
+  "cast_other_device": "«{name}» no es el mismo dispositivo que la última vez: ahora responde desde {address}. Elígelo en la lista si es tu tele."
 }

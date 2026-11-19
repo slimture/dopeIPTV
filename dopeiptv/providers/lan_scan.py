@@ -39,6 +39,7 @@ from __future__ import annotations
 import errno
 import functools
 import ipaddress
+import json
 import selectors
 import socket
 import sys
@@ -483,33 +484,52 @@ def scan(progress: Callable[[int], None] | None = None, hosts: list[str] | None 
 
 # -- what can be cast to --------------------------------------------------------------
 
+#: What a device's answer about itself is read to, at most: these are a few
+#: hundred bytes, and whatever answers on the port is free to send more.
+SHORT_ANSWER = 256 * 1024
+
+
+def _short_json(r: Any) -> Any:
+    """A short JSON answer of an address that was asked what it is - read
+    to SHORT_ANSWER and no further, from that address and nowhere it points
+    on to (the request followed no redirect). None for anything else."""
+    try:
+        if r.status_code != 200:
+            r.close()
+            return None
+        raw = dlna._read_body(r, SHORT_ANSWER)
+        if len(raw) > SHORT_ANSWER:
+            return None
+        return json.loads(raw.decode("utf-8", "replace"))
+    except Exception:
+        return None
+
+
 def _kodi(sess: Any, host: str, port: int) -> dict | None:
     """A Kodi's JSON-RPC: "pong" to a ping; a 401 from Kodi's own web
     server (its realm names it) is a Kodi that wants its login."""
     url = f"http://{_http_host(host)}:{port}/jsonrpc"
     try:
         r = sess.post(url, json={"jsonrpc": "2.0", "method": "JSONRPC.Ping", "id": 1},
-                      timeout=(CONNECT * 3, READ))
+                      timeout=(CONNECT * 3, READ), allow_redirects=False, stream=True)
     except Exception:
         return None
     if r.status_code == 401:
         realm = (r.headers.get("WWW-Authenticate", "") + r.headers.get("Server", "")).lower()
+        r.close()
         if "xbmc" in realm or "kodi" in realm:
             return {"kind": "kodi", "host": host, "port": port, "name": f"Kodi ({host})",
                     "login": True}
         return None
-    try:
-        js = r.json() if r.ok else None
-    except ValueError:
-        return None
+    js = _short_json(r)
     if not isinstance(js, dict) or js.get("result") != "pong":
         return None
     name = ""
     try:
         r = sess.post(url, json={"jsonrpc": "2.0", "method": "XBMC.GetInfoLabels", "id": 2,
                                  "params": {"labels": ["System.FriendlyName"]}},
-                      timeout=(CONNECT * 3, READ))
-        got = (r.json() or {}).get("result") if r.ok else None
+                      timeout=(CONNECT * 3, READ), allow_redirects=False, stream=True)
+        got = (_short_json(r) or {}).get("result")
         if isinstance(got, dict):
             name = str(got.get("System.FriendlyName") or "").strip()
     except Exception:
@@ -523,10 +543,11 @@ def _chromecast(sess: Any, host: str, port: int = 8008) -> dict | None:
     its name, model and id."""
     try:
         r = sess.get(f"http://{_http_host(host)}:{port}/setup/eureka_info",
-                     params={"params": "name,device_info"}, timeout=(CONNECT * 3, READ))
-        js = r.json() if r.ok else None
+                     params={"params": "name,device_info"}, timeout=(CONNECT * 3, READ),
+                     allow_redirects=False, stream=True)
     except Exception:
         return None
+    js = _short_json(r)
     if not isinstance(js, dict) or not (js.get("name") or js.get("device_info")):
         return None
     raw = js.get("device_info")

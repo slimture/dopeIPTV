@@ -3097,5 +3097,6 @@
   "srv_adult_hint": "Wyłączone: kanały i kategorie dla dorosłych (XXX, 18+ lub tak oznaczone przez dostawcę) nie trafiają do listy kanałów ani do udostępnianej playlisty – telewizor w pokoju dziecka nie ma profilu ani PIN-u. Ukryte i zablokowane kategorie nigdy nie są udostępniane.",
   "link_play_title": "Odtworzyć ten adres?",
   "link_play_body": "Odnośnik otwarty poza dopeIPTV prosi o odtworzenie adresu na {host}:\n\n{address}\n\nTen serwer zobaczy adres IP tego komputera. Odtwórz go tylko wtedy, gdy ufasz źródłu odnośnika.",
-  "pin_wait": "Za dużo błędnych prób. Spróbuj ponownie za {n} s."
+  "pin_wait": "Za dużo błędnych prób. Spróbuj ponownie za {n} s.",
+  "cast_other_device": "„{name}” to nie to samo urządzenie co ostatnio - teraz odpowiada z adresu {address}. Wybierz je z listy, jeśli to twój telewizor."
 }

@@ -2040,6 +2040,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "upd_err_not_installed": {"en": "This copy was not installed with the installer, so it cannot update itself."},
     "upd_err_mac_check": {"en": "The new version did not pass the check ({step})."},
     "cast_err_not_found": {"en": "The device “{name}” was not found - scan again."},
+    "cast_other_device": {"en": "“{name}” is not the device it was last time - it answers from {address} now. Pick it in the list if that is your TV."},
     "cast_err_no_address": {"en": "There is no address to cast."},
     "cast_err_track": {"en": "The chosen track could not be cast."},
     "cast_err_container": {"en": "This stream is {type}, and repackaging it here did not help either."},

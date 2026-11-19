@@ -72,8 +72,10 @@ class _CastWatchMixin:
             return
         ctx = getattr(self, "_cast_ctx", None) or {}
         name, line = self._cast_card_words(ctx, title)
-        card.set_media(name, line, str(getattr(self, "_cast_device", None) or ""),
-                       self._cast_on_airplay())
+        device = str(getattr(self, "_cast_device", None) or "")
+        where = getattr(getattr(self, "cast", None), "where", None)
+        card.set_media(name, line, device, self._cast_on_airplay(),
+                       where=str(where(device) or "") if callable(where) and device else "")
         pm, shape = self._cast_card_picture(ctx)
         card.set_art(pm, shape, name)
         self._cast_card_line_at = time.monotonic()
