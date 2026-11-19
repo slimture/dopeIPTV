@@ -361,10 +361,65 @@ def index_blob(by_id: dict[str, Schedule], by_name: dict[str, str]) -> bytes:
     return gzip_gently(buf.getvalue())
 
 
+#: The names an index holds, and the only ones its loader takes: the start
+#: and stop times are array("q") columns, which pickle as a call of array's
+#: own reconstructor. All else in it is a dict, a tuple, a str or an int,
+#: which pickle names nothing for.
+_INDEX_GLOBALS = frozenset({("array", "_array_reconstructor"), ("array", "array")})
+
+
+class IndexRefused(pickle.UnpicklingError):
+    """The index names something no index holds: not one this app wrote."""
+
+
+class _IndexUnpickler(pickle.Unpickler):
+    """Reads an index and nothing else. A pickle may name any callable and
+    call it - os.system as easily as array - so an index file that something
+    else wrote would run as the app the moment the guide was read. Every
+    name outside _INDEX_GLOBALS ends the read here (an extension code comes
+    this way too), and so does a persistent id."""
+
+    def find_class(self, module: str, name: str) -> Any:
+        if (module, name) not in _INDEX_GLOBALS:
+            raise IndexRefused(f"{module}.{name}")
+        return super().find_class(module, name)
+
+    def persistent_load(self, pid: Any) -> Any:
+        raise IndexRefused("a persistent id")
+
+
+def _only(values: Any, kind: type) -> bool:
+    return set(map(type, values)) <= {kind}
+
+
+def _is_index(by_id: Any, by_name: Any) -> bool:
+    """Whether what was read has an index's shape: channel ids to four
+    columns of one length (two array("q"), two tuples of text), and names
+    to channel ids. The lookups take it as it is, so anything else - a
+    damaged file, one made to look like an index - is no index."""
+    if type(by_id) is not dict or type(by_name) is not dict:
+        return False
+    if not (_only(by_name, str) and _only(by_name.values(), str) and _only(by_id, str)):
+        return False
+    for sched in by_id.values():
+        if type(sched) is not tuple or len(sched) != 4:
+            return False
+        starts, stops, titles, descs = sched
+        if not (type(starts) is array and type(stops) is array
+                and starts.typecode == "q" and stops.typecode == "q"
+                and type(titles) is tuple and type(descs) is tuple
+                and len(starts) == len(stops) == len(titles) == len(descs)
+                and _only(titles, str) and _only(descs, str)):
+            return False
+    return True
+
+
 def read_index_blob(data: bytes
                     ) -> tuple[dict[str, Schedule], dict[str, str]] | None:
-    """(by_id, by_name) from index_blob()'s bytes; None when damaged or from
-    another schema version."""
+    """(by_id, by_name) from index_blob()'s bytes; None when damaged, from
+    another schema version, or not an index at all - one that names
+    anything an index does not hold is refused and logged, never run
+    (_IndexUnpickler)."""
     try:
         # Index files are gzip-compressed; a plain pickle (proto starts \x80,
         # never the gzip magic) loads as well. Unpacked as it is read, the
@@ -372,21 +427,34 @@ def read_index_blob(data: bytes
         f: io.BufferedIOBase = io.BytesIO(data)
         if data[:2] == b"\x1f\x8b":
             f = gzip.GzipFile(fileobj=f)
-        u = pickle.Unpickler(f)
+        u = _IndexUnpickler(f)
         head = u.load()
-        if not isinstance(head, dict) or head.get("v") != _INDEX_VERSION:
+        if type(head) is not dict or head.get("v") != _INDEX_VERSION:
+            return None
+        pieces = head.get("pieces")
+        if type(pieces) is not int:
             return None
         by_id: dict[str, Schedule] = {}
-        for _ in range(head["pieces"]):
-            by_id.update(u.load())
+        for _ in range(pieces):
+            piece = u.load()
+            if type(piece) is not dict:
+                return None
+            by_id.update(piece)
         if f.read(1):       # the end of the file checks gzip's CRC too
             return None
+    except IndexRefused as e:
+        log.warning("EPG: the guide's index names %s, which no index holds - refused, "
+                    "nothing in it was run; the guide is read again", e)
+        return None
     except Exception:
         # Any damage at all means "parse the XML again". Letting one
         # through (zlib.error, a truncated pickle's AttributeError...)
         # failed the whole guide load instead, and on every start.
         return None
-    return by_id, head.get("by_name", {})
+    by_name = head.get("by_name", {})
+    if not _is_index(by_id, by_name):
+        return None
+    return by_id, by_name
 
 
 def _write_atomic(path: Path, data: bytes) -> None:
