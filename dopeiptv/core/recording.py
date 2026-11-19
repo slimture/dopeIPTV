@@ -782,11 +782,15 @@ class RecordingManager(QObject):
                 cmd += ["-t", str(secs)]
             cmd.append(path)
         else:
-            cmd = [exe, j["url"], f"--stream-record={path}", "--vo=null",
+            cmd = [exe, f"--stream-record={path}", "--vo=null",
                    "--ao=null", "--no-terminal", f"--user-agent={RECORD_UA}"]
             cmd += through
             if secs:
                 cmd.append(f"--length={secs}")
+            # The address last, after "--": a playlist's line that starts
+            # with a dash is a file that does not open, never an option of
+            # mpv's (media/players.player_command).
+            cmd += ["--", j["url"]]
         try:
             j["proc"] = subprocess.Popen(
                 cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
