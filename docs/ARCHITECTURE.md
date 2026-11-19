@@ -494,7 +494,8 @@ dopeiptv/
                        the folders - painted views on media_cards' PlacePage
     mw_popular.py      Popular right now for Movies and Series, matched to
                        the source on a worker
-    mw_guide.py        The Guide page in the middle pane, and its pop-out
+    mw_guide.py        The Guide page in the middle pane, and its pop-out; the
+                       guide's data loaded, kept fresh, cleared
     mw_series_page.py  A series' page in the middle pane: opened from anywhere,
                        played through the window's path, Back to the list as it was
     mw_place_films.py  The Movies place: the list's films as posters or rows,

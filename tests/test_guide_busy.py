@@ -16,6 +16,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtWidgets import QApplication, QWidget
 
 import dopeiptv.ui.main_window as mw
+import dopeiptv.ui.mw_guide as mw_guide
 from dopeiptv.i18n import tr
 from dopeiptv.providers.epg import XmltvGuide
 from dopeiptv.ui.mw_busy import _BusyMixin
@@ -69,7 +70,7 @@ class _Window(_BusyMixin, QWidget):
 
 def _jobs(monkeypatch):
     jobs: list = []
-    monkeypatch.setattr(mw, "run_async", lambda _pool, fn, done, err=None:
+    monkeypatch.setattr(mw_guide, "run_async", lambda _pool, fn, done, err=None:
                         jobs.append((fn, done, err)))
     return jobs
 
@@ -301,10 +302,10 @@ def test_no_provider_no_guide_load_and_no_failure():
     from dopeiptv.providers.client import OfflineClient
     jobs = []
     w = _Window(guide=XmltvGuide(OfflineClient()))
-    mw_run = mw.run_async
+    mw_run = mw_guide.run_async
     try:
-        mw.run_async = lambda _pool, fn, done, err=None: jobs.append(fn)
+        mw_guide.run_async = lambda _pool, fn, done, err=None: jobs.append(fn)
         w._load_guide()
     finally:
-        mw.run_async = mw_run
+        mw_guide.run_async = mw_run
     assert jobs == [] and not w.shown() and w.notes == []

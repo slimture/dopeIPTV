@@ -15,18 +15,26 @@ while the app
 runs and shown again as it was - same source, same channels, the same day
 - and drawn afresh otherwise. Showing or leaving it never touches the
 player.
+
+The guide's data is loaded here too, on the pool and one load at a time
+(_load_guide, _ensure_xmltv_loaded), again when it is old or runs out
+(_check_guide_age), and refreshed or cleared from Settings
+(_refresh_epg_now, _clear_epg_cache).
 """
 
 from __future__ import annotations
 
 import time
+from functools import partial
 
+from PyQt6 import sip
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
 
 from ..core.log import log
 from ..core.workers import run_async
 from ..i18n import tr
+from ..providers.epg import prune_epg_caches
 from .epg_grid import EpgGrid, EpgGridDialog
 from .theme import P
 
@@ -34,6 +42,14 @@ from .theme import P
 def _lineup_sig(channels: list) -> tuple:
     """The channels a guide covers, as much as tells two line-ups apart."""
     return tuple((c.get("stream_id"), c.get("name")) for c in channels)
+
+
+def _gone(obj) -> bool:
+    """Whether Qt has deleted *obj* (an async answer arriving late)."""
+    try:
+        return sip.isdeleted(obj)
+    except TypeError:           # not a Qt object (a test's window)
+        return False
 
 
 class GuidePage(QWidget):
@@ -444,3 +460,102 @@ class _GuideMixin:
         self._guide_page.put(grid)
         grid.scroll_to_time(left)
         grid.view.verticalScrollBar().setValue(v)
+
+    # -- the guide's data: loaded, kept fresh, cleared ----------------------------
+
+    def _refresh_epg_now(self) -> None:
+        """Force a fresh EPG fetch now (Settings button) without reloading the
+        channel list."""
+        self._flash_status(tr("status_loading_programme_guide"))
+        self._load_guide(force=True)
+
+    def _clear_epg_cache(self) -> None:
+        """Delete the cached guide for the current playlist, sweep away caches
+        left by playlists that no longer exist, then re-fetch fresh."""
+        self.xmltv.clear_cache()
+        try:
+            prune_epg_caches(p.get("id") for p in self.playlist_store.items) \
+                if self.playlist_store else None
+        except Exception:
+            pass
+        self._flash_status(tr("epg_cache_cleared"))
+        self._refresh_epg_now()
+
+    def _ensure_xmltv_loaded(self) -> None:
+        x = self.xmltv
+        # One load at a time: every live list loaded asked again, and each
+        # extra job sat on a pool thread waiting for the first one's
+        # download and parse - with a few category clicks, every pool
+        # thread, so lists and categories waited for the guide as well.
+        if x._loaded or x._failed or getattr(self, "_guide_loading", None) is x:
+            return
+        self._load_guide()
+
+    def _check_guide_age(self) -> None:
+        """Refresh the guide when it is old or running out (XmltvGuide.stale
+        allows one try an hour). Not while it loads, nor before it has."""
+        x = getattr(self, "xmltv", None)
+        if (x is None or getattr(self, "_guide_loading", None) is not None
+                or not x.is_loaded() or x.is_loading()):
+            return
+        try:
+            due = x.stale()
+        except Exception:
+            return
+        if due:
+            log.info("EPG: the guide is old or runs out soon - refreshing")
+            self._load_guide(force=True)
+
+    def _guide_progress(self, token: int):
+        """A guide's progress callback for the load with *token* (0: one the
+        window did not start). Called on the loading thread; the signal
+        brings it to the window's."""
+        return partial(self.epg_progress.emit, token)
+
+    def _load_guide(self, force: bool = False, label: str | None = None) -> None:
+        """Load the current guide on the pool. This load owns the "Loading
+        programme guide" strip (mw_busy) under a token of its own: its
+        download's progress shows it, its end - done, failed or raised -
+        ends it, and an older load's late word touches neither. *label*
+        names the wait after what the person did."""
+        x = self.xmltv
+        can_load = getattr(x, "can_load", None)
+        if callable(can_load) and not can_load():
+            # No provider yet (the first start): no guide to wait for, and
+            # no "could not load" for one that was never there.
+            return
+        self._guide_loading = x
+        token = self._guide_busy_begin(label)
+        self._guide_load_token = token
+        # Whichever thread downloads this guide now (this load, or a lookup
+        # that got there first) reports under this load's token.
+        x.progress_cb = self._guide_progress(token)
+
+        def finished(ok) -> None:
+            if _gone(self):
+                return
+            if (getattr(self, "_guide_loading", None) is x
+                    and getattr(self, "_guide_load_token", 0) == token):
+                self._guide_loading = None
+            self._guide_busy_end(
+                token, None if ok or x is not self.xmltv
+                else tr("detail_epg_failed"))
+            if ok and x is self.xmltv:
+                # The TV place's rows and cards: what is on asked again.
+                if hasattr(self, "_place_tv_guide_in"):
+                    self._place_tv_guide_in()
+                self.list_model.refresh_all()
+                if hasattr(self, "_request_epg"):
+                    # The detail panel asked while the guide was still on its
+                    # way (lookups don't wait for it), or shows the guide a
+                    # refresh replaced: fill it in now.
+                    self._request_epg()
+                # A guide in (or a new one): what the series rules ask for.
+                if hasattr(self, "_check_series_rules"):
+                    self._check_series_rules()
+                # TV mode's now and next, which never load it themselves.
+                if hasattr(self, "_tv_guide_in"):
+                    self._tv_guide_in()
+
+        run_async(self.pool, lambda: x.ensure_loaded(force=force),
+                  finished, lambda _e: finished(False))
