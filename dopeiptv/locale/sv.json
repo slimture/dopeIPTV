@@ -3094,5 +3094,7 @@
   "setting_sub_live": "Undertexter på live-tv",
   "setting_sub_live_hint": "Av: live-kanaler startar utan undertexter, medan filmer och serier får dem som vanligt. Slå på dem i spelaren när du vill.",
   "srv_adult": "Kanaler för vuxna",
-  "srv_adult_hint": "Av: kanaler och kategorier för vuxna (XXX, 18+ eller markerade så av leverantören) lämnas utanför kanallistan och den delade spellistan – en tv i ett barnrum har ingen profil eller PIN-kod. Dolda och låsta kategorier delas aldrig."
+  "srv_adult_hint": "Av: kanaler och kategorier för vuxna (XXX, 18+ eller markerade så av leverantören) lämnas utanför kanallistan och den delade spellistan – en tv i ett barnrum har ingen profil eller PIN-kod. Dolda och låsta kategorier delas aldrig.",
+  "link_play_title": "Spela upp den här adressen?",
+  "link_play_body": "En länk som öppnades utanför dopeIPTV vill spela upp en adress på {host}:\n\n{address}\n\nDen servern får se den här datorns IP-adress. Spela bara upp den om du litar på var länken kom ifrån."
 }

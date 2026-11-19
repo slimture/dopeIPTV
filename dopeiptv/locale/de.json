@@ -3094,5 +3094,7 @@
   "setting_sub_live": "Untertitel bei Live-TV",
   "setting_sub_live_hint": "Aus: Live-Sender starten ohne Untertitel, Filme und Serien bekommen sie weiterhin. Im Player kannst du sie jederzeit einschalten.",
   "srv_adult": "Kanäle für Erwachsene",
-  "srv_adult_hint": "Aus: Kanäle und Kategorien für Erwachsene (XXX, 18+ oder vom Anbieter so markiert) bleiben aus der Senderliste und der geteilten Playlist heraus – ein Fernseher im Kinderzimmer hat kein Profil und keine PIN. Ausgeblendete und gesperrte Kategorien werden nie bereitgestellt."
+  "srv_adult_hint": "Aus: Kanäle und Kategorien für Erwachsene (XXX, 18+ oder vom Anbieter so markiert) bleiben aus der Senderliste und der geteilten Playlist heraus – ein Fernseher im Kinderzimmer hat kein Profil und keine PIN. Ausgeblendete und gesperrte Kategorien werden nie bereitgestellt.",
+  "link_play_title": "Diese Adresse abspielen?",
+  "link_play_body": "Ein außerhalb von dopeIPTV geöffneter Link möchte eine Adresse auf {host} abspielen:\n\n{address}\n\nDieser Server sieht die IP-Adresse dieses Computers. Spiel sie nur ab, wenn du der Herkunft des Links vertraust."
 }

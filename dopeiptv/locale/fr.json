@@ -3094,5 +3094,7 @@
   "setting_sub_live": "Sous-titres en TV en direct",
   "setting_sub_live_hint": "Désactivé : les chaînes en direct démarrent sans sous-titres, les films et séries les gardent. Activez-les dans le lecteur quand vous voulez.",
   "srv_adult": "Chaînes pour adultes",
-  "srv_adult_hint": "Désactivé : les chaînes et catégories pour adultes (XXX, 18+ ou signalées ainsi par le fournisseur) restent hors de la liste des chaînes et de la playlist partagée – une télé dans une chambre d'enfant n'a ni profil ni code PIN. Les catégories masquées et verrouillées ne sont jamais diffusées."
+  "srv_adult_hint": "Désactivé : les chaînes et catégories pour adultes (XXX, 18+ ou signalées ainsi par le fournisseur) restent hors de la liste des chaînes et de la playlist partagée – une télé dans une chambre d'enfant n'a ni profil ni code PIN. Les catégories masquées et verrouillées ne sont jamais diffusées.",
+  "link_play_title": "Lire cette adresse ?",
+  "link_play_body": "Un lien ouvert en dehors de dopeIPTV demande à lire une adresse sur {host} :\n\n{address}\n\nCe serveur verra l'adresse IP de cet ordinateur. Ne la lis que si tu fais confiance à l'origine du lien."
 }

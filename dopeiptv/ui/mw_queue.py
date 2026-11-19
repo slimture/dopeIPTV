@@ -1,7 +1,9 @@
 """What is dropped on the window, and the music it plays (MainWindow
 mixin). A drop (``dragEnterEvent``, ``dropEvent``): a video or a track
 played, an M3U file or a provider's link opening the Add source window
-filled in (``_add_dropped_playlist``). The play queue of local music
+filled in (``_add_dropped_playlist``) - nothing while "Who's watching?"
+waits for a PIN (``_drop_waits``), and for a kids profile a source only
+with a grown-up's PIN, as in Settings. The play queue of local music
 (``queue_add``, ``queue_clear``, ``_queue_step``, ``_play_queued``,
 ``_place_in_queue``, its window ``open_queue``), in charge only while a
 local file plays (``_local_is_playing``) and rolling on at a file's end
@@ -33,6 +35,12 @@ class _QueueMixin:
         playlist dialog with it filled in, then on to the new playlist."""
         if not self.playlist_store:
             return
+        # Adding a source is Settings' to do: a kids profile needs a
+        # grown-up's PIN for it there (mw_profiles), so here too - else a
+        # dropped playlist was the way round that.
+        unlock = getattr(self, "_kids_settings_unlock", None)
+        if callable(unlock) and not unlock():
+            return
         kind, server, user, pw = found
         name = ""
         if kind == "m3u" and "://" not in server:
@@ -62,7 +70,14 @@ class _QueueMixin:
             out = [t for t in mime.text().split() if "://" in t][:1]
         return out
 
+    def _drop_waits(self) -> bool:
+        """"Who's watching?" waits for a profile's PIN at start: nothing
+        dropped on the window plays, or adds a source, before it is given."""
+        return bool(getattr(self, "_profile_locked", lambda: False)())
+
     def dragEnterEvent(self, e) -> None:
+        if self._drop_waits():
+            return
         mime = e.mimeData()
         if (any(u.isLocalFile()
                 and u.toLocalFile().lower().endswith(self.MEDIA_EXTS)
@@ -71,6 +86,8 @@ class _QueueMixin:
             e.acceptProposedAction()
 
     def dropEvent(self, e) -> None:
+        if self._drop_waits():
+            return
         for u in e.mimeData().urls():
             p = u.toLocalFile()
             if p and p.lower().endswith(self.MEDIA_EXTS):

@@ -3094,5 +3094,7 @@
   "setting_sub_live": "Titlovi na TV-u uživo",
   "setting_sub_live_hint": "Isključeno: kanali uživo počinju bez titlova, filmovi i serije ih i dalje imaju. Uključite ih u playeru kad želite.",
   "srv_adult": "Kanali za odrasle",
-  "srv_adult_hint": "Isključeno: kanali i kategorije za odrasle (XXX, 18+ ili tako označeni kod pružatelja) ostaju izvan popisa kanala i dijeljene playliste – televizor u dječjoj sobi nema profil ni PIN. Skrivene i zaključane kategorije nikad se ne dijele."
+  "srv_adult_hint": "Isključeno: kanali i kategorije za odrasle (XXX, 18+ ili tako označeni kod pružatelja) ostaju izvan popisa kanala i dijeljene playliste – televizor u dječjoj sobi nema profil ni PIN. Skrivene i zaključane kategorije nikad se ne dijele.",
+  "link_play_title": "Reproducirati ovu adresu?",
+  "link_play_body": "Poveznica otvorena izvan dopeIPTV-a traži reprodukciju adrese na {host}:\n\n{address}\n\nTaj će poslužitelj vidjeti IP adresu ovog računala. Reproduciraj je samo ako vjeruješ izvoru poveznice."
 }

@@ -35,6 +35,11 @@ SOCKET_PATH_MAX = 100
 #: Windows: the file in the user's local app data holding the word in the
 #: pipe's name (``_pipe_key``).
 PIPE_KEY = "instance.key"
+#: A second start's message is one line of JSON, a command with an address
+#: at most (core/commands.MAX_OWN): a longer line, or more lines than a
+#: start ever sends, ends the connection.
+MAX_MESSAGE = 64 * 1024
+MAX_MESSAGES = 8
 
 
 def server_name() -> str:
@@ -191,18 +196,31 @@ class CommandServer(QObject):
                 break
             conn: QLocalSocket = pending
             buf = bytearray()
+            lines = [0]                 # how many this connection has sent
 
-            def read(sock: QLocalSocket = conn, buf: bytearray = buf) -> None:
+            def read(sock: QLocalSocket = conn, buf: bytearray = buf,
+                     taken: list[int] = lines) -> None:
                 buf.extend(sock.readAll().data())
+                over = False
                 while b"\n" in buf:
                     line, _, rest = bytes(buf).partition(b"\n")
                     buf[:] = rest
+                    taken[0] += 1
+                    if len(line) > MAX_MESSAGE or taken[0] > MAX_MESSAGES:
+                        over = True
+                        break
                     try:
                         cmd = json.loads(line.decode("utf-8"))
-                    except ValueError:
+                    except (ValueError, RecursionError):
                         continue
                     if isinstance(cmd, dict):
                         self._on(cmd)
+                if over or len(buf) > MAX_MESSAGE:
+                    # A second start sends one short line and goes: whatever
+                    # this is, it is not kept in memory or read on.
+                    log.info("commands: a connection that sends no command is closed")
+                    buf.clear()
+                    sock.abort()
             conn.readyRead.connect(read)
             conn.disconnected.connect(conn.deleteLater)
             read()

@@ -1,7 +1,13 @@
 """Commands from outside, carried out: the command line and dopeiptv://
 links (core/commands.py), a second start handing over (core/instance.py),
 and the remote API, which asks the same way - also for a channel by its
-number, as a typed number zaps."""
+number, as a typed number zaps.
+
+Whoever hands a command over, it is checked first (commands.checked): an
+address is a stream's or a file's own path, nothing else. A link's address
+- any web page can open a link - is asked about in the window before it
+plays, with the address in plain sight (``_ask_link_play``); only one the
+person saved among the favourites plays at once (``_link_known``)."""
 
 from __future__ import annotations
 
@@ -50,8 +56,12 @@ class _CommandsMixin:
         """Do what *cmd* asks: {"play": address}, {"channel": name},
         {"number": channel number}, {"open": True}, {"tv": True} (TV mode,
         before whatever else it asks). Returns at once; a channel is looked
-        up off the window's thread."""
-        if not isinstance(cmd, dict):
+        up off the window's thread, and a link's address ({"link": True}
+        beside it) is asked about first."""
+        from ..core import commands
+        cmd = commands.checked(cmd)
+        if cmd is None:
+            log.info("command: not one the app takes - left")
             return {"ok": False}
         log.info("command: %s", ", ".join(sorted(cmd)))
         if (cmd.get("open") or cmd.get("play") or cmd.get("channel") or cmd.get("supporter")
@@ -74,6 +84,12 @@ class _CommandsMixin:
             return {"ok": True}
         url = str(cmd.get("play") or "").strip()
         if url:
+            if cmd.get("link") and not self._link_known(url):
+                # Any web page can open a link: asked first, after this call
+                # returns (a dialog is not opened inside an event's delivery).
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(0, lambda: self._ask_link_play(url))
+                return {"ok": True, "asked": True}
             self._play_address(url)
             return {"ok": True}
         name = str(cmd.get("channel") or "").strip()
@@ -86,6 +102,46 @@ class _CommandsMixin:
             self._play_channel_number(number)
             return {"ok": True}
         return {"ok": bool(cmd.get("open") or cmd.get("tv"))}
+
+    def _link_known(self, url: str) -> bool:
+        """Whether a link's address is one the person keeps among the
+        favourites (Open address… > Save to favorites): their own, played
+        without a question."""
+        favs = getattr(self, "web_favs", None)
+        try:
+            return bool(favs is not None and favs.is_favorite(url))
+        except Exception:
+            return False
+
+    def _ask_link_play(self, url: str) -> None:
+        """A link asks to play *url*: the question, in the window (TV mode's
+        own while it is on), with the server and the whole address in plain
+        text - never the phone's, whoever is at it. One at a time: a page
+        that opens link after link gets one question, not a pile."""
+        from ..core import commands
+        from ..i18n import tr
+        if getattr(self, "_link_asking", False):
+            log.info("command: a link's address left - another is being asked about")
+            return
+        if getattr(self, "_profile_locked", lambda: False)():
+            return
+        self._link_asking = True
+        # While the phone remote does something its questions are the
+        # phone's (mw_phone_rec): this one stays on the computer the link
+        # was opened on.
+        phone = self.__dict__.pop("_phone_ask_hook", None)
+        try:
+            idx = self._choice_dialog(
+                tr("link_play_title"),
+                tr("link_play_body", host=commands.host_of(url), address=commands.shown(url)),
+                [(tr("open_address_play"), "normal"), (tr("common_cancel"), "primary")])
+        finally:
+            if phone is not None:
+                self._phone_ask_hook = phone
+            self._link_asking = False
+        log.info("command: a link's address %s", "played" if idx == 0 else "not played")
+        if idx == 0:
+            self._play_address(url)
 
     def _play_address(self, url: str, title: str | None = None) -> None:
         """A file plays as one opened from Local files (resume, its name);

@@ -327,6 +327,11 @@ def main() -> int:
         sys.stdout = open(os.devnull, "w")
     if sys.stderr is None:
         sys.stderr = open(os.devnull, "w")
+    # A start by a dopeiptv:// link takes the link and nothing after it:
+    # what follows is the link's own text (core/commands.own_arguments), and
+    # neither the options below nor Qt's own ever read it.
+    from .core.commands import is_link, own_arguments
+    sys.argv[1:] = own_arguments(sys.argv[1:])
     configure_logging()
     # One unconditional startup line so packaging smoke tests can prove
     # Python + our package imported cleanly before any GL/Qt init runs.
@@ -489,6 +494,10 @@ def main() -> int:
     # the restore in place once it knows no copy took the command.
     from .core.commands import parse_command
     command = parse_command(sys.argv[1:])
+    if command is None and any(is_link(a) for a in sys.argv[1:]):
+        # A link that asks nothing the app knows: the window comes forward -
+        # never a second copy of the app for every such link a page opens.
+        command = {"open": True}
     restored = _put_restore_in_place() if command is None else None
 
     # Opt-in X11/XWayland backend (Settings > "Run via X11"). Must be set

@@ -3094,5 +3094,7 @@
   "setting_sub_live": "Manukuu kwenye TV mubashara",
   "setting_sub_live_hint": "Imezimwa: chaneli mubashara zinaanza bila manukuu, filamu na mfululizo bado zinayapata. Yawashe kwenye kicheza video unapotaka.",
   "srv_adult": "Chaneli za watu wazima",
-  "srv_adult_hint": "Imezimwa: chaneli na kategoria za watu wazima (XXX, 18+ au zilizowekwa alama hivyo na mtoa huduma) hazijumuishwi kwenye orodha ya chaneli wala orodha ya kucheza inayoshirikiwa – TV katika chumba cha mtoto haina wasifu wala PIN. Kategoria zilizofichwa na zilizofungwa hazitolewi kamwe."
+  "srv_adult_hint": "Imezimwa: chaneli na kategoria za watu wazima (XXX, 18+ au zilizowekwa alama hivyo na mtoa huduma) hazijumuishwi kwenye orodha ya chaneli wala orodha ya kucheza inayoshirikiwa – TV katika chumba cha mtoto haina wasifu wala PIN. Kategoria zilizofichwa na zilizofungwa hazitolewi kamwe.",
+  "link_play_title": "Cheza anwani hii?",
+  "link_play_body": "Kiungo kilichofunguliwa nje ya dopeIPTV kinaomba kucheza anwani iliyo kwenye {host}:\n\n{address}\n\nSeva hiyo itaona anwani ya IP ya kompyuta hii. Icheze tu ikiwa unaamini kiungo kilikotoka."
 }

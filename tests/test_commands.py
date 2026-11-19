@@ -72,7 +72,8 @@ def test_a_file_address_is_the_path_it_names(url, posix, windows):
 
 
 @pytest.mark.parametrize("link, want", [
-    ("dopeiptv://play?url=http%3A%2F%2Fh%2Fx.ts", {"play": "http://h/x.ts"}),
+    # A link's address is marked as one: the window asks before it plays.
+    ("dopeiptv://play?url=http%3A%2F%2Fh%2Fx.ts", {"play": "http://h/x.ts", "link": True}),
     ("dopeiptv://channel?name=TV4%20HD", {"channel": "TV4 HD"}),
     ("dopeiptv://channel/Kanal%205", {"channel": "Kanal 5"}),
     ("DOPEIPTV://OPEN", {"open": True}),

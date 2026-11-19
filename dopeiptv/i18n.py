@@ -2019,6 +2019,8 @@ _STRINGS: dict[str, dict[str, str]] = {
     "problem_copy": {"en": "Copy"},
     "problem_copied": {"en": "Copied"},
     "cmd_no_channel": {"en": "No channel called “{name}” in this source."},
+    "link_play_title": {"en": "Play this address?"},
+    "link_play_body": {"en": "A link opened outside dopeIPTV asks to play an address on {host}:\n\n{address}\n\nThat server will see this computer's IP address. Play it only if you trust where the link came from."},
     "trakt_rejected": {"en": "Trakt rejected the sign-in (HTTP {code}{detail})."},
     "oauth_page_ok": {"en": "Connected to Trakt ✓"},
     "oauth_page_failed": {"en": "Sign-in was cancelled or failed."},

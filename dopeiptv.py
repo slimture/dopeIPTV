@@ -18,10 +18,19 @@ if sys.argv[1:2] == ["--build-files"]:
     from dopeiptv.core.build_check import files_main
     sys.exit(files_main(sys.argv[2:]))
 
+# A start by a dopeiptv:// link reads the link and nothing after it: what
+# follows a link on the command line came with the link (a quote in it ends
+# its argument on Windows) and must never be read as an option below - nor
+# by Qt (dopeiptv/core/commands.py, own_arguments). No link starts server
+# mode.
+from dopeiptv.core.commands import own_arguments
+
+sys.argv[1:] = own_arguments(sys.argv[1:])
+
 # Optionally re-exec with a custom memory allocator (jemalloc/mimalloc)
 # preloaded, before anything heavy is imported. Strict no-op unless a library
 # is actually found for this platform, so it can never affect a normal start.
-from dopeiptv.core._alloc import maybe_preload_allocator
+from dopeiptv.core._alloc import maybe_preload_allocator  # noqa: E402
 
 maybe_preload_allocator()
 
