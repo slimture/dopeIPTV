@@ -18,7 +18,7 @@ from PyQt6.QtCore import QObject, QSettings, Qt, QTimer, pyqtSignal
 from . import rec_mp4
 from .log import log
 from .player_exec import (NO_WINDOW, address_scheme, fetchable, ffmpeg_protocols,
-                          find_player_executable)
+                          find_player_executable, find_program)
 from .privacy import for_log
 from .rec_extras import not_a_device
 
@@ -301,7 +301,7 @@ class RecordingManager(QObject):
     def ffmpeg() -> str | None:
         """The app's ffmpeg: the one a packaged build bundles, else the
         system's."""
-        return _bundled_ffmpeg() or shutil.which("ffmpeg")
+        return _bundled_ffmpeg() or find_program("ffmpeg")
 
     @staticmethod
     def recorder() -> tuple[str | None, str | None]:

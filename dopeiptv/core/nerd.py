@@ -180,8 +180,9 @@ def active_tunnels() -> list[str]:
         now = time.monotonic()
         if now - _tunnels_seen[0] < TUNNELS_FOR:
             return list(_tunnels_seen[1])
+        from .player_exec import system_program
         found = parse_ifconfig(_run(["/sbin/ifconfig"])) if sys.platform == "darwin" \
-            else parse_ipconfig(_run(["ipconfig"]))
+            else parse_ipconfig(_run([system_program("ipconfig.exe")]))
         _tunnels_seen = (now, found)
         return list(found)
     try:

@@ -84,6 +84,40 @@ def ffmpeg_protocols(address: str) -> list[str]:
     return ["-protocol_whitelist", FFMPEG_PROTOCOLS]
 
 
+def system_program(*parts: str) -> str:
+    """A program of Windows' own by its full path under System32
+    (%SystemRoot%\\System32\\ipconfig.exe): a bare name is looked for in
+    the app's folder and the current one before the system's, where a file
+    of the same name would be started instead."""
+    import ntpath
+    base = os.environ.get("SystemRoot") or os.environ.get("windir") or "C:\\Windows"
+    return ntpath.join(base, "System32", *parts)
+
+
+#: What a program on Windows' PATH may be: a program, never a batch file
+#: (cmd.exe reads its arguments again - a stream's address among them).
+_WIN_PROGRAM = (".exe", ".com")
+
+
+def find_program(name: str) -> str | None:
+    """shutil.which - but on Windows never the current folder, which it (and
+    Windows itself, for a bare name) searches first: a folder the person
+    opened a file from could hold an ffmpeg.exe of its own. Only the PATH's
+    own folders, whole paths, and only a program found there."""
+    if sys.platform != "win32":
+        return shutil.which(name)
+    exts = ("",) if name.lower().endswith(_WIN_PROGRAM) else _WIN_PROGRAM
+    for folder in os.environ.get("PATH", "").split(os.pathsep):
+        folder = folder.strip().strip('"')
+        if not folder or not os.path.isabs(folder):
+            continue                    # "." or a relative one: the current folder's
+        for ext in exts:
+            path = os.path.join(folder, name + ext)
+            if os.path.isfile(path):
+                return path
+    return None
+
+
 def find_player_executable(player: str) -> str | None:
     """Locate the mpv or vlc binary, or None if it isn't installed."""
     if player == "mpv":
@@ -98,7 +132,7 @@ def find_player_executable(player: str) -> str | None:
             if os.path.isfile(c) and os.access(c, os.X_OK):
                 return c
         else:
-            found = shutil.which(c)
+            found = find_program(c)
             if found:
                 return found
     return None
