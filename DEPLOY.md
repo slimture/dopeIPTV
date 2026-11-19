@@ -1610,3 +1610,107 @@ Written for the dopeiptv jail.
   then ends `so any user here may connect (SOCKET_OPEN = yes)`. In the
   dopeiptv jail `www` is there and the socket is 0660 `iptv:www` already:
   nothing changes but the day the group is gone.
+- **No answer in a temporary file.** A request's body has been held in
+  memory since "Hardening, November 2026"; an answer larger than nginx's
+  buffers was still written to a file in `/var/tmp/nginx` and sent from
+  there - a sync copy can be 2 MB. `proxy_max_temp_file_size 0;` in the
+  content server's 8081 server and in the proxy's dopeiptv.org server:
+  such an answer is passed on as it comes, the service and the proxy
+  waiting for the reader (the service gives a write 600 s). www, plain
+  http and iptv.dope.rs proxy nothing. The proxy's live file differs from
+  the repo's - its own addresses, an older layout - so the one line goes
+  in by itself (below); `deploy/proxy-headers.sh` would put it in too.
+- **No symbolic link followed.** `disable_symlinks on
+  from=$document_root;` in the content server: a link under `public/` - a
+  copy, a hand, a mistake - to a file outside it is answered as if nothing
+  were there. Nothing the site serves is one (git holds none in `public/`
+  or `site/`, `sync-releases.sh` makes none); the deploy looks on the
+  server before the file goes in. nginx then opens each folder below the
+  root on its own, on FreeBSD only to pass through it (`O_SEARCH`, or
+  `O_EXEC` where there is no `O_SEARCH`), so no folder needs more than it
+  has now.
+
+### This round's deploy (host)
+
+**dopeiptv** - the files, and a look that nothing under the site's root is
+a link (no output: from the new file on, one would be answered 404):
+
+```sh
+jexec dopeiptv sh -c 'cd /root/dopeiptv && git pull origin website && cp -R public/. /usr/local/www/iptv/public/ && cp -R site donate sync-releases.sh /usr/local/www/iptv/'
+jexec dopeiptv find /usr/local/www/iptv/public -type l
+```
+
+The content server's file - no zone changed, so a reload takes it:
+
+```sh
+diff /usr/local/bastille/jails/dopeiptv/root/usr/local/etc/nginx/conf.d/iptv.dope.rs.conf /usr/local/bastille/jails/dopeiptv/root/root/dopeiptv/deploy/content-iptv.dope.rs.conf
+cp /usr/local/bastille/jails/dopeiptv/root/usr/local/etc/nginx/conf.d/iptv.dope.rs.conf /root/iptv.dope.rs.conf.before-tempfile
+cp /usr/local/bastille/jails/dopeiptv/root/root/dopeiptv/deploy/content-iptv.dope.rs.conf /usr/local/bastille/jails/dopeiptv/root/usr/local/etc/nginx/conf.d/iptv.dope.rs.conf
+jexec dopeiptv nginx -t && service -j dopeiptv nginx reload
+jexec dopeiptv ps -axo pid,lstart,command | grep "[n]ginx: worker"
+jexec dopeiptv sh -c 'nginx -T 2>/dev/null | grep -E "^ *(proxy_max_temp_file_size|disable_symlinks) "'
+```
+
+The diff shows only the two directives and their comments; workers started
+just now; nginx has loaded `disable_symlinks on from=$document_root;` and
+`proxy_max_temp_file_size 0;`. If `nginx -t` complains, nothing was
+reloaded, and `cp /root/iptv.dope.rs.conf.before-tempfile
+/usr/local/bastille/jails/dopeiptv/root/usr/local/etc/nginx/conf.d/iptv.dope.rs.conf`
+puts the old file back.
+
+The service (its rc file is the same) and the pages - the transparency
+page and the privacy policy:
+
+```sh
+service -j dopeiptv iptv_donate restart
+jexec dopeiptv tail -n 1 /var/log/iptv-donate.log
+jexec dopeiptv python3 -I /usr/local/www/iptv/donate/donate.py --check
+jexec -U iptv dopeiptv /bin/sh /usr/local/www/iptv/sync-releases.sh
+```
+
+The log's last line `[donate] listening on
+unix:/var/run/iptv_donate/donate.sock (0660, group www), Stripe set up,
+...`, and `--check` `200 {"stripe": true, ...}`. A line `[donate] not
+started: ...` means the group it names is not there: it says what to put
+right, and the service tries again every 5 seconds.
+
+**webproxy** - one line into the live `dopeiptv.org.conf`, which is never
+written over with the repo's: a copy kept, the line put into a new file
+right after `server_name dopeiptv.org;` (awk says `not put in` where the
+file has no such line or has the directive already - then stop there), the
+difference shown - one added line, `proxy_max_temp_file_size 0;` -, the
+live configuration tested as it is, then the new file moved in, tested,
+and nginx reloaded:
+
+```sh
+cp -p /usr/local/bastille/jails/webproxy/root/usr/local/etc/nginx/conf.d/dopeiptv.org.conf /root/dopeiptv.org.conf.before-tempfile
+awk '/^[ \t]*proxy_max_temp_file_size[ \t]/ { had++ } { print } /^[ \t]*server_name[ \t]+dopeiptv\.org[ \t]*;/ { print "    proxy_max_temp_file_size 0;"; n++ } END { exit (n == 1 && had == 0 ? 0 : 1) }' /root/dopeiptv.org.conf.before-tempfile > /root/dopeiptv.org.conf.new && echo "one line put in" || echo "not put in"
+diff /root/dopeiptv.org.conf.before-tempfile /root/dopeiptv.org.conf.new
+jexec webproxy nginx -t
+mv -f /root/dopeiptv.org.conf.new /usr/local/bastille/jails/webproxy/root/usr/local/etc/nginx/conf.d/dopeiptv.org.conf
+jexec webproxy nginx -t && service -j webproxy nginx reload
+jexec webproxy ps -axo pid,lstart,command | grep "[n]ginx: worker"
+jexec webproxy sh -c 'nginx -T 2>/dev/null | grep -n proxy_max_temp_file_size'
+```
+
+Workers started just now, and nginx has the one line. Should the second
+`nginx -t` complain, nothing was reloaded; this puts the old file back:
+
+```sh
+cp -p /root/dopeiptv.org.conf.before-tempfile /usr/local/bastille/jails/webproxy/root/usr/local/etc/nginx/conf.d/dopeiptv.org.conf && jexec webproxy nginx -t && service -j webproxy nginx reload
+```
+
+These commands hold no `#` and no `!`, and remove nothing: they run as
+they are in the host's zsh.
+
+**Check.** From anywhere, the site, Sync now, Send feedback and a
+watch-together room in the app, an update check, a tip dialog that opens,
+and the admin page work as before. Then a link under the site's root, to
+a file outside it that is public anyway, answered 404 (a 200 would mean it
+was followed) - and taken away again:
+
+```sh
+jexec dopeiptv ln -s /usr/local/www/iptv/sync-releases.sh /usr/local/www/iptv/public/link-check.txt
+curl -s -o /dev/null -w '%{http_code}\n' https://dopeiptv.org/link-check.txt
+jexec dopeiptv rm /usr/local/www/iptv/public/link-check.txt
+```
