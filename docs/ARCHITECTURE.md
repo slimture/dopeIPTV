@@ -285,6 +285,7 @@ dopeiptv/
     audio_effects.py   The visualiser, the equaliser and night mode on the core
     sleep_timer.py     The sleep timer's countdown and the number typed, in
                        the picture's corner
+    stats_overlay.py   Stats for nerds over the picture (_StatsLabel)
     popout_mirror.py   The pop-out's picture: the mirror (raster, GL or the
                        picture's own thread), the docked placeholder
     seek_slider.py     The seek bar slider: click, drag, hover time
