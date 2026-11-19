@@ -55,6 +55,17 @@ running() {
     [ -n "$pid" ] && ps -p "$pid" -o command= 2>/dev/null | grep -q sync-releases
 }
 if ! mkdir "$LOCK" 2>/dev/null; then
+    # Run by hand (a terminal), as a deploy does: wait for the one running,
+    # then render with the files just copied in - leaving at once kept the
+    # pages that run had rendered from the old ones. Cron leaves, as ever.
+    if running && [ -t 2 ]; then
+        say "another sync is running - waiting for it to finish (at most 15 min)"
+        waited=0
+        while running && [ "$waited" -lt 900 ]; do
+            sleep 2
+            waited=$((waited + 2))
+        done
+    fi
     if running; then
         say "another sync is already running - nothing to do"
         exit 0
@@ -224,6 +235,15 @@ count_downloads
 write_nightly
 
 # ---- The latest release --------------------------------------------------------
+# In a subshell of its own: when GitHub does not answer or a release is half
+# mirrored, it gives up (exit 1) and the release already here stays - and
+# the pages are still rendered below, from that release, so the site's own
+# files (a deploy) never wait for GitHub. Nothing it sets is needed after
+# it: what the pages read is in files ($REL, $FILES).
+set +e
+(
+set -e
+trap - EXIT HUP INT TERM    # its end must not clear the lock and $TMP
 API=$TMP/latest.json
 if ! fetch -q -T 30 --user-agent="$UA" -o "$API" \
         "https://api.github.com/repos/$REPO/releases/latest"; then
@@ -402,6 +422,12 @@ else
     mv -f "$REL.part" "$REL"
     say "wrote releases.json for v$version with $(jq '.assets | length' "$REL") asset(s)"
 fi
+)
+release_rc=$?
+set -e
+if [ "$release_rc" -ne 0 ]; then
+    say "the pages are rendered from the release already here"
+fi
 
 # ---- The pages -----------------------------------------------------------------------
 # Every page in every language, into a staging directory first; only once
@@ -418,8 +444,29 @@ for c in $(jq -r '.names | keys_unsorted[] | select(. != "en")' "$SITE/i18n.json
 done
 avail=$(for c in $codes; do echo "$c"; done | jq -R . | jq -cs .)
 
+# CSS and JS as the pages were rendered with them: a copy of each under its
+# content hash (public/assets/style.<hash>.css), linked from the pages. A
+# deploy copies the new style.css in at once, but the pages still out link
+# the copy they were made with until their replacements go out below, in
+# the same moment - before, the old pages got the new CSS (one release's
+# cards drawn with the next one's styles) until a sync rendered them, and a
+# browser could keep that mix for a year under the old address. nginx
+# caches *.css and *.js for good, which a hash in the name makes true.
+ASSETS=$PUB/assets
+mkdir -p "$ASSETS"
+snapshot() {  # snapshot /name.ext: the copy's address, made if it is new
+    src=$PUB$1
+    [ -f "$src" ] || { printf '%s' "$1"; return 0; }
+    base=${1#/}
+    tmp=$ASSETS/.${base}.$$
+    cp "$src" "$tmp"
+    h=$(md5 -q "$tmp" | cut -c1-10)
+    name=${base%.*}.$h.${base##*.}
+    if [ -f "$ASSETS/$name" ]; then rm -f "$tmp"; else mv -f "$tmp" "$ASSETS/$name"; fi
+    printf '/assets/%s' "$name"
+}
 asset_urls=$(for p in /style.css /nav.js /app.js /help.js /features.js /events.js; do
-    printf '%s\t%s?v=%s\n' "$p" "$p" "$(md5 -q "$PUB$p" | cut -c1-10)"
+    printf '%s\t%s\n' "$p" "$(snapshot "$p")"
 done | jq -R 'split("\t") | {key: .[0], value: .[1]}' | jq -cs from_entries)
 # The app's pictures, per language: public/screenshots/<lang>/<name>.webp,
 # listed as "<lang>/<name>" (render.jq falls back to English).
@@ -531,3 +578,14 @@ for f in $(cd "$OUT" && find . -type f | sort); do
     changed=$((changed + 1))
 done
 say "pages: $changed of $(cd "$OUT" && find . -type f | wc -l | tr -d ' ') updated"
+
+# Copies no page has linked for two weeks go; the ones the pages link now
+# stay, however old.
+keep=$(printf '%s' "$asset_urls" | jq -r '.[]' | sed -n 's#^/assets/##p')
+find "$ASSETS" -type f -name '*.*.*' -mtime +14 | while IFS= read -r f; do
+    b=${f##*/}
+    if ! printf '%s\n' "$keep" | grep -qxF -- "$b"; then
+        rm -f "$f"
+        say "pruned old $b"
+    fi
+done

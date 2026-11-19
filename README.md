@@ -243,8 +243,13 @@ cd /usr/local/www/iptv && su -m iptv -c 'sh sync-releases.sh'
 When `donate/` changed, `service iptv_donate restart` as well.
 
 The last line puts a change on the pages now rather than at the next
-quarter-hour - and a changed `style.css` or JS file is only linked under its
-new address (below) once the pages are rendered again.
+quarter-hour; its last words say how many pages changed
+(`pages: 12 of 244 updated`). Run by hand it waits for a sync already
+running (the cron's) and then renders with the files just copied; when
+GitHub does not answer it still renders, from the release already here. A
+new `style.css` or JS file reaches the pages only with them: the pages out
+keep linking the copy they were made with (below) until their replacements
+go out, in the same moment, so the order of the copies above does not matter.
 
 `public/.` with the trailing dot copies the CONTENTS. `cp -R public/ dest/`
 on FreeBSD puts the directory inside the target instead, giving you
@@ -379,9 +384,12 @@ to `/` and `/help/`, so each page has one address.
 After a deploy, resubmit `https://dopeiptv.org/sitemap.xml` in Google Search
 Console and Bing Webmaster Tools.
 
-CSS and JS are cached for a year: the sync links them from every page with
-the file's content hash in the URL (`?v=`), so a changed file always gets a
-new address. Anything linked without it would be stuck for a year.
+CSS and JS are cached for a year: the sync copies each into
+`public/assets/` under its content hash (`style.<hash>.css`) and links the
+copy from every page, so a changed file always gets a new address - and an
+address always the same bytes (a `?v=` on the live file could be cached with
+the next deploy's content). Copies no page has linked for two weeks are
+pruned. Anything linked without a hash would be stuck for a year.
 
 Server-side lines that belong with this, all in the templates in `deploy/`:
 

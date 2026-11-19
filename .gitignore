@@ -2,3 +2,6 @@
 # files under dopeiptv/, tests/, tools/) - this branch holds the site only.
 __pycache__/
 *.pyc
+# The sync's copies of CSS and JS under their content hash (sync-releases.sh):
+# made on the server, never committed.
+public/assets/
