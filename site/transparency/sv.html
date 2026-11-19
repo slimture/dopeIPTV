@@ -94,6 +94,10 @@
 <h3>Koden</h3>
 <p>Synkkoden, platsen och nyckeln, och hur kopian låses:</p>
 <!--tp:code sync key-->
+<p>Själva krypteringen, ChaCha20-Poly1305 (RFC 8439), utskriven i sin helhet: en kopia vars tagg inte stämmer – ändrad med en enda bit, eller låst för en annan plats – avvisas innan något av den läses. Appens tester kontrollerar den mot RFC:ns egna testvektorer.</p>
+<!--tp:code sync aead-->
+<p>Var koden sparas på din dator: i appens inställningsfil, som bara ditt eget användarkonto kan läsa (på Linux och macOS har filen läget 0600 och mappen 0700):</p>
+<!--tp:code sync stored-->
 <p>Räknaren i varje kopia, och hur en synkrunda märker en tidigare kopia och lägger tillbaka sin egen:</p>
 <!--tp:code sync counter-->
 <p>Det appen skickar med – sitt namn och sin version, inget om dig – och bara över HTTPS:</p>

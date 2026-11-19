@@ -94,6 +94,10 @@
 <h3>The code</h3>
 <p>The sync code, the slot and the key, and how the copy is locked:</p>
 <!--tp:code sync key-->
+<p>The encryption itself, ChaCha20-Poly1305 (RFC 8439), written out in full: a copy whose tag does not match – changed by one bit, or sealed for another slot – is refused before anything of it is read. The app's tests check it against the RFC's own test vectors.</p>
+<!--tp:code sync aead-->
+<p>Where the code is kept on your computer: in the app's settings file, which only your own user account can read (on Linux and macOS the file is 0600 and its folder 0700):</p>
+<!--tp:code sync stored-->
 <p>The counter in every copy, and how a round notices an earlier copy and puts its own back:</p>
 <!--tp:code sync counter-->
 <p>What the app sends with it – its name and version, nothing about you – and only over HTTPS:</p>

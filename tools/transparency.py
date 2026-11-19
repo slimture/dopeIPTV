@@ -66,6 +66,11 @@ CODE: dict[str, list[dict]] = {
     "sync": [
         {"id": "key", "repo": "app", "path": "dopeiptv/core/sync.py",
          "names": ["format_code", "new_code", "hkdf", "derive", "seal", "unseal"]},
+        {"id": "aead", "repo": "app", "path": "dopeiptv/core/chacha20poly1305.py",
+         "names": ["poly1305", "_pad16", "_tag", "encrypt", "decrypt"]},
+        {"id": "stored", "repo": "app", "path": "dopeiptv/core/sync.py", "names": ["K_CODE", "code_of"],
+         "with": [{"repo": "app", "path": "dopeiptv/core/settings_files.py",
+                   "names": ["keep_private", "protect"]}]},
         {"id": "counter", "repo": "app", "path": "dopeiptv/core/sync.py",
          "names": ["_META", "_COUNTER", "counter", "_counted", "round_trip"]},
         {"id": "send", "repo": "app", "path": "dopeiptv/core/sync.py",
