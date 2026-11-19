@@ -273,3 +273,40 @@ def test_mine_leaves_another_sources_locked_rows_out(settings):
     # Kept without its category there: left out while its kind is locked.
     assert mw_mitt._lock_keeps({"_kind": "live", "_key": 5}, {"live": frozenset({"7"})}) is False
     assert mw_mitt._lock_keeps({"_kind": "live", "_key": 5}, {"vod": frozenset({"9"})}) is True
+
+
+def test_the_sidebar_search_names_a_locked_category_without_its_channels(settings):
+    from PyQt6.QtWidgets import QApplication, QListWidget
+
+    from dopeiptv.i18n import set_language, tr
+    from dopeiptv.ui.mw_search import _SearchMixin
+    app = QApplication.instance() or QApplication([])
+    set_language("en")
+
+    class SearchWindow(_SearchMixin):
+        def __init__(self, unlocked: bool) -> None:
+            self.mode = "live"
+            self._raw_categories = [{"category_id": "1", "category_name": "News"},
+                                    {"category_id": "7", "category_name": "XXX Adults 18+"}]
+            self.overrides = CategoryOverrides(settings, "category_overrides_p1")
+            self.parental = ParentalControl(settings)
+            self.parental.session_unlocked = unlocked
+            self.cat_list = QListWidget()
+
+        def _profile_kids(self) -> bool:
+            return False
+
+    idx = {"7": [("Adult One", "adult one"), ("Adult Two", "adult two")],
+           "1": [("News One", "news one")]}
+
+    def rows(word, unlocked=False):
+        w = SearchWindow(unlocked)
+        w._render_cat_search(word, idx)
+        return [w.cat_list.item(i).text() for i in range(w.cat_list.count())]
+
+    assert rows("adult one") == [tr("cat_search_none")]      # its channels not searched
+    assert rows("xxx") == ["XXX Adults 18+  " + tr("cat_locked_suffix")]
+    assert rows("adult") == ["XXX Adults 18+  " + tr("cat_locked_suffix")]
+    assert rows("adult", unlocked=True) == ["XXX Adults 18+  ·  Adult One, Adult Two"]
+    assert rows("news") == ["News  ·  News One"]
+    assert app is not None
