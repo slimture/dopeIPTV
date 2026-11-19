@@ -23,6 +23,7 @@ from collections import OrderedDict
 from typing import Any
 
 from .ed25519 import public_key, sign, verify
+from .log import register_secrets
 
 #: The public half of dopeiptv.org's supporter key (32 bytes, hex). Empty
 #: until the site has one: then no key checks out.
@@ -94,6 +95,7 @@ def stored(settings: Any) -> dict[str, Any] | None:
         return None
     if not key:
         return None
+    register_secrets(key, "".join(key.split()))
     seen = (PUBLIC_KEY_HEX, key)
     with _seen_lock:
         if seen in _seen:

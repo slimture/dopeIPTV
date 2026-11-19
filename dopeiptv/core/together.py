@@ -96,7 +96,7 @@ from typing import Any, Callable
 from . import build_check
 from . import chacha20poly1305 as aead
 from . import ed25519
-from .log import log
+from .log import log, register_secrets
 from .sync import hkdf
 
 ENDPOINT = "https://dopeiptv.org/together/"
@@ -200,6 +200,8 @@ def derive(code: str) -> tuple[str, bytes]:
     if shown is None:
         raise ValueError("not a room code")
     raw = shown.replace("-", "")
+    # Whoever has the code is in the room: never in a log.
+    register_secrets(shown, raw, shown.lower())
     rounds = OLD_STRETCH if len(raw) == OLD_LEN else STRETCH
     seed = hashlib.pbkdf2_hmac("sha256", raw.encode("ascii"), _SALT, rounds, 32)
     return hkdf(seed, _SALT, b"room", 32).hex(), hkdf(seed, _SALT, b"key", 32)

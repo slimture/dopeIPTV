@@ -19,6 +19,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO
 
+from .log import open_private, private_folder
+
 TS_PACKET = 188
 
 
@@ -41,7 +43,10 @@ class SegmentStore:
                  clock: Callable[[], float] = time.time,
                  min_free: int | None = None) -> None:
         self.root = root
-        self.root.mkdir(parents=True, exist_ok=True)
+        # What was watched, this user's alone: the folder 0700 (narrowed
+        # when it was there before), each segment 0600 (open_private).
+        self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        private_folder(str(self.root))
         self.keep_seconds = keep_seconds
         self.max_bytes = max_bytes
         self.min_free = self.MIN_FREE_BYTES if min_free is None else min_free
@@ -101,7 +106,7 @@ class SegmentStore:
         seq = self._next_seq
         self._next_seq += 1
         path = self.root / f"{seq:08d}.ts"
-        self._fh = open(path, "wb")
+        self._fh = open_private(str(path), "wb")
         seg = Segment(seq, self._run, now, now, 0, path)
         self._segs.append(seg)
         self._by_seq[seq] = seg

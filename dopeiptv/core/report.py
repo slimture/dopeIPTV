@@ -24,7 +24,7 @@ import sys
 from typing import Any, Callable, Iterable
 
 from . import build_check
-from .log import URL_IN_TEXT, log, recent_lines
+from .log import URL_IN_TEXT, log, open_private, private_folder, recent_lines
 
 ENDPOINT = "https://dopeiptv.org/feedback/report"
 REPLIES = "https://dopeiptv.org/feedback/replies"
@@ -46,8 +46,9 @@ _EMAIL = re.compile(r"[\w.+-]{1,64}@[\w-]{1,63}(?:\.[\w-]{1,63})+")
 _SUPPORTER = re.compile(r"(?i)\bDS1-[A-Za-z0-9_-]{20,}")
 # A login written name=value or name: value - a quoted name or value too, as
 # JSON and config files write them ("password": "x y"); the quotes stay.
-_KEYVAL = re.compile(r"(?i)\b(user(?:name)?|pass(?:word)?|pwd|token|key|api_key|apikey|secret|"
-                     r"auth|sid|session|mac|play_token|login|host)([\"']?\s*[=:]\s*)"
+# (The log's filter masks the same, core/log.py, all but the login and host.)
+_KEYVAL = re.compile(r"(?i)\b(user(?:name)?|pass(?:word)?|pwd|(?:access_|refresh_|play_)?token|key|"
+                     r"api[_-]?key|secret|auth|sid|session|mac|login|host)([\"']?\s*[=:]\s*)"
                      r"(\"[^\"\n]{0,200}\"|'[^'\n]{0,200}'|[^\s&'\",;]+)")
 # A header that carries a login, to the end of its line, and a bearer token
 # wherever it stands.
@@ -612,6 +613,7 @@ def take_last_crash(folder: str) -> str:
 
 
 def open_crash_file(folder: str) -> Any:
-    """The file the native crash handler writes to this run (kept open)."""
-    os.makedirs(folder, exist_ok=True)
-    return open(crash_path(folder), "w", encoding="utf-8")  # noqa: SIM115 - held for the run
+    """The file the native crash handler writes to this run (kept open),
+    this user's alone (0600 in a 0700 folder): what was on the stack."""
+    private_folder(folder)
+    return open_private(crash_path(folder), "w", encoding="utf-8")

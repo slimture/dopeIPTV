@@ -266,3 +266,125 @@ def test_masking_an_address_never_breaks_the_formatting():
     # A local path and a plain address stay readable.
     keep = "using /home/pontus/Videos/1.ts and https://image.tmdb.org/t/p/w500/abc.jpg"
     assert _filtered("%s", keep) == keep
+
+
+def test_a_login_outside_an_address_is_masked_too():
+    """The filter only looked inside text with "://" in it: requests
+    quotes the path and query alone ("Max retries exceeded with url:
+    /get.php?username=..."), a header goes to a log as text, an answer as
+    JSON - all passed through while nothing was registered."""
+    assert not logmod._secrets
+    out = _filtered("guide: %s", "HTTPConnectionPool(host='box.example', port=8080): Max retries "
+                    "exceeded with url: /get.php?username=joe99&password=hunter2&type=m3u_plus "
+                    "(Caused by NewConnectionError)")
+    assert "joe99" not in out and "hunter2" not in out, out
+    assert "type=m3u_plus" in out and "box.example" in out, "what was asked still shows"
+    out = _filtered("url: /live/joe99/hunter2/1234.ts failed")
+    assert "joe99" not in out and "hunter2" not in out and "1234.ts failed" in out, out
+    for line, gone in (("sent Authorization: Bearer abcdefgh12345678", "abcdefgh12345678"),
+                       ("Cookie: PHPSESSID=s3ss10n; mac=00:1A:79:12:34:56", "s3ss10n"),
+                       ('answer {"access_token": "tok3n-value", "expires_in": 7776000}', "tok3n-value"),
+                       ("{'refresh_token': 'r3fresh', 'scope': 'public'}", "r3fresh"),
+                       ("X-Emby-Token: 0123456789abcdef", "0123456789abcdef"),
+                       ("X-Api-Key=k3yk3yk3y", "k3yk3yk3y"),
+                       ("portal box 00:1A:79:AB:CD:EF answered", "00:1A:79:AB:CD:EF"),
+                       ("key DS1-" + "A" * 100 + " pasted", "A" * 30)):
+        out = _filtered("%s", line)
+        assert gone not in out, out
+    # The server a line is about stays, and so does a line of Python.
+    assert _filtered("host: box.example login: joe") == "host: box.example login: joe"
+    code = '    key = str(settings.value("supporter_key", "") or "")'
+    assert _filtered("%s", code) == code
+
+
+def test_an_address_s_new_names_lose_their_values():
+    for param in ("X-Emby-Token", "access_token", "refresh_token", "api-key", "X-Api-Key"):
+        out = redact_url(f"http://box.example/x?{param}=s3cretvalue&action=a")
+        assert "s3cretvalue" not in out and "action=a" in out, out
+
+
+def test_the_log_s_login_patterns_are_the_report_s():
+    """The report and the log mask the same headers, tokens, MACs and
+    supporter keys; the log's names are the report's but the login and
+    the host."""
+    from dopeiptv.core import report
+    for name in ("AUTH_LINE", "BEARER", "MAC", "SUPPORTER"):
+        assert getattr(logmod, name).pattern == getattr(report, "_" + name).pattern, name
+    names = report._KEYVAL.pattern.split("(", 2)[1]
+    assert logmod.KEYVAL.pattern.split("(", 2)[1] == names.replace("|login|host", "")
+
+
+def test_a_control_character_is_shown_not_acted_on():
+    """An escape sequence in a stream's title or a server's answer would
+    recolour the terminal, move the cursor or rewrite the line before it
+    in a log viewer."""
+    out = _filtered("title: %s", "News\x1b[2J\x1b]0;owned\x07\rFAKE\x85end\tok\nnext")
+    assert out == "title: News\\x1b[2J\\x1b]0;owned\\x07\\x0dFAKE\\x85end\tok\nnext", out
+    rec = logging.LogRecord("dopeiptv", logging.INFO, __file__, 1, "bare\x1b[31m", None, None)
+    _RedactFilter().filter(rec)
+    assert rec.getMessage() == "bare\\x1b[31m"
+
+
+def test_a_log_file_and_the_crash_file_are_this_user_s_alone(tmp_path, monkeypatch):
+    import os
+    import stat
+
+    from dopeiptv.core import report
+    if os.name != "posix":
+        pytest.skip("modes are POSIX")
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    monkeypatch.setattr(logmod.sys, "platform", "linux")
+    old = os.umask(0o022)
+    try:
+        path = logmod.set_file_logging(True)
+        try:
+            assert path is not None
+            assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
+            assert stat.S_IMODE(os.stat(os.path.dirname(path)).st_mode) == 0o700
+            handler = logmod._file_handler
+            handler.doRollover()
+            assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
+            assert stat.S_IMODE(os.stat(path + ".1").st_mode) == 0o600
+        finally:
+            logmod.set_file_logging(False)
+        # One left from before at 0644 is narrowed as it is opened.
+        loose = tmp_path / "loose.log"
+        loose.write_text("x")
+        os.chmod(loose, 0o644)
+        fh = logmod._private_handler(str(loose))
+        fh.close()
+        assert stat.S_IMODE(os.stat(loose).st_mode) == 0o600
+        crash = report.open_crash_file(str(tmp_path / "crash"))
+        crash.close()
+        assert stat.S_IMODE(os.stat(report.crash_path(str(tmp_path / "crash"))).st_mode) == 0o600
+        assert stat.S_IMODE(os.stat(tmp_path / "crash").st_mode) == 0o700
+    finally:
+        os.umask(old)
+
+
+def test_sign_ins_codes_and_the_supporter_key_are_registered_where_they_are_read(monkeypatch):
+    """Trakt's and Simkl's tokens, the sync code, a room's code and the
+    supporter key - each masked in every log line from the moment the app
+    reads it."""
+    import dopeiptv.core.workers as workers
+    from dopeiptv.core import supporter, sync, together
+    from dopeiptv.core.stores import KeptValues
+
+    class S(dict):
+        def value(self, key, default=None):
+            return self.get(key, default)
+
+    monkeypatch.setattr(workers, "on_gui_thread", lambda *a, **k: None)
+    KeptValues(S(trakt_access_token="trakt-acc3ss", trakt_expires_at=1700000000),
+               ["trakt_access_token", "trakt_expires_at"])
+    KeptValues(S(), ["simkl_access_token"]).put({"simkl_access_token": "simkl-t0ken"})
+    raw = bytes(range(32))
+    sync.code_of(S(sync_code=sync.format_code(raw)))
+    room = together.new_code()
+    together.derive(room)
+    key = "DS1-" + "B" * 100
+    supporter.stored(S(supporter_key=key))
+    gone = ("trakt-acc3ss", "simkl-t0ken", sync.format_code(raw), room, room.replace("-", ""), key)
+    out = redact(" / ".join(gone))
+    assert not [g for g in gone if g in out], out
+    assert "1700000000" not in logmod._secrets

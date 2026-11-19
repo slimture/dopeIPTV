@@ -111,7 +111,7 @@ from . import shortcut_keys
 from .backup import RISKY_SOURCE
 from .cert_pin import KEY as _PIN
 from .cert_pin import KEY_FOR as _PIN_FOR
-from .log import log
+from .log import log, register_secrets
 from .stores import FavoriteStore, HistoryStore
 
 ENDPOINT = "https://dopeiptv.org/sync/"
@@ -1909,4 +1909,9 @@ def set_chosen(settings: Any, cats: tuple[str, ...] | list[str]) -> None:
 
 
 def code_of(settings: Any) -> bytes | None:
-    return parse_code(str(settings.value(K_CODE, "") or ""))
+    raw = parse_code(str(settings.value(K_CODE, "") or ""))
+    if raw is not None:
+        # The code is the key to every synced setting: never in a log.
+        shown = format_code(raw)
+        register_secrets(shown, shown.replace("-", ""), shown.lower())
+    return raw

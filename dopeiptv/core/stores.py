@@ -17,6 +17,7 @@ from typing import Any
 from PyQt6.QtCore import QSettings
 
 from . import pins, privacy
+from .log import register_secrets
 
 
 class _Kept:
@@ -63,6 +64,11 @@ def _kept_for(settings: Any, keys: tuple[str, ...]) -> _Kept:
         return kept
 
 
+def _register(values: Mapping[str, Any]) -> None:
+    """A sign-in's tokens (Trakt's, Simkl's) kept out of every log line."""
+    register_secrets(*(str(v) for k, v in values.items() if k.endswith("_token") and v))
+
+
 class KeptValues:
     """A few keys of a settings object held in memory, for a client whose
     workers read and renew them (Trakt's and Simkl's sign-in). Changed here
@@ -96,6 +102,7 @@ class KeptValues:
                 value = None
             if value is not None and value != "":
                 read[key] = value
+        _register(read)
         kept = self._kept
         with kept.lock:
             if kept.pending:
@@ -127,6 +134,7 @@ class KeptValues:
         """*values* in memory now, in the settings on the window's thread.
         With *since* (a snapshot's stamp) only if none of its keys changed
         meanwhile; False when it came too late and nothing was written."""
+        _register(values)
         kept = self._kept
         with kept.lock:
             if not self._still(since):
