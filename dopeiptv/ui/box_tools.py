@@ -10,20 +10,53 @@ import time
 from typing import Any, Callable
 
 from PyQt6 import sip
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtCore import QBuffer, QIODevice, Qt, QTimer
+from PyQt6.QtGui import QImage, QImageReader, QPixmap
 from PyQt6.QtWidgets import (
     QComboBox, QDialog, QDialogButtonBox, QFileDialog, QGridLayout, QHBoxLayout,
     QLabel, QPushButton, QSizePolicy, QVBoxLayout,
 )
 
+from ..core import picture_files
 from ..core.log import log
-from ..core.workers import run_async
+from ..core.workers import OUTSIDE_PICTURE_MIB, run_async
 from ..i18n import tr
-from ..providers.enigma2 import signal_rows
+from ..providers.enigma2 import GRAB_MAX, signal_rows
 from .theme import ACCENTS, P
 
 SIGNAL_MS = 2000
+
+#: The formats the box's screenshot is read as, by its first bytes: no
+#: other image reader of Qt's is handed what the box sent.
+GRAB_FORMATS = ((b"\xff\xd8\xff", b"jpeg"), (b"\x89PNG\r\n\x1a\n", b"png"), (b"BM", b"bmp"))
+
+
+def decode_grab(data: Any) -> QImage | None:
+    """The box's screenshot as a picture, or None - on a worker:
+    QImageReader.read lets go of the GIL while it decodes. At most GRAB_MAX
+    bytes, a JPEG, PNG or BMP read only as what its first bytes say, and
+    no larger decoded than OUTSIDE_PICTURE_MIB - its size read from its
+    header, never asked of the reader (core/workers.py says why)."""
+    if not isinstance(data, bytes) or not data or len(data) > GRAB_MAX:
+        return None
+    fmt = next((f for magic, f in GRAB_FORMATS if data.startswith(magic)), None)
+    size = picture_files.picture_size(data) if fmt else None
+    if size is None or size[0] * size[1] * 4 > OUTSIDE_PICTURE_MIB << 20:
+        return None
+    buf = QBuffer()
+    buf.setData(data)
+    if not buf.open(QIODevice.OpenModeFlag.ReadOnly):
+        return None
+    reader = QImageReader(buf, fmt)
+    reader.setAutoDetectImageFormat(False)
+    img = reader.read()
+    return None if img.isNull() else img
+
+
+def _grab(client: Any, mode: Any) -> tuple[bytes, QImage | None]:
+    """The box's screenshot and its picture (None: none) - on a worker."""
+    data = client.screenshot(mode)
+    return data, decode_grab(data)
 
 
 def why(err: Any) -> str:
@@ -212,7 +245,7 @@ class BoxScreenshotDialog(_BoxWindow):
         self._busy = True
         self.again.setEnabled(False)
         self.status.setText(tr("box_grab_taking"))
-        self._ask(self.client.screenshot, self._came, self.mode.currentData())
+        self._ask(_grab, self._came, self.client, self.mode.currentData())
 
     def _failed(self, err: Any = None) -> None:
         if self._gone():
@@ -220,13 +253,14 @@ class BoxScreenshotDialog(_BoxWindow):
         super()._failed(err)
         self.again.setEnabled(True)
 
-    def _came(self, data: Any) -> None:
+    def _came(self, got: Any) -> None:
         if self._gone():
             return
         self._busy = False
         self.again.setEnabled(True)
-        pix = QPixmap()
-        if not isinstance(data, bytes) or not pix.loadFromData(data):
+        data, img = got if isinstance(got, tuple) and len(got) == 2 else (b"", None)
+        pix = QPixmap.fromImage(img) if isinstance(img, QImage) else QPixmap()
+        if pix.isNull():
             self.status.setText(tr("err_box_no_grab"))
             return
         self._data, self._pixmap = data, pix

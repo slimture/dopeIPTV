@@ -251,14 +251,18 @@ class BoxClient(OfflineClient):
 
     def get(self, path: str, params: dict | None = None,
             timeout: tuple[float, float] | None = None,
-            absolute: bool = False) -> Any:
+            absolute: bool = False, stream: bool = False) -> Any:
         """GET from the box, logging in the way it asks (basic or digest)
         the first time it says 401. Raises LocalizedError for a login the
-        box wants and does not get."""
+        box wants and does not get. *stream*: the body left for the caller
+        to read (and close) with a ceiling of its own."""
         url = path if absolute else self.url(path)
+        more = {"stream": True} if stream else {}
         r = self.session.get(url, params=params, auth=self._auth,
-                             timeout=timeout or self.TIMEOUT)
+                             timeout=timeout or self.TIMEOUT, **more)
         if r.status_code == 401:
+            if stream:
+                r.close()
             if not self.username:
                 raise LocalizedError("err_box_login_needed")
             if self._auth is None:
@@ -268,10 +272,12 @@ class BoxClient(OfflineClient):
                               if "digest" in challenge
                               else auth_mod.HTTPBasicAuth(self.username, self.password))
                 r = self.session.get(url, params=params, auth=self._auth,
-                                     timeout=timeout or self.TIMEOUT)
+                                     timeout=timeout or self.TIMEOUT, **more)
             if r.status_code == 401:
                 self._auth = None
                 raise LocalizedError("err_wrong_login")
+        if stream and not r.ok:
+            r.close()
         r.raise_for_status()
         return r
 

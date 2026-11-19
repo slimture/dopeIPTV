@@ -258,17 +258,23 @@ class MediaServerClient(BoxClient):
 
     def get(self, path: str, params: dict | None = None,
             timeout: tuple[float, float] | None = None,
-            absolute: bool = False) -> Any:
-        return self.request("GET", path, params=params, timeout=timeout, absolute=absolute)
+            absolute: bool = False, stream: bool = False) -> Any:
+        return self.request("GET", path, params=params, timeout=timeout, absolute=absolute,
+                            stream=stream)
 
     def request(self, method: str, path: str, params: dict | None = None,
                 body: Any = None, timeout: tuple[float, float] | None = None,
-                absolute: bool = False, headers: dict | None = None) -> Any:
+                absolute: bool = False, headers: dict | None = None,
+                stream: bool = False) -> Any:
         """One call to the server with the sign-in on it. A 401 is a
-        sign-in the server no longer takes (LocalizedError)."""
+        sign-in the server no longer takes (LocalizedError). *stream*: as
+        BoxClient.get's."""
         url = path if absolute else self.url(path)
+        more = {"stream": True} if stream else {}
         r = self.session.request(method, url, params=params, json=body, headers=headers,
-                                 timeout=timeout or self.TIMEOUT)
+                                 timeout=timeout or self.TIMEOUT, **more)
+        if stream and not r.ok:
+            r.close()
         if r.status_code == 401:
             raise LocalizedError("err_ms_signed_out", kind=self.KIND)
         r.raise_for_status()
