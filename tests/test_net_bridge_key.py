@@ -140,6 +140,12 @@ def test_with_its_key_the_bridge_works_and_the_key_goes_no_further(case):
     assert bridge.secret not in repr(sent)
     assert _ask(bridge, f"CONNECT {target} HTTP/1.1\r\nHost: {target}\r\n{_login(bridge)}\r\n"
                 ).startswith(b"HTTP/1.1 200 Connection established")
+    # The bridge counts a tunnel on its own thread once it has answered: on a
+    # busy machine that can come a moment after the answer is read here.
+    import time
+    end = time.monotonic() + 10
+    while bridge.served < 2 and time.monotonic() < end:
+        time.sleep(0.01)
     assert bridge.served == 2 and bridge.unkeyed == 0
 
 
