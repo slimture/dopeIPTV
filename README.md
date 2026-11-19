@@ -317,7 +317,7 @@ asks for. Linked from a row at the foot of every page (`/donations/` sends
 visitors to `/support/`). Every footer names Solecraft AB with its
 organisation number, address and e-mail, and says in the reader's language
 that dopeIPTV does not contain, sell or link to any channels or other
-content (`foot_made_by`, `foot_nocontent`).
+content (`foot_nocontent`).
 
 - The texts are HTML fragments in `site/legal/sv/` and `site/legal/en/`.
   **The Swedish text governs**; the English is its translation, and the two

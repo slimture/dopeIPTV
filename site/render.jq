@@ -312,7 +312,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     + "      </div>\n"
     + "      <nav class=\"foot-cols\">\n"
     + foot_group(t("foot_h_app");
-        [["/#download", t("nav_download")], ["/help/", t("nav_help")],
+        [["/#features", t("nav_features")], ["/#download", t("nav_download")], ["/help/", t("nav_help")],
          ["https://github.com/slimture/dopeIPTV/releases", t("footer_releases")],
          ["https://github.com/slimture/dopeIPTV", "GitHub"]])
     + foot_group(t("foot_h_contact");
@@ -323,11 +323,8 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     + "      </nav>\n"
     + "    </div>\n"
     + "    <div class=\"foot-base\">\n"
-    + "      <div class=\"foot-maker\">\n"
-    + "        <a class=\"sole\" href=\"https://solecraft.se/\" rel=\"noopener\" aria-label=\"\(t("footer_built_by") | h)\" data-tip=\"\(t("footer_built_by") | h)\"><span class=\"sole-logo\">Solecraft</span></a>\n"
-    + "        <span class=\"v\">© \($year | h) Solecraft AB</span>\n"
-    + "      </div>\n"
-    + "      <p class=\"foot-company\">\(t("foot_made_by") | gsub("%COMPANY%"; $COMPANY) | h) · \(t("foot_orgnr") | h) <bdi>\($ORGNR | h)</bdi> · \(t("foot_place") | gsub("%TOWN%"; $TOWN) | h) · <a href=\"mailto:\($EMAIL | h)\">\($EMAIL | h)</a> · \(t("foot_nocontent") | h)</p>\n"
+    + "      <p class=\"foot-company\">© \($year | h) <a href=\"https://solecraft.se/\" rel=\"noopener\">\($COMPANY | h)</a> · \(t("foot_orgnr") | h) <bdi>\($ORGNR | h)</bdi> · \(t("foot_place") | gsub("%TOWN%"; $TOWN) | h) · <a href=\"mailto:\($EMAIL | h)\">\($EMAIL | h)</a></p>\n"
+    + "      <p class=\"foot-note\">\(t("foot_nocontent") | h)</p>\n"
     + "    </div>\n"
     + "  </div>\n"
     + "</footer>\n";

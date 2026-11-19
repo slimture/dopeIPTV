@@ -155,9 +155,11 @@ def test_the_heart_says_support_us_and_the_footer_the_country():
 
 
 def test_every_page_has_the_one_footer():
-    # One footer for every page (render.jq, site_footer): the three groups,
-    # the payment terms among the legal links, and on the company line that
-    # dopeIPTV holds no channels - once, not a sentence of its own.
+    # One footer for every page (render.jq, site_footer): the three groups -
+    # Features first among the app's, as in the header and the menu -, the
+    # payment terms among the legal links, under the hairline the company
+    # with the copyright and, once, that dopeIPTV holds no channels; one
+    # logo, dopeIPTV's (Solecraft's under it made two marks fight).
     import glob
     for f in glob.glob(os.path.join(SITE, "lang", "*.json")):
         have = json.load(open(f, encoding="utf-8"))
@@ -172,7 +174,11 @@ def test_every_page_has_the_one_footer():
         foot = en.split("<footer>", 1)[1]
         assert foot.count('class="foot-col"') == 3
         assert 'href="/payments/"' in foot and 'href="/about/"' in foot and "data-feedback" in foot
-        assert "· No channels or content included.</p>" in foot
+        assert foot.count("No channels or content included.") == 1
+        assert '<p class="foot-note">No channels or content included.</p>' in foot
+        assert "© " in foot and "Solecraft AB</a>" in foot
+        assert foot.index('href="/#features"') < foot.index('href="/#download"')
+        assert foot.count('class="logo"') == 1 and "sole-logo" not in foot
         assert "foot-nocontent" not in en
 
 

@@ -359,13 +359,17 @@ h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.03em; line-height:
 .autonote a.verify-link { color: var(--accent); font-weight: 600; }
 .autonote a.verify-link:hover { text-decoration: underline; }
 
-/* The footer (render.jq, site_footer): dopeIPTV and what it is beside the
-   links in three small groups, the version under its line; under a
-   hairline Solecraft with the copyright, and the company line. On a phone the brand goes over the groups, two columns
-   of them (the app's beside contact and legal), each link a finger's room. */
-footer { background: var(--surface); padding: 44px 0 36px; margin-top: 24px; }
-footer .foot-top { display: flex; justify-content: space-between; align-items: flex-start;
-  gap: 32px 56px; flex-wrap: wrap; }
+/* The footer (render.jq, site_footer): dopeIPTV and what it is, the version
+   under its line, beside the links in three groups spread over the rest of
+   the width; each group's name in the text's own ink over its links in the
+   muted one. Under a hairline one quiet line: the company with the
+   copyright, and that no content comes with the app. One logo, dopeIPTV's:
+   a second (Solecraft's) under it made two marks fight for the eye. On a
+   phone the brand goes over the groups, two columns of them (the app's
+   beside contact and legal), each link a finger's room. */
+footer { background: var(--surface); padding: 44px 0 32px; margin-top: 24px; }
+footer .foot-top { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 32px 48px; align-items: start; }
 footer .foot-brand { max-width: 300px; }
 footer .foot-mark { display: inline-flex; align-items: center; gap: 10px; color: var(--text); }
 footer .foot-mark .logo { width: 24px; height: 24px; flex: none; }
@@ -374,23 +378,21 @@ footer .foot-mark .logo path { fill: #fff; }
 footer .foot-mark b { font-family: var(--display); font-weight: 600; font-size: 17px; letter-spacing: -.02em; }
 footer .foot-tag { margin: 10px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
 footer .foot-ver { margin: 6px 0 0; color: var(--faint); font-size: 12.5px; }
-footer .foot-cols { display: grid; grid-template-columns: repeat(3, auto); gap: 24px 56px; }
-footer .foot-h { margin: 0 0 12px; font-size: 12px; font-weight: 600; letter-spacing: .06em;
-  text-transform: uppercase; color: var(--faint); }
-footer .foot-col ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
-footer .foot-col a { color: var(--muted); font-size: 14px; }
+footer .foot-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px 32px; }
+footer .foot-h { margin: 0 0 10px; font-size: 13.5px; font-weight: 600; color: var(--text); }
+footer .foot-col ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px;
+  font-size: 13.5px; line-height: 1.45; }
+footer .foot-col a { color: var(--muted); }
 footer .foot-col a:hover { color: var(--accent); }
-footer .foot-base { margin-top: 36px; padding-top: 20px; border-top: 1px solid var(--line);
-  display: grid; gap: 10px; }
-footer .foot-maker { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
-footer .v { font-size: 12.5px; color: var(--faint); }
-footer .foot-company { margin: 0; color: var(--faint); font-size: 12.5px; line-height: 1.6; }
+footer .foot-base { margin-top: 36px; padding-top: 18px; border-top: 1px solid var(--line);
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 24px; }
+footer .foot-company, footer .foot-note { margin: 0; color: var(--faint); font-size: 12.5px; line-height: 1.6; }
 footer .foot-company a { color: inherit; }
 footer .foot-company bdi { white-space: nowrap; }
 footer .foot-company a:hover { color: var(--accent); }
 @media (max-width: 720px) {
   footer { padding: 36px 0 30px; }
-  footer .foot-top { flex-direction: column; gap: 28px; }
+  footer .foot-top { grid-template-columns: minmax(0, 1fr); gap: 28px; }
   footer .foot-cols { grid-template-columns: 1fr 1fr; gap: 22px 24px; width: 100%; }
   footer .foot-col:first-child { grid-row: span 2; }
   footer .foot-col ul { gap: 2px; }
@@ -1089,28 +1091,6 @@ dialog.dn::backdrop { background: rgba(5, 7, 10, .66); }
 nav.links .navdonate { color: var(--muted); }
 .navdonate .heart { width: 15px; height: 15px; flex: none; fill: var(--heart); }
 @media (min-width: 1001px) { nav.links a.navdonate { display: inline-flex; align-items: center; gap: 6px; } }
-footer .v a { color: inherit; }
-/* Solecraft's logotype (its S is the company's mark) as the footer's own
-   sign, the copyright line under it; drawn in a text colour, so it follows
-   both themes. */
-footer .sole { display: block; color: var(--muted); line-height: 0; position: relative; }
-footer .sole:hover { color: var(--text); }
-/* Who made it, on hover: a label of the site's own rather than the browser's
-   title tooltip, which comes late and looks different everywhere. */
-footer .sole[data-tip]::after {
-  content: attr(data-tip); position: absolute; inset-inline-start: 0; bottom: calc(100% + 9px);
-  white-space: nowrap; font: 500 13px/1.3 var(--sans); letter-spacing: 0;
-  color: var(--text); background: var(--surface-2); border: 1px solid var(--line);
-  padding: 6px 10px; border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.18);
-  opacity: 0; transform: translateY(3px); pointer-events: none;
-  transition: opacity .15s ease, transform .15s ease;
-}
-footer .sole[data-tip]:hover::after, footer .sole[data-tip]:focus-visible::after { opacity: 1; transform: none; }
-@media (prefers-reduced-motion: reduce) { footer .sole[data-tip]::after { transition: opacity .15s ease; transform: none; } }
-footer .sole-logo { display: block; height: 17px; aspect-ratio: 666 / 111; overflow: hidden; white-space: nowrap;
-  text-indent: 110%; background: currentColor;
-  -webkit-mask: url(/solecraft-logo.svg) center / contain no-repeat; mask: url(/solecraft-logo.svg) center / contain no-repeat; }
-footer .v a:hover { color: var(--accent); }
 /* The ways to give: three cards in a row (one under the other on a phone),
    the tip and the monthly support on the accent, GitHub quieter; a way not
    set up yet says "coming soon" on a button that is no link. */
