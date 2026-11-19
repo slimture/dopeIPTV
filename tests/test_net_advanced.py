@@ -545,11 +545,20 @@ def test_a_proxys_request_goes_on_as_the_server_takes_it():
     assert net_bridge.split_target("[::1]:8443", 443) == ("::1", 8443)
 
 
+def _is_the_bridge(px: str) -> bool:
+    """A bridge's address as the player is handed it: on this computer,
+    with the bridge's key as the proxy's login."""
+    from urllib.parse import urlsplit
+    u = urlsplit(px)
+    return (u.scheme == "http" and u.hostname == "127.0.0.1" and bool(u.port)
+            and u.username == net_bridge.USER and len(u.password or "") >= 24)
+
+
 def test_the_player_is_pointed_at_the_bridge_only_where_the_route_changes_something():
     n = on(nerd_dns="cloudflare")
     nerd.install(n.s)
     px = n.stream_options({}, "http://provider.example/live/1.ts")["http-proxy"]
-    assert px.startswith("http://127.0.0.1:")
+    assert _is_the_bridge(px)
     assert n.stream_options({}, "http://127.0.0.1:5000/dvr/abc")["http-proxy"] == ""
     assert n.stream_options({}, "http://provider.example/1.ts", opened="http://127.0.0.1:9/x")["http-proxy"] == ""
     assert n.stream_options({}, "http://192.168.1.20:8001/1:0:1")["http-proxy"] == ""
@@ -659,10 +668,19 @@ def _pinned_and_others(servers, tmp_path, redirect_to: str | None = None):
     return ca, route, source, home, other, cdn
 
 
-def _connect(bridge, target: str) -> str:
-    """The bridge's answer to CONNECT *target*: its status line."""
+def _login(bridge) -> str:
+    """The bridge's key as a proxy's login, as a player sends it."""
+    import base64
+    word = base64.b64encode(f"{net_bridge.USER}:{bridge.secret}".encode()).decode()
+    return f"Proxy-Authorization: Basic {word}\r\n"
+
+
+def _connect(bridge, target: str, login: str | None = None) -> str:
+    """The bridge's answer to CONNECT *target*: its status line. With the
+    bridge's key, as the app's own player sends it (*login*: another)."""
+    login = _login(bridge) if login is None else login
     with socket.create_connection(("127.0.0.1", bridge.port), timeout=15) as s:
-        s.sendall(f"CONNECT {target} HTTP/1.1\r\nHost: {target}\r\n\r\n".encode())
+        s.sendall(f"CONNECT {target} HTTP/1.1\r\nHost: {target}\r\n{login}\r\n".encode())
         return s.recv(4096).split(b"\r\n", 1)[0].decode()
 
 
@@ -735,7 +753,7 @@ def test_real_mpv_plays_through_the_bridge(servers, tmp_path):
     try:
         url = f"https://nas.example:{home.port}/live/3.ts"
         assert nerd.apply_stream(m, source, False, url=url)
-        assert m["http-proxy"].startswith("http://127.0.0.1:") and m["tls-verify"] is False
+        assert _is_the_bridge(m["http-proxy"]) and m["tls-verify"] is False
         m.command("loadfile", url)
         end = time.monotonic() + 20
         while time.monotonic() < end and not home.requests:
@@ -780,7 +798,7 @@ def test_a_recording_goes_through_the_bridge(monkeypatch, tmp_path):
     mgr._spawn(job)
     cmd = calls[-1]
     i = cmd.index("-http_proxy")
-    assert cmd[i + 1].startswith("http://127.0.0.1:") and cmd.index("-i") > i
+    assert _is_the_bridge(cmd[i + 1]) and cmd.index("-i") > i
     assert "-tls_verify" not in cmd                     # the stream's own check
     # A pinned home server: the bridge checks the pin, the recorder not the chain.
     nerd.set_source({"kind": "xtream", "options": cert_pin.pin_options("nas.example", 8443, "ab" * 32)})
