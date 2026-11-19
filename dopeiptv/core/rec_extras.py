@@ -32,6 +32,7 @@ import time
 from datetime import datetime
 
 from .log import log
+from .privacy import for_log
 from .nerd_check import FAIL, INFO, OK, WARN, Check
 
 DEFAULT_TEMPLATE = "{title} {date} {time}"
@@ -282,9 +283,10 @@ def run_post(command: str, path: str, title: str, channel: str = "") -> subproce
                                 start_new_session=True,
                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     except (OSError, ValueError) as e:
-        log.warning("recording: the command after it did not start: %s", e)
+        log.warning("recording: the command after it did not start: %s", for_log(e))
         return None
-    log.info("recording: started %s for %s", os.path.basename(argv[0]), os.path.basename(path))
+    log.info("recording: started %s for %s", os.path.basename(argv[0]),
+             for_log(os.path.basename(path)))
     return proc
 
 
