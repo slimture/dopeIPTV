@@ -791,6 +791,18 @@ class M3UClient(OfflineClient):
     # inside a long word that is no attribute.
     _ATTR = re.compile(r'(?<![\w-])([\w-]++)="([^"]*)"')
 
+    def _guide_ok(self, url: str) -> bool:
+        """The playlist's own guide address (url-tvg) as the app may fetch
+        it itself: from a playlist over the network only http(s), and from
+        one on the internet never a host on this computer or a link-local
+        one (core/stream_address.py, as for its streams). A playlist file
+        on this computer names what it likes, as before."""
+        if not self.server.lower().startswith(("http://", "https://")):
+            return True
+        if not url.lower().startswith(("http://", "https://")):
+            return False
+        return not (stream_address.on_internet(self.server) and stream_address.host_refusal(url))
+
     def __init__(self, url: str, stable: bool = False, map_path: str = "") -> None:
         super().__init__()
         self.server = (url or "").strip()
@@ -902,7 +914,9 @@ class M3UClient(OfflineClient):
                 if url:
                     # A playlist may list several comma-separated guides; the
                     # first reachable one is the sensible default.
-                    self.epg_url = url.split(",")[0].strip()
+                    first = url.split(",")[0].strip()
+                    if self._guide_ok(first):
+                        self.epg_url = first
             elif line.startswith("#"):
                 continue                       # other directives: ignore
             elif pending is not None:

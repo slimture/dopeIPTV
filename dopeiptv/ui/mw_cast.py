@@ -47,7 +47,7 @@ from typing import Any
 
 from PyQt6.QtWidgets import QDialog, QMenu, QPushButton
 
-from ..core import privacy
+from ..core import privacy, stream_address
 from ..core.log import log
 from ..core.privacy import for_log
 from ..core.workers import run_async
@@ -117,6 +117,14 @@ class _CastMixin(_CastMomentMixin):
         url, title = self._stream_for(it)
         if not url:
             url = it.get("_url")
+            if url and it.get("stream_id") is not None:
+                # A source's row (one kept in History too): its address is
+                # the source's word, judged as the client judges it - never
+                # the raw line once the client has refused it.
+                judge = getattr(self.client, "played_from_source", None)
+                same = not source_id or str(source_id) == self._cast_source_of()
+                url = judge(url) if (judge is not None and same) \
+                    else stream_address.played(url, True, "cast")
             title = it.get("name") or it.get("title") or "dopeIPTV"
         # A live channel has to go as HLS: the receiver cannot decode a raw
         # MPEG transport stream at all, whatever we label it. Every section

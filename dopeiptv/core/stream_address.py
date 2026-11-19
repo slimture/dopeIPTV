@@ -118,6 +118,12 @@ THIS_COMPUTER = "this computer"
 LINK_LOCAL = "a link-local host"
 #: The end of a refusal only a source on the internet gets.
 _INTERNET = " from the internet"
+#: AceStream's engine on this computer: its HTTP API on port 6878 plays the
+#: content id it is given, and an AceStream playlist on the internet names
+#: its streams there - what the person's list is for. The one place here a
+#: source on the internet may send the player: plain http to that port of
+#: the loopback address or localhost, exactly as written, a path under /ace/.
+_ACESTREAM_NETLOCS = frozenset(("127.0.0.1:6878", "localhost:6878", "[::1]:6878"))
 
 
 def scheme_of(address: str) -> str:
@@ -257,6 +263,19 @@ def host_refusal(address: str) -> str:
     return ""
 
 
+def acestream(address: str) -> bool:
+    """Whether *address* is a stream of AceStream's engine on this computer
+    (_ACESTREAM_NETLOCS, a path under /ace/: getstream, manifest.m3u8...).
+    The whole host part must be one of those as written, so no reader can
+    take another host or port from it."""
+    try:
+        parts = urlsplit(address)
+    except ValueError:
+        return False
+    return (parts.scheme == "http" and parts.netloc.lower() in _ACESTREAM_NETLOCS
+            and parts.path.startswith("/ace/"))
+
+
 @functools.lru_cache(maxsize=4096)
 def _head_refusal(head: str) -> str:
     return host_refusal(head)
@@ -330,6 +349,8 @@ def refusal(address: str, remote: bool = True, internet: bool = False) -> str:
     if scheme not in MEDIA:
         return f"{scheme}://{_INTERNET}"
     where = host_refusal(address)
+    if where == THIS_COMPUTER and acestream(address):
+        return ""
     return where + _INTERNET if where else ""
 
 

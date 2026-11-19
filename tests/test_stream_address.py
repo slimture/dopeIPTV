@@ -324,6 +324,27 @@ def test_a_source_on_the_internet_hands_out_media_streams_and_never_this_compute
             stream_address.NETWORK, address
 
 
+def test_an_acestream_list_on_the_internet_plays_through_the_engine_here_and_nothing_else():
+    # The engine's streams, as AceStream playlists write them, play as before.
+    for address in ("http://127.0.0.1:6878/ace/getstream?id=0123abcd",
+                    "http://localhost:6878/ace/getstream?infohash=ab12&pid=1",
+                    "http://127.0.0.1:6878/ace/manifest.m3u8?id=0123abcd",
+                    "http://[::1]:6878/ace/r/0123abcd/x.ts"):
+        assert refusal(address, internet=True) == "", address
+        assert played(address, True, internet=True) == address
+    # Anything else on this computer stays refused: another port, another
+    # path of the engine, https, a login, a host part any reader could read
+    # another way, the engine's port at a link-local or spelt-out host.
+    for address in ("http://127.0.0.1:6879/ace/getstream?id=1", "http://127.0.0.1:6878/webui/api/service",
+                    "http://127.0.0.1:6878/server/api?method=x", "http://127.0.0.1:6878/",
+                    "https://127.0.0.1:6878/ace/getstream?id=1", "http://u:p@127.0.0.1:6878/ace/getstream",
+                    "http://tv.example@127.0.0.1:6878/ace/getstream", "http://127.1:6878/ace/getstream",
+                    "http://127.0.0.1:6878\\@127.0.0.1:631/ace/getstream", "http://127.0.0.1:631/ace/getstream",
+                    "http://169.254.1.1:6878/ace/getstream", "http://0.0.0.0:6878/ace/getstream",
+                    "rtmp://127.0.0.1:6878/ace/getstream"):
+        assert refusal(address, internet=True), address
+
+
 def test_where_a_source_is_read_from_its_own_address_never_looked_up():
     for server in ("http://tv.example/get.php?username=u", "tv.example:8080", "https://abc.plex.direct:32400",
                    "http://8.8.8.8", "http://[2001:db8::1]/", "http://[bad"):
@@ -518,3 +539,18 @@ def test_every_list_and_page_of_an_internet_source_is_looked_at_for_pictures():
         client_mod._nerd_lists(c, {"_kind": "jellyfin", "_server": server}, "p1")
         assert c.vod_streams()[0]["stream_icon"] == picture
         assert c.series_info(1)["episodes"]["1"][0]["info"]["movie_image"] == picture
+
+
+def test_an_internet_playlists_own_guide_address_never_names_this_computer():
+    head = '#EXTM3U url-tvg="{}"\n#EXTINF:-1,One\nhttp://tv.example/1.ts\n'
+    for server, guide, kept in (
+            ("http://tv.example/list.m3u", "https://guide.example/epg.xml.gz", True),
+            ("http://tv.example/list.m3u", "http://127.0.0.1:631/printers", False),
+            ("http://tv.example/list.m3u", "http://169.254.169.254/latest/meta-data/", False),
+            ("http://tv.example/list.m3u", "file:///etc/passwd", False),
+            ("http://tv.example/list.m3u", "http://192.168.1.10/epg.xml", True),
+            ("http://192.168.1.10/list.m3u", "http://127.0.0.1:34400/xmltv.xml", True),
+            ("/home/u/list.m3u", "/home/u/guide.xml", True)):
+        c = M3UClient(server)
+        c._parse(head.format(guide))
+        assert c.epg_url == (guide if kept else ""), (server, guide)
