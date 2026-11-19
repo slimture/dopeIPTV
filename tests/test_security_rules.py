@@ -134,6 +134,29 @@ def test_every_xml_parse_of_outside_data_takes_the_safe_check():
     assert not found, "XML parsed without core/safe_xml.py's check:\n" + "\n".join(found)
 
 
+def test_a_source_s_id_names_a_file_only_through_file_part():
+    """Rule 5: an id comes from backups and sync too; a file's name made of
+    one takes core/source_files.file_part, never the id as it came."""
+    ids = {"pid", "playlist_id", "source_id", "sid"}
+    exts = (".json", ".xml", ".pkl", ".gz", ".m3u", ".db", ".d")
+    found = []
+    for rel, tree in _modules():
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.JoinedStr):
+                continue
+            parts = node.values
+            for i, v in enumerate(parts):
+                if not isinstance(v, ast.FormattedValue):
+                    continue
+                inner = v.value.values[0] if isinstance(v.value, ast.BoolOp) else v.value
+                if not (isinstance(inner, ast.Name) and inner.id in ids):
+                    continue
+                after = parts[i + 1] if i + 1 < len(parts) else None
+                if isinstance(after, ast.Constant) and str(after.value).startswith(exts):
+                    found.append(f"{rel}:{node.lineno}")
+    assert not found, found
+
+
 def test_no_module_decides_on_entities_from_the_bytes():
     """Rule 5: a look at the bytes for <!ENTITY or <!DOCTYPE misses UTF-16
     and a declared UTF-7 - the check is expat's (core/safe_xml.py)."""
