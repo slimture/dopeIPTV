@@ -7,6 +7,13 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Fixed
+
+- Ctrl+C in the terminal the app was started from closes the window as its
+  close button does (the player, recordings and settings let go in order);
+  it was raised inside whatever Qt callback ran then and offered as a crash
+  report. A second Ctrl+C ends the process at once.
+
 ### Security
 
 - core/build_check.py: `secure` lets a service's address through only over

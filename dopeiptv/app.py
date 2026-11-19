@@ -109,6 +109,31 @@ from .ui.app_icon import (  # noqa: F401
 )
 
 
+def _close_on_interrupt(window) -> bool:
+    """Ctrl+C in the terminal the app was started from closes the window
+    as its close button does - the player, recordings and settings let go
+    in order - instead of a KeyboardInterrupt raised inside whatever Qt
+    callback ran then, which read as a crash. A second Ctrl+C ends the
+    process at once. Python only sees a signal while it runs, so a light
+    tick keeps it looking."""
+    import signal
+
+    def ask(_sig, _frame) -> None:
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+        log.info("Ctrl+C: closing the window")
+        QTimer.singleShot(0, window.close)
+
+    try:
+        signal.signal(signal.SIGINT, ask)
+    except (ValueError, OSError):       # not the main thread, or no SIGINT
+        return False
+    tick = QTimer(window)
+    tick.timeout.connect(lambda: None)
+    tick.start(500)
+    window._interrupt_tick = tick
+    return True
+
+
 def _install_crash_hooks() -> None:
     """Print genuinely-uncaught Python exceptions to stderr with an
     explicit flush. Newer PyQt6 turns unhandled slot exceptions into
@@ -146,6 +171,11 @@ def _install_crash_hooks() -> None:
 
     def _hook(exc_type, exc_value, exc_tb):
         if _is_quiet(exc_type):
+            return
+        if isinstance(exc_type, type) and issubclass(exc_type, KeyboardInterrupt):
+            # Ctrl+C in the terminal, raised in whatever Qt callback ran
+            # then: the person's wish to stop, never a crash to report.
+            log.info("interrupted (Ctrl+C)")
             return
         buf = io.StringIO()
         traceback.print_exception(exc_type, exc_value, exc_tb, file=buf)
@@ -619,6 +649,7 @@ def main() -> int:
 
     w = MainWindow(client, settings, store)
     w.show()
+    _close_on_interrupt(w)
     if restored is not None:
         from .i18n import tr
         w._show_toast(tr("restore_done_start") if restored
