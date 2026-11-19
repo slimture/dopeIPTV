@@ -309,9 +309,10 @@ def test_the_window_says_it_once_however_it_was_switched():
     assert said[-1] == tr("night_refused") and tr("night_refused") != tr("night_on")
     w._night_mode_refused()                   # found out as a stream's sound starts
     assert said[-1] == tr("night_refused")
-    # The window hears both from the player.
+    # The window hears both from the player (its part of the window's
+    # build, ui/mw_build_detail.py).
     from dopeiptv.ui.main_window import MainWindow
-    src = inspect.getsource(MainWindow._build_ui)
+    src = inspect.getsource(MainWindow._build_player)
     assert "night_mode_changed.connect(self._night_mode_told)" in src
     assert "night_mode_refused.connect(self._night_mode_refused)" in src
 

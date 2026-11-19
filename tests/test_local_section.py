@@ -1285,8 +1285,10 @@ def test_the_detail_panel_has_only_one_vertical_scroll_region():
     import inspect
 
     from dopeiptv.ui import main_window as mw
+    from dopeiptv.ui import mw_build_detail
 
-    src = inspect.getsource(mw)
+    # The detail column is built in ui/mw_build_detail.py.
+    src = inspect.getsource(mw) + inspect.getsource(mw_build_detail)
     # The info box must not be a scroll area any more...
     assert "self.media_info = QFrame" in src, \
         "the info box must be a plain frame, not a nested scroll area"

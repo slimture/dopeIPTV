@@ -5,9 +5,10 @@ and the order signals' handlers run in. The menus (``_build_menus``), the
 central stack and its splitter (``_build_center``), the sidebar
 (``_build_sidebar_shell``, ``_build_places_nav``, ``_build_category_column``,
 ``_build_sidebar_foot``) and the middle pane (``_build_middle_pane``,
-``_build_list_controls``, ``_build_list_view``, ``_build_status_row``).
-Moved out of main_window.py as they were; a part's locals that a later part
-uses are handed on.
+``_build_list_controls``, ``_build_list_view``, ``_build_status_row``); the
+detail column is ui/mw_build_detail.py, whose ``_BuildDetailMixin`` is this
+one's base. Moved out of main_window.py as they were; a part's locals that a
+later part uses are handed on.
 """
 
 from __future__ import annotations
@@ -28,13 +29,14 @@ from .channel_list import (
     CategoryColorDelegate, ChannelDelegate, ChannelListModel, ChannelListView,
     FolderDropList,
 )
+from .mw_build_detail import _BuildDetailMixin
 from .nav_widgets import NavButton, PlacesFold, PlacesLayout, SideRule, SourceAvatar, SourceLabel
 from .theme import P
 from .widgets import HeartButton, _SidebarLogo
 
 
-class _BuildMixin:
-    """MainWindow mixin: ``_build_ui``'s parts."""
+class _BuildMixin(_BuildDetailMixin):
+    """MainWindow mixin: ``_build_ui``'s parts, the detail column's in its base."""
     def _build_menus(self) -> None:
         def action(text: str, slot) -> QAction:
             act = QAction(text, self)
