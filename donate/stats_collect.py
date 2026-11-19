@@ -110,6 +110,18 @@ Once, on a fresh start (no state.json yet), `--backfill` also reads the
 download log's older, rotated files (<log>.0, <log>.1.bz2 ...), so the
 downloads per day go back as far as the server kept them.
 
+Anyone can send the page's signal, as often as the web server lets them,
+with any browser name and any page to have come from. So nothing a line
+says can stop a run (a line that cannot be read is passed over, and said
+as a number), take its time (every pattern has an end, a day's marks are
+looked up, not gone through) or grow what is kept without end: a browser
+name is read to UA_MAX, a version is a few digits, a day keeps at most
+MAX_DAY_VISITS visits (STATS_MAX_DAY_VISITS in the settings file; 50 000 -
+past it a new visit is its page views only, the day's "capped"), a visit
+at most MAX_VISIT_PAGES pages, a day's lists their largest entries, and a
+log is read READ_MAX at a time. Everything written is the service's alone
+to read (files 0600, folders 0700).
+
 Settings come from the same file as donate.py's (DONATE_CONFIG). Standard
 library only.
 """
@@ -122,6 +134,7 @@ import glob
 import gzip
 import hashlib
 import hmac
+import io
 import ipaddress
 import json
 import lzma
@@ -151,6 +164,7 @@ SITE_HOSTS = {h.strip().lower() for h in CONF.get(
     "SITE_HOST", "dopeiptv.org,www.dopeiptv.org,iptv.dope.rs").split(",") if h.strip()}
 GEO_DB = CONF.get("GEO_DB", os.path.join(STATS_DIR, "dbip-country-lite.mmdb"))
 GEO_URL = "https://download.db-ip.com/free/dbip-country-lite-{month}.mmdb.gz"
+GEO_MAX = 256 << 20       # the database is a few megabytes; nothing larger is taken for it
 KEEP_PER_DAY = 40         # a day's longest lists (sites, files): the top 40, the rest summed
 VISITS_DIR = os.path.join(STATS_DIR, "visits")
 ANON_DIR = os.path.join(STATS_DIR, "visits-anon")
@@ -163,6 +177,32 @@ except ValueError:
 #: counts per day stay.
 UPDATES_DAYS = 30
 VISIT_GAP = 30 * 60       # a visit ends after half an hour without a page
+
+# Anyone can send the page's signal, with any browser name and any address
+# to have come from, as often as the web server lets them. None of it may
+# grow what is kept without end or take the run's time:
+#: A browser's name as read: the longest real ones are a third of this. The
+#: web server's log cuts it at the same place (deploy/content-...conf).
+UA_MAX = 1024
+#: A site's name is at most 253 characters.
+HOST_MAX = 255
+#: A day's lists that the world keeps short (languages, systems, browser
+#: versions): never this long from people, so made-up ones cannot grow them.
+KEEP_WIDE = 200
+#: The visits kept of one day. Past it a new visit is counted as its page
+#: views only (the day's "capped") - a flood of made-up visitors fills
+#: neither the disk nor the memory of whoever reads the day's file.
+try:
+    MAX_DAY_VISITS = max(1000, int(CONF.get("STATS_MAX_DAY_VISITS", "50000")))
+except ValueError:
+    MAX_DAY_VISITS = 50000
+#: How much of a log one run reads; the rest waits for the next.
+READ_MAX = 32 << 20
+#: One visit's pages, support dialogs opened and downloads: nobody's visit
+#: has as many, and one that goes on being sent stops growing there.
+MAX_VISIT_PAGES = 1000
+MAX_VISIT_EVENTS = 200
+MAX_VISIT_DOWNLOADS = 200
 
 PAGES = {"/": "/", "/help/": "/help/"}
 BOTS = re.compile(r"bot|crawl|spider|slurp|curl|wget|python|httpclient|go-http|java/|okhttp|"
@@ -245,14 +285,30 @@ def channel_of(host: str, source: str = "") -> str:
     return "Other sites"
 
 
+_NO_URL = urlsplit("")
+
+
+def _split(url: str):
+    """urlsplit, for an address a visitor made up: one it cannot read
+    ("http://[", a host name that is none) is no address at all - never an
+    error that stops the run and, with it, the statistics."""
+    try:
+        return urlsplit(url)
+    except ValueError:
+        return _NO_URL
+
+
 def referrer_host(ref: str) -> str:
     """The site that linked here: a web address's host, or an Android app's
     name (android-app://com.google.android.googlequicksearchbox/)."""
     if not ref:
         return ""
-    parts = urlsplit(ref)
-    host = (parts.hostname or "").lower().removeprefix("www.").removeprefix("m.")
-    return host if parts.scheme in ("http", "https", "android-app") else ""
+    parts = _split(ref)
+    try:
+        host = (parts.hostname or "").lower().removeprefix("www.").removeprefix("m.")
+    except ValueError:
+        return ""
+    return host[:HOST_MAX] if parts.scheme in ("http", "https", "android-app") else ""
 
 
 def referrer_page(ref: str, host: str) -> str:
@@ -263,7 +319,7 @@ def referrer_page(ref: str, host: str) -> str:
     no page, and for a search engine, whose page says nothing more."""
     if not host or SEARCH.search(host):
         return ""
-    parts = urlsplit(ref)
+    parts = _split(ref)
     if parts.scheme not in ("http", "https"):
         return ""
     path = re.sub(r"/+", "/", parts.path or "").rstrip("/")
@@ -286,15 +342,19 @@ def os_of(ua: str) -> str:
     return "Other"
 
 
+# A version is a few digits: a made-up one of thousands is never a name to
+# count a day's browsers under (each would be a list entry of its own), and
+# every part has an end, so no browser name takes the pattern long to read.
+SAFARI = r"Version/(\d{1,4})[\d.]{0,24} (?:Mobile/\S{1,40} )?Safari/"
 BROWSERS = [(name, re.compile(rx)) for name, rx in (
-    ("Edge", r"Edg(?:e|A|iOS)?/(\d+)"),
-    ("Opera", r"(?:OPR|Opera|OPT)/(\d+)"),
-    ("Samsung Internet", r"SamsungBrowser/(\d+)"),
-    ("Yandex", r"YaBrowser/(\d+)"),
-    ("Vivaldi", r"Vivaldi/(\d+)"),
-    ("Firefox", r"(?:Firefox|FxiOS)/(\d+)"),
-    ("Chrome", r"(?:Chrome|CriOS)/(\d+)"),
-    ("Safari", r"Version/(\d+)[\d.]* (?:Mobile/\S+ )?Safari/"),
+    ("Edge", r"Edg(?:e|A|iOS)?/(\d{1,4})"),
+    ("Opera", r"(?:OPR|Opera|OPT)/(\d{1,4})"),
+    ("Samsung Internet", r"SamsungBrowser/(\d{1,4})"),
+    ("Yandex", r"YaBrowser/(\d{1,4})"),
+    ("Vivaldi", r"Vivaldi/(\d{1,4})"),
+    ("Firefox", r"(?:Firefox|FxiOS)/(\d{1,4})"),
+    ("Chrome", r"(?:Chrome|CriOS)/(\d{1,4})"),
+    ("Safari", SAFARI),
 )]
 
 
@@ -314,16 +374,16 @@ def os_version_of(ua: str) -> str:
     if m:
         return {"10.0": "Windows 10/11", "6.3": "Windows 8.1", "6.2": "Windows 8",
                 "6.1": "Windows 7"}.get(m.group(1), "Windows")
-    m = re.search(r"(?:iPhone|CPU) OS (\d+)", ua)
+    m = re.search(r"(?:iPhone|CPU) OS (\d{1,3})", ua)
     if m:
         major = m.group(1)
         # From iOS 26 Safari says 18 for every newer system, and its own
         # version - the system's - is the one to go by.
-        s = re.search(r"Version/(\d+)[\d.]* (?:Mobile/\S+ )?Safari/", ua)
+        s = re.search(SAFARI, ua)
         if major == "18" and s and int(s.group(1)) >= 26:
             major = s.group(1)
         return ("iPadOS " if "iPad" in ua else "iOS ") + major
-    m = re.search(r"Android (\d+)", ua)
+    m = re.search(r"Android (\d{1,3})", ua)
     if m:
         return "Android " + m.group(1)
     if "CrOS" in ua:
@@ -390,9 +450,19 @@ def _bump(d: dict, key: str, n: int = 1) -> None:
     d[key] = d.get(key, 0) + n
 
 
+def _whole_lines(data: bytes, more: bool) -> int:
+    """How much of *data* is whole lines. A full piece (*more* follows it)
+    without one end of line is nothing a web server wrote: passed over, so
+    the run can never stand still at it."""
+    cut = data.rfind(b"\n") + 1
+    return len(data) if not cut and more else cut
+
+
 def _read_new(path: str, state: dict) -> list:
     """Lines added to *path* since the last run, following a rotation into
-    <path>.0; *state* ({"ino", "off"}) is updated in place."""
+    <path>.0; *state* ({"ino", "off"}) is updated in place. At most READ_MAX
+    of a file a run - a log grown huge (a flood, or runs that failed for a
+    day) is read in pieces, never all into memory; the rest waits."""
     lines: list = []
     try:
         st = os.stat(path)
@@ -405,7 +475,15 @@ def _read_new(path: str, state: dict) -> list:
             if old.st_ino == ino:
                 with open(path + ".0", "rb") as fh:
                     fh.seek(off)
-                    lines += fh.read().decode("utf-8", "replace").splitlines()
+                    data = fh.read(READ_MAX)
+                if off + len(data) < old.st_size:
+                    # More of the old file than one run reads: the rest of
+                    # it next time, before the new file.
+                    cut = _whole_lines(data, True)
+                    lines += data[:cut].decode("utf-8", "replace").splitlines()
+                    state["off"] = off + cut
+                    return lines
+                lines += data.decode("utf-8", "replace").splitlines()
         except OSError:
             pass
         off = 0
@@ -413,9 +491,9 @@ def _read_new(path: str, state: dict) -> list:
         off = 0
     with open(path, "rb") as fh:
         fh.seek(off)
-        data = fh.read()
+        data = fh.read(READ_MAX)
     # Only whole lines: a half-written last line waits for the next run.
-    cut = data.rfind(b"\n") + 1
+    cut = _whole_lines(data, len(data) == READ_MAX)
     lines += data[:cut].decode("utf-8", "replace").splitlines()
     state["ino"], state["off"] = st.st_ino, off + cut
     return lines
@@ -484,6 +562,23 @@ def _hash(state: dict, day: str, *parts: str) -> str:
     return hmac.new(keys.key(_month(day)), "|".join(parts).encode(), hashlib.sha256).hexdigest()[:12]
 
 
+def _first(state: dict, kind: str, day: str, marks: list, mark: str) -> bool:
+    """Whether *mark* is new among a day's *marks*, and then adds it. Looked
+    up in a set kept beside the list for this run (state["_seen"], never
+    saved): a day of a hundred thousand marks costs a line no more than a
+    day of ten - going through the list for each line did, and a flood of
+    made-up visitors took the run's whole time."""
+    sets = state.setdefault("_seen", {})
+    known = sets.get((kind, day))
+    if known is None:
+        known = sets[(kind, day)] = set(marks)
+    if mark in known:
+        return False
+    known.add(mark)
+    marks.append(mark)
+    return True
+
+
 def _hash_before(state: dict, day: str, *parts: str) -> str:
     """The same mark under the month before's key: how this visitor was
     known then, to tell a return from there."""
@@ -539,10 +634,8 @@ def _app_update(stats: dict, day: str, name: str, ua: str, ip: str, state: dict,
         return
     if ip and ip != "-":
         h = _hash(state, day, "update", ip, name)
-        seen = state.setdefault("seen_dl", {}).setdefault(day, [])
-        if h in seen:
+        if not _first(state, "dl", day, state.setdefault("seen_dl", {}).setdefault(day, []), h):
             return
-        seen.append(h)
     country = (db.country(ip) if db is not None and ip and ip != "-" else "") or ""
     recent = state.setdefault("recent_updates", [])
     recent.append([_to_hour(t), name[:120], m.group(1)[:20], country, 1 if own else 0])
@@ -566,28 +659,35 @@ def _download(stats: dict, line: str, state: dict, visits: Visits | None = None,
     if mon not in MONTHS:
         return
     day = f"{yyyy}-{MONTHS[mon]:02d}-{dd}"
+    try:
+        date.fromisoformat(day)                 # the web server's own date: a day there is
+    except ValueError:
+        return
     name = name.rsplit("/", 1)[-1]
     ip = m.group(7) or ""
-    if APP_UA.match(m.group(6)):
-        return _app_update(stats, day, name, m.group(6), ip, state, own=not counted(ip),
+    ua = m.group(6)[:UA_MAX]
+    if APP_UA.match(ua):
+        return _app_update(stats, day, name, ua, ip, state, own=not counted(ip),
                            t=_dl_epoch(line), db=db, visits=visits)
-    if not counted(ip) or not browser(m.group(6)):
+    if not counted(ip) or not browser(ua):
         return
     if ip and ip != "-":
-        h = _hash(state, day, ip, m.group(6), name)
-        seen = state.setdefault("seen_dl", {}).setdefault(day, [])
-        if h in seen:
+        h = _hash(state, day, ip, ua, name)
+        if not _first(state, "dl", day, state.setdefault("seen_dl", {}).setdefault(day, []), h):
             return
-        seen.append(h)
     d = _day(stats, day)
     _bump(d["downloads"], platform_of(name))
     _bump(d.setdefault("files", {}), name[:120])
     if visits is not None and ip and ip != "-":
         t = _dl_epoch(line)
-        vid = _hash(state, day, ip, m.group(6))
-        visit = visits.open_visit(day, vid, t) or _new_visit(
-            visits, day, vid, t, ip, m.group(6), db, _hash_before(state, day, ip, m.group(6)))
-        visit["downloads"].append([t, name[:120]])
+        vid = _hash(state, day, ip, ua)
+        visit = visits.open_visit(day, vid, t)
+        if visit is None:
+            if visits.full(day):                # counted above; no visit of its own
+                return
+            visit = _new_visit(visits, day, vid, t, ip, ua, db, _hash_before(state, day, ip, ua))
+        if len(visit["downloads"]) < MAX_VISIT_DOWNLOADS:
+            visit["downloads"].append([t, name[:120]])
         visit["end"] = max(visit["end"], t)
 
 
@@ -669,13 +769,18 @@ def fetch_geo(state: dict) -> None:
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "dopeiptv.org-stats"})
             with urllib.request.urlopen(req, timeout=120) as resp:
-                data = gzip.decompress(resp.read())
+                packed = resp.read(GEO_MAX + 1)
+            # Never more than a country database can be, packed or unpacked:
+            # whatever answers in its place cannot fill the memory or the disk.
+            data = gzip.GzipFile(fileobj=io.BytesIO(packed)).read(GEO_MAX + 1) if len(packed) <= GEO_MAX else b""
+            if not data or len(data) > GEO_MAX:
+                raise ValueError("not the size of a country database")
             fd, tmp = tempfile.mkstemp(dir=os.path.dirname(GEO_DB), prefix=".tmp-")
             with os.fdopen(fd, "wb") as fh:
                 fh.write(data)
             from mmdb import Reader
             Reader(tmp)                         # a whole, readable file before it replaces the old
-            os.chmod(tmp, 0o640)
+            os.chmod(tmp, 0o600)
             os.replace(tmp, GEO_DB)
             print(f"[stats] country database from {url}", flush=True)
             return
@@ -687,11 +792,21 @@ def fetch_geo(state: dict) -> None:
 
 # -- one run -----------------------------------------------------------------------
 
+def _private_dir(path: str) -> None:
+    """*path* is there, and the service's alone (0700): what is kept in it
+    is nobody else's to read on this machine. One made wider before is
+    narrowed; one that cannot be (another owner's) is left as it is."""
+    os.makedirs(path, mode=0o700, exist_ok=True)
+    with contextlib.suppress(OSError):
+        if os.stat(path).st_mode & 0o077:
+            os.chmod(path, 0o700)
+
+
 @contextlib.contextmanager
 def _locked():
     """One run at a time - cron's and the admin page's - or both would count
     the same new lines."""
-    os.makedirs(STATS_DIR, mode=0o750, exist_ok=True)
+    _private_dir(STATS_DIR)
     with open(os.path.join(STATS_DIR, ".lock"), "w") as fh:
         fcntl.flock(fh, fcntl.LOCK_EX)
         try:
@@ -715,18 +830,36 @@ class Visits:
         self.upd_days: dict = {}
         self.uniques = uniques
         self._sets: dict = {}
+        self._by_id: dict = {}          # day -> {visitor: its visits, in the day's order}
 
     def day(self, day: str) -> list:
         if day not in self.days:
             got = _load_list(os.path.join(VISITS_DIR, day + ".json"))
             self.days[day] = got
+            by: dict = {}
+            for v in got:
+                if isinstance(v, dict):
+                    by.setdefault(v.get("id"), []).append(v)
+            self._by_id[day] = by
         return self.days[day]
 
+    def add(self, day: str, v: dict) -> None:
+        """A new visit at the end of its day (and under its visitor)."""
+        self.day(day).append(v)
+        self._by_id[day].setdefault(v["id"], []).append(v)
+
     def open_visit(self, day: str, vid: str, t: int):
-        for v in reversed(self.day(day)):
-            if v["id"] == vid and t - v["end"] <= VISIT_GAP and t >= v["start"] - 60:
+        # The visitor's own visits of the day, newest first - found by the
+        # visitor, not by going through every visit of the day for each line.
+        self.day(day)
+        for v in reversed(self._by_id[day].get(vid, ())):
+            if t - v["end"] <= VISIT_GAP and t >= v["start"] - 60:
                 return v
         return None
+
+    def full(self, day: str) -> bool:
+        """Whether the day keeps as many visits as a day may (MAX_DAY_VISITS)."""
+        return len(self.day(day)) >= MAX_DAY_VISITS
 
     def before(self, day: str, vid: str, earlier: str = "") -> int:
         """On how many earlier days this visitor came: in this month by its
@@ -757,7 +890,7 @@ class Visits:
         for folder, days in ((VISITS_DIR, self.days), (UPDATES_DIR, self.upd_days)):
             if not days:
                 continue
-            os.makedirs(folder, mode=0o750, exist_ok=True)
+            _private_dir(folder)
             for day, lst in days.items():
                 _save(os.path.join(folder, day + ".json"), lst)
 
@@ -770,18 +903,18 @@ def _new_visit(visits: Visits, day: str, vid: str, t: int, ip: str, ua: str, db,
          "country": (db.country(ip) if db is not None else "") or "",
          "returning": visits.before(day, vid, earlier), "pages": [], "time": 0,
          "downloads": [], "events": []}
-    visits.day(day).append(v)
+    visits.add(day, v)
     return v
 
 
 def _page_line(stats: dict, uniques: dict, state: dict, r: dict, db, visits: Visits) -> None:
-    ua, ip = r.get("a") or "", r.get("ip") or ""
+    ua, ip = (r.get("a") or "")[:UA_MAX], r.get("ip") or ""
     if not counted(ip):
         return
     day = (r.get("t") or "")[:10]
     if len(day) != 10:
         return
-    url = urlsplit(r.get("u") or "")
+    url = _split(r.get("u") or "")
     status = str(r.get("s"))
     if url.path in PAGES:                       # the page itself: every request, robots too
         if r.get("m") == "GET" and status in ("200", "304"):
@@ -817,7 +950,7 @@ def _page_line(stats: dict, uniques: dict, state: dict, r: dict, db, visits: Vis
         # A payment is counted per day only, never on a visit: the visit's
         # time, country and browser beside Stripe's own record of who paid
         # would tie the two together. Opening the dialog is the visit's.
-        if visit is not None and ev == "donate":
+        if visit is not None and ev == "donate" and len(visit["events"]) < MAX_VISIT_EVENTS:
             visit["events"].append([t, ev])
             visit["end"] = max(visit["end"], t)
         return
@@ -839,6 +972,11 @@ def _page_line(stats: dict, uniques: dict, state: dict, r: dict, db, visits: Vis
         host = ""
     ref_page = referrer_page(q.get("r", ""), host)
     src = re.sub(r"[^\w.-]", "", q.get("s", ""))[:40].lower()
+    if visit is None and visits.full(day):
+        # The day keeps as many visits as a day may: this one is its page
+        # view above and nothing more (said once a run, in collect).
+        d["capped"] = d.get("capped", 0) + 1
+        return
     if visit is None or "channel" not in visit:  # a new visit, or one that began with a download
         visit = visit or _new_visit(visits, day, vid, t, ip, ua, db, _hash_before(state, day, ip, ua))
         visit.update(channel=channel_of(host, src), ref=host[:80], source=src,
@@ -851,14 +989,13 @@ def _page_line(stats: dict, uniques: dict, state: dict, r: dict, db, visits: Vis
             _bump(d.setdefault("screens", {}), kind)
     if q.get("hl") == "1":
         visit["hl"] = True
-    visit["pages"].append([t, page, 0])
+    if len(visit["pages"]) < MAX_VISIT_PAGES:
+        visit["pages"].append([t, page, 0])
     visit["end"] = max(visit["end"], t)
 
-    seen = uniques.setdefault(day, [])
-    if vid in seen:
+    if not _first(state, "visitor", day, uniques.setdefault(day, []), vid):
         return
-    seen.append(vid)                            # the visitor's first page today
-    d["visitors"] += 1
+    d["visitors"] += 1                          # the visitor's first page today
     if visit["returning"]:
         d["returning"] = d.get("returning", 0) + 1
     _bump(d["channels"], channel_of(host, src))
@@ -1084,22 +1221,44 @@ def collect(backfill: bool = False, with_fetch: bool = False) -> None:
         if not os.path.isdir(UPDATES_DIR):
             _seed_updates(state, visits)
 
+        # A line is whatever a visitor's browser - or anyone's script - sent.
+        # One that cannot be read is passed over and said as a number: it
+        # must never stop the run, or one request stops the statistics for
+        # as long as its line is in the log.
+        passed: dict = {}
         for line in _read_new(STATS_LOG, state.setdefault("logs", {}).setdefault("stats", {})):
             try:
                 r = json.loads(line)
-            except ValueError:
+            except (ValueError, RecursionError):
                 continue
             if isinstance(r, dict):
-                _page_line(stats, uniques, state, r, db, visits)
+                try:
+                    _page_line(stats, uniques, state, r, db, visits)
+                except Exception as e:  # noqa: BLE001 - whatever it is, the next line is read
+                    _bump(passed, type(e).__name__)
 
         if backfill:
             for old in _rotated(DL_LOG):
                 with _open_any(old) as fh:
                     for line in fh:
-                        _download(stats, line, state)
+                        try:
+                            _download(stats, line, state)
+                        except Exception as e:  # noqa: BLE001 - as above
+                            _bump(passed, type(e).__name__)
                 print(f"[stats] read {old}", flush=True)
         for line in _read_new(DL_LOG, state["logs"].setdefault("downloads", {})):
-            _download(stats, line, state, visits, db)
+            try:
+                _download(stats, line, state, visits, db)
+            except Exception as e:  # noqa: BLE001 - as above
+                _bump(passed, type(e).__name__)
+        if passed:
+            # Only how many and what kind: the line itself holds an address.
+            print(f"[stats] {sum(passed.values())} line(s) could not be read and were passed over ("
+                  + ", ".join(f"{k} {v}" for k, v in sorted(passed.items())) + ")", flush=True)
+        for day, lst in visits.days.items():
+            if len(lst) >= MAX_DAY_VISITS:
+                print(f"[stats] {day}: {len(lst)} visits kept, as many as a day may (STATS_MAX_DAY_VISITS) - "
+                      f"the day's later ones are counted as page views only", flush=True)
         # Days kept from before visits were judged are judged once, too.
         for f in glob.glob(os.path.join(VISITS_DIR, "*.json")):
             if os.path.basename(f)[:10] not in kinds:
@@ -1121,23 +1280,46 @@ def collect(backfill: bool = False, with_fetch: bool = False) -> None:
         # a flood of made-up referrers cannot grow the file without end.
         for d in stats["days"].values():
             for k in ("refs", "ref_pages", "files", "sources", "update_files", "update_from"):
-                lst = d.get(k) or {}
-                if len(lst) > KEEP_PER_DAY:
-                    top = sorted(lst.items(), key=lambda kv: -kv[1])
-                    d[k] = dict(top[:KEEP_PER_DAY - 1])
-                    d[k]["other"] = d[k].get("other", 0) + sum(v for _, v in top[KEEP_PER_DAY - 1:])
+                _keep_top(d, k, KEEP_PER_DAY)
+            # Languages, systems and browser versions are few in the world;
+            # only made-up ones could make these long.
+            for k in ("langs", "os_versions", "browser_versions"):
+                _keep_top(d, k, KEEP_WIDE)
         stats["updated"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         stats["geo"] = db is not None
         visits.save()
         _drop_payments(state)
         _updates_to_the_hour(state)
+        _forget_old_updates(state)
         _anonymize_old()
         _save(uniques_path, uniques)
         _save(kinds_path, kinds)
         _save(stats_path, stats)
         state.pop("_keys", None)
+        state.pop("_seen", None)
         keys.save()
         _save(state_path, state)
+
+
+def _keep_top(d: dict, k: str, most: int) -> None:
+    """A day's list *k* kept to its *most* largest, the rest summed as
+    "other"."""
+    lst = d.get(k) or {}
+    if len(lst) > most:
+        top = sorted(lst.items(), key=lambda kv: -kv[1])
+        d[k] = dict(top[:most - 1])
+        d[k]["other"] = d[k].get("other", 0) + sum(v for _, v in top[most - 1:])
+
+
+def _forget_old_updates(state: dict, now: float | None = None) -> None:
+    """The newest updates the admin page's live line shows (state.json's
+    recent_updates) are kept as long as the updates themselves: one older
+    than UPDATES_DAYS goes, however few came after it."""
+    cut = (time.time() if now is None else now) - UPDATES_DAYS * 86400
+    recent = state.get("recent_updates")
+    if isinstance(recent, list):
+        state["recent_updates"] = [r for r in recent if not (
+            isinstance(r, list) and r and isinstance(r[0], (int, float)) and 0 < r[0] < cut)]
 
 
 def _seed_updates(state: dict, visits: Visits) -> None:
@@ -1342,7 +1524,7 @@ def _anonymize_old() -> None:
             month["visits"].sort(key=lambda a: (a["day"], a["country"], a["browser"], a["os"], a["device"],
                                                 a["channel"], a["site"], a["pages"], a["time"]))
             month["days"] = sorted(month["days"] + [day])
-            os.makedirs(ANON_DIR, mode=0o750, exist_ok=True)
+            _private_dir(ANON_DIR)
             _save(month_path, month)
         with contextlib.suppress(OSError):
             os.unlink(f)
@@ -1387,9 +1569,10 @@ def _save(path: str, data) -> None:
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".tmp-")
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         json.dump(data, fh, separators=(",", ":"))
-    os.chmod(tmp, 0o640)
+    os.chmod(tmp, 0o600)                        # the service's alone, like the folder
     os.replace(tmp, path)
 
 
 if __name__ == "__main__":
+    os.umask(0o077)             # whatever a run makes is the service's alone to read
     collect(backfill="--backfill" in sys.argv[1:], with_fetch=True)
