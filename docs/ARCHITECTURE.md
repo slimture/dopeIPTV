@@ -560,6 +560,9 @@ dopeiptv/
     welcome.py         First-run welcome overlay (connect / explore)
     channel_list.py    Virtualized list: model, view, painted delegate
     dialogs.py         Playlist editor, content manager
+    feedback_dialogs.py Send feedback, the offer of a report, the answers to
+                       feedback
+    backup_dialogs.py  A backup put back: picked, shown, staged
     epg_grid.py        The guide (EpgGrid): timeline grid, filter, bar -
                        on the Guide page or in its window (EpgGridDialog)
     reminders.py       Reminders manager dialog
