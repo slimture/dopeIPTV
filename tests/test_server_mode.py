@@ -862,10 +862,11 @@ def test_the_tuner_answers_only_this_computer_s_own_networks():
 
     local = home_net.LocalNetworks(networks, lambda: ["192.168.20.7"], clock=lambda: now[0])
     for ok in ("127.0.0.1", "::1", "192.168.1.77", "::ffff:192.168.1.9", "fe80::1%eth0",
-               "2001:db8:5::42", "192.168.20.7"):
+               "192.168.20.7"):
         assert local.allows(ok), ok
     for refused in ("192.168.2.5", "10.0.0.5", "172.16.3.4", "100.64.1.2", "8.8.8.8",
-                    "2001:db8:6::1", "fd00::5", "", "nonsense"):
+                    "2001:db8:6::1", "fd00::5", "", "nonsense",
+                    "2001:db8:5::42"):          # an own network, but a public one
         assert not local.allows(refused), refused
     assert local.allows("10.1.2.3", own="10.1.2.3"), "this computer, at an address of its own"
     assert len(reads) == 1, "kept, not read for every request"
@@ -893,6 +894,120 @@ def test_this_computer_s_own_networks_are_read_without_qt():
         from PyQt6 import QtNetwork
         v4 = {n for n in home_net._linux_networks() if n.version == 4}
         assert v4 == {n for n in home_net._qt_networks(QtNetwork) if n.version == 4}
+
+
+def test_only_own_networks_of_the_home_stand_for_it():
+    """A VPN's subnet, a public network (a modem in bridge mode), carrier
+    NAT's and a 10/8 netmask are not the home: their other users would get
+    the tuner, which needs no token. Nerd's other networks still let one in."""
+    from ipaddress import ip_network
+
+    from dopeiptv.core import home_net
+
+    for ok in ("192.168.1.0/24", "10.0.0.0/16", "172.16.5.0/24", "169.254.0.0/16",
+               "192.168.1.5/32", "fe80::/64", "fd12:3456:789a:1::/64"):
+        assert home_net.trusted(ip_network(ok)), ok
+    for bad in ("10.0.0.0/8", "172.16.0.0/12", "100.64.0.0/10", "100.101.102.0/24",
+                "203.0.113.0/24", "198.51.100.0/22", "2001:db8:5::/64", "fc00::/7",
+                "127.0.0.0/8"):
+        assert not home_net.trusted(ip_network(bad)), bad
+    nets = [ip_network("192.168.1.0/24"), ip_network("203.0.113.0/24"),
+            ip_network("100.64.0.0/10"), ip_network("10.0.0.0/8")]
+    local = home_net.LocalNetworks(lambda: nets, lambda: ["100.101.102.103"])
+    assert local.allows("192.168.1.20")
+    for refused in ("203.0.113.9", "100.64.7.7", "10.200.1.1"):
+        assert not local.allows(refused), refused
+    assert local.allows("100.101.102.103"), "listed by the person in Nerd's other networks"
+    assert local.allows("127.0.0.1") and local.allows("::1"), "loopback, always"
+
+
+def _fake_qt(ifaces):
+    from types import SimpleNamespace
+
+    class Flag:
+        IsUp, IsPointToPoint = 1, 2
+
+    class Kind:
+        Ethernet, Wifi, Ppp, Virtual, Unknown = "eth", "wifi", "ppp", "virtual", "unknown"
+
+    def entry(text):
+        ip, prefix = text.split("/")
+        return SimpleNamespace(ip=lambda: SimpleNamespace(toString=lambda: ip),
+                               prefixLength=lambda: int(prefix))
+
+    def iface(name, kind, flags, addrs):
+        return SimpleNamespace(name=lambda: name, type=lambda: getattr(Kind, kind),
+                               flags=lambda: flags,
+                               addressEntries=lambda: [entry(a) for a in addrs])
+
+    class QNetworkInterface:
+        InterfaceFlag, InterfaceType = Flag, Kind
+
+        @staticmethod
+        def allInterfaces():
+            return [iface(*i) for i in ifaces]
+
+    return SimpleNamespace(QNetworkInterface=QNetworkInterface)
+
+
+def test_a_tunnel_s_network_is_not_an_own_network_as_qt_reads_them():
+    from ipaddress import ip_network
+
+    from dopeiptv.core import home_net
+
+    up, p2p = 1, 2
+    qt = _fake_qt([("eth0", "Ethernet", up, ["192.168.1.5/24", "fe80::1/64"]),
+                   ("wlan0", "Wifi", up, ["192.168.50.3/24"]),
+                   ("eth1", "Ethernet", 0, ["192.168.9.3/24"]),           # down
+                   ("tun0", "Unknown", up | p2p, ["10.8.0.6/24"]),        # OpenVPN
+                   ("wg0", "Unknown", up | p2p, ["10.6.0.2/24"]),         # WireGuard
+                   ("utun4", "Unknown", up, ["fd7a:115c:a1e0::1/64"]),    # macOS
+                   ("tap0", "Ethernet", up, ["10.9.0.2/24"]),             # OpenVPN tap
+                   ("ztabcdef", "Ethernet", up, ["10.147.17.5/24"]),      # ZeroTier
+                   ("tailscale0", "Unknown", up, ["100.101.102.103/32"]),
+                   ("gre1", "Virtual", up, ["10.20.0.1/30"]),
+                   ("ppp0", "Ppp", up, ["10.64.64.64/32"]),
+                   ("tunnel_32512", "Ethernet", up, ["10.7.0.2/24"])])   # Windows' name
+    assert set(home_net._qt_networks(qt)) == {
+        ip_network("192.168.1.0/24"), ip_network("fe80::/64"), ip_network("192.168.50.0/24")}
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="Linux's own interface lists")
+def test_a_tunnel_s_network_is_not_an_own_network_as_linux_reads_them(tmp_path, monkeypatch):
+    import fcntl
+    import struct
+    from ipaddress import ip_network
+
+    from dopeiptv.core import home_net
+
+    up, p2p = 0x1, 0x10
+    ifaces = {"lo": (up | 0x8, "127.0.0.1", "255.0.0.0"),
+              "eth0": (up, "192.168.1.5", "255.255.255.0"),
+              "br0": (up, "10.0.10.2", "255.255.255.0"),        # a bridge holds the LAN
+              "tun0": (up | p2p, "10.8.0.6", "255.255.255.0"),
+              "wg0": (up | p2p, "10.6.0.2", "255.255.255.0"),
+              "tap0": (up, "10.9.0.2", "255.255.255.0"),
+              "tailscale0": (up | p2p, "100.101.102.103", "255.255.255.255"),
+              "ppp0": (up | p2p, "81.2.3.4", "255.255.255.255")}
+
+    def ioctl(_fd, req, buf):
+        flags, addr, mask = ifaces[buf[:16].split(b"\0", 1)[0].decode()]
+        if req == home_net._SIOCGIFFLAGS:
+            return buf[:16] + struct.pack("H", flags) + buf[18:]
+        return buf[:20] + socket.inet_aton(addr if req == home_net._SIOCGIFADDR else mask) \
+            + buf[24:]
+
+    inet6 = tmp_path / "if_inet6"
+    inet6.write_text("fe800000000000000000000000000001 02 40 20 80 eth0\n"
+                     "fd000000000000080000000000000006 05 40 00 80 tun0\n"
+                     "fdaa0000000000000000000000000002 06 40 00 80 wg0\n"
+                     "fd7a115ca1e0ab120000000000000001 07 80 00 80 tailscale0\n")
+    monkeypatch.setattr(socket, "if_nameindex", lambda: list(enumerate(ifaces, 1)))
+    monkeypatch.setattr(fcntl, "ioctl", ioctl)
+    monkeypatch.setattr(home_net, "_IF_INET6", str(inet6))
+    assert set(home_net._linux_networks()) == {
+        ip_network("127.0.0.0/8"), ip_network("192.168.1.0/24"), ip_network("10.0.10.0/24"),
+        ip_network("fe80::/64")}
 
 
 def test_the_tuner_s_endpoints_are_refused_beyond_its_own_networks(server, monkeypatch):
