@@ -15,6 +15,7 @@ from ..core._lazy_requests import requests
 from PyQt6.QtCore import QObject, QSettings, QThreadPool, QTimer
 
 
+from ..core import privacy
 from ..core.log import log
 from ..core.workers import run_async
 
@@ -823,7 +824,8 @@ class PosterResolver(QObject):
         entry = self._cache.get(key)
         tid = entry.get("tmdb_id") if isinstance(entry, dict) else None
         if (not isinstance(entry, dict) or not isinstance(tid, int)
-                or "backdrop_url" in entry or key in self._backdrop_asked):
+                or "backdrop_url" in entry or key in self._backdrop_asked
+                or privacy.title_private(title)):
             return False
         self._backdrop_asked.add(key)
         # Bound after the test: a default is typed where it is written.
@@ -894,7 +896,8 @@ class PosterResolver(QObject):
         if not title:
             return True
         key = self._key(title, kind)
-        return key in self._cache or key in self._failed
+        return (key in self._cache or key in self._failed
+                or privacy.title_private(title))
 
     def get_full(self, title: str, kind: str,
                  callback: Callable[[dict], None]) -> dict | None:
@@ -906,6 +909,10 @@ class PosterResolver(QObject):
         if key in self._cache:
             return self._cache[key]
         if key in self._failed:
+            return {}
+        if privacy.title_private(title):
+            # What plays privately: TMDB is not asked about it (what it
+            # answered before is above). No match, for now.
             return {}
         self._waiting.setdefault(key, []).append(callback)
         self._ensure_fetch(title, kind, key)

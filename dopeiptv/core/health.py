@@ -166,8 +166,9 @@ class StreamHealth:
         self._retry = False
 
     def active(self) -> bool:
-        """Recording now: Nerd and the switch on, and not private viewing."""
-        return self._on() and not privacy.private()
+        """Recording now: Nerd and the switch on, and what plays is not
+        private (private viewing, or a playback begun in it going on)."""
+        return self._on() and not privacy.playing_private()
 
     # -- what is kept ---------------------------------------------------------
 

@@ -25,7 +25,8 @@ from urllib.parse import quote, urlsplit
 
 from .. import APP_NAME, VERSION
 from ..core._lazy_requests import requests
-from ..core.log import log, redact_url
+from ..core.log import log
+from ..core.privacy import url_for_log
 from ..i18n import LocalizedError
 from . import mdns
 from .cast_bridge import lan_address
@@ -482,7 +483,7 @@ class KodiManager:
         self._dvr = bool(dvr)
         self.last_position = self.position_offset = self.position_at = 0.0
         self.duration = 0.0 if dvr else float(duration or 0.0)
-        log.info("kodi -> %s (%s): %s", dev.name, dev.address, redact_url(shown))
+        log.info("kodi -> %s (%s): %s", dev.name, dev.address, url_for_log(shown))
         try:
             self._call("Player.Open", {"item": {"file": target}}, timeout=15)
         except KodiAuthError as e:

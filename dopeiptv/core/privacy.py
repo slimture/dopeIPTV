@@ -19,8 +19,9 @@ import json
 import time
 from datetime import datetime
 from typing import Any
+from urllib.parse import urlsplit
 
-from .log import log
+from .log import log, redact_url
 
 # (id, seconds back; 0 = everything), in the order a menu shows them.
 RANGES: tuple[tuple[str, int], ...] = (
@@ -42,11 +43,13 @@ def private() -> bool:
     return _private
 
 
-# The playback (kind, key) that was private at some point. The same playback
+# The playback (kind, key) that was private at some point, and the names it
+# goes by (folded) - what nothing is asked about elsewhere while it lasts. The same playback
 # going on after private viewing ends - a reconnect, a backup address, a seek
 # in the archive - stays private to the end of its run, for every reporter
 # (Discord, the media servers, Watch together, the statistics, the events).
 _private_playback: tuple[str, str] | None = None
+_private_titles: frozenset[str] = frozenset()
 
 
 def _key(key: Any) -> str:
@@ -59,8 +62,10 @@ def playback_started(kind: str, key: Any) -> None:
     """The window's player took a stream (or private viewing was turned on
     while one plays): marked private while private viewing is on; anything
     else chosen after it ended is not."""
-    global _private_playback
+    global _private_playback, _private_titles
     ident = (str(kind or ""), _key(key))
+    if _private_playback != ident:
+        _private_titles = frozenset()
     if private():
         _private_playback = ident
     elif _private_playback != ident:
@@ -69,9 +74,10 @@ def playback_started(kind: str, key: Any) -> None:
 
 def playback_stopped() -> None:
     """Stop: what is played next is a new playback."""
-    global _private_playback
+    global _private_playback, _private_titles
     if not private():
         _private_playback = None
+        _private_titles = frozenset()
 
 
 def playback_private(kind: str, key: Any) -> bool:
@@ -86,12 +92,55 @@ def private_key(key: Any) -> bool:
     return private() or (_private_playback is not None and _private_playback[1] == _key(key))
 
 
+def playing_private() -> bool:
+    """Whether what the window's player (or a cast) plays is private: private
+    viewing on, or a playback that began in it still going on. For those
+    that know no kind and key - the player itself, the log."""
+    return _private or _private_playback is not None
+
+
+def _fold(title: Any) -> str:
+    return str(title or "").strip().lower()
+
+
+def playback_titles(*names: Any) -> None:
+    """The names the playback just started goes by - its title, its series,
+    a file's cleaned name. Kept only for a private one, and only to answer
+    title_private()."""
+    global _private_titles
+    _private_titles = (frozenset(f for f in map(_fold, names) if f)
+                       if _private_playback is not None else frozenset())
+
+
+def title_private(title: Any) -> bool:
+    """Whether *title* is what plays privately now: nothing is to be asked
+    about it elsewhere (TMDB), though the lists around it still fetch
+    their posters."""
+    return bool(_private_titles) and _fold(title) in _private_titles
+
+
 def for_log(text: Any) -> Any:
     """What a log line may say of what is played: its title or name, or
     "<private>" while private viewing is on or a playback that began
     private still goes on after it - the log is kept on disk and goes with
     a report."""
-    return "<private>" if _private or _private_playback is not None else text
+    return "<private>" if playing_private() else text
+
+
+def url_for_log(url: Any) -> str:
+    """A stream's address as a log line may carry it: its account taken out
+    (core/log.redact_url) - and, for what plays privately, everything that
+    says which stream or file it is: the server's name alone, nothing of a
+    file's path."""
+    if not playing_private():
+        return redact_url(url)
+    try:
+        parts = urlsplit(str(url or ""))
+        if parts.scheme and parts.hostname:
+            return f"{parts.scheme}://{parts.hostname}/<private>"
+    except ValueError:
+        pass
+    return "<private>"
 
 
 def cutoff(seconds: int, now: float | None = None) -> float | None:

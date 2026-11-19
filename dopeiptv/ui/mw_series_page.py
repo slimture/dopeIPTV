@@ -638,10 +638,24 @@ class _SeriesPageMixin:
 
     # -- the seasons ------------------------------------------------------------------
 
+    def _sp_private(self) -> bool:
+        """Private viewing, or this series' episode the private playback
+        still going on after it: the page follows what plays, and the
+        season it lands on would say what was watched."""
+        if privacy.private():
+            return True
+        lp = getattr(self, "_last_playback", None) or {}
+        if lp.get("kind") != "episode" \
+                or not privacy.playback_private("episode", lp.get("key")):
+            return False
+        mine = (lp.get("series_ctx") or {}).get("series_id")
+        here = (self._sp_ctx or {}).get("series_id")
+        return mine is None or here is None or str(mine) == str(here)
+
     def _sp_season_picked(self, i: int) -> None:
         """A season the person picked: kept for the next time (never while
         viewing privately), with the episode that is next now."""
-        if privacy.private() or not 0 <= i < len(self._sp_seasons):
+        if self._sp_private() or not 0 <= i < len(self._sp_seasons):
             return
         nxt = self._sp_next
         next_key = sv.episode_key(nxt.episode) if nxt and nxt.episode is not None else ""
@@ -658,8 +672,8 @@ class _SeriesPageMixin:
         if season.number is None or not any(not sv.still_of(e) for e in season.episodes):
             return
         tid = self.tmdb.tmdb_id_for(self._sp_title(), "series")
-        if not isinstance(tid, int):
-            return
+        if not isinstance(tid, int) or privacy.title_private(self._sp_title()):
+            return      # no id, or the series played privately: not asked
         known = self._sp_tmdb if self._sp_tmdb is not None else {}
         self._sp_tmdb = known
         key = (tid, season.number)

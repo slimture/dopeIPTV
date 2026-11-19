@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .. import ORG
-from ..core.log import log, redact_url
+from ..core.log import log
 from ..i18n import tr
 from ..providers.casting import CastHub
 from ..providers.kodi import KodiManager
@@ -35,7 +35,7 @@ from ..core.series_rules import SeriesRuleStore
 from ..media.players import launch_player
 from ..core.contest import ContestWatch
 from ..core import privacy
-from ..core.privacy import for_log
+from ..core.privacy import for_log, url_for_log
 from ..core.health import StreamHealth
 from ..core.recording import RecordingManager
 from ..core.stores import (
@@ -73,7 +73,7 @@ from .mw_sync import _SyncMixin
 from .mw_together import _TogetherMixin
 from .mw_simkl import _SimklMixin
 from .mw_discord import _DiscordMixin
-from .mw_privacy import _PrivacyMixin
+from .mw_privacy import _PrivacyMixin, note_titles, wake_reason
 from .mw_profiles import _ProfilesMixin
 from .mw_commands import _CommandsMixin
 from .mw_box import _BoxMixin
@@ -1394,8 +1394,8 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             self._radio_up()
             return
         ctx = self.series_ctx or {}
-        log.info("_leave_series: back to the series list (series_id=%r)",
-                 ctx.get("series_id"))
+        log.info("_leave_series: back to the series list (series_id=%s)",
+                 for_log(ctx.get("series_id")))
         self.series_ctx = None
         self.back_btn.hide()
         # Land in the series' OWN category with the series row selected - not
@@ -1727,7 +1727,8 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                 QFileDialog.Option.HideNameFilterDetails))
         if not path:
             return
-        self.settings.setValue("local_open_dir", os.path.dirname(path))
+        if not privacy.private():       # where a file watched privately lies
+            self.settings.setValue("local_open_dir", os.path.dirname(path))
         self._play_local_path(path)
 
     def _play_local_path(self, path: str) -> None:
@@ -1868,6 +1869,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                                "key": self._item_key(it),
                                "kind": "live", "item": it}
         privacy.playback_started("live", self._item_key(it))
+        note_titles(self._last_playback)
         self._sync_player_buttons()
         self.listw.viewport().update()
         self.setWindowTitle(title or self._base_title)
@@ -1900,7 +1902,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         self._arm_loading(it.get("stream_icon"))
         if self.player.play(url, title, local_buffer=True,
                             buffer_key=f"live:{self._item_key(it)}"):
-            self.wake.acquire(tr("wake_playing", title=title))
+            self.wake.acquire(wake_reason(title))
             self._health_begin(self._item_key(it), title, it, "live", False)
             self._events_started(self._item_key(it), title, it, "live", False)
             self._together_started(self._item_key(it), title, it, "live", False)
@@ -2095,7 +2097,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         if pos <= 0:
             # Nothing to offer: either never watched >1 min, watched past 95%
             # (counted as finished), or saved under another kind pre-fix.
-            log.debug("resume: no saved position for %s (kind=%s)", key, kind)
+            log.debug("resume: no saved position for %s (kind=%s)", for_log(key), kind)
             return 0.0
         return self._ask_resume(pos)
 
@@ -2134,6 +2136,8 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         kind, key = lp.get("kind"), lp.get("key")
         if kind not in self._RESUMABLE or key is None:
             return
+        if privacy.playback_private(kind, key):
+            return      # a title's track choice says it was watched
         prefs = self._track_prefs()
         # Filed under the episode AND under its series. Picking Swedish
         # subtitles on episode 1 means you want them on episode 2, and a
@@ -2179,15 +2183,18 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         Trakt learns of the mark through the regular local->Trakt sync
         (the live scrobble usually beats it there anyway). Embedded player
         only - external players never report their position."""
-        from ..core import privacy
+        last = getattr(self, "_last_playback", None)
+        if last and (last.get("_private") or privacy.playback_private(
+                last.get("kind") or "", last.get("key"))):
+            # Watched privately - though private viewing ended before it
+            # did: the mark would reach the media server and Trakt / Simkl.
+            # Kept on the playback itself: this is asked again when the
+            # next title starts, after Stop has ended the private playback.
+            last["_private"] = True
+            return
         if privacy.private():
             return                     # private viewing marks nothing
-        last = getattr(self, "_last_playback", None)
         if not last or last.get("kind") not in ("movie", "episode", "recording"):
-            return
-        if privacy.playback_private(last.get("kind") or "", last.get("key")):
-            # Watched privately and private viewing ended before it did: the
-            # mark would reach the media server and Trakt / Simkl.
             return
         if last.get("_auto_marked"):
             return                     # once per playback session
@@ -2512,6 +2519,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                                               if kind == "episode" else None),
                                "own_buffer": own_buffer}
         privacy.playback_started(kind, key)
+        note_titles(self._last_playback)
         # Snapshot the ordered episode queue + current index so a natural
         # end-of-episode can autoplay the next one, even if the user browses
         # away meanwhile. An override (set by autoplay itself) carries the same
@@ -2635,7 +2643,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                                 buffer_key=f"{kind}:{key}" if key else None,
                                 web=kind == "web", own_buffer=own_buffer,
                                 outside=outside):
-                self.wake.acquire(tr("wake_playing", title=title))
+                self.wake.acquire(wake_reason(title))
                 self._health_begin(key, title, item, kind, catchup)
                 self._events_started(key, title, item, kind, catchup)
                 self._together_started(key, title, item, kind, catchup)
@@ -2649,12 +2657,12 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                 # TV mode fills the screen: another window would open
                 # behind it, out of reach of the remote.
                 log.warning("embedded play() refused %s in TV mode",
-                            redact_url(url))
+                            url_for_log(url))
                 self._show_stream_error(tr("tv_play_refused"))
                 self._tv_refused()      # said on its page, back on it
             else:
                 log.warning("embedded play() refused %s - falling back to an "
-                            "external mpv window", redact_url(url))
+                            "external mpv window", url_for_log(url))
                 self.player.hide()
                 launch_player("mpv", url, title, self)
         else:

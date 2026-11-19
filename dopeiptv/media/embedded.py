@@ -17,7 +17,8 @@ from PyQt6.QtWidgets import (
 )
 
 from ..core import channel_prefs, night_mode
-from ..core.log import log, redact_url
+from ..core.log import log
+from ..core.privacy import for_log, url_for_log
 from ..core.local_buffer import rewind_bytes
 from ..i18n import tr
 from .audio_effects import AudioEffectsMixin
@@ -1209,7 +1210,7 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
             if self._dvr is not None and self._dvr_on_eof():
                 return      # the app's own buffer goes on from the store
             self._eof_seen = True
-            log.info("eof event: %s", redact_url(self.current_url))
+            log.info("eof event: %s", url_for_log(self.current_url))
             self.finished.emit()
         except RuntimeError:
             # This arrives from mpv's event thread via a queued connection,
@@ -1754,7 +1755,7 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
                     _set_forced_only(m, False)
                     m["sub-visibility"] = True
             except Exception as e:
-                log.debug("sub-files %r failed: %s", sub_files, e)
+                log.debug("sub-files %r failed: %s", for_log(sub_files), e)
             try:
                 # While muted the slider reads 0. Sending that as the volume
                 # would leave the stream silent even after unmuting, since mute
@@ -2343,7 +2344,7 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
                 # The decisive line for "the queue stopped after one track":
                 # if this never appears, mpv never reported end-of-file and
                 # nothing downstream was ever asked to play the next one.
-                log.info("eof reached: %s", redact_url(self.current_url))
+                log.info("eof reached: %s", url_for_log(self.current_url))
                 self.finished.emit()
         else:
             self._eof_seen = False

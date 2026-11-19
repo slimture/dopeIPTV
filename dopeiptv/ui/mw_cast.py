@@ -55,6 +55,7 @@ from ..i18n import LocalizedError, tr
 from ..providers import cast_feed
 from .cast_dialog import CastDialog
 from .mw_cast_moment import _CastMomentMixin
+from .mw_privacy import note_titles
 from .cast_add_dialogs import _AddressDialog, _KodiAddDialog
 from .theme import P
 
@@ -739,8 +740,9 @@ class _CastMixin(_CastMomentMixin):
                             if e is item or self._item_key(e) == key), -1)
             self._last_playback["ep_queue"] = queue or []
             self._last_playback["ep_index"] = idx
-        self._trakt_start_for_item(kind, item)
-        self._simkl_start_for_item(kind, item)
+        # Asked of this playback, as a start here is: a title that began
+        # in private viewing is not told when it is sent again after it.
+        self._watch_accounts_start(kind, key, item)
         self._ms_started(url, key, kind, item, float(start or 0.0))
         log.info("cast: %s to %s, from %d s", for_log(title), device,
                  int(start or 0))
@@ -869,6 +871,7 @@ class _CastMixin(_CastMomentMixin):
         if key is None or not kind:
             return
         privacy.playback_started(kind, key)
+        note_titles(ctx)
         self._cast_hooked = True
         title, item = ctx.get("title") or "", ctx.get("item")
         for name in ("_events_started", "_discord_started"):

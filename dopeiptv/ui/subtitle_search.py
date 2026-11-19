@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..core.log import log
+from ..core.privacy import for_log
 from ..core.workers import default_image_cache_dir, run_async
 from ..i18n import tr
 from ..providers.opensubtitles import LANGUAGES, movie_hash
@@ -289,7 +290,7 @@ class SubtitleSearchDialog(QDialog):
             text = tr("subs_loaded", name=language_name(row["language"]))
             if remaining is not None:
                 text += " — " + tr("subs_remaining", n=remaining)
-            log.info("subtitles: loaded %s (%s left today)", path, remaining)
+            log.info("subtitles: loaded %s (%s left today)", for_log(path), remaining)
             self.window_._show_toast(text, 5000)
             self.accept()
 

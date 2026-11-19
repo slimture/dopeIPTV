@@ -134,7 +134,7 @@ class _QueueMixin:
         i = getattr(self, "_track_index", -1)
         if not self._local_is_playing():
             log.info("queue: not stepping - no local file is playing "
-                     "(key=%r last=%r)", getattr(self, "_playing_key", None),
+                     "(key=%r last=%r)", for_log(getattr(self, "_playing_key", None)),
                      (getattr(self, "_last_playback", None) or {}).get("kind"))
             return False
         if not q or i < 0:

@@ -32,7 +32,8 @@ import time
 from typing import IO, Any, Callable
 from urllib.parse import urlsplit
 
-from ..core.log import log, redact_url
+from ..core.log import log
+from ..core.privacy import url_for_log
 from ..core.player_exec import NO_WINDOW
 
 #: What the converter reads instead of an address.
@@ -280,7 +281,7 @@ class Feed:
         if stop.is_set():
             _end(proc)
         log.info("cast feed: reading the %s from %s", self.kind,
-                 redact_url(url))
+                 url_for_log(url))
         out: list[float] = [0.0]
         errs = threading.Thread(target=_progress, args=(proc, out), daemon=True)
         errs.start()

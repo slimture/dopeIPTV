@@ -28,7 +28,8 @@ from xml.sax.saxutils import escape
 
 from .. import APP_NAME, VERSION
 from ..core._lazy_requests import requests
-from ..core.log import log, redact_url
+from ..core.log import log
+from ..core.privacy import url_for_log
 from ..i18n import LocalizedError
 from .cast_bridge import lan_address
 from ..core.exclusive_bind import ExclusiveBindMixin, IdleTimeoutMixin
@@ -636,7 +637,7 @@ class DlnaManager:
         self._played = False
         self.last_position = self.position_offset = self.position_at = 0.0
         self.duration = 0.0 if dvr else float(duration or 0.0)
-        log.info("dlna -> %s: %s (%s)", device_name, redact_url(target), mime)
+        log.info("dlna -> %s: %s (%s)", device_name, url_for_log(target), mime)
         meta = didl(target, title, mime)
         try:
             self._set_uri(target, meta)

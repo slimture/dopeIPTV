@@ -24,7 +24,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QListWidgetItem, QMenu
 
 from ..core.log import log
-from ..core.privacy import for_log, private
+from ..core.privacy import for_log, playback_private
 from ..core.stores import FAV_DEFAULT_GROUP
 from ..core.workers import run_async
 from ..i18n import tr
@@ -267,9 +267,11 @@ class _RadioMixin:
                                  item={**it, "_kind": "radio",
                                        "_key": "radio:" + uuid})
             self._radio_icy_start()
-        # Told only when turned on, and never during private viewing.
+        # Told only when turned on, and never of a station played privately
+        # - asked of the playback: one begun in private viewing and played
+        # again after it is still that playback.
         if (uuid and self.settings.value(rb.SETTING_CLICKS, "false") == "true"
-                and not private()):
+                and not playback_private("radio", "radio:" + uuid)):
             client = self._radio()
             run_async(self.pool, partial(client.click, uuid), self._radio_clicked,
                       self._radio_clicked)

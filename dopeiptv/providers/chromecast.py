@@ -5,7 +5,8 @@ from __future__ import annotations
 import threading
 import time
 
-from ..core.log import log, redact_url
+from ..core.log import log
+from ..core.privacy import url_for_log
 from ..i18n import LocalizedError
 from .cast_bridge import (
     QUALITY, SAFE_AUDIO, SAFE_VIDEO, CastBridge,
@@ -698,7 +699,7 @@ class ChromecastManager:
                                  title, start=start):
                 return device_name
             raise LocalizedError("cast_err_container", type=ctype)
-        log.info("cast -> %s: %s (%s)", device_name, resolved,
+        log.info("cast -> %s: %s (%s)", device_name, url_for_log(resolved),
                  ctype if served else f"{ctype}, guessed")
         verdict = self._play_and_verify(mc, resolved, ctype, title,
                                         start=start)
@@ -749,7 +750,7 @@ class ChromecastManager:
         fallback = cast_content_type(url)
         if fallback not in _UNPLAYABLE:
             log.info("cast -> %s: %s (%s, guessed)", device_name,
-                     redact_url(url), fallback)
+                     url_for_log(url), fallback)
             if self._play_and_verify(mc, url, fallback, title,
                                      start=start) is not False:
                 return device_name

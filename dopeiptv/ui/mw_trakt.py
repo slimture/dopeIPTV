@@ -104,18 +104,32 @@ class _TraktMixin:
         from ..core import privacy
         if privacy.playback_private(kind, key):
             return
-        if kind in ("movie", "episode"):
-            self._trakt_start_for_item(kind, item)
-            self._simkl_start_for_item(kind, item)
-        elif kind == "local" and item is not None and not item.get("_no_scrobble"):
-            # A local file scrobbles as a movie when Trakt can match the
-            # cleaned title; an unmatched file just scrobbles nothing.
-            local_movie = {"name": item.get("_clean_title") or item.get("name") or ""}
-            self._trakt_start_for_item("movie", local_movie)
-            self._simkl_start_for_item("movie", local_movie)
+        # The playback it is, for Trakt's start: its answer to the lookup
+        # comes later, and private viewing turned on meanwhile made this
+        # playback private.
+        self._watch_ident = (kind, key)
+        try:
+            if kind in ("movie", "episode"):
+                self._trakt_start_for_item(kind, item)
+                self._simkl_start_for_item(kind, item)
+            elif kind == "local" and item is not None and not item.get("_no_scrobble"):
+                # A local file scrobbles as a movie when Trakt can match the
+                # cleaned title; an unmatched file just scrobbles nothing.
+                local_movie = {"name": item.get("_clean_title") or item.get("name") or ""}
+                self._trakt_start_for_item("movie", local_movie)
+                self._simkl_start_for_item("movie", local_movie)
+        finally:
+            self._watch_ident = None
 
     def _trakt_start_for_item(self, kind: str, item) -> None:
         from ..core import privacy
+        ident = getattr(self, "_watch_ident", None)
+
+        def still_public() -> bool:
+            # Asked again once Trakt has answered the lookup.
+            return not (privacy.playback_private(*ident) if ident is not None
+                        else privacy.private())
+
         # The account of the profile watching, whatever profile is in use by
         # the time the answer comes (core/profiles.py).
         trakt = self.trakt
@@ -128,7 +142,7 @@ class _TraktMixin:
 
             def job(title=title):
                 movie = trakt.find_movie(title)
-                if not movie:
+                if not movie or not still_public():
                     return None
                 payload = {"movie": movie}
                 trakt.scrobble_start(payload, 0.0)
@@ -147,7 +161,7 @@ class _TraktMixin:
 
             def job(show_title=show_title, season=season, episode=episode):
                 ep = trakt.find_episode(show_title, season, episode)
-                if not ep:
+                if not ep or not still_public():
                     return None
                 payload = {"episode": ep}
                 trakt.scrobble_start(payload, 0.0)
@@ -156,7 +170,7 @@ class _TraktMixin:
             return
 
         def done(payload):
-            if payload and trakt is self.trakt:
+            if payload and trakt is self.trakt and still_public():
                 self._trakt_active = {"payload": payload, "client": trakt}
 
         run_async(self.pool, job, done, lambda _e: None)

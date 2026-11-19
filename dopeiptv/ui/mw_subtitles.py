@@ -11,7 +11,9 @@ import json
 import os
 from typing import Any
 
+from ..core import privacy
 from ..core.log import log
+from ..core.privacy import for_log
 from ..i18n import current_language
 from ..providers.metadata import PosterResolver
 from ..providers.opensubtitles import OpenSubtitles, bundled_key, search_language
@@ -105,13 +107,15 @@ class _SubtitlesMixin:
         kind, key = lp.get("kind"), lp.get("key")
         if kind not in self._RESUMABLE or key is None or not path:
             return
+        if privacy.playback_private(kind, key):
+            return      # shown for this playback; nothing filed under the title
         memory = self._subtitle_memory()
         memory.pop(f"{kind}:{key}", None)
         memory[f"{kind}:{key}"] = path      # re-insert = newest
         while len(memory) > _REMEMBER_MAX:
             memory.pop(next(iter(memory)))
         self.settings.setValue(_SETTINGS_KEY, json.dumps(memory))
-        log.info("subtitles: remembered %s for %s:%s", path, kind, key)
+        log.info("subtitles: remembered %s for %s:%s", for_log(path), kind, for_log(key))
 
     def _remembered_subtitles(self, kind: str, key: Any) -> list[str]:
         path = self._subtitle_memory().get(f"{kind}:{key}")
