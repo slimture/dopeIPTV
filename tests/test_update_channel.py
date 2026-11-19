@@ -121,6 +121,20 @@ def test_releases_never_see_a_nightly(github):
     assert fetch_update(channel="stable")["tag"] == "v1.4.0"
 
 
+def test_releases_never_take_a_test_build_whoever_names_one(github):
+    """A test build is signed with the release key, so only its version keeps
+    it off Releases: the site's releases.json naming one is not believed."""
+    github["site"] = site_json("1.6.6.40")
+    assert fetch_update(channel="stable")["tag"] == "v1.4.0", "GitHub's release instead"
+    assert any("api.github.com" in u for u in github["asked"])
+    github["latest"] = rel("v1.6.6.40")
+    with pytest.raises(ValueError):
+        fetch_update(channel="stable")
+    github["site"], github["latest"] = None, rel("v1.4.0")
+    github["site_nightly"] = site_json("1.6.6.41")
+    assert fetch_update(channel="nightly")["tag"] == "v1.6.6.41", "Test builds as before"
+
+
 def test_test_builds_take_the_newer_of_the_two(github):
     github["all"] = [rel("nightly-1.4.0.15", prerelease=True)]
     assert fetch_update(channel="nightly")["tag"] == "v1.4.0.15"

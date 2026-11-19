@@ -19,6 +19,7 @@ from bisect import bisect_left, bisect_right
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
+from xml.parsers import expat
 
 from PyQt6.QtCore import QStandardPaths
 
@@ -43,6 +44,52 @@ Schedule = tuple[array, array, tuple, tuple]
 # the player's frames with it, for 0.8 s. Fed a slice at a time, the window
 # runs between slices.
 _ZLIB_STEP = 1 << 18
+# What one unpacking call may give at most, so a slice of a gzip bomb never
+# turns into hundreds of MB at once.
+_ZLIB_OUT = 1 << 22
+
+#: The most a guide's download may be, and the most a gzipped guide may
+#: unpack to. A real XMLTV guide is tens of MB up to a few hundred unpacked
+#: (the largest seen ~260 MB), so neither is ever met by one - only by an
+#: answer that never ends or a gzip bomb, which would fill the memory. The
+#: two are equal: a guide downloaded plain is kept gzipped and read back.
+GUIDE_DOWNLOAD_MAX = 2 << 30
+GUIDE_UNPACKED_MAX = 2 << 30
+
+
+class GuideTooLarge(ValueError):
+    """A guide past GUIDE_DOWNLOAD_MAX or GUIDE_UNPACKED_MAX: not read further."""
+
+
+def read_capped(r: Any, on_chunk: Callable[[int], None] | None = None,
+                limit: int | None = None) -> bytes:
+    """A guide's answer read a chunk at a time, at most *limit* bytes
+    (GUIDE_DOWNLOAD_MAX); *on_chunk* told the bytes so far. More - its
+    Content-Length says so, or it keeps coming - is refused (GuideTooLarge),
+    logged, its connection closed."""
+    limit = GUIDE_DOWNLOAD_MAX if limit is None else limit
+    try:
+        said = int(r.headers.get("content-length") or 0)
+    except (AttributeError, TypeError, ValueError):
+        said = 0
+    chunks: list[bytes] = []
+    received = 0
+    if said <= limit:
+        for chunk in r.iter_content(64 * 1024):
+            received += len(chunk)
+            if received > limit:
+                break
+            chunks.append(chunk)
+            if on_chunk is not None:
+                on_chunk(received)
+    if said > limit or received > limit:
+        close = getattr(r, "close", None)
+        if callable(close):
+            close()
+        log.warning("EPG: the guide is larger than %d MB (GUIDE_DOWNLOAD_MAX) - not read "
+                    "further; no real guide is this large", limit >> 20)
+        raise GuideTooLarge(f"the guide is larger than {limit >> 20} MB")
+    return b"".join(chunks)
 
 
 def gzip_gently(data: bytes, level: int = 5) -> bytes:
@@ -55,19 +102,32 @@ def gzip_gently(data: bytes, level: int = 5) -> bytes:
     return b"".join(out)
 
 
-def gunzip_gently(data: bytes) -> bytes:
+def gunzip_gently(data: bytes, limit: int | None = None) -> bytes:
     """gzip.decompress(), a slice at a time, every member of the stream.
-    Raises zlib.error on damaged or cut-short data."""
+    Raises zlib.error on damaged or cut-short data, GuideTooLarge (logged)
+    past *limit* bytes unpacked (GUIDE_UNPACKED_MAX)."""
+    limit = GUIDE_UNPACKED_MAX if limit is None else limit
     out: list[bytes] = []
+    size = 0
     view = memoryview(data)
     while len(view):
         d = zlib.decompressobj(31)
         pos = 0
         while not d.eof:
-            if pos >= len(view):
-                raise zlib.error("compressed data ends early")
-            out.append(d.decompress(view[pos:pos + _ZLIB_STEP]))
-            pos += _ZLIB_STEP
+            if d.unconsumed_tail:
+                piece = d.decompress(d.unconsumed_tail, _ZLIB_OUT)
+            else:
+                if pos >= len(view):
+                    raise zlib.error("compressed data ends early")
+                piece = d.decompress(view[pos:pos + _ZLIB_STEP], _ZLIB_OUT)
+                pos += _ZLIB_STEP
+            size += len(piece)
+            if size > limit:
+                log.warning("EPG: a gzipped guide unpacks to more than %d MB "
+                            "(GUIDE_UNPACKED_MAX) - refused; no real guide is this large",
+                            limit >> 20)
+                raise GuideTooLarge(f"the guide unpacks to more than {limit >> 20} MB")
+            out.append(piece)
         rest = d.unused_data + bytes(view[pos:])
         if rest[:2] != b"\x1f\x8b":
             break           # padding after the last member
@@ -184,6 +244,43 @@ def prune_epg_caches(keep_ids) -> int:
     return removed
 
 
+class _Root(Exception):
+    """The root element began: the prolog, the only place for a DTD, is over."""
+
+
+def refuse_entities(data: bytes) -> None:
+    """Raise ValueError when a guide declares a DTD of its own - where
+    entities are declared, a "billion laughs" bomb that balloons memory in
+    the parse (and the Linux bundle takes the system's expat, which may have
+    no amplification limit). Expat reads the prolog up to the root element,
+    however long it is: a comment of any length may come first. Real XMLTV
+    carries at most <!DOCTYPE tv SYSTEM "xmltv.dtd">, with no internal
+    subset, which is left to parse; a document that is no XML is left to the
+    parse to refuse."""
+    p = expat.ParserCreate()
+
+    def doctype(_name: str, _sysid: Any, _pubid: Any, internal: int) -> None:
+        if internal:
+            raise ValueError("XMLTV declares a DTD of its own (entities); refusing to parse")
+
+    def entity(*_args: Any) -> None:
+        raise ValueError("XMLTV declares internal entities; refusing to parse")
+
+    def root(*_args: Any) -> None:
+        raise _Root
+
+    p.StartDoctypeDeclHandler = doctype
+    p.EntityDeclHandler = entity
+    p.StartElementHandler = root
+    view = memoryview(data)
+    try:
+        for i in range(0, len(view), _ZLIB_STEP):
+            p.Parse(bytes(view[i:i + _ZLIB_STEP]), False)
+        p.Parse(b"", True)
+    except (_Root, expat.ExpatError):
+        pass
+
+
 def parse_xmltv(data: bytes, keep_past_days: int
                 ) -> tuple[dict[str, Schedule], dict[str, str]]:
     """XMLTV (plain or gzipped) -> (schedules by channel id, channel id by
@@ -196,15 +293,7 @@ def parse_xmltv(data: bytes, keep_past_days: int
             data = gunzip_gently(data)
         except zlib.error:
             pass
-    # Robustness: refuse a guide that declares its own internal XML
-    # entities. A hostile or broken EPG URL could otherwise ship a
-    # "billion laughs" entity-expansion bomb that balloons memory during
-    # iterparse. Entity definitions live in the DOCTYPE prolog, before the
-    # root element, so scanning the head is enough - and real XMLTV never
-    # declares custom entities (a plain <!DOCTYPE tv SYSTEM "xmltv.dtd">
-    # carries none and is left to parse normally). Caught by ensure_loaded.
-    if b"<!ENTITY" in data[:65536]:
-        raise ValueError("XMLTV declares internal entities; refusing to parse")
+    refuse_entities(data)           # caught by ensure_loaded
     cutoff = (datetime.now().astimezone().timestamp()
               - keep_past_days * 86400)
     rows: dict[str, list[tuple]] = {}
@@ -585,25 +674,24 @@ class XmltvGuide:
                     params=params, stream=True, timeout=(20, 300))
         r.raise_for_status()
         total = int(r.headers.get("content-length") or 0)
-        chunks: list[bytes] = []
-        received = 0
         # Reported when the figure changes, and without a total twice a
         # second: once per 64 KB it was ~2,200 calls into the window for a
         # 140 MB guide, each one restyling the loading strip.
         said, said_at = None, 0.0
-        for chunk in r.iter_content(64 * 1024):
-            chunks.append(chunk)
-            received += len(chunk)
+
+        def progress(received: int) -> None:
+            nonlocal said, said_at
             if self.progress_cb:
                 pct = min(99, received * 100 // total) if total else -1
                 now = time.monotonic()
                 if pct != said or (pct < 0 and now - said_at >= 0.5):
                     said, said_at = pct, now
                     self.progress_cb(pct)
+        data = read_capped(r, progress)
         if self.progress_cb:
             self.progress_cb(100)
         # Not cached here: the parse process keeps it (_parse_and_index).
-        return b"".join(chunks)
+        return data
 
     def refresh_file(self) -> int:
         """Download the guide and keep it on disk without reading it into
@@ -630,9 +718,9 @@ class XmltvGuide:
         parts: list[bytes] = []
         for i, u in enumerate(urls):
             try:
-                r = self._get(u, timeout=(20, 300))
+                r = self._get(u, stream=True, timeout=(20, 300))
                 r.raise_for_status()
-                data = r.content
+                data = read_capped(r)
                 if data[:2] == b"\x1f\x8b":
                     data = gunzip_gently(data)
                 parts.append(_tv_body(data))

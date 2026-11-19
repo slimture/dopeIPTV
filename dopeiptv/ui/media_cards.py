@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import time
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable, Sequence
 
 from PyQt6 import sip
@@ -283,6 +283,28 @@ class Card:
     #: A heading over the cards after it ("Today", a channel's name): a
     #: ``CardView`` gives it a line of its own; never picked or played.
     heading: bool = False
+    #: The picture last painted for it (``card_picture``): kept on screen
+    #: while a new *image* is on its way.
+    shown: str = field(default="", compare=False, repr=False)
+
+
+def card_picture(images: Any, card: Card) -> tuple[Any, bool]:
+    """The picture to paint for *card*, and whether it is its own: its
+    *image* once loaded; while a new one is on its way, the one it showed
+    until then - TMDB's poster taking over from the provider's blinked to
+    an empty box and back to the same artwork -; else its *fallback*
+    (painted dimmed), or none."""
+    pm = images.get(card.image) if card.image else None
+    if pm is not None:
+        card.shown = card.image
+        return pm, True
+    if card.shown and card.shown != card.image:
+        pm = images.get(card.shown)
+        if pm is not None:
+            return pm, True
+    if card.fallback:
+        return images.get(card.fallback), False
+    return None, False
 
 
 def is_heading(item: Any) -> bool:
@@ -1045,9 +1067,6 @@ class _PaintedView(QListView):
             self._fit_h = -1
         self._relayout()
 
-    def is_fitted(self) -> bool:
-        return self._host is not None
-
     def content_height(self) -> int:
         raise NotImplementedError
 
@@ -1291,13 +1310,7 @@ class CardDelegate(QStyledItemDelegate):
         return False
 
     def _picture(self, card: Card) -> tuple[QPixmap | None, bool]:
-        images = self._view.images
-        pm = images.get(card.image) if card.image else None
-        if pm is not None:
-            return pm, True
-        if card.fallback:
-            return images.get(card.fallback), False
-        return None, False
+        return card_picture(self._view.images, card)
 
     def _paint_card(self, p, slot, card, rtl, playing, hover, selected, focus) -> None:
         v = self._view
@@ -1834,10 +1847,7 @@ class StripDelegate(QStyledItemDelegate):
             p.setFont(px_font(20, BOLD))
             p.setPen(colour("accent"))
             p.drawText(parts["rank"], int(Qt.AlignmentFlag.AlignCenter), str(card.rank))
-        pm = s.images.get(card.image) if card.image else None
-        own = pm is not None
-        if pm is None and card.fallback:
-            pm = s.images.get(card.fallback)
+        pm, own = card_picture(s.images, card)
         # A card may ask for its picture fitted inside the box (a logo).
         paint_picture(p, parts["picture"], pm, s.pictures, corner_radius(6),
                       card.initials or initials_of(card.title),
@@ -2055,9 +2065,6 @@ class CardRow(QWidget):
         """The row's name among the rows that can be hidden; "" for none
         (its heading offers nothing)."""
         self._hide_key = str(name or "")
-
-    def hide_key(self) -> str:
-        return self._hide_key
 
     def heading_menu(self) -> QMenu | None:
         """The heading's menu: "Hide this row" - None for a row with no

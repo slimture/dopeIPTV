@@ -297,6 +297,7 @@ class _BusyMixin:
         ov = getattr(self, "_busy_overlay", None)
         if ov is None:
             ov = QLabel(self.listw)
+            ov.setTextFormat(Qt.TextFormat.PlainText)      # it names a category
             ov.setObjectName("BusyOverlay")
             ov.setAlignment(Qt.AlignmentFlag.AlignCenter)
             ov.setStyleSheet(

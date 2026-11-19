@@ -500,6 +500,9 @@ class CastCard(QWidget):
         self.title.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         words.addWidget(self.title)
         self.line = QLabel("")
+        # A title, what is on, a receiver's words: never markup.
+        for lbl in (self.title, self.line):
+            lbl.setTextFormat(Qt.TextFormat.PlainText)
         self.line.setObjectName("CastLine")
         self.line.setWordWrap(True)
         words.addWidget(self.line)
@@ -518,6 +521,7 @@ class CastCard(QWidget):
         self.state_row = state
         words.addWidget(state)
         self.note = QLabel("")
+        self.note.setTextFormat(Qt.TextFormat.PlainText)
         self.note.setObjectName("CastNote")
         self.note.setWordWrap(True)
         self.note.hide()

@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import collections
 import os
+import re
 import secrets
 import shutil
 import subprocess
@@ -540,7 +541,7 @@ class AirPlayBridge:
             raise RuntimeError("no ffmpeg")
         self.plan, self.error, self.remote_seen = p, "", False
         self._tail.clear()
-        self.folder = tempfile.mkdtemp(prefix="airplay-", dir=_cache_dir())
+        self.folder = tempfile.mkdtemp(prefix=folder_prefix(), dir=_cache_dir())
         self.prefix = f"/{secrets.token_urlsafe(18)}/"
         server = _Server(("0.0.0.0", 0), _Handler)
         server.bridge = self
@@ -685,6 +686,44 @@ class AirPlayBridge:
 
 
 PIDFILE = "ffmpeg.pid"
+#: A run's folder names the copy of the app it is: airplay-<its pid>-...
+#: Two copies may run at once, and a sweep leaves a live one's cast alone.
+_OWNER = re.compile(r"airplay-(\d+)-")
+
+
+def folder_prefix() -> str:
+    """The start of this copy's run folders' names (``_OWNER``)."""
+    return f"airplay-{os.getpid()}-"
+
+
+def _owner(name: str) -> int | None:
+    """The pid of the copy a run folder is from; None for a folder of a
+    version before it was named (a leftover then, as it always was)."""
+    m = _OWNER.match(name)
+    return int(m.group(1)) if m else None
+
+
+def _alive(pid: int, run: Callable[..., Any] = subprocess.run) -> bool:
+    """Whether process *pid* - the copy a run folder is from - still runs;
+    unknown counts as running: a live copy's cast is never ended."""
+    if pid == os.getpid():
+        return True
+    if sys.platform == "win32":
+        # os.kill(pid, 0) is no probe there: 0 is CTRL_C_EVENT.
+        try:
+            out = run(["tasklist", "/FI", f"PID eq {pid}", "/NH"],
+                      capture_output=True, text=True, timeout=3,
+                      creationflags=NO_WINDOW).stdout
+        except (OSError, subprocess.SubprocessError):
+            return True
+        return str(pid) in (out or "")
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except OSError:
+        return True             # there, another account's
+    return True
 
 
 def _is_ffmpeg(pid: int, run: Callable[..., Any] = subprocess.run) -> bool:
@@ -719,7 +758,8 @@ def sweep_leftovers(base: str | None = None,
     """End the ffmpeg of an AirPlay run that could not tidy up (a crash, a
     kill) and remove its files; how many ffmpeg were ended. Such an ffmpeg
     goes on pulling the channel, which takes one of the account's
-    connections from the player."""
+    connections from the player. Only a run of a copy no longer running:
+    another copy's cast goes on (``_owner``, ``_alive``)."""
     ended = 0
     try:
         base = base or cast_cache_dir()
@@ -727,6 +767,9 @@ def sweep_leftovers(base: str | None = None,
     except OSError:
         return 0
     for name in names:
+        owner = _owner(name)
+        if owner is not None and _alive(owner, run):
+            continue
         folder = os.path.join(base, name)
         try:
             with open(os.path.join(folder, PIDFILE)) as fh:

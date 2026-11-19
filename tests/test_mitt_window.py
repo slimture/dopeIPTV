@@ -83,6 +83,13 @@ w.player.play = fake_play
 
 # -- the stores --------------------------------------------------------------------------
 now = datetime.now()
+_since_midnight = now - now.replace(hour=0, minute=0, second=0, microsecond=0)
+# *ago*, squeezed into today when the test runs just after midnight:
+# History's first heading is Today whatever the clock says (CI at 00:02
+# put "three hours ago" on yesterday).
+def today_ago(ago):
+    span = timedelta(hours=3, minutes=5)
+    return ago if _since_midnight >= span else ago * (_since_midnight / span)
 chans = w.client.live_streams(None)                         # stream ids 1..5
 own = w._own(w.settings)
 for c in chans[:4]:
@@ -95,7 +102,7 @@ w.movie_favs.add("all", {"stream_id": 40, "name": "Favourite Film"})
 own.setValue("favorites_pb", json.dumps({"all": [{"stream_id": 77, "name": "Nordic One"}]}))
 own.setValue("history_pb", json.dumps([{"name": "Nordic One", "_kind": "live", "_key": 77,
                                         "_url": "http://pb.invalid/77", "stream_id": 77,
-                                        "_watched_at": (now - timedelta(hours=1)).isoformat()}]))
+                                        "_watched_at": (now - today_ago(timedelta(hours=1))).isoformat()}]))
 local = os.path.join(_tmp, "Semester 2025.mkv")
 open(local, "wb").write(b"x")
 w.resume.record("vod", 30, 1200, 3600, item={"stream_id": 30, "name": "Northern Lights"})
@@ -107,8 +114,8 @@ def h(name, kind, key, ago, **kw):
     return {"name": name, "_kind": kind, "_key": key, "_url": f"http://pa.invalid/{kind}/{key}",
             "_watched_at": (now - ago).isoformat(), **kw}
 w.history.entries = [
-    h("Big Buck Bunny", "live", 1, timedelta(minutes=10), stream_id=1),
-    h("Northern Lights", "movie", 30, timedelta(hours=3)),
+    h("Big Buck Bunny", "live", 1, today_ago(timedelta(minutes=10)), stream_id=1),
+    h("Northern Lights", "movie", 30, today_ago(timedelta(hours=3))),
     h("Stjärnfall", "movie", 31, timedelta(days=1, hours=1)),
     h("Adults Only", "movie", 32, timedelta(days=2), is_adult="1"),
     h("Kustlinjen · S2 E4", "episode", "504", timedelta(days=3),

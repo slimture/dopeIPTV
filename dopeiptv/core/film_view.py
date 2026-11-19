@@ -105,16 +105,6 @@ def rating_of(row: dict, *more: Any) -> float | None:
     return sv.rating_of(*values)
 
 
-def genres_of(*values: Any) -> str:
-    """The genres, as the first of *values* (dicts) that names any says
-    them ("Drama, Adventure")."""
-    for d in _dicts(*values):
-        text = str(d.get("genre") or d.get("genres") or "").strip()
-        if text:
-            return " ".join(text.split())
-    return ""
-
-
 def plot_of(*values: Any) -> str:
     for d in _dicts(*values):
         for k in ("plot", "description", "overview"):
@@ -139,29 +129,6 @@ def is_new(row: dict, now: float | None = None, days: int = NEW_DAYS) -> bool:
     now = time.time() if now is None else now
     age = now - at
     return -_FUTURE_SLACK_S <= age <= days * 24 * 60 * 60
-
-
-def cast_of(info: dict | None, tmdb: dict | None, limit: int = 12) -> list[tuple[str, str, Any]]:
-    """Who is in it, as (name, photo address, TMDB person id): TMDB's
-    credits when it has them (with their photos), else the names the
-    source lists ("A, B, C") - nothing asked for to find out."""
-    out: list[tuple[str, str, Any]] = []
-    seen: set[str] = set()
-    for c in (tmdb or {}).get("cast") or []:
-        if not isinstance(c, dict):
-            continue
-        name = " ".join(str(c.get("name") or "").split())
-        if name and name.casefold() not in seen:
-            seen.add(name.casefold())
-            out.append((name, str(c.get("profile_url") or ""), c.get("person_id")))
-    if not out:
-        raw = str((info or {}).get("cast") or (info or {}).get("actors") or "")
-        for part in raw.split(","):
-            name = " ".join(part.split())
-            if name and name.casefold() not in seen:
-                seen.add(name.casefold())
-                out.append((name, "", None))
-    return out[:limit]
 
 
 @dataclass(frozen=True)

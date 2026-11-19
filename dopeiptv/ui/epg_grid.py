@@ -49,7 +49,7 @@ from ..core.log import log
 from ..i18n import tr
 from .qt_i18n import format_when
 from .theme import P, corner_radius
-from .widgets import popup_menu_over_video
+from .widgets import plain_text, popup_menu_over_video
 
 
 class _GridView(QGraphicsView):
@@ -313,6 +313,7 @@ class EpgGrid(QWidget):
         self.title_lbl.setObjectName("GuideTitle")
         top.addWidget(self.title_lbl)
         self.scope_lbl = QLabel("")
+        self.scope_lbl.setTextFormat(Qt.TextFormat.PlainText)     # a category's name
         self.scope_lbl.setObjectName("GuideScope")
         top.addWidget(self.scope_lbl)
         self.filter = QLineEdit(placeholderText=tr("epg_filter_channels"))
@@ -449,6 +450,7 @@ class EpgGrid(QWidget):
         # Programme description panel: fed from the XMLTV desc of whatever
         # block is selected - the data was always there, just never shown.
         self.desc = QLabel("")
+        self.desc.setTextFormat(Qt.TextFormat.PlainText)          # the guide's words
         self.desc.setWordWrap(True)
         self.desc.setMaximumHeight(56)
         self.desc.hide()
@@ -457,6 +459,7 @@ class EpgGrid(QWidget):
         foot = QHBoxLayout()
         foot.setSpacing(8)
         self.info = QLabel(tr("epg_select_channel"))
+        self.info.setTextFormat(Qt.TextFormat.PlainText)
         self.info.setWordWrap(True)
         foot.addWidget(self.info, 1)
         self.play_btn = QPushButton(tr("epg_play_channel"), objectName="Primary")
@@ -591,7 +594,7 @@ class EpgGrid(QWidget):
         fm = QFontMetrics(f)
         self.scope_lbl.setText(
             fm.elidedText(name, Qt.TextElideMode.ElideRight, 220))
-        self.scope_lbl.setToolTip(name)
+        self.scope_lbl.setToolTip(plain_text(name))
 
     def stale(self) -> bool:
         """True once the board kept for showing again should be drawn afresh:

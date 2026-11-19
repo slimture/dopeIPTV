@@ -96,3 +96,26 @@ def test_it_opens_whole_on_the_screen_over_a_window_low_on_it():
     assert abs(centre - parent.frameGeometry().center().x()) <= 2 or fb.frameGeometry().left() == room.left()
     fb.close()
     parent.close()
+
+
+def test_feedback_and_a_report_link_to_the_privacy_policy(monkeypatch):
+    """A small link under the fine print of both windows opens the privacy
+    policy's part on the app in the browser - also where the report can only
+    be copied (a modified build)."""
+    _qapp()
+    from PyQt6.QtWidgets import QPushButton
+    from dopeiptv.core import xdg
+    from dopeiptv.i18n import tr
+    from dopeiptv.ui import dialogs
+    opened: list[str] = []
+    monkeypatch.setattr(xdg, "open_url", lambda url: opened.append(url) or True)
+    windows = [dialogs.FeedbackDialog(None, lambda opts: ""),
+               dialogs.FeedbackDialog(None, lambda opts: "", copy_only=True),
+               dialogs.ReportDialog(None, "error", "trace"),
+               dialogs.ReportDialog(None, "feedback", "words", copy_only=True)]
+    for w in windows:
+        links = [b for b in w.findChildren(QPushButton) if b.text() == tr("fb_privacy_link")]
+        assert len(links) == 1, type(w).__name__
+        links[0].click()
+    assert opened == [dialogs.PRIVACY_URL] * len(windows)
+    assert dialogs.PRIVACY_URL.startswith("https://dopeiptv.org/privacy/")

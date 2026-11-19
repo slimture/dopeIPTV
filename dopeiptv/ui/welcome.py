@@ -505,6 +505,7 @@ class WelcomeOverlay(QWidget):
         self._b_wait.setWordWrap(True)
         self._b_wait.setVisible(False)
         self._b_err = QLabel("", objectName="OnbErr")
+        self._b_err.setTextFormat(Qt.TextFormat.PlainText)     # what the site answered
         self._b_err.setWordWrap(True)
         self._b_err.setVisible(False)
         # What dopeiptv.org gets, in Settings > Sync's words: a caption.
@@ -517,6 +518,7 @@ class WelcomeOverlay(QWidget):
         self._b_restore = QPushButton(tr("onb_restore_backup"))
         self._b_restore.clicked.connect(self._ask_restore)
         self._b_rerr = QLabel("", objectName="OnbErr")
+        self._b_rerr.setTextFormat(Qt.TextFormat.PlainText)
         self._b_rerr.setWordWrap(True)
         self._b_rerr.setVisible(False)
         # A backup staged: put in place as the app next starts.

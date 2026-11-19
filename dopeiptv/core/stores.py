@@ -320,10 +320,6 @@ class FavoriteStore:
                 return True
         return False
 
-    def groups_for(self, ident) -> list[str]:
-        return [g for g, items in self.groups.items()
-                if any(x.get(self.id_key) == ident for x in items)]
-
     def remove_group(self, group: str) -> None:
         self.groups.pop(group, None)
         if group in self.locked_groups():
@@ -518,17 +514,6 @@ class HistoryStore:
         self.entries = []
         self._save()
         self._drop_left_behind(lambda _e: False)
-
-    def clear_kind(self, kinds) -> None:
-        """Remove only entries whose _kind is in *kinds* (e.g. just channels,
-        leaving movies and series). Used by the per-category history delete."""
-        ks = set(kinds)
-
-        def stays(e: Any) -> bool:
-            return not isinstance(e, dict) or e.get("_kind") not in ks
-        self.entries = [e for e in self.entries if stays(e)]
-        self._save()
-        self._drop_left_behind(stays)
 
     def _drop_left_behind(self, stays: Callable[[Any], bool]) -> None:
         """What was taken out, out of the first profile's copy under the old

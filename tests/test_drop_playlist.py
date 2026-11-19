@@ -12,6 +12,7 @@ from PyQt6.QtGui import QDragEnterEvent, QDropEvent  # noqa: E402
 from PyQt6.QtWidgets import QApplication  # noqa: E402
 
 from dopeiptv.ui import main_window as mw  # noqa: E402
+from dopeiptv.ui import mw_queue  # noqa: E402
 from dopeiptv.ui.main_window import MainWindow  # noqa: E402
 
 app = QApplication.instance() or QApplication([])
@@ -80,10 +81,10 @@ def test_a_dropped_m3u_file_opens_the_add_dialog_filled_in(monkeypatch):
         def values(self):
             return dict(seen, epg_url="", refresh="never")
 
-    monkeypatch.setattr(mw, "PlaylistDialog", _Dialog)
+    monkeypatch.setattr(mw_queue, "PlaylistDialog", _Dialog)
     monkeypatch.setattr(mw.QTimer, "singleShot",
                         staticmethod(lambda _ms, fn: fn()))
-    w, calls = _window(mw.OfflineClient())
+    w, calls = _window(mw_queue.OfflineClient())
 
     mime = _mime(urls=["/home/u/Sport channels.m3u"])
     enter = _enter(mime)
@@ -110,10 +111,10 @@ def test_with_a_provider_playing_the_switch_is_asked(monkeypatch):
                         refresh="never")
 
     asked = []
-    monkeypatch.setattr(mw, "PlaylistDialog", _Dialog)
+    monkeypatch.setattr(mw_queue, "PlaylistDialog", _Dialog)
     monkeypatch.setattr(mw.QTimer, "singleShot",
                         staticmethod(lambda _ms, fn: fn()))
-    monkeypatch.setattr(mw, "confirm",
+    monkeypatch.setattr(mw_queue, "confirm",
                         lambda *_a, **_k: asked.append(1) or False)
     w, calls = _window(object())          # a real provider is in use
 

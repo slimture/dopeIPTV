@@ -41,10 +41,7 @@ def test_import(mod):
 
 @pytest.mark.parametrize("mod", MODULES_NEED_DISPLAY)
 def test_import_gui(mod):
-    try:
-        importlib.import_module(mod)
-    except ImportError:
-        pytest.skip("display or Qt not available")
+    importlib.import_module(mod)
 
 
 def _relative_import_targets():
@@ -76,9 +73,12 @@ _ABOVE = {"core": ("providers", "services", "media", "ui"),
           "media": ("services", "ui"),
           "services": ("ui",)}
 # The one cross-edge the architecture names: the player overlays' colours
-# (the player itself and its loading indicator).
+# (the player itself, its loading indicator, its visualiser and the number
+# typed in the picture's corner).
 _CROSS_EDGES = {("dopeiptv.media.embedded", "dopeiptv.ui.theme"),
-                ("dopeiptv.media.loading_overlay", "dopeiptv.ui.theme")}
+                ("dopeiptv.media.loading_overlay", "dopeiptv.ui.theme"),
+                ("dopeiptv.media.audio_effects", "dopeiptv.ui.theme"),
+                ("dopeiptv.media.sleep_timer", "dopeiptv.ui.theme")}
 
 
 def test_no_layer_imports_one_above_it():

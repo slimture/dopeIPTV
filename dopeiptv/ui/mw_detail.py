@@ -394,7 +394,7 @@ class _DetailMixin:
         if imdb_id:
             label = stars or tr("detail_view_imdb")
             self.media_rating_lbl.setText(
-                f'<a href="https://www.imdb.com/title/{imdb_id}/" '
+                f'<a href="https://www.imdb.com/title/{html.escape(str(imdb_id))}/" '
                 f'style="color:{ACCENT}; text-decoration:none;">'
                 f'{label}</a>')
             self.media_rating_lbl.show()
@@ -448,6 +448,7 @@ class _DetailMixin:
         photo.setText(name.strip()[:1].upper() if name else "?")
         v.addWidget(photo, 0, Qt.AlignmentFlag.AlignHCenter)
         name_lbl = QLabel(name)
+        name_lbl.setTextFormat(Qt.TextFormat.PlainText)
         name_lbl.setStyleSheet(f"color:{P['muted']}; font-size:10px;")
         name_lbl.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         name_lbl.setFixedWidth(size + 16)
@@ -1055,6 +1056,7 @@ class _DetailMixin:
         t.setAlignment(Qt.AlignmentFlag.AlignTop)
         ti = QLabel(post["title"] or tr("detail_unknown_programme"),
                     objectName="EpgRowTitle")
+        ti.setTextFormat(Qt.TextFormat.PlainText)       # the guide's words
         ti.setWordWrap(True)
         row.addWidget(t, 0, Qt.AlignmentFlag.AlignTop)
         row.addWidget(ti, 1)

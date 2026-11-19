@@ -99,7 +99,7 @@ class _ShortcutsMixin:
     def _night_mode_refused(self) -> None:
         """Night mode is on, but the stream plays without its filter: the
         core refused it, as it was switched on or as a stream's sound
-        started (media/embedded.py _night_on_event)."""
+        started (media/audio_effects.py _night_on_event)."""
         self._night_say(tr("night_refused"), 4000)
 
     def _night_say(self, text: str, ms: int) -> None:

@@ -23,6 +23,7 @@ from ..core.log import log
 from ..i18n import tr
 from .notices import Entry, Message, NoticeHub
 from .theme import P, contrast, corner_radius, ink_on, tinted
+from .widgets import plain_text
 
 # -- colours -------------------------------------------------------------------
 
@@ -355,7 +356,7 @@ class ActivityLine(QWidget):
         self._note = hub.note_text()
         self._unread = hub.unread()
         if self._entries or self._note or self._unread:
-            self.setToolTip(self._tip())
+            self.setToolTip(plain_text(self._tip()))
             self.setAccessibleName(self._tip().replace("\n", "; "))
             self._fader.show()
             self._sync_spin()
@@ -760,6 +761,7 @@ class _PanelRow(QWidget):
         col.setSpacing(5)
         col.setContentsMargins(0, 0, 0, 0)
         text = QLabel(e.text)
+        text.setTextFormat(Qt.TextFormat.PlainText)     # "Recording <a guide's title>"
         text.setObjectName("NoticeRowText")
         text.setWordWrap(True)
         col.addWidget(text)
@@ -945,7 +947,7 @@ class DecisionCard(QFrame):
         m = waiting[0]
         self._msg = m
         self._words = m.title + (" " + m.body if m.body else "")
-        self.setToolTip(self._words)
+        self.setToolTip(plain_text(self._words))
         self.setAccessibleName(self._words)
         self.setAccessibleDescription(tr("notice_" + m.level))
         self.action_btn.setText(m.action_label or tr("notice_open"))

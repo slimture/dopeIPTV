@@ -1360,12 +1360,6 @@ def _stop_all() -> None:
             log.debug("video thread: shutdown at quit: %s", e)
 
 
-def live_threads() -> int:
-    """Render threads running now (tests, diagnostics)."""
-    return sum(1 for s in list(_LIVE)
-               if s._renderer is not None and s._renderer.isRunning())
-
-
 class ThreadedVideoSurface(QWidget):
     """The video surface whose picture a thread of its own draws: the same
     signals and attributes the player and multiview use on _MpvGLWidget."""

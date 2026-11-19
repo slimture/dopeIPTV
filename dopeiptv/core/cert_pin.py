@@ -360,23 +360,6 @@ def clear_mismatch(host: str, port: int) -> None:
         _mismatch.pop((host.lower().strip("[]"), port), None)
 
 
-def mismatch_in(exc: BaseException | None) -> PinMismatch | None:
-    """The PinMismatch somewhere in what *exc* wraps (requests and urllib3
-    wrap it twice over)."""
-    seen: set[int] = set()
-    stack: list[Any] = [exc]
-    while stack:
-        e = stack.pop()
-        if e is None or id(e) in seen:
-            continue
-        seen.add(id(e))
-        if isinstance(e, PinMismatch):
-            return e
-        stack += [getattr(e, "reason", None), e.__cause__, e.__context__]
-        stack += [a for a in getattr(e, "args", ()) if isinstance(a, BaseException)]
-    return None
-
-
 # -- the Nerd line ---------------------------------------------------------------
 
 def check(url: str, pinned: tuple[str, int, str] | None, route: Any = None,

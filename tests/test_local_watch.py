@@ -214,11 +214,13 @@ def test_a_walk_never_lays_its_library_over_another_view(tmp_path, monkeypatch):
     went through (what is watched after it)."""
     import dopeiptv.providers.cast_bridge as cb
     import dopeiptv.ui.mw_local as ml
+    import dopeiptv.ui.mw_local_library as mll
     from dopeiptv.core._lazy_requests import requests as rq
     from tests.test_local_responsive import _drain, _Window
     jobs: list = []
     monkeypatch.setattr(ml, "run_async", lambda pool, fn, done, err=None: jobs.append(
         (pool, fn, done, err)))
+    monkeypatch.setattr(mll, "run_async", ml.run_async)
     monkeypatch.setattr(cb, "ffmpeg_path", lambda: None)
 
     def offline(*_a, **_k):

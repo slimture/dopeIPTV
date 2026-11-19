@@ -693,7 +693,8 @@ jobs:
   # Nothing here sets a deployment target, so the minimum macOS a .dmg
   # supports follows the runner it was built on (Homebrew bottles are built
   # per OS version, so pinning the target alone would not buy compatibility
-  # back). That floor is macOS 15.
+  # back). That floor is macOS 15 for Apple Silicon; each leg names its own
+  # (macos_min), which the .app's Info.plist carries (dopeiptv-mac.spec).
   #
   # Signed with Solecraft AB's Developer ID and notarised by Apple, so the
   # .dmg opens like any app from the web - when the repository has the
@@ -717,6 +718,10 @@ jobs:
             arch: arm64
             deps: brew
             experimental: false
+            # The oldest macOS the .dmg runs on, its Info.plist's
+            # LSMinimumSystemVersion (Finder refuses an older one): the
+            # Homebrew bottles bundled here are built for macOS 15 (above).
+            macos_min: '15.0'
           #
           # Intel, back with conda-forge. Homebrew moved macOS x86_64 to
           # Tier 3 in September 2026 - no CI, no new bottles: "brew install
@@ -732,6 +737,10 @@ jobs:
             arch: x86_64
             deps: conda
             experimental: true
+            # conda-forge's libraries and libmpv (built for 11.0 below) run
+            # on older ones; PyQt6's universal wheel needs macOS 14
+            # (docs/MAINTAINING.md).
+            macos_min: '14.0'
     #
     # Only the Intel leg may fail without failing the run. A blanket
     # continue-on-error once let a broken arm64 build go green and ship a
@@ -941,6 +950,7 @@ jobs:
         env:
           DOPEIPTV_VERSION: ${{ steps.v.outputs.version }}
           DOPEIPTV_ICNS: ${{ github.workspace }}/build/dopeiptv.icns
+          DOPEIPTV_MACOS_MIN: ${{ matrix.macos_min }}
         run: pyinstaller --noconfirm dopeiptv-mac.spec   # -> dist/dopeIPTV.app
       - name: Make libmpv and ffmpeg self-contained (Intel)
         if: matrix.deps == 'conda'

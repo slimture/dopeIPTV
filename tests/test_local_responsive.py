@@ -21,6 +21,7 @@ import os
 import pytest
 
 import dopeiptv.ui.mw_local as ml
+import dopeiptv.ui.mw_local_library as mll
 from dopeiptv.core.local_listing import FolderListing
 from tests.test_local_section import _Stub
 
@@ -61,6 +62,7 @@ def jobs(monkeypatch):
     monkeypatch.setattr(ml, "run_async",
                         lambda pool, fn, done, err=None: queued.append(
                             (pool, fn, done, err)))
+    monkeypatch.setattr(mll, "run_async", ml.run_async)
     # No ffmpeg thumbnails, no network: neither is what is measured here.
     import dopeiptv.providers.cast_bridge as cb
     monkeypatch.setattr(cb, "ffmpeg_path", lambda: None)

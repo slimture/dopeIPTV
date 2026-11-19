@@ -1485,10 +1485,12 @@ def test_the_cast_bars_take_a_click_like_every_other_bar_of_their_kind():
     # And the cast card has one for each, with something to say on hover.
     import dopeiptv.ui.cast_card as card_mod
     import dopeiptv.ui.main_window as mwmod
+    import dopeiptv.ui.mw_build_detail as build_mod
     card = inspect.getsource(card_mod)
     assert "self.seek = _SeekSlider()" in card
     assert "self.vol = _SeekSlider()" in card
-    build = inspect.getsource(mwmod)
+    # The window's build of the card is in ui/mw_build_detail.py.
+    build = inspect.getsource(mwmod) + inspect.getsource(build_mod)
     assert "card.seek.set_time_provider" in build
     assert "card.vol.set_time_provider" in build
 

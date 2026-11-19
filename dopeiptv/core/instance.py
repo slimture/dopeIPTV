@@ -9,6 +9,8 @@ from __future__ import annotations
 import getpass
 import json
 import os
+import secrets
+import stat
 import sys
 import zlib
 from typing import Callable
@@ -28,14 +30,25 @@ except (ImportError, OSError) as e:
     UNAVAILABLE = str(e) or e.__class__.__name__
 
 
+#: The longest path a Unix socket can have, with room to spare (108 bytes).
+SOCKET_PATH_MAX = 100
+#: Windows: the file in the user's local app data holding the word in the
+#: pipe's name (``_pipe_key``).
+PIPE_KEY = "instance.key"
+
+
 def server_name() -> str:
     """Per user: another account's copy never takes this one's commands.
     In a Flatpak each start has a /tmp of its own, where Qt would put the
     socket; the app's runtime folder is the one place two starts share.
     Elsewhere on Linux the user's own runtime folder ($XDG_RUNTIME_DIR,
-    which only they can enter), not the /tmp everyone shares, where another
-    account could take the name first and hear this one's commands. macOS
-    keeps Qt's per-user temporary folder, Windows a named pipe."""
+    which only they can enter) - without one a folder of their own in
+    their cache (0700, ``_make_folder``) - never the /tmp everyone shares,
+    where another account could take the name first and hear this one's
+    commands. macOS keeps Qt's per-user temporary folder. Windows' named
+    pipes are the whole machine's: the name carries a random word only
+    this user can read (``_pipe_key``), so no other account can make it
+    first; the pipe itself is the user's alone (UserAccessOption)."""
     forced = os.environ.get("DOPEIPTV_INSTANCE_SOCKET", "").strip()
     if forced:
         return forced
@@ -49,21 +62,71 @@ def server_name() -> str:
         shared = os.path.join(runtime, "app", app_id)
         if os.path.isdir(shared):
             return os.path.join(shared, name)
-    if sys.platform.startswith("linux") and runtime and os.path.isabs(runtime) \
-            and os.path.isdir(runtime):
-        return os.path.join(runtime, "dopeiptv", name)
+    if sys.platform.startswith("linux"):
+        if runtime and os.path.isabs(runtime) and os.path.isdir(runtime):
+            return os.path.join(runtime, "dopeiptv", name)
+        cache = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
+        own = os.path.join(cache, "dopeiptv", "instance", name)
+        if os.path.isabs(own) and len(own.encode("utf-8")) <= SOCKET_PATH_MAX:
+            return own
+    if sys.platform == "win32":
+        key = _pipe_key()
+        if key:
+            return f"{name}-{key}"
     return name
 
 
-def _make_folder(name: str) -> None:
-    """The folder a path name lives in, only the user's (0700)."""
+def _pipe_key() -> str:
+    """The random word in this user's pipe name, made once and kept in their
+    local app data, which no other account can read; "" where there is none
+    (the name as before)."""
+    base = os.environ.get("LOCALAPPDATA", "")
+    if not base or not os.path.isabs(base):
+        return ""
+    path = os.path.join(base, "dopeiptv", PIPE_KEY)
+    for _attempt in range(2):
+        try:
+            with open(path, encoding="ascii") as fh:
+                key = fh.read().strip()
+            if len(key) == 32 and all(c in "0123456789abcdef" for c in key):
+                return key
+            return ""
+        except FileNotFoundError:
+            pass
+        except (OSError, ValueError):
+            return ""
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            continue                # another start made it first: read that one
+        except OSError as e:
+            log.info("commands: no key for the pipe's name (%s)", e)
+            return ""
+        with os.fdopen(fd, "w", encoding="ascii") as fh:
+            fh.write(secrets.token_hex(16))
+    return ""
+
+
+def _make_folder(name: str) -> bool:
+    """The folder a path name lives in, only the user's (0700): made so,
+    narrowed when it is wider; False when another account owns it - the
+    socket is then not made there."""
     folder = os.path.dirname(name)
-    if not folder or os.path.isdir(folder):
-        return
+    if not folder:
+        return True
     try:
         os.makedirs(folder, mode=0o700, exist_ok=True)
+        if os.name == "posix":
+            st = os.stat(folder)
+            if st.st_uid != os.getuid():
+                log.warning("commands: %s is another account's - not listening there", folder)
+                return False
+            if stat.S_IMODE(st.st_mode) & 0o077:
+                os.chmod(folder, 0o700)
     except OSError as e:
         log.info("commands: no folder for the socket (%s)", e)
+    return True
 
 
 def send_to_running(command: dict, timeout_ms: int = 800) -> bool:
@@ -106,7 +169,8 @@ class CommandServer(QObject):
         server.setSocketOptions(QLocalServer.SocketOption.UserAccessOption)
         server.newConnection.connect(self._accept)
         name = server_name()
-        _make_folder(name)
+        if not _make_folder(name):
+            return
         if not server.listen(name):
             # A copy that crashed leaves its socket file behind (Unix).
             QLocalServer.removeServer(name)

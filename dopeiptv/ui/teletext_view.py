@@ -480,9 +480,6 @@ class TeletextDialog(QDialog):
         super().showEvent(e)
         self.setFocus()
 
-    def shown_page(self) -> ttx.Page | None:
-        return self._shown
-
     def closeEvent(self, e: Any) -> None:  # noqa: N802 - Qt's name
         self._poll.stop()
         try:

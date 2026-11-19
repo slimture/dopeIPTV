@@ -381,7 +381,8 @@ def test_the_cast_panel_hides_what_a_tv_cannot_do(monkeypatch):
     from PyQt6.QtCore import QSettings, QThreadPool
     from PyQt6.QtWidgets import QApplication, QWidget
 
-    from dopeiptv.providers import casting, chromecast
+    from dopeiptv.providers import casting
+    from dopeiptv.ui import cast_dialog
     app = QApplication.instance() or QApplication([])   # kept alive
 
     hub = casting.CastHub(_FakeMgr(["Kitchen"]),
@@ -395,8 +396,8 @@ def test_the_cast_panel_hides_what_a_tv_cannot_do(monkeypatch):
     tracks = {"audio": [{"index": 0, "codec": "aac"},
                         {"index": 1, "codec": "ac3", "lang": "swe"}],
               "subtitle": [{"index": 0, "codec": "subrip", "lang": "swe"}]}
-    d = chromecast.CastDialog(win, "http://a", "A", tracks=tracks,
-                              probe=False)
+    d = cast_dialog.CastDialog(win, "http://a", "A", tracks=tracks,
+                               probe=False)
     win.pool.waitForDone(3000)
     QApplication.processEvents()
     names = [d.list.item(i).text() for i in range(d.list.count())]

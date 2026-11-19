@@ -10,8 +10,8 @@ body:
     id: version
     attributes:
       label: dopeIPTV version
-      description: Shown in the app menu → About (e.g. 1.4.0).
-      placeholder: "1.4.0"
+      description: Shown in Help → About dopeIPTV (on a Mac, in the dopeIPTV menu) and at the foot of Settings → General (e.g. 1.6.6).
+      placeholder: "1.6.6"
     validations:
       required: true
   - type: dropdown
@@ -43,11 +43,14 @@ body:
   - type: dropdown
     id: playlist
     attributes:
-      label: Playlist type
+      label: Source type
       options:
         - Xtream Codes
         - M3U / M3U8
         - Stalker / Ministra portal
+        - A box or TV server at home (Enigma2, Tvheadend, HDHomeRun, SAT>IP, VDR, DVBViewer, NextPVR, MythTV)
+        - Jellyfin / Emby / Plex
+        - Local files, radio or a web address (YouTube, Twitch …)
         - More than one kind
         - Not relevant
     validations:
@@ -71,7 +74,7 @@ body:
         Start the app with logging on, reproduce the bug, then paste the relevant part (the whole file is fine).
         **Linux:** `DOPEIPTV_LOG=debug DOPEIPTV_LOG_FILE=/tmp/dope.log dopeiptv` (or the path to the AppImage).
         **macOS:** `DOPEIPTV_LOG=debug DOPEIPTV_LOG_FILE=/tmp/dope.log /Applications/dopeIPTV.app/Contents/MacOS/dopeiptv`
-        **Windows:** in PowerShell, inside the unzipped folder:
+        **Windows:** in PowerShell, inside the unzipped folder (installed with the installer: `cd $env:LOCALAPPDATA\Programs\dopeIPTV` first):
         `$env:DOPEIPTV_LOG="debug"; $env:DOPEIPTV_LOG_FILE="$env:TEMP\dopeiptv.log"; .\dopeiptv.exe` — the log is then at `%TEMP%\dopeiptv.log`.
         Credentials are redacted automatically, but skim before posting.
       render: text

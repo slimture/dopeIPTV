@@ -371,6 +371,89 @@ def test_a_channel_is_sent_on_to_its_source_and_a_real_mpv_plays_it(served, sour
         player.terminate()
 
 
+class _Lists:
+    """A source's lists as server mode's tests have them: hidden, locked and
+    adult channels among the rest."""
+
+    def live_categories(self):
+        return [{"category_id": "1", "category_name": "News"},
+                {"category_id": "2", "category_name": "Hidden"},
+                {"category_id": "3", "category_name": "XXX Adult"},
+                {"category_id": "4", "category_name": "Locked"}]
+
+    def live_streams(self, _cat=None):
+        return [{"stream_id": 1, "name": "One", "category_id": "1"},
+                {"stream_id": 3, "name": "Three", "category_id": "1"},
+                {"stream_id": 4, "name": "Secret", "category_id": "2"},
+                {"stream_id": 5, "name": "Night", "category_id": "3"},
+                {"stream_id": 6, "name": "Kid lock", "category_id": "4"},
+                {"stream_id": 7, "name": "Marked", "category_id": "1", "is_adult": "1"},
+                {"stream_id": 8, "name": "By hand", "category_id": "1"}]
+
+    def live_url(self, sid, fmt="ts"):
+        return f"http://provider.invalid/live/u/p/{sid}.{fmt}"
+
+
+def test_the_share_hands_out_only_what_server_mode_s_lineup_does(served):
+    """A parent's locked categories, channels hidden by hand and adult ones
+    are neither in the playlist nor sent on (the 302), as server mode's
+    lineup leaves them out (share.kept_out)."""
+    pls = [{"id": "p1", "name": "Home", "kind": "xtream", "server": "http://x.invalid"}]
+    sh = Share(lambda: pls, make_client=lambda _pl: _Lists(),
+               filters=lambda pid: ({"2", "4"}, {"8"}, {}) if pid == "p1" else (set(), set(), {}))
+    names = [info.rsplit(",", 1)[1] for info, _url in _entries(sh.m3u("http://h", TOKEN))]
+    assert names == ["One", "Three"]
+    assert sh.stream_url("p1", "1") == "http://provider.invalid/live/u/p/1.ts"
+    for sid in ("4", "5", "6", "7", "8"):
+        assert sh.stream_url("p1", sid) is None, sid
+    srv = served(share=sh)
+    assert ask(srv.port, "GET", "/stream/p1/1")[0] == 302
+    for sid in ("4", "5", "6", "7", "8"):
+        assert ask(srv.port, "GET", f"/stream/p1/{sid}")[0] == 404, sid
+
+    def unreadable(_pid):
+        raise TimeoutError("the app is busy")
+    sh = Share(lambda: pls, make_client=lambda _pl: _Lists(), filters=unreadable)
+    assert _entries(sh.m3u("http://h", TOKEN)) == [], "left out, never handed out whole"
+    srv = served(share=sh)
+    assert ask(srv.port, "GET", "/stream/p1/1")[0] == 503
+
+
+def test_the_window_s_share_asks_server_mode_s_filters(sources, monkeypatch):
+    from types import SimpleNamespace
+
+    from PyQt6.QtWidgets import QApplication
+
+    from dopeiptv.ui import mw_remote
+    QApplication.instance() or QApplication([])
+    _xt, pls = sources
+    made: dict = {}
+
+    class Server:
+        def __init__(self, *_a, share=None, **_k):
+            made["share"] = share
+
+        def start(self):
+            pass
+
+    monkeypatch.setattr(mw_remote, "RemoteServer", Server)
+    asked: list[str] = []
+
+    class W(mw_remote._RemoteMixin):
+        playlist_store = SimpleNamespace(playlists=lambda: pls[:1])
+
+        def _server_filters(self, pid):
+            asked.append(pid)
+            return set(), {"405"}, {}
+
+    W()._remote_start({"host": "127.0.0.1", "port": 0, "token": TOKEN, "share": True,
+                       "remote": False})
+    sh = made["share"]
+    assert [i.rsplit(",", 1)[1] for i, _u in _entries(sh.m3u("http://h", TOKEN))] == ["TV4 HD"]
+    assert asked == ["main"]
+    assert sh.stream_url("main", "405") is None and sh.stream_url("main", "401")
+
+
 def test_a_bad_host_header_cannot_write_the_playlist(served, sources):
     _xt, pls = sources
     srv = served(share=Share(lambda: pls[:1]))

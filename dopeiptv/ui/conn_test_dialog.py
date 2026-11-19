@@ -70,6 +70,9 @@ class StepRow(QWidget):
         self.result.setWordWrap(True)
         self.result.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.more = QLabel("")
+        # A step's result may quote what the server said: words, never markup.
+        for lbl in (self.result, self.more):
+            lbl.setTextFormat(Qt.TextFormat.PlainText)
         self.more.setWordWrap(True)
         self.more.setStyleSheet(f"font-size:12px; color:{P['muted']};")
         self.more.hide()

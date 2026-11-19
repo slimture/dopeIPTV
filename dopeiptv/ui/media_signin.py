@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from typing import Any, Callable, Iterator
 
 from PyQt6 import sip
-from PyQt6.QtCore import QThreadPool, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QThreadPool, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QComboBox, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget,
 )
@@ -132,6 +132,7 @@ class MediaSignIn(QWidget):
         lay.addWidget(self.server_row)
         self.server_row.hide()
         self.status = QLabel("")
+        self.status.setTextFormat(Qt.TextFormat.PlainText)     # the server's words, a user's name
         self.status.setWordWrap(True)
         lay.addWidget(self.status)
         self.status.hide()

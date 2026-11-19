@@ -11,6 +11,7 @@ import os
 import pytest
 
 import dopeiptv.ui.mw_local as ml
+import dopeiptv.ui.mw_local_library as mll
 from dopeiptv.core import shortcut_keys
 from tests.test_local_responsive import _drain, _Window
 
@@ -21,6 +22,7 @@ def jobs(monkeypatch):
     monkeypatch.setattr(ml, "run_async",
                         lambda pool, fn, done, err=None: queued.append(
                             (pool, fn, done, err)))
+    monkeypatch.setattr(mll, "run_async", ml.run_async)
     import dopeiptv.providers.cast_bridge as cb
     monkeypatch.setattr(cb, "ffmpeg_path", lambda: None)
     from dopeiptv.core._lazy_requests import requests as _rq

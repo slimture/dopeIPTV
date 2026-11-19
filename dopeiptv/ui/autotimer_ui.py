@@ -141,6 +141,7 @@ class AutoTimerDialog(QDialog):
         self.dup.setCurrentIndex(max(0, self.dup.findData(r.avoid_dup)))
         f.addRow(tr("at_dup"), self.dup)
         self.status = QLabel("")
+        self.status.setTextFormat(Qt.TextFormat.PlainText)     # the box's words
         self.status.setWordWrap(True)
         self.status.setStyleSheet(f"color:{P['muted']}; font-size:12px;")
         f.addRow(self.status)
@@ -320,6 +321,7 @@ class AutoTimerPreview(QDialog):
         self.setMinimumSize(480, 320)
         v = QVBoxLayout(self)
         self.status = QLabel(tr("at_asking"))
+        self.status.setTextFormat(Qt.TextFormat.PlainText)
         self.status.setWordWrap(True)
         self.status.setStyleSheet(f"color:{P['muted']}; font-size:12px;")
         self.list = QListWidget()
@@ -363,6 +365,7 @@ class BoxRules(QObject):
         self.rules: list[at.Rule] = []
         self.loaded = False
         self.status = QLabel("")
+        self.status.setTextFormat(Qt.TextFormat.PlainText)
         self.status.setObjectName("SettingsHint")
         self.status.setWordWrap(True)
         self.buttons = {k: QPushButton(tr(k)) for k in

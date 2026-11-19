@@ -367,8 +367,9 @@ def test_the_bouquets_and_a_bouquets_entries_as_the_editor_lists_them(fake):
     assert box.paths("/api/getsatellites")[-1] == {"stype": "tv"}
     assert [(e.ref, e.name) for e in ed.providers()] == [(PROV, "Viasat")]
     assert [e.name for e in ed.channels_in(PROV)] == ["TV4 <HD>", "Kanal 5"]
-    assert [e.name for e in ed.all_channels()] == ["Eurosport", "Kanal 5", "SVT1 HD", "SVT2 HD", "TV4 <HD>"]
-    assert [e.name for e in ed.all_channels(radio=True)] == ["P1"]
+    assert [e.name for e in ed.channels_in(bq.all_ref())] == [
+        "Eurosport", "Kanal 5", "SVT1 HD", "SVT2 HD", "TV4 <HD>"]
+    assert [e.name for e in ed.channels_in(bq.all_ref(True))] == ["P1"]
 
 
 def test_a_renamed_entry_is_still_the_same_entry():

@@ -406,12 +406,9 @@ def test_a_pinned_certificate_and_only_that_one(servers, tmp_path):
     wrong = requests.Session()
     net_adapter.mount(wrong, Route(servers=(dns.url,), pins=(("nas.example", home.port, _fp(other)),)))
     cert_pin.clear_mismatch("nas.example", home.port)
-    with pytest.raises(requests.exceptions.SSLError) as e:
+    with pytest.raises(requests.exceptions.SSLError):
         wrong.get(url, timeout=5)
-    found = cert_pin.mismatch_in(e.value)
-    assert found is not None and found.got == _fp(cert) and found.pinned == _fp(other)
     assert cert_pin.mismatch("nas.example", home.port) == _fp(cert)
-    assert "changed" in str(found)
 
 
 def test_a_pin_holds_through_a_proxy_too(servers, tmp_path):

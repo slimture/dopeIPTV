@@ -162,12 +162,14 @@ class TvScreen(QWidget):
 
     def _title(self, text: str) -> QLabel:
         lbl = QLabel(text)
+        lbl.setTextFormat(Qt.TextFormat.PlainText)      # a category's, a series' name
         lbl.setFont(font(34, bold=True))
         lbl.setStyleSheet(f"color:{P['text']};")
         return lbl
 
     def _note(self, text: str = "") -> QLabel:
         lbl = QLabel(text)
+        lbl.setTextFormat(Qt.TextFormat.PlainText)
         lbl.setFont(font(28))
         lbl.setWordWrap(True)
         lbl.setStyleSheet(f"color:{P['muted']};")

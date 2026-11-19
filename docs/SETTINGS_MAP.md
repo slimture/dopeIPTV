@@ -8,10 +8,12 @@ a setting goes"; `tests/test_settings_map.py` checks that every page is in
 one group, every row on one page, that the search finds them, and that
 this file names every page.
 
-The pages are built in `ui/mw_settings.py` (`open_settings`), Nerd's in
-`ui/nerd_settings.py` (with `ui/net_advanced.py`), the shortcuts in
-`ui/shortcuts.py`, Simkl in `ui/mw_simkl.py`, sync in `ui/mw_sync.py`,
-Discord in `ui/mw_discord.py`. A row without a key is an action or a
+The pages are built one module per group - `ui/set_watch.py`,
+`ui/set_content.py`, `ui/set_services.py` and `ui/set_system.py`, each
+page's `build_<page>` - and put together in `ui/mw_settings.py`
+(`open_settings`); Nerd's in `ui/nerd_settings.py` (with
+`ui/net_advanced.py`), the shortcuts in `ui/shortcuts.py`, Simkl in
+`ui/mw_simkl.py`, sync in `ui/mw_sync.py`, Discord in `ui/mw_discord.py`. A row without a key is an action or a
 status. "(inverted)" is stored the other way round from what the row says.
 A source's own options are on its own page, under Sources (below).
 "(this profile's)" is a profile's own (`core/profiles.py`): kept under
@@ -174,7 +176,7 @@ by `core/places.retire_home` - "Open Home at startup" became `start_place`
 - TV mode: Open TV mode, `tv_mode_start`, `tv_inputs` (game controllers and
   LIRC), the remotes and controllers found
 - Support dopeIPTV: feedback and its answers, `supporter_key` (its window),
-  `supporter_icon`, ask for a donation now and then (`donate_ask`; the
+  `supporter_icon`, ask for support now and then (`donate_ask`; the
   household's - its rhythm and snooze are `donate_until`, `donate_period`,
   `donate_first_seen`, not settings)
 - (no heading) About dopeIPTV with the version, a link row that opens About
@@ -260,8 +262,9 @@ while Nerd is on, and so are the link rows that lead to them.
 - Server for the home (server mode, `services/home_server.py`): `nerd_server`,
   `nerd_server_tuners` (0: the account's limit), `nerd_server_port`,
   `nerd_server_sources` (the sources as chips; the categories in each are
-  chosen on the server's page in a browser, which also changes the port and
-  the tuners); open the page, copy the tuner's and the playlist's
+  chosen on the server's page in a browser, which also changes the port, the
+  tuners and channels for adults), `nerd_server_adult` (channels for adults
+  in the lineup and the shared playlist; off); open the page, copy the tuner's and the playlist's
   addresses, how it stands. Not shown: `nerd_server_token`,
   `nerd_server_device_id` (made once, never in a backup)
 - Webhooks: `nerd_hooks`, `nerd_hooks_urls`, `nerd_hooks_header`

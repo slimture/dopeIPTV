@@ -173,6 +173,8 @@ def main(argv: list[str] | None = None) -> int:
     # buffers), as the window has them.
     QCoreApplication.setOrganizationName(ORG)
     QCoreApplication.setApplicationName(APP_NAME)
+    from .core import settings_files
+    settings_files.protect()            # the logins and tokens: this user's alone
     settings = QSettings(ORG, ORG)
     from .core import nerd
     from .i18n import set_language

@@ -862,10 +862,11 @@ def test_the_tuner_answers_only_this_computer_s_own_networks():
 
     local = home_net.LocalNetworks(networks, lambda: ["192.168.20.7"], clock=lambda: now[0])
     for ok in ("127.0.0.1", "::1", "192.168.1.77", "::ffff:192.168.1.9", "fe80::1%eth0",
-               "2001:db8:5::42", "192.168.20.7"):
+               "192.168.20.7"):
         assert local.allows(ok), ok
     for refused in ("192.168.2.5", "10.0.0.5", "172.16.3.4", "100.64.1.2", "8.8.8.8",
-                    "2001:db8:6::1", "fd00::5", "", "nonsense"):
+                    "2001:db8:6::1", "fd00::5", "", "nonsense",
+                    "2001:db8:5::42"):          # an own network, but a public one
         assert not local.allows(refused), refused
     assert local.allows("10.1.2.3", own="10.1.2.3"), "this computer, at an address of its own"
     assert len(reads) == 1, "kept, not read for every request"
@@ -895,6 +896,120 @@ def test_this_computer_s_own_networks_are_read_without_qt():
         assert v4 == {n for n in home_net._qt_networks(QtNetwork) if n.version == 4}
 
 
+def test_only_own_networks_of_the_home_stand_for_it():
+    """A VPN's subnet, a public network (a modem in bridge mode), carrier
+    NAT's and a 10/8 netmask are not the home: their other users would get
+    the tuner, which needs no token. Nerd's other networks still let one in."""
+    from ipaddress import ip_network
+
+    from dopeiptv.core import home_net
+
+    for ok in ("192.168.1.0/24", "10.0.0.0/16", "172.16.5.0/24", "169.254.0.0/16",
+               "192.168.1.5/32", "fe80::/64", "fd12:3456:789a:1::/64"):
+        assert home_net.trusted(ip_network(ok)), ok
+    for bad in ("10.0.0.0/8", "172.16.0.0/12", "100.64.0.0/10", "100.101.102.0/24",
+                "203.0.113.0/24", "198.51.100.0/22", "2001:db8:5::/64", "fc00::/7",
+                "127.0.0.0/8"):
+        assert not home_net.trusted(ip_network(bad)), bad
+    nets = [ip_network("192.168.1.0/24"), ip_network("203.0.113.0/24"),
+            ip_network("100.64.0.0/10"), ip_network("10.0.0.0/8")]
+    local = home_net.LocalNetworks(lambda: nets, lambda: ["100.101.102.103"])
+    assert local.allows("192.168.1.20")
+    for refused in ("203.0.113.9", "100.64.7.7", "10.200.1.1"):
+        assert not local.allows(refused), refused
+    assert local.allows("100.101.102.103"), "listed by the person in Nerd's other networks"
+    assert local.allows("127.0.0.1") and local.allows("::1"), "loopback, always"
+
+
+def _fake_qt(ifaces):
+    from types import SimpleNamespace
+
+    class Flag:
+        IsUp, IsPointToPoint = 1, 2
+
+    class Kind:
+        Ethernet, Wifi, Ppp, Virtual, Unknown = "eth", "wifi", "ppp", "virtual", "unknown"
+
+    def entry(text):
+        ip, prefix = text.split("/")
+        return SimpleNamespace(ip=lambda: SimpleNamespace(toString=lambda: ip),
+                               prefixLength=lambda: int(prefix))
+
+    def iface(name, kind, flags, addrs):
+        return SimpleNamespace(name=lambda: name, type=lambda: getattr(Kind, kind),
+                               flags=lambda: flags,
+                               addressEntries=lambda: [entry(a) for a in addrs])
+
+    class QNetworkInterface:
+        InterfaceFlag, InterfaceType = Flag, Kind
+
+        @staticmethod
+        def allInterfaces():
+            return [iface(*i) for i in ifaces]
+
+    return SimpleNamespace(QNetworkInterface=QNetworkInterface)
+
+
+def test_a_tunnel_s_network_is_not_an_own_network_as_qt_reads_them():
+    from ipaddress import ip_network
+
+    from dopeiptv.core import home_net
+
+    up, p2p = 1, 2
+    qt = _fake_qt([("eth0", "Ethernet", up, ["192.168.1.5/24", "fe80::1/64"]),
+                   ("wlan0", "Wifi", up, ["192.168.50.3/24"]),
+                   ("eth1", "Ethernet", 0, ["192.168.9.3/24"]),           # down
+                   ("tun0", "Unknown", up | p2p, ["10.8.0.6/24"]),        # OpenVPN
+                   ("wg0", "Unknown", up | p2p, ["10.6.0.2/24"]),         # WireGuard
+                   ("utun4", "Unknown", up, ["fd7a:115c:a1e0::1/64"]),    # macOS
+                   ("tap0", "Ethernet", up, ["10.9.0.2/24"]),             # OpenVPN tap
+                   ("ztabcdef", "Ethernet", up, ["10.147.17.5/24"]),      # ZeroTier
+                   ("tailscale0", "Unknown", up, ["100.101.102.103/32"]),
+                   ("gre1", "Virtual", up, ["10.20.0.1/30"]),
+                   ("ppp0", "Ppp", up, ["10.64.64.64/32"]),
+                   ("tunnel_32512", "Ethernet", up, ["10.7.0.2/24"])])   # Windows' name
+    assert set(home_net._qt_networks(qt)) == {
+        ip_network("192.168.1.0/24"), ip_network("fe80::/64"), ip_network("192.168.50.0/24")}
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="Linux's own interface lists")
+def test_a_tunnel_s_network_is_not_an_own_network_as_linux_reads_them(tmp_path, monkeypatch):
+    import fcntl
+    import struct
+    from ipaddress import ip_network
+
+    from dopeiptv.core import home_net
+
+    up, p2p = 0x1, 0x10
+    ifaces = {"lo": (up | 0x8, "127.0.0.1", "255.0.0.0"),
+              "eth0": (up, "192.168.1.5", "255.255.255.0"),
+              "br0": (up, "10.0.10.2", "255.255.255.0"),        # a bridge holds the LAN
+              "tun0": (up | p2p, "10.8.0.6", "255.255.255.0"),
+              "wg0": (up | p2p, "10.6.0.2", "255.255.255.0"),
+              "tap0": (up, "10.9.0.2", "255.255.255.0"),
+              "tailscale0": (up | p2p, "100.101.102.103", "255.255.255.255"),
+              "ppp0": (up | p2p, "81.2.3.4", "255.255.255.255")}
+
+    def ioctl(_fd, req, buf):
+        flags, addr, mask = ifaces[buf[:16].split(b"\0", 1)[0].decode()]
+        if req == home_net._SIOCGIFFLAGS:
+            return buf[:16] + struct.pack("H", flags) + buf[18:]
+        return buf[:20] + socket.inet_aton(addr if req == home_net._SIOCGIFADDR else mask) \
+            + buf[24:]
+
+    inet6 = tmp_path / "if_inet6"
+    inet6.write_text("fe800000000000000000000000000001 02 40 20 80 eth0\n"
+                     "fd000000000000080000000000000006 05 40 00 80 tun0\n"
+                     "fdaa0000000000000000000000000002 06 40 00 80 wg0\n"
+                     "fd7a115ca1e0ab120000000000000001 07 80 00 80 tailscale0\n")
+    monkeypatch.setattr(socket, "if_nameindex", lambda: list(enumerate(ifaces, 1)))
+    monkeypatch.setattr(fcntl, "ioctl", ioctl)
+    monkeypatch.setattr(home_net, "_IF_INET6", str(inet6))
+    assert set(home_net._linux_networks()) == {
+        ip_network("127.0.0.0/8"), ip_network("192.168.1.0/24"), ip_network("10.0.10.0/24"),
+        ip_network("fe80::/64")}
+
+
 def test_the_tuner_s_endpoints_are_refused_beyond_its_own_networks(server, monkeypatch):
     srv = server[0]
 
@@ -909,6 +1024,46 @@ def test_the_tuner_s_endpoints_are_refused_beyond_its_own_networks(server, monke
             _get(srv, path)
         assert e.value.code == 403, path
     assert _get(srv, f"/playlist.m3u?token={TOKEN}").status == 200, "the token's routes as before"
+
+
+def test_a_web_page_cannot_drive_the_tuner(server):
+    """A page in a browser here asks the tuner by an IP address (an <img>, a
+    no-cors fetch: sent without asking) - refused, no connection opened;
+    Plex, Jellyfin, VLC and a person typing the address send neither header."""
+    srv, _host, provider, _pool = server
+    for headers in ({"Origin": "https://evil.example"}, {"Origin": "null"},
+                    {"Origin": f"http://127.0.0.1:{srv.port}"},
+                    {"Sec-Fetch-Site": "cross-site"}, {"Sec-Fetch-Site": "same-site"}):
+        for path in ("/discover.json", "/lineup.json", "/auto/v5"):
+            with pytest.raises(urllib.error.HTTPError) as e:
+                _get(srv, path, headers)
+            assert e.value.code == 403, (path, headers)
+    assert provider.total() == 0, "nothing opened for a web page"
+    assert _get(srv, "/discover.json").status == 200
+    assert _get(srv, "/lineup.json", {"Sec-Fetch-Site": "none"}).status == 200
+
+
+def test_a_web_page_cannot_shut_the_tuner_or_this_computer_out(server, monkeypatch):
+    srv = server[0]
+    monkeypatch.setattr(srv, "limiter", hs.RateLimiter(fails=3))
+    bad = "/playlist.m3u?token=" + "x" * 32
+    for _ in range(5):
+        with pytest.raises(urllib.error.HTTPError):
+            _get(srv, bad)                      # this computer: never shut out
+    assert not srv.limiter.blocked("127.0.0.1")
+    monkeypatch.setattr(hs, "_loopback", lambda _who: False)     # as if from the network
+    for _ in range(5):
+        with pytest.raises(urllib.error.HTTPError):
+            _get(srv, bad, {"Sec-Fetch-Site": "cross-site"})
+    assert not srv.limiter.blocked("127.0.0.1"), "a web page's guesses never count"
+    for _ in range(3):
+        with pytest.raises(urllib.error.HTTPError):
+            _get(srv, bad)
+    assert srv.limiter.blocked("127.0.0.1"), "a device's own guesses as before"
+    with pytest.raises(urllib.error.HTTPError) as e:
+        _get(srv, f"/playlist.m3u?token={TOKEN}")
+    assert e.value.code == 429
+    assert _get(srv, "/discover.json").status == 200, "a shut-out address keeps its tuner"
 
 
 def test_the_tuner_answers_only_under_a_home_name(server):
@@ -929,6 +1084,42 @@ def test_the_tuner_answers_only_under_a_home_name(server):
             _get(srv, path, {"Host": "evil.example:8000"})
         assert e.value.code == 403, path
     assert _get(srv, "/discover.json").status == 200          # by its address, as before
+
+
+def test_the_tuner_answers_under_the_usual_home_names_and_says_what_it_refuses(server,
+                                                                              monkeypatch):
+    """A Fritz!Box's .fritz.box and Tailscale's MagicDNS names are a home's
+    too; a name that is not is refused, and logged once per name - a media
+    server set up with it would otherwise lose its tuner with nothing said."""
+    from dopeiptv.services.home_server import tuner_host_ok
+    for ok in ("pc.fritz.box", "pc.fritz.box:3675", "mypc.tail1a2b3.ts.net", "nas.home.arpa",
+               "box.internal", "pc.localdomain", "PC.FRITZ.BOX."):
+        assert tuner_host_ok(ok), ok
+    for bad in ("evilfritz.box", "fritz.box.evil.example", "ts.net.evil.example",
+                "evil-ts.net", "pc.box"):
+        assert not tuner_host_ok(bad), bad
+    srv = server[0]
+    said: list[str] = []
+
+    class Log:
+        def info(self, msg, *args):
+            said.append(msg % args)
+
+        def __getattr__(self, _name):
+            return lambda *a, **k: None
+
+    monkeypatch.setattr(hs, "log", Log())
+    for host in ("pc.example.com:3675", "pc.example.com:3675", "nas.example.org"):
+        with pytest.raises(urllib.error.HTTPError) as e:
+            _get(srv, "/lineup.json", {"Host": host})
+        assert e.value.code == 403
+    refused = [s for s in said if "not a home network's name" in s]
+    assert len(refused) == 2, said
+    assert "'pc.example.com:3675'" in refused[0] and ".fritz.box" in refused[0]
+    assert "'nas.example.org'" in refused[1]
+    for i in range(hs.REFUSED_NAMES_MAX + 5):
+        srv.refused_name(f"n{i}.example")
+    assert len(srv._refused_names) == hs.REFUSED_NAMES_MAX, "a flood of names stays small"
 
 
 def test_the_discovery_is_not_answered_beyond_its_own_networks():
@@ -1060,3 +1251,101 @@ def test_private_viewing_never_names_the_person_s_channel(server):
         privacy.set_private(False)
         logger.removeHandler(keep)
         logger.setLevel(level)
+
+
+# -- channels for adults: out unless the person lets them out ---------------------------------
+
+def test_channels_for_adults_go_out_only_when_the_person_lets_them(server):
+    """Off by default (a TV in a child's room has no profile or PIN); on,
+    the adult category and the channel the provider marks join the lineup
+    and the page's categories - a hidden or locked one never does."""
+    from dataclasses import replace
+    srv = server[0]
+    assert srv.config.adult is False
+    assert {c.name for c in srv.lineup()} == {"One", "Two", "Three"}
+    srv.refresh(replace(srv.config, adult=True))
+    assert {c.name for c in srv.lineup()} == {"One", "Two", "Three", "Night", "Marked"}
+    cats = json.loads(_get(srv, "/api/categories?source=p1", {"X-Dopeiptv-Token": TOKEN}).read())
+    assert [c["name"] for c in cats["categories"]] == ["News", "XXX Adult"]
+    view = json.loads(_get(srv, "/api/settings", {"X-Dopeiptv-Token": TOKEN}).read())
+    assert view["adult"] is True
+
+
+def test_the_adult_switch_is_read_stored_and_checked():
+    class Settings:
+        def __init__(self, values):
+            self.values = values
+
+        def value(self, key, default=None):
+            return self.values.get(key, default)
+
+        def setValue(self, key, value):
+            self.values[key] = value
+
+    assert hs.read_config(Settings({})).adult is False
+    assert hs.read_config(Settings({hs.K_ADULT: "true"})).adult is True
+    assert hs.read_config(Settings({hs.K_ADULT: True})).adult is True
+    assert hs.read_config(Settings({hs.K_ADULT: "false"})).adult is False
+    assert hs.changes_from_page({"adult": True}, ["p1"]) == {hs.K_ADULT: "true"}
+    assert hs.changes_from_page({"adult": False}, ["p1"]) == {hs.K_ADULT: "false"}
+    with pytest.raises(ValueError):
+        hs.changes_from_page({"adult": "yes"}, ["p1"])
+    page, _csp = server_page.render({"bg": "#101010"}, {"bg": "#ffffff"},
+                                    {"srv_adult": "Channels for adults"})
+    assert b'id="adult"' in page and b"Channels for adults" in page
+
+
+def test_the_share_hands_out_adult_channels_only_when_let():
+    from dopeiptv.services.share import Share, kept_out
+    cats = {"1": "News", "3": "XXX Adult", "4": "Locked"}
+    news = {"stream_id": 1, "category_id": "1"}
+    night = {"stream_id": 5, "category_id": "3"}
+    marked = {"stream_id": 7, "category_id": "1", "is_adult": "1"}
+    locked = {"stream_id": 6, "category_id": "4"}
+    by_hand = {"stream_id": 8, "category_id": "1"}
+    for adult in (False, True):
+        assert not kept_out(news, cats, {"4"}, {"8"}, adult)
+        assert kept_out(locked, cats, {"4"}, {"8"}, adult), "locked never goes out"
+        assert kept_out(by_hand, cats, {"4"}, {"8"}, adult), "hidden by hand never goes out"
+        assert kept_out(night, cats, {"4"}, {"8"}, adult) is not adult
+        assert kept_out(marked, cats, {"4"}, {"8"}, adult) is not adult
+
+    let_out = [False]
+    share = Share(lambda: [{"id": "p1", "kind": "xtream"}], filters=lambda _pid: ({"4"}, {"8"}, {}),
+                  adult=lambda: let_out[0])
+    share.channels = lambda _pl: ([news, night, marked, locked, by_hand], cats)  # type: ignore[method-assign]
+    pl = {"id": "p1"}
+    assert [r["stream_id"] for r in share.handed_out(pl)[0]] == [1]
+    let_out[0] = True
+    assert [r["stream_id"] for r in share.handed_out(pl)[0]] == [1, 5, 7]
+
+
+def test_an_address_the_tuner_refuses_is_said_once_with_the_way_in(server, monkeypatch):
+    """A media server reaching the tuner over a VPN or Tailscale is refused;
+    the log says so once per address, with where to let it in."""
+    srv = server[0]
+    said: list[str] = []
+
+    class Elsewhere:
+        def allows(self, _address, _own=""):
+            return False
+
+    class Log:
+        def info(self, msg, *args):
+            said.append(msg % args)
+
+        def __getattr__(self, _name):
+            return lambda *a, **k: None
+
+    monkeypatch.setattr(srv, "local", Elsewhere())
+    monkeypatch.setattr(hs, "log", Log())
+    for path in ("/discover.json", "/lineup.json"):
+        with pytest.raises(urllib.error.HTTPError) as e:
+            _get(srv, path)
+        assert e.value.code == 403
+    refused = [s for s in said if "the tuner refused" in s]
+    assert len(refused) == 1, said
+    assert "127.0.0.1" in refused[0] and "Nerd > Network > Other networks" in refused[0]
+    for i in range(hs.REFUSED_NAMES_MAX + 5):
+        srv.refused_address(f"10.9.0.{i}")
+    assert len(srv._refused_addresses) == hs.REFUSED_NAMES_MAX, "a flood of addresses stays small"

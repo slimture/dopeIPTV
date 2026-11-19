@@ -1316,7 +1316,8 @@ def test_the_cast_panel_shows_the_airplay_row(qapp, macos, tmp_path):
     from PyQt6.QtCore import QSettings, QThreadPool
     from PyQt6.QtWidgets import QWidget
 
-    from dopeiptv.providers import casting, chromecast
+    from dopeiptv.providers import casting
+    from dopeiptv.ui import cast_dialog
     hub = casting.CastHub(_Mgr(["Living room"]), _Mgr([]))
     rx = am.AirPlayReceiver()
     hub.add_receiver(rx)
@@ -1326,8 +1327,8 @@ def test_the_cast_panel_shows_the_airplay_row(qapp, macos, tmp_path):
     tracks = {"audio": [{"index": 0, "codec": "aac"},
                         {"index": 1, "codec": "ac3", "lang": "swe"}],
               "subtitle": [{"index": 0, "codec": "subrip", "lang": "swe"}]}
-    d = chromecast.CastDialog(win, "http://p/live/u/pw/1.m3u8", "SVT1",
-                              tracks=tracks, probe=False)
+    d = cast_dialog.CastDialog(win, "http://p/live/u/pw/1.m3u8", "SVT1",
+                               tracks=tracks, probe=False)
     win.pool.waitForDone(3000)
     _pump(qapp)
     names = [d.list.item(i).text() for i in range(d.list.count())]
@@ -1355,7 +1356,8 @@ def test_the_cast_panel_lists_airplay_only_where_there_are_routes(
     from PyQt6.QtCore import QSettings, QThreadPool
     from PyQt6.QtWidgets import QWidget
 
-    from dopeiptv.providers import casting, chromecast
+    from dopeiptv.providers import casting
+    from dopeiptv.ui import cast_dialog
     hub = casting.CastHub(_Mgr(["Living room"]), _Mgr([]), _Mgr([]))
     rx = am.AirPlayReceiver()
     hub.add_receiver(rx)
@@ -1363,8 +1365,8 @@ def test_the_cast_panel_lists_airplay_only_where_there_are_routes(
     win.settings = QSettings(str(tmp_path / "s.ini"), QSettings.Format.IniFormat)
     win.cast, win.pool, win._cast_device = hub, QThreadPool(), None
     _Detector.found = False
-    d = chromecast.CastDialog(win, "http://p/live/u/pw/1.m3u8", "SVT1",
-                              tracks={}, probe=False)
+    d = cast_dialog.CastDialog(win, "http://p/live/u/pw/1.m3u8", "SVT1",
+                               tracks={}, probe=False)
     d.show()
     end = time.monotonic() + 10
     while time.monotonic() < end and not d.rescan_btn.isEnabled():

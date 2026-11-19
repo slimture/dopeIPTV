@@ -21,6 +21,7 @@ def _inline_workers(monkeypatch):
     that was the macOS beachball). Run those jobs inline here so the tests
     can assert on the result."""
     import dopeiptv.ui.mw_local as ml
+    import dopeiptv.ui.mw_local_library as mll
 
     def run_now(_pool, fn, done, err=None):
         try:
@@ -30,6 +31,7 @@ def _inline_workers(monkeypatch):
                 err(e)
 
     monkeypatch.setattr(ml, "run_async", run_now)
+    monkeypatch.setattr(mll, "run_async", ml.run_async)
 
 
 @pytest.fixture(autouse=True)
@@ -303,10 +305,12 @@ def test_library_cache_warm_start(tmp_path, monkeypatch):
     """Second visit renders from the cache before the rescan lands, and an
     unchanged rescan does not re-render."""
     import dopeiptv.ui.mw_local as ml
+    import dopeiptv.ui.mw_local_library as mll
     calls = []
     monkeypatch.setattr(ml, "run_async",
                         lambda pool, fn, done, err=None: calls.append(
                             (fn, done)))
+    monkeypatch.setattr(mll, "run_async", ml.run_async)
     root = tmp_path / "M"
     root.mkdir()
     (root / "Show.S01E01.mkv").write_bytes(b"x")
@@ -481,7 +485,6 @@ def test_the_play_queue_steps_and_wraps_an_album(tmp_path):
         AUDIO_EXTS = MainWindow.AUDIO_EXTS
         _is_audio = MainWindow._is_audio
         _is_video = MainWindow._is_video
-        _music_is_playing = MainWindow._music_is_playing
         _local_is_playing = MainWindow._local_is_playing
         _local_autoadvance_ok = MainWindow._local_autoadvance_ok
         queue_add = MainWindow.queue_add
@@ -585,9 +588,10 @@ def test_a_tagged_track_is_never_sent_to_tmdb(tmp_path):
     w._local_make_thumbs = lambda rows: calls.append(rows)
 
     import dopeiptv.ui.mw_local as ml
+    import dopeiptv.ui.mw_local_library as mll
     jobs = []
-    ml_run = ml.run_async
-    ml.run_async = lambda pool, fn, done, err=None: jobs.append(fn)
+    ml_run, mll_run = ml.run_async, mll.run_async
+    ml.run_async = mll.run_async = lambda pool, fn, done, err=None: jobs.append(fn)
     try:
         w._local_resolve_posters([
             {"_key": "t", "_path": str(tmp_path / "02.flac"),
@@ -599,7 +603,7 @@ def test_a_tagged_track_is_never_sent_to_tmdb(tmp_path):
         for fn in jobs:
             fn()
     finally:
-        ml.run_async = ml_run
+        ml.run_async, mll.run_async = ml_run, mll_run
     # The film was looked up; the track never was.
     assert asked.get("titles") == ["Film 2020", "Film"]
 
@@ -662,6 +666,7 @@ def test_online_album_art_is_asked_once_and_only_when_needed(tmp_path,
     already has real art is left alone, and every answer - misses too - is
     remembered so the same album is never asked about twice."""
     import dopeiptv.ui.mw_local as ml
+    import dopeiptv.ui.mw_local_library as mll
 
     album = tmp_path / "Kanye West - Donda"
     album.mkdir()
@@ -685,6 +690,7 @@ def test_online_album_art_is_asked_once_and_only_when_needed(tmp_path,
     monkeypatch.setattr(ml, "run_async",
                         lambda pool, fn, done, err=None: jobs.append(
                             (fn, done)))
+    monkeypatch.setattr(mll, "run_async", ml.run_async)
 
     w = _Stub()
     w._load_gen = 0
@@ -752,7 +758,6 @@ def test_a_left_over_queue_never_hijacks_tv_or_film():
         VIDEO_EXTS = MainWindow.VIDEO_EXTS
         _is_audio = MainWindow._is_audio
         _is_video = MainWindow._is_video
-        _music_is_playing = MainWindow._music_is_playing
         _local_is_playing = MainWindow._local_is_playing
         _local_autoadvance_ok = MainWindow._local_autoadvance_ok
         _queue_step = MainWindow._queue_step
@@ -776,11 +781,11 @@ def test_a_left_over_queue_never_hijacks_tv_or_film():
     w = _Q()
     # Music playing: the queue is in charge.
     w._last_playback = {"kind": "local", "url": "/m/01.flac"}
-    assert w._music_is_playing() is True
+    assert w._local_is_playing() is True
 
     # A channel is on: the leftover queue must stay out of the way.
     w._last_playback = {"kind": "live", "url": "http://h/live/1.ts"}
-    assert w._music_is_playing() is False
+    assert w._local_is_playing() is False
     assert w._queue_step(1) is False
     assert w._queue_autoplay() is False
     assert w.played == []
@@ -982,7 +987,6 @@ def _queue_stub():
         VIDEO_EXTS = MainWindow.VIDEO_EXTS
         _is_audio = MainWindow._is_audio
         _is_video = MainWindow._is_video
-        _music_is_playing = MainWindow._music_is_playing
         _local_is_playing = MainWindow._local_is_playing
         _local_autoadvance_ok = MainWindow._local_autoadvance_ok
         queue_add = MainWindow.queue_add
@@ -1281,8 +1285,10 @@ def test_the_detail_panel_has_only_one_vertical_scroll_region():
     import inspect
 
     from dopeiptv.ui import main_window as mw
+    from dopeiptv.ui import mw_build_detail
 
-    src = inspect.getsource(mw)
+    # The detail column is built in ui/mw_build_detail.py.
+    src = inspect.getsource(mw) + inspect.getsource(mw_build_detail)
     # The info box must not be a scroll area any more...
     assert "self.media_info = QFrame" in src, \
         "the info box must be a plain frame, not a nested scroll area"
@@ -1304,10 +1310,12 @@ def test_leaving_mid_scan_lets_the_next_visit_scan_again(tmp_path,
     active; the next visit took it for a walk still running and never
     started one, so the library stayed half-scanned all session."""
     import dopeiptv.ui.mw_local as ml
+    import dopeiptv.ui.mw_local_library as mll
     calls = []
     monkeypatch.setattr(ml, "run_async",
                         lambda pool, fn, done, err=None: calls.append(
                             (fn, done)))
+    monkeypatch.setattr(mll, "run_async", ml.run_async)
     root = tmp_path / "M"
     root.mkdir()
     (root / "Show.S01E01.mkv").write_bytes(b"x")
@@ -1417,10 +1425,12 @@ def test_the_caps_are_said(tmp_path, monkeypatch):
 def test_a_newer_query_or_another_folder_cancels_the_walk(tmp_path,
                                                           monkeypatch):
     import dopeiptv.ui.mw_local as ml
+    import dopeiptv.ui.mw_local_library as mll
     jobs = []
     monkeypatch.setattr(ml, "run_async",
                         lambda pool, fn, done, err=None: jobs.append(
                             (fn, done)))
+    monkeypatch.setattr(mll, "run_async", ml.run_async)
     w = _Stub()
     root = _music_videos(tmp_path)
     w._current_cat = root

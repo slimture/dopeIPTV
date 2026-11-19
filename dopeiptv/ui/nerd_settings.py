@@ -84,7 +84,7 @@ PART_KEYS = {
               "nerd_hooks_urls", "nerd_mqtt", "nerd_mqtt_host", "nerd_mqtt_port", "nerd_mqtt_tls",
               "nerd_mqtt_client", "nerd_mqtt_prefix", "nerd_mqtt_ha", "nerd_mqtt_commands",
               "nerd_rec_template", "nerd_rec_post", "nerd_server", "nerd_server_port",
-              "nerd_server_tuners", "nerd_server_sources"),
+              "nerd_server_tuners", "nerd_server_sources", "nerd_server_adult"),
     "diag": ("nerd_log_level", "nerd_log_file", "nerd_overlay_more", "nerd_health"),
 }
 #: Parts that share a page: the channel lists with the boxes, what follows a
@@ -1046,6 +1046,10 @@ def _server_card(page: SettingsPage, n: nerd.Nerd, settings: Any, lines: list[Ch
         c.widget(ChipGroups([(tr("nerd_server_sources"), [ch for _p, ch in chips])]),
                  tr("nerd_server_sources") + " " + " ".join(ch.text() for _p, ch in chips))
     c.note(tr("nerd_server_sources_hint"))
+    adult = ToggleSwitch(n.flag(hs.K_ADULT))
+    adult.setAccessibleName(tr("srv_adult"))
+    c.row(tr("srv_adult"), adult, tr("srv_adult_hint"),
+          search="adult adults 18+ XXX parental lineup playlist share")
 
     def token() -> str:
         got = str(settings.value(hs.K_TOKEN, "") or "").strip()
@@ -1119,6 +1123,7 @@ def _server_card(page: SettingsPage, n: nerd.Nerd, settings: Any, lines: list[Ch
         picked = {pid: chosen.get(pid, []) for pid, chip in chips if chip.isChecked()}
         return {hs.K_ON: "true" if on.isChecked() else "false",
                 hs.K_TUNERS: str(tuners.value()), hs.K_PORT: str(port.value()),
+                hs.K_ADULT: "true" if adult.isChecked() else "false",
                 hs.K_SOURCES: json.dumps(picked, sort_keys=True) if picked else ""}
     values.switch = on  # type: ignore[attr-defined]
     values.port = port.value  # type: ignore[attr-defined]

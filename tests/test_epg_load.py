@@ -227,8 +227,9 @@ def test_a_lookup_does_not_wait_for_another_threads_load(tmp_path):
 
 def test_one_guide_load_at_a_time(monkeypatch):
     import dopeiptv.ui.main_window as mw
+    import dopeiptv.ui.mw_guide as mw_guide
     jobs = []
-    monkeypatch.setattr(mw, "run_async",
+    monkeypatch.setattr(mw_guide, "run_async",
                         lambda _pool, fn, done, err=None: jobs.append(
                             (fn, done)))
 

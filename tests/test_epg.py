@@ -199,6 +199,7 @@ def test_ensure_xmltv_loaded_ends_the_progress_indicator(monkeypatch):
     until the watchdog or a category switch happened to hide it. Both the
     success and the failure callback must finish the progress indicator."""
     import dopeiptv.ui.main_window as mw
+    import dopeiptv.ui.mw_guide as mw_guide
     from dopeiptv.ui.mw_busy import _BusyMixin
 
     class _Stub(_BusyMixin):
@@ -232,7 +233,7 @@ def test_ensure_xmltv_loaded_ends_the_progress_indicator(monkeypatch):
             if err:
                 err(e)
 
-    monkeypatch.setattr(mw, "run_async", run_now)
+    monkeypatch.setattr(mw_guide, "run_async", run_now)
 
     # Success: indicator finished AND the list refreshed.
     w = _Stub()

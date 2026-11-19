@@ -7,6 +7,7 @@ or both. The stores' "Trakt" layer holds what those accounts say together.
 
 from __future__ import annotations
 
+import html
 import secrets
 import threading
 import time
@@ -1132,7 +1133,8 @@ class _TraktMixin:
             state["expires_at"] = time.time() + data.get("expires_in", 600)
             show, page = device_pages(data)
             info.setText(
-                tr("trakt_enter_code", url=show, code=data['user_code']))
+                tr("trakt_enter_code", url=html.escape(str(show)),
+                   code=html.escape(str(data['user_code']))))
             open_url(page)
             QTimer.singleShot(state["interval"] * 1000, poll)
 

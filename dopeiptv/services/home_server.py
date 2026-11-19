@@ -58,11 +58,11 @@ from ..core.dvr_session import DvrSession
 from ..core.exclusive_bind import ExclusiveBindMixin, IdleTimeoutMixin
 from ..core.log import log, redact_url
 from ..core.nerd_check import FAIL, OK, WARN, Check
-from ..core.phone_remote import RateLimiter
+from ..core.phone_remote import RateLimiter, cross_site
 from ..core.remote_api import lan_addresses
 from ..core.restream import BOX, NO_DATA, TUNERS, VPN, Busy, Restreamer, ffmpeg_opener, is_hls
 from .guide_keeper import GuideKeeper
-from .share import Share, lineup_guide, public_logo
+from .share import Share, kept_out, lineup_guide, public_logo
 
 DEFAULT_PORT = 3675             # the remote API's 3673, the phone remote's 3674, and one
 MAX_TUNERS = 64
@@ -72,6 +72,8 @@ K_TUNERS = "nerd_server_tuners"
 K_SOURCES = "nerd_server_sources"
 K_TOKEN = "nerd_server_token"
 K_DEVICE = "nerd_server_device_id"
+#: Channels and categories for adults handed out too (off: left out).
+K_ADULT = "nerd_server_adult"
 MAX_BODY = 64 * 1024
 #: A stream whose client reads nothing for this long is let go.
 STREAM_WRITE_TIMEOUT = 30.0
@@ -108,6 +110,9 @@ class Config:
     sources: dict[str, list[str]] = field(default_factory=dict)
     token: str = ""
     device_id: str = ""
+    #: Channels for adults in the lineup and the share (``kept_out``); off,
+    #: as a TV in a child's room has no profile or PIN.
+    adult: bool = False
 
 
 def parse_sources(raw: Any) -> dict[str, list[str]]:
@@ -131,6 +136,11 @@ def _int(value: Any, default: int, lo: int, hi: int) -> int:
     return n if lo <= n <= hi else default
 
 
+def read_flag(value: Any) -> bool:
+    """A switch as QSettings hands it back (a bool, or "true"/"false")."""
+    return value is True or str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
 def read_config(settings: Any) -> Config:
     """The server's settings; a token and a device id made the first time."""
     token = str(settings.value(K_TOKEN, "") or "").strip()
@@ -144,7 +154,7 @@ def read_config(settings: Any) -> Config:
     return Config(port=_int(settings.value(K_PORT, DEFAULT_PORT), DEFAULT_PORT, 1024, 65535),
                   tuners=_int(settings.value(K_TUNERS, 0), 0, 0, MAX_TUNERS),
                   sources=parse_sources(settings.value(K_SOURCES, "")),
-                  token=token, device_id=device)
+                  token=token, device_id=device, adult=read_flag(settings.value(K_ADULT, False)))
 
 
 def changes_from_page(body: dict, known: list[str]) -> dict[str, str]:
@@ -168,6 +178,10 @@ def changes_from_page(body: dict, known: list[str]) -> dict[str, str]:
         kept = {str(k): [str(c) for c in v][:5000] for k, v in src.items()
                 if str(k) in known and isinstance(v, list)}
         out[K_SOURCES] = json.dumps(kept, sort_keys=True) if kept else ""
+    if "adult" in body:
+        if not isinstance(body.get("adult"), bool):
+            raise ValueError('"adult" is true or false')
+        out[K_ADULT] = "true" if body["adult"] else "false"
     return out
 
 
@@ -249,6 +263,9 @@ class HomeServer:
         self._lineup: tuple[float, list[LineupChannel]] | None = None
         self._lineup_lock = threading.Lock()
         self._authed: set[str] = set()
+        self._refused_names: set[str] = set()
+        self._refused_addresses: set[str] = set()
+        self._refused_lock = threading.Lock()
         self.restream = Restreamer(host.pool, self.limit, self.total, others=self._others,
                                    app_session=host.app_session, ingest_for=self._ingest_for,
                                    check=self._check)
@@ -260,6 +277,36 @@ class HomeServer:
         self.taken = False
         #: What MARK says in every answer.
         self.mark = str(getattr(host, "kind", "") or "server")
+
+    def refused_name(self, host: str | None) -> bool:
+        """A tuner endpoint asked under a name that is not the home's
+        (``tuner_host_ok``): logged once per name - a media server set up
+        with that name otherwise loses its tuner with nothing said. True
+        when it was logged."""
+        name = (host or "").strip().lower()[:120]
+        with self._refused_lock:
+            if name in self._refused_names or len(self._refused_names) >= REFUSED_NAMES_MAX:
+                return False
+            self._refused_names.add(name)
+        log.info("server: the tuner was asked as %r, not a home network's name, and refused - "
+                 "a device asks it by this computer's address or a name under %s",
+                 name, ", ".join(HOME_SUFFIXES))
+        return True
+
+    def refused_address(self, address: str) -> bool:
+        """A tuner endpoint asked from an address outside this computer's own
+        home networks (``home_net.LocalNetworks``): logged once per address,
+        with how to let it in - a media server reaching the tuner over a VPN
+        or Tailscale otherwise loses it with nothing said. True when logged."""
+        who = (address or "").strip()[:64]
+        with self._refused_lock:
+            if who in self._refused_addresses or len(self._refused_addresses) >= REFUSED_NAMES_MAX:
+                return False
+            self._refused_addresses.add(who)
+        log.info("server: the tuner refused %s - not on one of this computer's own home "
+                 "networks (a VPN's, Tailscale's or a provider's shared range are not); to let "
+                 "it in, add it under Nerd > Network > Other networks", who)
+        return True
 
     # -- on and off ---------------------------------------------------------------------
     @property
@@ -338,7 +385,7 @@ class HomeServer:
         _rows, cats = self.share.channels(pl)
         excluded = self.host.filters(str(pl["id"]))[0]
         return [(cid, name) for cid, name in cats.items()
-                if cid not in excluded and not adult_category(name)]
+                if cid not in excluded and (self.config.adult or not adult_category(name))]
 
     def lineup(self) -> list[LineupChannel]:
         """Every channel served, numbered: the app's own numbers where it
@@ -348,7 +395,6 @@ class HomeServer:
             held = self._lineup
             if held is not None and time.monotonic() - held[0] < LINEUP_TTL:
                 return held[1]
-        from ..core.profiles import adult_category, adult_item
         picked: list[tuple[str | None, dict, dict, str]] = []
         for pl in self.served():
             pid = str(pl["id"])
@@ -362,8 +408,8 @@ class HomeServer:
             for r in rows:
                 cid = str(r.get("category_id"))
                 sid = str(r.get("stream_id"))
-                if (cid in excluded or sid in hidden or adult_item(r)
-                        or adult_category(cats.get(cid, "")) or (wanted and cid not in wanted)):
+                if kept_out(r, cats, excluded, hidden, adult=self.config.adult) \
+                        or (wanted and cid not in wanted):
                     continue
                 own = numbers.get(sid)
                 num = str(own if own is not None else (r.get("_num_own", r.get("num")) or "")).strip()
@@ -544,7 +590,7 @@ class HomeServer:
         everything = [p for p in (self.host.sources() or []) if p.get("id") and p.get("kind") != "local"]
         served = {str(p["id"]) for p in self.served()}
         return {"port": self.port, "tuners": self.config.tuners, "auto_tuners": self.auto_tuners(),
-                "command": launch_command(),
+                "adult": self.config.adult, "command": launch_command(),
                 "sources": [{"id": str(p["id"]), "name": str(p.get("name") or p.get("server") or ""),
                              "kind": str(p.get("kind") or "xtream"), "served": str(p["id"]) in served,
                              "categories": (chosen.get(str(p["id"])) or None)} for p in everything]}
@@ -602,9 +648,16 @@ def _host_ok(host: str) -> bool:
     return 0 < len(host) <= 255 and all(c in allowed for c in host)
 
 
-#: Name endings a home network's own names have (RFC 6762's .local, RFC
-#: 8375's home.arpa, the routers' usual .lan, .home, .internal).
-HOME_SUFFIXES = (".local", ".lan", ".home", ".home.arpa", ".internal", ".localdomain")
+#: Name endings a home network's own names have: RFC 6762's .local (mDNS),
+#: RFC 8375's home.arpa, ICANN's .internal for private use, the routers'
+#: usual .lan, .home and .localdomain, AVM's .fritz.box (a Fritz!Box answers
+#: names under it itself) and Tailscale's MagicDNS .ts.net (answered inside
+#: the tailnet). A deliberate list, kept short: a DNS rebinding needs a name
+#: whose answers a web page's owner sets, and these are answered at home.
+HOME_SUFFIXES = (".local", ".lan", ".home", ".home.arpa", ".internal", ".localdomain",
+                 ".fritz.box", ".ts.net")
+#: Refused names logged (``refused_name``), so a flood of them stays small.
+REFUSED_NAMES_MAX = 64
 
 
 def tuner_host_ok(host: str | None) -> bool:
@@ -639,6 +692,15 @@ def tuner_host_ok(host: str | None) -> bool:
     except OSError:
         own = ""
     return bool(own) and name == own
+
+
+def _loopback(address: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(address.split("%", 1)[0])
+    except ValueError:
+        return False
+    mapped = ip.ipv4_mapped if isinstance(ip, ipaddress.IPv6Address) else None
+    return (mapped or ip).is_loopback
 
 
 def _own(handler: BaseHTTPRequestHandler) -> str:
@@ -711,30 +773,44 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
                 self._text(403, "only the home network")
                 return
             lim = server.limiter
-            if lim.blocked(who):
-                self._text(429, "too many wrong tokens - try again later", {"Retry-After": "60"})
-                return
             parts = urlsplit(self.path)
             path = parts.path.rstrip("/") or "/"
             query = parse_qs(parts.query, keep_blank_values=False)
             reading = method in ("GET", "HEAD")
             try:
                 if path in HDHR_PATHS or _AUTO.match(path):
+                    # No token here, so no lock-out either: a shut-out
+                    # address still has its tuner.
                     if not server.local.allows(who, _own(self)):
                         # No token here: this computer's own networks only.
+                        server.refused_address(who)
                         self._text(403, "only this computer's own network")
+                        return
+                    if cross_site(self.headers):
+                        # A web page in a browser here (an <img>, a fetch)
+                        # would open the provider's connection; no tuner
+                        # client sends an Origin or Sec-Fetch-Site.
+                        self._text(403, "not for a web page")
                         return
                     if not tuner_host_ok(self.headers.get("Host")):
                         # Not a home name: a web page's own, rebound here.
+                        server.refused_name(self.headers.get("Host"))
                         self._text(403, "ask the tuner by this computer's address")
                         return
                     self._hdhomerun(path, method)
                     return
+                if lim.blocked(who):
+                    self._text(429, "too many wrong tokens - try again later", {"Retry-After": "60"})
+                    return
                 given = self._token(query)
                 if not self._authorized(given):
                     # Only a try at the token counts: a browser asks for
-                    # /favicon.ico by itself.
-                    if given and lim.failed(who):
+                    # /favicon.ico by itself. Never this computer's nor a
+                    # web page's: a page in a browser here would shut out
+                    # the person's own browser, or a phone that visits it.
+                    if given and not _loopback(who) \
+                            and not cross_site(self.headers, self.headers.get("Host")) \
+                            and lim.failed(who):
                         log.warning("server: an address on the network kept guessing the token; "
                                     "it is shut out for %d minutes", int(lim.lockout // 60))
                     time.sleep(0.25)

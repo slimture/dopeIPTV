@@ -217,6 +217,42 @@ def test_a_client_that_keeps_guessing_gets_nothing_more_even_with_the_token(serv
     assert code == 429 and h["retry-after"]
 
 
+def test_a_web_page_changes_nothing_even_with_the_token(served):
+    """A page of another site in the phone's browser - a form posting
+    text/plain that reads as JSON, a fetch - is refused; the remote's own
+    page (same origin) is not."""
+    w = Window()
+    srv = served(w)
+    own = f"http://127.0.0.1:{srv.port}"
+    for headers in ({"Origin": "https://evil.example"}, {"Origin": "null"},
+                    {"Sec-Fetch-Site": "cross-site"}, {"Sec-Fetch-Site": "same-site"},
+                    {"Origin": "http://127.0.0.1:1", "Sec-Fetch-Site": "same-site"}):
+        code, _h, _raw = ask(srv.port, "POST", f"/{TOKEN}/api/volume", b'{"value": 99}',
+                             {"Content-Type": "text/plain", **headers})
+        assert code == 403, headers
+    assert w.calls == []
+    for headers in ({}, {"Origin": own, "Sec-Fetch-Site": "same-origin"},
+                    {"Sec-Fetch-Site": "none"}):
+        assert ask(srv.port, "POST", f"/{TOKEN}/api/volume", {"value": 30}, headers)[0] == 200
+    assert [c[0] for c in w.calls] == ["volume"] * 3
+    assert ask(srv.port, "GET", f"/{TOKEN}/", headers={"Sec-Fetch-Site": "cross-site",
+                                                        "Sec-Fetch-Mode": "navigate"})[0] == 200
+
+
+def test_a_web_page_s_guesses_never_shut_the_phone_out(served):
+    srv = served(limiter=RateLimiter(fails=3))
+    for _ in range(6):
+        assert ask(srv.port, "GET", "/" + "g" * 32 + "/api/state",
+                   headers={"Sec-Fetch-Site": "cross-site"})[0] == 403
+        assert ask(srv.port, "POST", "/" + "g" * 32 + "/api/stop", {},
+                   {"Origin": "https://evil.example"})[0] == 403
+    assert not srv.limiter.blocked("127.0.0.1")
+    assert ask(srv.port, "GET", f"/{TOKEN}/api/state")[0] == 200
+    for _ in range(3):
+        assert ask(srv.port, "GET", "/" + "g" * 32 + "/")[0] == 403
+    assert ask(srv.port, "GET", f"/{TOKEN}/api/state")[0] == 429, "the phone's own guesses as before"
+
+
 def test_a_flood_is_slowed(served):
     srv = served(limiter=RateLimiter(rate=0.5, burst=6))
     codes = [ask(srv.port, "GET", f"/{TOKEN}/api/state")[0] for _ in range(10)]

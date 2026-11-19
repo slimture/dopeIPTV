@@ -24,6 +24,7 @@ from ..core.log import log
 from ..core.workers import run_async
 from ..i18n import tr
 from .theme import P
+from .widgets import plain_text
 
 
 def two_lines(fp: str) -> str:
@@ -67,6 +68,7 @@ class CertTrustDialog(QDialog):
 
         def value(text: str, colour: str = "", mono: bool = False) -> QLabel:
             lbl = QLabel(text)
+            lbl.setTextFormat(Qt.TextFormat.PlainText)     # what the server's certificate says
             lbl.setWordWrap(not mono)          # a fingerprint keeps its two lines
             lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             # The face through the style sheet: the app's own names one for
@@ -197,7 +199,8 @@ class _Review(QObject):
         self.deleteLater()
 
     def _failed(self, message: str) -> None:
-        QMessageBox.warning(self.window, tr("cert_changed_title"), tr("cert_fetch_failed", error=message))
+        QMessageBox.warning(self.window, tr("cert_changed_title"),
+                            plain_text(tr("cert_fetch_failed", error=message)))
         self.deleteLater()
 
 

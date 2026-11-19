@@ -107,10 +107,15 @@ def _from_site(d: dict, nightly: bool = False) -> dict:
 
 
 def fetch_site_release() -> dict:
-    """The release dopeiptv.org offers. Raises on network/HTTP error."""
+    """The release dopeiptv.org offers. Raises on network/HTTP error, and
+    when it names a test build: those are signed with the same key, so only
+    the version keeps one off Releases (GitHub is asked then)."""
     r = requests.get(f"{SITE}/releases.json", headers=site_headers(), timeout=15)
     r.raise_for_status()
-    return _from_site(r.json() or {})
+    rel = _from_site(r.json() or {})
+    if is_nightly(rel["tag"]):
+        raise ValueError(f"releases.json names a test build ({rel['tag']}), not a release")
+    return rel
 
 
 def fetch_github_release(repo: str = GITHUB_REPO) -> dict:
@@ -186,6 +191,10 @@ def fetch_update(repo: str = GITHUB_REPO, channel: str = "stable") -> dict:
     build_check.refuse("updates")
     stable = fetch_latest_release(repo)
     if channel != "nightly":
+        if is_nightly(stable.get("tag", "")):
+            # Releases never install a test build (and a Mac's would skip
+            # the notarisation check), whoever names one.
+            raise ValueError(f"the release named is a test build ({stable.get('tag')})")
         return stable
     try:
         nightly = fetch_latest_nightly(repo)

@@ -19,7 +19,11 @@ computer and every private range - not only the part this computer is on.
 What needs no token - server mode's HDHomeRun tuner - lets in less
 (``LocalNetworks``): this computer, the networks of its own addresses
 (``own_networks``) and, while Nerd is on, the other networks listed here;
-not every private range (a VPN's other customers, carrier NAT).
+not every private range (a VPN's other customers, carrier NAT). Of its own
+networks only those of the home count (``trusted``): never a tunnel's (a
+VPN's subnet holds its other customers, ``is_tunnel``), nor a public, carrier
+NAT or implausibly wide one. A network the person wants in all the same -
+their Tailscale's, a VPN's - they list in Nerd's other networks.
 """
 
 from __future__ import annotations
@@ -275,8 +279,46 @@ Network = ipaddress.IPv4Network | ipaddress.IPv6Network
 #: Wi-Fi, a cable plugged in).
 LOCAL_TTL = 60.0
 LOCAL_RETRY = 5.0
-# Linux's interface ioctls (linux/sockios.h) and IFF_UP.
+# Linux's interface ioctls (linux/sockios.h), IFF_UP and IFF_POINTOPOINT.
 _SIOCGIFFLAGS, _SIOCGIFADDR, _SIOCGIFNETMASK, _IFF_UP = 0x8913, 0x8915, 0x891B, 0x1
+_IFF_POINTOPOINT = 0x10
+_IF_INET6 = "/proc/net/if_inet6"
+
+# The rule for what needs no token: which of this computer's own networks
+# stand for the home. A tunnel's network is not one - a VPN's subnet holds
+# its other customers, a mesh VPN's every device of the account - nor a public
+# network (a modem in bridge mode hands a computer one), carrier NAT's shared
+# 100.64/10 (another subscriber's) or a netmask wider than a home's. A network
+# the person does want in - their Tailscale's, a VPN's - they add themselves
+# in Nerd's other networks (KEY, ``configured``), which this never narrows.
+#: The ranges a trusted own network lies in: RFC 1918, link-local, IPv6's
+#: unique local and link-local.
+LAN_NETS: tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...] = (
+    ipaddress.IPv4Network("10.0.0.0/8"), ipaddress.IPv4Network("172.16.0.0/12"),
+    ipaddress.IPv4Network("192.168.0.0/16"), ipaddress.IPv4Network("169.254.0.0/16"),
+    ipaddress.IPv6Network("fc00::/7"), ipaddress.IPv6Network("fe80::/10"))
+#: The widest own network trusted, per IP version: a home's is a /24, at
+#: most a /16; an interface's IPv6 network a /64, a whole site's a /48.
+WIDEST = {4: 16, 6: 48}
+#: Interfaces that are tunnels by name, where the system does not say so
+#: (IFF_POINTOPOINT, Qt's Ppp and Virtual do): OpenVPN's tun and tap,
+#: WireGuard, PPP, macOS's utun and IPsec, Tailscale, ZeroTier (Qt on
+#: Windows names a tunnel "tunnel_<n>").
+TUNNEL_NAMES = ("tun", "tap", "wg", "ppp", "utun", "ipsec", "tailscale", "zt")
+
+
+def is_tunnel(name: str, point_to_point: bool = False) -> bool:
+    """Whether the interface *name* is a tunnel (a VPN, PPP), not a network
+    in the home."""
+    return point_to_point or (name or "").lower().startswith(TUNNEL_NAMES)
+
+
+def trusted(net: Network) -> bool:
+    """Whether an own network may stand for the home in what needs no token
+    (the rule above)."""
+    return (net.prefixlen >= WIDEST[net.version]
+            and any(net.network_address in lan and net.broadcast_address in lan
+                    for lan in LAN_NETS))
 
 
 def _network(address: str, prefix: int | str) -> Network | None:
@@ -288,13 +330,19 @@ def _network(address: str, prefix: int | str) -> Network | None:
 
 
 def _qt_networks(qt: Any) -> list[Network]:
-    """Every address of every interface that is up, with its prefix, as Qt
-    reads them (QNetworkInterface: Linux, macOS and Windows alike)."""
+    """Every address of every interface that is up but a tunnel's, with its
+    prefix, as Qt reads them (QNetworkInterface: Linux, macOS and Windows
+    alike)."""
     out: list[Network] = []
     iface_cls = qt.QNetworkInterface
     up = iface_cls.InterfaceFlag.IsUp
+    p2p = iface_cls.InterfaceFlag.IsPointToPoint
+    tunnels = (iface_cls.InterfaceType.Ppp, iface_cls.InterfaceType.Virtual)
     for iface in iface_cls.allInterfaces():
-        if not iface.flags() & up:
+        flags = iface.flags()
+        if not flags & up:
+            continue
+        if iface.type() in tunnels or is_tunnel(iface.name(), bool(flags & p2p)):
             continue
         for entry in iface.addressEntries():
             if entry.prefixLength() >= 0:
@@ -306,15 +354,20 @@ def _qt_networks(qt: Any) -> list[Network]:
 
 def _linux_networks() -> list[Network]:
     """The same from Linux itself, without Qt: each interface's IPv4 address
-    and netmask (ioctl), and /proc/net/if_inet6's IPv6 ones."""
+    and netmask (ioctl), and /proc/net/if_inet6's IPv6 ones; a tunnel's
+    (IFF_POINTOPOINT, or its name) left out."""
     import fcntl
     import struct
     out: list[Network] = []
+    tunnels: set[str] = set()
     for _index, name in socket.if_nameindex():
         req = struct.pack("256s", name.encode("utf-8", "replace")[:15])
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             try:
                 flags = struct.unpack("H", fcntl.ioctl(s.fileno(), _SIOCGIFFLAGS, req)[16:18])[0]
+                if is_tunnel(name, bool(flags & _IFF_POINTOPOINT)):
+                    tunnels.add(name)
+                    continue
                 if not flags & _IFF_UP:
                     continue
                 addr = socket.inet_ntoa(fcntl.ioctl(s.fileno(), _SIOCGIFADDR, req)[20:24])
@@ -325,10 +378,11 @@ def _linux_networks() -> list[Network]:
         if net is not None:
             out.append(net)
     try:
-        with open("/proc/net/if_inet6", encoding="ascii") as fh:
+        with open(_IF_INET6, encoding="ascii") as fh:
             for line in fh:
                 f = line.split()
-                if len(f) >= 6 and len(f[0]) == 32:
+                if len(f) >= 6 and len(f[0]) == 32 and not is_tunnel(f[5]) \
+                        and f[5] not in tunnels:
                     text = ":".join(f[0][i:i + 4] for i in range(0, 32, 4))
                     net = _network(text, int(f[2], 16))
                     if net is not None:
@@ -340,7 +394,8 @@ def _linux_networks() -> list[Network]:
 
 def _routed_networks() -> list[Network]:
     """The last resort: the address each route leaves from (nothing is
-    sent), as its /24 or /64."""
+    sent), as its /24 or /64. It cannot tell a tunnel's address from the
+    home's; ``trusted`` still keeps out any but a home range."""
     out: list[Network] = []
     for family, probe, prefix in ((socket.AF_INET, "10.255.255.255", 24),
                                   (socket.AF_INET, "172.31.255.255", 24),
@@ -361,10 +416,11 @@ def _routed_networks() -> list[Network]:
 
 def own_networks() -> list[Network]:
     """The networks of this computer's own addresses, IPv4 and IPv6,
-    link-local too. Qt's QNetworkInterface where the window has loaded
-    QtNetwork already - never imported here: the server without a window
-    has no Qt but QtCore - else Linux's own lists, else the /24 or /64 of
-    each address a route leaves from. Local calls only; never raises."""
+    link-local too; a tunnel's left out. Qt's QNetworkInterface where the
+    window has loaded QtNetwork already - never imported here: the server
+    without a window has no Qt but QtCore - else Linux's own lists, else
+    the /24 or /64 of each address a route leaves from. Local calls only;
+    never raises."""
     qt = sys.modules.get("PyQt6.QtNetwork")
     if qt is not None:
         try:
@@ -383,11 +439,12 @@ def own_networks() -> list[Network]:
 
 class LocalNetworks:
     """Who may use what needs no token (server mode's HDHomeRun tuner and
-    its discovery): this computer, the networks of its own addresses and,
-    while Nerd is on, the other networks Nerd lists (``configured``) -
-    never every private range. Kept LOCAL_TTL seconds; an address outside
-    them has them read again, at most every LOCAL_RETRY. Asked on the
-    server's threads, never the window's."""
+    its discovery): this computer, the networks of its own addresses that
+    stand for the home (``trusted``) and, while Nerd is on, the other
+    networks Nerd lists (``configured``, as the person typed them) - never
+    every private range. Kept LOCAL_TTL seconds; an address outside them
+    has them read again, at most every LOCAL_RETRY. Asked on the server's
+    threads, never the window's."""
 
     def __init__(self, networks: Callable[[], Iterable[Network]] | None = None,
                  others: Callable[[], Iterable[str]] | None = None,
@@ -402,7 +459,7 @@ class LocalNetworks:
 
     def _read(self, now: float) -> None:
         try:
-            nets = list(self._networks())
+            nets = [n for n in self._networks() if trusted(n)]
         except Exception as e:
             log.debug("own networks not read: %s", e)
             nets = []
