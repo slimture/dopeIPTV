@@ -396,9 +396,18 @@ def guide_body(chunks: Iterator[bytes]) -> Iterator[bytes]:
     enc = (m.group(1).decode("ascii") if m else "utf-8").lower()
     decode = None
     if enc not in ("utf-8", "utf8", "us-ascii", "ascii"):
+        # Only a text encoding decodes a guide: "zlib", "base64" or "rot13"
+        # named by a guide (the provider's word) leave its bytes as they
+        # are, as an unknown name does - zlib's decoder raised
+        # AssertionError and broke the whole answer.
         try:
-            decode = codecs.getincrementaldecoder(enc)("replace")
-        except LookupError:
+            info = codecs.lookup(enc)
+            if getattr(info, "_is_text_encoding", True) and info.incrementaldecoder is not None:
+                tried = info.incrementaldecoder("replace")
+                tried.decode(b"<tv>", False)    # idna refuses "replace" only when used
+                tried.reset()
+                decode = tried
+        except (LookupError, TypeError, ValueError, AssertionError):
             decode = None
 
     def conv(data: bytes, final: bool = False) -> bytes:
