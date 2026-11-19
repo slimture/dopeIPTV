@@ -147,6 +147,14 @@ def pump(n=10):
         w.pool.waitForDone(5)
 
 
+def until(ok, secs=20):
+    import time
+    end = time.monotonic() + secs
+    while not ok() and time.monotonic() < end:
+        pump(1)
+    return ok()
+
+
 s = QSettings(os.path.join(tempfile.mkdtemp(), "s.ini"), QSettings.Format.IniFormat)
 s.setValue("language", "sv")
 theme.apply_theme(s)
@@ -189,7 +197,8 @@ guide = w.nav_btns["guide"]
 assert guide.isCheckable()
 guide.click()
 pump()
-assert w._guide_page_showing() and len(w._guide_grid.channels) == 1
+# The guide's rows are filled on the pool: a loaded machine takes longer.
+assert until(lambda: w._guide_page_showing() and len(w._guide_grid.channels) == 1)
 assert guide.isChecked() and not w.nav_btns["live"].isChecked()
 assert w.mode == "live" and w._place == "guide" and w._list_place == "tv"
 # TV, the list under it, takes the page away; the list is as it was.
