@@ -69,7 +69,7 @@ from ..core.log import log
 from . import about, set_content, set_services, set_system, set_watch
 from .theme import P, THEMES, apply_theme, build_style, effective_theme
 from .settings_ui import Chip, SettingsPage, SettingsShell, page_icon, settings_style
-from .widgets import confirm, file_dialog_options
+from .widgets import confirm, file_dialog_options, plain_text
 from ..core.workers import run_async
 
 
@@ -451,8 +451,8 @@ class _SettingsMixin:
         from .dialogs import RestoreBackupDialog, pick_backup, stage_backup
         b, why = pick_backup(parent)
         if b is None:
-            if why:
-                QMessageBox.warning(parent, tr("restore_title"), why)
+            if why:     # the file's own words in it (its version)
+                QMessageBox.warning(parent, tr("restore_title"), plain_text(why))
             return
         store = getattr(self, "playlist_store", None)
         on = getattr(self, "_sync_on", None)
@@ -482,7 +482,7 @@ class _SettingsMixin:
             return
         why = stage_backup(b)
         if why:
-            QMessageBox.warning(parent, tr("restore_title"), why)
+            QMessageBox.warning(parent, tr("restore_title"), plain_text(why))
             return
         # As after Reset all: nothing written on the way out, and the app
         # closes - the backup is put in place as it next starts, where no

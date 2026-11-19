@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
 from ..core.log import log
 from ..i18n import tr
 from .theme import P, corner_radius, on_accent
+from .widgets import plain_text
 from .category_flags import category_flag, flag_icon
 from .media_cards import Pictures
 from .tv_place import (
@@ -498,7 +499,8 @@ class ChannelListModel(QAbstractListModel):
         if role == Qt.ItemDataRole.ToolTipRole:
             # Where a row is, when it says (a Local files search's match) -
             # the poster wall has no line under the name for it.
-            return it.get("_tip") or None
+            tip = it.get("_tip")
+            return plain_text(tip) if tip else None     # a file's, a folder's name
         return None
 
     def set_items(self, items: list, kind: str) -> None:
@@ -671,7 +673,7 @@ class ChannelDelegate(QStyledItemDelegate):
             if isinstance(it, dict) and not it.get("_tip"):
                 name = name_of(it) if callable(name_of) else str(it.get("name") or "")
                 if name and heading_of(name) is None:
-                    QToolTip.showText(event.globalPos(), name, view)
+                    QToolTip.showText(event.globalPos(), plain_text(name), view)
                     return True
         return super().helpEvent(event, view, option, index)
 

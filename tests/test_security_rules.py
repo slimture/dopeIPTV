@@ -168,3 +168,76 @@ def test_no_module_decides_on_entities_from_the_bytes():
                 if v in ("<!ENTITY", "<!DOCTYPE") and rel not in ENTITY_BYTES_OK:
                     found.append(f"{rel}:{node.lineno}")
     assert not found, found
+
+
+# -- words from outside never read as markup (rule 5) ---------------------------------
+
+def _plain_words(node: ast.expr) -> bool:
+    """Words a Qt window shows as they are: a literal, the app's own words
+    with nothing put in them, or what ui/widgets.plain_text escaped."""
+    if isinstance(node, ast.Constant):
+        return True
+    if isinstance(node, ast.Call):
+        fn = node.func
+        called = fn.id if isinstance(fn, ast.Name) else getattr(fn, "attr", "")
+        return called == "plain_text" or (called == "tr" and not node.keywords)
+    return False
+
+
+#: Questions and messages whose words hold only the app's own or the
+#: person's: (file, the words as the code writes them) -> why.
+OWN_WORDS = {
+    ("media/players.py", "tr('status_player_not_found_msg', name=name)"): "mpv or VLC",
+    ("ui/mw_profiles.py", "tr('pin_wait', n=max(1, math.ceil(wait)))"): "a number",
+    ("ui/mw_profiles.py", "text"): "the wrong PIN's words and the wait, a number",
+    ("ui/mw_settings.py", "tr('pl_export_failed', error=exc)"): "the file the person picked",
+    ("ui/mw_settings.py", "tr('backup_done', what=self._backup_counts(counts), path=path)"):
+        "counts and the file the person picked",
+    ("ui/mw_settings.py", "tr('pl_import_done', n=added)"): "a number",
+}
+
+
+def test_a_question_or_message_shows_outside_words_as_words():
+    """A QMessageBox or a QInputDialog has no plain mode: a box's, a
+    provider's or a backup's words put in one are escaped first
+    (ui/widgets.plain_text) - an <img src="file:///..."> there loaded a
+    file from the disk, on Windows a UNC path sent the login's hash."""
+    found = []
+    for name, owner, at in (("warning", "QMessageBox", 2), ("information", "QMessageBox", 2),
+                            ("critical", "QMessageBox", 2), ("question", "QMessageBox", 2),
+                            ("getText", "QInputDialog", 2), ("getItem", "QInputDialog", 2),
+                            ("getInt", "QInputDialog", 2), ("getDouble", "QInputDialog", 2),
+                            ("getMultiLineText", "QInputDialog", 2)):
+        for rel, line, call in _calls(name):
+            fn = call.func
+            if not (isinstance(fn, ast.Attribute) and isinstance(fn.value, ast.Name)
+                    and fn.value.id == owner and len(call.args) > at):
+                continue
+            words = call.args[at]
+            if not _plain_words(words) and (rel, ast.unparse(words)) not in OWN_WORDS:
+                found.append(f"{rel}:{line} {ast.unparse(words)}")
+    assert not found, "outside words that Qt may read as markup: " + ", ".join(found)
+
+
+#: Labels that show a provider's, a guide's, a box's or a device's words,
+#: by the file that makes them: each is set PlainText there.
+PLAIN_LABELS = {
+    "ui/mw_build.py": {"count_lbl"},
+    "ui/mw_build_detail.py": {"stream_error"},
+    "ui/source_page.py": {"title", "subtitle", "crumb_name", "problem_label"},
+    "media/rewind_bar.py": {"ts_label"},
+    "ui/multiview_cell.py": {"_title", "_pl"},
+    "ui/mw_updates.py": {"_update_banner_lbl"},
+}
+
+
+def test_labels_with_outside_words_are_plain_text():
+    found = []
+    for rel, wanted in PLAIN_LABELS.items():
+        tree = ast.parse((PKG / rel).read_text(encoding="utf-8"))
+        plain = {n.func.value.attr for n in ast.walk(tree)
+                 if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                 and n.func.attr == "setTextFormat" and isinstance(n.func.value, ast.Attribute)
+                 and n.args and ast.unparse(n.args[0]) == "Qt.TextFormat.PlainText"}
+        found += [f"{rel}: {name}" for name in sorted(wanted - plain)]
+    assert not found, "not PlainText: " + ", ".join(found)

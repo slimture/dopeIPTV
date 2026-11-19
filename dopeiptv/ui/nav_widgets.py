@@ -16,6 +16,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtWidgets import QLayout, QPushButton, QSizePolicy, QToolButton, QWidget
 
 from .theme import P, corner_radius, ink_on, tinted
+from .widgets import plain_text
 
 #: Status kinds a nav entry can show.
 DOT, PILL, COUNT = "dot", "pill", "count"
@@ -434,7 +435,7 @@ class SourceAvatar(QPushButton):
         tooltip."""
         self._initials = source_initials(name)
         self._fill = None
-        self.setToolTip(f"{name}\n{hint}" if name and hint else (name or hint))
+        self.setToolTip(plain_text(f"{name}\n{hint}" if name and hint else (name or hint)))
         self.setAccessibleName(name or hint)
         self.setAccessibleDescription(hint)
         self.update()
@@ -447,7 +448,7 @@ class SourceAvatar(QPushButton):
         self._initials = text
         self._fill = fill
         lines = [x for x in (name, source, hint) if x]
-        self.setToolTip("\n".join(lines))
+        self.setToolTip(plain_text("\n".join(lines)))
         self.setAccessibleName(name)
         self.setAccessibleDescription(hint)
         self.update()
@@ -524,7 +525,7 @@ class SourceLabel(QPushButton):
         if (name, kind) != (self._name, self._kind):
             self._name, self._kind = name, kind
             self.update()
-        self.setToolTip(tip)
+        self.setToolTip(plain_text(tip))       # a source's name in it
         self.setAccessibleName(accessible or name)
         self.setAccessibleDescription(hint)
 

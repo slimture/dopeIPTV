@@ -15,7 +15,7 @@ import threading
 import time
 
 from PyQt6 import sip
-from PyQt6.QtCore import QObject, QTimer
+from PyQt6.QtCore import QObject, Qt, QTimer
 from PyQt6.QtWidgets import (
     QDialog, QDialogButtonBox, QLabel, QListWidget, QMessageBox, QPushButton,
     QTabWidget, QVBoxLayout,
@@ -29,6 +29,7 @@ from ..i18n import tr
 from ..providers.metadata import PosterResolver
 from ..providers.simkl import scrobble_episode, scrobble_movie
 from .theme import P
+from .widgets import plain_text
 
 
 class _SimklMixin:
@@ -263,7 +264,7 @@ class _SimklPinDialog(QDialog):
 
     def _start_failed(self, msg: str) -> None:
         if self._live():
-            self.info.setText(tr("simkl_could_not_start", msg=msg))
+            self.info.setText(plain_text(tr("simkl_could_not_start", msg=msg)))
 
     def _poll(self) -> None:
         if not self._live() or not self.code:
@@ -285,7 +286,7 @@ class _SimklPinDialog(QDialog):
 
     def _poll_failed(self, msg: str) -> None:
         if self._live():
-            self.info.setText(tr("simkl_login_failed", msg=msg))
+            self.info.setText(plain_text(tr("simkl_login_failed", msg=msg)))
 
 
 class _SimklListsDialog(QDialog):
@@ -304,6 +305,7 @@ class _SimklListsDialog(QDialog):
         tabs.addTab(self.wl_list, tr("trakt_tab_watchlist"))
         tabs.addTab(self.hist_list, tr("nav_history"))
         self.status = QLabel(tr("common_loading"))
+        self.status.setTextFormat(Qt.TextFormat.PlainText)     # the service's words
         self.status.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         lay.addWidget(self.status)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)

@@ -39,6 +39,7 @@ from ..i18n import tr
 from .media_cards import Card, CardDelegate, CardView, PageHeader, PlacePage, Segmented, is_heading
 from .series_page import drawn_icon
 from .theme import P, corner_radius
+from .widgets import plain_text
 
 __all__ = ["ListPlace", "PlaceCard", "PlaceCardView", "fits_inside", "layout_icon",
            "line_of"]
@@ -427,7 +428,7 @@ class ListPlace(PlacePage):
         """The way back's words ("Back to Films"); None hides it (the top)."""
         if text:
             self._back_full = text
-            self.back.setToolTip(text)
+            self.back.setToolTip(plain_text(text))     # a folder's, a country's name
             self.back.setAccessibleName(text)
             self._fit_back()
         if self.back.isHidden() == bool(text):

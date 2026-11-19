@@ -38,7 +38,7 @@ from ..media.loading_overlay import paint_spinner
 from ..media.seek_slider import _SeekSlider
 from .media_cards import Pictures, initials_of, paint_picture
 from .theme import P, corner_radius, ink_on, tinted
-from .widgets import paint_strip_glyph
+from .widgets import paint_strip_glyph, plain_text
 
 #: The card's states (ui/mw_cast_watch.py picks one).
 STARTING, PLAYING, PAUSED, BUFFERING = "starting", "playing", "paused", "buffering"
@@ -422,6 +422,7 @@ class ElidedLabel(QLabel):
 
     def __init__(self, text: str = "", parent: QWidget | None = None) -> None:
         super().__init__(text, parent)
+        self.setTextFormat(Qt.TextFormat.PlainText)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
 
     def minimumSizeHint(self) -> QSize:               # noqa: N802 - Qt hook
@@ -636,7 +637,8 @@ class CastCard(QWidget):
         """The TV it plays on - and, in its tooltip, *where* that TV is (its
         address): which device the name stands for."""
         self.device.setText(device or "")
-        self.device.setToolTip(f"{device}\n{where}" if device and where else device or "")
+        self.device.setToolTip(plain_text(     # the device's own name
+            f"{device}\n{where}" if device and where else device or ""))
         self.device.setAccessibleName(tr("cast_casting_to", name=device or ""))
         self.device_mark.set_glyph("airplay" if airplay else "cast")
         self.device_row.setVisible(bool(device))

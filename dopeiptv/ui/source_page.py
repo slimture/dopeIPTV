@@ -35,6 +35,7 @@ from .dialogs import SourceFields
 from .nav_widgets import source_initials
 from .settings_ui import PAGE_MAX_WIDTH, SettingsCard, Stepper, align_controls
 from .theme import P, _mix, ink_on
+from .widgets import plain_text
 
 #: Each kind as the page and the list of sources name it.
 KIND_NAMES = {"xtream": "Xtream", "m3u": "M3U", "stalker": "Stalker", "enigma2": "Enigma2",
@@ -277,6 +278,7 @@ class SourcePage(SourceFields, QScrollArea):
         self.crumb.setCursor(Qt.CursorShape.PointingHandCursor)
         self.crumb.clicked.connect(self.go_back)
         self.crumb_name = QLabel("")
+        self.crumb_name.setTextFormat(Qt.TextFormat.PlainText)
         self.crumb_name.setObjectName("SettingsHint")
         row.addWidget(self.crumb)
         row.addWidget(self.crumb_name)
@@ -290,9 +292,11 @@ class SourcePage(SourceFields, QScrollArea):
         text = QVBoxLayout()
         text.setSpacing(3)
         self.title = QLabel("")
+        self.title.setTextFormat(Qt.TextFormat.PlainText)
         self.title.setObjectName("SettingsTitle")
         self.title.setWordWrap(True)
         self.subtitle = QLabel("")
+        self.subtitle.setTextFormat(Qt.TextFormat.PlainText)    # the provider's account words
         self.subtitle.setObjectName("SettingsHint")
         self.subtitle.setWordWrap(True)
         self.subtitle.setStyleSheet("font-size:12.5px;")
@@ -309,6 +313,7 @@ class SourcePage(SourceFields, QScrollArea):
         self._col.addLayout(head)
         # What keeps the last change from being stored, while it does.
         self.problem_label = QLabel("")
+        self.problem_label.setTextFormat(Qt.TextFormat.PlainText)
         self.problem_label.setWordWrap(True)
         self.problem_label.setStyleSheet(f"color:{P['error']}; font-size:12.5px;")
         self.problem_label.hide()
@@ -769,7 +774,7 @@ class SourcePage(SourceFields, QScrollArea):
         bad = self.problem()
         if bad is not None and self.values() != self._stored and not self._just_browsed():
             self._show_part(bad[2])
-            QMessageBox.warning(self.window(), bad[0], bad[1])
+            QMessageBox.warning(self.window(), bad[0], plain_text(bad[1]))
             return
         if self._back is not None:
             self._back()
@@ -784,7 +789,8 @@ class SourcePage(SourceFields, QScrollArea):
         if not stored and self.values() != self._stored and not self._just_browsed():
             bad = self.problem()
             if bad is not None:
-                QMessageBox.warning(self.window(), bad[0], f"{bad[1]}\n\n{tr('src_not_saved')}")
+                QMessageBox.warning(self.window(), bad[0],
+                                    plain_text(f"{bad[1]}\n\n{tr('src_not_saved')}"))
         if self._left_cb is not None:
             self._left_cb(self._pid, self._changed)
 

@@ -99,6 +99,7 @@ class ToggleSwitch(QCheckBox):
 
 def _muted(text: str, size: int = 12) -> QLabel:
     lbl = QLabel(text)
+    lbl.setTextFormat(Qt.TextFormat.PlainText)      # a device's, a box's words in it
     lbl.setWordWrap(True)
     lbl.setObjectName("SettingsHint")
     lbl.setStyleSheet(f"font-size:{size}px;")
@@ -172,6 +173,7 @@ class SettingsCard(QFrame):
         text = QVBoxLayout()
         text.setSpacing(2)
         name = QLabel(label)
+        name.setTextFormat(Qt.TextFormat.PlainText)     # a cast device's, a source's name
         name.setWordWrap(True)
         name.setObjectName("SettingsLabel")
         text.addWidget(name)
@@ -329,6 +331,7 @@ class SettingsPage(QScrollArea):
         outer.addWidget(col, 100)
         outer.addStretch(1)
         head = QLabel(title)
+        head.setTextFormat(Qt.TextFormat.PlainText)
         head.setObjectName("SettingsTitle")
         self._col.addWidget(head)
         self._subtitle = None
@@ -408,6 +411,7 @@ class SettingsPage(QScrollArea):
         if title:
             # In the page's own type, not small capitals.
             head = QLabel(title)
+            head.setTextFormat(Qt.TextFormat.PlainText)
             head.setObjectName("SettingsCardTitle")
             # A styled label indents its text by half an "x" unless told
             # not to, which set every heading off the rows under it.

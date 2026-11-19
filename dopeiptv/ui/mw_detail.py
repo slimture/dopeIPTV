@@ -10,7 +10,7 @@ import re
 from ..providers.client import b64, epg_times
 from ..i18n import tr
 from .theme import ACCENT, P
-from .widgets import _ClickableWidget
+from .widgets import _ClickableWidget, plain_text
 from ..core import film_view as fv
 from ..core.log import log, redact_url
 from ..core.privacy import for_log
@@ -433,7 +433,7 @@ class _DetailMixin:
         chip = _ClickableWidget()
         if self.tmdb and name:
             chip.setCursor(Qt.CursorShape.PointingHandCursor)
-            chip.setToolTip(tr("detail_cast_find", name=name))
+            chip.setToolTip(plain_text(tr("detail_cast_find", name=name)))
             chip.clicked.connect(
                 lambda: self._on_cast_clicked(name, person_id))
         v = QVBoxLayout(chip)

@@ -18,6 +18,7 @@ from ..core.profiles import adult_category
 from ..core.workers import run_async
 from ..i18n import tr
 from .mw_radio import SEARCH
+from .widgets import plain_text
 
 
 class _SearchMixin:
@@ -175,7 +176,7 @@ class _SearchMixin:
                 label += "  ·  " + ", ".join(sample)
             it = QListWidgetItem(label)
             it.setData(Qt.ItemDataRole.UserRole, cid)
-            it.setToolTip(cname)
+            it.setToolTip(plain_text(cname))     # the provider's category name
             self.cat_list.addItem(it)
         if not results:
             none_it = QListWidgetItem(tr("cat_search_none"))

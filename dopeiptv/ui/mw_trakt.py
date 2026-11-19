@@ -21,6 +21,7 @@ from ..providers.trakt import (
 )
 from .notices import hub_of
 from .theme import P
+from .widgets import plain_text
 from ..core.workers import run_async
 from ..core.xdg import open_url
 from PyQt6 import sip
@@ -1097,7 +1098,7 @@ class _TraktMixin:
 
         def exchange_failed(msg) -> None:
             if not state["cancelled"]:
-                info.setText(tr("trakt_login_failed", msg=msg))
+                info.setText(plain_text(tr("trakt_login_failed", msg=msg)))
 
         # However the dialog goes away - Cancel, Escape or the window's close
         # button - the listener must stop. Only Cancel used to say so, and
@@ -1155,7 +1156,7 @@ class _TraktMixin:
 
         def poll_failed(msg) -> None:
             if not state["cancelled"]:
-                info.setText(tr("trakt_login_failed", msg=msg))
+                info.setText(plain_text(tr("trakt_login_failed", msg=msg)))
 
         def started(data) -> None:
             if state["cancelled"]:
@@ -1172,7 +1173,7 @@ class _TraktMixin:
 
         def start_failed(msg) -> None:
             if not state["cancelled"]:
-                info.setText(tr("trakt_could_not_start", msg=msg))
+                info.setText(plain_text(tr("trakt_could_not_start", msg=msg)))
 
         # Closed any way at all: stop polling (see the browser dialog).
         d.finished.connect(lambda _r: state.__setitem__("cancelled", True))
@@ -1196,6 +1197,7 @@ class _TraktMixin:
         tw.addTab(wl_list, tr("trakt_tab_watchlist"))
         tw.addTab(hist_list, tr("nav_history"))
         status = QLabel(tr("common_loading"))
+        status.setTextFormat(Qt.TextFormat.PlainText)      # the service's words
         status.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         lay.addWidget(status)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)

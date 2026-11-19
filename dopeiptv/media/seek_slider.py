@@ -156,6 +156,7 @@ class _SeekSlider(QSlider):
             else:
                 lbl = QLabel(win)
             lbl.setObjectName("SeekHoverTip")
+            lbl.setTextFormat(Qt.TextFormat.PlainText)     # a guide's programme title
             lbl.setStyleSheet(
                 "#SeekHoverTip { background: rgba(24,24,30,235);"
                 " color: #ECECF1; border: 1px solid rgba(255,255,255,0.14);"

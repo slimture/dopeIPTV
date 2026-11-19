@@ -193,6 +193,7 @@ class _MultiviewCell(QWidget):
         self._border.hide()
 
         self._title = QLabel("", self.video)
+        self._title.setTextFormat(Qt.TextFormat.PlainText)     # channel and programme
         self._title.setStyleSheet(
             "background:rgba(0,0,0,150); color:#ECECF1; padding:3px 8px;"
             "font-size:12px; font-weight:600;")
@@ -201,6 +202,7 @@ class _MultiviewCell(QWidget):
         # under the title (cells can come from different accounts).
         self.playlist_name = ""
         self._pl = QLabel("", self.video)
+        self._pl.setTextFormat(Qt.TextFormat.PlainText)
         self._pl.setStyleSheet(
             "background:rgba(0,0,0,120); color:#9A9AA5; padding:1px 8px;"
             "font-size:10px;")

@@ -1666,10 +1666,10 @@ class EpgGrid(QWidget):
                                state, data)
             # The whole title and its time, however narrow the card is
             # drawn (zoomed out, its title is cut short or left out).
-            block.setToolTip(
+            block.setToolTip(plain_text(
                 f"{p.get('title') or '?'}\n"
                 f"{datetime.fromtimestamp(p['start_timestamp']):%H:%M}–"
-                f"{datetime.fromtimestamp(p['stop_timestamp']):%H:%M}")
+                f"{datetime.fromtimestamp(p['stop_timestamp']):%H:%M}"))
             # State glyphs on the block itself: a scheduled/running recording
             # and a set reminder used to be visible only in the context menu.
             prefix = ""
@@ -1745,7 +1745,7 @@ class EpgGrid(QWidget):
         cell.setData(0, {"channel": ch, "prog": None})
         name = ch.get("name") or "?"
         # The whole name, however it is cut (or left out, logos alone).
-        cell.setToolTip(name)
+        cell.setToolTip(plain_text(name))
         # Group first, then position (see the logo below): a row drawn after
         # the board scrolled sideways joins a column group that is already
         # shifted, and addToGroup keeps the item's scene position - which put

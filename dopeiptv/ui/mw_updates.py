@@ -27,6 +27,7 @@ from ..i18n import tr
 from .dialogs import UpdateDialog
 from .notices import hub_of
 from .theme import P
+from .widgets import plain_text
 
 #: How soon a step that needs the build's verdict looks again while the
 #: check that works it out (core/build_check.py) is still running.
@@ -167,7 +168,7 @@ class _UpdatesMixin:
             logo.setToolTip(tr("tooltip_jump_playing"))
             self.update_status_btn.hide()
             return
-        logo.setToolTip(tr("about_update_available", version=latest_tag))
+        logo.setToolTip(plain_text(tr("about_update_available", version=latest_tag)))
         # The attention-grabbing part (status link, red badge, bounce,
         # red->accent settle) runs once per version, so the cached apply at
         # startup and the later network check for the same tag don't double up.
@@ -210,6 +211,7 @@ class _UpdatesMixin:
             row.setContentsMargins(14, 8, 8, 8)
             row.setSpacing(12)
             self._update_banner_lbl = QLabel("")
+            self._update_banner_lbl.setTextFormat(Qt.TextFormat.PlainText)    # the release's tag
             self._update_banner_lbl.setStyleSheet(
                 "color:#FFFFFF; font-size:12px; font-weight:600;"
                 " background:transparent;")
