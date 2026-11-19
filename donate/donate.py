@@ -914,14 +914,20 @@ class Handler(BaseHTTPRequestHandler):
         return data if isinstance(data, dict) else {}
 
     def _user(self) -> str:
-        """The signed-in admin: the one nginx names in X-Admin-User (which it
-        overwrites on every request; never a client's), else the one this
-        request's session cookie names - or ""."""
-        named = (self.headers.get("X-Admin-User") or "").strip()
-        if _is_admin(named):
-            return named
+        """The signed-in admin: the one this request's signed session cookie
+        names - or "". nginx's X-Admin-User proves nothing on its own:
+        anything that reaches this service's socket can send the header, so
+        a process in the jail could have named any admin and been one. Only
+        before the first admin exists (admin_auth has none) does it still
+        count - nginx's old password prompt names the owner there, the way
+        to make that first invite."""
         user = session_user(self.headers.get("Cookie") or "")
-        return user if _is_admin(user) else ""
+        if _is_admin(user):
+            return user
+        if _auth().has_users():
+            return ""
+        named = (self.headers.get("X-Admin-User") or "").strip()
+        return named if _is_admin(named) else ""
 
     def _session_headers(self, session: str | None) -> None:
         # This browser is the site's owner: nginx leaves it out of the

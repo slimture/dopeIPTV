@@ -385,3 +385,28 @@ if __name__ == "__main__":
         fn()
         print("ok", name)
     print(f"{len(tests)} passed")
+
+
+def test_an_admin_is_who_the_signed_session_says_never_a_header_alone():
+    # The security review's way in: anything that reaches the service's
+    # socket could send X-Admin-User naming an admin - and make itself one
+    # with an invite. Once there are admins, only the signed session counts.
+    srv, _stats, donate = _service()
+    import admin_auth
+    admin_auth._CFG["path"] = ""        # this test's own admins, in its own folder
+    try:
+        auth = donate._auth()
+        token, _until = auth.invite("owner", "alice", "Alice")
+        auth.invite_password(token, "a long and good password 42")
+        assert auth.has_users()
+        forged = {"X-Admin-User": "alice", "Origin": donate.ORIGIN}
+        assert _call(srv, "GET", "/admin/account", headers=forged)[0] == 401
+        assert _call(srv, "POST", "/admin/account/invite", body={"user": "mallory"}, headers=forged)[0] == 401
+        cookie = {"Cookie": f"{donate.SESSION_COOKIE}={donate.session_cookie('alice')}"}
+        status, body = _call(srv, "GET", "/admin/account", headers=cookie)
+        assert status == 200 and body.get("user", "alice") == "alice"
+        assert _call(srv, "GET", "/admin/account", headers={"Cookie": f"{donate.SESSION_COOKIE}=alice.1.x"})[0] == 401
+    finally:
+        admin_auth._CFG["path"] = ""    # the next test's service sets up its own
+        srv.shutdown()
+        srv.server_close()

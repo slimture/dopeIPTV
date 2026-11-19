@@ -1,8 +1,9 @@
 """admin.py - the data behind the admin page (/admin/), served by donate.py.
 
-nginx asks for a password in front of /admin/ and passes the signed-in user
-on as X-Admin-User; donate.py refuses any /admin/ request without it, so a
-missing auth_basic line cannot open the page to everyone.
+nginx lets only a signed-in browser through to /admin/ (auth_request) and
+donate.py checks the signed session cookie again itself, so a missing nginx
+line cannot open the page to everyone - and a header sent straight to the
+service's socket (X-Admin-User) proves nothing once the first admin exists.
 
     GET /admin/            the page (admin/index.html, admin.css, admin.js)
     GET /admin/data?days=N the numbers for the last N days (7, 30, 90, 365;
