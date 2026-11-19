@@ -424,11 +424,21 @@ class _TimeshiftMixin:
         try:
             fmt = str(self.settings.value("stream_format", "ts") or "ts")
             live = self.client.live_url(it.get("stream_id"), fmt) or ""
-            url = catchup.for_programme(
-                src, live, datetime.fromtimestamp(start, timezone.utc),
-                datetime.fromtimestamp(end, timezone.utc),
-                catchup_id=str(it.get("catchup_id") or ""),
-                channel_source=str(it.get("catchup_source") or ""))
+            begin, finish = (datetime.fromtimestamp(start, timezone.utc),
+                             datetime.fromtimestamp(end, timezone.utc))
+            cid, channel = str(it.get("catchup_id") or ""), str(it.get("catchup_source") or "")
+            now = datetime.now(timezone.utc)
+            url = catchup.for_programme(src, live, begin, finish, catchup_id=cid,
+                                        channel_source=channel, now=now)
+            template, mode = catchup.settings_of(src)
+            if url and channel and not template and url == catchup.archive_url(
+                    live, begin, finish, template, mode, now, cid, channel):
+                # The channel's own catch-up address, no template or rule of
+                # the person's in it: the source's word, judged as its stream
+                # addresses are (core/stream_address.py).
+                judge = getattr(self.client, "played_from_source", None)
+                if callable(judge):
+                    url = judge(url) or None
         except Exception as e:
             log.info("[ts] the source's catch-up address could not be made: %s", e)
             return None

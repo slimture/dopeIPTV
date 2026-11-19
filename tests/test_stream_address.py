@@ -275,3 +275,182 @@ def test_the_players_take_a_last_look_before_mpv():
     for hostile in (WRITES_A_FILE, "edl://x", "memory://x", "fdclose://3"):
         assert EmbeddedPlayer.play(Untouched(), hostile, "t") is False
         assert _MultiviewCell.play(Untouched(), hostile, "t") is False
+
+
+# -- a source on the internet hands out media streams, never this computer -----------
+
+#: What a source on the internet may not send the player to, and why: a
+#: file share (Windows signs in there with the person's account), a raw
+#: socket, the printer's page on this computer, the cloud's metadata.
+FROM_THE_INTERNET = ("smb://evil.example/share/a.ts", "tcp://evil.example:25", "tls://evil.example:443",
+                     "ftp://evil.example/a.ts", "sftp://evil.example/a.ts", "davs://evil.example/a",
+                     "ipfs://Qm", "httpproxy://evil.example:3128/10.0.0.1:22", "ytdl://evil.example/x",
+                     "http://127.0.0.1:631/", "http://169.254.169.254/latest/meta-data/",
+                     "http://[::1]/")
+#: Every spelling of this computer and of a link-local host is the same host.
+SPELLINGS = ("http://127.1/", "http://2130706433/", "http://0x7f000001/", "http://0177.0.0.1/",
+             "http://127.0.0.1./", "http://localhost:8080/", "http://LOCALHOST./", "http://a.localhost/",
+             "http://[::ffff:127.0.0.1]/", "http://[::ffff:7f00:1]/", "http://[0:0:0:0:0:0:0:1]/",
+             "http://[::127.0.0.1]/", "http://0.0.0.0:631/", "http://0/", "http://[::]/",
+             "http://[fe80::1%25eth0]/", "http://169.254.1.1/", "http://metadata.google.internal/",
+             "http://[fd00:ec2::254]/", "http://100.100.100.200/", "http://127.0.0.1%2e/",
+             "http://tv.example@127.0.0.1/", "http://tv.example#@127.0.0.1/x",
+             "http://tv.example\\@127.0.0.1/", "http://１２７.０.０.１/", "https://[::1]:8443/x.m3u8",
+             "rtmp://127.0.0.1/app playpath=x", "rtsp://169.254.10.10/cam", "udp://@127.0.0.1:1234")
+#: From the internet as before: a server's stream, a multicast group, and a
+#: private address of the home network (an ISP's multicast proxy, udpxy
+#: on the router).
+STILL_FROM_THE_INTERNET = (
+    "http://tv.example:8080/live/u/p/1.ts", "https://cdn.example/hls/a.m3u8?token=1",
+    "rtsp://cam.example/1", "rtmp://live.example/app playpath=x live=1", "udp://@239.0.0.1:1234",
+    "rtp://@239.1.1.1:5000", "srt://relay.example:9000?streamid=x", "rist://relay.example:1968",
+    "mms://radio.example/a", "http://192.168.1.1:4022/udp/239.0.0.1:1234", "http://10.0.0.5:8080/x.ts",
+    "http://[fd00::5]:8096/x", "http://100.64.1.2/x.ts", "http://tv.example/x.ts|Referer=http://127.0.0.1/",
+    "http://127.0.0.1.tv.example/x.ts")
+
+
+def test_a_source_on_the_internet_hands_out_media_streams_and_never_this_computer():
+    for address in FROM_THE_INTERNET + SPELLINGS:
+        assert refusal(address, internet=True), address
+        assert played(address, True, internet=True) == ""
+    for address in STILL_FROM_THE_INTERNET:
+        assert refusal(address, internet=True) == "", address
+    # What is no stream whoever lists it stays so.
+    for address in NEVER:
+        assert refusal(address, internet=True), address
+    # A source of the home network as before: its NAS's share, udpxy here.
+    for address in FROM_THE_INTERNET + SPELLINGS:
+        assert refusal(address, remote=True) == "" or stream_address.scheme_of(address) not in \
+            stream_address.NETWORK, address
+
+
+def test_where_a_source_is_read_from_its_own_address_never_looked_up():
+    for server in ("http://tv.example/get.php?username=u", "tv.example:8080", "https://abc.plex.direct:32400",
+                   "http://8.8.8.8", "http://[2001:db8::1]/", "http://[bad"):
+        assert stream_address.on_internet(server), server
+    for server in ("http://192.168.1.10/list.m3u", "10.0.0.1:8096", "http://127.0.0.1:34400/lineup.m3u",
+                   "https://[fd00::5]:8096", "nas", "http://vuplus.local", "http://box.lan:8001",
+                   "http://fritz.box/dvb/m3u/tvsd.m3u", "http://100.101.102.103:9981", ""):
+        assert not stream_address.on_internet(server), server
+
+
+PLAYLIST_ODD = """#EXTM3U
+#EXTINF:-1 tvg-logo="http://127.0.0.1:631/printers",Share
+smb://evil.example/share/a.ts
+#EXTINF:-1 tvg-logo="http://192.168.1.1/picon/2.png",Socket
+tcp://evil.example:25
+#EXTINF:-1 tvg-logo="http://[::1]/x.png",Printer
+http://127.0.0.1:631/
+#EXTINF:-1 tvg-logo="http://169.254.169.254/x.png",Cloud
+http://169.254.169.254/latest/meta-data/
+#EXTINF:-1 tvg-logo="http://logos.example/5.png",Loopback
+http://[::1]/
+#EXTINF:-1 tvg-logo="http://localhost/6.png",Proxy
+http://192.168.1.1:4022/udp/239.0.0.1:1234
+"""
+
+
+def _odd(server: str, monkeypatch) -> M3UClient:
+    monkeypatch.setattr(M3UClient, "_fetch", lambda self: PLAYLIST_ODD)
+    return client_mod.make_client({"kind": "m3u", "server": server})
+
+
+def test_an_internet_playlist_plays_no_share_socket_or_service_of_this_computer(monkeypatch, warnings):
+    internet = _odd("http://tv.example/list.m3u", monkeypatch)
+    rows = internet.live_streams()
+    assert [internet.live_url(r["stream_id"]) for r in rows] == [
+        "", "", "", "", "", "http://192.168.1.1:4022/udp/239.0.0.1:1234"]
+    # Said once each, with its reason and never the address.
+    assert any("smb://" in w for w in warnings) and any("this computer" in w for w in warnings)
+    assert any("link-local" in w for w in warnings)
+    assert not any("evil.example" in w or "631" in w for w in warnings)
+    # The same list from a box of the home network or as a file of one's own: as before.
+    for server in ("http://192.168.1.10/list.m3u", "http://nas.local/list.m3u", "/home/u/list.m3u"):
+        own = _odd(server, monkeypatch)
+        assert [own.live_url(r["stream_id"]) for r in own.live_streams()] == [
+            "smb://evil.example/share/a.ts", "tcp://evil.example:25", "http://127.0.0.1:631/",
+            "http://169.254.169.254/latest/meta-data/", "http://[::1]/",
+            "http://192.168.1.1:4022/udp/239.0.0.1:1234"], server
+
+
+def test_a_backup_address_on_the_internet_makes_the_source_the_internets(monkeypatch):
+    from dopeiptv.core import mirrors, nerd
+    from tests.test_nerd import S
+    nerd.install(S(nerd_enabled="true"))
+    try:
+        assert not client_mod._on_internet("m3u", "http://192.168.1.10/list.m3u", {})
+        assert client_mod._on_internet("m3u", "http://192.168.1.10/list.m3u",
+                                       {mirrors.KEY: "http://tv.example/list.m3u"})
+        assert not client_mod._on_internet("m3u", "http://192.168.1.10/list.m3u",
+                                           {mirrors.KEY: "http://192.168.1.11/list.m3u"})
+    finally:
+        nerd.install(None)
+
+
+def test_the_persons_udpxy_on_this_computer_still_plays_an_internet_sources_multicast(warnings):
+    from dopeiptv.core import nerd
+    from tests.test_nerd import S
+    nerd.install(S(nerd_enabled="true", nerd_udpxy="127.0.0.1:4022"))
+    try:
+        source = {"_kind": "m3u", "_server": "http://tv.example/list.m3u"}
+        c = _Fake("udp://@239.0.0.1:1234")
+        client_mod._nerd_lists(c, source, "p1")
+        assert c.live_url(1) == "http://127.0.0.1:4022/udp/239.0.0.1:1234"
+        # The source's own word is judged first: no udpxy makes this computer of it.
+        c = _Fake("udp://@127.0.0.1:1234")
+        client_mod._nerd_lists(c, source, "p1")
+        assert c.live_url(1) == ""
+    finally:
+        nerd.install(None)
+
+
+def test_an_internet_sources_archive_and_catchup_addresses_are_judged_the_same(warnings):
+    for kind in ("stalker", "xtream", "m3u"):
+        c = _Fake("http://127.0.0.1:631/")
+        client_mod._nerd_lists(c, {"_kind": kind, "_server": "http://tv.example"}, "p1")
+        assert c.archive_link(1, 1.0) is None
+        assert c.timeshift_urls(1, None, 60) == ["http://tv.example/archive.ts"]
+        assert c.played_from_source("http://[::1]/x") == ""
+        assert c.played_from_source("http://tv.example/x") == "http://tv.example/x"
+        home = _Fake("http://127.0.0.1:631/")
+        client_mod._nerd_lists(home, {"_kind": kind, "_server": "http://192.168.1.2"}, "p1")
+        assert home.archive_link(1, 1.0) is not None
+        assert home.played_from_source("http://[::1]/x") == "http://[::1]/x"
+
+
+def test_a_channels_own_catchup_address_from_the_internet_is_the_sources_word(warnings):
+    """Nerd's catch-up with no template of the person's: the channel's own
+    catchup-source is the provider's word (ui/mw_timeshift.py)."""
+    from datetime import datetime, timezone
+
+    from dopeiptv.core import nerd
+    from dopeiptv.ui.mw_timeshift import _TimeshiftMixin
+    from tests.test_nerd import S
+    nerd.install(S(nerd_enabled="true"))
+
+    class Window:
+        settings = S()
+
+        def __init__(self, server: str) -> None:
+            self.client = _Fake("http://tv.example/live/1.ts")
+            client_mod._nerd_lists(self.client, {"_kind": "m3u", "_server": server}, "p1")
+
+    start = datetime(2026, 11, 1, 20, tzinfo=timezone.utc).timestamp()
+    try:
+        for template, channel, server, out in (
+                ("", "http://127.0.0.1:631/x?s={utc}", "http://tv.example/l.m3u", None),
+                ("", "http://tv.example/arc/{utc}.ts", "http://tv.example/l.m3u",
+                 "http://tv.example/arc/%d.ts" % start),
+                ("", "http://127.0.0.1:631/x?s={utc}", "http://192.168.1.2/l.m3u",
+                 "http://127.0.0.1:631/x?s=%d" % start),
+                # The person's own template is theirs.
+                ("http://127.0.0.1:8000/{utc}.ts", "", "http://tv.example/l.m3u",
+                 "http://127.0.0.1:8000/%d.ts" % start)):
+            nerd.set_source({"kind": "m3u", "options": {"catchup_mode": "default",
+                                                         "catchup_template": template}})
+            it = {"stream_id": 1, "catchup_source": channel}
+            assert _TimeshiftMixin._nerd_catchup_url(Window(server), it, start, start + 1800) == out, \
+                (template, channel, server)
+    finally:
+        nerd.set_source(None)
+        nerd.install(None)

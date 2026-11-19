@@ -1207,18 +1207,30 @@ def _nerd_lists(client, source: dict, pid: str | None) -> None:
     from ..core.url_rewrite import rewrite
     streams, url = client.live_streams, client.live_url
     kind = str(source.get("_kind") or "xtream")
-    remote = _is_remote(kind, str(source.get("_server") or ""))
+    server = str(source.get("_server") or "")
+    remote = _is_remote(kind, server)
+    internet = remote and _on_internet(kind, server, source)
+
+    def theirs(address: Any) -> str:
+        """*address* as the source's own word may be played: what a stream
+        can be from where the source is (core/stream_address.py)."""
+        return stream_address.played(address, remote, kind, internet=internet)
 
     def handed(raw: Any, udpxy: bool = False) -> Any:
         """What is played for the address the source gave: through the
         person's rewrite rules (and udpxy), and only what a stream can be
         (core/stream_address.py) - the source says what goes to the player,
-        the recorder and a cast. An address the person's own rules made is
-        theirs: only what is no stream whoever lists it is kept from it."""
+        the recorder and a cast. The source's word is judged as the source's,
+        from the internet as such; what the person's own rules made of it is
+        theirs - only what is no stream whoever lists it is kept from it -
+        and their udpxy in front of a multicast group a stream of the home
+        network's."""
         if not raw:
             return raw
         out = rewrite(raw, source)
         from_source = out == raw
+        if from_source and not theirs(out):
+            return ""
         if udpxy:
             out = nerd_lists.udpxy_url(out, source)
         return stream_address.played(out, remote and from_source, kind)
@@ -1260,16 +1272,33 @@ def _nerd_lists(client, source: dict, pid: str | None) -> None:
             # A portal's archive by programme: its link is the portal's word
             # too (not rewritten: it was never one of the source's lists').
             got = link(stream_id, start, stop)
-            if got is not None and not stream_address.played(got.get("url"), remote, kind):
+            if got is not None and not theirs(got.get("url")):
                 return None
             return got
         client.archive_link = archive_link
+    # A whole address the source gave outside these calls (a channel's own
+    # catch-up address, ui/mw_timeshift.py): judged as these are.
+    client.played_from_source = theirs
 
 
 def _is_remote(kind: str, server: str) -> bool:
     """Whether a source's addresses come over the network: every kind but a
     playlist file on this computer (core/stream_address.py)."""
     return kind != "m3u" or server.strip().lower().startswith(("http://", "https://"))
+
+
+def _on_internet(kind: str, server: str, options: dict) -> bool:
+    """Whether a source is on the internet (core/stream_address.on_internet):
+    its own address, or one of the backup addresses its lists may come from
+    instead (core/mirrors.py) - a source is the home network's only when
+    every address it is read from is."""
+    found = [server]
+    if kind in mirrors.KINDS and options.get(mirrors.KEY):
+        try:
+            found += mirrors.parse(options.get(mirrors.KEY), kind)
+        except Exception:
+            return True
+    return any(stream_address.on_internet(a) for a in found)
 
 
 def _make_client(playlist: dict):
