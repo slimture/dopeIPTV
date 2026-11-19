@@ -356,7 +356,6 @@ h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.03em; line-height:
 .autonote { margin-top: 18px; font-size: 13px; color: var(--faint); line-height: 1.75; }
 .autonote code { font-family: var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; color: var(--muted); overflow-wrap: anywhere; }
 /* What the app is not, before anyone downloads it: a quiet line. */
-.dl-nochan { margin: 22px auto 0; text-align: center; font-size: 14px; color: var(--muted); max-width: 60ch; }
 .autonote a.verify-link { color: var(--accent); font-weight: 600; }
 .autonote a.verify-link:hover { text-decoration: underline; }
 
