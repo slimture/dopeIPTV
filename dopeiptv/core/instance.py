@@ -50,7 +50,9 @@ def server_name() -> str:
     which only they can enter) - without one a folder of their own in
     their cache (0700, ``_make_folder``) - never the /tmp everyone shares,
     where another account could take the name first and hear this one's
-    commands. macOS keeps Qt's per-user temporary folder. Windows' named
+    commands. Elsewhere (macOS, a BSD), or with a cache path too long for
+    a socket, a folder of their own in the temporary folder
+    (dopeiptv-<uid>, 0700, theirs and no link). Windows' named
     pipes are the whole machine's: the name carries a random word only
     this user can read (``_pipe_key``), so no other account can make it
     first; the pipe itself is the user's alone (UserAccessOption)."""
@@ -67,6 +69,9 @@ def server_name() -> str:
         shared = os.path.join(runtime, "app", app_id)
         if os.path.isdir(shared):
             return os.path.join(shared, name)
+    if sys.platform == "win32":
+        key = _pipe_key()
+        return f"{name}-{key}" if key else name
     if sys.platform.startswith("linux"):
         if runtime and os.path.isabs(runtime) and os.path.isdir(runtime):
             return os.path.join(runtime, "dopeiptv", name)
@@ -74,11 +79,14 @@ def server_name() -> str:
         own = os.path.join(cache, "dopeiptv", "instance", name)
         if os.path.isabs(own) and len(own.encode("utf-8")) <= SOCKET_PATH_MAX:
             return own
-    if sys.platform == "win32":
-        key = _pipe_key()
-        if key:
-            return f"{name}-{key}"
-    return name
+    uid = getattr(os, "getuid", None)
+    if uid is None:
+        return name
+    # Off Linux, or a cache path too long for a socket: a folder of the
+    # user's own in the temporary folder (0700 and theirs, _make_folder) -
+    # never the temporary folder itself, which may be every account's.
+    import tempfile
+    return os.path.join(tempfile.gettempdir(), f"dopeiptv-{uid()}", name)
 
 
 def _pipe_key() -> str:
@@ -123,8 +131,10 @@ def _make_folder(name: str) -> bool:
     try:
         os.makedirs(folder, mode=0o700, exist_ok=True)
         if os.name == "posix":
-            st = os.stat(folder)
-            if st.st_uid != os.getuid():
+            # lstat: a link another account left in a shared temporary
+            # folder would lead the socket - and the chmod - elsewhere.
+            st = os.lstat(folder)
+            if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
                 log.warning("commands: %s is another account's - not listening there", folder)
                 return False
             if stat.S_IMODE(st.st_mode) & 0o077:

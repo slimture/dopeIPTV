@@ -195,15 +195,20 @@ def runtime_dir(monkeypatch):
 def test_the_socket_is_named_in_the_users_own_folder_not_tmp(runtime_dir, monkeypatch):
     """/tmp is everyone's: another account could take the name there first
     and hear this one's commands. On Linux the user's runtime folder;
-    macOS and Windows keep Qt's own place (a per-user temp folder, a pipe)."""
+    Windows keeps its pipe; elsewhere (macOS, a BSD) a folder of the
+    user's own in the temporary folder, never the folder itself."""
     from dopeiptv.core import instance
     monkeypatch.setattr(instance.sys, "platform", "linux")
     name = instance.server_name()
     assert os.path.dirname(name) == os.path.join(runtime_dir, "dopeiptv")
     assert os.path.basename(name).startswith("dopeiptv-")
-    for other in ("darwin", "win32"):
-        monkeypatch.setattr(instance.sys, "platform", other)
-        assert "/" not in instance.server_name()
+    own_tmp = os.path.join(tempfile.gettempdir(), f"dopeiptv-{os.getuid()}") if os.name == "posix" else ""
+    monkeypatch.setattr(instance.sys, "platform", "win32")
+    assert "/" not in instance.server_name()
+    if own_tmp:
+        for other in ("darwin", "freebsd14"):
+            monkeypatch.setattr(instance.sys, "platform", other)
+            assert os.path.dirname(instance.server_name()) == own_tmp
     monkeypatch.setattr(instance.sys, "platform", "linux")
     monkeypatch.delenv("XDG_RUNTIME_DIR")
     cache = tempfile.mkdtemp(prefix="dpc")
@@ -211,7 +216,8 @@ def test_the_socket_is_named_in_the_users_own_folder_not_tmp(runtime_dir, monkey
     # No runtime folder: a folder of the user's own in their cache, not /tmp.
     assert os.path.dirname(instance.server_name()) == os.path.join(cache, "dopeiptv", "instance")
     monkeypatch.setenv("XDG_CACHE_HOME", "/" + "x" * instance.SOCKET_PATH_MAX)
-    assert "/" not in instance.server_name()                 # too long for a socket: as before
+    if own_tmp:                                   # too long for a socket: the temporary folder's own
+        assert os.path.dirname(instance.server_name()) == own_tmp
     shutil.rmtree(cache, ignore_errors=True)
 
 
@@ -256,6 +262,24 @@ def test_a_socket_folder_another_account_owns_is_not_listened_in(app, socket_nam
     monkeypatch.setattr(instance.os, "getuid", lambda: os.stat(os.path.dirname(socket_name)).st_uid + 1)
     server = instance.CommandServer(lambda _c: None)
     assert not server.listening and not os.path.exists(socket_name)
+    server.close()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="folder owners and links")
+def test_a_link_in_place_of_the_socket_folder_is_not_listened_in(app, monkeypatch, tmp_path):
+    """In a temporary folder every account shares, another could leave a
+    link where the socket's folder goes - to a folder of this user's own,
+    which the old check (stat, following it) took for the right one."""
+    from dopeiptv.core import instance
+    target = tmp_path / "home-folder"
+    target.mkdir()
+    os.chmod(target, 0o755)
+    link = tmp_path / "dpl"
+    link.symlink_to(target)
+    monkeypatch.setenv("DOPEIPTV_INSTANCE_SOCKET", str(link / "s"))
+    server = instance.CommandServer(lambda _c: None)
+    assert not server.listening and not (target / "s").exists()
+    assert os.stat(target).st_mode & 0o777 == 0o755, "not narrowed through the link"
     server.close()
 
 
