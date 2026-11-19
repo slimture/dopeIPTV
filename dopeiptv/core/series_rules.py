@@ -34,6 +34,8 @@ from dataclasses import dataclass
 from itertools import pairwise
 from typing import Any, Callable, Iterable, Protocol
 
+from .num import number, whole
+
 #: How far ahead the guide is looked through.
 DAYS = 7
 #: Upcoming recordings one rule keeps scheduled at a time - a keyword on
@@ -82,10 +84,7 @@ def norm(text: object) -> str:
 
 
 def _minutes(settings: Settings, key: str, most: int) -> int:
-    try:
-        n = int(float(settings.value(key, 0) or 0))
-    except (TypeError, ValueError):
-        return 0
+    n = whole(settings.value(key, 0) or 0, 0)
     return max(0, min(most, n))
 
 
@@ -259,10 +258,12 @@ def find_airings(rules: list[dict], channels: Iterable[dict],
             continue
         for p in programmes(ch, lo - shift, hi - shift, match):
             try:
-                start = float(p["start_timestamp"]) + shift
-                stop = float(p["stop_timestamp"]) + shift
-            except (KeyError, TypeError, ValueError):
+                start, stop = number(p["start_timestamp"]), number(p["stop_timestamp"])
+            except (KeyError, TypeError):
                 continue
+            if start is None or stop is None:
+                continue
+            start, stop = start + shift, stop + shift
             if start < lo or start >= hi or stop <= start:
                 continue
             title = str(p.get("title") or "")
@@ -301,10 +302,7 @@ class _Window:
 
 
 def _num(v: Any, default: float) -> float:
-    try:
-        return float(v)
-    except (TypeError, ValueError):
-        return default
+    return number(v, default)
 
 
 def _job_window(job: dict) -> _Window:
@@ -574,10 +572,7 @@ def retimed(airings: Iterable[Airing], jobs: Iterable[dict],
 
 
 def _start(v: Any) -> int | None:
-    try:
-        return int(float(v))
-    except (TypeError, ValueError):
-        return None
+    return whole(v)
 
 
 def remind_plan(airings: Iterable[Airing], reminders: Iterable[dict],

@@ -43,6 +43,7 @@ from .dvr_pool import DvrPool
 from .dvr_session import DvrSession, IngestFactory
 from .dvr_store import Segment
 from .log import log, redact_url
+from .num import digits
 
 #: The hold the restream puts on a session it reads.
 SERVER = "server"
@@ -99,8 +100,9 @@ def _private(stream: str) -> bool:
     (core/privacy.py): private viewing on, or a playback that began in it -
     the window keys it by the row's stream id, a number or its text."""
     keys: list[object] = [stream]
-    if stream.isdigit():
-        keys.append(int(stream))
+    n = digits(stream)
+    if n is not None:
+        keys.append(n)
     return any(privacy.playback_private("live", k) for k in keys)
 
 

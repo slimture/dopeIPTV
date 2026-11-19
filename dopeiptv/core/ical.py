@@ -18,6 +18,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Iterable
 
+from .num import number
+
 PRODID = "-//dopeIPTV//dopeIPTV//EN"
 #: How often a subscribed calendar is asked to look again.
 REFRESH = "PT15M"
@@ -113,12 +115,16 @@ def calendar(events: Iterable[Event], name: str = "dopeIPTV", now: float | None 
 
 # -- what the app has ------------------------------------------------------------
 
+#: The last second a DATE-TIME can be (9999-12-31T23:59:59Z).
+_LAST = 253402300799.0
+
+
 def _num(value: Any) -> float | None:
-    try:
-        n = float(value)
-    except (TypeError, ValueError):
-        return None
-    return n if n > 0 else None
+    """A time kept with a reminder or a recording (a store, a backup or
+    another computer's sync wrote it): a finite number of seconds past
+    1970 and before the year 10000, else None."""
+    n = number(value, hi=_LAST)
+    return n if n is not None and n > 0 else None
 
 
 def reminder_events(reminders: Iterable[dict], source_id: str = "", source: str = "",
@@ -133,7 +139,7 @@ def reminder_events(reminders: Iterable[dict], source_id: str = "", source: str 
             continue
         ch = r.get("ch") or {}
         sid = r.get("stream_id")
-        stop = _num(r.get("stop")) or (stops or {}).get((sid, int(start)))
+        stop = _num(r.get("stop")) or _num((stops or {}).get((sid, int(start))))
         channel = str(ch.get("name") or "")
         title = str(r.get("title") or channel or "?")
         desc = " · ".join(p for p in (note, channel, source) if p)

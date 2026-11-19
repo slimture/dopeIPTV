@@ -24,6 +24,7 @@ from urllib.parse import urlsplit
 
 from . import hls_cap as _hls
 from .log import log
+from .num import whole
 
 DEFAULT_UA = "dopeIPTV/1.0"
 
@@ -370,10 +371,8 @@ class Nerd:
         return self.get(key, "true" if default else "false").strip().lower() in _TRUE
 
     def num(self, key: str, default: int) -> int:
-        try:
-            return int(float(self.get(key, str(default))))
-        except ValueError:
-            return default
+        # A spin box's range: Qt refuses an int past 32 bits.
+        return whole(self.get(key, str(default)), default, lo=-(2**31), hi=2**31 - 1)
 
     @property
     def on(self) -> bool:

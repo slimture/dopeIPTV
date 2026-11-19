@@ -313,7 +313,7 @@ def pin_of(options: dict | None) -> tuple[str, int, str] | None:
     fp = normal(str(o.get(KEY) or ""))
     where = str(o.get(KEY_FOR) or "").strip().lower()
     host, _sep, port = where.rpartition(":")
-    if not fp or not host or not port.isdigit():
+    if not fp or not host or not port.isdecimal() or len(port) > 5 or not 0 < int(port) < 65536:
         return None
     return host.strip("[]"), int(port), fp
 

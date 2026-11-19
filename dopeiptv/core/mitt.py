@@ -34,6 +34,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any
 
+from .num import digits, number
 from .palette_match import fold, words
 
 __all__ = [
@@ -168,10 +169,7 @@ def when_of(row: Mapping[str, Any]) -> float:
 
 
 def _num(v: Any) -> float:
-    try:
-        return float(v or 0)
-    except (TypeError, ValueError):
-        return 0.0
+    return number(v or 0, 0.0)
 
 
 def history_entries(rows: Iterable[Any], source: str) -> list[Entry]:
@@ -469,17 +467,19 @@ def length_of(row: Mapping[str, Any]) -> float:
         return secs
     for key in ("duration", "episode_run_time", "runtime"):
         v = row.get(key)
-        if isinstance(v, (int, float)) and v > 0:
-            return float(v) * 60.0
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            minutes = number(v, lo=0)
+            if minutes:
+                return minutes * 60.0
         if isinstance(v, str) and v.strip():
             m = _HMS.match(v)
             if m:
-                total = (int(m.group(1) or 0) * 3600 + int(m.group(2)) * 60
-                         + int(m.group(3)))
+                h, mm, ss = (digits(g or "0") for g in m.groups())
+                total = (h or 0) * 3600 + (mm or 0) * 60 + (ss or 0)
                 if total > 0:
                     return float(total)
-            elif v.strip().isdigit() and int(v) > 0:
-                return float(int(v)) * 60.0
+            elif digits(v.strip()):
+                return float(digits(v.strip()) or 0) * 60.0
     return 0.0
 
 

@@ -228,7 +228,7 @@ def _parse(version: str) -> tuple[int, ...]:
     part sorts it after its release and before the next."""
     out: list[int] = []
     for part in version.lstrip("vV").strip().split("."):
-        digits = "".join(ch for ch in part if ch.isdigit())
+        digits = "".join(ch for ch in part if ch.isdecimal())[:18]
         out.append(int(digits) if digits else 0)
     return tuple(out)
 

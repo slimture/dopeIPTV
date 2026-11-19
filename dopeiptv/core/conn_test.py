@@ -37,6 +37,7 @@ from urllib.parse import unquote, urljoin, urlsplit
 
 from . import mirrors, nerd, rtsp
 from .log import log
+from .num import whole
 
 STEPS = ("dns", "tcp", "tls", "login", "stream", "speed")
 #: What a stream needs, about (Mbit/s): the comparison the speed step makes.
@@ -695,12 +696,14 @@ def account_lines(ui: dict) -> list[tuple[str, dict[str, Any]]]:
         out.append(("ct_acct_open", {}))
     else:
         try:
-            ts = int(float(str(exp)))
+            ts = whole(exp)
+            if ts is None:
+                raise ValueError(exp)
             date = datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
             days = int((ts - time.time()) // 86400)
             out.append(("ct_acct_ends", {"date": date, "days": days}) if days >= 0
                        else ("ct_acct_ended", {"date": date}))
-        except (TypeError, ValueError, OSError):
+        except (TypeError, ValueError, OSError, OverflowError):
             pass
     limit, active = numbers(ui)
     if limit is not None and active is not None:
