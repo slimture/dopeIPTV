@@ -196,7 +196,11 @@ def test_the_windows_release_job_picks_exactly_audits_and_pins_the_loader():
     """Read as text on purpose (PyYAML is not a test dependency)."""
     text = (_REPO / ".github/workflows/release.yml").read_text(
         encoding="utf-8")
-    assert "python tools/pick_mpv_asset.py" in text
+    # libmpv is the build packaging/build-inputs.json names by its SHA-256
+    # (tools/build_inputs.py), never whatever a release API calls newest;
+    # tools/pick_mpv_asset.py picks the archive when that list is changed.
+    assert 'python tools/build_inputs.py fetch "libmpv-windows-${MPV_ARCH}" libmpv/mpv-2.dll' in text
+    assert "releases/latest" not in text and "api.github.com" not in text
     assert "python tools/win_dll_audit.py" in text
     assert re.search(r"VULKAN_LOADER_TAG:\s*v\d+\.\d+\.\d+\s*$", text, re.M), (
         "the Vulkan loader must be built from a pinned tag")

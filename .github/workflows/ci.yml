@@ -27,8 +27,10 @@ jobs:
     # surprise in the middle of a release.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6.3.0
         with:
           python-version: '3.12'
           cache: pip
@@ -61,11 +63,27 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen   # no display on the runner
         run: pytest -q
-      - name: Dependency audit (advisory)
-        # Flags known CVEs in the installed dependencies. Advisory only
-        # (continue-on-error) so a newly-disclosed upstream CVE surfaces here
-        # without blocking commits/releases through no change of ours.
-        continue-on-error: true
+
+  audit:
+    # Known vulnerabilities in the Python packages the builds ship: the exact
+    # versions of packaging/requirements-release.txt (every platform's) and
+    # of the Flatpak's wheels, asked of PyPI's advisory database by pip-audit
+    # (tools/audit_deps.py). A finding fails this job until the lock moves
+    # to a fixed version - or packaging/audit-allowlist.txt accepts it, with
+    # a reason and a date after which it fails again. An advisory service
+    # that cannot be reached is a warning, never a failure.
+    name: Known vulnerabilities in what is shipped
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6.3.0
+        with:
+          python-version: '3.12'
+      - name: pip-audit, as pinned
         run: |
-          pip install pip-audit
-          pip-audit --strict || true
+          python -m pip install --require-hashes -r packaging/requirements-pip.txt
+          python -m pip install --require-hashes -r packaging/requirements-audit.txt
+      - name: Audit
+        run: python tools/audit_deps.py

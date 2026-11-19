@@ -3,6 +3,7 @@ pre-release the app recognises - and a release is not changed by it. Read
 as text: CI installs no YAML parser."""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from dopeiptv.core.updates import NIGHTLY_PREFIX
@@ -14,13 +15,18 @@ NIGHTLY = (ROOT / ".github/workflows/nightly.yml").read_text(encoding="utf-8")
 
 def test_the_release_workflow_can_be_called_with_a_nightly_version():
     assert "workflow_call:" in RELEASE and "nightly_version:" in RELEASE
-    # Every job stamps it right after checkout, and only for a nightly.
-    stamp = ("      - uses: actions/checkout@v5\n"
+    # Every job stamps it right after checkout (the action by its commit,
+    # its token not left in the clone), and only for a nightly.
+    checkouts = re.findall(r"      - uses: (actions/checkout@[0-9a-f]{40}   # v[\d.]+)\n", RELEASE)
+    assert len(set(checkouts)) == 1
+    stamp = (f"      - uses: {checkouts[0]}\n"
+             "        with:\n"
+             "          persist-credentials: false\n"
              "      - name: Nightly version\n"
              "        if: ${{ inputs.nightly_version }}\n")
     assert RELEASE.count(stamp) == 5
     # The sixth checkout is the checksums job's, which builds nothing.
-    assert RELEASE.count("actions/checkout@v5") == 6
+    assert RELEASE.count("uses: actions/checkout@") == len(checkouts) == 6
 
 
 def test_a_release_still_attaches_only_on_a_tag():

@@ -1,0 +1,8 @@
+# pip-audit, for the "audit" job of ci.yml (tools/audit_deps.py): asks
+# PyPI's advisory database about the versions the packages ship. Pinned and
+# hashed like the rest, in requirements-audit.txt - never edited by hand:
+#
+#   uv pip compile packaging/requirements-audit.in --python-version 3.12 \
+#     --python-platform x86_64-manylinux_2_39 --generate-hashes --no-annotate \
+#     --emit-index-url -o packaging/requirements-audit.txt
+pip-audit

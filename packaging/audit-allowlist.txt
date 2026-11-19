@@ -1,0 +1,9 @@
+# Known vulnerabilities in shipped Python packages that are accepted for now
+# (tools/audit_deps.py, the "audit" job of ci.yml). One per line:
+#
+#   <advisory id> <package> <YYYY-MM-DD> <why it is accepted>
+#
+# The id as pip-audit prints it (GHSA-..., PYSEC-... or CVE-...). After the
+# date the finding fails CI again: nothing is accepted for good. Prefer the
+# fix - a newer version in packaging/requirements-release.txt or the Flatpak
+# manifest - and keep this file empty.

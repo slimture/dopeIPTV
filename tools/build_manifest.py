@@ -24,6 +24,12 @@ Without the key nothing is written: a fork's build calls itself modified,
 which it is. --require-key makes that an error (a release). The key's
 public half must be one the app carries (dopeiptv/core/update_keys.py),
 or nothing is signed. Never in git: .gitignore names both files.
+
+The key is DOPEIPTV_BUILD_KEY when that is set - a key that signs file
+lists and nothing else (update_keys.BUILD_KEYS) - else DOPEIPTV_UPDATE_KEY.
+Either is read once and taken out of the environment before the bundle is
+started: the bundle holds every third-party package the app ships, and
+none of them is handed a signing key.
 """
 from __future__ import annotations
 
@@ -41,12 +47,31 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
+#: Where the signing key comes from, the first one set.
+KEY_VARS = ("DOPEIPTV_BUILD_KEY", "DOPEIPTV_UPDATE_KEY")
+
+
+def _take_secret() -> str:
+    """The signing key, out of the environment for good: nothing this
+    process starts after it inherits one."""
+    found = ""
+    for var in KEY_VARS:
+        value = os.environ.pop(var, "").strip()
+        found = found or value
+    return found
+
+
+# Before the package is imported: importing it in a checkout runs git
+# (dopeiptv/__init__.py), and git is whatever the PATH names.
+_GIVEN = _take_secret()
+
 from dopeiptv.core import build_check, ed25519  # noqa: E402
-from dopeiptv.core.update_keys import UPDATE_KEYS  # noqa: E402
+
+UPDATE_KEYS = build_check.MANIFEST_KEYS
 
 
 def _seed(require: bool, keys: tuple[str, ...]) -> bytes | None:
-    secret = os.environ.get("DOPEIPTV_UPDATE_KEY", "").strip()
+    secret = _take_secret() or _GIVEN
     if not secret:
         msg = "DOPEIPTV_UPDATE_KEY is empty: no build manifest - this build will call itself modified"
         if require:
@@ -91,8 +116,10 @@ def _ask(app: str) -> dict:
     os.close(fd)
     try:
         # Absolute, in the system's own form: CreateProcess on Windows.
+        # Never with a signing key in its environment (KEY_VARS).
+        env = {k: v for k, v in os.environ.items() if k not in KEY_VARS}
         proc = subprocess.run([os.path.abspath(app), "--build-files", out], stdin=subprocess.DEVNULL,
-                              capture_output=True, text=True, errors="replace",
+                              capture_output=True, text=True, errors="replace", env=env,
                               timeout=300, check=False)
         try:
             with open(out, encoding="utf-8") as fh:

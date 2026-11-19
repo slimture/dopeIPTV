@@ -41,10 +41,13 @@ from typing import Any, Iterable, Mapping
 
 from . import ed25519
 from .log import log
-from .update_keys import UPDATE_KEYS
+from .update_keys import BUILD_KEYS, UPDATE_KEYS
 
 MANIFEST = "_build_manifest.json"
 SIGNATURE = MANIFEST + ".sig"
+#: The keys a build's file list may be signed with: a build key (which signs
+#: nothing else) or the update key (core/update_keys.py).
+MANIFEST_KEYS: tuple[str, ...] = tuple(dict.fromkeys((*BUILD_KEYS, *UPDATE_KEYS)))
 FORMAT = 1
 #: Sent with every request to dopeiptv.org: official, modified or source.
 HEADER = "X-dopeIPTV-Build"
@@ -293,7 +296,7 @@ def git_head(root: str) -> str:
 
 
 def check(pkg_dir: str, frozen: bool, version: str, archive: Any = None,
-          keys: Iterable[str] = UPDATE_KEYS, root: str | None = None) -> Verdict:
+          keys: Iterable[str] = MANIFEST_KEYS, root: str | None = None) -> Verdict:
     """What the package in *pkg_dir* is (see the module's words)."""
     root = os.path.dirname(os.path.realpath(pkg_dir)) if root is None else root
     data = _read(os.path.join(pkg_dir, MANIFEST))
