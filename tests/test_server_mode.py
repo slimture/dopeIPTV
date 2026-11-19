@@ -1086,6 +1086,42 @@ def test_the_tuner_answers_only_under_a_home_name(server):
     assert _get(srv, "/discover.json").status == 200          # by its address, as before
 
 
+def test_the_tuner_answers_under_the_usual_home_names_and_says_what_it_refuses(server,
+                                                                              monkeypatch):
+    """A Fritz!Box's .fritz.box and Tailscale's MagicDNS names are a home's
+    too; a name that is not is refused, and logged once per name - a media
+    server set up with it would otherwise lose its tuner with nothing said."""
+    from dopeiptv.services.home_server import tuner_host_ok
+    for ok in ("pc.fritz.box", "pc.fritz.box:3675", "mypc.tail1a2b3.ts.net", "nas.home.arpa",
+               "box.internal", "pc.localdomain", "PC.FRITZ.BOX."):
+        assert tuner_host_ok(ok), ok
+    for bad in ("evilfritz.box", "fritz.box.evil.example", "ts.net.evil.example",
+                "evil-ts.net", "pc.box"):
+        assert not tuner_host_ok(bad), bad
+    srv = server[0]
+    said: list[str] = []
+
+    class Log:
+        def info(self, msg, *args):
+            said.append(msg % args)
+
+        def __getattr__(self, _name):
+            return lambda *a, **k: None
+
+    monkeypatch.setattr(hs, "log", Log())
+    for host in ("pc.example.com:3675", "pc.example.com:3675", "nas.example.org"):
+        with pytest.raises(urllib.error.HTTPError) as e:
+            _get(srv, "/lineup.json", {"Host": host})
+        assert e.value.code == 403
+    refused = [s for s in said if "not a home network's name" in s]
+    assert len(refused) == 2, said
+    assert "'pc.example.com:3675'" in refused[0] and ".fritz.box" in refused[0]
+    assert "'nas.example.org'" in refused[1]
+    for i in range(hs.REFUSED_NAMES_MAX + 5):
+        srv.refused_name(f"n{i}.example")
+    assert len(srv._refused_names) == hs.REFUSED_NAMES_MAX, "a flood of names stays small"
+
+
 def test_the_discovery_is_not_answered_beyond_its_own_networks():
     from dopeiptv.providers.hdhomerun import discover_packet
     dev = hdhr.new_device_id()

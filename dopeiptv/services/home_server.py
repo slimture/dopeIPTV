@@ -249,6 +249,8 @@ class HomeServer:
         self._lineup: tuple[float, list[LineupChannel]] | None = None
         self._lineup_lock = threading.Lock()
         self._authed: set[str] = set()
+        self._refused_names: set[str] = set()
+        self._refused_lock = threading.Lock()
         self.restream = Restreamer(host.pool, self.limit, self.total, others=self._others,
                                    app_session=host.app_session, ingest_for=self._ingest_for,
                                    check=self._check)
@@ -260,6 +262,21 @@ class HomeServer:
         self.taken = False
         #: What MARK says in every answer.
         self.mark = str(getattr(host, "kind", "") or "server")
+
+    def refused_name(self, host: str | None) -> bool:
+        """A tuner endpoint asked under a name that is not the home's
+        (``tuner_host_ok``): logged once per name - a media server set up
+        with that name otherwise loses its tuner with nothing said. True
+        when it was logged."""
+        name = (host or "").strip().lower()[:120]
+        with self._refused_lock:
+            if name in self._refused_names or len(self._refused_names) >= REFUSED_NAMES_MAX:
+                return False
+            self._refused_names.add(name)
+        log.info("server: the tuner was asked as %r, not a home network's name, and refused - "
+                 "a device asks it by this computer's address or a name under %s",
+                 name, ", ".join(HOME_SUFFIXES))
+        return True
 
     # -- on and off ---------------------------------------------------------------------
     @property
@@ -602,9 +619,16 @@ def _host_ok(host: str) -> bool:
     return 0 < len(host) <= 255 and all(c in allowed for c in host)
 
 
-#: Name endings a home network's own names have (RFC 6762's .local, RFC
-#: 8375's home.arpa, the routers' usual .lan, .home, .internal).
-HOME_SUFFIXES = (".local", ".lan", ".home", ".home.arpa", ".internal", ".localdomain")
+#: Name endings a home network's own names have: RFC 6762's .local (mDNS),
+#: RFC 8375's home.arpa, ICANN's .internal for private use, the routers'
+#: usual .lan, .home and .localdomain, AVM's .fritz.box (a Fritz!Box answers
+#: names under it itself) and Tailscale's MagicDNS .ts.net (answered inside
+#: the tailnet). A deliberate list, kept short: a DNS rebinding needs a name
+#: whose answers a web page's owner sets, and these are answered at home.
+HOME_SUFFIXES = (".local", ".lan", ".home", ".home.arpa", ".internal", ".localdomain",
+                 ".fritz.box", ".ts.net")
+#: Refused names logged (``refused_name``), so a flood of them stays small.
+REFUSED_NAMES_MAX = 64
 
 
 def tuner_host_ok(host: str | None) -> bool:
@@ -740,6 +764,7 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
                         return
                     if not tuner_host_ok(self.headers.get("Host")):
                         # Not a home name: a web page's own, rebound here.
+                        server.refused_name(self.headers.get("Host"))
                         self._text(403, "ask the tuner by this computer's address")
                         return
                     self._hdhomerun(path, method)
