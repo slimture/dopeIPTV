@@ -1746,6 +1746,7 @@
   "sync_err_none": "Hakuna kilichosawazishwa chini ya msimbo huo. Ukague kwenye kompyuta yako nyingine, au anza hapa.",
   "sync_err_big": "Ni kingi mno kusawazisha ({size} kati ya {limit}). Zima Historia ya kutazama au Orodha za kucheza.",
   "sync_err_fail": "Usawazishaji haukukamilika – itajaribu tena baadaye.",
+  "sync_err_older": "Nakala iliyosawazishwa kwenye dopeiptv.org ilikuwa ya zamani kuliko ile ambayo kompyuta hii ilikuwa imeshaiona. Nakala mpya zaidi ya kompyuta hii imerudishwa.",
   "fba_menu": "Majibu ya maoni",
   "fba_sent": "Imetumwa {date}",
   "fba_you": "Uliandika: “{text}”",

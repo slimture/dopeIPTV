@@ -1746,6 +1746,7 @@
   "sync_err_none": "Sotto questo codice non c'è nulla di sincronizzato. Controllalo sull'altro computer, oppure inizia qui.",
   "sync_err_big": "Troppo da sincronizzare ({size} su {limit}). Disattiva Cronologia di visione o Playlist.",
   "sync_err_fail": "La sincronizzazione non è terminata: nuovo tentativo più tardi.",
+  "sync_err_older": "La copia sincronizzata su dopeiptv.org era più vecchia di una che questo computer aveva già visto. La copia più recente di questo computer è stata rimessa al suo posto.",
   "fba_menu": "Risposte al feedback",
   "fba_sent": "Inviato il {date}",
   "fba_you": "Hai scritto: «{text}»",

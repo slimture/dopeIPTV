@@ -1746,6 +1746,7 @@
   "sync_err_none": "Inget är synkat under den koden. Kontrollera den på din andra dator, eller börja här.",
   "sync_err_big": "För mycket att synka ({size} av {limit}). Stäng av Tittarhistorik eller Spellistor.",
   "sync_err_fail": "Synken blev inte klar – försöker igen senare.",
+  "sync_err_older": "Den synkade kopian på dopeiptv.org var äldre än en som den här datorn redan hade sett. Den här datorns nyare kopia lades tillbaka.",
   "fba_menu": "Svar på feedback",
   "fba_sent": "Skickad {date}",
   "fba_you": "Du skrev: ”{text}”",

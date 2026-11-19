@@ -227,10 +227,7 @@ MAX_BODY = 56_000
 def _over_https(url: str) -> str:
     """*url* if it is https - or this computer, for the tests' own servers;
     anything else is refused before a connection is made."""
-    from urllib.parse import urlsplit
-    parts = urlsplit(url)
-    if parts.scheme == "https" or (parts.scheme == "http"
-                                   and parts.hostname in ("127.0.0.1", "localhost", "::1")):
+    if build_check.secure(url):
         return url
     raise ValueError("reports go over https only")
 

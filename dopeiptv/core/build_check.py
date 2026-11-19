@@ -422,6 +422,20 @@ def headers() -> dict[str, str]:
     return {HEADER: kind()}
 
 
+def secure(url: str) -> bool:
+    """Whether a request to one of dopeiptv.org's services may go to *url*:
+    https - or this computer, for the tests' own servers. Anything else is
+    refused before a connection is made (a changed endpoint, a typo)."""
+    from urllib.parse import urlsplit
+    try:
+        parts = urlsplit(str(url))
+        host = parts.hostname
+    except ValueError:
+        return False
+    return parts.scheme == "https" or (
+        parts.scheme == "http" and host in ("127.0.0.1", "localhost", "::1"))
+
+
 class NotOfficial(RuntimeError):
     """A service of dopeiptv.org asked for in a modified build."""
 

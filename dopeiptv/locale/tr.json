@@ -1746,6 +1746,7 @@
   "sync_err_none": "Bu kodla eşitlenmiş bir şey yok. Diğer bilgisayarında kontrol et ya da burada başlat.",
   "sync_err_big": "Eşitlenecek çok fazla şey var ({size} / {limit}). İzleme geçmişi veya Oynatma listeleri seçeneğini kapat.",
   "sync_err_fail": "Eşitleme tamamlanmadı – daha sonra yeniden denenecek.",
+  "sync_err_older": "dopeiptv.org'daki eşitlenmiş kopya, bu bilgisayarın daha önce gördüğü bir kopyadan eskiydi. Bu bilgisayarın daha yeni kopyası geri konuldu.",
   "fba_menu": "Geri bildirim yanıtları",
   "fba_sent": "{date} tarihinde gönderildi",
   "fba_you": "Yazdığın: “{text}”",

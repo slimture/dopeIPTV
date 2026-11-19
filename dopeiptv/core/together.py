@@ -632,9 +632,12 @@ class Relay:
         if not build_check.allowed():
             # Never asked from a modified build: the relay refuses it anyway.
             raise RelayError("modified")
+        if not build_check.secure(self.url):
+            log.warning("together: not https - nothing sent")
+            raise RelayError("net")
         try:
             r = self._http().request(method, self.url, headers=headers or self.headers,
-                                     timeout=(6.0, timeout), **kw)
+                                     timeout=(6.0, timeout), allow_redirects=False, **kw)
         except Exception as e:
             log.info("together: %s not answered (%s)", method, type(e).__name__)
             raise RelayError("net") from e

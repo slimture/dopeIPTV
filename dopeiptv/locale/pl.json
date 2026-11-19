@@ -1746,6 +1746,7 @@
   "sync_err_none": "Pod tym kodem nic nie jest zsynchronizowane. Sprawdź go na drugim komputerze albo zacznij tutaj.",
   "sync_err_big": "Za dużo do synchronizacji ({size} z {limit}). Wyłącz: Historia oglądania lub Playlisty.",
   "sync_err_fail": "Synchronizacja się nie zakończyła – ponowna próba później.",
+  "sync_err_older": "Zsynchronizowana kopia na dopeiptv.org była starsza niż ta, którą ten komputer już widział. Nowsza kopia z tego komputera została odłożona z powrotem.",
   "fba_menu": "Odpowiedzi na opinie",
   "fba_sent": "Wysłano {date}",
   "fba_you": "Twoja wiadomość: „{text}”",

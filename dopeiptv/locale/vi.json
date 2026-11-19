@@ -1746,6 +1746,7 @@
   "sync_err_none": "Không có gì được đồng bộ dưới mã đó. Hãy kiểm tra trên máy kia, hoặc bắt đầu ở đây.",
   "sync_err_big": "Quá nhiều để đồng bộ ({size} trên {limit}). Hãy tắt Lịch sử xem hoặc Danh sách phát.",
   "sync_err_fail": "Đồng bộ chưa xong – sẽ thử lại sau.",
+  "sync_err_older": "Bản đồng bộ trên dopeiptv.org cũ hơn một bản mà máy này đã thấy trước đó. Bản mới hơn của máy này đã được đặt lại.",
   "fba_menu": "Phản hồi cho góp ý",
   "fba_sent": "Đã gửi {date}",
   "fba_you": "Bạn đã viết: “{text}”",

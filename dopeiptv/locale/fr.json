@@ -1746,6 +1746,7 @@
   "sync_err_none": "Rien n'est synchronisé sous ce code. Vérifie-le sur ton autre ordinateur, ou commence ici.",
   "sync_err_big": "Trop de choses à synchroniser ({size} sur {limit}). Désactive Historique de visionnage ou Listes de lecture.",
   "sync_err_fail": "La synchronisation n'a pas abouti – nouvel essai plus tard.",
+  "sync_err_older": "La copie synchronisée sur dopeiptv.org était plus ancienne qu'une copie que cet ordinateur avait déjà vue. La copie plus récente de cet ordinateur a été remise en place.",
   "fba_menu": "Réponses aux avis",
   "fba_sent": "Envoyé le {date}",
   "fba_you": "Tu as écrit : « {text} »",

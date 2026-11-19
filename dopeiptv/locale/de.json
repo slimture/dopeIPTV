@@ -1746,6 +1746,7 @@
   "sync_err_none": "Unter diesem Code ist nichts synchronisiert. Prüfe ihn auf deinem anderen Computer oder starte hier.",
   "sync_err_big": "Zu viel zum Synchronisieren ({size} von {limit}). Schalte Wiedergabeverlauf oder Wiedergabelisten aus.",
   "sync_err_fail": "Die Synchronisierung wurde nicht fertig – neuer Versuch später.",
+  "sync_err_older": "Die synchronisierte Kopie auf dopeiptv.org war älter als eine, die dieser Computer schon gesehen hatte. Die neuere Kopie dieses Computers wurde zurückgelegt.",
   "fba_menu": "Antworten auf Feedback",
   "fba_sent": "Gesendet am {date}",
   "fba_you": "Du hast geschrieben: „{text}“",

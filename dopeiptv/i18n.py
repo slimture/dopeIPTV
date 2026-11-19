@@ -2351,6 +2351,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "sync_err_none": {"en": "Nothing is synced under that code. Check it on your other computer, or start here."},
     "sync_err_big": {"en": "Too much to sync ({size} of {limit}). Turn Watch history or Playlists off."},
     "sync_err_fail": {"en": "Sync did not finish - trying again later."},
+    "sync_err_older": {"en": "The synced copy on dopeiptv.org was older than one this computer had already seen. This computer's newer copy was put back."},
     # Nerd: backup addresses, the connection test; connections to the account.
     "nerd_src_mirrors": {"en": "Backup addresses"},
     "nerd_src_mirrors_hint": {"en": "Other addresses of the same account, one per line. While the one in use cannot be reached, the next one is tried - and kept."},

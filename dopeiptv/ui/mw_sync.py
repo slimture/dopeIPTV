@@ -330,7 +330,13 @@ class _SyncMixin:
         log.info("sync: done - version %d, %d bytes%s%s", result.version, result.size,
                  ", sent" if result.uploaded else "",
                  ", changed here" if applied.any() else "")
-        self._sync_set_status("ok")
+        self._sync_set_status("older" if result.older else "ok")
+        if result.older:
+            # The site (or someone in its place) handed back an earlier copy:
+            # this computer's was put back - said, never quietly.
+            hub_of(self).post(tr("sync_err_older"), level="warning", key="sync_older",
+                              action=lambda: self.open_settings(at_page="sync"),
+                              action_label=tr("sync_nav"))
         if applied.any():
             try:
                 self._sync_show_applied(applied)
@@ -537,7 +543,8 @@ class _SyncMixin:
             from ..core.recording import format_size
             problem = tr("sync_err_big", size=format_size(size),
                          limit=format_size(sync.MAX_BLOB))
-        elif kind in ("net", "busy", "refused", "read", "newer", "none", "full", "fail"):
+        elif kind in ("net", "busy", "refused", "read", "newer", "none", "full", "fail",
+                      "older"):
             problem = tr(f"sync_err_{kind}")
         return line, problem
 

@@ -821,3 +821,49 @@ def test_an_old_code_of_eight_still_joins_its_room():
     assert room == "0258caccc3f0ce8fedc3566735114e0f3f359c829cb6ee42b1b670dbba91cd4a"
     assert key.hex() == "4a0cb0fc2c7e0d8cefdfa6b50df360d2cbc7e8d79812de5e0d94596fb69056df"
     assert together.derive("K7PQM-2XDH9")[0] != room
+
+
+def test_the_relay_goes_over_https_only_and_follows_no_redirect():
+    """A room's messages go to the relay named or nowhere: never to an
+    address that is not https (this computer's own for the tests), never
+    after a redirect."""
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    for url in ("http://dopeiptv.org/together/", "ftp://dopeiptv.org/together/"):
+        relay = together.Relay("ab" * 32, "c3" * 8, endpoint=url)
+        with pytest.raises(together.RelayError) as err:
+            relay.post(b"x" * 40)
+        assert err.value.kind == "net"
+        assert relay._session is None                    # no connection was made
+
+    elsewhere = []
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_POST(self):
+            self.rfile.read(int(self.headers.get("Content-Length") or 0))
+            if self.path.startswith("/elsewhere"):
+                elsewhere.append(self.path)
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'{"now": 1}')
+                return
+            self.send_response(307)
+            self.send_header("Location", "/elsewhere" + self.path)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        relay = together.Relay("ab" * 32, "c3" * 8,
+                               endpoint=f"http://127.0.0.1:{httpd.server_address[1]}/together/")
+        with pytest.raises(together.RelayError):
+            relay.post(b"x" * 40)
+        relay.close()
+        assert not elsewhere
+    finally:
+        httpd.shutdown()
+        httpd.server_close()

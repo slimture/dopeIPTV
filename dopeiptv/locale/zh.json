@@ -1746,6 +1746,7 @@
   "sync_err_none": "此代码下没有同步内容。请在另一台电脑上核对代码，或在这里开始。",
   "sync_err_big": "要同步的内容太多（{size} / {limit}）。请关闭观看历史或播放列表。",
   "sync_err_fail": "同步未完成——稍后重试。",
+  "sync_err_older": "dopeiptv.org 上的同步副本比这台电脑之前见过的一份更旧。已把这台电脑上更新的副本放回去。",
   "fba_menu": "反馈回复",
   "fba_sent": "发送于 {date}",
   "fba_you": "你写道：“{text}”",

@@ -1746,6 +1746,7 @@
   "sync_err_none": "Tidak ada yang disinkronkan dengan kode itu. Periksa di komputer Anda yang lain, atau mulai di sini.",
   "sync_err_big": "Terlalu banyak untuk disinkronkan ({size} dari {limit}). Matikan Riwayat tontonan atau Daftar putar.",
   "sync_err_fail": "Sinkronisasi tidak selesai – dicoba lagi nanti.",
+  "sync_err_older": "Salinan tersinkron di dopeiptv.org lebih lama daripada salinan yang sudah pernah dilihat komputer ini. Salinan komputer ini yang lebih baru dikembalikan.",
   "fba_menu": "Jawaban atas masukan",
   "fba_sent": "Dikirim {date}",
   "fba_you": "Anda menulis: “{text}”",

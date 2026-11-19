@@ -1746,6 +1746,7 @@
   "sync_err_none": "Pod tim kodom ništa nije sinhronizovano. Proveri ga na drugom računaru ili počni ovde.",
   "sync_err_big": "Previše za sinhronizaciju ({size} od {limit}). Isključi Istoriju gledanja ili Plejliste.",
   "sync_err_fail": "Sinhronizacija nije završena – ponovni pokušaj kasnije.",
+  "sync_err_older": "Sinhronizovana kopija na dopeiptv.org bila je starija od one koju je ovaj računar već video. Novija kopija ovog računara vraćena je nazad.",
   "fba_menu": "Odgovori na povratne informacije",
   "fba_sent": "Poslato {date}",
   "fba_you": "Tvoja poruka: „{text}”",
