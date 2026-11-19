@@ -1,5 +1,5 @@
 {
-    "updated": "2026-11-18",
+    "updated": "2026-11-19",
     "pages": [
         "privacy",
         "terms",
@@ -18,14 +18,14 @@
     },
     "text": {
         "sv": {
-            "updated": "Senast uppdaterad 18 november 2026",
+            "updated": "Senast uppdaterad 19 november 2026",
             "governing": "Det här är den svenska texten, som är den som gäller.",
             "other": "Read in English",
             "link": "en",
             "toc": "Innehåll"
         },
         "en": {
-            "updated": "Last updated 18 November 2026",
+            "updated": "Last updated 19 November 2026",
             "governing": "This is a translation of the Swedish text, which is the one that applies.",
             "other": "Läs på svenska",
             "link": "sv",
