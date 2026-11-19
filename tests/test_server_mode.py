@@ -808,7 +808,9 @@ def test_a_port_already_taken_leaves_no_thread_running(tmp_path):
         w._server_start()
         assert w._home is None and not pool.shared
         assert wait_until(told, 10), "the note came"
-        assert wait_until(lambda: ticking() == before, 5), "the failed server's restream stopped"
+        # At most as many as before: a restream an earlier test let go may
+        # still be ending when this one starts, and goes meanwhile.
+        assert wait_until(lambda: ticking() <= before, 5), "the failed server's restream stopped"
     finally:
         blocker.close()
 
