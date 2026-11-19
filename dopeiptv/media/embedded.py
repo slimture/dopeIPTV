@@ -644,6 +644,9 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         self._ts_hide_timer.timeout.connect(self._hide_ts_timeline)
 
         self.overlay = QLabel("", self)
+        # A station's ICY title, a programme's or a channel's name: words,
+        # never markup (AutoText read a tag in them as rich text).
+        self.overlay.setTextFormat(Qt.TextFormat.PlainText)
         self.overlay.setStyleSheet(
             "background: rgba(16,16,20,210); color:#ECECF1;"
             "border-radius:10px; padding:10px 14px; font-size:13px;")
@@ -911,6 +914,8 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         # the video like the badges above; it only shows text.
         self.number_badge = QLabel("", self)
         self.number_badge.setObjectName("NumberEntry")
+        # TV mode shows a track's own name here: words, never markup.
+        self.number_badge.setTextFormat(Qt.TextFormat.PlainText)
         self.number_badge.hide()
         self._number_badge_timer = QTimer(self)
         self._number_badge_timer.setSingleShot(True)

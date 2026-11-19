@@ -174,7 +174,9 @@ class _Review(QObject):
         box = QMessageBox(self.window)
         box.setIcon(QMessageBox.Icon.Warning)
         box.setWindowTitle(tr("cert_changed_title"))
-        box.setText(tr("cert_changed_body", name=str(self.pl.get("name") or ""), server=f"{host}:{port}"))
+        # The source's name is shown as words (a QMessageBox has no plain mode).
+        box.setText(plain_text(tr("cert_changed_body", name=str(self.pl.get("name") or ""),
+                                  server=f"{host}:{port}")))
         review = box.addButton(tr("cert_review_btn"), QMessageBox.ButtonRole.AcceptRole)
         box.addButton(tr("common_close"), QMessageBox.ButtonRole.RejectRole)
         box.exec()
