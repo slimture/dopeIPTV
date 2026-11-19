@@ -13,8 +13,8 @@
 
 ### dopeiptv.org
 
-- **Privacy, behind the scenes** shows the new code: the sync counter, the room code, the reports' last cleaning, and how long the website's statistics keep each part. It also says more plainly where each protection stops.
-- The website's statistics never note a tip on a visit - a tip counts only in the day's total - and the service forgets an address within minutes once its request limit no longer needs it.
+- **The website's statistics** keep much less. A visitor's ID is made with a key that changes every month and is deleted once the month after has ended - from then on nobody can tie it to an address, us included. A visit is kept in detail for 30 days instead of 400, then only as anonymous figures. The logs that hold addresses are kept two days instead of a week, and the front server keeps no log of requests at all. A tip is never noted on a visit, only in the day's total, and the service forgets an address within minutes once its request limit no longer needs it.
+- **Privacy, behind the scenes** shows the new code - the sync counter, the room code, the reports' last cleaning, the statistics' monthly key - and says more plainly where each protection stops, including that the list of where the app connects is what its own code names, not a guarantee that nothing else does.
 
 ## dopeIPTV 1.6.7
 
