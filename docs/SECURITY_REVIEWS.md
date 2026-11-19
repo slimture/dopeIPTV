@@ -29,9 +29,9 @@ assessment of each. The findings, and what came of them:
 | Settings sync | The counter is no freshness guarantee for a computer that has never synced, and the server can withhold a copy | info | Written down: inherent to a server that stores; the transparency page says so |
 | Settings sync | Requests could follow a redirect or go over plain http | low | 1.6.8: https only, no redirect followed |
 | Watch together | Room codes of 8 characters (about 40 bits) and 120 000 rounds were guessable offline from the room id | high | 1.6.8: 10 characters (about 50 bits), 600 000 rounds; old codes still join |
-| Watch together | Replayed messages were acted on | medium | 1.6.8: a sequence number per sender; 1.6.9 (in progress): stale frames after a rejoin refused |
-| Watch together | Every member holds the room key, so one member can write as another | medium | 1.6.9 (in progress): member ids bound to a key pair of their own, messages signed |
-| Watch together | Padding not checked strictly on opening | low | 1.6.9 (in progress) |
+| Watch together | Replayed messages were acted on | medium | 1.6.8: a sequence number per sender; 1.6.9: the relay's backlog at joining not read, messages out of their time ignored |
+| Watch together | Every member holds the room key, so one member can write as another | medium | 1.6.9: member ids the hash of an Ed25519 key of their own, every message signed (1.6.8 members protected once they update) |
+| Watch together | Padding not checked strictly on opening | low | 1.6.9: one of the padded sizes, zeros after the text |
 | Watch together | The relay sees who is in a room with whom, when and from which address | info | Written down: a relay has to; it keeps it in memory only and logs nothing |
 | Private viewing | A resume point, a log line or Trakt/Simkl could still name a private playback after the switch was turned off | medium | 1.6.8: kept per playback (`playback_private`, `private_key`, `for_log`) |
 | Private viewing | Other reporters, metadata lookups and logs outside `for_log` were not shown to be covered | medium | 1.6.9 (in progress): every reporter, store and lookup audited against the playback |

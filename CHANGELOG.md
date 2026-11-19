@@ -28,6 +28,16 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   alone no longer lets anyone delete or replace a household's copy. An
   older app goes on syncing a slot until a computer with this version
   writes to it, then says the site turned it down until it is updated.
+- core/together.py: each member of a room has an Ed25519 key of its own,
+  its id the hash of the public key, and signs every message over the room
+  and its exact bytes - nobody in a room can speak as another (1.6.8
+  members' messages are taken as before, and protected once they update).
+  A frame opens only at one of the padded sizes with zeros after its text;
+  the relay's backlog at joining is not read and messages out of their time
+  are ignored, so an old frame handed over again after a rejoin cannot move
+  playback; what one member can cause is bounded (members listed, hellos
+  answered, version jumps, seeks past a title's end). A room with an old
+  8-character code says that it is easier to guess (`together_old_code`).
 
 ## [1.6.8]
 
