@@ -1,6 +1,6 @@
 """The Movies place (core/film_view.py, ui/mw_place_films.py, the detail
 column's Continue in ui/mw_detail.py): what a film's card says (year,
-length, rating, New, how far, Play or Continue, who is in it); a category
+length, rating, New, how far, Play or Continue); a category
 of 20,000 films made at once and dressed only as it comes on screen; and in
 the window - Popular right now matched to the source and ranked, Continue,
 both hidden when empty or while filtering, Grid / List remembered, the
@@ -42,7 +42,6 @@ def test_year_length_and_rating_from_what_the_source_says():
     assert fv.rating_of({"rating": "", "rating_5based": "4"}) == 8.0
     assert fv.rating_of({"rating": "0"}, {"rating": 6.6}) == 6.6
     assert fv.rating_of({}) is None
-    assert fv.genres_of({}, {"genre": " Drama,  Action "}) == "Drama, Action"
     assert fv.plot_of({"plot": ""}, {"overview": " a \n b "}) == "a b"
 
 
@@ -68,17 +67,6 @@ def test_the_button_plays_or_continues_by_how_far_it_got():
     assert not fv.primary(0, 0).resume
     # No length kept with the point: the film's own.
     assert fv.primary(600, 0, minutes=100).resume
-
-
-def test_the_cast_from_tmdb_else_the_source_never_asked_for():
-    tmdb = {"cast": [{"name": "Ann", "profile_url": "http://p/a.jpg", "person_id": 1},
-                     {"name": "ann", "profile_url": "", "person_id": 2},
-                     {"name": " Bo  B ", "person_id": 3}, "junk"]}
-    assert fv.cast_of({"cast": "X, Y"}, tmdb) == [("Ann", "http://p/a.jpg", 1), ("Bo B", "", 3)]
-    assert fv.cast_of({"cast": "X, Y, , X"}, {}) == [("X", "", None), ("Y", "", None)]
-    assert fv.cast_of({"actors": "Z"}, None) == [("Z", "", None)]
-    assert len(fv.cast_of({"cast": ", ".join(f"P{i}" for i in range(30))}, None)) == 12
-    assert fv.cast_of(None, None) == []
 
 
 # -- the views (Qt, no window) --------------------------------------------------------

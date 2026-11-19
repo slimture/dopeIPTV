@@ -4428,11 +4428,6 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         lp = getattr(self, "_last_playback", None) or {}
         return lp.get("kind") == "local"
 
-    def _music_is_playing(self) -> bool:
-        """Is a local audio file what the player is on right now?"""
-        lp = getattr(self, "_last_playback", None) or {}
-        return self._local_is_playing() and self._is_audio(lp.get("url"))
-
     def _local_autoadvance_ok(self, url: str) -> bool:
         """Should end-of-file roll on to the next local file?
 

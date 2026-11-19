@@ -333,10 +333,6 @@ class BouquetEditor:
                 raise self._absent("404") from None
             raise
 
-    def all_channels(self, radio: bool = False) -> list[Entry]:
-        """Every channel the box knows (its whole service list), by name."""
-        return self.channels_in(all_ref(radio))
-
     def satellites(self, radio: bool = False) -> list[Entry]:
         try:
             return parse_satellites(self._json("/api/getsatellites",

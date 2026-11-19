@@ -153,7 +153,6 @@ def test_history_store_survives_corrupt_settings(blob):
     h.add("http://x/live/u/p/1.ts", "One", None, 1, "live")
     assert any(e.get("_key") == 1 for e in h.entries)
     h.remove(1, "live")
-    h.clear_kind({"live"})
     h.clear()
     assert h.entries == []
 
@@ -167,7 +166,6 @@ def test_favorite_store_survives_corrupt_settings(blob):
     assert f.is_favorite(5)
     # Junk items without the id key are tolerated by lookups and removal.
     f.groups.setdefault("Default", []).append({"name": "no-id"})
-    assert f.groups_for(5) == ["Default"]
     f.remove(5)
     assert not f.is_favorite(5)
 

@@ -236,42 +236,6 @@ class _PlacesMixin:
                 else "history"
         return mode
 
-    def _replay_history_row(self, it: dict) -> None:
-        """A History row played again (Mine's history): from its stored
-        address and kind, wherever the window is - a station as Radio plays
-        it, an episode under its series (resume, marks, scrobbles; no
-        queue), then its series' page with the episode marked (Back: the
-        place under it)."""
-        url = it.get("_url")
-        if not url:
-            return
-        kind = it.get("_kind") or "live"
-        if kind == "radio":
-            self._radio_play(it)
-            return
-        ctx = it.get("_series_ctx") or {}
-        if kind == "episode" and ctx.get("series_id") is None:
-            # Recorded before the series' snapshot existed: a film then.
-            kind = "movie"
-        try:
-            self._current_key = it.get("_key")
-            self._show_detail(it)       # the panel follows this row
-        except Exception:
-            pass
-        saved = self.series_ctx
-        if kind == "episode":
-            self.series_ctx = ctx
-            self._ep_queue_override, self._ep_index_override = [], -1
-        try:
-            self._start_playback(url, it.get("name") or "dopeIPTV",
-                                 it.get("stream_icon"), it.get("_key"), kind, item=it)
-        finally:
-            self.series_ctx = saved
-            if kind == "episode":
-                self._ep_queue_override, self._ep_index_override = None, -1
-        if kind == "episode":
-            self._open_series_page(ctx, focus=it.get("_key"))
-
     def _refresh_places(self, reason: str = "") -> None:
         """What a place shows changed (a profile, a source, a followed
         series, a sync): each place's own page asked to show it again - and

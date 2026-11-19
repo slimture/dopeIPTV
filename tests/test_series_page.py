@@ -1123,19 +1123,6 @@ row = next(r for r in w.history.items() if str(r.get("_key")) == "1002")
 assert row["_kind"] == "episode" and (row.get("_series_ctx") or {}).get("series_id") == 130, row
 w.show_cast_strip(None)
 
-# -- an episode replayed from History: played with its series (marks, resume,
-#    scrobbles), marked on its page, no stray autoplay queue -------------------------
-hist = {"_url": "http://x/series/u/p/2001.mkv", "_key": "2001", "_kind": "episode",
-        "name": "Show 30 · S2 * E1 - Ep 1",
-        "_series_ctx": {"series_id": 130, "name": "Show 30"}}
-w._replay_history_row(hist)              # Mine's History (mw_places)
-app.processEvents()
-lp = w._last_playback
-assert str(lp["key"]) == "2001" and (lp.get("series_ctx") or {}).get("series_id") == 130, lp
-assert lp["ep_queue"] == [], [e.get("name") for e in lp["ep_queue"]][:3]
-assert w.series_ctx is None
-settle(lambda: w._series_page_showing() and w._series_page.playing_key == "2001")
-
 # -- TV mode and watch together: an episode turned back leaves no queue -------------
 guard = w._guard_stream_switch
 w._guard_stream_switch = lambda url, title: False

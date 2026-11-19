@@ -481,7 +481,6 @@ def test_the_play_queue_steps_and_wraps_an_album(tmp_path):
         AUDIO_EXTS = MainWindow.AUDIO_EXTS
         _is_audio = MainWindow._is_audio
         _is_video = MainWindow._is_video
-        _music_is_playing = MainWindow._music_is_playing
         _local_is_playing = MainWindow._local_is_playing
         _local_autoadvance_ok = MainWindow._local_autoadvance_ok
         queue_add = MainWindow.queue_add
@@ -752,7 +751,6 @@ def test_a_left_over_queue_never_hijacks_tv_or_film():
         VIDEO_EXTS = MainWindow.VIDEO_EXTS
         _is_audio = MainWindow._is_audio
         _is_video = MainWindow._is_video
-        _music_is_playing = MainWindow._music_is_playing
         _local_is_playing = MainWindow._local_is_playing
         _local_autoadvance_ok = MainWindow._local_autoadvance_ok
         _queue_step = MainWindow._queue_step
@@ -776,11 +774,11 @@ def test_a_left_over_queue_never_hijacks_tv_or_film():
     w = _Q()
     # Music playing: the queue is in charge.
     w._last_playback = {"kind": "local", "url": "/m/01.flac"}
-    assert w._music_is_playing() is True
+    assert w._local_is_playing() is True
 
     # A channel is on: the leftover queue must stay out of the way.
     w._last_playback = {"kind": "live", "url": "http://h/live/1.ts"}
-    assert w._music_is_playing() is False
+    assert w._local_is_playing() is False
     assert w._queue_step(1) is False
     assert w._queue_autoplay() is False
     assert w.played == []
@@ -982,7 +980,6 @@ def _queue_stub():
         VIDEO_EXTS = MainWindow.VIDEO_EXTS
         _is_audio = MainWindow._is_audio
         _is_video = MainWindow._is_video
-        _music_is_playing = MainWindow._music_is_playing
         _local_is_playing = MainWindow._local_is_playing
         _local_autoadvance_ok = MainWindow._local_autoadvance_ok
         queue_add = MainWindow.queue_add
