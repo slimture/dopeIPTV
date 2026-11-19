@@ -449,6 +449,26 @@ def test_no_login_reaches_another_device_through_the_shared_playlist_or_guide(tm
         assert b"".join(share_mod.logins_out(iter(sliced))) == data, step
 
 
+def test_a_guide_cut_short_still_ends_whole_without_its_logins(tmp_path):
+    """A download that stopped: what was whole is passed on, the logins
+    taken out of it too, and the document still ends where it should."""
+    import xml.etree.ElementTree as ET
+    progs = "".join(
+        f'<programme start="2026111420{i:02d}00 +0100" stop="2026111420{i:02d}30 +0100" channel="c">'
+        f"<title>Show {i}</title><icon src=\"http://u:pw-secret@box.lan/{i}.png\"/></programme>\n"
+        for i in range(40))
+    raw = ('<?xml version="1.0" encoding="UTF-8"?><tv><channel id="c"><display-name>C</display-name>'
+           "</channel>\n" + progs + "</tv>").encode()
+    path = tmp_path / "cut.xml"
+    path.write_bytes(gzip.compress(raw)[:-200])
+    sh = Share(lambda: [{"id": "p", "name": "P", "kind": "m3u"}], guide_path=lambda _pid: str(path))
+    data = b"".join(sh.guide())
+    root = ET.fromstring(data)                       # whole, though the file was not
+    titles = [p.findtext("title") for p in root.findall("programme")]
+    assert titles and titles == [f"Show {i}" for i in range(len(titles))]
+    assert b"secret" not in data
+
+
 def test_the_share_hands_out_only_what_server_mode_s_lineup_does(served):
     """A parent's locked categories, channels hidden by hand and adult ones
     are neither in the playlist nor sent on (the 302), as server mode's

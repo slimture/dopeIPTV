@@ -381,25 +381,32 @@ def logins_out(pieces: Iterator[bytes]) -> Iterator[bytes]:
     rule. Each slice is held back from its last "<" (or an <url> or <image>
     not yet closed) so no element is cut in two; past 1 MiB it goes on."""
     rest = b""
-    for piece in pieces:
-        data = rest + piece
-        cut = data.rfind(b"<")
-        if cut < 0:
-            cut = len(data)
-        moved = True
-        while moved:                    # cut only ever moves back: it ends
-            moved = False
-            for tag in (b"<icon", b"<url", b"<image"):
-                i = data.rfind(tag, 0, cut)
-                if i >= 0:
-                    end = _end_of(data, i, tag[1:])
-                    if end is None or end > cut:
-                        cut, moved = i, True
-        if len(data) - cut > (1 << 20):
-            cut = len(data)
-        rest = data[cut:]
-        if cut:
-            yield _scrubbed(data[:cut])
+    try:
+        for piece in pieces:
+            data = rest + piece
+            cut = data.rfind(b"<")
+            if cut < 0:
+                cut = len(data)
+            moved = True
+            while moved:                # cut only ever moves back: it ends
+                moved = False
+                for tag in (b"<icon", b"<url", b"<image"):
+                    i = data.rfind(tag, 0, cut)
+                    if i >= 0:
+                        end = _end_of(data, i, tag[1:])
+                        if end is None or end > cut:
+                            cut, moved = i, True
+            if len(data) - cut > (1 << 20):
+                cut = len(data)
+            rest = data[cut:]
+            if cut:
+                yield _scrubbed(data[:cut])
+    except Exception:
+        # A guide cut short: guide_body gives what was whole, then says so -
+        # what is held back here is the end of that, and goes out first.
+        if rest:
+            yield _scrubbed(rest)
+        raise
     if rest:
         yield _scrubbed(rest)
 
