@@ -1413,7 +1413,9 @@ or for the admin page. Written for the dopeiptv jail (above).
   the group. Where the group does not exist (another system, a typo), the
   socket is 0666 as before - nginx still reaches it whoever it runs as -
   in a folder of the service's own that others can only pass through
-  (0711), and the start line says so. In the dopeiptv jail only nginx
+  (0711), and the start line says so (since "Fail closed, answers in
+  memory, no links followed" the service does not start then, unless its
+  config says `SOCKET_OPEN = yes`). In the dopeiptv jail only nginx
   (`www`) and the service (`iptv`) run, so the socket is theirs alone.
 - **The logs keep less of the address asked for.** A page view (`/`,
   `/help/`) keeps its path, never its query - `?fbclid=`, `?utm_...`,
@@ -1492,7 +1494,8 @@ jexec dopeiptv python3 -I /usr/local/www/iptv/donate/donate.py --check
 log's last line `[donate] listening on
 unix:/var/run/iptv_donate/donate.sock (0660, group www), Stripe set up,
 ...`; `--check` (as root) answers `200 {"stripe": true, ...}`. A line with
-`0666: no group 'www' here` means the group is named otherwise in this
+`no group 'www' here` (`0666: ...` until the next round, `[donate] not
+started: ...` since) means the group is named otherwise in this
 jail: `jexec dopeiptv pw groupshow www`, then `SOCKET_GROUP=` in the
 jail's `/usr/local/etc/iptv-donate.conf` and `sysrc -j dopeiptv
 iptv_donate_socket_group=`, both the group nginx's workers run as.
@@ -1585,3 +1588,25 @@ Among the last lines, the page's says `"u":"/"` and its `/hit`'s
 `"u":"/hit?p=%2F&ev=view&t=&x=&n=&s=check&l=en&...&r="` - no `fbclid`
 anywhere; the download's request is `"HEAD /dl.php?f=SHA256SUMS
 HTTP/1.0" 302` (a HEAD is not counted).
+
+## Fail closed, answers in memory, no links followed
+
+What a third review of the site found, and what changed (each commit says
+it in full). Nothing changes for a visitor, for the app - sync, feedback,
+watch together, updates and tips as before - or for the admin page.
+Written for the dopeiptv jail.
+
+- **The service does not start on a socket others could use.** Where the
+  group `SOCKET_GROUP` names does not exist, or the service may not give
+  it (another system, a typo), it stops at once and says why in its log -
+  `[donate] not started: the socket ... cannot be nginx's and this
+  service's alone: no group 'www' here. SOCKET_GROUP in
+  /usr/local/etc/iptv-donate.conf names the group nginx's workers run
+  as, ...` - and leaves no socket behind; before, it went on with the
+  socket 0666, open to every user in the jail. daemon(8) starts it again
+  every 5 seconds, so the line comes back until the config is right.
+  Only `SOCKET_OPEN = yes` in `iptv-donate.conf` - for a machine without
+  such a group, a developer's - keeps the old way, and the start line
+  then ends `so any user here may connect (SOCKET_OPEN = yes)`. In the
+  dopeiptv jail `www` is there and the socket is 0660 `iptv:www` already:
+  nothing changes but the day the group is gone.

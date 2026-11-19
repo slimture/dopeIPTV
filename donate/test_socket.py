@@ -3,9 +3,12 @@
 workers' and the service's alone - 0660 and nginx's group (SOCKET_GROUP,
 www), in a folder the rc file makes iptv:www 0750 - where before anyone in
 the jail could connect (0666). Where the group does not exist, or cannot be
-given, it is 0666 as before, so nginx still reaches it, in a folder nobody
-else can put anything in. The group's id and the calls that change a file
-are made up for the rules, a real socket for the rest.
+given, it fails closed: the service does not start, and says why, naming
+SOCKET_GROUP. Only SOCKET_OPEN = yes (a machine without such a group, a
+developer's) makes it 0666 then, so nginx still reaches it, in a folder
+nobody else can put anything in - and the start line says so. The group's
+id and the calls that change a file are made up for the rules, a real
+socket and a real start for the rest.
 
 Plain Python: ``python3 donate/test_socket.py`` runs them all (pytest finds
 them too). Everything in a temporary directory.
@@ -79,15 +82,23 @@ class _Files:
 SOCK, DIR = "/var/run/iptv_donate/donate.sock", "/var/run/iptv_donate"
 
 
-def _run(d, files: _Files, groups: dict, group: str = "www") -> str:
+def _run(d, files: _Files, groups: dict, group: str = "www", open_ok: bool = False) -> str:
     patches = files.patch(d, groups)
     for p in patches:
         p.start()
     try:
-        return d.open_to_nginx(SOCK, group)
+        return d.open_to_nginx(SOCK, group, open_ok)
     finally:
         for p in reversed(patches):
             p.stop()
+
+
+def _refused(d, files: _Files, groups: dict, group: str = "www") -> str:
+    try:
+        said = _run(d, files, groups, group)
+    except d.SocketNotPrivate as e:
+        return str(e)
+    raise AssertionError(f"opened: {said}")
 
 
 def test_in_the_rc_files_folder_the_socket_is_nginxs_group_and_0660():
@@ -108,30 +119,62 @@ def test_elsewhere_the_socket_is_given_the_group():
     assert files.files[SOCK] == (1001, 80, stat.S_IFSOCK | 0o660)
 
 
-def test_without_the_group_it_is_0666_as_before_in_a_folder_of_its_own():
+def test_without_the_group_it_does_not_start():
     d = _donate()
     files = _Files({SOCK: (1001, 1001, stat.S_IFSOCK | 0o660), DIR: (1001, 1001, stat.S_IFDIR | 0o777)})
-    said = _run(d, files, {}, group="www")
-    assert said.startswith("0666: no group 'www' here")
-    assert files.files[SOCK][2] == stat.S_IFSOCK | 0o666       # nginx reaches it, whoever it runs as
-    assert files.files[DIR][2] == stat.S_IFDIR | 0o711         # passed through, nothing put in or listed
-    assert not [c for c in files.calls if c[0] == "chown"]
+    said = _refused(d, files, {}, group="www")
+    assert "no group 'www' here" in said and "SOCKET_GROUP" in said and "SOCKET_OPEN = yes" in said
+    assert d.CONFIG_FILE in said                               # where to put it right
+    assert files.calls == []                                   # the socket as made: 0660, never wider
+    assert files.files[SOCK][2] == stat.S_IFSOCK | 0o660 and files.files[DIR][2] == stat.S_IFDIR | 0o777
 
 
-def test_a_group_it_may_not_give_is_0666_too():
+def test_a_group_it_may_not_give_does_not_start_either():
     d = _donate()
     files = _Files({SOCK: (1001, 1001, stat.S_IFSOCK | 0o660), DIR: (1001, 1001, stat.S_IFDIR | 0o700)},
                    chown_fails=True)
-    said = _run(d, files, {"www": 80})
-    assert said.startswith("0666: the group 'www' could not be given")
+    said = _refused(d, files, {"www": 80})
+    assert "the group 'www' could not be given" in said and "SOCKET_GROUP" in said
+    assert [c for c in files.calls if c[0] == "chmod"] == []
+    assert files.files[SOCK][2] == stat.S_IFSOCK | 0o660 and files.files[DIR][2] == stat.S_IFDIR | 0o700
+    # No group named at all is no way round it.
+    assert "SOCKET_GROUP is empty" in _refused(d, _Files({SOCK: (1001, 1001, stat.S_IFSOCK | 0o660)}), {}, "")
+
+
+def test_socket_open_yes_keeps_the_old_way_and_says_so():
+    d = _donate()
+    files = _Files({SOCK: (1001, 1001, stat.S_IFSOCK | 0o660), DIR: (1001, 1001, stat.S_IFDIR | 0o777)})
+    said = _run(d, files, {}, group="www", open_ok=True)
+    assert said == "0666: no group 'www' here, so any user here may connect (SOCKET_OPEN = yes)"
+    assert files.files[SOCK][2] == stat.S_IFSOCK | 0o666       # nginx reaches it, whoever it runs as
+    assert files.files[DIR][2] == stat.S_IFDIR | 0o711         # passed through, nothing put in or listed
+    assert not [c for c in files.calls if c[0] == "chown"]
+    files = _Files({SOCK: (1001, 1001, stat.S_IFSOCK | 0o660), DIR: (1001, 1001, stat.S_IFDIR | 0o700)},
+                   chown_fails=True)
+    said = _run(d, files, {"www": 80}, open_ok=True)
+    assert said.startswith("0666: the group 'www' could not be given") and said.endswith("(SOCKET_OPEN = yes)")
     assert files.files[SOCK][2] == stat.S_IFSOCK | 0o666
     assert files.files[DIR][2] == stat.S_IFDIR | 0o711         # 0700 kept nginx out: now it can pass
+    # Where the group is there, SOCKET_OPEN changes nothing: 0660 and the group.
+    files = _Files({SOCK: (1001, 80, stat.S_IFSOCK | 0o660), DIR: (1001, 80, stat.S_IFDIR | 0o750)})
+    assert _run(d, files, {"www": 80}, open_ok=True) == "0660, group www"
+
+
+def test_only_yes_opens_it():
+    for value, opened in (("yes", True), ("YES", True), (" yes ", True), ("", False), ("no", False),
+                          ("1", False), ("true", False), ("on", False), ("yes please", False)):
+        os.environ["SOCKET_OPEN"] = value
+        try:
+            assert _donate().SOCKET_OPEN is opened, value
+        finally:
+            del os.environ["SOCKET_OPEN"]
+    assert _donate().SOCKET_OPEN is False                      # not set: never open
 
 
 def test_a_folder_not_its_own_is_left_alone():
     d = _donate()
     files = _Files({SOCK: (1001, 1001, stat.S_IFSOCK | 0o660), DIR: (0, 0, stat.S_IFDIR | 0o1777)})
-    _run(d, files, {})
+    _run(d, files, {}, open_ok=True)
     assert files.files[DIR][2] == stat.S_IFDIR | 0o1777        # /tmp and the like: someone else's
     assert ("chmod", DIR, "0o711") not in files.calls
 
@@ -155,14 +198,26 @@ def test_a_real_socket_comes_out_so():
         assert d.open_to_nginx(path, _own_group()) == f"0660, group {_own_group()}"
         st = os.stat(path)
         assert stat.S_IMODE(st.st_mode) == 0o660 and st.st_gid == os.getgid()
-        assert d.open_to_nginx(path, "no-such-group-here").startswith("0666")
+        try:
+            d.open_to_nginx(path, "no-such-group-here")
+            raise AssertionError("opened without the group")
+        except d.SocketNotPrivate:
+            pass
+        assert stat.S_IMODE(os.stat(path).st_mode) == 0o660    # left as it was made
+        assert stat.S_IMODE(os.stat(folder).st_mode) == 0o700
+        assert d.open_to_nginx(path, "no-such-group-here", True).startswith("0666")
         assert stat.S_IMODE(os.stat(path).st_mode) == 0o666
         assert stat.S_IMODE(os.stat(folder).st_mode) == 0o711
     finally:
         s.close()
 
 
-def test_the_service_starts_on_it_and_answers_through_it():
+SCRIPT = os.path.join(HERE, "donate.py")
+
+
+def _service(conf_lines: str) -> tuple:
+    """The service's config in a folder of its own, its socket there: the
+    socket's path and the environment to start it with."""
     root = tempfile.mkdtemp(prefix="d")
     stats, run = os.path.join(root, "stats"), os.path.join(root, "run")
     os.makedirs(stats)
@@ -170,24 +225,53 @@ def test_the_service_starts_on_it_and_answers_through_it():
     path = os.path.join(run, "donate.sock")
     conf = os.path.join(root, "donate.conf")
     with open(conf, "w") as fh:
-        fh.write(f"STATS_DIR={stats}\nLISTEN=unix:{path}\nSOCKET_GROUP={_own_group()}\n")
+        fh.write(f"STATS_DIR={stats}\nLISTEN=unix:{path}\n{conf_lines}")
     env = {k: v for k, v in os.environ.items() if not k.startswith(("STATS_", "LISTEN", "SOCKET_"))}
     env["DONATE_CONFIG"] = conf
-    script = os.path.join(HERE, "donate.py")
-    proc = subprocess.Popen([sys.executable, "-I", script], env=env, stderr=subprocess.PIPE, text=True)
+    return path, env
+
+
+def _answers(path: str, env: dict) -> tuple:
+    """Start it, ask it through its socket (--check), stop it: the socket as
+    it was while it ran, and what the service said."""
+    proc = subprocess.Popen([sys.executable, "-I", SCRIPT], env=env, stderr=subprocess.PIPE, text=True)
     try:
         deadline = time.monotonic() + 30
         while not os.path.exists(path) and proc.poll() is None and time.monotonic() < deadline:
             time.sleep(0.05)
         st = os.stat(path)
-        assert stat.S_ISSOCK(st.st_mode) and stat.S_IMODE(st.st_mode) == 0o660 and st.st_gid == os.getgid()
-        got = subprocess.run([sys.executable, "-I", script, "--check"], env=env, capture_output=True,
+        got = subprocess.run([sys.executable, "-I", SCRIPT, "--check"], env=env, capture_output=True,
                              text=True, timeout=30)
         assert got.returncode == 0 and got.stdout.startswith("200 "), got.stdout
     finally:
         proc.terminate()
         _out, said = proc.communicate(timeout=10)
+    return st, said
+
+
+def test_the_service_starts_on_it_and_answers_through_it():
+    path, env = _service(f"SOCKET_GROUP={_own_group()}\n")
+    st, said = _answers(path, env)
+    assert stat.S_ISSOCK(st.st_mode) and stat.S_IMODE(st.st_mode) == 0o660 and st.st_gid == os.getgid()
     assert f"listening on unix:{path} (0660, group {_own_group()})" in said, said
+
+
+def test_without_the_group_the_service_does_not_start_and_says_why():
+    path, env = _service("SOCKET_GROUP=no-such-group-here\n")
+    got = subprocess.run([sys.executable, "-I", SCRIPT], env=env, capture_output=True, text=True, timeout=30)
+    assert got.returncode == 1, got.stderr
+    said = got.stderr
+    assert "[donate] not started: " in said and "listening on" not in said, said
+    assert "no group 'no-such-group-here' here" in said and "SOCKET_GROUP in " + env["DONATE_CONFIG"] in said
+    assert "SOCKET_OPEN = yes" in said
+    assert not os.path.exists(path)                            # nothing left to connect to
+    # SOCKET_OPEN = yes, as a developer's config would say it: it starts,
+    # open to all here, and its start line says so.
+    path, env = _service("SOCKET_GROUP=no-such-group-here\nSOCKET_OPEN = yes\n")
+    st, said = _answers(path, env)
+    assert stat.S_IMODE(st.st_mode) == 0o666
+    assert (f"listening on unix:{path} (0666: no group 'no-such-group-here' here, so any user here may "
+            "connect (SOCKET_OPEN = yes))") in said, said
 
 
 def test_the_rc_file_makes_the_folder_the_services_and_nginxs_alone():

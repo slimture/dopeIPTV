@@ -97,7 +97,14 @@ named by DONATE_CONFIG (default /usr/local/etc/iptv-donate.conf):
                             or host:port for TCP
     SOCKET_GROUP            the group nginx's workers run as (www): the socket
                             is 0660 and that group's (the rc file's folder,
-                            iptv_donate_socket_group, names the same one)
+                            iptv_donate_socket_group, names the same one).
+                            Where it cannot be - no such group here, or one
+                            this user may not give - the service does not
+                            start, and says why.
+    SOCKET_OPEN             yes: only for a machine without such a group (a
+                            developer's) - the socket is then 0666, any user
+                            here may connect, and the start line says so.
+                            Anything else, or not set: never open.
     ADMIN_USERS             only until the new sign-in has its first admin,
                             and only with nginx's old password prompt still
                             in front: who of it may open /admin/. Empty (the
@@ -152,11 +159,13 @@ _PM = re.compile(r"^pm_[A-Za-z0-9]{8,200}$")
 STRIPE_CS = "https://api.stripe.com/v1/checkout/sessions"
 
 
+CONFIG_FILE = os.environ.get("DONATE_CONFIG", "/usr/local/etc/iptv-donate.conf")
+
+
 def _load_config() -> dict[str, str]:
     conf: dict[str, str] = {}
-    path = os.environ.get("DONATE_CONFIG", "/usr/local/etc/iptv-donate.conf")
     try:
-        with open(path, encoding="utf-8") as fh:
+        with open(CONFIG_FILE, encoding="utf-8") as fh:
             for line in fh:
                 line = line.strip()
                 if not line or line.startswith("#") or "=" not in line:
@@ -1937,6 +1946,11 @@ LISTEN = CONF.get("LISTEN", "unix:/var/run/iptv_donate/donate.sock")
 #: socket's folder iptv:www 0750 with the same group
 #: (iptv_donate_socket_group in rc.conf; the two name one group).
 SOCKET_GROUP = CONF.get("SOCKET_GROUP", "www")
+#: A machine without that group (a developer's) may say SOCKET_OPEN = yes:
+#: the socket is then 0666 and open to every user here. Nothing else opens
+#: it - not set, the service does not start on a socket it cannot keep to
+#: nginx's group (open_to_nginx).
+SOCKET_OPEN = CONF.get("SOCKET_OPEN", "").strip().lower() == "yes"
 
 
 def _gb(n: int) -> str:
@@ -2065,16 +2079,23 @@ def keep_private(stats_dir: str) -> int:
     return narrowed
 
 
-def open_to_nginx(path: str, group: str = SOCKET_GROUP) -> str:
+class SocketNotPrivate(Exception):
+    """The socket cannot be kept to nginx's workers and this service: the
+    service does not start (main). Its words say why, for the log."""
+
+
+def open_to_nginx(path: str, group: str = SOCKET_GROUP, open_ok: bool = SOCKET_OPEN) -> str:
     """The socket at *path* for nginx's workers and this service alone:
     its group *group*, mode 0660. In the rc file's folder (iptv:www 0750) a
     new file already has the folder's group, as FreeBSD gives every new
     file; elsewhere it is given it. Where the group does not exist, or this
-    user may not give it (it is not one of the group's), the socket is
-    0666 as before - nginx's workers reach it whoever they run as - and its
-    folder, if it is this service's own, is one the others can only pass
-    through (0711): nothing else put in it, nothing listed. What was done,
-    for the start line."""
+    user may not give it (it is not one of the group's), it fails closed:
+    SocketNotPrivate, the socket as it was made (0660, never wider), and
+    the service does not start. Only *open_ok* (SOCKET_OPEN = yes, for a
+    machine without such a group) makes it 0666 then - nginx's workers
+    reach it whoever they run as - with its folder, if it is this service's
+    own, one the others can only pass through (0711): nothing else put in
+    it, nothing listed. What was done, for the start line."""
     import grp
     import stat
     try:
@@ -2089,6 +2110,18 @@ def open_to_nginx(path: str, group: str = SOCKET_GROUP) -> str:
             return f"0660, group {group}"
         except OSError:
             pass
+    if gid is not None:
+        why = f"the group {group!r} could not be given"
+    elif group:
+        why = f"no group {group!r} here"
+    else:
+        why = "SOCKET_GROUP is empty"
+    if not open_ok:
+        raise SocketNotPrivate(
+            f"the socket {path} cannot be nginx's and this service's alone: {why}. SOCKET_GROUP in "
+            f"{CONFIG_FILE} names the group nginx's workers run as, the same as the rc file's "
+            "iptv_donate_socket_group; on a machine without one, SOCKET_OPEN = yes there lets any "
+            "user here connect")
     os.chmod(path, 0o666)
     folder = os.path.dirname(os.path.abspath(path))
     try:
@@ -2098,8 +2131,7 @@ def open_to_nginx(path: str, group: str = SOCKET_GROUP) -> str:
             os.chmod(folder, want)
     except OSError:
         pass
-    why = f"no group {group!r} here" if gid is None else f"the group {group!r} could not be given"
-    return f"0666: {why}, so any user here may connect (SOCKET_GROUP)"
+    return f"0666: {why}, so any user here may connect (SOCKET_OPEN = yes)"
 
 
 def _connection():
@@ -2154,7 +2186,17 @@ def main() -> None:
             srv = UnixHTTPServer(path, Handler)
         finally:
             os.umask(old)
-        how = f" ({open_to_nginx(path)})"
+        try:
+            how = f" ({open_to_nginx(path)})"
+        except SocketNotPrivate as e:
+            # Fails closed: nothing listens, nothing is left to connect to.
+            srv.server_close()
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+            print(f"[donate] not started: {e}", file=sys.stderr, flush=True)
+            raise SystemExit(1) from None
     else:
         host, _, port = LISTEN.rpartition(":")
         srv = TCPHTTPServer((host or "127.0.0.1", int(port)), Handler)
