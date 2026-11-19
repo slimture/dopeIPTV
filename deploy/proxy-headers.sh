@@ -56,7 +56,8 @@ done < "$TMP/includes"
 while read -r line; do
     case $line in
         *Content-Security-Policy*'$csp_policy'*) ;;
-        *Strict-Transport-Security*|*X-Content-Type-Options*|*X-Frame-Options*|*Referrer-Policy*) ;;
+        *Strict-Transport-Security*|*X-Content-Type-Options*|*X-Frame-Options*|*Referrer-Policy*)
+            say "replaced by this site's own: $line" ;;
         *) say "kept from the http block: $line"; printf '    %s\n' "$line" >> "$TMP/headers" ;;
     esac
 done < "$TMP/global"
