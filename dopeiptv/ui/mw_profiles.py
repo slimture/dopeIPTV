@@ -238,9 +238,18 @@ class _ProfilesMixin:
             return
         # Held back while they were not known: shown now.
         self._kids_ver = int(self.__dict__.get("_kids_ver", 0)) + 1
+        self._held_rows_in("kids")
+
+    def _held_rows_in(self, reason: str) -> None:
+        """Rows held back for want of their categories (a kids profile's
+        test, the parental lock's on what the stores kept): shown now in
+        every place, list and TV mode's Home."""
         try:
-            self._refresh_places("kids")
-            if getattr(self, "all_items", None) and not self._guide_page_showing():
+            self._refresh_places(reason)
+            if reason == "lock" and getattr(self, "mode", "") == "history" \
+                    and not self._guide_page_showing():
+                self._load_items(getattr(self, "_current_cat", None))   # History read again
+            elif getattr(self, "all_items", None) and not self._guide_page_showing():
                 self._apply_filter()
             tv = getattr(self, "_tv_page", None)
             if tv is not None and not _gone(tv) and getattr(self, "_tv_on", False) \

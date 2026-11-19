@@ -364,6 +364,9 @@ class _Win(_MediaServerMixin, QObject):
     def _set_status(self, text):
         self.status = text
 
+    def _lock_filter(self, rows):        # nothing locked (mw_lists)
+        return list(rows)
+
 
 def test_what_plays_is_reported_start_progress_pause_stop(app):
     c = _Client()

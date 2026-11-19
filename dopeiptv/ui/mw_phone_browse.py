@@ -575,8 +575,10 @@ class _PhoneBrowseMixin:
 
     def _pb_history_shown(self, rows: list[dict]) -> list[dict]:
         """History as the phone may list it: a kids profile's limits, and
-        no channel, film or episode the lists leave out now."""
+        no channel, film or episode the lists leave out now - one kept
+        without its category held back until the catalogue said it."""
         unlocked = bool(getattr(self.parental, "session_unlocked", False))
+        rows = self._lock_filter(rows)
         out = []
         excluded = {m: self.overrides.excluded_ids(m, include_locked=not unlocked)
                     for m in ("live", "vod", "series")}

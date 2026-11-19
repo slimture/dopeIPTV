@@ -322,9 +322,20 @@ class _PlaceTvMixin:
         hidden = self.channel_ov.anything_hidden()
         out: list[dict] = []
         seen: set[str] = set()
+        entries = []
         for e in list(getattr(self.history, "entries", []) or []):
             if not isinstance(e, dict) or e.get("_kind") != "live":
                 continue
+            if e.get("category_id") in (None, ""):
+                # Kept without its category (before History kept it): the
+                # one its list has it in, when a list showed it this session.
+                sid = e.get("stream_id") if e.get("stream_id") is not None else e.get("_key")
+                cat = (known.get(str(sid)) or {}).get("category_id")
+                if cat not in (None, ""):
+                    e = {**e, "category_id": cat}
+            entries.append(e)
+        # The parental lock as the lists have it: none of a locked category.
+        for e in self._lock_filter(entries):
             sid = e.get("stream_id")
             if sid is None:
                 sid = e.get("_key")

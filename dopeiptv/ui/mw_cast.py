@@ -1021,7 +1021,9 @@ class _CastMixin(_CastMomentMixin):
         """What a History row needs beyond its address, for this kind.
 
         For a live channel, its stream_id and archive depth, so a later replay
-        from History still has timeshift and catch-up available.
+        from History still has timeshift and catch-up available - and, as
+        for a film, its category: the parental lock leaves a locked one's
+        row out wherever History is shown (the lists' rule, _lock_filter).
 
         For an episode, its series - so a replay from History (or Home's
         Recently viewed) resumes as an EPISODE, lands in the series' episode
@@ -1033,8 +1035,11 @@ class _CastMixin(_CastMomentMixin):
         if kind == "live" and item is not None:
             return {"stream_id": item.get("stream_id"),
                     "num": item.get("num"),
+                    "category_id": item.get("category_id"),
                     "tv_archive": item.get("tv_archive"),
                     "tv_archive_duration": item.get("tv_archive_duration")}
+        if kind == "movie" and item is not None:
+            return {"category_id": item.get("category_id")}
         if kind == "local" and item is not None:
             return {k: item.get(k)
                     for k in ("_year", "_filename", "_clean_title", "_path")
