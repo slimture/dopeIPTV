@@ -211,7 +211,9 @@ def test_the_app_menus_keys_are_the_ones_the_window_sets():
     from dopeiptv.ui import mw_privacy
     for key in (mw_privacy.PRIVATE_SHORTCUT, mw_privacy.CLEAR_SHORTCUT):
         assert any(nk.same(key, k) for k in nk.APP_KEYS), key
-    src = open(os.path.join(_REPO_ROOT, "dopeiptv", "ui", "main_window.py"), encoding="utf-8").read()
+    # The window's menus are made in its build (ui/mw_build.py).
+    src = "".join(open(os.path.join(_REPO_ROOT, "dopeiptv", "ui", name), encoding="utf-8").read()
+                  for name in ("main_window.py", "mw_build.py"))
     assert 'open_video_action.setShortcut("Ctrl+O")' in src
 
 
