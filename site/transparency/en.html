@@ -35,8 +35,8 @@
 <li><b>You</b> read all of it, change or delete anything, and decide whether to send it.</li>
 <li><b>Our server</b> cleans it once more and keeps it without your IP address.</li>
 </ol>
-<p>The cleaning works in two ways. First it looks for <em>patterns</em>: anything shaped like a web address, an IP or MAC address, an e-mail address, or a password, token or login written as <code>name=value</code>. Then it removes <em>what the app knows is yours</em>: the names, servers and logins of your sources, your channel names, the titles you have watched, your user name and your home folder. Each is replaced by a placeholder such as <code>&lt;private&gt;</code>, so the report still makes sense to us without saying who you are.</p>
-<p>If you ask for an answer, the app makes a random code that stays on your computer and sends only a hash of it – a one-way fingerprint we cannot turn back into the code. Later the app asks whether that hash has an answer. Nothing in it says who you are.</p>
+<p>The cleaning works in two ways. First it looks for <em>patterns</em>: anything shaped like a web address – with or without <code>http://</code> in front –, an IP or MAC address, an e-mail address, a password, token or login written as <code>name=value</code>, in quotes or as JSON, and a login header or cookie. Then it removes <em>what the app knows is yours</em>: the names, servers and logins of your sources, your channel names, the titles you have watched, your user name and your home folder. Each is replaced by a placeholder such as <code>&lt;private&gt;</code>, so the report still makes sense to us without saying who you are. The part that sends runs the patterns once more on exactly what goes, whichever way the text came, and sends it only over HTTPS to our own address – never after a redirect elsewhere.</p>
+<p>If you ask for an answer, the app makes a random code that stays on your computer and sends only a hash of it – a one-way fingerprint we cannot turn back into the code. Later the app asks whether that hash has an answer. The hash is the same each time it asks, so our server can tell that the questions belong together, but not who asks. A reply you write to one of our answers is cleaned the same way as the report.</p>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">
@@ -55,6 +55,8 @@
 <!--tp:code reports answers-->
 <p>On our server, the second cleaning and what is stored – look for what is <em>not</em> there: no IP address, no browser details.</p>
 <!--tp:code reports server-->
+<p>And the one use of your IP address: in memory, to limit how many requests one address makes – forgotten within a minute once the limit no longer needs it. The same limits guard sync and Watch together.</p>
+<!--tp:code reports limits-->
 <p>And the tests that check all of this every time the app is built. A change that let something through would fail them:</p>
 <!--tp:tests reports-->
 <h3>Check it yourself</h3>
@@ -66,7 +68,7 @@
 <ul>
 <li>The cleaning knows patterns and what the app knows is yours. Words you type yourself in a piece of feedback, or a name it has never seen – a file name, a channel from a list you have since removed – stay as they are. That is why you see the whole report before anything is sent.</li>
 <li>Our server's second cleaning is simpler than the app's: it looks for the same patterns, but it does not know your names. It is there for an old app or a hand-made request; the app's cleaning is the one that counts.</li>
-<li>Like every request on the internet, the report arrives from your IP address. Our server uses it only in memory, for at most a day, to limit how many reports one address can send, and never stores it.</li>
+<li>Like every request on the internet, the report arrives from your IP address. Our server uses it only in memory, for about ten minutes, to limit how many reports one address can send, and never stores it.</li>
 </ul>
 
 <h2 id="sync">2. Settings sync</h2>
@@ -77,8 +79,9 @@
 <li><b>From the code</b> come two unrelated values: a <em>slot</em> (where the copy is kept) and a <em>key</em> (which locks it).</li>
 <li><b>Our server</b> gets the slot and the locked copy. Never the code, never the key.</li>
 </ol>
-<p>The two values come from the code through <strong>HKDF-SHA256</strong>, a standard way to make several keys from one secret: knowing the slot says nothing about the key. The copy is compressed and then encrypted with <strong>ChaCha20-Poly1305</strong>, one of the ciphers that protect HTTPS connections on the web. It also detects any change: a copy someone has tampered with does not open. Your other computers get the same code from you – typed or pasted – and so make the same slot and key.</p>
-<p>The request carries the app's name and version, whether it is an official build, the slot and the locked copy. No account, no e-mail address, no name. The web server does not log sync requests at all, and a copy no computer has read or written for 180 days is deleted.</p>
+<p>The two values come from the code through <strong>HKDF-SHA256</strong>, a standard way to make several keys from one secret: knowing the slot says nothing about the key. The copy is compressed and then encrypted with <strong>ChaCha20-Poly1305</strong>, one of the ciphers that protect HTTPS connections on the web. It also detects any change: a copy someone has tampered with does not open.</p>
+<p>What our server could still do is hand back an earlier copy it kept. So every copy carries a counter, locked with the rest and one higher with every upload. A computer that has already seen a later copy notices, keeps its own newer values, puts its copy back and tells you so. Your other computers get the same code from you – typed or pasted – and so make the same slot and key.</p>
+<p>The request carries the app's name and version, whether it is an official build, the slot and the locked copy. No account, no e-mail address, no name. It goes only over HTTPS, and never after a redirect elsewhere. The web server does not log sync requests at all, and a copy no computer has read or written for 180 days is deleted.</p>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">
@@ -87,18 +90,20 @@
 <!--tp:ex sync inside-->
 <p class="tp-ex-h">What our server receives (the locked copy is shortened here):</p>
 <!--tp:ex sync request-->
-<p class="fine">Made by running the app's own code with a new, random sync code. Run it again and every character changes.</p>
+<p class="fine">Made by running the app's own code with a new, random sync code – the <code>~</code> entry is the counter, here the third upload. Run it again and every character changes.</p>
 <h3>The code</h3>
 <p>The sync code, the slot and the key, and how the copy is locked:</p>
 <!--tp:code sync key-->
-<p>What the app sends with it – its name and version, nothing about you:</p>
+<p>The counter in every copy, and how a round notices an earlier copy and puts its own back:</p>
+<!--tp:code sync counter-->
+<p>What the app sends with it – its name and version, nothing about you – and only over HTTPS:</p>
 <!--tp:code sync send-->
-<p>On our server: what is kept per slot.</p>
+<p>On our server: what is kept per slot, and how a request is handled – the address only for the limits (<a href="#reports">part 1</a>).</p>
 <!--tp:code sync server-->
 <p>And the web server's setting that keeps sync out of its logs (<code>access_log off</code>):</p>
 <!--tp:code sync nolog-->
 <h3>Check it yourself</h3>
-<blockquote class="tp-ask" data-for="sync"><p>Below is code from dopeIPTV, an open-source TV player – the part that syncs settings between computers through the developer's server. Explain in plain English, step by step, what it does. Then review it critically: could the server, or anyone who gets hold of what the server stores, read the data or tell whose it is? Are the cryptography and the keys used correctly? Point out weaknesses and what the code does not protect against. Do not guess: say so if something depends on code that is not included here.</p></blockquote>
+<blockquote class="tp-ask" data-for="sync"><p>Below is code from dopeIPTV, an open-source TV player – the part that syncs settings between computers through the developer's server. Explain in plain English, step by step, what it does. Then review it critically: could the server, or anyone who gets hold of what the server stores, read the data, change it, hand back an older copy unnoticed, or tell whose it is? Are the cryptography and the keys used correctly? Point out weaknesses and what the code does not protect against. Do not guess: say so if something depends on code that is not included here.</p></blockquote>
 <!--tp:copy sync-->
 </div>
 </details>
@@ -106,18 +111,19 @@
 <ul>
 <li>Whoever has your sync code can read and change your synced data. Keep it like a password. If you lose it, we cannot help you get it back – we never had it.</li>
 <li>Our server sees how big your copy is and when it changes, though not what is in it.</li>
-<li>Your IP address reaches our server with each request. It is used only in memory, to limit requests, and is never written down.</li>
+<li>Our server could keep showing your computers the newest copy one of them has seen and hold back what another sends later. The counter catches a copy older than one your computer has seen, not one that simply stops changing – and a computer that joins for the first time has seen nothing yet.</li>
+<li>Your IP address reaches our server with each request. It is used only in memory, for the limits – about ten minutes, a day when a new copy is made – and is never written down.</li>
 </ul>
 
 <h2 id="together">3. Watch together</h2>
 <p class="tp-promise">Who is in the room and what you watch go between your computers locked – our server only passes on messages it cannot open.</p>
 <h3>How it works</h3>
 <ol class="tp-flow">
-<li><b>The room code</b> – eight characters you share with your friends – stays with the people in the room.</li>
+<li><b>The room code</b> – ten characters you share with your friends – stays with the people in the room.</li>
 <li><b>From the code</b> each computer makes the same room name and the same key.</li>
 <li><b>Our server</b> passes the locked messages on, keeps them only in memory, and forgets the room an hour after the last request.</li>
 </ol>
-<p>Eight characters are quick to type, but on their own they would be quick to guess. So the code is first stretched with <strong>PBKDF2</strong> – 120,000 rounds of SHA-256, which makes every guess slow – and then turned into a room name and a key with HKDF, as for sync. Each message – who joined, what plays, play, pause and seek – is encrypted with ChaCha20-Poly1305 and padded to one of four fixed sizes, so its length says little about what is in it. Each person gets a new random number for each room.</p>
+<p>Ten characters are quick to type, but on their own they would be quicker to guess than a key should be. So the code is first stretched with <strong>PBKDF2</strong> – 600,000 rounds of SHA-256, so trying every code against one room would keep a graphics card busy for centuries – and then turned into a room name and a key with HKDF, as for sync. A code of eight characters from an older version still joins its room. Each message – who joined, what plays, play, pause and seek – is encrypted with ChaCha20-Poly1305 and padded to one of four fixed sizes, so its length says little about what is in it. Inside, locked, each message also carries its sender's number and a count: one passed on twice is used once. Each person gets a new random number for each room. The app talks to the relay only over HTTPS, and never follows a redirect elsewhere.</p>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">
@@ -126,16 +132,18 @@
 <!--tp:ex together inside-->
 <p class="tp-ex-h">What our server receives:</p>
 <!--tp:ex together request-->
-<p class="fine">Made by running the app's own code with the room code <code>K7PQ-M2XD</code>. The title, the name and the position are all in there – locked.</p>
+<p class="fine">Made by running the app's own code with the room code <code>K7PQM-2XDH9</code>. The title, the name and the position are all in there – locked.</p>
 <h3>The code</h3>
 <p>The room name and the key from the code, and how a message is padded and locked:</p>
 <!--tp:code together key-->
-<p>On our server: a message is taken as bytes and passed on – nothing opens it, nothing is written to disk.</p>
+<p>How each message gets its count, and how one seen before is left out:</p>
+<!--tp:code together replay-->
+<p>On our server: a message is taken as bytes and passed on – nothing opens it, nothing is written to disk – and the request, where the address is used only for the limits:</p>
 <!--tp:code together server-->
 <p>And the web server's setting that keeps Watch together out of its logs:</p>
 <!--tp:code together nolog-->
 <h3>Check it yourself</h3>
-<blockquote class="tp-ask" data-for="together"><p>Below is code from dopeIPTV, an open-source TV player – the part that lets friends watch in step through a relay on the developer's server. Explain in plain English, step by step, what it does. Then review it critically: what can the relay, or someone who watches the traffic, learn about who watches what, and with whom? Is the room code strong enough, and are the cryptography and the padding used correctly? Point out weaknesses and what the code does not protect against. Do not guess: say so if something depends on code that is not included here.</p></blockquote>
+<blockquote class="tp-ask" data-for="together"><p>Below is code from dopeIPTV, an open-source TV player – the part that lets friends watch in step through a relay on the developer's server. Explain in plain English, step by step, what it does. Then review it critically: what can the relay, or someone who watches the traffic, learn about who watches what, and with whom – and could it replay, change or forge messages? Is the room code strong enough, and are the cryptography and the padding used correctly? Point out weaknesses and what the code does not protect against. Do not guess: say so if something depends on code that is not included here.</p></blockquote>
 <!--tp:copy together-->
 </div>
 </details>
@@ -143,7 +151,8 @@
 <ul>
 <li>Anyone who gets the room code can join the room and see the names and what plays. Share it only with the people you watch with. A room takes at most eight people.</li>
 <li>The people in the room see the name you choose and what you watch – that is the point of it.</li>
-<li>Our server sees the room name, a random number for each person, how big the messages are and when they are sent – and, like every server, the IP address they come from. Watch together cannot be used while private viewing is on.</li>
+<li>Our server sees the room name, a random number for each person, how big the messages are and when they are sent – and, like every server, the IP address they come from, which it uses only in memory, for the limits. It could also hold messages back or pass them on late; it cannot read, change or forge them. Watch together cannot be used while private viewing is on.</li>
+<li>A code of eight characters from an older version is easier to guess. Start a new room to get one of ten.</li>
 </ul>
 
 <h2 id="private">4. Private viewing</h2>
@@ -154,7 +163,7 @@
 <li><b>Each place that keeps something</b> – watch history, where you stopped – asks the switch itself before it writes.</li>
 <li><b>Each place that tells</b> – Trakt, Simkl, Discord, your media server, the statistics, the log – asks it too.</li>
 </ol>
-<p>The check sits in the stores themselves, not in the buttons that play something. So no part of the app can forget it: whichever way you start a film, the history refuses to write it. A playback that began in private stays private to its end – even if the stream reconnects after you turn private viewing off.</p>
+<p>The check sits in the stores themselves, not in the buttons that play something. So no part of the app can forget it: whichever way you start a film, the history refuses to write it. A playback that began in private stays private to its end – even if the stream reconnects after you turn private viewing off: it is not kept, not counted and not told to Trakt, Simkl, Discord or your media server.</p>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">
@@ -166,6 +175,8 @@
 <!--tp:code private switch-->
 <p>Where the history and the resume points refuse to write:</p>
 <!--tp:code private stores-->
+<p>And where Trakt and Simkl are told – asked of the playback, not only of the switch:</p>
+<!--tp:code private tellers-->
 <h3>Check it yourself</h3>
 <blockquote class="tp-ask" data-for="private"><p>Below is code from dopeIPTV, an open-source TV player – its private viewing mode. Explain in plain English, step by step, what it does. Then review it critically: is there a way for what is played during private viewing to be saved or reported anyway? Point out weaknesses and what the code does not protect against. Do not guess: say so if something depends on code that is not included here.</p></blockquote>
 <!--tp:copy private-->
@@ -181,7 +192,7 @@
 <p class="tp-promise">When the app looks for an update it says which app and version it is, on which system – and nothing else.</p>
 <h3>How it works</h3>
 <p>Once a day the app asks dopeiptv.org which version is the newest (GitHub, if we do not answer). The request carries a user agent and one more line saying whether this is an official build. That is all: no ID, no settings, nothing about what you watch.</p>
-<p>An update is never used just because it arrived. Every release comes with a list of its files' checksums, signed with our own release key. The app checks the signature and the file's checksum before it installs anything. Someone who could change a file on GitHub, but does not hold our key, cannot get an update into your app.</p>
+<p>An update is never used just because it arrived. Every release comes with a list of its files' checksums, signed with our own release key. The app checks the signature and the file's checksum before it installs anything. Someone who could change a file on GitHub, but does not hold our key, cannot get an update into your app. A copy built by someone else, without our key, takes no update at all.</p>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">
@@ -191,7 +202,7 @@
 <h3>The code</h3>
 <p>The user agent and the build line, and where they are put on the request:</p>
 <!--tp:code updates headers-->
-<p>The check of the signed checksums before an update is installed:</p>
+<p>The check of the signed checksums, and of the downloaded file against them, before an update is installed:</p>
 <!--tp:code updates signed-->
 <h3>Check it yourself</h3>
 <blockquote class="tp-ask" data-for="updates"><p>Below is code from dopeIPTV, an open-source TV player – the part that looks for updates and checks them before they are installed. Explain in plain English, step by step, what it does. Then review it critically: what does the request reveal about the person or their computer, and could a tampered update get through the check? Point out weaknesses and what the code does not protect against. Do not guess: say so if something depends on code that is not included here.</p></blockquote>
@@ -212,7 +223,8 @@
 <li><b>Every 15 minutes</b> the log is read: the address becomes a country (looked up on our own server) and a visitor ID, and is not written further.</li>
 <li><b>After 400 days</b> a visit loses its ID, the time of day and the screen size. Only anonymous figures remain.</li>
 </ol>
-<p>The visitor ID is a <strong>hash</strong>: the IP address and the browser's name run through SHA-256 together with a secret that exists only on our server, cut to twelve characters. The same visitor gets the same ID, so we can count unique and returning visitors – but the ID cannot be turned back into the address.</p>
+<p>The visitor ID is a <strong>hash</strong>: the IP address and the browser's name run through SHA-256 together with a secret that exists only on our server, cut to twelve characters. The same visitor gets the same ID, so we can count unique and returning visitors. The ID does not show the address, but it is pseudonymous, not anonymous: whoever had both the statistics and the secret could try addresses until one fits.</p>
+<p>How long each part is kept: the log with your address about a week; each visit with its ID 400 days; the IDs on their own, to compare a year with the year before, 25 months; after that only anonymous figures. A payment is never noted on a visit – a tip counts only in the day's total – so a visit cannot be tied to the payment service's record of who paid.</p>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">
@@ -229,6 +241,8 @@
 <!--tp:code website log-->
 <p>The visitor ID and the visit as it is kept:</p>
 <!--tp:code website visitor-->
+<p>How long the visits and the IDs are kept, and the one place a tip is counted – per day, never on the visit:</p>
+<!--tp:code website kept-->
 <p>What a visit keeps after 400 days:</p>
 <!--tp:code website anon-->
 <h3>Check it yourself</h3>
@@ -251,7 +265,7 @@
 
 <h2 id="hosts">7. Everything the app talks to</h2>
 <p class="tp-promise">Every address written in the app's code is listed here, with when the app uses it.</p>
-<p>The list is made by searching the app's code for every host name in it – the same search you can run yourself. The app also talks to what you add yourself: your sources, and the boxes, TVs and servers on your network. Those are yours, so they are not in the code.</p>
+<p>The list is made by searching the app's code for every host name in it – the same search you can run yourself. The app also talks to what you add yourself: your sources, and the boxes, TVs and servers on your network – and to the addresses their own lists name, such as channel logos and guides on other servers, and, through yt-dlp, the site of an address you open. Those come from your data, not from the code, so they are not in the lists below.</p>
 <h3>Addresses the app connects to</h3>
 <table class="tp-hosts">
 <thead><tr><th>Address</th><th>What for, and when</th></tr></thead>
@@ -309,7 +323,8 @@ grep -rnoE --include='*.py' "[\"'][a-z0-9.-]+\.(org|com|net|info|tv|io|dev|se|ap
 <ul>
 <li><strong>Built in public.</strong> Every release is built by GitHub Actions from the version's tag in the code – not on our computers. <a href="https://github.com/slimture/dopeIPTV/blob/%REF%/.github/workflows/release.yml" rel="noopener">The build's recipe</a> is in the code, and <a href="https://github.com/slimture/dopeIPTV/actions/workflows/release.yml" rel="noopener">the log of every build</a> is open to anyone.</li>
 <li><strong>Signed.</strong> The release's files are listed with their checksums, and the list is signed with our release key. The app checks an update against it, and this website checks every file it hands out against it too.</li>
-<li><strong>It checks itself.</strong> The app carries a signed list of its own files and checks them when it starts. A changed copy knows it is changed, and does not use our services: it looks for no updates here and sends no reports to us.</li>
+<li><strong>It checks itself.</strong> The app carries a signed list of its own files and checks them when it starts. A changed copy knows it is changed, and does not use our services: it looks for no updates here and sends no reports to us. Run straight from the code, it says so, and works as an official build.</li>
+<li><strong>A courtesy, not a lock.</strong> The check is made by the app itself, and what kind of build it is the app says about itself. A copy changed on purpose can change the check too, and anyone can write a request by hand. So none of the protection on this page rests on it – that is the encryption and the cleaning above. What it gives you is an app that knows when it is not ours, and says so.</li>
 </ul>
 <!--tp:code builds allowed-->
 <p>You can also run the tests yourself, or run the app straight from the code:</p>
