@@ -109,10 +109,12 @@ MAX_XML = 512 * 1024
 LIST_MAX = 256 << 20
 TRANSPORTS = ("tcp", "udp", "http")
 
-_EXTINF = re.compile(r'#EXTINF:\s*-?[\d.]*(?P<attrs>(?:[^,"]|"[^"]*")*),(?P<name>.*)')
-_ATTR = re.compile(r'([\w-]+)="([^"]*)"')
+# As providers/client.py reads an M3U line: linear on any line.
+_EXTINF = re.compile(r'#EXTINF:\s*+-?[\d.]*+(?P<attrs>(?:[^,"]|"[^"]*")*+),(?P<name>.*)')
+_ATTR = re.compile(r'(?<![\w-])([\w-]++)="([^"]*)"')
 _NUMBERED = re.compile(r"^(\d{1,4})\.\s+(.+)$")
-_LISTS = re.compile(r"[\s,;|]+(?=(?:https?://|file:))", re.I)
+# A run of separators is tried from its start only: linear on a long one.
+_LISTS = re.compile(r"(?<![\s,;|])[\s,;|]++(?=(?:https?://|file:))", re.I)
 
 
 # -- what a server says ---------------------------------------------------------------

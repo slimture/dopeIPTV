@@ -778,13 +778,18 @@ class M3UClient(OfflineClient):
     LOG_NAME = "m3u"
 
     # A quoted attribute may hold a comma (group-title="News, Sports"); the
-    # loose form still reads a line whose quotes do not balance.
+    # loose form still reads a line whose quotes do not balance. Possessive
+    # (*+): what one part takes no other part takes back - the same match,
+    # in linear time on a provider's line of any length (a run of digits
+    # with no comma took quadratic time, the whole window waiting).
     _EXTINF = re.compile(
-        r'#EXTINF:\s*-?[\d.]*(?P<attrs>(?:[^,"]|"[^"]*")*),(?P<name>.*)')
-    _EXTINF_LOOSE = re.compile(r'#EXTINF:-?\d*\s*(?P<attrs>[^,]*),(?P<name>.*)')
+        r'#EXTINF:\s*+-?[\d.]*+(?P<attrs>(?:[^,"]|"[^"]*")*+),(?P<name>.*)')
+    _EXTINF_LOOSE = re.compile(r'#EXTINF:-?\d*+\s*+(?P<attrs>[^,]*+),(?P<name>.*)')
     # A failed download is tried again after this long, not on every call.
     RETRY_SECS = 60.0
-    _ATTR = re.compile(r'([\w-]+)="([^"]*)"')
+    # An attribute begins where a word begins: findall never starts again
+    # inside a long word that is no attribute.
+    _ATTR = re.compile(r'(?<![\w-])([\w-]++)="([^"]*)"')
 
     def __init__(self, url: str, stable: bool = False, map_path: str = "") -> None:
         super().__init__()

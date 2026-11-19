@@ -67,8 +67,29 @@ _SERIES_INFO_KEYS = ("name", "cover", "plot", "cast", "director", "genre",
 # Where a channel row says it has an archive: Ministra's lists have
 # "archive" and "enable_tv_archive", other portals "tv_archive".
 _ARCHIVE_FLAGS = ("tv_archive", "archive", "enable_tv_archive")
-# A MAG player's options after the address in a cmd ("position:0").
-_MAG_OPTIONS = re.compile(r"(?:\s+[a-z_]+:(?!//)\S*)+\s*$", re.I)
+class _TrailingOptions:
+    """A MAG player's options after the address in a cmd ("position:0"):
+    ``sub("", cmd)`` takes them off its end as
+    re.sub(r"(?:\\s+[a-z_]+:(?!//)\\S*)+\\s*$", "", cmd, flags=re.I) did -
+    a word at a time from the end, in linear time (that pattern took
+    quadratic time on a portal's answer with a long run of spaces)."""
+
+    _OPTION = re.compile(r"[a-z_]+:(?!//)\S*", re.I)
+    _SPACES = re.compile(r"(\s+)")
+
+    def sub(self, repl: str, s: str) -> str:
+        parts = self._SPACES.split(s)       # word, spaces, word, ..., word
+        end = len(parts) - 1
+        if end >= 2 and parts[end] == "":
+            end -= 2                        # the spaces it ends with
+        cut = None
+        while end >= 2 and self._OPTION.fullmatch(parts[end]):
+            cut = end - 1                   # the spaces before an option go with it
+            end -= 2
+        return s if cut is None else "".join(parts[:cut]) + repl
+
+
+_MAG_OPTIONS = _TrailingOptions()
 
 
 def portal_endpoints(url: str) -> list[str]:

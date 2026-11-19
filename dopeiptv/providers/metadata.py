@@ -19,6 +19,23 @@ from ..core import privacy
 from ..core.log import log
 from ..core.workers import run_async
 
+_BRACKETED = re.compile(r"[\[({][^\])}]*[\])}]")
+#: A bare year, in brackets or not, with the spaces round it - the spaces
+#: before it taken from where their run begins, never from inside it.
+_YEAR_LEFT = re.compile(r"(?:(?<!\s)\s++)?\(?\b(19|20)\d{2}\b\)?\s*+")
+
+
+def without_brackets(text: str, repl: str = " ") -> str:
+    """Every bracketed part of *text* - "[MULTI]", "(1080p)", "{x}" - put
+    as *repl*: re.sub(_BRACKETED, repl, text), in linear time. A bracket
+    opened after the last one closed begins no part, so what follows the
+    last closing bracket is never searched (a provider's name of many
+    opening brackets was scanned to its end from each)."""
+    last = max(text.rfind("]"), text.rfind(")"), text.rfind("}"))
+    if last < 0:
+        return text
+    return _BRACKETED.sub(repl, text[:last + 1]) + text[last + 1:]
+
 
 def _tmdb_dbg(msg: str) -> None:
     # Verbose TMDB title-resolution trace (query, match/no-match/error), shown
@@ -681,7 +698,7 @@ class PosterResolver(QObject):
         # a single trailing one: '[AR-ENG]', '[MULTI]', '(1080p)',
         # '{x}'. Provider libraries often stack several, sometimes with
         # a dangling unclosed bracket ('... [AR-ENG] [').
-        t = re.sub(r"[\[({][^\])}]*[\])}]", " ", t)
+        t = without_brackets(t)
         # Drop any leftover stray/unclosed bracket characters so a title
         # ending '... [' doesn't defeat the TMDB search.
         t = re.sub(r"[\[\](){}]", " ", t)
@@ -693,8 +710,10 @@ class PosterResolver(QObject):
             r"REMUX|EXTENDED|UNRATED|DIRECTORS?[ .]CUT)\b.*$", "",
             t, flags=re.IGNORECASE)
         # Strip any leftover bare year, optionally in parens, so it
-        # doesn't confuse the TMDB search string.
-        t = re.sub(r"\s*\(?\b(19|20)\d{2}\b\)?\s*", " ", t)
+        # doesn't confuse the TMDB search string. The spaces before it
+        # are taken whole from where they begin (_YEAR_LEFT): linear on a
+        # long run of them.
+        t = _YEAR_LEFT.sub(" ", t)
         # Trim leftover punctuation / whitespace
         t = t.strip(" -_.|:;/[](){}\t\n")
         t = re.sub(r"\s+", " ", t)

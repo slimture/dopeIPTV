@@ -142,7 +142,8 @@ def split_guide_urls(text: str | None) -> list[str]:
     t = (text or "").strip()
     if not t:
         return []
-    return [u.strip() for u in re.split(r"[\s,;|]+(?=https?://)", t) if u.strip()]
+    # A run of separators tried from its start only: linear on a long one.
+    return [u.strip() for u in re.split(r"(?<![\s,;|])[\s,;|]++(?=https?://)", t) if u.strip()]
 
 
 def _tv_body(data: bytes) -> bytes:

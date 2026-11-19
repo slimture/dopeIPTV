@@ -20,7 +20,8 @@ from ..core.privacy import for_log
 
 _QUALITY = re.compile(r"\b(uhd|fhd|hd|sd|hevc|h265|4k|1080p?|720p?|50fps|backup)\b")
 # A provider's country prefix: "SE: ", "SE | ", "|UK| " (not "SVT-1").
-_PREFIX = re.compile(r"^\s*\|?\s*[a-z]{2,3}\s*[:|]\s*")
+# Possessive spaces: the same match, linear on a name of many spaces.
+_PREFIX = re.compile(r"^\s*+\|?\s*+[a-z]{2,3}\s*+[:|]\s*")
 
 
 def name_key(name: str) -> str:

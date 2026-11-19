@@ -52,8 +52,9 @@ GUIDE_BACK = 6 * 3600
 PAGE = 1000
 LOGIN_KEYS = ("err_wrong_login", "err_box_login_needed")
 
-_EXTINF = re.compile(r'#EXTINF:\s*-?[\d.]*(?P<attrs>(?:[^,"]|"[^"]*")*),(?P<name>.*)')
-_ATTR = re.compile(r'([\w-]+)="([^"]*)"')
+# As providers/client.py reads an M3U line: linear on any line.
+_EXTINF = re.compile(r'#EXTINF:\s*+-?[\d.]*+(?P<attrs>(?:[^,"]|"[^"]*")*+),(?P<name>.*)')
+_ATTR = re.compile(r'(?<![\w-])([\w-]++)="([^"]*)"')
 _NUMBERED = re.compile(r"^(\d+)\s+(.+)$")
 
 
