@@ -610,13 +610,13 @@ class _PlaceRecMixin:
         self.open_settings(at_page="recording", at_row=(-1, -1, tr("set_card_series")))
 
     def _rp_open_folder(self) -> None:
-        from ..core.xdg import open_url
+        from ..core.xdg import open_folder
         d = Path(self.rec.directory())
         try:
             d.mkdir(parents=True, exist_ok=True)
         except OSError as e:
             log.info("recordings: the folder is not there: %s", e)
-        open_url(d.as_uri())
+        open_folder(d)
 
     # -- what records now and next ---------------------------------------------------------
 

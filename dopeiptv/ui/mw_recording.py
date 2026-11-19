@@ -1409,8 +1409,7 @@ class _RecordingMixin(_TimeshiftMixin):
 
     def _rec_open_folder_of(self, it) -> None:
         """The folder a recording is in, in the system's file manager."""
-        from pathlib import Path
-        from ..core.xdg import open_url
+        from ..core.xdg import open_folder
         folder = os.path.dirname(str(it.get("_path") or "")) or self.rec.directory()
         if os.path.isdir(folder):
-            open_url(Path(folder).as_uri())
+            open_folder(folder)

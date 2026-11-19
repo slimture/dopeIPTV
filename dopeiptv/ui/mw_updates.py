@@ -21,7 +21,7 @@ from .. import VERSION
 from ..core import build_check, macupdate, selfupdate, winupdate
 from ..core.log import log
 from ..core.updates import GITHUB_REPO, fetch_update, offered
-from ..core.xdg import open_url
+from ..core.xdg import link_ok, open_url
 from ..core.workers import run_async
 from ..i18n import tr
 from .dialogs import UpdateDialog
@@ -297,8 +297,9 @@ class _UpdatesMixin:
             self._self_update()
         else:
             # A test build: its file for this computer, else its release page.
-            open_url(self.settings.value("update_latest_url", "")
-                     or _WEBSITE)
+            # The release's answer said where; only an https one is opened.
+            url = self.settings.value("update_latest_url", "")
+            open_url(url if link_ok(url) else _WEBSITE)
 
     def _self_update(self) -> None:
         """Download, verify and test the newest AppImage, then offer to

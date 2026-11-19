@@ -790,10 +790,9 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     open_logs = QPushButton(tr("nerd_open_logs"))
 
     def open_log_folder() -> None:
-        from ..core.xdg import open_url
+        from ..core.xdg import open_folder
         os.makedirs(log_dir(), exist_ok=True)
-        from pathlib import Path
-        open_url(Path(log_dir()).as_uri())
+        open_folder(log_dir())
     open_logs.clicked.connect(open_log_folder)
     home = os.path.expanduser("~")
     shown_dir = "~" + log_dir()[len(home):] if log_dir().startswith(home) else log_dir()

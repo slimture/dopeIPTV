@@ -23,7 +23,7 @@ from ..core import night_mode, rec_mp4
 from ..core.local_buffer import MEMORY_MAX_MINUTES
 from ..core.recording import format_size
 from ..core.workers import dir_size_bytes, run_async
-from ..core.xdg import open_url
+from ..core.xdg import open_folder
 from ..i18n import tr
 from ..media.dvr_player import DVR_SPACE_GB, dvr_base
 from ..media.embedded import SUB_COLORS, SUB_SCALES
@@ -136,7 +136,7 @@ def build_playback(ctx: SettingsContext) -> None:
 
     def open_dvr_dir() -> None:
         dvr_dir.mkdir(parents=True, exist_ok=True)
-        open_url(dvr_dir.as_uri())
+        open_folder(dvr_dir)
     where_btn.clicked.connect(open_dvr_dir)
 
     def where_text(size: str) -> str:

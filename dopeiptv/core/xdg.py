@@ -12,10 +12,14 @@ over on our libstdc++.
 """
 from __future__ import annotations
 
+import ipaddress
 import os
 import shutil
 import subprocess
 import sys
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlsplit
 
 from .log import log
 
@@ -191,8 +195,41 @@ def _open_with_handlers(url: str) -> bool:
     return False
 
 
+def link_ok(url: Any) -> bool:
+    """Whether *url* may be opened in the browser: an https address, or an
+    http one on this computer (server mode's page). Nothing else - a
+    service's answer (a sign-in page, a release's download) could name a
+    ``file:`` path, a ``javascript:`` or another program's scheme, which
+    the desktop would hand to whatever claims it."""
+    if not isinstance(url, str) or not url or len(url) > 8192:
+        return False
+    if any(ord(c) < 0x21 or ord(c) == 0x7F for c in url):
+        return False
+    try:
+        parts = urlsplit(url)
+        host = parts.hostname or ""
+    except ValueError:
+        return False
+    scheme = parts.scheme.lower()
+    if scheme == "https":
+        return bool(host)
+    if scheme == "http":
+        return _loopback(host)
+    return False
+
+
+def _loopback(host: str) -> bool:
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
 def open_url(url: str) -> bool:
-    """Open *url* in the user's browser. Returns whether a handler was
+    """Open *url* in the user's browser - only one ``link_ok`` lets through
+    (a folder goes through ``open_folder``). Returns whether a handler was
     started.
 
     On a Linux desktop Qt's opener goes first (``_open_with_qt``): it
@@ -205,6 +242,27 @@ def open_url(url: str) -> bool:
     """
     if not url:
         return False
+    if not link_ok(url):
+        scheme = url.partition(":")[0][:16] if isinstance(url, str) else type(url).__name__
+        log.warning("open_url: not opened - not an https address (%r)", scheme)
+        return False
+    return _open(url)
+
+
+def open_folder(path: str | os.PathLike) -> bool:
+    """Open a folder of the app's own (recordings, logs, rewind buffers)
+    in the file manager; nothing for a path that is no folder."""
+    try:
+        folder = Path(path).absolute()
+        if not folder.is_dir():
+            return False
+        url = folder.as_uri()
+    except (OSError, ValueError):
+        return False
+    return _open(url)
+
+
+def _open(url: str) -> bool:
     if sys.platform.startswith("linux") and _open_with_qt(url):
         return True
     if sys.platform.startswith("linux") and _open_with_handlers(url):
