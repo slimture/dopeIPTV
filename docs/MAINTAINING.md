@@ -142,6 +142,13 @@ Platform notes that are easy to forget:
      paragraph and list item on one line: GitHub shows a release's every
      line break (`tests/test_tidy_release_notes.py` checks it)
 2. Push `testing`; wait for CI to be green (and ideally try the test build).
+   Then the security review (AGENTS.md, rule 13): on the `website` branch,
+   `python3 tools/review_kit.py --app <checkout of testing> --ref testing
+   --out review-kit` makes every question of the transparency page with
+   its code, and the questions about the rest of the app, in one file
+   (`review-kit/ALL.txt`). Give it to at least one independent AI
+   assistant, fix or answer every finding, and add the round - who asked,
+   what came back, what was done - to `docs/SECURITY_REVIEWS.md`.
 3. Run **`tools/release.sh x.y.z`**. It never trusts a local branch: it
    fetches, merges `origin/testing` into `main`, checks that all five
    places agree, pushes `main`, and tags `vx.y.z`. Safe to re-run.

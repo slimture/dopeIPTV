@@ -26,6 +26,97 @@ until the person turns it on knowing what it costs, and asks first when
 the limit is full or unknown; run the quality gate yourself before you
 say something works.
 
+**And a fifth, as binding: security and privacy.** dopeIPTV is to be
+known for being open, private and very hard to attack. Every change and
+every new feature follows [the security and privacy rules](#security-and-privacy-rules)
+below; a change that cannot follow one stops and asks.
+
+## Security and privacy rules
+
+They hold for every change, however small, and for every new feature.
+Each one names where it is already done right - copy that, do not invent
+a new way. The threat model behind them (who could attack, what stops
+them, what is honestly left) is [`docs/SECURITY.md`](docs/SECURITY.md).
+
+1. **Nothing leaves without a reason the person can see.** Every outbound
+   connection is something the person did (opened, sent, turned on), or
+   an automatic one the transparency page lists (the update check). A new
+   host or a new kind of data sent is added, in the same change, to the
+   transparency page's hosts (`tools/transparency.py` `HOSTS`,
+   `site/transparency/*.html` on the `website` branch), to the privacy
+   policy if dopeiptv.org keeps anything of it, and to `docs/FEATURES.md`.
+2. **dopeiptv.org's services** go through `build_check.secure` (https to
+   dopeiptv.org itself), `allow_redirects=False`, never from a modified
+   build (`build_check.allowed`), and carry nothing that says who asks: no
+   account, name, supporter key, title or address. A value the server
+   could use to tell people apart is a hash or a code from the person's
+   own secret (`report.py`'s answer codes, `sync.auth_of`), never an id
+   the app makes up and keeps. What the server keeps, and how long, its
+   docstring and the privacy policy say - and only that is kept.
+3. **Third parties** (TMDB, Trakt, Simkl, OpenSubtitles, radio-browser,
+   Plex.tv, GitHub...): https with certificate checks (never
+   `verify=False`; `core/cert_pin.py` reading a certificate before pinning
+   it is the one exception), the least the service needs, and nothing
+   about a private playback unless the person asks for it right then.
+4. **Private viewing.** Anything that keeps or sends what plays asks
+   `privacy.playback_private(kind, key)` (or `private_key`) for that very
+   playback - never the switch alone - and keeps and sends nothing. A
+   title, channel, programme or address in a log goes through
+   `privacy.for_log`.
+5. **Everything from outside is hostile**: providers, guides, boxes and
+   servers on the network, files, subtitles, images, web services, the
+   phone remote's and server mode's clients, a backup being restored. It
+   is size-limited while it is read (`epg.read_capped`), parsed with the
+   safe helpers (no XML entities or DTDs - `epg.refuse_entities` -,
+   bounded nesting, no regex that can run away), numbers range-checked,
+   never shown as markup (`Qt.TextFormat.PlainText`, `ui/widgets.plain_text`),
+   never an address the app then fetches unless it is one the app should
+   (no `file:`, no internal address an outsider chose), never a path
+   outside the folder it belongs in, and never unpickled except through a
+   restricted unpickler.
+6. **Secrets** - logins, tokens, the sync and room codes, keys - stay in
+   the settings files (0600 in a 0700 folder, `core/settings_files.py`).
+   Never in a log (`core/log.py`'s filter is the net, not the plan: do not
+   log them), a report (`core/report.py` scrubs, with the person's own
+   values), a URL that is logged, a crash file, a cache, or a backup the
+   person did not choose to keep them in. Tokens are compared with
+   `hmac.compare_digest`; anything random that guards something comes from
+   `secrets`.
+7. **Servers on this computer or the network** bind only where they must
+   (loopback unless the feature is for the network), take a token of 128
+   bits or more on every request (the HDHomeRun protocol's few endpoints,
+   for this computer's own networks only, are the exception - see
+   `home_server.local`), check the Host header against DNS rebinding and
+   the Origin / Sec-Fetch-Site so a web page cannot use them, limit sizes,
+   headers and time, never serve a file outside their folder, and give
+   their pages a CSP of their own hashes (`core/phone_page.py`).
+8. **Programs the app starts** get an argument list, never a shell; text
+   from outside goes where it cannot be read as an option; ffmpeg reads
+   only the protocols the job needs; the command after a recording runs as
+   the person wrote it, never with outside text spliced into its words
+   (`core/rec_extras.py`).
+9. **Cryptography** only from what is here - `core/chacha20poly1305.py`,
+   `core/ed25519.py`, HKDF in `core/sync.py`, `hashlib`, `hmac`,
+   `secrets` - used the way it is already used. A new scheme needs a
+   written design, test vectors and a line on the transparency page.
+10. **Updates and builds**: only what the signed checksum list names is
+    installed (`selfupdate.signed_asset`); downloads follow redirects only
+    over https (`selfupdate._get_https`); a new dependency needs a reason
+    in its commit and a pinned version; workflows keep least privilege and
+    pinned actions.
+11. **Transparency**: a change to anything the transparency page shows
+    updates the page's words and its code excerpts (`tools/transparency.py`)
+    in the same round, and the page never claims more than the code does.
+    Honest limits are written down, not left out.
+12. **Tests**: every rule a change touches has a test that fails when the
+    rule is broken; `tests/test_security_rules.py` holds the ones that read
+    the whole code base, and a new exception there needs its reason beside
+    it.
+13. **Before a release**: make the review kit (`tools/review_kit.py --app
+    <checkout> --ref testing` on the `website` branch), give its `ALL.txt`
+    to at least one independent AI assistant, fix or answer every finding,
+    and record the round in `docs/SECURITY_REVIEWS.md`.
+
 ## Module responsibilities
 
 Modules are grouped into layered subpackages (`providers/`, `core/`,
