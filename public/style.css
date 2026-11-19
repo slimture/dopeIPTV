@@ -1490,7 +1490,10 @@ dialog.howdlg::backdrop { background: rgba(5, 7, 10, .66); }
    (a computer has downloads, then donate), so their colours swap with them
    and the bands still take turns. */
 .is-phone main { display: flex; flex-direction: column; }
-.is-phone main > #download { order: 1; }
+/* Never the browser's scroll anchor: drawn last but first in the page's
+   order, it was picked as the anchor, so "Built on" growing above it pushed
+   the page down by the card's whole height - to the footer. */
+.is-phone main > #download { order: 1; overflow-anchor: none; }
 .is-phone #support { background: var(--surface); }
 .is-phone #download { background: var(--bg); }
 .is-phone #download .dlx-card { background: var(--surface); }

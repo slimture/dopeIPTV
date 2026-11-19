@@ -1642,8 +1642,19 @@ window.iptvCopyButtons(document);
                 { duration: 680, delay: 420 + i * 70, easing: "cubic-bezier(.34, 1.36, .64, 1)", fill: "backwards" });
     });
   }
+  // The heading stays where it was tapped: a browser that still moves the
+  // page as the card opens (scroll anchoring on content drawn out of order,
+  // style.css #download) is put back by as much as it moved.
+  function keep(top0) {
+    var d = sum.getBoundingClientRect().top - top0;
+    if (Math.abs(d) > 1) { window.scrollBy(0, d); }
+  }
   sum.addEventListener("click", function (e) {
-    if (still || !body) { return; }
+    var top0 = sum.getBoundingClientRect().top;
+    if (still || !body) {
+      if (!box.open) { requestAnimationFrame(function () { keep(top0); }); }
+      return;
+    }
     e.preventDefault();
     if (running) { running.cancel(); running = null; }
     if (box.open) {
@@ -1657,6 +1668,7 @@ window.iptvCopyButtons(document);
     // leaves the top, under the sticky header.
     box.open = true;
     var h = body.offsetHeight;
+    keep(top0);
     fly();
     running = body.animate([{ height: "0px", opacity: .4 }, { height: h + "px", opacity: 1 }],
                            { duration: 420, easing: "cubic-bezier(.2, .8, .2, 1)" });
