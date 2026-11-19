@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import QMessageBox
 
 from ..i18n import english, tr
 
-from ..core.player_exec import find_player_executable
+from ..core.player_exec import address_scheme, fetchable, find_player_executable
 
 _libmpv_error: str | None = None
 
@@ -290,15 +290,33 @@ def player_command(player: str, exe: str, url: str, title: str) -> list[str]:
             "--", url]
 
 
+def allowed_page(player: str, url: str) -> bool:
+    """mpv's own word for a page it opens through yt-dlp (ytdl://<a web
+    address>), which the app itself hands it (core/ytdlp.mpv_address)."""
+    if player != "mpv" or not url.startswith("ytdl://"):
+        return False
+    rest = url[len("ytdl://"):]
+    return rest.lower().startswith(("http://", "https://")) and fetchable(rest)
+
+
 def launch_player(player: str, url: str, title: str | None = None,
                   parent: object = None) -> None:
     """Spawn an external mpv or VLC process."""
     log.info("launching EXTERNAL %s for %s", player,
              for_log(title or redact_url(url)))
     title = title or "dopeIPTV"
+    name = "mpv" if player == "mpv" else "VLC"
+    if not fetchable(url) and not allowed_page(player, url):
+        # No stream's address and no file's path (player_exec.fetchable): a
+        # playlist's line that would have the player read this computer's
+        # files by another name, or one that starts with a dash. Never
+        # handed to a player, whatever "--" then does with it.
+        log.warning("external %s not started: not a stream's address (%s:)",
+                    name, address_scheme(url)[:20] or "-")
+        QMessageBox.warning(parent, name, tr("open_address_bad"))
+        return
     exe = find_player_executable(player)
     cmd = player_command(player, exe, url, title) if exe else None
-    name = "mpv" if player == "mpv" else "VLC"
     if not cmd:
         QMessageBox.warning(parent, tr("status_player_not_found"),
                             tr("status_player_not_found_msg", name=name))

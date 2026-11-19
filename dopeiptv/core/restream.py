@@ -157,7 +157,7 @@ def ffmpeg_opener(ffmpeg: str, src: dict | None) -> Callable[..., Any]:
 
     from . import nerd
     from .dvr_ingest import USER_AGENT
-    from .player_exec import NO_WINDOW
+    from .player_exec import NO_WINDOW, ffmpeg_protocols
 
     def opener(url: str, **_kw: Any) -> _Piped:
         n = nerd.current()
@@ -170,7 +170,9 @@ def ffmpeg_opener(ffmpeg: str, src: dict | None) -> Callable[..., Any]:
             px = n.proxy(src, url) if n.flag("nerd_proxy_player", True) else ""
             if px:
                 cmd += ["-http_proxy", px]
-        cmd += ["-i", url, "-map", "0:v?", "-map", "0:a?", "-c", "copy", "-f", "mpegts", "pipe:1"]
+        # ffmpeg_protocols: the list's segments and keys stay a stream's.
+        cmd += [*ffmpeg_protocols(url), "-i", url, "-map", "0:v?", "-map", "0:a?", "-c", "copy",
+                "-f", "mpegts", "pipe:1"]
         proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                 stderr=subprocess.DEVNULL, creationflags=NO_WINDOW)
         return _Piped(proc)

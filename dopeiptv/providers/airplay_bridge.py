@@ -46,7 +46,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable
 
 from ..core.log import log
-from ..core.player_exec import NO_WINDOW
+from ..core.player_exec import NO_WINDOW, ffmpeg_protocols
 from ..core.exclusive_bind import ExclusiveBindMixin, IdleTimeoutMixin
 from . import cast_feed
 from .cast_bridge import (_endless, _hls_file, _hls_name_ok, _timeshift,
@@ -279,7 +279,7 @@ def probe(source: str, net: list[str] | None = None, exe: str | None = None,
     try:
         res = subprocess.run(
             [exe, "-hide_banner", "-nostdin", *_probe_limits(source),
-             *(net or []), "-i", source],
+             *(net or []), *ffmpeg_protocols(source), "-i", source],
             capture_output=True, timeout=timeout, creationflags=NO_WINDOW)
         found = parse_probe(res.stderr.decode("utf-8", "replace"))
     except Exception as e:
@@ -307,7 +307,8 @@ def ffmpeg_args(exe: str, p: Plan, start: float = 0.0,
         src, opts = cast_feed.INPUT, list(cast_feed.INPUT_OPTIONS)
     else:
         src = p.url if "://" in p.url else os.path.abspath(p.url)
-        opts = [*_probe_limits(src), *(net or []),
+        # ffmpeg_protocols: what the address leads to stays a stream's.
+        opts = [*_probe_limits(src), *(net or []), *ffmpeg_protocols(src),
                 *(["-ss", f"{start:.3f}"] if start > 0 else [])]
     if p.video == "copy":
         video = ["-c:v", "copy", *(["-tag:v", "hvc1"] if p.hevc else [])]

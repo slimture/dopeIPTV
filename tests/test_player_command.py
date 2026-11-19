@@ -46,24 +46,71 @@ def test_launch_player_starts_that_command(monkeypatch):
     seen = []
     monkeypatch.setattr(players, "find_player_executable", lambda _p: "/usr/bin/mpv")
     monkeypatch.setattr(players.subprocess, "Popen", lambda cmd, **_k: seen.append(cmd))
-    players.launch_player("mpv", "--include=http://evil.invalid/x.conf", "T")
-    assert seen == [players.player_command(
-        "mpv", "/usr/bin/mpv", "--include=http://evil.invalid/x.conf", "T")]
-    assert seen[0][-2:] == ["--", "--include=http://evil.invalid/x.conf"]
+    for url in ("http://h.invalid/live/u/p/1.ts", "rtsp://box.invalid/?src=1",
+                "udp://@239.0.0.1:1234", "/films/a film.mkv", "C:\\Films\\a.mkv",
+                "ytdl://https://www.youtube.com/watch?v=x"):
+        seen.clear()
+        players.launch_player("mpv", url, "T")
+        assert seen == [players.player_command("mpv", "/usr/bin/mpv", url, "T")], url
 
 
-def test_the_mpv_recorder_takes_the_address_after_its_options(tmp_path, monkeypatch):
-    """The recorder without ffmpeg is mpv: the same rule."""
+NOT_STREAMS = (*EVIL, "concat:/etc/passwd|/etc/hosts", "subfile,,start,0,end,9,,:/etc/passwd",
+               "gopher://127.0.0.1:6379/_FLUSHALL", "unix:///run/user/1000/bus", "fd:0",
+               "pipe:0", "cache:http://h.invalid/1.ts", "memory://#EXTM3U", "edl://x",
+               "av://v4l2:/dev/video0", "ytdl://file:///etc/passwd", "", " ")
+
+
+@pytest.mark.parametrize("player", ["mpv", "vlc"])
+@pytest.mark.parametrize("url", NOT_STREAMS)
+def test_what_is_no_streams_address_never_reaches_a_player(player, url, monkeypatch):
+    """Not a stream's address and not a file's path: no player is started
+    for it at all, and the person is told (the words Open address has)."""
+    started, told = [], []
+    monkeypatch.setattr(players, "find_player_executable", lambda _p: "/usr/bin/" + player)
+    monkeypatch.setattr(players.subprocess, "Popen", lambda cmd, **_k: started.append(cmd))
+    monkeypatch.setattr(players.QMessageBox, "warning",
+                        staticmethod(lambda *a, **_k: told.append(a[-1])))
+    players.launch_player(player, url, "T")
+    assert started == [] and len(told) == 1
+
+
+def test_the_schemes_a_stream_has_and_what_ffmpeg_makes_of_an_address():
+    from dopeiptv.core import player_exec as pe
+
+    for url, scheme in (("http://h/1.ts", "http"), ("HTTPS://h/1.m3u8", "https"),
+                        ("/films/a:b.mkv", ""), ("C:\\Films\\a.mkv", ""), ("c:/x.ts", ""),
+                        ("film.mkv", ""), ("file:///films/a.mkv", "file"),
+                        ("concat:/a|/b", "concat"), ("subfile,,start,0,end,9,,:/a", "subfile"),
+                        ("crypto+file:///a", "crypto+file"), ("gopher://h:70/_x", "gopher"),
+                        ("--log-file=/x", ""), ("", "")):
+        assert pe.address_scheme(url) == scheme, url
+    for url in ("http://h/1.ts", "https://h/x.m3u8", "rtsp://h/x", "rtmp://h/app/x",
+                "rtp://239.0.0.1:5000", "udp://@239.0.0.1:1234", "srt://h:9000",
+                "mms://h/x", "mmsh://h/x", "/films/a.mkv", "C:\\a.mkv", "file:///films/a.mkv"):
+        assert pe.fetchable(url), url
+    # A stream's address keeps ffmpeg to a stream's protocols; a file's own
+    # path keeps ffmpeg's own rule for files.
+    opts = pe.ffmpeg_protocols("http://h/x.m3u8")
+    assert opts[0] == "-protocol_whitelist"
+    listed = opts[1].split(",")
+    for needed in ("http", "https", "tcp", "tls", "crypto", "udp", "rtp", "rtmp", "httpproxy"):
+        assert needed in listed
+    for never in ("file", "concat", "subfile", "pipe", "fd", "unix", "gopher", "cache", "async"):
+        assert never not in listed
+    assert pe.ffmpeg_protocols("/films/a.mkv") == pe.ffmpeg_protocols("file:///a.mkv") == []
+
+
+def _recorder(tmp_path, monkeypatch, kind, name):
     from PyQt6.QtCore import QSettings
 
     from dopeiptv.core import recording
     from dopeiptv.core.recording import RecordingManager
 
-    s = QSettings("dopeIPTV-test", "recdash")
+    s = QSettings("dopeIPTV-test", name)
     s.clear()
     s.setValue("recordings_dir", str(tmp_path))
     rm = RecordingManager(s)
-    seen = []
+    seen: list[list[str]] = []
 
     class FakeProc:
         def __init__(self, cmd, **_kw):
@@ -74,21 +121,51 @@ def test_the_mpv_recorder_takes_the_address_after_its_options(tmp_path, monkeypa
 
     monkeypatch.setattr(recording.subprocess, "Popen", FakeProc)
     monkeypatch.setattr(RecordingManager, "recorder",
-                        staticmethod(lambda: ("mpv", "/usr/bin/mpv")))
-    evil = "--log-file=/tmp/x"
-    rm._spawn({"url": evil, "title": "T", "stop": 9e12})
+                        staticmethod(lambda: (kind, "/usr/bin/" + kind)))
+    return rm, seen
+
+
+def test_the_mpv_recorder_takes_the_address_after_its_options(tmp_path, monkeypatch):
+    """The recorder without ffmpeg is mpv: the address last, after "--"."""
+    rm, seen = _recorder(tmp_path, monkeypatch, "mpv", "recdash")
+    url = "http://h.invalid/live/u/p/1.ts"
+    rm._spawn({"url": url, "title": "T", "stop": 9e12})
     cmd = seen[0]
-    assert cmd[-2:] == ["--", evil] and evil not in cmd[:-2]
+    assert cmd[-2:] == ["--", url] and url not in cmd[:-2]
     assert any(a.startswith("--stream-record=") for a in cmd[:-2])
     assert any(a.startswith("--length=") for a in cmd[:-2])
 
-    # ffmpeg takes it as -i's value: never an option either.
+
+@pytest.mark.parametrize("kind", ["ffmpeg", "mpv"])
+@pytest.mark.parametrize("url", [u for u in NOT_STREAMS if u.strip()])
+def test_what_is_no_streams_address_is_never_recorded(kind, url, tmp_path, monkeypatch):
+    from dopeiptv.core.recording import NOT_A_STREAM
+
+    rm, seen = _recorder(tmp_path, monkeypatch, kind, "recnostream")
+    job = {"url": url, "title": "T", "stop": None, "status": "scheduled"}
+    rm._spawn(job)
+    assert seen == []
+    assert job["status"] == "failed" and job["error"] == NOT_A_STREAM
+
+
+def test_ffmpeg_records_a_stream_with_a_streams_protocols_only(tmp_path, monkeypatch):
+    from dopeiptv.core.player_exec import FFMPEG_PROTOCOLS
+
+    rm, seen = _recorder(tmp_path, monkeypatch, "ffmpeg", "recproto")
+    for url in ("http://h.invalid/live/u/p/1.ts", "https://h.invalid/x.m3u8",
+                "rtsp://box.invalid/?src=1", "udp://@239.0.0.1:1234"):
+        seen.clear()
+        rm._spawn({"url": url, "title": "T", "stop": None})
+        cmd = seen[0]
+        i = cmd.index("-i")
+        assert cmd[i + 1] == url
+        # An input option of that address, before its -i.
+        assert cmd[cmd.index("-protocol_whitelist") + 1] == FFMPEG_PROTOCOLS
+        assert cmd.index("-protocol_whitelist") < i
+    # A file's own path: ffmpeg's own rule for files, nothing added.
     seen.clear()
-    monkeypatch.setattr(RecordingManager, "recorder",
-                        staticmethod(lambda: ("ffmpeg", "/usr/bin/ffmpeg")))
-    rm._spawn({"url": evil, "title": "T", "stop": None})
-    cmd = seen[0]
-    assert cmd[cmd.index(evil) - 1] == "-i" and cmd.count(evil) == 1
+    rm._spawn({"url": str(tmp_path / "a.ts"), "title": "T", "stop": None})
+    assert "-protocol_whitelist" not in seen[0]
 
 
 @pytest.mark.skipif(shutil.which("mpv") is None, reason="needs mpv")

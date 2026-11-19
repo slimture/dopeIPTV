@@ -43,7 +43,7 @@ from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from ..core.log import log
-from ..core.player_exec import NO_WINDOW
+from ..core.player_exec import NO_WINDOW, ffmpeg_protocols
 from ..core.exclusive_bind import ExclusiveBindMixin, IdleTimeoutMixin
 from . import cast_feed
 
@@ -267,6 +267,18 @@ def lan_address() -> str:
 BITMAP_SUBS = {"dvb_subtitle", "dvd_subtitle", "hdmv_pgs_subtitle", "xsub"}
 
 
+def probe_args(exe: str, source: str) -> list[str]:
+    """ffprobe's command for *source*. The address is -i's value - a
+    playlist's line that starts with a dash is never an option of
+    ffprobe's - and what it leads to stays a stream's
+    (player_exec.ffmpeg_protocols)."""
+    return [exe, "-v", "error",
+            *(["-user_agent", _UA] if "://" in source else []),
+            *ffmpeg_protocols(source),
+            "-print_format", "json", "-show_streams", "-show_format",
+            "-i", source]
+
+
 def probe_tracks(source: str, exe: str | None = None) -> dict:
     """List the audio and subtitle tracks in *source* with ffprobe.
 
@@ -284,12 +296,10 @@ def probe_tracks(source: str, exe: str | None = None) -> dict:
     if not exe:
         return out
     try:
-        raw = subprocess.run(
-            [exe, "-v", "error", *(["-user_agent", _UA]
-                                   if "://" in source else []),
-             "-print_format", "json", "-show_streams", "-show_format",
-             source],
-            capture_output=True, timeout=25, creationflags=NO_WINDOW).stdout
+        raw = subprocess.run(probe_args(exe, source),
+                             capture_output=True, timeout=25,
+                             stdin=subprocess.DEVNULL,
+                             creationflags=NO_WINDOW).stdout
         probed = json.loads(raw or b"{}")
         streams = probed.get("streams", [])
         # The runtime comes along for the ride: a resume point is only worth
@@ -465,6 +475,9 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool,
         # what it carries in its first PMT, so a megabyte is plenty.
         *_probe_limits(source),
         *_input_options(source),
+        # What the address leads to stays a stream's (a redirect, a
+        # playlist's segments): never this computer's own files.
+        *ffmpeg_protocols(source),
         # Seeking before -i is the cheap kind: ffmpeg jumps in the container
         # instead of decoding its way there, which is what makes resuming an
         # hour into a film instant rather than a minute of waiting.
@@ -524,6 +537,7 @@ def hls_args(exe: str, source: str, copy_video: bool, folder: str,
         exe, "-hide_banner", "-loglevel", "error",
         *_probe_limits(source),
         *_input_options(source),
+        *ffmpeg_protocols(source),
         *(["-ss", f"{start:.3f}"] if start > 0 else []),
         "-fflags", "+genpts", "-i", source,
         "-map", "0:v:0", "-map", f"0:a:{audio}", "-map", f"0:s:{subs}",

@@ -29,7 +29,8 @@ DEFAULT_TEMPLATE = "{title} {date} {time}"
 FIELDS = ("title", "channel", "date", "time", "year", "month", "day", "hour",
           "minute", "weekday", "path", "folder", "file")
 _NAME_FIELDS = FIELDS[:10]
-_UNSAFE = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
+# Half a surrogate pair too (JSON can carry one): no file system takes it.
+_UNSAFE = re.compile(r'[\\/:*?"<>|\x00-\x1f\x7f\ud800-\udfff]')
 # A title or a channel's name is cut at this many characters, as
 # safe_filename cuts a title; and no part of the path comes near a file
 # system's 255 bytes a name - room is left for the " (12)" and the extension
@@ -39,16 +40,31 @@ NAME_CHARS = 120
 PART_BYTES = 255 - 16
 
 
+#: The names Windows keeps for its devices, whatever comes after a dot.
+_WINDOWS_DEVICES = frozenset(
+    ["CON", "PRN", "AUX", "NUL"] + [f"{d}{n}" for d in ("COM", "LPT") for n in "123456789"])
+
+
+def not_a_device(name: str) -> str:
+    """*name*, or "_name" when Windows would open one of its devices for it
+    (CON, NUL, COM1... - "NUL.ts" too): a recording of a channel called so
+    went nowhere, and its folder could not be made."""
+    if name.split(".", 1)[0].strip().upper() in _WINDOWS_DEVICES:
+        return "_" + name
+    return name
+
+
 def _clean(text: str) -> str:
     return re.sub(r"\s+", " ", _UNSAFE.sub("", text)).strip()
 
 
 def _safe_part(text: str) -> str:
     part = _clean(text)
-    raw = part.encode("utf-8")
+    raw = part.encode("utf-8", "ignore")
     if len(raw) > PART_BYTES:
         part = raw[:PART_BYTES].decode("utf-8", "ignore")
-    return part.strip().strip(".").strip()
+    part = part.strip().strip(".").strip()
+    return not_a_device(part) if part else part
 
 
 def _pieces(template: str, values: dict[str, str]) -> list[str]:
