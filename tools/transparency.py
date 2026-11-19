@@ -114,9 +114,10 @@ CODE: dict[str, list[dict]] = {
     "website": [
         {"id": "log", "repo": "site", "path": "deploy/content-iptv.dope.rs.conf",
          "from": r"^log_format iptv_stats", "to": r"';\s*$"},
-        {"id": "visitor", "repo": "site", "path": "donate/stats_collect.py", "names": ["_hash", "_new_visit"]},
+        {"id": "visitor", "repo": "site", "path": "donate/stats_collect.py",
+         "names": ["MonthKeys", "_hash", "_hash_before", "_new_visit"]},
         {"id": "kept", "repo": "site", "path": "donate/stats_collect.py",
-         "from": r"^KEEP_UNIQUE_DAYS = ", "to": r"^    VISITS_DAYS = 400",
+         "from": r"^KEEP_UNIQUE_DAYS = ", "to": r"^UPDATES_DAYS = ",
          "with": [{"repo": "site", "path": "donate/stats_collect.py",
                    "from": r"^    if ev in \(\"donate\", \"donated\"\):", "to": r"^        return$"}]},
         {"id": "anon", "repo": "site", "path": "donate/stats_collect.py", "names": ["anonymous"]},
@@ -403,7 +404,8 @@ _SITE = r'''
 import json, sys
 sys.path.insert(0, "donate")
 import stats_collect as s
-state = {"secret": "0" * 64}
+from datetime import date
+state = {"_keys": s.MonthKeys(None, date(2026, 11, 19), {"2026-11": "0" * 64})}
 ip, ua = "203.0.113.7", "Mozilla/5.0 (X11; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0"
 line = {"ip": ip, "t": "2026-11-19T21:04:31+01:00", "m": "GET", "u": "/hit?p=help&ev=view",
         "s": 204, "r": "https://duckduckgo.com/", "a": ua, "l": "sv"}
@@ -411,9 +413,9 @@ class Geo:
     def country(self, addr): return "SE"
 class Visits:
     def __init__(self): self.d = {}
-    def before(self, day, vid): return False
+    def before(self, day, vid, earlier=""): return False
     def day(self, day): return self.d.setdefault(day, [])
-vid = s._hash(state, ip, ua)
+vid = s._hash(state, "2026-11-19", ip, ua)
 visit = s._new_visit(Visits(), "2026-11-19", vid, 1763582671, ip, ua, Geo())
 visit.update({"pages": [["help", 1763582671, 48]], "time": 48, "lang": "sv", "channel": "search",
               "ref": "duckduckgo.com"})

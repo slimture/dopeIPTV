@@ -53,8 +53,9 @@ before. A payment is never on a visit, only in the day's count: the
 visit's time, country and browser beside the payment service's record of
 who paid would tie the two together. A visit ends after 30 minutes
 without a page. After
-STATS_VISITS_DAYS days (400, thirteen months: a year against the year
-before) a visit is made anonymous rather than deleted:
+STATS_VISITS_DAYS days (30: a visit in detail can point to one person -
+its time to the second, versions, screen and languages together) a visit
+is made anonymous rather than deleted:
 it moves to STATS_DIR/visits-anon/<month>.json with its day, country,
 browser and system without versions, device, page language, how the
 visitor came, the number of pages, the time rounded to ten seconds, and
@@ -63,14 +64,22 @@ no screen, mixed in the month so their order tells nothing. Those, and the
 counts per day, are kept for good.
 
 Each update the app fetched for itself goes to STATS_DIR/updates/<day>.json
-for the same log: when, the file, the version it came from, the system and
-processor the app named, the country, and whether from your own network -
-no address. Never a visit, never counted as one; after STATS_VISITS_DAYS
-the day's file goes (the counts per day stay).
+for the same log: the hour it came in, the file, the version it came from,
+the system and processor the app named, the country, and whether from your
+own network - no address, never the second. Never a visit, never counted
+as one; after UPDATES_DAYS (30) the day's file goes (the counts per day
+stay).
 
-A visitor is a hash of address and browser with a secret salt kept on this
-server: no address is written down, and the hashes are kept 25 months only
-to count unique and returning visitors (a year against the year before);
+A visitor is a keyed hash (HMAC-SHA256) of address and browser: no address
+is written down. The key is the month's own (MonthKeys, visitor-keys.json,
+readable by the service alone): a new one each month, and a month's key
+deleted once the month after it has ended. Until then whoever held both the
+statistics and the key could try addresses until one fits - the ID is
+pseudonymous, not anonymous; after it nobody can, this server's own
+administrators included. So a visitor is the same visitor within a month
+and is told returning from the month before at the most; unique visitors
+over a span longer than a month are the months' summed. The hashes are
+kept 25 months (uniques.json) to count them per day, week and month;
 kinds.json, which of a day's visitors were people and which robots, keeps
 the same hashes as long. Robots that say so, scripts and empty browser
 names are left out everywhere.
@@ -106,6 +115,7 @@ import fcntl
 import glob
 import gzip
 import hashlib
+import hmac
 import ipaddress
 import json
 import lzma
@@ -141,9 +151,12 @@ VISITS_DIR = os.path.join(STATS_DIR, "visits")
 ANON_DIR = os.path.join(STATS_DIR, "visits-anon")
 UPDATES_DIR = os.path.join(STATS_DIR, "updates")
 try:
-    VISITS_DAYS = max(1, int(CONF.get("STATS_VISITS_DAYS", "400")))
+    VISITS_DAYS = max(1, int(CONF.get("STATS_VISITS_DAYS", "30")))
 except ValueError:
-    VISITS_DAYS = 400
+    VISITS_DAYS = 30
+#: The app's updates one by one, each at its hour, for the visitor log; the
+#: counts per day stay.
+UPDATES_DAYS = 30
 VISIT_GAP = 30 * 60       # a visit ends after half an hour without a page
 
 PAGES = {"/": "/", "/help/": "/help/"}
@@ -409,9 +422,68 @@ def browser(ua: str) -> bool:
     return ua.startswith("Mozilla/") and not BOTS.search(ua)
 
 
-def _hash(state: dict, *parts: str) -> str:
-    secret = state.setdefault("secret", secrets.token_hex(32))
-    return hashlib.sha256("|".join((secret, *parts)).encode()).hexdigest()[:12]
+def _month(day: str) -> str:
+    return day[:7]
+
+
+def _month_before(month: str) -> str:
+    year, mon = int(month[:4]), int(month[5:7])
+    return f"{year - 1}-12" if mon == 1 else f"{year}-{mon - 1:02d}"
+
+
+class MonthKeys:
+    """The keys the visitor hashes are made with: one per month, random,
+    kept only for this month and the one before it (a visitor is told
+    returning from there) - a month's key goes once the month after it has
+    ended, and with it any way back from its hashes to an address. A line
+    of an older month (a backfill, a late log) gets a key for this run
+    alone, never kept."""
+
+    def __init__(self, path: str | None, today: date, keys: dict | None = None) -> None:
+        self.path = path
+        self.month = today.strftime("%Y-%m")
+        self.kept = (self.month, _month_before(self.month))
+        got = keys if keys is not None else (_load(path, {}) if path else {})
+        self.keys = {m: k for m, k in got.items()
+                     if m in self.kept and isinstance(k, str) and re.fullmatch(r"[0-9a-f]{64}", k)}
+        self.changed = self.keys != got
+        self._passing: dict[str, bytes] = {}
+
+    def key(self, month: str) -> bytes:
+        if month in self.keys:
+            return bytes.fromhex(self.keys[month])
+        if month == self.month:                 # never one made for a month gone by
+            self.keys[month] = secrets.token_hex(32)
+            self.changed = True
+            return bytes.fromhex(self.keys[month])
+        return self._passing.setdefault(month, secrets.token_bytes(32))
+
+    def save(self) -> None:
+        if not self.path or not self.changed:
+            return
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(self.path), prefix=".tmp-")
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(self.keys, fh)
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, self.path)
+        self.changed = False
+
+
+def _hash(state: dict, day: str, *parts: str) -> str:
+    """A visitor, a download or an update as a mark: HMAC-SHA256 of *parts*
+    with the key of *day*'s month (state["_keys"], never saved with the
+    state), cut to twelve characters."""
+    keys = state.get("_keys")
+    if not isinstance(keys, MonthKeys):
+        keys = state["_keys"] = MonthKeys(None, date.fromisoformat(day))
+    return hmac.new(keys.key(_month(day)), "|".join(parts).encode(), hashlib.sha256).hexdigest()[:12]
+
+
+def _hash_before(state: dict, day: str, *parts: str) -> str:
+    """The same mark under the month before's key: how this visitor was
+    known then, to tell a return from there."""
+    first = date.fromisoformat(day).replace(day=1)
+    return _hash(state, (first - timedelta(days=1)).isoformat(), *parts)
 
 
 #: The app updating itself (dopeiptv/core/updates.py user_agent):
@@ -437,10 +509,15 @@ RECENT_UPDATES = 30
 APP_SYSTEM = re.compile(r"\(([^;()]{1,40});\s*([^;()]{0,40})\)")
 
 
+def _to_hour(t: int) -> int:
+    """A moment as its hour: an update kept is never the second it came."""
+    return int(t) - int(t) % 3600 if t else 0
+
+
 def _update_row(t: int, name: str, from_version: str, country: str, own: bool, ua: str = "") -> dict:
     """An update as the visitor log shows it (admin.py visits)."""
     m = APP_SYSTEM.search(ua or "")
-    return {"t": t, "file": name[:120], "from": from_version[:20], "os": platform_of(name),
+    return {"t": _to_hour(t), "file": name[:120], "from": from_version[:20], "os": platform_of(name),
             "cpu": (m.group(2).strip()[:20] if m else ""), "country": country, "own": 1 if own else 0}
 
 
@@ -456,14 +533,14 @@ def _app_update(stats: dict, day: str, name: str, ua: str, ip: str, state: dict,
     if not m:
         return
     if ip and ip != "-":
-        h = _hash(state, "update", ip, name)
+        h = _hash(state, day, "update", ip, name)
         seen = state.setdefault("seen_dl", {}).setdefault(day, [])
         if h in seen:
             return
         seen.append(h)
     country = (db.country(ip) if db is not None and ip and ip != "-" else "") or ""
     recent = state.setdefault("recent_updates", [])
-    recent.append([t, name[:120], m.group(1)[:20], country, 1 if own else 0])
+    recent.append([_to_hour(t), name[:120], m.group(1)[:20], country, 1 if own else 0])
     del recent[:-RECENT_UPDATES]
     if visits is not None:
         visits.updates(day).append(_update_row(t, name, m.group(1), country, own, ua))
@@ -492,7 +569,7 @@ def _download(stats: dict, line: str, state: dict, visits: Visits | None = None,
     if not counted(ip) or not browser(m.group(6)):
         return
     if ip and ip != "-":
-        h = _hash(state, ip, m.group(6), name)
+        h = _hash(state, day, ip, m.group(6), name)
         seen = state.setdefault("seen_dl", {}).setdefault(day, [])
         if h in seen:
             return
@@ -502,8 +579,9 @@ def _download(stats: dict, line: str, state: dict, visits: Visits | None = None,
     _bump(d.setdefault("files", {}), name[:120])
     if visits is not None and ip and ip != "-":
         t = _dl_epoch(line)
-        vid = _hash(state, ip, m.group(6))
-        visit = visits.open_visit(day, vid, t) or _new_visit(visits, day, vid, t, ip, m.group(6), db)
+        vid = _hash(state, day, ip, m.group(6))
+        visit = visits.open_visit(day, vid, t) or _new_visit(
+            visits, day, vid, t, ip, m.group(6), db, _hash_before(state, day, ip, m.group(6)))
         visit["downloads"].append([t, name[:120]])
         visit["end"] = max(visit["end"], t)
 
@@ -645,15 +723,21 @@ class Visits:
                 return v
         return None
 
-    def before(self, day: str, vid: str) -> int:
-        """On how many earlier days (of the last 400) this visitor came."""
+    def before(self, day: str, vid: str, earlier: str = "") -> int:
+        """On how many earlier days this visitor came: in this month by its
+        mark, in the month before by *earlier* (its mark under that month's
+        key); before that it cannot be told - those keys are gone."""
         n = 0
+        month, prev = _month(day), _month_before(_month(day))
         for d, lst in self.uniques.items():
             if d >= day:
                 continue
+            mark = vid if _month(d) == month else earlier if _month(d) == prev else ""
+            if not mark:
+                continue
             if d not in self._sets:
                 self._sets[d] = set(lst)
-            if vid in self._sets[d]:
+            if mark in self._sets[d]:
                 n += 1
         return n
 
@@ -673,12 +757,13 @@ class Visits:
                 _save(os.path.join(folder, day + ".json"), lst)
 
 
-def _new_visit(visits: Visits, day: str, vid: str, t: int, ip: str, ua: str, db) -> dict:
+def _new_visit(visits: Visits, day: str, vid: str, t: int, ip: str, ua: str, db,
+               earlier: str = "") -> dict:
     name, version = browser_of(ua)
     v = {"id": vid, "start": t, "end": t, "browser": name, "bv": version,
          "os": os_version_of(ua), "device": device_of(ua),
          "country": (db.country(ip) if db is not None else "") or "",
-         "returning": visits.before(day, vid), "pages": [], "time": 0,
+         "returning": visits.before(day, vid, earlier), "pages": [], "time": 0,
          "downloads": [], "events": []}
     visits.day(day).append(v)
     return v
@@ -704,7 +789,7 @@ def _page_line(stats: dict, uniques: dict, state: dict, r: dict, db, visits: Vis
     if page is None:
         return
     t = _epoch(r.get("t") or "")
-    vid = _hash(state, ip, ua)
+    vid = _hash(state, day, ip, ua)
     d = _day(stats, day)
     ev = q.get("ev", "view")
     visit = visits.open_visit(day, vid, t)
@@ -750,7 +835,7 @@ def _page_line(stats: dict, uniques: dict, state: dict, r: dict, db, visits: Vis
     ref_page = referrer_page(q.get("r", ""), host)
     src = re.sub(r"[^\w.-]", "", q.get("s", ""))[:40].lower()
     if visit is None or "channel" not in visit:  # a new visit, or one that began with a download
-        visit = visit or _new_visit(visits, day, vid, t, ip, ua, db)
+        visit = visit or _new_visit(visits, day, vid, t, ip, ua, db, _hash_before(state, day, ip, ua))
         visit.update(channel=channel_of(host, src), ref=host[:80], source=src,
                      lang=q.get("l", "")[:5], blang=q.get("bl", "")[:20])
         if ref_page:
@@ -982,8 +1067,12 @@ def collect(backfill: bool = False, with_fetch: bool = False) -> None:
         uniques = _load(uniques_path, {})
         kinds = _load(kinds_path, {})
         visits = Visits(uniques)
-        for gone in ("salts", "seen"):          # the day-salted hashes of before
+        # The day-salted hashes of before, and the one key kept for 25 months
+        # after them: gone, and with it any way back from those hashes.
+        for gone in ("salts", "seen", "secret"):
             state.pop(gone, None)
+        keys = state["_keys"] = MonthKeys(os.path.join(STATS_DIR, "visitor-keys.json"),
+                                          datetime.now().astimezone().date())
         if with_fetch:
             fetch_geo(state)
         db = geo()
@@ -1034,10 +1123,13 @@ def collect(backfill: bool = False, with_fetch: bool = False) -> None:
         stats["geo"] = db is not None
         visits.save()
         _drop_payments(state)
+        _updates_to_the_hour(state)
         _anonymize_old()
         _save(uniques_path, uniques)
         _save(kinds_path, kinds)
         _save(stats_path, stats)
+        state.pop("_keys", None)
+        keys.save()
         _save(state_path, state)
 
 
@@ -1095,6 +1187,24 @@ def _drop_payments(state: dict) -> None:
     state["payments_off_visits"] = 1
 
 
+def _updates_to_the_hour(state: dict) -> None:
+    """Once: the updates kept from before at the second they came, put at
+    their hour (the newer ones are kept so from the start)."""
+    if state.get("updates_hourly"):
+        return
+    for f in glob.glob(os.path.join(UPDATES_DIR, "*.json")):
+        rows = _load_list(f)
+        if any(isinstance(u, dict) and u.get("t") and u["t"] % 3600 for u in rows):
+            for u in rows:
+                if isinstance(u, dict) and u.get("t"):
+                    u["t"] = _to_hour(u["t"])
+            _save(f, rows)
+    for r in state.get("recent_updates") or []:
+        if isinstance(r, list) and r and isinstance(r[0], int):
+            r[0] = _to_hour(r[0])
+    state["updates_hourly"] = 1
+
+
 def _anonymize_old() -> None:
     """Visits older than STATS_VISITS_DAYS: into the month's anonymous file,
     then the day's file goes. A day already in the month file is never
@@ -1116,8 +1226,9 @@ def _anonymize_old() -> None:
         with contextlib.suppress(OSError):
             os.unlink(f)
     # The app's updates of then: counted in stats.json already, so they go.
+    gone_updates = (datetime.now(timezone.utc).date() - timedelta(days=UPDATES_DAYS)).isoformat()
     for f in glob.glob(os.path.join(UPDATES_DIR, "*.json")):
-        if os.path.basename(f)[:10] < cutoff:
+        if os.path.basename(f)[:10] < gone_updates:
             with contextlib.suppress(OSError):
                 os.unlink(f)
 

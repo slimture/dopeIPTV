@@ -145,9 +145,9 @@ grep -n sync-releases /etc/crontab
 
 nginx writes `/dl.php`, and only that, to a log of its own; the sync counts
 downloads in it. It holds IP addresses, so it is turned over at midnight and
-kept a week, as the statistics' log (the privacy policy says so): the sync
-reads it every 15 minutes and keeps the counts itself, so nothing older is
-needed. `P` keeps the newest rotation (`.0`) uncompressed, so the sync can
+only the day before is kept - two days at the most, as the statistics' log
+(the privacy policy says so): the sync reads it every 15 minutes and keeps
+the counts itself, so nothing older is needed. `P` keeps the newest rotation (`.0`) uncompressed, so the sync can
 finish reading the file it was rotated into. 30 is SIGUSR1: nginx reopens
 its logs.
 
@@ -155,7 +155,7 @@ its logs.
 mkdir -p /usr/local/etc/newsyslog.conf.d
 cat > /usr/local/etc/newsyslog.conf.d/iptv.dope.rs.conf <<'EOF'
 # logfilename                                [owner:group]  mode count size when flags [/pid_file] [sig]
-/var/log/nginx/iptv.dope.rs-downloads.log    root:iptv      640  7     *    @T00 JP    /var/run/nginx.pid 30
+/var/log/nginx/iptv.dope.rs-downloads.log    root:iptv      640  1     *    @T00 JP    /var/run/nginx.pid 30
 /var/log/iptv-sync.log                       iptv:iptv      644  5     1024 *    JN
 EOF
 newsyslog -nv 2>&1 | grep iptv          # a dry run: both files listed, nothing rotated
@@ -451,11 +451,20 @@ How it counts, so the numbers are honest:
   running them, link previews and prerendered pages never do. Every page
   request is counted too, robots and all, so the page shows how much was
   left out.
-- A visitor is a hash of address and browser with a secret salt kept on the
-  server; no address is written down. The hashes are kept 25 months (unique
-  and returning visitors, a year against the year before). Single visits
-  are kept 400 days, thirteen months (`STATS_VISITS_DAYS`; until
-  November 2026 it was 30); then they are made anonymous -
+- A visitor is a keyed hash (HMAC-SHA256) of address and browser; no
+  address is written down. The key is the month's own
+  (`STATS_DIR/visitor-keys.json`, 0600): a new one each month, and a
+  month's key deleted once the month after it has ended - from then on
+  nobody can tell an address from its hashes, this server's administrators
+  included. A visitor is the same visitor within a month and is told
+  returning from the month before at the most; unique visitors over a
+  longer span are the months' summed. (Before November 2026 one secret
+  was kept for 25 months; the first run of this version deletes it.) The
+  hashes themselves are kept 25 months for the counts. Single visits are
+  kept 30 days (`STATS_VISITS_DAYS`: a visit in detail - its time to the
+  second, versions, screen, languages, the page that linked - can point to
+  one person; it was 400 days in November 2026, a `STATS_VISITS_DAYS`
+  line in the config file overrides this); then they are made anonymous -
   no id, no time of day, no versions or screen, only the day, country,
   browser and system, device, how the visitor came, pages, time and whether
   there was a download or the donate dialog - and kept for good, as are the
@@ -469,7 +478,7 @@ How it counts, so the numbers are honest:
   followed (its host only). Each once a page, through the same `/hit`, sent
   by nothing in an automated browser; the service keeps only what
   `donate/stats_events.py` lists and drops anything else. They live on the
-  visit (`acts`) and go with it after 13 months - the anonymous visit keeps
+  visit (`acts`) and go with it after 30 days - the anonymous visit keeps
   none of them.
 - Updates the app fetches for itself (from 1.4.5): the app asks
   `releases.json` for the newest version and fetches the file through
@@ -481,8 +490,9 @@ How it counts, so the numbers are honest:
   The admin page splits them into release and test build (a file with a
   four-part version), keeps one from your own network apart (shown, not
   counted), and the Visitors tab shows the newest few as they come - from
-  the last 30 the collector keeps in `state.json` (time, file, version
-  from, country; no address).
+  the last 30 the collector keeps in `state.json` (the hour, file, version
+  from, country; no address). Each is kept at its hour, never the second,
+  and for 30 days (`UPDATES_DAYS`); the counts per day stay.
   Test builds the same way: `sync-releases.sh` writes the newest one to
   `nightly.json` (linked from nowhere), and `/dl.php` counts a test
   build's file and sends it on to its pre-release on GitHub - nothing of
@@ -591,14 +601,15 @@ install -m 640 -o root -g iptv /dev/null /var/log/nginx/iptv.dope.rs-stats.log
 install -m 640 -o iptv -g iptv /dev/null /var/log/iptv-stats.log
 service iptv_donate restart
 echo '5,20,35,50 * * * * iptv /usr/local/bin/python3 -I /usr/local/www/iptv/donate/stats_collect.py >> /var/log/iptv-stats.log 2>&1' >> /etc/crontab
-echo '/var/log/nginx/iptv.dope.rs-stats.log        root:iptv      640  7     *    @T00 JP    /var/run/nginx.pid 30' \
+echo '/var/log/nginx/iptv.dope.rs-stats.log        root:iptv      640  1     *    @T00 JP    /var/run/nginx.pid 30' \
     >> /usr/local/etc/newsyslog.conf.d/iptv.dope.rs.conf
 newsyslog -nv 2>&1 | grep stats
 ```
 
 The log is made before nginx opens it, so it belongs to the `iptv` group
 (`stats_collect.py` runs as `iptv`); newsyslog turns it over at midnight,
-keeps a week, and leaves the newest old one uncompressed so a line written
+keeps only the day before (two days of addresses at the most), and leaves
+that one uncompressed so a line written
 just before midnight is still read. The counts live in
 `/usr/local/www/iptv/stats/` - outside the web root.
 

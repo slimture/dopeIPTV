@@ -4,7 +4,7 @@
 <li><strong>We do not know who you are, and we do not try to find out.</strong> You have no account with us, and what we keep holds no names, no e-mail addresses and no IP addresses. The only things that can be tied to a person are an e-mail you send us yourself and a payment, which Stripe handles.</li>
 <li><strong>The app keeps everything on your computer.</strong> Your sources, logins, favourites, history and settings never leave it. No analytics, no telemetry, no advertising.</li>
 <li><strong>The app only contacts us when it has a reason:</strong> to look for updates (you can turn this off), when you send an error report or feedback yourself – which you see in full and which is already cleaned of names, addresses, logins and what you have watched – and, if you turn them on, for settings sync and for watching together, both encrypted so that we cannot read them.</li>
-<li><strong>The website's statistics are made anonymous in several steps.</strong> No cookies and no outside analytics services. Your IP address is turned at once into a country and a pseudonymous ID and is never written into the statistics, and the logs that contain it are deleted automatically after a week (the front server's operating logs after at most 30 days). After 13 months even the ID goes, and only anonymous figures remain.</li>
+<li><strong>The website's statistics are made anonymous in several steps.</strong> No cookies and no outside analytics services. Your IP address is turned at once into a country and a pseudonymous ID and is never written into the statistics, and the logs that contain it are deleted automatically after two days at the most. After 30 days a visit loses its ID and its details, and once the month after it has ended, the ID can no longer be tied to any address – by anyone, us included.</li>
 <li><strong>Tips and monthly support</strong> are paid through Stripe. Card details go straight to Stripe and never to us, and our server keeps nothing about the payment.</li>
 <li><strong>What we never collect:</strong> what you watch, your sources, channels and logins, and where you are more precisely than the country. We use no cookies that follow you, sell no data, show no ads and have no trackers from others – not even the fonts come from anyone else.</li>
 </ul>
@@ -121,8 +121,8 @@
 <h3>Server logs</h3>
 <p>To send you a page, our web server needs your IP address, and your browser also sends the address of the page, the time, the name and version of your browser and system (the user agent), the page you came from (the referrer) and the languages you prefer.</p>
 <ul>
-<li>The front server, which handles the encrypted connection, keeps a general technical log of requests and a log of errors, for operation and security. They are rotated every night and kept for at most 30 days, then removed automatically. Settings sync and watch together requests are never logged.</li>
-<li>For the statistics below, the server keeps two separate logs with IP address, time, address, status, referrer, browser and language: one of page views and the pages' view signal, and one of download clicks. Both are turned over every night and kept for about a week, then removed automatically. They are the only places where your IP address is written down.</li>
+<li>The front server, which handles the encrypted connection, keeps no log of the requests to dopeiptv.org, and writes an error down only when something stops it working. Settings sync and watch together requests are never logged anywhere.</li>
+<li>For the statistics below, the server keeps two separate logs with IP address, time, address, status, referrer, browser and language: one of page views and the pages' view signal, and one of download clicks. Both are turned over every night and only the day before is kept – two days at the most –, then removed automatically. They are the only places where your IP address is written down.</li>
 <li>The services behind the website – the supporter key, feedback, sync and watch together – keep IP addresses only in memory, briefly – at most a day – to limit how many requests one address can make.</li>
 </ul>
 <p>Legal basis: our legitimate interest in running the website securely (Article 6(1)(f)).</p>
@@ -145,13 +145,14 @@
 <li><p><strong>At once.</strong> Every fifteen minutes the server reads the log. The IP address is used for two things and is then not written into the statistics:</p>
 <ul>
 <li>a <strong>country</strong>, looked up in a country database on our own server (<a href="https://db-ip.com" rel="noopener">DB-IP's</a> free database – nothing is sent anywhere);</li>
-<li>a <strong>pseudonymous visitor ID</strong>: a shortened one-way hash of the IP address and the browser name, made with a secret key that exists only on our server.</li>
+<li>a <strong>pseudonymous visitor ID</strong>: a shortened keyed hash (HMAC-SHA256) of the IP address and the browser name, made with a secret key that exists only on our server. The key is new every month.</li>
 </ul>
-<p>The ID does not show the address, we do not link it to anything else and we never try to find out who is behind it – it exists only so that we can count unique and returning visitors.</p></li>
-<li><strong>After about a week</strong> the log with the IP addresses is deleted automatically.</li>
-<li><p><strong>After 13 months (400 days)</strong> the ID, the time of day, the screen size and the version numbers are removed, the time is rounded to ten seconds and the visit is mixed with the rest of the month, so that their order tells nothing.</p>
+<p>The ID does not show the address, we do not link it to anything else and we never try to find out who is behind it – it exists only so that we can count unique and returning visitors. It is pseudonymous, not anonymous: as long as its month's key exists, someone who had both the statistics and the key could try addresses until one fits.</p></li>
+<li><strong>After two days at the most</strong> the log with the IP addresses is deleted automatically.</li>
+<li><p><strong>After 30 days</strong> the ID, the time of day, the screen size and the version numbers are removed, the time is rounded to ten seconds and the visit is mixed with the rest of the month, so that their order tells nothing.</p>
 <p>Only the day, country, browser and system, type of device, page language, how the visitor came, the number of pages and whether there was a download or a support link followed remain. That is no longer personal data and is kept without a time limit, as are the totals per day.</p></li>
-<li><strong>After 25 months</strong> the last visitor IDs are deleted; they are kept that long only to compare one year with the year before.</li>
+<li><strong>When the month after the visit's month has ended</strong>, that month's key is deleted. From then on no one – we included – can tell which address an ID belonged to.</li>
+<li><strong>After 25 months</strong> the last visitor IDs, which by then can be tied to nothing, are deleted; they are kept only to count visitors per day, week and month.</li>
 </ol>
 <p>Until step 3 each visit is kept with:</p>
 <ul>
@@ -162,7 +163,7 @@
 <li>whether you have been here before.</li>
 </ul>
 <p>Visits from non-public addresses and from the website's administrators are not counted, and visits that look as if they come from robots are marked as such.</p>
-<p>For updates the app downloads (section 2), we save the time, the file, the version that was updated, the operating system and processor, the country and whether it came from our own network – never the IP address and no ID. They are deleted after 400 days; only totals per day remain.</p>
+<p>For updates the app downloads (section 2), we save the hour, the file, the version that was updated, the operating system and processor, the country and whether it came from our own network – never the IP address, the exact time or an ID. They are deleted after 30 days; only totals per day remain.</p>
 <p>Only the website's administrators can see the statistics.</p>
 <p>Legal basis: our legitimate interest in understanding and improving the website and the app (Article 6(1)(f)). We have chosen methods that do not follow you: no cookies, no outside services, pseudonymous IDs and fixed deletion times. You can object at any time (section 10).</p>
 
@@ -224,8 +225,8 @@
 <h2 id="retention">9. How long we keep data</h2>
 <p>Most of what we keep says nothing about who you are: no name, no e-mail address, no IP address, no account. Only two things are tied to a person – an e-mail you send us, and a payment (at Stripe and in our accounts). Everything else holds nothing that points to you, or is kept only briefly and then deleted automatically.</p>
 <ul>
-<li><strong>Server logs</strong> – the only places where an IP address is written down, with the browser and what was fetched, nothing else about you: the statistics' two logs about a week, the front server's operating logs at most 30 days. Then removed automatically.</li>
-<li><strong>Statistics</strong> – no IP address and no name, only a pseudonymous ID: each visit for 400 days, then fully anonymous (without ID, time of day or screen size); the last IDs are deleted after 25 months. Update records, never with an IP address or ID: 400 days.</li>
+<li><strong>Server logs</strong> – the only places where an IP address is written down, with the browser and what was fetched, nothing else about you: the statistics' two logs, two days at the most. Then removed automatically. The front server keeps no log of requests.</li>
+<li><strong>Statistics</strong> – no IP address and no name, only a pseudonymous ID: each visit for 30 days, then fully anonymous (without ID, time of day or screen size); the key that makes the IDs is deleted when the month after has ended, the last IDs after 25 months. Update records, never with an IP address, exact time or ID: 30 days.</li>
 <li><strong>Error reports and feedback</strong> – no IP address, no name, no e-mail address, and cleaned of anything identifying before they are stored: 12 months, then removed automatically.</li>
 <li><strong>Synced data</strong> – encrypted on your computer, so we cannot read it or tell whose it is: until you delete it, or 180 days after it was last used.</li>
 <li><strong>Watch together</strong> – encrypted, in memory only, never on disk: until an hour after the room's last request.</li>
@@ -251,7 +252,7 @@
 <li>The statistics keep no IP addresses, only a pseudonymous ID that does not show the address and that we do not use to find out who you are.</li>
 <li>Reports and feedback are stored without an IP address, browser details or e-mail address.</li>
 <li>Synced data and watch together are encrypted, so that we can neither read them nor tell whose they are.</li>
-<li>On our side your IP address is written down only in the server logs, which are deleted automatically after a week (the front server's operating logs after at most 30 days, section 9).</li>
+<li>On our side your IP address is written down only in the server logs, which are deleted automatically after two days at the most (section 9).</li>
 </ul>
 <p>Write to <a href="mailto:info@solecraft.se">info@solecraft.se</a>. We answer within a month, free of charge.</p>
 <p>Because we cannot pick you out ourselves, we usually need your help to find anything at all:</p>

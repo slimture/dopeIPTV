@@ -22,7 +22,7 @@
 <li><a href="#private">Privat tittande</a></li>
 <li><a href="#updates">Sökning efter uppdateringar</a></li>
 <li><a href="#website">Webbplatsens statistik</a></li>
-<li><a href="#hosts">Allt som appen pratar med</a></li>
+<li><a href="#hosts">Vart appen ansluter</a></li>
 <li><a href="#builds">Så vet du att appen kör den här koden</a></li>
 </ol>
 </nav>
@@ -211,7 +211,7 @@
 </details>
 <h3>Det här skyddar det inte mot</h3>
 <ul>
-<li>Kontrollen kommer från din IP-adress, och vår webbservers logg sparar den i ungefär en vecka, som för varje besök (<a href="#website">del 6</a>). Vi räknar en uppdatering du laddar ner – versionen den kom från, system och processor, land – aldrig med adressen.</li>
+<li>Kontrollen kommer från din IP-adress, och vår webbservers logg sparar den i högst två dygn, som för varje besök (<a href="#website">del 6</a>). Vi räknar en uppdatering du laddar ner – versionen den kom från, system och processor, land, på timmen och i 30 dagar – aldrig med adressen.</li>
 <li>Du kan stänga av kontrollen i appen: <em>Sök efter uppdateringar vid start</em>.</li>
 </ul>
 
@@ -219,12 +219,12 @@
 <p class="tp-promise">Vi räknar besök utan kakor, utan externa tjänster och utan att spara din IP-adress i statistiken.</p>
 <h3>Så fungerar det</h3>
 <ol class="tp-flow">
-<li><b>Webbservern</b> skriver varje anrop i en logg – med IP-adressen. Loggen raderas efter ungefär en vecka.</li>
+<li><b>Webbservern</b> skriver varje anrop i en logg – med IP-adressen. Loggen raderas efter högst två dygn. Frontservern före den för ingen logg över anrop.</li>
 <li><b>Var femtonde minut</b> läses loggen: adressen blir ett land (uppslaget på vår egen server) och ett besökar-id, och skrivs inte vidare.</li>
-<li><b>Efter 400 dagar</b> förlorar ett besök sitt id, klockslaget och skärmstorleken. Bara anonyma siffror finns kvar.</li>
+<li><b>Efter 30 dagar</b> förlorar ett besök sitt id, klockslaget och skärmstorleken. Bara anonyma siffror finns kvar.</li>
 </ol>
-<p>Besökar-id:t är en <strong>hashsumma</strong>: IP-adressen och webbläsarens namn körs genom SHA-256 tillsammans med en hemlighet som bara finns på vår server, och kortas till tolv tecken. Samma besökare får samma id, så att vi kan räkna unika och återkommande besökare. Id:t visar inte adressen, men det är pseudonymt, inte anonymt: den som hade både statistiken och hemligheten skulle kunna prova adresser tills en passar.</p>
-<p>Hur länge varje del sparas: loggen med din adress ungefär en vecka; varje besök med sitt id 400 dagar; id:na för sig, för att jämföra ett år med året före, 25 månader; därefter bara anonyma siffror. En betalning noteras aldrig på ett besök – ett tips räknas bara i dagens summa – så ett besök kan inte kopplas till betaltjänstens uppgifter om vem som betalade.</p>
+<p>Besökar-id:t är en <strong>nyckelhash</strong>: IP-adressen och webbläsarens namn körs genom HMAC-SHA256 med en nyckel som bara finns på vår server, och kortas till tolv tecken. Nyckeln är ny varje månad, och en månads nyckel raderas när månaden efter är slut. Inom en månad får samma besökare samma id, så att vi kan räkna unika och återkommande besökare. Id:t visar inte adressen, men det är pseudonymt, inte anonymt: så länge månadens nyckel finns skulle den som hade både statistiken och nyckeln kunna prova adresser tills en passar. När nyckeln är borta kan ingen det – inte heller vi.</p>
+<p>Hur länge varje del sparas: loggen med din adress högst två dygn; varje besök i detalj – dess id, sekunden det kom, webbläsarens version, skärmen, språken, sidan som länkade hit, som tillsammans skulle kunna peka ut en person – 30 dagar; nyckeln som gjorde dess id tills månaden efter är slut; id:na för sig, för att räkna besökare per dag, vecka och månad, 25 månader – då går de inte att koppla till något; därefter bara anonyma siffror. En betalning noteras aldrig på ett besök – ett tips räknas bara i dagens summa – så ett besök kan inte kopplas till betaltjänstens uppgifter om vem som betalade.</p>
 <details class="tp-proof">
 <summary>Vill du se hur det fungerar bakom kulisserna?</summary>
 <div class="tp-proof-body">
@@ -233,9 +233,9 @@
 <!--tp:ex website log-->
 <p class="tp-ex-h">Det statistiken sparar av det besöket – ingen IP-adress:</p>
 <!--tp:ex website visit-->
-<p class="tp-ex-h">Samma besök efter 400 dagar:</p>
+<p class="tp-ex-h">Samma besök efter 30 dagar:</p>
 <!--tp:ex website anon-->
-<p class="fine">Framtaget genom att köra webbplatsens egen kod, med en påhittad hemlighet.</p>
+<p class="fine">Framtaget genom att köra webbplatsens egen kod, med en påhittad nyckel.</p>
 <h3>Koden</h3>
 <p>Webbserverns loggformat – det enda stället där din IP-adress skrivs ned:</p>
 <!--tp:code website log-->
@@ -243,7 +243,7 @@
 <!--tp:code website visitor-->
 <p>Hur länge besöken och id:na sparas, och det enda ställe där ett tips räknas – per dag, aldrig på besöket:</p>
 <!--tp:code website kept-->
-<p>Det ett besök behåller efter 400 dagar:</p>
+<p>Det ett besök behåller efter 30 dagar:</p>
 <!--tp:code website anon-->
 <h3>Kontrollera det själv</h3>
 <p>Här kan du kontrollera mer än koden. Öppna webbläsarens utvecklarverktyg på valfri sida på webbplatsen:</p>
@@ -259,13 +259,14 @@
 <h3>Det här skyddar det inte mot</h3>
 <ul>
 <li>Till skillnad från appen kan du inte granska vår server: du får lita på att den kör den här koden. Det du själv kan kontrollera är vad din webbläsare laddar och sparar.</li>
-<li>Din IP-adress finns i webbserverns logg i ungefär en vecka, och i frontserverns driftloggar i högst 30 dagar.</li>
-<li>Besökar-id:t är pseudonymt, inte anonymt: med hemligheten ger samma adress och webbläsare samma id. Därför raderas de sista id:na efter 25 månader.</li>
+<li>Din IP-adress finns i webbserverns logg i högst två dygn. Medan den finns där knyter den varje anrop till en adress – det är vad en åtkomstlogg är.</li>
+<li>Under sina första 30 dagar sparas ett besök i detalj, och tills månaden efter är slut går dess id att spåra med den månadens nyckel. Den som tog över vår server under den tiden skulle kunna knyta nya besök till adresser. Därefter är besöket anonymt och nyckeln borta.</li>
 </ul>
 
-<h2 id="hosts">7. Allt som appen pratar med</h2>
-<p class="tp-promise">Varje adress som står i appens kod finns med här, med när appen använder den.</p>
+<h2 id="hosts">7. Vart appen ansluter</h2>
+<p class="tp-promise">Varje nätverksmål som appens egen kod namnger finns med här, med när appen använder det.</p>
 <p>Listan är framtagen genom att söka igenom appens kod efter varje värdnamn i den – samma sökning som du kan göra själv. Appen pratar också med det du själv lägger till: dina källor, och boxarna, tv-apparaterna och servrarna i ditt nätverk – och med adresserna som deras egna listor anger, som kanallogotyper och tv-guider på andra servrar, och, genom yt-dlp, webbplatsen för en adress du öppnar. De kommer från dina uppgifter, inte från koden, så de finns inte i listorna nedan.</p>
+<p>Listan är det som appens egen kod namnger. Den är ingen garanti för att ingen annan anslutning kan ske: biblioteken appen är byggd på, videospelaren i den (mpv och FFmpeg), yt-dlp och ditt operativsystem kan göra egna anslutningar, och en adress som sätts ihop medan appen kör står inte utskriven i koden. Det du kan göra är att läsa den länkade koden och själv se appens trafik – båda nedan.</p>
 <h3>Adresser som appen ansluter till</h3>
 <table class="tp-hosts">
 <thead><tr><th>Adress</th><th>Till vad, och när</th></tr></thead>
@@ -310,13 +311,13 @@
 <p>En till som du hittar om du söker: <code>8.8.8.8</code> finns också i delen som castar till en tv. Där frågar den din egen dator vilket nätverkskort som leder ut på internet – ett knep som inte skickar någonting alls:</p>
 <!--tp:code hosts route-->
 <h3>Kontrollera det själv</h3>
-<p>Sök igenom koden själv. Den första sökningen hittar adresserna som är skrivna som webbadresser, den andra värdnamnen som står för sig själva – tillsammans listorna ovan, förutom påhittade exempel som <code>example.com</code>:</p>
+<p>Sök igenom koden själv. Den första sökningen hittar adresserna som är skrivna som webbadresser, den andra värdnamnen som står för sig själva – tillsammans listorna ovan, förutom påhittade exempel som <code>example.com</code>. De hittar det som står utskrivet, inte en adress som sätts ihop av delar:</p>
 <pre class="tp-cmd"><code>git clone https://github.com/slimture/dopeIPTV
 cd dopeIPTV
 git checkout %REF%
 grep -rnoE --include='*.py' "https?://[A-Za-z0-9.-]+" dopeiptv | sort -t: -k3 -u
 grep -rnoE --include='*.py' "[\"'][a-z0-9.-]+\.(org|com|net|info|tv|io|dev|se|app)[\"']" dopeiptv | sort -t: -k3 -u</code></pre>
-<p>Eller se vad appen verkligen gör: en brandvägg för program visar varje anslutning när den sker – OpenSnitch på Linux, LuLu eller Little Snitch på en Mac, eller brandväggens logg i Windows.</p>
+<p>Eller se vad appen verkligen gör: en brandvägg för program visar varje anslutning när den sker – OpenSnitch på Linux, LuLu eller Little Snitch på en Mac, eller brandväggens logg i Windows. Den visar vad som hände medan du tittade, med dina inställningar: prova funktionerna du använder, och dem du inte använder.</p>
 
 <h2 id="builds">8. Så vet du att appen kör den här koden</h2>
 <p class="tp-promise">Appen du laddar ner är byggd av exakt den här koden, öppet, och den märker om den har ändrats.</p>
