@@ -72,6 +72,7 @@ map and the one-way import rule.
 | `providers/cast_feed.py` | A cast's archive or rewind buffer in pieces, read here into one converter run (`Feed`): one growing playlist on the TV, keyframe starts, the buffer's loopback address never handed out |
 | `providers/opensubtitles.py` | OpenSubtitles.com client (search, download, file hash) |
 | `core/stores.py` | Data persistence layer; `KeptValues`, a sign-in held in memory once per profile and settings file for every client made for it (read where one is made, unless a write is still on its way there), renewed on a worker - one renewal at a time (`renewal`), its answer kept only if the sign-in did not change meanwhile (`snapshot`, `since`: not after a sign-out, a new sign-in or a newer renewal) - and written to the settings on the window's thread (`core/workers.on_gui_thread`) |
+| `core/settings_files.py` | The app's settings files - every login, the sync code, the tokens - this user's alone on Linux and macOS: each file 0600 and the app's own folder 0700, only ever narrowed (`keep_private`; a missing file made empty at 0600 first, since Qt keeps a file's mode when it writes it again); the main settings, resume, follow and cache once at start, before anything writes them - the window's and `--server`'s (`protect`); never a macOS plist made or its folder touched, nothing on Windows |
 | `core/workers.py` | Thread pool helpers, LogoLoader, image caches; a picture decoded once, on the loader's pool, at the cache's size (`decode_image`: QImageReader, the GIL let go; the GUI thread only makes the pixmap); `fetch_file`, one image into the disk cache on the caller's thread (the phone remote's logos: timeout, size cap, image types, the same cooldowns) |
 | `core/local_buffer.py` | The seekable window of a live channel's rewind buffer (DVR row) |
 | `core/dvr_store.py` | The app-kept rewind buffer's rolling segment store (retention, readers) |
@@ -525,7 +526,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   kodi, mdns, simkl), `core/` (stores, local_buffer, stream_info,
   dvr_store/ingest/server/session/pool/record, updates, log, player_exec,
   wakelock, selfupdate, winupdate, macupdate, ed25519, update_keys,
-  build_check, gcguard, contest, connections, tuners, rtsp, mirrors,
+  build_check, gcguard, settings_files, contest, connections, tuners, rtsp, mirrors,
   conn_test, health, home_net, nerd, nerd_lists, channel_numbers, video_mode,
   shortcut_keys, palette_match, search_all, guide_rows, channel_prefs,
   http_login, commands,

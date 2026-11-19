@@ -434,6 +434,11 @@ def main() -> int:
         from .media.video_thread import video_check
         return video_check()
 
+    # The settings files hold every login and token: this user's alone
+    # before the restore below or anything else writes them.
+    from .core import settings_files
+    settings_files.protect()
+
     # A backup restored over everything in Settings waits for this moment:
     # put in place before anything reads the settings it replaces (the size
     # of the interface below included) - but only by a start that opens the

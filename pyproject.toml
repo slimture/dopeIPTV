@@ -202,6 +202,7 @@ files = [
     "dopeiptv/core/player_exec.py",
     "dopeiptv/core/wakelock.py",
     "dopeiptv/core/gcguard.py",
+    "dopeiptv/core/settings_files.py",
     "dopeiptv/core/contest.py",
     "dopeiptv/core/connections.py",
     "dopeiptv/core/tuners.py",
