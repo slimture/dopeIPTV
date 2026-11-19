@@ -286,6 +286,8 @@ dopeiptv/
     sleep_timer.py     The sleep timer's countdown and the number typed, in
                        the picture's corner
     stats_overlay.py   Stats for nerds over the picture (_StatsLabel)
+    tracks.py          Audio and subtitle tracks (the one a stream opens
+                       with, the menu's entries), a channel's own settings
     popout_mirror.py   The pop-out's picture: the mirror (raster, GL or the
                        picture's own thread), the docked placeholder
     seek_slider.py     The seek bar slider: click, drag, hover time
