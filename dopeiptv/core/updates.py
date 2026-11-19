@@ -36,8 +36,10 @@ NIGHTLY_PREFIX = "nightly-"
 
 def user_agent() -> str:
     """``dopeIPTV/1.4.4 (Windows; AMD64)``: what the app is, which version
-    it runs and on what - all the site learns of an update check or an
-    update, and how it tells them from a browser."""
+    it runs and on what - all the app itself tells of an update check or
+    an update, and how the site tells them from a browser. What any
+    connection shows besides (the address it comes from, when, what it
+    asks for) the site's privacy policy says how long it keeps."""
     return f"dopeIPTV/{VERSION} ({platform.system() or sys.platform}; {platform.machine() or '?'})"
 
 

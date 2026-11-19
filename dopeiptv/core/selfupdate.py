@@ -33,7 +33,7 @@ from pathlib import Path
 from . import build_check, desktop_entry, ed25519
 from ._lazy_requests import requests
 from .update_keys import UPDATE_KEYS
-from .updates import GITHUB_REPO, is_nightly, site_headers, user_agent
+from .updates import GITHUB_REPO, is_nightly, site_headers
 from ..i18n import LocalizedError
 from .log import log
 from .xdg import system_env
@@ -111,17 +111,41 @@ def target_path(current: Path, old_version: str, new_version: str) -> Path:
 _SUMS_LINE = re.compile(r"([0-9a-fA-F]{64}) [ *](\S.*)")
 
 
+_HOPS = 5
+DOWNLOAD_MAX = 2 << 30          # no release file comes near 2 GiB
+
+
+def _get_https(url: str, **kw):
+    """GET *url*, following its redirects by hand: each address https (a
+    release's file on GitHub moves on to its storage, never to plain http),
+    and each hop's headers its own - the build's kind only to dopeiptv.org."""
+    for _ in range(_HOPS + 1):
+        if not url.startswith("https://"):
+            raise UpdateError("upd_err_not_https")
+        r = requests.get(url, allow_redirects=False, headers=site_headers(url), **kw)
+        if not getattr(r, "is_redirect", False):
+            return r
+        from urllib.parse import urljoin
+        nxt = urljoin(url, r.headers.get("Location") or "")
+        r.close()
+        url = nxt
+    raise UpdateError("upd_err_download", error="too many redirects")
+
+
 def _github_file(tag: str, name: str) -> bytes:
     """A small file of the release *tag* (v1.4.6, or a test build's
-    v1.4.5.90), straight from GitHub."""
+    v1.4.5.90), straight from GitHub - read no further than 1 MiB."""
     ver = tag.strip().lstrip("vV")
     gh_tag = f"nightly-{ver}" if is_nightly(tag) else f"v{ver}"
     url = f"https://github.com/{GITHUB_REPO}/releases/download/{gh_tag}/{name}"
-    r = requests.get(url, timeout=20, headers={"User-Agent": user_agent()})
-    r.raise_for_status()
-    if len(r.content) > 1 << 20:
-        raise ValueError(f"{name} is too large")
-    return r.content
+    with _get_https(url, timeout=20, stream=True) as r:
+        r.raise_for_status()
+        out = bytearray()
+        for chunk in r.iter_content(chunk_size=1 << 14):
+            out += chunk
+            if len(out) > 1 << 20:
+                raise ValueError(f"{name} is too large")
+    return bytes(out)
 
 
 def signed_asset(release: dict, asset: dict) -> dict:
@@ -189,16 +213,18 @@ def download(asset: dict, dest: Path,
     size = int(asset.get("size") or 0)
     sha = _expected_sha256(asset)
     # Nothing is fetched that cannot be checked, or from an address that
-    # is not https.
+    # is not https - nor from one a redirect leads to (_get_https).
     if not str(asset.get("url") or "").startswith("https://"):
         raise UpdateError("upd_err_not_https")
     if not sha:
         raise UpdateError("upd_err_no_checksum")
     h = hashlib.sha256()
     got = 0
+    # A server that sends more than the file is stops being read there,
+    # not once the disk is full: it cannot match the signed checksum.
+    limit = size or DOWNLOAD_MAX
     try:
-        with requests.get(asset["url"], stream=True, timeout=30,
-                          headers=site_headers(asset["url"])) as r:
+        with _get_https(asset["url"], stream=True, timeout=30) as r:
             r.raise_for_status()
             total = size or int(r.headers.get("Content-Length") or 0)
             with open(dest, "wb") as fh:
@@ -207,9 +233,13 @@ def download(asset: dict, dest: Path,
                         raise UpdateError("cancelled")
                     if not chunk:
                         continue
+                    got += len(chunk)
+                    if got > limit:
+                        log.error("update: %s sent more than its %d bytes - stopped",
+                                  asset.get("name"), limit)
+                        raise UpdateError("upd_err_checksum")
                     fh.write(chunk)
                     h.update(chunk)
-                    got += len(chunk)
                     if progress is not None:
                         progress(got, total)
         if size and got != size:

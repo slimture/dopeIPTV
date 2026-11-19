@@ -16,6 +16,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   (`personal`) as a required argument, so the last scrub before anything
   leaves knows the source's names, logins and addresses as well as the
   patterns, whichever way a report was put together.
+- core/selfupdate.py: an update's download follows its redirects by hand
+  (`_get_https`): each address https, the build's kind sent to
+  dopeiptv.org alone, five hops at most; it stops reading once more has
+  come than the file is (`DOWNLOAD_MAX` when no size is given), and
+  GitHub's checksum list stops at 1 MiB while it is read.
 
 ## [1.6.8]
 

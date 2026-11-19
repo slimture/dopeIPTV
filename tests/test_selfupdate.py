@@ -386,8 +386,18 @@ class _Got:
     def __init__(self, body: bytes):
         self.content = body
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
     def raise_for_status(self):
         pass
+
+    def iter_content(self, chunk_size: int):
+        for i in range(0, len(self.content), chunk_size):
+            yield self.content[i:i + chunk_size]
 
 
 def _github_has(monkeypatch, rel: dict | None) -> list:
@@ -484,3 +494,79 @@ def test_a_build_without_a_key_takes_no_update(monkeypatch):
     with pytest.raises(selfupdate.UpdateError) as e:
         selfupdate.signed_asset({"tag": "v1.4.6"}, _asset())
     assert e.value.key == "upd_err_unsigned"
+
+
+class _Hop:
+    """A redirect to *where*."""
+    is_redirect = True
+
+    def __init__(self, where: str):
+        self.headers = {"Location": where}
+
+    def close(self):
+        pass
+
+
+def test_a_download_follows_redirects_only_over_https(monkeypatch, tmp_path):
+    body = b"new version"
+    asset = _asset(digest="sha256:" + hashlib.sha256(body).hexdigest())
+    asset["size"] = len(body)
+    asked: list = []
+    hops = {asset["url"]: _Hop("https://github.com/x/releases/download/v1/f"),
+            "https://github.com/x/releases/download/v1/f": _Hop("/storage/f")}
+
+    def get(url, **kw):
+        asked.append((url, kw.get("allow_redirects"), kw["headers"].get("X-dopeIPTV-Build")))
+        return hops.get(url) or _Resp(body)
+
+    monkeypatch.setattr(selfupdate.requests, "get", get)
+    selfupdate.download(asset, tmp_path / "f")
+    assert (tmp_path / "f").read_bytes() == body
+    assert [u for u, _r, _b in asked] == [asset["url"], "https://github.com/x/releases/download/v1/f",
+                                          "https://github.com/storage/f"]
+    assert all(r is False for _u, r, _b in asked), "requests follows no redirect by itself"
+    assert asked[0][2] and not asked[1][2], "the build's kind goes to dopeiptv.org alone"
+
+    # A redirect to plain http is not followed, and nothing is left behind.
+    hops["https://github.com/x/releases/download/v1/f"] = _Hop("http://github.com/storage/f")
+    asked.clear()
+    with pytest.raises(UpdateError, match="https"):
+        selfupdate.download(asset, tmp_path / "g")
+    assert len(asked) == 2 and not (tmp_path / "g").exists()
+
+    # Nor round and round.
+    hops[asset["url"]] = _Hop(asset["url"])
+    with pytest.raises(UpdateError, match="redirects"):
+        selfupdate.download(asset, tmp_path / "h")
+
+
+def test_a_download_stops_once_it_is_larger_than_the_file(monkeypatch, tmp_path):
+    body = b"x" * (3 << 16)
+    asset = _asset(digest="sha256:" + hashlib.sha256(body[:10]).hexdigest())
+    asset["size"] = 10
+    read: list = []
+
+    class _Endless(_Resp):
+        def iter_content(self, chunk_size):
+            for chunk in super().iter_content(chunk_size):
+                read.append(len(chunk))
+                yield chunk
+
+    monkeypatch.setattr(selfupdate.requests, "get", lambda url, **kw: _Endless(body))
+    with pytest.raises(UpdateError, match="damaged"):
+        selfupdate.download(asset, tmp_path / "f")
+    assert len(read) == 1, "it stopped at the first chunk past the size"
+    assert not (tmp_path / "f").exists()
+    # With no size given, the cap is DOWNLOAD_MAX.
+    monkeypatch.setattr(selfupdate, "DOWNLOAD_MAX", 1 << 16)
+    read.clear()
+    with pytest.raises(UpdateError, match="damaged"):
+        selfupdate.download(dict(asset, size=0), tmp_path / "f")
+    assert len(read) == 2
+
+
+def test_githubs_checksum_list_is_read_no_further_than_a_megabyte(monkeypatch):
+    monkeypatch.setattr(selfupdate.requests, "get", lambda url, **kw: _Got(b"0" * (2 << 20)))
+    with pytest.raises(ValueError, match="too large"):
+        selfupdate._github_file("v1.6.8", "SHA256SUMS")
+
