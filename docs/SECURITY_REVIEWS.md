@@ -73,6 +73,15 @@ assessment of each. The findings, and what came of them:
 | Boxes | An Enigma2 box's screenshot was read and decoded whole on the window's thread | low | 1.6.9: 64 MB, three formats, size from the header, off the window's thread |
 | Stream addresses | A provider's `ytdl://` address ran yt-dlp | low | 1.6.9: refused from a source |
 | Threat model | The rules had no written threat model behind them | info | 1.6.9: docs/SECURITY.md |
+| Logs | Logins outside an address (a bare query, a header, `key=value`, a MAC) reached the log; control characters were written as they came; log files had the default mode | medium | 1.6.9: masked, escaped, 0600 in 0700 |
+| Updates | The update check followed dopeiptv.org's and GitHub's redirects anywhere, the yt-dlp download too | low | 1.6.9: the site's none, GitHub's https only |
+| VPN guard | An address in another IPv4 spelling or an IPv4-mapped IPv6, and a network path, slipped past the guard | low | 1.6.9: `nerd.ipv4_any`, paths by their server |
+| Numbers | "1e999", "Infinity", NaN or thousands of digits from a provider raised or overflowed | low | 1.6.9: `core/num.py` |
+| Sign-in | Trakt's loopback sign-in took any request with a code and waited on a silent connection | low | 1.6.9: state checked, 5 s |
+| Sharing | A logo, a source's name or the guide's icons carried a login to another device | medium | 1.6.9: left out |
+| MQTT | A broker could hold the events thread and flood the app with commands | low | 1.6.9: bounded and paced |
+| Local IPC | The command socket's last place was the shared temporary folder | low | 1.6.9: a folder of the user's own |
+| Windows | System tools by bare name, ffmpeg and mpv from the current folder or a batch file | low | 1.6.9: full paths, programs only |
 | Overall | The parts reviewed are not the whole attack surface: parsers of provider data, logins at rest, the local servers, the programs the app starts, the build chain | info | 1.6.9 (in progress): five more reviews - local servers and processes, untrusted input and secrets, supply chain and platforms, the website's services - with their findings to be added here |
 
 ## The next round

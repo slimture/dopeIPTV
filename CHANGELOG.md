@@ -210,6 +210,37 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 - docs/SECURITY.md: the threat model - what is protected, who could attack
   and what stops each, the honest limits with their reasons, and how it is
   kept; SECURITY.md says how to report and what follows a report.
+- core/log.py: logins outside an address are masked too - a query or an
+  Xtream path without its address, a login header, a bearer token, a login
+  written name=value, a box's MAC, a supporter key; control characters are
+  shown, not acted on; log, crash and rewind-buffer files belong to this
+  user alone.
+- core/updates.py, core/ytdlp.py: dopeiptv.org is asked with no redirect
+  followed; GitHub and the yt-dlp download follow redirects only over https.
+- core/nerd.py: the VPN guard judges every spelling of an IPv4 address by
+  where it goes; a file on a network share is not one's own file.
+- core/num.py: numbers from outside are finite and range-checked and never
+  raise.
+- core/m3u_ids.py: many channels of one name no longer cost quadratic time.
+- core/restream.py, core/rec_extras.py, core/rec_mp4.py: names in their log
+  lines go through `for_log`.
+- core/url_rewrite.py: rules nested past Python's limit are no rules.
+- providers/oauth_loopback.py: Trakt's browser sign-in checks its state;
+  stray and silent requests are ignored, Cancel and the time limit always
+  work.
+- services/share.py: no login reaches another device through a logo, a
+  source's name or the guide's icons and links.
+- core/mqtt.py, core/events.py: a broker that never stops sending holds
+  nothing, and Home Assistant's commands are paced.
+- core/instance.py: the command socket is never in a shared temporary
+  folder.
+- core/supporter.py: only a key exactly as it is written checks out.
+- core/backup.py: the PIN's wrong tries stay on this computer; shaders,
+  other networks, a log file and watch-history sign-ins are named before a
+  restore.
+- core/player_exec.py, core/platform_windows.py, the installer: Windows'
+  own tools are started by their full path, and ffmpeg and mpv never come
+  from the current folder or a batch file.
 ## [1.6.8]
 
 ### Security
