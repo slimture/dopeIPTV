@@ -68,10 +68,18 @@ class Client:
         return [FILM]
 
 
+def _run_now(_pool, fn, done, fail=None):
+    try:
+        got = fn()
+    except Exception as e:  # noqa: BLE001 - as the pool hands it to fail
+        fail(str(e))
+        return
+    done(got)
+
+
 @pytest.fixture(autouse=True)
 def _inline_pool(monkeypatch):
-    monkeypatch.setattr(mw_lists, "run_async",
-                        lambda _pool, fn, done, fail=None: done(fn()))
+    monkeypatch.setattr(mw_lists, "run_async", _run_now)
     privacy.set_private(False)
 
 
@@ -201,6 +209,24 @@ def test_a_row_kept_without_its_category_is_held_back_then_told(settings):
     w2._place_tv_learn([NEWS])
     assert [r["name"] for r in w2._place_tv_recent_rows()] == ["News One"]
     assert w2.client.asked == ["live"]
+
+
+def test_a_catalogue_that_cannot_be_read_holds_them_back_and_is_asked_later(settings, monkeypatch):
+    _watched(settings, legacy=True)
+    w = Win(settings)
+    calls = []
+
+    def down(_cat=None):
+        calls.append(1)
+        raise OSError("provider down")
+    w.client.live_streams = down
+    assert w._place_tv_recent_rows() == []
+    assert w._place_tv_recent_rows() == [] and len(calls) == 1     # not asked at every look
+    now = mw_lists.time.monotonic()
+    monkeypatch.setattr(mw_lists.time, "monotonic", lambda: now + mw_lists.LOCK_RETRY_S + 1)
+    w.client.live_streams = Client().live_streams
+    w._place_tv_recent_rows()
+    assert [r["name"] for r in w._place_tv_recent_rows()] == ["News One"]
 
 
 def test_nothing_locked_reads_nothing_and_changes_nothing():

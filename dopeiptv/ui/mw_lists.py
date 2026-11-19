@@ -30,6 +30,10 @@ from ..i18n import tr
 # is a real category id (the "All" row).
 _UNSET = object()
 
+#: The source's catalogue not read for the parental lock's held-back rows
+#: (_lock_learn): asked again no sooner than this.
+LOCK_RETRY_S = 60.0
+
 
 # The status row's "123 channels", per kind of list.
 _COUNT_KEYS = {
@@ -1131,6 +1135,10 @@ class _ListsMixin:
         if threading.current_thread() is not threading.main_thread():
             return
         client = self.client
+        failed_at = self.__dict__.get("_lock_failed")
+        if failed_at is not None and failed_at[0] is client \
+                and time.monotonic() - failed_at[1] < LOCK_RETRY_S:
+            return                      # held back meanwhile; asked again later
         asking = self.__dict__.get("_lock_asking")
         if asking is None or asking[0] is not client:
             asking = (client, set())
@@ -1147,6 +1155,7 @@ class _ListsMixin:
         def failed(_msg=None) -> None:
             if self.__dict__.get("_lock_asking", (None,))[0] is client:
                 asking[1].difference_update((m, i) for m, ids in todo.items() for i in ids)
+            self._lock_failed = (client, time.monotonic())
 
         run_async(self.pool, work, self._lock_cats_in, failed)
 
@@ -1159,7 +1168,6 @@ class _ListsMixin:
             known.setdefault(mode, {}).update(cats)
         if not self.__dict__.pop("_lock_held", False):
             return
-        self._lock_ver = int(self.__dict__.get("_lock_ver", 0)) + 1
         held = getattr(self, "_held_rows_in", None)
         if callable(held):
             held("lock")
