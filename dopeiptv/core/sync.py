@@ -8,6 +8,10 @@ computer and typed or pasted on the others. From it come (HKDF-SHA256) the
 key it is encrypted with (ChaCha20-Poly1305, core/chacha20poly1305.py),
 here, before anything is sent. The site sees the slot, the size and when;
 it never sees the code or the key, and cannot read a byte of what is kept.
+Nor can it change one unnoticed: the tag refuses a changed copy. What it
+could do is hand back an earlier copy of its own; every copy carries a
+counter, sealed with the rest (counter()), so a computer that has seen a
+later one says so, keeps its own and puts it back (RoundResult.older).
 No account, no e-mail, no name and no supporter key go along: nothing that
 says who asks (donate/sync.py on the website branch). A copy no computer
 has read or written for 180 days is deleted there.
@@ -156,6 +160,8 @@ def masked(code: str) -> str:
 
 def hkdf(ikm: bytes, salt: bytes, info: bytes, length: int) -> bytes:
     """HKDF-SHA256 (RFC 5869)."""
+    if not 0 < length <= 255 * 32:
+        raise ValueError("HKDF-SHA256 makes 1 to 8160 bytes")
     prk = hmac.new(salt or b"\0" * 32, ikm, hashlib.sha256).digest()
     out, block = b"", b""
     counter = 1
@@ -178,6 +184,29 @@ def derive(raw: bytes) -> tuple[str, bytes]:
 
 def empty_doc() -> dict[str, Any]:
     return {"v": FORMAT, "c": {}}
+
+
+#: The copy's counter: one more on every upload, sealed with the rest, so
+#: an earlier copy handed back is told from the latest. An entry in a
+#: category of its own that no computer applies - an older app keeps it
+#: as it keeps any entry (its merge takes the higher) without counting.
+_META = "~"
+_COUNTER = "n"
+
+
+def counter(doc: dict[str, Any]) -> int:
+    e = (doc["c"].get(_META) or {}).get(_COUNTER)
+    if not isinstance(e, dict) or not isinstance(e.get("v"), int):
+        return 0
+    return max(0, int(e["v"]))
+
+
+def _counted(doc: dict[str, Any], n: int) -> dict[str, Any]:
+    """*doc* with the counter *n* (its categories copied, so a shared one
+    is not changed)."""
+    out = _copy(doc)
+    out["c"][_META] = dict(out["c"].get(_META) or {}, **{_COUNTER: {"t": n, "v": n}})
+    return out
 
 
 def _canon(value: Any) -> str:
@@ -939,11 +968,16 @@ class Remote:
         if not build_check.allowed():
             # Never asked from a modified build: the site refuses it anyway.
             raise SyncError("modified")
+        if not build_check.secure(self.url):
+            log.warning("sync: not https - nothing sent")
+            raise SyncError("net")
         try:
+            # Never followed elsewhere: a copy goes to the slot named, or
+            # nowhere.
             return requests.request(method, self.url, headers=self.headers,
                                     data=None if body is None
                                     else json.dumps(body).encode("ascii"),
-                                    timeout=self.timeout)
+                                    timeout=self.timeout, allow_redirects=False)
         except Exception as e:
             log.info("sync: %s not answered (%s)", method, type(e).__name__)
             raise SyncError("net") from e
@@ -1011,6 +1045,9 @@ class RoundResult:
     version: int
     uploaded: bool
     size: int
+    #: The copy there was older than one this computer had seen (its
+    #: counter lower): this computer's was kept and put back.
+    older: bool = False
 
 
 def round_trip(remote: Remote, key: bytes, doc: dict[str, Any], snap: Snapshot,
@@ -1023,30 +1060,42 @@ def round_trip(remote: Remote, key: bytes, doc: dict[str, Any], snap: Snapshot,
     quicker) merged again with what it put there. *fresh*: joining; *seen*:
     the categories this computer has synced before (one it has not, that
     the site has already, starts fresh), and whether its shortcuts
-    (newcomer()). *doc* itself is not changed."""
+    (newcomer()). *doc* itself is not changed. Each upload counts one more
+    than the highest counter either side has (counter()); a copy whose
+    counter is below the one *doc* has seen is older than what this
+    computer had - the merge keeps this computer's newer entries anyway,
+    and the result is put back and said (*older*)."""
     now = int(time.time()) if now is None else now
+    highest = counter(doc)
     got = remote.get()
     if got is None and joining:
         raise SyncError("none")
     theirs = unseal(key, got[1]) if got else empty_doc()
+    older = got is not None and counter(theirs) < highest
+    if older:
+        log.warning("sync: the copy there is older than one seen here (%d < %d) - "
+                    "this computer's is put back", counter(theirs), highest)
     new_here: bool | set[str] = True if fresh else {
         c for c in cats if seen is not None and c not in seen and theirs["c"].get(c)}
     stamped = _copy(doc)
     stamp(stamped, snap, cats, now, new_here, newcomer(seen, theirs, snap.platform))
     for attempt in range(4):
         if attempt:
+            # Another computer was quicker: its copy is the latest now.
             theirs = unseal(key, got[1]) if got else empty_doc()
+            older = older or (got is not None and counter(theirs) < highest)
         version = got[0] if got else 0
         merged = merge(theirs, stamped)
         prune(merged, now)
         if got is not None and _canon(merged) == _canon(theirs):
-            return RoundResult(merged, stamped, version, False, len(got[1]))
+            return RoundResult(merged, stamped, version, False, len(got[1]), older)
+        merged = _counted(merged, max(counter(merged), highest) + 1)
         blob = seal(key, merged)
         if len(blob) > MAX_BLOB:
             raise SyncError("big", len(blob))
         ok, info = remote.put(version, blob)
         if ok:
-            return RoundResult(merged, stamped, int(info), True, len(blob))
+            return RoundResult(merged, stamped, int(info), True, len(blob), older)
         got = info
     raise SyncError("busy")
 

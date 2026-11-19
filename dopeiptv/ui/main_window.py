@@ -2493,17 +2493,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         if record and kind:
             self.history.add(url, title, icon_url, key, kind,
                              extra=self._history_extra(kind, item, title))
-        if kind in ("movie", "episode"):
-            self._trakt_start_for_item(kind, item)
-            self._simkl_start_for_item(kind, item)
-        elif (kind == "local" and item is not None
-                and not item.get("_no_scrobble")):
-            # A local file scrobbles as a movie when Trakt can match the
-            # cleaned title; an unmatched file just scrobbles nothing.
-            local_movie = {"name": item.get("_clean_title")
-                           or item.get("name") or ""}
-            self._trakt_start_for_item("movie", local_movie)
-            self._simkl_start_for_item("movie", local_movie)
+        self._watch_accounts_start(kind, key, item)
         self.stream_error.hide()
         # Remember the channel we're leaving so the "last channel" key can
         # bounce back to it.

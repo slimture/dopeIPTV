@@ -7,6 +7,36 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.6.8]
+
+### Security
+
+- core/report.py: `send_status` runs the pattern scrub on exactly what is
+  sent, whichever caller built the text; `_KEYVAL` takes quoted and JSON
+  values (`_hide_value` keeps the quotes), `_AUTH_LINE` an Authorization,
+  Proxy-Authorization, Cookie or Set-Cookie line, `_BEARER` a bearer
+  token, `_HOST_PATH` an address with a path and no scheme; reports and
+  replies go over https only (`build_check.secure`, loopback for the
+  tests) and follow no redirect.
+- core/privacy.py: a playback's key compared as text (an int and a str
+  key of one title were two playbacks); `private_key` for a store that has
+  no kind at hand - services/resume.py keeps no resume point of a private
+  playback going on, and `for_log` names no title while one goes on.
+  ui/mw_trakt.py `_watch_accounts_start`: Trakt and Simkl are asked of the
+  playback (`playback_private`), not of the switch alone.
+- core/selfupdate.py: a build with no release key raises `upd_err_unsigned`
+  in `signed_asset` instead of trusting the site's checksum.
+- core/together.py: room codes of ten characters (`CODE_LEN`, about 50
+  bits) stretched by 600 000 rounds (`STRETCH`); one of eight (`OLD_LEN`)
+  still derives its room with `OLD_STRETCH`.
+- core/sync.py: a counter sealed in every copy (`counter`, an entry of its
+  own category `~` that an older app carries on), one more on each upload;
+  a copy below the one this computer has seen is told (`RoundResult.older`,
+  `sync_err_older` on the Sync page and as a message) and this computer's
+  put back. HKDF refuses a length it cannot make.
+- core/sync.py and core/together.py: https only (`build_check.secure`) and
+  no redirect followed.
+
 ## [1.6.7]
 
 ### Fixed

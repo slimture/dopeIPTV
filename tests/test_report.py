@@ -528,3 +528,55 @@ def test_a_test_build_s_version_is_no_address():
                        "connected to 10.0.0.12 and 127.0.0.1")
     assert f"dopeIPTV {base}.123" in out and f"INFO {base}.123 starting" in out
     assert "10.0.0.12" not in out and "<ip>" in out and "127.0.0.1" in out
+
+
+def test_logins_in_quotes_json_headers_and_addresses_without_a_scheme_go():
+    """What the patterns catch beyond name=value: a quoted value (the quotes
+    kept), JSON's "name": "value", a login header to the end of its line, a
+    bearer token, urllib3's host='...' and a server written without its
+    scheme - and what they leave: a file's path, a version, a time."""
+    cases = {
+        'password="my secret" next': 'password="<hidden>" next',
+        '{"password": "secret123", "user": "kalle"}': '{"password": "<hidden>", "user": "<hidden>"}',
+        "Authorization: Bearer abc.def.ghi": "Authorization: <hidden>",
+        "got Bearer eyJhbGciOiJIUzI1NiJ9.x.y today": "got Bearer <hidden> today",
+        "Cookie: sid=abc; theme=dark": "Cookie: <hidden>",
+        "HTTPConnectionPool(host='iptv.example.com', port=8080)": "HTTPConnectionPool(host='<hidden>', port=8080)",
+        "iptv.example.com:8080/live/kalle/pw/1.ts failed": "<address> failed",
+    }
+    for text, scrubbed in cases.items():
+        assert report.scrub(text) == scrubbed, (text, report.scrub(text))
+    for keep in ('File "~/dopeIPTV/dopeiptv/ui/main_window.py", line 42', "lib/python3.12/site-packages/x.py",
+                 "dopeIPTV 1.6.7/notes", "localhost:3673"):
+        assert report.scrub(keep) == keep, keep
+
+
+def test_the_last_scrub_is_in_send_itself_and_it_goes_over_https_only(monkeypatch):
+    """Whoever calls send_status, the patterns run once more on the way out;
+    the report goes over https (or to this computer, for a test's own
+    server), and a redirect is not followed."""
+    from dopeiptv.core import build_check
+    import dopeiptv.core._lazy_requests as lazy
+    monkeypatch.setattr(build_check, "allowed", lambda: True)
+    calls: list = []
+
+    class Answer:
+        status_code, content = 200, b"{}"
+
+    class Requests:
+        @staticmethod
+        def post(url, **kw):
+            calls.append((url, kw))
+            return Answer()
+
+    monkeypatch.setattr(lazy, "requests", Requests)
+    assert report.send_status("feedback", "it broke at token=abc123 on iptv.example.com/live/1",
+                              endpoint="https://dopeiptv.org/feedback/report") == 200
+    url, kw = calls[-1]
+    body = json.loads(kw["data"])
+    assert body["text"] == "it broke at token=<hidden> on <address>"
+    assert kw["allow_redirects"] is False
+    calls.clear()
+    assert report.send_status("error", "x", endpoint="http://example.com/feedback/report") == 0
+    assert report.fetch_replies(["a" * 32], endpoint="http://example.com/feedback/replies") is None
+    assert calls == [], "nothing goes over plain http to another computer"

@@ -1,3 +1,21 @@
+## dopeIPTV 1.6.8
+
+**More private: error reports, private viewing, sync and Watch together tightened, and dopeiptv.org shows the code for each.**
+
+### Security and privacy
+
+- **Error reports** are cleaned once more at the very moment they are sent, whichever way the text came, and the cleaning catches more: logins in quotes or in JSON, login headers and cookies, and server addresses written without `http://`. Reports go only over HTTPS to dopeiptv.org, never on to another address.
+- **Private viewing:** a film or an episode that began in private viewing leaves no resume point and no title in the log, even when you turn private viewing off before it ends - and if its stream reconnects after that, Trakt and Simkl are not told either.
+- **Watch together:** room codes have ten characters instead of eight, and each guess at one takes five times as long - trying every code against one room would take a graphics card centuries. A code from 1.6.7 still joins its room.
+- **Settings sync:** dopeiptv.org could never read or change your synced copy; now it cannot hand back an earlier one unnoticed either. Every copy carries a counter, locked with the rest: a computer that has seen a later copy keeps its own, puts it back and says so.
+- **Sync and Watch together** talk to dopeiptv.org only over HTTPS and never follow a redirect elsewhere.
+- **Updates:** a copy of the app built without dopeIPTV's release key takes no update at all, rather than trust a checksum from the same place as the file.
+
+### dopeiptv.org
+
+- **Privacy, behind the scenes** shows the new code: the sync counter, the room code, the reports' last cleaning, and how long the website's statistics keep each part. It also says more plainly where each protection stops.
+- The website's statistics never note a tip on a visit - a tip counts only in the day's total - and the service forgets an address within minutes once its request limit no longer needs it.
+
 ## dopeIPTV 1.6.7
 
 **Safer on a shared computer and on the home network, and Reset all now removes everything.**

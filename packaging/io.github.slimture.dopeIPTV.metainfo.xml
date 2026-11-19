@@ -70,6 +70,18 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.6.8" date="2026-11-19">
+      <description>
+        <p>More private: error reports, private viewing, sync and Watch together tightened.</p>
+        <ul>
+          <li>Error reports are cleaned once more as they are sent, catch more kinds of logins and go over HTTPS only</li>
+          <li>A playback begun in private viewing stays private to its end: no resume point, no title in the log, nothing told to Trakt or Simkl</li>
+          <li>Watch together's room codes have ten characters and are far harder to guess; a code from 1.6.7 still works</li>
+          <li>Settings sync notices an earlier copy handed back and puts this computer's own back</li>
+          <li>A copy of the app built without the release key takes no update</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.6.7" date="2026-11-19">
       <description>
         <p>Safer on a shared computer and on the home network, and Reset all now removes everything.</p>

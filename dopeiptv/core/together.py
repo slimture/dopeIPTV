@@ -2,9 +2,14 @@
 playing it from their own source, in step - through a relay on
 dopeiptv.org that only passes sealed messages between them.
 
-The room code. Eight characters from an alphabet with nothing to mistake
-(no 0/O, no 1/I/L), shown as two groups of four: ``K7PQ-M2XD``. Whoever
-has it is in the room. From it come - stretched (PBKDF2), then HKDF-SHA256
+The room code. Ten characters from an alphabet with nothing to mistake
+(no 0/O, no 1/I/L), about 50 bits, shown as two groups of five:
+``K7PQM-2XDH9`` (a code of eight from 1.6.7, ``K7PQ-M2XD``, still joins its
+room, with the rounds it had). Whoever has it is in the room. Whoever
+sees a room id could try codes against it, so each try costs 600 000
+rounds of PBKDF2 (``STRETCH``) - with 50 bits, centuries of a graphics
+card for one room, which the relay keeps in memory only while it is used.
+From it come - stretched, then HKDF-SHA256
 as core/sync.py derives its key - the *room id* the relay keeps messages
 under (64 hex) and the *key* every message is sealed with
 (ChaCha20-Poly1305, core/chacha20poly1305.py). The relay sees the room id,
@@ -61,12 +66,17 @@ MAX_MEMBERS = 8
 WAIT = 25.0
 
 ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
-CODE_LEN = 8
+#: A new room's code: 10 of the 31 characters, about 50 bits - read aloud in
+#: two groups of five. A code of 8 (from 1.6.7) still joins its room.
+CODE_LEN = 10
+OLD_LEN = 8
 _SALT = b"dopeIPTV together v1"
 _AAD = b"dopeIPTV together v1"
 #: PBKDF2 rounds before HKDF: the code is short, and the relay knows the
-#: room id - each guess at a code costs it this much more.
-STRETCH = 120_000
+#: room id - each guess at a code costs it this much more. A code of the
+#: old length keeps its old rounds, so its room is the same room.
+STRETCH = 600_000
+OLD_STRETCH = 120_000
 FORMAT = 1
 #: A message's plain text is padded up to one of these, so the sizes the
 #: relay sees say little about what was sent.
@@ -92,7 +102,7 @@ def new_code() -> str:
 
 
 def format_code(raw: str) -> str:
-    half = CODE_LEN // 2
+    half = len(raw) // 2
     return f"{raw[:half]}-{raw[half:]}"
 
 
@@ -100,7 +110,7 @@ def parse_code(text: str) -> str | None:
     """A code as typed or pasted (any case, any separators) in its shown
     form, or None for anything that is not one."""
     s = "".join(ch for ch in str(text or "").upper() if ch.isalnum())
-    if len(s) != CODE_LEN or any(ch not in ALPHABET for ch in s):
+    if len(s) not in (CODE_LEN, OLD_LEN) or any(ch not in ALPHABET for ch in s):
         return None
     return format_code(s)
 
@@ -113,8 +123,9 @@ def derive(code: str) -> tuple[str, bytes]:
     shown = parse_code(code)
     if shown is None:
         raise ValueError("not a room code")
-    seed = hashlib.pbkdf2_hmac("sha256", shown.replace("-", "").encode("ascii"),
-                               _SALT, STRETCH, 32)
+    raw = shown.replace("-", "")
+    rounds = OLD_STRETCH if len(raw) == OLD_LEN else STRETCH
+    seed = hashlib.pbkdf2_hmac("sha256", raw.encode("ascii"), _SALT, rounds, 32)
     return hkdf(seed, _SALT, b"room", 32).hex(), hkdf(seed, _SALT, b"key", 32)
 
 
@@ -621,9 +632,12 @@ class Relay:
         if not build_check.allowed():
             # Never asked from a modified build: the relay refuses it anyway.
             raise RelayError("modified")
+        if not build_check.secure(self.url):
+            log.warning("together: not https - nothing sent")
+            raise RelayError("net")
         try:
             r = self._http().request(method, self.url, headers=headers or self.headers,
-                                     timeout=(6.0, timeout), **kw)
+                                     timeout=(6.0, timeout), allow_redirects=False, **kw)
         except Exception as e:
             log.info("together: %s not answered (%s)", method, type(e).__name__)
             raise RelayError("net") from e

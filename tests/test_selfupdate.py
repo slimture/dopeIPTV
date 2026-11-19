@@ -477,7 +477,10 @@ def test_the_release_keys_are_ed25519_public_keys():
         assert len(base64.b64decode(k, validate=True)) == 32
 
 
-def test_a_build_without_a_key_goes_by_the_checksum(monkeypatch):
+def test_a_build_without_a_key_takes_no_update(monkeypatch):
+    """No release key, no signature to check: the update stops rather than
+    trust a checksum from the same site that offers the file."""
     monkeypatch.setattr(selfupdate, "UPDATE_KEYS", ())
-    asset = _asset()
-    assert selfupdate.signed_asset({"tag": "v1.4.6"}, asset) is asset
+    with pytest.raises(selfupdate.UpdateError) as e:
+        selfupdate.signed_asset({"tag": "v1.4.6"}, _asset())
+    assert e.value.key == "upd_err_unsigned"

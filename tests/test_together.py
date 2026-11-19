@@ -20,11 +20,11 @@ from dopeiptv.services import together as matching
 # -- the code, the room id and the key ---------------------------------------------
 
 
-def test_a_code_is_eight_characters_nobody_can_misread():
+def test_a_code_is_ten_characters_nobody_can_misread():
     seen = set()
     for _ in range(200):
         code = together.new_code()
-        assert len(code) == 9 and code[4] == "-"
+        assert len(code) == 11 and code[5] == "-"
         raw = code.replace("-", "")
         assert all(ch in together.ALPHABET for ch in raw)
         seen.add(code)
@@ -808,3 +808,62 @@ def test_watch_together_sits_in_the_view_menu():
     acts = {n: QAction(n, bar) for n in ("multiview", "cast", "together", "about")}
     menus = app_menu.lay_out(bar, acts, mac=True)
     assert [a.text() for a in menus["view"].actions()] == ["multiview", "cast", "together"]
+
+
+def test_an_old_code_of_eight_still_joins_its_room():
+    """A code of 8 from 1.6.7 is still a code, with its old rounds: the same
+    room and key that version makes, so both versions meet in one room."""
+    assert together.parse_code("K7PQ M2XD") == "K7PQ-M2XD"
+    assert together.parse_code("k7pqm2xdh9") == "K7PQM-2XDH9"
+    for bad in ("K7PQM-2XDH", "K7PQM-2XDH9Z", "K7PQM-2XDH0"):
+        assert together.parse_code(bad) is None, bad
+    room, key = together.derive("K7PQ-M2XD")
+    assert room == "0258caccc3f0ce8fedc3566735114e0f3f359c829cb6ee42b1b670dbba91cd4a"
+    assert key.hex() == "4a0cb0fc2c7e0d8cefdfa6b50df360d2cbc7e8d79812de5e0d94596fb69056df"
+    assert together.derive("K7PQM-2XDH9")[0] != room
+
+
+def test_the_relay_goes_over_https_only_and_follows_no_redirect():
+    """A room's messages go to the relay named or nowhere: never to an
+    address that is not https (this computer's own for the tests), never
+    after a redirect."""
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    for url in ("http://dopeiptv.org/together/", "ftp://dopeiptv.org/together/"):
+        relay = together.Relay("ab" * 32, "c3" * 8, endpoint=url)
+        with pytest.raises(together.RelayError) as err:
+            relay.post(b"x" * 40)
+        assert err.value.kind == "net"
+        assert relay._session is None                    # no connection was made
+
+    elsewhere = []
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_POST(self):
+            self.rfile.read(int(self.headers.get("Content-Length") or 0))
+            if self.path.startswith("/elsewhere"):
+                elsewhere.append(self.path)
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'{"now": 1}')
+                return
+            self.send_response(307)
+            self.send_header("Location", "/elsewhere" + self.path)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        relay = together.Relay("ab" * 32, "c3" * 8,
+                               endpoint=f"http://127.0.0.1:{httpd.server_address[1]}/together/")
+        with pytest.raises(together.RelayError):
+            relay.post(b"x" * 40)
+        relay.close()
+        assert not elsewhere
+    finally:
+        httpd.shutdown()
+        httpd.server_close()

@@ -593,6 +593,122 @@ def test_a_category_turned_on_later_takes_what_the_others_have(tmp_path, site):
     assert a.playlists.get("bb") is not None and a.playlists.get(pid)["password"] == "new"
 
 
+def test_every_upload_counts_and_an_older_app_carries_the_count(tmp_path, site):
+    """The counter is sealed with the rest, one more on every upload; an
+    app from before it (1.6.7) merges it as any entry and keeps the higher,
+    so a computer with it never takes that app's upload for an old copy."""
+    slot, key = sync.derive(os.urandom(32))
+    remote = sync.Remote(slot, site.url, timeout=5)
+    a = Computer(tmp_path, "a", slot)
+    a.settings.setValue("theme", "nord")
+    a.round(remote, key, now=1000)
+    assert sync.counter(_site_doc(site, slot, key)) == 1
+    a.settings.setValue("theme", "dawn")
+    result, _ = a.round(remote, key, now=2000)
+    assert result.uploaded and not result.older
+    assert sync.counter(_site_doc(site, slot, key)) == sync.counter(a.state.doc) == 2
+    # Nothing changed: nothing sent, the count stays.
+    result, _ = a.round(remote, key, now=2100)
+    assert not result.uploaded and sync.counter(_site_doc(site, slot, key)) == 2
+
+    # An older app's round: its own copy (no counter) merged with the one
+    # there and sealed as it is - the counter rides along, not counted.
+    there = _site_doc(site, slot, key)
+    theirs = {"v": 1, "c": {"settings": {"accent": {"t": 3000, "v": "green"}}}}
+    merged = sync.merge(there, theirs)
+    version = site.slots[slot][0]
+    site.slots[slot] = (version + 1, base64.b64encode(sync.seal(key, merged)).decode("ascii"))
+    assert sync.counter(_site_doc(site, slot, key)) == 2
+    result, _ = a.round(remote, key, now=4000)
+    assert not result.older and a.settings.value("accent") == "green"
+
+
+def test_an_earlier_copy_handed_back_is_told_and_this_computers_put_back(tmp_path, site):
+    """The site - or someone in its place - cannot change a copy (the tag
+    refuses it) but could hand back an earlier one. A computer that has
+    seen a later one keeps its own newer values, puts its copy back and
+    says so; a computer joining afterwards gets the newer one."""
+    slot, key = sync.derive(os.urandom(32))
+    remote = sync.Remote(slot, site.url, timeout=5)
+    a = Computer(tmp_path, "a", slot)
+    pid = a.playlists.add(dict(PROVIDER))["id"]
+    a.favs(pid).add("all", {"stream_id": 1, "name": "One"})
+    a.settings.setValue("theme", "nord")
+    a.round(remote, key, now=1000)
+    early = site.slots[slot][1]
+    a.settings.setValue("theme", "dracula")
+    a.favs(pid).remove(1)
+    a.round(remote, key, now=2000)
+    assert sync.counter(a.state.doc) == 2
+
+    version = site.slots[slot][0]
+    site.slots[slot] = (version, early)                 # the earlier copy, handed back
+    result, _ = a.round(remote, key, now=3000)
+    assert result.older and result.uploaded
+    assert a.settings.value("theme") == "dracula"
+    assert not a.favs(pid).items()                      # the removal holds
+    back = _site_doc(site, slot, key)
+    assert sync.counter(back) == 3 and sync.live(back, "settings")["theme"] == "dracula"
+
+    b = Computer(tmp_path, "b", slot)
+    b.state.fresh = b.state.joining = True
+    result, _ = b.round(remote, key, now=4000)
+    assert not result.older and b.settings.value("theme") == "dracula"
+
+
+def test_sync_goes_over_https_only_and_follows_no_redirect(tmp_path, site, monkeypatch):
+    """Nothing is sent to an address that is not https (this computer's
+    own for the tests), and a copy goes to the slot named or nowhere: a
+    redirect is not followed."""
+    from dopeiptv.core import _lazy_requests
+
+    slot, _key2 = sync.derive(os.urandom(32))
+    called = []
+    real = _lazy_requests.requests.request
+    monkeypatch.setattr(_lazy_requests.requests, "request",
+                        lambda *a, **kw: called.append(a) or real(*a, **kw))
+    for url in ("http://dopeiptv.org/sync/", "ftp://dopeiptv.org/sync/", "dopeiptv.org/sync/"):
+        with pytest.raises(sync.SyncError) as err:
+            sync.Remote(slot, url, timeout=2).get()
+        assert err.value.kind == "net"
+    assert not called
+
+    elsewhere = []
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_GET(self):
+            if self.path.startswith("/elsewhere"):
+                elsewhere.append(self.path)
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'{"version": 1, "blob": ""}')
+                return
+            self.send_response(302)
+            self.send_header("Location", "/elsewhere/" + slot)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        with pytest.raises(sync.SyncError):
+            sync.Remote(slot, f"http://127.0.0.1:{httpd.server_address[1]}/sync/", timeout=5).get()
+        assert not elsewhere
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
+def test_hkdf_refuses_a_length_it_cannot_make():
+    assert len(sync.hkdf(b"k", b"s", b"i", 255 * 32)) == 255 * 32
+    for bad in (0, 255 * 32 + 1, -1):
+        with pytest.raises(ValueError):
+            sync.hkdf(b"k", b"s", b"i", bad)
+
+
 # -- keyboard shortcuts, per system ---------------------------------------------------------
 
 def _keys(computer):
@@ -1117,5 +1233,28 @@ def test_closing_before_the_first_round_after_the_update_removes_no_ones_keys(
     w.settings.setValue(shortcut_keys.SETTING, shortcut_keys.dump({"mute": "J"}))
     w._sync_on_close()
     assert state.doc["c"]["settings"][mine]["t"] == 0
+    w._sync_forget()
+    w._sync_pool.waitForDone(2000)
+
+
+def test_the_window_says_an_earlier_copy_handed_back(tmp_path, site, qapp):
+    """An earlier copy handed back is never put up with quietly: the card's
+    line says it and a message stays in the panel, with a way to the page."""
+    from dopeiptv.ui.notices import NoticeHub, hub_of
+
+    w = _window(tmp_path, "w", site)
+    w.notices = NoticeHub(w)
+    w.settings.setValue("theme", "nord")
+    assert w._sync_start_here() and _settle(w)
+    slot = sync.derive(sync.code_of(w.settings))[0]
+    early = site.slots[slot]
+    w.settings.setValue("theme", "dracula")
+    assert w.sync_now(manual=True) and _settle(w)
+    site.slots[slot] = (site.slots[slot][0], early[1])
+    assert w.sync_now(manual=True) and _settle(w)
+    assert w._sync_status[0] == "older"
+    assert w._sync_status_text()[1] == tr("sync_err_older")
+    said = [m for m in hub_of(w).messages() if m.key == "sync_older"]
+    assert said and said[0].action is not None and w.settings.value("theme") == "dracula"
     w._sync_forget()
     w._sync_pool.waitForDone(2000)

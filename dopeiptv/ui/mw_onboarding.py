@@ -173,7 +173,7 @@ class _OnboardingMixin:
         kind = self._sync_status[0]
         if kind in ("idle", "running"):
             return
-        if kind == "ok":
+        if kind in ("ok", "older"):
             self._wsync_joined = True
             state = self._sync_state
             have = sync.chosen(self.settings)

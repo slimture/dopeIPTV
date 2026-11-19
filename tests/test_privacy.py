@@ -179,6 +179,40 @@ def test_a_private_film_keeps_no_resume_point_or_watched_mark_after_private_ends
         privacy.playback_stopped()
 
 
+def test_the_resume_store_itself_keeps_nothing_of_a_private_playback_going_on(settings):
+    """The store's own check, whoever calls it: a title begun privately keeps
+    no resume point after private viewing ends while it plays - its key as
+    a number or as text alike - and the next title is kept as always."""
+    r = ResumeStore(settings, "resume_a")
+    privacy.set_private(True)
+    privacy.playback_started("movie", 7)
+    privacy.set_private(False)
+    r.record("vod", "7", 600.0, 5400.0, item={"name": "Hemlig"})
+    r.record("vod", 7, 700.0, 5400.0, item={"name": "Hemlig"})
+    assert r.saved_position(7, "movie") == 0 and r.saved_position("7", "movie") == 0
+    assert privacy.playback_private("movie", "7"), "a number and its text are one key"
+    privacy.playback_started("movie", 8)
+    r.record("vod", 8, 600.0, 5400.0, item={"name": "Synlig"})
+    assert r.saved_position(8, "movie") == 600
+
+
+def test_the_log_names_no_title_of_a_private_playback_going_on(settings):
+    """for_log: "<private>" while private viewing is on, and while a playback
+    that began private goes on after it ended - until Stop or another title."""
+    privacy.set_private(True)
+    privacy.playback_started("movie", 7)
+    assert privacy.for_log("Hemlig") == "<private>"
+    privacy.set_private(False)
+    assert privacy.for_log("Hemlig") == "<private>", "the private film still plays"
+    privacy.playback_started("movie", 8)
+    assert privacy.for_log("Synlig") == "Synlig"
+    privacy.set_private(True)
+    privacy.playback_started("movie", 9)
+    privacy.set_private(False)
+    privacy.playback_stopped()
+    assert privacy.for_log("Synlig") == "Synlig", "Stop ends the private playback"
+
+
 def test_the_clear_window(settings):
     from PyQt6.QtWidgets import QApplication
 
@@ -317,3 +351,39 @@ def test_the_window_turns_private_viewing_on_and_off_and_clears():
     out = subprocess.run([sys.executable, "-c", _CHILD], cwd=_REPO_ROOT, env=env,
                          capture_output=True, text=True, timeout=120)
     assert "PRIVACY_OK" in out.stdout, out.stdout + out.stderr[-3000:]
+
+
+def test_trakt_and_simkl_hear_nothing_of_a_private_playback_going_on():
+    """Trakt and Simkl are asked of the playback, not of the switch alone: a
+    film that began in private viewing is not told when its stream starts
+    again after the switch went off - the next title chosen is."""
+    from dopeiptv.ui.mw_trakt import _TraktMixin
+
+    told: list = []
+
+    class W(_TraktMixin):
+        def _trakt_start_for_item(self, kind, item):
+            told.append(("trakt", kind, item.get("name")))
+
+        def _simkl_start_for_item(self, kind, item):
+            told.append(("simkl", kind, item.get("name")))
+
+    w = W()
+    film = {"stream_id": 7, "name": "The Bridge"}
+    try:
+        privacy.set_private(True)
+        privacy.playback_started("movie", 7)
+        w._watch_accounts_start("movie", 7, film)
+        privacy.set_private(False)
+        w._watch_accounts_start("movie", 7, film)          # the stream again: a reconnect
+        privacy.playback_started("movie", 7)
+        assert told == []
+        w._watch_accounts_start("movie", 8, {"name": "Other"})
+        assert told == [("trakt", "movie", "Other"), ("simkl", "movie", "Other")]
+        told.clear()
+        privacy.playback_stopped()
+        w._watch_accounts_start("local", "/m/f.mkv", {"name": "f.mkv", "_clean_title": "Film"})
+        assert told == [("trakt", "movie", "Film"), ("simkl", "movie", "Film")]
+    finally:
+        privacy.set_private(False)
+        privacy.playback_stopped()
