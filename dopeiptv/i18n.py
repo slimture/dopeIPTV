@@ -2085,6 +2085,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "msg_restore_defaults_body": {"en": "Undo all channel renames and hides for this section and go back to the provider's original list?"},
     "msg_parental_title": {"en": "Parental control"},
     "msg_wrong_pin": {"en": "Wrong PIN."},
+    "pin_wait": {"en": "Too many wrong tries. Try again in {n} s."},
     "msg_rec_file_not_ready": {"en": "The recording file hasn't been created yet - try again in a few seconds."},
     "msg_rec_needs_ffmpeg": {"en": "Recording needs ffmpeg (recommended) or mpv on the PATH.\n\nInstall ffmpeg, e.g.:  sudo apt install ffmpeg"},
     "msg_stop_time_future": {"en": "The stop time must be in the future and after the start time."},

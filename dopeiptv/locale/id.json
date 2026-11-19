@@ -3096,5 +3096,6 @@
   "srv_adult": "Saluran dewasa",
   "srv_adult_hint": "Mati: saluran dan kategori dewasa (XXX, 18+, atau ditandai begitu oleh penyedia) tidak masuk ke daftar saluran dan playlist bersama – TV di kamar anak tidak punya profil atau PIN. Kategori tersembunyi dan terkunci tidak pernah disajikan.",
   "link_play_title": "Putar alamat ini?",
-  "link_play_body": "Sebuah tautan yang dibuka di luar dopeIPTV meminta untuk memutar alamat di {host}:\n\n{address}\n\nServer itu akan melihat alamat IP komputer ini. Putar hanya jika kamu memercayai asal tautan itu."
+  "link_play_body": "Sebuah tautan yang dibuka di luar dopeIPTV meminta untuk memutar alamat di {host}:\n\n{address}\n\nServer itu akan melihat alamat IP komputer ini. Putar hanya jika kamu memercayai asal tautan itu.",
+  "pin_wait": "Terlalu banyak percobaan yang salah. Coba lagi dalam {n} dtk."
 }

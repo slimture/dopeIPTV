@@ -585,16 +585,29 @@ class _ContextMenuMixin:
             return True
         if not self.parental.has_pin():
             return True
+        # Wrong PINs are counted, and each makes the next try wait a little
+        # longer (mw_profiles, core/pins.Tries): four digits are soon tried.
+        must_wait = getattr(self, "_pin_must_wait", None)
+        if callable(must_wait) and must_wait(["parental"], tr("parental_control")):
+            return False
         pin, ok = QInputDialog.getText(
             self, tr("parental_control"), tr("parental_enter_pin"),
             QLineEdit.EchoMode.Password)
         if not ok:
             return False
-        if self.parental.verify(pin.strip()):
+        pin = pin.strip()
+        if pin and self.parental.verify(pin):
             self.parental.session_unlocked = True
+            tries = getattr(self, "_pin_tries", None)
+            if callable(tries):
+                tries().right("parental")
             return True
-        QMessageBox.warning(self, tr("msg_parental_title"),
-                            tr("msg_wrong_pin"))
+        was_wrong = getattr(self, "_pin_was_wrong", None)
+        if pin and callable(was_wrong):
+            was_wrong(["parental"], tr("msg_parental_title"))
+        else:
+            QMessageBox.warning(self, tr("msg_parental_title"),
+                                tr("msg_wrong_pin"))
         return False
 
     def _ensure_pin_configured(self) -> bool:

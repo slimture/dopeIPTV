@@ -6,7 +6,6 @@ scoped per-playlist so each provider keeps its own data.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import threading
 import time
@@ -17,7 +16,7 @@ from typing import Any
 
 from PyQt6.QtCore import QSettings
 
-from . import privacy
+from . import pins, privacy
 
 
 class _Kept:
@@ -529,7 +528,8 @@ class HistoryStore:
 
 
 class ParentalControl:
-    """A salted+hashed PIN gating locked categories and favorite groups."""
+    """A PIN gating locked categories and favorite groups, kept as
+    core/pins.py keeps one: PBKDF2 with a salt of its own, never the PIN."""
 
     def __init__(self, settings: QSettings) -> None:
         self.settings = settings
@@ -538,14 +538,13 @@ class ParentalControl:
     def has_pin(self) -> bool:
         return bool(self.settings.value("parental_pin_hash", ""))
 
-    @staticmethod
-    def _hash(salt: str, pin: str) -> str:
-        return hashlib.sha256((salt + pin).encode()).hexdigest()
+    def _keep(self, pin: str) -> None:
+        salt, stored = pins.make(pin)
+        self.settings.setValue("parental_salt", salt)
+        self.settings.setValue("parental_pin_hash", stored)
 
     def set_pin(self, pin: str) -> None:
-        salt = uuid.uuid4().hex
-        self.settings.setValue("parental_salt", salt)
-        self.settings.setValue("parental_pin_hash", self._hash(salt, pin))
+        self._keep(pin)
         self.session_unlocked = False
 
     def clear_pin(self) -> None:
@@ -554,9 +553,15 @@ class ParentalControl:
         self.session_unlocked = False
 
     def verify(self, pin: str) -> bool:
-        salt = self.settings.value("parental_salt", "")
+        """Whether *pin* is the parental PIN. One kept the way versions up
+        to 1.6.8 kept it (one SHA-256) is still taken, and written anew
+        now that it is known to be right."""
         stored = self.settings.value("parental_pin_hash", "")
-        return bool(stored) and self._hash(salt, pin) == stored
+        if not pins.check(stored, self.settings.value("parental_salt", ""), pin):
+            return False
+        if pins.outdated(stored):
+            self._keep(pin)
+        return True
 
     def lock_session(self) -> None:
         self.session_unlocked = False

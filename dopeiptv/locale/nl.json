@@ -3096,5 +3096,6 @@
   "srv_adult": "Kanalen voor volwassenen",
   "srv_adult_hint": "Uit: kanalen en categorieën voor volwassenen (XXX, 18+ of zo gemarkeerd door de aanbieder) blijven buiten de zenderlijst en de gedeelde playlist – een tv in een kinderkamer heeft geen profiel of pincode. Verborgen en vergrendelde categorieën worden nooit gedeeld.",
   "link_play_title": "Dit adres afspelen?",
-  "link_play_body": "Een link die buiten dopeIPTV is geopend, vraagt om een adres op {host} af te spelen:\n\n{address}\n\nDie server ziet het IP-adres van deze computer. Speel het alleen af als je vertrouwt waar de link vandaan komt."
+  "link_play_body": "Een link die buiten dopeIPTV is geopend, vraagt om een adres op {host} af te spelen:\n\n{address}\n\nDie server ziet het IP-adres van deze computer. Speel het alleen af als je vertrouwt waar de link vandaan komt.",
+  "pin_wait": "Te veel verkeerde pogingen. Probeer het over {n} s opnieuw."
 }

@@ -1,13 +1,17 @@
 """Profiles in the window (core/profiles.py keeps them, ui/profiles_ui.py
 draws them): the stores of the profile in use, switching to another - the
 playback stopped first, everything of the profile's read again, no restart -
-the "Who's watching?" picker at start, the PIN of a profile that has one, a
-kids profile's limits (no locked category or folder, never a PIN question
-for one, Settings only with a grown-up's PIN), and the profile as the phone
-remote, the remote API and Home Assistant see and switch it."""
+the "Who's watching?" picker at start, the PIN of a profile that has one
+(wrong ones counted, each making the next try wait a little longer -
+``_pin_must_wait``, ``_pin_was_wrong``, core/pins.Tries: in the window and
+in TV mode, which ask through here), a kids profile's limits (no locked
+category or folder, never a PIN question for one, Settings only with a
+grown-up's PIN), and the profile as the phone remote, the remote API and
+Home Assistant see and switch it."""
 
 from __future__ import annotations
 
+import math
 import threading
 import time
 from typing import Any
@@ -16,7 +20,7 @@ from PyQt6 import sip
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QMessageBox
 
-from ..core import profiles
+from ..core import pins, profiles
 from ..core.log import log
 from ..core.profiles import Profile, ProfileSettings, adult_category, adult_item
 from ..core.stores import (
@@ -427,18 +431,75 @@ class _ProfilesMixin:
 
     # -- the PIN -------------------------------------------------------------------------
 
+    def _pin_tries(self) -> pins.Tries:
+        """The wrong PINs counted (core/pins.py), kept in the household's
+        settings so closing the app does not start the count over."""
+        tries = self.__dict__.get("_pin_tries_kept")
+        if tries is None:
+            tries = self._pin_tries_kept = pins.Tries(profiles.raw(self.settings))
+        return tries
+
+    def _pin_names(self, *found: Profile) -> list[str]:
+        """The PINs a question takes, by their names in the count: those
+        profiles', and the parental PIN where there is one (it opens what
+        theirs open) - a wrong try is one at each of them."""
+        names = [f"profile/{p.id}" for p in found if p.has_pin]
+        if self.parental.has_pin():
+            names.append("parental")
+        return names
+
+    def _pin_must_wait(self, names: list[str], title: str, parent=None) -> bool:
+        """Whether a PIN may not be tried yet, after wrong ones - said, with
+        how long (a minute at the very most: a slow-down, never a lock)."""
+        wait = self._pin_tries().wait(*names)
+        if wait <= 0:
+            return False
+        QMessageBox.information(parent or self, title, tr("pin_wait", n=max(1, math.ceil(wait))))
+        return True
+
+    def _pin_was_wrong(self, names: list[str], title: str, parent=None) -> None:
+        """A wrong PIN: counted for each PIN the question takes, and said -
+        with the wait that follows, from the third on."""
+        wait = self._pin_tries().wrong(*names)
+        text = tr("msg_wrong_pin")
+        if wait > 0:
+            text += "\n\n" + tr("pin_wait", n=max(1, math.ceil(wait)))
+            log.info("profiles: wrong PINs - the next try waits %d s", math.ceil(wait))
+        QMessageBox.warning(parent or self, title, text)
+
+    def _pin_given(self, pin: str, *found: Profile) -> str:
+        """Which PIN *pin* is - one of those profiles' ("profile/<id>"), the
+        parental one ("parental") - or "" for none of them. Its own wrong
+        tries are forgotten, and only its own: knowing one PIN is no way to
+        more tries at another."""
+        if not pin:
+            return ""
+        name = next((f"profile/{p.id}" for p in found
+                     if p.has_pin and self.profiles.verify(p.id, pin)), "")
+        if not name and self.parental.has_pin() and self.parental.verify(pin):
+            name = "parental"
+        if name:
+            self._pin_tries().right(name)
+        return name
+
     def _profile_unlock(self, p: Profile, parent=None) -> bool:
         """Profile *p*'s PIN asked, if it has one (or the parental PIN):
         True when it may be opened."""
         if not p.has_pin:
             return True
+        names = self._pin_names(p)
+        if self._pin_must_wait(names, p.name, parent):
+            return False
         from .profiles_ui import ask_pin
         pin = ask_pin(parent or self, p.name, tr("profile_enter_pin", name=p.name))
         if pin is None:
             return False
-        if p.verify(pin) or (self.parental.has_pin() and self.parental.verify(pin)):
+        if self._pin_given(pin, p):
             return True
-        QMessageBox.warning(parent or self, p.name, tr("msg_wrong_pin"))
+        if pin:
+            self._pin_was_wrong(names, p.name, parent)
+        else:                           # nothing typed: no guess
+            QMessageBox.warning(parent or self, p.name, tr("msg_wrong_pin"))
         return False
 
     def _profile_pick(self, pid: str, tv: bool = False) -> bool:
@@ -474,13 +535,21 @@ class _ProfilesMixin:
         store = self.profiles
         if not store.grown_up_pins() and not self.parental.has_pin():
             return True
+        title = tr("settings_title")
+        grown_ups = [p for p in store.profiles() if not p.kids]
+        names = self._pin_names(*grown_ups)
+        if self._pin_must_wait(names, title):
+            return False
         from .profiles_ui import ask_pin
-        pin = ask_pin(self, tr("settings_title"), tr("profile_kids_settings"))
+        pin = ask_pin(self, title, tr("profile_kids_settings"))
         if pin is None:
             return False
-        if store.grown_up_pin(pin) or (self.parental.has_pin() and self.parental.verify(pin)):
+        if self._pin_given(pin, *grown_ups):
             return True
-        QMessageBox.warning(self, tr("settings_title"), tr("msg_wrong_pin"))
+        if pin:
+            self._pin_was_wrong(names, title)
+        else:
+            QMessageBox.warning(self, title, tr("msg_wrong_pin"))
         return False
 
     # -- the picker -----------------------------------------------------------------------
@@ -627,7 +696,10 @@ class _ProfilesMixin:
             if len(fails) >= REMOTE_PIN_TRIES:
                 raise ValueError("too many wrong PINs - try again in a few minutes")
             pin = str(params.get("pin") or "")
-            if not (pin and (p.verify(pin) or (self.parental.has_pin() and self.parental.verify(pin)))):
+            # Through the store: a PIN kept the old way is written anew on
+            # a right entry here too (core/pins.py).
+            if not (pin and (store.verify(p.id, pin)
+                             or (self.parental.has_pin() and self.parental.verify(pin)))):
                 if pin:
                     fails.append(now)
                     if len(fails) >= REMOTE_PIN_TRIES:

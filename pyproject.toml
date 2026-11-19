@@ -154,6 +154,7 @@ files = [
     "dopeiptv/core/viewing_stats.py",
     "dopeiptv/core/donate_rhythm.py",
     "dopeiptv/core/profiles.py",
+    "dopeiptv/core/pins.py",
     "dopeiptv/core/catchup.py",
     "dopeiptv/core/url_rewrite.py",
     "dopeiptv/core/hls_cap.py",

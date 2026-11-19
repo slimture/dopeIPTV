@@ -3096,5 +3096,6 @@
   "srv_adult": "Yetişkin kanalları",
   "srv_adult_hint": "Kapalı: yetişkinlere yönelik kanallar ve kategoriler (XXX, 18+ veya sağlayıcının böyle işaretledikleri) kanal listesine ve paylaşılan oynatma listesine girmez – bir çocuk odasındaki televizyonun profili ya da PIN'i yoktur. Gizli ve kilitli kategoriler asla sunulmaz.",
   "link_play_title": "Bu adres oynatılsın mı?",
-  "link_play_body": "dopeIPTV dışında açılan bir bağlantı, {host} üzerindeki bir adresi oynatmak istiyor:\n\n{address}\n\nO sunucu bu bilgisayarın IP adresini görecek. Yalnızca bağlantının geldiği yere güveniyorsan oynat."
+  "link_play_body": "dopeIPTV dışında açılan bir bağlantı, {host} üzerindeki bir adresi oynatmak istiyor:\n\n{address}\n\nO sunucu bu bilgisayarın IP adresini görecek. Yalnızca bağlantının geldiği yere güveniyorsan oynat.",
+  "pin_wait": "Çok fazla yanlış deneme. {n} sn sonra yeniden dene."
 }

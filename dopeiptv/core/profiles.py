@@ -23,14 +23,14 @@ profile (MAIN_ID, "Me" in their language) - copied, not moved: the old keys
 stay until the next version, so a downgrade still finds them (migrate()).
 
 A profile: a name, a colour from a fixed palette (COLOURS - ui/theme.py's
-ACCENTS) or an emoji for its avatar, an optional 4-digit PIN (salted SHA-256,
-as the parental PIN), and a parental level: "kids" sees only what the
-parental lock leaves open and never asks for the rest.
+ACCENTS) or an emoji for its avatar, an optional 4-digit PIN (kept as the
+parental PIN is - core/pins.py: PBKDF2 with a salt of its own, an older
+value written anew on the next right entry), and a parental level: "kids"
+sees only what the parental lock leaves open and never asks for the rest.
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 import uuid
@@ -40,6 +40,7 @@ from typing import Any
 
 from PyQt6.QtCore import QSettings
 
+from . import pins
 from .log import log
 
 #: Where a profile's own keys are kept: ``profiles/<id>/<key>``.
@@ -379,11 +380,6 @@ def valid_pin(text: str) -> bool:
     return bool(_PIN.fullmatch(str(text or "")))
 
 
-def hash_pin(salt: str, pin: str) -> str:
-    """As the parental PIN is kept (core/stores.ParentalControl)."""
-    return hashlib.sha256((salt + pin).encode()).hexdigest()
-
-
 @dataclass
 class Profile:
     id: str
@@ -402,7 +398,9 @@ class Profile:
         return initials(self.name)
 
     def verify(self, pin: str) -> bool:
-        return bool(self.pin_hash) and hash_pin(self.pin_salt, str(pin or "").strip()) == self.pin_hash
+        """Whether *pin* is this profile's (core/pins.py: kept either way).
+        The store's verify() also writes an older value anew."""
+        return pins.check(self.pin_hash, self.pin_salt, str(pin or "").strip())
 
     def public(self) -> dict[str, Any]:
         """What another program may know of it: never the PIN."""
@@ -530,8 +528,7 @@ class ProfileStore:
         p = self.get(pid)
         if p is None:
             return
-        p.pin_salt = uuid.uuid4().hex
-        p.pin_hash = hash_pin(p.pin_salt, pin)
+        p.pin_salt, p.pin_hash = pins.make(pin)
         self._save()
 
     def clear_pin(self, pid: str) -> None:
@@ -541,13 +538,28 @@ class ProfileStore:
             self._save()
 
     def verify(self, pid: str, pin: str) -> bool:
+        """Whether *pin* is profile *pid*'s. One kept the way versions up
+        to 1.6.8 kept it is written anew now that the PIN is known to be
+        right (core/pins.py)."""
         p = self.get(pid)
-        return p is not None and p.verify(pin)
+        pin = str(pin or "").strip()
+        if p is None or not p.verify(pin):
+            return False
+        if pins.outdated(p.pin_hash):
+            p.pin_salt, p.pin_hash = pins.make(pin)
+            self._save()
+            log.info("profiles: a PIN kept the old way is kept the new way now")
+        return True
+
+    def grown_up_match(self, pin: str) -> Profile | None:
+        """The profile that is not a kids' one whose PIN *pin* is, or None."""
+        return next((p for p in self.items
+                     if not p.kids and p.has_pin and self.verify(p.id, pin)), None)
 
     def grown_up_pin(self, pin: str) -> bool:
         """Whether *pin* is the PIN of a profile that is not a kids' one
         (what opens Settings from a kids profile)."""
-        return any(not p.kids and p.verify(pin) for p in self.items)
+        return self.grown_up_match(pin) is not None
 
     def grown_up_pins(self) -> bool:
         return any(not p.kids and p.has_pin for p in self.items)

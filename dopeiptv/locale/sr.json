@@ -3096,5 +3096,6 @@
   "srv_adult": "Kanali za odrasle",
   "srv_adult_hint": "Isključeno: kanali i kategorije za odrasle (XXX, 18+ ili tako označeni kod provajdera) ostaju van liste kanala i deljene plejliste – televizor u dečjoj sobi nema profil ni PIN. Skrivene i zaključane kategorije nikad se ne dele.",
   "link_play_title": "Pustiti ovu adresu?",
-  "link_play_body": "Link otvoren izvan dopeIPTV-a traži da se pusti adresa na {host}:\n\n{address}\n\nTaj server će videti IP adresu ovog računara. Pusti je samo ako veruješ izvoru linka."
+  "link_play_body": "Link otvoren izvan dopeIPTV-a traži da se pusti adresa na {host}:\n\n{address}\n\nTaj server će videti IP adresu ovog računara. Pusti je samo ako veruješ izvoru linka.",
+  "pin_wait": "Previše pogrešnih pokušaja. Pokušaj ponovo za {n} s."
 }
