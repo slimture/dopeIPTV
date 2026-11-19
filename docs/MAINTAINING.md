@@ -17,8 +17,12 @@ module map in one page) and [`ARCHITECTURE.md`](ARCHITECTURE.md).
 - **Stability comes first, and video playback must never break.** The
   embedded mpv/OpenGL path (`media/embedded.py`, `media/video_surface.py`)
   is the heart of the app - change it only with a clear reason and a test.
-- No telemetry, no accounts, no server side. The app talks to the user's
-  provider plus GitHub, TMDB and - when turned on - Trakt and OpenSubtitles.
+- No telemetry and no accounts. The app talks to the sources the user adds
+  plus TMDB, dopeiptv.org (the update check; and, only when used, feedback,
+  settings sync and Watch together - small services of the website's own),
+  GitHub as the update fallback, and - when turned on - Trakt, Simkl,
+  OpenSubtitles and the rest `SECURITY.md` lists, with the servers the app
+  runs itself on the home network.
 
 ## Where things live
 
@@ -79,7 +83,8 @@ pytest). Logs: `DOPEIPTV_LOG=debug DOPEIPTV_LOG_FILE=/tmp/dope.log`.
   website and the Releases channel never see them.
 - **`release.yml`** - on a `v*` tag: builds and attaches every package -
   sdist + wheel, AppImage + .deb (x86_64 and aarch64), macOS .dmg (arm64
-  and x86_64), Windows .zip (x64 and arm64), Flatpak - plus `SHA256SUMS`.
+  and x86_64), the Windows installer and .zip (x64 and arm64), Flatpak -
+  plus `SHA256SUMS`.
   Each job uploads its own files, so one failing format never blocks the
   others. The **experimental leg** may fail without failing the run: the
   Intel Mac. The Flatpak is not one any more: it is built, installed and
@@ -158,16 +163,16 @@ Only names here - the values are with the owner.
 
 | What | Where it is used | Without it |
 |---|---|---|
-| GitHub Actions secret `DOPEIPTV_TMDB_KEY` | written into `dopeiptv/_tmdb_key.py` (git-ignored) by every release/nightly build | builds have no bundled TMDB key: posters need the user's own key, Home's popular shelves stay empty |
+| GitHub Actions secret `DOPEIPTV_TMDB_KEY` | written into `dopeiptv/_tmdb_key.py` (git-ignored) by every release/nightly build | builds have no bundled TMDB key: posters and Popular right now on Movies and Series need the user's own key |
 | GitHub Actions secret `DOPEIPTV_OPENSUBTITLES_KEY` | bundled the same way for subtitle search | users must enter their own free OpenSubtitles key |
-| GitHub Actions secret `SIMKL_CLIENT_ID` | the client id of dopeIPTV's app at simkl.com/settings/developer (no secret is used: the PIN sign-in needs none), written into `dopeiptv/_simkl_key.py` (git-ignored) by every release build ("Bake built-in Simkl client id") | Simkl is not offered in Settings |
+| GitHub Actions secret `SIMKL_CLIENT_ID` | the client id of dopeIPTV's app at simkl.com/settings/developer (no secret is used: the PIN sign-in needs none), written into `dopeiptv/_simkl_key.py` (git-ignored) by every release build ("Bake built-in Simkl client id"); a client id public in the code, `PUBLIC_CLIENT_ID` (`providers/simkl.py`), wins over the file | nothing while `PUBLIC_CLIENT_ID` is set; with it empty too, Simkl is not offered in Settings |
 | Discord application | its application id is `DISCORD_APP_ID` in `dopeiptv/core/discord_rpc.py` (public, not a secret: discord.com/developers → Applications, named "dopeIPTV", since Discord shows "Watching <its name>"); a Rich Presence art asset named `dopeiptv` gives the status its picture | the Discord switch is not offered |
-| Trakt app registration | its client id is `DEFAULT_CLIENT_ID` in `providers/trakt.py`; the redirect goes through the website (see its README) | users can enter their own client id in Settings → Trakt |
+| Trakt app registration | its client id is `DEFAULT_CLIENT_ID` in `providers/trakt.py`; the redirect goes through the website (see its README) | Trakt sign-in fails: there is no Settings row for a client id of one's own - only a build with `DEFAULT_CLIENT_ID` empty asks for one on Connect (`_trakt_creds_dialog` in `ui/mw_trakt.py`) |
 | The web server | runs the site and its cron sync (website branch: `README.md`, `DEPLOY.md`) | the site stops updating; the app is unaffected |
 | GitHub repository settings | releases, Actions, the Security tab for private reports | - |
-| Stripe (dopeIPTV's own account, under Solecraft AB) - two Payment Links | a tip (the customer chooses the amount) and monthly support (a fixed price), both returning to `https://dopeiptv.org/support/?paid={CHECKOUT_SESSION_ID}`; their addresses are the web server's, in `/usr/local/etc/iptv-site.conf` (`SUPPORT_TIP_URL`, `SUPPORT_MONTHLY_URL`, `SUPPORT_SPONSORS_URL`), read by `sync-releases.sh` (website branch, `DEPLOY.md` "Support"). `.github/FUNDING.yml` (the Sponsor button, shown with Settings → Features → Sponsorships ticked), the README's "Support dopeIPTV" and the app's heart point at `dopeiptv.org/support/` | the site invites to no payment (the support page says "coming soon"); the app's heart still opens the support page |
+| Stripe (dopeIPTV's own account, under Solecraft AB) - the tip dialog and a Payment Link | a tip (any amount, once) in the site's tip dialog, paid through `donate/donate.py` (or a Payment Link of its own, `SUPPORT_TIP_URL`, while `SUPPORT_TIPS` is not on), and monthly support (a fixed price) as a Payment Link returning to `https://dopeiptv.org/support/?paid={CHECKOUT_SESSION_ID}`; the settings are the web server's, in `/usr/local/etc/iptv-site.conf` (`SUPPORT_TIPS`, `SUPPORT_MONTHLY_URL`, `SUPPORT_SPONSORS_URL`, ...), read by `sync-releases.sh` (website branch, `DEPLOY.md` "Support"). `.github/FUNDING.yml` (the Sponsor button, shown with Settings → Features → Sponsorships ticked), the README's "Support dopeIPTV" and the app's heart point at `dopeiptv.org/support/` | the site invites to no payment (the support page says "coming soon"); the app's heart still opens the support page |
 | Stripe key for the supporter key | a restricted key, read-only (Checkout Sessions: Read, PaymentIntents: Read), on the web server in `/usr/local/etc/iptv-donate.key`, read by `donate/donate.py` | the thank-you after paying shows no supporter key |
-| The admin page's password | `/usr/local/etc/nginx/iptv-admin.htpasswd` on the web server (website branch, `DEPLOY.md` "Statistics and the admin page") | `/admin/` cannot be opened; the site is unaffected |
+| The admin page's sign-in | each admin's passkey, or a name and password (and an authenticator code if turned on); the admins in `/usr/local/www/iptv/stats/admin-users.json` on the web server, a new one by an invite from another (website branch, `DEPLOY.md` "Statistics and the admin page") | `/admin/` cannot be opened; the site is unaffected |
 | Apple Developer Program (Solecraft AB, team `6QR76TBT4J`) | the macOS builds' signature and notarisation - see "macOS signing" below | the .dmg is signed ad hoc and users allow the first start under Privacy & Security |
 | GitHub Actions secrets `MACOS_CERT_P12`, `MACOS_CERT_PASSWORD` | the Developer ID Application certificate with its private key (base64 of the exported .p12) and the export password | as above |
 | GitHub Actions secrets `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID` | an App Store Connect API team key (Developer access) for `notarytool` | a release fails at notarising - the certificate alone signs but is not enough |
@@ -327,17 +332,19 @@ preview, SEO) and `DEPLOY.md` (the server). In short:
   must start right after `|`, `(`, `[`, `;`, `then` or `else` - jq 1.8
   binds `a and b as $x` differently than 1.7.
 - Strict Content-Security-Policy: no inline scripts or styles, nothing
-  from other origins but Stripe's script and frames for the donate dialog
+  from other origins but Stripe's script and frames for the tip dialog
   (`deploy/csp.snippet.txt`). The download section and the FAQ work
   without JavaScript.
 - The one non-static piece is `donate/donate.py`, a standard-library
-  service behind `/donate/` that creates Stripe payment sessions for the
-  donate dialog (card form, Apple Pay, Google Pay on the page itself), in
-  the donor's own currency. If it is down, the dialog falls back to
-  Stripe's own page. It also serves `/admin/` behind nginx's password:
-  visitors, downloads and donations by day, week, month and year, counted
-  from nginx's own log of page views by `donate/stats_collect.py` (cron) -
-  no script or cookie on the site, no address kept.
+  service behind `/donate/` that makes the Stripe payments for the tip
+  dialog (card form, Apple Pay, Google Pay on the page itself), in the
+  payer's own currency, and hands out supporter keys. For the app it
+  serves feedback and its answers (`/feedback/`), settings sync (`/sync/`)
+  and Watch together (`/together/`). And `/admin/`, for its admins only
+  (a passkey, or a password): visitors, downloads, and tips and monthly
+  support by day, week, month and year, the visits counted from nginx's
+  own log of page views by `donate/stats_collect.py` (cron) - no script or
+  cookie on the site, no address kept.
 - The look is deliberately quiet: black or white, greys and the app
   icon's blue (`#4C8DFF`); San Francisco on Apple devices, self-hosted
   Inter elsewhere. On a phone the downloads fold away behind "Send the
@@ -398,7 +405,10 @@ tests check that placeholders line up and that every `tr("…")` key exists.
   (checked from a checkout, November 2026); the packaged app's direct way
   (the provider's http HLS, allowed by NSAllowsArbitraryLoadsForMedia) is
   still to be seen on a real Mac - `docs/DEVELOPER_NOTES.md` says how it
-  works.
+  works. Since 1.6.5 a live channel plays live on an Apple TV, with no
+  going back (`_cast_can_go_back` in `ui/mw_cast.py`): each step back was
+  a new stream the Apple TV started over, slow and out of step with its
+  sound.
 - Windows code signing (see above).
 - **A home network split in VLANs** (approved, November 2026): searches
   sent to everyone at once - mDNS, SSDP, the HDHomeRun, Jellyfin and Plex
@@ -422,7 +432,7 @@ tests check that placeholders line up and that every `tr("…")` key exists.
   `ui/profiles_ui.py`; Settings > System > Profiles). What is a profile's
   own is declared in `core/profiles.py` (favorites of every kind, history
   and resume points, Watch later, watched marks, followed series,
-  reminders, statistics, Trakt and Simkl, Home's sections, theme and
+  reminders, statistics, Trakt and Simkl, what the places show, theme and
   accent, audio and subtitle languages, the kids level); everything else is
   the household's. The first start copies everything into the first
   profile (`me`) and leaves the old keys: **drop the old keys in the
@@ -594,9 +604,9 @@ Not decided: each needs a word with the maintainer first.
 
 **Reception and the stream itself**
 
-- **SAT>IP client**: minisatip, Digital Devices, Telestar, and Enigma2 or
-  Tvheadend serving SAT>IP. RTSP with the tuning in the address, the
-  server's channel list where it has one (an M3U), else a scan.
+- **SAT>IP client**: built - see "SAT>IP servers" below. Not built: a
+  channel scan for a server that offers no list (today the person gives an
+  M3U).
 - **Teletext and DVB subtitles**: built. Both in the subtitle menu by
   language and page ("Swedish - teletext 199"; the pages from the PMT, read
   from the rewind buffer or a local .ts), mpv's `teletext-page` set before

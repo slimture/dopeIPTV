@@ -20,13 +20,18 @@ monolith into a proper Python package (`dopeiptv/`).  The top-level
 The package is organised into layered subpackages with a one-way import
 rule (see `ARCHITECTURE.md` for the full module map):
 
-- `providers/` — data sources (Xtream / M3U / Stalker clients, EPG, TMDB,
-  Trakt, OpenSubtitles, Chromecast and DLNA)
-- `core/`      — storage, background workers, OS integration
+- `providers/` — data sources and the network edge (Xtream / M3U / Stalker
+  clients, the boxes and TV servers at home, Jellyfin / Emby / Plex, EPG,
+  TMDB, Trakt, Simkl, OpenSubtitles, radio-browser.info, and the cast
+  targets: Chromecast, DLNA, Kodi, AirPlay's bridge)
+- `core/`      — storage, background workers, OS integration, and the
+  logic without Qt widgets (the rewind buffer, recordings, sync, the phone
+  remote's and the remote API's servers, ...)
 - `media/`     — playback (embedded libmpv widget, external launchers)
 - `services/`  — window-agnostic application services (cover art, resume,
   reminders, the system's media controls - MPRIS, Now Playing, the SMTC -,
-  notifications, the popular-titles chart)
+  notifications, the popular-titles chart, failover, the search across
+  sources, the shared lists and server mode)
 - `ui/`        — the main window, its mixins and all widgets/dialogs
 
 `ui` may import from any layer below it; `services` builds on
@@ -293,7 +298,10 @@ pieces (`ui/media_cards.py`): one view of uniform cells per list, pictures
 through the loaders only for what is on screen. The app opens where the
 person left off (`last_place`, each profile's own) or always on Mine
 (`start_place`); Home's settings were carried over once
-(`places.retire_home`).
+(`places.retire_home`). A film has no page of its own: in Movies a click
+shows it in the detail column (its plot, cast and Continue with how far it
+got) and a double click or Enter plays it (`ui/mw_place_films.py`,
+`ui/mw_detail.py`); a series opens its page (`ui/mw_series_page.py`).
 
 Popular right now (the top of Movies and of Series) comes from
 `services/popular.py` through `ui/mw_popular.py`: TMDB's weekly chart
@@ -311,7 +319,8 @@ in the background.  Cache files live in the platform's cache directory.
 
 ## Theme system
 
-`THEMES` in `ui/theme.py` (25 today, five of them light) and `ACCENTS`
+`THEMES` in `ui/theme.py` (27 today: 25 for everyone, five of them light,
+and the two a supporter key opens, `SUPPORTER_THEMES`) and `ACCENTS`
 (ten, plus the theme's own and any custom colour).  The active theme
 populates a global palette dict `P`; `build_style()` generates the full
 QSS from it.  Theme changes take effect immediately without restarting
@@ -367,7 +376,7 @@ AVKit's `AVRoutePickerView` with `player` set (macOS 10.15+), which is
 Apple's documented control for routing one AVPlayer's video. The user
 clicks Apple's AirPlay button there and picks the Apple TV; the app never
 clicks it. `AVPlayerView` was not used: its own play button and timeline
-would sit beside the cast strip, and its play plays on the Mac. The panel
+would sit beside the cast card's, and its play plays on the Mac. The panel
 is made once per cast (a fallback or a seek keeps it), floats over the
 cast dialog and works while it is modal (`worksWhenModal`; Qt runs a modal
 dialog as an AppKit modal session). It is never an NSView inside a Qt
@@ -399,7 +408,7 @@ log ("airplay: ..."): the window opened, Apple's menu opened and closed,
 and code (with the error under it), each AVFoundation error-log entry - no
 address with its login (`redact_url`) and not the bridge's token. The
 receiver joins `CastHub` through `add_receiver` (`ui/mw_airplay.py`), so
-the strip drives it like any cast. `NSBonjourServices` (`_airplay._tcp`,
+the cast card (`ui/cast_card.py`) drives it like any cast. `NSBonjourServices` (`_airplay._tcp`,
 `_raop._tcp`), `NSLocalNetworkUsageDescription` and App Transport
 Security's media and local-network exceptions are in the Mac app's
 Info.plist (`dopeiptv-mac.spec`).
@@ -439,9 +448,18 @@ on its way is in). For AirPlay that is a new item in the same AVPlayer
 picked Apple TV stay; with the bridge the old ffmpeg stops before the new
 one asks the provider (`settle`), and a route that goes while the Apple TV
 loads the new item does not end the cast (`SWAP_GRACE_S`, until the item
-is ready). The strip has no volume for AirPlay - AVPlayer's has no effect
-while the Apple TV plays the video, its remote sets it - and its menu
+is ready). The cast card has no volume for AirPlay - AVPlayer's has no
+effect while the Apple TV plays the video, its remote sets it (the phone
+remote hides its volume too: `vol_off`) - and its square AirPlay button
 brings the AirPlay window back.
+
+A live channel plays live on an Apple TV: going back in it - the rewind
+buffer, the archive, the steps and the timeline, from the card, the phone
+remote or the media keys - is not offered there (`_cast_can_go_back` in
+`ui/mw_cast.py`, since 1.6.5), and a channel watched behind live is cast
+live. Each step back was a new stream the Apple TV started over: slow, and
+its sound out of step with the picture. Pausing, films and episodes work as
+before, and a Chromecast still goes back.
 
 Why not elsewhere: pyatv was tried on real hardware in July 2026 (an Apple
 TV 4K pairs and connects, `play_url` fails with HTTP 500 on

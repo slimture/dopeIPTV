@@ -174,7 +174,7 @@ by `core/places.retire_home` - "Open Home at startup" became `start_place`
 - TV mode: Open TV mode, `tv_mode_start`, `tv_inputs` (game controllers and
   LIRC), the remotes and controllers found
 - Support dopeIPTV: feedback and its answers, `supporter_key` (its window),
-  `supporter_icon`, ask for a donation now and then (`donate_ask`; the
+  `supporter_icon`, ask for support now and then (`donate_ask`; the
   household's - its rhythm and snooze are `donate_until`, `donate_period`,
   `donate_first_seen`, not settings)
 - (no heading) About dopeIPTV with the version, a link row that opens About
